@@ -18,6 +18,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from apps.core.fields import CountryField
 from apps.core.models import BaseModel, TranslationModel, TsTzRange, Versioned, valid_period_check
@@ -27,6 +28,7 @@ from apps.core.postcodes import (
     PostcodePattern,
     normalize_postcode_pattern,
 )
+from apps.core.translation_fields import translation_language_field, translation_status_field
 from apps.vendors.models import FiscalRegime, Vendor
 from apps.vendors.scoping import VendorScopedManager
 
@@ -91,14 +93,33 @@ class Territory(BaseModel):
 
     VatStatus = TerritoryVatStatus
 
-    code = TerritoryCodeField(unique=True, help_text="e.g. ES-CN, IT-LIVIGNO, XI.")
-    name = models.CharField(max_length=100)
-    country = CountryField(help_text="The country the territory belongs to (ISO 3166-1 alpha-2).")
-    vat_status = models.CharField("VAT status", max_length=24, choices=VatStatus.choices)
+    code = TerritoryCodeField(
+        unique=True,
+        help_text=_("A short code that is unique, for example 'ES-CN' for the Canary Islands."),
+    )
+    name = models.CharField(
+        max_length=100, help_text=_("The name of the territory, for example 'Canary Islands'.")
+    )
+    country = CountryField(
+        help_text=_("The country the territory belongs to, as a two-letter code such as 'ES'.")
+    )
+    vat_status = models.CharField(
+        "VAT status",
+        max_length=24,
+        choices=VatStatus.choices,
+        help_text=_(
+            "Whether the territory is outside the EU VAT area, inside it with rates of its "
+            "own, or special and handled by its own rule. Ask your accountant if you are "
+            "not sure."
+        ),
+    )
     postcode_patterns = PostcodePatternsField(
         default=list,
         blank=True,
-        help_text='Exact postcode "23041", prefix "35*" or range "22100..22199", comma separated.',
+        help_text=_(
+            "The postcodes in the territory, separated by commas: an exact postcode such as"
+            " '23041', a prefix such as '35*' or a range such as '22100..22199'."
+        ),
     )
 
     class Meta:
@@ -176,23 +197,44 @@ class TaxRate(Versioned):
     Category = TaxRateCategory
     Source = TaxRateSource
 
-    country = CountryField(help_text="ISO 3166-1 alpha-2.")
+    country = CountryField(
+        help_text=_("The country the rate applies to, as a two-letter code such as 'IT'.")
+    )
     territory = models.ForeignKey(
         Territory,
         on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="rates",
-        help_text="Empty for the country's own rate.",
+        help_text=_(
+            "Only for the rate of a territory of the country. Leave it empty for the "
+            "country's own rate."
+        ),
     )
-    category = models.CharField(max_length=16, choices=Category.choices)
+    category = models.CharField(
+        max_length=16,
+        choices=Category.choices,
+        help_text=_(
+            "Which kind of goods the rate is for: standard, reduced, super-reduced, zero or books."
+        ),
+    )
     rate = models.DecimalField(
         max_digits=engine.RATE_MAX_DIGITS,
         decimal_places=engine.RATE_DECIMAL_PLACES,
         validators=[MinValueValidator(engine.MIN_RATE), MaxValueValidator(engine.MAX_RATE)],
-        help_text="Percentage, e.g. 25.5 for 25.5%.",
+        help_text=_(
+            "The VAT percentage, for example 25.5 for 25.5%. Ask your accountant if you are"
+            " not sure."
+        ),
     )
-    source = models.CharField(max_length=16, choices=Source.choices)
+    source = models.CharField(
+        max_length=16,
+        choices=Source.choices,
+        help_text=_(
+            "Where the rate comes from: the European Commission rate database (EC TEDB) or "
+            "entered by hand."
+        ),
+    )
 
     class Meta:
         ordering = ["country", "territory_id", "category", "-valid_from"]
@@ -255,12 +297,6 @@ class VatRegime(models.TextChoices):
     EXEMPT = engine.EXEMPT, "Exempt (no VAT charged)"
 
 
-EXEMPT_COUNTRY_HELP = (
-    "'Other' exemption only: the country of the law cited in the legal note (ISO 3166-1 "
-    "alpha-2). It must be the country of the vendor's VAT number, as for the Italian reasons."
-)
-
-
 def vat_registration_country(vendor: Vendor) -> str:
     """The country of the vendor's VAT registration (TAX.13): see
     `engine.vat_registration_country`."""
@@ -287,22 +323,56 @@ class VendorTaxProfile(Versioned):
     vendor_scope: ClassVar[str] = "vendor"
     objects = VendorScopedManager()
 
-    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="tax_profiles")
-    regime = models.CharField("VAT regime", max_length=16, choices=Regime.choices)
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.PROTECT,
+        related_name="tax_profiles",
+        help_text=_("The vendor this VAT regime belongs to."),
+    )
+    regime = models.CharField(
+        "VAT regime",
+        max_length=16,
+        choices=Regime.choices,
+        help_text=_(
+            "How the vendor charges VAT: OSS (VAT of the buyer's country for EU consumers),"
+            " domestic only (VAT of the vendor's own country) or exempt (no VAT charged). "
+            "Ask your accountant if you are not sure."
+        ),
+    )
     exempt_reason = models.CharField(
-        max_length=24, choices=ExemptReason.choices, blank=True, help_text="Exempt regime only."
+        max_length=24,
+        choices=ExemptReason.choices,
+        blank=True,
+        help_text=_(
+            "Only for the exempt regime: why the vendor charges no VAT, the flat-rate "
+            "scheme or another reason. Ask your accountant if you are not sure."
+        ),
     )
     exempt_country = CountryField(
-        "country of the exemption law", blank=True, help_text=EXEMPT_COUNTRY_HELP
+        "country of the exemption law",
+        blank=True,
+        help_text=_(
+            "Only for an 'Other' exemption: the country of the law named in the legal note,"
+            " as a two-letter code. It must be the country of the vendor's VAT number. Ask "
+            "your accountant if you are not sure."
+        ),
     )
     exemption_nature = models.CharField(
         "exemption nature",
         max_length=4,
         choices=[(code, code) for code in engine.NATURE_CODES],
         blank=True,
-        help_text="`Other` exemptions: the e-invoice nature code (D-28).",
+        help_text=_(
+            "Only for an 'Other' exemption: the nature code that the e-invoice needs. Ask "
+            "your accountant which one applies."
+        ),
     )
-    oss_registered_since = models.DateField("OSS registered since", null=True, blank=True)
+    oss_registered_since = models.DateField(
+        "OSS registered since",
+        null=True,
+        blank=True,
+        help_text=_("Only for the OSS regime: the date the vendor registered for OSS."),
+    )
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -369,13 +439,25 @@ class VendorTaxProfileTranslation(TranslationModel):
     translation_of = "profile"
     translated_fields = ("legal_note",)
 
+    language = translation_language_field()
+    status = translation_status_field()
+
     vendor_scope: ClassVar[str] = "profile__vendor"
     objects = VendorScopedManager()
 
     profile = models.ForeignKey(
-        VendorTaxProfile, on_delete=models.CASCADE, related_name="translations"
+        VendorTaxProfile,
+        on_delete=models.CASCADE,
+        related_name="translations",
+        help_text=_("The VAT regime this note belongs to."),
     )
-    legal_note = models.TextField(blank=True)
+    legal_note = models.TextField(
+        blank=True,
+        help_text=_(
+            "The legal note printed on order documents for this regime, in this language. "
+            "Ask your accountant for the exact wording."
+        ),
+    )
 
     class Meta(TranslationModel.Meta):
         constraints = [
@@ -424,7 +506,13 @@ class TaxRegimeChangeRequest(BaseModel):
         max_length=24, choices=ExemptReason.choices, blank=True, help_text="Exempt regime only."
     )
     exempt_country = CountryField(
-        "country of the exemption law", blank=True, help_text=EXEMPT_COUNTRY_HELP
+        "country of the exemption law",
+        blank=True,
+        help_text=_(
+            "Only for an 'Other' exemption: the country of the law named in the legal note,"
+            " as a two-letter code. It must be the country of the vendor's VAT number. Ask "
+            "your accountant if you are not sure."
+        ),
     )
     oss_registered_since = models.DateField("OSS registered since", null=True, blank=True)
     fiscal_regime = models.CharField(

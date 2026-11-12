@@ -3,9 +3,9 @@ workflow, and the rules of the VIES check (TAX.5). No ORM.
 
 This module holds the vocabulary of the tax configuration and the consistency rules of its
 rows, and the goods tax decision (`resolve_goods_tax`, TAX.3, decision D-01: B2C goods are
-taxed in the delivery country). The shipping tax decision is TAX.4. Northern Ireland follows the
-EU goods rules (D-02, TAX.18: `is_northern_ireland`, `_resolve_northern_ireland`); shipping
-follows the goods (D-03).
+taxed in the delivery country). The shipping tax decision is TAX.4: shipping always follows the
+goods (D-03, TAX.17). Northern Ireland follows the EU goods rules (D-02, TAX.18:
+`is_northern_ireland`, `_resolve_northern_ireland`).
 """
 
 import datetime as dt
@@ -1079,30 +1079,19 @@ def tax_amount(net: Decimal, rate: Decimal) -> Decimal:
 
 # --- TAX.4: VAT on shipping (D-03) -----------------------------------------------------------
 
-TREATMENT_FOLLOWS_GOODS: Final = "follows_goods"
-
-
-class UnsupportedShippingTreatment(BlockingTaxError):
-    """A shipping method stores a VAT treatment other than `follows_goods` (`standard_rate`,
-    `exempt`, the old carrier `force_vat`). D-03 is not decided for them: the quote is blocked
-    instead of guessing a VAT."""
-
 
 class ShippingChargeLike(Protocol):
-    """What the tax engine reads from a shipping quote: the net price and the stored treatment.
-    SHP.3's `ShippingRate` satisfies it; tax never imports shipping."""
+    """What the tax engine reads from a shipping quote: the net price. Shipping VAT always
+    follows the goods (TAX.17), so no treatment is read. SHP.3's `ShippingRate` satisfies it;
+    tax never imports shipping."""
 
     @property
     def net(self) -> Decimal: ...
-
-    @property
-    def tax_treatment(self) -> str: ...
 
 
 @dataclass(frozen=True)
 class ShippingCharge:
     net: Decimal
-    tax_treatment: str = TREATMENT_FOLLOWS_GOODS
 
 
 @dataclass(frozen=True)
@@ -1165,7 +1154,7 @@ def resolve_shipping_tax(
     gives no portions. `ctx` is kept for the signature of spec 05 (the decisions already carry
     the context's outcome).
     """
-    net, treatment = shipping.net, shipping.tax_treatment
+    net = shipping.net
     if not isinstance(net, Decimal):
         raise TypeError("shipping net must be Decimal")
     if not net.is_finite() or net < 0:
@@ -1173,11 +1162,6 @@ def resolve_shipping_tax(
     lines = list(goods)
     if not lines:
         raise ValueError("shipping VAT needs the package's goods: no goods given")
-    if treatment != TREATMENT_FOLLOWS_GOODS:
-        raise UnsupportedShippingTreatment(
-            f"shipping VAT treatment {treatment!r} is not supported (D-03): "
-            "shipping follows the goods"
-        )
     if ctx.vendor_profile.regime == EXEMPT:
         # Re-checked so a vendor profile that became incomplete blocks here too (never a silent 0%).
         _exempt(ctx.vendor_profile, vendor_country=ctx.vendor_country)

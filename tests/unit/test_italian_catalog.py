@@ -26,6 +26,23 @@ def test_no_scoped_msgid_is_untranslated() -> None:
     assert catalog._missing(polib.pofile(str(PO))) == []
 
 
+def test_help_text_scopes_give_only_the_help_text_strings(tmp_path: Path) -> None:
+    source = tmp_path / "sample.py"
+    source.write_text(
+        "from django.utils.translation import gettext_lazy as _\n"
+        'label = _("A label")\n'
+        'field = Field(verbose_name=_("A name"), help_text=_("Say it in plain words."))\n',
+        encoding="utf-8",
+    )
+    found = [msgid for msgid, *_rest in catalog._help_entries(source)]
+    assert found == ["Say it in plain words."]
+
+
+def test_the_help_text_of_events_and_cms_is_in_the_catalog() -> None:
+    texts = {key[0] for key in catalog.collect()}
+    assert "Pick the picture from the library or upload a new one. Required." in texts
+
+
 def test_the_compiled_catalog_matches_the_source_catalog() -> None:
     assert catalog.check() == 0
 
