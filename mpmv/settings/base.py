@@ -414,6 +414,12 @@ COMPLIANCE_PUBLIC_HOLIDAYS: list[str] = []
 # The country -> accepted warnings languages map (CMP.3) is cached per process this long; a staff
 # edit drops this process's copy at once, other processes reload within this time.
 COMPLIANCE_COUNTRY_LANGUAGES_CACHE_SECONDS = 300
+# CMP.6: the withdrawal period in days from receipt of the goods. The directive grants 14 and the
+# code never goes below it; a longer period is a platform choice (open owner question).
+WITHDRAWAL_PERIOD_DAYS = 14
+# CMP.6: the legal guarantee of conformity shown in the pre-contractual information (24 months,
+# the directive's minimum; a country may set a longer one).
+LEGAL_GUARANTEE_MONTHS = 24
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"

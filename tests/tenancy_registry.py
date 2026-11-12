@@ -64,6 +64,7 @@ from apps.compliance.models import (
     StatementOfReasons,
     TransparencySubmission,
     VendorGpsrDefaults,
+    WithdrawalStatement,
 )
 from apps.compliance.tests.factories import (
     GpsrInfoFactory,
@@ -73,6 +74,7 @@ from apps.compliance.tests.factories import (
     StatementOfReasonsFactory,
     TransparencySubmissionFactory,
     VendorGpsrDefaultsFactory,
+    WithdrawalStatementFactory,
 )
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
@@ -236,6 +238,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ),
     TransparencySubmission: lambda vendor: TransparencySubmissionFactory.create(
         statement=StatementOfReasonsFactory.create(vendor=vendor)
+    ),
+    WithdrawalStatement: lambda vendor: WithdrawalStatementFactory.create(
+        vendor_order=VendorOrderFactory.create(vendor=vendor)
     ),
     ShippingZone: lambda vendor: ShippingZoneFactory.create(vendor=vendor),  # a vendor zone
     ShippingMethod: lambda vendor: ShippingMethodFactory.create(vendor=vendor),
@@ -545,6 +550,20 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "dsa_notice_received": NoVendorData(
         "Thanks page after a report (CMP.5): shows only the reference kept in the session."
+    ),
+    "withdrawal": NoVendorData(
+        "Online withdrawal, step one (CMP.6): no vendor data without the order number and email "
+        "of a contract; captcha and a rate limit guard the POST."
+    ),
+    "withdrawal_confirm": NoVendorData(
+        "Online withdrawal, step two (CMP.6): POST only, answers 405 to a GET; a signed token "
+        "names one order and every chosen vendor order must belong to it."
+    ),
+    "withdrawal_done": NoVendorData(
+        "Withdrawal acknowledgement (CMP.6): shows only the statements kept in the session."
+    ),
+    "consumer_information": NoVendorData(
+        "Pre-contractual information (CMP.6): platform-wide legal text, no vendor data."
     ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),

@@ -33,6 +33,7 @@ SCOPES = (
     "apps/manager",
     "apps/accounts",
     "apps/orders/templates",
+    "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
     "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)
     "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
     "apps/vendors/models.py",
@@ -85,7 +86,10 @@ THEME_FILES = (
     ),
 )
 # A single-file scope may be narrowed to the classes whose strings the catalog translates.
-ONLY_CLASSES = {"apps/cms/models.py": ("HelpEntry",)}
+ONLY_CLASSES = {
+    "apps/compliance/forms.py": ("WithdrawalLookupForm",),
+    "apps/cms/models.py": ("HelpEntry",),
+}
 SKIP_PARTS = {"tests", "migrations", "static", "node_modules"}
 
 SIMPLE = {"gettext", "gettext_lazy", "gettext_noop", "_", "ugettext"}

@@ -23,7 +23,9 @@ from apps.compliance.models import (
     StatementOfReasons,
     TransparencySubmission,
     VendorGpsrDefaults,
+    WithdrawalStatement,
 )
+from apps.orders.tests.factories import VendorOrderFactory
 from apps.vendors.tests.factories import VendorFactory
 
 
@@ -152,3 +154,15 @@ class ProductRestrictionFactory(DjangoModelFactory[ProductRestriction]):
 
     product = factory.SubFactory(ProductFactory)
     statement = factory.SubFactory(StatementOfReasonsFactory)
+
+
+class WithdrawalStatementFactory(DjangoModelFactory[WithdrawalStatement]):
+    """A recorded withdrawal from a vendor order; the order is the vendor order's own."""
+
+    class Meta:
+        model = WithdrawalStatement
+
+    vendor_order = factory.SubFactory(VendorOrderFactory)
+    order = factory.SelfAttribute("vendor_order.order")
+    submitted_at = factory.LazyFunction(timezone.now)
+    language = "en"

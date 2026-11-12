@@ -889,6 +889,10 @@ msgstr ""
 msgid "Email"
 msgstr "Email"
 
+#: apps/compliance/forms.py
+msgid "Email address of the order"
+msgstr "Indirizzo email dell’ordine"
+
 #: apps/accounts/admin.py
 msgid ""
 "Enabled: you set a password now. Disabled: the account is created without a password and cannot "
@@ -1793,6 +1797,10 @@ msgstr "Ordine %(order_number)s: conferma di %(vendor_name)s"
 msgid "Order %(order_number)s: part of your order was cancelled"
 msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
 
+#: apps/compliance/forms.py
+msgid "Order number"
+msgstr "Numero d’ordine"
+
 #: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
 msgstr "Ordini"
@@ -2427,6 +2435,14 @@ msgid ""
 msgstr ""
 "L'indirizzo a cui mandiamo il link per confermare la candidatura. Obbligatorio: senza un indirizzo"
 " funzionante non puoi proseguire."
+
+#: apps/compliance/forms.py
+msgid ""
+"The address you gave when you ordered. It proves the order is yours, and the confirmation of your "
+"withdrawal is sent there. Required."
+msgstr ""
+"L’indirizzo che hai indicato quando hai ordinato. Dimostra che l’ordine è tuo e la conferma del "
+"tuo recesso viene inviata lì. Obbligatorio."
 
 #: apps/catalog/taxonomy_admin.py
 msgid ""
@@ -3664,6 +3680,14 @@ msgid ""
 msgstr ""
 "Le domande che i nuovi venditori fanno più spesso, con le tue risposte. Se non ne aggiungi, la "
 "pagina non mostra domande."
+
+#: apps/compliance/forms.py
+msgid ""
+"The reference from your order confirmation email, for example 2027-000123. Required: without it we"
+" cannot find your order."
+msgstr ""
+"Il riferimento riportato nell’email di conferma dell’ordine, per esempio 2027-000123. "
+"Obbligatorio: senza non riusciamo a trovare il tuo ordine."
 
 #: apps/compliance/models.py
 msgid ""
