@@ -1,6 +1,7 @@
 """Language-prefix routing helpers (spec 09 §9.2, I18N.1).
 
-`/` is the primary language (settings.LANGUAGE_CODE, EN) with no prefix; every other language in
+`/` is the primary language (settings.LANGUAGE_CODE, the first of MPMV_LANGUAGES) with no
+prefix; every other language in
 settings.LANGUAGES gets `/<code>/`. Nothing here lists languages: adding one is a settings entry.
 """
 
@@ -22,6 +23,15 @@ def language_choices() -> list[tuple[str, str]]:
     language to settings.LANGUAGES needs no migration (`apps.core.fields.LanguageField`).
     """
     return [(str(code), str(name)) for code, name in settings.LANGUAGES]
+
+
+def primary_language() -> str:
+    """The primary language, read from settings when called.
+
+    Model fields use this callable as `default`: a literal `settings.LANGUAGE_CODE` would be
+    frozen at import and migrations would drift when MPMV_LANGUAGES changes.
+    """
+    return str(settings.LANGUAGE_CODE)
 
 
 def configured_languages() -> list[str]:

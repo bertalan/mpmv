@@ -108,3 +108,17 @@ So a pulled kill switch stops checkout, imports or payments everywhere within 5 
 is no shared cache to invalidate: PostgreSQL is the only datastore (ADR-0001). Code that must
 not start work after a kill switch is pulled checks the flag right before it starts, and long
 jobs check it again between batches.
+
+## Checkout and payments kill switches (ORD.10)
+
+`apps.orders.services.place_order` calls `ensure_checkout_open(vendors)` first: both the
+`checkout` and the `payments` switch must be on for the platform and for every vendor in the
+order, otherwise it raises `CheckoutClosed` (`scope` "site" or "vendor", `customer_message`
+translated, naming no vendor). A mixed cart with one closed vendor is refused whole. Orders
+already placed or paid are never touched. PAY.1 must call `ensure_checkout_open` before it
+creates a payment intent.
+
+`manage.py check_payments` (service `apps.payments.services.check_payments_without_transfer`)
+raises an OPS.2 alert when a succeeded payment has no vendor transfer after
+`PAYMENT_TRANSFER_GRACE_MINUTES` (60). It reads a `PaymentSource`; `payment_source()` returns an
+empty placeholder until PAY.3 wires the real query.

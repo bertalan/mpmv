@@ -55,6 +55,15 @@ ENV PATH=/app/.venv/bin:$PATH \
     MPMV_HTTP_PORT=8000 \
     MPMV_VERSION=${MPMV_VERSION}
 
+# ORD.9 3/3 (ADR-0010): the system libraries WeasyPrint loads at run time (text shaping, font
+# lookup) and one font family covering Latin with accents. No build tools, no recommended
+# packages, apt lists removed in the same layer. Debian security updates arrive with the weekly
+# image rebuild (OPS.4).
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+       libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fontconfig fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system --gid 10001 mpmv \
     && useradd --system --uid 10001 --gid mpmv --home-dir /app --no-create-home \
        --shell /usr/sbin/nologin mpmv

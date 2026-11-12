@@ -46,13 +46,11 @@ ECONOMY: Final = "economy"
 OTHER: Final = "other"
 SERVICE_LEVELS: Final = (STANDARD, EXPRESS, ECONOMY, OTHER)
 
-# VAT treatment of a method's shipping charge (SHP.12). Stored only: the tax engine (TAX.4,
-# `resolve_shipping_tax`) applies it, and how `standard_rate` and `exempt` are computed depends
-# on D-03, which is open. The default follows the goods (EU ancillary-supply rule).
+# VAT treatment of a method's shipping charge (SHP.12, TAX.17). Shipping always follows the
+# goods (ancillary supply, D-03 decided): the tax engine splits it over the goods' decisions
+# (`resolve_shipping_tax`). No other treatment exists.
 FOLLOWS_GOODS: Final = "follows_goods"
-STANDARD_RATE: Final = "standard_rate"
-EXEMPT: Final = "exempt"
-TAX_TREATMENTS: Final = (FOLLOWS_GOODS, STANDARD_RATE, EXEMPT)
+TAX_TREATMENTS: Final = (FOLLOWS_GOODS,)
 DEFAULT_TAX_TREATMENT: Final = FOLLOWS_GOODS
 
 # A weight band as (from_kg, to_kg); to_kg None means unlimited. Bounds are right-inclusive,

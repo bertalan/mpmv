@@ -5,8 +5,8 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.models import User
-from apps.accounts.tests.factories import UserFactory
-from apps.accounts.tests.mfa import verified_login
+from apps.accounts.tests.factories import PasskeyDeviceFactory, UserFactory
+from apps.accounts.tests.mfa import password_login, verified_login
 
 pytestmark = pytest.mark.django_db
 
@@ -28,15 +28,29 @@ def test_the_mfa_overview_is_in_italian(client: Client, italian: User) -> None:
 
 
 def test_the_mfa_setup_and_totp_pages_are_in_italian(client: Client, italian: User) -> None:
-    verified_login(client, italian)
+    password_login(client, italian)  # no second factor yet: the enrolment wording
     setup = client.get(reverse("mfa:setup"), headers=EN).text
     assert "Configura la verifica in due passaggi" in setup
     assert "Registra una passkey" in setup
     # The passkey script's messages come from the page, not from JavaScript literals.
     assert 'data-text-unsupported="Questo browser non supporta le passkey."' in setup
+    verified_login(client, italian)
     totp = client.get(reverse("mfa:totp"), headers=EN).text
     assert "Configura un\u2019app di autenticazione" in totp
     assert "Codice di autenticazione" in totp
+
+
+def test_the_security_page_is_in_italian(client: Client, italian: User) -> None:
+    PasskeyDeviceFactory.create(user=italian)
+    verified_login(client, italian)
+    html = client.get(reverse("mfa:setup"), headers=EN).text
+    for text in (
+        "Sicurezza dell",
+        "protetto con una passkey.",
+        "altra passkey",
+        "mai usata",
+    ):
+        assert text in html
 
 
 def test_the_recovery_codes_page_pluralises_in_italian(client: Client, italian: User) -> None:
