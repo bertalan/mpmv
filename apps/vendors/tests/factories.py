@@ -26,6 +26,7 @@ from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
+    NoTinCountry,
     SelfCertification,
     Vendor,
     VendorApplication,
@@ -447,3 +448,14 @@ class CommissionRuleFactory(DjangoModelFactory[CommissionRule]):
     version = factory.Sequence(lambda n: n + 1)
     valid_from = factory.Sequence(lambda n: dt.datetime(2026 + n, 1, 1, tzinfo=dt.UTC))
     valid_to = factory.LazyAttribute(lambda o: o.valid_from.replace(year=o.valid_from.year + 1))
+
+
+class NoTinCountryFactory(DjangoModelFactory[NoTinCountry]):
+    """A jurisdiction that issues no TIN; the data migration already seeds the six default ones."""
+
+    class Meta:
+        model = NoTinCountry
+
+    country = factory.Iterator(["NZ", "JP", "CH", "SG", "AU"])
+    reason = "Issues no TIN to individuals."
+    valid_from = dt.date(2024, 1, 1)

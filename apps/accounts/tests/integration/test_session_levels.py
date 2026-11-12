@@ -496,6 +496,7 @@ WIRED = {
     "role_grant",
     "vat_regime",
     "commission_change",
+    "no_tin_country",
     "audit_in_clear",
     "mfa_disable",
     "owner_role_grant",

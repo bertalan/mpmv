@@ -19,6 +19,7 @@ class VendorsConfig(AppConfig):
         "crossvendorconsent",
         "vendorplan",
         "commissionrule",
+        "notincountry",
     )
     unaudited_models = {
         "vendortranslation": "storefront texts under the translation workflow, no legal or "

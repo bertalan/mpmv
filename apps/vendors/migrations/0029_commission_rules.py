@@ -49,7 +49,7 @@ DROP FUNCTION IF EXISTS vendors_commissionrule_immutable();
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vendors", "0026_storefront_rich_text"),
+        ("vendors", "0028_no_tin_country"),
     ]
 
     operations = [

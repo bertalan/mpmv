@@ -30,6 +30,7 @@ from apps.api.tests.factories import ApiClientFactory, ApiRateCounterFactory
 from apps.cart.models import CartLine
 from apps.cart.tests.factories import CartLineFactory
 from apps.catalog.models import (
+    BrandBatch,
     PriceHistory,
     Product,
     ProductAttribute,
@@ -41,6 +42,7 @@ from apps.catalog.models import (
     VariantTranslation,
 )
 from apps.catalog.tests.factories import (
+    BrandBatchFactory,
     PriceHistoryFactory,
     ProductAttributeFactory,
     ProductFactory,
@@ -202,6 +204,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
             product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
         )
     ),
+    BrandBatch: lambda vendor: BrandBatchFactory.create(vendor=vendor),
     SkuAlias: lambda vendor: renamed_product_alias(vendor),
     ProductAttribute: lambda vendor: ProductAttributeFactory.create(
         product=ProductFactory.create(vendor=vendor)
@@ -281,6 +284,16 @@ NOT_VENDOR_OWNED: dict[str, str] = {
     "vendors.CommissionRule": (
         "Platform pricing configuration managed by staff only (VEN.2): the optional vendor is "
         "the rule's target, not an owner; no vendor endpoint lists or edits commission rules."
+    ),
+    "catalog.Brand": (
+        "Shared catalog entity (CAT.20): approved brands are platform-wide and public; "
+        "`proposed_by` and `batch` only say who proposed a pending brand. Another vendor's "
+        "pending brand is hidden by `brands.brand_choices` and `Product.clean`, and the public "
+        "brand page serves approved brands only; vendors never edit brands."
+    ),
+    "catalog.BrandTranslation": (
+        "Storefront texts of a shared brand (CAT.20); reaches a vendor only through the brand "
+        "that vendor proposed, and is edited by staff only."
     ),
     "catalog.Redirect": (
         "Platform SEO rule managed by staff only (CAT.6): its optional target product is where a "
@@ -455,6 +468,32 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:notice": StaffOnly(
         "One notice of illegal content (CMP.5): platform data, not vendor-owned; needs the "
         "compliance.review_notices permission, so a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "subprocessors": NoVendorData(
+        "Sub-processor register (CMP.4): static reviewed data, the same for every visitor."
+    ),
+    "privacy_account": NoVendorData(
+        "The signed-in user's own privacy page (CMP.4): forms only, no vendor data."
+    ),
+    "privacy_export": NoVendorData(
+        "Own-data export (CMP.4): POST only, always the signed-in user, never an id from the "
+        "input; fresh re-authentication and a rate limit guard it."
+    ),
+    "privacy_erase": NoVendorData(
+        "Own account erasure (CMP.4, D-30): POST only, always the signed-in user; fresh "
+        "re-authentication, confirmation and a rate limit guard it."
+    ),
+    "privacy_erase_done": NoVendorData(
+        "Static confirmation page after an erasure request (CMP.4): no data."
+    ),
+    "privacy_requests": StaffOnly(
+        "Erasure requests (CMP.4): platform data listed by public id; needs "
+        "compliance.change_erasurerequest, so a vendor member gets 404."
+    ),
+    "privacy_request_process": StaffOnly(
+        "Process an erasure request (CMP.4): platform data; needs "
+        "compliance.change_erasurerequest, so a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "dsa_notice": NoVendorData(
