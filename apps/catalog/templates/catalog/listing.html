@@ -16,6 +16,7 @@
   {% endfor %}{% if previous_url %}<link rel="prev" href="{{ previous_url }}">{% endif %}
   {% if next_url %}<link rel="next" href="{{ next_url }}">{% endif %}
   <link rel="stylesheet" href="{% static 'catalog/listing.css' %}">
+  {% if jsonld %}<script type="application/ld+json">{{ jsonld|safe }}</script>{% endif %}
 {% endblock %}
 {% block content %}
   <div class="listing">
@@ -26,6 +27,7 @@
       <p class="listing-count">{% blocktranslate count counter=window.total %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktranslate %}</p>
     </header>
     {% if vendor_profile %}{% include "catalog/includes/vendor_profile.html" %}{% endif %}
+    {% if brand_profile and not brand_profile.is_empty %}{% include "catalog/includes/brand_profile.html" %}{% endif %}
     {% if editorial.before %}{{ editorial.before }}{% endif %}
     {% if store_categories %}{% include "catalog/includes/store_categories.html" %}{% endif %}
 

@@ -352,3 +352,12 @@ def test_the_background_recheck_ignores_a_number_vies_cannot_check(
 def test_the_background_recheck_retries_with_growing_delays() -> None:
     delays = [tasks.VIES_RETRY.delay_after(attempt) or 0 for attempt in range(3)]
     assert 0 < delays[0] < delays[1] < delays[2]
+
+
+def test_an_xi_number_is_not_checked_and_never_raises() -> None:
+    client = FakeViesClient(default=VALID)
+    check = services.verify_vat_number("XI", "XI 123 4567 89", client=client)
+    assert check.verified is False
+    assert check.reason == engine.VAT_REASON_NOT_IN_VIES
+    assert client.calls == []
+    assert not VatValidation.objects.exists()

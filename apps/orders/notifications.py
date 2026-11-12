@@ -12,7 +12,8 @@ address it must ship to, never the buyer's email, billing address or other vendo
 payment reference, commission or tax identifier of the buyer enters any context. The platform
 never sends invoices or receipts: the per-vendor confirmation is a non-fiscal document.
 
-Emails render in the order's language snapshot, English when it is not configured.
+Customer emails render in the order's language snapshot, vendor emails in the vendor's mail
+language (ORD.16); the platform language (English) stands in when it is not configured.
 """
 
 import logging
@@ -45,6 +46,13 @@ ORDER_CONFIRMATION = "orders.order_confirmation"
 VENDOR_NEW_ORDER = "orders.vendor_new_order"
 VENDOR_ORDER_SHIPPED = "orders.vendor_order_shipped"
 
+VENDOR_ORDER_DELIVERED = "orders.vendor_order_delivered"
+ORDER_CANCELLED = "orders.order_cancelled"
+VENDOR_ORDER_CANCELLED = "orders.vendor_order_cancelled"
+VENDOR_ORDER_CANCELLED_NOTICE = "orders.vendor_order_cancelled_notice"
+#: The outbox attachment kind of the non-fiscal PDF (documents.py builds it at send time).
+CONFIRMATION_PDF_KIND = "orders:vendor_confirmation_pdf"
+
 #: The shipping address lines a vendor needs to ship; nothing else of the buyer's data.
 _SHIP_TO_KEYS = ("name", "line1", "line2", "postal_code", "city", "region")
 
@@ -74,6 +82,12 @@ def _ship_to(order: Order) -> list[str]:
     address = order.shipping_address or {}
     parts = [str(address.get(key, "")).strip() for key in _SHIP_TO_KEYS]
     return [part for part in parts if part] + [order.shipping_country]
+
+
+def _vendor_language(sub: VendorOrder) -> str:
+    """The vendor's mail language (ORD.16), the platform language when it has none. One that is
+    no longer configured falls back the same way when the email is queued."""
+    return str(sub.vendor.mail_language or settings.LANGUAGE_CODE)
 
 
 def _vendor_name(sub: VendorOrder) -> str:
@@ -124,13 +138,15 @@ def notify_order_paid(order: Order) -> None:
                 "lines": _lines(sub),
                 "shipping": _money(sub.shipping_net + sub.shipping_tax_amount),
                 "total": _money(sub.gross_total),
+                # The non-fiscal PDF is built when the email is sent (documents.py), not stored.
+                "attachment": {"kind": CONFIRMATION_PDF_KIND, "ref": str(sub.public_id)},
             },
         )
         if sub.vendor.contact_email:
             enqueue_email(
                 recipient=sub.vendor.contact_email,
                 template_key=VENDOR_NEW_ORDER,
-                language=settings.LANGUAGE_CODE,  # vendors have no language of their own yet
+                language=_vendor_language(sub),
                 idempotency_key=f"vendor-order:{sub.public_id}:new",
                 context={
                     "order_number": order.number,
@@ -140,6 +156,64 @@ def notify_order_paid(order: Order) -> None:
                     "total": _money(sub.gross_total),
                 },
             )
+
+
+def _vendor_event(sub: VendorOrder, kind: str, event: str) -> None:
+    """Customer mail about one sub-order, once per sub-order and event."""
+    order = sub.order
+    if not _sendable(order):
+        return
+    enqueue_email(
+        recipient=order.email,
+        template_key=kind,
+        language=order.language,
+        idempotency_key=f"vendor-order:{sub.public_id}:{event}",
+        context={
+            "order_number": order.number,
+            "customer_name": order.customer_name,
+            "vendor_name": _vendor_name(sub),
+        },
+    )
+
+
+def notify_vendor_order_delivered(sub: VendorOrder) -> None:
+    """Customer: this vendor's part of the order was delivered."""
+    _vendor_event(sub, VENDOR_ORDER_DELIVERED, "delivered")
+
+
+def notify_order_cancelled(order: Order) -> None:
+    """Customer: the order was cancelled (before payment, so nothing was charged)."""
+    if not _sendable(order):
+        return
+    enqueue_email(
+        recipient=order.email,
+        template_key=ORDER_CANCELLED,
+        language=order.language,
+        idempotency_key=f"order:{order.public_id}:cancelled",
+        context={"order_number": order.number, "customer_name": order.customer_name},
+    )
+
+
+def notify_vendor_order_cancelled(sub: VendorOrder) -> None:
+    """Customer and vendor: one vendor's part of a paid order was cancelled. The vendor gets
+    only its own lines, never the buyer's data."""
+    order = sub.order
+    _vendor_event(sub, VENDOR_ORDER_CANCELLED, "cancelled")
+    if _sendable(order) and sub.vendor.contact_email:
+        enqueue_email(
+            recipient=sub.vendor.contact_email,
+            template_key=VENDOR_ORDER_CANCELLED_NOTICE,
+            language=_vendor_language(sub),
+            idempotency_key=f"vendor-order:{sub.public_id}:cancelled-notice",
+            context={
+                "order_number": order.number,
+                "vendor_name": _vendor_name(sub),
+                "lines": [
+                    {key: value for key, value in line.items() if key != "total"}
+                    for line in _lines(sub)
+                ],
+            },
+        )
 
 
 def notify_vendor_order_shipped(sub: VendorOrder) -> None:

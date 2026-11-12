@@ -31,9 +31,10 @@ from apps.core.i18n import hreflang_alternates
 from apps.core.money import CURRENCY
 from apps.vendors import services as vendors_services
 
-from . import listings, services, slugs
+from . import engine, listings, product_pages, services, slugs
 
 TEMPLATE = "catalog/listing.html"
+PRODUCT_TEMPLATE = "catalog/product.html"
 
 
 def _language() -> str:
@@ -175,6 +176,8 @@ def _listing(
         (group.key, option.value): option.label for group in groups for option in group.options
     }
     labels.update({(listings.VENDOR, option.value): option.label for option in vendors})
+    brand = anchor.scope.brand
+    site = request.build_absolute_uri("/").rstrip("/")
 
     context: dict[str, Any] = {
         "editorial": (
@@ -193,6 +196,13 @@ def _listing(
         "vendor_options": vendors,
         "store_categories": store_categories,
         "vendor_profile": vendor_profile,
+        "brand_profile": services.brand_profile(brand, language) if brand else None,
+        # One JSON-LD block per page (SEO.7): the brand page's graph until `seo.page_graph`.
+        "jsonld": (
+            engine.jsonld_text(services.brand_graph(brand, language, site=site, paths=anchor.paths))
+            if brand
+            else ""
+        ),
         "policy_items": [
             {"title": title, "content": RichText(text)}
             for title, text in (vendor_profile.policies if vendor_profile else ())
@@ -213,7 +223,7 @@ def _listing(
         "canonical_url": canonical_url,
         "alternates": alternates,
         "language_urls": language_urls,
-        "robots": listings.listing_robots(params, total=window.total),
+        "robots": listings.listing_robots(params, total=window.total, request=request),
         "previous_url": (
             listings.listing_url(location, params.with_page(window.previous_page))
             if window.previous_page
@@ -234,3 +244,46 @@ def _amount(amount: Decimal | None) -> str:
 
 
 _safe_listing = require_safe(_listing)
+
+
+@require_safe
+def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpResponseBase:
+    """The product page (CAT.7) at `/product/{slug}/`, `/it/prodotto/{slug}/`.
+
+    A product that is not public (draft, hidden, vendor not active) and a slug that is not the
+    current one answer 404: the old-slug middleware (CAT.5) turns the latter into a 301. A
+    spelling of the page's own URL (another segment) gets a 301 to it. A language without a
+    published text shows the source text on the source slug, with a notice and a source-language
+    canonical (spec 09), like the listings.
+    """
+    language = _language()
+    page = product_pages.find(slug, language)
+    if page is None:
+        raise Http404("No such product.")
+    default = settings.LANGUAGE_CODE
+    location = (
+        slugs.product_path(language, slug, default_language=default)
+        if page.is_fallback
+        else page.canonical_path
+    )
+    if request.path_info != location:
+        query = request.META.get("QUERY_STRING", "")
+        return HttpResponsePermanentRedirect(listings.join_query(location, query))
+    site = request.build_absolute_uri("/").rstrip("/")
+    alternates = hreflang_alternates(
+        {lang: request.build_absolute_uri(path) for lang, path in page.paths.items()}
+    )
+    context: dict[str, Any] = {
+        "page_data": page,
+        "currency": CURRENCY,
+        "language_urls": dict(page.paths),
+        "alternates": alternates,
+        "canonical_url": request.build_absolute_uri(page.canonical_path),
+        "robots": listings.ROBOTS_INDEX,
+        "jsonld": product_pages.structured_data(page, site=site),
+        "vendor_url": slugs.vendor_path(language, page.vendor.slug, default_language=default),
+        # CAT.15: related products and the other sellers of this product.
+        "related": product_pages.related(page),
+    }
+    response: HttpResponse = render(request, PRODUCT_TEMPLATE, context)
+    return response

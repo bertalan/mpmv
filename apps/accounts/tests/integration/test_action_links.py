@@ -37,7 +37,7 @@ from apps.core.models import AuditLog, OutboxEmail
 
 pytestmark = [pytest.mark.django_db, pytest.mark.urls("apps.accounts.tests.integration.urls")]
 
-LOGIN_PATH = "/django-admin/login/"
+LOGIN_PATH = "/account/login/"
 SYSTEM = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
 
 

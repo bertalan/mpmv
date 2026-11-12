@@ -24,38 +24,53 @@ _FIELD_ERRORS = {
 
 class NoticeForm(forms.Form):
     target_kind = forms.ChoiceField(
-        label=_("What do you report?"), choices=Notice.TargetKind.choices
+        label=_("What do you report?"),
+        choices=Notice.TargetKind.choices,
+        help_text=_(
+            "Choose what you are reporting: a product, an event, a vendor shop or other "
+            "content of the site."
+        ),
     )
     url = forms.CharField(
         label=_("Exact location (web address)"),
         max_length=URL_MAX,
         widget=forms.URLInput(attrs={"autocomplete": "off", "inputmode": "url"}),
-        help_text=_("The full address of the page that shows the content."),
+        help_text=_(
+            "The full web address of the page that shows the content, starting with http://"
+            " or https://. Required."
+        ),
     )
     explanation = forms.CharField(
         label=_("Explanation"),
         max_length=10000,
         widget=forms.Textarea(attrs={"rows": 6}),
-        help_text=_("Why you consider the content illegal."),
+        help_text=_("Tell us why you think the content is illegal. Required."),
     )
     category = forms.ChoiceField(
         label=_("Type of report"),
         choices=Notice.Category.choices,
         initial=Notice.Category.GENERAL,
-        help_text=_("Reports of child sexual abuse material may be sent without your details."),
+        help_text=_(
+            "Choose 'Illegal content' for most reports. A report of child sexual abuse "
+            "material can be sent without your name and email address."
+        ),
     )
     notifier_name = forms.CharField(
         label=_("Your name"),
         max_length=255,
         required=False,
         widget=forms.TextInput(attrs={"autocomplete": "name"}),
+        help_text=_("Your name. Required, except for a report of child sexual abuse material."),
     )
     notifier_email = forms.CharField(
         label=_("Your email address"),
         max_length=254,
         required=False,
         widget=forms.EmailInput(attrs={"autocomplete": "email"}),
-        help_text=_("We confirm receipt and tell you our decision at this address."),
+        help_text=_(
+            "Your email address. We confirm that we received the report and tell you our "
+            "decision there. Required, except for a report of child sexual abuse material."
+        ),
     )
     good_faith = forms.BooleanField(
         label=_(
@@ -63,6 +78,7 @@ class NoticeForm(forms.Form):
             "and complete."
         ),
         required=False,
+        help_text=_("Tick the box to confirm the statement. Without it the report cannot be sent."),
     )
 
     def clean(self) -> dict[str, Any]:
@@ -96,11 +112,17 @@ class DecisionForm(forms.Form):
             (engine.NOTICE_ACTION_TAKEN, _("Action taken")),
             (engine.NOTICE_NO_ACTION, _("No action")),
         ],
+        help_text=_(
+            "Choose 'Action taken' if the content was restricted, or 'No action' if it was "
+            "left as it is."
+        ),
     )
     reason = forms.CharField(
         label=_("Reason"),
         widget=forms.Textarea(attrs={"rows": 4}),
-        help_text=_("Sent to the notifier with the decision."),
+        help_text=_(
+            "Why you decided this way. The notifier receives this text with the decision. Required."
+        ),
     )
 
 
@@ -114,29 +136,47 @@ class RestrictionForm(forms.Form):
             ("event", _("Event (hide)")),
             ("vendor", _("Vendor storefront (suspend)")),
         ],
+        help_text=_(
+            "What you restrict: a product is unpublished, an event is hidden, a vendor shop"
+            " is suspended."
+        ),
     )
     target_ref = forms.UUIDField(
-        label=_("Reference of the content"), help_text=_("The public id shown in the Manager.")
+        label=_("Reference of the content"),
+        help_text=_(
+            "The public id of the content, as shown in the Manager (a long code with "
+            "letters, numbers and dashes)."
+        ),
     )
     scope = forms.CharField(
-        label=_("Scope"), help_text=_("What is restricted, where and for how long.")
+        label=_("Scope"),
+        help_text=_(
+            "What is restricted, where and for how long, in plain words. The vendor sees this text."
+        ),
     )
     valid_until = forms.DateField(
         label=_("Restriction ends on"),
         required=False,
         widget=forms.DateInput(attrs={"type": "date"}),
-        help_text=_("Leave empty when the restriction has no end date."),
+        help_text=_(
+            "The last day of the restriction. Leave it empty when the restriction has no end date."
+        ),
     )
     facts = forms.CharField(
-        label=_("Facts and circumstances relied on"), widget=forms.Textarea(attrs={"rows": 4})
+        label=_("Facts and circumstances relied on"),
+        widget=forms.Textarea(attrs={"rows": 4}),
+        help_text=_(
+            "The facts and circumstances you relied on to decide. The vendor sees this text."
+        ),
     )
     transparency_explanation = forms.CharField(
         label=_("Explanation for the public database"),
         max_length=engine.PUBLIC_TEXT_LIMIT,
         widget=forms.Textarea(attrs={"rows": 3}),
         help_text=_(
-            "Warning: this text is published in the EU transparency database. Write no personal "
-            "data, no names, no email addresses or web addresses."
+            "Warning: this text is meant for the EU transparency database (the submission is "
+            "not built yet, so for now it is only stored). At most 2000 characters. Write no "
+            "personal data, no names, no email addresses or web addresses."
         ),
     )
     ground_kind = forms.ChoiceField(
@@ -145,25 +185,67 @@ class RestrictionForm(forms.Form):
             (engine.GROUND_ILLEGAL, _("The content is illegal")),
             (engine.GROUND_TERMS, _("The content is incompatible with the platform terms")),
         ],
+        help_text=_("Say whether the content is illegal or only against the platform terms."),
     )
     ground = forms.CharField(
-        label=_("Legal provision or term relied on"), widget=forms.Textarea(attrs={"rows": 2})
+        label=_("Legal provision or term relied on"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text=_(
+            "The law or the term of the platform terms you relied on, for example the "
+            "article and the name of the law."
+        ),
     )
     automated_detection = forms.BooleanField(
-        label=_("Automated means were used to detect the content"), required=False
+        label=_("Automated means were used to detect the content"),
+        required=False,
+        help_text=_("Tick it if software helped to find the content."),
     )
     automated_decision = forms.BooleanField(
-        label=_("Automated means were used to decide"), required=False
+        label=_("Automated means were used to decide"),
+        required=False,
+        help_text=_("Tick it if software took the decision."),
     )
 
 
 class AuthoritiesForm(forms.Form):
     """Article 18: staff told the authorities of a suspected threat to life or safety."""
 
-    authority = forms.CharField(label=_("Authority told"), max_length=255)
+    authority = forms.CharField(
+        label=_("Authority told"),
+        max_length=255,
+        help_text=_(
+            "The name of the authority you told about a suspected threat to life or safety."
+            " Required."
+        ),
+    )
     note = forms.CharField(
         label=_("Note"),
         required=False,
         widget=forms.Textarea(attrs={"rows": 3}),
-        help_text=_("Kept with the notice, not in the audit log."),
+        help_text=_(
+            "An optional note. It is kept with the notice and is not written in the audit log."
+        ),
+    )
+
+
+class WithdrawalLookupForm(forms.Form):
+    """Step one of the withdrawal function: which contract. Minimal data (CMP.6)."""
+
+    order_number = forms.CharField(
+        label=_("Order number"),
+        max_length=32,
+        widget=forms.TextInput(attrs={"autocomplete": "off"}),
+        help_text=_(
+            "The reference from your order confirmation email, for example 2027-000123. "
+            "Required: without it we cannot find your order."
+        ),
+    )
+    email = forms.EmailField(
+        label=_("Email address of the order"),
+        max_length=254,
+        widget=forms.EmailInput(attrs={"autocomplete": "email"}),
+        help_text=_(
+            "The address you gave when you ordered. It proves the order is yours, and the "
+            "confirmation of your withdrawal is sent there. Required."
+        ),
     )
