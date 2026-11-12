@@ -3,11 +3,13 @@
 Everything here takes plain values, not live catalogue, tax or shipping rows: the caller (the
 checkout, ORD.4) resolves prices, tax and the shipping choice, and these services store them as
 snapshots. Mutations accept `dry_run=True` and return a ChangeSet, and write one AuditLog entry
-per changed object (SEC.4). `tax` and `shipping` are never imported here.
+per changed object (SEC.4). `tax` is never imported here; `shipping` only for the carrier's
+tracking link (ORD.7).
 """
 
 import datetime as dt
-from collections.abc import Sequence
+import uuid
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Protocol
@@ -15,9 +17,10 @@ from typing import Any, Protocol
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db import connection, transaction
-from django.db.models import Sum
+from django.db.models import Prefetch, QuerySet, Sum
 from django.utils import timezone
 from django.utils.functional import Promise
+from django.utils.text import slugify
 
 from apps.accounts.models import User
 from apps.cart import engine as cart_engine
@@ -28,12 +31,21 @@ from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.money import CENT
 from apps.core.services import audit_changes, flag_enabled
+from apps.shipping.models import Carrier
 from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission
 
 from . import engine, notifications
 from .messages import CLOSED_SITE, CLOSED_VENDOR
-from .models import Order, OrderLine, OrderNumberSequence, StockReservation, VendorOrder
+from .models import (
+    Order,
+    OrderLine,
+    OrderNumberSequence,
+    OrderState,
+    PrivacyStatus,
+    StockReservation,
+    VendorOrder,
+)
 from .tz import business_tz
 
 DRY_RUN_NUMBER = "(assigned when placed)"
@@ -1012,3 +1024,55 @@ def hold_stock(
         )
         changeset.create("orders.stockreservation", str(hold.public_id), snapshot)
         return changeset
+
+
+# --- the customer's own orders (ORD.7) ---------------------------------------------------------
+
+
+def customer_orders(user: User) -> QuerySet[Order]:
+    """The orders a signed-in customer may see in "My orders": their own, never anyone else's.
+
+    Only `active` orders (D-30): a legacy order (MIG.4) is shown when the vendor's migration
+    choice (D-16) kept it active; the rest of the last ten years sits in the restricted tax
+    archive, visible to the Tax/Audit permission only, so it never shows here. An order still in
+    `checkout` is a draft and is not listed. The checkout, order confirmation and payment pages
+    own the draft."""
+    if not user.is_authenticated:
+        return Order.objects.none()
+    orders = Order.objects.filter(customer=user, privacy_status=PrivacyStatus.ACTIVE).exclude(
+        state=OrderState.CHECKOUT
+    )
+    # Hook for the restricted tax archive flag (ORD.14, draft #338): once `Order` has it, an
+    # archive row is out whatever its `privacy_status`. Boolean field named `tax_archive`.
+    if any(field.name == "tax_archive" for field in Order._meta.get_fields()):
+        orders = orders.filter(**{"tax_archive": False})
+    return orders
+
+
+def customer_order(user: User, public_id: uuid.UUID) -> Order | None:
+    """One order of the customer, or None (the view answers 404 for a stranger's order too)."""
+    return (
+        customer_orders(user)
+        .prefetch_related(
+            Prefetch(
+                "vendor_orders",
+                queryset=VendorOrder.objects.select_related("vendor").prefetch_related("lines"),
+            )
+        )
+        .filter(public_id=public_id)
+        .first()
+    )
+
+
+def carrier_tracking_templates(names: Iterable[str]) -> dict[str, str]:
+    """The tracking-link template of each carrier name the vendors typed, by the name as typed.
+
+    A name matches a carrier by its code (case-insensitive, spaces as dashes). A name with no
+    carrier record has no link: the customer still sees the carrier and the number."""
+    wanted = {name: slugify(name) for name in names if name}
+    carriers = dict(
+        Carrier.objects.filter(code__in=set(wanted.values()), is_active=True).values_list(
+            "code", "tracking_url_template"
+        )
+    )
+    return {name: carriers[code] for name, code in wanted.items() if carriers.get(code)}

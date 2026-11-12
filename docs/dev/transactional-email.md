@@ -64,6 +64,18 @@ The provider also receives the email's public id as an idempotency key. That cov
 after the provider accepted the email but before our commit. Every status change adds a row to
 the append-only `OutboxEmailEvent` history.
 
+### Attachments
+
+An email can carry one file (ORD.9 3/3, the non-fiscal confirmation PDF). The context holds a
+reference, `context["attachment"] = {"kind": ..., "ref": ...}`, never the bytes. An app registers
+the builder for its kind with `services.register_email_attachment` (in `AppConfig.ready`; `core`
+never imports the app). `deliver_email` calls it at send time, in the queue worker, and passes the
+result to the sender as `OutgoingEmail.attachments`. The builder also gets the recipient and must
+check the reference belongs to it (the confirmation PDF only goes to the order's own address). The file is not stored. If the builder
+raises, or the kind is unknown, the email is sent without the file and the history row says
+`attachment omitted: <reason>`; an attachment never blocks an email. A provider adapter must send
+`OutgoingEmail.attachments`.
+
 Backends: `apps.core.mail.ConsoleEmailSender` (default; prints the text part) and
 `MemoryEmailSender` (tests; `fail_next(...)` scripts provider failures). Pick one with
 `MPMV_EMAIL_SENDER`. The sender address comes from `MPMV_EMAIL_FROM`.

@@ -14,7 +14,7 @@ from django.utils import timezone
 from apps.core.alerts import raise_alert
 from apps.core.opschecks import Alert
 
-from .engine import PaidPayment, payment_without_transfer_alert
+from .transfer_alert import PaidPayment, payment_without_transfer_alert
 
 DEFAULT_GRACE_MINUTES = 60
 

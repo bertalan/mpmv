@@ -106,7 +106,7 @@
     window.location.assign(result.redirect);
   };
 
-  // D-32 (CORE.25): a fresh passkey for operational mode, or for one action ("Do it once").
+  // D-32 (CORE.25): a fresh passkey for the passkey window, or for one action ("Do it once").
   const assertion = async (form, optionsBody) => {
     const { publicKey } = await postJson(form.dataset.optionsUrl, form, optionsBody);
     publicKey.challenge = toBytes(publicKey.challenge);

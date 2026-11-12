@@ -16,6 +16,7 @@ from .env import (
     env_str,
     map_tile_origin,
 )
+from .languages import language_settings
 
 # Allows `models.DecimalField[Any]`-style generics at runtime (django-stubs).
 django_stubs_ext.monkeypatch()
@@ -137,7 +138,7 @@ MIDDLEWARE = [
     # CORE.4: which device verified the session, then confine required roles to the MFA pages.
     "django_otp.middleware.OTPMiddleware",
     "apps.accounts.middleware.MfaRequiredMiddleware",
-    "apps.accounts.middleware.SessionLevelMiddleware",  # CORE.25 (D-32): operational mode timers
+    "apps.accounts.middleware.SessionLevelMiddleware",  # CORE.25 (D-32): the passkey window timers
     # CORE.17: one gate per Manager space (404, login or MFA) for every URL under /manager/.
     "apps.manager.middleware.ManagerGateMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -170,12 +171,17 @@ MFA_REQUIRED_POLICIES: list[str] = [
 MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitive actions
 # Step-up for sensitive views of apps that cannot import accounts (the core audit log view, SEC.4).
 STEP_UP_DECORATOR = "apps.accounts.decorators.step_up_required"
-# Path prefixes whose requests (polling) do not count as activity for operational mode (CORE.25).
+# Path prefixes whose requests (polling) do not count as activity for the passkey window (CORE.25).
 SESSION_LEVEL_POLL_PATHS: tuple[str, ...] = ()
 LEVEL_DECORATOR = "apps.accounts.decorators.requires_level"  # CORE.25 (D-32)
+# Role-matrix check (CORE.18) for admin pages of lower apps, which cannot import the Manager.
+PLATFORM_SECTION_CHECK = "apps.manager.access.may_access_section"
 # The Manager login (CORE.17): where the Manager gate sends anonymous visitors.
 LOGIN_URL = "login"
-MFA_LOGIN_URL = "admin:login"  # until the site and vendor login pages exist
+# Whether product cards link to a product page. The CAT.7 product page is routed, so this is True;
+# the switch stays so that a deployment without the page can never render a link that answers 404.
+PRODUCT_PAGES_ROUTED = True
+MFA_LOGIN_URL = LOGIN_URL  # /account/login/: the django-admin login is loopback-only (OPS.5)
 # Secure action links in emails (CORE.15, spec 02): validity of a link unless its purpose sets
 # its own, and Continue POSTs allowed per client IP every 15 minutes.
 ACTION_LINK_MAX_AGE = 72 * 3600  # seconds
@@ -196,6 +202,9 @@ VENDOR_APPLICATION_RATE_LIMIT = 20
 # are deleted this many days after the request, and one reminder goes out after this many hours.
 VENDOR_APPLICATION_RETENTION_DAYS = 3
 VENDOR_APPLICATION_REMINDER_HOURS = 48
+# Review window for storefront logo changes (CORE.9, owner decision Q1): the previous logo file is
+# kept this many days so staff can restore it with a revert; then a job deletes it.
+VENDOR_LOGO_REVIEW_DAYS = 14
 MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts
 OTP_TOTP_ISSUER = MFA_ISSUER
 OTP_ADMIN_HIDE_SENSITIVE_DATA = True
@@ -263,6 +272,8 @@ MPMV_THEME_BUILD_DIR = BASE_DIR / "build" / "themes"
 # Help/contact link shown in the same place in the header and footer of every public page
 # (THM.3, WCAG 3.2.6 consistent help); empty = no help link until a contact page exists.
 MPMV_HELP_URL = env_str("MPMV_HELP_URL", "")
+# The vendor guide the help dialog links on vendor-facing screens (ARC.32); empty = no link.
+MPMV_VENDOR_GUIDE_URL = env_str("MPMV_VENDOR_GUIDE_URL", "")
 
 # PostgreSQL is the only datastore (ADR-0001).
 DATABASES = {
@@ -282,15 +293,9 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# Language order (spec 09, D-18): EN primary and source, then IT, DE, FR, ES; more are added here.
-LANGUAGE_CODE = "en"
-LANGUAGES = [
-    ("en", "English"),
-    ("it", "Italiano"),
-    ("de", "Deutsch"),
-    ("fr", "Français"),
-    ("es", "Español"),
-]
+# Site languages (spec 09, D-18, I18N.15): MPMV_LANGUAGES, an ordered list of codes; the first is
+# the primary (source) language without URL prefix. Default: en,it,de,fr,es. Checked by core.E911.
+LANGUAGE_CODE, LANGUAGES = language_settings(env_list("MPMV_LANGUAGES"))
 USE_I18N = True
 LOCALE_PATHS = [BASE_DIR / "locale"]
 
@@ -353,6 +358,13 @@ MPMV_MAX_ANIMATION_PIXELS = env_int("MPMV_MAX_ANIMATION_PIXELS", 16_000_000)
 MPMV_MAX_IMAGE_SIDE = env_int("MPMV_MAX_IMAGE_SIDE", 16_000)
 MPMV_MAX_STORED_IMAGE_PIXELS = env_int("MPMV_MAX_STORED_IMAGE_PIXELS", 40_000_000)
 MPMV_MAX_IMAGE_FRAMES = env_int("MPMV_MAX_IMAGE_FRAMES", 300)
+# CAT.20: how many manual brand proposals one vendor may have waiting for review (feed and
+# import proposals are grouped in one batch per run and do not count).
+MPMV_BRAND_PENDING_LIMIT = env_int("MPMV_BRAND_PENDING_LIMIT", 20)
+# New brands one import run may propose, and how many brands from imports one vendor may have
+# waiting for review in all (a vendor cannot fill the shared list through batches).
+MPMV_BRAND_BATCH_LIMIT = env_int("MPMV_BRAND_BATCH_LIMIT", 500)
+MPMV_BRAND_BATCH_PENDING_LIMIT = env_int("MPMV_BRAND_BATCH_PENDING_LIMIT", 2000)
 MPMV_IMAGE_DECODE_WAIT_SECONDS = env_float("MPMV_IMAGE_DECODE_WAIT_SECONDS", 30.0)
 # Safe parsing of the upload field (SEC.2) and the SVG refusal in the second step of Wagtail's
 # multiple upload (THM.12).
@@ -403,6 +415,12 @@ COMPLIANCE_PUBLIC_HOLIDAYS: list[str] = []
 # The country -> accepted warnings languages map (CMP.3) is cached per process this long; a staff
 # edit drops this process's copy at once, other processes reload within this time.
 COMPLIANCE_COUNTRY_LANGUAGES_CACHE_SECONDS = 300
+# CMP.6: the withdrawal period in days from receipt of the goods. The directive grants 14 and the
+# code never goes below it; a longer period is a platform choice (open owner question).
+WITHDRAWAL_PERIOD_DAYS = 14
+# CMP.6: the legal guarantee of conformity shown in the pre-contractual information (24 months,
+# the directive's minimum; a country may set a longer one).
+LEGAL_GUARANTEE_MONTHS = 24
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -534,6 +552,13 @@ if _MAP_TILE_ORIGIN:
         **SECURE_CSP,
         "img-src": [*SECURE_CSP["img-src"], _MAP_TILE_ORIGIN],  # type: ignore[misc]
     }
+
+# Payment provider (PAY.5, owner decision D-09): the registered provider checkout uses, set per
+# environment with MPMV_PAYMENT_PROVIDER. Empty means none is configured yet (PAY.1 registers
+# Stripe, the only provider at launch). An unknown code fails the system check payments.E001.
+# The in-memory fake provider exists only where PAYMENT_ALLOW_FAKE_PROVIDER is True (tests).
+PAYMENT_PROVIDER = env_str("MPMV_PAYMENT_PROVIDER", "")
+PAYMENT_ALLOW_FAKE_PROVIDER = False
 
 # Per-API-key rate limit (CORE.12, CORE.16, apps.api.engine): fixed windows counted in PostgreSQL,
 # so every app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every

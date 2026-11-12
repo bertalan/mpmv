@@ -9,8 +9,8 @@ from django.core.management.base import CommandError
 from django.utils import timezone
 
 from apps.core.models import OutboxEmail
-from apps.payments.engine import ALERT_KEY, PaidPayment
 from apps.payments.services import check_payments_without_transfer
+from apps.payments.transfer_alert import ALERT_KEY, PaidPayment
 
 pytestmark = pytest.mark.django_db
 

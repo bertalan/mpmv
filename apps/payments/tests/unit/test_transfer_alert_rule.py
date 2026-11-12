@@ -2,8 +2,8 @@
 
 import datetime as dt
 
-from apps.payments.engine import ALERT_KEY, PaidPayment, payment_without_transfer_alert
-from apps.payments.engine import payments_without_transfer as late_payments
+from apps.payments.transfer_alert import ALERT_KEY, PaidPayment, payment_without_transfer_alert
+from apps.payments.transfer_alert import payments_without_transfer as late_payments
 
 NOW = dt.datetime(2027, 3, 1, 12, 0, tzinfo=dt.UTC)
 GRACE = dt.timedelta(minutes=60)
