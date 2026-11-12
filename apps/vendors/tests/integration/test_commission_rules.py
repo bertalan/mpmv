@@ -458,7 +458,7 @@ def test_a_rule_cannot_leave_a_gap_after_a_closed_one() -> None:
     add_rule(CommissionRuleFactory.build(valid_from=utc(2027)), ctx=CTX)  # exactly at the end
 
 
-# --- CORE.25 session level and the Configuration and tax role (D-32 group 2, `commission_change`)
+# --- CORE.25 session level and the Configuration and tax role (D-32 sensitive, `commission_change`)
 
 
 def role_user(key: str) -> User:
@@ -484,13 +484,13 @@ PLAN_FORM = {"code": "gold", "name": "Gold", "max_products": "10", "features": "
 
 
 def test_a_restricted_session_is_refused_on_a_rule_and_a_plan_change(client: Client) -> None:
-    verified_login(client, role_user("config"), passkey=True, level=levels.RESTRICTED)
+    verified_login(client, role_user("config"), passkey=True, level=levels.NO_WINDOW)
     rule_url = reverse("admin:vendors_commissionrule_add")
     assert client.get(rule_url).status_code == 403
     assert client.post(rule_url, RULE_FORM).status_code == 403
     assert not CommissionRule.objects.exists()
     client = Client()
-    verified_login(client, role_user("owner"), passkey=True, level=levels.RESTRICTED)
+    verified_login(client, role_user("owner"), passkey=True, level=levels.NO_WINDOW)
     assert client.post(reverse("admin:vendors_vendorplan_add"), PLAN_FORM).status_code == 403
     assert not VendorPlan.objects.filter(code="gold").exists()
 
@@ -510,7 +510,7 @@ def test_the_configuration_role_adds_rules_and_the_platform_owner_adds_plans(
 def test_a_plan_change_needs_the_operational_session_too(client: Client) -> None:
     plan = VendorPlanFactory.create(code="silver")
     url = reverse("admin:vendors_vendorplan_change", args=[plan.pk])
-    verified_login(client, role_user("owner"), passkey=True, level=levels.RESTRICTED)
+    verified_login(client, role_user("owner"), passkey=True, level=levels.NO_WINDOW)
     assert client.post(url, {**PLAN_FORM, "code": "silver", "name": "Changed"}).status_code == 403
     plan.refresh_from_db()
     assert plan.name != "Changed"

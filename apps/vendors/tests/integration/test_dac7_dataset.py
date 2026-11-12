@@ -361,7 +361,7 @@ def test_the_admin_refuses_a_new_vendor_with_dac7_data_without_a_fresh_second_fa
 ) -> None:
     verified_login(client, staff, verified_at=time.time() - 3600)
     # No bank field in the form: the DAC7 step-up is what refuses it (a bank field would ask
-    # for the group 3 passkey first, `payout_details`).
+    # for the critical passkey first, `payout_details`).
     response = client.post(
         reverse("admin:vendors_vendor_add"),
         add_form(iban="", bic="", bank_name="", account_holder_name=""),

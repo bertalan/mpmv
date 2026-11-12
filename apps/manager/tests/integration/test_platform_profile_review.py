@@ -190,7 +190,7 @@ def test_the_other_platform_roles_get_404(client: Client, changed: AuditLog, key
     assert client.post(revert_url(changed), {"reason": "x"}).status_code == 404
 
 
-# --- CORE.25: the revert is a group 2 action (needs operational mode)
+# --- CORE.25: the revert is a sensitive action (needs an open passkey window)
 
 
 @pytest.fixture
@@ -208,7 +208,7 @@ def logo_entry(vendor: Vendor, owner: User) -> AuditLog:
 def test_a_restricted_session_cannot_revert_a_text_change(
     client: Client, reviewer: User, changed: AuditLog, vendor: Vendor
 ) -> None:
-    verified_login(client, reviewer, level=levels.RESTRICTED)
+    verified_login(client, reviewer, level=levels.NO_WINDOW)
     response = client.post(revert_url(changed), {"reason": "Not acceptable."})
     assert response.status_code == 403
     assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "New tagline"
@@ -218,7 +218,7 @@ def test_a_restricted_session_cannot_revert_a_text_change(
 def test_a_restricted_session_cannot_revert_a_logo_change(
     client: Client, reviewer: User, logo_entry: AuditLog, vendor: Vendor
 ) -> None:
-    verified_login(client, reviewer, level=levels.RESTRICTED)
+    verified_login(client, reviewer, level=levels.NO_WINDOW)
     assert client.post(revert_url(logo_entry), {"reason": "Not theirs."}).status_code == 403
     vendor.refresh_from_db()
     assert vendor.logo is not None
@@ -228,7 +228,7 @@ def test_a_restricted_session_cannot_revert_a_logo_change(
 def test_an_operational_session_reverts_both_kinds(
     client: Client, reviewer: User, changed: AuditLog, logo_entry: AuditLog, vendor: Vendor
 ) -> None:
-    verified_login(client, reviewer, level=levels.OPERATIONAL)
+    verified_login(client, reviewer, level=levels.PASSKEY_WINDOW)
     client.post(revert_url(changed), {"reason": "Not acceptable."})
     client.post(revert_url(logo_entry), {"reason": "Not theirs."})
     assert AuditLog.objects.filter(action="vendor.profile_reverted").count() == 1
@@ -247,9 +247,9 @@ def test_the_notice_decisions_are_a_group_2_action(client: Client) -> None:
 
     staff = UserFactory.create(permissions=["core.platform_owner", "compliance.review_notices"])
     url = f"{PLATFORM}notices/{uuid.uuid4()}/"
-    verified_login(client, staff, level=levels.RESTRICTED)
+    verified_login(client, staff, level=levels.NO_WINDOW)
     assert client.post(url, {"action": "review"}).status_code == 403
-    verified_login(client, staff, level=levels.OPERATIONAL)
+    verified_login(client, staff, level=levels.PASSKEY_WINDOW)
     assert client.post(url, {"action": "review"}).status_code == 404  # past the gate
 
 
@@ -266,7 +266,7 @@ def test_confirming_a_logo_replacement_deletes_the_kept_file_and_is_gated(
     assert entry.before is not None
     kept = int(entry.before["logo"].removeprefix("image:"))
     confirm = f"{PAGE}{entry.public_id}/confirm/"
-    verified_login(client, reviewer, level=levels.RESTRICTED)
+    verified_login(client, reviewer, level=levels.NO_WINDOW)
     assert client.post(confirm).status_code == 403
     assert MediaImage.objects.filter(pk=kept).exists()
     verified_login(client, reviewer)

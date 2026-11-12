@@ -344,7 +344,7 @@ CLAIM_ACTIONS = (
         "approve_claim",
         "Approve the submitted claim",
         decision_action("approve_claim"),
-        level="owner_role_grant",  # D-32 group 3: it grants the owner role
+        level="owner_role_grant",  # D-32 critical: it grants the owner role
     ),
     _claim_admin_action(
         "reject_claim", "Reject the submitted claim", decision_action("reject_claim")
@@ -560,7 +560,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         form_url: str = "",
         extra_context: dict[str, Any] | None = None,
     ) -> HttpResponse:
-        """Changing the invoicing bank details needs a per-action passkey (D-32 group 3,
+        """Changing the invoicing bank details needs a per-action passkey (D-32 critical,
         `payout_details`); other edits do not."""
         parent = super().changeform_view
 
@@ -924,7 +924,7 @@ class VendorPlanAdmin(admin.ModelAdmin[VendorPlan]):
         form_url: str = "",
         extra_context: dict[str, Any] | None = None,
     ) -> HttpResponse:
-        """A plan sets limits and scopes commission rules: an operational session (CORE.25)."""
+        """A plan sets limits and scopes commission rules: a passkey or an open window (CORE.25)."""
         parent = super().changeform_view
         return requires_level("commission_change")(
             lambda req: parent(req, object_id, form_url, extra_context)
@@ -1066,8 +1066,8 @@ class NoTinCountryAdmin(admin.ModelAdmin[NoTinCountry]):
     end page asks for the reason, refuses an empty one and shows how many vendors it blocks. No
     bulk action: it has no place to ask for a reason.
 
-    A change relaxes a compliance and payout gate, so every write view needs an operational
-    session (CORE.25, D-32 group 2, action `no_tin_country`)."""
+    A change relaxes a compliance and payout gate, so every write view needs a passkey
+    or an open passkey window (CORE.25, D-32 sensitive, action `no_tin_country`)."""
 
     delete_confirmation_template = "admin/vendors/notincountry/delete_confirmation.html"
 

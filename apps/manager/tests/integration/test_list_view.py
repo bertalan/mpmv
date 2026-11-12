@@ -245,9 +245,9 @@ def test_a_bulk_action_is_a_group_2_action_so_a_restricted_session_is_refused(
     client: Client, owner: User, members: list[VendorMember]
 ) -> None:
     data = {"action": "touch", "selected": _ids(members[1]), "confirm": "1"}
-    verified_login(client, owner, level=levels.RESTRICTED)
+    verified_login(client, owner, level=levels.NO_WINDOW)
     assert client.post(LIST, data).status_code == 403
     assert views.CALLS == []
-    verified_login(client, owner, level=levels.OPERATIONAL)
+    verified_login(client, owner, level=levels.PASSKEY_WINDOW)
     assert client.post(LIST, data).status_code == 302
     assert [("touch", _ids(members[1]), False)] == views.CALLS
