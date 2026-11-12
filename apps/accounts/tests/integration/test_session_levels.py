@@ -243,6 +243,52 @@ def test_the_banner_shows_the_mode_and_an_end_now_button(client: Client) -> None
     assert "End now" in banner
 
 
+def _restricted_banner(client: Client) -> str:
+    from django.template import Context, Template
+
+    request = client.get(reverse("test-export")).wsgi_request
+    return Template("{% load session_levels %}{% session_level_banner %}").render(
+        Context({"request": request})
+    )
+
+
+def test_the_restricted_banner_offers_the_passkey_window_to_who_may_elevate(
+    client: Client,
+) -> None:
+    user, _ = _staff_with_passkey()
+    _restricted_session(client, user)
+    banner = _restricted_banner(client)
+    assert "Sensitive actions ask for your passkey once, or open a passkey window" in banner
+    assert 'data-passkey="elevate"' in banner
+    assert "Open passkey window" in banner
+    assert reverse("levels:operational") in banner
+    assert "Passkeys need JavaScript." in banner  # the no-JavaScript fallback
+    assert "Add a passkey" not in banner
+
+
+def test_the_restricted_banner_offers_enrolment_to_who_holds_elevate_without_a_passkey(
+    client: Client,
+) -> None:
+    user = UserFactory.create(staff=True)
+    user.user_permissions.add(Permission.objects.get(codename=levels.ELEVATE_CODENAME))
+    verified_login(client, user, level=levels.RESTRICTED)
+    banner = _restricted_banner(client)
+    assert "Add a passkey" in banner
+    assert reverse("mfa:setup") in banner
+    assert "next=" in banner
+    assert 'data-passkey="elevate"' not in banner
+    assert "cannot open a passkey window" not in banner
+
+
+def test_the_restricted_banner_says_plainly_when_the_role_cannot_elevate(client: Client) -> None:
+    user, _ = _staff_with_passkey(elevate=False)
+    _restricted_session(client, user)
+    banner = _restricted_banner(client)
+    assert "Your role cannot open a passkey window" in banner
+    assert 'data-passkey="elevate"' not in banner
+    assert "Add a passkey" not in banner
+
+
 # --- Do it once
 
 

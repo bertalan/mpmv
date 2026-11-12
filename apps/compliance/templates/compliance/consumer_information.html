@@ -1,0 +1,19 @@
+{% extends "layouts/content.html" %}
+{% load i18n %}
+{% block title %}{% translate "Consumer information" %} · {{ site_name }}{% endblock %}
+{% block page_content %}
+  <article class="consumer-information">
+    <h1>{% translate "Consumer information" %}</h1>
+    <section id="withdrawal">
+      <h2>{% translate "Right of withdrawal" %}</h2>
+      <p>{% blocktranslate with days=info.withdrawal.period_days %}You may withdraw from a distance contract within {{ days }} days without giving a reason. The period runs from the day you receive the goods. Each seller in your order is a separate contract.{% endblocktranslate %}</p>
+      <p>{% translate "To withdraw online, use the button below at any time during the withdrawal period. You enter the order number and your email address, choose the parts to withdraw from, and confirm. You receive an acknowledgement by email with the content, the date and the time." %}</p>
+      <p><a class="withdrawal-link" href="{{ info.withdrawal.url }}">{{ info.withdrawal.button_label }}</a></p>
+    </section>
+    <section id="guarantee">
+      <h2>{% translate "Legal guarantee of conformity" %}</h2>
+      <p>{% blocktranslate with months=info.guarantee.months %}Goods sold to consumers have a legal guarantee of conformity of {{ months }} months from delivery. The seller is liable for a lack of conformity that appears within that period.{% endblocktranslate %}</p>
+      {% if info.guarantee.notice_is_draft %}<p><em>{% translate "This is a summary. The harmonised notice on the legal guarantee will replace it." %}</em></p>{% endif %}
+    </section>
+  </article>
+{% endblock %}
