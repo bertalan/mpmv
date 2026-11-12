@@ -67,7 +67,8 @@ def bad_request(request: HttpRequest, exception: Exception) -> HttpResponse:
 
 
 @never_cache
-@staff_member_required
+# The site login, not the loopback-only django-admin one.
+@staff_member_required(login_url=settings.MFA_LOGIN_URL)  # type: ignore[untyped-decorator]
 def styleguide(request: HttpRequest) -> HttpResponse:
     """`/_styleguide/` (THM.4, spec 14 §14.9): every component in every state, staff only.
 

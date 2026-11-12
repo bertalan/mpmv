@@ -34,14 +34,14 @@ def verified_login(
     device: TOTPDevice | None = None,
     *,
     verified_at: float | None = None,
-    level: str = levels.OPERATIONAL,
+    level: str = levels.PASSKEY_WINDOW,
     passkey: bool = False,
 ) -> TOTPDevice:
     """Log `user` in with a second factor already verified (a confirmed TOTP device).
 
-    The session is in operational mode by default, so tests of other features reach sensitive
-    views; pass `level=levels.RESTRICTED` for what a real login gives (CORE.25). `passkey=True`
-    also records a fresh passkey with user verification, as a group 3 action asks.
+    The passkey window is open by default, so tests of other features reach sensitive
+    views; pass `level=levels.NO_WINDOW` for what a real login gives (CORE.25). `passkey=True`
+    also records a fresh passkey with user verification, as a critical action asks.
     """
     device = device or TOTPDeviceFactory.create(user=user)
     client.force_login(user)
@@ -51,7 +51,7 @@ def verified_login(
     if passkey:
         session[VERIFIED_KIND_SESSION_KEY] = "passkey"
         session[VERIFIED_UV_SESSION_KEY] = True
-    if level == levels.OPERATIONAL:
+    if level == levels.PASSKEY_WINDOW:
         session[levels.STARTED_KEY] = session[levels.ACTIVITY_KEY] = time.time()
     session.save()
     return device

@@ -1,0 +1,10 @@
+{% if email_language == "it" %}{% if customer_name %}Ciao {{ customer_name }},{% else %}Ciao,{% endif %}
+
+Confermiamo che il {{ submitted_at }} hai dichiarato, con la funzione di recesso del nostro sito, di recedere dal contratto per le seguenti parti dell'ordine {{ order_number }}:{% else %}{% if customer_name %}Hello {{ customer_name }},{% else %}Hello,{% endif %}
+
+This confirms that on {{ submitted_at }} you declared, with the withdrawal function of our website, that you withdraw from the contract for the following parts of order {{ order_number }}:{% endif %}
+{% for statement in statements %}
+- {{ statement.vendor_name }} ({% if email_language == "it" %}riferimento{% else %}reference{% endif %} {{ statement.reference }}){% for line in statement.lines %}
+  {{ line.quantity }} x {{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %}{% endfor %}
+{% endfor %}
+{% if email_language == "it" %}Il venditore ti dirà come restituire la merce. Conserva questo messaggio come prova del tuo recesso.{% else %}The seller will tell you how to return the goods. Keep this message as proof of your withdrawal.{% endif %}

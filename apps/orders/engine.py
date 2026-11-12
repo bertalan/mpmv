@@ -9,6 +9,7 @@ import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
+from urllib.parse import quote
 
 from apps.core.money import round_line
 
@@ -192,6 +193,80 @@ def normalise_carrier(raw: str) -> str:
     if value and (len(value) > CARRIER_MAX or not _CARRIER_RE.fullmatch(value)):
         raise InvalidTracking("the carrier name is too long or has characters it cannot have")
     return value
+
+
+# --- the customer's view of one vendor part (ORD.7) -------------------------------------------
+
+
+@dataclass(frozen=True)
+class TimelineStep:
+    """One step of the status timeline. `status` is `done`, `current` (the last step reached)
+    or `upcoming`; `at` is the time when the order keeps one for the step."""
+
+    key: str
+    status: str
+    at: dt.datetime | None
+
+
+_TIMELINE_KEYS = ("placed", "paid", "accepted", "shipped", "delivered")
+_ACCEPTED_ON = frozenset({"accepted", "shipped", "delivered", "completed"})
+_SHIPPED_ON = frozenset({"shipped", "delivered", "completed"})
+_DELIVERED_ON = frozenset({"delivered", "completed"})
+
+
+def vendor_timeline(
+    state: str,
+    *,
+    placed_at: dt.datetime,
+    paid_at: dt.datetime | None,
+    shipped_at: dt.datetime | None,
+    delivered_at: dt.datetime | None,
+) -> tuple[TimelineStep, ...]:
+    """The steps a customer sees for one vendor part: placed, paid, accepted, shipped, delivered.
+
+    A cancelled or refunded part keeps the steps its timestamps prove and ends with one step
+    named after its state (the order does not keep the time the vendor accepted a part)."""
+    dead = state in _DEAD_STATES
+    reached = {
+        "placed": True,
+        "paid": paid_at is not None,
+        "accepted": shipped_at is not None or (not dead and state in _ACCEPTED_ON),
+        "shipped": shipped_at is not None or (not dead and state in _SHIPPED_ON),
+        "delivered": delivered_at is not None or (not dead and state in _DELIVERED_ON),
+    }
+    times: dict[str, dt.datetime | None] = {
+        "placed": placed_at,
+        "paid": paid_at,
+        "accepted": None,
+        "shipped": shipped_at,
+        "delivered": delivered_at,
+    }
+    done = [key for key in _TIMELINE_KEYS if reached[key]]
+    if dead:
+        return (
+            *(TimelineStep(key, "done", times[key]) for key in done),
+            TimelineStep(state, "current", None),
+        )
+    return tuple(
+        TimelineStep(
+            key,
+            "upcoming" if not reached[key] else ("current" if key == done[-1] else "done"),
+            times[key],
+        )
+        for key in _TIMELINE_KEYS
+    )
+
+
+def tracking_link(template: str, tracking_number: str) -> str:
+    """The carrier's tracking page for a number, or "" when there is none to show.
+
+    The template comes from the carrier record and must hold `{tracking_number}` and start with
+    `https://`; the number is percent-encoded. Anything else gives no link, never a bad one."""
+    if not tracking_number or "{tracking_number}" not in template:
+        return ""
+    if not template.startswith("https://"):
+        return ""
+    return template.replace("{tracking_number}", quote(tracking_number, safe=""))
 
 
 _FULFILLED_STATES = frozenset({"shipped", "delivered", "completed"})
