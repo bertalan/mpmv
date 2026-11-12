@@ -178,9 +178,9 @@ def _icc_with_payload() -> bytes:
     return srgb + SCRIPT + SECRET_PLACE
 
 
-def _minimal_pdf() -> bytes:
+def _minimal_pdf(catalog_extra: bytes = b"") -> bytes:
     objects = [
-        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Catalog /Pages 2 0 R " + catalog_extra + b">>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
         b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>",
     ]
@@ -491,6 +491,29 @@ def document_cases() -> list[Case]:
             "PDF header followed by HTML a browser would sniff",
             tags=frozenset({"polyglot"}),
         ),
+        *[
+            Case(
+                f"doc-active-{label}",
+                "guide.pdf",
+                _minimal_pdf(extra),
+                "refuse",
+                f"PDF active content: {label}",
+                tags=frozenset({"active-content"}),
+            )
+            for label, extra in (
+                ("openaction-js", b"/OpenAction << /S /JavaScript /JS (app.alert(1)) >> "),
+                ("js-name", b"/Names << /JavaScript 9 0 R >> "),
+                ("js-key", b"/X << /JS (x) >> "),
+                ("launch", b"/OpenAction << /S /Launch /F (calc.exe) >> "),
+                ("embedded-file", b"/Names << /EmbeddedFiles 9 0 R >> "),
+                ("additional-actions", b"/AA << /O 9 0 R >> "),
+                ("submit-form", b"/A << /S /SubmitForm /F (https://x.example/) >> "),
+                ("rich-media", b"/Type /RichMedia "),
+                ("xfa", b"/AcroForm << /XFA 9 0 R >> "),
+                ("hex-escaped-name", b"/OpenAction << /S /J#61vaScript /J#53 (x) >> "),
+                ("open-action-only", b"/OpenAction [3 0 R /Fit] "),
+            )
+        ],
         Case("doc-png-as-pdf", "guide.pdf", png(), "refuse", "an image named .pdf"),
         Case("doc-html", "guide.html", HTML_PAGE, "refuse", "an HTML document"),
         Case("doc-svg", "logo.svg", SVG_WITH_SCRIPT, "refuse", "an SVG document"),

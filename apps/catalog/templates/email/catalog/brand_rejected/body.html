@@ -1,0 +1,11 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}{{ vendor_name }}: the platform team did not approve the brand below. It was removed from your products listed under it, which stay on sale without a brand. Open each product in your shop area and pick an existing brand, or propose the brand again with an official link or a Wikidata ID.{% endblocktranslate %}</p>
+{% for brand in brands %}<h2>{{ brand.name }}</h2>
+{% if brand.products %}<ul>
+{% for product in brand.products %}<li>{{ product.title }} ({{ product.sku }})</li>
+{% endfor %}</ul>
+{% else %}<p>{% translate "No products used it." %}</p>
+{% endif %}{% endfor %}</body>
+</html>

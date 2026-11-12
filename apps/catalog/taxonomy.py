@@ -35,15 +35,23 @@ from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.functions import Lower
+from django.utils.translation import gettext_lazy as _
 from treebeard.mp_tree import MP_Node
-from wagtail.models import Page
+from wagtail.models import Collection, Page
 
 from apps.core import translations
 from apps.core.fields import CountryField
-from apps.core.models import BaseModel, TranslationModel, resolve_translation
+from apps.core.models import BaseModel, MediaImage, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
+from apps.vendors.scoping import VendorScopedManager
 
 from . import engine, slugs
+from .fields import (
+    language_field,
+    seo_description_field,
+    seo_title_field,
+    translation_status_field,
+)
 
 url_slug_validator = RegexValidator(
     r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
@@ -56,7 +64,13 @@ code_validator = RegexValidator(
 
 def _slug_field() -> models.SlugField[Any, Any]:
     return models.SlugField(
-        max_length=200, validators=[url_slug_validator], help_text="URL segment in this language."
+        max_length=200,
+        validators=[url_slug_validator],
+        help_text=_(
+            "The last part of the web address in this language, for example 'summer-bags'. "
+            "Required: use lower case letters, digits and single hyphens. It must differ from "
+            "the others at the same level."
+        ),
     )
 
 
@@ -93,12 +107,26 @@ class CategoryTranslation(TranslationModel):
     translation_of = "category"
     translated_fields = ("name", "description", "seo_title", "seo_description")
 
+    language = language_field()
+    status = translation_status_field()
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="translations")
-    name = models.CharField(max_length=255)
+    name = models.CharField(
+        max_length=255,
+        help_text=_(
+            "The name of the category in this language, for example 'Bags'. Required: without "
+            "it the category has no name for buyers."
+        ),
+    )
     slug = _slug_field()
-    description = models.TextField(blank=True, help_text="HTML, shown on the category page.")
-    seo_title = models.CharField("SEO title", max_length=255, blank=True)
-    seo_description = models.TextField("SEO description", blank=True)
+    description = models.TextField(
+        blank=True,
+        help_text=_(
+            "An introduction shown on the category page, for example what you find in it. "
+            "Basic formatting is allowed. Optional."
+        ),
+    )
+    seo_title = seo_title_field()
+    seo_description = seo_description_field()
 
     class Meta(TranslationModel.Meta):
         ordering = ["category", "language"]
@@ -137,22 +165,39 @@ class Taxonomy(BaseModel):  # type: ignore[django-manager-missing]  # Term is un
         max_length=64,
         unique=True,
         validators=[code_validator],
-        help_text="Stable key for imports and the API, e.g. compatibility. Not shown to visitors.",
+        help_text=_(
+            "A short fixed name for this set of categories or tags, for example 'season'. "
+            "Required: lower case letters, digits and _, starting with a letter. Imports use "
+            "it, so do not change it later; buyers never see it."
+        ),
     )
     hierarchical = models.BooleanField(
-        default=False, help_text="Terms can have child terms (e.g. maker → model)."
+        default=False,
+        help_text=_(
+            "Tick it if categories or tags in this set can sit inside others, for example "
+            "maker and then model. Leave it unticked for a flat list."
+        ),
     )
-    filterable = models.BooleanField(default=True, help_text="Offered as a listing filter.")
+    filterable = models.BooleanField(
+        default=True,
+        help_text=_("Tick it to let buyers narrow a product list by these categories or tags."),
+    )
     has_landing = models.BooleanField(
-        "has landing pages", default=False, help_text="Each term gets its own page."
+        "has landing pages",
+        default=False,
+        help_text=_(
+            "Tick it to give each category or tag of this set its own page that buyers can "
+            "open and share."
+        ),
     )
     term_attributes = models.JSONField(
         default=list,
         blank=True,
-        help_text='Extra fields of the terms: a list like [{"code": "model_year", "kind": '
-        '"number", "required": false, "label": "Model year"}]; kinds: '
-        + ", ".join(engine.TERM_ATTRIBUTE_KINDS)
-        + ".",
+        help_text=_(
+            "Extra details to record for each category or tag, written as a list, for example "
+            '[{"code": "model_year", "kind": "number", "required": false, "label": "Model '
+            'year"}]. Leave it empty for none. The kind is one of: text, number, boolean.'
+        ),
     )
 
     class Meta:
@@ -190,8 +235,16 @@ class TaxonomyTranslation(TranslationModel):
     translation_of = "taxonomy"
     translated_fields = ("name",)
 
+    language = language_field()
+    status = translation_status_field()
     taxonomy = models.ForeignKey(Taxonomy, on_delete=models.CASCADE, related_name="translations")
-    name = models.CharField(max_length=255)
+    name = models.CharField(
+        max_length=255,
+        help_text=_(
+            "The name of this set of categories or tags in this language, for example "
+            "'Season'. Required: without it the set has no name for buyers."
+        ),
+    )
     slug = _slug_field()
 
     class Meta(TranslationModel.Meta):
@@ -233,11 +286,22 @@ CMS_TOP_LEVEL_DEPTH = 3
 class Term(MP_Node, BaseModel):  # type: ignore[misc,django-manager-missing]  # untyped
     """A term of a taxonomy: a tree per taxonomy, flat when the taxonomy is not hierarchical."""
 
-    taxonomy = models.ForeignKey(Taxonomy, on_delete=models.PROTECT, related_name="terms")
+    taxonomy = models.ForeignKey(
+        Taxonomy,
+        on_delete=models.PROTECT,
+        related_name="terms",
+        help_text=_(
+            "The set of categories or tags this one belongs to, for example 'season'. "
+            "Required. It cannot be changed afterwards."
+        ),
+    )
     attributes = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Values of the extra fields the taxonomy declares, by code.",
+        help_text=_(
+            "The values of the extra details its set asks for, written as code and value, for "
+            'example {"model_year": 2020}. Leave it empty if the set asks for none.'
+        ),
     )
 
     class Meta:
@@ -306,12 +370,26 @@ class TermTranslation(TranslationModel):
     translation_of = "term"
     translated_fields = ("name", "description", "seo_title", "seo_description")
 
+    language = language_field()
+    status = translation_status_field()
     term = models.ForeignKey(Term, on_delete=models.CASCADE, related_name="translations")
-    name = models.CharField(max_length=255)
+    name = models.CharField(
+        max_length=255,
+        help_text=_(
+            "The name of the category or tag in this language, for example 'Summer'. "
+            "Required: without it it has no name for buyers."
+        ),
+    )
     slug = _slug_field()
-    description = models.TextField(blank=True, help_text="HTML, shown on the term page.")
-    seo_title = models.CharField("SEO title", max_length=255, blank=True)
-    seo_description = models.TextField("SEO description", blank=True)
+    description = models.TextField(
+        blank=True,
+        help_text=_(
+            "An introduction shown on the page of this category or tag. Basic formatting is "
+            "allowed. Optional."
+        ),
+    )
+    seo_title = seo_title_field()
+    seo_description = seo_description_field()
 
     class Meta(TranslationModel.Meta):
         ordering = ["term", "language"]
@@ -350,15 +428,41 @@ class Manufacturer(BaseModel):
     """The company behind one or more brands (CAT.20): legal name, official URL, `sameAs` links
     and country. Shared by all vendors; edited by Catalog staff only."""
 
-    legal_name = models.CharField(max_length=255)
-    url = models.URLField(blank=True, max_length=500, help_text="Official site, https only.")
+    legal_name = models.CharField(
+        _("legal name"),
+        max_length=255,
+        help_text=_(
+            "The registered name of the company that makes the products. It is shown on the "
+            "brand page and in its structured data. Example: 'Acme Holdings Ltd'."
+        ),
+    )
+    url = models.URLField(
+        _("official URL"),
+        blank=True,
+        max_length=500,
+        help_text=_(
+            "The company's own website, an https address. It tells search engines which "
+            "company this is. Example: https://holdings.example/."
+        ),
+    )
     same_as = models.JSONField(
-        "sameAs links",
+        _("sameAs links"),
         default=list,
         blank=True,
-        help_text="Absolute https links: Wikidata, Wikipedia, official profiles.",
+        help_text=_(
+            "A list of https links to the same company elsewhere: Wikidata, Wikipedia, "
+            "official profiles. Search engines use them to recognise the company. "
+            'Example: ["https://www.wikidata.org/wiki/Q7"].'
+        ),
     )
-    country = CountryField(blank=True, help_text="Country of the registered office.")
+    country = CountryField(
+        _("country"),
+        blank=True,
+        help_text=_(
+            "The country of the registered office. It is part of the structured data. "
+            "Example: Italy."
+        ),
+    )
 
     class Meta:
         ordering = ["legal_name"]
@@ -373,6 +477,59 @@ class Manufacturer(BaseModel):
             raise ValidationError(errors)
 
 
+class BrandBatch(BaseModel):
+    """The new brands one feed or import run brought (CAT.20), proposed and reviewed together.
+
+    One row per run, however many brands: they do not count against the vendor's limit on
+    manual proposals. Staff approve or reject the whole run in one step."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Pending review")
+        APPROVED = "approved", _("Approved")
+        REJECTED = "rejected", _("Rejected")
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(
+        "vendors.Vendor",
+        on_delete=models.CASCADE,
+        related_name="brand_batches",
+        verbose_name=_("vendor"),
+        help_text=_(
+            "The vendor whose feed or import brought these brands. It lets the review team "
+            "ask the right person. Example: the vendor that uploaded the product file."
+        ),
+    )
+    source = models.CharField(
+        _("source"),
+        max_length=200,
+        help_text=_(
+            "A short label of the import run. It tells reviewers where the brands come "
+            "from. Example: 'spring price list, import of 2026-11-02'."
+        ),
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+        help_text=_(
+            "Where the review stands. Set by the approve and reject actions, never by hand. "
+            "Example: Pending review."
+        ),
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = _("brand batch")
+        verbose_name_plural = _("brand batches")
+
+    def __str__(self) -> str:
+        return f"{self.source} ({self.vendor_id})"
+
+
 class Brand(BaseModel):
     """A brand (`g:brand` in feeds) as a linked entity (CAT.20); its name is the same in every
     language. One shared list for all vendors: a vendor picks any `approved` brand and proposes a
@@ -384,31 +541,117 @@ class Brand(BaseModel):
         PENDING = "pending", "Pending review"
         REJECTED = "rejected", "Rejected"
 
-    name = models.CharField(max_length=200)
+    name = models.CharField(
+        _("name"),
+        max_length=200,
+        help_text=_(
+            "The brand as customers know it; it is the same in every language. Names that "
+            "differ only in case, accents or punctuation count as duplicates. Example: 'Acme'."
+        ),
+    )
     # What duplicate detection compares: `engine.brand_name_key(name)`, set by `save()`.
     name_key = models.CharField(max_length=200, blank=True, editable=False, db_index=True)
     status = models.CharField(
-        max_length=16, choices=Status.choices, default=Status.APPROVED, db_index=True
+        _("status"),
+        max_length=16,
+        choices=Status.choices,
+        default=Status.APPROVED,
+        db_index=True,
+        help_text=_(
+            "Only approved brands have a public page and can be picked by every vendor. "
+            "Use the approve, reject and merge actions to review a proposal. "
+            "Example: Approved."
+        ),
     )
     wikidata_id = models.CharField(
-        "Wikidata item ID",
+        _("Wikidata item ID"),
         max_length=12,
         blank=True,
-        help_text="E.g. Q42; the format is checked, nothing is fetched.",
+        help_text=_(
+            "The brand's item on Wikidata. It links the brand to one world-wide identity and "
+            "is how duplicates are found. Only the format is checked, nothing is fetched. "
+            "Example: Q42."
+        ),
     )
-    url = models.URLField("official URL", blank=True, max_length=500, help_text="https only.")
+    url = models.URLField(
+        _("official URL"),
+        blank=True,
+        max_length=500,
+        help_text=_(
+            "The brand's own website, an https address. It is linked from the brand page and "
+            "given to search engines. Example: https://acme.example/."
+        ),
+    )
     same_as = models.JSONField(
-        "sameAs links",
+        _("sameAs links"),
         default=list,
         blank=True,
-        help_text="Absolute https links: Wikipedia per language, official profiles.",
+        help_text=_(
+            "A list of https links to the same brand elsewhere: Wikipedia in each language, "
+            "official profiles. The Wikidata link is added from the ID above. "
+            'Example: ["https://en.wikipedia.org/wiki/Acme"].'
+        ),
     )
     logo = models.ForeignKey(
-        "core.MediaImage", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "core.MediaImage",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("logo"),
+        help_text=_(
+            "The brand logo shown on its page. Upload a new one with the file fields below, "
+            "or pick an image from the library that already has its licence and author. "
+            "Example: the official logo as PNG or SVG."
+        ),
     )
-    logo_alt = models.CharField(max_length=125, blank=True)
+    logo_alt = models.CharField(
+        _("logo description"),
+        max_length=125,
+        blank=True,
+        help_text=_(
+            "Plain text describing the logo for people who cannot see it. Required with a "
+            "logo. Example: 'Acme, an anvil in a red circle'."
+        ),
+    )
     manufacturer = models.ForeignKey(
-        Manufacturer, null=True, blank=True, on_delete=models.SET_NULL, related_name="brands"
+        Manufacturer,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="brands",
+        verbose_name=_("manufacturer"),
+        help_text=_(
+            "The company that makes the brand's products, when it is not the brand itself. "
+            "It is shown on the brand page and in the structured data. "
+            "Example: 'Acme Holdings Ltd'."
+        ),
+    )
+    proposed_by = models.ForeignKey(
+        "vendors.Vendor",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="proposed_brands",
+        verbose_name=_("proposed by"),
+        help_text=_(
+            "The vendor that suggested this brand. While the brand is pending only this "
+            "vendor can use it, and the review team knows whom to ask. Empty for brands "
+            "staff created. Example: the vendor that sells it."
+        ),
+    )
+    batch = models.ForeignKey(
+        BrandBatch,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="brands",
+        verbose_name=_("import batch"),
+        help_text=_(
+            "The import run that brought this brand, when it was not proposed by hand. "
+            "Brands of a batch are reviewed together and do not count against the vendor's "
+            "limit on manual proposals. Example: 'spring price list'."
+        ),
     )
 
     class Meta:
@@ -424,6 +667,16 @@ class Brand(BaseModel):
                 condition=~models.Q(wikidata_id=""),
                 name="catalog_brand_wikidata_unique",
                 violation_error_message="Another brand has this Wikidata ID.",
+            ),
+            # Race-safe duplicate detection for proposals (CAT.20). Partial: brands that were
+            # approved before the key existed may share one (legacy data is not rewritten), and
+            # the services refuse a new duplicate of any brand. A rejected brand keeps its name
+            # reserved; proposing it again reopens that row as pending (`brands._candidate`).
+            models.UniqueConstraint(
+                fields=["name_key"],
+                condition=~models.Q(name_key="") & ~models.Q(status="approved"),
+                name="catalog_brand_name_key_open_unique",
+                violation_error_message="A brand with a very similar name exists.",
             ),
         ]
 
@@ -453,6 +706,16 @@ class Brand(BaseModel):
         )
         if key and renamed and others.filter(name_key=key).exists():
             errors.setdefault("name", []).append("A brand with a very similar name exists.")
+        logo = self.logo if self.logo_id else None
+        if logo is not None and not brand_logo_images().filter(pk=logo.pk).exists():
+            errors.setdefault("logo", []).append(
+                "A brand logo comes from the platform's logos collection: upload it there."
+            )
+        if logo is not None and (logo.licence_id is None or not logo.author.strip()):
+            # CMS.8: an image migrated without its licence or author is not chosen for new content.
+            errors.setdefault("logo", []).append(
+                "This image has no licence or author yet: classify it in the image library first."
+            )
         if self.logo_id and not self.logo_alt.strip():
             errors.setdefault("logo_alt", []).append("Describe the logo for screen readers.")
         if self.wikidata_id and others.filter(wikidata_id=self.wikidata_id).exists():
@@ -471,11 +734,36 @@ class BrandTranslation(TranslationModel):
     translation_of = "brand"
     translated_fields = ("description", "seo_title", "seo_description")
 
+    language = language_field()
+    status = translation_status_field()
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name="translations")
     slug = _slug_field()
-    description = models.TextField(blank=True, help_text="HTML, shown on the brand page.")
-    seo_title = models.CharField("SEO title", max_length=255, blank=True)
-    seo_description = models.TextField("SEO description", blank=True)
+    description = models.TextField(
+        _("description"),
+        blank=True,
+        help_text=_(
+            "The text on the brand page, in this language only: a language without one shows "
+            "no description, never another language's. Basic formatting is kept. "
+            "Example: 'Anvils and forging tools made in Bergamo since 1949.'"
+        ),
+    )
+    seo_title = models.CharField(
+        _("SEO title"),
+        max_length=255,
+        blank=True,
+        help_text=_(
+            "The title search engines show for the brand page. Optional. "
+            "Example: 'Acme anvils and forging tools'."
+        ),
+    )
+    seo_description = models.TextField(
+        _("SEO description"),
+        blank=True,
+        help_text=_(
+            "The short text search engines show under the title. Example: 'Buy Acme anvils "
+            "from independent shops.'"
+        ),
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["brand", "language"]
@@ -493,3 +781,14 @@ class BrandTranslation(TranslationModel):
 
     def __str__(self) -> str:
         return f"{self.brand} [{self.language}]"
+
+
+def brand_logo_images() -> models.QuerySet[MediaImage]:
+    """The images a brand logo may be: those in a collection that accepts SVG (the platform
+    logos collection, THM.12) or below one, never a vendor's or a page's image."""
+    paths = Collection.objects.filter(svg_policy__isnull=False).values_list("path", flat=True)
+    condition = models.Q(pk__in=[])
+    for path in paths:
+        condition |= models.Q(collection__path__startswith=path)
+    images: models.QuerySet[MediaImage] = MediaImage.objects.filter(condition)
+    return images

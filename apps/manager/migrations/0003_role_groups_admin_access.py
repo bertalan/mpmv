@@ -1,8 +1,7 @@
 """Give the roles that edit or read the help texts Wagtail's admin access (ARC.32, CORE.18).
 
 Runs the same idempotent sync as the seed: the Catalog and moderation role and the platform
-owner role gain `wagtailadmin.access_admin`; membership is never touched. To be renumbered after
-the other open manager migrations land.
+owner role gain `wagtailadmin.access_admin`; membership is never touched.
 """
 
 from django.db import migrations
@@ -23,5 +22,9 @@ class Migration(migrations.Migration):
     dependencies = [
         ("manager", "0002_seed_role_groups"),
         ("wagtailadmin", "0001_create_admin_access_permissions"),
+        # Wagtail's own migrations give their "choose" permissions to every group that holds the
+        # admin access: they must run before this sync, or the groups would drift.
+        ("wagtailimages", "0023_add_choose_permissions"),
+        ("wagtaildocs", "0011_add_choose_permissions"),
     ]
     operations = [migrations.RunPython(sync, migrations.RunPython.noop)]

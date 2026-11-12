@@ -74,11 +74,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "title",
-                    models.CharField(
-                        help_text="The heading of the help text, in a few words that say what the screen is for. Example: Your orders.",
-                        max_length=120,
-                        verbose_name="title",
-                    ),
+                    models.CharField(max_length=120, verbose_name="title"),
                 ),
                 (
                     "body",
