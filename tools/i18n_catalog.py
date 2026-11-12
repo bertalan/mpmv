@@ -46,8 +46,10 @@ EXTRA_FILES = ("apps/vendors/services.py",)
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
 HELP_TEXT_SCOPES = (
     "apps/catalog",
+    "apps/cms",
     "apps/compliance",
     "apps/core",
+    "apps/events",
     "apps/ingest",
     "apps/shipping",
     "apps/tax",
