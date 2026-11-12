@@ -1,0 +1,5 @@
+{{ vendor_name }}: the buyer of order {{ order_number }} declared on {{ submitted_at }} that they withdraw from the contract for your part of the order (reference {{ reference }}).
+{% for line in lines %}
+- {{ line.quantity }} x {{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %}{% endfor %}
+
+The refund and return follow your usual returns process. The withdrawal is recorded on the platform.

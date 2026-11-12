@@ -2165,7 +2165,13 @@ def product_cards(products: Sequence[Product], language: str) -> list[ProductCar
         text = resolved.translation
         title = text.title if text is not None else product.sku
         url = None
-        if text is not None and text.slug and resolved.language is not None:
+        # Without the product page route (PRODUCT_PAGES_ROUTED false) a link would be a 404.
+        if (
+            getattr(settings, "PRODUCT_PAGES_ROUTED", False)
+            and text is not None
+            and text.slug
+            and resolved.language is not None
+        ):
             url = slugs.product_path(
                 resolved.language, text.slug, default_language=settings.LANGUAGE_CODE
             )

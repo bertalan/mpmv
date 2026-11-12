@@ -16,6 +16,7 @@ from .env import (
     env_str,
     map_tile_origin,
 )
+from .languages import language_settings
 
 # Allows `models.DecimalField[Any]`-style generics at runtime (django-stubs).
 django_stubs_ext.monkeypatch()
@@ -177,7 +178,10 @@ LEVEL_DECORATOR = "apps.accounts.decorators.requires_level"  # CORE.25 (D-32)
 PLATFORM_SECTION_CHECK = "apps.manager.access.may_access_section"
 # The Manager login (CORE.17): where the Manager gate sends anonymous visitors.
 LOGIN_URL = "login"
-MFA_LOGIN_URL = "admin:login"  # until the site and vendor login pages exist
+# Whether product cards link to a product page. The CAT.7 product page is routed, so this is True;
+# the switch stays so that a deployment without the page can never render a link that answers 404.
+PRODUCT_PAGES_ROUTED = True
+MFA_LOGIN_URL = LOGIN_URL  # /account/login/: the django-admin login is loopback-only (OPS.5)
 # Secure action links in emails (CORE.15, spec 02): validity of a link unless its purpose sets
 # its own, and Continue POSTs allowed per client IP every 15 minutes.
 ACTION_LINK_MAX_AGE = 72 * 3600  # seconds
@@ -286,15 +290,9 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# Language order (spec 09, D-18): EN primary and source, then IT, DE, FR, ES; more are added here.
-LANGUAGE_CODE = "en"
-LANGUAGES = [
-    ("en", "English"),
-    ("it", "Italiano"),
-    ("de", "Deutsch"),
-    ("fr", "Français"),
-    ("es", "Español"),
-]
+# Site languages (spec 09, D-18, I18N.15): MPMV_LANGUAGES, an ordered list of codes; the first is
+# the primary (source) language without URL prefix. Default: en,it,de,fr,es. Checked by core.E911.
+LANGUAGE_CODE, LANGUAGES = language_settings(env_list("MPMV_LANGUAGES"))
 USE_I18N = True
 LOCALE_PATHS = [BASE_DIR / "locale"]
 
@@ -414,6 +412,12 @@ COMPLIANCE_PUBLIC_HOLIDAYS: list[str] = []
 # The country -> accepted warnings languages map (CMP.3) is cached per process this long; a staff
 # edit drops this process's copy at once, other processes reload within this time.
 COMPLIANCE_COUNTRY_LANGUAGES_CACHE_SECONDS = 300
+# CMP.6: the withdrawal period in days from receipt of the goods. The directive grants 14 and the
+# code never goes below it; a longer period is a platform choice (open owner question).
+WITHDRAWAL_PERIOD_DAYS = 14
+# CMP.6: the legal guarantee of conformity shown in the pre-contractual information (24 months,
+# the directive's minimum; a country may set a longer one).
+LEGAL_GUARANTEE_MONTHS = 24
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
