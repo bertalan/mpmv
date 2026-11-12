@@ -66,6 +66,8 @@ urlpatterns = [
     path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
     path("_styleguide/", include("apps.themes.urls")),
+    # Temporary staff "Site links" page for STAGE testing (OPS.12); remove before LIVE.
+    path("_links/", include("apps.seo.urls")),
     *i18n_patterns(
         path("vendor/apply/", include("apps.vendors.application_urls")),  # "Sell with us" (VEN.22)
         path("", include("apps.catalog.urls")),  # listings (CAT.8): before the CMS catch-all

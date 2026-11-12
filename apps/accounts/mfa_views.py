@@ -80,7 +80,23 @@ def _bad_request(error: str) -> JsonResponse:
 def setup(request: HttpRequest) -> HttpResponse:
     if not _may_enrol(request):
         return mfa_redirect(request, "mfa:verify")
+    user = _user(request)
     next_url = safe_next(request)
+    passkeys = [
+        {
+            "device": device,
+            "remove_url": reverse(
+                "mfa:remove_device",
+                kwargs={"kind": services.PASSKEY, "public_id": device.public_id},
+            ),
+        }
+        for device in PasskeyDevice.objects.filter(user=user, confirmed=True).order_by("created_at")
+    ]
+    has_totp = TOTPDevice.objects.filter(user=user, confirmed=True).exists()
+    required = services.mfa_required(user)
+    # The "your role requires a factor" notice: only for a user with none, or one sent here by
+    # the MFA gate (a redirect with `next`); the Account menu and the banner say `from=security`.
+    sent_by_gate = "next" in request.GET and request.GET.get("from") != "security"
     return render(
         request,
         "accounts/mfa/setup.html",
@@ -89,7 +105,10 @@ def setup(request: HttpRequest) -> HttpResponse:
             "totp_url": _with_next("mfa:totp", next_url),
             "register_options_url": reverse("mfa:passkey_register_options"),
             "register_url": _with_next("mfa:passkey_register", next_url),
-            "required": services.mfa_required(_user(request)),
+            "required": required,
+            "passkeys": passkeys,
+            "has_totp": has_totp,
+            "show_required": required and (not (passkeys or has_totp) or sent_by_gate),
         },
     )
 

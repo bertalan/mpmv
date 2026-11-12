@@ -391,6 +391,14 @@ msgstr ""
 "Un breve testo mostrato sopra i prodotti di questa categoria o etichetta. Se non ne aggiungi, la "
 "pagina parte direttamente dai prodotti."
 
+#: apps/seo/templates/seo/site_links.html
+msgid ""
+"A temporary list of every page you can open on this site, for testing. Only staff see it; it will "
+"be removed before the site goes live."
+msgstr ""
+"Un elenco temporaneo di tutte le pagine che puoi aprire su questo sito, per i test. Lo vede solo "
+"lo staff; verrà rimosso prima della messa online del sito."
+
 #: apps/cms/blocks.py
 msgid ""
 "A title above the cards, for example 'You may also like'. If you leave it empty, the cards have no"
@@ -429,6 +437,11 @@ msgstr ""
 "I primi eventi di un venditore, fino a questo numero, vengono controllati prima di andare online. "
 "Esempio: 3. Obbligatorio."
 
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "About %(minutes_left)s min left. It also ends when you sign out or after inactivity."
+msgstr ""
+"Mancano circa %(minutes_left)s min. Finisce anche quando esci o dopo un periodo di inattività."
+
 #: apps/manager/forms.py
 msgid "About the shop"
 msgstr "Informazioni sul negozio"
@@ -445,9 +458,13 @@ msgstr "Accettato dal venditore"
 msgid "Access denied"
 msgstr "Accesso negato"
 
-#: themes/base/templates/components/user_tools.html
+#: apps/seo/site_links.py themes/base/templates/components/user_tools.html
 msgid "Account"
 msgstr "Account"
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Account security"
+msgstr "Sicurezza dell’account"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Act on the content"
@@ -461,6 +478,10 @@ msgstr "Azione sulle righe selezionate"
 msgid "Add a factor"
 msgstr "Aggiungi un fattore"
 
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "Add a passkey"
+msgstr "Aggiungi una passkey"
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Add an authenticator app"
 msgstr "Aggiungi un’app di autenticazione"
@@ -473,9 +494,17 @@ msgstr "Aggiungi un link esterno"
 msgid "Add another factor before removing your last one."
 msgstr "Aggiungi un altro fattore prima di rimuovere l’ultimo."
 
+#: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
+msgid "Add another passkey"
+msgstr "Aggiungi un’altra passkey"
+
 #: apps/cms/blocks.py
 msgid "Add at least one question. They show as a list that opens one answer at a time."
 msgstr "Aggiungi almeno una domanda. Si vedono come un elenco che apre una risposta alla volta."
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "added %(created)s"
+msgstr "aggiunta il %(created)s"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
@@ -540,6 +569,12 @@ msgstr ""
 "Un modulo web facoltativo per gli utenti, accanto all'email di assistenza. Deve iniziare con "
 "https://."
 
+#: apps/seo/templates/seo/site_links.html
+msgid "And %(counter)s more."
+msgid_plural "And %(counter)s more."
+msgstr[0] "E ancora %(counter)s."
+msgstr[1] "E altri %(counter)s."
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Anonymous"
 msgstr "Anonimo"
@@ -551,6 +586,10 @@ msgid ""
 msgstr ""
 "Un altro tuo prodotto pensato per essere comprato insieme a questo, per esempio la batteria di un "
 "giocattolo. Lascialo vuoto se non ce n'è."
+
+#: apps/seo/site_links.py
+msgid "API documentation"
+msgstr "Documentazione dell'API"
 
 #: apps/cms/models.py
 msgid "applies to"
@@ -588,6 +627,10 @@ msgstr "App di autenticazione"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Authorities told: %(authority)s, %(at)s."
 msgstr "Autorità informate: %(authority)s, %(at)s."
+
+#: apps/seo/site_links.py
+msgid "Back office"
+msgstr "Back office"
 
 #: apps/orders/templates/orders/customer_order.html
 msgid "Back to my orders"
@@ -657,6 +700,22 @@ msgstr "Corriere: %(carrier)s"
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Corriere: %(carrier)s. Numero di tracking: %(tracking_number)s."
+
+#: apps/seo/site_links.py
+msgid "Catalogue: %(taxonomy)s"
+msgstr "Catalogo: %(taxonomy)s"
+
+#: apps/seo/site_links.py
+msgid "Catalogue: brands"
+msgstr "Catalogo: marchi"
+
+#: apps/seo/site_links.py
+msgid "Catalogue: categories"
+msgstr "Catalogo: categorie"
+
+#: apps/seo/site_links.py
+msgid "Catalogue: products"
+msgstr "Catalogo: prodotti"
 
 #: apps/compliance/forms.py
 msgid "Choose 'Action taken' if the content was restricted, or 'No action' if it was left as it is."
@@ -909,6 +968,10 @@ msgstr "descrizione"
 msgid "Description of the logo"
 msgstr "Descrizione del logo"
 
+#: apps/seo/site_links.py
+msgid "Developer and system"
+msgstr "Sviluppo e sistema"
+
 #: themes/base/templates/components/alert.html
 msgid "Dismiss"
 msgstr "Chiudi"
@@ -921,6 +984,10 @@ msgstr "completato"
 msgid "Drafts"
 msgstr "Bozze"
 
+#: apps/seo/site_links.py
+msgid "DSA points of contact"
+msgstr "Punti di contatto DSA"
+
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid ""
 "Each code signs you in once if you lose your authenticator or passkey. Store them somewhere safe "
@@ -929,9 +996,17 @@ msgstr ""
 "Ogni codice ti fa accedere una sola volta se perdi l’app di autenticazione o la passkey. "
 "Conservali subito in un luogo sicuro: vengono mostrati solo questa volta."
 
+#: apps/seo/site_links.py
+msgid "Editors' admin (Wagtail)"
+msgstr "Amministrazione dei redattori (Wagtail)"
+
 #: apps/manager/templates/manager/login.html
 msgid "Email"
 msgstr "Email"
+
+#: apps/compliance/forms.py
+msgid "Email address of the order"
+msgstr "Indirizzo email dell’ordine"
 
 #: apps/accounts/admin.py
 msgid ""
@@ -940,6 +1015,10 @@ msgid ""
 msgstr ""
 "Abilitata: imposti subito una password. Disabilitata: l'account viene creato senza password e non "
 "può accedere con una password finché non ne viene impostata una."
+
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "End now"
+msgstr "Termina ora"
 
 #: apps/manager/forms.py
 msgid "Enter a valid carrier name."
@@ -952,6 +1031,10 @@ msgstr "Inserisci un indirizzo web valido che inizi con https://"
 #: apps/manager/forms.py
 msgid "Enter the tracking number: letters, digits, spaces and . / _ - only."
 msgstr "Inserisci il numero di tracciamento: solo lettere, cifre, spazi e . / _ -"
+
+#: apps/seo/site_links.py
+msgid "Erase your account (asks for confirmation)"
+msgstr "Cancella il tuo account (chiede conferma)"
 
 #: themes/base/templates/components/alert.html
 msgid "Error"
@@ -1379,6 +1462,10 @@ msgstr "Lingua"
 msgid "Language of the texts"
 msgstr "Lingua dei testi"
 
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "last used %(used)s"
+msgstr "ultimo uso il %(used)s"
+
 #: apps/shipping/models.py
 msgid ""
 "Leave it empty for a zone that every vendor can use. Choose a vendor for a zone that belongs to "
@@ -1422,6 +1509,10 @@ msgstr "Testo del link"
 #: apps/cms/models.py
 msgid "link the vendor guide"
 msgstr "collega la guida per i venditori"
+
+#: apps/seo/site_links.py
+msgid "Liveness probe"
+msgstr "Controllo di attività"
 
 #: themes/base/templates/components/button.html
 msgid "Loading"
@@ -1487,6 +1578,14 @@ msgstr "Principale"
 msgid "Manage recovery codes"
 msgstr "Gestisci i codici di recupero"
 
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Manage two-factor settings and recovery codes"
+msgstr "Gestisci la verifica in due passaggi e i codici di recupero"
+
+#: apps/seo/site_links.py
+msgid "Manager"
+msgstr "Manager"
+
 #: apps/manager/templates/manager/layout.html
 msgid "Manager sections"
 msgstr "Sezioni del Manager"
@@ -1532,6 +1631,10 @@ msgstr "I miei ordini"
 #: apps/catalog/taxonomy.py
 msgid "name"
 msgstr "nome"
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "never used"
+msgstr "mai usata"
 
 #: apps/catalog/taxonomy_admin.py
 msgid "New logo file"
@@ -1658,6 +1761,10 @@ msgstr "Non è stato ancora modificato nulla. Controlla le modifiche qui sotto, 
 msgid "Nothing to show."
 msgstr "Niente da mostrare."
 
+#: apps/seo/templates/seo/site_links.html
+msgid "Nothing yet."
+msgstr "Ancora niente."
+
 #: apps/manager/notice_views.py apps/manager/templates/manager/platform/notice_detail.html
 msgid "Notice"
 msgstr "Segnalazione"
@@ -1670,9 +1777,21 @@ msgstr "Segnalazioni"
 msgid "Notifier"
 msgstr "Segnalante"
 
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "off"
+msgstr "non attiva"
+
 #: apps/catalog/taxonomy.py
 msgid "official URL"
 msgstr "URL ufficiale"
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "on"
+msgstr "attiva"
+
+#: apps/seo/site_links.py
+msgid "On STAGE and LIVE these may answer only from the server's own network."
+msgstr "Su STAGE e LIVE queste pagine possono rispondere solo dalla rete del server."
 
 #: apps/manager/forms.py
 msgid "One line under the shop name. Plain text."
@@ -1789,6 +1908,14 @@ msgstr ""
 msgid "Only when the event is hidden after a notice."
 msgstr "Solo quando l'evento viene nascosto in seguito a una segnalazione."
 
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "Open passkey window"
+msgstr "Apri la finestra passkey"
+
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "Operational mode"
+msgstr "Modalità operativa"
+
 #: apps/catalog/taxonomy_admin.py
 msgid "Optional text that replaces the generated credit line. Example: 'Logo: Acme Ltd'."
 msgstr "Testo facoltativo che sostituisce la riga di credito generata. Esempio: 'Logo: Acme Ltd'."
@@ -1848,6 +1975,10 @@ msgstr "Ordine %(order_number)s: conferma di %(vendor_name)s"
 #: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
 msgid "Order %(order_number)s: part of your order was cancelled"
 msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
+
+#: apps/compliance/forms.py
+msgid "Order number"
+msgstr "Numero d’ordine"
 
 #: apps/orders/customer_views.py
 msgid "Order placed"
@@ -1923,6 +2054,7 @@ msgid "Passkey"
 msgstr "Passkey"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
+#: apps/accounts/templates/accounts/mfa/setup.html
 msgid "passkey"
 msgstr "passkey"
 
@@ -1930,6 +2062,7 @@ msgstr "passkey"
 msgid "Passkey name"
 msgstr "Nome della passkey"
 
+#: apps/accounts/templates/accounts/levels/_banner.html
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Passkeys need JavaScript."
@@ -2015,6 +2148,14 @@ msgstr "Testo semplice per chi non vede l’immagine, per esempio il nome del ne
 msgid "Platform"
 msgstr "Piattaforma"
 
+#: apps/seo/site_links.py
+msgid "Platform space: content reports"
+msgstr "Spazio piattaforma: segnalazioni"
+
+#: apps/seo/site_links.py
+msgid "Platform space: dashboard"
+msgstr "Spazio piattaforma: cruscotto"
+
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Please correct the error below."
 msgid_plural "Please correct the errors below."
@@ -2053,9 +2194,25 @@ msgstr "Indietro"
 msgid "Price with VAT"
 msgstr "Prezzo con IVA"
 
+#: apps/seo/site_links.py
+msgid "Privacy and your data"
+msgstr "Privacy e i tuoi dati"
+
+#: apps/seo/site_links.py
+msgid "Privacy requests (staff)"
+msgstr "Richieste privacy (staff)"
+
+#: apps/seo/site_links.py
+msgid "Privacy sub-processors"
+msgstr "Sub-responsabili del trattamento"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Product"
 msgstr "Prodotto"
+
+#: apps/seo/site_links.py
+msgid "Product pages are not built yet (CAT.7): products are listed once they are."
+msgstr "Le pagine prodotto non esistono ancora (CAT.7): i prodotti compariranno quando ci saranno."
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Products"
@@ -2076,6 +2233,10 @@ msgstr "Quantità"
 #: apps/orders/customer_views.py
 msgid "Quote requested"
 msgstr "Preventivo richiesto"
+
+#: apps/seo/site_links.py
+msgid "Readiness probe"
+msgstr "Controllo di prontezza"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Reason"
@@ -2141,12 +2302,17 @@ msgid "Relative to"
 msgstr "Rispetto a"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
+#: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Remove"
 msgstr "Rimuovi"
 
 #: apps/manager/forms.py
 msgid "Remove the logo"
 msgstr "Rimuovi il logo"
+
+#: apps/seo/site_links.py
+msgid "Report illegal content (DSA)"
+msgstr "Segnala contenuti illegali (DSA)"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
@@ -2172,6 +2338,10 @@ msgstr "Resi e rimborsi"
 #: apps/manager/forms.py
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
+
+#: apps/seo/site_links.py
+msgid "robots.txt"
+msgstr "robots.txt"
 
 #: apps/catalog/taxonomy.py
 msgid "sameAs links"
@@ -2207,6 +2377,14 @@ msgstr "schermata o tipo di pagina"
 msgid "Search by name, SKU, brand or vendor, then click the product."
 msgstr "Cerca per nome, SKU, marchio o venditore, poi clicca sul prodotto."
 
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "Secure mode"
+msgstr "Modalità protetta"
+
+#: apps/accounts/templates/accounts/mfa/setup.html themes/base/templates/components/user_tools.html
+msgid "Security"
+msgstr "Sicurezza"
+
 #: apps/manager/templates/manager/list.html
 msgid "Select"
 msgstr "Seleziona"
@@ -2214,6 +2392,17 @@ msgstr "Seleziona"
 #: apps/manager/lists.py
 msgid "Select at least one row."
 msgstr "Seleziona almeno una riga."
+
+#: apps/seo/site_links.py
+msgid "Sell with us (vendor application)"
+msgstr "Vendi con noi (candidatura venditore)"
+
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid ""
+"Sensitive actions ask for your passkey once, or open a passkey window to cover several in a row."
+msgstr ""
+"Le azioni sensibili chiedono la tua passkey una volta, oppure apri una finestra passkey per "
+"coprirne diverse di seguito."
 
 #: apps/catalog/taxonomy.py
 msgid "SEO description"
@@ -2227,7 +2416,7 @@ msgstr "Titolo SEO"
 msgid "Set up an authenticator app"
 msgstr "Configura un’app di autenticazione"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html apps/seo/site_links.py
 msgid "Set up two-factor authentication"
 msgstr "Configura la verifica in due passaggi"
 
@@ -2269,6 +2458,26 @@ msgstr "Spedizione: %(shipping)s EUR"
 msgid "Shop"
 msgstr "Negozio"
 
+#: apps/seo/site_links.py
+msgid "Shop space: choose the shop"
+msgstr "Spazio negozio: scegli il negozio"
+
+#: apps/seo/site_links.py
+msgid "Shop space: dashboard"
+msgstr "Spazio negozio: cruscotto"
+
+#: apps/seo/site_links.py
+msgid "Shop space: orders"
+msgstr "Spazio negozio: ordini"
+
+#: apps/seo/site_links.py
+msgid "Shop space: storefront profile"
+msgstr "Spazio negozio: profilo del negozio"
+
+#: apps/seo/site_links.py
+msgid "Shops"
+msgstr "Negozi"
+
 #: apps/cms/choosers.py
 msgid "Show only the products of one brand."
 msgstr "Mostra solo i prodotti di un marchio."
@@ -2309,7 +2518,7 @@ msgstr "Mostrata sull'articolo. Un articolo importato mantiene la sua data origi
 msgid "Shown to the vendor and kept in the audit log."
 msgstr "Viene mostrato al venditore e conservato nel registro delle operazioni."
 
-#: apps/manager/templates/manager/login.html
+#: apps/manager/templates/manager/login.html apps/seo/site_links.py
 msgid "Sign in"
 msgstr "Accedi"
 
@@ -2330,6 +2539,10 @@ msgstr ""
 #: apps/ingest/models.py
 msgid "Since when the item is no longer in the feed. Empty while it is there."
 msgstr "Da quando l'articolo non è più nel flusso. Vuoto finché c'è."
+
+#: apps/cms/templatetags/cms_tags.py apps/seo/templates/seo/site_links.html
+msgid "Site links"
+msgstr "Link del sito"
 
 #: themes/base/templates/components/skip_link.html
 msgid "Skip to main content"
@@ -2430,6 +2643,10 @@ msgstr "stato"
 msgid "Status history"
 msgstr "Cronologia dello stato"
 
+#: apps/seo/site_links.py
+msgid "Storefront pages: %(language)s"
+msgstr "Pagine del negozio: %(language)s"
+
 #: apps/manager/sections.py apps/manager/templates/manager/shop/profile.html
 msgid "Storefront profile"
 msgstr "Profilo del negozio"
@@ -2437,6 +2654,10 @@ msgstr "Profilo del negozio"
 #: apps/manager/views.py
 msgid "Storefront profile saved."
 msgstr "Profilo del negozio salvato."
+
+#: apps/seo/site_links.py
+msgid "Styleguide"
+msgstr "Guida di stile"
 
 #: themes/base/templates/components/alert.html
 msgid "Success"
@@ -2453,6 +2674,10 @@ msgstr "Cambia"
 #: apps/manager/forms.py
 msgid "Tagline"
 msgstr "Slogan"
+
+#: apps/seo/site_links.py
+msgid "Technical admin (Django)"
+msgstr "Amministrazione tecnica (Django)"
 
 #: apps/vendors/models.py
 msgid ""
@@ -2533,6 +2758,14 @@ msgid ""
 msgstr ""
 "L'indirizzo a cui mandiamo il link per confermare la candidatura. Obbligatorio: senza un indirizzo"
 " funzionante non puoi proseguire."
+
+#: apps/compliance/forms.py
+msgid ""
+"The address you gave when you ordered. It proves the order is yours, and the confirmation of your "
+"withdrawal is sent there. Required."
+msgstr ""
+"L’indirizzo che hai indicato quando hai ordinato. Dimostra che l’ordine è tuo e la conferma del "
+"tuo recesso viene inviata lì. Obbligatorio."
 
 #: apps/catalog/taxonomy_admin.py
 msgid ""
@@ -3771,6 +4004,14 @@ msgstr ""
 "Le domande che i nuovi venditori fanno più spesso, con le tue risposte. Se non ne aggiungi, la "
 "pagina non mostra domande."
 
+#: apps/compliance/forms.py
+msgid ""
+"The reference from your order confirmation email, for example 2027-000123. Required: without it we"
+" cannot find your order."
+msgstr ""
+"Il riferimento riportato nell’email di conferma dell’ordine, per esempio 2027-000123. "
+"Obbligatorio: senza non riusciamo a trovare il tuo ordine."
+
 #: apps/compliance/models.py
 msgid ""
 "The reference number the authority or the notice gave this case. Leave it empty if there is none."
@@ -4546,8 +4787,7 @@ msgstr "Numero di tracciamento"
 msgid "Tracking number: %(number)s"
 msgstr "Numero di tracciamento: %(number)s"
 
-#: apps/accounts/templates/accounts/mfa/overview.html
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/overview.html apps/seo/site_links.py
 msgid "Two-factor authentication"
 msgstr "Verifica in due passaggi"
 
@@ -5181,6 +5421,14 @@ msgstr[1] "Hai %(counter)s codici di recupero non usati."
 msgid "You have no orders yet"
 msgstr "Non hai ancora ordini"
 
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Your account is protected with a passkey."
+msgstr "Il tuo account è protetto con una passkey."
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Your account is protected with an authenticator app."
+msgstr "Il tuo account è protetto con un’app di autenticazione."
+
 #: apps/vendors/models.py
 msgid ""
 "Your certified email (PEC) address, if you have one. It is required when the SDI recipient code is"
@@ -5243,6 +5491,10 @@ msgstr ""
 "diverso dal codice del prodotto e da quello di ogni altro tuo prodotto o variante: maiuscole e "
 "spazi non rendono diversi due codici."
 
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Your protection"
+msgstr "La tua protezione"
+
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid "Your recovery codes"
 msgstr "I tuoi codici di recupero"
@@ -5250,6 +5502,10 @@ msgstr "I tuoi codici di recupero"
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Your role"
 msgstr "Il tuo ruolo"
+
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "Your role cannot open a passkey window."
+msgstr "Il tuo ruolo non può aprire una finestra passkey."
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
