@@ -5,7 +5,7 @@ from django.apps import apps as django_apps
 from django.core import checks
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DEFAULT_DB_ALIAS, connections
-from django.db.models.signals import post_migrate, post_save, pre_save
+from django.db.models.signals import post_delete, post_migrate, post_save, pre_save
 
 from . import roles
 
@@ -54,6 +54,7 @@ class CmsConfig(AppConfig):
         "vendorlandingpage": "Wagtail page: editor content with revisions and action log",
         "editorroleseed": "marker row that a role was seeded once; no security data of its own",
         "navigationmenu": "Wagtail snippet: menu content, logged in Wagtail's action log",
+        "helpentry": "Wagtail snippet: help text (ARC.32), logged in Wagtail's action log",
         # Installed only for wagtail-localize's editor (I18N.3); its menu is hidden.
         "wagtaildocs.document": "Wagtail document: editor upload, logged in Wagtail's action log",
         # django-taggit (a Wagtail dependency) registers its tags in the staff admin.
@@ -64,11 +65,12 @@ class CmsConfig(AppConfig):
     def ready(self) -> None:
         from wagtail.signals import page_published
 
-        from .checks import check_base_url
+        from .checks import check_base_url, check_vendor_guide_url
         from .models import LegalPage
         from .signals import record_published_legal_page, sanitise_before_save
 
         checks.register(check_base_url, deploy=True)
+        checks.register(check_vendor_guide_url)
         _declare_page_restriction_forms()
         # After every migrate (and every test database flush): one Locale per configured
         # language, so adding a language to settings.LANGUAGES needs no migration (spec 09).
@@ -91,6 +93,16 @@ class CmsConfig(AppConfig):
             )
         # Rich text written outside the editor is stored with the editor's allow-list (CMS.12).
         pre_save.connect(sanitise_before_save, dispatch_uid="cms.sanitise_rich_text")
+        # The cached help answers (ARC.32) are dropped when an entry changes.
+        from . import help as help_lookup
+        from .models import HelpEntry
+
+        post_save.connect(
+            help_lookup.drop_cache, sender=HelpEntry, dispatch_uid="cms.help_cache_save"
+        )
+        post_delete.connect(
+            help_lookup.drop_cache, sender=HelpEntry, dispatch_uid="cms.help_cache_delete"
+        )
         _guard_editor()
 
 
