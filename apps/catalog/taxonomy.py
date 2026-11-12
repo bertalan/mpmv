@@ -46,6 +46,12 @@ from apps.core.translations import Resolved
 from apps.vendors.scoping import VendorScopedManager
 
 from . import engine, slugs
+from .fields import (
+    language_field,
+    seo_description_field,
+    seo_title_field,
+    translation_status_field,
+)
 
 url_slug_validator = RegexValidator(
     r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
@@ -58,7 +64,13 @@ code_validator = RegexValidator(
 
 def _slug_field() -> models.SlugField[Any, Any]:
     return models.SlugField(
-        max_length=200, validators=[url_slug_validator], help_text="URL segment in this language."
+        max_length=200,
+        validators=[url_slug_validator],
+        help_text=_(
+            "The last part of the web address in this language, for example 'summer-bags'. "
+            "Required: use lower case letters, digits and single hyphens. It must differ from "
+            "the others at the same level."
+        ),
     )
 
 
@@ -95,12 +107,26 @@ class CategoryTranslation(TranslationModel):
     translation_of = "category"
     translated_fields = ("name", "description", "seo_title", "seo_description")
 
+    language = language_field()
+    status = translation_status_field()
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="translations")
-    name = models.CharField(max_length=255)
+    name = models.CharField(
+        max_length=255,
+        help_text=_(
+            "The name of the category in this language, for example 'Bags'. Required: without "
+            "it the category has no name for buyers."
+        ),
+    )
     slug = _slug_field()
-    description = models.TextField(blank=True, help_text="HTML, shown on the category page.")
-    seo_title = models.CharField("SEO title", max_length=255, blank=True)
-    seo_description = models.TextField("SEO description", blank=True)
+    description = models.TextField(
+        blank=True,
+        help_text=_(
+            "An introduction shown on the category page, for example what you find in it. "
+            "Basic formatting is allowed. Optional."
+        ),
+    )
+    seo_title = seo_title_field()
+    seo_description = seo_description_field()
 
     class Meta(TranslationModel.Meta):
         ordering = ["category", "language"]
@@ -139,22 +165,39 @@ class Taxonomy(BaseModel):  # type: ignore[django-manager-missing]  # Term is un
         max_length=64,
         unique=True,
         validators=[code_validator],
-        help_text="Stable key for imports and the API, e.g. compatibility. Not shown to visitors.",
+        help_text=_(
+            "A short fixed name for this set of categories or tags, for example 'season'. "
+            "Required: lower case letters, digits and _, starting with a letter. Imports use "
+            "it, so do not change it later; buyers never see it."
+        ),
     )
     hierarchical = models.BooleanField(
-        default=False, help_text="Terms can have child terms (e.g. maker → model)."
+        default=False,
+        help_text=_(
+            "Tick it if categories or tags in this set can sit inside others, for example "
+            "maker and then model. Leave it unticked for a flat list."
+        ),
     )
-    filterable = models.BooleanField(default=True, help_text="Offered as a listing filter.")
+    filterable = models.BooleanField(
+        default=True,
+        help_text=_("Tick it to let buyers narrow a product list by these categories or tags."),
+    )
     has_landing = models.BooleanField(
-        "has landing pages", default=False, help_text="Each term gets its own page."
+        "has landing pages",
+        default=False,
+        help_text=_(
+            "Tick it to give each category or tag of this set its own page that buyers can "
+            "open and share."
+        ),
     )
     term_attributes = models.JSONField(
         default=list,
         blank=True,
-        help_text='Extra fields of the terms: a list like [{"code": "model_year", "kind": '
-        '"number", "required": false, "label": "Model year"}]; kinds: '
-        + ", ".join(engine.TERM_ATTRIBUTE_KINDS)
-        + ".",
+        help_text=_(
+            "Extra details to record for each category or tag, written as a list, for example "
+            '[{"code": "model_year", "kind": "number", "required": false, "label": "Model '
+            'year"}]. Leave it empty for none. The kind is one of: text, number, boolean.'
+        ),
     )
 
     class Meta:
@@ -192,8 +235,16 @@ class TaxonomyTranslation(TranslationModel):
     translation_of = "taxonomy"
     translated_fields = ("name",)
 
+    language = language_field()
+    status = translation_status_field()
     taxonomy = models.ForeignKey(Taxonomy, on_delete=models.CASCADE, related_name="translations")
-    name = models.CharField(max_length=255)
+    name = models.CharField(
+        max_length=255,
+        help_text=_(
+            "The name of this set of categories or tags in this language, for example "
+            "'Season'. Required: without it the set has no name for buyers."
+        ),
+    )
     slug = _slug_field()
 
     class Meta(TranslationModel.Meta):
@@ -235,11 +286,22 @@ CMS_TOP_LEVEL_DEPTH = 3
 class Term(MP_Node, BaseModel):  # type: ignore[misc,django-manager-missing]  # untyped
     """A term of a taxonomy: a tree per taxonomy, flat when the taxonomy is not hierarchical."""
 
-    taxonomy = models.ForeignKey(Taxonomy, on_delete=models.PROTECT, related_name="terms")
+    taxonomy = models.ForeignKey(
+        Taxonomy,
+        on_delete=models.PROTECT,
+        related_name="terms",
+        help_text=_(
+            "The set of categories or tags this one belongs to, for example 'season'. "
+            "Required. It cannot be changed afterwards."
+        ),
+    )
     attributes = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Values of the extra fields the taxonomy declares, by code.",
+        help_text=_(
+            "The values of the extra details its set asks for, written as code and value, for "
+            'example {"model_year": 2020}. Leave it empty if the set asks for none.'
+        ),
     )
 
     class Meta:
@@ -308,12 +370,26 @@ class TermTranslation(TranslationModel):
     translation_of = "term"
     translated_fields = ("name", "description", "seo_title", "seo_description")
 
+    language = language_field()
+    status = translation_status_field()
     term = models.ForeignKey(Term, on_delete=models.CASCADE, related_name="translations")
-    name = models.CharField(max_length=255)
+    name = models.CharField(
+        max_length=255,
+        help_text=_(
+            "The name of the category or tag in this language, for example 'Summer'. "
+            "Required: without it it has no name for buyers."
+        ),
+    )
     slug = _slug_field()
-    description = models.TextField(blank=True, help_text="HTML, shown on the term page.")
-    seo_title = models.CharField("SEO title", max_length=255, blank=True)
-    seo_description = models.TextField("SEO description", blank=True)
+    description = models.TextField(
+        blank=True,
+        help_text=_(
+            "An introduction shown on the page of this category or tag. Basic formatting is "
+            "allowed. Optional."
+        ),
+    )
+    seo_title = seo_title_field()
+    seo_description = seo_description_field()
 
     class Meta(TranslationModel.Meta):
         ordering = ["term", "language"]
@@ -658,6 +734,8 @@ class BrandTranslation(TranslationModel):
     translation_of = "brand"
     translated_fields = ("description", "seo_title", "seo_description")
 
+    language = language_field()
+    status = translation_status_field()
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name="translations")
     slug = _slug_field()
     description = models.TextField(
