@@ -8,13 +8,15 @@
   no CSP violation under the strict policy, screenshots in build/e2e/screenshots.
 """
 
+import contextlib
 import re
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from django.test import Client
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import Page, Route, expect
 from pytest_django.live_server_helper import LiveServer
 from wagtail.models import Page as WagtailPage
 
@@ -86,7 +88,6 @@ def test_the_wagtail_help_item_opens_the_page_help(
 def test_the_wagtail_help_item_answers_space_and_a_stale_answer_is_dropped(
     page: Page, live_server: LiveServer
 ) -> None:
-    HelpEntryFactory.create(kind="general", key="", title="Fresh", body="<p>New.</p>")
     sign_in(page, live_server)
     page.goto(f"{live_server.url}/admin/")
     page.get_by_role("button", name=re.compile(r"^Help\d*")).click()
@@ -95,13 +96,42 @@ def test_the_wagtail_help_item_answers_space_and_a_stale_answer_is_dropped(
     expect(page.locator(DIALOG)).to_be_visible()
     page.keyboard.press("Escape")
     expect(page.locator(DIALOG)).not_to_be_visible()
-    # Two clicks in a row (the second while the first load runs): one entry, never two.
+    # Two clicks in a row: the first answer is held until the second one has been answered and
+    # shown, then released late (a stale answer). One entry, the fresh one, never two.
+    held: list[Route] = []
+
+    def answer(route: Route) -> None:
+        if "lang=stale" in route.request.url:
+            held.append(route)  # the first (stale) request waits here
+            return
+        route.fulfill(
+            status=200,
+            content_type="text/html",
+            body='<div class="help-entry"><h2>Fresh</h2></div>',
+        )
+
+    page.route(re.compile(r"/entry/\?"), answer)
+    # The two clicks differ by the language they ask for, so the routes tell the requests apart.
     page.evaluate(
-        "for (let i = 0; i < 2; i++) document.querySelector('[data-admin-help-open]').click()"
+        """() => {
+            const opener = document.querySelector('[data-admin-help-open]');
+            opener.dataset.helpLang = 'stale';
+            opener.click();
+            opener.dataset.helpLang = 'fresh';
+            opener.click();
+        }"""
     )
     expect(page.locator(DIALOG)).to_contain_text("Fresh")
-    page.wait_for_timeout(500)
-    assert page.locator(f"{DIALOG} .help-entry").count() == 1
+    with contextlib.suppress(PlaywrightError):  # the browser has already aborted the stale fetch
+        for route in held:
+            route.fulfill(
+                status=200,
+                content_type="text/html",
+                body='<div class="help-entry"><h2>Stale</h2></div>',
+            )
+    page.evaluate("new Promise((resolve) => setTimeout(resolve, 0))")  # let any late answer land
+    expect(page.locator(DIALOG)).not_to_contain_text("Stale")
+    expect(page.locator(f"{DIALOG} .help-entry")).to_have_count(1)
 
 
 def test_the_staff_admin_button_opens_the_screen_help(
