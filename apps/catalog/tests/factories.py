@@ -23,6 +23,8 @@ from apps.catalog.models import (
     BrandTranslation,
     Category,
     CategoryTranslation,
+    Manufacturer,
+    PriceHistory,
     Product,
     ProductAttribute,
     ProductTranslation,
@@ -85,6 +87,16 @@ class SlugHistoryFactory(DjangoModelFactory[SlugHistory]):
     product = factory.SubFactory(ProductFactory)
     language = "en"
     slug = factory.Sequence(lambda n: f"old-product-{n}-en")
+
+
+class PriceHistoryFactory(DjangoModelFactory[PriceHistory]):
+    """One recorded price setting of a product (CMP.6); the services append these in real use."""
+
+    class Meta:
+        model = PriceHistory
+
+    product = factory.SubFactory(ProductFactory)
+    price_net = Decimal("10.00")
 
 
 class RedirectFactory(DjangoModelFactory[Redirect]):
@@ -225,6 +237,13 @@ class BrandFactory(DjangoModelFactory[Brand]):
         model = Brand
 
     name = factory.Sequence(lambda n: f"Brand {n}")
+
+
+class ManufacturerFactory(DjangoModelFactory[Manufacturer]):
+    class Meta:
+        model = Manufacturer
+
+    legal_name = factory.Sequence(lambda n: f"Maker {n} Ltd")
 
 
 class BrandTranslationFactory(DjangoModelFactory[BrandTranslation]):

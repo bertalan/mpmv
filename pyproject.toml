@@ -159,6 +159,7 @@ layers = [
   "apps.cart",
   "apps.events",  # event pages link products and categories and use the CMS blocks (spec 15)
   "apps.cms",  # reads catalog terms and vendor storefronts (CMS.2 cards)
+  "apps.fitment",  # the garage (spec 17): reads catalog and accounts; cms, events, seo and ingest read it
   "apps.catalog | apps.tax | apps.shipping",
   "apps.vendors",
   "apps.accounts",
@@ -174,6 +175,29 @@ name = "CMS reads catalog and vendors, never tax or shipping (spec 01 graph)"
 type = "forbidden"
 source_modules = ["apps.cms"]
 forbidden_modules = ["apps.tax", "apps.shipping"]
+
+# Spec 17 §17.2.1: the garage reads accounts and the catalog only. An order line keeps the fit
+# answer shown at purchase, never the garage, so the checkout and money apps never import it.
+[[tool.importlinter.contracts]]
+name = "The garage is independent of tax and shipping and unknown to the checkout (spec 17)"
+type = "forbidden"
+source_modules = ["apps.fitment"]
+forbidden_modules = [
+  "apps.tax",
+  "apps.shipping",
+  "apps.cart",
+  "apps.orders",
+  "apps.payments",
+  "apps.ledger",
+  "apps.cms",
+  "apps.events",
+]
+
+[[tool.importlinter.contracts]]
+name = "The checkout, tax and shipping never import the garage (spec 17)"
+type = "forbidden"
+source_modules = ["apps.tax", "apps.shipping", "apps.cart", "apps.orders", "apps.payments", "apps.ledger"]
+forbidden_modules = ["apps.fitment"]
 
 [[tool.importlinter.contracts]]
 name = "Procrastinate is used only through apps.core.tasks (ADR-0004)"
@@ -201,6 +225,7 @@ forbidden_modules = [
   "apps.payments",
   "apps.ledger",
   "apps.ingest",
+  "apps.fitment",
   "apps.cms",
   "apps.events",
   "apps.seo",
@@ -226,6 +251,7 @@ source_modules = [
   "apps.payments",
   "apps.ledger",
   "apps.ingest",
+  "apps.fitment",
   "apps.cms",
   "apps.events",
   "apps.seo",
@@ -243,6 +269,30 @@ name = "Tax and shipping engines stay independent of orders and cart"
 type = "forbidden"
 source_modules = ["apps.tax", "apps.shipping"]
 forbidden_modules = ["apps.orders", "apps.cart", "apps.payments", "apps.ledger", "apps.events"]
+
+# Spec 01 graph: `ingest` sits above `catalog` only (catalog --> ingest). It never reaches the
+# checkout, tax, shipping, payments, ledger, the CMS or the other apps of its layer.
+[[tool.importlinter.contracts]]
+name = "Ingest depends only on catalog, vendors, accounts and core (spec 01 graph)"
+type = "forbidden"
+source_modules = ["apps.ingest"]
+forbidden_modules = [
+  "apps.tax",
+  "apps.shipping",
+  "apps.cart",
+  "apps.orders",
+  "apps.payments",
+  "apps.ledger",
+  "apps.cms",
+  "apps.events",
+  "apps.seo",
+  "apps.compliance",
+  "apps.themes",
+  "apps.api",
+  "apps.manager",
+  "apps.mcp",
+  "apps.seed",
+]
 
 # Spec 15: nothing in the checkout reads events. cart and orders sit above events in the
 # layers, so this contract keeps them off it.

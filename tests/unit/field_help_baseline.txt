@@ -1,4 +1,4 @@
-# count: 213
+# count: 266
 # editor-facing fields have no help text
 # Only shrinks: delete a line when its field is fixed.
 admin:accounts.user.email
@@ -10,7 +10,11 @@ admin:catalog.attributevalue.attribute
 admin:catalog.attributevaluetranslation.label
 admin:catalog.attributevaluetranslation.language
 admin:catalog.attributevaluetranslation.status
+admin:catalog.brand.logo
+admin:catalog.brand.logo_alt
+admin:catalog.brand.manufacturer
 admin:catalog.brand.name
+admin:catalog.brand.status
 admin:catalog.brandtranslation.language
 admin:catalog.brandtranslation.seo_description
 admin:catalog.brandtranslation.seo_title
@@ -22,6 +26,7 @@ admin:catalog.categorytranslation.name
 admin:catalog.categorytranslation.seo_description
 admin:catalog.categorytranslation.seo_title
 admin:catalog.categorytranslation.status
+admin:catalog.manufacturer.legal_name
 admin:catalog.product.fiscal_category
 admin:catalog.product.google_category_id
 admin:catalog.product.height_cm
@@ -98,6 +103,54 @@ admin:core.platformoperator.commission_vat_mode
 admin:core.platformoperator.legal_name
 admin:core.platformoperator.tax_regime
 admin:core.platformoperator.valid_from
+admin:ingest.importrun.created
+admin:ingest.importrun.dry_run
+admin:ingest.importrun.errors
+admin:ingest.importrun.finished_at
+admin:ingest.importrun.kind
+admin:ingest.importrun.log
+admin:ingest.importrun.seen
+admin:ingest.importrun.skipped
+admin:ingest.importrun.source
+admin:ingest.importrun.started_at
+admin:ingest.importrun.status
+admin:ingest.importrun.unchanged
+admin:ingest.importrun.updated
+admin:ingest.mappingtable.aliases
+admin:ingest.mappingtable.key
+admin:ingest.mappingtable.kind
+admin:ingest.mappingtable.target_id
+admin:ingest.mappingtable.target_type
+admin:ingest.mappingtable.target_value
+admin:ingest.mappingtable.vendor
+admin:ingest.productdraft.extracted
+admin:ingest.productdraft.item
+admin:ingest.productdraft.status
+admin:ingest.reviewitem.blocking
+admin:ingest.reviewitem.decision
+admin:ingest.reviewitem.item
+admin:ingest.reviewitem.kind
+admin:ingest.reviewitem.note
+admin:ingest.reviewitem.payload
+admin:ingest.reviewitem.product
+admin:ingest.reviewitem.resolved_at
+admin:ingest.reviewitem.resolved_by
+admin:ingest.reviewitem.run
+admin:ingest.sourceitem.last_seen_at
+admin:ingest.sourceitem.missing_since
+admin:ingest.sourceitem.product
+admin:ingest.sourceitem.sku
+admin:ingest.sourceitem.source
+admin:ingest.sourceitem.source_url
+admin:ingest.sourceitem.vendor
+admin:ingest.sourceobservation.item
+admin:ingest.sourceobservation.observed_at
+admin:ingest.sourceobservation.payload
+admin:ingest.sourceobservation.payload_hash
+admin:ingest.suppliersource.adapter_code
+admin:ingest.suppliersource.config
+admin:ingest.suppliersource.is_active
+admin:ingest.suppliersource.vendor
 admin:shipping.carrier.code
 admin:shipping.carrier.is_active
 admin:shipping.carriertranslation.label

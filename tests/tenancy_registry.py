@@ -30,6 +30,7 @@ from apps.api.tests.factories import ApiClientFactory, ApiRateCounterFactory
 from apps.cart.models import CartLine
 from apps.cart.tests.factories import CartLineFactory
 from apps.catalog.models import (
+    PriceHistory,
     Product,
     ProductAttribute,
     ProductTranslation,
@@ -40,6 +41,7 @@ from apps.catalog.models import (
     VariantTranslation,
 )
 from apps.catalog.tests.factories import (
+    PriceHistoryFactory,
     ProductAttributeFactory,
     ProductFactory,
     ProductTranslationFactory,
@@ -74,6 +76,24 @@ from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
+from apps.ingest.models import (
+    ImportRun,
+    MappingTable,
+    ProductDraft,
+    ReviewItem,
+    SourceItem,
+    SourceObservation,
+    SupplierSource,
+)
+from apps.ingest.tests.factories import (
+    ImportRunFactory,
+    MappingTableFactory,
+    ProductDraftFactory,
+    ReviewItemFactory,
+    SourceItemFactory,
+    SourceObservationFactory,
+    SupplierSourceFactory,
+)
 from apps.orders.models import OrderLine, StockReservation, VendorOrder
 from apps.orders.tests.factories import (
     OrderLineFactory,
@@ -171,6 +191,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     SlugHistory: lambda vendor: SlugHistoryFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
+    PriceHistory: lambda vendor: PriceHistoryFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
     Variant: lambda vendor: VariantFactory.create(
         product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
     ),
@@ -190,6 +213,13 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ),
     GpsrInfo: lambda vendor: GpsrInfoFactory.create(product=ProductFactory.create(vendor=vendor)),
     VendorGpsrDefaults: lambda vendor: VendorGpsrDefaultsFactory.create(vendor=vendor),
+    SupplierSource: lambda vendor: SupplierSourceFactory.create(vendor=vendor),
+    SourceItem: lambda vendor: SourceItemFactory.create(source__vendor=vendor),
+    SourceObservation: lambda vendor: SourceObservationFactory.create(item__source__vendor=vendor),
+    ProductDraft: lambda vendor: ProductDraftFactory.create(item__source__vendor=vendor),
+    ImportRun: lambda vendor: ImportRunFactory.create(source__vendor=vendor),
+    ReviewItem: lambda vendor: ReviewItemFactory.create(run__source__vendor=vendor),
+    MappingTable: lambda vendor: MappingTableFactory.create(vendor=vendor),
     GpsrSafetyText: lambda vendor: GpsrSafetyTextFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),

@@ -29,10 +29,26 @@ msgstr "%(name)s rimosso."
 msgid "%(vendor_name)s shipped its part of order %(order_number)s."
 msgstr "%(vendor_name)s ha spedito la sua parte dell’ordine %(order_number)s."
 
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
+msgstr ""
+"La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
+
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
+msgstr ""
+"La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
+
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
 msgstr "%(vendor_name)s: nuovo ordine pagato %(order_number)s da spedire:"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
+msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
+msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
 
 #: apps/cms/blocks.py apps/cms/models.py
 msgid ""
@@ -173,6 +189,14 @@ msgid ""
 msgstr ""
 "Un titolo sopra le domande, per esempio 'Domande e risposte'. Se lo lasci "
 "vuoto, le domande non hanno titolo."
+
+#: apps/cms/blocks.py
+msgid ""
+"A title shown above the products, for example 'Our favourites'. Up to 120 "
+"characters. If you leave it empty, no title is shown."
+msgstr ""
+"Un titolo mostrato sopra i prodotti, per esempio 'I nostri preferiti'. Fino "
+"a 120 caratteri. Se lo lasci vuoto, non viene mostrato nessun titolo."
 
 #: apps/events/admin_views.py apps/events/models.py
 msgid "A vendor's first events up to this number go through review."
@@ -575,23 +599,43 @@ msgstr ""
 msgid "Go to the home page"
 msgstr "Vai alla home page"
 
+#: apps/cms/blocks.py
+msgid ""
+"Grid shows the products in rows and columns. Row puts them on one line that "
+"the visitor can scroll sideways."
+msgstr ""
+"La griglia mostra i prodotti in righe e colonne. La riga li mette su una "
+"sola linea che il visitatore può far scorrere di lato."
+
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello %(customer_name)s,"
 msgstr "Ciao %(customer_name)s,"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello,"
@@ -879,6 +923,24 @@ msgstr "Ordine"
 msgid "Order %(number)s"
 msgstr "Ordine %(number)s"
 
+#: apps/orders/templates/email/orders/order_cancelled/subject.txt
+msgid "Order %(order_number)s was cancelled"
+msgstr "L’ordine %(order_number)s è stato annullato"
+
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
+msgid ""
+"Order %(order_number)s was cancelled before payment. Nothing was charged."
+msgstr ""
+"L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato"
+" addebitato nulla."
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
+msgid "Order %(order_number)s was cancelled. Do not ship these items:"
+msgstr ""
+"L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
+
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Order %(order_number)s, sold by %(vendor_name)s:"
@@ -888,9 +950,17 @@ msgstr "Ordine %(order_number)s, venduto da %(vendor_name)s:"
 msgid "Order %(order_number)s: a shipment is on its way"
 msgstr "Ordine %(order_number)s: una spedizione è in arrivo"
 
+#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
+msgid "Order %(order_number)s: a shipment was delivered"
+msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
+
 #: apps/orders/templates/email/orders/order_confirmation/subject.txt
 msgid "Order %(order_number)s: confirmation from %(vendor_name)s"
 msgstr "Ordine %(order_number)s: conferma di %(vendor_name)s"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
+msgid "Order %(order_number)s: part of your order was cancelled"
+msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
@@ -1091,6 +1161,10 @@ msgstr ""
 "Scansiona questo codice QR con la tua app di autenticazione, poi inserisci "
 "il codice a 6 cifre che mostra."
 
+#: apps/cms/blocks.py
+msgid "Search by name, SKU, brand or vendor, then click the product."
+msgstr "Cerca per nome, SKU, marchio o venditore, poi clicca sul prodotto."
+
 #: apps/manager/templates/manager/list.html
 msgid "Select"
 msgstr "Seleziona"
@@ -1132,6 +1206,19 @@ msgstr "Spedizione: %(shipping)s EUR"
 #: apps/manager/templates/manager/layout.html
 msgid "Shop"
 msgstr "Negozio"
+
+#: apps/cms/choosers.py
+msgid "Show only the products of one brand."
+msgstr "Mostra solo i prodotti di un marchio."
+
+#: apps/cms/choosers.py
+msgid "Show only the products of one category and the categories below it."
+msgstr ""
+"Mostra solo i prodotti di una categoria e delle categorie sotto di essa."
+
+#: apps/cms/choosers.py
+msgid "Show only the products of one vendor."
+msgstr "Mostra solo i prodotti di un venditore."
 
 #: apps/accounts/forms.py apps/manager/templates/manager/login.html
 msgid "Show password"
@@ -1566,6 +1653,16 @@ msgstr ""
 "Le categorie di prodotti di cui parla l'evento, così i visitatori lo trovano"
 " da lì. Lascia vuoto se non ce n'è nessuna."
 
+#: apps/cms/blocks.py
+msgid ""
+"The products to show, in this order. Add at least one and at most 12. A "
+"product that is no longer for sale, or has no text in the page language, is "
+"left out by itself."
+msgstr ""
+"I prodotti da mostrare, in questo ordine. Aggiungine almeno uno e al massimo"
+" 12. Un prodotto che non è più in vendita, o che non ha testo nella lingua "
+"della pagina, viene escluso da solo."
+
 #: apps/events/models.py
 msgid ""
 "The products you bring or put on offer at this event. You can only choose "
@@ -1905,6 +2002,12 @@ msgstr "La verifica in due passaggi è attiva"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Two-factor settings"
 msgstr "Impostazioni della verifica in due passaggi"
+
+#: apps/cms/choosers.py
+msgid "Type part of a product name, SKU, brand or vendor name."
+msgstr ""
+"Scrivi una parte del nome del prodotto, dello SKU, del marchio o del nome "
+"del venditore."
 
 #: apps/cms/blocks.py
 msgid ""

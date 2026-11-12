@@ -50,9 +50,18 @@ from wagtail.blocks import StructBlockValidationError
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Page
 
-from apps.catalog.models import Category, Product, TaxonomyTranslation, Term, TermTranslation
+from apps.catalog.models import (
+    Category,
+    Product,
+    ProductTranslation,
+    TaxonomyTranslation,
+    Term,
+    TermTranslation,
+)
 from apps.catalog.services import (
     ListingScope,
+    ProductCard,
+    ProductGrid,
     category_url,
     listed_products,
     product_cards,
@@ -756,6 +765,45 @@ class BrandChooserBlock(brand_chooser.get_block_class("_BrandChooserBlock", __na
     """A catalog brand, chosen in the brand chooser modal."""
 
 
+def _item_list(
+    name: str, cards: Iterable[ProductCard], context: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    """One schema.org `ItemList` of product references (spec 10 "Widgets feed the graph"): the
+    `@id` of a product is its page; a list item never repeats its offers (the product's own page
+    carries the `Product` node). A card without a page, and a list without items, give nothing."""
+    request = context.get("request")
+    items: list[dict[str, Any]] = []
+    for card in cards:
+        if not card.url:
+            continue
+        url = request.build_absolute_uri(card.url) if request is not None else card.url
+        item: dict[str, Any] = {"@id": url, "name": card.title, "url": url}
+        if card.image_url:
+            item["image"] = card.image_url
+        items.append({"@type": "ListItem", "position": len(items) + 1, "item": item})
+    if not items:
+        return []
+    return [
+        {
+            "@type": "ItemList",
+            "name": name,
+            "numberOfItems": len(items),
+            "itemListElement": items,
+        }
+    ]
+
+
+def page_graph_nodes(body: Iterable[Any], context: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """The `@graph` nodes of a page body's widgets, in order: every block that implements
+    `graph_nodes(value, context)` (the product grid and the product cards, SEO.7)."""
+    nodes: list[dict[str, Any]] = []
+    for child in body:
+        graph_nodes = getattr(child.block, "graph_nodes", None)
+        if graph_nodes is not None:
+            nodes.extend(graph_nodes(child.value, context))
+    return nodes
+
+
 class ProductGridBlock(blocks.StructBlock):  # type: ignore[misc]
     """The newest products of one category, term, brand or vendor (the CAT.8 listing query)."""
 
@@ -823,27 +871,134 @@ class ProductGridBlock(blocks.StructBlock):  # type: ignore[misc]
         label = _("Product grid")
         template = "cms/blocks/product_grid.html"
 
+    def _grid(self, value: Any, parent_context: Mapping[str, Any] | None) -> ProductGrid | None:
+        chosen = next(iter(value["source"]), None)
+        if chosen is None or chosen.value is None:
+            return None
+        return product_grid(
+            ListingScope(**{chosen.block_type: chosen.value}),
+            _page_language(dict(parent_context) if parent_context else None),
+            limit=grid_limit(value.get("limit")),
+            # The listing's name and page: for "See all", and as the heading when it is empty.
+            with_anchor=bool(value.get("see_all")) or not value.get("heading"),
+        )
+
     def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
         context = super().get_context(value, parent_context=parent_context)
         context["cards"], context["see_all_url"] = [], None
-        chosen = next(iter(value["source"]), None)
-        if chosen is None or chosen.value is None:
+        grid = self._grid(value, parent_context)
+        if grid is None:
             return context
-        heading = value.get("heading") or ""
-        see_all = bool(value.get("see_all"))
-        grid = product_grid(
-            ListingScope(**{chosen.block_type: chosen.value}),
-            _page_language(parent_context),
-            limit=grid_limit(value.get("limit")),
-            # The listing's name and page: for "See all", and as the heading when it is empty.
-            with_anchor=see_all or not heading,
-        )
         context["cards"] = grid.cards
-        context["heading"] = heading or grid.name or ""
+        context["heading"] = value.get("heading") or grid.name or ""
         context["listing_name"] = grid.name
-        context["see_all_url"] = grid.see_all_url if see_all else None
+        context["see_all_url"] = grid.see_all_url if value.get("see_all") else None
         context["currency"] = CURRENCY
         return context
+
+    def graph_nodes(self, value: Any, context: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """The grid's named `ItemList` (SEO.7): its heading, else its listing's name."""
+        grid = self._grid(value, context)
+        if grid is None:
+            return []
+        name = value.get("heading") or grid.name or str(_("Products"))
+        return _item_list(name, grid.cards, context)
+
+
+# --- Product cards (CMS.11)
+
+PRODUCT_CARDS_LAYOUTS = ("grid", "row")
+PRODUCT_CARDS_MAX = 12  # one listing row of a page; more is the product grid's job
+
+
+def _shown_in_language(products: Iterable[Product | None], language: str) -> list[Product]:
+    """The chosen products that are listed (published, of an active vendor, not retired) and
+    published in `language`, in the editor's order. No text from another language stands in:
+    a product the page language lacks is left out (CMS.11)."""
+    wanted = list(dict.fromkeys(product.pk for product in products if product is not None))
+    if not wanted:
+        return []
+    texts = ProductTranslation.objects.filter(
+        product_id__in=wanted, language=language, status=translations.PUBLISHED
+    ).values("product_id")
+    found = {
+        product.pk: product
+        for product in listed_products().filter(pk__in=wanted).filter(pk__in=texts)
+    }
+    return [found[pk] for pk in wanted if pk in found]
+
+
+class ProductCardsBlock(blocks.StructBlock):  # type: ignore[misc]
+    """Hand-picked products as cards, in a grid or one scrolling row (CMS.11): the same block in
+    every body that offers products. A product that is retired, unpublished or not published in
+    the page's language disappears without editing the page; a block with none left is left
+    out. Editors search the product chooser; the cards show the price as the grid does."""
+
+    heading = blocks.CharBlock(
+        required=False,
+        max_length=120,
+        help_text=_(
+            "A title shown above the products, for example 'Our favourites'. "
+            "Up to 120 characters. If you leave it empty, no title is shown."
+        ),
+    )
+    layout = blocks.ChoiceBlock(
+        choices=[("grid", _("Grid")), ("row", _("Row"))],
+        default="grid",
+        label=_("Layout"),
+        help_text=_(
+            "Grid shows the products in rows and columns. Row puts them on one line "
+            "that the visitor can scroll sideways."
+        ),
+    )
+    products = blocks.ListBlock(
+        ProductChooserBlock(
+            help_text=_("Search by name, SKU, brand or vendor, then click the product.")
+        ),
+        min_num=1,
+        max_num=PRODUCT_CARDS_MAX,
+        label=_("Products"),
+        help_text=_(
+            "The products to show, in this order. Add at least one and at most 12. A product "
+            "that is no longer for sale, or has no text in the page language, is left out by "
+            "itself."
+        ),
+    )
+
+    class Meta:
+        icon = "pick"
+        label = _("Product cards")
+        template = "cms/blocks/product_cards.html"
+
+    def _cards(self, value: Any, parent_context: Mapping[str, Any] | None) -> list[ProductCard]:
+        """The cards, computed once per block value and request: the page render and the
+        SEO.7 graph both ask for them."""
+        language = _page_language(dict(parent_context) if parent_context else None)
+        request = (parent_context or {}).get("request")
+        cache: dict[tuple[int, str], tuple[Any, list[ProductCard]]] | None = None
+        if request is not None:
+            cache = request.__dict__.setdefault("_product_cards_cache", {})
+            hit = cache.get((id(value), language))
+            if hit is not None and hit[0] is value:
+                return hit[1]
+        cards = product_cards(_shown_in_language(value["products"], language), language)
+        if cache is not None:
+            cache[(id(value), language)] = (value, cards)
+        return cards
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        context["cards"] = self._cards(value, parent_context)
+        context["heading"] = value.get("heading") or ""
+        context["row"] = value.get("layout") == "row"
+        context["currency"] = CURRENCY
+        return context
+
+    def graph_nodes(self, value: Any, context: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """The cards' named `ItemList` (SEO.7): the heading, else a generic name."""
+        return _item_list(
+            value.get("heading") or str(_("Products")), self._cards(value, context), context
+        )
 
 
 # --- Launch countdown (CMS.9)

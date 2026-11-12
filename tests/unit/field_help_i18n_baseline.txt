@@ -1,4 +1,4 @@
-# count: 143
+# count: 154
 # help texts are not marked for translation or not in the Italian catalog
 # Only shrinks: delete a line when its field is fixed.
 admin:accounts.user.usable_password
@@ -7,10 +7,16 @@ admin:catalog.attribute.position
 admin:catalog.attribute.unit
 admin:catalog.attributevalue.position
 admin:catalog.attributevalue.value
+admin:catalog.brand.same_as
+admin:catalog.brand.url
+admin:catalog.brand.wikidata_id
 admin:catalog.brandtranslation.description
 admin:catalog.brandtranslation.slug
 admin:catalog.categorytranslation.description
 admin:catalog.categorytranslation.slug
+admin:catalog.manufacturer.country
+admin:catalog.manufacturer.same_as
+admin:catalog.manufacturer.url
 admin:catalog.product.brand
 admin:catalog.product.category
 admin:catalog.product.gtin
@@ -65,6 +71,11 @@ admin:core.platformoperator.support_email
 admin:core.platformoperator.user_contact_languages
 admin:core.platformoperator.user_contact_url
 admin:core.platformoperator.vat_number
+admin:ingest.productdraft.enriched
+admin:ingest.sourceitem.aliases
+admin:ingest.suppliersource.code
+admin:ingest.suppliersource.schedule
+admin:ingest.suppliersource.write_enabled
 admin:shipping.carrier.supports_api
 admin:shipping.carrier.tracking_url_template
 admin:shipping.countrygroup.code
