@@ -25,6 +25,23 @@ def _axe_helper_style(violation: str) -> bool:
     return "style-src-elem blocked inline" in violation and "wagtailadmin/js/vendor.js" in violation
 
 
+def _suppress_date_pickers(page: Page) -> None:
+    """Keep the xdsoft date pickers from ever showing.
+
+    The picker opens on focus, from a timer that can fire after any keyboard or blur based
+    dismissal, and then stays over the footer actions and swallows the Publish click. The test
+    types the dates, so the popups are never needed: a constructed stylesheet (allowed by the
+    CSP, unlike an injected <style>) keeps them hidden whatever the timing.
+    """
+    page.evaluate(
+        """() => {
+            const sheet = new CSSStyleSheet();
+            sheet.replaceSync('.xdsoft_datetimepicker { display: none !important; }');
+            document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+        }"""
+    )
+
+
 def test_staff_publishes_an_event_and_visitors_see_it(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
@@ -44,6 +61,7 @@ def test_staff_publishes_an_event_and_visitors_see_it(
     page.locator("#id_title").fill("Spring trade fair")
     page.locator("#id_summary").fill("Meet the makers at the spring trade fair.")
     page.locator("#id_event_type").select_option(EventPage.EventType.FAIR)
+    _suppress_date_pickers(page)
     page.locator("#id_starts_at").fill("2027-03-10 09:00")
     page.locator("#id_ends_at").fill("2027-03-10 17:00")
     page.locator("#id_attendance").select_option(EventPage.Attendance.IN_PERSON)
@@ -52,13 +70,16 @@ def test_staff_publishes_an_event_and_visitors_see_it(
     page.locator("#id_postcode").fill("20121")
     page.locator("#id_city").fill("Milano")
     page.locator("#id_country").fill("IT")
-    # An open date picker stays over the footer actions and swallows the Publish click: close
-    # them with a click outside, as a user would.
-    page.get_by_text("One or two sentences that tell what the event is").click()
     expect(page.locator(".xdsoft_datetimepicker:visible")).to_have_count(0)
     shot("admin-add-event")
-    page.get_by_role("button", name="More actions").click()
-    page.get_by_role("button", name="Publish").click()
+    more_actions = page.get_by_role("button", name="More actions")
+    more_actions.scroll_into_view_if_needed()
+    expect(more_actions).to_be_enabled()
+    more_actions.click()
+    publish = page.get_by_role("button", name="Publish")
+    expect(publish).to_be_visible()
+    expect(publish).to_be_enabled()
+    publish.click()
     expect(page.get_by_text("Page 'Spring trade fair' created and published.")).to_be_visible()
     admin_violations = [v for v in csp_violations(page) if not _axe_helper_style(v)]
     assert admin_violations == [], "\n".join(admin_violations)
