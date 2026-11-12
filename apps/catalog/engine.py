@@ -4,13 +4,16 @@ its terms, the shape of a product's typed attributes, variant axes and variants 
 redirect rules: safe same-site paths, matching, loops and chains (CAT.6). No ORM here."""
 
 import datetime as dt
+import json
 import re
 import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
+from html.parser import HTMLParser
 from typing import Any, Protocol, cast
 from urllib.parse import unquote_to_bytes, urlsplit
+from zoneinfo import ZoneInfo
 
 from apps.core.money import CENT, to_decimal
 
@@ -806,3 +809,325 @@ def rank_search_hits(hits: Iterable[SearchHit], *, limit: int = SEARCH_RESULT_LI
         return (not hit.sku_exact, not hit.sku_prefix, -search_score(hit), -hit.product_id)
 
     return [hit.product_id for hit in sorted(best.values(), key=key)[:limit]]
+
+
+# --- Price history and the Omnibus reference price (CMP.6, directive 98/6/EC art. 6a)
+#
+# A reduction may be announced (strikethrough price) only against the lowest price applied in
+# the 30 days before the reduction started. Prices are the net ones the vendor sets; the
+# comparison is the same net or gross. Days are business-time-zone calendar days (D-31).
+
+OMNIBUS_DAYS = 30
+
+
+@dataclass(frozen=True)
+class PricePoint:
+    """One recorded price setting: the regular price and the optional scheduled sale."""
+
+    recorded_at: dt.datetime
+    price_net: Decimal | None
+    sale_price_net: Decimal | None
+    sale_from: dt.datetime | None
+    sale_to: dt.datetime | None
+    currency: str = "EUR"
+
+
+# Owner decision Q1 (2026-11-11): a variant's own price override wins over the product's sale, so
+# a sale never reaches a variant that has an override. The Omnibus reference follows the same rule.
+SALE_APPLIES_TO_OVERRIDDEN_VARIANT = False
+
+
+@dataclass(frozen=True)
+class ReferencePrice:
+    """The prior price to show next to a reduced price, with when the reduction started."""
+
+    price_net: Decimal
+    current_net: Decimal
+    reduction_started_at: dt.datetime
+
+
+@dataclass(frozen=True)
+class _Segment:
+    start: dt.datetime
+    end: dt.datetime | None  # None: open-ended
+    price: Decimal | None
+    is_sale: bool
+
+
+def _segments(points: Iterable[PricePoint]) -> list[_Segment]:
+    """The price in force over time. A setting holds until the next one is recorded; inside it a
+    sale holds from `sale_from` (or the recording) to `sale_to`. Zero-length spans are dropped,
+    so a setting replaced at the same instant never applied."""
+    ordered = sorted(points, key=lambda p: p.recorded_at)  # stable: ties keep their order
+    segments: list[_Segment] = []
+    for index, point in enumerate(ordered):
+        start = point.recorded_at
+        end = ordered[index + 1].recorded_at if index + 1 < len(ordered) else None
+        cuts = [start]
+        if point.sale_price_net is not None:
+            for edge in (point.sale_from, point.sale_to):
+                if edge is not None and edge > start and (end is None or edge < end):
+                    cuts.append(edge)
+        cuts = sorted(set(cuts))
+        for cut_index, cut in enumerate(cuts):
+            cut_end = cuts[cut_index + 1] if cut_index + 1 < len(cuts) else end
+            if cut_end is not None and cut_end <= cut:
+                continue
+            on_sale = (
+                point.sale_price_net is not None
+                and point.price_net is not None
+                and (point.sale_from is None or point.sale_from <= cut)
+                and (point.sale_to is None or cut < point.sale_to)
+            )
+            price = point.sale_price_net if on_sale else point.price_net
+            segments.append(_Segment(cut, cut_end, price, on_sale))
+    return segments
+
+
+def _window_start(reduction_start: dt.datetime, tz: ZoneInfo, days: int) -> dt.datetime:
+    local_day = reduction_start.astimezone(tz).date() - dt.timedelta(days=days)
+    return dt.datetime.combine(local_day, dt.time(), tzinfo=tz)
+
+
+def reference_price(
+    points: Iterable[PricePoint],
+    *,
+    at: dt.datetime,
+    tz: ZoneInfo,
+    days: int = OMNIBUS_DAYS,
+    currency: str = "EUR",
+) -> ReferencePrice | None:
+    """The lowest price of the `days` calendar days before the reduction in force at `at`.
+
+    None when no reduction is in force, when there is no history before it, or when that lowest
+    price is not above the reduced one (nothing to announce). Successive reductions keep the
+    price before the first one: the reduction starts when the continuous run of reduced
+    prices does. The reduced price itself is never part of the window.
+    """
+    segments = _segments(p for p in points if p.currency == currency)
+    current = next((s for s in segments if s.start <= at and (s.end is None or at < s.end)), None)
+    if current is None or not current.is_sale or current.price is None:
+        return None
+    first = segments.index(current)
+    while (
+        first > 0
+        and segments[first - 1].is_sale
+        and segments[first - 1].end == (segments[first].start)
+    ):
+        first -= 1
+    reduction_start = segments[first].start
+    window_start = _window_start(reduction_start, tz, days)
+    prior = [
+        s.price
+        for s in segments[:first]
+        if s.price is not None
+        and (s.end is None or s.end > window_start)
+        and s.start < reduction_start
+    ]
+    if not prior:
+        return None
+    lowest = min(prior)
+    if lowest <= current.price:
+        return None
+    return ReferencePrice(
+        price_net=lowest, current_net=current.price, reduction_started_at=reduction_start
+    )
+
+
+# --- Brands and manufacturers (CAT.20): the pure rules behind duplicate detection and links.
+
+WIKIDATA_ID_RE = re.compile(r"Q[1-9][0-9]{0,9}")
+
+
+def brand_name_key(name: str) -> str:
+    """The key two spellings of one brand share (`Acme & Sons`, `ACME and sons`): NFKD without
+    accents, case-folded, `&` read as `and`, punctuation dropped, whitespace collapsed. A key of
+    `A.C.M.E.` and `ACME` is the same on purpose. Empty for a name with no letters or digits."""
+    text = unicodedata.normalize("NFKC", name).replace("&", " and ")
+    text = unicodedata.normalize("NFKD", text.casefold())
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    # Dots and apostrophes vanish (A.C.M.E. = ACME); other punctuation separates words.
+    text = re.sub("[.'\u2019]", "", text)
+    text = re.sub("[^0-9a-z\u0080-\uffff]+", " ", text)
+    return " ".join(text.split())
+
+
+def wikidata_id_error(value: str) -> str | None:
+    """None for an empty value or a Wikidata item ID like `Q42`; the format only, nothing is
+    fetched."""
+    if value == "" or WIKIDATA_ID_RE.fullmatch(value):
+        return None
+    return "A Wikidata item ID is a Q followed by a number, e.g. Q42."
+
+
+def https_url_error(value: str) -> str | None:
+    """None for an absolute `https://` URL with a host, no credentials and no spaces."""
+    text = value.strip()
+    if text != value or any(ch.isspace() for ch in value):
+        return "A link cannot contain spaces."
+    try:
+        parts = urlsplit(value)
+        host = parts.hostname
+    except ValueError:
+        return "This is not a valid link."
+    if parts.scheme != "https" or not host:
+        return "Links must be absolute https:// addresses."
+    if parts.username is not None or parts.password is not None:
+        return "A link cannot contain a user name or password."
+    return None
+
+
+def same_as_errors(urls: Sequence[str]) -> list[str]:
+    """One message per refused entry of a `sameAs` list: not an https link, or listed twice."""
+    errors: list[str] = []
+    seen: set[str] = set()
+    for url in urls:
+        problem = https_url_error(url) if isinstance(url, str) else "Links must be text."
+        if problem:
+            errors.append(f"{url!r}: {problem}")
+        elif url in seen:
+            errors.append(f"{url!r}: listed twice.")
+        seen.add(url)
+    return errors
+
+
+def link_field_errors(url: str, same_as: object) -> dict[str, list[str]]:
+    """The errors of an official `url` and a `sameAs` list, by field name."""
+    errors: dict[str, list[str]] = {}
+    if url and (problem := https_url_error(url)):
+        errors["url"] = [problem]
+    if not isinstance(same_as, list):
+        errors["same_as"] = ["Enter a list of links."]
+    elif found := same_as_errors(same_as):
+        errors["same_as"] = found
+    return errors
+
+
+# --- Brand structured data (CAT.20 3/3, spec 10 SEO.7): graph nodes with stable `@id`s
+
+SCHEMA_ORG = "https://schema.org"
+WIKIDATA_ENTITY = "https://www.wikidata.org/wiki/"
+BRAND_FRAGMENT = "#brand"
+_JSONLD_ESCAPES = {code: f"\\u{code:04x}" for code in (0x3C, 0x3E, 0x26, 0x2028, 0x2029)}
+
+
+def jsonld_text(data: Mapping[str, Any]) -> str:
+    """`data` as JSON safe inside `<script type="application/ld+json">`: markup characters
+    are escaped, so the text cannot close the element or open another."""
+    return json.dumps(data, ensure_ascii=False).translate(_JSONLD_ESCAPES)
+
+
+class _PlainText(HTMLParser):
+    """The text of HTML with entities decoded; script and style content is dropped."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self._skip = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"script", "style"}:
+            self._skip += 1
+        else:
+            self.parts.append(" ")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style"}:
+            self._skip = max(0, self._skip - 1)
+        self.parts.append(" ")
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip:
+            self.parts.append(data)
+
+
+def plain_description(html: str) -> str:
+    """A rich-text description as one line of plain text, for structured data."""
+    parser = _PlainText()
+    parser.feed(html)
+    parser.close()
+    return " ".join("".join(parser.parts).split())
+
+
+def https_links(urls: Iterable[object]) -> list[str]:
+    """The valid absolute `https://` links of `urls`, each once, in order (a stored value that
+    skipped validation never reaches a page)."""
+    found: list[str] = []
+    for url in urls:
+        if isinstance(url, str) and https_url_error(url) is None and url not in found:
+            found.append(url)
+    return found
+
+
+def wikidata_url(wikidata_id: str) -> str:
+    """The Wikidata page of an item ID; empty for no ID or one of the wrong format."""
+    if wikidata_id and wikidata_id_error(wikidata_id) is None:
+        return f"{WIKIDATA_ENTITY}{wikidata_id}"
+    return ""
+
+
+def brand_node_id(paths: Mapping[str, str], *, source: str, site: str) -> str:
+    """The `@id` of a brand: its listing page URL plus `#brand`. The page of the source language
+    when there is one, else the first language by code, so the id is the same whatever language
+    or vendor page asks. Empty when the brand has no public page."""
+    path = paths.get(source) or (paths[min(paths)] if paths else "")
+    return f"{site.rstrip('/')}{path}{BRAND_FRAGMENT}" if path else ""
+
+
+def brand_node(
+    *,
+    node_id: str,
+    name: str,
+    website: str = "",
+    logo_url: str = "",
+    description: str = "",
+    wikidata_id: str = "",
+    same_as: Iterable[object] = (),
+    manufacturer_id: str = "",
+) -> dict[str, Any]:
+    """The schema.org `Brand` node. `sameAs` lists the Wikidata item first, then the https
+    links; an empty value is left out."""
+    links = https_links([wikidata_url(wikidata_id), *same_as])
+    site = website if https_url_error(website) is None else ""
+    optional: dict[str, Any] = {
+        "url": site,
+        "logo": logo_url,
+        "description": description,
+        "sameAs": links,
+        "manufacturer": {"@id": manufacturer_id} if manufacturer_id else "",
+    }
+    node: dict[str, Any] = {"@type": "Brand", "@id": node_id, "name": name}
+    node.update({key: value for key, value in optional.items() if value})
+    return node
+
+
+def manufacturer_node(
+    *,
+    node_id: str,
+    legal_name: str,
+    url: str = "",
+    same_as: Iterable[object] = (),
+    country: str = "",
+    brand_ids: Sequence[str] = (),
+) -> dict[str, Any]:
+    """The schema.org `Organization` node of a brand's manufacturer, pointing at its brands."""
+    site = url if https_url_error(url) is None else ""
+    optional: dict[str, Any] = {
+        "url": site,
+        "sameAs": https_links(same_as),
+        "address": {"@type": "PostalAddress", "addressCountry": country} if country else "",
+        "brand": [{"@id": brand_id} for brand_id in brand_ids],
+    }
+    node: dict[str, Any] = {
+        "@type": "Organization",
+        "@id": node_id,
+        "name": legal_name,
+        "legalName": legal_name,
+    }
+    node.update({key: value for key, value in optional.items() if value})
+    return node
+
+
+def brand_graph(nodes: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    """The `@graph` document of a brand page."""
+    return {"@context": SCHEMA_ORG, "@graph": [dict(node) for node in nodes]}

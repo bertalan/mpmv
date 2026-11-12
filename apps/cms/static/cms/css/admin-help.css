@@ -1,0 +1,124 @@
+/* Contextual help in both admins (ARC.32 parts 3 and 4): the staff admin's header button and the
+   dialog both admins share (cms/js/admin-help.js). System colours (Canvas, CanvasText) with the
+   admins' own variables first, so light and dark follow the admin. No inline style anywhere. */
+
+.help-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  inline-size: 44px;
+  block-size: 44px;
+  margin-inline: auto 12px;
+  padding: 0;
+  border: 1px solid currentcolor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.help-button:hover {
+  background: rgb(255 255 255 / 20%);
+}
+
+.help-button:focus-visible {
+  outline: 3px solid currentcolor;
+  outline-offset: 2px;
+}
+
+.help-button svg {
+  inline-size: 24px;
+  block-size: 24px;
+}
+
+.admin-help {
+  box-sizing: border-box;
+  inline-size: min(40rem, calc(100vw - 2rem));
+  max-block-size: calc(100vh - 4rem);
+  padding: 0;
+  border: 1px solid var(--w-color-border-field-default, var(--border-color, GrayText));
+  border-radius: 8px;
+  background: var(--w-color-surface-page, var(--body-bg, Canvas));
+  color: var(--w-color-text-context, var(--body-fg, CanvasText));
+  font: 1rem/1.5 system-ui, sans-serif;
+}
+
+.admin-help::backdrop {
+  background: rgb(0 0 0 / 50%);
+}
+
+.admin-help__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-block-end: 1px solid var(--w-color-border-field-default, var(--border-color, GrayText));
+}
+
+.admin-help__title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.admin-help__close {
+  inline-size: 44px;
+  block-size: 44px;
+  border: 1px solid currentcolor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.admin-help__close:focus-visible {
+  outline: 3px solid currentcolor;
+  outline-offset: 2px;
+}
+
+.admin-help__body {
+  padding: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-help .help-entry__title {
+  margin-block: 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.admin-help a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.admin-help .help-fields {
+  margin-block-start: 1.5rem;
+  padding-block-start: 1rem;
+  border-block-start: 1px solid var(--w-color-border-field-default, var(--border-color, GrayText));
+}
+
+.admin-help .help-fields__title {
+  margin-block: 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.admin-help .help-fields__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-help .help-fields__list li {
+  margin-block-end: 0.75rem;
+}
+
+.admin-help .help-fields__name {
+  font-weight: 700;
+}
+
+.admin-help .help-fields__help {
+  display: block;
+}

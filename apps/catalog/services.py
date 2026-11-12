@@ -17,22 +17,25 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any
 from urllib.parse import urlencode, urlsplit
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.postgres.search import SearchQuery, SearchRank, TrigramStrictWordSimilarity
 from django.core.exceptions import NON_FIELD_ERRORS, PermissionDenied, ValidationError
-from django.db import models, transaction
+from django.db import connection, models, transaction
 from django.db.models import Case, Prefetch, Q, QuerySet, Value, When
 from django.db.models.functions import Length
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from django.utils.module_loading import import_string
 
 from apps.core import translations
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.models import MediaImage
+from apps.core.money import CURRENCY
 from apps.core.services import audit_changes, holds_permission, run_mutation, save_audited
 from apps.core.text import ascii_int
 from apps.vendors.models import Vendor
@@ -48,6 +51,8 @@ from .models import (
     Category,
     CategoryTranslation,
     FiscalCategory,
+    Manufacturer,
+    PriceHistory,
     Product,
     ProductAttribute,
     ProductKind,
@@ -106,6 +111,80 @@ def variant_price_snapshot(variant: Variant) -> dict[str, Any]:
     }
 
 
+def _record_price_history(product: Product, variant: Variant | None = None) -> PriceHistory:
+    """Append the current price setting of `product` (or of `variant`'s override) to its history.
+
+    Called by every service that writes a price, in the same transaction (CMP.6).
+    """
+    return PriceHistory.objects.create(
+        product=product,
+        variant=variant,
+        price_net=product.price_net if variant is None else variant.price_net_override,
+        sale_price_net=product.sale_price_net if variant is None else None,
+        sale_from=product.sale_from if variant is None else None,
+        sale_to=product.sale_to if variant is None else None,
+        recorded_at=timezone.now(),
+    )
+
+
+def price_points(product: Product, variant: Variant | None = None) -> list[engine.PricePoint]:
+    """The price settings of `product` over time, or of what `variant` sells for.
+
+    A variant follows its product's price unless it has an override. Whether the product's sale
+    reaches an overridden variant is `engine.SALE_APPLIES_TO_OVERRIDDEN_VARIANT` (owner decision
+    2026-11-11: no, the override wins). A point is emitted at every row of the product or variant.
+    """
+    rows = PriceHistory.objects.filter(product=product)
+    if variant is not None:
+        rows = rows.filter(Q(variant=None) | Q(variant=variant))
+    points: list[engine.PricePoint] = []
+    base: PriceHistory | None = None
+    override: Decimal | None = None
+    for row in rows.order_by("recorded_at", "id"):
+        if variant is None:
+            points.append(_point(row, row.price_net))
+            continue
+        if row.variant_id is None:
+            base = row
+        else:
+            override = row.price_net
+        price = override if override is not None else (base.price_net if base else None)
+        sale = (
+            base
+            if base and (override is None or engine.SALE_APPLIES_TO_OVERRIDDEN_VARIANT)
+            else None
+        )
+        points.append(
+            engine.PricePoint(
+                row.recorded_at,
+                price,
+                sale.sale_price_net if sale else None,
+                sale.sale_from if sale else None,
+                sale.sale_to if sale else None,
+                row.currency,
+            )
+        )
+    return points
+
+
+def _point(row: PriceHistory, price: Decimal | None) -> engine.PricePoint:
+    return engine.PricePoint(
+        row.recorded_at, price, row.sale_price_net, row.sale_from, row.sale_to, row.currency
+    )
+
+
+def reference_price(
+    product: Product, *, variant: Variant | None = None, at: dt.datetime | None = None
+) -> engine.ReferencePrice | None:
+    """The Omnibus prior price to show beside the reduced one, or None (CMP.6)."""
+    return engine.reference_price(
+        price_points(product, variant),
+        at=at or timezone.now(),
+        tz=ZoneInfo(settings.BUSINESS_TIME_ZONE),
+        currency=CURRENCY,
+    )
+
+
 def set_product_price(
     product: Product,
     *,
@@ -151,6 +230,7 @@ def set_product_price(
             for name, value in prices.items():
                 setattr(current, name, value)
             current.save(update_fields=[*PRODUCT_PRICE_FIELDS, "updated_at"])
+            _record_price_history(current)
 
         run_mutation(changes, apply, ctx=ctx, action=PRODUCT_PRICE_CHANGED, dry_run=dry_run)
 
@@ -185,6 +265,7 @@ def set_variant_price(
         def apply() -> None:
             current.price_net_override = prices["price_net_override"]
             current.save(update_fields=[*VARIANT_PRICE_FIELDS, "updated_at"])
+            _record_price_history(current.product, current)
 
         run_mutation(changes, apply, ctx=ctx, action=VARIANT_PRICE_CHANGED, dry_run=dry_run)
 
@@ -295,8 +376,17 @@ def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) 
         if dry_run:
             return changes
         product.save()
+        if action == PRODUCT_CREATED and product.price_net is not None:
+            _record_price_history(product)
         audit_changes(changes, ctx=ctx, action=action)
     return changes
+
+
+def _allow_history_delete() -> None:
+    """Let the price-history delete trigger pass for this transaction only: rows go with their
+    product or variant (cascade), through the delete services, never on their own."""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT set_config('mpmv.allow_price_history_delete', 'on', true)")
 
 
 def delete_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
@@ -313,6 +403,7 @@ def delete_product(product: Product, *, ctx: AuditContext, dry_run: bool = False
         for variant in stored.variants.select_for_update().select_related("product__vendor"):
             variant_changes.delete(VARIANT_MODEL, str(variant.public_id), variant_snapshot(variant))
         if not dry_run:
+            _allow_history_delete()
             stored.delete()
             audit_changes(product_changes, ctx=ctx, action=PRODUCT_DELETED)
             audit_changes(variant_changes, ctx=ctx, action=VARIANT_DELETED)
@@ -371,6 +462,8 @@ def save_variant(variant: Variant, *, ctx: AuditContext, dry_run: bool = False) 
         if dry_run:
             return changes
         variant.save()
+        if action == VARIANT_CREATED and variant.price_net_override is not None:
+            _record_price_history(variant.product, variant)
         audit_changes(changes, ctx=ctx, action=action)
     return changes
 
@@ -387,6 +480,7 @@ def delete_variant(variant: Variant, *, ctx: AuditContext, dry_run: bool = False
         changes.delete(VARIANT_MODEL, str(stored.public_id), variant_snapshot(stored))
         if dry_run:
             return changes
+        _allow_history_delete()
         stored.delete()
         audit_changes(changes, ctx=ctx, action=VARIANT_DELETED)
     return changes
@@ -1805,10 +1899,111 @@ def _term_anchor(term: Term, language: str) -> ListingAnchor:
 
 def brand_anchor(slug: str, language: str) -> ListingAnchor | None:
     """The brand page at `/brand/{slug}/`; None when there is none."""
-    found = _by_slug(BrandTranslation.objects.select_related("brand"), slug, language)
+    # A pending or rejected brand (CAT.20) has no public page.
+    approved = BrandTranslation.objects.filter(brand__status=Brand.Status.APPROVED)
+    found = _by_slug(approved.select_related("brand"), slug, language)
     if found is None:
         return None
     return _brand_anchor(found.brand)
+
+
+def brand_page_paths(brand: Brand) -> dict[str, str]:
+    """The public page paths of `brand` by language (empty while no text is published)."""
+    return _brand_anchor(brand).paths
+
+
+def brand_node_id(brand: Brand, *, site: str, paths: Mapping[str, str] | None = None) -> str:
+    """The schema.org `@id` of `brand` (its page URL in the source language plus `#brand`): the
+    one id every vendor's product and the brand page use (CAT.20, SEO.7). `site` is the origin,
+    like `https://shop.example`. Empty when the brand has no public page. `paths` are the page
+    paths when the caller already has them (`ListingAnchor.paths`): no second lookup."""
+    if paths is None:
+        paths = brand_page_paths(brand)
+    return engine.brand_node_id(paths, source=translations.source_language(), site=site)
+
+
+@dataclass(frozen=True)
+class BrandProfile:
+    """What the brand page shows above its products (CAT.20 3/3). Links are validated https."""
+
+    logo: MediaImage | None
+    logo_alt: str
+    website: str
+    wikidata_url: str
+    manufacturer: Manufacturer | None
+    description: str  # sanitised HTML in the page language, empty when not translated
+
+    @property
+    def is_empty(self) -> bool:
+        return not (
+            self.logo or self.website or self.wikidata_url or self.manufacturer or self.description
+        )
+
+
+def brand_profile(brand: Brand, language: str) -> BrandProfile:
+    """The brand page content for `language`. The description is the published text of that
+    language only: a missing translation gives none, never the source language's text."""
+    text = brand.translation(language)
+    description = ""
+    if text.translation is not None and not text.is_fallback:
+        description = _clean_rich_text(str(text.translation.description)).strip()
+    logo = brand.logo if brand.logo_id else None
+    return BrandProfile(
+        logo=logo,
+        logo_alt=str(brand.logo_alt) if logo else "",
+        website=str(brand.url) if engine.https_url_error(brand.url) is None else "",
+        wikidata_url=engine.wikidata_url(brand.wikidata_id),
+        manufacturer=brand.manufacturer,
+        description=description,
+    )
+
+
+def _clean_rich_text(html: str) -> str:
+    """`html` through the CMS rich-text sanitiser (CMS.12), found by name: catalog sits below
+    the CMS in the app graph."""
+    clean: str = import_string("apps.cms.engine.sanitise_rich_text")(html, None)
+    return clean
+
+
+def brand_graph(
+    brand: Brand, language: str, *, site: str, paths: Mapping[str, str] | None = None
+) -> dict[str, Any]:
+    """The JSON-LD `@graph` of a brand page: the `Brand` node and, when there is one, its
+    manufacturer `Organization` (spec 10, SEO.7 conventions: stable `@id`s, https links only, a
+    description only in the page language). `site` is the origin, without a trailing slash."""
+    node_id = brand_node_id(brand, site=site, paths=paths)
+    profile = brand_profile(brand, language)
+    maker = profile.manufacturer
+    maker_id = f"{site}/#manufacturer-{maker.public_id}" if maker is not None else ""
+    logo_url = ""
+    if profile.logo is not None:
+        logo_url = profile.logo.file.url
+        if logo_url.startswith("/"):
+            logo_url = f"{site}{logo_url}"
+    nodes = [
+        engine.brand_node(
+            node_id=node_id,
+            name=str(brand.name),
+            website=profile.website,
+            logo_url=logo_url,
+            description=engine.plain_description(profile.description),
+            wikidata_id=str(brand.wikidata_id),
+            same_as=brand.same_as if isinstance(brand.same_as, list) else (),
+            manufacturer_id=maker_id,
+        )
+    ]
+    if maker is not None:
+        nodes.append(
+            engine.manufacturer_node(
+                node_id=maker_id,
+                legal_name=str(maker.legal_name),
+                url=str(maker.url),
+                same_as=maker.same_as if isinstance(maker.same_as, list) else (),
+                country=str(maker.country),
+                brand_ids=[node_id],
+            )
+        )
+    return engine.brand_graph(nodes)
 
 
 def _brand_anchor(brand: Brand) -> ListingAnchor:
