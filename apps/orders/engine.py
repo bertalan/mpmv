@@ -6,12 +6,20 @@ Amounts are `Decimal`, rounded half up per line before they are added up (spec 0
 import calendar
 import datetime as dt
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 from urllib.parse import quote
 
 from apps.core.money import round_line
+from apps.tax.engine import (
+    ShippingCharge,
+    TaxContext,
+    TaxDecision,
+    TaxPortion,
+    resolve_shipping_tax,
+)
 
 HUNDRED = Decimal(100)
 
@@ -101,6 +109,150 @@ def shipping_tax(shipping_net: Decimal, rate: Decimal) -> Decimal:
     if shipping_net < 0:
         raise ValueError("shipping cannot be negative")
     return round_line(shipping_net * rate / HUNDRED)
+
+
+# --- checkout preview (ORD.3, SHP.4) ---------------------------------------------------------
+
+# Blocking messages of the checkout. `needs_quote` is not a failure: the package goes the quote
+# way (SHP.9) and the order cannot be placed as a plain one.
+CHECKOUT_OFF = "checkout_disabled"
+EMPTY_CART = "empty_cart"
+ADDRESS_MISSING = "address_missing"
+NOT_FOR_SALE = "not_for_sale"
+ON_REQUEST = "on_request"
+OUT_OF_STOCK = "out_of_stock"
+NEEDS_QUOTE = "needs_quote"
+SHIPPING_BLOCKED = "shipping_blocked"
+SHIPPING_CHOICE_INVALID = "shipping_choice_invalid"
+TAX_BLOCKED = "tax_blocked"
+NO_PRICE = "no_price"
+SHIPPING_VAT_SPLIT = "shipping_vat_split"
+
+READY = "ready"
+QUOTE = "quote"
+BLOCKED = "blocked"
+
+REQUIRED_ADDRESS_FIELDS = ("line1", "city", "postcode", "country")
+
+
+@dataclass(frozen=True)
+class Block:
+    """Why the checkout cannot go on (or must take the quote way), for one vendor package or the
+    whole cart (`vendor_id` None). `fields` names the missing address fields."""
+
+    code: str
+    message: str
+    vendor_id: int | None = None
+    product_id: int | None = None
+    fields: tuple[str, ...] = ()
+
+
+def missing_address_fields(address: Mapping[str, Any]) -> list[str]:
+    """The required address fields that are absent or blank, in a fixed order."""
+    return [name for name in REQUIRED_ADDRESS_FIELDS if not str(address.get(name) or "").strip()]
+
+
+@dataclass(frozen=True)
+class PackageLineInput:
+    """One line to price: the unit price the customer sees, the discount and the goods tax
+    decision (`resolve_goods_tax`)."""
+
+    unit_price_net: Decimal
+    quantity: int
+    discount_net: Decimal
+    decision: TaxDecision
+
+
+@dataclass(frozen=True)
+class PricedLine:
+    amounts: LineAmounts
+    decision: TaxDecision
+
+
+@dataclass(frozen=True)
+class PackageAmounts:
+    """A vendor package priced: lines, the shipping split over the goods' decisions (TAX.17,
+    pro rata, remainder on the largest share) and the totals."""
+
+    lines: tuple[PricedLine, ...]
+    shipping_portions: tuple[TaxPortion, ...]
+    shipping_tax: Decimal
+    totals: Totals
+
+
+@dataclass(frozen=True)
+class SummaryLine:
+    product_id: int
+    variant_id: int | None
+    title: str
+    quantity: int
+    unit_price_net: Decimal
+    net: Decimal | None = None
+    tax_rate: Decimal | None = None
+    tax: Decimal | None = None
+
+
+@dataclass(frozen=True)
+class ShippingOption:
+    """A shipping choice offered for a package, net of VAT."""
+
+    key: str
+    kind: str
+    label: str
+    net: Decimal
+    is_default: bool = False
+    min_days: int | None = None
+    max_days: int | None = None
+
+
+@dataclass(frozen=True)
+class PackageSummary:
+    """One vendor's package as the checkout shows it. `state` is `ready` (priced and placeable),
+    `quote` (a shipping quote is needed first) or `blocked`. Amounts are set only when ready."""
+
+    vendor_id: int
+    state: str
+    lines: tuple[SummaryLine, ...]
+    blocks: tuple[Block, ...] = ()
+    shipping_options: tuple[ShippingOption, ...] = ()
+    selected_shipping: str = ""
+    shipping_portions: tuple[TaxPortion, ...] = ()
+    totals: Totals | None = None
+
+
+def price_package(
+    ctx: TaxContext, lines: Sequence[PackageLineInput], shipping_net: Decimal
+) -> PackageAmounts:
+    """Each line to cents (ROUND_HALF_UP), the shipping VAT through the tax engine, the totals.
+
+    Shipping follows the goods: with two VAT rates in the package the shipping has two portions.
+    A package without shipping charge (0.00, pickup or free) has no portions.
+    """
+    if not lines:
+        raise ValueError("a package needs at least one line")
+    priced = tuple(
+        PricedLine(
+            line_amounts(
+                entry.unit_price_net, entry.quantity, entry.discount_net, entry.decision.rate
+            ),
+            entry.decision,
+        )
+        for entry in lines
+    )
+    portions = tuple(
+        resolve_shipping_tax(
+            ctx, [(p.amounts.net, p.decision) for p in priced], ShippingCharge(net=shipping_net)
+        )
+    )
+    shipping_tax = sum((p.tax for p in portions), start=Decimal("0.00"))
+    return PackageAmounts(
+        lines=priced,
+        shipping_portions=portions,
+        shipping_tax=shipping_tax,
+        totals=totals(
+            (p.amounts for p in priced), shipping_net=shipping_net, shipping_tax=shipping_tax
+        ),
+    )
 
 
 # --- state machines --------------------------------------------------------------------------
