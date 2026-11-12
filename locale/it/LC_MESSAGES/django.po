@@ -97,6 +97,13 @@ msgid ""
 msgstr ""
 "Una breve frase sotto il nome del negozio, al massimo 200 caratteri, per esempio 'Ceramiche fatte "
 "a mano in Umbria'. Lasciala vuota se non ne vuoi una."
+#: apps/manager/media.py
+msgid ""
+"A PDF document, for example your return policy. It is stored in your own shop collection and no "
+"other shop can see it."
+msgstr ""
+"Un documento PDF, per esempio la tua politica di reso. Viene salvato nella raccolta del tuo "
+"negozio e nessun altro negozio può vederlo."
 
 #: apps/manager/forms.py
 msgid "About the shop"
@@ -125,6 +132,10 @@ msgstr "Aggiungi un fattore"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Add an authenticator app"
 msgstr "Aggiungi un’app di autenticazione"
+
+#: apps/manager/templates/manager/shop/link_dialog.html
+msgid "Add an external link"
+msgstr "Aggiungi un link esterno"
 
 #: apps/accounts/mfa_views.py
 msgid "Add another factor before removing your last one."
@@ -338,6 +349,10 @@ msgstr "Email"
 msgid "Enter a valid carrier name."
 msgstr "Inserisci un nome di corriere valido."
 
+#: apps/manager/media.py
+msgid "Enter a valid web address starting with https://"
+msgstr "Inserisci un indirizzo web valido che inizi con https://"
+
 #: apps/manager/forms.py
 msgid "Enter the tracking number: letters, digits, spaces and . / _ - only."
 msgstr "Inserisci il numero di tracciamento: solo lettere, cifre, spazi e . / _ -"
@@ -460,6 +475,9 @@ msgid "Internal note on what changed in this version. Vendors do not see it. Up 
 msgstr ""
 "Nota interna su cosa è cambiato in questa versione. I venditori non la vedono. Al massimo 200 "
 "caratteri."
+#: apps/manager/templates/manager/shop/link_dialog.html
+msgid "Insert link"
+msgstr "Inserisci link"
 
 #: apps/accounts/mfa_views.py
 msgid "Invalid code. Check the time on your device and try again."
@@ -533,6 +551,10 @@ msgstr "ragione sociale"
 #: apps/manager/forms.py
 msgid "Letters, digits, spaces and . / _ - only."
 msgstr "Solo lettere, cifre, spazi e . / _ -"
+
+#: apps/manager/media.py
+msgid "Link text"
+msgstr "Testo del link"
 
 #: themes/base/templates/components/button.html
 msgid "Loading"
@@ -1326,6 +1348,9 @@ msgstr ""
 #: apps/manager/notice_views.py
 msgid "The content could not be restricted: check the notice status and target."
 msgstr ""
+#: apps/manager/notice_views.py
+msgid "The content could not be restricted: check the notice status and target."
+msgstr ""
 "Non è stato possibile limitare il contenuto: controlla lo stato e il bersaglio della segnalazione."
 
 #: apps/manager/notice_views.py
@@ -1482,6 +1507,13 @@ msgid ""
 msgstr ""
 "La licenza con cui si usa il logo; sono elencate solo le licenze che consentono l'uso commerciale."
 " Serve con un nuovo file. Esempio: 'Opera propria' per un logo che ci ha dato il marchio."
+#: apps/manager/media.py
+msgid ""
+"The full address of the page to open, starting with https://, for example "
+"https://www.example.com/guide. Required: the link has nowhere to go without it."
+msgstr ""
+"L’indirizzo completo della pagina da aprire, che inizia con https://, per esempio "
+"https://www.example.com/guide. Obbligatorio: senza indirizzo il link non porta da nessuna parte."
 
 #: apps/manager/templates/manager/forbidden.html
 msgid ""
@@ -1688,10 +1720,30 @@ msgstr ""
 "Il venditore il cui feed o la cui importazione ha portato questi marchi. Permette al team di "
 "revisione di chiedere alla persona giusta. Esempio: il venditore che ha caricato il file dei "
 "prodotti."
+#: apps/manager/templates/manager/shop/profile.html
+msgid ""
+"The text in this language is a machine draft and is not public yet. Edit and save it to publish "
+"it."
+msgstr ""
+"Il testo in questa lingua è una bozza automatica e non è ancora pubblico. Modificalo e salvalo per"
+" pubblicarlo."
+
+#: apps/manager/templates/manager/shop/profile.html
+msgid "The texts and policies customers read on the page of %(vendor)s, one language at a time."
+msgstr ""
+"I testi e le condizioni che i clienti leggono nella pagina di %(vendor)s, una lingua alla volta."
 
 #: apps/accounts/decorators.py
 msgid "The verification failed. Please reload the page and try again."
 msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
+
+#: apps/manager/media.py
+msgid ""
+"The words buyers click on. If you leave it empty, the words you selected are used, or the address "
+"itself when nothing is selected."
+msgstr ""
+"Le parole su cui gli acquirenti fanno clic. Se lo lasci vuoto, si usano le parole che hai "
+"selezionato, oppure l’indirizzo stesso se non hai selezionato nulla."
 
 #: themes/base/templates/components/error_summary.html
 msgid "There is a problem"
@@ -1951,6 +2003,9 @@ msgstr "Perché il campo è obbligatorio, per memoria. Al massimo 200 caratteri.
 #: apps/catalog/taxonomy.py
 msgid "Wikidata item ID"
 msgstr "ID della voce Wikidata"
+#: apps/manager/media.py
+msgid "Web address"
+msgstr "Indirizzo web"
 
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid ""
