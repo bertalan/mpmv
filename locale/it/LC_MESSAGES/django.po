@@ -85,6 +85,12 @@ msgstr ""
 "motori di ricerca li usano per riconoscere l'azienda. Esempio: "
 "[\"https://www.wikidata.org/wiki/Q7\"]."
 
+#: apps/manager/media.py
+msgid ""
+"A PDF document, for example your return policy. It is stored in your own shop collection and no "
+"other shop can see it."
+msgstr "Un documento PDF, per esempio la tua politica di reso. Viene salvato nella raccolta del tuo negozio e nessun altro negozio può vederlo."
+
 #: apps/vendors/models.py
 msgid ""
 "A phone number where we can reach you, with the country prefix, for example +39 06 1234 5678. "
@@ -186,6 +192,10 @@ msgstr "Aggiungi un fattore"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Add an authenticator app"
 msgstr "Aggiungi un’app di autenticazione"
+
+#: apps/manager/templates/manager/shop/link_dialog.html
+msgid "Add an external link"
+msgstr "Aggiungi un link esterno"
 
 #: apps/accounts/mfa_views.py
 msgid "Add another factor before removing your last one."
@@ -290,6 +300,10 @@ msgstr "lotti di marchi"
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "Cancel"
 msgstr "Annulla"
+
+#: apps/vendors/services.py
+msgid "Cancellation"
+msgstr "Annullamento"
 
 #: apps/manager/forms.py
 msgid "Cancellation policy"
@@ -430,6 +444,10 @@ msgstr "Email"
 msgid "Enter a valid carrier name."
 msgstr "Inserisci un nome di corriere valido."
 
+#: apps/manager/media.py
+msgid "Enter a valid web address starting with https://"
+msgstr "Inserisci un indirizzo web valido che inizi con https://"
+
 #: apps/manager/forms.py
 msgid "Enter the tracking number: letters, digits, spaces and . / _ - only."
 msgstr "Inserisci il numero di tracciamento: solo lettere, cifre, spazi e . / _ -"
@@ -528,6 +546,15 @@ msgstr "Ciao %(customer_name)s,"
 msgid "Hello,"
 msgstr "Ciao,"
 
+#: apps/manager/forms.py
+msgid ""
+"How and when you ship. Customers see it in the 'Shipping' section of your shop page. Leave it "
+"empty and the section is not shown. Up to about 5,000 characters including formatting."
+msgstr ""
+"Come e quando spedisci. I clienti la vedono nella sezione ‘Spedizione’ della pagina del tuo "
+"negozio. Se la lasci vuota, la sezione non viene mostrata. Fino a circa 5.000 caratteri, "
+"formattazione compresa."
+
 #: apps/catalog/models.py
 msgid ""
 "How buyers get this product. Buy: they order and pay on the site, so it needs a price. Catalog "
@@ -587,6 +614,10 @@ msgstr "lotto di importazione"
 #: themes/base/templates/components/alert.html
 msgid "Information"
 msgstr "Informazione"
+
+#: apps/manager/templates/manager/shop/link_dialog.html
+msgid "Insert link"
+msgstr "Inserisci link"
 
 #: apps/vendors/models.py
 msgid "Internal note on what changed in this version. Vendors do not see it. Up to 200 characters."
@@ -666,6 +697,10 @@ msgstr "ragione sociale"
 #: apps/manager/forms.py
 msgid "Letters, digits, spaces and . / _ - only."
 msgstr "Solo lettere, cifre, spazi e . / _ -"
+
+#: apps/manager/media.py
+msgid "Link text"
+msgstr "Testo del link"
 
 #: themes/base/templates/components/button.html
 msgid "Loading"
@@ -892,6 +927,14 @@ msgstr ""
 msgid "Optional text that replaces the generated credit line. Example: 'Logo: Acme Ltd'."
 msgstr "Testo facoltativo che sostituisce la riga di credito generata. Esempio: 'Logo: Acme Ltd'."
 
+#: apps/manager/forms.py
+msgid ""
+"Optional. The name of the courier, for example the one on the parcel. The customer gets it in the "
+"shipping email together with the tracking number."
+msgstr ""
+"Facoltativo. Il nome del corriere, per esempio quello scritto sul pacco. Il cliente lo riceve "
+"nell’email di spedizione insieme al numero di tracking."
+
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Order"
 msgstr "Ordine"
@@ -1048,6 +1091,14 @@ msgstr[1] "Correggi gli errori qui sotto."
 msgid "PNG, JPEG or WebP. Leave empty to keep the current image."
 msgstr "PNG, JPEG o WebP. Lascia vuoto per mantenere l’immagine attuale."
 
+#: apps/manager/media.py
+msgid ""
+"PNG, JPEG, WebP or GIF (SVG is not accepted). The image is checked and saved again without its "
+"hidden data. It goes into your own images only."
+msgstr ""
+"PNG, JPEG, WebP o GIF (gli SVG non sono accettati). L’immagine viene controllata e salvata di "
+"nuovo senza i suoi dati nascosti. Finisce solo tra le tue immagini."
+
 #: apps/catalog/taxonomy_admin.py
 msgid "Position"
 msgstr "Posizione"
@@ -1168,6 +1219,10 @@ msgstr "Limita e invia la motivazione"
 msgid "Retired"
 msgstr "Ritirati"
 
+#: apps/vendors/services.py
+msgid "Returns and refunds"
+msgstr "Resi e rimborsi"
+
 #: apps/manager/forms.py
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
@@ -1216,7 +1271,7 @@ msgstr "Configura la verifica in due passaggi"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Ship the order"
-msgstr "Spedisci l'ordine"
+msgstr "Spedisci l’ordine"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Ship to"
@@ -1226,6 +1281,10 @@ msgstr "Spedire a"
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "Ship to:"
 msgstr "Spedire a:"
+
+#: apps/vendors/services.py
+msgid "Shipping"
+msgstr "Spedizione"
 
 #: apps/manager/forms.py
 msgid "Shipping policy"
@@ -1591,6 +1650,10 @@ msgstr ""
 "Il paese in cui ha sede la tua attività. Sono elencati solo i paesi che accettiamo al momento. "
 "Obbligatorio: decide quali dati ti chiediamo più avanti."
 
+#: apps/vendors/models.py
+msgid "The country whose authorities issue no tax identification number (TIN)."
+msgstr "Il paese le cui autorità non rilasciano un codice fiscale estero (TIN)."
+
 #: apps/catalog/models.py
 msgid "The day and time the rule stops applying. Leave it empty and the rule never expires."
 msgstr ""
@@ -1638,6 +1701,12 @@ msgid "The form was sent from an old or expired page. Go back, reload the page a
 msgstr ""
 "Il modulo è stato inviato da una pagina vecchia o scaduta. Torna indietro, ricarica la pagina e "
 "invialo di nuovo."
+
+#: apps/manager/media.py
+msgid ""
+"The full address of the page to open, starting with https://, for example "
+"https://www.example.com/guide. Required: the link has nowhere to go without it."
+msgstr "L’indirizzo completo della pagina da aprire, che inizia con https://, per esempio https://www.example.com/guide. Obbligatorio: senza di esso il link non porta da nessuna parte."
 
 #: apps/vendors/models.py
 msgid ""
@@ -2199,6 +2268,11 @@ msgid ""
 msgstr ""
 "Le parole da cercare, per esempio 'tazza in ceramica'. Compilale solo quando la destinazione è una"
 " ricerca."
+#: apps/manager/media.py
+msgid ""
+"The words buyers click on. If you leave it empty, the words you selected are used, or the address "
+"itself when nothing is selected."
+msgstr "Le parole su cui cliccano i clienti. Se lo lasci vuoto, vengono usate le parole che hai selezionato, oppure l’indirizzo stesso se non hai selezionato nulla."
 
 #: themes/base/templates/components/error_summary.html
 msgid "There is a problem"
@@ -2240,6 +2314,14 @@ msgid ""
 msgstr ""
 "Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può essere modificato. "
 "Contatta l’assistenza per farlo riaprire."
+
+#: apps/manager/forms.py
+msgid ""
+"Tick it and save to delete the current logo. A new image and the description above are then "
+"ignored."
+msgstr ""
+"Spunta e salva per eliminare il logo attuale. Un’eventuale nuova immagine e la descrizione qui "
+"sopra vengono ignorate."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -2458,6 +2540,9 @@ msgstr ""
 "Cosa contiene l'attributo. Scelta: uno o più valori da un elenco che definisci, per esempio le "
 "taglie. Numero: una misura, per esempio una larghezza. Testo: un testo libero, per esempio un "
 "autore. Obbligatorio."
+#: apps/manager/media.py
+msgid "Web address"
+msgstr "Indirizzo web"
 
 #: apps/vendors/models.py
 msgid "What the field is needed for: a payout request or the activation of the vendor."
@@ -2470,6 +2555,17 @@ msgid ""
 msgstr ""
 "Cosa ottengono i visitatori: 301 li manda a un nuovo indirizzo, 410 dice che la pagina non esiste "
 "più. Un 410 non ha destinazione."
+
+#: apps/manager/forms.py
+msgid ""
+"When and how a customer can cancel an order. Customers see it in the 'Cancellation' section of "
+"your shop page. Leave it empty and the section is not shown. Up to about 5,000 characters "
+"including formatting. If you are unsure what the law requires, ask a legal adviser."
+msgstr ""
+"Quando e come un cliente può annullare un ordine. I clienti la vedono nella sezione ‘Annullamento’"
+" della pagina del tuo negozio. Se la lasci vuota, la sezione non viene mostrata. Fino a circa "
+"5.000 caratteri, formattazione compresa. Se non sei sicuro di cosa preveda la legge, chiedi a un "
+"consulente legale."
 
 #: apps/vendors/models.py
 msgid "When the contract was accepted."
@@ -2550,6 +2646,10 @@ msgid ""
 msgstr ""
 "Perché esiste la regola, per esempio un codice prodotto ritirato. È solo un'etichetta per te e i "
 "tuoi colleghi: non cambia nulla per i visitatori."
+
+#: apps/vendors/models.py
+msgid "Why this country issues no TIN."
+msgstr "Perché questo paese non rilascia il TIN."
 
 #: apps/catalog/taxonomy.py
 msgid "Wikidata item ID"
@@ -2647,6 +2747,15 @@ msgstr "Il tuo ruolo"
 msgid "Your role requires a second factor before you can continue."
 msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
 
+#: apps/manager/forms.py
+msgid ""
+"Your story, shown on your shop page in the language selected above. Up to about 10,000 characters "
+"including formatting. Only the formatting the editor offers is kept."
+msgstr ""
+"La tua storia, mostrata nella pagina del tuo negozio nella lingua scelta qui sopra. Fino a circa "
+"10.000 caratteri, formattazione compresa. Viene mantenuta solo la formattazione che offre "
+"l’editor."
+
 #: apps/vendors/models.py
 msgid ""
 "Your VAT number, with or without the country prefix, for example IT12345678901. We check it in the"
@@ -2654,47 +2763,3 @@ msgid ""
 msgstr ""
 "La tua partita IVA, con o senza il prefisso del paese, per esempio IT12345678901. La verifichiamo "
 "nel registro europeo VIES. Non sai se ne hai una? Chiedi al tuo commercialista."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
-#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
-msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
-msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
-
-#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
-#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
-msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
-msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
-msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
-msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
-
-#: apps/orders/templates/email/orders/order_cancelled/subject.txt
-msgid "Order %(order_number)s was cancelled"
-msgstr "L’ordine %(order_number)s è stato annullato"
-
-#: apps/orders/templates/email/orders/order_cancelled/body.html
-#: apps/orders/templates/email/orders/order_cancelled/body.txt
-msgid "Order %(order_number)s was cancelled before payment. Nothing was charged."
-msgstr "L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato addebitato nulla."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
-msgid "Order %(order_number)s was cancelled. Do not ship these items:"
-msgstr "L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
-
-#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
-msgid "Order %(order_number)s: a shipment was delivered"
-msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
-msgid "Order %(order_number)s: part of your order was cancelled"
-msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
-
-#: apps/vendors/models.py
-msgid "The country whose authorities issue no tax identification number (TIN)."
-msgstr "Il paese le cui autorità non rilasciano un codice fiscale estero (TIN)."
-
-#: apps/vendors/models.py
-msgid "Why this country issues no TIN."
-msgstr "Perché questo paese non rilascia il TIN."
