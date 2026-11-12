@@ -96,7 +96,7 @@ def test_the_banner_opens_the_passkey_window(
     virtual_authenticator: CDPSession,
     shot: Callable[[str], Path],
 ) -> None:
-    """CORE.25: in Secure mode the banner holds the button; one touch opens the window."""
+    """CORE.25: with no window open the banner holds the button; one touch opens the window."""
     password = secrets.token_urlsafe(16)
     UserFactory.create(
         email="owner@example.com",
@@ -107,16 +107,16 @@ def test_the_banner_opens_the_passkey_window(
     _sign_in_with_a_new_passkey(page, live_server.url, "owner@example.com", password)
 
     page.goto(f"{live_server.url}/manager/platform/")
-    banner = page.locator(".session-level--restricted")
+    banner = page.locator(".session-level--closed")
     expect(banner).to_contain_text("open a passkey window to cover several in a row")
     expect(banner.locator("form[data-passkey-ready]")).to_have_count(1)
     shot("banner-passkey-window-closed")
     banner.get_by_role("button", name="Open passkey window").click()
-    expect(page.locator(".session-level--operational")).to_be_visible()
+    expect(page.locator(".session-level--open")).to_be_visible()
     shot("banner-passkey-window-open")
-    # A group 2 page that Secure mode refuses now passes without the prompt.
+    # A sensitive page that asked for a passkey now passes without the prompt.
     page.goto(f"{live_server.url}/django-admin/accounts/user/")
-    expect(page.get_by_text("This needs Operational mode")).to_have_count(0)
+    expect(page.get_by_text("This needs your passkey")).to_have_count(0)
 
 
 def test_the_security_page_shows_the_passkey(

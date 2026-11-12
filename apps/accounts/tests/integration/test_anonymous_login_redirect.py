@@ -13,7 +13,7 @@ SIGNED_IN_PAGES = [
     "/account/mfa/setup/",
     "/account/privacy/",
     "/account/level/options/",
-    "/account/level/operational/",
+    "/account/level/window/",
     "/_styleguide/",
 ]
 

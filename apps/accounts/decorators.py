@@ -111,13 +111,13 @@ def step_up_required[**P](max_age: int | None = None) -> Callable[[View[P]], Vie
 
 
 def _prompt(request: HttpRequest, action: str, group: int, digest: str) -> HttpResponse:
-    """The refusal of a sensitive action in restricted mode, with the way forward (D-32)."""
-    outcome = "restricted"
+    """The refusal of a sensitive action when no passkey window is open (D-32), with the way on."""
+    outcome = "window_required"
     levels.record_prompt(request, action, group, outcome)
     can_elevate = levels.may_elevate(request.user)
     if wants_json(request):
         return JsonResponse(
-            {"error": "operational_mode_required", "action": action, "digest": digest}, status=403
+            {"error": "passkey_window_required", "action": action, "digest": digest}, status=403
         )
     replay = [
         (key, value)
@@ -148,14 +148,14 @@ def requires_level[**P](action: str) -> Callable[[View[P]], View[P]]:
 
     The group of `action` comes from the `PlatformOperator` configuration, per request:
 
-    1. free: runs in any session;
-    2. operational mode required: in restricted mode the user gets a prompt with "Do it once"
-       (a fresh passkey authorises this action with these parameters, once, about 2 minutes) or
-       "Switch to operational mode";
-    3. operational mode and, per action, a passkey verification no older than
-       `MFA_STEP_UP_MAX_AGE` (a code does not count), even inside operational mode. In
-       restricted mode it can also be done once, each time with a fresh passkey assertion with
-       user verification made for that grant (never one from an earlier login or elevation).
+    1. everyday: runs in any session;
+    2. sensitive: a passkey once, or an open passkey window. With no window the user gets a
+       prompt with "Do it once" (a fresh passkey authorises this action with these parameters,
+       once, about 2 minutes) or "Open passkey window";
+    3. critical: a passkey verification no older than `MFA_STEP_UP_MAX_AGE` each time (a code
+       does not count), even with the window open. With no window it can also be done once, each
+       time with a fresh passkey assertion with user verification made for that grant (never one
+       from an earlier login or an earlier window).
 
     Stack it with `step_up_required` where the view must also confirm a recent second factor.
     """
@@ -169,14 +169,14 @@ def requires_level[**P](action: str) -> Callable[[View[P]], View[P]]:
                     request.get_full_path(), resolve_url(settings.MFA_LOGIN_URL)
                 )
             group = levels.policy().group_of(action)
-            if group == session_policy.GROUP_FREE:
+            if group == session_policy.GROUP_EVERYDAY:
                 return view(request, *args, **kwargs)
             digest = levels.params_digest(request)
-            if levels.current_level(request) != levels.OPERATIONAL:
+            if levels.current_level(request) != levels.PASSKEY_WINDOW:
                 if levels.consume_single(request, action, digest):
                     return view(request, *args, **kwargs)
                 return _prompt(request, action, group, digest)
-            if group == session_policy.GROUP_PASSKEY and not is_recently_passkey_verified(request):
+            if group == session_policy.GROUP_CRITICAL and not is_recently_passkey_verified(request):
                 levels.record_prompt(request, action, group, "passkey_required")
                 if wants_json(request):
                     return JsonResponse({"error": "passkey_required", "action": action}, status=403)
