@@ -85,6 +85,12 @@ msgstr ""
 "motori di ricerca li usano per riconoscere l'azienda. Esempio: "
 "[\"https://www.wikidata.org/wiki/Q7\"]."
 
+#: apps/manager/media.py
+msgid ""
+"A PDF document, for example your return policy. It is stored in your own shop collection and no "
+"other shop can see it."
+msgstr "Un documento PDF, per esempio la tua politica di reso. Viene salvato nella raccolta del tuo negozio e nessun altro negozio può vederlo."
+
 #: apps/vendors/models.py
 msgid ""
 "A phone number where we can reach you, with the country prefix, for example +39 06 1234 5678. "
@@ -186,6 +192,10 @@ msgstr "Aggiungi un fattore"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Add an authenticator app"
 msgstr "Aggiungi un’app di autenticazione"
+
+#: apps/manager/templates/manager/shop/link_dialog.html
+msgid "Add an external link"
+msgstr "Aggiungi un link esterno"
 
 #: apps/accounts/mfa_views.py
 msgid "Add another factor before removing your last one."
@@ -434,6 +444,10 @@ msgstr "Email"
 msgid "Enter a valid carrier name."
 msgstr "Inserisci un nome di corriere valido."
 
+#: apps/manager/media.py
+msgid "Enter a valid web address starting with https://"
+msgstr "Inserisci un indirizzo web valido che inizi con https://"
+
 #: apps/manager/forms.py
 msgid "Enter the tracking number: letters, digits, spaces and . / _ - only."
 msgstr "Inserisci il numero di tracciamento: solo lettere, cifre, spazi e . / _ -"
@@ -601,6 +615,10 @@ msgstr "lotto di importazione"
 msgid "Information"
 msgstr "Informazione"
 
+#: apps/manager/templates/manager/shop/link_dialog.html
+msgid "Insert link"
+msgstr "Inserisci link"
+
 #: apps/vendors/models.py
 msgid "Internal note on what changed in this version. Vendors do not see it. Up to 200 characters."
 msgstr ""
@@ -679,6 +697,10 @@ msgstr "ragione sociale"
 #: apps/manager/forms.py
 msgid "Letters, digits, spaces and . / _ - only."
 msgstr "Solo lettere, cifre, spazi e . / _ -"
+
+#: apps/manager/media.py
+msgid "Link text"
+msgstr "Testo del link"
 
 #: themes/base/templates/components/button.html
 msgid "Loading"
@@ -1680,6 +1702,12 @@ msgstr ""
 "Il modulo è stato inviato da una pagina vecchia o scaduta. Torna indietro, ricarica la pagina e "
 "invialo di nuovo."
 
+#: apps/manager/media.py
+msgid ""
+"The full address of the page to open, starting with https://, for example "
+"https://www.example.com/guide. Required: the link has nowhere to go without it."
+msgstr "L’indirizzo completo della pagina da aprire, che inizia con https://, per esempio https://www.example.com/guide. Obbligatorio: senza di esso il link non porta da nessuna parte."
+
 #: apps/vendors/models.py
 msgid ""
 "The full legal name of your business as in the company register, or your own first and last name "
@@ -2240,6 +2268,11 @@ msgid ""
 msgstr ""
 "Le parole da cercare, per esempio 'tazza in ceramica'. Compilale solo quando la destinazione è una"
 " ricerca."
+#: apps/manager/media.py
+msgid ""
+"The words buyers click on. If you leave it empty, the words you selected are used, or the address "
+"itself when nothing is selected."
+msgstr "Le parole su cui cliccano i clienti. Se lo lasci vuoto, vengono usate le parole che hai selezionato, oppure l’indirizzo stesso se non hai selezionato nulla."
 
 #: themes/base/templates/components/error_summary.html
 msgid "There is a problem"
@@ -2507,6 +2540,9 @@ msgstr ""
 "Cosa contiene l'attributo. Scelta: uno o più valori da un elenco che definisci, per esempio le "
 "taglie. Numero: una misura, per esempio una larghezza. Testo: un testo libero, per esempio un "
 "autore. Obbligatorio."
+#: apps/manager/media.py
+msgid "Web address"
+msgstr "Indirizzo web"
 
 #: apps/vendors/models.py
 msgid "What the field is needed for: a payout request or the activation of the vendor."

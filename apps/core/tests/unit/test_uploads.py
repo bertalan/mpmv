@@ -5,6 +5,7 @@ cases through every upload path of the site.
 """
 
 import io
+import random
 import threading
 import time
 from pathlib import Path
@@ -71,6 +72,97 @@ def test_the_document_checks_refuse_or_accept_every_corpus_file(case: Case) -> N
         return
     name = check_document(case.data, case.filename, max_bytes=MAX_DOCUMENT_BYTES)
     assert_safe_document(f"documents/{name}", case.data, case)
+
+
+@pytest.mark.parametrize("size", [100_000, 1_000_000, 5_000_000])
+def test_a_large_pdf_with_compressed_streams_is_not_mistaken_for_active_content(
+    size: int,
+) -> None:
+    """Random bytes inside a stream contain `/xx#41`-like runs and name-like tokens by chance:
+    only the object syntax is scanned, never the stream bodies."""
+    body = random.Random(20261111).randbytes(size)  # noqa: S311  # deterministic test data
+    assert b"endstream" not in body  # fixed seed: change it if this ever fires
+    data = (
+        b"%PDF-1.5\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+        b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+        b"3 0 obj\n<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>\nendobj\n"
+        + b"4 0 obj\n<< /Length %d /Filter /FlateDecode >>\nstream\n" % size
+        + body
+        + b"\nendstream\nendobj\ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n0\n%%EOF\n"
+    )
+    assert check_document(data, "big.pdf", max_bytes=MAX_DOCUMENT_BYTES) == "big.pdf"
+
+
+def test_active_names_are_still_found_around_a_stream() -> None:
+    body = random.Random(7).randbytes(2_000)  # noqa: S311  # deterministic test data
+    data = (
+        b"%PDF-1.5\n1 0 obj\n<< /Length 2000 >>\nstream\n"
+        + body
+        + b"\nendstream\nendobj\n2 0 obj\n<< /OpenAction << /S /J#61vaScript >> >>\nendobj\n"
+        b"startxref\n0\n%%EOF\n"
+    )
+    with pytest.raises(UploadRefused):
+        check_document(data, "a.pdf", max_bytes=MAX_DOCUMENT_BYTES)
+
+
+@pytest.mark.parametrize(
+    "middle",
+    [
+        pytest.param(
+            b"% stream\n<< /OpenAction << /S /JavaScript /JS (x) >> >>\n% endstream\n",
+            id="stream-words-in-comments",
+        ),
+        pytest.param(
+            b"<< /X (stream\n) /OpenAction << /S /JavaScript >> /Y (endstream) >>\n",
+            id="stream-words-in-strings",
+        ),
+        pytest.param(
+            b"<< /Length 9 0 R >>\nstream\n/JS (x) /OpenAction\nendstream\n",
+            id="indirect-length",
+        ),
+        pytest.param(b"<< >>\nstream\n/JS (x)\nendstream\n", id="missing-length"),
+        pytest.param(b"<< /Length 3 >>\nstream\n/JS (x)\nendstream\n", id="wrong-length"),
+        pytest.param(
+            b"<< /Length 2 /X (>>\nstream\n) /Y << /OpenAction << /S /JavaScript >> >> % >>\n"
+            b"stream\nxx\nendstream\n",
+            id="stream-keyword-inside-a-string",
+        ),
+        pytest.param(
+            b"<< /K << /Length 10 >> >>\nstream\n/JS (x) 1\nendstream\n",
+            id="length-of-a-nested-dictionary-is-not-used",
+        ),
+    ],
+)
+def test_active_syntax_is_not_hidden_behind_stream_words(middle: bytes) -> None:
+    """Only a real stream body is blanked: a dictionary, `stream`, exactly `/Length` bytes and
+    `endstream`. Anything else is scanned as it is (a false refusal is fine, a bypass is not)."""
+    data = b"%PDF-1.5\n1 0 obj\n" + middle + b"endobj\nstartxref\n0\n%%EOF\n"
+    with pytest.raises(UploadRefused):
+        check_document(data, "a.pdf", max_bytes=MAX_DOCUMENT_BYTES)
+
+
+def test_a_length_that_swallows_a_later_endstream_and_object_is_scanned() -> None:
+    body = b"x\nendstream\nendobj\n5 0 obj\n<< /OpenAction << /S /JavaScript >> >>\nendobj\n6 0 obj"
+    data = (
+        b"%PDF-1.5\n1 0 obj\n"
+        + b"<< /Length %d >>\nstream\n" % len(body)
+        + body
+        + b"\nendstream\nendobj\nstartxref\n0\n%%EOF\n"
+    )
+    with pytest.raises(UploadRefused):
+        check_document(data, "a.pdf", max_bytes=MAX_DOCUMENT_BYTES)
+
+
+def test_a_real_stream_with_name_like_bytes_is_blanked_for_both_eol_styles() -> None:
+    for eol in (b"\n", b"\r\n"):
+        data = (
+            b"%PDF-1.5\n1 0 obj\n<< /Length 12 >>\nstream"
+            + eol
+            + b"/JS /OpenAct"
+            + eol
+            + b"endstream\nendobj\nstartxref\n0\n%%EOF\n"
+        )
+        assert check_document(data, "a.pdf", max_bytes=MAX_DOCUMENT_BYTES) == "a.pdf"
 
 
 def test_a_bomb_is_refused_before_its_pixels_are_decoded() -> None:
