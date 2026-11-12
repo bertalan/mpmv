@@ -389,6 +389,12 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "home": NoVendorData("Public home page."),
     "catalog:category": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "product-category"}),
+    "catalog:product": NoVendorData(
+        "Public product page (CAT.7): only the published fields of a published product of an "
+        "active vendor, the same for every visitor; Vendor B is not active, so its products are "
+        "a 404.",
+        kwargs={"segment": "product"},
+    ),
     "catalog:brand": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "brand"}),
     "catalog:term": NoVendorData(PUBLIC_LISTING, login=member_with_landing_taxonomy),
     "catalog:vendor": NoVendorData(
@@ -403,10 +409,10 @@ ENDPOINTS: dict[str, Access] = {
         "non-staff user gets 404."
     ),
     "levels:options": NoVendorData(OWN_ACCOUNT),
-    "levels:operational": NoVendorData(OWN_ACCOUNT),
+    "levels:window": NoVendorData(OWN_ACCOUNT),
     "levels:once_options": NoVendorData(OWN_ACCOUNT),
     "levels:once": NoVendorData(OWN_ACCOUNT),
-    "levels:end": NoVendorData(OWN_ACCOUNT),
+    "levels:close": NoVendorData(OWN_ACCOUNT),
     "mfa:overview": NoVendorData(OWN_ACCOUNT),
     "mfa:setup": NoVendorData(OWN_ACCOUNT),
     "mfa:totp": NoVendorData(OWN_ACCOUNT),
@@ -512,6 +518,20 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
+    ),
+    "manager:platform:profile_changes": StaffOnly(
+        "Storefront profile history (CORE.9): platform staff holding the revert permission only; "
+        "a vendor member gets 403 on the platform space, so no vendor sees any history."
+    ),
+    "manager:platform:profile_confirm": StaffOnly(
+        "Confirm of one logo change (CORE.9): platform staff holding the revert permission only, "
+        "POST only.",
+        kwargs={"entry": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "manager:platform:profile_revert": StaffOnly(
+        "Revert of one storefront profile change (CORE.9): platform staff holding the revert "
+        "permission only, POST only.",
+        kwargs={"entry": "00000000-0000-0000-0000-000000000000"},
     ),
     "manager:platform:notices": StaffOnly(
         "Notices of illegal content (CMP.5): platform data, not vendor-owned; needs the "

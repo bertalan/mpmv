@@ -138,7 +138,7 @@ MIDDLEWARE = [
     # CORE.4: which device verified the session, then confine required roles to the MFA pages.
     "django_otp.middleware.OTPMiddleware",
     "apps.accounts.middleware.MfaRequiredMiddleware",
-    "apps.accounts.middleware.SessionLevelMiddleware",  # CORE.25 (D-32): operational mode timers
+    "apps.accounts.middleware.SessionLevelMiddleware",  # CORE.25 (D-32): the passkey window timers
     # CORE.17: one gate per Manager space (404, login or MFA) for every URL under /manager/.
     "apps.manager.middleware.ManagerGateMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -171,16 +171,16 @@ MFA_REQUIRED_POLICIES: list[str] = [
 MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitive actions
 # Step-up for sensitive views of apps that cannot import accounts (the core audit log view, SEC.4).
 STEP_UP_DECORATOR = "apps.accounts.decorators.step_up_required"
-# Path prefixes whose requests (polling) do not count as activity for operational mode (CORE.25).
+# Path prefixes whose requests (polling) do not count as activity for the passkey window (CORE.25).
 SESSION_LEVEL_POLL_PATHS: tuple[str, ...] = ()
 LEVEL_DECORATOR = "apps.accounts.decorators.requires_level"  # CORE.25 (D-32)
 # Role-matrix check (CORE.18) for admin pages of lower apps, which cannot import the Manager.
 PLATFORM_SECTION_CHECK = "apps.manager.access.may_access_section"
 # The Manager login (CORE.17): where the Manager gate sends anonymous visitors.
 LOGIN_URL = "login"
-# Whether product cards link to a product page. False until the CAT.7 product page is routed:
-# without it every `/product/<slug>/` answers 404. CAT.7 sets this to True.
-PRODUCT_PAGES_ROUTED = False
+# Whether product cards link to a product page. The CAT.7 product page is routed, so this is True;
+# the switch stays so that a deployment without the page can never render a link that answers 404.
+PRODUCT_PAGES_ROUTED = True
 MFA_LOGIN_URL = LOGIN_URL  # /account/login/: the django-admin login is loopback-only (OPS.5)
 # Secure action links in emails (CORE.15, spec 02): validity of a link unless its purpose sets
 # its own, and Continue POSTs allowed per client IP every 15 minutes.
@@ -202,6 +202,9 @@ VENDOR_APPLICATION_RATE_LIMIT = 20
 # are deleted this many days after the request, and one reminder goes out after this many hours.
 VENDOR_APPLICATION_RETENTION_DAYS = 3
 VENDOR_APPLICATION_REMINDER_HOURS = 48
+# Review window for storefront logo changes (CORE.9, owner decision Q1): the previous logo file is
+# kept this many days so staff can restore it with a revert; then a job deletes it.
+VENDOR_LOGO_REVIEW_DAYS = 14
 MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts
 OTP_TOTP_ISSUER = MFA_ISSUER
 OTP_ADMIN_HIDE_SENSITIVE_DATA = True

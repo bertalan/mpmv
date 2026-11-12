@@ -554,7 +554,7 @@ def remove_device(device: AnyDevice, *, ctx: AuditContext, dry_run: bool = False
 
 
 def removal_weakens_mfa(device: AnyDevice) -> bool:
-    """Removing `device` would disable MFA or remove the user's last passkey (D-32 group 3)."""
+    """Removing `device` would disable MFA or remove the user's last passkey (D-32 critical)."""
     kind = kind_of(device)
     if kind == RECOVERY_CODES:
         return False

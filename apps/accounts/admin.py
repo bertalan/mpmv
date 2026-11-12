@@ -289,7 +289,7 @@ class UserAdmin(DjangoUserAdmin[User]):
 
 
 def _posts_owner_grant(request: HttpRequest, target: User | None) -> bool:
-    """The form grants the superuser flag or the platform owner permission (D-32 group 3)."""
+    """The form grants the superuser flag or the platform owner permission (D-32 critical)."""
     if request.method != "POST":
         return False
     if request.POST.get("is_superuser") and not (target is not None and target.is_superuser):
@@ -327,7 +327,7 @@ def _posts_platform_owner_permission(request: HttpRequest) -> bool:
 def _role_grant_gate(
     request: HttpRequest, view: Callable[[HttpRequest], HttpResponse], target: User | None
 ) -> Callable[[HttpRequest], HttpResponse]:
-    """Roles and permissions need operational mode (`role_grant`); making a superuser or a
+    """Roles and permissions need the passkey window (`role_grant`); making a superuser or a
     platform owner also needs a per-action passkey (`owner_role_grant`)."""
     gated = step_up_required()(view)
     if _posts_owner_grant(request, target):

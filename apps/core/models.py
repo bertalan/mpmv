@@ -42,7 +42,8 @@ from .svg import LOGO_COLLECTION_NAME, MAX_SVG_BYTES, UnsafeSvgError, sanitise_s
 # admin access, superuser status included. Granted as `core.platform_owner`, directly or through a
 # group, and checked by `services.is_platform_owner`, not `has_perm` (true for any superuser).
 PLATFORM_OWNER_CODENAME = "platform_owner"
-# D-32 (CORE.25): the roles that may switch a session to operational mode ("Do it once" too).
+# D-32 (CORE.25): the roles that may open a passkey window ("Do it once" too). The codename is a
+# stored identifier (roles hold it), so it keeps its name.
 ELEVATE_CODENAME = "elevate"
 
 
@@ -468,7 +469,7 @@ class PlatformOperator(Versioned):
     )
     # D-21, CMP.13: changed only by a platform owner through
     # `apps.core.services.set_allowed_vendor_countries`; other new versions carry it over.
-    # D-32 (CORE.25): the session level timers and the three action lists, sparse over the D-32
+    # D-32 (CORE.25): the passkey window timers and the three action lists, sparse over the D-32
     # defaults (`core.session_policy`); `{}` is the defaults. Tunable without code (trial).
     session_policy = models.JSONField(
         default=dict,
@@ -497,7 +498,7 @@ class PlatformOperator(Versioned):
             ),
             (
                 ELEVATE_CODENAME,
-                "May switch a session to operational mode or do a sensitive action once",
+                "May open a passkey window or do a sensitive action once",
             ),
         ]
         constraints = [

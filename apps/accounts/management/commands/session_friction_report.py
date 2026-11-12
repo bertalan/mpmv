@@ -1,4 +1,7 @@
-"""Prompts and elevations per user per day, for the D-32 friction review (CORE.25)."""
+"""Prompts and passkey windows per user per day, for the D-32 friction review (CORE.25).
+
+Rows written before the passkey window wording (`accounts.session.operational_started`) count too.
+"""
 
 import datetime as dt
 from argparse import ArgumentParser
@@ -22,7 +25,7 @@ class Command(BaseCommand):
         since = timezone.now() - dt.timedelta(days=options["days"])
         rows = AuditLog.objects.filter(
             created_at__gte=since,
-            action__in=[levels.PROMPT, levels.SESSION_STARTED, levels.SINGLE_GRANTED],
+            action__in=[levels.PROMPT, *levels.SESSION_STARTED_ACTIONS, levels.SINGLE_GRANTED],
         ).values_list("created_at", "actor_label", "action")
         prompts: Counter[tuple[dt.date, str]] = Counter()
         elevations: Counter[tuple[dt.date, str]] = Counter()

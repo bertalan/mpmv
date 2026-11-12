@@ -1,0 +1,49 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Storefront profile changes (CORE.9 3/3, platform space, revert permission only): who changed what
+and when, before and after of every changed text, and a revert form with a required reason. All
+values are escaped by the template engine: rich text shows as its stored HTML source, never rendered.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Storefront changes" %}</h1>
+  <p class="manager-lead">{% translate "Changes owners made to their storefront texts, policies and logo. They are live at once; revert one with a reason and the owners are told. A change can be reverted only while the text has not changed again." %}</p>
+  {% if filter_vendor %}<p>{% blocktranslate with vendor=filter_vendor.display_name %}Showing {{ vendor }} only.{% endblocktranslate %} <a href="{% url 'manager:platform:profile_changes' %}">{% translate "Show all" %}</a></p>{% endif %}
+  {% if rows %}
+    {% for row in rows %}
+      <section class="manager-card" aria-labelledby="change-{{ row.entry.public_id }}">
+        <h2 id="change-{{ row.entry.public_id }}">{{ row.vendor }} ({{ row.language }}){% if row.is_revert %} &ndash; {% translate "revert" %}{% endif %}</h2>
+        <p>
+          {{ row.entry.actor_label }} &middot; <time datetime="{{ row.entry.created_at|date:'c' }}">{{ row.entry.created_at|date:"Y-m-d H:i" }}</time>
+          {% if row.reverted %}&middot; <strong>{% translate "Reverted" %}</strong>{% endif %}
+        </p>
+        {% if row.reason %}<p>{% translate "Reason" %}: {{ row.reason }}</p>{% endif %}
+        <table class="manager-table">
+          <caption class="visually-hidden">{% translate "Before and after" %}</caption>
+          <thead><tr><th scope="col">{% translate "Field" %}</th><th scope="col">{% translate "Before" %}</th><th scope="col">{% translate "After" %}</th></tr></thead>
+          <tbody>
+            {% for item in row.diff %}<tr><th scope="row">{{ item.field }}</th><td>{{ item.before|linebreaksbr }}</td><td>{{ item.after|linebreaksbr }}</td></tr>{% endfor %}
+          </tbody>
+        </table>
+        {% if row.confirmable %}
+          <form method="post" action="{% url 'manager:platform:profile_confirm' entry=row.entry.public_id %}" class="manager-form">
+            {% csrf_token %}
+            <p class="manager-help">{% translate "The previous logo is kept until the review window closes, so a revert can restore it. Confirm the change to delete it now." %}</p>
+            {% include "components/button.html" with label=_("Confirm and delete the old logo") type="submit" only %}
+          </form>
+        {% endif %}
+        {% if not row.is_revert and not row.reverted %}
+          <form method="post" action="{% url 'manager:platform:profile_revert' entry=row.entry.public_id %}" class="manager-form">
+            {% csrf_token %}
+            <label for="reason-{{ row.entry.public_id }}">{% translate "Reason (sent to the owners)" %}</label>
+            <p id="reason-help-{{ row.entry.public_id }}" class="manager-help">{% translate "Plain text. The owners and the audit trail keep it: do not write personal data, such as names, emails or phone numbers." %}</p>
+            <textarea id="reason-{{ row.entry.public_id }}" name="reason" aria-describedby="reason-help-{{ row.entry.public_id }}" rows="3" maxlength="1000" required></textarea>
+            {% include "components/button.html" with label=_("Revert this change") type="submit" only %}
+          </form>
+        {% endif %}
+      </section>
+    {% endfor %}
+  {% else %}
+    <p>{% translate "No storefront changes yet." %}</p>
+  {% endif %}
+{% endblock %}

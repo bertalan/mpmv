@@ -50,7 +50,7 @@ def _may_enrol(request: HttpRequest) -> bool:
 
 
 def _wants_uv(request: HttpRequest) -> bool:
-    """`?factor=passkey`: a sensitive action (D-32 group 3) asks for a passkey with user
+    """`?factor=passkey`: a sensitive action (D-32 critical) asks for a passkey with user
     verification; only such a verification counts for it."""
     return request.GET.get("factor") == "passkey"
 
@@ -169,7 +169,7 @@ def verify(request: HttpRequest) -> HttpResponse:
     if not services.has_second_factor(user):
         return mfa_redirect(request, "mfa:setup", next_url=safe_next(request))
     next_url = safe_next(request)
-    # D-32 group 3: the action asked for a passkey, so a code or recovery code is not offered.
+    # D-32 critical: the action asked for a passkey, so a code or recovery code is not offered.
     passkey_only = (request.POST.get("factor") or request.GET.get("factor")) == "passkey"
     error = ""
     method: str | None = None
@@ -394,6 +394,6 @@ def remove_device(request: HttpRequest, kind: str, public_id: str) -> HttpRespon
             messages.success(req, gettext("%(name)s removed.") % {"name": device.name})
         return HttpResponseRedirect(reverse("mfa:overview"))
 
-    if services.removal_weakens_mfa(device):  # D-32 group 3: the last factor or last passkey
+    if services.removal_weakens_mfa(device):  # D-32 critical: the last factor or last passkey
         return requires_level("mfa_disable")(remove)(request)
     return remove(request)

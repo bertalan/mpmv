@@ -49,7 +49,12 @@ MODAL_FRAGMENTS = (
     "manager:shop:image_select_format",
 )
 # Routes that answer a redirect or an action, not a page of the shell.
-NOT_PAGES = ("manager:shop:order_action", *MODAL_FRAGMENTS)
+NOT_PAGES = (
+    "manager:shop:order_action",
+    "manager:platform:profile_revert",  # POST only, redirects to the changes page
+    "manager:platform:profile_confirm",  # POST only, redirects to the changes page
+    *MODAL_FRAGMENTS,
+)
 
 
 def _soup(content: bytes) -> BeautifulSoup:
@@ -140,6 +145,7 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:dashboard": "platform",
         "manager:platform:notices": "platform",
         "manager:platform:notice": "platform",
+        "manager:platform:profile_changes": "platform",
     }
 
 
@@ -150,7 +156,13 @@ def _open(name: str) -> tuple[Client, str]:
         if name == "manager:shop:order":
             kwargs = {"public_id": paid_vendor_order(vendor).public_id}  # type: ignore[arg-type]
     else:
-        user = UserFactory.create(permissions=["core.platform_owner", "compliance.review_notices"])
+        user = UserFactory.create(
+            permissions=[
+                "core.platform_owner",
+                "compliance.review_notices",
+                "vendors.revert_storefront_profile",
+            ]
+        )
         kwargs = {}
         if name == "manager:platform:notice":
             kwargs = {"public_id": NoticeFactory.create().public_id}
@@ -184,7 +196,8 @@ def _manager_route_names() -> set[str]:
     names = set()
     for route, space in manager_routes():
         assert space is not None
-        path = "/" + re.sub(r"<[^>]+>", "0", route.replace("<uuid:public_id>", nil))
+        path = "/" + re.sub(r"<[^>]+>", "0", re.sub(r"<uuid:[^>]+>", nil, route))
+        assert resolve(path).view_name != "wagtail_serve", f"{route} fell through to Wagtail"
         names.add(resolve(path).view_name)
     return names
 
