@@ -12,7 +12,7 @@ import apps.cms.blocks
 class Migration(migrations.Migration):
     dependencies = [
         ("catalog", "0015_field_help_text"),
-        ("cms", "0015_product_cards_blocks"),
+        ("cms", "0016_help_entry"),
         ("core", "0021_audit_actor_pseudonymised"),
         ("vendors", "0028_no_tin_country"),
     ]

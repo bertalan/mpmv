@@ -435,6 +435,10 @@ ENDPOINTS: dict[str, Access] = {
         "that account it shows only the generic 'link not valid' page.",
         kwargs={"user_key": "00000000-0000-0000-0000-000000000000"},
     ),
+    "help_entry": NoVendorData(
+        "Contextual help (ARC.32): the platform's help text for a screen, the same for every "
+        "signed-in caller; reads no vendor data."
+    ),
     "geocoding_find": NoVendorData(
         "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
     ),
