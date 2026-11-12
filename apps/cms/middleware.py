@@ -24,6 +24,7 @@ from apps.core.services import consume_rate_limit, rate_limit_wait
 from apps.core.throttling import ip_bucket
 
 from .csp import nonce_picker_scripts
+from .help_admin import strip_assets
 
 
 def _in_wagtail_admin(request: HttpRequest) -> bool:
@@ -47,8 +48,12 @@ class WagtailAdminPickerNonceMiddleware:
             or not _in_wagtail_admin(request)
         ):
             return response
-        html, changed = nonce_picker_scripts(response.content.decode(response.charset), str(nonce))
-        if changed:
+        original = response.content.decode(response.charset)
+        html, _changed = nonce_picker_scripts(original, str(nonce))
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            html = strip_assets(html)  # the help script is for the signed-in admin only (ARC.32)
+        if html != original:
             response.content = html.encode(response.charset)
         return response
 
