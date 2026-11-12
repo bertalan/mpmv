@@ -509,7 +509,7 @@ class Brand(BaseModel):
             # Race-safe duplicate detection for proposals (CAT.20). Partial: brands that were
             # approved before the key existed may share one (legacy data is not rewritten), and
             # the services refuse a new duplicate of any brand. A rejected brand keeps its name
-            # reserved, so it cannot be proposed again unchanged.
+            # reserved; proposing it again reopens that row as pending (`brands._candidate`).
             models.UniqueConstraint(
                 fields=["name_key"],
                 condition=~models.Q(name_key="") & ~models.Q(status="approved"),

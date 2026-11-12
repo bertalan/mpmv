@@ -62,8 +62,8 @@ class BrandOutcome:
 @dataclass
 class BatchOutcome:
     """A batch proposal. `by_name` maps every name given to the brand to use (an existing one
-    or a new pending one); `refused` lists names that match a brand this vendor cannot use (a
-    rejected brand, another vendor's pending proposal)."""
+    or a new pending one, which may reopen a rejected brand); `refused` lists names that match
+    a brand this vendor cannot use (another vendor's pending proposal)."""
 
     batch: BrandBatch | None
     created: list[Brand]
@@ -186,19 +186,36 @@ def _candidate(
     wikidata_id: str = "",
     url: str = "",
     same_as: Iterable[str] = (),
-) -> Brand:
-    """A new pending brand, validated (duplicates by name key and Wikidata ID, https links)."""
-    brand = Brand(
-        name=name.strip(),
-        status=Brand.Status.PENDING,
-        proposed_by=vendor,
-        batch=batch,
-        wikidata_id=wikidata_id.strip(),
-        url=url.strip(),
-        same_as=[link.strip() for link in same_as],
-    )
+) -> tuple[Brand, dict[str, Any] | None]:
+    """A pending brand, validated (duplicates by name key and Wikidata ID, https links), and
+    its snapshot before when it reopens a rejected brand of the same name or Wikidata ID (the
+    rejection notice invites the vendor to propose again; the rejected row keeps its name and
+    Wikidata ID reserved, so it is reused as the new proposal). Unsaved: the caller saves."""
+    name = name.strip()
+    wikidata = wikidata_id.strip()
+    rejected = Brand.objects.select_for_update().filter(status=Brand.Status.REJECTED)
+    reopened = rejected.filter(name_key=engine.brand_name_key(name)).first()
+    if reopened is None and wikidata:
+        reopened = rejected.filter(wikidata_id=wikidata).first()
+    before = None if reopened is None else brand_snapshot(reopened)
+    brand = reopened or Brand()
+    brand.name = name
+    brand.status = Brand.Status.PENDING
+    brand.proposed_by = vendor
+    brand.batch = batch
+    brand.wikidata_id = wikidata
+    brand.url = url.strip()
+    brand.same_as = [link.strip() for link in same_as]
     brand.full_clean()
-    return brand
+    return brand, before
+
+
+def _record_proposal(changes: ChangeSet, brand: Brand, before: dict[str, Any] | None) -> None:
+    after = brand_snapshot(brand)
+    if before is None:
+        changes.create(BRAND_MODEL, str(brand.public_id), after)
+    else:
+        changes.update(BRAND_MODEL, str(brand.public_id), before, after)
 
 
 def propose_brand(
@@ -230,9 +247,11 @@ def propose_brand(
                     )
                 }
             )
-        brand = _candidate(name, vendor=vendor, wikidata_id=wikidata_id, url=url, same_as=same_as)
+        brand, before = _candidate(
+            name, vendor=vendor, wikidata_id=wikidata_id, url=url, same_as=same_as
+        )
         changes = ChangeSet()
-        changes.create(BRAND_MODEL, str(brand.public_id), brand_snapshot(brand))
+        _record_proposal(changes, brand, before)
         if dry_run:
             return BrandOutcome(None, changes)
         with _duplicate_guard():
@@ -263,7 +282,11 @@ def propose_batch(
         existing: list[Brand] = []
         refused: list[str] = []
         usable = {brand.name_key: brand for brand in brand_choices(vendor)}
-        taken = set(Brand.objects.values_list("name_key", flat=True))
+        # A rejected name is not taken: proposing it again reopens the rejected brand.
+        taken = set(
+            Brand.objects.exclude(status=Brand.Status.REJECTED).values_list("name_key", flat=True)
+        )
+        befores: dict[Any, dict[str, Any] | None] = {}
         batch = BrandBatch(vendor=vendor, source=source.strip()[:200])
         for raw in names:
             name = raw.strip()
@@ -284,9 +307,10 @@ def propose_batch(
                         f"One import can propose at most {batch_limit} new brands. "
                         "Split the file, or ask the platform team to add the brands."
                     )
-                brand = _candidate(name, vendor=vendor, batch=batch)
+                brand, before = _candidate(name, vendor=vendor, batch=batch)
                 by_key[key] = chosen[raw] = brand
                 created.append(brand)
+                befores[brand.public_id] = before
         changes = ChangeSet()
         if not created:
             return BatchOutcome(None, [], chosen, refused, changes, existing)
@@ -305,7 +329,7 @@ def propose_batch(
         )
         changes.changes.extend(batch_changes.changes)
         for brand in created:
-            changes.create(BRAND_MODEL, str(brand.public_id), brand_snapshot(brand))
+            _record_proposal(changes, brand, befores[brand.public_id])
         if dry_run:
             return BatchOutcome(None, created, chosen, refused, changes, existing)
         with _duplicate_guard():

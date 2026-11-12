@@ -117,7 +117,8 @@ def test_staff_admin_edits_the_new_fields(staff_client: Client) -> None:
     url = reverse("admin:catalog_brand_change", args=[brand.pk])
     page = staff_client.get(url)
     assert page.status_code == 200
-    for name in ("status", "wikidata_id", "same_as", "manufacturer", "logo"):
+    # The status is read-only on a change form: only the review actions move it (CAT.20).
+    for name in ("wikidata_id", "same_as", "manufacturer", "logo"):
         assert f'name="{name}"' in page.content.decode()
     assert (
         staff_client.get(reverse("admin:catalog_manufacturer_change", args=[maker.pk])).status_code
