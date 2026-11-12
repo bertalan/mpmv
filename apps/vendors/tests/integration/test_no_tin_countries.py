@@ -232,7 +232,7 @@ def test_the_engine_does_not_import_django_or_apps() -> None:
             imported += [alias.name for alias in node.names]
         elif isinstance(node, ast.ImportFrom):
             imported.append(node.module or "")
-    pure = {"apps.core.countries", "apps.core.text"}  # no ORM: plain helpers
+    pure = {"apps.core.countries", "apps.core.text", "apps.core.validity"}  # no ORM: helpers
     orm_django = ("django.db", "django.apps", "django.conf", "django.contrib")
     assert not [m for m in imported if m.startswith(orm_django)]
     assert not [m for m in imported if m.startswith("apps") and m not in pure]

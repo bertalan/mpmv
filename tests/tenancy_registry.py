@@ -281,6 +281,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
 # Models with a ForeignKey chain to Vendor that are deliberately not vendor-scoped, by label,
 # with the reason.
 NOT_VENDOR_OWNED: dict[str, str] = {
+    "vendors.CommissionRule": (
+        "Platform pricing configuration managed by staff only (VEN.2): the optional vendor is "
+        "the rule's target, not an owner; no vendor endpoint lists or edits commission rules."
+    ),
     "catalog.Brand": (
         "Shared catalog entity (CAT.20): approved brands are platform-wide and public; "
         "`proposed_by` and `batch` only say who proposed a pending brand. Another vendor's "
