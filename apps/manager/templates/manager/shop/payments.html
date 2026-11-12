@@ -6,6 +6,7 @@ the shop sells on request only. No inline script or style.
 {% endcomment %}
 {% block manager_content %}
   <h1>{% translate "Payments" %}</h1>
+  <p class="manager-lead">{% blocktranslate with vendor=manager.vendor.display_name %}Payout account of {{ vendor }}.{% endblocktranslate %}</p>
   {% if account and account.is_active %}
     <p class="manager-lead">{% translate "Your payout account is active. Customers can buy your products online." %}</p>
   {% else %}

@@ -755,6 +755,10 @@ msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
 msgid "Payments"
 msgstr "Pagamenti"
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Payout account of %(vendor)s."
+msgstr "Account per i pagamenti di %(vendor)s."
+
 #: apps/vendors/forms.py
 msgid ""
 "Pick a password you do not use anywhere else. You will use it with your email address to log in. "
@@ -1532,7 +1536,9 @@ msgstr "Togli la spunta per smettere di applicare la regola senza eliminarla."
 msgid ""
 "Until your payout account is active, your products are shown in the catalog and sold on request: "
 "customers cannot add them to the cart."
-msgstr "Finché il tuo account per i pagamenti non è attivo, i tuoi prodotti compaiono nel catalogo e si vendono su richiesta: i clienti non possono aggiungerli al carrello."
+msgstr ""
+"Finché il tuo account per i pagamenti non è attivo, i tuoi prodotti compaiono nel catalogo e si "
+"vendono su richiesta: i clienti non possono aggiungerli al carrello."
 
 #: apps/manager/media.py
 msgid "Upload"
@@ -1703,7 +1709,8 @@ msgstr ""
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Your payout account is active. Customers can buy your products online."
-msgstr "Il tuo account per i pagamenti è attivo. I clienti possono acquistare i tuoi prodotti online."
+msgstr ""
+"Il tuo account per i pagamenti è attivo. I clienti possono acquistare i tuoi prodotti online."
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid "Your recovery codes"
