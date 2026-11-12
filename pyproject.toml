@@ -22,6 +22,8 @@ dependencies = [
   "wagtail>=8.1,<8.2",
   "wagtail-localize>=1.14.5,<1.15",
   "defusedxml>=0.7.1",  # SVG logo checks (THM.12)
+  "polib>=1.2",  # gettext catalogs: tools/i18n_catalog.py, i18n review files (I18N.13)
+  "openpyxl>=3.1.5",  # XLSX review files (I18N.13); already pulled in by Wagtail
 ]
 
 [dependency-groups]
@@ -83,6 +85,7 @@ untyped_calls_exclude = ["factory"]
 module = [
   "dj_database_url", "croniter", "django_otp", "django_otp.*", "whitenoise", "whitenoise.*",
   "gunicorn", "gunicorn.*", "defusedxml", "defusedxml.*", "polib",
+  "openpyxl", "openpyxl.*",
 ]
 ignore_missing_imports = true
 

@@ -48,13 +48,61 @@ msgstr "%(vendor_name)s: nuovo ordine pagato %(order_number)s da spedire:"
 msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
 msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
 
+#: apps/vendors/models.py
+msgid ""
+"A fingerprint (SHA-256) of the exact text that was accepted, to prove later that it has not "
+"changed."
+msgstr ""
+"Un'impronta (SHA-256) del testo esatto che è stato accettato, per dimostrare in seguito che non è "
+"cambiato."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"A list of https links to the same brand elsewhere: Wikipedia in each language, official profiles. "
+"The Wikidata link is added from the ID above. Example: [\"https://en.wikipedia.org/wiki/Acme\"]."
+msgstr ""
+"Un elenco di link https allo stesso marchio altrove: Wikipedia in ogni lingua, profili ufficiali. "
+"Il link a Wikidata viene aggiunto a partire dall'ID qui sopra. Esempio: "
+"[\"https://it.wikipedia.org/wiki/Acme\"]."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"A list of https links to the same company elsewhere: Wikidata, Wikipedia, official profiles. "
+"Search engines use them to recognise the company. Example: [\"https://www.wikidata.org/wiki/Q7\"]."
+msgstr ""
+"Un elenco di link https alla stessa azienda altrove: Wikidata, Wikipedia, profili ufficiali. I "
+"motori di ricerca li usano per riconoscere l'azienda. Esempio: "
+"[\"https://www.wikidata.org/wiki/Q7\"]."
+
 #: apps/manager/media.py
 msgid ""
 "A PDF document, for example your return policy. It is stored in your own shop collection and no "
 "other shop can see it."
+msgstr "Un documento PDF, per esempio la tua politica di reso. Viene salvato nella raccolta del tuo negozio e nessun altro negozio può vederlo."
+
+#: apps/vendors/models.py
+msgid ""
+"A phone number where we can reach you, with the country prefix, for example +39 06 1234 5678. "
+"Optional, up to 32 characters."
 msgstr ""
-"Un documento PDF, per esempio la tua politica di reso. Viene salvato nella raccolta del tuo "
-"negozio e nessun altro negozio può vederlo."
+"Un numero di telefono a cui possiamo chiamarti, con il prefisso internazionale, per esempio +39 06"
+" 1234 5678. Facoltativo, al massimo 32 caratteri."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"A short label of the import run. It tells reviewers where the brands come from. Example: 'spring "
+"price list, import of 2026-11-02'."
+msgstr ""
+"Un'etichetta breve dell'importazione. Dice ai revisori da dove arrivano i marchi. Esempio: "
+"'listino di primavera, importazione del 02/11/2026'."
+
+#: apps/vendors/models.py
+msgid ""
+"A short line under your shop name, up to 200 characters, for example 'Handmade ceramics from "
+"Umbria'. Leave it empty to show none."
+msgstr ""
+"Una breve frase sotto il nome del negozio, al massimo 200 caratteri, per esempio 'Ceramiche fatte "
+"a mano in Umbria'. Lasciala vuota se non ne vuoi una."
 
 #: apps/manager/forms.py
 msgid "About the shop"
@@ -101,6 +149,18 @@ msgstr "Tutti"
 msgid "Anonymous"
 msgstr "Anonimo"
 
+#: apps/catalog/taxonomy_admin.py
+msgid "Approve all brands of the selected batches"
+msgstr "Approva tutti i marchi dei lotti selezionati"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Approve the selected proposals"
+msgstr "Approva le proposte selezionate"
+
+#: apps/catalog/taxonomy.py
+msgid "Approved"
+msgstr "Approvata"
+
 #: apps/accounts/templates/accounts/mfa/totp.html apps/accounts/templates/accounts/mfa/verify.html
 msgid "Authentication code"
 msgstr "Codice di autenticazione"
@@ -137,6 +197,14 @@ msgstr "Torna alle impostazioni della verifica in due passaggi"
 msgid "Bad request"
 msgstr "Richiesta non valida"
 
+#: apps/catalog/taxonomy.py
+msgid "brand batch"
+msgstr "lotto di marchi"
+
+#: apps/catalog/taxonomy.py
+msgid "brand batches"
+msgstr "lotti di marchi"
+
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "Cancel"
 msgstr "Annulla"
@@ -166,6 +234,44 @@ msgstr "Scegli un venditore"
 msgid "Choose how you will confirm it is you after your password."
 msgstr "Scegli come confermare la tua identità dopo la password."
 
+#: apps/vendors/models.py
+msgid ""
+"Companies only: LS if your company is in liquidation, LN if it is not, as in the company register."
+msgstr ""
+"Solo società: LS se la tua società è in liquidazione, LN se non lo è, come risulta al registro "
+"delle imprese."
+
+#: apps/vendors/models.py
+msgid ""
+"Companies only: SU if one person owns all the shares, SM if there are several shareholders. Not "
+"sure? Ask your accountant."
+msgstr ""
+"Solo società: SU se un solo socio possiede tutte le quote, SM se i soci sono più di uno. Non sei "
+"sicuro? Chiedi al tuo commercialista."
+
+#: apps/vendors/models.py
+msgid ""
+"Companies only: the number from the company register (in Italy, the REA number), if you have one. "
+"It is asked for the platform's yearly DAC7 reporting duty."
+msgstr ""
+"Solo società: il numero del registro delle imprese (in Italia, il numero REA), se ce l'hai. Ci "
+"viene richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma."
+
+#: apps/vendors/models.py
+msgid "Companies only: the share capital as in the company register, for example 10000.00."
+msgstr ""
+"Solo società: il capitale sociale come risulta al registro delle imprese, per esempio 10000.00."
+
+#: apps/vendors/models.py
+msgid ""
+"Companies only: tick it if your tax identification number is the same as your VAT number. In the "
+"countries where this is allowed we fill it in once VIES confirms the VAT number. Not sure? Ask "
+"your accountant."
+msgstr ""
+"Solo società: spuntala se il tuo numero di identificazione fiscale coincide con la partita IVA. "
+"Nei paesi in cui è previsto lo compiliamo noi quando VIES conferma la partita IVA. Non sei sicuro?"
+" Chiedi al tuo commercialista."
+
 #: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
 msgid "Confirm"
 msgstr "Conferma"
@@ -183,6 +289,10 @@ msgstr "Continua non ti fa accedere: la pagina che si apre ti chiede di conferma
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "Continue to your request"
 msgstr "Continua con la tua richiesta"
+
+#: apps/catalog/taxonomy.py
+msgid "country"
+msgstr "paese"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Customer"
@@ -205,6 +315,10 @@ msgstr "Deciso"
 #: apps/accounts/admin.py
 msgid "Delete selected %(verbose_name_plural)s"
 msgstr "Elimina %(verbose_name_plural)s selezionati"
+
+#: apps/catalog/taxonomy.py
+msgid "description"
+msgstr "descrizione"
 
 #: apps/manager/forms.py
 msgid "Description of the logo"
@@ -326,6 +440,14 @@ msgstr "Ciao %(customer_name)s,"
 msgid "Hello,"
 msgstr "Ciao,"
 
+#: apps/vendors/models.py
+msgid ""
+"How your products are sold unless a product says otherwise: buyers order and pay online, or they "
+"first send you an enquiry."
+msgstr ""
+"Come vendi i tuoi prodotti, salvo diversa indicazione sul singolo prodotto: i clienti ordinano e "
+"pagano online, oppure ti inviano prima una richiesta."
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
 "If you are not signed in, Continue signs you in once with this link; you will still confirm it is "
@@ -339,6 +461,10 @@ msgstr ""
 msgid "Images"
 msgstr "Immagini"
 
+#: apps/catalog/taxonomy.py
+msgid "import batch"
+msgstr "lotto di importazione"
+
 #: themes/base/templates/components/alert.html
 msgid "Information"
 msgstr "Informazione"
@@ -347,6 +473,12 @@ msgstr "Informazione"
 msgid "Insert link"
 msgstr "Inserisci link"
 
+#: apps/vendors/models.py
+msgid "Internal note on what changed in this version. Vendors do not see it. Up to 200 characters."
+msgstr ""
+"Nota interna su cosa è cambiato in questa versione. I venditori non la vedono. Al massimo 200 "
+"caratteri."
+
 #: apps/accounts/mfa_views.py
 msgid "Invalid code. Check the time on your device and try again."
 msgstr "Codice non valido. Controlla l’ora del tuo dispositivo e riprova."
@@ -354,6 +486,39 @@ msgstr "Codice non valido. Controlla l’ora del tuo dispositivo e riprova."
 #: apps/accounts/mfa_views.py
 msgid "Invalid code. Try again."
 msgstr "Codice non valido. Riprova."
+
+#: apps/vendors/models.py
+msgid ""
+"Italy only: the ATECO code of your business activity, for example 47.91.10. It is on your VAT "
+"registration; if you do not know it, ask your accountant."
+msgstr ""
+"Solo Italia: il codice ATECO della tua attività, per esempio 47.91.10. Lo trovi nella tua apertura"
+" di partita IVA; se non lo conosci, chiedilo al tuo commercialista."
+
+#: apps/vendors/models.py
+msgid ""
+"Italy only: the province of the company register office (REA) where your company is registered, "
+"for example RM."
+msgstr ""
+"Solo Italia: la provincia dell'ufficio del registro delle imprese (REA) in cui è iscritta la tua "
+"società, per esempio RM."
+
+#: apps/vendors/models.py
+msgid "Italy only: your REA number from the company register, for example 123456."
+msgstr "Solo Italia: il tuo numero REA del registro delle imprese, per esempio 123456."
+
+#: apps/vendors/models.py
+msgid "Italy: the 2-letter province code, for example RM. Elsewhere: the state or region."
+msgstr ""
+"Italia: la sigla di 2 lettere della provincia, per esempio RM. Altrove: lo stato o la regione."
+
+#: apps/vendors/models.py
+msgid ""
+"Italy: your codice fiscale, 16 characters for a person or 11 digits for a company. Elsewhere: your"
+" national tax identification number (TIN). It is stored encrypted."
+msgstr ""
+"Italia: il tuo codice fiscale, 16 caratteri per una persona o 11 cifre per una società. Altrove: "
+"il tuo numero di identificazione fiscale nazionale (TIN). Viene conservato cifrato."
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Items"
@@ -367,9 +532,21 @@ msgstr "Lingua"
 msgid "Language of the texts"
 msgstr "Lingua dei testi"
 
+#: apps/vendors/models.py
+msgid ""
+"Leave it empty for every region, or choose EU or non-EU to apply the rule to every vendor "
+"established there."
+msgstr ""
+"Lascialo vuoto per tutte le aree, oppure scegli UE o extra UE per applicare la regola a tutti i "
+"venditori con sede lì."
+
 #: themes/base/templates/components/footer.html
 msgid "Legal"
 msgstr "Note legali"
+
+#: apps/catalog/taxonomy.py
+msgid "legal name"
+msgstr "ragione sociale"
 
 #: apps/manager/forms.py
 msgid "Letters, digits, spaces and . / _ - only."
@@ -391,13 +568,41 @@ msgstr "Accedi"
 msgid "Logo"
 msgstr "Logo"
 
+#: apps/catalog/taxonomy.py
+msgid "logo"
+msgstr "logo"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo author or rights holder"
+msgstr "Autore o titolare dei diritti del logo"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo credit line"
+msgstr "Riga di credito del logo"
+
+#: apps/catalog/taxonomy.py
+msgid "logo description"
+msgstr "descrizione del logo"
+
 #: apps/manager/forms.py
 msgid "Logo image"
 msgstr "Immagine del logo"
 
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo licence"
+msgstr "Licenza del logo"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo permission reference"
+msgstr "Riferimento del permesso per il logo"
+
 #: apps/manager/views.py
 msgid "Logo saved."
 msgstr "Logo salvato."
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo source URL"
+msgstr "URL della fonte del logo"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Lost your device?"
@@ -414,6 +619,10 @@ msgstr "Gestisci i codici di recupero"
 #: apps/manager/templates/manager/layout.html
 msgid "Manager sections"
 msgstr "Sezioni del Manager"
+
+#: apps/catalog/taxonomy.py
+msgid "manufacturer"
+msgstr "produttore"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Mark as delivered"
@@ -432,6 +641,26 @@ msgstr ""
 #: themes/base/templates/components/header.html
 msgid "Menu"
 msgstr "Menu"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Merge brands"
+msgstr "Unisci marchi"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Merge into"
+msgstr "Unisci in"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Merge the selected brands into another brand"
+msgstr "Unisci i marchi selezionati in un altro marchio"
+
+#: apps/catalog/taxonomy.py
+msgid "name"
+msgstr "nome"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "New logo file"
+msgstr "Nuovo file del logo"
 
 #: apps/orders/templates/email/orders/vendor_new_order/subject.txt
 msgid "New paid order %(order_number)s"
@@ -498,9 +727,59 @@ msgstr "Segnalazioni"
 msgid "Notifier"
 msgstr "Segnalante"
 
+#: apps/catalog/taxonomy.py
+msgid "official URL"
+msgstr "URL ufficiale"
+
 #: apps/manager/forms.py
 msgid "One line under the shop name. Plain text."
 msgstr "Una riga sotto il nome del negozio. Testo semplice."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"Only approved brands have a public page and can be picked by every vendor. Use the approve, reject"
+" and merge actions to review a proposal. Example: Approved."
+msgstr ""
+"Solo i marchi approvati hanno una pagina pubblica e possono essere scelti da ogni venditore. Per "
+"rivedere una proposta usa le azioni di approvazione, rifiuto e unione. Esempio: Approvata."
+
+#: apps/vendors/models.py
+msgid ""
+"Only for regime RF20: the number ending in EX that your country of establishment issued for the "
+"cross-border VAT franchise, for example DE123456789EX."
+msgstr ""
+"Solo per il regime RF20: il numero che termina con EX rilasciato dal tuo paese di stabilimento per"
+" il regime di franchigia IVA transfrontaliera, per esempio DE123456789EX."
+
+#: apps/vendors/models.py
+msgid ""
+"Only if the bank account is not in the name of your business: the name of the account holder. It "
+"is asked for the platform's yearly DAC7 reporting duty."
+msgstr ""
+"Solo se il conto bancario non è intestato alla tua attività: il nome dell'intestatario. Ci viene "
+"richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma."
+
+#: apps/vendors/models.py
+msgid ""
+"Only if you are established outside the EU and have appointed a fiscal representative in Italy: "
+"their name, as in the appointment. Otherwise leave it empty."
+msgstr ""
+"Solo se hai sede fuori dall'UE e hai nominato un rappresentante fiscale in Italia: il suo nome, "
+"come nella nomina. Altrimenti lascialo vuoto."
+
+#: apps/vendors/models.py
+msgid ""
+"Only if you have a permanent establishment (a branch or fixed place of business) apart from your "
+"registered office: its street, without the number. Otherwise leave the whole address empty; if "
+"unsure, ask your accountant."
+msgstr ""
+"Solo se hai una stabile organizzazione (una filiale o una sede fissa) diversa dalla sede legale: "
+"la sua via, senza il numero civico. Altrimenti lascia vuoto tutto l'indirizzo; se non sei sicuro, "
+"chiedi al tuo commercialista."
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Optional text that replaces the generated credit line. Example: 'Logo: Acme Ltd'."
+msgstr "Testo facoltativo che sostituisce la riga di credito generata. Esempio: 'Logo: Acme Ltd'."
 
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Order"
@@ -600,9 +879,29 @@ msgstr "Password"
 msgid "Payment received for order %(order_number)s"
 msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
 
+#: apps/catalog/taxonomy.py
+msgid "Pending review"
+msgstr "In attesa di revisione"
+
+#: apps/vendors/forms.py
+msgid ""
+"Pick a password you do not use anywhere else. You will use it with your email address to log in. "
+"Required: without it your account is not created."
+msgstr ""
+"Scegli una password che non usi altrove. La userai insieme al tuo indirizzo email per accedere. "
+"Obbligatorio: senza non creiamo il tuo account."
+
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
 msgstr "Effettuato il"
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"Plain text describing the logo for people who cannot see it. Required with a logo. Example: 'Acme,"
+" an anvil in a red circle'."
+msgstr ""
+"Testo semplice che descrive il logo per chi non lo può vedere. Obbligatorio se c'è un logo. "
+"Esempio: 'Acme, un'incudine in un cerchio rosso'."
 
 #: apps/manager/forms.py
 msgid "Plain text for people who cannot see the image, for example the shop name."
@@ -641,6 +940,10 @@ msgstr "Prodotto"
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Products"
 msgstr "Prodotti"
+
+#: apps/catalog/taxonomy.py
+msgid "proposed by"
+msgstr "proposto da"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Published"
@@ -681,9 +984,29 @@ msgstr "Codici di recupero"
 msgid "Reference"
 msgstr "Riferimento"
 
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"Reference of the stored written permission, when the licence needs one. Example: "
+"'permission-2026-11-acme.pdf'."
+msgstr ""
+"Riferimento del permesso scritto conservato, quando la licenza lo richiede. Esempio: "
+"'permission-2026-11-acme.pdf'."
+
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 msgid "Register a passkey"
 msgstr "Registra una passkey"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Reject all brands of the selected batches"
+msgstr "Rifiuta tutti i marchi dei lotti selezionati"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Reject the selected proposals"
+msgstr "Rifiuta le proposte selezionate"
+
+#: apps/catalog/taxonomy.py
+msgid "Rejected"
+msgstr "Rifiutata"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Remove"
@@ -714,6 +1037,10 @@ msgstr "Ritirati"
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
 
+#: apps/catalog/taxonomy.py
+msgid "sameAs links"
+msgstr "Link sameAs"
+
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Save"
 msgstr "Salva"
@@ -735,6 +1062,14 @@ msgstr "Seleziona"
 #: apps/manager/lists.py
 msgid "Select at least one row."
 msgstr "Seleziona almeno una riga."
+
+#: apps/catalog/taxonomy.py
+msgid "SEO description"
+msgstr "Descrizione SEO"
+
+#: apps/catalog/taxonomy.py
+msgid "SEO title"
+msgstr "Titolo SEO"
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Set up an authenticator app"
@@ -791,13 +1126,59 @@ msgstr "Vai al contenuto principale"
 msgid "SKU"
 msgstr "SKU"
 
+#: apps/vendors/models.py
+msgid ""
+"Sole traders only: if your country issues no tax identification number, the city and country where"
+" you were born. It is asked for the platform's yearly DAC7 reporting duty and stored encrypted. "
+"Not sure? Ask your accountant."
+msgstr ""
+"Solo ditte individuali: se il tuo paese non rilascia un numero di identificazione fiscale, la "
+"città e il paese in cui sei nato. Ci viene richiesto per l'obbligo di comunicazione annuale DAC7 "
+"della piattaforma e viene conservato cifrato. Non sei sicuro? Chiedi al tuo commercialista."
+
+#: apps/vendors/models.py
+msgid ""
+"Sole traders only: your date of birth. It is asked for the platform's yearly DAC7 reporting duty, "
+"and it is stored encrypted."
+msgstr ""
+"Solo ditte individuali: la tua data di nascita. Ci viene richiesta per l'obbligo di comunicazione "
+"annuale DAC7 della piattaforma e viene conservata cifrata."
+
+#: apps/vendors/models.py
+msgid ""
+"Sole traders only: your first name, as on your identity document. It goes on the invoices we issue"
+" to you."
+msgstr ""
+"Solo ditte individuali: il tuo nome, come sul documento d'identità. Compare nelle fatture che ti "
+"emettiamo."
+
+#: apps/vendors/models.py
+msgid ""
+"Sole traders only: your last name, as on your identity document. It goes on the invoices we issue "
+"to you."
+msgstr ""
+"Solo ditte individuali: il tuo cognome, come sul documento d'identità. Compare nelle fatture che "
+"ti emettiamo."
+
 #: themes/base/templates/500.html
 msgid "Something went wrong"
 msgstr "Qualcosa è andato storto"
 
+#: apps/catalog/taxonomy.py
+msgid "source"
+msgstr "origine"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Staff"
 msgstr "Staff"
+
+#: apps/vendors/models.py
+msgid ""
+"Staff only: the vendor's user number in the old system, kept to link migrated data. Leave it as it"
+" is."
+msgstr ""
+"Solo per lo staff: il numero utente del venditore nel vecchio sistema, conservato per collegare i "
+"dati migrati. Lascialo com'è."
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
@@ -812,6 +1193,10 @@ msgstr "Motivazioni"
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Status"
 msgstr "Stato"
+
+#: apps/catalog/taxonomy.py
+msgid "status"
+msgstr "stato"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/profile.html
 msgid "Storefront profile"
@@ -837,6 +1222,129 @@ msgstr "Cambia"
 msgid "Tagline"
 msgstr "Slogan"
 
+#: apps/vendors/models.py
+msgid ""
+"Tell buyers about your shop: who you are and what you make or sell. Leave it empty and your shop "
+"page has no description."
+msgstr ""
+"Racconta ai clienti il tuo negozio: chi sei e cosa produci o vendi. Se la lasci vuota, la pagina "
+"del tuo negozio non ha descrizione."
+
+#: apps/vendors/models.py
+msgid ""
+"Tell buyers how and when you ship, and what it costs. Buyers read it in your shop before they "
+"order."
+msgstr ""
+"Spiega ai clienti come e quando spedisci e quanto costa. I clienti la leggono nel tuo negozio "
+"prima di ordinare."
+
+#: apps/vendors/models.py
+msgid ""
+"Tell buyers how to ask for a refund, how long it takes and who pays the return shipping. Buyers "
+"read it in your shop before they order."
+msgstr ""
+"Spiega ai clienti come chiedere un rimborso, quanto tempo richiede e chi paga la spedizione del "
+"reso. I clienti la leggono nel tuo negozio prima di ordinare."
+
+#: apps/vendors/models.py
+msgid ""
+"Tell buyers until when they can cancel an order and how, for example 'before the parcel is handed "
+"to the courier'. Buyers read it in your shop before they order."
+msgstr ""
+"Spiega ai clienti fino a quando possono annullare un ordine e come, per esempio 'prima che il "
+"pacco sia consegnato al corriere'. I clienti la leggono nel tuo negozio prima di ordinare."
+
+#: apps/vendors/models.py
+msgid ""
+"The 7-character code of the SDI channel (the Italian tax system) that receives e-invoices "
+"addressed to you. 0000000 is used together with a PEC address, which you give in the PEC field; "
+"XXXXXXX is for businesses established outside Italy. Your accountant or invoicing software can "
+"tell you the code."
+msgstr ""
+"Il codice di 7 caratteri del canale SDI (il Sistema di Interscambio) che riceve le fatture "
+"elettroniche a te intestate. 0000000 si usa insieme a un indirizzo PEC, che indichi nel campo PEC;"
+" XXXXXXX è per le imprese con sede fuori dall'Italia. Il codice te lo può dire il tuo "
+"commercialista o il tuo programma di fatturazione."
+
+#: apps/vendors/forms.py
+msgid ""
+"The address where we send the link to confirm your application. Required: without a working "
+"address you cannot continue."
+msgstr ""
+"L'indirizzo a cui mandiamo il link per confermare la candidatura. Obbligatorio: senza un indirizzo"
+" funzionante non puoi proseguire."
+
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"The approved brand that keeps the products and takes over the old page address. Example: merge the"
+" proposal 'Acmee' into the existing brand 'Acme'."
+msgstr ""
+"Il marchio approvato che tiene i prodotti e prende l'indirizzo della vecchia pagina. Esempio: "
+"unisci la proposta 'Acmee' nel marchio esistente 'Acme'."
+
+#: apps/vendors/models.py
+msgid "The BIC (SWIFT) code of your bank, 8 or 11 characters, if you have it."
+msgstr "Il codice BIC (SWIFT) della tua banca, di 8 o 11 caratteri, se lo hai."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The brand as customers know it; it is the same in every language. Names that differ only in case, "
+"accents or punctuation count as duplicates. Example: 'Acme'."
+msgstr ""
+"Il marchio come lo conoscono i clienti; è uguale in ogni lingua. I nomi che differiscono solo per "
+"maiuscole, accenti o punteggiatura contano come duplicati. Esempio: 'Acme'."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The brand logo shown on its page. Upload a new one with the file fields below, or pick an image "
+"from the library that already has its licence and author. Example: the official logo as PNG or "
+"SVG."
+msgstr ""
+"Il logo del marchio mostrato sulla sua pagina. Caricane uno nuovo con i campi file qui sotto, "
+"oppure scegli un'immagine della libreria che ha già licenza e autore. Esempio: il logo ufficiale "
+"in PNG o SVG."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The brand's item on Wikidata. It links the brand to one world-wide identity and is how duplicates "
+"are found. Only the format is checked, nothing is fetched. Example: Q42."
+msgstr ""
+"La voce del marchio su Wikidata. Collega il marchio a un'unica identità mondiale ed è il modo in "
+"cui si trovano i duplicati. Viene controllato solo il formato, non viene scaricato nulla. Esempio:"
+" Q42."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The brand's own website, an https address. It is linked from the brand page and given to search "
+"engines. Example: https://acme.example/."
+msgstr ""
+"Il sito web del marchio, un indirizzo https. È collegato dalla pagina del marchio e comunicato ai "
+"motori di ricerca. Esempio: https://acme.example/."
+
+#: apps/vendors/models.py
+msgid "The city of your permanent establishment."
+msgstr "La città della tua stabile organizzazione."
+
+#: apps/vendors/models.py
+msgid "The city of your registered office."
+msgstr "La città della tua sede legale."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The company that makes the brand's products, when it is not the brand itself. It is shown on the "
+"brand page and in the structured data. Example: 'Acme Holdings Ltd'."
+msgstr ""
+"L'azienda che produce i prodotti del marchio, quando non è il marchio stesso. Viene mostrata sulla"
+" pagina del marchio e nei dati strutturati. Esempio: 'Acme Holdings Ltd'."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The company's own website, an https address. It tells search engines which company this is. "
+"Example: https://holdings.example/."
+msgstr ""
+"Il sito web dell'azienda, un indirizzo https. Dice ai motori di ricerca di quale azienda si "
+"tratta. Esempio: https://holdings.example/."
+
 #: apps/manager/notice_views.py
 msgid "The content could not be restricted: check the notice status and target."
 msgstr ""
@@ -846,14 +1354,74 @@ msgstr ""
 msgid "The content is restricted and the vendor is told."
 msgstr "Il contenuto è limitato e il venditore ne è informato."
 
+#: apps/vendors/models.py
+msgid "The contract version that was accepted."
+msgstr "La versione del contratto che è stata accettata."
+
+#: apps/catalog/taxonomy.py
+msgid "The country of the registered office. It is part of the structured data. Example: Italy."
+msgstr "Il paese della sede legale. Fa parte dei dati strutturati. Esempio: Italia."
+
+#: apps/vendors/models.py
+msgid "The country of your permanent establishment."
+msgstr "Il paese della tua stabile organizzazione."
+
+#: apps/vendors/models.py
+msgid "The country of your registered office."
+msgstr "Il paese della tua sede legale."
+
+#: apps/vendors/models.py
+msgid ""
+"The country that issued your tax identification number. We check the format for that country. It "
+"is asked for the platform's yearly DAC7 reporting duty."
+msgstr ""
+"Il paese che ha rilasciato il tuo numero di identificazione fiscale. Ne controlliamo il formato "
+"per quel paese. Ci viene richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma."
+
+#: apps/vendors/models.py
+msgid ""
+"The country where you are resident for tax. It is asked for the platform's yearly DAC7 reporting "
+"duty. Not sure? Ask your accountant."
+msgstr ""
+"Il paese in cui hai la residenza fiscale. Ci viene richiesto per l'obbligo di comunicazione "
+"annuale DAC7 della piattaforma. Non sei sicuro? Chiedi al tuo commercialista."
+
+#: apps/vendors/models.py
+msgid ""
+"The country where your business is established, as in the company register. It decides which legal"
+" details we ask you for. Required: the profile cannot be saved without it."
+msgstr ""
+"Il paese in cui ha sede la tua attività, come risulta al registro delle imprese. Decide quali dati"
+" legali ti chiediamo. Obbligatorio: senza non puoi salvare il profilo."
+
+#: apps/vendors/forms.py
+msgid ""
+"The country where your business is established. Only the countries we accept at the moment are "
+"listed. Required: it decides which details we ask you for later."
+msgstr ""
+"Il paese in cui ha sede la tua attività. Sono elencati solo i paesi che accettiamo al momento. "
+"Obbligatorio: decide quali dati ti chiediamo più avanti."
+
 #: apps/manager/notice_views.py
 msgid "The decision is recorded and the notifier is told."
 msgstr "La decisione è registrata e il segnalante ne viene informato."
+
+#: apps/vendors/models.py
+msgid ""
+"The email address where the platform writes to you about your shop. Required: without it we cannot"
+" reach you."
+msgstr ""
+"L'indirizzo email a cui la piattaforma ti scrive per il tuo negozio. Obbligatorio: senza non "
+"possiamo contattarti."
 
 #: apps/manager/templates/manager/login.html
 msgid ""
 "The email or the password is not correct, or the account is locked for a while. Please try again."
 msgstr "L’email o la password non sono corrette, oppure l’account è bloccato per un po’. Riprova."
+
+#: apps/vendors/models.py
+msgid "The feature to switch on or off for this vendor."
+msgstr "La funzione da attivare o disattivare per questo venditore."
 
 #: themes/base/templates/403_csrf.html
 msgid "The form was sent from an old or expired page. Go back, reload the page and send it again."
@@ -865,9 +1433,83 @@ msgstr ""
 msgid ""
 "The full address of the page to open, starting with https://, for example "
 "https://www.example.com/guide. Required: the link has nowhere to go without it."
+msgstr "L’indirizzo completo della pagina da aprire, che inizia con https://, per esempio https://www.example.com/guide. Obbligatorio: senza di esso il link non porta da nessuna parte."
+
+#: apps/vendors/models.py
+msgid ""
+"The full legal name of your business as in the company register, or your own first and last name "
+"if you are a sole trader. It appears on invoices and contracts. Required: the profile cannot be "
+"saved without it."
 msgstr ""
-"L’indirizzo completo della pagina da aprire, che inizia con https://, per esempio "
-"https://www.example.com/guide. Obbligatorio: senza indirizzo il link non porta da nessuna parte."
+"La denominazione legale della tua attività come risulta al registro delle imprese, oppure il tuo "
+"nome e cognome se sei ditta individuale. Compare su fatture e contratti. Obbligatorio: senza non "
+"puoi salvare il profilo."
+
+#: apps/vendors/models.py
+msgid ""
+"The full text of the contract in this language. Required. Once a vendor has accepted the version "
+"it is final: new terms need a new version."
+msgstr ""
+"Il testo completo del contratto in questa lingua. Obbligatorio. Dopo l'accettazione di un "
+"venditore è definitivo: nuove condizioni richiedono una nuova versione."
+
+#: apps/vendors/models.py
+msgid ""
+"The IBAN of the bank account that receives your payouts. Check it carefully: a wrong IBAN can "
+"delay your payment. It is stored encrypted."
+msgstr ""
+"L'IBAN del conto bancario su cui ricevi i tuoi pagamenti. Controllalo con attenzione: un IBAN "
+"sbagliato può ritardare il pagamento. Viene conservato cifrato."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The import run that brought this brand, when it was not proposed by hand. Brands of a batch are "
+"reviewed together and do not count against the vendor's limit on manual proposals. Example: "
+"'spring price list'."
+msgstr ""
+"L'importazione che ha portato questo marchio, quando non è stato proposto a mano. I marchi di un "
+"lotto vengono rivisti insieme e non contano nel limite di proposte manuali del venditore. Esempio:"
+" 'listino di primavera'."
+
+#: apps/vendors/models.py
+msgid "The IP address the acceptance came from, kept as evidence. Empty if it was not known."
+msgstr ""
+"L'indirizzo IP da cui è arrivata l'accettazione, conservato come prova. Vuoto se non era noto."
+
+#: apps/vendors/models.py
+msgid ""
+"The Italian VAT number of your fiscal representative (11 digits). Leave it empty if you have none."
+msgstr ""
+"La partita IVA italiana del tuo rappresentante fiscale (11 cifre). Lasciala vuota se non ne hai "
+"uno."
+
+#: apps/vendors/models.py
+msgid "The language of the text that was shown when the contract was accepted."
+msgstr "La lingua del testo mostrato al momento dell'accettazione del contratto."
+
+#: apps/vendors/admin.py
+msgid ""
+"The language these texts are written in. Required. Add one set of texts per language: visitors see"
+" the one in their language, or the English one when theirs is not published."
+msgstr ""
+"La lingua in cui sono scritti questi testi. Obbligatorio. Aggiungi un gruppo di testi per lingua: "
+"i visitatori vedono quello nella loro lingua, oppure quello inglese se il loro non è pubblicato."
+
+#: apps/vendors/models.py
+msgid ""
+"The legal form of your business, as in the company register. Not sure which one you are? Ask your "
+"accountant."
+msgstr ""
+"La forma giuridica della tua attività, come risulta al registro delle imprese. Non sei sicuro di "
+"quale sia? Chiedi al tuo commercialista."
+
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"The licence the logo is used under; only licences that allow commercial use are listed. Needed "
+"with a new file. Example: 'Own work' for a logo the brand gave us."
+msgstr ""
+"La licenza con cui si usa il logo; sono elencate solo le licenze che consentono l'uso commerciale."
+" Serve con un nuovo file. Esempio: 'Opera propria' per un logo che ci ha dato il marchio."
 
 #: apps/manager/templates/manager/forbidden.html
 msgid ""
@@ -876,6 +1518,18 @@ msgid ""
 msgstr ""
 "Il Manager è riservato allo staff della piattaforma e ai membri dei venditori. Se ti serve "
 "l’accesso, chiedilo allo staff della piattaforma oppure accedi con un altro account."
+
+#: apps/vendors/models.py
+msgid "The name of your bank. Optional: it helps us recognise the account."
+msgstr "Il nome della tua banca. Facoltativo: ci aiuta a riconoscere il conto."
+
+#: apps/vendors/forms.py
+msgid ""
+"The name of your business or shop, for example 'Rossi Ceramics'. Required: the application needs "
+"it."
+msgstr ""
+"Il nome della tua attività o del tuo negozio, per esempio 'Ceramiche Rossi'. Obbligatorio: la "
+"candidatura lo richiede."
 
 #: apps/manager/notice_views.py
 msgid "The notice is under review."
@@ -906,6 +1560,26 @@ msgstr "La passkey non ha funzionato."
 msgid "the passkey was not accepted"
 msgstr "la passkey non è stata accettata"
 
+#: apps/vendors/models.py
+msgid "The person who accepted the contract on behalf of the vendor."
+msgstr "La persona che ha accettato il contratto a nome del venditore."
+
+#: apps/vendors/models.py
+msgid "The postal code of your permanent establishment, for example 00184."
+msgstr "Il CAP della tua stabile organizzazione, per esempio 00184."
+
+#: apps/vendors/models.py
+msgid "The postal code of your registered office, for example 00184."
+msgstr "Il CAP della tua sede legale, per esempio 00184."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The registered name of the company that makes the products. It is shown on the brand page and in "
+"its structured data. Example: 'Acme Holdings Ltd'."
+msgstr ""
+"La ragione sociale dell'azienda che produce i prodotti. Viene mostrata sulla pagina del marchio e "
+"nei suoi dati strutturati. Esempio: 'Acme Holdings Ltd'."
+
 #: themes/base/templates/400.html
 msgid "The request could not be understood. Check the address and try again."
 msgstr "Non è stato possibile comprendere la richiesta. Controlla l’indirizzo e riprova."
@@ -915,6 +1589,66 @@ msgstr "Non è stato possibile comprendere la richiesta. Controlla l’indirizzo
 msgid "The request failed."
 msgstr "La richiesta non è riuscita."
 
+#: apps/vendors/models.py
+msgid "The rule applies to vendors established in this country. Leave it empty for every country."
+msgstr "La regola vale per i venditori con sede in questo paese. Lascialo vuoto per tutti i paesi."
+
+#: apps/vendors/models.py
+msgid "The rule applies to vendors with this legal form. Leave it empty for every legal form."
+msgstr ""
+"La regola vale per i venditori con questa forma giuridica. Lascialo vuoto per tutte le forme "
+"giuridiche."
+
+#: apps/vendors/models.py
+msgid ""
+"The shop name your buyers see, for example 'Rossi Ceramics'. Required: the shop cannot be shown "
+"without a name."
+msgstr ""
+"Il nome del negozio che i clienti vedono, per esempio 'Ceramiche Rossi'. Obbligatorio: senza nome "
+"il negozio non può essere mostrato."
+
+#: apps/vendors/models.py
+msgid ""
+"The short name in your shop's web address, for example 'rossi-ceramics'. Leave it empty and we "
+"make it from the shop name. Changing it later breaks the links people already have."
+msgstr ""
+"Il nome breve nell'indirizzo web del tuo negozio, per esempio 'ceramiche-rossi'. Se lo lasci vuoto"
+" lo ricaviamo dal nome del negozio. Se lo cambi dopo, i link che le persone hanno già smettono di "
+"funzionare."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The short text search engines show under the title. Example: 'Buy Acme anvils from independent "
+"shops.'"
+msgstr ""
+"Il testo breve che i motori di ricerca mostrano sotto il titolo. Esempio: 'Compra le incudini Acme"
+" dai negozi indipendenti.'"
+
+#: apps/vendors/models.py
+msgid "The street number of your permanent establishment, for example 12/B."
+msgstr "Il numero civico della tua stabile organizzazione, per esempio 12/B."
+
+#: apps/vendors/models.py
+msgid "The street number of your registered office, for example 12/B."
+msgstr "Il numero civico della tua sede legale, per esempio 12/B."
+
+#: apps/vendors/models.py
+msgid ""
+"The street of your registered office (sede legale), as in the company register, without the "
+"number."
+msgstr ""
+"La via della tua sede legale, come risulta al registro delle imprese, senza il numero civico."
+
+#: apps/vendors/models.py
+msgid ""
+"The tax regime that applies to your business, chosen from the official FatturaPA list (RF19 is the"
+" flat-rate regime, forfettario). Not sure which one applies? Ask your accountant: we cannot choose"
+" it for you."
+msgstr ""
+"Il regime fiscale che riguarda la tua attività, scelto dall'elenco ufficiale FatturaPA (RF19 è il "
+"regime forfettario). Non sai quale ti riguarda? Chiedi al tuo commercialista: non possiamo "
+"sceglierlo noi per te."
+
 #: apps/manager/templates/manager/shop/profile.html
 msgid ""
 "The text in this language is a machine draft and is not public yet. Edit and save it to publish "
@@ -923,10 +1657,65 @@ msgstr ""
 "Il testo in questa lingua è una bozza automatica e non è ancora pubblico. Modificalo e salvalo per"
 " pubblicarlo."
 
+#: apps/catalog/taxonomy.py
+msgid ""
+"The text on the brand page, in this language only: a language without one shows no description, "
+"never another language's. Basic formatting is kept. Example: 'Anvils and forging tools made in "
+"Bergamo since 1949.'"
+msgstr ""
+"Il testo sulla pagina del marchio, solo in questa lingua: una lingua senza testo non mostra "
+"nessuna descrizione, mai quella di un'altra lingua. La formattazione di base viene mantenuta. "
+"Esempio: 'Incudini e attrezzi da forgia prodotti a Bergamo dal 1949.'"
+
 #: apps/manager/templates/manager/shop/profile.html
 msgid "The texts and policies customers read on the page of %(vendor)s, one language at a time."
 msgstr ""
 "I testi e le condizioni che i clienti leggono nella pagina di %(vendor)s, una lingua alla volta."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The title search engines show for the brand page. Optional. Example: 'Acme anvils and forging "
+"tools'."
+msgstr ""
+"Il titolo che i motori di ricerca mostrano per la pagina del marchio. Facoltativo. Esempio: "
+"'Incudini e attrezzi da forgia Acme'."
+
+#: apps/vendors/models.py
+msgid "The vendor profile field that must be filled in. Required: a rule needs a field."
+msgstr ""
+"Il campo del profilo venditore che deve essere compilato. Obbligatorio: una regola richiede un "
+"campo."
+
+#: apps/vendors/models.py
+msgid "The vendor that accepted the contract."
+msgstr "Il venditore che ha accettato il contratto."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The vendor that suggested this brand. While the brand is pending only this vendor can use it, and "
+"the review team knows whom to ask. Empty for brands staff created. Example: the vendor that sells "
+"it."
+msgstr ""
+"Il venditore che ha suggerito questo marchio. Finché il marchio è in attesa solo questo venditore "
+"può usarlo e il team di revisione sa a chi chiedere. Vuoto per i marchi creati dallo staff. "
+"Esempio: il venditore che lo vende."
+
+#: apps/vendors/models.py
+msgid "The vendor this consent belongs to."
+msgstr "Il venditore a cui appartiene questo consenso."
+
+#: apps/vendors/models.py
+msgid "The vendor this setting applies to."
+msgstr "Il venditore a cui si applica questa impostazione."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The vendor whose feed or import brought these brands. It lets the review team ask the right "
+"person. Example: the vendor that uploaded the product file."
+msgstr ""
+"Il venditore il cui feed o la cui importazione ha portato questi marchi. Permette al team di "
+"revisione di chiedere alla persona giusta. Esempio: il venditore che ha caricato il file dei "
+"prodotti."
 
 #: apps/accounts/decorators.py
 msgid "The verification failed. Please reload the page and try again."
@@ -936,9 +1725,7 @@ msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
 msgid ""
 "The words buyers click on. If you leave it empty, the words you selected are used, or the address "
 "itself when nothing is selected."
-msgstr ""
-"Le parole su cui gli acquirenti fanno clic. Se lo lasci vuoto, si usano le parole che hai "
-"selezionato, oppure l’indirizzo stesso se non hai selezionato nulla."
+msgstr "Le parole su cui cliccano i clienti. Se lo lasci vuoto, vengono usate le parole che hai selezionato, oppure l’indirizzo stesso se non hai selezionato nulla."
 
 #: themes/base/templates/components/error_summary.html
 msgid "There is a problem"
@@ -980,6 +1767,37 @@ msgid ""
 msgstr ""
 "Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può essere modificato. "
 "Contatta l’assistenza per farlo riaprire."
+
+#: apps/vendors/models.py
+msgid ""
+"Tick it if you want to accept enquiries from buyers about your products. Unticked: you do not take"
+" enquiries."
+msgstr ""
+"Spunta la casella se vuoi ricevere richieste di informazioni dai clienti sui tuoi prodotti. Senza "
+"spunta non ricevi richieste."
+
+#: apps/vendors/models.py
+msgid ""
+"Tick it to let other vendors suggest your products next to theirs. Unticked: your products are not"
+" suggested by others."
+msgstr ""
+"Spunta la casella per permettere ad altri venditori di suggerire i tuoi prodotti accanto ai loro. "
+"Senza spunta i tuoi prodotti non vengono suggeriti da altri."
+
+#: apps/vendors/models.py
+msgid ""
+"Tick it to let others include your products in the bundles they create. Unticked: they cannot."
+msgstr ""
+"Spunta la casella per permettere ad altri di includere i tuoi prodotti nei pacchetti che creano. "
+"Senza spunta non possono farlo."
+
+#: apps/vendors/models.py
+msgid ""
+"Ticked: the feature is on for this vendor. Unticked: it is off, whatever the platform setting is. "
+"An emergency switch can only be turned off here."
+msgstr ""
+"Con la spunta la funzione è attiva per questo venditore. Senza spunta è disattivata, qualunque sia"
+" l'impostazione della piattaforma. Un interruttore di emergenza qui si può solo disattivare."
 
 #: apps/manager/media.py
 msgid "Title"
@@ -1024,9 +1842,23 @@ msgstr "La verifica in due passaggi è attiva"
 msgid "Two-factor settings"
 msgstr "Impostazioni della verifica in due passaggi"
 
+#: apps/vendors/models.py
+msgid "Untick it to stop applying the rule without deleting it."
+msgstr "Togli la spunta per smettere di applicare la regola senza eliminarla."
+
 #: apps/manager/media.py
 msgid "Upload"
 msgstr "Carica"
+
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"Upload a logo to replace the current one: PNG, JPEG, WebP or SVG, checked and re-encoded without "
+"metadata. It is shown on the brand page and in its structured data. Example: the brand's official "
+"logo."
+msgstr ""
+"Carica un logo per sostituire quello attuale: PNG, JPEG, WebP o SVG, controllato e ricodificato "
+"senza metadati. Viene mostrato sulla pagina del marchio e nei suoi dati strutturati. Esempio: il "
+"logo ufficiale del marchio."
 
 #: apps/manager/media.py
 msgid "Uploading…"
@@ -1051,6 +1883,10 @@ msgstr "Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
 #: apps/manager/templates/manager/layout.html apps/manager/templates/manager/shop/dashboard.html
 msgid "Vendor"
 msgstr "Venditore"
+
+#: apps/catalog/taxonomy.py
+msgid "vendor"
+msgstr "venditore"
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "Vendor closed"
@@ -1098,6 +1934,62 @@ msgstr ""
 msgid "Web address"
 msgstr "Indirizzo web"
 
+#: apps/vendors/models.py
+msgid "What the field is needed for: a payout request or the activation of the vendor."
+msgstr "A cosa serve il campo: una richiesta di pagamento o l'attivazione del venditore."
+
+#: apps/vendors/models.py
+msgid "When the contract was accepted."
+msgstr "Quando il contratto è stato accettato."
+
+#: apps/vendors/models.py
+msgid ""
+"When this version replaces the previous one. Required. Once a vendor has accepted the version it "
+"can no longer be changed."
+msgstr ""
+"Da quando questa versione sostituisce la precedente. Obbligatorio. Dopo l'accettazione di un "
+"venditore la versione non si può più modificare."
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Where the logo comes from; some licences require it. Example: the brand's press page."
+msgstr ""
+"Da dove arriva il logo; alcune licenze lo richiedono. Esempio: la pagina stampa del marchio."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"Where the review stands. Set by the approve and reject actions, never by hand. Example: Pending "
+"review."
+msgstr ""
+"A che punto è la revisione. Lo impostano le azioni di approvazione e rifiuto, mai a mano. Esempio:"
+" In attesa di revisione."
+
+#: apps/vendors/admin.py
+msgid ""
+"Where this version is in the review: a machine draft still needs checking, reviewed is checked, "
+"published is shown to visitors. Only published texts are shown."
+msgstr ""
+"A che punto è questa versione nella revisione: una bozza automatica va ancora controllata, "
+"'Reviewed' è controllata, 'Published' è mostrata ai visitatori. Si mostrano solo i testi "
+"pubblicati."
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Who to credit for the logo. Needed with a new file. Example: the brand's name."
+msgstr "Chi citare come autore del logo. Serve con un nuovo file. Esempio: il nome del marchio."
+
+#: apps/vendors/models.py
+msgid "Why it was switched, for example the incident or request reference. Up to 200 characters."
+msgstr ""
+"Perché è stata cambiata, per esempio il riferimento dell'incidente o della richiesta. Al massimo "
+"200 caratteri."
+
+#: apps/vendors/models.py
+msgid "Why the field is required, for the record. Up to 200 characters."
+msgstr "Perché il campo è obbligatorio, per memoria. Al massimo 200 caratteri."
+
+#: apps/catalog/taxonomy.py
+msgid "Wikidata item ID"
+msgstr "ID della voce Wikidata"
+
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid ""
 "You are a member of several vendors. Choose the one to work on; you can switch from the header "
@@ -1132,9 +2024,33 @@ msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Hai %(counter)s codice di recupero non usato."
 msgstr[1] "Hai %(counter)s codici di recupero non usati."
 
+#: apps/vendors/models.py
+msgid ""
+"Your certified email (PEC) address, if you have one. It is required when the SDI recipient code is"
+" 0000000."
+msgstr ""
+"Il tuo indirizzo di posta elettronica certificata (PEC), se ce l'hai. È obbligatorio quando il "
+"codice destinatario SDI è 0000000."
+
+#: apps/vendors/models.py
+msgid ""
+"Your EORI number, the customs identification number for businesses that move goods in or out of "
+"the EU. Leave it empty if you do not have one."
+msgstr ""
+"Il tuo numero EORI, il codice doganale delle imprese che spostano merci da o verso l'UE. Lascialo "
+"vuoto se non ne hai uno."
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Your factors"
 msgstr "I tuoi fattori"
+
+#: apps/vendors/forms.py
+msgid ""
+"Your first and last name. We use it to greet you and to set up your account. Required: we cannot "
+"process the application without it."
+msgstr ""
+"Il tuo nome e cognome. Lo usiamo per rivolgerci a te e per creare il tuo account. Obbligatorio: "
+"senza non possiamo elaborare la candidatura."
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid "Your recovery codes"
@@ -1147,3 +2063,11 @@ msgstr "Il tuo ruolo"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
 msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
+
+#: apps/vendors/models.py
+msgid ""
+"Your VAT number, with or without the country prefix, for example IT12345678901. We check it in the"
+" EU VIES register. Not sure if you have one? Ask your accountant."
+msgstr ""
+"La tua partita IVA, con o senza il prefisso del paese, per esempio IT12345678901. La verifichiamo "
+"nel registro europeo VIES. Non sai se ne hai una? Chiedi al tuo commercialista."

@@ -1,0 +1,7 @@
+{% load i18n %}{% blocktranslate %}{{ vendor_name }}: the platform team did not approve the brand below. It was removed from your products listed under it, which stay on sale without a brand. Open each product in your shop area and pick an existing brand, or propose the brand again with an official link or a Wikidata ID.{% endblocktranslate %}
+
+{% for brand in brands %}{{ brand.name }}
+{% for product in brand.products %}- {{ product.title }} ({{ product.sku }})
+{% empty %}{% translate "No products used it." %}
+{% endfor %}
+{% endfor %}
