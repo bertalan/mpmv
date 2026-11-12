@@ -29,10 +29,24 @@ msgstr "%(name)s rimosso."
 msgid "%(vendor_name)s shipped its part of order %(order_number)s."
 msgstr "%(vendor_name)s ha spedito la sua parte dell’ordine %(order_number)s."
 
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
+msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
+
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
+msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
+
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
 msgstr "%(vendor_name)s: nuovo ordine pagato %(order_number)s da spedire:"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
+msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
+msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
 
 #: apps/vendors/models.py
 msgid ""
@@ -42,6 +56,24 @@ msgstr ""
 "Un'impronta (SHA-256) del testo esatto che è stato accettato, per dimostrare in seguito che non è "
 "cambiato."
 
+#: apps/catalog/taxonomy.py
+msgid ""
+"A list of https links to the same brand elsewhere: Wikipedia in each language, official profiles. "
+"The Wikidata link is added from the ID above. Example: [\"https://en.wikipedia.org/wiki/Acme\"]."
+msgstr ""
+"Un elenco di link https allo stesso marchio altrove: Wikipedia in ogni lingua, profili ufficiali. "
+"Il link a Wikidata viene aggiunto a partire dall'ID qui sopra. Esempio: "
+"[\"https://it.wikipedia.org/wiki/Acme\"]."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"A list of https links to the same company elsewhere: Wikidata, Wikipedia, official profiles. "
+"Search engines use them to recognise the company. Example: [\"https://www.wikidata.org/wiki/Q7\"]."
+msgstr ""
+"Un elenco di link https alla stessa azienda altrove: Wikidata, Wikipedia, profili ufficiali. I "
+"motori di ricerca li usano per riconoscere l'azienda. Esempio: "
+"[\"https://www.wikidata.org/wiki/Q7\"]."
+
 #: apps/vendors/models.py
 msgid ""
 "A phone number where we can reach you, with the country prefix, for example +39 06 1234 5678. "
@@ -49,6 +81,14 @@ msgid ""
 msgstr ""
 "Un numero di telefono a cui possiamo chiamarti, con il prefisso internazionale, per esempio +39 06"
 " 1234 5678. Facoltativo, al massimo 32 caratteri."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"A short label of the import run. It tells reviewers where the brands come from. Example: 'spring "
+"price list, import of 2026-11-02'."
+msgstr ""
+"Un'etichetta breve dell'importazione. Dice ai revisori da dove arrivano i marchi. Esempio: "
+"'listino di primavera, importazione del 02/11/2026'."
 
 #: apps/vendors/models.py
 msgid ""
@@ -99,6 +139,18 @@ msgstr "Tutti"
 msgid "Anonymous"
 msgstr "Anonimo"
 
+#: apps/catalog/taxonomy_admin.py
+msgid "Approve all brands of the selected batches"
+msgstr "Approva tutti i marchi dei lotti selezionati"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Approve the selected proposals"
+msgstr "Approva le proposte selezionate"
+
+#: apps/catalog/taxonomy.py
+msgid "Approved"
+msgstr "Approvata"
+
 #: apps/accounts/templates/accounts/mfa/totp.html apps/accounts/templates/accounts/mfa/verify.html
 msgid "Authentication code"
 msgstr "Codice di autenticazione"
@@ -134,6 +186,14 @@ msgstr "Torna alle impostazioni della verifica in due passaggi"
 #: themes/base/templates/400.html
 msgid "Bad request"
 msgstr "Richiesta non valida"
+
+#: apps/catalog/taxonomy.py
+msgid "brand batch"
+msgstr "lotto di marchi"
+
+#: apps/catalog/taxonomy.py
+msgid "brand batches"
+msgstr "lotti di marchi"
 
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "Cancel"
@@ -220,6 +280,10 @@ msgstr "Continua non ti fa accedere: la pagina che si apre ti chiede di conferma
 msgid "Continue to your request"
 msgstr "Continua con la tua richiesta"
 
+#: apps/catalog/taxonomy.py
+msgid "country"
+msgstr "paese"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Customer"
 msgstr "Cliente"
@@ -241,6 +305,10 @@ msgstr "Deciso"
 #: apps/accounts/admin.py
 msgid "Delete selected %(verbose_name_plural)s"
 msgstr "Elimina %(verbose_name_plural)s selezionati"
+
+#: apps/catalog/taxonomy.py
+msgid "description"
+msgstr "descrizione"
 
 #: apps/manager/forms.py
 msgid "Description of the logo"
@@ -324,23 +392,35 @@ msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare
 msgid "Go to the home page"
 msgstr "Vai alla home page"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello %(customer_name)s,"
 msgstr "Ciao %(customer_name)s,"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello,"
@@ -366,6 +446,10 @@ msgstr ""
 #: apps/manager/sections.py
 msgid "Images"
 msgstr "Immagini"
+
+#: apps/catalog/taxonomy.py
+msgid "import batch"
+msgstr "lotto di importazione"
 
 #: themes/base/templates/components/alert.html
 msgid "Information"
@@ -442,6 +526,10 @@ msgstr ""
 msgid "Legal"
 msgstr "Note legali"
 
+#: apps/catalog/taxonomy.py
+msgid "legal name"
+msgstr "ragione sociale"
+
 #: apps/manager/forms.py
 msgid "Letters, digits, spaces and . / _ - only."
 msgstr "Solo lettere, cifre, spazi e . / _ -"
@@ -458,13 +546,41 @@ msgstr "Accedi"
 msgid "Logo"
 msgstr "Logo"
 
+#: apps/catalog/taxonomy.py
+msgid "logo"
+msgstr "logo"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo author or rights holder"
+msgstr "Autore o titolare dei diritti del logo"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo credit line"
+msgstr "Riga di credito del logo"
+
+#: apps/catalog/taxonomy.py
+msgid "logo description"
+msgstr "descrizione del logo"
+
 #: apps/manager/forms.py
 msgid "Logo image"
 msgstr "Immagine del logo"
 
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo licence"
+msgstr "Licenza del logo"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo permission reference"
+msgstr "Riferimento del permesso per il logo"
+
 #: apps/manager/views.py
 msgid "Logo saved."
 msgstr "Logo salvato."
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo source URL"
+msgstr "URL della fonte del logo"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Lost your device?"
@@ -481,6 +597,10 @@ msgstr "Gestisci i codici di recupero"
 #: apps/manager/templates/manager/layout.html
 msgid "Manager sections"
 msgstr "Sezioni del Manager"
+
+#: apps/catalog/taxonomy.py
+msgid "manufacturer"
+msgstr "produttore"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Mark as delivered"
@@ -499,6 +619,26 @@ msgstr ""
 #: themes/base/templates/components/header.html
 msgid "Menu"
 msgstr "Menu"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Merge brands"
+msgstr "Unisci marchi"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Merge into"
+msgstr "Unisci in"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Merge the selected brands into another brand"
+msgstr "Unisci i marchi selezionati in un altro marchio"
+
+#: apps/catalog/taxonomy.py
+msgid "name"
+msgstr "nome"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "New logo file"
+msgstr "Nuovo file del logo"
 
 #: apps/orders/templates/email/orders/vendor_new_order/subject.txt
 msgid "New paid order %(order_number)s"
@@ -565,9 +705,21 @@ msgstr "Segnalazioni"
 msgid "Notifier"
 msgstr "Segnalante"
 
+#: apps/catalog/taxonomy.py
+msgid "official URL"
+msgstr "URL ufficiale"
+
 #: apps/manager/forms.py
 msgid "One line under the shop name. Plain text."
 msgstr "Una riga sotto il nome del negozio. Testo semplice."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"Only approved brands have a public page and can be picked by every vendor. Use the approve, reject"
+" and merge actions to review a proposal. Example: Approved."
+msgstr ""
+"Solo i marchi approvati hanno una pagina pubblica e possono essere scelti da ogni venditore. Per "
+"rivedere una proposta usa le azioni di approvazione, rifiuto e unione. Esempio: Approvata."
 
 #: apps/vendors/models.py
 msgid ""
@@ -603,6 +755,10 @@ msgstr ""
 "la sua via, senza il numero civico. Altrimenti lascia vuoto tutto l'indirizzo; se non sei sicuro, "
 "chiedi al tuo commercialista."
 
+#: apps/catalog/taxonomy_admin.py
+msgid "Optional text that replaces the generated credit line. Example: 'Logo: Acme Ltd'."
+msgstr "Testo facoltativo che sostituisce la riga di credito generata. Esempio: 'Logo: Acme Ltd'."
+
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Order"
 msgstr "Ordine"
@@ -610,6 +766,21 @@ msgstr "Ordine"
 #: apps/manager/templates/manager/shop/order.html
 msgid "Order %(number)s"
 msgstr "Ordine %(number)s"
+
+#: apps/orders/templates/email/orders/order_cancelled/subject.txt
+msgid "Order %(order_number)s was cancelled"
+msgstr "L’ordine %(order_number)s è stato annullato"
+
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
+msgid "Order %(order_number)s was cancelled before payment. Nothing was charged."
+msgstr ""
+"L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato addebitato nulla."
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
+msgid "Order %(order_number)s was cancelled. Do not ship these items:"
+msgstr "L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
 
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
@@ -620,9 +791,17 @@ msgstr "Ordine %(order_number)s, venduto da %(vendor_name)s:"
 msgid "Order %(order_number)s: a shipment is on its way"
 msgstr "Ordine %(order_number)s: una spedizione è in arrivo"
 
+#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
+msgid "Order %(order_number)s: a shipment was delivered"
+msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
+
 #: apps/orders/templates/email/orders/order_confirmation/subject.txt
 msgid "Order %(order_number)s: confirmation from %(vendor_name)s"
 msgstr "Ordine %(order_number)s: conferma di %(vendor_name)s"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
+msgid "Order %(order_number)s: part of your order was cancelled"
+msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
@@ -678,6 +857,10 @@ msgstr "Password"
 msgid "Payment received for order %(order_number)s"
 msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
 
+#: apps/catalog/taxonomy.py
+msgid "Pending review"
+msgstr "In attesa di revisione"
+
 #: apps/vendors/forms.py
 msgid ""
 "Pick a password you do not use anywhere else. You will use it with your email address to log in. "
@@ -689,6 +872,14 @@ msgstr ""
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
 msgstr "Effettuato il"
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"Plain text describing the logo for people who cannot see it. Required with a logo. Example: 'Acme,"
+" an anvil in a red circle'."
+msgstr ""
+"Testo semplice che descrive il logo per chi non lo può vedere. Obbligatorio se c'è un logo. "
+"Esempio: 'Acme, un'incudine in un cerchio rosso'."
 
 #: apps/manager/forms.py
 msgid "Plain text for people who cannot see the image, for example the shop name."
@@ -727,6 +918,10 @@ msgstr "Prodotto"
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Products"
 msgstr "Prodotti"
+
+#: apps/catalog/taxonomy.py
+msgid "proposed by"
+msgstr "proposto da"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Published"
@@ -767,9 +962,29 @@ msgstr "Codici di recupero"
 msgid "Reference"
 msgstr "Riferimento"
 
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"Reference of the stored written permission, when the licence needs one. Example: "
+"'permission-2026-11-acme.pdf'."
+msgstr ""
+"Riferimento del permesso scritto conservato, quando la licenza lo richiede. Esempio: "
+"'permission-2026-11-acme.pdf'."
+
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 msgid "Register a passkey"
 msgstr "Registra una passkey"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Reject all brands of the selected batches"
+msgstr "Rifiuta tutti i marchi dei lotti selezionati"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Reject the selected proposals"
+msgstr "Rifiuta le proposte selezionate"
+
+#: apps/catalog/taxonomy.py
+msgid "Rejected"
+msgstr "Rifiutata"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Remove"
@@ -800,6 +1015,10 @@ msgstr "Ritirati"
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
 
+#: apps/catalog/taxonomy.py
+msgid "sameAs links"
+msgstr "Link sameAs"
+
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Save"
 msgstr "Salva"
@@ -821,6 +1040,14 @@ msgstr "Seleziona"
 #: apps/manager/lists.py
 msgid "Select at least one row."
 msgstr "Seleziona almeno una riga."
+
+#: apps/catalog/taxonomy.py
+msgid "SEO description"
+msgstr "Descrizione SEO"
+
+#: apps/catalog/taxonomy.py
+msgid "SEO title"
+msgstr "Titolo SEO"
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Set up an authenticator app"
@@ -915,6 +1142,10 @@ msgstr ""
 msgid "Something went wrong"
 msgstr "Qualcosa è andato storto"
 
+#: apps/catalog/taxonomy.py
+msgid "source"
+msgstr "origine"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Staff"
 msgstr "Staff"
@@ -940,6 +1171,10 @@ msgstr "Motivazioni"
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Status"
 msgstr "Stato"
+
+#: apps/catalog/taxonomy.py
+msgid "status"
+msgstr "stato"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/profile.html
 msgid "Storefront profile"
@@ -1017,9 +1252,52 @@ msgstr ""
 "L'indirizzo a cui mandiamo il link per confermare la candidatura. Obbligatorio: senza un indirizzo"
 " funzionante non puoi proseguire."
 
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"The approved brand that keeps the products and takes over the old page address. Example: merge the"
+" proposal 'Acmee' into the existing brand 'Acme'."
+msgstr ""
+"Il marchio approvato che tiene i prodotti e prende l'indirizzo della vecchia pagina. Esempio: "
+"unisci la proposta 'Acmee' nel marchio esistente 'Acme'."
+
 #: apps/vendors/models.py
 msgid "The BIC (SWIFT) code of your bank, 8 or 11 characters, if you have it."
 msgstr "Il codice BIC (SWIFT) della tua banca, di 8 o 11 caratteri, se lo hai."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The brand as customers know it; it is the same in every language. Names that differ only in case, "
+"accents or punctuation count as duplicates. Example: 'Acme'."
+msgstr ""
+"Il marchio come lo conoscono i clienti; è uguale in ogni lingua. I nomi che differiscono solo per "
+"maiuscole, accenti o punteggiatura contano come duplicati. Esempio: 'Acme'."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The brand logo shown on its page. Upload a new one with the file fields below, or pick an image "
+"from the library that already has its licence and author. Example: the official logo as PNG or "
+"SVG."
+msgstr ""
+"Il logo del marchio mostrato sulla sua pagina. Caricane uno nuovo con i campi file qui sotto, "
+"oppure scegli un'immagine della libreria che ha già licenza e autore. Esempio: il logo ufficiale "
+"in PNG o SVG."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The brand's item on Wikidata. It links the brand to one world-wide identity and is how duplicates "
+"are found. Only the format is checked, nothing is fetched. Example: Q42."
+msgstr ""
+"La voce del marchio su Wikidata. Collega il marchio a un'unica identità mondiale ed è il modo in "
+"cui si trovano i duplicati. Viene controllato solo il formato, non viene scaricato nulla. Esempio:"
+" Q42."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The brand's own website, an https address. It is linked from the brand page and given to search "
+"engines. Example: https://acme.example/."
+msgstr ""
+"Il sito web del marchio, un indirizzo https. È collegato dalla pagina del marchio e comunicato ai "
+"motori di ricerca. Esempio: https://acme.example/."
 
 #: apps/vendors/models.py
 msgid "The city of your permanent establishment."
@@ -1028,6 +1306,22 @@ msgstr "La città della tua stabile organizzazione."
 #: apps/vendors/models.py
 msgid "The city of your registered office."
 msgstr "La città della tua sede legale."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The company that makes the brand's products, when it is not the brand itself. It is shown on the "
+"brand page and in the structured data. Example: 'Acme Holdings Ltd'."
+msgstr ""
+"L'azienda che produce i prodotti del marchio, quando non è il marchio stesso. Viene mostrata sulla"
+" pagina del marchio e nei dati strutturati. Esempio: 'Acme Holdings Ltd'."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The company's own website, an https address. It tells search engines which company this is. "
+"Example: https://holdings.example/."
+msgstr ""
+"Il sito web dell'azienda, un indirizzo https. Dice ai motori di ricerca di quale azienda si "
+"tratta. Esempio: https://holdings.example/."
 
 #: apps/manager/notice_views.py
 msgid "The content could not be restricted: check the notice status and target."
@@ -1041,6 +1335,10 @@ msgstr "Il contenuto è limitato e il venditore ne è informato."
 #: apps/vendors/models.py
 msgid "The contract version that was accepted."
 msgstr "La versione del contratto che è stata accettata."
+
+#: apps/catalog/taxonomy.py
+msgid "The country of the registered office. It is part of the structured data. Example: Italy."
+msgstr "Il paese della sede legale. Fa parte dei dati strutturati. Esempio: Italia."
 
 #: apps/vendors/models.py
 msgid "The country of your permanent establishment."
@@ -1135,6 +1433,16 @@ msgstr ""
 "L'IBAN del conto bancario su cui ricevi i tuoi pagamenti. Controllalo con attenzione: un IBAN "
 "sbagliato può ritardare il pagamento. Viene conservato cifrato."
 
+#: apps/catalog/taxonomy.py
+msgid ""
+"The import run that brought this brand, when it was not proposed by hand. Brands of a batch are "
+"reviewed together and do not count against the vendor's limit on manual proposals. Example: "
+"'spring price list'."
+msgstr ""
+"L'importazione che ha portato questo marchio, quando non è stato proposto a mano. I marchi di un "
+"lotto vengono rivisti insieme e non contano nel limite di proposte manuali del venditore. Esempio:"
+" 'listino di primavera'."
+
 #: apps/vendors/models.py
 msgid "The IP address the acceptance came from, kept as evidence. Empty if it was not known."
 msgstr ""
@@ -1166,6 +1474,14 @@ msgid ""
 msgstr ""
 "La forma giuridica della tua attività, come risulta al registro delle imprese. Non sei sicuro di "
 "quale sia? Chiedi al tuo commercialista."
+
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"The licence the logo is used under; only licences that allow commercial use are listed. Needed "
+"with a new file. Example: 'Own work' for a logo the brand gave us."
+msgstr ""
+"La licenza con cui si usa il logo; sono elencate solo le licenze che consentono l'uso commerciale."
+" Serve con un nuovo file. Esempio: 'Opera propria' per un logo che ci ha dato il marchio."
 
 #: apps/manager/templates/manager/forbidden.html
 msgid ""
@@ -1228,6 +1544,14 @@ msgstr "Il CAP della tua stabile organizzazione, per esempio 00184."
 msgid "The postal code of your registered office, for example 00184."
 msgstr "Il CAP della tua sede legale, per esempio 00184."
 
+#: apps/catalog/taxonomy.py
+msgid ""
+"The registered name of the company that makes the products. It is shown on the brand page and in "
+"its structured data. Example: 'Acme Holdings Ltd'."
+msgstr ""
+"La ragione sociale dell'azienda che produce i prodotti. Viene mostrata sulla pagina del marchio e "
+"nei suoi dati strutturati. Esempio: 'Acme Holdings Ltd'."
+
 #: themes/base/templates/400.html
 msgid "The request could not be understood. Check the address and try again."
 msgstr "Non è stato possibile comprendere la richiesta. Controlla l’indirizzo e riprova."
@@ -1264,6 +1588,14 @@ msgstr ""
 " lo ricaviamo dal nome del negozio. Se lo cambi dopo, i link che le persone hanno già smettono di "
 "funzionare."
 
+#: apps/catalog/taxonomy.py
+msgid ""
+"The short text search engines show under the title. Example: 'Buy Acme anvils from independent "
+"shops.'"
+msgstr ""
+"Il testo breve che i motori di ricerca mostrano sotto il titolo. Esempio: 'Compra le incudini Acme"
+" dai negozi indipendenti.'"
+
 #: apps/vendors/models.py
 msgid "The street number of your permanent establishment, for example 12/B."
 msgstr "Il numero civico della tua stabile organizzazione, per esempio 12/B."
@@ -1297,10 +1629,28 @@ msgstr ""
 "Il testo in questa lingua è una bozza automatica e non è ancora pubblico. Modificalo e salvalo per"
 " pubblicarlo."
 
+#: apps/catalog/taxonomy.py
+msgid ""
+"The text on the brand page, in this language only: a language without one shows no description, "
+"never another language's. Basic formatting is kept. Example: 'Anvils and forging tools made in "
+"Bergamo since 1949.'"
+msgstr ""
+"Il testo sulla pagina del marchio, solo in questa lingua: una lingua senza testo non mostra "
+"nessuna descrizione, mai quella di un'altra lingua. La formattazione di base viene mantenuta. "
+"Esempio: 'Incudini e attrezzi da forgia prodotti a Bergamo dal 1949.'"
+
 #: apps/manager/templates/manager/shop/profile.html
 msgid "The texts and policies customers read on the page of %(vendor)s, one language at a time."
 msgstr ""
 "I testi e le condizioni che i clienti leggono nella pagina di %(vendor)s, una lingua alla volta."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The title search engines show for the brand page. Optional. Example: 'Acme anvils and forging "
+"tools'."
+msgstr ""
+"Il titolo che i motori di ricerca mostrano per la pagina del marchio. Facoltativo. Esempio: "
+"'Incudini e attrezzi da forgia Acme'."
 
 #: apps/vendors/models.py
 msgid "The vendor profile field that must be filled in. Required: a rule needs a field."
@@ -1312,6 +1662,16 @@ msgstr ""
 msgid "The vendor that accepted the contract."
 msgstr "Il venditore che ha accettato il contratto."
 
+#: apps/catalog/taxonomy.py
+msgid ""
+"The vendor that suggested this brand. While the brand is pending only this vendor can use it, and "
+"the review team knows whom to ask. Empty for brands staff created. Example: the vendor that sells "
+"it."
+msgstr ""
+"Il venditore che ha suggerito questo marchio. Finché il marchio è in attesa solo questo venditore "
+"può usarlo e il team di revisione sa a chi chiedere. Vuoto per i marchi creati dallo staff. "
+"Esempio: il venditore che lo vende."
+
 #: apps/vendors/models.py
 msgid "The vendor this consent belongs to."
 msgstr "Il venditore a cui appartiene questo consenso."
@@ -1319,6 +1679,15 @@ msgstr "Il venditore a cui appartiene questo consenso."
 #: apps/vendors/models.py
 msgid "The vendor this setting applies to."
 msgstr "Il venditore a cui si applica questa impostazione."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The vendor whose feed or import brought these brands. It lets the review team ask the right "
+"person. Example: the vendor that uploaded the product file."
+msgstr ""
+"Il venditore il cui feed o la cui importazione ha portato questi marchi. Permette al team di "
+"revisione di chiedere alla persona giusta. Esempio: il venditore che ha caricato il file dei "
+"prodotti."
 
 #: apps/accounts/decorators.py
 msgid "The verification failed. Please reload the page and try again."
@@ -1447,6 +1816,16 @@ msgstr "Togli la spunta per smettere di applicare la regola senza eliminarla."
 msgid "Upload"
 msgstr "Carica"
 
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"Upload a logo to replace the current one: PNG, JPEG, WebP or SVG, checked and re-encoded without "
+"metadata. It is shown on the brand page and in its structured data. Example: the brand's official "
+"logo."
+msgstr ""
+"Carica un logo per sostituire quello attuale: PNG, JPEG, WebP o SVG, controllato e ricodificato "
+"senza metadati. Viene mostrato sulla pagina del marchio e nei suoi dati strutturati. Esempio: il "
+"logo ufficiale del marchio."
+
 #: apps/manager/media.py
 msgid "Uploading…"
 msgstr "Caricamento…"
@@ -1470,6 +1849,10 @@ msgstr "Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
 #: apps/manager/templates/manager/layout.html apps/manager/templates/manager/shop/dashboard.html
 msgid "Vendor"
 msgstr "Venditore"
+
+#: apps/catalog/taxonomy.py
+msgid "vendor"
+msgstr "venditore"
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "Vendor closed"
@@ -1529,6 +1912,19 @@ msgstr ""
 "Da quando questa versione sostituisce la precedente. Obbligatorio. Dopo l'accettazione di un "
 "venditore la versione non si può più modificare."
 
+#: apps/catalog/taxonomy_admin.py
+msgid "Where the logo comes from; some licences require it. Example: the brand's press page."
+msgstr ""
+"Da dove arriva il logo; alcune licenze lo richiedono. Esempio: la pagina stampa del marchio."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"Where the review stands. Set by the approve and reject actions, never by hand. Example: Pending "
+"review."
+msgstr ""
+"A che punto è la revisione. Lo impostano le azioni di approvazione e rifiuto, mai a mano. Esempio:"
+" In attesa di revisione."
+
 #: apps/vendors/admin.py
 msgid ""
 "Where this version is in the review: a machine draft still needs checking, reviewed is checked, "
@@ -1537,6 +1933,10 @@ msgstr ""
 "A che punto è questa versione nella revisione: una bozza automatica va ancora controllata, "
 "'Reviewed' è controllata, 'Published' è mostrata ai visitatori. Si mostrano solo i testi "
 "pubblicati."
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Who to credit for the logo. Needed with a new file. Example: the brand's name."
+msgstr "Chi citare come autore del logo. Serve con un nuovo file. Esempio: il nome del marchio."
 
 #: apps/vendors/models.py
 msgid "Why it was switched, for example the incident or request reference. Up to 200 characters."
@@ -1547,6 +1947,10 @@ msgstr ""
 #: apps/vendors/models.py
 msgid "Why the field is required, for the record. Up to 200 characters."
 msgstr "Perché il campo è obbligatorio, per memoria. Al massimo 200 caratteri."
+
+#: apps/catalog/taxonomy.py
+msgid "Wikidata item ID"
+msgstr "ID della voce Wikidata"
 
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid ""
@@ -1629,39 +2033,3 @@ msgid ""
 msgstr ""
 "La tua partita IVA, con o senza il prefisso del paese, per esempio IT12345678901. La verifichiamo "
 "nel registro europeo VIES. Non sai se ne hai una? Chiedi al tuo commercialista."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
-#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
-msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
-msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
-
-#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
-#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
-msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
-msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
-msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
-msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
-
-#: apps/orders/templates/email/orders/order_cancelled/subject.txt
-msgid "Order %(order_number)s was cancelled"
-msgstr "L’ordine %(order_number)s è stato annullato"
-
-#: apps/orders/templates/email/orders/order_cancelled/body.html
-#: apps/orders/templates/email/orders/order_cancelled/body.txt
-msgid "Order %(order_number)s was cancelled before payment. Nothing was charged."
-msgstr "L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato addebitato nulla."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
-msgid "Order %(order_number)s was cancelled. Do not ship these items:"
-msgstr "L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
-
-#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
-msgid "Order %(order_number)s: a shipment was delivered"
-msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
-msgid "Order %(order_number)s: part of your order was cancelled"
-msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"

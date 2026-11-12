@@ -58,6 +58,7 @@ from .attributes import (
 from .fields import SkuField
 from .taxonomy import (
     Brand,
+    BrandBatch,
     BrandTranslation,
     Category,
     CategoryTranslation,
@@ -75,6 +76,7 @@ __all__ = [
     "AttributeValue",
     "AttributeValueTranslation",
     "Brand",
+    "BrandBatch",
     "BrandTranslation",
     "Category",
     "CategoryTranslation",
@@ -505,6 +507,10 @@ class Product(BaseModel):
                 errors["required_companion"] = (
                     "A required companion must belong to the same vendor."
                 )
+        if self.brand_id is not None and self.vendor_id is not None:
+            problem = self._brand_problem()
+            if problem:
+                errors["brand"] = problem
         if self.sale_price_net is not None and self.sale_price_net == 0:
             errors["sale_price_net"] = engine.ZERO_SALE_PRICE
         if "price_net" not in errors:
@@ -513,6 +519,26 @@ class Product(BaseModel):
                 errors["price_net"] = missing
         if errors:
             raise ValidationError(errors)
+
+    def _brand_problem(self) -> str:
+        """Why the brand cannot be set (CAT.20), or "": an approved brand, or the vendor's own
+        pending proposal. A brand the product already has stays, so old data stays editable."""
+        stored = (
+            None
+            if self._state.adding or self.pk is None
+            else Product.objects.filter(pk=self.pk).values_list("brand_id", flat=True).first()
+        )
+        if stored == self.brand_id:
+            return ""
+        brand_id = self.brand_id
+        if brand_id is None:
+            return ""
+        status, proposer = Brand.objects.values_list("status", "proposed_by_id").get(pk=brand_id)
+        if status == Brand.Status.APPROVED or (
+            status == Brand.Status.PENDING and proposer == self.vendor_id
+        ):
+            return ""
+        return "Pick an approved brand, or propose this one first and wait for its review."
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         _with_sku_key(self, kwargs)
@@ -704,6 +730,7 @@ class Redirect(BaseModel):
         MANUAL = "manual", "Manual"
         RETIRED_SKU = "retired_sku", "Retired SKU"
         MERGED_TAG = "merged_tag", "Merged tag"
+        MERGED_BRAND = "merged_brand", "Merged brand"
         DISCONTINUED_CATEGORY = "discontinued_category", "Discontinued category"
         LEGACY_RULE = "legacy_rule", "Legacy site rule"
 
