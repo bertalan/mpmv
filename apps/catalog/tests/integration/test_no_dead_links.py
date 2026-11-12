@@ -1,7 +1,7 @@
-"""No listing links to a product page that does not exist yet (the CAT.7 page is not routed).
+"""A listing never links to a 404 product page (CAT.7).
 
-With `PRODUCT_PAGES_ROUTED` false (the production default until CAT.7) a product card shows its
-title without a link; every `/product/<slug>/` link a page renders would answer 404.
+With `PRODUCT_PAGES_ROUTED` true (the default) a product card links to the product page, which
+answers 200; with it false a card shows its title without a link, so no link answers 404.
 """
 
 from typing import Any
@@ -55,10 +55,17 @@ def test_no_page_links_to_a_missing_product_page(
     assert "steel-bag" in text or "borsa-acciaio" in text  # the card is still shown
 
 
-def test_the_cards_link_to_the_product_page_once_it_is_routed(
-    client: Client, settings: SettingsWrapper
+@pytest.mark.parametrize(("path", "language"), [("/shop/acme/", "en"), ("/it/shop/acme/", "it")])
+def test_every_product_link_of_a_listing_is_a_200_product_page(
+    client: Client, settings: SettingsWrapper, path: str, language: str
 ) -> None:
     settings.PRODUCT_PAGES_ROUTED = True
     _shop()
-    links, _ = _product_links(client, "/shop/acme/")
-    assert links == ["/product/steel-bag/"]
+    links, _ = _product_links(client, path)
+    expected = "/product/steel-bag/" if language == "en" else "/it/prodotto/borsa-acciaio/"
+    assert links == [expected]
+    for link in links:
+        response = client.get(link)
+        assert response.status_code == 200
+        body = response.content.decode()
+        assert "steel-bag" in body or "borsa-acciaio" in body
