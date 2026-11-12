@@ -282,8 +282,8 @@ def ensure_strict_decoding() -> None:
     """Make Pillow refuse truncated data (its default).
 
     WeasyPrint sets `ImageFile.LOAD_TRUNCATED_IMAGES = True` process-wide when imported, which
-    would let a truncated or text-bomb PNG through the upload guard. Called at startup and after
-    the document renderer imports WeasyPrint.
+    would let a truncated or text-bomb PNG through the upload guard. Called at startup and
+    before every decode in the upload guard.
     """
     ImageFile.LOAD_TRUNCATED_IMAGES = False
 
