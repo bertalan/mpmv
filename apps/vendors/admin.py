@@ -460,7 +460,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             "Invoicing bank details",
             {"fields": BANK_FIELDS},
         ),
-        ("Contact", {"fields": ("contact_email", "phone")}),
+        ("Contact", {"fields": ("contact_email", "phone", "mail_language")}),
         ("Sales", {"fields": ("sales_mode_default", "enquiries_enabled")}),
         ("Migration", {"fields": ("legacy_wp_user_id",)}),
         ("Dates", {"fields": ("created_at", "updated_at")}),
