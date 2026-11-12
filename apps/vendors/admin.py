@@ -21,6 +21,7 @@ from django.urls import URLPattern, path, reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString
+from django.utils.translation import gettext_lazy as _
 
 from apps.accounts.decorators import level_gated_action, requires_level, step_up_required
 from apps.accounts.mfa_session import is_recently_verified
@@ -112,7 +113,30 @@ def status_action(target: VendorStatus) -> StatusAction:
     )(action)
 
 
-class VendorTranslationInline(admin.StackedInline[VendorTranslation, Vendor]):
+class TranslationHelpMixin:
+    """Help for the `language` and `status` fields of translation tables, which `apps.core` owns."""
+
+    def formfield_for_dbfield(self, db_field: Any, request: HttpRequest, **kwargs: Any) -> Any:
+        if db_field.name == "language":
+            kwargs.update(
+                help_text=_(
+                    "The language these texts are written in. Required. Add one set of texts per "
+                    "language: visitors see the one in their language, or the English one when "
+                    "theirs is not published."
+                )
+            )
+        elif db_field.name == "status":
+            kwargs.update(
+                help_text=_(
+                    "Where this version is in the review: a machine draft still needs checking, "
+                    "reviewed is checked, published is shown to visitors. Only published texts "
+                    "are shown."
+                )
+            )
+        return super().formfield_for_dbfield(db_field, request, **kwargs)  # type: ignore[misc]
+
+
+class VendorTranslationInline(TranslationHelpMixin, admin.StackedInline[VendorTranslation, Vendor]):
     model = VendorTranslation
     extra = 1
     fields = (
@@ -718,7 +742,7 @@ def _locked(obj: VendorContract | None) -> bool:
 
 
 class VendorContractTranslationInline(
-    admin.StackedInline[VendorContractTranslation, VendorContract]
+    TranslationHelpMixin, admin.StackedInline[VendorContractTranslation, VendorContract]
 ):
     model = VendorContractTranslation
     extra = 1

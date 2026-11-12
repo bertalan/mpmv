@@ -15,7 +15,8 @@ Configuration comes only from environment variables.
 | [`systemd/mpmv-caddy.socket`](systemd/mpmv-caddy.socket) | Listening sockets of the proxy (80, 443), handed to Caddy by systemd socket activation |
 | [`server/mpmv-deploy`](server/mpmv-deploy) | Deploy and rollback by image tag on a server |
 | [`server/*.env.example`](server/) | Variables the server needs, without values |
-| [`ci/parity-smoke.sh`](ci/parity-smoke.sh) | CI and release gate: runs the image as the server does (ARC.23) |
+| [`ci/parity-smoke.sh`](ci/parity-smoke.sh) | CI and release gate: runs the image as the server does, upgrading from the previous release tag (ARC.23, OPS.11) |
+| [`ci/previous-release.sh`](ci/previous-release.sh) | the release tag before this build, for the smoke's upgrade path (OPS.11) |
 
 Release rules (tagging, STAGE, LIVE, no hand edits): [docs/dev/release.md](../docs/dev/release.md).
 
