@@ -39,6 +39,8 @@ DEFAULT_OPERATIONAL_ACTIONS: Final = frozenset(
         "role_grant",
         "api_key",
         "vat_regime",
+        "commission_change",
+        "no_tin_country",
         "tax_in_clear",
         "audit_in_clear",
         "bulk_edit",

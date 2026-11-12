@@ -1,0 +1,13 @@
+{% load i18n %}{% comment %}
+Help entry (ARC.32): the body of the help dialog, an HTML fragment fetched by the help script
+(themes/base/js/help.js) from the help endpoint, never part of a page. The text was sanitised when
+it was saved (CMS.12).
+
+Context: `help` (title, html, source; None when no entry is configured) and `vendor_guide_url`.
+{% endcomment %}{% if help %}<div class="help-entry" data-help-source="{{ help.source }}">
+  <h3 class="help-entry__title">{{ help.title }}</h3>
+  <div class="help-entry__body">{{ help.html|safe }}</div>
+  {% if vendor_guide_url %}<p class="help-entry__guide"><a href="{{ vendor_guide_url }}">{% translate "Vendor guide" %}</a></p>{% endif %}
+</div>{% else %}<div class="help-entry" data-help-source="none">
+  <p class="help-entry__empty">{% translate "There is no help text for this page yet." %}</p>
+</div>{% endif %}

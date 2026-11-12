@@ -65,6 +65,14 @@ PUBLIC: dict[str, str] = {
         "Thanks page after a report (CMP.5): shows only the reference kept in the visitor's "
         "own session, a 404 without one."
     ),
+    "subprocessors": (
+        "Sub-processor register (CMP.4): static reviewed data, read-only, public by design "
+        "(GDPR art. 13 and 28)."
+    ),
+    "privacy_erase_done": (
+        "Static confirmation after an account erasure (CMP.4): the user is already signed out "
+        "and the account blocked, so the page cannot ask for a session; it shows no data."
+    ),
     "dsa_contact_points": (
         "DSA points of contact (CMP.5): the operator's own contact data, read-only, public by law "
         "(DSA art. 11 and 12)."

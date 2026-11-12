@@ -6,6 +6,7 @@ from typing import Any
 from django import forms
 from django.contrib import admin
 from django.http import HttpRequest
+from django.utils.translation import gettext_lazy as _
 
 from apps.core.audit import audit_context
 
@@ -21,7 +22,15 @@ def theme_choices() -> list[tuple[str, str]]:
 
 class ThemeSettingsForm(forms.ModelForm[ThemeSettings]):
     # Read from the registry when the form is built: adding a theme needs no migration.
-    theme = forms.ChoiceField(choices=theme_choices, required=False, label="Theme")
+    theme = forms.ChoiceField(
+        choices=theme_choices,
+        required=False,
+        label="Theme",
+        help_text=_(
+            "The name of an installed theme. Leave it empty to use the default theme of the "
+            "environment."
+        ),
+    )
 
     class Meta:
         model = ThemeSettings

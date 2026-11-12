@@ -20,6 +20,6 @@ def sync(apps, schema_editor):  # type: ignore[no-untyped-def]
 class Migration(migrations.Migration):
     dependencies = [
         ("manager", "0002_seed_role_groups"),
-        ("vendors", "0027_revert_storefront_profile_permission"),
+        ("vendors", "0030_revert_storefront_profile_permission"),
     ]
     operations = [migrations.RunPython(sync, migrations.RunPython.noop)]

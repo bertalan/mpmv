@@ -10,11 +10,14 @@ import re
 from collections.abc import Collection, Container, Iterable, Mapping, Sequence
 from decimal import Decimal
 from enum import StrEnum
+from html import unescape
 from typing import Any, Final
+from urllib.parse import urlsplit
 
 from apps.core.countries import EU_MEMBER_STATES as EU_MEMBER_STATES  # TIN_FORMATS covers them
 from apps.core.countries import ISO_3166_ALPHA2, is_eu
 from apps.core.text import slugify
+from apps.core.validity import NoValidRow, OverlappingValidity, covers
 
 # --- Status state machine (spec 04 §4.2)
 
@@ -363,8 +366,47 @@ TIN_FORMATS: Final[Mapping[str, re.Pattern[str]]] = {
 _ANY_TIN = re.compile(r"[A-Z0-9][A-Z0-9./-]{0,29}", re.ASCII)
 _TIN_SEPARATORS = re.compile(r"[./-]")
 # Jurisdictions that issue no TIN (in their absence DAC7 asks an individual's place of birth).
-# A reviewable list, kept short on purpose: staff can still record a TIN when there is one.
-NO_TIN_COUNTRIES: Final = frozenset({"AE", "BM", "BS", "KY", "MC", "VG"})
+# The live list is staff-editable data (`NoTinCountry`, VEN.27) that the service passes in; this
+# is only the list migration 0028 seeds it with (and what the pure unit tests pass in).
+SEEDED_NO_TIN_COUNTRIES: Final = frozenset({"AE", "BM", "BS", "KY", "MC", "VG"})
+
+
+@dataclasses.dataclass(frozen=True)
+class NoTinWindow:
+    """One period in which `country` issued no TIN: `[valid_from, valid_to)`, open-ended when
+    `valid_to` is None (VEN.27). Dates are business-time-zone calendar days."""
+
+    country: str
+    valid_from: dt.date
+    valid_to: dt.date | None = None
+
+
+def no_tin_windows_overlap(a: NoTinWindow, b: NoTinWindow) -> bool:
+    """Whether two windows of the same country share a day (an empty window shares none)."""
+    if a.country != b.country:
+        return False
+    for first, second in ((a, b), (b, a)):
+        if first.valid_to is not None and first.valid_to <= first.valid_from:
+            return False
+        if second.valid_to is not None and second.valid_to <= second.valid_from:
+            return False
+        if first.valid_to is not None and first.valid_to <= second.valid_from:
+            return False
+    return True
+
+
+def no_tin_countries_on(windows: Iterable[NoTinWindow], on: dt.date) -> frozenset[str]:
+    """The countries that issued no TIN on the day `on`, so a DAC7 report for a past period and a
+    payout decision can be reproduced from the dated list."""
+    return frozenset(
+        w.country for w in windows if w.valid_from <= on and (w.valid_to is None or on < w.valid_to)
+    )
+
+
+def is_no_tin_country(windows: Iterable[NoTinWindow], country: str, on: dt.date) -> bool:
+    return country in no_tin_countries_on(windows, on)
+
+
 # Member States where an entity's VAT number, without its prefix, is also its TIN: only there is
 # "same as the VAT number" offered. Elsewhere the two differ (AT "U" + 8 digits, DE, FR, NL, SE
 # "01" suffix, EE, HU, LT, LU, MT): the vendor enters the TIN. A test derives a valid TIN for
@@ -1066,7 +1108,7 @@ def _vat_number_as_tin(identity: LegalIdentity) -> tuple[str, str] | None:
     return (country, number) if is_valid_tin(number, country) else None
 
 
-def dac7_check(identity: LegalIdentity) -> Completeness:
+def dac7_check(identity: LegalIdentity, no_tin_countries: Collection[str]) -> Completeness:
     """The DAC7 dataset of `identity`: fields that are missing, and present ones that are
     invalid (a TIN malformed for its country, a VAT number VIES found invalid, ...).
 
@@ -1077,6 +1119,8 @@ def dac7_check(identity: LegalIdentity) -> Completeness:
     that passes has a tax identifier for FatturaPA.
     The VAT number, the account holder's name and a permanent establishment are reported only
     when there is one, so they are never missing.
+
+    `no_tin_countries` is the staff-editable list of jurisdictions that issue no TIN (VEN.27).
     """
     ident = normalized(identity)
     missing: list[str] = []
@@ -1096,7 +1140,7 @@ def dac7_check(identity: LegalIdentity) -> Completeness:
     if ident.registered_country == ITALY:
         need("registered_province")
     need("tin_country")
-    if ident.tin_country in NO_TIN_COUNTRIES and is_individual(ident):
+    if ident.tin_country in no_tin_countries and is_individual(ident):
         if not ident.tax_code:
             need("place_of_birth")
     else:
@@ -1110,20 +1154,24 @@ def dac7_check(identity: LegalIdentity) -> Completeness:
     return Completeness(missing=_in_field_order(missing), invalid=_in_field_order(invalid))
 
 
-def dac7_missing(identity: LegalIdentity) -> tuple[str, ...]:
+def dac7_missing(identity: LegalIdentity, no_tin_countries: Collection[str]) -> tuple[str, ...]:
     """The DAC7 fields still missing or invalid, in field order (see `dac7_check`)."""
-    result = dac7_check(identity)
+    result = dac7_check(identity, no_tin_countries)
     return _in_field_order((*result.missing, *result.invalid))
 
 
-def payout_completeness(identity: LegalIdentity, rules: Iterable[Requirement]) -> Completeness:
+def payout_completeness(
+    identity: LegalIdentity,
+    rules: Iterable[Requirement],
+    no_tin_countries: Collection[str],
+) -> Completeness:
     """What a payout still needs: the staff-editable rules plus the DAC7 dataset.
 
     The DAC7 check is not a rule: deactivating requirement rows relaxes only what the rows add,
     never the dataset the platform must report.
     """
     by_rules = completeness(identity, rules, purpose=PAYOUT)
-    dac7 = dac7_check(identity)
+    dac7 = dac7_check(identity, no_tin_countries)
     missing = _in_field_order((*by_rules.missing, *dac7.missing))
     invalid = _in_field_order(
         name for name in (*by_rules.invalid, *dac7.invalid) if name not in missing
@@ -1770,6 +1818,79 @@ def check_establishment(establishment: Establishment, allowed: Collection[str]) 
         raise EstablishmentNotAllowed(establishment, error)
 
 
+# --- Commission rules (VEN.2, spec 04): versioned rows, validated and selected here, purely
+
+NET_GOODS: Final = "net_goods"
+NET_GOODS_AND_SHIPPING: Final = "net_goods_and_shipping"
+COMMISSION_BASES: Final = (NET_GOODS, NET_GOODS_AND_SHIPPING)
+GROSS_PAID: Final = "gross_paid"  # the payment fee is always on the gross paid (case FEE-NETTO)
+FEE_BASES: Final = (GROSS_PAID,)
+MAX_PERCENT: Final = Decimal("100")
+
+
+class NoCommissionRule(NoValidRow):
+    """No commission rule applies: a blocking error, never a silent 0% (case REGOLA-ZERO)."""
+
+
+class OverlappingCommissionRules(OverlappingValidity):
+    """More than one rule of the same level covers the instant: the data is inconsistent."""
+
+
+def commission_rule_errors(
+    *,
+    percent: Decimal,
+    base: str,
+    fee_percent: Decimal,
+    fee_fixed: Decimal,
+    fee_base: str,
+    promo_label: str,
+) -> dict[str, str]:
+    """What is wrong with a commission rule, by field name; empty when it is valid.
+
+    A 0% commission is accepted only with an explicit label (a promotion, "operator-owned"):
+    there is no implicit zero rule (case REGOLA-ZERO).
+    """
+    errors: dict[str, str] = {}
+    if not 0 <= percent <= MAX_PERCENT:
+        errors["percent"] = "The commission is a percentage from 0 to 100."
+    elif percent == 0 and not promo_label.strip():
+        errors["percent"] = "A 0% commission needs an explicit promo label."
+    if base not in COMMISSION_BASES:
+        errors["base"] = f"The commission base is one of {', '.join(COMMISSION_BASES)}."
+    if not 0 <= fee_percent <= MAX_PERCENT:
+        errors["fee_percent"] = "The payment fee is a percentage from 0 to 100."
+    if fee_fixed < 0:
+        errors["fee_fixed"] = "The fixed payment fee cannot be negative."
+    if fee_base not in FEE_BASES:
+        errors["fee_base"] = "The payment fee is always charged on the gross amount paid."
+    return errors
+
+
+def select_rule[R: Any](
+    rules: Iterable[R], *, vendor_id: int | None, plan_id: int | None, at: dt.datetime
+) -> R:
+    """The rule in force at `at`: the vendor's own, else its plan's, else the platform default.
+
+    Each level has at most one row valid at an instant (the database refuses overlaps). Nothing
+    applying is `NoCommissionRule`.
+    """
+    candidates = [rule for rule in rules if covers(rule, at)]
+    levels = (
+        lambda r: r.vendor_id is not None and r.vendor_id == vendor_id,
+        lambda r: r.vendor_id is None and r.plan_id is not None and r.plan_id == plan_id,
+        lambda r: r.vendor_id is None and r.plan_id is None,
+    )
+    for level in levels:
+        found = [rule for rule in candidates if level(rule)]
+        if len(found) > 1:
+            raise OverlappingCommissionRules(
+                f"{len(found)} commission rules are valid at {at.isoformat()} for one level."
+            )
+        if found:
+            return found[0]
+    raise NoCommissionRule(f"No commission rule is valid at {at.isoformat()}; configure one first.")
+
+
 # --- Storefront profile (CORE.9, D-34): the tagline is plain text; the description and the three
 # policies are Wagtail rich text (HTML stored, cleaned by the CMS.12 hook).
 
@@ -1858,6 +1979,42 @@ def has_page_link(html: str) -> bool:
         == "page"
         for tag, raw in _TAG.findall(html)
     )
+
+
+LINK_MAX_LENGTH: Final = 2000
+
+
+def is_https_address(value: str) -> bool:
+    """Whether `value` is a plain https address as written (no stripping): no other scheme
+    (`javascript:`, `data:`, `http:`, `mailto:`), no relative or scheme-relative address, no
+    credentials, no whitespace, control character or backslash, at most `LINK_MAX_LENGTH`."""
+    if len(value) > LINK_MAX_LENGTH or any(ord(c) <= 32 or ord(c) == 127 for c in value):
+        return False
+    parts = urlsplit(value)
+    try:
+        host, _port = parts.hostname, parts.port
+    except ValueError:
+        return False
+    return (
+        parts.scheme.lower() == "https"
+        and bool(host)
+        and "@" not in parts.netloc
+        and ("\\" not in value)
+    )
+
+
+def has_unsafe_link(html: str) -> bool:
+    """Whether a stored rich text has an `<a href>` that is not a plain https address. Document
+    links (`linktype="document"`, no href) are refused by `media_problem` until ARC.15. The
+    sanitiser lets `http:`, `mailto:`, relative and scheme-relative addresses through, but a
+    vendor text may only link out over https (VEN.31), whatever the form posted."""
+    for tag, raw in _TAG.findall(html):
+        if tag.lower() != "a":
+            continue
+        attrs = {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}
+        if "href" in attrs and not is_https_address(unescape(attrs["href"])):
+            return True
+    return False
 
 
 def image_embed_formats(html: str) -> list[str]:
