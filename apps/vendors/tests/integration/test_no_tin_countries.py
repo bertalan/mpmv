@@ -381,11 +381,11 @@ def test_the_engine_answers_the_list_on_a_day() -> None:
     assert not engine.no_tin_windows_overlap(w[0], engine.NoTinWindow("JP", dt.date(2024, 6, 1)))
 
 
-# --- CORE.25: a change needs an operational session (group 2, `no_tin_country`)
+# --- CORE.25: a change needs an passkey window (sensitive, `no_tin_country`)
 
 
 def restricted(client: Client, mfa_login_user: User) -> Client:
-    verified_login(client, mfa_login_user, passkey=True, level=levels.RESTRICTED)
+    verified_login(client, mfa_login_user, passkey=True, level=levels.NO_WINDOW)
     return client
 
 

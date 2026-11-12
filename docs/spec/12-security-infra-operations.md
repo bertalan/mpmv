@@ -28,7 +28,7 @@ because the task SEC.2 (uploads) used the same ID.
 
 | ID | Requirement | Detail |
 |---|---|---|
-| SEC.1 | Access model | MFA, step-up, per-role session lifetimes, two session levels, restricted and operational (D-32), session list and invalidation (see [02](02-core-identity-permissions.md), CORE.24, CORE.25) |
+| SEC.1 | Access model | MFA, step-up, per-role session lifetimes, the passkey window (D-32), session list and invalidation (see [02](02-core-identity-permissions.md), CORE.24, CORE.25) |
 | SEC-R2 | Tenant isolation as a tested invariant | Automated negative tests for every endpoint, view and MCP tool |
 | SEC.3 | HTTP hardening | CSP without `unsafe-inline` (native since Django 6.0), HSTS, `Secure`/`HttpOnly`/`SameSite` cookies, security headers |
 | SEC.4 | Uploads | Server-side MIME validation, size limits, image re-encoding, no unsanitized SVG. Final caps of task SEC.2: 60 megapixels for still images (also Pillow's decompression-bomb threshold), 16 megapixels for animations, 40 megapixels for the stored original, 16,000 px per side, 300 frames, 25 MB per file; one image decode at a time per process (decode lock; a second upload waits up to `MPMV_IMAGE_DECODE_WAIT_SECONDS`, then gets a "try again" error); every cap is an environment setting checked at startup |

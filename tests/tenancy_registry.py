@@ -409,10 +409,10 @@ ENDPOINTS: dict[str, Access] = {
         "non-staff user gets 404."
     ),
     "levels:options": NoVendorData(OWN_ACCOUNT),
-    "levels:operational": NoVendorData(OWN_ACCOUNT),
+    "levels:window": NoVendorData(OWN_ACCOUNT),
     "levels:once_options": NoVendorData(OWN_ACCOUNT),
     "levels:once": NoVendorData(OWN_ACCOUNT),
-    "levels:end": NoVendorData(OWN_ACCOUNT),
+    "levels:close": NoVendorData(OWN_ACCOUNT),
     "mfa:overview": NoVendorData(OWN_ACCOUNT),
     "mfa:setup": NoVendorData(OWN_ACCOUNT),
     "mfa:totp": NoVendorData(OWN_ACCOUNT),
