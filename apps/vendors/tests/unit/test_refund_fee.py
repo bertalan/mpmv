@@ -92,6 +92,34 @@ def test_rule_snapshot_roundtrip_keeps_old_surcharge() -> None:
     assert rf.refund_fee(D("3.15"), rf.RefundFeeRule.from_snapshot(snap)) == D("6.00")
 
 
+def test_surcharge_with_sub_cent_precision_refused() -> None:
+    with pytest.raises(ValueError, match="decimals"):
+        rule("2.005")
+
+
+def test_surcharge_with_trailing_zero_decimals_accepted() -> None:
+    assert rule("2.500").surcharge == D("2.5")
+
+
+def test_snapshot_roundtrip_keeps_live_result() -> None:
+    live = rule("2.50")
+    restored = rf.RefundFeeRule.from_snapshot(live.snapshot())
+    assert rf.refund_fee(D("1.00"), restored) == rf.refund_fee(D("1.00"), live) == D("4.00")
+
+
+def test_module_has_no_unrounded_quantize() -> None:
+    tree = ast.parse(Path(rf.__file__).read_text())
+    calls = [
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute)
+        and n.func.attr == "quantize"
+        and not any(k.arg == "rounding" for k in n.keywords)
+    ]
+    assert not calls
+
+
 def test_snapshot_missing_key_refused() -> None:
     with pytest.raises(ValueError, match="snapshot"):
         rf.RefundFeeRule.from_snapshot({})
