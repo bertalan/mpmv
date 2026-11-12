@@ -89,7 +89,9 @@ msgstr ""
 msgid ""
 "A PDF document, for example your return policy. It is stored in your own shop collection and no "
 "other shop can see it."
-msgstr "Un documento PDF, per esempio la tua politica di reso. Viene salvato nella raccolta del tuo negozio e nessun altro negozio può vederlo."
+msgstr ""
+"Un documento PDF, per esempio la tua politica di reso. Viene salvato nella raccolta del tuo "
+"negozio e nessun altro negozio può vederlo."
 
 #: apps/vendors/models.py
 msgid ""
@@ -177,6 +179,10 @@ msgstr "Accetta l'ordine"
 msgid "Access denied"
 msgstr "Accesso negato"
 
+#: themes/base/templates/components/user_tools.html
+msgid "Account"
+msgstr "Account"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Act on the content"
 msgstr "Interveni sul contenuto"
@@ -240,6 +246,10 @@ msgid ""
 msgstr ""
 "Un altro tuo prodotto pensato per essere comprato insieme a questo, per esempio la batteria di un "
 "giocattolo. Lascialo vuoto se non ce n'è."
+
+#: apps/cms/models.py
+msgid "applies to"
+msgstr "si applica a"
 
 #: apps/catalog/taxonomy_admin.py
 msgid "Approve all brands of the selected batches"
@@ -474,6 +484,10 @@ msgstr ""
 "[{\"code\": \"model_year\", \"kind\": \"number\", \"required\": false, \"label\": \"Anno del "
 "modello\"}]. Lascialo vuoto se non servono. Il tipo è uno tra: text, number, boolean."
 
+#: themes/base/templates/components/user_tools.html
+msgid "Fields on this page"
+msgstr "Campi di questa pagina"
+
 #: apps/manager/media.py
 msgid "File"
 msgstr "File"
@@ -500,6 +514,10 @@ msgstr "Hai dimenticato le credenziali di accesso?"
 msgid "Form expired"
 msgstr "Modulo scaduto"
 
+#: apps/cms/models.py
+msgid "General (every other screen)"
+msgstr "Generale (ogni altra schermata)"
+
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Generate new codes"
 msgstr "Genera nuovi codici"
@@ -507,6 +525,10 @@ msgstr "Genera nuovi codici"
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Generating new codes makes every previous code stop working."
 msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
+
+#: apps/cms/models.py
+msgid "Give the screen or page type: letters, digits and . : _ - only."
+msgstr "Indica la schermata o il tipo di pagina: solo lettere, cifre e . : _ -"
 
 #: themes/base/templates/layouts/error.html
 msgid "Go to the home page"
@@ -545,6 +567,30 @@ msgstr "Ciao %(customer_name)s,"
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello,"
 msgstr "Ciao,"
+
+#: themes/base/templates/components/user_tools.html
+msgid "Help"
+msgstr "Aiuto"
+
+#: apps/cms/models.py
+msgid "help entries"
+msgstr "testi di aiuto"
+
+#: apps/cms/models.py
+msgid "help entry"
+msgstr "testo di aiuto"
+
+#: themes/base/templates/components/user_tools.html
+msgid "Help for this page"
+msgstr "Aiuto per questa pagina"
+
+#: apps/cms/models.py
+msgid "help text"
+msgstr "testo di aiuto"
+
+#: apps/manager/wagtail_hooks.py
+msgid "Help texts"
+msgstr "Testi di aiuto"
 
 #: apps/manager/forms.py
 msgid ""
@@ -702,9 +748,17 @@ msgstr "Solo lettere, cifre, spazi e . / _ -"
 msgid "Link text"
 msgstr "Testo del link"
 
+#: apps/cms/models.py
+msgid "link the vendor guide"
+msgstr "collega la guida per i venditori"
+
 #: themes/base/templates/components/button.html
 msgid "Loading"
 msgstr "Caricamento"
+
+#: themes/base/templates/components/user_tools.html
+msgid "Loading help…"
+msgstr "Caricamento dell’aiuto…"
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Log in"
@@ -1019,6 +1073,10 @@ msgstr "Pagina %(page)s di %(count)s"
 msgid "Page not found"
 msgstr "Pagina non trovata"
 
+#: apps/cms/models.py
+msgid "Page type"
+msgstr "Tipo di pagina"
+
 #: themes/base/templates/components/pagination.html
 msgid "Pagination"
 msgstr "Paginazione"
@@ -1245,6 +1303,14 @@ msgstr ""
 "Scansiona questo codice QR con la tua app di autenticazione, poi inserisci il codice a 6 cifre che"
 " mostra."
 
+#: apps/cms/models.py
+msgid "Screen (route name)"
+msgstr "Schermata (nome della route)"
+
+#: apps/cms/models.py
+msgid "screen or page type"
+msgstr "schermata o tipo di pagina"
+
 #: apps/manager/templates/manager/list.html
 msgid "Select"
 msgstr "Seleziona"
@@ -1309,6 +1375,7 @@ msgstr "Accedi"
 
 #: apps/manager/templates/manager/forbidden.html apps/manager/templates/manager/layout.html
 #: apps/manager/templates/manager/shop/vendor_closed.html
+#: themes/base/templates/components/user_tools.html
 msgid "Sign out"
 msgstr "Esci"
 
@@ -1706,7 +1773,9 @@ msgstr ""
 msgid ""
 "The full address of the page to open, starting with https://, for example "
 "https://www.example.com/guide. Required: the link has nowhere to go without it."
-msgstr "L’indirizzo completo della pagina da aprire, che inizia con https://, per esempio https://www.example.com/guide. Obbligatorio: senza di esso il link non porta da nessuna parte."
+msgstr ""
+"L’indirizzo completo della pagina da aprire, che inizia con https://, per esempio "
+"https://www.example.com/guide. Obbligatorio: senza di esso il link non porta da nessuna parte."
 
 #: apps/vendors/models.py
 msgid ""
@@ -1735,9 +1804,17 @@ msgstr ""
 "usare una formattazione semplice. Facoltativo, ma con un testo chiaro chi compra decide più in "
 "fretta."
 
+#: apps/cms/models.py
+msgid "The general text has no screen or page type."
+msgstr "Il testo generale non ha una schermata né un tipo di pagina."
+
 #: apps/catalog/models.py
 msgid "The height of the packed product in centimetres, for example 10. Optional."
 msgstr "L'altezza del prodotto imballato in centimetri, per esempio 10. Facoltativo."
+
+#: themes/base/templates/components/user_tools.html
+msgid "The help text could not be loaded. Try again."
+msgstr "Non è stato possibile caricare il testo di aiuto. Riprova."
 
 #: apps/vendors/models.py
 msgid ""
@@ -1871,6 +1948,14 @@ msgid ""
 msgstr ""
 "Il nome della categoria o etichetta in questa lingua, per esempio 'Estate'. Obbligatorio: senza, "
 "non ha un nome per chi compra."
+
+#: apps/cms/models.py
+msgid ""
+"The name of the screen (for example catalog:brand) or of the page type (for example "
+"cms.StandardPage). Leave it empty for the general text."
+msgstr ""
+"Il nome della schermata (per esempio catalog:brand) o del tipo di pagina (per esempio "
+"cms.StandardPage). Lascialo vuoto per il testo generale."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -2262,21 +2347,28 @@ msgstr ""
 "La parola che chi compra vede per questo valore in questa lingua, per esempio 'Rosso'. "
 "Obbligatorio: senza, il valore non ha un nome in questa lingua."
 
+#: apps/manager/media.py
+msgid ""
+"The words buyers click on. If you leave it empty, the words you selected are used, or the address "
+"itself when nothing is selected."
+msgstr ""
+"Le parole su cui cliccano i clienti. Se lo lasci vuoto, vengono usate le parole che hai "
+"selezionato, oppure l’indirizzo stesso se non hai selezionato nulla."
+
 #: apps/catalog/models.py
 msgid ""
 "The words to search for, for example 'ceramic mug'. Fill them only when the target is a search."
 msgstr ""
 "Le parole da cercare, per esempio 'tazza in ceramica'. Compilale solo quando la destinazione è una"
 " ricerca."
-#: apps/manager/media.py
-msgid ""
-"The words buyers click on. If you leave it empty, the words you selected are used, or the address "
-"itself when nothing is selected."
-msgstr "Le parole su cui cliccano i clienti. Se lo lasci vuoto, vengono usate le parole che hai selezionato, oppure l’indirizzo stesso se non hai selezionato nulla."
 
 #: themes/base/templates/components/error_summary.html
 msgid "There is a problem"
 msgstr "Si è verificato un problema"
+
+#: themes/base/templates/components/help_entry.html
+msgid "There is no help text for this page yet."
+msgstr "Per questa pagina non c’è ancora un testo di aiuto."
 
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "This action changes nothing."
@@ -2339,6 +2431,14 @@ msgstr ""
 "Spunta la casella se vuoi ricevere richieste di informazioni dai clienti sui tuoi prodotti. Senza "
 "spunta non ricevi richieste."
 
+#: apps/cms/models.py
+msgid ""
+"Tick it on screens for vendors, so the dialog also links the vendor guide. It has no effect until "
+"the platform has a vendor guide address."
+msgstr ""
+"Selezionalo sulle schermate per i venditori, così la finestra rimanda anche alla guida per i "
+"venditori. Non ha effetto finché la piattaforma non ha un indirizzo della guida per i venditori."
+
 #: apps/catalog/models.py
 msgid ""
 "Tick it to apply the rule to every address that starts with this one, for example /author/ also "
@@ -2392,6 +2492,10 @@ msgstr ""
 #: apps/manager/media.py
 msgid "Title"
 msgstr "Titolo"
+
+#: apps/cms/models.py
+msgid "title"
+msgstr "titolo"
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid ""
@@ -2482,6 +2586,10 @@ msgstr "venditore"
 msgid "Vendor closed"
 msgstr "Venditore chiuso"
 
+#: themes/base/templates/components/help_entry.html
+msgid "Vendor guide"
+msgstr "Guida per i venditori"
+
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Verify"
 msgstr "Verifica"
@@ -2520,6 +2628,18 @@ msgstr ""
 "Abbiamo ricevuto il tuo pagamento di %(total)s EUR per l’ordine %(order_number)s. Ogni venditore "
 "preparerà la sua parte e riceverai un messaggio quando verrà spedita."
 
+#: apps/manager/media.py
+msgid "Web address"
+msgstr "Indirizzo web"
+
+#: apps/cms/models.py
+msgid ""
+"What a person can do here and what to do first, in short plain sentences. Without text the dialog "
+"shows only the title."
+msgstr ""
+"Che cosa si può fare qui e da dove iniziare, in frasi brevi e semplici. Senza testo la finestra "
+"mostra solo il titolo."
+
 #: apps/catalog/models.py
 msgid "What buyers see for this version: in stock, out of stock or on backorder."
 msgstr "Cosa vede chi compra per questa versione: disponibile, esaurito o in ordine al fornitore."
@@ -2540,13 +2660,18 @@ msgstr ""
 "Cosa contiene l'attributo. Scelta: uno o più valori da un elenco che definisci, per esempio le "
 "taglie. Numero: una misura, per esempio una larghezza. Testo: un testo libero, per esempio un "
 "autore. Obbligatorio."
-#: apps/manager/media.py
-msgid "Web address"
-msgstr "Indirizzo web"
 
 #: apps/vendors/models.py
 msgid "What the field is needed for: a payout request or the activation of the vendor."
 msgstr "A cosa serve il campo: una richiesta di pagamento o l'attivazione del venditore."
+
+#: apps/cms/models.py
+msgid ""
+"What the text is for: one screen, every page of one page type, or every screen that has no text of"
+" its own. Example: choose Screen for the brand listing."
+msgstr ""
+"A che cosa serve il testo: una schermata, ogni pagina di un tipo di pagina, o ogni schermata che "
+"non ha un testo proprio. Esempio: scegli Schermata per l’elenco dei marchi."
 
 #: apps/catalog/models.py
 msgid ""

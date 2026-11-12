@@ -1,4 +1,4 @@
-{% load i18n theme_tags %}{% comment %}
+{% load i18n theme_tags cms_tags %}{% comment %}
 Site header of the `ride` theme (THM.6, spec 14 §14.6): a dark bar with the logo on the left, the
 main navigation, search and cart icons with text for screen readers, the help link and the
 language switcher. Below 64rem a burger button (a disclosure, `aria-expanded`) opens the menu.
@@ -41,6 +41,7 @@ of the help link.
       {% endwith %}
       {% include "components/help_link.html" %}
       {% if languages %}{% include "components/language_switcher.html" %}{% endif %}
+      {% help_context as help %}{% include "components/user_tools.html" %}
     </div>
   </div>
 </header>
