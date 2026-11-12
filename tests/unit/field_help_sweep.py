@@ -215,6 +215,7 @@ def _staff_request() -> Any:
         is_staff=True,
         is_superuser=True,
         pk=1,
+        holds_all_platform_roles=True,  # CORE.18 section checks answer without a database
         has_perm=lambda *a, **k: True,
         has_perms=lambda *a, **k: True,
         has_module_perms=lambda *a, **k: True,
