@@ -630,8 +630,114 @@ def sanitise_image(
 PDF_MAGIC = b"%PDF-"
 SNIFFABLE = re.compile(rb"<\s*(html|script|body|head|iframe|svg|!doctype)", re.IGNORECASE)
 SNIFF_WINDOW = 1024  # browsers sniff the first 512 bytes; twice that for good measure
+# Names of PDF actions and objects that run code, launch programs, carry files or send data.
+# Readers other than a browser's (Acrobat and others) do not sandbox them.
+ACTIVE_PDF_NAMES = re.compile(
+    rb"/(JavaScript|JS|Launch|EmbeddedFiles?|OpenAction|AA|RichMedia|XFA|SubmitForm|ImportData"
+    rb"|GoToR|GoToE)(?![A-Za-z0-9#])"
+)
+# `/J#61vaScript` is the same name as `/JavaScript`: no name with a hex escape is accepted.
+ESCAPED_PDF_NAME = re.compile(rb"/[^\s/<>\[\]()%]*#[0-9A-Fa-f]{2}")
 ZIP_END_RECORD = b"PK\x05\x06"
 ZIP_END_WINDOW = 22 + 0xFFFF  # the record and the longest archive comment
+
+# A small PDF tokenizer, only to find real stream bodies. Whitespace, comments, hex strings,
+# dictionary delimiters, names and plain words; literal strings are read by hand (nesting).
+_PDF_TOKEN = re.compile(
+    rb"(?P<ws>[\s\x00]+)|(?P<comment>%[^\r\n]*)|(?P<open><<)|(?P<close>>>)|(?P<hex><[^<>]*>)"
+    rb"|(?P<lit>\()|(?P<name>/[^\s\x00()<>\[\]{}/%]*)|(?P<word>[^\s\x00()<>\[\]{}/%]+)"
+)
+_PDF_STRING_PARTS = re.compile(rb"[()\\]")
+_PDF_REGULAR = rb"[^\s\x00()<>\[\]{}/%]"  # a character that continues a word
+_PDF_DIRECT_LENGTH = re.compile(
+    rb"[\s\x00]*(\d+)(?!"
+    + _PDF_REGULAR
+    + rb")(?P<ref>[\s\x00]+\d+[\s\x00]+R(?!"
+    + _PDF_REGULAR
+    + rb"))?"
+)
+_PDF_END_STREAM = re.compile(rb"(?:\r\n|\n|\r)?endstream(?!" + _PDF_REGULAR + rb")")
+
+
+def _literal_string_end(data: bytes, pos: int) -> int:
+    """The index after the literal string that opens at `data[pos]` (`(`), or `len(data)`."""
+    depth = 0
+    index = pos
+    while True:
+        found = _PDF_STRING_PARTS.search(data, index)
+        if found is None:
+            return len(data)
+        char = found.group()
+        if char == b"\\":
+            index = found.end() + 1
+            continue
+        depth += 1 if char == b"(" else -1
+        index = found.end()
+        if depth == 0:
+            return index
+
+
+def blank_stream_bodies(data: bytes) -> bytes:
+    """`data` with the bodies of real streams replaced by a space.
+
+    Stream bodies are compressed or binary, and random bytes there look like names, so only the
+    object and dictionary syntax around them is scanned. A body is blanked only when it is
+    structurally a stream: a top-level dictionary closed by `>>` (outside any string or comment),
+    optional white space, `stream`, an end of line, exactly the dictionary's direct `/Length N`
+    bytes and then `endstream`. Anything else (an indirect, missing, repeated or wrong length,
+    `stream` inside a string or comment) is left in place and scanned: a false refusal is
+    acceptable, a bypass is not.
+    """
+    pieces: list[bytes] = []
+    kept_from = 0
+    pos = 0
+    depth = 0
+    length: int | None = None  # the top-level dictionary's direct /Length; -1 once not usable
+    closed_top_level = False  # the previous token closed a top-level dictionary
+    while pos < len(data):
+        token = _PDF_TOKEN.match(data, pos)
+        if token is None:
+            pos += 1
+            closed_top_level = False
+            continue
+        kind = token.lastgroup
+        pos = token.end()
+        if kind in ("ws", "comment"):
+            continue
+        was_closed, closed_top_level = closed_top_level, False
+        if kind == "lit":
+            pos = _literal_string_end(data, token.start())
+        elif kind == "open":
+            if depth == 0:
+                length = None
+            depth += 1
+        elif kind == "close":
+            depth = max(depth - 1, 0)
+            closed_top_level = depth == 0
+        elif kind == "name" and depth == 1 and token.group() == b"/Length":
+            found = _PDF_DIRECT_LENGTH.match(data, pos)
+            if found is None or found.group("ref") or length is not None:
+                length = -1
+            else:
+                length = int(found.group(1))
+        elif kind == "word" and token.group() == b"stream" and was_closed and depth == 0:
+            eol = data[pos : pos + 2]
+            start = pos + (2 if eol == b"\r\n" else 1 if eol[:1] == b"\n" else 0)
+            if start == pos or length is None or length < 0:
+                continue
+            end = start + length
+            # A body that holds an `endstream` is not one stream: a reader may stop there.
+            if (
+                end <= len(data)
+                and _PDF_END_STREAM.match(data, end)
+                and data.find(b"endstream", start, end) < 0
+            ):
+                pieces.append(data[kept_from:start])
+                kept_from = end
+                pos = end
+            length = None
+    pieces.append(data[kept_from:])
+    return b" ".join(pieces)
 
 
 def check_document(data: bytes, name: str, *, max_bytes: int) -> str:
@@ -651,4 +757,7 @@ def check_document(data: bytes, name: str, *, max_bytes: int) -> str:
         raise UploadRefused("polyglot", "The file mixes a PDF with an archive.")
     if not data.rstrip().endswith(b"%%EOF"):
         raise UploadRefused("polyglot", "The file has data after the end of the PDF.")
+    syntax = blank_stream_bodies(data)
+    if ACTIVE_PDF_NAMES.search(syntax) or ESCAPED_PDF_NAME.search(syntax):
+        raise UploadRefused("active_content", "The PDF contains scripts or embedded actions.")
     return safe_filename(name, "pdf")

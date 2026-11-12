@@ -10,6 +10,7 @@ import hashlib
 import logging
 from collections.abc import Callable, Collection, Mapping
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -46,6 +47,7 @@ from apps.accounts.services import (
 )
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
+from apps.core.fields import read_upload
 from apps.core.models import AuditLog, ImageLicence, MediaImage, resolve_translation
 from apps.core.services import (
     NoPlatformOperator,
@@ -59,12 +61,14 @@ from apps.core.services import (
     save_audited,
 )
 from apps.core.throttling import ip_bucket
+from apps.core.uploads import UploadRefused, check_document
 
 from . import engine
 from .models import (
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
+    NoTinCountry,
     SelfCertification,
     Vendor,
     VendorApplication,
@@ -134,29 +138,34 @@ def _clean_rich_text(html: str) -> str:
 
 
 def media_problem(vendor: Vendor, html: str) -> str | None:
-    """Why a stored rich text may not be published for `vendor`, or None: every image it embeds
-    and every document it links must be in the vendor's own collection (depth 2, named by
-    `engine.vendor_collection_name`) or below it. A foreign, missing or non-numeric id is a
-    problem, so crafted HTML cannot reach another vendor's files (D-34)."""
+    """Why a stored rich text may not be published for `vendor`, or None: its links are https
+    addresses, it links no document (waits for ARC.15), and every image it embeds is in the
+    vendor's own collection (depth 2, named by `engine.vendor_collection_name`) or below it. A
+    foreign, missing or non-numeric id is a problem, so crafted HTML cannot reach another
+    vendor's files (D-34)."""
     if engine.has_page_link(html):
         return "Links to other pages of the site are not allowed here."
+    if engine.has_unsafe_link(html):
+        return "Links must be web addresses starting with https://"
     images, documents = engine.media_references(html)
-    if not images and not documents:
+    if documents:
+        # A vendor PDF would be public by URL: no document link until ARC.15 (private storage).
+        return "Links to documents are not available yet."
+    if not images:
         return None
-    if not all(ref.isdecimal() for ref in (*images, *documents)):
-        return "Choose images and documents from your own library."
+    if not all(ref.isdecimal() for ref in images):
+        return "Choose images from your own library."
     own = ImageCollection.objects.filter(
         depth=2, name=engine.vendor_collection_name(str(vendor.public_id))
     ).first()
     if own is None:
-        return "Choose images and documents from your own library."
+        return "Choose images from your own library."
     allowed = ImageCollection.objects.descendant_of(own, inclusive=True)
-    for model, refs in ((get_image_model(), images), (get_document_model(), documents)):
-        wanted = {int(ref) for ref in refs}
-        if wanted and model.objects.filter(pk__in=wanted, collection__in=allowed).count() != len(
-            wanted
-        ):
-            return "Choose images and documents from your own library."
+    wanted = {int(ref) for ref in images}
+    if get_image_model().objects.filter(pk__in=wanted, collection__in=allowed).count() != len(
+        wanted
+    ):
+        return "Choose images from your own library."
     return None
 
 
@@ -689,15 +698,33 @@ def requirement_rules(purpose: str = engine.PAYOUT) -> list[engine.Requirement]:
     return [row.as_rule() for row in rows]
 
 
+def business_today() -> dt.date:
+    """Today's calendar day in the business time zone (the day the no-TIN list is dated by)."""
+    return timezone.localdate(timezone.now(), ZoneInfo(settings.BUSINESS_TIME_ZONE))
+
+
+def no_tin_countries(on: dt.date | None = None) -> frozenset[str]:
+    """The jurisdictions that issued no TIN on the day `on` (default today, business time zone),
+    read from the dated table for the pure engine (VEN.27). Pass the day of the period a DAC7
+    report covers to reproduce what was true then."""
+    windows = [row.window() for row in NoTinCountry.objects.all()]
+    return engine.no_tin_countries_on(windows, on or business_today())
+
+
 def legal_profile_completeness(vendor: Vendor, purpose: str = engine.PAYOUT) -> engine.Completeness:
     """Which fields required for `purpose` the vendor is missing, or holds invalid values for.
 
     For a payout that is the active requirement rows plus the DAC7 dataset
-    (`engine.payout_completeness`): no row can relax DAC7.
+    (`engine.payout_completeness`): no row can relax DAC7. The no-TIN list is read as of today.
+
+    TOCTOU: the answer is true only at the moment of the read (staff may remove a no-TIN country,
+    or the vendor change a field, a moment later). A payout task (VEN.6/VEN.7, not built yet) must
+    call this, or `assert_payout_allowed`, inside the same transaction that creates the payout
+    and lock the vendor row first, never on a result checked earlier.
     """
     identity = vendor.legal_identity()
     if purpose == engine.PAYOUT:
-        return engine.payout_completeness(identity, requirement_rules(purpose))
+        return engine.payout_completeness(identity, requirement_rules(purpose), no_tin_countries())
     return engine.completeness(identity, requirement_rules(purpose), purpose=purpose)
 
 
@@ -792,6 +819,92 @@ def delete_requirement(
         requirement.delete()
 
     return run_mutation(changes, apply, ctx=ctx, action=REQUIREMENT_DELETED, dry_run=dry_run)
+
+
+# --- No-TIN jurisdictions (VEN.27, owner decision MQ-16): a staff-edited, audited list.
+
+NO_TIN_MODEL = "vendors.notincountry"
+NO_TIN_ADDED = "vendor.no_tin_country_added"
+NO_TIN_REMOVED = "vendor.no_tin_country_removed"
+
+
+def no_tin_snapshot(row: NoTinCountry) -> dict[str, Any]:
+    return {
+        "country": row.country,
+        "reason": row.reason,
+        "valid_from": row.valid_from.isoformat(),
+        "valid_to": None if row.valid_to is None else row.valid_to.isoformat(),
+    }
+
+
+def no_tin_impact(country: str) -> int:
+    """How many vendors fail the payout check once `country` stops counting as issuing no TIN:
+    those whose TIN country it is and who have no TIN (they rely on the place of birth)."""
+    return Vendor.objects.filter(tin_country=country, tax_code="").count()
+
+
+def add_no_tin_country(
+    country: str, *, reason: str, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """List `country` as issuing no TIN from today (business time zone), with the reason
+    (audited). A new row is created: earlier periods of the same country keep their own rows.
+    Raises `ValidationError` for an unknown country, one already listed today, and an empty
+    reason."""
+    row = NoTinCountry(country=country, reason=reason.strip(), valid_from=business_today())
+    row.full_clean(exclude=["public_id"])
+    changes = ChangeSet()
+    changes.create(NO_TIN_MODEL, row.country, no_tin_snapshot(row))
+
+    def apply() -> None:
+        try:
+            with transaction.atomic():
+                row.save()
+        except IntegrityError:  # a concurrent add of the same country won the race
+            raise ValidationError({"country": f"{row.country} is already on the list."}) from None
+
+    return run_mutation(changes, apply, ctx=ctx, action=NO_TIN_ADDED, dry_run=dry_run)
+
+
+def remove_no_tin_country(
+    country: str, *, reason: str, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Stop listing `country` from today (business time zone), with the reason (audited): the open
+    row gets its `valid_to`, it is never deleted, so past periods stay reproducible. Its
+    individuals need a TIN again. Raises `ValidationError` for a country that is not listed and
+    for an empty reason."""
+    why = reason.strip()
+    if not why:
+        raise ValidationError({"reason": "A reason is required."})
+    code = NoTinCountry._meta.get_field("country").to_python(country)
+    with transaction.atomic():
+        row = (
+            NoTinCountry.objects.select_for_update()
+            .filter(country=code, valid_to__isnull=True)
+            .first()
+        )
+        if row is None:
+            raise ValidationError({"country": f"{code} is not on the no-TIN list."})
+        before = no_tin_snapshot(row)
+        today = business_today()
+        changes = ChangeSet()
+        changes.update(
+            NO_TIN_MODEL,
+            row.country,
+            before,
+            {
+                **before,
+                "valid_to": today.isoformat(),
+                "removal_reason": why,
+                "vendors_without_tin": no_tin_impact(row.country),
+            },
+        )
+
+        def apply() -> None:
+            row.valid_to = max(today, row.valid_from)  # added today and removed today: empty
+            row.removal_reason = why
+            row.save(update_fields=["valid_to", "removal_reason", "updated_at"])
+
+        return run_mutation(changes, apply, ctx=ctx, action=NO_TIN_REMOVED, dry_run=dry_run)
 
 
 # --- Onboarding (VEN.5): application, versioned contract, acceptance, checklist
@@ -1142,7 +1255,7 @@ def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
     return engine.onboarding_checklist(
         contract_version=contract.version if contract is not None and accepted else None,
         current_contract_version=contract.version if contract is not None else None,
-        dac7_missing=engine.dac7_missing(stored.legal_identity()),
+        dac7_missing=engine.dac7_missing(stored.legal_identity(), no_tin_countries()),
         payout=legal_profile_completeness(stored),
         platform_duties_missing=platform_duties_missing(stored),
     )
@@ -2368,6 +2481,85 @@ def upload_storefront_image(
             stored[0].delete(stored[1])
         raise
     return image
+
+
+def vendor_media_documents(vendor: Vendor) -> QuerySet[Any]:
+    """The documents the vendor may list and choose: its collection and the ones below it."""
+    own = vendor_media_collection(vendor)
+    documents: QuerySet[Any] = get_document_model().objects.all()
+    if own is None:
+        return documents.none()
+    allowed = ImageCollection.objects.descendant_of(own, inclusive=True)
+    found: QuerySet[Any] = documents.filter(collection__in=allowed)
+    return found
+
+
+def upload_storefront_document(
+    vendor: Vendor,
+    *,
+    upload: Any,
+    title: str,
+    actor: User,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> Any:
+    """The vendor owner uploads a PDF from the storefront editor, into the vendor's own
+    collection only (the caller cannot name another). The SEC.2 document checks apply (PDF by
+    content, size cap, no HTML or archive polyglot, a name the app makes). Owner only, and not
+    for a suspended or closed vendor (`PermissionDenied`). Shares the hourly upload limit of the
+    images; one `vendor.media_uploaded` audit entry (`after.document`). Raises
+    `ValidationError({"file": [...]})` for a refused file. With `dry_run` the file is checked and
+    the unsaved document returned: nothing is written, counted or audited."""
+    if not has_vendor_permission(actor, vendor, "profile"):
+        raise PermissionDenied("Only the vendor owner uploads storefront documents.")
+    wait = (
+        None
+        if dry_run
+        else consume_rate_limit(
+            f"vendor-media:user:{actor.pk}", limit=MEDIA_UPLOAD_LIMIT, window=PROFILE_RATE_WINDOW
+        )
+    )
+    if wait:
+        minutes = max(1, int(wait.total_seconds() // 60))
+        raise ValidationError({"file": f"Too many uploads: try again in {minutes} minutes."})
+    limit = settings.WAGTAILDOCS_MAX_UPLOAD_SIZE
+    try:
+        upload.name = check_document(read_upload(upload, limit), upload.name, max_bytes=limit)
+    except UploadRefused as refusal:
+        raise ValidationError({"file": refusal.message}) from None
+    stored: tuple[Any, str] | None = None
+    try:
+        with transaction.atomic():
+            locked = _lock_profile_vendor(vendor, actor)
+            root = ImageCollection.get_first_root_node()
+            target = root if dry_run else vendor_logo_collection(locked)
+            document = get_document_model()(
+                title=(title.strip() or "Document")[:255],
+                file=upload,
+                collection=target,
+                uploaded_by_user=actor,
+            )
+            if dry_run:
+                return document
+            document.save()
+            stored = (document.file.storage, document.file.name)
+            record(
+                ctx,
+                MEDIA_UPLOADED,
+                MODEL_LABEL,
+                str(vendor.public_id),
+                None,
+                {
+                    "document": f"document:{document.pk}",
+                    "title": document.title,
+                    "vendor": str(vendor.public_id),
+                },
+            )
+    except BaseException:
+        if stored is not None:  # the row rolls back; the file would stay on disk
+            stored[0].delete(stored[1])
+        raise
+    return document
 
 
 class _PendingImage:
