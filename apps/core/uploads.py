@@ -54,7 +54,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Literal
 
-from PIL import GifImagePlugin, Image, ImageCms, JpegImagePlugin
+from PIL import GifImagePlugin, Image, ImageCms, ImageFile, JpegImagePlugin
 
 # Format (as Pillow names it) → stored extension; and the extensions accepted for each format.
 IMAGE_FORMATS = {"JPEG": "jpg", "PNG": "png", "GIF": "gif", "WEBP": "webp", "AVIF": "avif"}
@@ -254,6 +254,7 @@ def _open(data: bytes, limits: ImageLimits) -> Image.Image:
     # Pillow's decompression-bomb warning is an error here. Its threshold, `MAX_IMAGE_PIXELS`, is
     # set once at startup to the decode cap (`configure_pillow`, from `CoreConfig.ready`), so it
     # refuses nothing the cap accepts. The cap itself is `_check_size`, which does not rely on it.
+    ensure_strict_decoding()
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
@@ -274,6 +275,17 @@ def configure_pillow(max_pixels: int) -> None:
     the process (renditions, imports) on the same threshold whatever ran before.
     """
     Image.MAX_IMAGE_PIXELS = max_pixels
+    ensure_strict_decoding()
+
+
+def ensure_strict_decoding() -> None:
+    """Make Pillow refuse truncated data (its default).
+
+    WeasyPrint sets `ImageFile.LOAD_TRUNCATED_IMAGES = True` process-wide when imported, which
+    would let a truncated or text-bomb PNG through the upload guard. Called at startup and after
+    the document renderer imports WeasyPrint.
+    """
+    ImageFile.LOAD_TRUNCATED_IMAGES = False
 
 
 def _format_of(image: Image.Image) -> str:
@@ -356,6 +368,7 @@ def _open_checked(
 
 
 def _load(image: Image.Image, frames: int) -> None:
+    ensure_strict_decoding()
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
@@ -569,6 +582,7 @@ def _animation(source: Image.Image, fmt: str, frames: int, limits: ImageLimits) 
     to_srgb = _ColourConverter()
     sequence: list[Image.Image] = []
     durations: list[int] = []
+    ensure_strict_decoding()
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)

@@ -45,6 +45,22 @@ def test_memory_sender_keeps_what_it_sends_with_a_provider_id() -> None:
     assert sender.sent == []
 
 
+def test_an_email_has_no_attachment_unless_given_one() -> None:
+    assert _email().attachments == ()
+    attachment = mail.Attachment(filename="a.pdf", content_type="application/pdf", content=b"%PDF")
+    with_file = mail.OutgoingEmail(**{**_email().__dict__, "attachments": (attachment,)})
+    assert with_file.attachments == (attachment,)
+
+
+def test_console_sender_lists_attachments_without_printing_their_bytes() -> None:
+    stream = io.StringIO()
+    attachment = mail.Attachment(filename="a.pdf", content_type="application/pdf", content=b"%PDF")
+    email = mail.OutgoingEmail(**{**_email().__dict__, "attachments": (attachment,)})
+    mail.ConsoleEmailSender(stream).send(email)
+    assert "a.pdf" in stream.getvalue()
+    assert "%PDF" not in stream.getvalue()
+
+
 def test_memory_sender_raises_the_scripted_failures_in_order_then_sends() -> None:
     sender = mail.MemoryEmailSender()
     sender.fail_next(mail.TransientSendError("timeout"), mail.PermanentSendError("rejected"))

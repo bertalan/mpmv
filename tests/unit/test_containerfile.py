@@ -126,6 +126,31 @@ def test_static_files_are_collected_at_build_time(instructions: list[Instruction
     assert any("collectstatic" in run and "--noinput" in run for run in runs)
 
 
+PDF_PACKAGES = (
+    "libpango-1.0-0",
+    "libpangoft2-1.0-0",
+    "libharfbuzz-subset0",
+    "fontconfig",
+    "fonts-dejavu-core",
+)
+
+
+def test_runtime_installs_only_the_pdf_packages_and_cleans_apt_lists(
+    instructions: list[Instruction],
+) -> None:
+    """ORD.9 3/3, ADR-0010: the minimum system libraries for WeasyPrint, in the runtime stage
+    only (no build tools), recommends off, apt lists removed in the same layer."""
+    runtime, build = stages(instructions)[-1], stages(instructions)[1]
+    assert not [i for i in build if i.keyword == "RUN" and "apt-get" in i.args]
+    installs = [i.args for i in runtime if i.keyword == "RUN" and "apt-get install" in i.args]
+    assert len(installs) == 1
+    install = installs[0]
+    assert "--no-install-recommends" in install
+    assert "rm -rf /var/lib/apt/lists/*" in install
+    packages = set(install.split("apt-get install", 1)[1].split("&&")[0].split())
+    assert {p for p in packages if not p.startswith("-")} == set(PDF_PACKAGES)
+
+
 def test_final_stage_runs_as_a_non_root_user(instructions: list[Instruction]) -> None:
     final = stages(instructions)[-1]
     users = [i.args.split(":")[0] for i in final if i.keyword == "USER"]

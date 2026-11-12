@@ -857,6 +857,47 @@ def enqueue_email(
     return changeset
 
 
+class AttachmentUnavailable(Exception):
+    """An attachment cannot be built; the email goes out without it. The message is stored in the
+    email's history, so it must say why without any personal data."""
+
+
+#: Builds one attachment from the reference in the email context and the recipient it is
+#: addressed to, which it must check (ORD.9 3/3).
+AttachmentBuilder = Callable[[str, str], mail.Attachment]
+_ATTACHMENT_BUILDERS: dict[str, AttachmentBuilder] = {}
+
+
+def register_email_attachment(kind: str, builder: AttachmentBuilder) -> None:
+    """Let an app attach a file to its emails without `core` importing it. An email asks for one
+    with `context["attachment"] = {"kind": kind, "ref": "<reference>"}`; the file is built when
+    the email is sent (in the queue worker), never stored, and never put in the outbox row."""
+    _ATTACHMENT_BUILDERS[kind] = builder
+
+
+def _attachments(
+    context: Mapping[str, Any], recipient: str
+) -> tuple[tuple[mail.Attachment, ...], str]:
+    """The attachment an email asks for, and the history note when it is left out: the email is
+    sent without it (never blocked) if it cannot be built."""
+    marker = context.get("attachment")
+    if not isinstance(marker, dict):
+        return (), ""
+    kind, ref = str(marker.get("kind", "")), str(marker.get("ref", ""))
+    builder = _ATTACHMENT_BUILDERS.get(kind)
+    if builder is None:
+        logger.warning("email attachment kind %r is not registered", kind)
+        return (), "attachment omitted: unknown kind"
+    try:
+        return (builder(ref, recipient),), ""
+    except AttachmentUnavailable as exc:
+        logger.warning("email attachment %s omitted: %s", kind, exc)
+        return (), f"attachment omitted: {exc}"
+    except Exception as exc:
+        logger.exception("email attachment %s failed", kind)
+        return (), f"attachment omitted: {type(exc).__name__}"
+
+
 def _attempt(email: OutboxEmail, *, dry_run: bool) -> str:
     """Try to send `email`, updating its fields; return the history detail."""
     status = OutboxEmail.Status
@@ -877,6 +918,7 @@ def _attempt(email: OutboxEmail, *, dry_run: bool) -> str:
         email.status = status.SENT
         return ""
     email.attempts += 1
+    attachments, note = _attachments(email.context_data, email.recipient)
     outgoing = mail.OutgoingEmail(
         recipient=email.recipient,
         from_address=settings.DEFAULT_FROM_EMAIL,
@@ -884,6 +926,7 @@ def _attempt(email: OutboxEmail, *, dry_run: bool) -> str:
         text_body=rendered.text_body,
         html_body=rendered.html_body,
         idempotency_key=str(email.public_id),
+        attachments=attachments,
     )
     now = timezone.now()
     try:
@@ -905,7 +948,7 @@ def _attempt(email: OutboxEmail, *, dry_run: bool) -> str:
         email.status, email.sent_at = status.SENT, now
         email.provider_message_id = result.provider_message_id
         email.next_attempt_at, email.last_error = None, ""
-        return ""
+        return note
     return email.last_error
 
 
