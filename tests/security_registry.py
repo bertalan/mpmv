@@ -47,6 +47,10 @@ PUBLIC: dict[str, str] = {
     "readyz": "Readiness probe: a status only, no data.",
     "robots_txt": "robots.txt (SEO.8): constant text for crawlers, no vendor data.",
     "email_webhook": "Email provider feedback: refused unless the payload is signed (ARC.16).",
+    "payments_webhook": (
+        "Payment provider events (PAY.2): refused unless the payload is signed and fresh; with "
+        "no provider configured it answers 404."
+    ),
     "home": "Public home page.",
     "media": MEDIA,
     "catalog:category": PUBLIC_CATALOG,
@@ -127,6 +131,10 @@ PUBLIC: dict[str, str] = {
 # Views that do not check the CSRF token, and what protects them instead.
 CSRF_EXEMPT: dict[str, str] = {
     "email_webhook": "Server-to-server call from the email provider, verified by its signature.",
+    "payments_webhook": (
+        "Server-to-server call from the payment provider, verified by its signature and a "
+        "timestamp tolerance (PAY.2)."
+    ),
 }
 # Every API v1 operation (django-ninja) is CSRF-exempt: it authenticates with a bearer API key
 # only (CORE.13), never with the session cookie, so a cross-site form cannot act through it.
