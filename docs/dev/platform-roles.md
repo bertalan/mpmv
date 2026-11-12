@@ -7,10 +7,10 @@
 | Role | Group | Permissions |
 |---|---|---|
 | Configuration and tax | Platform: configuration and tax | `manager.platform_config` |
-| Catalog and moderation | Platform: catalog and moderation | `manager.platform_catalog`, `vendors.view_all_vendors`, `vendors.revert_storefront_profile` |
+| Catalog and moderation | Platform: catalog and moderation | `manager.platform_catalog`, `vendors.view_all_vendors`, `vendors.revert_storefront_profile`, `wagtailadmin.access_admin` |
 | Finance and payments | Platform: finance and payments | `manager.platform_finance`, `vendors.view_all_vendors` |
 | Support | Platform: support | `manager.platform_support`, `vendors.view_all_vendors` |
-| Platform owner | Platform: owner | `core.platform_owner`, `vendors.view_all_vendors`, `vendors.revert_storefront_profile` |
+| Platform owner | Platform: owner | `core.platform_owner`, `vendors.view_all_vendors`, `vendors.revert_storefront_profile`, `wagtailadmin.access_admin` |
 
 Incompatible pairs (refused unless the one-person-team setting is on): Configuration and tax + Finance and payments.
 
