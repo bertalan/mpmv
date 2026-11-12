@@ -55,6 +55,7 @@ PRIVATE_PATHS = (
     "/admin/",
     "/i18n/",
     "/api/",
+    "/_links/",  # temporary staff "Site links" page (OPS.12); remove before LIVE
 )
 
 

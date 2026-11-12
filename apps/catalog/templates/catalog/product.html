@@ -1,0 +1,95 @@
+{% extends "layouts/base.html" %}
+{% load i18n l10n static responsive_images wagtailcore_tags %}
+{% comment %}
+  Product page (CAT.7). Semantic and unstyled beyond catalog/product.css; THM.7 restyles it. No
+  inline script or style (the CSP has no 'unsafe-inline'). Shows published data only: the
+  `ProductPage` built by `product_pages.find`. The price is the listings' interim net price
+  (TODO(TAX.12): the gross amount at the delivery country's rate replaces it, see
+  includes/product_card.html). The cart is not built yet: the variant choice and the buy button
+  are a disabled placeholder (no form until the cart exists). `related` (CAT.15) holds the related products and other sellers.
+{% endcomment %}
+{% block title %}{{ page_data.title }}{% if site_name %} · {{ site_name }}{% endif %}{% endblock %}
+{% block description %}{% if page_data.short_description %}<meta name="description" content="{{ page_data.short_description }}">{% endif %}{% endblock %}
+{% block head %}
+  {% robots_meta robots %}
+  <link rel="canonical" href="{{ canonical_url }}">
+  {% for lang, url in alternates %}<link rel="alternate" hreflang="{{ lang }}" href="{{ url }}">
+  {% endfor %}
+  <link rel="stylesheet" href="{% static 'catalog/product.css' %}">
+  {% if jsonld %}<script type="application/ld+json">{{ jsonld|safe }}</script>{% endif %}
+{% endblock %}
+{% block content %}
+  <article class="product-page">
+    <header class="product-header">
+      <h1>{{ page_data.title }}</h1>
+      {% if page_data.is_fallback %}<p class="product-notice" role="note">{% translate "This page is not available in your language yet." %}</p>{% endif %}
+      {% if page_data.short_description %}<p class="product-teaser">{{ page_data.short_description }}</p>{% endif %}
+    </header>
+
+    {% if page_data.gallery %}
+      <section class="product-gallery" aria-labelledby="product-gallery-heading">
+        <h2 id="product-gallery-heading" class="visually-hidden">{% translate "Product images" %}</h2>
+        <ul>
+          {% for item in page_data.gallery %}<li>{% responsive_image item.image "content" alt=item.alt %}</li>{% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    <section class="product-buy" aria-labelledby="product-buy-heading">
+      <h2 id="product-buy-heading" class="visually-hidden">{% translate "Price and availability" %}</h2>
+      <p class="product-sku">{% translate "SKU" %}: <span class="product-sku-value">{{ page_data.product.sku }}</span></p>
+      {% if page_data.retired %}
+        <p class="product-retired" role="note">{% translate "This product is no longer available." %}</p>
+      {% elif page_data.on_request %}
+        <p class="product-price">{% translate "Price on request" %}</p>
+        <p class="product-on-request">{% blocktranslate with vendor=page_data.vendor.display_name %}Ask {{ vendor }} about this product: it is not sold online.{% endblocktranslate %}</p>
+      {% else %}
+        {% if not page_data.variants %}
+          <p class="product-price">{% if page_data.price is not None %}<data value="{{ page_data.price|unlocalize }}">{{ currency }} {{ page_data.price }}</data> <small>{% translate "excl. VAT" %}</small>{% endif %}</p>
+          <p class="product-stock">{% include "catalog/includes/stock_status.html" with status=page_data.stock_status %}</p>
+        {% endif %}
+        <div class="product-form">
+          {% if page_data.variants %}
+            <fieldset class="product-variants">
+              <legend>{% translate "Choose a version" %}</legend>
+              <ul>
+                {% for variant in page_data.variants %}
+                  <li>
+                    <input type="radio" name="variant" id="variant-{{ forloop.counter }}" value="{{ variant.sku }}"{% if variant.selected %} checked{% endif %}>
+                    <label for="variant-{{ forloop.counter }}">{{ variant.label }}{% if variant.price is not None %} <span class="variant-price"><data value="{{ variant.price|unlocalize }}">{{ currency }} {{ variant.price }}</data> <small>{% translate "excl. VAT" %}</small></span>{% endif %} <span class="variant-stock">{% include "catalog/includes/stock_status.html" with status=variant.stock_status %}</span> <span class="variant-sku">({{ variant.sku }})</span></label>
+                  </li>
+                {% endfor %}
+              </ul>
+            </fieldset>
+          {% endif %}
+          <button type="button" disabled aria-disabled="true">{% translate "Add to cart" %}</button>
+          <p class="product-form-note">{% translate "Buying online opens soon." %}</p>
+        </div>
+      {% endif %}
+      <p class="product-vendor">{% translate "Sold by" %} <a href="{{ vendor_url }}">{{ page_data.vendor.display_name }}</a></p>
+    </section>
+
+    {% if page_data.description %}
+      <section class="product-description" aria-labelledby="product-description-heading"{% if page_data.is_fallback %} lang="{{ page_data.shown }}"{% endif %}>
+        <h2 id="product-description-heading">{% translate "Description" %}</h2>
+        <div>{{ page_data.description|richtext }}</div>
+      </section>
+    {% endif %}
+
+    {% if page_data.companion %}
+      <aside class="product-companion" aria-labelledby="product-companion-heading">
+        <h2 id="product-companion-heading">{% translate "Needed with this product" %}</h2>
+        {% include "catalog/includes/product_card.html" with card=page_data.companion %}
+      </aside>
+    {% endif %}
+
+    {% if related %}
+      <section class="product-related" aria-labelledby="product-related-heading">
+        <h2 id="product-related-heading">{% translate "You may also like" %}</h2>
+        <ul class="product-grid">
+          {% for card in related %}<li>{% include "catalog/includes/product_card.html" %}</li>{% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+  </article>
+{% endblock %}

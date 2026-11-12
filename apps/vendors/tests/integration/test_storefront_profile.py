@@ -350,3 +350,28 @@ def test_the_vendor_limit_is_per_vendor(owner: User, vendor: Vendor, settings: o
     VendorMemberFactory.create(vendor=other, user=owner, role="owner")
     save_storefront_profile(vendor, "en", {"tagline": "a"}, actor=owner, ctx=CTX)
     save_storefront_profile(other, "en", {"tagline": "a"}, actor=owner, ctx=CTX)
+
+
+def test_the_policy_headings_are_translated_in_italian(vendor: Vendor) -> None:
+    """The Manager help texts quote these headings, so the Italian shop must show them."""
+    from django.utils import translation
+
+    from apps.core.models import TranslationStatus
+    from apps.vendors.services import storefront_profile
+
+    VendorTranslationFactory.create(
+        vendor=vendor,
+        language="en",
+        status=TranslationStatus.PUBLISHED,
+        shipping_policy="Ships in 3 days",
+        refund_policy="Refunds in 14 days",
+        cancellation_policy="Cancel before shipping",
+    )
+    with translation.override("it"):
+        profile = storefront_profile(vendor, "en")
+    assert profile is not None
+    assert [title for title, _body in profile.policies] == [
+        "Spedizione",
+        "Resi e rimborsi",
+        "Annullamento",
+    ]

@@ -30,6 +30,7 @@ from apps.api.tests.factories import ApiClientFactory, ApiRateCounterFactory
 from apps.cart.models import CartLine
 from apps.cart.tests.factories import CartLineFactory
 from apps.catalog.models import (
+    BrandBatch,
     PriceHistory,
     Product,
     ProductAttribute,
@@ -41,6 +42,7 @@ from apps.catalog.models import (
     VariantTranslation,
 )
 from apps.catalog.tests.factories import (
+    BrandBatchFactory,
     PriceHistoryFactory,
     ProductAttributeFactory,
     ProductFactory,
@@ -62,6 +64,7 @@ from apps.compliance.models import (
     StatementOfReasons,
     TransparencySubmission,
     VendorGpsrDefaults,
+    WithdrawalStatement,
 )
 from apps.compliance.tests.factories import (
     GpsrInfoFactory,
@@ -71,6 +74,7 @@ from apps.compliance.tests.factories import (
     StatementOfReasonsFactory,
     TransparencySubmissionFactory,
     VendorGpsrDefaultsFactory,
+    WithdrawalStatementFactory,
 )
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
@@ -202,6 +206,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
             product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
         )
     ),
+    BrandBatch: lambda vendor: BrandBatchFactory.create(vendor=vendor),
     SkuAlias: lambda vendor: renamed_product_alias(vendor),
     ProductAttribute: lambda vendor: ProductAttributeFactory.create(
         product=ProductFactory.create(vendor=vendor)
@@ -233,6 +238,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ),
     TransparencySubmission: lambda vendor: TransparencySubmissionFactory.create(
         statement=StatementOfReasonsFactory.create(vendor=vendor)
+    ),
+    WithdrawalStatement: lambda vendor: WithdrawalStatementFactory.create(
+        vendor_order=VendorOrderFactory.create(vendor=vendor)
     ),
     ShippingZone: lambda vendor: ShippingZoneFactory.create(vendor=vendor),  # a vendor zone
     ShippingMethod: lambda vendor: ShippingMethodFactory.create(vendor=vendor),
@@ -278,6 +286,20 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
 # Models with a ForeignKey chain to Vendor that are deliberately not vendor-scoped, by label,
 # with the reason.
 NOT_VENDOR_OWNED: dict[str, str] = {
+    "vendors.CommissionRule": (
+        "Platform pricing configuration managed by staff only (VEN.2): the optional vendor is "
+        "the rule's target, not an owner; no vendor endpoint lists or edits commission rules."
+    ),
+    "catalog.Brand": (
+        "Shared catalog entity (CAT.20): approved brands are platform-wide and public; "
+        "`proposed_by` and `batch` only say who proposed a pending brand. Another vendor's "
+        "pending brand is hidden by `brands.brand_choices` and `Product.clean`, and the public "
+        "brand page serves approved brands only; vendors never edit brands."
+    ),
+    "catalog.BrandTranslation": (
+        "Storefront texts of a shared brand (CAT.20); reaches a vendor only through the brand "
+        "that vendor proposed, and is edited by staff only."
+    ),
     "catalog.Redirect": (
         "Platform SEO rule managed by staff only (CAT.6): its optional target product is where a "
         "legacy URL lands, not an owner; no vendor endpoint lists or edits redirects."
@@ -322,6 +344,25 @@ def vendor_image(vendor: Vendor) -> models.Model:
     return MediaImageFactory.create(collection=collection)
 
 
+def vendor_document(vendor: Vendor) -> models.Model:
+    """A PDF document in the vendor's own collection (VEN.31 part 2)."""
+    from django.core.files.base import ContentFile
+    from wagtail.documents import get_document_model
+    from wagtail.models import Collection
+
+    from apps.vendors.engine import vendor_collection_name
+    from tests.upload_corpus import PDF
+
+    root = Collection.get_first_root_node()
+    collection = root.add_child(name=vendor_collection_name(str(vendor.public_id)))
+    # A title unique per vendor, so a page that echoes the caller's own document
+    # cannot be mistaken for a leak of the other vendor's (the image factory does the same).
+    document = get_document_model()(title=f"Terms {vendor.public_id}", collection=collection)
+    document.file.save("terms.pdf", ContentFile(PDF), save=False)
+    document.save()
+    return document  # type: ignore[no-any-return]
+
+
 def by_pk(obj: models.Model) -> dict[str, str]:
     return {"pk": str(obj.pk)}
 
@@ -349,6 +390,12 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "home": NoVendorData("Public home page."),
     "catalog:category": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "product-category"}),
+    "catalog:product": NoVendorData(
+        "Public product page (CAT.7): only the published fields of a published product of an "
+        "active vendor, the same for every visitor; Vendor B is not active, so its products are "
+        "a 404.",
+        kwargs={"segment": "product"},
+    ),
     "catalog:brand": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "brand"}),
     "catalog:term": NoVendorData(PUBLIC_LISTING, login=member_with_landing_taxonomy),
     "catalog:vendor": NoVendorData(
@@ -358,11 +405,15 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
     "themes:styleguide": StaffOnly("Component samples of the active theme (THM.4), staff only."),
+    "site_links": StaffOnly(
+        "Temporary list of the site's pages for STAGE testing (OPS.12), staff only; a signed-in "
+        "non-staff user gets 404."
+    ),
     "levels:options": NoVendorData(OWN_ACCOUNT),
-    "levels:operational": NoVendorData(OWN_ACCOUNT),
+    "levels:window": NoVendorData(OWN_ACCOUNT),
     "levels:once_options": NoVendorData(OWN_ACCOUNT),
     "levels:once": NoVendorData(OWN_ACCOUNT),
-    "levels:end": NoVendorData(OWN_ACCOUNT),
+    "levels:close": NoVendorData(OWN_ACCOUNT),
     "mfa:overview": NoVendorData(OWN_ACCOUNT),
     "mfa:setup": NoVendorData(OWN_ACCOUNT),
     "mfa:totp": NoVendorData(OWN_ACCOUNT),
@@ -404,6 +455,10 @@ ENDPOINTS: dict[str, Access] = {
         "that account it shows only the generic 'link not valid' page.",
         kwargs={"user_key": "00000000-0000-0000-0000-000000000000"},
     ),
+    "help_entry": NoVendorData(
+        "Contextual help (ARC.32): the platform's help text for a screen, the same for every "
+        "signed-in caller; reads no vendor data."
+    ),
     "geocoding_find": NoVendorData(
         "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
     ),
@@ -429,6 +484,26 @@ ENDPOINTS: dict[str, Access] = {
         "goes into the caller's own collection only; owner only, other roles get 404 "
         "(`test_staff_and_other_users_get_404...` and the upload tests in test_image_chooser)."
     ),
+    # The document chooser and the link dialog of the same editor (VEN.31 part 2).
+    "manager:shop:document_chosen": VendorScoped(make=vendor_document, kwargs=by_pk),
+    "manager:shop:document_choose": VendorScopedList(
+        make=vendor_document,
+        identify=lambda o: str(o.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:document_results": VendorScopedList(
+        make=vendor_document,
+        identify=lambda o: str(o.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:document_create": NoVendorData(
+        "The upload tab of the document chooser (VEN.31): the form and the upload answer, the "
+        "file goes into the caller's own collection only; owner only, other roles get 404 "
+        "(`test_staff_and_other_users_get_404...` in test_document_chooser)."
+    ),
+    "manager:shop:link_choose": NoVendorData(
+        "The external link dialog (VEN.31): a form that echoes an https address back to the "
+        "editor; reads and writes no vendor data; owner only "
+        "(`test_staff_and_anonymous_are_refused`)."
+    ),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # ORD.6: the vendor's own orders; another vendor's id is a 404 on the detail and every action.
     "manager:shop:orders": VendorScopedList(
@@ -444,6 +519,20 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
+    ),
+    "manager:platform:profile_changes": StaffOnly(
+        "Storefront profile history (CORE.9): platform staff holding the revert permission only; "
+        "a vendor member gets 403 on the platform space, so no vendor sees any history."
+    ),
+    "manager:platform:profile_confirm": StaffOnly(
+        "Confirm of one logo change (CORE.9): platform staff holding the revert permission only, "
+        "POST only.",
+        kwargs={"entry": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "manager:platform:profile_revert": StaffOnly(
+        "Revert of one storefront profile change (CORE.9): platform staff holding the revert "
+        "permission only, POST only.",
+        kwargs={"entry": "00000000-0000-0000-0000-000000000000"},
     ),
     "manager:platform:notices": StaffOnly(
         "Notices of illegal content (CMP.5): platform data, not vendor-owned; needs the "
@@ -471,6 +560,17 @@ ENDPOINTS: dict[str, Access] = {
     "privacy_erase_done": NoVendorData(
         "Static confirmation page after an erasure request (CMP.4): no data."
     ),
+    "customer_orders": NoVendorData(
+        "The signed-in customer's own orders (ORD.7): the queryset starts from the caller's "
+        "orders (`test_the_list_shows_only_the_callers_orders`); a vendor part shows the vendor's "
+        "public display name only, never its members, commission or notes."
+    ),
+    "customer_order": NoVendorData(
+        "One of the signed-in customer's own orders (ORD.7): a stranger's order, a guest order "
+        "and an unknown id all answer 404 "
+        "(`test_a_stranger_s_order_is_a_404_like_an_unknown_one`).",
+        kwargs={"public_id": NIL_UUID},
+    ),
     "privacy_requests": StaffOnly(
         "Erasure requests (CMP.4): platform data listed by public id; needs "
         "compliance.change_erasurerequest, so a vendor member gets 404."
@@ -486,6 +586,20 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "dsa_notice_received": NoVendorData(
         "Thanks page after a report (CMP.5): shows only the reference kept in the session."
+    ),
+    "withdrawal": NoVendorData(
+        "Online withdrawal, step one (CMP.6): no vendor data without the order number and email "
+        "of a contract; captcha and a rate limit guard the POST."
+    ),
+    "withdrawal_confirm": NoVendorData(
+        "Online withdrawal, step two (CMP.6): POST only, answers 405 to a GET; a signed token "
+        "names one order and every chosen vendor order must belong to it."
+    ),
+    "withdrawal_done": NoVendorData(
+        "Withdrawal acknowledgement (CMP.6): shows only the statements kept in the session."
+    ),
+    "consumer_information": NoVendorData(
+        "Pre-contractual information (CMP.6): platform-wide legal text, no vendor data."
     ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),

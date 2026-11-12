@@ -1,4 +1,4 @@
-"""Session level endpoints (D-32, CORE.25): elevate with a fresh passkey, "do it once", end now.
+"""Passkey window endpoints (D-32, CORE.25): open with a fresh passkey, "do it once", close now.
 
 Thin adapters over `levels`. The passkey ceremony is the one of the MFA pages, with user
 verification required; the challenge is kept in the session and used once. A session without the
@@ -70,7 +70,8 @@ def _require_elevate(request: HttpRequest) -> None:
         raise PermissionDenied
 
 
-# Groups 2 and 3 may be done once; group 3 only with its own fresh passkey assertion with user
+# Sensitive and critical actions (groups 2 and 3) may be done once; a critical one only with its
+# own fresh passkey assertion with user
 # verification (every `_assert` requires it, bound to this action and digest, single use, 120 s).
 ONCE_GROUPS = (2, 3)
 DIGEST = re.compile(r"[0-9a-f]{64}")
@@ -78,31 +79,31 @@ DIGEST = re.compile(r"[0-9a-f]{64}")
 
 @not_anonymous(
     reason="signed in, a verified second factor and the elevate permission are required",
-    purpose="Passkey options to start operational mode",
+    purpose="Passkey options to open the passkey window",
     task="CORE.25",
 )
 @signed_in
 @require_POST
 def options(request: HttpRequest) -> JsonResponse:
-    """Passkey request options for switching to operational mode. A challenge alone grants
-    nothing: `operational` checks the role and verifies the assertion."""
+    """Passkey request options for opening the passkey window. A challenge alone grants
+    nothing: `window` checks the role and verifies the assertion."""
     return _options(request, levels.CHALLENGE_KEY, None)
 
 
 @not_anonymous(
     reason="signed in, a verified second factor and the elevate permission are required",
-    purpose="Start operational mode with a passkey",
+    purpose="Open the passkey window with a passkey",
     task="CORE.25",
 )
 @signed_in
 @require_POST
-def operational(request: HttpRequest) -> JsonResponse:
-    """Verify a fresh passkey assertion and start operational mode."""
+def window(request: HttpRequest) -> JsonResponse:
+    """Verify a fresh passkey assertion and open the passkey window."""
     _require_elevate(request)
     result = _assert(request, levels.CHALLENGE_KEY)
     if isinstance(result, JsonResponse):
         return result
-    levels.start_operational(request)
+    levels.open_window(request)
     return JsonResponse({"redirect": safe_next(request)})
 
 
@@ -150,12 +151,12 @@ def once(request: HttpRequest) -> JsonResponse:
 
 @not_anonymous(
     reason="signed in, a verified second factor and the elevate permission are required",
-    purpose="End operational mode",
+    purpose="Close the passkey window",
     task="CORE.25",
 )
 @signed_in
 @require_POST
-def end(request: HttpRequest) -> HttpResponse:
-    """The banner's "end now" button."""
-    levels.end_operational(request, "manual")
+def close(request: HttpRequest) -> HttpResponse:
+    """The banner's "Close now" button."""
+    levels.close_window(request, "manual")
     return HttpResponseRedirect(safe_next(request))
