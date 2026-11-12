@@ -383,6 +383,7 @@ ENDPOINTS: dict[str, Access] = {
     "readyz": NoVendorData("Readiness probe: a status only, no data."),
     "robots_txt": NoVendorData("robots.txt (SEO.8): constant text for crawlers; no vendor data."),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
+    "payments_webhook": NoVendorData("Signed payment provider events; answers with a status only."),
     "media": NoVendorData(
         "Public image files (THM.12): published images and their renditions, no vendor data.",
         kwargs={"path": "images/missing.webp"},
