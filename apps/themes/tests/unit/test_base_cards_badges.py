@@ -20,6 +20,8 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 from apps.themes.build import render_themes
 from apps.themes.tests.builders import SHIPPED_THEMES
 
+pytestmark = pytest.mark.usefixtures("english_interface")
+
 INTERACTIVE = re.compile(r"<(?:a|button|input|select|textarea|details)[\s>]")
 
 

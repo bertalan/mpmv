@@ -12,6 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from django_otp.models import Device, ThrottlingMixin
 
 from apps.core.fields import LanguageField
+from apps.core.i18n import primary_language
 from apps.core.models import BaseModel
 
 from . import engine
@@ -61,7 +62,7 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         ),
     )
     full_name = models.CharField(max_length=150, blank=True)
-    preferred_language = LanguageField(default=settings.LANGUAGE_CODE)
+    preferred_language = LanguageField(default=primary_language)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False, help_text="Can log into the staff admin.")
     date_joined = models.DateTimeField(default=timezone.now)
