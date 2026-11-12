@@ -1,0 +1,1 @@
+{% load i18n %}{% blocktranslate %}Order {{ order_number }}: part of your order was cancelled{% endblocktranslate %}
