@@ -4,8 +4,9 @@
 > design from the owner's idea (issue #86). Decided: the **whole garage is P1, before opening**, built
 > in slices that merge one by one (§17.13); the seller wording is "Compatibility declared by the
 > seller" (Q-G8); the fitment-relevant categories are an operator setting seeded with none (Q-G4).
-> Open and with counsel, not blockers: Q-G1 (anonymous cookie) and Q-G2 (filter, Omnibus, DSA art. 27);
-> the design takes the prudent option meanwhile. The text is sector-neutral on purpose: the wording
+> Counsel answered Q-G1 and Q-G2 (adviser opinion 2026-11-11; owner, 2026-11-11): the anonymous garage cookie is
+> technical and needs no consent on the conditions of §17.4.2, and the Garage filter is described
+> on the ranking page and in the terms. Q-G8 adds the vehicle snapshot on the order (§17.4.6). The text is sector-neutral on purpose: the wording
 > is "item", "make", "model", "variant" and "year range". A vertical theme or the operator's
 > configuration supplies the real nouns.
 
@@ -43,7 +44,7 @@ Design principles (each one is argued in the sections that follow):
 Summary of what this proposal asks lane-a to decide, in one place (full list in §17.12):
 a new app `fitment`, a new prefix `FIT`, P1 in slices (owner, Q-G3), with the legacy `compatibility`
 terms converted by FIT.15 before cutover, filter over ranking, anonymous garage in one
-first-party cookie that asks consent until counsel confirms the user-interface-customisation exemption, no per-node
+first-party technical cookie without a consent gate (Q-G1, decided 2026-11-11), no per-node
 generated pages.
 
 ## 17.2 Data model
@@ -297,16 +298,16 @@ Anonymous visitors can use the garage without an account. The proposal is **one 
 cookie, written only after an explicit user action** (pressing *Save* in the chooser), never at
 first visit:
 
-- cookie `mpmv_garage`: a versioned JSON of at most 2 KB, holding up to 3 profiles
-  `{node id, year, name}` and which one is active. **No identifier, no session id, no counter.** It is
-  `Secure`, `SameSite=Lax`, `Path=/`, not readable by third parties, 180 days from the last change
-  (a setting);
+- cookie `mpmv_garage`: a versioned JSON of at most 2 KB, holding up to 3 vehicles
+  `{node id, year}` (make, model and year only, Q-G1) and which one is active. **No identifier, no
+  session id, no counter, no free-text name.** It is `Secure`, `SameSite=Lax`, `Path=/`, not readable
+  by third parties, 180 days from the last change (a setting, capped at 12 months);
 - the server reads it on each request and **never stores it**: nothing about an anonymous
   garage is written to the database or to logs (the request log does not record the cookie value);
 - every value is validated like hostile input (SEC.5): integers only, node must exist and be active,
-  name NFC-normalised, 40 characters, HTML-escaped on output; an invalid cookie is ignored and cleared;
-- a footer and a menu link *Forget my garage* removes it at once, with no confirmation text that
-  has to be read.
+  a cookie carrying any other field (a name included) is invalid; an invalid cookie is ignored and cleared;
+- a visible *Remove vehicle* button next to each saved vehicle, and a footer and menu link *Forget
+  my garage*, remove it at once, with no confirmation text that has to be read.
 
 Why a cookie and not `localStorage` or a server-side session: the server must know the active
 profile on the first byte of a server-rendered page (no flash of the unfiltered list, works without
@@ -324,12 +325,13 @@ The condition list that keeps it inside the exemption: set only on the explicit 
 selection inside, no identifier, never read by analytics, advertising or the Consent Mode tags
 (SEO.5), duration tied to the purpose, plain-language information next to the button
 ("This stays on this device so the shop remembers your choice. It is not used for anything else.").
-A setting `GARAGE_ANON_STORAGE` has three values: `consent` (**the default until counsel answers**:
-the *Save* button first asks for the CMP's functional/preferences category and, without it, the
-anonymous garage works for the current visit only), `exempt` (the cookie is written on the explicit
-action alone, switched on by the operator after counsel confirms the exemption) and `off` (current
-visit only, in a session cookie). Counsel answers Q-G1 (⚖️, owner handles it); the design does not
-wait for it and does not need a code change to move from `consent` to `exempt`.
+**Decided (owner, 2026-11-11, Q-G1, adviser opinion 2026-11-11):** the cookie is technical and needs no consent, on
+these conditions: written only on *Save*; it holds only make, model and year, no identifier; expiry
+at most 12 months; a visible *Remove vehicle* button; a label next to *Save* such as "Save this
+vehicle on this browser for your next visits (you can remove it at any time)". The "preferences"
+consent gate is dropped. A setting `GARAGE_ANON_STORAGE` keeps two values: `exempt` (the default:
+the cookie is written on the explicit action alone) and `off` (current visit only, in a session
+cookie).
 
 ### 17.4.3 Merge on login or sign-up
 
@@ -338,7 +340,7 @@ When a visitor with an anonymous garage signs in or creates an account:
 1. the server compares: if the cookie holds profiles that the account does not have (same node and
    year counts as the same), the next page shows one non-modal notice: *"You have 2 profiles saved on
    this device. Add them to your account? [Add] [Not now]"*;
-2. *Add* copies them (respecting the maximum; names kept, a numeric suffix on a clash), clears the
+2. *Add* copies them (respecting the maximum; named after the vehicle, a numeric suffix on a clash), clears the
    cookie, and the account's own active profile stays active; if the account has none, the cookie's
    active one becomes active;
 3. *Not now* leaves the cookie alone and asks again at the next sign-in, not on every page;
@@ -404,7 +406,7 @@ grids, blog index, event list) a region labelled "Garage" shows above the result
   deletion is one click, nothing is sent to third parties, logs and analytics do not carry it.
   A DPIA screening note is recorded (low risk, small-scale, no special category by default).
 
-### 17.4.6 The order keeps the fit answer, never the garage
+### 17.4.6 The order keeps the fit answer and the selected vehicle, never the garage
 
 **Decided (lane-a, 2026-11-10, Q-G6):** the fit answer shown at the moment of purchase is snapshotted on
 the order line, because it matters in returns and disputes and orders store snapshots by rule (spec 01).
@@ -415,6 +417,13 @@ order itself, follows the order's retention (D-29, D-30, D-31) and is exported w
 `orders` does not import `fitment`: the product page posts the snapshot as an opaque, validated JSON
 annotation through a small order-line annotation hook in `orders`, and an order line without one is
 normal (FIT.17). Vendors see the answer on the order line as seller-declared compatibility, nothing more.
+
+**Decided (Q-G8, adviser opinion 2026-11-11):** when a customer buys with an active garage vehicle, the order also
+snapshots that one vehicle (make, model, year, as labels at that time) and shows "Vehicle selected
+by the customer in the compatibility filter: <make, model, year> — compatibility declared by the
+vendor" in the order summary and in the emails to the customer and the vendor. The customer terms
+say that compatibility data is declared by the vendor and that an incompatibility is a conformity
+defect (Codice del consumo art. 129 and following) borne by the vendor (CMP.5).
 
 ## 17.5 How the garage is used
 
@@ -615,8 +624,8 @@ WHERE ps.always_visible
 | Rule | Does it apply | What the design does |
 |---|---|---|
 | **GDPR** (2016/679) | the account garage is personal data | §17.4.5: basis 6(1)(b), purposes limited, minimal data, retention, export and erasure, notice, no art. 22 decision, privacy by design, special-category switch |
-| **ePrivacy** art. 5(3) | storage on the terminal (the anonymous cookie, also `localStorage`) | explicit user action, no identifier, UI-customisation exemption argued (WP29 04/2012, EDPB 2/2023) but not relied on at launch: `GARAGE_ANON_STORAGE` defaults to `consent`, `exempt` once counsel agrees (Q-G1) |
-| **Omnibus** (2019/2161), Consumer Rights Directive art. 6(1)(ea) | main parameters of ranking of results presented after a search | Our reading: a filter the consumer chooses and can switch off is the consumer's own criterion, not a ranking the trader determines, and the order is unchanged. Nothing in this design boosts or demotes. To be safe the banner links to a "How the garage works" page, and the existing ranking page (CMP.5) states that fitment declaration affects what an active garage shows. **Counsel confirms (⚖️, Q-G2).** If a boost is ever added, art. 6(1)(ea) applies in full |
+| **ePrivacy** art. 5(3) | storage on the terminal (the anonymous cookie, also `localStorage`) | explicit user action, no identifier; technical cookie with no consent gate on the §17.4.2 conditions (Q-G1, decided: adviser opinion 2026-11-11); `GARAGE_ANON_STORAGE` defaults to `exempt` |
+| **Omnibus** (2019/2161), Consumer Rights Directive art. 6(1)(ea) | main parameters of ranking of results presented after a search | Our reading: a filter the consumer chooses and can switch off is the consumer's own criterion, not a ranking the trader determines, and the order is unchanged. Nothing in this design boosts or demotes. To be safe the banner links to a "How the garage works" page, and the existing ranking page (CMP.5) states that fitment declaration affects what an active garage shows. Counsel answered Q-G2 (adviser opinion 2026-11-11): the Garage filter is described on the "How we rank results" page and in the terms. If a boost is ever added, art. 6(1)(ea) applies in full |
 | **P2B** (2019/1150) art. 5 and 7 | the garage changes vendors' exposure | yes, in practice: an undeclared item is hidden under an active garage. The ranking/exposure page (CMP.5) lists "declared fitment and `universal` status" as a parameter and says how it works; no preferential treatment of the operator's own items (art. 7), tested by FIT.8 |
 | **DSA** art. 27 (recommender systems), art. 3(s) | a system that *suggests or prioritises* information | a user-chosen filter suggests and prioritises nothing, so we read it as out of scope; the "where items that fit are" and "Guides for your <item>" strips are deterministic and explained. Art. 27 sits in the section that micro and small platforms are exempt from (art. 19), but the terms (CMP.5) describe it anyway. Art. 38 (a non-profiling option) is met by the generic state. Art. 25 (dark patterns): no nag, no pre-selection. Art. 26(3): no advertising by profiling, no special-category data |
 | **UCPD** (2005/29/EC) | "fits your X" is a claim to the consumer | "Compatibility declared by the seller" (Q-G8), the `check` tier, `unknown` stated openly, no claim of certainty the data lacks; vendors answer for their declarations in the vendor terms, with the same notice-and-action path (CMP.5) for wrong fitment |
@@ -665,20 +674,20 @@ WHERE ps.always_visible
 
 | ID | Question | Proposal |
 |---|---|---|
-| Q-G1 ⚖️ | Counsel: is the anonymous garage cookie exempt from consent under the user-interface-customisation exemption, as designed? | **With counsel (owner handles it), not a blocker.** Prudent design: `GARAGE_ANON_STORAGE=consent` by default; `exempt` is an operator switch once counsel agrees |
-| Q-G2 ⚖️ | Counsel: confirm that a consumer-chosen filter is not a ranking under Omnibus art. 6(1)(ea) and not a recommender under DSA art. 27 | **With counsel, not a blocker.** The "How the garage works" page and the CMP.5 ranking and terms text are updated anyway (FIT.13) |
+| Q-G1 ✅ ⚖️ | Counsel: is the anonymous garage cookie exempt from consent under the user-interface-customisation exemption, as designed? | **Decided (owner, 2026-11-11, adviser opinion 2026-11-11):** technical cookie, no consent, on the conditions of §17.4.2 (written only on *Save*, make, model and year only, at most 12 months, a visible *Remove vehicle* button, the plain label); `GARAGE_ANON_STORAGE=exempt` by default and the `consent` mode is dropped (FIT.6) |
+| Q-G2 ✅ ⚖️ | Counsel: confirm that a consumer-chosen filter is not a ranking under Omnibus art. 6(1)(ea) and not a recommender under DSA art. 27 | **Decided (adviser opinion 2026-11-11):** the Garage filter is described on the "How we rank results" page and in the terms (FIT.13, CMP.5) |
 | Q-G3 ✅ | Priority and timing | **Decided (owner, 2026-11-10): P1, before opening, the whole garage** (not only the fit box), in the slices of §17.13 that merge one by one |
 | Q-G4 ✅ | Which categories are fitment-relevant? | **Decided (owner):** a setting the operator fills (fitment-relevant categories, stored as `FitmentCategory` rows, bulk-settable in the platform space), **seeded with none**: until the operator marks categories, the garage filters nothing |
 | Q-G5 ✅ | Undeclared items under an active garage: hidden and counted (proposal), or shown in a separate collapsed section? | **Decided (lane-a, 2026-11-10):** hidden and counted, with *Show all* |
 | Q-G6 ✅ | Should the fit answer shown at purchase be kept on the order line as dispute evidence? | **Decided (lane-a, 2026-11-10): yes**, the answer (tier, declared-by-seller wording version, profile node) is snapshotted on the order line, never the garage; not personal data beyond the order itself (§17.4.6, FIT.17) |
 | Q-G7 | Level limits: at most 4 node levels and 3 anonymous profiles, 10 per account, 500 rows per product, 24 months inactivity: acceptable defaults? | Yes, all settings |
-| Q-G8 ✅ | Vendor liability wording and the return rule | **Decided (owner):** the wording is "Compatibility declared by the seller"; the platform does not guarantee it; the seller answers for its declaration; a wrong fit is a non-conformity return (§17.5.3, vendor terms through FIT.13) |
+| Q-G8 ✅ | Vendor liability wording and the return rule | **Decided (owner):** the wording is "Compatibility declared by the seller"; the platform does not guarantee it; the seller answers for its declaration; a wrong fit is a non-conformity return (§17.5.3, vendor terms through FIT.13). Added (adviser opinion 2026-11-11): the order snapshots the selected vehicle and shows it with "compatibility declared by the vendor" in the summary and the emails; the customer terms carry the conformity-defect paragraph (§17.4.6, FIT.17, CMP.5) |
 | Q-G9 | Is a reference catalogue (licensed standard data) in scope at all, and who pays the licence? | Open. FIT.16 stays P3 and optional: the garage works without it |
 | Q-G10 | A "new items for your garage" email or a personalised home block: wanted later? | Not in this proposal; each needs its own opt-in and decision |
 
 ## 17.13 Tasks
 
-The rows are no longer blocked by a proposal: D-38 is decided as P1 in slices, with only the counsel items (Q-G1, Q-G2) open and not blocking. IDs are checked against `main` and
+The rows are no longer blocked by a proposal: D-38 is decided as P1 in slices, and the counsel items Q-G1 and Q-G2 answered on 2026-11-11. IDs are checked against `main` and
 every open pull request. Owner decision Q-G3: **P1, before opening, the whole garage**. FIT.16 (optional reference data) stays P3.
 
 ### Slices that merge one by one
@@ -730,15 +739,15 @@ confirm, not a new dependency edge):
 | FIT.3 | Vendor Fits tab in the shop space (D-38, slice FIT-b): mode radio, cascading node picker with search and a no-script fallback, year fields, exclusion, notes, copy from another product, bulk action with ChangeSet preview, node proposals with an anti-flooding limit, per-vendor data-quality report | P1 | 14 | FIT.2, CAT.19, CORE.9 | A vendor sets fitment on a product and on 50 products in bulk; a proposal is pending and invisible until reviewed; the 21st pending proposal is refused; a cross-tenant negative test passes |
 | FIT.4 | CSV import and export of fitment and the ING link (D-38, slice FIT-b): headers from the level codes, `replace` and `add`, dry run report, set-based upsert through staging, review items for unmatched names, `MappingTable` kind `fitment`, `StagedFitment`, provenance rules, AI-parsed fitment never auto-published | P1 | 14 | FIT.2, ING.1, ING.5 | A 100 000-row file loads in a background task with a report; round trip export equals import; a feed refresh leaves `manual` rows alone; an AI-parsed row lands in review |
 | FIT.5 | Garage profiles for accounts (D-38, slice FIT-c): `GarageProfile` (one active at most, reset keeps profiles, rename, duplicate, delete with confirmation, merged and retired node handling), limits, the "My garage" page in the customer area, 24-month inactivity cleanup with notice, CMP.4 export and erasure hooks, `contains_special_category` switch | P1 | 12 | FIT.1, CORE.1, CMP.4 | Regression case 7 and 10 pass; export contains the profiles and erasure removes them; with the special-category switch the account garage is unavailable |
-| FIT.6 | Anonymous garage and merge (D-38, slice FIT-c): the `mpmv_garage` cookie (explicit save, up to 3 profiles, no identifier, hostile-input validation, 180 days, *Forget my garage*), `GARAGE_ANON_STORAGE` modes `exempt`, `consent`, `off` wired to the SEO.5 consent state, merge notice at sign-in without silent merge, cookie cleared at sign-out when it came from the account | P1 | 10 | FIT.5, SEO.5, ORD.1 | Regression case 8 passes; no server write and no log of the cookie value; the three storage modes are tested and the default is `consent`; analytics tags never read the cookie |
+| FIT.6 | Anonymous garage and merge (D-38, slice FIT-c): the `mpmv_garage` cookie (explicit save, up to 3 vehicles holding make, model and year only, no identifier and no free-text name, hostile-input validation, 180 days capped at 12 months, a visible *Remove vehicle* button, *Forget my garage*, the label "Save this vehicle on this browser for your next visits (you can remove it at any time)"), technical with no consent gate (Q-G1, owner, 2026-11-11, adviser opinion 2026-11-11): `GARAGE_ANON_STORAGE` modes `exempt` (default) and `off`, never read by the SEO.5 consent tags, merge notice at sign-in without silent merge, cookie cleared at sign-out when it came from the account | P1 | 10 | FIT.5, SEO.5, ORD.1 | Regression case 8 passes; no server write and no log of the cookie value; the cookie is written on *Save* with no consent prompt and never before; the two storage modes are tested and the default is `exempt`; a lifetime setting above 12 months is refused; *Remove vehicle* removes one vehicle at once; the cookie holds no name or identifier field; analytics tags never read the cookie |
 | FIT.7 | Garage UI (D-38, slice FIT-c): header menu, banner with *Change* and *Show all*, chooser (explicit *Apply*), "Add your garage" line, polite live announcements, focus handling, empty states of §17.5.6, no URL parameter anywhere, the translatable garage noun | P1 | 14 | FIT.5, THM.4, I18N.1 | An e2e run with screenshots covers the flow with keyboard only; zero axe violations (`wcag22aa`); reload, language switch and back button keep the state; no garage in any URL |
 | FIT.8 | Listings and search (D-38, slice FIT-d): predicate registry in CAT.8 and CAT.9, registered by `fitment`; filter semantics of §17.5.1, counts "N of M" and the unknown-count, exact SKU, GTIN or MPN always shown, CMS.10 grids, no reordering, `check` badge | P1 | 14 | FIT.2, FIT.7, CAT.8, CAT.9, CMS.10 | Regression cases 3 and 4 pass; an active garage never changes the sort order of a listing; the count equals the rows listed; the operator's own items get no preference |
 | FIT.9 | Product page (D-38, slice FIT-d): "Does it fit?" box in four states, summary list of fitment grouped by make and model, links to hub articles, card badges, buy flow unaffected | P1 | 8 | FIT.8, CAT.7 | Regression case 5 passes; a non-fitting item is purchasable with one inline note; the summary is identical with and without a garage |
-| FIT.17 | Fit answer on the order line (D-38 Q-G6, slice FIT-d): an order-line annotation hook in `orders` (opaque validated JSON, no `fitment` import), the product page posts the shown answer (tier, wording version, profile node id and label), shown on the order, the confirmation and the vendor order view as seller-declared compatibility, in the order export and in the retention scrub | P1 | 6 | FIT.9, ORD.2 | A purchase with an active garage stores the answer and never the profiles; an order without a garage has no annotation; the import contract shows `orders` does not import `fitment`; a return view shows the wording the customer saw |
+| FIT.17 | Fit answer on the order line (D-38 Q-G6, slice FIT-d): an order-line annotation hook in `orders` (opaque validated JSON, no `fitment` import), the product page posts the shown answer (tier, wording version, profile node id and label), shown on the order, the confirmation and the vendor order view as seller-declared compatibility, in the order export and in the retention scrub; vehicle snapshot (Q-G8, adviser opinion 2026-11-11): an order placed with an active garage vehicle also snapshots that vehicle (make, model, year labels at that time) and shows "Vehicle selected by the customer in the compatibility filter: <make, model, year> — compatibility declared by the vendor" in the order summary and in the ORD.9 emails to the customer and the vendor | P1 | 6 | FIT.9, ORD.2 | A purchase with an active garage stores the answer and never the profiles; an order without a garage has no annotation; the import contract shows `orders` does not import `fitment`; a return view shows the wording the customer saw; a purchase with an active vehicle shows the vehicle line in the order summary, the customer email and the vendor email (snapshot tests in five languages); a later rename or retirement of the node does not change the order's line |
 | FIT.10 | Editorial links (D-38, slice FIT-e): `fitment_nodes` chooser on blog posts and term landing pages, `editorial_page` hub article per node and locale, *Compatible items* block from the fitment query, *Make this my garage* form button, product-to-article links, the staff coverage report, the blog index garage banner | P1 | 12 | FIT.1, FIT.8, CMS.3, CMS.4 | An article linked to a node lists the matching items without hand-picking; a node with 50 items and no article appears in the report; a general article is always shown; a second hub article for the same node and locale is refused |
 | FIT.11 | Events (D-38, slice FIT-e): `fitment_nodes` on `EventPage` (organiser chooser), the "For <profile> owners" badge and the *Only events for my garage* checkbox (off by default), feeds ignore the garage | P1 | 6 | FIT.1, FIT.7, EVT.1 | A tagged event gets the badge; the checkbox filters; the RSS and ICS feeds are the same with and without a garage |
 | FIT.12 | SEO and cache rules (D-38, slice FIT-e): self-canonical to the generic URL, `Cache-Control: private` and `Vary: Cookie` on personalised responses (no `noindex`, canonical only), edge bypass on the garage cookie, JSON-LD `isAccessoryOrSparePartFor` (up to 10) and BlogPosting `about`, hub articles in the sitemap, cache purge on fitment change | P1 | 8 | FIT.8, FIT.10, SEO.7 | Regression cases 6 and 9 pass (the bypass rule is also written into the SEO.6 cache contract and tested there when SEO.6 lands); the generic and personalised crawl give the same URL set; Rich Results Test has no errors; no garage in any JSON-LD |
-| FIT.13 | Legal and transparency text (D-38, slice FIT-f): privacy notice and processing register entry, DPIA screening note, the "How the garage works" page, the CMP.5 ranking and terms entries (declared fitment as an exposure parameter), vendor terms wording ("Compatibility declared by the seller": no platform guarantee, the seller answers for it, a wrong fit is a non-conformity return), counsel review of Q-G1 and Q-G2 | P1 | 6 | CMP.4, CMP.5, FIT.5 | The texts exist in the five languages; counsel's answers are recorded; the ranking page lists the fitment rule |
+| FIT.13 | Legal and transparency text (D-38, slice FIT-f): privacy notice and processing register entry, DPIA screening note, the "How the garage works" page, the CMP.5 ranking and terms entries (declared fitment as an exposure parameter), vendor terms wording ("Compatibility declared by the seller": no platform guarantee, the seller answers for it, a wrong fit is a non-conformity return), counsel review of Q-G1 and Q-G2; counsel answered Q-G1 and Q-G2 (adviser opinion 2026-11-11): the Garage filter is described on the "How we rank results" page and in the terms, and the customer terms carry the Q-G8 paragraph (compatibility declared by the vendor, an incompatibility is a conformity defect under Codice del consumo art. 129 and following, borne by the vendor) through CMP.5 | P1 | 6 | CMP.4, CMP.5, FIT.5 | The texts exist in the five languages; counsel's answers are recorded; the ranking page lists the fitment rule; the customer terms contain the conformity-defect paragraph |
 | FIT.14 | Performance (D-38, slice FIT-d): dataset generator (200 000 products, 3 million rows), EXPLAIN budget test (p95 database time under 150 ms with an active garage), the optional matched-set cache only if the budget fails, bulk write timing | P1 | 6 | FIT.8 | The budget test passes in CI and fails when an index is dropped |
 | FIT.15 | Legacy carry-over (D-38, slice FIT-f): convert the migrated `compatibility` terms into fitment nodes (dry run, report, aliases from the legacy names), map the legacy model articles to nodes with an editor-assisted list, keep all legacy URLs | P1 | 8 | FIT.1, FIT.10, MIG.3, MIG.11 | Every legacy compatibility term maps to a node or is listed as unmatched; each legacy article is linked to a node or in the unmatched report; no legacy URL changes |
 | FIT.16 | Standard reference data import (D-38, optional): `FitmentSource`, `FitmentCatalogueProvider` interface, a file provider, diff preview, licence stored, no automatic deletion of nodes in use, `external_ref` and `sameAs` | P3 | 14 | FIT.1, FIT.4 | A sample reference file loads with a diff preview; nodes in use are never deleted; the licence is stored with the source |

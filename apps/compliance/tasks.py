@@ -2,9 +2,11 @@
 
 import logging
 
+from apps.core.audit import AuditContext
+from apps.core.models import AuditLog
 from apps.core.tasks import NO_RETRY, locked, periodic, task
 
-from . import services
+from . import retention, services
 
 logger = logging.getLogger(__name__)
 
@@ -27,3 +29,13 @@ def check_published_gpsr(timestamp: int) -> None:
     with an error in the log and one email a day to the staff alert address."""
     rows = services.flag_published_products_failing_gpsr()
     logger.info("compliance.check_published_gpsr found %d product(s)", len(rows))
+
+
+@periodic("45 3 * * *")
+@locked()
+@task("compliance.run_retention", retry=NO_RETRY)
+def run_retention(timestamp: int) -> None:
+    """Every night: apply the order and account retention lifecycle (CMP.4, D-29, D-30)."""
+    ctx = AuditContext(actor_label="system:retention", source=AuditLog.Source.TASK)
+    result = retention.run_retention(ctx=ctx)
+    logger.info("compliance.run_retention %s", result.counts())

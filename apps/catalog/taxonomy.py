@@ -37,12 +37,13 @@ from django.db import models
 from django.db.models.functions import Lower
 from django.utils.translation import gettext_lazy as _
 from treebeard.mp_tree import MP_Node
-from wagtail.models import Page
+from wagtail.models import Collection, Page
 
 from apps.core import translations
 from apps.core.fields import CountryField
-from apps.core.models import BaseModel, TranslationModel, resolve_translation
+from apps.core.models import BaseModel, MediaImage, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
+from apps.vendors.scoping import VendorScopedManager
 
 from . import engine, slugs
 from .fields import (
@@ -428,34 +429,38 @@ class Manufacturer(BaseModel):
     and country. Shared by all vendors; edited by Catalog staff only."""
 
     legal_name = models.CharField(
+        _("legal name"),
         max_length=255,
         help_text=_(
-            "The full registered name of the company that makes the products, for example "
-            "'Acme Industries S.p.A.'. Required: the manufacturer cannot be saved without it."
+            "The registered name of the company that makes the products. It is shown on the "
+            "brand page and in its structured data. Example: 'Acme Holdings Ltd'."
         ),
     )
     url = models.URLField(
+        _("official URL"),
         blank=True,
         max_length=500,
         help_text=_(
-            "The official website of the company, starting with https://, for example "
-            "https://www.example.com. Optional."
+            "The company's own website, an https address. It tells search engines which "
+            "company this is. Example: https://holdings.example/."
         ),
     )
     same_as = models.JSONField(
-        "sameAs links",
+        _("sameAs links"),
         default=list,
         blank=True,
         help_text=_(
-            "Other pages that prove who the company is, such as Wikidata, Wikipedia or an "
-            "official profile. Write a list of full https links. Optional."
+            "A list of https links to the same company elsewhere: Wikidata, Wikipedia, "
+            "official profiles. Search engines use them to recognise the company. "
+            'Example: ["https://www.wikidata.org/wiki/Q7"].'
         ),
     )
     country = CountryField(
+        _("country"),
         blank=True,
         help_text=_(
-            "The country of the registered office of the company. Optional: leave it empty if "
-            "you do not know it."
+            "The country of the registered office. It is part of the structured data. "
+            "Example: Italy."
         ),
     )
 
@@ -472,6 +477,59 @@ class Manufacturer(BaseModel):
             raise ValidationError(errors)
 
 
+class BrandBatch(BaseModel):
+    """The new brands one feed or import run brought (CAT.20), proposed and reviewed together.
+
+    One row per run, however many brands: they do not count against the vendor's limit on
+    manual proposals. Staff approve or reject the whole run in one step."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Pending review")
+        APPROVED = "approved", _("Approved")
+        REJECTED = "rejected", _("Rejected")
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(
+        "vendors.Vendor",
+        on_delete=models.CASCADE,
+        related_name="brand_batches",
+        verbose_name=_("vendor"),
+        help_text=_(
+            "The vendor whose feed or import brought these brands. It lets the review team "
+            "ask the right person. Example: the vendor that uploaded the product file."
+        ),
+    )
+    source = models.CharField(
+        _("source"),
+        max_length=200,
+        help_text=_(
+            "A short label of the import run. It tells reviewers where the brands come "
+            "from. Example: 'spring price list, import of 2026-11-02'."
+        ),
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+        help_text=_(
+            "Where the review stands. Set by the approve and reject actions, never by hand. "
+            "Example: Pending review."
+        ),
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = _("brand batch")
+        verbose_name_plural = _("brand batches")
+
+    def __str__(self) -> str:
+        return f"{self.source} ({self.vendor_id})"
+
+
 class Brand(BaseModel):
     """A brand (`g:brand` in feeds) as a linked entity (CAT.20); its name is the same in every
     language. One shared list for all vendors: a vendor picks any `approved` brand and proposes a
@@ -484,50 +542,54 @@ class Brand(BaseModel):
         REJECTED = "rejected", "Rejected"
 
     name = models.CharField(
+        _("name"),
         max_length=200,
         help_text=_(
-            "The brand name as buyers know it, for example 'Acme'. Required: a brand cannot be "
-            "saved without it. Two brands cannot have the same or a very similar name."
+            "The brand as customers know it; it is the same in every language. Names that "
+            "differ only in case, accents or punctuation count as duplicates. Example: 'Acme'."
         ),
     )
     # What duplicate detection compares: `engine.brand_name_key(name)`, set by `save()`.
     name_key = models.CharField(max_length=200, blank=True, editable=False, db_index=True)
     status = models.CharField(
+        _("status"),
         max_length=16,
         choices=Status.choices,
         default=Status.APPROVED,
         db_index=True,
         help_text=_(
-            "Approved brands can be picked for products and are public. Pending review brands "
-            "wait for a check and are not public. Rejected brands cannot be used. If you leave "
-            "it empty, the brand is approved."
+            "Only approved brands have a public page and can be picked by every vendor. "
+            "Use the approve, reject and merge actions to review a proposal. "
+            "Example: Approved."
         ),
     )
     wikidata_id = models.CharField(
-        "Wikidata item ID",
+        _("Wikidata item ID"),
         max_length=12,
         blank=True,
         help_text=_(
-            "The brand's code on Wikidata, for example Q42. Optional. Only the format is "
-            "checked: nothing is looked up online."
+            "The brand's item on Wikidata. It links the brand to one world-wide identity and "
+            "is how duplicates are found. Only the format is checked, nothing is fetched. "
+            "Example: Q42."
         ),
     )
     url = models.URLField(
-        "official URL",
+        _("official URL"),
         blank=True,
         max_length=500,
         help_text=_(
-            "The official website of the brand, starting with https://, for example "
-            "https://www.example.com. Optional."
+            "The brand's own website, an https address. It is linked from the brand page and "
+            "given to search engines. Example: https://acme.example/."
         ),
     )
     same_as = models.JSONField(
-        "sameAs links",
+        _("sameAs links"),
         default=list,
         blank=True,
         help_text=_(
-            "Other pages that prove who the brand is, such as Wikipedia in each language or an "
-            "official profile. Write a list of full https links. Optional."
+            "A list of https links to the same brand elsewhere: Wikipedia in each language, "
+            "official profiles. The Wikidata link is added from the ID above. "
+            'Example: ["https://en.wikipedia.org/wiki/Acme"].'
         ),
     )
     logo = models.ForeignKey(
@@ -536,14 +598,20 @@ class Brand(BaseModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
-        help_text=_("The brand logo, shown on the brand page. Optional."),
+        verbose_name=_("logo"),
+        help_text=_(
+            "The brand logo shown on its page. Upload a new one with the file fields below, "
+            "or pick an image from the library that already has its licence and author. "
+            "Example: the official logo as PNG or SVG."
+        ),
     )
     logo_alt = models.CharField(
+        _("logo description"),
         max_length=125,
         blank=True,
         help_text=_(
-            "Describe the logo in a few words for people who cannot see it, for example 'Acme, "
-            "red letters on white'. Required when you add a logo; up to 125 characters."
+            "Plain text describing the logo for people who cannot see it. Required with a "
+            "logo. Example: 'Acme, an anvil in a red circle'."
         ),
     )
     manufacturer = models.ForeignKey(
@@ -552,9 +620,37 @@ class Brand(BaseModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="brands",
+        verbose_name=_("manufacturer"),
         help_text=_(
-            "The company that makes products under this brand. Optional: leave it empty if you "
-            "do not know it."
+            "The company that makes the brand's products, when it is not the brand itself. "
+            "It is shown on the brand page and in the structured data. "
+            "Example: 'Acme Holdings Ltd'."
+        ),
+    )
+    proposed_by = models.ForeignKey(
+        "vendors.Vendor",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="proposed_brands",
+        verbose_name=_("proposed by"),
+        help_text=_(
+            "The vendor that suggested this brand. While the brand is pending only this "
+            "vendor can use it, and the review team knows whom to ask. Empty for brands "
+            "staff created. Example: the vendor that sells it."
+        ),
+    )
+    batch = models.ForeignKey(
+        BrandBatch,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="brands",
+        verbose_name=_("import batch"),
+        help_text=_(
+            "The import run that brought this brand, when it was not proposed by hand. "
+            "Brands of a batch are reviewed together and do not count against the vendor's "
+            "limit on manual proposals. Example: 'spring price list'."
         ),
     )
 
@@ -571,6 +667,16 @@ class Brand(BaseModel):
                 condition=~models.Q(wikidata_id=""),
                 name="catalog_brand_wikidata_unique",
                 violation_error_message="Another brand has this Wikidata ID.",
+            ),
+            # Race-safe duplicate detection for proposals (CAT.20). Partial: brands that were
+            # approved before the key existed may share one (legacy data is not rewritten), and
+            # the services refuse a new duplicate of any brand. A rejected brand keeps its name
+            # reserved; proposing it again reopens that row as pending (`brands._candidate`).
+            models.UniqueConstraint(
+                fields=["name_key"],
+                condition=~models.Q(name_key="") & ~models.Q(status="approved"),
+                name="catalog_brand_name_key_open_unique",
+                violation_error_message="A brand with a very similar name exists.",
             ),
         ]
 
@@ -600,6 +706,16 @@ class Brand(BaseModel):
         )
         if key and renamed and others.filter(name_key=key).exists():
             errors.setdefault("name", []).append("A brand with a very similar name exists.")
+        logo = self.logo if self.logo_id else None
+        if logo is not None and not brand_logo_images().filter(pk=logo.pk).exists():
+            errors.setdefault("logo", []).append(
+                "A brand logo comes from the platform's logos collection: upload it there."
+            )
+        if logo is not None and (logo.licence_id is None or not logo.author.strip()):
+            # CMS.8: an image migrated without its licence or author is not chosen for new content.
+            errors.setdefault("logo", []).append(
+                "This image has no licence or author yet: classify it in the image library first."
+            )
         if self.logo_id and not self.logo_alt.strip():
             errors.setdefault("logo_alt", []).append("Describe the logo for screen readers.")
         if self.wikidata_id and others.filter(wikidata_id=self.wikidata_id).exists():
@@ -623,14 +739,31 @@ class BrandTranslation(TranslationModel):
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name="translations")
     slug = _slug_field()
     description = models.TextField(
+        _("description"),
         blank=True,
         help_text=_(
-            "A short story of the brand, shown on the brand page. Basic formatting is "
-            "allowed. Optional."
+            "The text on the brand page, in this language only: a language without one shows "
+            "no description, never another language's. Basic formatting is kept. "
+            "Example: 'Anvils and forging tools made in Bergamo since 1949.'"
         ),
     )
-    seo_title = seo_title_field()
-    seo_description = seo_description_field()
+    seo_title = models.CharField(
+        _("SEO title"),
+        max_length=255,
+        blank=True,
+        help_text=_(
+            "The title search engines show for the brand page. Optional. "
+            "Example: 'Acme anvils and forging tools'."
+        ),
+    )
+    seo_description = models.TextField(
+        _("SEO description"),
+        blank=True,
+        help_text=_(
+            "The short text search engines show under the title. Example: 'Buy Acme anvils "
+            "from independent shops.'"
+        ),
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["brand", "language"]
@@ -648,3 +781,14 @@ class BrandTranslation(TranslationModel):
 
     def __str__(self) -> str:
         return f"{self.brand} [{self.language}]"
+
+
+def brand_logo_images() -> models.QuerySet[MediaImage]:
+    """The images a brand logo may be: those in a collection that accepts SVG (the platform
+    logos collection, THM.12) or below one, never a vendor's or a page's image."""
+    paths = Collection.objects.filter(svg_policy__isnull=False).values_list("path", flat=True)
+    condition = models.Q(pk__in=[])
+    for path in paths:
+        condition |= models.Q(collection__path__startswith=path)
+    images: models.QuerySet[MediaImage] = MediaImage.objects.filter(condition)
+    return images
