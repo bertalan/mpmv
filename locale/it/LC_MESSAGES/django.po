@@ -66,6 +66,10 @@ msgstr ""
 " è stata controllata da una persona. 'Pubblicata' viene mostrata ai visitatori. Se il testo "
 "inglese cambia, le traduzioni riviste e pubblicate tornano a 'Bozza automatica'."
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "(opens the carrier's site)"
+msgstr "(si apre il sito del corriere)"
+
 #: apps/catalog/taxonomy_admin.py
 msgid "-- root --"
 msgstr "-- radice --"
@@ -450,6 +454,10 @@ msgstr "Informazioni sul negozio"
 msgid "Accept the order"
 msgstr "Accetta l'ordine"
 
+#: apps/orders/customer_views.py
+msgid "Accepted by the seller"
+msgstr "Accettato dal venditore"
+
 #: themes/base/templates/403.html
 msgid "Access denied"
 msgstr "Accesso negato"
@@ -636,6 +644,10 @@ msgstr "Autorità informate: %(authority)s, %(at)s."
 msgid "Back office"
 msgstr "Back office"
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Back to my orders"
+msgstr "Torna ai miei ordini"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Back to the notices"
 msgstr "Torna alle segnalazioni"
@@ -664,6 +676,10 @@ msgstr "Prima"
 msgid "Before and after"
 msgstr "Prima e dopo"
 
+#: apps/orders/customer_views.py
+msgid "Being prepared"
+msgstr "In preparazione"
+
 #: apps/catalog/taxonomy.py
 msgid "brand batch"
 msgstr "lotto di marchi"
@@ -684,6 +700,10 @@ msgstr "Annullamento"
 msgid "Cancellation policy"
 msgstr "Condizioni di annullamento"
 
+#: apps/orders/customer_views.py
+msgid "Cancelled"
+msgstr "Annullato"
+
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Cannot scan? Enter this key:"
 msgstr "Non riesci a scansionare? Inserisci questa chiave:"
@@ -691,6 +711,10 @@ msgstr "Non riesci a scansionare? Inserisci questa chiave:"
 #: apps/manager/forms.py apps/manager/templates/manager/shop/order.html
 msgid "Carrier"
 msgstr "Corriere"
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "Carrier: %(carrier)s"
+msgstr "Corriere: %(carrier)s"
 
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
@@ -834,6 +858,10 @@ msgstr ""
 "Nei paesi in cui è previsto lo compiliamo noi quando VIES conferma la partita IVA. Non sei sicuro?"
 " Chiedi al tuo commercialista."
 
+#: apps/orders/customer_views.py
+msgid "Completed"
+msgstr "Completato"
+
 #: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
 msgid "Confirm"
 msgstr "Conferma"
@@ -868,6 +896,10 @@ msgstr ""
 "Conta quante volte data, ora o luogo sono cambiati dopo la pubblicazione, così che i calendari "
 "delle persone aggiornino la loro copia. Lo compila la piattaforma."
 
+#: apps/orders/customer_views.py
+msgid "current step"
+msgstr "passaggio attuale"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Customer"
 msgstr "Cliente"
@@ -881,6 +913,10 @@ msgstr ""
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Dashboard"
 msgstr "Dashboard"
+
+#: apps/orders/templates/orders/customer_orders.html
+msgid "Date"
+msgstr "Data"
 
 #: apps/events/models.py
 msgid ""
@@ -913,6 +949,10 @@ msgstr "Se lo lasci vuoto, il pulsante dice 'Candidati ora'."
 #: apps/accounts/admin.py
 msgid "Delete selected %(verbose_name_plural)s"
 msgstr "Elimina %(verbose_name_plural)s selezionati"
+
+#: apps/orders/customer_views.py
+msgid "Delivered"
+msgstr "Consegnato"
 
 #: apps/cms/models.py
 msgid ""
@@ -969,6 +1009,10 @@ msgstr "Sviluppo e sistema"
 #: themes/base/templates/components/alert.html
 msgid "Dismiss"
 msgstr "Chiudi"
+
+#: apps/orders/customer_views.py
+msgid "done"
+msgstr "completato"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Drafts"
@@ -1440,6 +1484,10 @@ msgstr ""
 "Italia: il tuo codice fiscale, 16 caratteri per una persona o 11 cifre per una società. Altrove: "
 "il tuo numero di identificazione fiscale nazionale (TIN). Viene conservato cifrato."
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Item"
+msgstr "Articolo"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Items"
 msgstr "Articoli"
@@ -1614,6 +1662,10 @@ msgstr "Unisci in"
 msgid "Merge the selected brands into another brand"
 msgstr "Unisci i marchi selezionati in un altro marchio"
 
+#: apps/orders/templates/orders/customer_orders.html
+msgid "My orders"
+msgstr "I miei ordini"
+
 #: apps/catalog/taxonomy.py
 msgid "name"
 msgstr "nome"
@@ -1729,6 +1781,10 @@ msgid ""
 msgstr ""
 "Non ancora usato: viene salvato per una funzione futura. Quando leggere il flusso, come "
 "espressione cron, per esempio '0 3 * * *' (ogni giorno alle 3:00). Lascia vuoto se non serve."
+
+#: apps/orders/customer_views.py
+msgid "not yet"
+msgstr "non ancora"
 
 #: apps/manager/views.py
 msgid "Nothing changed."
@@ -1918,11 +1974,11 @@ msgstr ""
 "Facoltativo. Il nome del corriere, per esempio quello scritto sul pacco. Il cliente lo riceve "
 "nell’email di spedizione insieme al numero di tracking."
 
-#: apps/manager/templates/manager/shop/orders.html
+#: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_orders.html
 msgid "Order"
 msgstr "Ordine"
 
-#: apps/manager/templates/manager/shop/order.html
+#: apps/manager/templates/manager/shop/order.html apps/orders/templates/orders/customer_order.html
 msgid "Order %(number)s"
 msgstr "Ordine %(number)s"
 
@@ -1941,6 +1997,7 @@ msgstr ""
 msgid "Order %(order_number)s was cancelled. Do not ship these items:"
 msgstr "L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
 
+#: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Order %(order_number)s, sold by %(vendor_name)s:"
@@ -1965,6 +2022,10 @@ msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
 #: apps/compliance/forms.py
 msgid "Order number"
 msgstr "Numero d’ordine"
+
+#: apps/orders/customer_views.py
+msgid "Order placed"
+msgstr "Ordine effettuato"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
@@ -2022,6 +2083,14 @@ msgstr "Tipo di pagina"
 msgid "Pagination"
 msgstr "Paginazione"
 
+#: apps/orders/customer_views.py
+msgid "Paid"
+msgstr "Pagato"
+
+#: apps/orders/customer_views.py
+msgid "Partly refunded"
+msgstr "Rimborsato in parte"
+
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Passkey"
@@ -2045,6 +2114,10 @@ msgstr "Le passkey richiedono JavaScript."
 #: apps/manager/templates/manager/login.html
 msgid "Password"
 msgstr "Password"
+
+#: apps/orders/customer_views.py
+msgid "Payment received"
+msgstr "Pagamento ricevuto"
 
 #: apps/orders/templates/email/orders/payment_confirmed/subject.txt
 msgid "Payment received for order %(order_number)s"
@@ -2096,6 +2169,10 @@ msgstr "Scegli l'immagine dalla libreria o caricane una nuova. Obbligatoria."
 
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
+msgstr "Effettuato il"
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "Placed on"
 msgstr "Effettuato il"
 
 #: apps/catalog/taxonomy.py
@@ -2182,6 +2259,10 @@ msgstr "Anteprima: %(action)s"
 msgid "Previous"
 msgstr "Indietro"
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Price with VAT"
+msgstr "Prezzo con IVA"
+
 #: apps/seo/site_links.py
 msgid "Privacy and your data"
 msgstr "Privacy e i tuoi dati"
@@ -2214,9 +2295,13 @@ msgstr "proposto da"
 msgid "Published"
 msgstr "Pubblicati"
 
-#: apps/manager/templates/manager/shop/order.html
+#: apps/manager/templates/manager/shop/order.html apps/orders/templates/orders/customer_order.html
 msgid "Quantity"
 msgstr "Quantità"
+
+#: apps/orders/customer_views.py
+msgid "Quote requested"
+msgstr "Preventivo richiesto"
 
 #: apps/seo/site_links.py
 msgid "Readiness probe"
@@ -2267,6 +2352,10 @@ msgid ""
 msgstr ""
 "Riferimento del permesso scritto conservato, quando la licenza lo richiede. Esempio: "
 "'permission-2026-11-acme.pdf'."
+
+#: apps/orders/customer_views.py
+msgid "Refunded"
+msgstr "Rimborsato"
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 msgid "Register a passkey"
@@ -2432,6 +2521,10 @@ msgstr "Spedire a"
 msgid "Ship to:"
 msgstr "Spedire a:"
 
+#: apps/orders/customer_views.py
+msgid "Shipped"
+msgstr "Spedito"
+
 #: apps/vendors/services.py
 msgid "Shipping"
 msgstr "Spedizione"
@@ -2440,6 +2533,11 @@ msgstr "Spedizione"
 msgid "Shipping policy"
 msgstr "Condizioni di spedizione"
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Shipping with VAT"
+msgstr "Spedizione con IVA"
+
+#: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Shipping: %(shipping)s EUR"
@@ -2551,6 +2649,10 @@ msgstr "Vai al contenuto principale"
 msgid "SKU"
 msgstr "SKU"
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Sold by %(name)s"
+msgstr "Venduto da %(name)s"
+
 #: apps/vendors/models.py
 msgid ""
 "Sole traders only: if your country issues no tax identification number, the city and country where"
@@ -2625,12 +2727,18 @@ msgstr "Motivazioni"
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
+#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_orders.html
 msgid "Status"
 msgstr "Stato"
 
 #: apps/catalog/taxonomy.py
 msgid "status"
 msgstr "stato"
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "Status history"
+msgstr "Cronologia dello stato"
 
 #: apps/manager/sections.py apps/manager/templates/manager/platform/profile_changes.html
 msgid "Storefront changes"
@@ -4566,6 +4674,11 @@ msgstr "Questo browser non supporta le passkey."
 msgid "This content is not available in this language."
 msgstr "Questo contenuto non è disponibile in questa lingua."
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "This is your order reference, not an invoice. Each seller issues its own invoice."
+msgstr ""
+"Questo è il riferimento del tuo ordine, non una fattura. Ogni venditore emette la propria fattura."
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "This link was sent to you by email. Press Continue to open the page it leads to."
 msgstr "Questo link ti è stato inviato per email. Premi Continua per aprire la pagina a cui porta."
@@ -4765,18 +4878,32 @@ msgstr ""
 msgid "Too many attempts. Please try again later."
 msgstr "Troppi tentativi. Riprova più tardi."
 
-#: apps/manager/templates/manager/shop/orders.html
+#: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_orders.html
 msgid "Total"
 msgstr "Totale"
 
+#: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Total: %(total)s EUR"
 msgstr "Totale: %(total)s EUR"
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Track the parcel"
+msgstr "Segui il pacco"
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "Tracking"
+msgstr "Tracciamento"
+
 #: apps/manager/forms.py apps/manager/templates/manager/shop/order.html
 msgid "Tracking number"
 msgstr "Numero di tracciamento"
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "Tracking number: %(number)s"
+msgstr "Numero di tracciamento: %(number)s"
 
 #: apps/accounts/templates/accounts/mfa/overview.html apps/seo/site_links.py
 msgid "Two-factor authentication"
@@ -4863,6 +4990,14 @@ msgstr "Verifica"
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Verify it is you"
 msgstr "Verifica la tua identità"
+
+#: apps/orders/customer_views.py
+msgid "Waiting for payment"
+msgstr "In attesa di pagamento"
+
+#: apps/orders/customer_views.py
+msgid "Waiting for the seller"
+msgstr "In attesa del venditore"
 
 #: themes/base/templates/components/alert.html
 msgid "Warning"
@@ -5034,6 +5169,10 @@ msgstr ""
 "Cosa ottengono i visitatori: 301 li manda a un nuovo indirizzo, 410 dice che la pagina non esiste "
 "più. Un 410 non ha destinazione."
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "What you bought from %(name)s"
+msgstr "Cosa hai acquistato da %(name)s"
+
 #: apps/compliance/forms.py
 msgid "What you restrict: a product is unpublished, an event is hidden, a vendor shop is suspended."
 msgstr ""
@@ -5124,6 +5263,10 @@ msgid ""
 msgstr ""
 "Da quando vale questa versione. Una modifica è una nuova versione da una data; il servizio che la "
 "aggiunge chiude la precedente."
+
+#: apps/orders/templates/orders/customer_orders.html
+msgid "When you buy something, you find it here with its status and tracking."
+msgstr "Quando acquisti qualcosa, lo trovi qui con il suo stato e il tracciamento."
 
 #: apps/catalog/models.py
 msgid ""
@@ -5392,6 +5535,10 @@ msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Hai %(counter)s codice di recupero non usato."
 msgstr[1] "Hai %(counter)s codici di recupero non usati."
 
+#: apps/orders/templates/orders/customer_orders.html
+msgid "You have no orders yet"
+msgstr "Non hai ancora ordini"
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your account is protected with a passkey."
 msgstr "Il tuo account è protetto con una passkey."
@@ -5439,6 +5586,10 @@ msgstr ""
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."
 msgstr "Il tuo nome. Obbligatorio, tranne per una segnalazione di materiale pedopornografico."
+
+#: apps/orders/templates/orders/customer_orders.html
+msgid "Your orders, newest first"
+msgstr "I tuoi ordini, dal più recente"
 
 #: apps/catalog/models.py
 msgid ""

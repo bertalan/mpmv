@@ -827,3 +827,17 @@ def test_other_markup_is_never_an_image() -> None:
     with pytest.raises(UploadRefused) as refusal:
         upload_kind(b"<!DOCTYPE html><html></html>", "page.png")
     assert refusal.value.code == "invalid"
+
+
+def test_importing_weasyprint_does_not_relax_truncated_image_handling() -> None:
+    """WeasyPrint sets LOAD_TRUNCATED_IMAGES process-wide; the guard must not rely on it."""
+    import weasyprint.images  # noqa: F401
+    from PIL import ImageFile
+
+    ImageFile.LOAD_TRUNCATED_IMAGES = True
+    try:
+        data = _png((200, 200))
+        with pytest.raises(UploadRefused):
+            sanitise_image(data[: len(data) // 2], "a.png", LIMITS)
+    finally:
+        ImageFile.LOAD_TRUNCATED_IMAGES = False
