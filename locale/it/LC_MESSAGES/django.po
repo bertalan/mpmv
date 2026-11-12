@@ -83,6 +83,10 @@ msgstr ""
 msgid "A category or tag that has its own pages."
 msgstr "Una categoria o etichetta che ha pagine dedicate."
 
+#: apps/vendors/templates/email/vendors/profile_reverted/subject.txt
+msgid "A change to the storefront profile of %(vendor_name)s was reverted"
+msgstr "Una modifica al profilo vetrina di %(vendor_name)s è stata annullata"
+
 #: apps/cms/blocks.py apps/cms/models.py
 msgid "A clear, short answer. It opens when the visitor clicks the question. Required."
 msgstr ""
@@ -501,10 +505,18 @@ msgstr "Aggiungi almeno una domanda. Si vedono come un elenco che apre una rispo
 msgid "added %(created)s"
 msgstr "aggiunta il %(created)s"
 
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "After"
+msgstr "Dopo"
+
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Tutti"
+
+#: apps/manager/views.py
+msgid "all languages"
+msgstr "tutte le lingue"
 
 #: apps/compliance/models.py
 msgid ""
@@ -651,6 +663,14 @@ msgstr "Torna alle impostazioni della verifica in due passaggi"
 msgid "Bad request"
 msgstr "Richiesta non valida"
 
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Before"
+msgstr "Prima"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Before and after"
+msgstr "Prima e dopo"
+
 #: apps/orders/customer_views.py
 msgid "Being prepared"
 msgstr "In preparazione"
@@ -711,6 +731,16 @@ msgstr "Catalogo: categorie"
 #: apps/seo/site_links.py
 msgid "Catalogue: products"
 msgstr "Catalogo: prodotti"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid ""
+"Changes owners made to their storefront texts, policies and logo. They are live at once; revert "
+"one with a reason and the owners are told. A change can be reverted only while the text has not "
+"changed again."
+msgstr ""
+"Modifiche fatte dai titolari ai testi, alle condizioni e al logo del loro negozio. Sono visibili "
+"subito; annullane una indicando un motivo e i titolari ne saranno informati. Una modifica si può "
+"annullare solo finché il testo non è cambiato di nuovo."
 
 #: apps/compliance/forms.py
 msgid "Choose 'Action taken' if the content was restricted, or 'No action' if it was left as it is."
@@ -834,6 +864,10 @@ msgstr "Completato"
 #: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
 msgid "Confirm"
 msgstr "Conferma"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Confirm and delete the old logo"
+msgstr "Conferma ed elimina il vecchio logo"
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
@@ -1052,6 +1086,10 @@ msgstr ""
 "Dettagli in più da registrare per ogni categoria o etichetta, scritti come elenco, per esempio "
 "[{\"code\": \"model_year\", \"kind\": \"number\", \"required\": false, \"label\": \"Anno del "
 "modello\"}]. Lascialo vuoto se non servono. Il tipo è uno tra: text, number, boolean."
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Field"
+msgstr "Campo"
 
 #: themes/base/templates/components/user_tools.html
 msgid "Fields on this page"
@@ -1675,6 +1713,10 @@ msgstr "nessuna registrazione di passkey in corso"
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
 
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "No storefront changes yet."
+msgstr "Nessuna modifica al negozio per ora."
+
 #: apps/shipping/models.py
 msgid ""
 "Not used yet at checkout: marks the method to preselect once checkout uses shipping rates. A "
@@ -2144,6 +2186,14 @@ msgstr ""
 msgid "Plain text for people who cannot see the image, for example the shop name."
 msgstr "Testo semplice per chi non vede l’immagine, per esempio il nome del negozio."
 
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid ""
+"Plain text. The owners and the audit trail keep it: do not write personal data, such as names, "
+"emails or phone numbers."
+msgstr ""
+"Testo semplice. I titolari e il registro delle modifiche lo conservano: non scrivere dati "
+"personali, come nomi, email o numeri di telefono."
+
 #: apps/manager/templates/manager/layout.html
 msgid "Platform"
 msgstr "Piattaforma"
@@ -2155,6 +2205,24 @@ msgstr "Spazio piattaforma: segnalazioni"
 #: apps/seo/site_links.py
 msgid "Platform space: dashboard"
 msgstr "Spazio piattaforma: cruscotto"
+
+#: apps/vendors/templates/email/vendors/profile_reverted/body.html
+#: apps/vendors/templates/email/vendors/profile_reverted/body.txt
+msgid ""
+"Platform staff reverted your change to the logo of %(vendor_name)s: it went back to the previous "
+"logo."
+msgstr ""
+"Lo staff della piattaforma ha annullato la tua modifica al logo di %(vendor_name)s: è tornato il "
+"logo precedente."
+
+#: apps/vendors/templates/email/vendors/profile_reverted/body.html
+#: apps/vendors/templates/email/vendors/profile_reverted/body.txt
+msgid ""
+"Platform staff reverted your change to the storefront profile of %(vendor_name)s (%(language)s): "
+"%(fields)s went back to the previous text."
+msgstr ""
+"Lo staff della piattaforma ha annullato la tua modifica al profilo vetrina di %(vendor_name)s "
+"(%(language)s): %(fields)s è tornato al testo precedente."
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Please correct the error below."
@@ -2239,8 +2307,15 @@ msgid "Readiness probe"
 msgstr "Controllo di prontezza"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
+#: apps/manager/templates/manager/platform/profile_changes.html
+#: apps/vendors/templates/email/vendors/profile_reverted/body.html
+#: apps/vendors/templates/email/vendors/profile_reverted/body.txt
 msgid "Reason"
 msgstr "Motivazione"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Reason (sent to the owners)"
+msgstr "Motivo (inviato ai titolari)"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
@@ -2338,6 +2413,18 @@ msgstr "Resi e rimborsi"
 #: apps/manager/forms.py
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "revert"
+msgstr "annullamento"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Revert this change"
+msgstr "Annulla questa modifica"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Reverted"
+msgstr "Annullata"
 
 #: apps/seo/site_links.py
 msgid "robots.txt"
@@ -2475,6 +2562,10 @@ msgstr "Spazio negozio: profilo del negozio"
 msgid "Shops"
 msgstr "Negozi"
 
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Show all"
+msgstr "Mostra tutto"
+
 #: apps/cms/choosers.py
 msgid "Show only the products of one brand."
 msgstr "Mostra solo i prodotti di un marchio."
@@ -2506,6 +2597,10 @@ msgstr "Mostra i prodotti più recenti di questa categoria."
 #: apps/cms/blocks.py
 msgid "Show the newest products of this shop."
 msgstr "Mostra i prodotti più recenti di questo negozio."
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Showing %(vendor)s only."
+msgstr "Solo %(vendor)s."
 
 #: apps/cms/models.py
 msgid "Shown on the article; a migrated article keeps its original date."
@@ -2639,6 +2734,10 @@ msgstr "stato"
 #: apps/orders/templates/orders/customer_order.html
 msgid "Status history"
 msgstr "Cronologia dello stato"
+
+#: apps/manager/sections.py apps/manager/templates/manager/platform/profile_changes.html
+msgid "Storefront changes"
+msgstr "Modifiche al negozio"
 
 #: apps/seo/site_links.py
 msgid "Storefront pages: %(language)s"
@@ -2927,6 +3026,14 @@ msgid "The category or tag visitors are sent to. Fill it only when the target is
 msgstr ""
 "La categoria o etichetta a cui mandare i visitatori. Compilalo solo quando la destinazione è una "
 "categoria o etichetta."
+
+#: apps/manager/views.py
+msgid "The change is confirmed and the old logo is deleted."
+msgstr "La modifica è confermata e il vecchio logo è stato eliminato."
+
+#: apps/manager/views.py
+msgid "The change was reverted and the owners were told."
+msgstr "La modifica è stata annullata e i titolari sono stati avvisati."
 
 #: apps/vendors/models.py
 msgid "The city of your permanent establishment."
@@ -3903,6 +4010,14 @@ msgid ""
 msgstr ""
 "I CAP del territorio, separati da virgole: un CAP esatto come '23041', un prefisso come '35*' o un"
 " intervallo come '22100..22199'."
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid ""
+"The previous logo is kept until the review window closes, so a revert can restore it. Confirm the "
+"change to delete it now."
+msgstr ""
+"Il logo precedente viene conservato fino alla chiusura del periodo di verifica, così un "
+"annullamento può ripristinarlo. Conferma la modifica per eliminarlo subito."
 
 #: apps/catalog/models.py
 msgid ""

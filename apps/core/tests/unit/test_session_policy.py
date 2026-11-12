@@ -8,7 +8,8 @@ from apps.core import session_policy as sp
 def test_the_d32_defaults() -> None:
     policy = sp.parse_policy({})
     assert (policy.idle_minutes, policy.cap_minutes, policy.single_seconds) == (15, 120, 120)
-    assert {"export", "backup", "role_grant", "api_key", "vat_regime"} <= policy.sensitive
+    wanted = {"export", "backup", "role_grant", "api_key", "vat_regime", "profile_revert"}
+    assert wanted <= policy.sensitive
     assert {"payout_details", "owner_role_grant", "mfa_disable"} <= policy.critical
     assert policy.group_of("catalogue_edit") == sp.GROUP_EVERYDAY
     assert policy.group_of("export") == sp.GROUP_SENSITIVE

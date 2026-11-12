@@ -50,6 +50,8 @@ DEFAULT_SENSITIVE_ACTIONS: Final = frozenset(
         "audit_in_clear",
         "bulk_edit",
         "impersonation",
+        "profile_revert",  # CORE.9 3/3: revert an owner's storefront text or logo change
+        "notice_decision",  # CMP.5: review, decide, restrict, tell the authorities
     }
 )
 DEFAULT_CRITICAL_ACTIONS: Final = frozenset(

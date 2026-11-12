@@ -38,6 +38,7 @@ from wagtail.images.views.chooser import (
     ImageSelectFormatView,
 )
 
+from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
@@ -247,6 +248,7 @@ class ManagerImageUploadView(_OwnListing, _FormatStep, ImageChosenResponseMixin,
         )
         return response
 
+    @requires_level_method("content_edit")  # group 1: any session, CORE.26 can tighten it
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         self.form = ImageUploadForm(request.POST, request.FILES, prefix=PREFIX)
         if not self.form.is_valid():
@@ -367,6 +369,7 @@ class ManagerDocumentUploadView(
         )
         return response
 
+    @requires_level_method("content_edit")  # group 1: any session, CORE.26 can tighten it
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         self.form = DocumentUploadForm(request.POST, request.FILES, prefix=DOC_PREFIX)
         if not self.form.is_valid():
@@ -450,6 +453,7 @@ class ManagerLinkView(_OwnImages, View):
         }
         return self.dialog(ExternalLinkForm(initial=initial, prefix=LINK_PREFIX))
 
+    @requires_level_method("content_edit")  # group 1: any session, CORE.26 can tighten it
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         form = ExternalLinkForm(request.POST, prefix=LINK_PREFIX)
         if not form.is_valid():

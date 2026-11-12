@@ -513,6 +513,20 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
+    "manager:platform:profile_changes": StaffOnly(
+        "Storefront profile history (CORE.9): platform staff holding the revert permission only; "
+        "a vendor member gets 403 on the platform space, so no vendor sees any history."
+    ),
+    "manager:platform:profile_confirm": StaffOnly(
+        "Confirm of one logo change (CORE.9): platform staff holding the revert permission only, "
+        "POST only.",
+        kwargs={"entry": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "manager:platform:profile_revert": StaffOnly(
+        "Revert of one storefront profile change (CORE.9): platform staff holding the revert "
+        "permission only, POST only.",
+        kwargs={"entry": "00000000-0000-0000-0000-000000000000"},
+    ),
     "manager:platform:notices": StaffOnly(
         "Notices of illegal content (CMP.5): platform data, not vendor-owned; needs the "
         "compliance.review_notices permission, so a vendor member gets 404."
