@@ -61,6 +61,8 @@ ALLOW_SEED = env_bool("MPMV_ALLOW_SEED", default=False)
 DEMO_MODE = env_bool("MPMV_DEMO_MODE", default=False)
 FORCE_NOINDEX = env_bool("MPMV_FORCE_NOINDEX", default=False)
 LIVE_DATA = False
+# True only in mpmv.settings.stage: the checks that guard LIVE (e.g. payments.E003) apply there too.
+STAGE = False
 
 INSTALLED_APPS = [
     # Django's admin with the self-service password change audited (SEC.4).
@@ -559,6 +561,12 @@ if _MAP_TILE_ORIGIN:
 # The in-memory fake provider exists only where PAYMENT_ALLOW_FAKE_PROVIDER is True (tests).
 PAYMENT_PROVIDER = env_str("MPMV_PAYMENT_PROVIDER", "")
 PAYMENT_ALLOW_FAKE_PROVIDER = False
+# Stripe (PAY.1, PAY.2): keys come from the environment only and are empty until set; on LIVE and
+# STAGE `manage.py check` refuses an empty key while MPMV_PAYMENT_PROVIDER=stripe (payments.E003).
+STRIPE_SECRET_KEY = env_str("MPMV_STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = env_str("MPMV_STRIPE_WEBHOOK_SECRET", "")
+STRIPE_API_VERSION = env_str("MPMV_STRIPE_API_VERSION", "")  # empty: the account's default
+STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300  # Stripe's recommended replay window
 
 # Per-API-key rate limit (CORE.12, CORE.16, apps.api.engine): fixed windows counted in PostgreSQL,
 # so every app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every

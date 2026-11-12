@@ -98,6 +98,8 @@ from apps.ingest.tests.factories import (
     SourceObservationFactory,
     SupplierSourceFactory,
 )
+from apps.ledger.models import LedgerEntry
+from apps.ledger.tests.factories import LedgerEntryFactory
 from apps.orders.models import OrderLine, StockReservation, VendorOrder
 from apps.orders.tests.factories import (
     OrderLineFactory,
@@ -267,6 +269,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     CartLine: lambda vendor: CartLineFactory.create(product=ProductFactory.create(vendor=vendor)),
     # ORD.2: a sub-order of its own order, and a line of such a sub-order.
     VendorOrder: lambda vendor: VendorOrderFactory.create(vendor=vendor),
+    LedgerEntry: lambda vendor: LedgerEntryFactory.create(vendor=vendor),
     OrderLine: lambda vendor: OrderLineFactory.create(vendor_order__vendor=vendor),
     StockReservation: lambda vendor: StockReservationFactory.create(
         product=ProductFactory.create(vendor=vendor)
@@ -383,6 +386,7 @@ ENDPOINTS: dict[str, Access] = {
     "readyz": NoVendorData("Readiness probe: a status only, no data."),
     "robots_txt": NoVendorData("robots.txt (SEO.8): constant text for crawlers; no vendor data."),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
+    "payments_webhook": NoVendorData("Signed payment provider events; answers with a status only."),
     "media": NoVendorData(
         "Public image files (THM.12): published images and their renditions, no vendor data.",
         kwargs={"path": "images/missing.webp"},

@@ -2,6 +2,7 @@
 
 - payments.E001: `PAYMENT_PROVIDER` names a provider that is not registered.
 - payments.E002: the fake provider is configured where real data lives (`LIVE_DATA`).
+- payments.E003: Stripe is configured on LIVE or STAGE without its keys (PAY.1, PAY.2).
 """
 
 from typing import Any
@@ -33,4 +34,19 @@ def check_payment_provider(app_configs: Any = None, **kwargs: Any) -> list[Check
                 id="payments.E002",
             )
         ]
+    if code == "stripe" and (settings.LIVE_DATA or settings.STAGE):
+        missing = [
+            name
+            for name in ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET")
+            if not getattr(settings, name, "")
+        ]
+        if missing:
+            return [
+                Error(
+                    f"PAYMENT_PROVIDER is stripe but {', '.join(missing)} is empty.",
+                    hint="Set MPMV_STRIPE_SECRET_KEY and MPMV_STRIPE_WEBHOOK_SECRET "
+                    "(deploy/server/mpmv.env.example).",
+                    id="payments.E003",
+                )
+            ]
     return []
