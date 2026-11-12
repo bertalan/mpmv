@@ -2045,6 +2045,16 @@ def profile_text_errors(values: Mapping[str, str]) -> dict[str, str]:
     return errors
 
 
+def plain_text_error(value: str) -> str | None:
+    """Why `value` is not acceptable plain text (control characters, HTML markup), or None.
+    For free text that is shown escaped and never as rich text, such as a staff reason."""
+    if _CONTROL.search(value):
+        return "Remove the control characters."
+    if _HTML_MARKUP.search(value):
+        return "Write plain text: HTML tags are not accepted."
+    return None
+
+
 LOGO_ALT_MAX_LENGTH: Final = 125
 
 

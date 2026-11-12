@@ -12,6 +12,7 @@ EXPECTED = {
     "catalog": {
         "manager.platform_catalog",
         "vendors.view_all_vendors",
+        "vendors.revert_storefront_profile",
         "wagtailadmin.access_admin",
     },
     "finance": {"manager.platform_finance", "vendors.view_all_vendors", "core.elevate"},
@@ -19,6 +20,7 @@ EXPECTED = {
     "owner": {
         "core.platform_owner",
         "vendors.view_all_vendors",
+        "vendors.revert_storefront_profile",
         "wagtailadmin.access_admin",
         "core.elevate",
     },

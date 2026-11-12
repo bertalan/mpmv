@@ -1,0 +1,7 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% if language %}{% blocktranslate %}Platform staff reverted your change to the storefront profile of {{ vendor_name }} ({{ language }}): {{ fields }} went back to the previous text.{% endblocktranslate %}{% else %}{% blocktranslate %}Platform staff reverted your change to the logo of {{ vendor_name }}: it went back to the previous logo.{% endblocktranslate %}{% endif %}</p>
+<p>{% translate "Reason" %}: {{ reason }}</p>
+</body>
+</html>
