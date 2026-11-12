@@ -2446,11 +2446,11 @@ msgstr "Spedizione"
 msgid "Shipping policy"
 msgstr "Condizioni di spedizione"
 
-#: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/orders/customer_order.html
 msgid "Shipping with VAT"
 msgstr "Spedizione con IVA"
 
+#: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Shipping: %(shipping)s EUR"
