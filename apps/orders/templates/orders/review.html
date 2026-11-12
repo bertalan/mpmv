@@ -1,0 +1,12 @@
+{% extends "layouts/base.html" %}
+{% load i18n captcha %}
+{% block title %}{% translate "Review and pay" %} · {{ site_name }}{% endblock %}
+{% block head %}{% robots_meta "noindex, nofollow" %}
+{% captcha_script %}{% endblock %}
+{% block content %}
+<article class="checkout">
+  <h1>{% translate "Review and pay" %}</h1>
+  {% include "components/step_indicator.html" with steps=steps current=current_step only %}
+  {% include "orders/_review_body.html" %}
+</article>
+{% endblock %}

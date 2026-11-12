@@ -1,0 +1,26 @@
+{% load i18n captcha %}<div id="review-body">
+{% if partial %}<div id="live-region" hx-swap-oob="innerHTML">{% translate "Shipping updated." %}</div>{% endif %}
+  <div id="review-errors" role="alert">{% for error in errors %}{% include "components/alert.html" with level="danger" message=error only %}{% endfor %}</div>
+  {% for message in cart_messages %}{% include "components/alert.html" with level="warning" message=message only %}{% endfor %}
+  <section aria-labelledby="deliver-title">
+    <h2 id="deliver-title">{% translate "Delivery details" %}</h2>
+    <p>{{ address.name }}{% if address.company %}, {{ address.company }}{% endif %}<br>{{ address.line1 }}{% if address.line2 %}, {{ address.line2 }}{% endif %}<br>{{ address.postcode }} {{ address.city }}{% if address.state %} ({{ address.state }}){% endif %}, {{ address.country }}<br>{{ email }}</p>
+    <p><a href="{% url 'orders:checkout' %}">{% translate "Change details" %}</a></p>
+    {% if business and vat_note %}{% include "components/alert.html" with level=vat_ok|yesno:"success,info" message=vat_note only %}{% endif %}
+  </section>
+  <form method="post" action="{% url 'orders:review' %}">
+    {% csrf_token %}
+    {% for package in packages %}{% include "orders/_package.html" with package=package mode="review" %}{% endfor %}
+    <noscript><p><button type="submit" class="button button--secondary" formaction="{% url 'orders:shipping' %}">{% translate "Update shipping" %}</button></p></noscript>
+    {% if order %}{% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=order.lines total=order.total note=order.note only %}{% endif %}
+    {% if ordering_closed %}{% include "components/alert.html" with level="info" message=_("Ordering is not open yet. Your cart is kept.") only %}{% endif %}
+    {% if placeable %}
+      {% captcha_widget %}
+      <p class="helptext">{% translate "When you place the order we hold the items for you. Payment follows in the next step." %}</p>
+      {% include "components/button.html" with label=_("Place order") type="submit" only %}
+    {% else %}
+      <p class="helptext">{% translate "Solve the points above to place the order." %}</p>
+      <p>{% url "orders:cart" as cart_url %}{% include "components/button.html" with label=_("Back to the cart") url=cart_url variant="secondary" only %}</p>
+    {% endif %}
+  </form>
+</div>

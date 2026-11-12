@@ -48,6 +48,7 @@ FORM_MODULES = (
     "apps.manager.media",
     "apps.vendors.forms",
     "apps.compliance.forms",
+    "apps.orders.ui.forms",
     "apps.events.admin_views",
 )
 

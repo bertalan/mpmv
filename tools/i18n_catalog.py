@@ -33,6 +33,7 @@ SCOPES = (
     "apps/manager",
     "apps/accounts",
     "apps/orders/templates",
+    "apps/orders/ui",
     "themes/base/templates/layouts",
 )
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
@@ -50,6 +51,7 @@ THEME_FILES = (
         for n in (
             "alert",
             "button",
+            "cart_line",
             "empty_state",
             "error_summary",
             "field",
@@ -57,8 +59,11 @@ THEME_FILES = (
             "header",
             "icon",
             "language_switcher",
+            "order_summary",
             "pagination",
+            "quantity_stepper",
             "skip_link",
+            "step_indicator",
             "table",
         )
     ),
