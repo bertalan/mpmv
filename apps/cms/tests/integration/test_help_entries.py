@@ -21,6 +21,7 @@ from apps.cms import help as help_lookup
 from apps.cms.models import HelpEntry
 from apps.cms.tests.factories import HelpEntryFactory
 from tests import hostile_input as hi
+from tests.unit.field_help_allowlist import ALLOWED_FIELD_NAMES
 
 pytestmark = pytest.mark.django_db
 
@@ -77,8 +78,9 @@ def test_help_text_is_stored_through_the_sanitiser() -> None:
 
 
 def test_every_field_has_a_help_text() -> None:
-    # id, translation_key and locale are Wagtail's own and hidden from the form.
-    own = {"id", "translation_key", "locale"}
+    # id, translation_key and locale are Wagtail's own and hidden from the form; names the ARC.30
+    # sweep allow-lists (such as "title") are self-explanatory and carry no help text on purpose.
+    own = {"id", "translation_key", "locale", *ALLOWED_FIELD_NAMES}
     fields = [f for f in HelpEntry._meta.fields if f.name not in own]
     assert [f.name for f in fields if not f.help_text] == []
 
