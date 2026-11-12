@@ -20,6 +20,8 @@ VIEW_ALL_VENDORS_PERMISSION: Final = "vendors.view_all_vendors"  # Q-34
 # Wagtail's access to the editors' admin: the roles that edit or read the help texts (ARC.32,
 # lane-a on #86) hold it, so the Help item and the "Help texts" snippet are reachable.
 EDITORS_ADMIN_PERMISSION: Final = "wagtailadmin.access_admin"
+# Opens a passkey window (CORE.25). Owner decision 2026-11-12 (D-32): owner, support and finance.
+ELEVATE_PERMISSION: Final = "core.elevate"
 
 
 class Access(StrEnum):
@@ -72,19 +74,24 @@ ROLES: Final[tuple[Role, ...]] = (
         FINANCE,
         "Platform: finance and payments",
         "Finance and payments",
-        ("manager.platform_finance", VIEW_ALL_VENDORS_PERMISSION),
+        ("manager.platform_finance", VIEW_ALL_VENDORS_PERMISSION, ELEVATE_PERMISSION),
     ),
     Role(
         SUPPORT,
         "Platform: support",
         "Support",
-        ("manager.platform_support", VIEW_ALL_VENDORS_PERMISSION),
+        ("manager.platform_support", VIEW_ALL_VENDORS_PERMISSION, ELEVATE_PERMISSION),
     ),
     Role(
         OWNER,
         "Platform: owner",
         "Platform owner",
-        (PLATFORM_OWNER_PERMISSION, VIEW_ALL_VENDORS_PERMISSION, EDITORS_ADMIN_PERMISSION),
+        (
+            PLATFORM_OWNER_PERMISSION,
+            VIEW_ALL_VENDORS_PERMISSION,
+            EDITORS_ADMIN_PERMISSION,
+            ELEVATE_PERMISSION,
+        ),
     ),
 )
 
