@@ -89,6 +89,43 @@ def test_a_baseline_never_lists_an_allow_listed_field() -> None:
         assert [k for k in listed if sweep.is_allowed(k)] == []
 
 
+# -- ARC.31 part 5: the remaining apps are done ----------------------------------------------------
+
+REMAINING_APPS = {
+    "accounts",
+    "api",
+    "compliance",
+    "core",
+    "ingest",
+    "orders",
+    "seo",
+    "shipping",
+    "tax",
+    "themes",
+}
+
+
+def _app_of(key: str) -> str:
+    kind, rest = key.split(":", 1)
+    if kind == "form":
+        return rest.split(".")[1] if rest.startswith("apps.") else rest.split(".")[0]
+    return rest.split(".")[0]
+
+
+def test_the_remaining_apps_are_out_of_both_baselines() -> None:
+    for path in (sweep.BASELINE, sweep.I18N_BASELINE):
+        _, listed = sweep.read_baseline(path)
+        left = [k for k in listed if _app_of(k) in REMAINING_APPS]
+        assert left == [], f"{path.name}: {len(left)} left, e.g. {left[:10]}"
+
+
+def test_help_text_of_the_remaining_apps_is_extracted_into_the_catalog() -> None:
+    from tools import i18n_catalog
+
+    scoped = {Path(s).name for s in i18n_catalog.HELP_TEXT_SCOPES}
+    assert {"compliance", "core", "ingest", "shipping", "tax", "themes"} <= scoped
+
+
 # -- Seeds: the sweep catches a field added without help ----------------------------------------
 
 
