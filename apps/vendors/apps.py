@@ -17,6 +17,8 @@ class VendorsConfig(AppConfig):
         "selfcertification",
         "vendorfeatureflag",
         "crossvendorconsent",
+        "vendorplan",
+        "commissionrule",
         "notincountry",
     )
     unaudited_models = {

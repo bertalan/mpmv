@@ -1,7 +1,9 @@
 """Vendors, their legal identity and their per-language storefront texts and policies (spec 04
 §4.2, VEN.1, VEN.12).
 
-Fields owned by later tasks are added there: `plan` (VEN.2), `payout_account` (VEN.6),
+Fields owned by later tasks are added there: `plan` (VEN.19: the per-vendor plan assignment with
+its effective-dated history; VEN.2 only defines `VendorPlan` and the rules),
+`payout_account` (VEN.6),
 `dac7_complete` (CMP.1), `logo` (media/images). Storefront texts follow the shared translation
 workflow (`apps.core.models.TranslationModel`, I18N.2). Which legal fields are required, and for
 what, is data: `LegalFieldRequirement` (VEN.12). The versioned vendor contract and its
@@ -9,6 +11,7 @@ append-only acceptances are VEN.5.
 """
 
 import dataclasses
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, ClassVar
 
 from django.conf import settings
@@ -16,6 +19,7 @@ from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import DateRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models.functions import Coalesce
 from django.utils.translation import gettext_lazy as _
 from wagtail.fields import RichTextField
 
@@ -31,7 +35,10 @@ from apps.core.models import (
     BaseModel,
     FeatureFlag,
     TranslationModel,
+    TsTzRange,
+    Versioned,
     resolve_translation,
+    valid_period_check,
 )
 from apps.core.translations import Resolved, source_hash
 
@@ -1393,6 +1400,175 @@ class VendorApplication(BaseModel):
 
     def __str__(self) -> str:
         return f"application of {self.user_id} (link v{self.version})"
+
+
+TWO_PLACES = Decimal("0.01")
+
+
+class VendorPlan(BaseModel):
+    """A plan: a bundle of limits and features, data not code (spec 04, VEN.2).
+
+    At launch a plan is only a commission scope (`CommissionRule.plan`) and limits (D-04: no
+    paid-plan fee is charged before VEN.19). `features` is a JSON object of flags such as
+    `featured` or `api_sync`. Changes go through `services.save_plan` (audited).
+
+    Which plan a vendor is on is not stored here: the assignment, with effective dates, belongs
+    to VEN.19. Until then `services.commission_rule_for` takes the plan as an argument, and the
+    caller must pass the plan in force at the time of the order (never today's plan for an old
+    order).
+    """
+
+    code = models.SlugField(max_length=32, unique=True)
+    name = models.CharField(max_length=80)
+    max_products = models.PositiveIntegerField(null=True, blank=True, help_text="Empty: unlimited.")
+    features = models.JSONField(default=dict, blank=True, help_text="Feature flags (an object).")
+    monthly_fee = MoneyField(
+        null=True, blank=True, help_text="Not charged before VEN.19 (D-04); empty: no fee."
+    )
+
+    class Meta:
+        ordering = ["code"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(monthly_fee__isnull=True) | models.Q(monthly_fee__gte=0),
+                name="vendors_plan_fee_not_negative",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def clean(self) -> None:
+        if not isinstance(self.features, dict):
+            raise ValidationError({"features": "Features must be a JSON object."})
+
+
+class CommissionRule(Versioned):
+    """A versioned commission rule (VEN.2): never edited, a change is a new row valid from a date.
+
+    Scope: one vendor, one plan, or neither (the platform default); `engine.select_rule` picks
+    vendor, then plan, then default. The database refuses overlapping periods within a scope, an
+    implicit 0% (a zero percent needs a `promo_label`), out-of-range rates, and, with a trigger
+    (migration 0027), any edit or delete: the only write an existing row takes is closing
+    `valid_to` once. Orders freeze `snapshot()`, never a live reference.
+    """
+
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="commission_rules",
+        help_text="Empty: not specific to one vendor.",
+    )
+    plan = models.ForeignKey(
+        VendorPlan,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="commission_rules",
+        help_text="Empty: not specific to one plan.",
+    )
+    version = models.PositiveIntegerField(
+        editable=False, help_text="Counts up within the scope, from 1."
+    )
+    percent = models.DecimalField(max_digits=5, decimal_places=2, help_text="E.g. 20.00.")
+    base = models.CharField(max_length=24, choices=[(b, b) for b in engine.COMMISSION_BASES])
+    fee_percent = models.DecimalField(
+        "payment fee percent", max_digits=5, decimal_places=2, help_text="E.g. 4.00."
+    )
+    fee_fixed = MoneyField("payment fee fixed", help_text="E.g. 2.00.")
+    fee_base = models.CharField(
+        max_length=16,
+        choices=[(b, b) for b in engine.FEE_BASES],
+        default=engine.GROSS_PAID,
+    )
+    promo_label = models.CharField(max_length=80, blank=True, help_text="E.g. launch promo.")
+
+    class Meta:
+        ordering = ["vendor_id", "plan_id", "-valid_from"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(percent__gte=0, percent__lte=100),
+                name="vendors_commissionrule_percent_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(percent__gt=0) | ~models.Q(promo_label=""),
+                name="vendors_commissionrule_no_implicit_zero",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fee_percent__gte=0, fee_percent__lte=100),
+                name="vendors_commissionrule_fee_percent_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fee_fixed__gte=0),
+                name="vendors_commissionrule_fee_fixed_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(base__in=engine.COMMISSION_BASES),
+                name="vendors_commissionrule_base_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fee_base__in=engine.FEE_BASES),
+                name="vendors_commissionrule_fee_base_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(vendor__isnull=True) | models.Q(plan__isnull=True),
+                name="vendors_commissionrule_one_scope",
+            ),
+            valid_period_check("vendors_commissionrule_valid_to_after_valid_from"),
+            models.UniqueConstraint(
+                Coalesce("vendor", models.Value(0)),
+                Coalesce("plan", models.Value(0)),
+                "version",
+                name="vendors_commissionrule_unique_version",
+            ),
+            ExclusionConstraint(
+                name="vendors_commissionrule_no_overlap",
+                expressions=[
+                    (Coalesce("vendor", models.Value(0)), RangeOperators.EQUAL),
+                    (Coalesce("plan", models.Value(0)), RangeOperators.EQUAL),
+                    (TsTzRange("valid_from", "valid_to"), RangeOperators.OVERLAPS),
+                ],
+                violation_error_message="Commission rules of one scope must not overlap.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        who = self.vendor or self.plan or "default"
+        return f"{who} v{self.version}: {self.percent}% from {self.valid_from:%Y-%m-%d}"
+
+    def clean(self) -> None:
+        # A field that failed its own validation is None here: its error is already reported.
+        if None in (self.percent, self.fee_percent, self.fee_fixed):
+            return
+        errors = engine.commission_rule_errors(
+            percent=self.percent,
+            base=self.base,
+            fee_percent=self.fee_percent,
+            fee_fixed=self.fee_fixed,
+            fee_base=self.fee_base,
+            promo_label=self.promo_label,
+        )
+        if self.vendor_id is not None and self.plan_id is not None:
+            errors["plan"] = "A rule is for a vendor or for a plan, not both."
+        if errors:
+            raise ValidationError(errors)
+
+    def snapshot(self) -> dict[str, Any]:
+        """What an order freezes (ORD.2): JSON-safe, with the rule id and version, and without
+        the closing date, which can still change after the order."""
+        return {
+            "rule_id": str(self.public_id),
+            "version": self.version,
+            "percent": str(self.percent.quantize(TWO_PLACES, ROUND_HALF_UP)),
+            "base": self.base,
+            "fee_percent": str(self.fee_percent.quantize(TWO_PLACES, ROUND_HALF_UP)),
+            "fee_fixed": str(self.fee_fixed.quantize(TWO_PLACES, ROUND_HALF_UP)),
+            "fee_base": self.fee_base,
+            "promo_label": self.promo_label,
+            "valid_from": self.valid_from.isoformat(),
+        }
 
 
 class DateRangeExpr(models.Func):

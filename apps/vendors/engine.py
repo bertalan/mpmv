@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 from apps.core.countries import EU_MEMBER_STATES as EU_MEMBER_STATES  # TIN_FORMATS covers them
 from apps.core.countries import ISO_3166_ALPHA2, is_eu
 from apps.core.text import slugify
+from apps.core.validity import NoValidRow, OverlappingValidity, covers
 
 # --- Status state machine (spec 04 §4.2)
 
@@ -1815,6 +1816,79 @@ def check_establishment(establishment: Establishment, allowed: Collection[str]) 
     error = establishment_error(establishment, allowed)
     if error is not None:
         raise EstablishmentNotAllowed(establishment, error)
+
+
+# --- Commission rules (VEN.2, spec 04): versioned rows, validated and selected here, purely
+
+NET_GOODS: Final = "net_goods"
+NET_GOODS_AND_SHIPPING: Final = "net_goods_and_shipping"
+COMMISSION_BASES: Final = (NET_GOODS, NET_GOODS_AND_SHIPPING)
+GROSS_PAID: Final = "gross_paid"  # the payment fee is always on the gross paid (case FEE-NETTO)
+FEE_BASES: Final = (GROSS_PAID,)
+MAX_PERCENT: Final = Decimal("100")
+
+
+class NoCommissionRule(NoValidRow):
+    """No commission rule applies: a blocking error, never a silent 0% (case REGOLA-ZERO)."""
+
+
+class OverlappingCommissionRules(OverlappingValidity):
+    """More than one rule of the same level covers the instant: the data is inconsistent."""
+
+
+def commission_rule_errors(
+    *,
+    percent: Decimal,
+    base: str,
+    fee_percent: Decimal,
+    fee_fixed: Decimal,
+    fee_base: str,
+    promo_label: str,
+) -> dict[str, str]:
+    """What is wrong with a commission rule, by field name; empty when it is valid.
+
+    A 0% commission is accepted only with an explicit label (a promotion, "operator-owned"):
+    there is no implicit zero rule (case REGOLA-ZERO).
+    """
+    errors: dict[str, str] = {}
+    if not 0 <= percent <= MAX_PERCENT:
+        errors["percent"] = "The commission is a percentage from 0 to 100."
+    elif percent == 0 and not promo_label.strip():
+        errors["percent"] = "A 0% commission needs an explicit promo label."
+    if base not in COMMISSION_BASES:
+        errors["base"] = f"The commission base is one of {', '.join(COMMISSION_BASES)}."
+    if not 0 <= fee_percent <= MAX_PERCENT:
+        errors["fee_percent"] = "The payment fee is a percentage from 0 to 100."
+    if fee_fixed < 0:
+        errors["fee_fixed"] = "The fixed payment fee cannot be negative."
+    if fee_base not in FEE_BASES:
+        errors["fee_base"] = "The payment fee is always charged on the gross amount paid."
+    return errors
+
+
+def select_rule[R: Any](
+    rules: Iterable[R], *, vendor_id: int | None, plan_id: int | None, at: dt.datetime
+) -> R:
+    """The rule in force at `at`: the vendor's own, else its plan's, else the platform default.
+
+    Each level has at most one row valid at an instant (the database refuses overlaps). Nothing
+    applying is `NoCommissionRule`.
+    """
+    candidates = [rule for rule in rules if covers(rule, at)]
+    levels = (
+        lambda r: r.vendor_id is not None and r.vendor_id == vendor_id,
+        lambda r: r.vendor_id is None and r.plan_id is not None and r.plan_id == plan_id,
+        lambda r: r.vendor_id is None and r.plan_id is None,
+    )
+    for level in levels:
+        found = [rule for rule in candidates if level(rule)]
+        if len(found) > 1:
+            raise OverlappingCommissionRules(
+                f"{len(found)} commission rules are valid at {at.isoformat()} for one level."
+            )
+        if found:
+            return found[0]
+    raise NoCommissionRule(f"No commission rule is valid at {at.isoformat()}; configure one first.")
 
 
 # --- Storefront profile (CORE.9, D-34): the tagline is plain text; the description and the three
