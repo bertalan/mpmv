@@ -29,10 +29,24 @@ msgstr "%(name)s rimosso."
 msgid "%(vendor_name)s shipped its part of order %(order_number)s."
 msgstr "%(vendor_name)s ha spedito la sua parte dell’ordine %(order_number)s."
 
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
+msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
+
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
+msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
+
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
 msgstr "%(vendor_name)s: nuovo ordine pagato %(order_number)s da spedire:"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
+msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
+msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
 
 #: apps/vendors/models.py
 msgid ""
@@ -69,6 +83,10 @@ msgstr "Accetta l'ordine"
 #: themes/base/templates/403.html
 msgid "Access denied"
 msgstr "Accesso negato"
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Account status"
+msgstr "Stato dell’account"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Act on the content"
@@ -206,6 +224,10 @@ msgstr ""
 msgid "Confirm"
 msgstr "Conferma"
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Connect your payout account"
+msgstr "Collega il tuo account per i pagamenti"
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
@@ -215,6 +237,10 @@ msgstr "Continua"
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "Continue does not sign you in: the page it opens asks you to confirm who you are."
 msgstr "Continua non ti fa accedere: la pagina che si apre ti chiede di confermare la tua identità."
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Continue the onboarding"
+msgstr "Continua la registrazione"
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "Continue to your request"
@@ -324,23 +350,35 @@ msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare
 msgid "Go to the home page"
 msgstr "Vai alla home page"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello %(customer_name)s,"
 msgstr "Ciao %(customer_name)s,"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello,"
@@ -536,6 +574,10 @@ msgstr "nessuna registrazione di passkey in corso"
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Not connected"
+msgstr "Non collegato"
+
 #: apps/manager/views.py
 msgid "Nothing changed."
 msgstr "Nessuna modifica."
@@ -565,9 +607,17 @@ msgstr "Segnalazioni"
 msgid "Notifier"
 msgstr "Segnalante"
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "On request"
+msgstr "Su richiesta"
+
 #: apps/manager/forms.py
 msgid "One line under the shop name. Plain text."
 msgstr "Una riga sotto il nome del negozio. Testo semplice."
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Online sale"
+msgstr "Vendita online"
 
 #: apps/vendors/models.py
 msgid ""
@@ -611,6 +661,21 @@ msgstr "Ordine"
 msgid "Order %(number)s"
 msgstr "Ordine %(number)s"
 
+#: apps/orders/templates/email/orders/order_cancelled/subject.txt
+msgid "Order %(order_number)s was cancelled"
+msgstr "L’ordine %(order_number)s è stato annullato"
+
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
+msgid "Order %(order_number)s was cancelled before payment. Nothing was charged."
+msgstr ""
+"L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato addebitato nulla."
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
+msgid "Order %(order_number)s was cancelled. Do not ship these items:"
+msgstr "L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
+
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Order %(order_number)s, sold by %(vendor_name)s:"
@@ -620,9 +685,17 @@ msgstr "Ordine %(order_number)s, venduto da %(vendor_name)s:"
 msgid "Order %(order_number)s: a shipment is on its way"
 msgstr "Ordine %(order_number)s: una spedizione è in arrivo"
 
+#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
+msgid "Order %(order_number)s: a shipment was delivered"
+msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
+
 #: apps/orders/templates/email/orders/order_confirmation/subject.txt
 msgid "Order %(order_number)s: confirmation from %(vendor_name)s"
 msgstr "Ordine %(order_number)s: conferma di %(vendor_name)s"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
+msgid "Order %(order_number)s: part of your order was cancelled"
+msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
@@ -677,6 +750,10 @@ msgstr "Password"
 #: apps/orders/templates/email/orders/payment_confirmed/subject.txt
 msgid "Payment received for order %(order_number)s"
 msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
+
+#: apps/manager/sections.py apps/manager/templates/manager/shop/payments.html
+msgid "Payments"
+msgstr "Pagamenti"
 
 #: apps/vendors/forms.py
 msgid ""
@@ -822,6 +899,10 @@ msgstr "Seleziona"
 msgid "Select at least one row."
 msgstr "Seleziona almeno una riga."
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Selling mode"
+msgstr "Modalità di vendita"
+
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Set up an authenticator app"
 msgstr "Configura un’app di autenticazione"
@@ -940,6 +1021,10 @@ msgstr "Motivazioni"
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Status"
 msgstr "Stato"
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Still needed"
+msgstr "Ancora necessario"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/profile.html
 msgid "Storefront profile"
@@ -1443,6 +1528,12 @@ msgstr "Impostazioni della verifica in due passaggi"
 msgid "Untick it to stop applying the rule without deleting it."
 msgstr "Togli la spunta per smettere di applicare la regola senza eliminarla."
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid ""
+"Until your payout account is active, your products are shown in the catalog and sold on request: "
+"customers cannot add them to the cart."
+msgstr "Finché il tuo account per i pagamenti non è attivo, i tuoi prodotti compaiono nel catalogo e si vendono su richiesta: i clienti non possono aggiungerli al carrello."
+
 #: apps/manager/media.py
 msgid "Upload"
 msgstr "Carica"
@@ -1610,6 +1701,10 @@ msgstr ""
 "Il tuo nome e cognome. Lo usiamo per rivolgerci a te e per creare il tuo account. Obbligatorio: "
 "senza non possiamo elaborare la candidatura."
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Your payout account is active. Customers can buy your products online."
+msgstr "Il tuo account per i pagamenti è attivo. I clienti possono acquistare i tuoi prodotti online."
+
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid "Your recovery codes"
 msgstr "I tuoi codici di recupero"
@@ -1629,39 +1724,3 @@ msgid ""
 msgstr ""
 "La tua partita IVA, con o senza il prefisso del paese, per esempio IT12345678901. La verifichiamo "
 "nel registro europeo VIES. Non sai se ne hai una? Chiedi al tuo commercialista."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
-#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
-msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
-msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
-
-#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
-#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
-msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
-msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
-msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
-msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
-
-#: apps/orders/templates/email/orders/order_cancelled/subject.txt
-msgid "Order %(order_number)s was cancelled"
-msgstr "L’ordine %(order_number)s è stato annullato"
-
-#: apps/orders/templates/email/orders/order_cancelled/body.html
-#: apps/orders/templates/email/orders/order_cancelled/body.txt
-msgid "Order %(order_number)s was cancelled before payment. Nothing was charged."
-msgstr "L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato addebitato nulla."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
-msgid "Order %(order_number)s was cancelled. Do not ship these items:"
-msgstr "L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
-
-#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
-msgid "Order %(order_number)s: a shipment was delivered"
-msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
-msgid "Order %(order_number)s: part of your order was cancelled"
-msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"

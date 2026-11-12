@@ -135,6 +135,7 @@ def _purchase_limit(product: Product, variant: Variant | None) -> int:
         product_status=product.status,
         sales_mode=product.sales_mode,
         vendor_status=product.vendor.status,
+        vendor_sales_mode=product.vendor.sales_mode_default,
         is_variable=product.kind == Product.Kind.VARIABLE,
         has_variant=variant is not None,
     )

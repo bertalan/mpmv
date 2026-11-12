@@ -12,7 +12,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.models import AuditLog
 from apps.core.services import run_mutation
 
-from . import registry, stripe_engine
+from . import connect, registry, stripe_engine
 from .changeset_keys import PAYMENT_MODEL, PAYMENT_SUCCEEDED
 from .engine import InvalidSignature, ProviderError, WebhookEvent
 from .models import Payment, ProcessedEvent
@@ -20,6 +20,7 @@ from .signals import on_payment_succeeded
 
 WEBHOOK_ACTOR = "webhook:payments"
 SUCCEEDED_EVENTS = frozenset({"payment_intent.succeeded", "payment.succeeded"})
+ACCOUNT_UPDATED = "account.updated"  # a connected account's onboarding status (VEN.6)
 
 
 class Outcome(StrEnum):
@@ -66,6 +67,11 @@ def process_webhook(
             )
             if event.type in SUCCEEDED_EVENTS:
                 record_payment_succeeded(provider.code, event, ctx=ctx)
+            elif event.type == ACCOUNT_UPDATED:
+                try:
+                    connect.handle_account_updated(event.payload, ctx=ctx)
+                except (KeyError, TypeError, ValueError) as error:
+                    raise ProviderError("account event without an account id") from error
     except ProviderError:  # a signed event without the fields of a payment: nothing was stored
         return WebhookResult(Outcome.MALFORMED, event)
     except IntegrityError:

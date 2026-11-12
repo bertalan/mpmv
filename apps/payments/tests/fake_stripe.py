@@ -9,6 +9,7 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 
 from apps.payments.stripe_client import (
+    StripeAccount,
     StripeError,
     StripeIntent,
     StripeRefund,
@@ -25,6 +26,9 @@ class FakeStripeClient:
         self.reversals: list[tuple[str, int]] = []
         self.transfer_calls: list[dict[str, object]] = []
         self.calls: list[str] = []
+        self.accounts: dict[str, StripeAccount] = {}
+        self.account_calls: list[dict[str, object]] = []
+        self.links: list[str] = []
         self._replies: dict[str, object] = {}
         self._refunded: dict[str, int] = {}
 
@@ -137,3 +141,37 @@ class FakeStripeClient:
         reversal = f"trr_{secrets.token_hex(6)}"
         self._replies[f"rv:{idempotency_key}"] = reversal
         return reversal
+
+    # -- Connect onboarding (VEN.6)
+
+    def create_account(
+        self,
+        *,
+        country: str,
+        email: str,
+        metadata: Mapping[str, str],
+        idempotency_key: str,
+    ) -> StripeAccount:
+        self.calls.append("create_account")
+        if (cached := self._replay(f"acct:{idempotency_key}")) is not None:
+            assert isinstance(cached, StripeAccount)
+            return cached
+        self.account_calls.append({"country": country, "email": email, "metadata": dict(metadata)})
+        account = StripeAccount(id=f"acct_{secrets.token_hex(6)}")
+        self.accounts[account.id] = account
+        self._replies[f"acct:{idempotency_key}"] = account
+        return account
+
+    def get_account(self, account_id: str) -> StripeAccount:
+        self.calls.append("get_account")
+        if account_id not in self.accounts:
+            raise StripeError("No such account")
+        return self.accounts[account_id]
+
+    def create_account_link(self, *, account_id: str, refresh_url: str, return_url: str) -> str:
+        self.calls.append("create_account_link")
+        if account_id not in self.accounts:
+            raise StripeError("No such account")
+        url = f"https://connect.example.test/setup/{account_id}/{secrets.token_hex(4)}"
+        self.links.append(url)
+        return url

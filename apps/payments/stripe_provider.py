@@ -189,6 +189,11 @@ class StripePaymentProvider:
             raise InvalidSignature("the signed body is not a Stripe event") from None
 
 
+def client_from_settings() -> StripeClient:
+    """The HTTP client the Manager uses for onboarding (tests pass a fake instead)."""
+    return HttpStripeClient(settings.STRIPE_SECRET_KEY, api_version=settings.STRIPE_API_VERSION)
+
+
 def provider_from_settings() -> StripePaymentProvider:
     """The registered factory: keys come from the environment, empty until configured."""
     return StripePaymentProvider(
@@ -198,4 +203,4 @@ def provider_from_settings() -> StripePaymentProvider:
     )
 
 
-__all__ = ["StripePaymentProvider", "provider_from_settings"]
+__all__ = ["StripePaymentProvider", "client_from_settings", "provider_from_settings"]
