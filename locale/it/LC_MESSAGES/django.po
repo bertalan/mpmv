@@ -425,6 +425,11 @@ msgstr ""
 "I primi eventi di un venditore, fino a questo numero, vengono controllati prima di andare online. "
 "Esempio: 3. Obbligatorio."
 
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "About %(minutes_left)s min left. It also ends when you sign out or after inactivity."
+msgstr ""
+"Mancano circa %(minutes_left)s min. Finisce anche quando esci o dopo un periodo di inattività."
+
 #: apps/manager/forms.py
 msgid "About the shop"
 msgstr "Informazioni sul negozio"
@@ -441,6 +446,10 @@ msgstr "Accesso negato"
 msgid "Account"
 msgstr "Account"
 
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Account security"
+msgstr "Sicurezza dell’account"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Act on the content"
 msgstr "Interveni sul contenuto"
@@ -452,6 +461,10 @@ msgstr "Azione sulle righe selezionate"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Add a factor"
 msgstr "Aggiungi un fattore"
+
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "Add a passkey"
+msgstr "Aggiungi una passkey"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Add an authenticator app"
@@ -465,9 +478,17 @@ msgstr "Aggiungi un link esterno"
 msgid "Add another factor before removing your last one."
 msgstr "Aggiungi un altro fattore prima di rimuovere l’ultimo."
 
+#: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
+msgid "Add another passkey"
+msgstr "Aggiungi un’altra passkey"
+
 #: apps/cms/blocks.py
 msgid "Add at least one question. They show as a list that opens one answer at a time."
 msgstr "Aggiungi almeno una domanda. Si vedono come un elenco che apre una risposta alla volta."
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "added %(created)s"
+msgstr "aggiunta il %(created)s"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
@@ -896,6 +917,10 @@ msgid ""
 msgstr ""
 "Abilitata: imposti subito una password. Disabilitata: l'account viene creato senza password e non "
 "può accedere con una password finché non ne viene impostata una."
+
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "End now"
+msgstr "Termina ora"
 
 #: apps/manager/forms.py
 msgid "Enter a valid carrier name."
@@ -1331,6 +1356,10 @@ msgstr "Lingua"
 msgid "Language of the texts"
 msgstr "Lingua dei testi"
 
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "last used %(used)s"
+msgstr "ultimo uso il %(used)s"
+
 #: apps/shipping/models.py
 msgid ""
 "Leave it empty for a zone that every vendor can use. Choose a vendor for a zone that belongs to "
@@ -1439,6 +1468,10 @@ msgstr "Principale"
 msgid "Manage recovery codes"
 msgstr "Gestisci i codici di recupero"
 
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Manage two-factor settings and recovery codes"
+msgstr "Gestisci la verifica in due passaggi e i codici di recupero"
+
 #: apps/manager/templates/manager/layout.html
 msgid "Manager sections"
 msgstr "Sezioni del Manager"
@@ -1480,6 +1513,10 @@ msgstr "Unisci i marchi selezionati in un altro marchio"
 #: apps/catalog/taxonomy.py
 msgid "name"
 msgstr "nome"
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "never used"
+msgstr "mai usata"
 
 #: apps/catalog/taxonomy_admin.py
 msgid "New logo file"
@@ -1614,9 +1651,17 @@ msgstr "Segnalazioni"
 msgid "Notifier"
 msgstr "Segnalante"
 
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "off"
+msgstr "non attiva"
+
 #: apps/catalog/taxonomy.py
 msgid "official URL"
 msgstr "URL ufficiale"
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "on"
+msgstr "attiva"
 
 #: apps/manager/forms.py
 msgid "One line under the shop name. Plain text."
@@ -1732,6 +1777,14 @@ msgstr ""
 #: apps/events/admin_views.py
 msgid "Only when the event is hidden after a notice."
 msgstr "Solo quando l'evento viene nascosto in seguito a una segnalazione."
+
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "Open passkey window"
+msgstr "Apri la finestra passkey"
+
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "Operational mode"
+msgstr "Modalità operativa"
 
 #: apps/catalog/taxonomy_admin.py
 msgid "Optional text that replaces the generated credit line. Example: 'Logo: Acme Ltd'."
@@ -1855,6 +1908,7 @@ msgid "Passkey"
 msgstr "Passkey"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
+#: apps/accounts/templates/accounts/mfa/setup.html
 msgid "passkey"
 msgstr "passkey"
 
@@ -1862,6 +1916,7 @@ msgstr "passkey"
 msgid "Passkey name"
 msgstr "Nome della passkey"
 
+#: apps/accounts/templates/accounts/levels/_banner.html
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Passkeys need JavaScript."
@@ -2053,6 +2108,7 @@ msgid "Relative to"
 msgstr "Rispetto a"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
+#: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Remove"
 msgstr "Rimuovi"
 
@@ -2119,6 +2175,14 @@ msgstr "schermata o tipo di pagina"
 msgid "Search by name, SKU, brand or vendor, then click the product."
 msgstr "Cerca per nome, SKU, marchio o venditore, poi clicca sul prodotto."
 
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "Secure mode"
+msgstr "Modalità protetta"
+
+#: apps/accounts/templates/accounts/mfa/setup.html themes/base/templates/components/user_tools.html
+msgid "Security"
+msgstr "Sicurezza"
+
 #: apps/manager/templates/manager/list.html
 msgid "Select"
 msgstr "Seleziona"
@@ -2126,6 +2190,13 @@ msgstr "Seleziona"
 #: apps/manager/lists.py
 msgid "Select at least one row."
 msgstr "Seleziona almeno una riga."
+
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid ""
+"Sensitive actions ask for your passkey once, or open a passkey window to cover several in a row."
+msgstr ""
+"Le azioni sensibili chiedono la tua passkey una volta, oppure apri una finestra passkey per "
+"coprirne diverse di seguito."
 
 #: apps/catalog/taxonomy.py
 msgid "SEO description"
@@ -4423,7 +4494,6 @@ msgid "Tracking number"
 msgstr "Numero di tracciamento"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
-#: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Two-factor authentication"
 msgstr "Verifica in due passaggi"
 
@@ -5037,6 +5107,14 @@ msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Hai %(counter)s codice di recupero non usato."
 msgstr[1] "Hai %(counter)s codici di recupero non usati."
 
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Your account is protected with a passkey."
+msgstr "Il tuo account è protetto con una passkey."
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Your account is protected with an authenticator app."
+msgstr "Il tuo account è protetto con un’app di autenticazione."
+
 #: apps/vendors/models.py
 msgid ""
 "Your certified email (PEC) address, if you have one. It is required when the SDI recipient code is"
@@ -5095,6 +5173,10 @@ msgstr ""
 "diverso dal codice del prodotto e da quello di ogni altro tuo prodotto o variante: maiuscole e "
 "spazi non rendono diversi due codici."
 
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Your protection"
+msgstr "La tua protezione"
+
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid "Your recovery codes"
 msgstr "I tuoi codici di recupero"
@@ -5102,6 +5184,10 @@ msgstr "I tuoi codici di recupero"
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Your role"
 msgstr "Il tuo ruolo"
+
+#: apps/accounts/templates/accounts/levels/_banner.html
+msgid "Your role cannot open a passkey window."
+msgstr "Il tuo ruolo non può aprire una finestra passkey."
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
