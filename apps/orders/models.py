@@ -478,3 +478,72 @@ class StockReservation(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.quantity} x {self.variant or self.product} until {self.expires_at:%H:%M}"
+
+
+class ProductReview(BaseModel):
+    """A product review (OP-28, Omnibus: how reviews are verified).
+
+    `verified_line` is the order line that proves the reviewer bought the product. It is set
+    only by `services.verify_review`, from order facts (`engine.verifying_line`): it is not an
+    editable field, so a reviewer, a form or the admin cannot mark a review verified. A review
+    without it is shown as "not verified"; migrated legacy reviews (MIG.18) start that way and
+    stay visible. Submission and moderation come later; this model holds what is shown.
+    """
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects: ClassVar[VendorScopedManager["ProductReview"]] = VendorScopedManager()
+
+    class Origin(models.TextChoices):
+        CUSTOMER = "customer", "Customer"
+        LEGACY_IMPORT = "legacy_import", "Migrated from the previous shop"
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews")
+    customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="product_reviews",
+        help_text="The reviewer's account; empty for some migrated reviews.",
+    )
+    display_name = models.CharField(
+        max_length=100, help_text="The only reviewer detail shown or migrated."
+    )
+    rating = models.PositiveSmallIntegerField(help_text="From 1 to 5.")
+    text = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(
+        default=timezone.now, help_text="The original date, also for a migrated review."
+    )
+    origin = models.CharField(max_length=16, choices=Origin.choices, default=Origin.CUSTOMER)
+    visible = models.BooleanField(default=True, help_text="Moderation hides a review here.")
+    verified_line = models.ForeignKey(
+        OrderLine,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="verified_reviews",
+        help_text="The order line proving the purchase; never set by the reviewer.",
+    )
+
+    class Meta:
+        ordering = ["-reviewed_at", "-id"]
+        indexes = [models.Index(fields=["product", "visible", "-reviewed_at"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(rating__gte=1) & models.Q(rating__lte=5),
+                name="orders_productreview_rating_1_to_5",
+            ),
+        ]
+
+    @property
+    def is_verified(self) -> bool:
+        return self.verified_line_id is not None
+
+    @property
+    def badge(self) -> str:
+        """`verified` or `not_verified`: what the theme badge shows."""
+        return engine.review_badge(verified=self.is_verified)
+
+    def __str__(self) -> str:
+        return f"{self.rating}/5 by {self.display_name} on {self.product}"

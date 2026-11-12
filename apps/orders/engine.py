@@ -291,3 +291,45 @@ def anonymisable_at_once(
 
 def check_privacy_transition(source: str, target: str) -> None:
     _check(PRIVACY_TRANSITIONS, "an order's privacy status", source, target)
+
+
+# --- product reviews (OP-28, Omnibus) ---------------------------------------------------------
+
+# A review is "verified" only when the same customer really bought the same product: an order
+# that was paid and not undone. Quotes, unpaid checkouts, cancelled and (partly) refunded orders
+# do not count. Nothing a reviewer types can change this: the rule reads order facts only.
+VERIFYING_ORDER_STATES = frozenset({"paid", "in_fulfillment", "fulfilled", "closed"})
+
+BADGE_VERIFIED = "verified"
+BADGE_NOT_VERIFIED = "not_verified"
+
+
+@dataclass(frozen=True)
+class PurchaseFact:
+    """One order line as the review check sees it."""
+
+    line_id: int
+    customer_id: int | None
+    product_id: int | None
+    order_state: str
+
+
+def verifying_line(
+    customer_id: int | None, product_id: int | None, purchases: Iterable[PurchaseFact]
+) -> int | None:
+    """The id of the earliest order line that verifies a review of `product_id` by
+    `customer_id`, or None. A guest order or a deleted product never verifies."""
+    if customer_id is None or product_id is None:
+        return None
+    matching = [
+        p.line_id
+        for p in purchases
+        if p.customer_id == customer_id
+        and p.product_id == product_id
+        and p.order_state in VERIFYING_ORDER_STATES
+    ]
+    return min(matching) if matching else None
+
+
+def review_badge(*, verified: bool) -> str:
+    return BADGE_VERIFIED if verified else BADGE_NOT_VERIFIED

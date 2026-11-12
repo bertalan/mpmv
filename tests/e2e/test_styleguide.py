@@ -495,3 +495,24 @@ def test_a_toast_is_added_to_the_live_region_and_dismissed(
     region.locator(".toast").first.get_by_role("button", name="Dismiss").click()
     expect(trigger).to_be_focused()
     assert csp_violations(page) == []
+
+
+def test_the_review_badges_show_verified_and_not_verified_in_words(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    """OP-28 (Omnibus): a verified and a not verified review badge, each with its text."""
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    verified = page.locator(".badge--verified")
+    not_verified = page.locator(".badge--not-verified")
+    expect(verified).to_be_visible()
+    expect(verified).to_have_text("Verified purchase")
+    expect(not_verified).to_be_visible()
+    # The visible words say it; the reason is extra text for screen readers.
+    expect(not_verified).to_contain_text("Not verified")
+    expect(not_verified.locator(".visually-hidden")).to_have_text(
+        ". This review is not tied to a confirmed order."
+    )
+    not_verified.scroll_into_view_if_needed()
+    shot("review-badges")
+    assert csp_violations(page) == [], "\n".join(csp_violations(page))

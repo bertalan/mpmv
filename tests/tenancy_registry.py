@@ -94,9 +94,10 @@ from apps.ingest.tests.factories import (
     SourceObservationFactory,
     SupplierSourceFactory,
 )
-from apps.orders.models import OrderLine, StockReservation, VendorOrder
+from apps.orders.models import OrderLine, ProductReview, StockReservation, VendorOrder
 from apps.orders.tests.factories import (
     OrderLineFactory,
+    ProductReviewFactory,
     StockReservationFactory,
     VendorOrderFactory,
     paid_vendor_order,
@@ -260,6 +261,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     # ORD.2: a sub-order of its own order, and a line of such a sub-order.
     VendorOrder: lambda vendor: VendorOrderFactory.create(vendor=vendor),
     OrderLine: lambda vendor: OrderLineFactory.create(vendor_order__vendor=vendor),
+    # OP-28: a review of the vendor's product.
+    ProductReview: lambda vendor: ProductReviewFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
     StockReservation: lambda vendor: StockReservationFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),

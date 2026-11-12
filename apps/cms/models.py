@@ -342,6 +342,8 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
         WITHDRAWAL = "withdrawal", _("Right of withdrawal")
         SHIPPING = "shipping", _("Shipping")
         RETURNS = "returns", _("Returns")
+        # OP-28 (Omnibus): how product reviews are checked and what "verified" means.
+        REVIEWS = "reviews", _("How reviews are checked")
         # CMP.5 (DSA article 14, P2B article 5): the platform's own terms of use, with the
         # restrictions and the moderation policy, and the ranking parameters page.
         PLATFORM_TERMS = "platform_terms", _("Platform terms of use")

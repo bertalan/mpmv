@@ -16,7 +16,14 @@ from django.db import connection
 from factory.django import DjangoModelFactory
 
 from apps.catalog.tests.factories import ProductFactory
-from apps.orders.models import Order, OrderLine, OrderNumberSequence, StockReservation, VendorOrder
+from apps.orders.models import (
+    Order,
+    OrderLine,
+    OrderNumberSequence,
+    ProductReview,
+    StockReservation,
+    VendorOrder,
+)
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -123,3 +130,13 @@ class StockReservationFactory(DjangoModelFactory[StockReservation]):
     product = factory.SubFactory(ProductFactory)
     quantity = 1
     expires_at = factory.LazyFunction(lambda: dt.datetime(2999, 1, 1, tzinfo=dt.UTC))
+
+
+class ProductReviewFactory(DjangoModelFactory[ProductReview]):
+    class Meta:
+        model = ProductReview
+
+    product = factory.SubFactory(ProductFactory)
+    display_name = factory.Sequence(lambda n: f"Reviewer {n}")
+    rating = 4
+    text = "Works as described."

@@ -25,8 +25,16 @@ def _everything(reviews: frozenset[str] = REVIEWED) -> list[PublishedLegalText]:
     ]
 
 
-def test_the_go_live_pages_are_the_five_customer_legal_and_checkout_pages() -> None:
-    assert GO_LIVE_LEGAL_KINDS == ("terms", "privacy", "withdrawal", "shipping", "returns")
+def test_the_go_live_pages_are_the_customer_legal_checkout_and_reviews_pages() -> None:
+    # OP-28 adds the reviews page (Omnibus: how reviews are verified) to the original five.
+    assert GO_LIVE_LEGAL_KINDS == (
+        "terms",
+        "privacy",
+        "withdrawal",
+        "shipping",
+        "returns",
+        "reviews",
+    )
 
 
 def test_native_review_and_counsel_check_are_required_and_the_ai_draft_is_not() -> None:

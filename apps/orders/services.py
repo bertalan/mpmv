@@ -30,7 +30,14 @@ from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission
 
 from . import engine, notifications
-from .models import Order, OrderLine, OrderNumberSequence, StockReservation, VendorOrder
+from .models import (
+    Order,
+    OrderLine,
+    OrderNumberSequence,
+    ProductReview,
+    StockReservation,
+    VendorOrder,
+)
 from .tz import business_tz
 
 DRY_RUN_NUMBER = "(assigned when placed)"
@@ -974,3 +981,55 @@ def hold_stock(
         )
         changeset.create("orders.stockreservation", str(hold.public_id), snapshot)
         return changeset
+
+
+def _review_snapshot(review: ProductReview) -> dict[str, object]:
+    line = review.verified_line
+    return {"verified_order_line": None if line is None else str(line.public_id)}
+
+
+def verify_review(review: ProductReview, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Set or clear the order line that verifies a review, from order facts only (OP-28).
+
+    The review is verified when the same customer bought the same product on an order that was
+    paid and not undone; otherwise the link is cleared, so a later refund removes the badge.
+    Idempotent: nothing changes, and nothing is audited, when the answer is the same.
+    """
+    changeset = ChangeSet()
+    try:
+        with transaction.atomic():
+            locked = ProductReview.objects.select_for_update().get(pk=review.pk)
+            before = _review_snapshot(locked)
+            facts: list[engine.PurchaseFact] = []
+            if locked.customer_id is not None and locked.product_id is not None:
+                facts = [
+                    engine.PurchaseFact(
+                        line_id=line.pk,
+                        customer_id=locked.customer_id,
+                        product_id=locked.product_id,
+                        order_state=line.vendor_order.order.state,
+                    )
+                    for line in OrderLine.objects.filter(
+                        product_id=locked.product_id,
+                        vendor_order__order__customer_id=locked.customer_id,
+                    ).select_related("vendor_order__order")
+                ]
+            line_id = engine.verifying_line(locked.customer_id, locked.product_id, facts)
+            if line_id != locked.verified_line_id:
+                locked.verified_line_id = line_id
+                locked.save(update_fields=["verified_line", "updated_at"])
+                locked.refresh_from_db()
+                changeset.update(
+                    "orders.productreview",
+                    str(locked.public_id),
+                    before,
+                    _review_snapshot(locked),
+                )
+            if dry_run:
+                raise _DryRunRollback
+            if not changeset.is_empty:
+                audit_changes(changeset, ctx=ctx, action="orders.review_verify")
+    except _DryRunRollback:
+        pass
+    review.refresh_from_db()
+    return changeset

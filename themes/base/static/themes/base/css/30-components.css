@@ -411,6 +411,18 @@
     color: var(--color-secondary-text);
   }
 
+  /* Review badges (OP-28): "verified" reuses the accent pair; "not verified" the muted dashed
+     one, so the two differ by shape and words as well as colour. */
+  .badge--verified {
+    background: var(--color-accent-tint);
+    color: var(--color-accent);
+  }
+
+  .badge--not-verified {
+    color: var(--color-text-muted);
+    border-style: dashed;
+  }
+
   /* --- Alerts (components/alert.html): the levels are in the base layer (THM.3); danger is
      the component's name for the error level. A dismissible alert puts its button at the end. */
 

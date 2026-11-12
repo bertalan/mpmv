@@ -105,6 +105,7 @@ LEGAL_PLACEHOLDER_TITLES: dict[str, dict[str, tuple[str, str]]] = {
         "withdrawal": ("Right of withdrawal", "right-of-withdrawal"),
         "shipping": ("Shipping", "shipping"),
         "returns": ("Returns", "returns"),
+        "reviews": ("How reviews are checked", "how-reviews-are-checked"),
     },
     "it": {
         "terms": ("Condizioni di vendita", "condizioni-di-vendita"),
@@ -112,6 +113,7 @@ LEGAL_PLACEHOLDER_TITLES: dict[str, dict[str, tuple[str, str]]] = {
         "withdrawal": ("Diritto di recesso", "diritto-di-recesso"),
         "shipping": ("Spedizioni", "spedizioni"),
         "returns": ("Resi", "resi"),
+        "reviews": ("Come verifichiamo le recensioni", "come-verifichiamo-le-recensioni"),
     },
     "de": {
         "terms": ("Verkaufsbedingungen", "verkaufsbedingungen"),
@@ -119,6 +121,7 @@ LEGAL_PLACEHOLDER_TITLES: dict[str, dict[str, tuple[str, str]]] = {
         "withdrawal": ("Widerrufsrecht", "widerrufsrecht"),
         "shipping": ("Versand", "versand"),
         "returns": ("Rücksendungen", "ruecksendungen"),
+        "reviews": ("So prüfen wir Bewertungen", "bewertungen-pruefung"),
     },
     "fr": {
         "terms": ("Conditions générales de vente", "conditions-generales-de-vente"),
@@ -126,6 +129,7 @@ LEGAL_PLACEHOLDER_TITLES: dict[str, dict[str, tuple[str, str]]] = {
         "withdrawal": ("Droit de rétractation", "droit-de-retractation"),
         "shipping": ("Livraison", "livraison"),
         "returns": ("Retours", "retours"),
+        "reviews": ("Comment les avis sont vérifiés", "verification-des-avis"),
     },
     "es": {
         "terms": ("Condiciones de venta", "condiciones-de-venta"),
@@ -133,6 +137,7 @@ LEGAL_PLACEHOLDER_TITLES: dict[str, dict[str, tuple[str, str]]] = {
         "withdrawal": ("Derecho de desistimiento", "desistimiento"),
         "shipping": ("Envíos", "envios"),
         "returns": ("Devoluciones", "devoluciones"),
+        "reviews": ("Cómo se comprueban las reseñas", "verificacion-de-resenas"),
     },
 }
 
@@ -150,9 +155,34 @@ LEGAL_PLACEHOLDER_BODY: dict[str, str] = {
 }
 
 
+# OP-28 (Omnibus): the draft paragraph of the reviews page, in EN and IT. It is a starting point
+# for the owner and counsel, who review it like every legal page (native review, counsel check)
+# before go-live; the other languages keep the placeholder until they are translated.
+REVIEWS_POLICY_BODY: dict[str, str] = {
+    "en": "<p>A review carries the label <b>Verified purchase</b> only when it comes from the "
+    "customer account that bought that product on an order that was paid and not cancelled or "
+    "refunded. We check this ourselves against our order records: nobody can mark their own "
+    "review as verified.</p><p>Reviews carried over from our previous shop are shown, with "
+    "their original date, under the label <b>Not verified</b>, because we cannot tie them to "
+    "an order, unless we found an order of the same customer for the same product. A review "
+    "with that label is not hidden and is not a bad review: it only lacks proof of "
+    "purchase.</p>",
+    "it": "<p>Una recensione ha l'etichetta <b>Acquisto verificato</b> solo se arriva "
+    "dall'account cliente che ha comprato quel prodotto con un ordine pagato e non annullato né "
+    "rimborsato. Il controllo lo facciamo noi sui dati degli ordini: nessuno può verificare da "
+    "sé la propria recensione.</p><p>Le recensioni trasferite dal nostro vecchio negozio sono "
+    "visibili, con la data originale, con l'etichetta <b>Non verificata</b>, perché non "
+    "possiamo collegarle a un ordine, salvo quando abbiamo trovato un ordine dello stesso "
+    "cliente per lo stesso prodotto. Una recensione con questa etichetta non è nascosta e non "
+    "è una recensione negativa: manca solo la prova d'acquisto.</p>",
+}
+
+
 def legal_placeholder(language: str, kind: str) -> PageText:
     """The placeholder of one legal page in `language`, or in EN when it has none."""
     titles = LEGAL_PLACEHOLDER_TITLES.get(language) or LEGAL_PLACEHOLDER_TITLES["en"]
     body = LEGAL_PLACEHOLDER_BODY.get(language) or LEGAL_PLACEHOLDER_BODY["en"]
+    if kind == "reviews" and language in REVIEWS_POLICY_BODY:
+        body = REVIEWS_POLICY_BODY[language]
     title, slug = titles[kind]
     return PageText(title=title, body=body, slug=slug)

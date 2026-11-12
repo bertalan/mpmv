@@ -93,11 +93,30 @@ def test_each_badge_says_its_meaning_in_words(kind: str, text: str) -> None:
     assert re.fullmatch(rf'<span class="badge badge--{modifier}">\s*{text}\s*</span>', html), html
 
 
+def test_the_verified_review_badge_says_verified_purchase() -> None:
+    html = render("badge", kind="verified")
+    assert re.fullmatch(
+        r'<span class="badge badge--verified">\s*Verified purchase\s*</span>', html
+    ), html
+
+
+def test_the_not_verified_review_badge_says_so_and_explains_it_to_screen_readers() -> None:
+    html = render("badge", kind="not_verified")
+    assert 'class="badge badge--not-verified"' in html
+    assert "Not verified" in html
+    # The reason is real text for assistive technology, not a title attribute or colour.
+    hidden = "This review is not tied to a confirmed order."
+    assert f'<span class="visually-hidden">. {hidden}</span>' in html
+    assert "title=" not in html
+
+
 def test_a_badge_label_can_be_replaced() -> None:
     assert ">-20%<" in render("badge", kind="sale", label="-20%").replace(" ", "")
 
 
-@pytest.mark.parametrize("kind", ["sale", "new", "out-of-stock", "on-request"])
+@pytest.mark.parametrize(
+    "kind", ["sale", "new", "out-of-stock", "on-request", "verified", "not-verified"]
+)
 def test_each_badge_has_its_style(base_css: str, kind: str) -> None:
     assert f".badge--{kind}" in base_css
 
