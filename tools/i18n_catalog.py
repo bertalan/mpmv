@@ -33,6 +33,7 @@ SCOPES = (
     "apps/manager",
     "apps/accounts",
     "apps/orders/templates",
+    "apps/vendors/templates/email/vendors/profile_reverted",
     "apps/orders/customer_views.py",  # the customer area labels (ORD.7)
     "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
     "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)
@@ -42,6 +43,10 @@ SCOPES = (
     # Brand review models (CAT.20): the rest of the catalog app joins with the storefront I18N.
     "apps/catalog/taxonomy.py",
     "apps/catalog/taxonomy_admin.py",
+    # The product page and what it includes (CAT.7); the listings join with the storefront I18N.
+    "apps/catalog/templates/catalog/product.html",
+    "apps/catalog/templates/catalog/includes/stock_status.html",
+    "apps/catalog/templates/catalog/includes/product_card.html",
     # Temporary staff "Site links" page (OPS.12); remove before LIVE.
     "apps/seo/site_links.py",
     "apps/seo/templates/seo/site_links.html",

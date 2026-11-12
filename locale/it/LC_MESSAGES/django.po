@@ -83,6 +83,10 @@ msgstr ""
 msgid "A category or tag that has its own pages."
 msgstr "Una categoria o etichetta che ha pagine dedicate."
 
+#: apps/vendors/templates/email/vendors/profile_reverted/subject.txt
+msgid "A change to the storefront profile of %(vendor_name)s was reverted"
+msgstr "Una modifica al profilo vetrina di %(vendor_name)s è stata annullata"
+
 #: apps/cms/blocks.py apps/cms/models.py
 msgid "A clear, short answer. It opens when the visitor clicks the question. Required."
 msgstr ""
@@ -497,14 +501,26 @@ msgstr "Aggiungi un’altra passkey"
 msgid "Add at least one question. They show as a list that opens one answer at a time."
 msgstr "Aggiungi almeno una domanda. Si vedono come un elenco che apre una risposta alla volta."
 
+#: apps/catalog/templates/catalog/product.html
+msgid "Add to cart"
+msgstr "Aggiungi al carrello"
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "added %(created)s"
 msgstr "aggiunta il %(created)s"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "After"
+msgstr "Dopo"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Tutti"
+
+#: apps/manager/views.py
+msgid "all languages"
+msgstr "tutte le lingue"
 
 #: apps/compliance/models.py
 msgid ""
@@ -607,6 +623,10 @@ msgid "Articles or pages to suggest under the products. If you add none, nothing
 msgstr ""
 "Articoli o pagine da suggerire sotto i prodotti. Se non ne aggiungi, non viene suggerito nulla."
 
+#: apps/catalog/templates/catalog/product.html
+msgid "Ask %(vendor)s about this product: it is not sold online."
+msgstr "Chiedi a %(vendor)s informazioni su questo prodotto: non si vende online."
+
 #: apps/accounts/templates/accounts/mfa/totp.html apps/accounts/templates/accounts/mfa/verify.html
 msgid "Authentication code"
 msgstr "Codice di autenticazione"
@@ -651,6 +671,14 @@ msgstr "Torna alle impostazioni della verifica in due passaggi"
 msgid "Bad request"
 msgstr "Richiesta non valida"
 
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Before"
+msgstr "Prima"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Before and after"
+msgstr "Prima e dopo"
+
 #: apps/orders/customer_views.py
 msgid "Being prepared"
 msgstr "In preparazione"
@@ -662,6 +690,10 @@ msgstr "lotto di marchi"
 #: apps/catalog/taxonomy.py
 msgid "brand batches"
 msgstr "lotti di marchi"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "Buying online opens soon."
+msgstr "Presto potrai comprare online."
 
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "Cancel"
@@ -712,6 +744,16 @@ msgstr "Catalogo: categorie"
 msgid "Catalogue: products"
 msgstr "Catalogo: prodotti"
 
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid ""
+"Changes owners made to their storefront texts, policies and logo. They are live at once; revert "
+"one with a reason and the owners are told. A change can be reverted only while the text has not "
+"changed again."
+msgstr ""
+"Modifiche fatte dai titolari ai testi, alle condizioni e al logo del loro negozio. Sono visibili "
+"subito; annullane una indicando un motivo e i titolari ne saranno informati. Una modifica si può "
+"annullare solo finché il testo non è cambiato di nuovo."
+
 #: apps/compliance/forms.py
 msgid "Choose 'Action taken' if the content was restricted, or 'No action' if it was left as it is."
 msgstr ""
@@ -735,6 +777,10 @@ msgstr ""
 #: apps/manager/sections.py apps/manager/templates/manager/shop/vendor_picker.html
 msgid "Choose a vendor"
 msgstr "Scegli un venditore"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "Choose a version"
+msgstr "Scegli una versione"
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
@@ -834,6 +880,10 @@ msgstr "Completato"
 #: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
 msgid "Confirm"
 msgstr "Conferma"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Confirm and delete the old logo"
+msgstr "Conferma ed elimina il vecchio logo"
 
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid "Confirm with your passkey to allow this one action. No passkey window opens."
@@ -977,6 +1027,10 @@ msgstr ""
 msgid "description"
 msgstr "descrizione"
 
+#: apps/catalog/templates/catalog/product.html
+msgid "Description"
+msgstr "Descrizione"
+
 #: apps/manager/forms.py
 msgid "Description of the logo"
 msgstr "Descrizione del logo"
@@ -1057,6 +1111,11 @@ msgstr "Errore"
 msgid "Exact location"
 msgstr "Posizione esatta"
 
+#: apps/catalog/templates/catalog/includes/product_card.html
+#: apps/catalog/templates/catalog/product.html
+msgid "excl. VAT"
+msgstr "IVA esclusa"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Explanation"
 msgstr "Spiegazione"
@@ -1070,6 +1129,10 @@ msgstr ""
 "Dettagli in più da registrare per ogni categoria o etichetta, scritti come elenco, per esempio "
 "[{\"code\": \"model_year\", \"kind\": \"number\", \"required\": false, \"label\": \"Anno del "
 "modello\"}]. Lascialo vuoto se non servono. Il tipo è uno tra: text, number, boolean."
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Field"
+msgstr "Campo"
 
 #: themes/base/templates/components/user_tools.html
 msgid "Fields on this page"
@@ -1396,6 +1459,10 @@ msgstr "Immagini"
 msgid "import batch"
 msgstr "lotto di importazione"
 
+#: apps/catalog/templates/catalog/includes/stock_status.html
+msgid "In stock"
+msgstr "Disponibile"
+
 #: apps/shipping/models.py
 msgid ""
 "In the rate calculation, shipping is free when the goods in the package are worth at least this "
@@ -1655,6 +1722,10 @@ msgstr "I miei ordini"
 msgid "name"
 msgstr "nome"
 
+#: apps/catalog/templates/catalog/product.html
+msgid "Needed with this product"
+msgstr "Ti serve insieme a questo prodotto"
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "never used"
 msgstr "mai usata"
@@ -1698,6 +1769,10 @@ msgstr "nessuna registrazione di passkey in corso"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "No storefront changes yet."
+msgstr "Nessuna modifica al negozio per ora."
 
 #: apps/shipping/models.py
 msgid ""
@@ -1811,6 +1886,10 @@ msgstr "URL ufficiale"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "on"
 msgstr "attiva"
+
+#: apps/catalog/templates/catalog/includes/stock_status.html
+msgid "On backorder"
+msgstr "Su ordinazione"
 
 #: apps/seo/site_links.py
 msgid "On STAGE and LIVE these may answer only from the server's own network."
@@ -2033,6 +2112,7 @@ msgstr ""
 msgid "Other ways the supplier writes the same term, as a JSON list."
 msgstr "Altri modi in cui il fornitore scrive lo stesso termine, come elenco JSON."
 
+#: apps/catalog/templates/catalog/includes/stock_status.html
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Out of stock"
 msgstr "Esaurito"
@@ -2178,6 +2258,14 @@ msgstr ""
 msgid "Plain text for people who cannot see the image, for example the shop name."
 msgstr "Testo semplice per chi non vede l’immagine, per esempio il nome del negozio."
 
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid ""
+"Plain text. The owners and the audit trail keep it: do not write personal data, such as names, "
+"emails or phone numbers."
+msgstr ""
+"Testo semplice. I titolari e il registro delle modifiche lo conservano: non scrivere dati "
+"personali, come nomi, email o numeri di telefono."
+
 #: apps/manager/templates/manager/layout.html
 msgid "Platform"
 msgstr "Piattaforma"
@@ -2189,6 +2277,24 @@ msgstr "Spazio piattaforma: segnalazioni"
 #: apps/seo/site_links.py
 msgid "Platform space: dashboard"
 msgstr "Spazio piattaforma: cruscotto"
+
+#: apps/vendors/templates/email/vendors/profile_reverted/body.html
+#: apps/vendors/templates/email/vendors/profile_reverted/body.txt
+msgid ""
+"Platform staff reverted your change to the logo of %(vendor_name)s: it went back to the previous "
+"logo."
+msgstr ""
+"Lo staff della piattaforma ha annullato la tua modifica al logo di %(vendor_name)s: è tornato il "
+"logo precedente."
+
+#: apps/vendors/templates/email/vendors/profile_reverted/body.html
+#: apps/vendors/templates/email/vendors/profile_reverted/body.txt
+msgid ""
+"Platform staff reverted your change to the storefront profile of %(vendor_name)s (%(language)s): "
+"%(fields)s went back to the previous text."
+msgstr ""
+"Lo staff della piattaforma ha annullato la tua modifica al profilo vetrina di %(vendor_name)s "
+"(%(language)s): %(fields)s è tornato al testo precedente."
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Please correct the error below."
@@ -2224,6 +2330,15 @@ msgstr "Anteprima: %(action)s"
 msgid "Previous"
 msgstr "Indietro"
 
+#: apps/catalog/templates/catalog/product.html
+msgid "Price and availability"
+msgstr "Prezzo e disponibilità"
+
+#: apps/catalog/templates/catalog/includes/product_card.html
+#: apps/catalog/templates/catalog/product.html
+msgid "Price on request"
+msgstr "Prezzo su richiesta"
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "Price with VAT"
 msgstr "Prezzo con IVA"
@@ -2243,6 +2358,10 @@ msgstr "Sub-responsabili del trattamento"
 #: apps/manager/templates/manager/shop/order.html
 msgid "Product"
 msgstr "Prodotto"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "Product images"
+msgstr "Immagini del prodotto"
 
 #: apps/seo/site_links.py
 msgid "Product pages are not built yet (CAT.7): products are listed once they are."
@@ -2273,8 +2392,15 @@ msgid "Readiness probe"
 msgstr "Controllo di prontezza"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
+#: apps/manager/templates/manager/platform/profile_changes.html
+#: apps/vendors/templates/email/vendors/profile_reverted/body.html
+#: apps/vendors/templates/email/vendors/profile_reverted/body.txt
 msgid "Reason"
 msgstr "Motivazione"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Reason (sent to the owners)"
+msgstr "Motivo (inviato ai titolari)"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
@@ -2372,6 +2498,18 @@ msgstr "Resi e rimborsi"
 #: apps/manager/forms.py
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "revert"
+msgstr "annullamento"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Revert this change"
+msgstr "Annulla questa modifica"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Reverted"
+msgstr "Annullata"
 
 #: apps/seo/site_links.py
 msgid "robots.txt"
@@ -2509,6 +2647,10 @@ msgstr "Spazio negozio: profilo del negozio"
 msgid "Shops"
 msgstr "Negozi"
 
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Show all"
+msgstr "Mostra tutto"
+
 #: apps/cms/choosers.py
 msgid "Show only the products of one brand."
 msgstr "Mostra solo i prodotti di un marchio."
@@ -2540,6 +2682,10 @@ msgstr "Mostra i prodotti più recenti di questa categoria."
 #: apps/cms/blocks.py
 msgid "Show the newest products of this shop."
 msgstr "Mostra i prodotti più recenti di questo negozio."
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Showing %(vendor)s only."
+msgstr "Solo %(vendor)s."
 
 #: apps/cms/models.py
 msgid "Shown on the article; a migrated article keeps its original date."
@@ -2579,9 +2725,13 @@ msgstr "Link del sito"
 msgid "Skip to main content"
 msgstr "Vai al contenuto principale"
 
-#: apps/manager/templates/manager/shop/order.html
+#: apps/catalog/templates/catalog/product.html apps/manager/templates/manager/shop/order.html
 msgid "SKU"
 msgstr "SKU"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "Sold by"
+msgstr "Venduto da"
 
 #: apps/orders/templates/orders/customer_order.html
 msgid "Sold by %(name)s"
@@ -2673,6 +2823,10 @@ msgstr "stato"
 #: apps/orders/templates/orders/customer_order.html
 msgid "Status history"
 msgstr "Cronologia dello stato"
+
+#: apps/manager/sections.py apps/manager/templates/manager/platform/profile_changes.html
+msgid "Storefront changes"
+msgstr "Modifiche al negozio"
 
 #: apps/seo/site_links.py
 msgid "Storefront pages: %(language)s"
@@ -2961,6 +3115,14 @@ msgid "The category or tag visitors are sent to. Fill it only when the target is
 msgstr ""
 "La categoria o etichetta a cui mandare i visitatori. Compilalo solo quando la destinazione è una "
 "categoria o etichetta."
+
+#: apps/manager/views.py
+msgid "The change is confirmed and the old logo is deleted."
+msgstr "La modifica è confermata e il vecchio logo è stato eliminato."
+
+#: apps/manager/views.py
+msgid "The change was reverted and the owners were told."
+msgstr "La modifica è stata annullata e i titolari sono stati avvisati."
 
 #: apps/vendors/models.py
 msgid "The city of your permanent establishment."
@@ -3938,6 +4100,14 @@ msgstr ""
 "I CAP del territorio, separati da virgole: un CAP esatto come '23041', un prefisso come '35*' o un"
 " intervallo come '22100..22199'."
 
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid ""
+"The previous logo is kept until the review window closes, so a revert can restore it. Confirm the "
+"change to delete it now."
+msgstr ""
+"Il logo precedente viene conservato fino alla chiusura del periodo di verifica, così un "
+"annullamento può ripristinarlo. Conferma la modifica per eliminarlo subito."
+
 #: apps/catalog/models.py
 msgid ""
 "The price in euros without VAT, for example 19.90. Needed to sell the product: with the Buy mode, "
@@ -4607,6 +4777,14 @@ msgstr "Questo link ti è stato inviato per email. Premi Continua per aprire la 
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid "This needs your passkey"
 msgstr "Serve la tua passkey"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "This page is not available in your language yet."
+msgstr "Questa pagina non è ancora disponibile nella tua lingua."
+
+#: apps/catalog/templates/catalog/product.html
+msgid "This product is no longer available."
+msgstr "Questo prodotto non è più disponibile."
 
 #: apps/manager/notice_views.py
 msgid "This step is not possible for the notice in its status."
@@ -5463,6 +5641,10 @@ msgstr[1] "Hai %(counter)s codici di recupero non usati."
 #: apps/orders/templates/orders/customer_orders.html
 msgid "You have no orders yet"
 msgstr "Non hai ancora ordini"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "You may also like"
+msgstr "Potrebbe piacerti anche"
 
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid ""

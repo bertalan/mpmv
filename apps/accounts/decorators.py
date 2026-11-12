@@ -184,6 +184,23 @@ def requires_level[**P](action: str) -> Callable[[View[P]], View[P]]:
                 return HttpResponseRedirect(f"{reverse('mfa:verify')}?{query}")
             return view(request, *args, **kwargs)
 
+        wrapped.session_action = action  # type: ignore[attr-defined]  # the sweep reads it
+        return wrapped
+
+    return decorator
+
+
+def requires_level_method(action: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """`requires_level` for a view method (`post(self, request, ...)`): the method itself carries
+    `session_action`, so a subclass that overrides it without the gate fails the sweep."""
+
+    def decorator(method: Callable[..., Any]) -> Callable[..., Any]:
+        @functools.wraps(method)
+        def wrapped(self: Any, request: HttpRequest, /, *args: Any, **kwargs: Any) -> Any:
+            bound = functools.partial(method, self)
+            return requires_level(action)(bound)(request, *args, **kwargs)
+
+        wrapped.session_action = action  # type: ignore[attr-defined]
         return wrapped
 
     return decorator
