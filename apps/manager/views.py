@@ -237,7 +237,10 @@ class VendorOrderListView(ManagerView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         rows = (
-            self.scoped(VendorOrder).select_related("order").order_by("-order__created_at", "-id")
+            self.scoped(VendorOrder)
+            .exclude(order__tax_archive=True)  # the restricted tax archive is never listed (MIG.4)
+            .select_related("order")
+            .order_by("-order__created_at", "-id")
         )
         state = self.request.GET.get("state", "")
         if state in VendorOrderState.values:
@@ -287,7 +290,8 @@ class VendorOrderDetailView(ManagerView):
 
     def sub_order(self) -> VendorOrder:
         return get_object_or_404(
-            self.scoped(VendorOrder).select_related("order"), public_id=self.kwargs["public_id"]
+            self.scoped(VendorOrder).exclude(order__tax_archive=True).select_related("order"),
+            public_id=self.kwargs["public_id"],
         )
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:

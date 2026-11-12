@@ -274,3 +274,18 @@ def test_a_restricted_order_renders_without_the_address(
     response = client.get(url(sub))
     assert response.status_code == 200
     assert "1 Test Street" not in response.text
+
+
+def test_a_tax_archive_order_is_hidden_from_the_vendor_list_and_detail(
+    client: Client, owner: User, vendor: Vendor
+) -> None:
+    """MIG.4: a migrated order kept only for the tax audit is absent from the vendor's UI."""
+    from apps.orders import archive
+    from apps.orders.tests.legacy_records import record
+
+    order, _ = archive.load_archive_order(record(), vendors={"A": vendor}, ctx=CTX)
+    assert order is not None
+    archived = VendorOrder.objects.get(order=order)
+    verified_login(client, owner)
+    assert order.number not in client.get(ORDERS).text
+    assert client.get(url(archived)).status_code == 404

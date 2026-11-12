@@ -12,6 +12,7 @@ EXPECTED = {
     "catalog": {"manager.platform_catalog", "vendors.view_all_vendors"},
     "finance": {"manager.platform_finance", "vendors.view_all_vendors"},
     "support": {"manager.platform_support", "vendors.view_all_vendors"},
+    "tax_audit": {"manager.platform_tax_audit"},
     "owner": {"core.platform_owner", "vendors.view_all_vendors"},
 }
 
@@ -65,6 +66,12 @@ def test_finance_does_not_edit_configuration_and_support_cannot_close_a_vendor()
 def test_the_technical_superuser_opens_only_the_break_glass_rows() -> None:
     rows = {s for s, cells in roles.MATRIX.items() if roles.SUPERUSER in cells}
     assert rows == roles.BREAK_GLASS_SECTIONS
+
+
+def test_only_the_tax_audit_role_opens_the_tax_archive() -> None:
+    assert set(roles.MATRIX["platform.tax_archive"]) == {"tax_audit"}
+    assert roles.MATRIX["platform.tax_archive"]["tax_audit"] is roles.Access.READ
+    assert roles.role("tax_audit").permissions == ("manager.platform_tax_audit",)
 
 
 def test_only_the_owner_manages_staff_roles() -> None:

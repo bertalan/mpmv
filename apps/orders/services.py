@@ -265,6 +265,8 @@ def create_order(
     legacy_wp_order_id: int | None = None,
     placed_at: dt.datetime | None = None,
     paid_at: dt.datetime | None = None,
+    tax_archive: bool = False,
+    historical_refunds: Sequence[dict[str, Any]] | None = None,
     dry_run: bool = False,
     now: dt.datetime | None = None,
 ) -> tuple[Order | None, ChangeSet]:
@@ -287,6 +289,8 @@ def create_order(
     if state not in engine.ORDER_STATES:
         raise ValueError(f"{state!r} is not an order state")
     legacy = legacy_wp_order_id is not None
+    if (tax_archive or historical_refunds) and not legacy:
+        raise ValueError("only a legacy order may be a tax archive or carry historical refunds")
     if (placed_at is not None or paid_at is not None) and not legacy:
         raise ValueError("only a legacy order may choose its dates (placed_at, paid_at)")
     if state not in engine.ORDER_INITIAL_STATES and not legacy:
@@ -313,6 +317,10 @@ def create_order(
         vat_validation=vat_validation or {},
         state=state,
         legacy_wp_order_id=legacy_wp_order_id,
+        tax_archive=tax_archive,
+        historical_refunds=list(historical_refunds or []),
+        privacy_status="restricted_tax_only" if tax_archive else "active",
+        restricted_at=(now or timezone.now()) if tax_archive else None,
     )
     order.paid_at = paid_at if legacy else None
     if placed_at is not None:

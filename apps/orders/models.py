@@ -192,11 +192,35 @@ class Order(_StateGuarded):
     )
     payment_intent_ref = models.CharField(max_length=255, blank=True)
     transfer_group = models.CharField(max_length=64, blank=True)
+    # The legacy order number, kept as a searchable reference (MIG.4).
     legacy_wp_order_id = models.PositiveBigIntegerField(null=True, blank=True, unique=True)
+    tax_archive = models.BooleanField(
+        default=False,
+        editable=False,
+        db_index=True,
+        help_text="A migrated order kept only for the tax audit (MIG.4, D-16): hidden from "
+        "customers and vendors, visible to the Tax/Audit role. Set at load, never changed.",
+    )
+    historical_refunds = models.JSONField(
+        default=list,
+        blank=True,
+        editable=False,
+        help_text="Refunds of a migrated order, stored inside it: amount, date, reason (MIG.20). "
+        "No ledger entry and no tax recalculation.",
+    )
 
     class Meta:
         ordering = ["-created_at", "-id"]
         constraints = [
+            models.CheckConstraint(
+                condition=models.Q(tax_archive=False) | models.Q(legacy_wp_order_id__isnull=False),
+                name="orders_order_tax_archive_is_legacy",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(tax_archive=False)
+                | models.Q(privacy_status__in=["restricted_tax_only", "anonymized"]),
+                name="orders_order_tax_archive_is_restricted",
+            ),
             models.CheckConstraint(
                 condition=models.Q(state__in=OrderState.values),
                 name="orders_order_state_valid",

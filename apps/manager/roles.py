@@ -49,6 +49,7 @@ CONFIG: Final = "config"
 CATALOG: Final = "catalog"
 FINANCE: Final = "finance"
 SUPPORT: Final = "support"
+TAX_AUDIT: Final = "tax_audit"  # MIG.4 / ORD.14: the only role that sees the restricted tax archive
 OWNER: Final = "owner"
 SUPERUSER: Final = "superuser"  # not a group: break-glass columns of the matrix only
 
@@ -76,6 +77,12 @@ ROLES: Final[tuple[Role, ...]] = (
         "Platform: support",
         "Support",
         ("manager.platform_support", VIEW_ALL_VENDORS_PERMISSION),
+    ),
+    Role(
+        TAX_AUDIT,
+        "Platform: tax audit",
+        "Tax audit",
+        ("manager.platform_tax_audit",),
     ),
     Role(
         OWNER,
@@ -114,6 +121,7 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.finance": {FINANCE: E, OWNER: R},
     "platform.tax_reports": {FINANCE: E, OWNER: R},
     "platform.staff_roles": {OWNER: E},
+    "platform.tax_archive": {TAX_AUDIT: R},  # the restricted tax-only order archive (MIG.4)
 }
 
 SECTION_LABELS: Final[Mapping[str, str]] = {
@@ -135,6 +143,7 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.finance": "Platform: finance (payouts, balances, refunds, reconciliation)",
     "platform.tax_reports": "Platform: tax and DAC7 reports",
     "platform.staff_roles": "Platform: staff and roles",
+    "platform.tax_archive": "Platform: restricted tax-only order archive (MIG.4)",
 }
 
 # The only rows the technical superuser opens without holding a role.

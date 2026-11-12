@@ -4,7 +4,7 @@ from django.db import models
 
 
 class PlatformAccess(models.Model):
-    """Carries `manager.platform_config|catalog|finance|support`; never instantiated.
+    """Carries `manager.platform_config|catalog|finance|support|tax_audit`; never instantiated.
 
     Section checks read role membership from `roles.py`; these permissions exist so a role is
     a group of dedicated permissions, none implied by `is_staff`, Wagtail access or a role.
@@ -18,6 +18,7 @@ class PlatformAccess(models.Model):
             ("platform_catalog", "Platform role: catalog and moderation"),
             ("platform_finance", "Platform role: finance and payments"),
             ("platform_support", "Platform role: support"),
+            ("platform_tax_audit", "Platform role: tax audit"),
         ]
 
     def __str__(self) -> str:
