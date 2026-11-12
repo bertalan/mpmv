@@ -544,9 +544,11 @@ VAT_RESULTS: Final = (VAT_VALID, VAT_INVALID, VAT_UNAVAILABLE)
 # state's service down, too slow, an answer about another number, a prefix that is not the
 # country's) leaves the number not verified and VAT is charged.
 
-# D-02: Northern Ireland numbers (prefix XI) are checked in VIES for goods; GB numbers are not.
+# D-02: Northern Ireland (code XI) is not an ISO country. Its VAT numbers are not checked in VIES
+# yet: `VatValidation` cannot store an `XI` row (TAX.19), so the check is "not in VIES" and fails
+# closed.
 NORTHERN_IRELAND_CODE: Final = "XI"
-VIES_COUNTRIES: Final = EU_MEMBER_STATES | {NORTHERN_IRELAND_CODE}
+VIES_COUNTRIES: Final = EU_MEMBER_STATES
 # Countries whose national number may itself start with two letters (the French key), so two
 # leading letters other than the prefix are not a sign of another country's number there.
 NUMBER_MAY_START_WITH_LETTERS: Final = frozenset({"FR"})
@@ -640,11 +642,7 @@ def vies_query(country: str, vat_number: str) -> ViesQuery:
     number VIES would refuse as malformed.
     """
     try:
-        iso = (
-            NORTHERN_IRELAND_CODE
-            if country.strip().upper() == NORTHERN_IRELAND_CODE
-            else normalize_country(country)
-        )
+        iso = normalize_country(country)
     except InvalidCountry:
         raise _not_checkable(VAT_REASON_NOT_IN_VIES, country.strip().upper()) from None
     if iso not in VIES_COUNTRIES:
@@ -894,10 +892,6 @@ class TaxContext:
     rates: RateTable
     territories: tuple[TerritoryRule, ...] = ()
     vat_check: VatCheckSnapshot | None = None
-    # TAX.18 inputs, supplied by the distance-sales ledger (TAX.8): the vendor is above the EUR
-    # 10,000 EU threshold, or has opted for the UK rate on sales to Northern Ireland.
-    distance_sales_over_threshold: bool = False
-    xi_uk_rate_option: bool = False
 
 
 @dataclass(frozen=True)
@@ -1020,8 +1014,8 @@ def _resolve_northern_ireland(ctx: TaxContext, category: FiscalCategory) -> TaxD
     Intrastat `XI`; the vendor keeps proof of delivery). Every other customer, a GB-only number
     included, is a consumer: an EU distance sale at the vendor country's rate while the vendor is
     under the EUR 10,000 EU threshold, and at the UK rate, reported through the vendor's EU OSS
-    under code `XI` with no UK registration, above it or by the vendor's option. A vendor outside
-    the OSS regime always charges its own country's rate. The UK rate is the `XI` rate, else the
+    under code `XI` with no UK registration. A vendor outside the OSS regime (the DOMESTIC profile,
+    below the threshold) charges its own country's rate. The UK rate is the `XI` rate, else the
     `GB` rate; a missing one raises `MissingTaxRate`.
     """
     vendor_country = normalize_country(ctx.vendor_country)
@@ -1029,9 +1023,7 @@ def _resolve_northern_ireland(ctx: TaxContext, category: FiscalCategory) -> TaxD
     if customer != "b2c" and customer.vat_country == NORTHERN_IRELAND_CODE:
         decision = _zero(REASON_REVERSE_CHARGE, NOTE_REVERSE_CHARGE)
         return replace(decision, intrastat_country=INTRASTAT_NORTHERN_IRELAND)
-    if ctx.vendor_profile.regime == OSS and (
-        ctx.distance_sales_over_threshold or ctx.xi_uk_rate_option
-    ):
+    if ctx.vendor_profile.regime == OSS:
         table = ctx.rates.rates
         code = NORTHERN_IRELAND_CODE if (NORTHERN_IRELAND_CODE, category) in table else "GB"
         return _taxed(
