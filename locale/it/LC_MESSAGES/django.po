@@ -2341,9 +2341,6 @@ msgstr ""
 "usare una formattazione semplice. Facoltativo, ma con un testo chiaro chi compra decide più in "
 "fretta."
 
-#: apps/cms/models.py
-msgid "The general text has no screen or page type."
-msgstr "Il testo generale non ha una schermata né un tipo di pagina."
 #: apps/compliance/forms.py
 msgid ""
 "The full web address of the page that shows the content, starting with http:// or https://. "
@@ -2351,6 +2348,10 @@ msgid ""
 msgstr ""
 "L'indirizzo web completo della pagina che mostra il contenuto, che inizia con http:// o https://. "
 "Obbligatorio."
+
+#: apps/cms/models.py
+msgid "The general text has no screen or page type."
+msgstr "Il testo generale non ha una schermata né un tipo di pagina."
 
 #: apps/shipping/models.py
 msgid "The heaviest parcel of the band, in kg, included. Leave it empty for no upper limit."
@@ -2606,13 +2607,6 @@ msgstr ""
 "Il nome della categoria o etichetta in questa lingua, per esempio 'Estate'. Obbligatorio: senza, "
 "non ha un nome per chi compra."
 
-#: apps/cms/models.py
-msgid ""
-"The name of the screen (for example catalog:brand) or of the page type (for example "
-"cms.StandardPage). Leave it empty for the general text."
-msgstr ""
-"Il nome della schermata (per esempio catalog:brand) o del tipo di pagina (per esempio "
-"cms.StandardPage). Lascialo vuoto per il testo generale."
 #: apps/core/models.py
 msgid "The name of the feature switch, exactly as it is registered in the code."
 msgstr "Il nome dell'interruttore della funzione, esattamente come è registrato nel codice."
@@ -2636,6 +2630,14 @@ msgid ""
 msgstr ""
 "Il nome del punto di ritiro in questa lingua, per esempio 'Ritiro in laboratorio'. Compare ai "
 "clienti quando il checkout userà la spedizione."
+
+#: apps/cms/models.py
+msgid ""
+"The name of the screen (for example catalog:brand) or of the page type (for example "
+"cms.StandardPage). Leave it empty for the general text."
+msgstr ""
+"Il nome della schermata (per esempio catalog:brand) o del tipo di pagina (per esempio "
+"cms.StandardPage). Lascialo vuoto per il testo generale."
 
 #: apps/tax/models.py
 msgid "The name of the territory, for example 'Canary Islands'."
@@ -3344,6 +3346,7 @@ msgid ""
 msgstr ""
 "Selezionalo sulle schermate per i venditori, così la finestra rimanda anche alla guida per i "
 "venditori. Non ha effetto finché la piattaforma non ha un indirizzo della guida per i venditori."
+
 #: apps/ingest/models.py
 msgid ""
 "Tick it to allow runs that write. Without it, every run of this source is a dry run that changes "
@@ -3654,13 +3657,6 @@ msgstr "Che cosa chiede l'autorità o che cosa segnala l'avviso, in poche frasi.
 msgid "What the field is needed for: a payout request or the activation of the vendor."
 msgstr "A cosa serve il campo: una richiesta di pagamento o l'attivazione del venditore."
 
-#: apps/cms/models.py
-msgid ""
-"What the text is for: one screen, every page of one page type, or every screen that has no text of"
-" its own. Example: choose Screen for the brand listing."
-msgstr ""
-"A che cosa serve il testo: una schermata, ogni pagina di un tipo di pagina, o ogni schermata che "
-"non ha un testo proprio. Esempio: scegli Schermata per l’elenco dei marchi."
 #: apps/shipping/models.py
 msgid ""
 "What the rate calculation does for this method in this area: an estimated cost that needs a quote,"
@@ -3688,6 +3684,14 @@ msgstr "Che cosa fa l'esecuzione: lettura del sito, giacenze, prezzi, immagini o
 #: apps/ingest/models.py
 msgid "What the supplier published for the item, as it was read."
 msgstr "Quello che il fornitore ha pubblicato per l'articolo, così come è stato letto."
+
+#: apps/cms/models.py
+msgid ""
+"What the text is for: one screen, every page of one page type, or every screen that has no text of"
+" its own. Example: choose Screen for the brand listing."
+msgstr ""
+"A che cosa serve il testo: una schermata, ogni pagina di un tipo di pagina, o ogni schermata che "
+"non ha un testo proprio. Esempio: scegli Schermata per l’elenco dei marchi."
 
 #: apps/catalog/models.py
 msgid ""
