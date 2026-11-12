@@ -1665,3 +1665,11 @@ msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
 #: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
 msgid "Order %(order_number)s: part of your order was cancelled"
 msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
+
+#: apps/vendors/models.py
+msgid "The country whose authorities issue no tax identification number (TIN)."
+msgstr "Il paese le cui autorità non rilasciano un codice fiscale estero (TIN)."
+
+#: apps/vendors/models.py
+msgid "Why this country issues no TIN."
+msgstr "Perché questo paese non rilascia il TIN."

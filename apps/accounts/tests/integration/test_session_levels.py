@@ -495,6 +495,7 @@ def test_enrolling_a_passkey_needs_a_fresh_second_factor(client: Client) -> None
 WIRED = {
     "role_grant",
     "vat_regime",
+    "no_tin_country",
     "audit_in_clear",
     "mfa_disable",
     "owner_role_grant",
