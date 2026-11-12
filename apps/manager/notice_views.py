@@ -17,6 +17,7 @@ from django.http.response import HttpResponseBase
 from django.urls import reverse
 from django.utils.translation import gettext as _
 
+from apps.accounts.decorators import requires_level_method
 from apps.compliance import services
 from apps.compliance.forms import AuthoritiesForm, DecisionForm, RestrictionForm
 from apps.compliance.models import Notice, StatementOfReasons
@@ -79,6 +80,7 @@ class NoticeDetailView(ManagerView):
         )
         return context
 
+    @requires_level_method("notice_decision")  # group 2; the owner may relax it
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
         public_id = kwargs["public_id"]
         self.notice(public_id)

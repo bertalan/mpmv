@@ -14,3 +14,14 @@ class OrdersConfig(AppConfig):
         "stockreservation": "a short-lived technical hold on stock; the order that confirms it "
         "is audited, and the stock change is audited when the payment succeeds",
     }
+
+    def ready(self) -> None:
+        # The confirmation PDF is built when the email is sent (ORD.9 3/3); `core` only knows
+        # the kind. Importing `documents` does not load WeasyPrint (it is imported on first use).
+        from apps.core.services import register_email_attachment
+
+        from . import documents
+
+        register_email_attachment(
+            documents.ATTACHMENT_KIND, documents.vendor_confirmation_attachment
+        )
