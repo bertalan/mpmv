@@ -30,6 +30,7 @@ from apps.api.tests.factories import ApiClientFactory, ApiRateCounterFactory
 from apps.cart.models import CartLine
 from apps.cart.tests.factories import CartLineFactory
 from apps.catalog.models import (
+    BrandBatch,
     PriceHistory,
     Product,
     ProductAttribute,
@@ -41,6 +42,7 @@ from apps.catalog.models import (
     VariantTranslation,
 )
 from apps.catalog.tests.factories import (
+    BrandBatchFactory,
     PriceHistoryFactory,
     ProductAttributeFactory,
     ProductFactory,
@@ -202,6 +204,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
             product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
         )
     ),
+    BrandBatch: lambda vendor: BrandBatchFactory.create(vendor=vendor),
     SkuAlias: lambda vendor: renamed_product_alias(vendor),
     ProductAttribute: lambda vendor: ProductAttributeFactory.create(
         product=ProductFactory.create(vendor=vendor)
@@ -278,6 +281,16 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
 # Models with a ForeignKey chain to Vendor that are deliberately not vendor-scoped, by label,
 # with the reason.
 NOT_VENDOR_OWNED: dict[str, str] = {
+    "catalog.Brand": (
+        "Shared catalog entity (CAT.20): approved brands are platform-wide and public; "
+        "`proposed_by` and `batch` only say who proposed a pending brand. Another vendor's "
+        "pending brand is hidden by `brands.brand_choices` and `Product.clean`, and the public "
+        "brand page serves approved brands only; vendors never edit brands."
+    ),
+    "catalog.BrandTranslation": (
+        "Storefront texts of a shared brand (CAT.20); reaches a vendor only through the brand "
+        "that vendor proposed, and is edited by staff only."
+    ),
     "catalog.Redirect": (
         "Platform SEO rule managed by staff only (CAT.6): its optional target product is where a "
         "legacy URL lands, not an owner; no vendor endpoint lists or edits redirects."

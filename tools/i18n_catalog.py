@@ -34,6 +34,9 @@ SCOPES = (
     "apps/accounts",
     "apps/orders/templates",
     "themes/base/templates/layouts",
+    # Brand review models (CAT.20): the rest of the catalog app joins with the storefront I18N.
+    "apps/catalog/taxonomy.py",
+    "apps/catalog/taxonomy_admin.py",
 )
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
@@ -73,7 +76,8 @@ CONTEXT_PLURAL = {"npgettext", "npgettext_lazy"}
 
 def _files() -> Iterator[Path]:
     for scope in SCOPES:
-        for path in sorted((ROOT / scope).rglob("*")):
+        base = ROOT / scope
+        for path in [base] if base.is_file() else sorted(base.rglob("*")):
             rel = path.relative_to(ROOT)
             if SKIP_PARTS & set(rel.parts) or path.suffix not in {".py", ".html", ".txt"}:
                 continue

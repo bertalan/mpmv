@@ -353,6 +353,13 @@ MPMV_MAX_ANIMATION_PIXELS = env_int("MPMV_MAX_ANIMATION_PIXELS", 16_000_000)
 MPMV_MAX_IMAGE_SIDE = env_int("MPMV_MAX_IMAGE_SIDE", 16_000)
 MPMV_MAX_STORED_IMAGE_PIXELS = env_int("MPMV_MAX_STORED_IMAGE_PIXELS", 40_000_000)
 MPMV_MAX_IMAGE_FRAMES = env_int("MPMV_MAX_IMAGE_FRAMES", 300)
+# CAT.20: how many manual brand proposals one vendor may have waiting for review (feed and
+# import proposals are grouped in one batch per run and do not count).
+MPMV_BRAND_PENDING_LIMIT = env_int("MPMV_BRAND_PENDING_LIMIT", 20)
+# New brands one import run may propose, and how many brands from imports one vendor may have
+# waiting for review in all (a vendor cannot fill the shared list through batches).
+MPMV_BRAND_BATCH_LIMIT = env_int("MPMV_BRAND_BATCH_LIMIT", 500)
+MPMV_BRAND_BATCH_PENDING_LIMIT = env_int("MPMV_BRAND_BATCH_PENDING_LIMIT", 2000)
 MPMV_IMAGE_DECODE_WAIT_SECONDS = env_float("MPMV_IMAGE_DECODE_WAIT_SECONDS", 30.0)
 # Safe parsing of the upload field (SEC.2) and the SVG refusal in the second step of Wagtail's
 # multiple upload (THM.12).
