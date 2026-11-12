@@ -117,7 +117,8 @@ def test_staff_admin_edits_the_new_fields(staff_client: Client) -> None:
     url = reverse("admin:catalog_brand_change", args=[brand.pk])
     page = staff_client.get(url)
     assert page.status_code == 200
-    for name in ("status", "wikidata_id", "same_as", "manufacturer", "logo"):
+    # The status is read-only on a change form: only the review actions move it (CAT.20).
+    for name in ("wikidata_id", "same_as", "manufacturer", "logo"):
         assert f'name="{name}"' in page.content.decode()
     assert (
         staff_client.get(reverse("admin:catalog_manufacturer_change", args=[maker.pk])).status_code
@@ -151,9 +152,9 @@ def test_the_migration_keeps_every_brand_public_and_fills_keys_idempotently() ->
 
 
 def test_a_logo_needs_an_alt_text() -> None:
-    from apps.core.tests.factories import MediaImageFactory
+    from apps.catalog.tests.factories import brand_logo_image
 
-    brand = BrandFactory.build(logo=MediaImageFactory.create(), logo_alt="")
+    brand = BrandFactory.build(logo=brand_logo_image(), logo_alt="")
     with pytest.raises(ValidationError) as caught:
         brand.full_clean()
     assert "logo_alt" in caught.value.message_dict
