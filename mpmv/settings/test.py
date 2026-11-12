@@ -23,6 +23,7 @@ PRODUCT_PAGES_ROUTED = True
 
 # Feature flags: the code defaults, whatever the shell exports, read from the database on every
 # check (tests roll back their writes, so a cached value could leak into the next test).
+PAYMENT_ALLOW_FAKE_PROVIDER = True  # the in-memory provider (PAY.5)
 ALLOW_SEED = True  # the `demo_seed` fixture (ARC.10)
 FEATURE_FLAGS = {}
 FEATURE_FLAGS_CACHE_SECONDS = 0
