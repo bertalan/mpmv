@@ -227,7 +227,8 @@ The groups:
    - VAT regime changes;
    - in-clear Tax and Audit views;
    - bulk edits;
-   - impersonation (CORE.10).
+   - impersonation (CORE.10);
+   - changes to the `PlatformOperator` configuration (`operator_config`).
 3. **Critical** (a per-action fresh passkey, even with the window open): payout and bank details;
    granting the owner, superuser or `platform_owner` role; disabling MFA or removing the last
    passkey; `bootstrap_platform_owner` (CORE.23).

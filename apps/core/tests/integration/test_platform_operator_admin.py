@@ -92,3 +92,57 @@ def test_rows_cannot_be_deleted_from_the_admin(staff_client: Client) -> None:
     url = reverse("admin:core_platformoperator_delete", args=[op.pk])
     assert staff_client.post(url, {"post": "yes"}).status_code == 403
     assert PlatformOperator.objects.filter(pk=op.pk).exists()
+
+
+def _logos_image() -> Any:
+    from wagtail.models import Collection
+
+    from apps.core.tests.factories import MediaImageFactory
+
+    return MediaImageFactory.create(collection=Collection.objects.get(svg_policy__isnull=False))
+
+
+def test_add_form_stores_logo_and_profiles_and_audits_them(staff_client: Client) -> None:
+    logo = _logos_image()
+    profiles = "https://www.wikidata.org/wiki/Q1\nhttps://example.org/p"
+    response = staff_client.post(
+        reverse("admin:core_platformoperator_add"),
+        _form(logo=str(logo.pk), official_profiles=profiles),
+    )
+    assert response.status_code == 302, response.content
+    stored = PlatformOperator.objects.get()
+    assert stored.logo_id == logo.pk
+    assert stored.official_profiles == ["https://www.wikidata.org/wiki/Q1", "https://example.org/p"]
+    entry = AuditLog.objects.get(action="core.platform_operator.configured")
+    assert (entry.after or {})["logo_id"] == logo.pk
+    assert (entry.after or {})["official_profiles"] == stored.official_profiles
+
+
+def test_add_form_offers_only_logos_collection_images(staff_client: Client) -> None:
+    from apps.core.tests.factories import MediaImageFactory
+
+    elsewhere = MediaImageFactory.create()
+    inside = _logos_image()
+    response = staff_client.get(reverse("admin:core_platformoperator_add"))
+    queryset = response.context["adminform"].form.fields["logo"].queryset
+    assert list(queryset) == [inside]
+    assert elsewhere not in queryset
+
+
+@pytest.mark.parametrize(
+    "profiles",
+    [
+        "\n".join(f"https://example.org/{n}" for n in range(11)),
+        "https://example.org/a\nhttps://EXAMPLE.org/a/",
+        "https://user:pw@example.org/a",
+        "http://example.org/a",
+        "https://example.org:99999/a",
+    ],
+)
+def test_add_form_refuses_bad_profile_lists(staff_client: Client, profiles: str) -> None:
+    response = staff_client.post(
+        reverse("admin:core_platformoperator_add"), _form(official_profiles=profiles)
+    )
+    assert response.status_code == 200
+    assert "official_profiles" in response.context["adminform"].form.errors
+    assert PlatformOperator.objects.count() == 0

@@ -45,6 +45,9 @@ from functools import lru_cache
 from html import escape, unescape
 from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urlsplit
+
+from apps.core.profile_links import profile_key
 
 NEUTRAL = ""  # the `language` of an image shown in every language without dedicated images
 
@@ -77,6 +80,51 @@ def faq_page_jsonld(questions: Iterable[tuple[str, str]]) -> dict[str, Any]:
             for question, answer in questions
         ],
     }
+
+
+def profile_links(urls: Iterable[str]) -> list[str]:
+    """The https profile links without a user name or password, each once (same link up to host
+    case, IDN form and a trailing slash), Wikidata first."""
+    seen: dict[str, None] = {}
+    for url in urls:
+        if (key := profile_key(url)) is not None:
+            seen.setdefault(key, None)
+    return sorted(
+        seen,
+        key=lambda u: urlsplit(u).hostname not in {"wikidata.org", "www.wikidata.org"},
+    )
+
+
+def organization_jsonld(
+    name: str,
+    url: str,
+    support_email: str = "",
+    logo_url: str = "",
+    profiles: Iterable[str] = (),
+) -> dict[str, Any]:
+    """A minimal schema.org Organization for the platform operator (SEO.8 follow-up).
+
+    SEO.7 replaces it with the shared `@graph` node. `sameAs` lists the operator's verified https
+    profiles and `logo` its logo, each only when set; the contact point is the public support
+    address.
+    """
+    node: dict[str, Any] = {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": name,
+        "url": url,
+    }
+    if logo_url:
+        node["logo"] = logo_url
+    if links := profile_links(profiles):
+        node["sameAs"] = links
+    if support_email:
+        node["contactPoint"] = {
+            "@type": "ContactPoint",
+            "contactType": "customer support",
+            "email": support_email,
+        }
+    return node
 
 
 def jsonld_text(data: Mapping[str, Any]) -> str:
