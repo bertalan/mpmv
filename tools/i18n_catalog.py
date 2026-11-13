@@ -34,6 +34,7 @@ SCOPES = (
     "apps/accounts",
     "apps/orders/templates",
     "apps/seo",
+    "apps/orders/ui",
     "apps/vendors/templates/email/vendors/profile_reverted",
     "apps/orders/customer_views.py",  # the customer area labels (ORD.7)
     "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
@@ -94,6 +95,7 @@ THEME_FILES = (
         for n in (
             "alert",
             "button",
+            "cart_line",
             "empty_state",
             "error_summary",
             "field",
@@ -102,8 +104,11 @@ THEME_FILES = (
             "help_entry",
             "icon",
             "language_switcher",
+            "order_summary",
             "pagination",
+            "quantity_stepper",
             "skip_link",
+            "step_indicator",
             "table",
             "user_tools",
         )

@@ -72,6 +72,7 @@ urlpatterns = [
     path("_links/", include("apps.seo.urls")),
     *i18n_patterns(
         path("vendor/apply/", include("apps.vendors.application_urls")),  # "Sell with us" (VEN.22)
+        path("", include("apps.orders.ui.urls")),  # cart and checkout (ORD.5)
         path("", include("apps.catalog.urls")),  # listings (CAT.8): before the CMS catch-all
         path("", include("apps.compliance.urls")),  # DSA contact points (CMP.5)
         path("", include("apps.seo.consent_urls")),  # cookie settings page (SEO.5)

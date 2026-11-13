@@ -531,6 +531,11 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
+    "manager:platform:staff_roles": StaffOnly(
+        "Staff and roles (CORE.18): platform owner only; lists the platform staff and grants or "
+        "revokes roles through the audited service. Every other role, a vendor member and a "
+        "superuser without a role get 404 or the gate's 403 (test_staff_roles)."
+    ),
     "manager:platform:profile_changes": StaffOnly(
         "Storefront profile history (CORE.9): platform staff holding the revert permission only; "
         "a vendor member gets 403 on the platform space, so no vendor sees any history."
@@ -597,6 +602,22 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "dsa_notice_received": NoVendorData(
         "Thanks page after a report (CMP.5): shows only the reference kept in the session."
+    ),
+    "orders:cart": NoVendorData(
+        "Cart page (ORD.5): shows the caller's own cart, found from their session or account, "
+        "never a cart or a vendor's data chosen by an identifier."
+    ),
+    "orders:checkout": NoVendorData(
+        "Checkout details (ORD.5): the caller's own cart and their own typed details only."
+    ),
+    "orders:review": NoVendorData(
+        "Checkout review (ORD.5): the caller's own cart and session; no identifier in the URL."
+    ),
+    "orders:shipping": NoVendorData(
+        "Shipping choice (ORD.5): stores a choice in the caller's own session for their own cart."
+    ),
+    "orders:confirmation": NoVendorData(
+        "Order confirmation (ORD.5): shows only the order the session just placed, a 404 without."
     ),
     "withdrawal": NoVendorData(
         "Online withdrawal, step one (CMP.6): no vendor data without the order number and email "

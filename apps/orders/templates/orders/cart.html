@@ -1,0 +1,11 @@
+{% extends "layouts/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Cart" %} · {{ site_name }}{% endblock %}
+{% block head %}{% robots_meta "noindex, nofollow" %}{% endblock %}
+{% block content %}
+<article class="checkout">
+  <h1>{% translate "Your cart" %}</h1>
+  {% if not empty %}{% include "components/step_indicator.html" with steps=steps current=current_step only %}{% endif %}
+  {% include "orders/_cart_body.html" %}
+</article>
+{% endblock %}
