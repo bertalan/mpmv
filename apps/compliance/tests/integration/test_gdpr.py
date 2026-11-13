@@ -439,6 +439,7 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
     }
     handled |= {
         "events.eventindexpage": "staff page owner (Wagtail), not the customer's data",
+        "ingest.reviewitem": "staff or vendor reviewer (resolved_by), not the customer's data",
     }
     found = set()
     for model in django_apps.get_models(include_auto_created=True):

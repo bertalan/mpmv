@@ -76,7 +76,7 @@ def test_each_vendor_has_its_own_collection(owner: User, vendor: Vendor) -> None
     assert vendor.logo.collection_id != other.logo.collection_id
 
 
-def test_replacing_the_logo_deletes_the_old_image(vendor: Vendor, owner: User) -> None:
+def test_replacing_the_logo_keeps_the_old_image(vendor: Vendor, owner: User) -> None:
     set_vendor_logo(vendor, upload=_file(), alt="Old", actor=owner, ctx=CTX)
     vendor.refresh_from_db()
     assert vendor.logo is not None
@@ -85,7 +85,7 @@ def test_replacing_the_logo_deletes_the_old_image(vendor: Vendor, owner: User) -
     vendor.refresh_from_db()
     assert vendor.logo is not None
     assert vendor.logo.pk != old_pk
-    assert not MediaImage.objects.filter(pk=old_pk).exists()
+    assert MediaImage.objects.filter(pk=old_pk).exists()  # kept for a staff revert (Q1)
 
 
 def test_changing_only_the_alt_text_keeps_the_image(vendor: Vendor, owner: User) -> None:
@@ -100,7 +100,7 @@ def test_changing_only_the_alt_text_keeps_the_image(vendor: Vendor, owner: User)
     assert vendor.logo_alt == "Better description"
 
 
-def test_removing_the_logo_deletes_the_image_and_clears_the_fields(
+def test_removing_the_logo_clears_the_fields_and_keeps_the_image_for_the_review_window(
     vendor: Vendor, owner: User
 ) -> None:
     set_vendor_logo(vendor, upload=_file(), alt="Mark", actor=owner, ctx=CTX)
@@ -108,7 +108,7 @@ def test_removing_the_logo_deletes_the_image_and_clears_the_fields(
     vendor.refresh_from_db()
     assert vendor.logo is None
     assert vendor.logo_alt == ""
-    assert not MediaImage.objects.exists()
+    assert MediaImage.objects.count() == 1  # kept for a staff revert (Q1)
 
 
 def test_the_change_is_audited_with_before_and_after(vendor: Vendor, owner: User) -> None:

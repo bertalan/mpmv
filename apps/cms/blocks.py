@@ -50,9 +50,18 @@ from wagtail.blocks import StructBlockValidationError
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Page
 
-from apps.catalog.models import Category, Product, TaxonomyTranslation, Term, TermTranslation
+from apps.catalog.models import (
+    Category,
+    Product,
+    ProductTranslation,
+    TaxonomyTranslation,
+    Term,
+    TermTranslation,
+)
 from apps.catalog.services import (
     ListingScope,
+    ProductCard,
+    ProductGrid,
     category_url,
     listed_products,
     product_cards,
@@ -86,6 +95,18 @@ from .engine import (
 RICH_TEXT_FEATURES = ["h2", "h3", "bold", "italic", "ol", "ul", "link"]
 
 
+def paragraph_block() -> blocks.RichTextBlock:
+    """The rich-text paragraph of every page body (one definition, one help text)."""
+    return blocks.RichTextBlock(
+        features=RICH_TEXT_FEATURES,
+        label=_("Rich text"),
+        help_text=_(
+            "Write your text here. Use the toolbar for headings, bold, lists and links. "
+            "A heading makes the page easier to scan."
+        ),
+    )
+
+
 def language_choices() -> list[tuple[str, Any]]:
     """Neutral first, then every configured language; read at runtime, so no migration."""
     return [(NEUTRAL, _("All languages (neutral)")), *settings.LANGUAGES]
@@ -94,11 +115,25 @@ def language_choices() -> list[tuple[str, Any]]:
 class FigureBlock(blocks.StructBlock):  # type: ignore[misc]  # Wagtail is untyped
     """One image with its alt text and an optional caption."""
 
-    image = ImageChooserBlock()
-    alt_text = blocks.CharBlock(
-        max_length=250, help_text=_("Describes the image for people who cannot see it.")
+    image = ImageChooserBlock(
+        help_text=_("Pick the picture from the library or upload a new one. Required.")
     )
-    caption = blocks.CharBlock(max_length=250, required=False)
+    alt_text = blocks.CharBlock(
+        max_length=250,
+        help_text=_(
+            "Describe the picture in a few words, for people who cannot see it. "
+            "Example: 'Red ceramic mug on a wooden table'. Required: the picture cannot be saved "
+            "without it."
+        ),
+    )
+    caption = blocks.CharBlock(
+        max_length=250,
+        required=False,
+        help_text=_(
+            "A short line shown under the picture, up to 250 characters. "
+            "If you leave it empty, no caption is shown."
+        ),
+    )
 
     class Meta:
         icon = "image"
@@ -112,7 +147,10 @@ class GalleryImageBlock(FigureBlock):
     language = blocks.ChoiceBlock(
         choices=language_choices,
         required=False,
-        help_text=_("Shown instead of the neutral images in its language."),
+        help_text=_(
+            "Pick a language to show this picture only to visitors reading in it. "
+            "Leave it on 'All languages' to show it to everyone."
+        ),
     )
 
 
@@ -159,9 +197,28 @@ class LinkValue(blocks.StructValue):  # type: ignore[misc]
 class LinkBlock(blocks.StructBlock):  # type: ignore[misc]
     """A labelled link to a page of the site or to an external URL, never both."""
 
-    page = blocks.PageChooserBlock(required=False)
-    url = blocks.URLBlock(required=False, label=_("URL"))
-    label = blocks.CharBlock(max_length=100)
+    page = blocks.PageChooserBlock(
+        required=False,
+        help_text=_(
+            "Choose a page of this site to link to. Fill in this or the web address below, not "
+            "both."
+        ),
+    )
+    url = blocks.URLBlock(
+        required=False,
+        label=_("URL"),
+        help_text=_(
+            "The full address of another website, for example 'https://example.com'. "
+            "Fill in this or the page above, not both."
+        ),
+    )
+    label = blocks.CharBlock(
+        max_length=100,
+        help_text=_(
+            "The words visitors click, for example 'Read more'. Required: without it the link "
+            "cannot be saved."
+        ),
+    )
 
     class Meta:
         icon = "link"
@@ -180,15 +237,42 @@ class LinkBlock(blocks.StructBlock):  # type: ignore[misc]
 class HeroBlock(blocks.StructBlock):  # type: ignore[misc]
     """The opening banner of a page: a heading, a short text, an image and up to two links."""
 
-    heading = blocks.CharBlock(max_length=120)
-    text = blocks.TextBlock(required=False, max_length=400)
-    image = ImageChooserBlock(required=False)
+    heading = blocks.CharBlock(
+        max_length=120,
+        help_text=_(
+            "The big title at the top of the page, up to 120 characters. "
+            "Required: the banner cannot be saved without it."
+        ),
+    )
+    text = blocks.TextBlock(
+        required=False,
+        max_length=400,
+        help_text=_(
+            "One or two sentences under the title, up to 400 characters. "
+            "If you leave it empty, only the title is shown."
+        ),
+    )
+    image = ImageChooserBlock(
+        required=False,
+        help_text=_("A picture for the banner. If you leave it empty, the banner has no picture."),
+    )
     alt_text = blocks.CharBlock(
         required=False,
         max_length=250,
-        help_text=_("Describes the image for people who cannot see it."),
+        help_text=_(
+            "Describe the picture in a few words, for people who cannot see it. "
+            "Example: 'Potter shaping a bowl'. Required when you choose a picture."
+        ),
     )
-    links = blocks.ListBlock(LinkBlock(), min_num=0, max_num=2, default=[])
+    links = blocks.ListBlock(
+        LinkBlock(),
+        min_num=0,
+        max_num=2,
+        default=[],
+        help_text=_(
+            "Up to two buttons under the text. If you add none, the banner has no buttons."
+        ),
+    )
 
     class Meta:
         icon = "pick"
@@ -209,9 +293,22 @@ class HeroBlock(blocks.StructBlock):  # type: ignore[misc]
 class CallToActionBlock(blocks.StructBlock):  # type: ignore[misc]
     """A heading, a short text and one link that invites the reader to act."""
 
-    heading = blocks.CharBlock(max_length=120)
-    text = blocks.TextBlock(required=False, max_length=400)
-    link = LinkBlock()
+    heading = blocks.CharBlock(
+        max_length=120,
+        help_text=_(
+            "The invitation, for example 'Visit our workshop'. Up to 120 characters. "
+            "Required: the block cannot be saved without it."
+        ),
+    )
+    text = blocks.TextBlock(
+        required=False,
+        max_length=400,
+        help_text=_(
+            "A sentence or two that says why to click, up to 400 characters. "
+            "If you leave it empty, only the title and the button are shown."
+        ),
+    )
+    link = LinkBlock(help_text=_("The button visitors click. Required."))
 
     class Meta:
         icon = "pick"
@@ -239,9 +336,26 @@ class LegalSectionBlock(blocks.StructBlock):  # type: ignore[misc]
     and 9). The `section` tag is what `apps.compliance` checks for; the heading and the text are
     written (and translated) by the editor."""
 
-    section = blocks.ChoiceBlock(choices=list(LEGAL_SECTIONS), label=_("Required section"))
-    heading = blocks.CharBlock(max_length=160)
-    text = blocks.RichTextBlock(features=RICH_TEXT_FEATURES)
+    section = blocks.ChoiceBlock(
+        choices=list(LEGAL_SECTIONS),
+        label=_("Required section"),
+        help_text=_(
+            "Which section the law asks for this text to be. The platform checks that every "
+            "required section exists, whatever the title says."
+        ),
+    )
+    heading = blocks.CharBlock(
+        max_length=160,
+        help_text=_(
+            "The title of the section as visitors read it, up to 160 characters. Required."
+        ),
+    )
+    text = blocks.RichTextBlock(
+        features=RICH_TEXT_FEATURES,
+        help_text=_(
+            "The text of the section. Write it as your legal adviser approved it. Required."
+        ),
+    )
 
     class Meta:
         icon = "doc-full"
@@ -250,8 +364,19 @@ class LegalSectionBlock(blocks.StructBlock):  # type: ignore[misc]
 
 
 class FaqItemBlock(blocks.StructBlock):  # type: ignore[misc]
-    question = blocks.CharBlock(max_length=250)
-    answer = blocks.RichTextBlock(features=RICH_TEXT_FEATURES)
+    question = blocks.CharBlock(
+        max_length=250,
+        help_text=_(
+            "The question as a customer would ask it, for example 'How long does delivery take?'. "
+            "Required: the question cannot be saved without it."
+        ),
+    )
+    answer = blocks.RichTextBlock(
+        features=RICH_TEXT_FEATURES,
+        help_text=_(
+            "A clear, short answer. It opens when the visitor clicks the question. Required."
+        ),
+    )
 
     class Meta:
         icon = "help"
@@ -262,8 +387,22 @@ class FaqBlock(blocks.StructBlock):  # type: ignore[misc]
     """Questions shown as disclosures (`<details>`). The page template emits one FAQPage for all
     the FAQ blocks of the page (`cms_tags.faq_jsonld`, spec 10)."""
 
-    heading = blocks.CharBlock(required=False, max_length=120)
-    items = blocks.ListBlock(FaqItemBlock(), min_num=1, label=_("Questions"))
+    heading = blocks.CharBlock(
+        required=False,
+        max_length=120,
+        help_text=_(
+            "A title above the questions, for example 'Questions and answers'. "
+            "If you leave it empty, the questions have no title."
+        ),
+    )
+    items = blocks.ListBlock(
+        FaqItemBlock(),
+        min_num=1,
+        label=_("Questions"),
+        help_text=_(
+            "Add at least one question. They show as a list that opens one answer at a time."
+        ),
+    )
 
     class Meta:
         icon = "help"
@@ -474,18 +613,34 @@ class ProductChooserBlock(product_chooser.get_block_class("_ProductChooserBlock"
 
 def _card_label() -> blocks.CharBlock:
     return blocks.CharBlock(
-        required=False, max_length=100, help_text=_("Leave empty to use its name.")
+        required=False,
+        max_length=100,
+        help_text=_(
+            "The title on the card, up to 100 characters. "
+            "If you leave it empty, the card uses the name of what it points to."
+        ),
     )
 
 
 def _card_text() -> blocks.TextBlock:
-    return blocks.TextBlock(required=False, max_length=250)
+    return blocks.TextBlock(
+        required=False,
+        max_length=250,
+        help_text=_(
+            "A short line under the title, up to 250 characters. "
+            "If you leave it empty, the card uses the short text of what it points to, if any."
+        ),
+    )
 
 
 class PageCardBlock(blocks.StructBlock):  # type: ignore[misc]
     """A card to a page of the site, in the reader's language."""
 
-    page = blocks.PageChooserBlock()
+    page = blocks.PageChooserBlock(
+        help_text=_(
+            "Choose the page the card leads to. If the page is not live, the card is left out."
+        )
+    )
     label = _card_label()
     text = _card_text()
 
@@ -498,7 +653,11 @@ class PageCardBlock(blocks.StructBlock):  # type: ignore[misc]
 class TermCardBlock(blocks.StructBlock):  # type: ignore[misc]
     """A card to a catalog term's listing (spec 03), with its name in the reader's language."""
 
-    term = TermChooserBlock()
+    term = TermChooserBlock(
+        help_text=_(
+            "Choose the category or tag the card leads to. A card to a hidden one is left out."
+        )
+    )
     label = _card_label()
     text = _card_text()
 
@@ -511,7 +670,11 @@ class TermCardBlock(blocks.StructBlock):  # type: ignore[misc]
 class VendorCardBlock(blocks.StructBlock):  # type: ignore[misc]
     """A card to an active vendor's storefront, with its tagline."""
 
-    vendor = VendorChooserBlock()
+    vendor = VendorChooserBlock(
+        help_text=_(
+            "Choose the shop the card leads to. A card to a shop that is not open is left out."
+        )
+    )
     label = _card_label()
     text = _card_text()
 
@@ -524,7 +687,12 @@ class VendorCardBlock(blocks.StructBlock):  # type: ignore[misc]
 class ProductCardBlock(blocks.StructBlock):  # type: ignore[misc]
     """A card to a product page (CMS.3), with its title in the reader's language."""
 
-    product = ProductChooserBlock()
+    product = ProductChooserBlock(
+        help_text=_(
+            "Choose the product the card leads to. A card to a product that is not on sale is "
+            "left out."
+        )
+    )
     label = _card_label()
     text = _card_text()
 
@@ -537,7 +705,14 @@ class ProductCardBlock(blocks.StructBlock):  # type: ignore[misc]
 class FeaturedLinksBlock(blocks.StructBlock):  # type: ignore[misc]
     """A heading and cards to pages, terms and vendors; left out when no card is public."""
 
-    heading = blocks.CharBlock(required=False, max_length=120)
+    heading = blocks.CharBlock(
+        required=False,
+        max_length=120,
+        help_text=_(
+            "A title above the cards, for example 'You may also like'. "
+            "If you leave it empty, the cards have no title."
+        ),
+    )
     cards = blocks.StreamBlock(
         [("page", PageCardBlock()), ("term", TermCardBlock()), ("vendor", VendorCardBlock())],
         min_num=1,
@@ -590,55 +765,241 @@ class BrandChooserBlock(brand_chooser.get_block_class("_BrandChooserBlock", __na
     """A catalog brand, chosen in the brand chooser modal."""
 
 
+def _item_list(
+    name: str, cards: Iterable[ProductCard], context: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    """One schema.org `ItemList` of product references (spec 10 "Widgets feed the graph"): the
+    `@id` of a product is its page; a list item never repeats its offers (the product's own page
+    carries the `Product` node). A card without a page, and a list without items, give nothing."""
+    request = context.get("request")
+    items: list[dict[str, Any]] = []
+    for card in cards:
+        if not card.url:
+            continue
+        url = request.build_absolute_uri(card.url) if request is not None else card.url
+        item: dict[str, Any] = {"@id": url, "name": card.title, "url": url}
+        if card.image_url:
+            item["image"] = card.image_url
+        items.append({"@type": "ListItem", "position": len(items) + 1, "item": item})
+    if not items:
+        return []
+    return [
+        {
+            "@type": "ItemList",
+            "name": name,
+            "numberOfItems": len(items),
+            "itemListElement": items,
+        }
+    ]
+
+
+def page_graph_nodes(body: Iterable[Any], context: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """The `@graph` nodes of a page body's widgets, in order: every block that implements
+    `graph_nodes(value, context)` (the product grid and the product cards, SEO.7)."""
+    nodes: list[dict[str, Any]] = []
+    for child in body:
+        graph_nodes = getattr(child.block, "graph_nodes", None)
+        if graph_nodes is not None:
+            nodes.extend(graph_nodes(child.value, context))
+    return nodes
+
+
 class ProductGridBlock(blocks.StructBlock):  # type: ignore[misc]
     """The newest products of one category, term, brand or vendor (the CAT.8 listing query)."""
 
-    heading = blocks.CharBlock(required=False, max_length=120)
+    heading = blocks.CharBlock(
+        required=False,
+        max_length=120,
+        help_text=_(
+            "A title above the products, up to 120 characters. "
+            "If you leave it empty, the title is the name of the chosen category, tag, brand or "
+            "shop."
+        ),
+    )
     source = blocks.StreamBlock(
         [
-            ("category", CategoryChooserBlock(label=_("Category"))),
-            ("term", TermChooserBlock(label=_("Term"))),
-            ("brand", BrandChooserBlock(label=_("Brand"))),
-            ("vendor", VendorChooserBlock(label=_("Vendor"))),
+            (
+                "category",
+                CategoryChooserBlock(
+                    label=_("Category"),
+                    help_text=_("Show the newest products of this category."),
+                ),
+            ),
+            (
+                "term",
+                TermChooserBlock(
+                    label=_("Term"),
+                    help_text=_("Show the newest products of this category or tag."),
+                ),
+            ),
+            (
+                "brand",
+                BrandChooserBlock(
+                    label=_("Brand"), help_text=_("Show the newest products of this brand.")
+                ),
+            ),
+            (
+                "vendor",
+                VendorChooserBlock(
+                    label=_("Vendor"), help_text=_("Show the newest products of this shop.")
+                ),
+            ),
         ],
         min_num=1,
         max_num=1,
         label=_("Products of"),
+        help_text=_("Choose where the products come from: one category, tag, brand or shop."),
     )
     limit = blocks.IntegerBlock(
         min_value=1,
         max_value=PRODUCT_GRID_MAX,
         default=PRODUCT_GRID_DEFAULT,
         label=_("Number of products"),
+        help_text=_(
+            "How many products to show, from 1 up to the maximum allowed. "
+            "If you leave it empty, the default number is used."
+        ),
     )
-    see_all = blocks.BooleanBlock(required=False, default=True, label=_("Link to the full listing"))
+    see_all = blocks.BooleanBlock(
+        required=False,
+        default=True,
+        label=_("Link to the full listing"),
+        help_text=_("Tick to add a 'See all' link under the products, to the full list."),
+    )
 
     class Meta:
         icon = "grip"
         label = _("Product grid")
         template = "cms/blocks/product_grid.html"
 
+    def _grid(self, value: Any, parent_context: Mapping[str, Any] | None) -> ProductGrid | None:
+        chosen = next(iter(value["source"]), None)
+        if chosen is None or chosen.value is None:
+            return None
+        return product_grid(
+            ListingScope(**{chosen.block_type: chosen.value}),
+            _page_language(dict(parent_context) if parent_context else None),
+            limit=grid_limit(value.get("limit")),
+            # The listing's name and page: for "See all", and as the heading when it is empty.
+            with_anchor=bool(value.get("see_all")) or not value.get("heading"),
+        )
+
     def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
         context = super().get_context(value, parent_context=parent_context)
         context["cards"], context["see_all_url"] = [], None
-        chosen = next(iter(value["source"]), None)
-        if chosen is None or chosen.value is None:
+        grid = self._grid(value, parent_context)
+        if grid is None:
             return context
-        heading = value.get("heading") or ""
-        see_all = bool(value.get("see_all"))
-        grid = product_grid(
-            ListingScope(**{chosen.block_type: chosen.value}),
-            _page_language(parent_context),
-            limit=grid_limit(value.get("limit")),
-            # The listing's name and page: for "See all", and as the heading when it is empty.
-            with_anchor=see_all or not heading,
-        )
         context["cards"] = grid.cards
-        context["heading"] = heading or grid.name or ""
+        context["heading"] = value.get("heading") or grid.name or ""
         context["listing_name"] = grid.name
-        context["see_all_url"] = grid.see_all_url if see_all else None
+        context["see_all_url"] = grid.see_all_url if value.get("see_all") else None
         context["currency"] = CURRENCY
         return context
+
+    def graph_nodes(self, value: Any, context: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """The grid's named `ItemList` (SEO.7): its heading, else its listing's name."""
+        grid = self._grid(value, context)
+        if grid is None:
+            return []
+        name = value.get("heading") or grid.name or str(_("Products"))
+        return _item_list(name, grid.cards, context)
+
+
+# --- Product cards (CMS.11)
+
+PRODUCT_CARDS_LAYOUTS = ("grid", "row")
+PRODUCT_CARDS_MAX = 12  # one listing row of a page; more is the product grid's job
+
+
+def _shown_in_language(products: Iterable[Product | None], language: str) -> list[Product]:
+    """The chosen products that are listed (published, of an active vendor, not retired) and
+    published in `language`, in the editor's order. No text from another language stands in:
+    a product the page language lacks is left out (CMS.11)."""
+    wanted = list(dict.fromkeys(product.pk for product in products if product is not None))
+    if not wanted:
+        return []
+    texts = ProductTranslation.objects.filter(
+        product_id__in=wanted, language=language, status=translations.PUBLISHED
+    ).values("product_id")
+    found = {
+        product.pk: product
+        for product in listed_products().filter(pk__in=wanted).filter(pk__in=texts)
+    }
+    return [found[pk] for pk in wanted if pk in found]
+
+
+class ProductCardsBlock(blocks.StructBlock):  # type: ignore[misc]
+    """Hand-picked products as cards, in a grid or one scrolling row (CMS.11): the same block in
+    every body that offers products. A product that is retired, unpublished or not published in
+    the page's language disappears without editing the page; a block with none left is left
+    out. Editors search the product chooser; the cards show the price as the grid does."""
+
+    heading = blocks.CharBlock(
+        required=False,
+        max_length=120,
+        help_text=_(
+            "A title shown above the products, for example 'Our favourites'. "
+            "Up to 120 characters. If you leave it empty, no title is shown."
+        ),
+    )
+    layout = blocks.ChoiceBlock(
+        choices=[("grid", _("Grid")), ("row", _("Row"))],
+        default="grid",
+        label=_("Layout"),
+        help_text=_(
+            "Grid shows the products in rows and columns. Row puts them on one line "
+            "that the visitor can scroll sideways."
+        ),
+    )
+    products = blocks.ListBlock(
+        ProductChooserBlock(
+            help_text=_("Search by name, SKU, brand or vendor, then click the product.")
+        ),
+        min_num=1,
+        max_num=PRODUCT_CARDS_MAX,
+        label=_("Products"),
+        help_text=_(
+            "The products to show, in this order. Add at least one and at most 12. A product "
+            "that is no longer for sale, or has no text in the page language, is left out by "
+            "itself."
+        ),
+    )
+
+    class Meta:
+        icon = "pick"
+        label = _("Product cards")
+        template = "cms/blocks/product_cards.html"
+
+    def _cards(self, value: Any, parent_context: Mapping[str, Any] | None) -> list[ProductCard]:
+        """The cards, computed once per block value and request: the page render and the
+        SEO.7 graph both ask for them."""
+        language = _page_language(dict(parent_context) if parent_context else None)
+        request = (parent_context or {}).get("request")
+        cache: dict[tuple[int, str], tuple[Any, list[ProductCard]]] | None = None
+        if request is not None:
+            cache = request.__dict__.setdefault("_product_cards_cache", {})
+            hit = cache.get((id(value), language))
+            if hit is not None and hit[0] is value:
+                return hit[1]
+        cards = product_cards(_shown_in_language(value["products"], language), language)
+        if cache is not None:
+            cache[(id(value), language)] = (value, cards)
+        return cards
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        context["cards"] = self._cards(value, parent_context)
+        context["heading"] = value.get("heading") or ""
+        context["row"] = value.get("layout") == "row"
+        context["currency"] = CURRENCY
+        return context
+
+    def graph_nodes(self, value: Any, context: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """The cards' named `ItemList` (SEO.7): the heading, else a generic name."""
+        return _item_list(
+            value.get("heading") or str(_("Products")), self._cards(value, context), context
+        )
 
 
 # --- Launch countdown (CMS.9)
@@ -693,28 +1054,73 @@ class LaunchCountdownBlock(blocks.StructBlock):  # type: ignore[misc]
 
     target = OperatorDateTimeBlock(
         label=_("Launch date and time"),
-        help_text=_("In the operator's time zone."),
+        help_text=_(
+            "When the launch happens, in the platform's local time. Example: 2026-12-01 09:00. "
+            "Required: the countdown cannot run without it."
+        ),
     )
-    heading = blocks.CharBlock(max_length=120)
-    body = blocks.TextBlock(required=False, max_length=400)
-    product = ProductChooserBlock(required=False)
-    category = CategoryChooserBlock(required=False)
-    cta_label = blocks.CharBlock(required=False, max_length=60, label=_("Button text"))
+    heading = blocks.CharBlock(
+        max_length=120,
+        help_text=_(
+            "The title above the countdown, for example 'New collection'. Up to 120 characters. "
+            "Required."
+        ),
+    )
+    body = blocks.TextBlock(
+        required=False,
+        max_length=400,
+        help_text=_(
+            "A sentence or two about the launch, up to 400 characters. "
+            "If you leave it empty, only the title and the clock are shown."
+        ),
+    )
+    product = ProductChooserBlock(
+        required=False,
+        help_text=_(
+            "The product being launched. The buttons lead to it. Choose a product or a category, "
+            "not both."
+        ),
+    )
+    category = CategoryChooserBlock(
+        required=False,
+        help_text=_(
+            "The category being launched. The buttons lead to it. Choose a product or a category, "
+            "not both."
+        ),
+    )
+    cta_label = blocks.CharBlock(
+        required=False,
+        max_length=60,
+        label=_("Button text"),
+        help_text=_(
+            "The words on the button before the launch, for example 'Get notified'. "
+            "If you leave it empty, there is no button."
+        ),
+    )
     cta_link = blocks.URLBlock(
         required=False,
         label=_("Button link"),
-        help_text=_("Leave empty to link the chosen product or category."),
+        help_text=_(
+            "Where the button leads, for example 'https://example.com/launch'. "
+            "If you leave it empty, it leads to the chosen product or category."
+        ),
     )
     expired_text = blocks.CharBlock(
         required=False,
         max_length=120,
         label=_("Text after the launch"),
-        help_text=_('Leave empty for "Available now".'),
+        help_text=_(
+            "The words shown once the launch has passed, up to 120 characters. "
+            "If you leave it empty, visitors read 'Available now'."
+        ),
     )
     expired_link = blocks.URLBlock(
         required=False,
         label=_("Link after the launch"),
-        help_text=_("Leave empty to link the chosen product or category."),
+        help_text=_(
+            "Where the link leads once the launch has passed. "
+            "If you leave it empty, it leads to the chosen product or category."
+        ),
     )
 
     class Meta:

@@ -54,12 +54,24 @@ class PolicyForm(forms.Form):
         label=gettext_lazy("Vendor"),
         queryset=Vendor.objects.order_by("display_name", "pk"),
         to_field_name="public_id",
+        help_text=gettext_lazy("The shop whose events rule you want to change."),
     )
-    mode = forms.ChoiceField(label=gettext_lazy("Moderation"), choices=PolicyMode.choices)
+    mode = forms.ChoiceField(
+        label=gettext_lazy("Moderation"),
+        choices=PolicyMode.choices,
+        help_text=gettext_lazy(
+            "How this shop's events are checked before they go live: by the usual rule, always, "
+            "or never because you trust the shop. Required."
+        ),
+    )
 
 
 class SettingsForm(forms.Form):
-    site = forms.ModelChoiceField(label=gettext_lazy("Site"), queryset=Site.objects.all())
+    site = forms.ModelChoiceField(
+        label=gettext_lazy("Site"),
+        queryset=Site.objects.all(),
+        help_text=gettext_lazy("The website whose events settings you are changing."),
+    )
     moderation_threshold = forms.IntegerField(
         label=gettext_lazy("Moderation threshold"),
         min_value=0,
@@ -70,6 +82,10 @@ class SettingsForm(forms.Form):
         label=gettext_lazy("Days a cancelled event stays in feeds"),
         min_value=0,
         max_value=POSITIVE_SMALL_INT_MAX,
+        help_text=gettext_lazy(
+            "How many days a cancelled event stays in the calendar feeds, marked as cancelled, so "
+            "that people's calendars learn about it. Example: 30. Required."
+        ),
     )
 
 

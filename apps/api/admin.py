@@ -112,7 +112,7 @@ class ApiClientAdmin(admin.ModelAdmin[ApiClient]):
         return request.user.has_perm(CHANGE_PERMISSION)
 
     @admin.action(description="Revoke the selected API keys", permissions=["revoke"])
-    @level_gated_action("api_key")  # D-32 group 2
+    @level_gated_action("api_key")  # D-32 sensitive
     def revoke(self, request: HttpRequest, queryset: QuerySet[ApiClient]) -> None:
         ctx = audit_context(request)
         revoked = 0

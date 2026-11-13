@@ -27,6 +27,7 @@ from apps.cms.models import (
     BlogIndexPage,
     BlogPostPage,
     EditorRoleSeed,
+    HelpEntry,
     HomePage,
     LegalPage,
     LegalPageReview,
@@ -164,6 +165,21 @@ class VendorLandingPageFactory(_InTree, DjangoModelFactory[VendorLandingPage]):
     @classmethod
     def _default_parent(cls) -> Page:
         return _primary_home()
+
+
+class HelpEntryFactory(DjangoModelFactory[HelpEntry]):
+    """A help entry of the primary language unless `locale` is given (ARC.32).
+
+    The general entry exists already (a data migration seeds it), so a test passes the `kind`
+    and `key` it needs."""
+
+    class Meta:
+        model = HelpEntry
+
+    kind = HelpEntry.Kind.ROUTE
+    key = factory.Sequence(lambda n: f"route:{n}")
+    title = factory.Sequence(lambda n: f"Help {n}")
+    body = "<p>What this page is for.</p>"
 
 
 class NavigationMenuFactory(DjangoModelFactory[NavigationMenu]):

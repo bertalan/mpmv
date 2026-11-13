@@ -452,7 +452,7 @@ def test_a_rolled_back_number_is_reused_by_the_waiting_order_through_create_orde
                     assert order is not None
                     results["a"] = order.number
                     a_has_number.set()
-                    time.sleep(1.0)  # B is now blocked on the counter row
+                    _wait_until_a_session_waits_for_a_lock()  # B is blocked on the counter row
                     raise RuntimeError("payment setup failed")
             except RuntimeError:
                 pass
@@ -465,11 +465,9 @@ def test_a_rolled_back_number_is_reused_by_the_waiting_order_through_create_orde
     def waiting() -> None:
         try:
             a_has_number.wait(timeout=10)
-            started = time.monotonic()
             order, _ = services.create_order(**_kwargs(vendors[1]))  # type: ignore[arg-type]
             assert order is not None
             results["b"] = order.number
-            results["b_waited"] = time.monotonic() - started
         except BaseException as exc:
             errors.append(exc)
         finally:
@@ -482,7 +480,24 @@ def test_a_rolled_back_number_is_reused_by_the_waiting_order_through_create_orde
         thread.join(timeout=30)
     assert not errors
     assert results["a"] == results["b"] == "2027-000001"
-    assert results["b_waited"] > 0.3  # it queued behind A's lock
+    # B queued behind A's lock (A saw it waiting before rolling back) and took the freed number.
+
+
+def _wait_until_a_session_waits_for_a_lock(timeout: float = 30.0) -> None:
+    """Return once another session of this database is blocked on a lock (no fixed sleep)."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        with connection.cursor() as cursor:
+            # Inside a transaction Postgres serves one cached snapshot of the activity view.
+            cursor.execute("SELECT pg_stat_clear_snapshot()")
+            cursor.execute(
+                "SELECT count(*) FROM pg_stat_activity "
+                "WHERE datname = current_database() AND wait_event_type = 'Lock'"
+            )
+            if cursor.fetchone()[0]:
+                return
+        time.sleep(0.01)
+    raise AssertionError("no session started waiting for a lock")
 
 
 def _kwargs(vendor: object) -> dict[str, object]:

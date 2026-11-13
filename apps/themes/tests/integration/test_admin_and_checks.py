@@ -101,6 +101,44 @@ def test_known_stored_themes_pass_the_database_check() -> None:
     assert check_site_themes(None, databases=["default"]) == []
 
 
+def _themes_migration_unapplied() -> None:
+    from django.db.migrations.recorder import MigrationRecorder
+
+    # Every themes migration: a later one depends on 0001.
+    MigrationRecorder.Migration.objects.filter(app="themes").delete()
+
+
+def _drop_theme_column() -> None:
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")  # no pending trigger events
+        cursor.execute(f'ALTER TABLE "{ThemeSettings._meta.db_table}" DROP COLUMN "theme"')
+
+
+def test_a_pending_themes_migration_skips_the_site_check() -> None:
+    """`migrate` runs the database checks before it applies anything (CORE.18 follow-up)."""
+    ThemeSettingsFactory.create(theme="removed")
+    _themes_migration_unapplied()
+    assert check_site_themes(None, databases=["default"]) == []
+    call_command("migrate", "--plan", skip_checks=False)
+
+
+def test_a_missing_column_does_not_block_migrate() -> None:
+    """A later migration may add a column: the table exists, the column does not yet."""
+    ThemeSettingsFactory.create(theme="removed")
+    _drop_theme_column()
+    assert check_site_themes(None, databases=["default"]) == []
+    _themes_migration_unapplied()
+    call_command("migrate", "--plan", skip_checks=False)
+
+
+def test_the_site_check_still_reports_on_a_fully_migrated_database() -> None:
+    ThemeSettingsFactory.create(theme="removed")
+    with pytest.raises(SystemCheckError, match=r"themes\.E003"):
+        call_command("migrate", "--plan", skip_checks=False)
+
+
 def test_without_a_database_the_site_check_does_nothing() -> None:
     ThemeSettingsFactory.create(theme="removed")
     assert check_site_themes(None) == []

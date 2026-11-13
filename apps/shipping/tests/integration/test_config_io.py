@@ -73,7 +73,6 @@ def configured_vendor() -> Vendor:
         key="standard",
         default=True,
         free_shipping_threshold=Decimal("99.00"),
-        tax_treatment=engine.STANDARD_RATE,
         over_max_weight=engine.QUOTE,
     )
     WeightBandFactory.create(method=standard, from_kg=Decimal(0), to_kg=Decimal(5))
@@ -84,9 +83,7 @@ def configured_vendor() -> Vendor:
         cost_net=Decimal("19.90"),
         surcharge_net=Decimal("1.50"),
     )
-    ShippingMethodFactory.create(
-        vendor=vendor, zone=world, carrier=carrier, express=True, tax_treatment=engine.EXEMPT
-    )
+    ShippingMethodFactory.create(vendor=vendor, zone=world, carrier=carrier, express=True)
     ShippingMethodFactory.create(
         vendor=vendor, zone=islands, carrier=carrier, key="standard", default=True
     )
@@ -121,7 +118,7 @@ def test_the_export_describes_the_vendor_configuration() -> None:
     assert document["country_groups"] == [{"code": "dach", "countries": ["AT", "CH", "DE"]}]
     standard = document["methods"][index(document["methods"], zone="home", key="standard")]
     assert standard["zone_scope"] == fmt.OWN
-    assert standard["tax_treatment"] == engine.STANDARD_RATE  # stored data only (D-03)
+    assert standard["tax_treatment"] == engine.FOLLOWS_GOODS  # the only value (TAX.17)
     assert standard["over_max_weight"] == engine.QUOTE  # stored data only (D-06)
     assert standard["free_shipping_threshold"] == "99.00"
     assert standard["bands"] == [
@@ -231,7 +228,7 @@ def test_an_invalid_file_is_rejected_with_a_per_row_report_and_changes_nothing()
     zones[index(zones, code="islands")]["postcode_patterns"] = ["70000-74999"]
     standard = index(methods, zone="home", key="standard")
     methods[standard]["bands"][1]["from_kg"] = "4.000"  # overlaps 0-5
-    methods[standard]["tax_treatment"] = "zero"
+    methods[standard]["tax_treatment"] = "exempt"
     express = index(methods, zone="world")
     methods[express]["carrier"] = "nobody"
     methods[express]["zone"] = "nowhere"
@@ -532,3 +529,20 @@ def test_there_is_at_most_one_standard_template() -> None:
 def test_without_a_standard_template_there_is_nothing_to_copy() -> None:
     ShippingTemplateFactory.create(is_standard=False)
     assert standard_template() is None
+
+
+def test_tax17_an_import_row_with_an_exempt_treatment_is_refused_with_a_clear_message() -> None:
+    vendor = configured_vendor()
+    document = export_config(vendor)
+    standard = index(document["methods"], zone="home", key="standard")
+    document["methods"][standard]["tax_treatment"] = "exempt"
+
+    result = import_config(fmt.parse_json(document), vendor=vendor, ctx=CTX)
+
+    assert not result.ok
+    messages = [
+        message
+        for row in result.to_dict()["rows"]
+        for message in row["errors"].get("tax_treatment", [])
+    ]
+    assert any("always follows the goods" in message for message in messages)

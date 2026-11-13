@@ -67,21 +67,36 @@ PATHOLOGICAL: dict[str, Callable[[int], str]] = {
 }
 
 
-def _best(func: Callable[[str], str], text: str, runs: int = 5) -> float:
+def _best(func: Callable[[str], str], text: str, runs: int = 7) -> float:
+    """Best CPU time of several runs.
+
+    CPU time (not wall time) ignores the moments a loaded CI runner deschedules the process;
+    the minimum drops the remaining spikes (GC, cache misses).
+    """
+    func(text)  # warm-up: regex caches, allocator, branch predictors
     best = float("inf")
     for _ in range(runs):
-        started = time.perf_counter()
+        started = time.process_time()
         func(text)
-        best = min(best, time.perf_counter() - started)
+        best = min(best, time.process_time() - started)
     return best
 
 
 @pytest.mark.parametrize("name", sorted(PATHOLOGICAL))
 def test_the_patterns_scale_linearly(name: str) -> None:
+    """Input x4: linear code costs ~4x, quadratic ~16x, exponential far more. Allow up to 10x."""
     make = PATHOLOGICAL[name]
-    small = _best(redact_unbounded, make(3000))
-    large = _best(redact_unbounded, make(12000))
-    assert large <= max(small, 0.002) * 8, f"{name}: {small:.4f}s -> {large:.4f}s"
+    small_text, large_text = make(3000), make(12000)
+    message = ""
+    # A real backtracking blow-up fails every attempt; a scheduler hiccup does not.
+    for _ in range(3):
+        small = _best(redact_unbounded, small_text)
+        large = _best(redact_unbounded, large_text)
+        # The floor only guards against a sub-0.5 ms baseline (timer noise).
+        if large <= max(small, 0.0005) * 10:
+            return
+        message = f"{name}: {small:.4f}s -> {large:.4f}s"
+    pytest.fail(message)
 
 
 @pytest.mark.parametrize("name", sorted(PATHOLOGICAL))

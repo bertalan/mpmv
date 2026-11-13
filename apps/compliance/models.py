@@ -20,10 +20,12 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product
 from apps.core.fields import CountryField, EncryptedCharField, LanguageField
 from apps.core.models import BaseModel
+from apps.orders.models import Order, VendorOrder
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
 
@@ -34,24 +36,59 @@ class GpsrPartyFields(models.Model):
     """Manufacturer and EU responsible person (GPSR art. 16 and 19), all optional per row."""
 
     manufacturer_name = models.CharField(
-        max_length=255, blank=True, help_text="Name, registered trade name or trade mark."
+        max_length=255,
+        blank=True,
+        help_text=_(
+            "Who makes the product: the name, registered trade name or trade mark. Fill the"
+            " four manufacturer fields together: a product that leaves all four empty uses "
+            "the defaults of its vendor."
+        ),
     )
-    manufacturer_address = models.TextField("manufacturer postal address", blank=True)
+    manufacturer_address = models.TextField(
+        "manufacturer postal address",
+        blank=True,
+        help_text=_("The manufacturer's postal address, with street, town and country."),
+    )
     manufacturer_contact = models.CharField(
         "manufacturer electronic address",
         max_length=254,
         blank=True,
-        help_text="Email or web address (https://) for safety questions.",
+        help_text=_(
+            "An email address or a web address (starting with https://) where buyers can "
+            "ask safety questions."
+        ),
     )
     manufacturer_country = CountryField(
         blank=True,
-        help_text="Where the manufacturer is established (ISO 3166-1 alpha-2). Outside the EU "
-        "the EU responsible person is mandatory.",
+        help_text=_(
+            "The country where the manufacturer is established, as a two-letter code such "
+            "as 'IT'. For a country outside the EU you must also fill in the EU responsible"
+            " person."
+        ),
     )
-    eu_responsible_name = models.CharField("EU responsible person", max_length=255, blank=True)
-    eu_responsible_address = models.TextField("EU responsible person postal address", blank=True)
+    eu_responsible_name = models.CharField(
+        "EU responsible person",
+        max_length=255,
+        blank=True,
+        help_text=_(
+            "The person or company in the EU who answers for the product when the "
+            "manufacturer is outside the EU. Fill the three EU responsible fields together;"
+            " leave all three empty to use the defaults of the vendor."
+        ),
+    )
+    eu_responsible_address = models.TextField(
+        "EU responsible person postal address",
+        blank=True,
+        help_text=_("The postal address of the EU responsible person."),
+    )
     eu_responsible_contact = models.CharField(
-        "EU responsible person electronic address", max_length=254, blank=True
+        "EU responsible person electronic address",
+        max_length=254,
+        blank=True,
+        help_text=_(
+            "An email address or a web address (starting with https://) of the EU "
+            "responsible person."
+        ),
     )
 
     class Meta:
@@ -63,7 +100,12 @@ class VendorGpsrDefaults(GpsrPartyFields, BaseModel):
 
     vendor_scope: ClassVar[str] = "vendor"
 
-    vendor = models.OneToOneField(Vendor, on_delete=models.CASCADE, related_name="gpsr_defaults")
+    vendor = models.OneToOneField(
+        Vendor,
+        on_delete=models.CASCADE,
+        related_name="gpsr_defaults",
+        help_text=_("The vendor these defaults belong to. A vendor has one set of defaults."),
+    )
 
     objects = VendorScopedManager()
 
@@ -80,11 +122,30 @@ class GpsrInfo(GpsrPartyFields, BaseModel):
 
     vendor_scope: ClassVar[str] = "product__vendor"
 
-    product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name="gpsr")
-    model_number = models.CharField(
-        "model or type", max_length=100, blank=True, help_text="Model, type or reference."
+    product = models.OneToOneField(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="gpsr",
+        help_text=_("The product this safety data is about. A product has one record."),
     )
-    batch = models.CharField("batch or serial number", max_length=100, blank=True)
+    model_number = models.CharField(
+        "model or type",
+        max_length=100,
+        blank=True,
+        help_text=_(
+            "The model, type or reference that identifies the product, for example the "
+            "number printed on the label."
+        ),
+    )
+    batch = models.CharField(
+        "batch or serial number",
+        max_length=100,
+        blank=True,
+        help_text=_(
+            "The batch or serial number of the product, if it has one. Leave it empty when "
+            "every unit is the same."
+        ),
+    )
 
     objects = VendorScopedManager()
 
@@ -105,11 +166,28 @@ class GpsrSafetyText(BaseModel):
 
     vendor_scope: ClassVar[str] = "product__vendor"
 
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="gpsr_texts")
-    language = LanguageField()
-    warnings = models.TextField(blank=True, help_text="Warnings that accompany the product.")
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="gpsr_texts",
+        help_text=_("The product these warnings are about."),
+    )
+    language = LanguageField(
+        help_text=_("The language these texts are written in. A product has one text per language.")
+    )
+    warnings = models.TextField(
+        blank=True,
+        help_text=_(
+            "The warnings that come with the product, in this language. A product with "
+            "warnings is not sold into a country until they exist in one of that country's "
+            "languages."
+        ),
+    )
     safety_information = models.TextField(
-        blank=True, help_text="Safety information: use, assembly, maintenance, disposal."
+        blank=True,
+        help_text=_(
+            "How to use, assemble, maintain and dispose of the product safely, in this language."
+        ),
     )
 
     objects = VendorScopedManager()
@@ -145,20 +223,57 @@ class SafetyCase(BaseModel):
 
     vendor_scope: ClassVar[str] = "vendor"
 
-    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="safety_cases")
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.PROTECT,
+        related_name="safety_cases",
+        help_text=_("The vendor the order or notice is about."),
+    )
     product = models.ForeignKey(
-        Product, null=True, blank=True, on_delete=models.SET_NULL, related_name="safety_cases"
+        Product,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="safety_cases",
+        help_text=_(
+            "The product the order or notice is about, if it is about one. If the product "
+            "is deleted later, its SKU stays on the case."
+        ),
     )
     product_sku = models.CharField(max_length=100, blank=True, editable=False)
-    kind = models.CharField(max_length=20, choices=Kind.choices)
+    kind = models.CharField(
+        max_length=20,
+        choices=Kind.choices,
+        help_text=_(
+            "An authority order must be acted on within 2 working days, a product safety "
+            "notice within 3. The days are counted from the day it was received, Monday to "
+            "Friday."
+        ),
+    )
     reference = models.CharField(
-        max_length=100, blank=True, help_text="The authority's or the notice's own reference."
+        max_length=100,
+        blank=True,
+        help_text=_(
+            "The reference number the authority or the notice gave this case. Leave it "
+            "empty if there is none."
+        ),
     )
     authority = models.CharField(
-        max_length=255, blank=True, help_text="The authority that issued the order."
+        max_length=255,
+        blank=True,
+        help_text=_("The authority that issued the order. Leave it empty for a safety notice."),
     )
-    summary = models.TextField(help_text="What is asked or reported.")
-    received_at = models.DateTimeField()
+    summary = models.TextField(
+        help_text=_(
+            "What the authority asks or what the notice reports, in a few sentences. Required."
+        )
+    )
+    received_at = models.DateTimeField(
+        help_text=_(
+            "When the order or notice arrived. The deadline is calculated from this date "
+            "and does not move afterwards."
+        )
+    )
     due_on = models.DateField(editable=False)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.OPEN)
     closed_at = models.DateTimeField(null=True, blank=True, editable=False)
@@ -195,10 +310,19 @@ class CountryWarningLanguages(BaseModel):
     country without a row uses its official languages; a country outside both is not checked.
     """
 
-    country = CountryField(unique=True)
+    country = CountryField(
+        unique=True,
+        help_text=_(
+            "The destination country, as a two-letter code such as 'IT'. Each country has one row."
+        ),
+    )
     languages = ArrayField(
         models.CharField(max_length=3),
-        help_text="ISO 639-1 codes; warnings in any one of them are enough.",
+        help_text=_(
+            "The languages in which this country accepts product warnings, as two-letter "
+            "codes such as 'it' or 'de', separated by commas. Warnings in any one of them "
+            "are enough. Without a row, the country's official languages apply."
+        ),
     )
 
     class Meta:
@@ -426,3 +550,47 @@ class ProductRestriction(BaseModel):
 
     def __str__(self) -> str:
         return f"Restriction of {self.product_id} ({'lifted' if self.lifted_at else 'active'})"
+
+
+class WithdrawalStatement(BaseModel):
+    """A consumer's statement that they withdraw from one vendor order (CMP.6, spec 11).
+
+    The record of the online withdrawal function: it is what the acknowledgement on a durable
+    medium states. It is written once and never changed or deleted (a withdrawal is evidence),
+    one per vendor order, and it moves no order state: the refund and return flow (ORD.8) reads
+    it. The buyer's email stays on the order; this row holds none.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor_order__vendor"
+    objects: ClassVar[VendorScopedManager["WithdrawalStatement"]] = VendorScopedManager()
+
+    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name="withdrawals")
+    vendor_order = models.OneToOneField(
+        VendorOrder, on_delete=models.PROTECT, related_name="withdrawal"
+    )
+    submitted_at = models.DateTimeField(help_text="When the statement was confirmed.")
+    period_closes_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="End of the period when it was sent; empty if undelivered.",
+    )
+    language = LanguageField(help_text="The language of the page and of the acknowledgement.")
+    acknowledged_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the acknowledgement was queued for the buyer's email.",
+    )
+
+    class Meta:
+        ordering = ["-submitted_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Withdrawal from {self.vendor_order}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise PermissionError("A withdrawal statement is never changed")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> Any:
+        raise PermissionError("A withdrawal statement is never deleted")

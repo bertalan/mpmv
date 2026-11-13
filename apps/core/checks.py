@@ -16,6 +16,8 @@
   provider adapter, not the console or test sender (core.E501), from a real address
   (core.E502); without live data (development, tests, STAGE) the console sender stays allowed
   until ARC.19.
+- Site flags (ARC.29): `check --deploy` refuses `MPMV_DEMO_MODE` and `MPMV_FORCE_NOINDEX` where
+  live data is held (core.E801).
 - Image formats (THM.12): a warning when Pillow cannot encode AVIF (core.W501).
 """
 
@@ -242,6 +244,7 @@ class _AnyPermission:
     """A user who holds every permission: what could an admin let someone write?"""
 
     is_active = is_staff = is_superuser = is_authenticated = True
+    holds_all_platform_roles = True  # role-matrix checks (CORE.18) read this instead of groups
     pk = None
 
     def has_perm(self, perm: str, obj: Any = None) -> bool:
@@ -550,6 +553,28 @@ def check_email_settings(
             )
         )
     return errors
+
+
+LIVE_FORBIDDEN_FLAGS = ("DEMO_MODE", "FORCE_NOINDEX")
+
+
+def check_live_site_flags(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """ARC.29: a stray demo or forced-noindex flag on LIVE would noindex the whole shop.
+
+    Runs under `manage.py check --deploy`. LIVE is the `LIVE_DATA` setting; STAGE keeps both."""
+    if not getattr(settings, "LIVE_DATA", False):
+        return []
+    return [
+        checks.Error(
+            f"MPMV_{flag} is on where live data is held: every page would be noindex.",
+            hint=f"Remove MPMV_{flag} from the LIVE environment (deploy/server/mpmv.env.example).",
+            id="core.E801",
+        )
+        for flag in LIVE_FORBIDDEN_FLAGS
+        if getattr(settings, flag, False)
+    ]
 
 
 # --- Image formats (THM.12, spec 14 §14.7)

@@ -14,7 +14,7 @@ import pytest
 from hypothesis import HealthCheck, settings
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from django.test import Client
 
@@ -28,6 +28,26 @@ def admin_open(settings: Any) -> None:
     """OPS.5: the technical admin answers every address, for tests of the sign-in protections
     that connect from several client addresses (the test settings allow loopback only)."""
     settings.ADMIN_ALLOWED_NETWORKS = ["0.0.0.0/0", "::/0"]
+
+
+@pytest.fixture
+def default_languages(settings: Any) -> None:
+    """I18N.15: pins the default language set (English primary, then it, de, fr, es) for tests
+    whose subject is exactly that set. The suite also runs with another `MPMV_LANGUAGES` (CI job
+    `it,de`), so a test must not read the default from the environment it runs in."""
+    from mpmv.settings.languages import DEFAULT_LANGUAGE_CODES, language_settings
+
+    settings.LANGUAGE_CODE, settings.LANGUAGES = language_settings(DEFAULT_LANGUAGE_CODES)
+    settings.WAGTAIL_CONTENT_LANGUAGES = settings.LANGUAGES
+
+
+@pytest.fixture
+def english_interface(default_languages: None) -> "Iterator[None]":
+    """Renders in English: for tests that assert the English msgids of the interface."""
+    from django.utils import translation
+
+    with translation.override("en"):
+        yield
 
 
 # Fixed seed for Faker and factory_boy, so a failure replays with the same data.
@@ -123,6 +143,17 @@ def _reproducible_factories(factory_seed: int) -> None:
     factory.random.reseed_random(factory_seed)
     for factory_class in app_factories():
         factory_class.reset_sequence()
+
+
+@pytest.fixture(autouse=True)
+def _no_language_leaks_between_tests() -> "Iterator[None]":
+    """A request activates its language (LocaleMiddleware, a user's preference) and nothing
+    deactivates it, so the next test of the thread would resolve `i18n_patterns` URLs in it."""
+    from django.utils import translation
+
+    translation.deactivate()
+    yield
+    translation.deactivate()
 
 
 @pytest.fixture
