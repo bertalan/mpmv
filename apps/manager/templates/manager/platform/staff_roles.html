@@ -1,0 +1,51 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Staff and roles (CORE.18 2/2, platform owner only): who holds which platform role, grant and
+revoke. Every change asks for operational mode (and a fresh passkey for the owner role) and is
+written to the audit log. The one-person-team warning stays on screen while the setting is on.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Staff and roles" %}</h1>
+  {% if one_person_team %}
+    {% translate "The one-person-team setting is on: one person may hold incompatible roles, such as Finance and payments with Configuration and tax. Every such grant is audited." as team_warning %}
+    {% include "components/alert.html" with level="warning" message=team_warning only %}
+  {% endif %}
+  <p class="manager-lead">{% translate "Platform staff hold one or more roles. Vendor members cannot hold a platform role. Changes need operational mode and are recorded in the audit log." %}</p>
+  <div class="table-scroll" role="region" aria-labelledby="staff-caption" tabindex="0">
+    <table class="table">
+      <caption id="staff-caption">{% translate "Platform staff" %}</caption>
+      <thead><tr>
+        <th scope="col">{% translate "Account" %}</th>
+        <th scope="col">{% translate "Roles" %}</th>
+      </tr></thead>
+      <tbody>
+        {% for member in members %}<tr>
+          <th scope="row">{{ member.user.full_name|default:member.user.email }}<br><span class="manager-lead">{{ member.user.email }}</span></th>
+          <td>
+            {% for role in member.roles %}
+              <form method="post" action="{% url 'manager:platform:staff_roles' %}" class="manager-inline-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="revoke">
+                <input type="hidden" name="email" value="{{ member.user.email }}">
+                <input type="hidden" name="role" value="{{ role.key }}">
+                <span>{{ role.label }}</span>
+                {% blocktranslate with role=role.label asvar revoke_label %}Revoke {{ role }}{% endblocktranslate %}
+                {% include "components/button.html" with label=revoke_label type="submit" variant="secondary" only %}
+              </form>
+            {% endfor %}
+          </td>
+        </tr>
+        {% empty %}<tr><td colspan="2">{% translate "Nobody holds a platform role yet." %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <h2>{% translate "Give a role" %}</h2>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" action="{% url 'manager:platform:staff_roles' %}" class="manager-form" novalidate>
+    {% csrf_token %}
+    {{ form.action }}
+    {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% include "components/button.html" with label=_("Give the role") type="submit" only %}
+  </form>
+{% endblock %}

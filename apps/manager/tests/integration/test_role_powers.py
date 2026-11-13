@@ -131,6 +131,15 @@ def test_the_check_flags_a_vendor_member_or_customer_in_a_role_group() -> None:
     assert {e.id for e in check_role_drift()} == {"manager.E005"}
 
 
+def test_the_check_flags_a_role_holder_with_orders() -> None:
+    from apps.orders.tests.factories import OrderFactory
+
+    buyer = UserFactory.create(staff=True)
+    OrderFactory.create(customer=buyer)
+    buyer.groups.add(Group.objects.get(name=roles.role("support").group))
+    assert any(buyer.email in p for p in role_conflicts())
+
+
 # --- migration adoption
 
 

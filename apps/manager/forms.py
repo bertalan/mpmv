@@ -163,3 +163,31 @@ class ShipmentForm(forms.Form):
             return orders_engine.normalise_carrier(self.cleaned_data["carrier"])
         except orders_engine.InvalidTracking:
             raise forms.ValidationError(_("Enter a valid carrier name."), code="invalid") from None
+
+
+class StaffRoleForm(forms.Form):
+    """Grant or revoke a platform role (CORE.18); the service owns the rules."""
+
+    ACTIONS = (("grant", "grant"), ("revoke", "revoke"))
+
+    action = forms.ChoiceField(choices=ACTIONS, widget=forms.HiddenInput)
+    email = forms.EmailField(
+        label=_("Email of the account"),
+        help_text=_("The email of an existing account. Capitals do not matter."),
+    )
+    role = forms.ChoiceField(
+        label=_("Role"),
+        help_text=_("The platform role to give to that account or to take away from it."),
+    )
+    reason = forms.CharField(
+        label=_("Reason"),
+        required=False,
+        max_length=500,
+        help_text=_("Required when you give a role to yourself; kept in the audit log."),
+    )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        from . import roles
+
+        super().__init__(*args, **kwargs)
+        self.fields["role"].choices = [(r.key, r.label) for r in roles.ROLES]  # type: ignore[attr-defined]

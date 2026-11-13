@@ -1,0 +1,4 @@
+{% load i18n %}{% blocktranslate %}{{ actor_name }} gave themselves a platform role. The change is in the audit log.{% endblocktranslate %}
+
+{% translate "Role" %}: {{ role }}
+{% translate "Reason" %}: {{ reason }}
