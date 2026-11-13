@@ -232,6 +232,25 @@ per vendor order (`proof_missing`, `proof_partial`, `proof_complete`, `declarati
 staff. The proofs are stored as private documents on the vendor order, with the party that issued
 each of them.
 
+### Checkout legal step (ORD.17, owner decision D-40)
+
+The last step before payment, in the core checkout and in any checkout module, holds:
+
+- a recap of the essential information next to the button: the goods per seller, the total with VAT and shipping, the
+  withdrawal information and the legal guarantee notice (CMP.6);
+- a mandatory **unticked** box: the buyer accepts the sales terms of each seller (one contract per seller) and the
+  platform's terms of use, both linked; the server re-checks it and stores on the order the version of every accepted
+  document and the time;
+- the **privacy notice as a link**, never a box (the order runs on the contract basis); any marketing consent is a
+  separate, optional, unticked box;
+- when the operator is established in Italy, a **second unticked box** for every buyer: specific approval of the
+  listed onerous clauses under artt. 1341 and 1342 of the Codice civile, with the clauses named and linked;
+- a button that names the obligation to pay ("Pay now", IT "Paga ora"; art. 51(2) Codice del consumo);
+- after a redirect back from the provider (3-D Secure) and before the webhook: a "payment received, confirming" state
+  with a short HTMX poll; only the webhook marks the order paid.
+
+The confirmation email carries the accepted terms on a durable medium (the text or a PDF, not only a link).
+
 ## 7.3 Tasks
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
@@ -258,3 +277,5 @@ each of them.
 | ORD.14 | Order privacy masking, the vendor "accounting" role and the Tax/Audit permission (D-29, D-30): in `restricted_tax_only` the personal fields (name, addresses, email, phone, tax ids) are masked (for example `j***@example.com`) in every ordinary vendor, support and customer-facing UI, in the API and in exports; in clear only for the vendor owner, a new vendor role "accounting" (assigned by the owner, own orders only) and the platform Tax/Audit permission (a CORE.18 role); every in-clear view needs a reason and writes an `AuditLog` entry with actor, order, time and reason; Support impersonation never reveals the clear fields | P1 | 10 | ORD.2, CORE.18, CORE.17, ARC.9 | A `restricted_tax_only` seed order is masked for a vendor member, a Support user, the API and the CSV export, and in clear for the vendor owner, a vendor accounting member (own vendor only) and a platform Tax/Audit holder; a reasonless reveal is refused; each reveal writes an `AuditLog` entry with actor, order, time and reason; an `active` order is shown normally; the owner can assign and remove the accounting role and no other member can |
 | ORD.15 | Vendor fiscal evidence package (D-30): a download per order for the vendor, while the order is `active` or `restricted_tax_only`, holding the order snapshot, the VIES log (time, number, returned name) and the transport proofs; personal fields in clear only to those allowed by ORD.14 (every download audited with a reason); no invoices, the platform issues none; refused once the order is `anonymized` | P1 | 6 | ORD.2, ORD.14, VEN.12 | A seed order's package holds the snapshot, the VIES log with the returned name and the transport proofs; a vendor member without the owner or accounting role gets the masked version; the download is in the `AuditLog`; an `anonymized` order has no package |
 | ORD.16 | Email language follow-ups (coherence check 19, ORD.9 1/2 leftovers): the German, French and Spanish bodies of every ORD.9 email are translated (today they fall back to English); vendors get a mail language setting, and vendor mails use it, with the platform language as the fallback | P2 | 4 | ORD.9, I18N.7 | Each ORD.9 email renders in the five languages with no English fallback in de, fr and es (snapshot tests); a vendor with a language set receives mails in it, a vendor with none in the platform language |
+| ORD.17 | Checkout legal step (owner decision D-40, 2026-11-13): recap next to the pay button, mandatory unticked acceptance of each seller's sales terms and the platform terms with the accepted versions and time stored on the order, privacy notice as a link, second unticked box with the specific approval of the onerous clauses (artt. 1341 and 1342 c.c.) for every buyer when `current_operator()` is established in Italy, button naming the obligation to pay (art. 51(2) Codice del consumo), accepted terms in the confirmation email on a durable medium, "payment received, confirming" state after a provider redirect (only the webhook marks paid); ⚖️ (L) the texts are reviewed by counsel | P1 | 10 | ORD.5, ORD.9, PAY.2, CMP.6 | The order cannot be placed without the box (server-side too); the order stores the accepted document versions; with an Italian operator the second box is required for a consumer and a business, with a non-Italian operator it is absent; the button reads "Pay now"; a redirect before the webhook shows the confirming state and the order stays unpaid until the webhook |
+| ORD.18 | Single-page accordion checkout, the **first paid module** (owner decision D-40): one page with a compact order summary on top; billing, delivery ("same as billing" ticked by default), shipping per vendor package, courier notes and payment as steps; a finished step closes into an editable summary row; totals recalculate after billing (country, VIES); the Stripe Payment Element opens inline before the payment exists and the order and PaymentIntent are created on "Pay now"; progress (addresses, choices, notes, step) saved server-side with the cart and expiring with it, across devices when signed in; keyboard and phone first; Turnstile survives the steps; ORD.17's legal step is reused, not copied; UI only over the core services, which re-check everything; lives in a private module package (ARC.33) | P2 | 24 | ARC.33, ORD.17, PAY.3, PAY.4 | With the module on, a mixed 3-vendor cart pays on one page and a reload resumes at the same step; with it off, the core checkout runs; a tampered step (skipped terms, changed price) is refused by the core services |
