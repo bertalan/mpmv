@@ -32,8 +32,8 @@ from django.utils import timezone
 
 from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.models import AuditLog
-from apps.core.services import NoPlatformOperator, audit_changes
+from apps.core.models import AuditLog, PlatformOperator
+from apps.core.services import NoPlatformOperator, audit_changes, current_operator
 from apps.orders.models import Order, VendorOrder
 from apps.orders.services import PAID_OR_LATER
 from apps.payments import registry, settlement
@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 SETTLEMENT_ACTOR = "system:order-settlement"
 PROBLEM_MODEL = "ledger.settlement"
 POSTING_BLOCKED = "ledger.posting_blocked"
+SETTLEMENT_BLOCKED_VAT_MODE = "ledger.settlement_blocked_vat_mode"
 TRANSFER_FAILED = "ledger.transfer_failed"
 TRANSFER_WITHOUT_ACCOUNT = "ledger.transfer_without_account"
 TRANSFER_BLOCKED = "ledger.transfer_blocked"
@@ -112,12 +113,37 @@ def paid_order(payment: Payment) -> Order | None:
     return order
 
 
+def vat_mode_blocks(order: Order, ctx: AuditContext) -> bool:
+    """True when the platform's `commission_vat_mode` is not "none": spec 04 section 4.4 case 3
+    ("No VAT on the commission and no VAT on the payment fee"), the only regime the figures
+    support. Any other mode needs VAT on the commission and fee (VEN.34), which nothing applies
+    yet, so nothing is posted or transferred: the order stays paid and the money stays on the
+    platform. Audited once per order."""
+    try:
+        mode = current_operator().commission_vat_mode
+    except NoPlatformOperator:
+        return False  # the per-entry handling reports a missing operator
+    if mode == PlatformOperator.CommissionVatMode.NONE:
+        return False
+    already = AuditLog.objects.filter(
+        action=SETTLEMENT_BLOCKED_VAT_MODE, target_key=order.number
+    ).exists()
+    if not already:
+        changes = ChangeSet()
+        changes.create(PROBLEM_MODEL, order.number, {"commission_vat_mode": mode})
+        audit_changes(changes, ctx=ctx, action=SETTLEMENT_BLOCKED_VAT_MODE)
+    return True
+
+
 def post_payment(payment: Payment, *, ctx: AuditContext | None = None) -> Outcome:
     """Write the ledger lines of every vendor package of the order `payment` paid. Idempotent."""
     ctx = ctx or system_ctx()
     outcome = Outcome()
     order = paid_order(payment)
     if order is None:
+        return outcome
+    if vat_mode_blocks(order, ctx):
+        outcome.blocked += 1
         return outcome
     plan = settlement.order_settlement(order)
     for blocked in plan.blocked:
@@ -170,7 +196,7 @@ def transfer_payment(payment: Payment, *, ctx: AuditContext | None = None) -> Ou
     outcome = post_payment(payment, ctx=ctx)
     order = paid_order(payment)
     provider = registry.configured_provider()
-    if order is None or provider is None:
+    if order is None or provider is None or vat_mode_blocks(order, ctx):
         return outcome
     plan = settlement.order_settlement(order)
     paid_total = sum((line.vendor_net for line in plan.vendors if line.transferable), Decimal("0"))

@@ -400,3 +400,36 @@ def test_a_rolled_back_payment_leaves_no_job_no_ledger_line_and_no_transfer(
     assert len(tasks.list_jobs("ledger.transfer_payment")) == jobs_before
     assert LedgerEntry.objects.count() == lines_before
     assert stripe.transfers == {}
+
+
+# --- commission VAT mode (spec 04 section 4.4 case 3, VEN.34) ----------------------------------
+
+
+def test_a_platform_with_vat_on_commissions_settles_nothing_until_ven_34(
+    stripe: FakeStripeClient,
+) -> None:
+    from apps.core.models import PlatformOperator
+
+    PlatformOperator.objects.update(commission_vat_mode="standard")
+    order = two_vendor_order()
+    pay(stripe, order)
+    payment = Payment.objects.get()
+    first = settlement.transfer_payment(payment)
+    again = settlement.settle_pending()
+    assert first.blocked == 1
+    assert again.transfers == []
+    assert LedgerEntry.objects.count() == 0
+    assert stripe.transfers == {}
+    assert Order.objects.get(pk=order.pk).state == "paid"
+    audits = AuditLog.objects.filter(action="ledger.settlement_blocked_vat_mode")
+    assert audits.count() == 1  # once per order, not on every sweep
+    assert audits.get().target_key == order.number
+    PlatformOperator.objects.update(commission_vat_mode="none")  # fixed: the sweep settles
+    assert len(settlement.settle_pending().transfers) == 2
+
+
+def test_mode_none_settles_as_before(stripe: FakeStripeClient) -> None:
+    order = two_vendor_order()
+    pay(stripe, order)
+    assert len(settlement.transfer_payment(Payment.objects.get()).transfers) == 2
+    assert not AuditLog.objects.filter(action="ledger.settlement_blocked_vat_mode").exists()
