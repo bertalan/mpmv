@@ -1,9 +1,11 @@
 """The contract clauses of CMP.5 (adviser opinion 2026-11-11), as versioned texts. Pure: no ORM.
 
 Customer terms carry clauses (a) to (c), vendor terms (d) to (h). Each clause states only what the
-spec and the adviser opinion say (D-05, D-08, D-15, L-10, Q-G2, Q-G8; VEN.33). The sentences are
-draft wording: they need counsel's review and approval (CMP.24) before go-live. Only English and
-Italian exist so far; the other site languages fall back to English until they are translated.
+spec and the adviser opinion say (D-05, D-08, D-15, L-10, Q-G2, Q-G8; VEN.33), in the wording of
+the owner's legal review of 2026-11-13. Counsel still reviews and approves them (CMP.24) before
+go-live. Only English and Italian exist so far; the other site languages fall back to English
+until they are translated. The vendor may not pass the refund fee of clause (f) on to consumers
+(Codice del consumo, artt. 56-57), so the clause has no pass-on sentence.
 
 The Italian texts follow the existing legal texts of the repository: formal and impersonal (no
 informal "tu"), with "il Cliente" and "il Venditore" as the parties.
@@ -62,13 +64,15 @@ CLAUSES: Final[tuple[Clause, ...]] = (
         {
             "en": (
                 "The compatibility data of the Garage is declared by the vendor. The platform "
-                "does not guarantee it. An incompatibility is a conformity defect (Codice del "
-                "consumo, art. 129 and following) borne by the vendor."
+                "does not guarantee it. For a consumer customer, an incompatibility with what was "
+                "declared is a conformity defect (Codice del consumo, art. 129 and following) "
+                "borne by the vendor."
             ),
             "it": (
                 "I dati di compatibilità del Garage sono dichiarati dal Venditore. La piattaforma "
-                "non li garantisce. Un'incompatibilità è un difetto di conformità (Codice del "
-                "consumo, art. 129 e seguenti) a carico del Venditore."
+                "non li garantisce. Per il Cliente consumatore, l'incompatibilità rispetto a "
+                "quanto dichiarato è un difetto di conformità (Codice del consumo, art. 129 e "
+                "seguenti) a carico del Venditore."
             ),
         },
     ),
@@ -81,14 +85,14 @@ CLAUSES: Final[tuple[Clause, ...]] = (
             "en": (
                 "The Garage filter is a filter that the customer chooses and can switch off. It "
                 "does not change the order of the results. While a vehicle is active, an item "
-                "without declared fitment is hidden; declared fitment and universal status are "
-                "parameters of what an active Garage shows."
+                "without declared fitment is hidden; declared fitment and universal compatibility "
+                "are parameters of what an active Garage shows."
             ),
             "it": (
                 "Il filtro Garage è un filtro che il Cliente sceglie e può disattivare. Non "
                 "modifica l'ordine dei risultati. Finché un veicolo è attivo, un articolo senza "
-                "compatibilità dichiarata è nascosto; la compatibilità dichiarata e lo stato "
-                "universale sono parametri di ciò che mostra un Garage attivo."
+                "compatibilità dichiarata è nascosto; la compatibilità dichiarata e la "
+                "compatibilità universale sono parametri di ciò che mostra un Garage attivo."
             ),
         },
     ),
@@ -99,12 +103,14 @@ CLAUSES: Final[tuple[Clause, ...]] = (
         {"en": "Payment service", "it": "Servizio di pagamento"},
         {
             "en": (
-                "Stripe provides the payment service under its Connected Account Agreement, "
-                "which the vendor accepts."
+                "The platform does not provide payment services. Stripe provides the payment "
+                "service under its Connected Account Agreement, which the vendor accepts by "
+                "authorising collection through the platform."
             ),
             "it": (
-                "Stripe presta il servizio di pagamento secondo il proprio Connected Account "
-                "Agreement, che il Venditore accetta."
+                "La piattaforma non presta servizi di pagamento. Stripe presta il servizio di "
+                "pagamento secondo il proprio Connected Account Agreement, che il Venditore "
+                "accetta autorizzando l'incasso tramite la piattaforma."
             ),
         },
     ),
@@ -116,14 +122,15 @@ CLAUSES: Final[tuple[Clause, ...]] = (
         {
             "en": (
                 "The vendor agrees to contractual set-off (Italian civil code, art. 1252) of "
-                "fees and refund fees against transfers. For a negative balance, the platform "
-                "may debit the vendor by SEPA under its mandate."
+                "commissions, collection costs, amounts refunded to customers and refund fees "
+                "against transfers. For a negative balance, the platform may debit the vendor by "
+                "SEPA under the mandate the vendor has given."
             ),
             "it": (
                 "Il Venditore accetta la compensazione convenzionale (art. 1252 del codice "
-                "civile) delle commissioni e dei costi di rimborso con i trasferimenti. In caso "
-                "di saldo negativo, la piattaforma può addebitare il Venditore tramite SEPA in "
-                "base al mandato da esso conferito."
+                "civile) di commissioni, costi di incasso, importi rimborsati ai Clienti e costi "
+                "di rimborso con i trasferimenti. In caso di saldo negativo, la piattaforma può "
+                "addebitare il Venditore tramite SEPA in base al mandato da esso conferito."
             ),
         },
     ),
@@ -134,26 +141,23 @@ CLAUSES: Final[tuple[Clause, ...]] = (
         {"en": "Refund fee", "it": "Costo di rimborso"},
         {
             "en": (
-                "A refund or chargeback gives back the commission and the collection cost on "
-                "the refunded share. The platform charges the vendor a refund fee on every "
-                "refund event, withdrawal included, whatever the cause, except a refund caused "
-                "by a platform malfunction or error. The refund fee is the provider cost of the "
-                "refund plus the fixed part of EUR 2.00, rounded up to the whole euro. The "
-                "vendor may pass it on in its own return terms within the law. A change of the "
-                "fixed part is notified on a durable medium at least 15 days before it takes "
-                "effect and applies only to orders created from its effective date."
+                "A refund or chargeback gives back the commission and the collection cost on the "
+                "refunded share. A refund fee applies to the vendor on every refund event, "
+                "withdrawal included, whatever the cause, except a refund caused by a platform "
+                "malfunction or error. The refund fee is Stripe's actual cost of the refund plus "
+                "the fixed part of EUR 2.00, rounded up to the whole euro. A change of the fixed "
+                "part is notified on a durable medium at least 15 days before it takes effect and "
+                "applies only to orders created from its effective date."
             ),
             "it": (
                 "Un rimborso o uno storno (chargeback) restituisce la commissione e il costo di "
-                "incasso sulla quota rimborsata. La piattaforma addebita al Venditore un costo "
-                "di rimborso per ogni evento di rimborso, recesso compreso, qualunque ne sia la "
-                "causa, salvo il rimborso causato da un malfunzionamento o da un errore della "
-                "piattaforma. Il costo di rimborso è il costo del fornitore del servizio di "
-                "pagamento per il rimborso più la parte fissa di EUR 2,00, arrotondato per "
-                "eccesso all'euro intero. Il Venditore può trasferirlo nelle proprie condizioni "
-                "di reso nei limiti di legge. La modifica della parte fissa è comunicata su "
-                "supporto durevole almeno 15 giorni prima della sua efficacia e si applica solo "
-                "agli ordini creati dalla data di efficacia."
+                "incasso sulla quota rimborsata. Si applica al Venditore un costo di rimborso per "
+                "ogni evento di rimborso, recesso compreso, qualunque ne sia la causa, salvo il "
+                "rimborso causato da un malfunzionamento o da un errore della piattaforma. Il "
+                "costo di rimborso è il costo vivo di Stripe per il rimborso più la parte fissa "
+                "di EUR 2,00, arrotondato per eccesso all'euro intero. La modifica della parte "
+                "fissa è comunicata su supporto durevole almeno 15 giorni prima della sua "
+                "efficacia e si applica solo agli ordini creati dalla data di efficacia."
             ),
         },
     ),
@@ -163,8 +167,14 @@ CLAUSES: Final[tuple[Clause, ...]] = (
         "accessibility",
         {"en": "Accessible content", "it": "Contenuti accessibili"},
         {
-            "en": "The vendor provides accessible descriptions and attachments.",
-            "it": "Il Venditore fornisce descrizioni e allegati accessibili.",
+            "en": (
+                "The vendor provides descriptions and attachments that are accessible within the "
+                "meaning of the accessibility legislation (Legislative Decree 82/2022)."
+            ),
+            "it": (
+                "Il Venditore fornisce descrizioni e allegati accessibili ai sensi della "
+                "normativa sull'accessibilità (D.Lgs. 82/2022)."
+            ),
         },
     ),
     Clause(
@@ -176,8 +186,14 @@ CLAUSES: Final[tuple[Clause, ...]] = (
             "it": "Compatibilità dichiarata dal venditore",
         },
         {
-            "en": "The vendor answers for the compatibility it declares.",
-            "it": "Il Venditore risponde della compatibilità che dichiara.",
+            "en": (
+                "The vendor answers for the compatibility it declares and indemnifies the "
+                "platform against third-party claims."
+            ),
+            "it": (
+                "Il Venditore risponde della compatibilità che dichiara e manleva la piattaforma "
+                "da reclami di terzi."
+            ),
         },
     ),
 )
