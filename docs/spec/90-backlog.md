@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **372** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2980 h** (P1 2194 h · P2 698 h · P3 88 h)
+- Micro-tasks: **373** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2981 h** (P1 2195 h · P2 698 h · P3 88 h)
 - P1 critical path (schedule lower bound with full parallelism): **153 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CORE.2 → CORE.3 → CORE.17 → CORE.18 → FIT.1 → FIT.5 → FIT.7 → FIT.8 → FIT.10 → FIT.12
 
 ## By macro area
@@ -34,13 +34,13 @@
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
 | CMP | Compliance | 33 | 190 | 88 | 0 | 278 |
 | SEC | Security | 12 | 76 | 0 | 0 | 76 |
-| OPS | Operations | 13 | 24 | 37 | 8 | 69 |
+| OPS | Operations | 14 | 25 | 37 | 8 | 70 |
 | MIG | Migration and cutover | 21 | 135 | 29 | 0 | 164 |
-| **Total** | | **372** | **2194** | **698** | **88** | **2980** |
+| **Total** | | **373** | **2195** | **698** | **88** | **2981** |
 
 ## By phase
 
-### F0 — Foundations (65 tasks, 469 h)
+### F0 — Foundations (66 tasks, 470 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -109,6 +109,7 @@
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.5 | Technical Django admin reachable only from a restricted network (owner decision Q-18): allow-list at the reverse proxy plus an app-level check on the Django admin path (defence in depth), the allowed networks as environment configuration, staff operations moved to the Manager platform space (CORE.17) and editors to the Wagtail admin (CORE.8) | P1 | 3 | ARC.13, CORE.8 | On STAGE the Django admin answers 404 from outside the allowed networks and works from inside; a test covers the app-level check |
 | OPS.13 | Scanner container for uploads (lane-a deploys, ADR-0009): ClamAV-class scanner image in its own container with its own Quadlet unit on STAGE and LIVE, reachable only on the private network or loopback by the app and worker, no published port, read-only root filesystem, memory and CPU limits, a persistent volume for signatures only; automatic signature updates (freshclam-style, at least every 6 hours, from the official mirrors, failure alerts after 24 h without a successful update); health check (scanner answers a ping and a scan of the EICAR string) feeding the OPS.2 alerts: scanner down, signatures older than 48 h, scan latency over threshold; documented in the deploy docs and an OPS.3 runbook (restart, manual update, what uploads do while it is down) | P1 | 5 | ARC.13, OPS.2 | On STAGE the unit starts after the app network, answers a ping, detects the EICAR string, and has no host port; stopping it raises an OPS.2 alert and the app refuses uploads (SEC.15); a stale signature database raises the alert; a signature update is applied without restarting the app; the runbook exists |
+| OPS.14 | Staff-only release indicator (owner, 2026-11-13): the deployed version from `MPMV_VERSION` (baked into the release image, `dev` locally) shown to staff only, never to anonymous users or customers: a small muted "Version X" in the Manager footer and in the account menu of the header; the value comes from a context processor that returns nothing for anyone but an active staff user; no public footer, meta tag or header carries it | P1 | 1 | OPS.1, CORE.17 | Staff see the version string on a Manager page and in the storefront account menu; an anonymous visitor and a signed-in non-staff customer never get the value in the HTML; with `MPMV_VERSION` unset the value is `dev`; no inline script or style |
 
 ### F1 — Catalog, import, base frontend (49 tasks, 442 h)
 
