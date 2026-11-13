@@ -155,3 +155,10 @@ TAX.20 and TAX.21. The owner answered the open questions of the register sweep t
 | MQ-35 | Contracts | A new language on an accepted version needs no new acceptance; accepted texts stay locked (Q-57) | [04](04-vendors-commissions-ledger.md) (VEN.16) |
 | MQ-36 | API, privacy | API mutation log kept 12 months (Q-14); API docs on LIVE only for a valid key or staff (Q-13); lockout message "too many attempts, try again in N minutes" (Q-12) | [02](02-core-identity-permissions.md) (CORE.29) |
 | MQ-37 | Security | Breached passwords (Q-11): vendors must change the password and re-authenticate, the operator is notified, no automatic activity blocking; customers must choose a different password | [02](02-core-identity-permissions.md) (CORE.28) |
+| MQ-38 | Security | TOTP secrets encrypted at rest; every encrypted value bound to its row (Q-10 owner, Q-93 lane-a) | [12](12-security-infra-operations.md) (SEC.16) |
+| MQ-39 | Vendors, SEO | The vendor slug can be changed, with a slug history and automatic 301 redirects; an old slug is never reused (Q-23) | [04](04-vendors-commissions-ledger.md) (VEN.37) |
+| MQ-40 | Platform | An operator configuration version may start in the past, audited with a reason; computed snapshots are not recomputed (Q-24) | [01](01-stack-and-architecture.md) (ARC.7) |
+| MQ-41 | Tax | A new VAT rate takes effect at midnight in its own country's time zone (Q-51) | [05](05-tax.md) (TAX.6) |
+| MQ-42 | Tax | A regime change may start in the past; staff see the orders already placed, which keep the old regime (Q-77) | [05](05-tax.md) (TAX.2) |
+| MQ-43 | Customer account | Preferences: requests and quotes, followed vendors, event notifications, email and newsletter, wish and gift lists, other marketing opt-ins (Q-84) | [07](07-cart-orders-payments.md) (ORD.11) |
+| MQ-44 | Docs | The security requirements of spec 12 are renamed SR-n so they do not clash with the SEC task IDs (Q-19, lane-a; done in a later docs PR) | [12](12-security-infra-operations.md) |
