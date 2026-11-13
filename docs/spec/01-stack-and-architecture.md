@@ -285,7 +285,7 @@ def tax_for_cart_line(line: CartLine, checkout: CheckoutData, on: date) -> TaxDe
 | ARC.4 | CI: ruff, mypy, pytest, coverage, import-linter (dependency graph), pip-audit, secret scan | P1 | 8 | ARC.3 | Pipeline green on PRs |
 | ARC.5 | Containers: OCI `Containerfile`, local stack with Apple `container` (network, volumes, app, worker, Postgres), Linux runtime for STAGE/LIVE, versioned images | P1 | 10 | ARC.3 | `make dev` with `container`; release image, Quadlet units, and deploy and rollback tooling tested locally and in CI |
 | ARC.6 | `core`: base model, `MoneyField`, Country, `ChangeSet`/dry-run, `AuditLog` | P1 | 12 | ARC.3 | Tests on rounding and audit |
-| ARC.7 | `PlatformOperator` (country, VAT number, regime, DAC7 authority) as configuration | P1 | 4 | ARC.6 | No "IT" constant in the tax code |
+| ARC.7 | `PlatformOperator` (country, VAT number, regime, DAC7 authority) as configuration; `require_sales_terms` (VEN.35, default off): when on, a vendor without a sales terms version is on request | P1 | 4 | ARC.6 | No "IT" constant in the tax code; `require_sales_terms` is off by default, and when switched on (a new version) a vendor without terms is on request |
 | ARC.8 | Feature flags per environment and per vendor + kill switch (checkout, import, payments) | P2 | 6 | ARC.6 | Flags manageable from the admin |
 | ARC.9 | Task worker + cron scheduler on Postgres, with locks and retries | P1 | 8 | ARC.2 | Test job scheduled and observable |
 | ARC.10 | Synthetic data seed: vendors with all regimes, EN/IT products, zones, orders | P1 | 10 | CAT.1, TAX.1, SHP.1 | Reproducible `make seed`, used by the tests |
