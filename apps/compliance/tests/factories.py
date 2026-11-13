@@ -24,8 +24,10 @@ from apps.compliance.models import (
     SuppressedEmail,
     TransparencySubmission,
     VendorGpsrDefaults,
+    WithdrawalStatement,
 )
 from apps.core.privacy import suppression_digest
+from apps.orders.tests.factories import VendorOrderFactory
 from apps.vendors.tests.factories import VendorFactory
 
 
@@ -164,3 +166,15 @@ class SuppressedEmailFactory(DjangoModelFactory[SuppressedEmail]):
 
     digest = factory.Sequence(lambda n: suppression_digest(f"suppressed{n}@example.com"))
     reason = SuppressedEmail.Reason.UNSUBSCRIBED
+
+
+class WithdrawalStatementFactory(DjangoModelFactory[WithdrawalStatement]):
+    """A recorded withdrawal from a vendor order; the order is the vendor order's own."""
+
+    class Meta:
+        model = WithdrawalStatement
+
+    vendor_order = factory.SubFactory(VendorOrderFactory)
+    order = factory.SelfAttribute("vendor_order.order")
+    submitted_at = factory.LazyFunction(timezone.now)
+    language = "en"

@@ -59,3 +59,15 @@ def remind_unconfirmed_applications(timestamp: int) -> None:
         )
     )
     logger.info("vendors.remind_unconfirmed_applications sent %d reminder(s)", len(changes.changes))
+
+
+@periodic("53 3 * * *")
+@locked()
+@task("vendors.purge_retained_logos", retry=NO_RETRY)
+def purge_retained_logos(timestamp: int) -> None:
+    """Every day: delete the previous logo files kept for a staff revert once the review window
+    (`VENDOR_LOGO_REVIEW_DAYS`) has closed (CORE.9, owner decision Q1). Audited per file."""
+    changes = services.purge_retained_logos(
+        ctx=AuditContext(actor_label="system:purge_retained_logos", source=AuditLog.Source.SYSTEM)
+    )
+    logger.info("vendors.purge_retained_logos handled %d kept logo file(s)", len(changes.changes))

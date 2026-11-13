@@ -27,7 +27,7 @@ EXEMPT_VIEW_NAMES = frozenset({"admin:logout", "wagtailadmin_logout"})
 
 
 class SessionLevelMiddleware:
-    """D-32 (CORE.25): end operational mode on idle or cap, and count the request as activity.
+    """D-32 (CORE.25): end the passkey window on idle or cap, and count the request as activity.
 
     After `MfaRequiredMiddleware`: a request that is turned away there is not activity.
     """

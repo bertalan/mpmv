@@ -244,6 +244,7 @@ class _AnyPermission:
     """A user who holds every permission: what could an admin let someone write?"""
 
     is_active = is_staff = is_superuser = is_authenticated = True
+    holds_all_platform_roles = True  # role-matrix checks (CORE.18) read this instead of groups
     pk = None
 
     def has_perm(self, perm: str, obj: Any = None) -> bool:
@@ -560,10 +561,10 @@ def check_privacy_pepper(
     """The privacy pepper (L-3) is its own secret: LIVE and STAGE refuse a missing one or one
     equal to SECRET_KEY (core.E901); development and tests only get a warning (core.W901).
 
-    LIVE and STAGE are the settings that set `REQUIRE_PRIVACY_PEPPER` (live.py, inherited by
-    stage.py): STAGE keeps `LIVE_DATA` off but still holds a pseudonym key worth protecting."""
+    LIVE is `LIVE_DATA`, STAGE is `STAGE` (as in payments.E003): STAGE keeps `LIVE_DATA` off but
+    still holds a pseudonym key worth protecting."""
     pepper = str(getattr(settings, "PRIVACY_PEPPER", "") or "").strip()
-    strict = bool(getattr(settings, "REQUIRE_PRIVACY_PEPPER", False))
+    strict = bool(getattr(settings, "LIVE_DATA", False) or getattr(settings, "STAGE", False))
     reused = bool(pepper) and pepper == str(settings.SECRET_KEY)
     if pepper and not reused:
         return []

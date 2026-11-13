@@ -4,7 +4,7 @@ ready, or without JavaScript) is a harmless GET of this page, never a POST.{% en
 <form data-passkey="register" data-csrf-token="{{ csrf_token }}" data-options-url="{{ register_options_url }}" data-finish-url="{{ register_url }}" data-text-request-failed="{% translate "The request failed." %}" data-text-unsupported="{% translate "This browser does not support passkeys." %}" data-text-failed="{% translate "The passkey did not work." %}">
   <p><label for="id_passkey_name">{% translate "Passkey name" %}</label>
     <input id="id_passkey_name" name="name" value="{% translate "Passkey" %}" maxlength="64"></p>
-  <button type="button" data-passkey-start>{% translate "Register a passkey" %}</button>
+  <button type="button" data-passkey-start>{% if add_another %}{% translate "Add another passkey" %}{% else %}{% translate "Register a passkey" %}{% endif %}</button>
   <noscript><p>{% translate "Passkeys need JavaScript." %}</p></noscript>
   <p data-passkey-error role="alert" hidden></p>
 </form>
