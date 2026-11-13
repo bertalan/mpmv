@@ -14,12 +14,13 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.catalog.models import Product, SkuAlias, Variant
-from apps.core.audit import AuditContext
+from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.services import run_mutation, save_audited
 from apps.vendors.models import Vendor
 
 from . import engine
+from .catalog_loader import CatalogLoader, LoadReport
 from .models import ImportRun, MappingTable, ReviewItem, SourceItem, SupplierSource
 
 RUN_CREATED = "ingest.run.created"
@@ -31,6 +32,7 @@ MAPPING_UPDATED = "ingest.mapping.updated"
 MAPPING_DELETED = "ingest.mapping.deleted"
 SOURCE_CREATED = "ingest.source.created"
 SOURCE_UPDATED = "ingest.source.updated"
+CATALOG_LOAD_RUN = "ingest.catalog_load.run"
 
 
 class WriteNotEnabled(Exception):
@@ -367,3 +369,41 @@ def delete_mapping(entry: MappingTable, *, ctx: AuditContext, dry_run: bool = Fa
     changes = ChangeSet()
     changes.delete("ingest.mappingtable", str(entry.public_id), mapping_snapshot(entry))
     return run_mutation(changes, entry.delete, ctx=ctx, action=MAPPING_DELETED, dry_run=dry_run)
+
+
+def load_legacy_catalog(
+    bundle: Mapping[str, Any],
+    *,
+    ctx: AuditContext,
+    dry_run: bool = True,
+    include_unpublished: bool = False,
+    attribute_aliases: Mapping[str, str] | None = None,
+) -> LoadReport:
+    """MIG.3 part 1: load vendors, catalog and taxonomies from the intermediate format.
+
+    `bundle` is the plain-dict shape documented in `legacy_catalog`. Idempotent: rows found by
+    their natural key are skipped, never updated. `include_unpublished` is the vendor's MIG.16
+    choice of drafts and archived products (loaded hidden); trashed products are only redirect
+    sources. Dry-run (the default) runs the real writes in a transaction that is rolled back, so
+    the report's ChangeSet is what a real run does. Every created row is audited (the vendor,
+    product and variant services audit their own) and one `ingest.catalog_load.run` entry records
+    the run (actor, counts, dry-run or not), also for a dry-run.
+    """
+    with transaction.atomic():
+        report = CatalogLoader(
+            bundle,
+            ctx=ctx,
+            include_unpublished=include_unpublished,
+            attribute_aliases=attribute_aliases or {},
+        ).run()
+        if dry_run:
+            transaction.set_rollback(True)
+    record(
+        ctx,
+        CATALOG_LOAD_RUN,
+        "ingest.catalogload",
+        "legacy",
+        None,
+        {"dry_run": dry_run, "include_unpublished": include_unpublished, **report.summary()},
+    )
+    return report
