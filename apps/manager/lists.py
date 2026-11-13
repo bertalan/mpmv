@@ -40,7 +40,7 @@ from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
 from django_stubs_ext import StrOrPromise
 
-from apps.accounts.decorators import mfa_redirect
+from apps.accounts.decorators import mfa_redirect, requires_level_method
 from apps.accounts.mfa_session import is_recently_verified
 from apps.accounts.services import has_second_factor
 from apps.core.audit import audit_context
@@ -151,6 +151,7 @@ class ManagerListView(ManagerView):
 
     # --- Bulk actions
 
+    @requires_level_method("bulk_edit")  # group 2: every list view inherits the gate
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
         action = next(
             (a for a in self.available_actions() if a.name == request.POST.get("action")), None

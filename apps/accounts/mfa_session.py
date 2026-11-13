@@ -58,7 +58,7 @@ def is_recently_verified(request: HttpRequest, max_age: int | None = None) -> bo
 
 def is_recently_passkey_verified(request: HttpRequest, max_age: int | None = None) -> bool:
     """Like `is_recently_verified`, but the last verification must be a passkey checked with user
-    verification (D-32 group 3: a code, a recovery code or a plain login passkey does not count)."""
+    verification (D-32 critical: a code, a recovery code or a plain login passkey is not enough)."""
     return (
         is_recently_verified(request, max_age)
         and request.session.get(VERIFIED_KIND_SESSION_KEY) == services.PASSKEY

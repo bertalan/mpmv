@@ -19,11 +19,13 @@ from typing import Any, ClassVar
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
 
 from . import engine
+from .fields import language_field, translation_status_field
 from .taxonomy import code_validator
 
 value_code_validator = RegexValidator(
@@ -57,14 +59,35 @@ class Attribute(BaseModel):
         max_length=64,
         unique=True,
         validators=[code_validator],
-        help_text="Stable key for imports and the API, e.g. size. Not shown to visitors.",
+        help_text=_(
+            "A short fixed name for this attribute, for example 'size'. Required: lower case "
+            "letters, digits and _, starting with a letter. Imports use it, so do not change "
+            "it later; buyers never see it."
+        ),
     )
-    kind = models.CharField(max_length=16, choices=AttributeKind.choices)
+    kind = models.CharField(
+        max_length=16,
+        choices=AttributeKind.choices,
+        help_text=_(
+            "What the attribute holds. Choice: one or more values from a list you define, for "
+            "example sizes. Number: a measure, for example a width. Text: a free text, for "
+            "example an author. Required."
+        ),
+    )
     unit = models.CharField(
-        max_length=16, blank=True, help_text="Number attributes only, e.g. cm, kg, ml."
+        max_length=16,
+        blank=True,
+        help_text=_(
+            "The unit of a number attribute, for example cm, kg or ml. Leave it empty for "
+            "choice and text attributes."
+        ),
     )
     position = models.PositiveIntegerField(
-        default=0, help_text="Order among a product's attributes when it does not set one."
+        default=0,
+        help_text=_(
+            "The order in which a product lists its attributes: lower numbers come first. "
+            "Leave 0 if the order does not matter."
+        ),
     )
 
     class Meta:
@@ -103,8 +126,16 @@ class AttributeTranslation(TranslationModel):
     translation_of = "attribute"
     translated_fields = ("name",)
 
+    language = language_field()
+    status = translation_status_field()
     attribute = models.ForeignKey(Attribute, on_delete=models.CASCADE, related_name="translations")
-    name = models.CharField(max_length=255)
+    name = models.CharField(
+        max_length=255,
+        help_text=_(
+            "The name buyers see for the attribute in this language, for example 'Colour'. "
+            "Required: without it the attribute has no name in this language."
+        ),
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["attribute", "language"]
@@ -122,14 +153,30 @@ class AttributeTranslation(TranslationModel):
 class AttributeValue(BaseModel):
     """One value of a choice attribute ("red" of color); its label is translated."""
 
-    attribute = models.ForeignKey(Attribute, on_delete=models.PROTECT, related_name="values")
+    attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.PROTECT,
+        related_name="values",
+        help_text=_(
+            "The attribute this value belongs to, for example 'size'. Required. Only choice "
+            "attributes have values."
+        ),
+    )
     value = models.SlugField(
         max_length=64,
         validators=[value_code_validator],
-        help_text="Stable key for imports and the API, e.g. red. Not shown to visitors.",
+        help_text=_(
+            "A short fixed name for this value, for example 'red'. Required: lower case "
+            "letters, digits, hyphens or _. Imports use it, so do not change it later; buyers "
+            "never see it."
+        ),
     )
     position = models.PositiveIntegerField(
-        default=0, help_text="Order among the attribute's values (S, M, L): drives variant order."
+        default=0,
+        help_text=_(
+            "The order of the values, for example 1 for S, 2 for M, 3 for L. Lower numbers come "
+            "first, and the variants of a product follow the same order."
+        ),
     )
 
     class Meta:
@@ -167,8 +214,16 @@ class AttributeValueTranslation(TranslationModel):
     translation_of = "value"
     translated_fields = ("label",)
 
+    language = language_field()
+    status = translation_status_field()
     value = models.ForeignKey(AttributeValue, on_delete=models.CASCADE, related_name="translations")
-    label = models.CharField(max_length=255)
+    label = models.CharField(
+        max_length=255,
+        help_text=_(
+            "The word buyers see for this value in this language, for example 'Red'. "
+            "Required: without it the value has no name in this language."
+        ),
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["value", "language"]

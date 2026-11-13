@@ -6,9 +6,12 @@ Rendered with the `ride` theme active, without a request: the shell parts are pu
 import re
 from typing import Any
 
+import pytest
 from django.template.loader import render_to_string
 
 from apps.themes.services import use_theme
+
+pytestmark = pytest.mark.usefixtures("english_interface")
 
 
 def render(name: str, /, **context: Any) -> str:

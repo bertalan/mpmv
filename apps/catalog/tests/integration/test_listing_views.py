@@ -41,6 +41,15 @@ from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
 
 pytestmark = pytest.mark.django_db
 
+
+@pytest.fixture(autouse=True)
+def _site_allows_indexing() -> None:
+    """These tests are about the listing rules: the site has turned its indexing switch on."""
+    apps.get_model("seo", "SeoSettings").objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )
+
+
 PUBLISHED = TranslationStatus.PUBLISHED
 INDEX = "index, follow"
 NOINDEX = "noindex, follow"

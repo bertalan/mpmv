@@ -40,6 +40,7 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.functions import Now
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from apps.core.fields import LanguageField, MoneyField
 from apps.core.models import BaseModel, TranslationModel, TranslationStatus, resolve_translation
@@ -55,9 +56,16 @@ from .attributes import (
     AttributeValue,
     AttributeValueTranslation,
 )
-from .fields import SkuField
+from .fields import (
+    SkuField,
+    language_field,
+    seo_description_field,
+    seo_title_field,
+    translation_status_field,
+)
 from .taxonomy import (
     Brand,
+    BrandBatch,
     BrandTranslation,
     Category,
     CategoryTranslation,
@@ -75,6 +83,7 @@ __all__ = [
     "AttributeValue",
     "AttributeValueTranslation",
     "Brand",
+    "BrandBatch",
     "BrandTranslation",
     "Category",
     "CategoryTranslation",
@@ -276,21 +285,55 @@ class Product(BaseModel):
     vendor_scope: ClassVar[str] = "vendor"
     objects = VendorScopedManager()
 
-    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="products")
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.PROTECT,
+        related_name="products",
+        help_text=_(
+            "The shop that sells this product. Required: the product cannot be saved without it, "
+            "and it cannot be changed afterwards."
+        ),
+    )
     staff_ref = _staff_ref("P-", "catalog_product_staff_ref_seq")
     sku = SkuField(
-        help_text="The vendor's label, kept as entered; unique per vendor ignoring case and "
-        "spaces, across products and variants."
+        help_text=_(
+            "Your own code for this product, for example 'MUG-RED-01'. Required. Use each code "
+            "once in your shop: capital letters and spaces do not make two codes different."
+        )
     )
     sku_key = _sku_key_field()
-    kind = models.CharField(max_length=16, choices=ProductKind.choices, default=ProductKind.SIMPLE)
+    kind = models.CharField(
+        max_length=16,
+        choices=ProductKind.choices,
+        default=ProductKind.SIMPLE,
+        help_text=_(
+            "Simple is one product with one price and one stock. Variable comes in versions, "
+            "such as sizes or colours, that you add one by one as variants."
+        ),
+    )
     # Changed only by the publishing services (CAT.10), which check the publishing rules.
     status = models.CharField(
         max_length=16, choices=ProductStatus.choices, default=ProductStatus.DRAFT, editable=False
     )
-    sales_mode = models.CharField(max_length=16, choices=SalesMode.choices, default=SalesMode.BUY)
+    sales_mode = models.CharField(
+        max_length=16,
+        choices=SalesMode.choices,
+        default=SalesMode.BUY,
+        help_text=_(
+            "How buyers get this product. Buy: they order and pay on the site, so it needs a "
+            "price. Catalog only: it is shown but cannot be bought. On request: buyers ask you "
+            "about it."
+        ),
+    )
     fiscal_category = models.CharField(
-        max_length=16, choices=FiscalCategory.choices, default=FiscalCategory.STANDARD
+        max_length=16,
+        choices=FiscalCategory.choices,
+        default=FiscalCategory.STANDARD,
+        help_text=_(
+            "The VAT treatment of the product: Standard rate for most goods, Reduced rate for "
+            "goods that qualify, Books for books under the special books regime. If you are "
+            "not sure which one applies, ask your accountant."
+        ),
     )
 
     # Required only for `buy`; kept, never public, for the other modes (Q-31, engine.public_price).
@@ -298,19 +341,65 @@ class Product(BaseModel):
         "net price",
         null=True,
         blank=True,
-        help_text="EUR, VAT excluded. Required to sell; never 0.00 (leave it empty instead).",
+        help_text=_(
+            "The price in euros without VAT, for example 19.90. Needed to sell the product: "
+            "with the Buy mode, an empty price is refused. It cannot be 0.00; leave it empty "
+            "instead."
+        ),
     )
-    sale_price_net = MoneyField("net sale price", null=True, blank=True)
-    sale_from = models.DateTimeField(null=True, blank=True)
-    sale_to = models.DateTimeField(null=True, blank=True)
+    sale_price_net = MoneyField(
+        "net sale price",
+        null=True,
+        blank=True,
+        help_text=_(
+            "An optional lower price in euros without VAT, for example 15.00. It must be below "
+            "the normal price. Leave it empty when there is no sale."
+        ),
+    )
+    sale_from = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_(
+            "The day and time the sale starts. It needs a sale price. Leave it empty if the "
+            "sale has no start date."
+        ),
+    )
+    sale_to = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_(
+            "The day and time the sale ends; it must be after the start. It needs a sale "
+            "price. Leave it empty if the sale has no end date."
+        ),
+    )
 
     # Stock of a simple product; a variable product keeps it on its variants.
     stock_policy = models.CharField(
-        max_length=16, choices=StockPolicy.choices, default=StockPolicy.TRACK
+        max_length=16,
+        choices=StockPolicy.choices,
+        default=StockPolicy.TRACK,
+        help_text=_(
+            "How stock is managed. Track stock: you keep the quantity up to date. Always open: "
+            "buyers can order even when it is out of stock. From the supplier source: for "
+            "stock kept in your supplier's own system."
+        ),
     )
-    stock_qty = models.IntegerField("stock quantity", default=0)
+    stock_qty = models.IntegerField(
+        "stock quantity",
+        default=0,
+        help_text=_(
+            "How many units you have now, for example 12. It cannot be negative. Variable "
+            "products keep the quantity on each variant."
+        ),
+    )
     stock_status = models.CharField(
-        max_length=16, choices=StockStatus.choices, default=StockStatus.IN_STOCK
+        max_length=16,
+        choices=StockStatus.choices,
+        default=StockStatus.IN_STOCK,
+        help_text=_(
+            "What buyers see: in stock, out of stock or on backorder. Backorder only works with "
+            "the always-open stock policy."
+        ),
     )
 
     weight_kg = models.DecimalField(
@@ -319,16 +408,36 @@ class Product(BaseModel):
         decimal_places=3,
         null=True,
         blank=True,
-        help_text="Required to publish a product that can be bought: it drives shipping.",
+        help_text=_(
+            "The weight of the packed product in kilograms, for example 0.350. Shipping costs "
+            "are calculated from it: without a weight, buyers cannot get a shipping rate."
+        ),
     )
     length_cm = models.DecimalField(
-        "length (cm)", max_digits=7, decimal_places=2, null=True, blank=True
+        "length (cm)",
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_(
+            "The longest side of the packed product in centimetres, for example 30. Optional."
+        ),
     )
     width_cm = models.DecimalField(
-        "width (cm)", max_digits=7, decimal_places=2, null=True, blank=True
+        "width (cm)",
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_("The width of the packed product in centimetres, for example 20. Optional."),
     )
     height_cm = models.DecimalField(
-        "height (cm)", max_digits=7, decimal_places=2, null=True, blank=True
+        "height (cm)",
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_("The height of the packed product in centimetres, for example 10. Optional."),
     )
 
     gtin = models.CharField(
@@ -336,17 +445,28 @@ class Product(BaseModel):
         max_length=14,
         blank=True,
         validators=[gtin_validator],
-        help_text="EAN or ISBN; when empty the SKU is used as MPN.",
+        help_text=_(
+            "The barcode number (EAN, UPC or ISBN), 8 to 14 digits, for example 4006381333931. "
+            "Leave it empty if the product has no barcode."
+        ),
     )
     mpn = models.CharField(
         "MPN",
         max_length=70,
         blank=True,
-        help_text="Manufacturer part number: with the brand it links the same article across "
-        "vendors.",
+        help_text=_(
+            "The part number the maker gave this article, up to 70 characters. Together with "
+            "the brand it lets the shop recognise the same article sold by different vendors."
+        ),
     )
     google_category_id = models.PositiveIntegerField(
-        "Google product category", null=True, blank=True
+        "Google product category",
+        null=True,
+        blank=True,
+        help_text=_(
+            "The number of the matching category in Google's product category list, for "
+            "example 2638. Optional: leave it empty if you do not know it."
+        ),
     )
 
     required_companion = models.ForeignKey(
@@ -355,10 +475,20 @@ class Product(BaseModel):
         null=True,
         blank=True,
         related_name="required_by",
-        help_text="A product that must be bought with this one.",
+        help_text=_(
+            "Another product of yours that is meant to be bought together with this one, for "
+            "example the battery for a toy. Leave it empty if there is none."
+        ),
     )
     upsells = models.ManyToManyField(
-        "self", symmetrical=False, blank=True, related_name="upsold_by"
+        "self",
+        symmetrical=False,
+        blank=True,
+        related_name="upsold_by",
+        help_text=_(
+            "Other products you want to suggest with this one, for example a better model. "
+            "Optional: leave it empty to suggest nothing."
+        ),
     )
 
     # Classification (CAT.2). A draft may have no category yet; publishing rules are CAT.10's.
@@ -368,10 +498,19 @@ class Product(BaseModel):
         null=True,
         blank=True,
         related_name="products",
-        help_text="Main category: the product's breadcrumb and Google category fallback.",
+        help_text=_(
+            "The main category of the product. It shows in the path above the product, so "
+            "buyers can find it. You can leave it empty while the product is a draft."
+        ),
     )
     secondary_categories = models.ManyToManyField(
-        Category, blank=True, related_name="secondary_products"
+        Category,
+        blank=True,
+        related_name="secondary_products",
+        help_text=_(
+            "Other categories where buyers may look for this product. Optional: the main "
+            "category is enough for most products."
+        ),
     )
     brand = models.ForeignKey(
         Brand,
@@ -379,16 +518,41 @@ class Product(BaseModel):
         null=True,
         blank=True,
         related_name="products",
-        help_text="Manufacturer brand.",
+        help_text=_(
+            "The brand of the maker, for example 'Acme'. Pick it from the list; leave it empty "
+            "if the product has no brand."
+        ),
     )
     # Tag the most specific terms: their upper levels are derived (services.effective_terms).
-    terms = models.ManyToManyField(Term, blank=True, related_name="products")
+    terms = models.ManyToManyField(
+        Term,
+        blank=True,
+        related_name="products",
+        help_text=_(
+            "The categories or tags that describe the product, for example a season or an "
+            "occasion. Pick the most specific ones: the broader ones are added for you."
+        ),
+    )
 
     legacy_wp_id_en = models.PositiveBigIntegerField(
-        "legacy EN post id", null=True, blank=True, unique=True
+        "legacy EN post id",
+        null=True,
+        blank=True,
+        unique=True,
+        help_text=_(
+            "The number this product had in the English pages of the old site. Used only when "
+            "moving old data; leave it empty for new products."
+        ),
     )
     legacy_wp_id_it = models.PositiveBigIntegerField(
-        "legacy IT post id", null=True, blank=True, unique=True
+        "legacy IT post id",
+        null=True,
+        blank=True,
+        unique=True,
+        help_text=_(
+            "The number this product had in the Italian pages of the old site. Used only when "
+            "moving old data; leave it empty for new products."
+        ),
     )
 
     class Meta:
@@ -505,6 +669,10 @@ class Product(BaseModel):
                 errors["required_companion"] = (
                     "A required companion must belong to the same vendor."
                 )
+        if self.brand_id is not None and self.vendor_id is not None:
+            problem = self._brand_problem()
+            if problem:
+                errors["brand"] = problem
         if self.sale_price_net is not None and self.sale_price_net == 0:
             errors["sale_price_net"] = engine.ZERO_SALE_PRICE
         if "price_net" not in errors:
@@ -513,6 +681,26 @@ class Product(BaseModel):
                 errors["price_net"] = missing
         if errors:
             raise ValidationError(errors)
+
+    def _brand_problem(self) -> str:
+        """Why the brand cannot be set (CAT.20), or "": an approved brand, or the vendor's own
+        pending proposal. A brand the product already has stays, so old data stays editable."""
+        stored = (
+            None
+            if self._state.adding or self.pk is None
+            else Product.objects.filter(pk=self.pk).values_list("brand_id", flat=True).first()
+        )
+        if stored == self.brand_id:
+            return ""
+        brand_id = self.brand_id
+        if brand_id is None:
+            return ""
+        status, proposer = Brand.objects.values_list("status", "proposed_by_id").get(pk=brand_id)
+        if status == Brand.Status.APPROVED or (
+            status == Brand.Status.PENDING and proposer == self.vendor_id
+        ):
+            return ""
+        return "Pick an approved brand, or propose this one first and wait for its review."
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         _with_sku_key(self, kwargs)
@@ -538,16 +726,30 @@ class ProductTranslation(TranslationModel):
     vendor_scope: ClassVar[str] = "product__vendor"
     objects = VendorScopedManager()
 
+    language = language_field()
+    status = translation_status_field()
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
     title = models.CharField(max_length=255)
-    short_description = models.TextField(blank=True)
-    description = models.TextField(blank=True, help_text="HTML.")
+    short_description = models.TextField(
+        blank=True,
+        help_text=_(
+            "A short teaser of one or two sentences, for example 'Hand-made ceramic mug, 300 "
+            "ml'. Optional: you can leave it empty."
+        ),
+    )
+    description = models.TextField(
+        blank=True,
+        help_text=_(
+            "The full text of the product page: materials, sizes, what is in the box. Basic "
+            "formatting is allowed. Optional, but buyers decide faster with a clear text."
+        ),
+    )
     # Derived {title} (no language suffix, D-25) from the title by `services.sync_product_slug`
     # (CAT.5), never the SKU; empty until generated. Replaced slugs move to SlugHistory and answer
     # a 301.
     slug = models.SlugField(max_length=80, blank=True, editable=False)
-    seo_title = models.CharField("SEO title", max_length=255, blank=True)
-    seo_description = models.TextField("SEO description", blank=True)
+    seo_title = seo_title_field()
+    seo_description = seo_description_field()
 
     class Meta(TranslationModel.Meta):
         ordering = ["product", "language"]
@@ -616,6 +818,56 @@ class SlugHistory(BaseModel):
         return f"{self.slug} [{self.language}]"
 
 
+class PriceHistory(BaseModel):
+    """One recorded price setting of a product or variant (CMP.6, Omnibus 30-day lowest price).
+
+    Append-only: written by the price services on every change, never edited (the model refuses
+    an update and database triggers refuse an update and a direct delete; rows go only with their
+    product or variant, through the delete services, which is intended). A row
+    with `variant` empty is the product's regular price and its optional scheduled sale; a row
+    with a variant records that variant's override (empty: it follows the product again).
+    Amounts are net, in `currency`.
+    """
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects = VendorScopedManager()
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="price_history")
+    variant = models.ForeignKey(
+        "Variant", on_delete=models.CASCADE, null=True, blank=True, related_name="price_history"
+    )
+    currency = models.CharField(max_length=3, default="EUR")
+    price_net = MoneyField("net price", null=True, blank=True)
+    sale_price_net = MoneyField("net sale price", null=True, blank=True)
+    sale_from = models.DateTimeField(null=True, blank=True)
+    sale_to = models.DateTimeField(null=True, blank=True)
+    recorded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["product", "recorded_at", "id"]
+        verbose_name_plural = "price history"
+        indexes = [models.Index(fields=["product", "recorded_at"], name="catalog_ph_product_time")]
+        constraints = [
+            models.CheckConstraint(
+                condition=(models.Q(price_net__isnull=True) | models.Q(price_net__gte=0))
+                & (models.Q(sale_price_net__isnull=True) | models.Q(sale_price_net__gte=0)),
+                name="catalog_pricehistory_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(currency__regex=r"^[A-Z]{3}$"),
+                name="catalog_pricehistory_currency",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.product_id} {self.price_net} {self.currency} @ {self.recorded_at:%Y-%m-%d}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise PermissionError("PriceHistory is append-only")
+        super().save(*args, **kwargs)
+
+
 def _only(kind: str, field: str | None) -> models.Q:
     """The target columns of a 301 to `kind`: `field` set, every other one empty."""
     empty = {
@@ -654,36 +906,104 @@ class Redirect(BaseModel):
         MANUAL = "manual", "Manual"
         RETIRED_SKU = "retired_sku", "Retired SKU"
         MERGED_TAG = "merged_tag", "Merged tag"
+        MERGED_BRAND = "merged_brand", "Merged brand"
         DISCONTINUED_CATEGORY = "discontinued_category", "Discontinued category"
         LEGACY_RULE = "legacy_rule", "Legacy site rule"
 
     source_path = models.CharField(
         max_length=engine.REDIRECT_PATH_MAX_LENGTH,
         unique=True,
-        help_text="The old path, e.g. /tag-product/old-tag/.",
+        help_text=_(
+            "The old address visitors still use, starting with a slash, for example "
+            "/tag-product/old-tag/. Required: without it the rule has nothing to match. "
+            "Each address can have only one rule."
+        ),
     )
     match_prefix = models.BooleanField(
-        "match everything below", default=False, help_text="E.g. /author/ for /author/anyone/."
+        "match everything below",
+        default=False,
+        help_text=_(
+            "Tick it to apply the rule to every address that starts with this one, for example "
+            "/author/ also covers /author/anyone/. Leave it unticked to match only this address."
+        ),
     )
-    code = models.PositiveSmallIntegerField(choices=Code.choices, default=Code.MOVED)
-    target_kind = models.CharField(max_length=16, choices=Target.choices, blank=True)
+    code = models.PositiveSmallIntegerField(
+        choices=Code.choices,
+        default=Code.MOVED,
+        help_text=_(
+            "What visitors get: 301 sends them to a new address, 410 tells them the page is "
+            "gone for good. A 410 has no target."
+        ),
+    )
+    target_kind = models.CharField(
+        max_length=16,
+        choices=Target.choices,
+        blank=True,
+        help_text=_(
+            "Where a 301 sends visitors: a path on this site, a product, a category or tag, or "
+            "a search. Required for a 301; leave it empty for a 410."
+        ),
+    )
     target_path = models.CharField(
         max_length=engine.REDIRECT_PATH_MAX_LENGTH,
         blank=True,
-        help_text="A path on this site, e.g. /it/. Never another site.",
+        help_text=_(
+            "The new address on this site, for example /it/. Never another website. Fill it "
+            "only when the target is a path."
+        ),
     )
     target_product = models.ForeignKey(
-        Product, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+        Product,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_("The product visitors are sent to. Fill it only when the target is a product."),
     )
     target_term = models.ForeignKey(
-        Term, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+        Term,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_(
+            "The category or tag visitors are sent to. Fill it only when the target is a "
+            "category or tag."
+        ),
     )
-    target_query = models.CharField("search words", max_length=200, blank=True)
-    origin = models.CharField(max_length=32, choices=Origin.choices, default=Origin.MANUAL)
+    target_query = models.CharField(
+        "search words",
+        max_length=200,
+        blank=True,
+        help_text=_(
+            "The words to search for, for example 'ceramic mug'. Fill them only when the "
+            "target is a search."
+        ),
+    )
+    origin = models.CharField(
+        max_length=32,
+        choices=Origin.choices,
+        default=Origin.MANUAL,
+        help_text=_(
+            "Why the rule exists, for example a retired product code. It is only a label for "
+            "you and your colleagues: it changes nothing for visitors."
+        ),
+    )
     expires_at = models.DateTimeField(
-        null=True, blank=True, help_text="Empty: the rule never expires."
+        null=True,
+        blank=True,
+        help_text=_(
+            "The day and time the rule stops applying. Leave it empty and the rule never expires."
+        ),
     )
-    note = models.CharField(max_length=200, blank=True)
+    note = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text=_(
+            "A private reminder of why the rule exists, up to 200 characters. Visitors never "
+            "see it."
+        ),
+    )
 
     class Meta:
         ordering = ["source_path"]
@@ -760,29 +1080,74 @@ class Variant(BaseModel):
     vendor_scope: ClassVar[str] = "vendor"
     objects = VendorScopedManager()
 
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="variants")
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="variants",
+        help_text=_(
+            "The variable product this version belongs to. Required: a variant cannot exist "
+            "without its product."
+        ),
+    )
     # Always the product's vendor (set on save, enforced by the composite foreign key).
     vendor = models.ForeignKey(
         Vendor, on_delete=models.PROTECT, related_name="variants", editable=False
     )
     staff_ref = _staff_ref("V-", "catalog_variant_staff_ref_seq")
     sku = SkuField(
-        help_text="The vendor's label, kept as entered; unique per vendor ignoring case and "
-        "spaces, across products and variants."
+        help_text=_(
+            "Your own code for this version, for example 'MUG-RED-01-L'. Required. It must "
+            "differ from the code of the product and of every other product or variant of "
+            "yours: capital letters and spaces do not make two codes different."
+        )
     )
     sku_key = _sku_key_field()
     price_net_override = MoneyField(
-        "net price override", null=True, blank=True, help_text="Empty: the product's price."
+        "net price override",
+        null=True,
+        blank=True,
+        help_text=_(
+            "A price in euros without VAT for this version only, for example 24.00. Leave it "
+            "empty and the version costs the same as the product."
+        ),
     )
     weight_kg_override = models.DecimalField(
-        "weight override (kg)", max_digits=8, decimal_places=3, null=True, blank=True
+        "weight override (kg)",
+        max_digits=8,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text=_(
+            "The weight of this version in kilograms, for example 0.450, when it differs from "
+            "the product. Leave it empty to use the product's weight."
+        ),
     )
-    stock_qty = models.IntegerField("stock quantity", default=0)
+    stock_qty = models.IntegerField(
+        "stock quantity",
+        default=0,
+        help_text=_("How many units of this version you have now, for example 5. Not negative."),
+    )
     stock_status = models.CharField(
-        max_length=16, choices=StockStatus.choices, default=StockStatus.IN_STOCK
+        max_length=16,
+        choices=StockStatus.choices,
+        default=StockStatus.IN_STOCK,
+        help_text=_("What buyers see for this version: in stock, out of stock or on backorder."),
     )
-    is_default = models.BooleanField("default variant", default=False)
-    position = models.PositiveIntegerField(default=0)
+    is_default = models.BooleanField(
+        "default variant",
+        default=False,
+        help_text=_(
+            "Tick it to mark the main version of the product. Only one version of a product can "
+            "be the default."
+        ),
+    )
+    position = models.PositiveIntegerField(
+        default=0,
+        help_text=_(
+            "The order of the versions: lower numbers come first, for example 1, 2, 3. "
+            "Leave 0 to keep the order they were added in."
+        ),
+    )
     # One value per variant axis of the product (CAT.3); see VariantOption.
     options = models.ManyToManyField(
         AttributeValue, through="VariantOption", related_name="variants", blank=True
@@ -862,9 +1227,23 @@ class VariantTranslation(TranslationModel):
     vendor_scope: ClassVar[str] = "variant__vendor"
     objects = VendorScopedManager()
 
+    language = language_field()
+    status = translation_status_field()
     variant = models.ForeignKey(Variant, on_delete=models.CASCADE, related_name="translations")
-    label = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
+    label = models.CharField(
+        max_length=255,
+        help_text=_(
+            "The name buyers see for this version, for example 'Red, size M'. Required: "
+            "without it the version has no name in this language."
+        ),
+    )
+    description = models.TextField(
+        blank=True,
+        help_text=_(
+            "A few words about this version only, for example 'Matt finish, fits the large "
+            "tray'. Optional."
+        ),
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["variant", "language"]

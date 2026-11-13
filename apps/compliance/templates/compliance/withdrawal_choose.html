@@ -1,0 +1,39 @@
+{% extends "layouts/content.html" %}
+{% load i18n %}
+{% block title %}{{ labels.button|capfirst }} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block page_content %}
+  <article class="withdrawal">
+    <h1>{% blocktranslate with number=order.number %}Withdraw from order {{ number }}{% endblocktranslate %}</h1>
+    {% if error %}<p role="alert" class="form-error">{{ error }}</p>{% endif %}
+    <form method="post" action="{% url 'withdrawal_confirm' %}">
+      {% csrf_token %}
+      <input type="hidden" name="token" value="{{ token }}">
+      <p>{% translate "Each seller in your order is a separate contract. Choose the parts you withdraw from." %}</p>
+      <ul class="withdrawal-options">
+        {% for option in options %}
+          <li>
+            {% if option.withdrawn %}
+              <strong>{{ option.vendor_name }}</strong>: {% translate "a withdrawal was already recorded." %}
+            {% elif option.window.is_open %}
+              <label>
+                <input type="checkbox" name="vendor_orders" value="{{ option.vendor_order.public_id }}">
+                <strong>{{ option.vendor_name }}</strong>
+              </label>
+              {% if option.window.closes_at %}<span>{% blocktranslate with until=option.window.closes_at|date:"Y-m-d" %}You can withdraw until {{ until }}.{% endblocktranslate %}</span>{% else %}<span>{% translate "The withdrawal period starts when you receive the goods; you can withdraw before then." %}</span>{% endif %}
+            {% else %}
+              <strong>{{ option.vendor_name }}</strong>:
+              {% if option.window.reason == "expired" %}{% translate "the withdrawal period has ended." %}
+              {% elif option.window.reason == "not_consumer" %}{% translate "the right of withdrawal is for consumers; this order was placed as a business." %}
+              {% else %}{% translate "withdrawal is not available for this part of the order." %}{% endif %}
+            {% endif %}
+            <ul>{% for line in option.lines %}<li>{{ line.quantity }} x {{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %}</li>{% endfor %}</ul>
+          </li>
+        {% endfor %}
+      </ul>
+      {% if any_open %}
+        {% include "components/button.html" with label=labels.confirm|capfirst type="submit" only %}
+      {% endif %}
+    </form>
+  </article>
+{% endblock %}

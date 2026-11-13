@@ -1,0 +1,28 @@
+{% extends "layouts/base.html" %}{% load i18n seo_robots %}
+{% comment %}
+Temporary staff "Site links" page (OPS.12; remove before LIVE): every page a person can open,
+built at request time by apps.seo.site_links. Each section is a heading and a list of links
+(title and path); tree depth is shown as nested indentation with a data attribute, no inline
+style (strict CSP).
+{% endcomment %}
+{% block title %}{% translate "Site links" %} · {{ site_name }}{% endblock %}
+{% block description %}{% robots_meta "noindex, nofollow" %}{% endblock %}
+{% block content %}
+<article class="site-links">
+  <h1>{% translate "Site links" %}</h1>
+  <p>{% translate "A temporary list of every page you can open on this site, for testing. Only staff see it; it will be removed before the site goes live." %}</p>
+  {% for section in sections %}
+    <section aria-labelledby="site-links-{{ forloop.counter }}">
+      <h2 id="site-links-{{ forloop.counter }}">{{ section.title }}</h2>
+      {% if section.note %}<p>{{ section.note }}</p>{% endif %}
+      {% if section.links %}
+        <ul>
+          {% for link in section.links %}<li data-depth="{{ link.depth }}">{% for step in ""|center:link.depth %}&#8195;{% endfor %}<a href="{{ link.path }}">{{ link.label }}</a> <code>{{ link.path }}</code></li>
+          {% endfor %}
+        </ul>
+        {% if section.more %}<p>{% blocktranslate count counter=section.more %}And {{ counter }} more.{% plural %}And {{ counter }} more.{% endblocktranslate %}</p>{% endif %}
+      {% elif not section.note %}<p>{% translate "Nothing yet." %}</p>{% endif %}
+    </section>
+  {% endfor %}
+</article>
+{% endblock %}
