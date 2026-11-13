@@ -9,6 +9,7 @@ panel) are caught by the model signals.
 
 from typing import Any
 
+from django.apps import apps as django_apps
 from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 from wagtail.contrib.settings.models import BaseGenericSetting, BaseSiteSetting
@@ -32,25 +33,32 @@ def drop_cache(**_kwargs: Any) -> None:
     transaction.on_commit(page_cache.invalidate, robust=True)
 
 
+CONTENT_MODELS = (
+    Page,
+    Site,
+    Locale,
+    BaseSiteSetting,
+    BaseGenericSetting,
+    PageViewRestriction,
+    CollectionViewRestriction,
+)
+
+
 def drop_for_content_model(instance: Any = None, **_kwargs: Any) -> None:
-    """Model signals reach every model: look only at the ones a public page renders from."""
-    if isinstance(instance, Page):
-        if instance.live:  # a draft is not served to the public
-            drop_cache()
-    elif isinstance(
-        instance,
-        Site
-        | Locale
-        | BaseSiteSetting
-        | BaseGenericSetting
-        | PageViewRestriction
-        | CollectionViewRestriction,
-    ):
-        drop_cache()
+    """A change to a model a public page renders from."""
+    if isinstance(instance, Page) and not instance.live:
+        return  # a draft is not served to the public
+    drop_cache()
 
 
 def connect() -> None:
+    """Connect per model, never without a `sender`: a `post_delete` receiver on every model makes
+    Django load and delete each row by primary key instead of one fast `DELETE ... WHERE`, which
+    slows bulk deletes everywhere (and changes the SQL of unrelated code, e.g. the API's refused-key
+    clean-up)."""
     for signal in (page_published, page_unpublished, post_page_move):
         signal.connect(drop_cache, dispatch_uid=f"{_UID}.{signal.__class__.__name__}.{id(signal)}")
-    post_save.connect(drop_for_content_model, dispatch_uid=f"{_UID}.save")
-    post_delete.connect(drop_for_content_model, dispatch_uid=f"{_UID}.delete")
+    for model in django_apps.get_models():
+        if issubclass(model, CONTENT_MODELS):
+            post_save.connect(drop_for_content_model, sender=model, dispatch_uid=f"{_UID}.save")
+            post_delete.connect(drop_for_content_model, sender=model, dispatch_uid=f"{_UID}.delete")

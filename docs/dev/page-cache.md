@@ -109,18 +109,19 @@ keep a page but asks the app each time, so the app, which does the purging, stay
 
 ## Storage and configuration
 
-A Django `FileBasedCache` (alias `pagecache`) in `MEDIA_ROOT/.page-cache`, because the app and the
-task worker both mount the media volume while the root file system is read-only. A scheduled
-publish in the worker therefore reaches the app's cache. No Redis (ADR-0001) and no new
-dependency. Caddy only serves image files from the media volume, so the cache folder is not
-reachable. A cache that cannot be read or written is a miss: the page is rendered. Size is bounded:
+A Django `FileBasedCache` (alias `pagecache`) in `var/page-cache` (`/app/var/page-cache` in the
+containers), a directory of its own and never inside `MEDIA_ROOT` or `STATIC_ROOT` (cached HTML
+must not sit in a web-served folder; Django's `caches.W002` guards that). The root file system is
+read-only, so production mounts the named volume `mpmv-pagecache` there in the app and the worker
+(not in Caddy): a scheduled publish in the worker reaches the app's cache. No Redis (ADR-0001) and
+no new dependency. A cache that cannot be read or written is a miss: the page is rendered. Size is bounded:
 `MAX_ENTRIES` 500 (older entries are culled) times 256 KiB per entry, about 128 MiB at most.
 
 | Setting | Env | Default |
 |---|---|---|
 | `PAGE_CACHE_ENABLED` | `MPMV_PAGE_CACHE` | off everywhere by default; `MPMV_PAGE_CACHE=1` turns it on in LIVE and STAGE |
 | `PAGE_CACHE_SECONDS` | `MPMV_PAGE_CACHE_SECONDS` | 300 |
-| `CACHES["pagecache"]["LOCATION"]` | `MPMV_PAGE_CACHE_DIR` | `MEDIA_ROOT/.page-cache` |
+| `CACHES["pagecache"]["LOCATION"]` | `MPMV_PAGE_CACHE_DIR` | `var/page-cache` (volume `mpmv-pagecache` in production) |
 
 To turn it off in an incident: set `MPMV_PAGE_CACHE=0` (or unset it) and restart. The next switch on starts with an
 empty cache only if something called `invalidate()` meanwhile, which every publish does.

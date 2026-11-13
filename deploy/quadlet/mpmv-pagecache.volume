@@ -1,0 +1,8 @@
+# Anonymous page cache (SEO.6, docs/dev/page-cache.md). The app and the worker write it so a
+# scheduled publish drops the app's cache; Caddy never mounts it. Cached HTML is disposable:
+# no backup needed, deleting the volume only empties the cache.
+[Volume]
+VolumeName=mpmv-pagecache
+# Owned by the image's non-root user (Containerfile, uid/gid 10001) from creation.
+User=10001
+Group=10001

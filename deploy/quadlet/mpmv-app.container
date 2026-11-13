@@ -19,9 +19,12 @@ EnvironmentFile=%h/.config/mpmv/database.env
 # Root certificate of the CA that signs the database server certificate (sslmode=verify-full,
 # DATABASE_URL names it with sslrootcert=/etc/mpmv/pg-root-ca.crt).
 Volume=%h/.config/mpmv/pg-root-ca.crt:/etc/mpmv/pg-root-ca.crt:ro,z
-# Uploads and renditions (MEDIA_ROOT): the only writable mount, never executable. The volume
+# Uploads and renditions (MEDIA_ROOT): a writable mount, never executable. The volume
 # unit makes it owned by the image user.
 Volume=mpmv-media.volume:/app/media:noexec,nosuid,nodev
+# Anonymous page cache (SEO.6): shared by the app and the worker, never mounted in Caddy and never
+# inside MEDIA_ROOT. Empty and unused while MPMV_PAGE_CACHE is off.
+Volume=mpmv-pagecache.volume:/app/var/page-cache:noexec,nosuid,nodev
 ReadOnly=true
 NoNewPrivileges=true
 DropCapability=ALL

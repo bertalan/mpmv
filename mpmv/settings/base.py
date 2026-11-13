@@ -442,23 +442,20 @@ STATICFILES_FINDERS = [
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Anonymous page cache (SEO.6, docs/dev/page-cache.md). The app and the task worker both mount the
-# media volume and the root file system is read-only, so the cache lives next to the media: files
-# are shared by every gunicorn worker and by the worker that publishes scheduled pages, which
-# is what makes a global invalidation reach every process without Redis (ADR-0001). The default
-# cache (LocMem) stays per process and holds nothing that must be shared.
+# Anonymous page cache (SEO.6, docs/dev/page-cache.md). Cached HTML must never sit in a web-served
+# folder (MEDIA_ROOT, STATIC_ROOT), so it has its own directory, `var/page-cache` (git-ignored),
+# which production mounts as the `mpmv-pagecache` volume in the app and the worker (the root file
+# system is read-only): files are shared by every gunicorn worker and by the worker that publishes
+# scheduled pages, so a global invalidation reaches every process without Redis (ADR-0001). The
+# default cache (LocMem) stays per process and holds nothing that must be shared.
 CACHES: dict[str, dict[str, Any]] = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
     "pagecache": {
         "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
-        "LOCATION": env_str("MPMV_PAGE_CACHE_DIR", "") or str(MEDIA_ROOT / ".page-cache"),
+        "LOCATION": env_str("MPMV_PAGE_CACHE_DIR", "") or str(BASE_DIR / "var" / "page-cache"),
         "OPTIONS": {"MAX_ENTRIES": 500, "CULL_FREQUENCY": 4},
     },
 }
-# caches.W002 (cache inside MEDIA_ROOT) is silenced on purpose: Caddy serves only the image
-# folders under /media/ and answers 404 to the rest, so `.page-cache` is never public
-# (apps/seo/tests/unit/test_page_cache_location.py pins that).
-SILENCED_SYSTEM_CHECKS = ["caches.W002"]
 PAGE_CACHE_ENABLED = env_bool("MPMV_PAGE_CACHE", default=False)
 # Default lifetime of a stored page, the safety net for content that changes without a signal
 # (a product shown in a block, a vendor storefront); publish, unpublish, move and settings
