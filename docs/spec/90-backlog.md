@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **379** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3058 h** (P1 2221 h · P2 749 h · P3 88 h)
+- Micro-tasks: **380** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3068 h** (P1 2221 h · P2 759 h · P3 88 h)
 - P1 critical path (schedule lower bound with full parallelism): **153 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CORE.2 → CORE.3 → CORE.17 → CORE.18 → FIT.1 → FIT.5 → FIT.7 → FIT.8 → FIT.10 → FIT.12
 
 ## By macro area
@@ -23,7 +23,7 @@
 | ORD | Cart, orders, returns | 18 | 142 | 42 | 0 | 184 |
 | PAY | Payments (Stripe Connect) | 6 | 40 | 4 | 16 | 60 |
 | PRM | Coupons and cart recovery | 16 | 0 | 143 | 10 | 153 |
-| ING | Supplier import and pipelines | 13 | 92 | 26 | 0 | 118 |
+| ING | Supplier import and pipelines | 14 | 92 | 36 | 0 | 128 |
 | I18N | Multilingual | 15 | 76 | 9 | 0 | 85 |
 | CMS | Wagtail content | 15 | 62 | 21 | 0 | 83 |
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
@@ -36,7 +36,7 @@
 | SEC | Security | 12 | 76 | 0 | 0 | 76 |
 | OPS | Operations | 14 | 25 | 37 | 8 | 70 |
 | MIG | Migration and cutover | 21 | 135 | 29 | 0 | 164 |
-| **Total** | | **379** | **2221** | **749** | **88** | **3058** |
+| **Total** | | **380** | **2221** | **759** | **88** | **3068** |
 
 ## By phase
 
@@ -328,7 +328,7 @@
 | MIG.17 | Shipping configuration migration: the MIG.1 extractor exports the legacy shipping option (zones with countries, postcode ranges and priority, the world catch-all, carriers per vendor with weight bands and surcharges, pickup options, quote settings) to the intermediate format, and the SHP.5 loader writes the `shipping` models; the marketplace plugin's own shipping tables are treated as a derived mirror and never used as a source | P1 | 4 | MIG.12, SHP.5 | A fresh-dump run loads the configuration with no duplicates on reload; the §13.3 shipping parity (200 vendor × country × postcode × weight combinations) shows no difference; the world catch-all and every pickup option are present; a value that does not parse is reported, never defaulted |
 | MIG.20 | Refunds migration (owner decision 2026-11-11, relayed by lane-a, #86): refund child orders and marketplace refund requests are stored inside the historical order (refunded amount, date, reason); there is no separate refund model for legacy data; no new ledger entry and no tax recalculation | P1 | 4 | MIG.4 | A migrated order shows its refunded amount, date and reason; the MIG.5 parity report reconciles order total minus refunds against the legacy figures; a refund amount that does not parse as `Decimal` is rejected with a report; the migration writes no ledger entry for a refund (MIG.8 covers balances); no refund model or table exists for legacy data |
 
-### F6 — After go-live (P2) (111 tasks, 859 h)
+### F6 — After go-live (P2) (112 tasks, 869 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -382,6 +382,7 @@
 | ING.11 | Supplier review import | P2 | 4 | ING.1, CMS.6 | Reviews imported with original date |
 | ING.12 | `/api/v1` import API for external vendors (upsert, stock, prices, media) | P2 | 8 | CORE.7, CAT.10 | Sample client in dry-run |
 | ING.13 | Admin checklist and "new vendor from source" wizard | P2 | 8 | ING.9 | Demo vendor activated without code |
+| ING.14 | AI providers for enrichment (owner decision D-13, 2026-11-13): Claude, Gemini and OpenAI clients behind `TextEnricher`, with the same policy, schema validation and archive as ING.5; the operator's default provider and model in the versioned operator settings (ARC.7); a vendor may choose its own provider for its own catalogue texts with its own API key, stored encrypted (SEC.3), set by the vendor owner with a fresh passkey window (D-32) and audited, and its usage counted per vendor; a provider failure falls back to no enrichment, never to another provider with the vendor's data without its choice; AI output is never published automatically (review queue) | P2 | 10 | ING.5, ARC.7, SEC.3 | The same product enriched through each of the three providers passes the same schema validation (providers mocked through our interface); a vendor key is never shown again after saving and never logged; a vendor's choice applies only to that vendor's products; a provider error leaves the text unchanged |
 | I18N.8 | Visitor content translation after go-live (D-18): products, categories, taxonomy terms, vendor storefronts, CMS pages, blog and landing pages, with the method the owner chooses (AI, professional or other) through the I18N.4 queue; per-language coverage report | P2 | 6 | I18N.4, I18N.3, I18N.6 | Per-language coverage report; only published translations appear in hreflang and sitemaps |
 | I18N.10 | User text stored in NFC (SEC.5 hostile-input finding F3, proposed on PR #166, registered by coherence check 7; owner: "non-NFC forms (store NFC)"): forms, API schemas and importers normalise free text to Unicode NFC at the service boundary; the SKU match key of spec 03 stays NFKC | P2 | 3 | — | Text entered through a form, the API or an importer is stored in NFC; the F3 strict xfail in `tests/integration/test_hostile_input_outputs.py` passes and its mark is removed |
 | CMS.6 | Review models (D-37 proposal, designed in [16](16-trust-community.md), in the `trust` app): `ProductReview`, `VendorReview`, `ReviewReply`, `ReviewRevision`, with the verified-purchase link to a delivered order line and the origin fields of supplier-imported reviews (ING.11); submission is TRU.3, moderation TRU.4, markup TRU.8 | P2 | 4 | ORD.2, TRU.1 | A customer review cannot be saved without a delivered order line of its author; a supplier-imported review carries its origin and original date and is never marked as a verified purchase; AggregateRating schema only with valid reviews |
