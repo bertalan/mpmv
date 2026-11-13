@@ -1,17 +1,19 @@
 # TLS reverse proxy in front of the app (ARC.5, ADR-0005, spec 12 §12.4).
-# Rootless Podman needs `net.ipv4.ip_unprivileged_port_start=80` to bind 80/443.
+# Ports 80 and 443 are not published: systemd opens them on the host (mpmv-caddy.socket, from
+# deploy/systemd) and passes them to this service by socket activation, Podman hands them on to
+# Caddy as file descriptors (deploy/caddy/Caddyfile binds them), and Caddy sees the real client
+# address. A published port would put Podman's port forwarder in between, which replaces the
+# client address with the container's own. Without the socket unit this service does not start.
 [Unit]
 Description=MPMV reverse proxy (Caddy)
+Requires=mpmv-caddy.socket
 Wants=network-online.target mpmv-app.service
-After=network-online.target mpmv-app.service
+After=network-online.target mpmv-app.service mpmv-caddy.socket
 
 [Container]
 ContainerName=mpmv-caddy
 Image=docker.io/library/caddy:2.11.9@sha256:0c2243efcf437ab7f7a978f1027fcf0d4f9be8a75df27b1b3fbc5dbe0ffa8cf0
 Network=mpmv.network
-PublishPort=80:80
-PublishPort=443:443
-PublishPort=443:443/udp
 # MPMV_SITE_ADDRESS (the public host name) comes from the env file; see deploy/README.md.
 EnvironmentFile=%h/.config/mpmv/caddy.env
 Volume=%h/.config/mpmv/Caddyfile:/etc/caddy/Caddyfile:ro,Z
@@ -25,5 +27,7 @@ NoNewPrivileges=true
 [Service]
 Restart=always
 
+# Caddy also starts at boot by itself, so certificate renewal never waits for a first visitor; the
+# socket unit (enabled by mpmv-deploy) starts first through Requires= and After=.
 [Install]
 WantedBy=default.target

@@ -12,9 +12,11 @@ Configuration comes only from environment variables.
 | [`local/stack.sh`](local/stack.sh) | Local stack on Apple `container`, driven by `make dev` |
 | [`quadlet/`](quadlet/) | Podman Quadlet units for STAGE and LIVE |
 | [`caddy/Caddyfile`](caddy/Caddyfile) | TLS reverse proxy in front of the app |
+| [`systemd/mpmv-caddy.socket`](systemd/mpmv-caddy.socket) | Listening sockets of the proxy (80, 443), handed to Caddy by systemd socket activation |
 | [`server/mpmv-deploy`](server/mpmv-deploy) | Deploy and rollback by image tag on a server |
 | [`server/*.env.example`](server/) | Variables the server needs, without values |
-| [`ci/parity-smoke.sh`](ci/parity-smoke.sh) | CI and release gate: runs the image as the server does (ARC.23) |
+| [`ci/parity-smoke.sh`](ci/parity-smoke.sh) | CI and release gate: runs the image as the server does, upgrading from the previous release tag (ARC.23, OPS.11) |
+| [`ci/previous-release.sh`](ci/previous-release.sh) | the release tag before this build, for the smoke's upgrade path (OPS.11) |
 
 Release rules (tagging, STAGE, LIVE, no hand edits): [docs/dev/release.md](../docs/dev/release.md).
 
@@ -33,7 +35,8 @@ Release rules (tagging, STAGE, LIVE, no hand edits): [docs/dev/release.md](../do
   read-only root filesystem and `NoNewPrivileges`. No secret is baked in: the build generates a
   throwaway key only to run `collectstatic`.
 - **Deploy units inside (ARC.23).** `/app/deploy` holds the release's `quadlet/` units,
-  `caddy/Caddyfile`, `server/mpmv-deploy` and the env examples (no env file, no certificate).
+  the `systemd/` socket unit, `caddy/Caddyfile`, `server/mpmv-deploy` and the env examples (no
+  env file, no certificate).
   `mpmv-deploy` installs them from the tag it deploys, so a server runs the units of its release.
 - **Base images** are pinned by tag and digest. To update one, take the new digest from the
   registry, change tag and digest together, and run `make image` and the CI image job.
@@ -94,7 +97,7 @@ amendment). Either way the app connects with TLS `sslmode=verify-full` against a
 | `mpmv-app.container` | `web`, with a health check; not published, Caddy proxies to it |
 | `mpmv-worker.container` | `worker` |
 | `mpmv-migrate.container` | `migrate`, one-shot, started only by `mpmv-deploy` |
-| `mpmv-caddy.container` | Caddy on 80/443 with certificates in volume `mpmv-caddy-data` |
+| `mpmv-caddy.container` | Caddy with certificates in volume `mpmv-caddy-data`; it publishes no port and takes 80/443 from `mpmv-caddy.socket` |
 | `mpmv-media.volume` | Volume `mpmv-media`: uploads and renditions (`MEDIA_ROOT`). App and worker write it, Caddy serves only image files in Wagtail's image folders from it, read-only, as inert files (no listing, `nosniff`, sandbox CSP); any other path under `/media/` is a 404. Back it up with the host until object storage replaces it |
 
 App, worker and migrate read two env files from `~/.config/mpmv/`, in this order, and mount one
@@ -114,6 +117,17 @@ the certificate from Let's Encrypt by itself (the name must resolve to the host 
 IP address is closed without an answer, HTTPS to them fails the TLS handshake, and a `Host`
 header that differs from the TLS server name gets 421.
 
+Caddy opens no port itself. The systemd user unit
+[`systemd/mpmv-caddy.socket`](systemd/mpmv-caddy.socket) listens on 80 and 443 (TCP, and UDP 443
+for HTTP/3), IPv4 and IPv6 on separate sockets, and hands them to `mpmv-caddy.service` by socket
+activation; Podman passes them on to Caddy, and the Caddyfile binds them by file descriptor
+(`fd/3` to `fdgram/8`, the order of the unit's `Listen` lines). The sockets live on the host, so
+Caddy sees each client's real address: the per-address limits of the app and the Django admin
+allow-list ([OPS.5](../docs/dev/admin-access.md)) work, and an SSH tunnel to the host's loopback
+arrives from `127.0.0.1`. A published port would put Podman's port forwarder in between, which
+replaces the client address with the container's own. Certificates still come from Let's Encrypt:
+Caddy answers HTTP-01 challenges on the port-80 sockets and TLS-ALPN-01 on the port-443 ones.
+
 ### First-time host setup
 
 As the deploy user, on a host with the recommended Podman (5 or later, with its quadlet generator):
@@ -121,7 +135,7 @@ As the deploy user, on a host with the recommended Podman (5 or later, with its 
 ```sh
 loginctl enable-linger "$USER"                     # user services start at boot (needs root once)
 sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80   # persist it in /etc/sysctl.d/
-mkdir -p ~/.config/containers/systemd ~/.config/mpmv ~/.local/bin
+mkdir -p ~/.config/containers/systemd ~/.config/systemd/user ~/.config/mpmv ~/.local/bin
 cp deploy/server/mpmv.env.example ~/.config/mpmv/mpmv.env    # fill in, then chmod 600
 cp deploy/server/database.env.example ~/.config/mpmv/database.env  # unless the DB setup wrote it; chmod 600
 cp <internal CA root certificate> ~/.config/mpmv/pg-root-ca.crt
@@ -133,7 +147,8 @@ podman run --rm --network none --entrypoint cat ghcr.io/<owner>/mpmv-app:X.Y.Z \
   /app/deploy/server/mpmv-deploy > ~/.local/bin/mpmv-deploy && chmod 755 ~/.local/bin/mpmv-deploy
 ```
 
-The units and the Caddyfile are not copied by hand: `deploy` installs those of the release.
+The units, the socket unit and the Caddyfile are not copied by hand: `deploy` installs those of
+the release.
 `~/.local/bin` is not on `PATH` in a non-interactive ssh session, so the script is always called
 by its absolute path, `~/.local/bin/mpmv-deploy`.
 
@@ -146,7 +161,8 @@ per-IP login lockout and registration limit act on the whole site; when they are
 before the subnet was fixed must be removed (`podman network rm mpmv-net`) and recreated by its
 unit.
 STAGE holds synthetic data only (spec 12). Then run the first deploy (below); it starts Caddy
-too. Afterwards every unit with an `[Install]` section starts at boot.
+too. Afterwards every unit with an `[Install]` section starts at boot, `mpmv-caddy.socket`
+included.
 
 ### Deploy and rollback
 
@@ -161,16 +177,25 @@ too. Afterwards every unit with an `[Install]` section starts at boot.
 `deploy` first runs the doctor: Podman and its quadlet generator present with every subcommand the
 script uses, every variable name of the release's `*.env.example` present in the env files (names
 only, values are never printed), `pg-root-ca.crt` readable, the `mpmv-media` volume owned by the
-image user (uid 10001), free disk above `MPMV_MIN_FREE_MB` (2048), and the installed and the new
-units converting with `quadlet -dryrun`. Any failure stops the deploy before anything changes.
+image user (uid 10001), free disk above `MPMV_MIN_FREE_MB` (2048), the installed and the new
+units converting with `quadlet -dryrun`, the socket unit present wherever the Caddy unit requires
+it, and `net.ipv4.ip_unprivileged_port_start` at 80 or lower. `systemd-analyze verify` is not
+used on the socket unit: the service it activates exists only after the Quadlet generator has
+run, so the check would always report it missing. Any failure stops the deploy before anything
+changes.
 
 Then it pulls the release (an image already in local storage is reused: release tags are
 immutable), copies the release's units, Caddyfile and script out of the image into
 `~/.local/state/mpmv/units/<version>/`, installs them (`~/.config/containers/systemd/`,
-`~/.config/mpmv/Caddyfile`, `~/.local/bin/mpmv-deploy`; stale `mpmv*` units are removed),
-reloads systemd, tags the image `localhost/mpmv-app:current`, runs `mpmv-migrate`, and restarts
-app and worker, plus Caddy when its Caddyfile or unit changed. If the migration fails, the live
-units and tag come back and nothing restarts.
+`~/.config/mpmv/Caddyfile`, `~/.local/bin/mpmv-deploy`, and the socket unit in
+`~/.config/systemd/user/`, or `MPMV_SYSTEMD_DIR`; stale `mpmv*` units are removed, a stale socket
+unit is disabled first), reloads systemd, enables the socket unit, tags the image
+`localhost/mpmv-app:current`, runs `mpmv-migrate`, and restarts app and worker, plus Caddy when
+its Caddyfile, unit or socket unit changed. Caddy restarts as stop, then the socket unit
+restarted (or stopped, for a release without one), then start: the old proxy releases 80 and 443
+before the other style binds them, so the first deploy with the socket and a rollback to a release
+from before it switch by themselves. If the migration fails, the live units and tag come back and
+nothing restarts.
 
 The check then polls, for at most `MPMV_CHECK_BUDGET` seconds (40), the app's health check and,
 through Caddy on this host (`curl --resolve <site>:443:127.0.0.1`, the site name read from

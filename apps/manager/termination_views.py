@@ -27,7 +27,7 @@ from django.http.response import HttpResponseBase
 from django.urls import reverse
 from django.utils.translation import gettext as _
 
-from apps.accounts.decorators import requires_level
+from apps.accounts.decorators import requires_level_method
 from apps.compliance import engine, services
 from apps.compliance.forms import FreezeReviewForm, TerminationForm, WithdrawTerminationForm
 from apps.compliance.models import TerminationNotice
@@ -92,10 +92,8 @@ class TerminationListView(ManagerView):
         )
         return context
 
-    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
-        return requires_level("termination_notice")(self._post)(request, *args, **kwargs)
-
-    def _post(self, request: HttpRequest, /, *args: Any, **kwargs: Any) -> HttpResponse:
+    @requires_level_method("termination_notice")  # group 2 (CORE.25)
+    def post(self, request: HttpRequest, /, *args: Any, **kwargs: Any) -> HttpResponse:
         if request.POST.get("action") != "issue":
             raise Http404("No such action.")
         vendors = Vendor.objects.filter(status__in=services.TERMINABLE_STATUSES)
@@ -156,10 +154,8 @@ class TerminationDetailView(ManagerView):
         )
         return context
 
-    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
-        return requires_level("termination_notice")(self._post)(request, *args, **kwargs)
-
-    def _post(self, request: HttpRequest, /, *args: Any, **kwargs: Any) -> HttpResponse:
+    @requires_level_method("termination_notice")  # group 2 (CORE.25)
+    def post(self, request: HttpRequest, /, *args: Any, **kwargs: Any) -> HttpResponse:
         public_id = kwargs["public_id"]
         self.notice(public_id)
         if request.POST.get("action") == "freeze":

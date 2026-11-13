@@ -29,6 +29,7 @@ MISSING_BASE = f"themes/{BASE_THEME}: the {BASE_THEME!r} theme is missing or inv
 # with "admin" (`accounts/admin/login.html`, the admin's login_template; `otp/admin111/`;
 # `procrastinate/admin/`), whatever it ships.
 UNTHEMED_PREFIXES = (
+    "documents/",  # PDF documents (ORD.9): rendered by WeasyPrint, never served as HTML; own CSS
     "admin/",
     "registration/",
     "otp/",  # django-otp: admin login and device admin only

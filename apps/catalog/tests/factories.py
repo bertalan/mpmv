@@ -13,6 +13,7 @@ from typing import Any
 
 import factory
 from factory.django import DjangoModelFactory
+from wagtail.models import Collection
 
 from apps.catalog.models import (
     Attribute,
@@ -20,10 +21,12 @@ from apps.catalog.models import (
     AttributeValue,
     AttributeValueTranslation,
     Brand,
+    BrandBatch,
     BrandTranslation,
     Category,
     CategoryTranslation,
     Manufacturer,
+    PriceHistory,
     Product,
     ProductAttribute,
     ProductTranslation,
@@ -38,6 +41,8 @@ from apps.catalog.models import (
     VariantOption,
     VariantTranslation,
 )
+from apps.core.models import MediaImage
+from apps.core.tests.factories import MediaImageFactory, SvgCollectionFactory
 from apps.vendors.tests.factories import VendorFactory
 
 
@@ -86,6 +91,16 @@ class SlugHistoryFactory(DjangoModelFactory[SlugHistory]):
     product = factory.SubFactory(ProductFactory)
     language = "en"
     slug = factory.Sequence(lambda n: f"old-product-{n}-en")
+
+
+class PriceHistoryFactory(DjangoModelFactory[PriceHistory]):
+    """One recorded price setting of a product (CMP.6); the services append these in real use."""
+
+    class Meta:
+        model = PriceHistory
+
+    product = factory.SubFactory(ProductFactory)
+    price_net = Decimal("10.00")
 
 
 class RedirectFactory(DjangoModelFactory[Redirect]):
@@ -228,6 +243,16 @@ class BrandFactory(DjangoModelFactory[Brand]):
     name = factory.Sequence(lambda n: f"Brand {n}")
 
 
+class BrandBatchFactory(DjangoModelFactory[BrandBatch]):
+    """The brands of one import run, pending review (CAT.20)."""
+
+    class Meta:
+        model = BrandBatch
+
+    vendor = factory.SubFactory(VendorFactory)
+    source = factory.Sequence(lambda n: f"import run {n}")
+
+
 class ManufacturerFactory(DjangoModelFactory[Manufacturer]):
     class Meta:
         model = Manufacturer
@@ -361,3 +386,12 @@ def clothing_attributes() -> dict[str, Attribute]:
         ),
         "author": attribute_with_values("author", {"en": "Author"}, {}, kind=Attribute.Kind.TEXT),
     }
+
+
+def brand_logo_image(**fields: Any) -> MediaImage:
+    """A classified image in the platform logos collection, the only place a brand logo may
+    come from (CAT.20 3/3)."""
+    collection = Collection.objects.filter(svg_policy__isnull=False).order_by("path").first()
+    if collection is None:
+        collection = SvgCollectionFactory.create().collection
+    return MediaImageFactory.create(collection=collection, **fields)

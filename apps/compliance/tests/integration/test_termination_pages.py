@@ -132,10 +132,10 @@ def test_a_withdrawal_without_a_reason_changes_nothing(
     assert notice.status == TerminationNotice.Status.PENDING
 
 
-def test_giving_notice_is_a_group_2_action_refused_in_a_restricted_session(
+def test_giving_notice_is_a_group_2_action_refused_without_an_open_window(
     client: Client, reviewer: Any, vendor: Vendor
 ) -> None:
-    verified_login(client, reviewer, level=levels.RESTRICTED)
+    verified_login(client, reviewer, level=levels.NO_WINDOW)
     assert client.get(PLATFORM).status_code == 200  # reading is free
     response = client.post(PLATFORM, issue_form(vendor))
     assert response.status_code == 403
@@ -144,7 +144,7 @@ def test_giving_notice_is_a_group_2_action_refused_in_a_restricted_session(
 
 def test_withdrawing_is_group_2_too(client: Client, reviewer: Any, vendor: Vendor) -> None:
     notice = TerminationNoticeFactory.create(vendor=vendor)
-    verified_login(client, reviewer, level=levels.RESTRICTED)
+    verified_login(client, reviewer, level=levels.NO_WINDOW)
     response = client.post(f"{PLATFORM}{notice.public_id}/", {"action": "withdraw", "reason": "x"})
     assert response.status_code == 403
     notice.refresh_from_db()
@@ -204,7 +204,7 @@ def test_the_owner_downloads_its_data_during_the_notice_period(
     mine = ProductFactory.create(vendor=vendor)
     theirs = ProductFactory.create()
     owner = VendorMemberFactory.create(vendor=vendor, role="owner").user
-    verified_login(client, owner, level=levels.RESTRICTED)
+    verified_login(client, owner, level=levels.NO_WINDOW)
     response = client.get(f"{SHOP}data/")
     assert response.status_code == 200
     assert "attachment" in response["Content-Disposition"]

@@ -5,6 +5,7 @@ Every Manager view extends `ManagerView` and names its section; the gate
 `scoped()`: `for_actor` (CORE.3), narrowed in the shop space to the selected vendor.
 """
 
+import uuid
 from dataclasses import replace
 from typing import Any, ClassVar
 
@@ -22,9 +23,11 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
-from apps.accounts.decorators import mfa_exempt
+from apps.accounts.decorators import mfa_exempt, mfa_redirect, requires_level_method
 from apps.accounts.forms import ManagerLoginForm
+from apps.accounts.mfa_session import is_recently_verified
 from apps.accounts.models import User
+from apps.accounts.services import has_second_factor
 from apps.catalog.models import Product
 from apps.catalog.services import product_kpis
 from apps.core.audit import audit_context
@@ -37,8 +40,15 @@ from apps.vendors.engine import RICH_TEXT_FIELDS, plain_to_html
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import Source, VendorScopedQuerySet
 from apps.vendors.services import (
+    PROFILE_FIELDS,
     PROFILE_LOCKED,
+    confirm_logo_change,
+    confirmable_logo_entry_ids,
+    profile_history,
     remove_vendor_logo,
+    revert_logo_change,
+    revert_profile_change,
+    reverted_entry_ids,
     save_storefront_profile,
     set_vendor_logo,
 )
@@ -191,6 +201,7 @@ class StorefrontProfileView(ManagerView):
                 return HttpResponseRedirect(reverse("manager:shop:profile"))
         return self.render_to_response(self.get_context_data(logo_form=form))
 
+    @requires_level_method("content_edit")  # group 1: any session, CORE.26 can tighten it
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         vendor, actor = self.manager.vendor, self.manager.user
         if vendor is None or not isinstance(actor, User):
@@ -336,6 +347,7 @@ class VendorOrderActionView(VendorOrderDetailView):
         )
         return self.render_to_response(context, status=409)
 
+    @requires_level_method("orders_in_progress")  # group 1: any session, CORE.26 can tighten it
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         action = self.kwargs["action"]
         if action not in orders_engine.FULFILMENT_ACTIONS:
@@ -368,6 +380,136 @@ class VendorOrderActionView(VendorOrderDetailView):
 class PlatformDashboardView(ManagerView):
     section = "platform.dashboard"
     template_name = "manager/platform/dashboard.html"
+
+
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+    except (ValueError, AttributeError):
+        return False
+    return True
+
+
+REVERT_ACTIONS = ("vendor.profile_reverted", "vendor.logo_reverted")
+
+
+class ProfileChangesView(ManagerView):
+    """Staff review the owners' storefront profile changes and see the reverts (CORE.9 3/3).
+
+    Platform space only (vendor members never get here, so a vendor sees no history), and only for
+    holders of the revert permission. Optional `?vendor=<public id>` narrows the list.
+    """
+
+    section = "platform.profile_changes"
+    template_name = "manager/platform/profile_changes.html"
+
+    def selected_vendor(self) -> Vendor | None:
+        found = self.request.GET.get("vendor", "")
+        if not found:
+            return None
+        try:
+            return Vendor.objects.filter(public_id=found).first()
+        except (ValidationError, ValueError):
+            return None
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        vendor = self.selected_vendor()
+        user = self.manager.user
+        entries = profile_history(user, vendor=vendor) if isinstance(user, User) else []
+        reverted = reverted_entry_ids(entries)
+        confirmable = confirmable_logo_entry_ids(entries)
+        keys = {e.vendor_key for e in entries if _is_uuid(e.vendor_key)}
+        names = {
+            str(k): v
+            for k, v in (
+                Vendor.objects.filter(public_id__in=keys).values_list("public_id", "display_name")
+            )
+        }
+        rows = []
+        for entry in entries:
+            before = entry.before if isinstance(entry.before, dict) else {}
+            after = entry.after if isinstance(entry.after, dict) else {}
+            rows.append(
+                {
+                    "entry": entry,
+                    "vendor": names.get(entry.vendor_key, entry.vendor_key),
+                    "language": after.get("language") or _("all languages"),
+                    "is_revert": entry.action in REVERT_ACTIONS,
+                    "reason": after.get("reason", ""),
+                    "reverted": str(entry.public_id) in reverted,
+                    "confirmable": str(entry.public_id) in confirmable,
+                    "diff": [
+                        {"field": name, "before": before.get(name, ""), "after": after[name]}
+                        for name in (*PROFILE_FIELDS, "logo", "logo_alt")
+                        if name in after
+                    ],
+                }
+            )
+        context["rows"] = rows
+        context["filter_vendor"] = vendor
+        return context
+
+
+class ProfileRevertView(ManagerView):
+    """Revert one change, with a required reason (POST only, CSRF-protected)."""
+
+    section = "platform.profile_changes"
+    http_method_names = ["post"]
+
+    @requires_level_method("profile_revert")  # group 2 (CORE.25)
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        actor = self.manager.user
+        if not isinstance(actor, User):
+            raise Http404("No Manager page here.")
+        if not is_recently_verified(request):  # step-up, as the other sensitive staff actions
+            target = "mfa:verify" if has_second_factor(actor) else "mfa:setup"
+            return mfa_redirect(
+                request, target, next_url=reverse("manager:platform:profile_changes")
+            )
+        ctx = replace(audit_context(request), source=AuditLog.Source.ADMIN)
+        is_logo = AuditLog.objects.filter(
+            public_id=kwargs["entry"], action="vendor.logo_changed"
+        ).exists()
+        revert = revert_logo_change if is_logo else revert_profile_change
+        try:
+            revert(kwargs["entry"], request.POST.get("reason", ""), actor=actor, ctx=ctx)
+        except ValidationError as error:
+            messages.error(request, " ".join(error.messages))
+        except PermissionDenied as error:
+            raise Http404("No Manager page here.") from error
+        else:
+            messages.success(request, _("The change was reverted and the owners were told."))
+        return HttpResponseRedirect(reverse("manager:platform:profile_changes"))
+
+
+class ProfileConfirmView(ManagerView):
+    """Confirm a logo change: the previous file kept for a revert is deleted now (owner decision
+    Q1). POST only, CSRF-protected, same level and step-up as the revert."""
+
+    section = "platform.profile_changes"
+    http_method_names = ["post"]
+
+    @requires_level_method("profile_revert")  # group 2 (CORE.25)
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        actor = self.manager.user
+        if not isinstance(actor, User):
+            raise Http404("No Manager page here.")
+        if not is_recently_verified(request):
+            target = "mfa:verify" if has_second_factor(actor) else "mfa:setup"
+            return mfa_redirect(
+                request, target, next_url=reverse("manager:platform:profile_changes")
+            )
+        ctx = replace(audit_context(request), source=AuditLog.Source.ADMIN)
+        try:
+            confirm_logo_change(kwargs["entry"], actor=actor, ctx=ctx)
+        except ValidationError as error:
+            messages.error(request, " ".join(error.messages))
+        except PermissionDenied as error:
+            raise Http404("No Manager page here.") from error
+        else:
+            messages.success(request, _("The change is confirmed and the old logo is deleted."))
+        return HttpResponseRedirect(reverse("manager:platform:profile_changes"))
 
 
 class VendorPickerView(ManagerView):

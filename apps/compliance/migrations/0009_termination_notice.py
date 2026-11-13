@@ -13,7 +13,7 @@ import apps.core.i18n
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("compliance", "0005_erasure_request"),
+        ("compliance", "0008_withdrawal_statement_append_only"),
         ("vendors", "0026_storefront_rich_text"),
     ]
 

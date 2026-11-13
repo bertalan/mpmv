@@ -19,6 +19,7 @@ class ComplianceConfig(AppConfig):
         "productrestriction",
         "transparencysubmission",
         "terminationnotice",
+        "withdrawalstatement",  # CMP.6: written once, only by the audited withdrawal service
     )
 
     def ready(self) -> None:

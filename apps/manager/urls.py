@@ -50,6 +50,24 @@ shop = (
             media.ManagerImageSelectFormatView.as_view(),
             name="image_select_format",
         ),
+        # Documents (VEN.31 part 2) and the external link dialog of the same editor.
+        path("media/documents/", media.ManagerDocumentChooseView.as_view(), name="document_choose"),
+        path(
+            "media/documents/results/",
+            media.ManagerDocumentResultsView.as_view(),
+            name="document_results",
+        ),
+        path(
+            "media/documents/create/",
+            media.ManagerDocumentUploadView.as_view(),
+            name="document_create",
+        ),
+        path(
+            "media/documents/chosen/<int:pk>/",
+            media.ManagerDocumentChosenView.as_view(),
+            name="document_chosen",
+        ),
+        path("media/links/", media.ManagerLinkView.as_view(), name="link_choose"),
     ],
     "shop",
 )
@@ -57,6 +75,17 @@ shop = (
 platform = (
     [
         path("", views.PlatformDashboardView.as_view(), name="dashboard"),
+        path("profile-changes/", views.ProfileChangesView.as_view(), name="profile_changes"),
+        path(
+            "profile-changes/<uuid:entry>/revert/",
+            views.ProfileRevertView.as_view(),
+            name="profile_revert",
+        ),
+        path(
+            "profile-changes/<uuid:entry>/confirm/",
+            views.ProfileConfirmView.as_view(),
+            name="profile_confirm",
+        ),
         path("notices/", notice_views.NoticeListView.as_view(), name="notices"),
         path("notices/<uuid:public_id>/", notice_views.NoticeDetailView.as_view(), name="notice"),
         path("terminations/", termination_views.TerminationListView.as_view(), name="terminations"),

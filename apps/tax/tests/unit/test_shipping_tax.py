@@ -210,12 +210,27 @@ def test_a_portion_is_a_tax_decision_compatible_outcome() -> None:
         assert getattr(p, name) == getattr(p.decision, name)
 
 
-# D-03: the stored tax_treatment values other than follows_goods are not applied
-@pytest.mark.parametrize("treatment", ["standard_rate", "exempt", "force_vat", ""])
-def test_d03_other_treatments_block_instead_of_guessing(treatment: str) -> None:
+# TAX.17 (D-03 decided): shipping always follows the goods; no other treatment exists
+def test_tax17_no_alternative_shipping_treatment_exists() -> None:
+    assert not hasattr(engine, "UnsupportedShippingTreatment")
+    assert not hasattr(engine, "TREATMENT_FOLLOWS_GOODS")
+
+
+def test_tax17_a_charge_that_names_a_treatment_is_still_split_over_the_goods() -> None:
+    # A legacy caller object that still carries a stored treatment: it is not read.
     c = ctx()
-    with pytest.raises(engine.UnsupportedShippingTreatment):
-        engine.resolve_shipping_tax(c, goods(c, ("10.00", "standard")), Rate(D("5.00"), treatment))
+    legacy = Rate(D("10.00"), "exempt")
+    portions = engine.resolve_shipping_tax(c, goods(c, ("100.00", "standard")), legacy)
+    assert [(p.rate, p.net, p.tax) for p in portions] == [(D("22"), D("10.00"), D("2.20"))]
+
+
+def test_tax17_a_mixed_basket_splits_pro_rata_with_the_cent_on_the_largest_base() -> None:
+    c = ctx()
+    portions = engine.resolve_shipping_tax(
+        c, goods(c, ("60.00", "standard"), ("40.00", "reduced")), Rate(D("5.01"))
+    )
+    assert sum((p.net for p in portions), D(0)) == D("5.01")
+    assert [(p.rate, p.net) for p in portions] == [(D("22"), D("3.01")), (D("10"), D("2.00"))]
 
 
 @pytest.mark.parametrize("net", [D("-1.00"), D("NaN")])
@@ -230,8 +245,8 @@ def test_shipping_with_no_goods_is_refused() -> None:
         engine.resolve_shipping_tax(ctx(), [], Rate(D("5.00")))
 
 
-def test_the_plain_charge_dataclass_defaults_to_follows_goods() -> None:
-    assert engine.ShippingCharge(net=D("1.00")).tax_treatment == "follows_goods"
+def test_the_plain_charge_dataclass_carries_only_the_net() -> None:
+    assert engine.ShippingCharge(net=D("1.00")).net == D("1.00")
 
 
 def test_a_float_net_is_refused() -> None:
