@@ -287,6 +287,10 @@ TEMPLATES = [
 # check themes.E002 fails when it names no registered theme), then `base`.
 MPMV_THEMES_DIR = BASE_DIR / "themes"
 MPMV_THEME_DEFAULT = env_str("MPMV_THEME_DEFAULT", "") or "base"
+
+# MIG.1 legacy source connector: table prefix of the legacy database. A fake default on purpose;
+# the real prefix lives only in the deployment environment, never in versioned files.
+MPMV_LEGACY_DB_PREFIX = env_str("MPMV_LEGACY_DB_PREFIX", "") or "legacy_"
 # Built theme CSS (THM.2): `make assets` writes themes/<slug>/{tokens,theme}.css here
 # (git-ignored); ThemeAssetsFinder serves it to runserver and collectstatic.
 MPMV_THEME_BUILD_DIR = BASE_DIR / "build" / "themes"
