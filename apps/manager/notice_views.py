@@ -17,18 +17,21 @@ from django.http.response import HttpResponseBase
 from django.urls import reverse
 from django.utils.translation import gettext as _
 
+from apps.accounts.decorators import requires_level_method
 from apps.compliance import services
 from apps.compliance.forms import AuthoritiesForm, DecisionForm, RestrictionForm
 from apps.compliance.models import Notice, StatementOfReasons
 from apps.core.audit import audit_context
 
+from .navigation import platform_role
 from .views import ManagerView
 
 SECTION = "platform.notices"
 
 
 def can_review(ctx: Any) -> bool:
-    return services.can_review_notices(ctx.user)
+    """The matrix row (CORE.18) and the permission the services check: both are needed."""
+    return platform_role(SECTION)(ctx) and services.can_review_notices(ctx.user)
 
 
 class NoticeListView(ManagerView):
@@ -79,6 +82,7 @@ class NoticeDetailView(ManagerView):
         )
         return context
 
+    @requires_level_method("notice_decision")  # group 2; the owner may relax it
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
         public_id = kwargs["public_id"]
         self.notice(public_id)

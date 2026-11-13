@@ -16,12 +16,19 @@ from tests.factory_registry import Factory, app_factories
 pytestmark = pytest.mark.django_db
 
 
+# Factories of a table that holds one row by design (a database constraint): they return it.
+SINGLETON_FACTORIES = {"FitmentSchemeFactory"}
+
+
 @pytest.mark.parametrize("factory_class", app_factories(), ids=lambda f: f.__name__)
 def test_every_factory_creates_valid_distinct_rows(factory_class: Factory) -> None:
     first, second = factory_class.create_batch(2)
     assert first.pk is not None
     assert second.pk is not None
-    assert first.pk != second.pk
+    if factory_class.__name__ in SINGLETON_FACTORIES:
+        assert first.pk == second.pk
+    else:
+        assert first.pk != second.pk
     first.full_clean()
     second.full_clean()
 

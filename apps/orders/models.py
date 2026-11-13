@@ -23,6 +23,7 @@ from django.utils import timezone
 
 from apps.catalog.models import Product
 from apps.core.fields import CountryField, LanguageField, MoneyField
+from apps.core.i18n import primary_language
 from apps.core.models import BaseModel
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
@@ -147,7 +148,7 @@ class Order(_StateGuarded):
     customer_vat_number = models.CharField(max_length=32, blank=True)
     customer_tax_id = models.CharField(max_length=32, blank=True)
     email = models.EmailField()
-    language = LanguageField(default=settings.LANGUAGE_CODE)
+    language = LanguageField(default=primary_language)
     billing_address = models.JSONField(default=dict)
     billing_country = CountryField()
     shipping_address = models.JSONField(default=dict)

@@ -3,11 +3,13 @@
 Everything here takes plain values, not live catalogue, tax or shipping rows: the caller (the
 checkout, ORD.4) resolves prices, tax and the shipping choice, and these services store them as
 snapshots. Mutations accept `dry_run=True` and return a ChangeSet, and write one AuditLog entry
-per changed object (SEC.4). `tax` and `shipping` are never imported here.
+per changed object (SEC.4). `tax` is never imported here; `shipping` only for the carrier's
+tracking link (ORD.7).
 """
 
 import datetime as dt
-from collections.abc import Sequence
+import uuid
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Protocol
@@ -15,22 +17,37 @@ from typing import Any, Protocol
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db import connection, transaction
-from django.db.models import Sum
+from django.db.models import Prefetch, QuerySet, Sum
 from django.utils import timezone
+from django.utils.functional import Promise
+from django.utils.module_loading import import_string
+from django.utils.text import slugify
 
 from apps.accounts.models import User
 from apps.cart import engine as cart_engine
 from apps.cart.models import Cart
 from apps.catalog.models import Product, Variant
+from apps.core import flags
 from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.money import CENT
-from apps.core.services import audit_changes
+from apps.core.services import audit_changes, flag_enabled
+from apps.shipping.models import Carrier
+from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission
 
 from . import engine, notifications
-from .models import Order, OrderLine, OrderNumberSequence, StockReservation, VendorOrder
+from .messages import CLOSED_SITE, CLOSED_VENDOR
+from .models import (
+    Order,
+    OrderLine,
+    OrderNumberSequence,
+    OrderState,
+    PrivacyStatus,
+    StockReservation,
+    VendorOrder,
+)
 from .tz import business_tz
 
 DRY_RUN_NUMBER = "(assigned when placed)"
@@ -374,10 +391,24 @@ def transition_order(
             audit_changes(changeset, ctx=ctx, action="orders.transition")
             if target == "paid":  # ORD.9: in this transaction, so a rollback sends nothing
                 notifications.notify_order_paid(locked)
+            elif target == "cancelled":
+                notifications.notify_order_cancelled(locked)
     except _DryRunRollback:
         pass
     order.refresh_from_db()
     return changeset
+
+
+class OrdersFrozen(ValueError):
+    """The vendor's open orders are frozen (a termination awaiting staff review): views answer
+    with a 4xx."""
+
+
+def _orders_frozen(vendor: Vendor) -> bool:
+    """Whether a hook in `settings.ORDER_FREEZE_HOOKS` freezes the vendor's open orders. Hooks
+    are dotted paths (orders never imports the apps that freeze); a voluntary closure freezes
+    nothing."""
+    return any(import_string(path)(vendor) for path in settings.ORDER_FREEZE_HOOKS)
 
 
 def transition_vendor_order(
@@ -404,6 +435,10 @@ def transition_vendor_order(
                 .select_related("vendor", "order")
                 .get(pk=sub.pk)
             )
+            if _orders_frozen(locked.vendor):  # CMP.5 part 4: frozen pending staff review
+                raise OrdersFrozen(
+                    "the vendor's open orders are frozen pending staff review (termination)"
+                )
             before = _vendor_order_snapshot(locked)
             engine.check_vendor_order_transition(locked.state, target)
             if target == "shipped":
@@ -433,6 +468,10 @@ def transition_vendor_order(
             audit_changes(changeset, ctx=ctx, action="orders.transition")
             if target == "shipped":  # ORD.9
                 notifications.notify_vendor_order_shipped(locked)
+            elif target == "delivered":
+                notifications.notify_vendor_order_delivered(locked)
+            elif target == "cancelled":
+                notifications.notify_vendor_order_cancelled(locked)
     except _DryRunRollback:
         pass
     sub.refresh_from_db()
@@ -679,6 +718,20 @@ class CheckoutPreview:
     customer_tax_id: str = ""
     customer_tax_status: str = "b2c"
     vat_validation: dict[str, Any] | None = None
+    # ORD.3: every vendor package as shown (also the ones that cannot be placed), the blocking
+    # messages and the totals of the ready packages. `vendors` holds the ready packages only.
+    packages: Sequence[engine.PackageSummary] = ()
+    blocks: Sequence[engine.Block] = ()
+    totals: engine.Totals | None = None
+
+    @property
+    def placeable(self) -> bool:
+        """True when nothing blocks the checkout and at least one package is ready."""
+        return not self.blocks and bool(self.vendors)
+
+    @property
+    def needs_quote(self) -> bool:
+        return any(b.code == engine.NEEDS_QUOTE for b in self.blocks)
 
 
 @dataclass(frozen=True)
@@ -694,6 +747,39 @@ class OrderRefused(Exception):
     def __init__(self, reasons: Sequence[Refusal]) -> None:
         self.reasons = list(reasons)
         super().__init__("; ".join(f"{r.code}: {r.detail}" for r in self.reasons))
+
+
+CLOSING_SWITCHES = (flags.CHECKOUT, flags.PAYMENTS)
+
+
+class CheckoutClosed(Exception):
+    """A kill switch (ARC.8) is off: no new order is placed and no payment starts (ORD.10).
+
+    `scope` is "site" when the platform value is off, "vendor" when only the listed vendors'
+    overrides are. `customer_message` is safe to show: it names no vendor. Orders already placed
+    or paid are never touched by the switch."""
+
+    def __init__(self, flag: str, scope: str, vendors: Sequence[int] = ()) -> None:
+        self.flag = flag
+        self.scope = scope
+        self.vendors = list(vendors)
+        super().__init__(f"{flag} switched off ({scope})")
+
+    @property
+    def customer_message(self) -> Promise:
+        return CLOSED_SITE if self.scope == "site" else CLOSED_VENDOR
+
+
+def ensure_checkout_open(vendors: Sequence[Vendor]) -> None:
+    """Raise `CheckoutClosed` unless both the checkout and the payments switches are on for the
+    platform and for every vendor of the order. Call it before an order or a payment intent is
+    created (PAY.1 calls it before it starts a payment)."""
+    for name in CLOSING_SWITCHES:
+        if not flag_enabled(name):
+            raise CheckoutClosed(name, "site")
+        closed = [v.pk for v in vendors if not flag_enabled(name, vendor=v)]
+        if closed:
+            raise CheckoutClosed(name, "vendor", closed)
 
 
 @dataclass(frozen=True)
@@ -721,7 +807,7 @@ def _lock_live_rows(
     products = {
         p.pk: p
         for p in Product.objects.select_for_update(of=("self",))
-        .select_related("vendor")
+        .select_related("vendor__connected_account")
         .filter(pk__in=product_ids)
         .order_by("pk")
     }
@@ -763,7 +849,7 @@ def _verify(
             continue
         error = cart_engine.purchase_error(
             product_status=product.status,
-            sales_mode=product.sales_mode,
+            sales_mode=vendors_services.effective_sales_mode(product),
             vendor_status=product.vendor.status,
             is_variable=product.kind == Product.Kind.VARIABLE,
             has_variant=variant is not None,
@@ -772,7 +858,9 @@ def _verify(
             reasons.append(Refusal("unavailable", product.pk, error))
             continue
         live = cart_engine.display_unit_price(
-            product.price_net, product.sales_mode, variant.price_net_override if variant else None
+            product.price_net,
+            vendors_services.effective_sales_mode(product),
+            variant.price_net_override if variant else None,
         )
         if live != entry.expected_unit_price_net:
             reasons.append(
@@ -822,7 +910,9 @@ def place_order(
     returns the change set without saving or holding anything.
 
     The payment (PAY.1) starts only after this transaction commits (`transaction.on_commit`).
+    Raises `CheckoutClosed` before anything is read or saved when a kill switch is off (ORD.10).
     """
+    ensure_checkout_open([item.vendor for item in preview.vendors])
     now = now or timezone.now()
     with transaction.atomic():
         products, variants, holds = _verify(preview, now=now)
@@ -887,7 +977,9 @@ def place_order(
 def _line_input(entry: PlaceLine, product: Product, variants: dict[int, Variant]) -> LineInput:
     variant = variants.get(entry.variant.pk) if entry.variant is not None else None
     unit_price = cart_engine.display_unit_price(
-        product.price_net, product.sales_mode, variant.price_net_override if variant else None
+        product.price_net,
+        vendors_services.effective_sales_mode(product),
+        variant.price_net_override if variant else None,
     )
     if unit_price is None:  # _verify refused anything not for sale
         raise OrderRefused([Refusal("unavailable", product.pk, "This item is not for sale.")])
@@ -968,3 +1060,55 @@ def hold_stock(
         )
         changeset.create("orders.stockreservation", str(hold.public_id), snapshot)
         return changeset
+
+
+# --- the customer's own orders (ORD.7) ---------------------------------------------------------
+
+
+def customer_orders(user: User) -> QuerySet[Order]:
+    """The orders a signed-in customer may see in "My orders": their own, never anyone else's.
+
+    Only `active` orders (D-30): a legacy order (MIG.4) is shown when the vendor's migration
+    choice (D-16) kept it active; the rest of the last ten years sits in the restricted tax
+    archive, visible to the Tax/Audit permission only, so it never shows here. An order still in
+    `checkout` is a draft and is not listed. The checkout, order confirmation and payment pages
+    own the draft."""
+    if not user.is_authenticated:
+        return Order.objects.none()
+    orders = Order.objects.filter(customer=user, privacy_status=PrivacyStatus.ACTIVE).exclude(
+        state=OrderState.CHECKOUT
+    )
+    # Hook for the restricted tax archive flag (ORD.14, draft #338): once `Order` has it, an
+    # archive row is out whatever its `privacy_status`. Boolean field named `tax_archive`.
+    if any(field.name == "tax_archive" for field in Order._meta.get_fields()):
+        orders = orders.filter(**{"tax_archive": False})
+    return orders
+
+
+def customer_order(user: User, public_id: uuid.UUID) -> Order | None:
+    """One order of the customer, or None (the view answers 404 for a stranger's order too)."""
+    return (
+        customer_orders(user)
+        .prefetch_related(
+            Prefetch(
+                "vendor_orders",
+                queryset=VendorOrder.objects.select_related("vendor").prefetch_related("lines"),
+            )
+        )
+        .filter(public_id=public_id)
+        .first()
+    )
+
+
+def carrier_tracking_templates(names: Iterable[str]) -> dict[str, str]:
+    """The tracking-link template of each carrier name the vendors typed, by the name as typed.
+
+    A name matches a carrier by its code (case-insensitive, spaces as dashes). A name with no
+    carrier record has no link: the customer still sees the carrier and the number."""
+    wanted = {name: slugify(name) for name in names if name}
+    carriers = dict(
+        Carrier.objects.filter(code__in=set(wanted.values()), is_active=True).values_list(
+            "code", "tracking_url_template"
+        )
+    )
+    return {name: carriers[code] for name, code in wanted.items() if carriers.get(code)}

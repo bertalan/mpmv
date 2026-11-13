@@ -2,9 +2,11 @@
 
 import logging
 
+from apps.core.audit import AuditContext
+from apps.core.models import AuditLog
 from apps.core.tasks import NO_RETRY, locked, periodic, task
 
-from . import services
+from . import retention, services
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,18 @@ def flag_overdue_safety_cases(timestamp: int) -> None:
     logger.info("compliance.flag_overdue_safety_cases flagged %d case(s)", len(changes.changes))
 
 
+@periodic("10 * * * *")
+@locked()
+@task("compliance.apply_due_terminations", retry=NO_RETRY)
+def apply_due_terminations(timestamp: int) -> None:
+    """Every hour: close each vendor whose notice of termination has run out (spec 11 CMP.5, P2B
+    art. 4). Never before the notice's effective time; each closure goes through the vendor
+    closure service and is audited."""
+    ctx = AuditContext(actor_label="system:termination", source=AuditLog.Source.SYSTEM)
+    changes = services.apply_due_terminations(ctx=ctx)
+    logger.info("compliance.apply_due_terminations made %d change(s)", len(changes.changes))
+
+
 @periodic("15 3 * * *")
 @locked()
 @task("compliance.check_published_gpsr", retry=NO_RETRY)
@@ -27,3 +41,13 @@ def check_published_gpsr(timestamp: int) -> None:
     with an error in the log and one email a day to the staff alert address."""
     rows = services.flag_published_products_failing_gpsr()
     logger.info("compliance.check_published_gpsr found %d product(s)", len(rows))
+
+
+@periodic("45 3 * * *")
+@locked()
+@task("compliance.run_retention", retry=NO_RETRY)
+def run_retention(timestamp: int) -> None:
+    """Every night: apply the order and account retention lifecycle (CMP.4, D-29, D-30)."""
+    ctx = AuditContext(actor_label="system:retention", source=AuditLog.Source.TASK)
+    result = retention.run_retention(ctx=ctx)
+    logger.info("compliance.run_retention %s", result.counts())

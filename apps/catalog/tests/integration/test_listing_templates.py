@@ -13,9 +13,11 @@ from typing import Any
 
 import pytest
 from bs4 import BeautifulSoup
+from django.apps import apps
 from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
+from wagtail.models import Site
 
 from apps.catalog import services
 from apps.catalog.models import Product, SalesMode
@@ -35,11 +37,22 @@ from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
 
+
+@pytest.fixture(autouse=True)
+def _site_allows_indexing() -> None:
+    """These tests are about the listing rules: the site has turned its indexing switch on."""
+    apps.get_model("seo", "SeoSettings").objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )
+
+
 PUBLISHED = TranslationStatus.PUBLISHED
 
 
 def listed(title: str, **kwargs: Any) -> Product:
-    kwargs.setdefault("vendor", VendorFactory.create(status=Vendor.Status.ACTIVE))
+    kwargs.setdefault(
+        "vendor", VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
+    )
     kwargs.setdefault("status", Product.Status.PUBLISHED)
     product = ProductFactory.create(**kwargs)
     slug = title.lower().replace(" ", "-")
@@ -83,7 +96,9 @@ def shop() -> dict[str, Any]:
     )
     blue = TermFactory.create(taxonomy=colour)
     TermTranslationFactory.create(term=blue, name="Blue", slug="blue", status=PUBLISHED)
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, slug="acme", display_name="Acme")
+    vendor = VendorFactory.create(
+        status=Vendor.Status.ACTIVE, sells_online=True, slug="acme", display_name="Acme"
+    )
     priced = listed("Steel bag", vendor=vendor, price_net=Decimal("12.50"))
     priced.terms.add(maker, red)
     on_request = listed("Custom bag", sales_mode=SalesMode.ON_REQUEST, price_net=None)
@@ -276,7 +291,7 @@ def test_a_card_on_a_fallback_language_page_links_to_the_source_language_url(
     client: Client, shop: dict[str, Any]
 ) -> None:
     product = ProductFactory.create(
-        vendor=VendorFactory.create(status=Vendor.Status.ACTIVE),
+        vendor=VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True),
         status=Product.Status.PUBLISHED,
     )
     ProductTranslationFactory.create(

@@ -166,25 +166,41 @@ def check_roles_matrix(app_configs: object = None, **kwargs: object) -> list[che
     ]
 
 
-SEED_MIGRATION = ("manager", "0002_seed_role_groups")
+SEED_MIGRATION = ("manager", "0002_seed_role_groups")  # first group seed; later ones follow
+
+
+def _manager_migrations_pending(connection: Any) -> bool:
+    """True while any manager migration (the group seeds) or any orders migration is unapplied."""
+    from django.db.migrations.executor import MigrationExecutor
+
+    executor = MigrationExecutor(connection)
+    applied = executor.loader.applied_migrations
+    if not any(app == "orders" for app, _ in applied):
+        return True
+    # Every manager node must be recorded, not only the leaf: a missing earlier one (the first
+    # group seed) is as pending as a missing later one.
+    return any(key not in applied for key in executor.loader.graph.nodes if key[0] == "manager")
 
 
 def check_role_drift(
     app_configs: object = None, databases: Sequence[str] | None = None, **kwargs: object
 ) -> list[checks.CheckMessage]:
-    """The role groups hold exactly the permissions of `roles.py` (manager.E004).
+    """The role groups hold exactly the permissions of `roles.py` (manager.E004, E005).
 
     Needs the database: runs with `manage.py check --database default` and in the test suite.
+    `migrate` runs the database checks before it applies anything, so the checks skip while a
+    manager migration is unapplied (the seeds that create and update the groups, so drift against
+    the current `roles.py` is expected) or the orders tables are missing. Every change to
+    `roles.py` therefore needs a new sync migration.
     """
-    from django.db import DatabaseError, connection
-    from django.db.migrations.recorder import MigrationRecorder
+    from django.db import DatabaseError, connections
 
     from .role_groups import role_conflicts, role_drift
 
+    if databases is not None and "default" not in databases:
+        return []
     try:
-        # `migrate` runs the database checks before it applies anything: until the seed migration
-        # has run, missing groups are expected and must not block the migration that creates them.
-        if SEED_MIGRATION not in MigrationRecorder(connection).applied_migrations():
+        if _manager_migrations_pending(connections["default"]):
             return []
         problems, conflicts = role_drift(), role_conflicts()
     except DatabaseError:  # not migrated yet

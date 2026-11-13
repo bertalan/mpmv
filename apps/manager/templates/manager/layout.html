@@ -5,8 +5,11 @@
 {% comment %}
 The Manager shell (CORE.17, spec 02 §Backoffice): one layout for both spaces, on the active
 theme's components (THM.3, THM.4). The header holds the site name (the space's dashboard), the
-vendor switcher for members of several vendors, the signed-in user, sign-out and the language
-switcher; under it the section menu from the navigation registry lists only the sections the
+vendor switcher for members of several vendors, the signed-in user, the language switcher and,
+at the right end, the user tools (ARC.32: the help button immediately left of the user menu,
+which holds the help item and sign-out; the button stays in the header on narrow screens, the
+tools wrap with it; the help script comes from the base layout; a signed-in user always has them,
+the plain sign-out form is the fallback of a URLconf without the help endpoint); under it the section menu from the navigation registry lists only the sections the
 actor may open, the current one marked `aria-current`. Pages fill `manager_content`.
 
 The Manager has no language prefix and no CMS page, like the account area. Strict CSP: no inline
@@ -31,11 +34,13 @@ script or style.
       {% endif %}
       <div class="site-header__tools">
         <span class="manager-header__user">{{ manager.user.get_username }}</span>
+        {% include "components/language_switcher.html" with languages=languages current_language=current_language next_url=next_url csrf_token=csrf_token only %}
+        {% help_context as help %}{% if help %}{% include "components/user_tools.html" %}{% else %}
         <form action="{% url 'logout' %}" method="post">
           {% csrf_token %}
           {% include "components/button.html" with label=_("Sign out") type="submit" variant="ghost" size="small" only %}
         </form>
-        {% include "components/language_switcher.html" with languages=languages current_language=current_language next_url=next_url csrf_token=csrf_token only %}
+        {% endif %}
       </div>
     </div>
     {% if manager_menu %}
@@ -56,4 +61,4 @@ script or style.
     {% block manager_content %}{% endblock %}
   </div>
 {% endblock %}
-{% block footer %}{% endblock %}
+{% block footer %}{% if release_version %}<footer class="manager-footer"><p class="manager-footer__version">{% translate "Version" %} {{ release_version }}</p></footer>{% endif %}{% endblock %}

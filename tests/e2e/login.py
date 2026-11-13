@@ -11,23 +11,23 @@ def admin_login(page: Page, base_url: str, email: str, password: str) -> None:
     page.get_by_role("button", name="Log in").click()
 
 
-def verify_with_totp(page: Page, token: str, *, operational: bool = False) -> None:
+def verify_with_totp(page: Page, token: str, *, window: bool = False) -> None:
     """Answer the MFA verification page with an authenticator-app code.
 
-    `operational=True` then puts the session in operational mode (see `make_operational`).
+    `window=True` then opens the passkey window (see `open_passkey_window`).
     """
     page.get_by_label("Authentication code").fill(token)
     page.get_by_role("button", name="Verify", exact=True).click()
-    if operational:
+    if window:
         page.wait_for_url(lambda url: "/account/mfa/verify" not in url)
-        make_operational(page)
+        open_passkey_window(page)
 
 
-def make_operational(page: Page) -> None:
-    """Put the browser's session in operational mode (D-32, CORE.25).
+def open_passkey_window(page: Page) -> None:
+    """Open the passkey window in the browser session (D-32, CORE.25).
 
     The real switch needs a passkey; the e2e suite has no authenticator, so the test writes the
-    session state (server side, in the shared test database) the way `levels.start_operational`
+    session state (server side, in the shared test database) the way `levels.open_window`
     does. Tests of the switch itself live in the integration suite.
     """
     import time
@@ -44,9 +44,9 @@ def make_operational(page: Page) -> None:
 
 
 def fresh_passkey(page: Page) -> None:
-    """Record a fresh passkey with user verification in the browser's session (D-32 group 3).
+    """Record a fresh passkey with user verification in the browser's session (D-32 critical).
 
-    Like `make_operational`, it writes the server-side session state because the e2e suite has
+    Like `open_passkey_window`, it writes the server-side session state because the e2e suite has
     no authenticator; the ceremony itself is tested in the integration suite.
     """
     import time

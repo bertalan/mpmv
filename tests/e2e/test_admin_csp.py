@@ -47,7 +47,7 @@ def test_admin_works_under_strict_csp(
     page.get_by_label("Email").fill("staff@example.com")
     page.get_by_label("Password").fill(password)
     page.get_by_role("button", name="Log in").click()
-    verify_with_totp(page, totp_token(device), operational=True)
+    verify_with_totp(page, totp_token(device), window=True)
     expect(
         page.get_by_role("link", name="Log out").or_(page.get_by_role("button", name="Log out"))
     ).to_be_visible()

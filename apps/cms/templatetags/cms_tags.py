@@ -4,15 +4,17 @@ the page-level FAQPage structured data (CMS.2); the page's image credits (CMS.8)
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urljoin
 
 from django import template
 from django.conf import settings
 from django.http import HttpRequest
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import translation
 from django.utils.html import format_html_join
 from django.utils.safestring import SafeString, mark_safe
-from wagtail.models import Locale, Page
+from django.utils.translation import gettext
+from wagtail.models import Locale, Page, Site
 
 from apps.core.i18n import (
     LanguageLink,
@@ -23,9 +25,10 @@ from apps.core.i18n import (
     translate_path,
 )
 from apps.core.image_licences import Credit
+from apps.core.services import NoPlatformOperator, current_operator
 
-from .. import services
-from ..engine import faq_page_jsonld, jsonld_text
+from .. import engine, services
+from ..engine import faq_page_jsonld, jsonld_text, organization_jsonld
 from ..models import NavigationMenu
 
 register = template.Library()
@@ -51,13 +54,28 @@ def _menu(location: str) -> NavigationMenu | None:
 def navigation_links(context: dict[str, Any], location: str) -> list[MenuLink]:
     """The links of the header or footer menu; pages are shown in the active language.
 
-    Links to deleted or unpublished pages are left out.
+    Links to deleted or unpublished pages are left out. The header menu ends with the
+    temporary "Site links" item (OPS.12; remove before LIVE).
     """
-    request: HttpRequest | None = context.get("request")
-    menu = _menu(location)
-    if menu is None:
+    links = _menu_links(context.get("request"), _menu(location))
+    if location == NavigationMenu.Location.HEADER:
+        links.extend(_site_links_item())
+    return links
+
+
+def _site_links_item() -> list[MenuLink]:
+    """The temporary staff "Site links" page (OPS.12), shown to everyone so the owner can test
+    its protection on STAGE; remove before LIVE."""
+    try:
+        return [MenuLink(label=gettext("Site links"), url=reverse("site_links"))]
+    except NoReverseMatch:  # a test URLconf without the route
         return []
+
+
+def _menu_links(request: HttpRequest | None, menu: NavigationMenu | None) -> list[MenuLink]:
     links: list[MenuLink] = []
+    if menu is None:
+        return links
     for block in menu.links:
         value = block.value
         if block.block_type == "external":
@@ -172,3 +190,68 @@ def jsonld_script(data: Mapping[str, Any] | None) -> SafeString:
     if not data:
         return mark_safe("")
     return mark_safe(f'<script type="application/ld+json">{jsonld_text(data)}</script>')  # noqa: S308
+
+
+@register.simple_tag(takes_context=True)
+def operator_organization_jsonld(context: template.Context) -> SafeString:
+    """The platform operator as one Organization JSON-LD script (home page); "" without a
+    request or a configured operator."""
+    try:
+        operator = current_operator()
+    except NoPlatformOperator:
+        return mark_safe("")
+    # Absolute URLs come from the default site, never from the request's Host header (the page
+    # may be served from a cache): the home page of the page's language, and the logo file.
+    site = Site.objects.filter(is_default_site=True).first()
+    if site is None:
+        return mark_safe("")
+    page: Page | None = context.get("page")
+    home = (page.relative_url(site) if page is not None else None) or "/"
+    logo_url = ""
+    logo = operator.logo
+    if logo is not None and logo.file:
+        try:
+            logo_url = urljoin(site.root_url, logo.file.url)
+        except ValueError:  # no file behind the field
+            logo_url = ""
+    return jsonld_script(
+        organization_jsonld(
+            operator.legal_name,
+            urljoin(site.root_url, home),
+            operator.support_email,
+            logo_url,
+            operator.official_profiles,
+        )
+    )
+
+
+# --- Contextual help (ARC.32)
+
+
+@register.simple_tag(takes_context=True)
+def help_context(context: dict[str, Any]) -> dict[str, str] | None:
+    """What the help button needs, for a signed-in user only; None for anyone else.
+
+    The route name and the page type say which entry the dialog asks for. The user is not looked
+    up without a session cookie: that would read the session and add `Vary: Cookie` to every
+    public page, and a visitor has no help button anyway (the signed-in chrome is never cached).
+    """
+    request: HttpRequest | None = context.get("request")
+    if request is None or settings.SESSION_COOKIE_NAME not in request.COOKIES:
+        return None
+    user = getattr(request, "user", None)
+    if user is None or not (user.is_authenticated and user.is_active):
+        return None
+    try:
+        url = reverse("help_entry")
+    except NoReverseMatch:  # a URLconf without the endpoint (a test harness): no button
+        return None
+    match = getattr(request, "resolver_match", None)
+    page = context.get("page")
+    label = page.specific_class._meta.label if isinstance(page, Page) else ""
+    return {
+        "url": url,
+        "route": engine.help_route_name(getattr(match, "view_name", "")),
+        "page_type": engine.help_page_type(label),
+        "language": translation.get_language() or settings.LANGUAGE_CODE,
+    }

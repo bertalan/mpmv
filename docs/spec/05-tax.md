@@ -156,7 +156,7 @@ Intended differences from today:
 - **Special territories** handled by postcode; Northern Ireland (`XI`) follows EU goods rules (D-02,
   decided: adviser opinion 2026-11-11; owner, 2026-11-11). A delivery to GB whose normalised postcode matches `^BT[0-9]`
   is jurisdiction `XI`. B2C is an EU distance sale counted in the vendor's EUR 10,000 EU threshold;
-  above it (or by the vendor's option) the UK rate applies, reported through the vendor's EU OSS
+  above it (or by the vendor's option; vendor regime `oss`) the UK rate applies, reported through the vendor's EU OSS
   under code `XI`, with no UK registration. B2B with a VIES-valid `XI` number is an intra-EU exempt
   supply (`N3.2`, Intrastat `XI`) with proof of delivery kept; a GB-only number is B2C (TAX.18).
 - **Outside-VAT-territory dataset** (TAX.7, needs human review): each territory is matched by an ISO-code form and by a French postcode form, because a buyer may supply either. Legal basis: Directive 2006/112/EC art. 6 (territories excluded from the Union VAT territory).
@@ -169,7 +169,6 @@ Intended differences from today:
   basis is the named constant `GOODS_COUNTRY_BASIS` in the tax engine.
 - Fail closed until built: a sale to a `special` territory raises a blocking error, and so does a
   vendor established in such a territory (not supported: the context has no vendor territory).
-  Northern Ireland (`XI`) also raises it until TAX.18 replaces the error with the D-02 rules.
 - The carrier `force_vat` flag goes away (D-03, decided: adviser opinion 2026-11-11): shipping charged by the vendor
   always follows the goods' VAT treatment, and no "force VAT" or other treatment option is offered
   (TAX.17). The pro-rata split across rates, with the rounding cent on the largest base, is final.
@@ -189,6 +188,25 @@ Intended differences from today:
   structured nature (N1 to N7) plus the legal note; Italian vendors need both.
 - Rates are updated from an official source (the Commission's TEDB) with staff review and validity
   periods; past orders keep the rates in their snapshot.
+
+### Triangulation and declaration of intent (TAX.15, TAX.16, owner decision D-28, needs human review)
+
+**Triangulation, art. 58 c.1 D.L. 331/93 (TAX.15).** Italian vendors only, never any other
+country, where the first leg is a domestic taxable supply. The case is a vendor IT1 selling to
+an Italian buyer IT2 who has the goods shipped directly to a consignee in another member state. It
+applies only when the transport is **by or on behalf of IT1, or by platform logistics**. Pickup by
+IT2, or a carrier that takes free orders from IT2, means Italian VAT. Checkout collects a tracked
+declaration from IT2: the final consignee's name, the delivery address in the other member state,
+a VIES-valid VAT number of the consignee, and an explicit request that IT1 ships there directly.
+The decision carries nature code `N3.2` and IT1 keeps the proof of the direct transport (ORD.13).
+
+**Declaration of intent, Italy (TAX.16).** Art. 8 c.1 lett. c D.P.R. 633/72, nature code `N3.5`.
+The buyer (a habitual exporter) holds a status on the buyer side; checkout captures the
+**telematic protocol number** of the buyer's declaration. Available to Italian vendors only.
+
+**VIES validation log (TAX.5, D-28).** The log kept with the order holds date, time and the
+consultation number (`requestIdentifier`), which VIES returns only when the requester's own VAT
+number is sent, so the vendor's number is sent as requester. Fail closed stays.
 
 ## 5.3 Mandatory regression cases (from the audits)
 
@@ -231,5 +249,8 @@ Intended differences from today:
 | TAX.12 | Consumer price display, go-live gate (Directive 98/6/EC, national consumer codes): B2C prices on cards, product pages, cart and feeds include VAT. The gross amount uses the destination country's rate through the TAX.3 tax engine; before the buyer picks a country, an estimated country (geo or locale) is used with a clear "VAT included, estimated for <country>" note. A net price shows only to business buyers who opt in. The catalog stays free of tax imports: a tax-side adapter or template tag supplies the gross amount. The owner confirmed the destination rate, the estimated country and the business opt-in on 2026-11-08 (MQ-12) | P1 | 6 | TAX.3, CAT.8 | Regression tests for IT, DE and FR consumers (destination rate, estimated-country note); a business buyer's net view after opt-in; `on_request` products never priced; ROUND_HALF_UP per line; the catalog app has no tax import |
 | TAX.13 | Exemption reasons per country (owner decision MQ-3): each exemption reason declares the country of the law that defines it (IT for `art74_publishing` and `flat_rate_forfettario`; `other` stores the country of the law cited in its legal note), and the profile consistency check refuses a reason whose country differs from the country of the vendor's VAT registration, on the staff direct path and on TAX.2 approval alike; the check also runs on a VAT number change; staff enter the law country of existing `other` profiles by hand (MQ-15) | P1 | 3 | TAX.2, VEN.12 | An Italian vendor saves `art74_publishing`; a German vendor is refused `art74_publishing` and `flat_rate_forfettario`; a staff-added profile and an approved request give the same refusal; changing an exempt Italian vendor's VAT number to another country is reported; `other` without a country is refused; no data migration fills the country of an existing `other` profile, and such a profile stays in the inconsistency report until staff enter the country (owner decision MQ-15) |
 | TAX.14 | Vendor territory in `TaxContext` (follow-up of TAX.3, D-26): the context carries the vendor's territory code, so a vendor established in a territory with its own rates or outside the VAT area can sell to its mainland and abroad; TAX.3 refuses such a vendor with `UnresolvedTerritory` when `registered_postal_code` shows it | P2 | 3 | TAX.3 | A vendor established in Madeira selling to mainland Portugal and to Italy gets the rates of its own rules; the blocking error is gone; the vendor territory comes from the territory table, not from a postcode guess |
+| TAX.15 | Triangulation, art. 58 c.1 D.L. 331/93 (owner decision D-28): Italian vendors only; only when transport is by or on behalf of the vendor or by platform logistics; checkout collects a tracked declaration from the buyer (final consignee name, delivery address in the other member state, VIES-valid VAT number, explicit request for direct shipping); nature code `N3.2`; the vendor keeps proof of the direct transport (ORD.13) | P1 | 10 | TAX.3, TAX.5, ORD.5, ORD.13 | A non-Italian vendor never gets the triangulation outcome; buyer pickup or a carrier taking free orders from the buyer gives Italian VAT; a complete declaration with a VIES-valid consignee number gives 0% with `N3.2`; an invalid VAT number or a missing direct-shipping request gives Italian VAT; the declaration is stored with the order |
+| TAX.16 | Declaration of intent, Italy (owner decision D-28, art. 8 c.1 lett. c D.P.R. 633/72): buyer-side status, checkout captures the telematic protocol number of the buyer's declaration; nature code `N3.5`; Italian vendors only | P2 | 6 | TAX.3, ORD.5 | An Italian vendor order with a protocol number gets 0% with `N3.5` and stores the number in the snapshot; a missing number gives Italian VAT; a non-Italian vendor never gets it |
 | TAX.17 | Shipping VAT always follows the goods (D-03, decided: adviser opinion 2026-11-11; follow-up of TAX.4 and SHP.12): `ShippingMethod.tax_treatment` keeps only `follows_goods`; the `standard_rate` and `exempt` values and any "force VAT" carrier option are removed, with a data migration that sets every stored method to `follows_goods` and reports the rows it changed; `UnsupportedShippingTreatment` and its branch in `resolve_shipping_tax` go; the shipping configuration import (spec 06) refuses any other value; the pro-rata split by net goods amount, rounding cent on the largest base, is final; the PR is flagged for human review (tax code) | P1 | 3 | TAX.4, SHP.12 | No model choice, Manager form or import accepts a treatment other than following the goods (tests); the data migration turns a seeded `standard_rate` method into `follows_goods` and lists it in its report; an import row with `exempt` is refused with a clear message; T8–T13 stay green; `UnsupportedShippingTreatment` no longer exists |
 | TAX.18 | Northern Ireland goods rules (D-02, decided: adviser opinion 2026-11-11; owner, 2026-11-11: open Northern Ireland now; replaces the blocking error for `XI` of TAX.3 and TAX.7): a delivery country GB with a normalised postcode matching `^BT[0-9]` resolves to jurisdiction `XI`; B2C is an EU distance sale of goods counted in the vendor's EUR 10,000 EU threshold (TAX.8), and above it, or by the vendor's option, the UK VAT rate applies, reported through the vendor's EU OSS under code `XI` (TAX.10), with no UK registration; B2B with a VIES-valid number with prefix `XI` is an intra-EU exempt supply (nature `N3.2`, Intrastat `XI`) and the vendor keeps proof of delivery; a GB-only VAT number is treated as B2C; the CMP.14 UK lead-only rule never applies to an `XI` delivery; the PR is flagged for human review (tax code) | P1 | 6 | TAX.3, TAX.5, TAX.7 | Regression cases: a `BT1 1AA` B2C delivery below the threshold gets the vendor's domestic rate and the same above the threshold gets the UK rate with OSS code `XI`; a `BT` B2B delivery with a VIES-valid `XI` number gets 0% with `N3.2` and Intrastat `XI`; a GB-only number on a `BT` delivery is B2C; a GB postcode not matching `^BT[0-9]` stays under the UK rules (CMP.14); lowercase and spaced `bt1 1aa` matches after normalisation; the `XI` blocking error is gone |
+| TAX.19 | XI VAT numbers: store `VatValidation` for `XI` (follow-up of TAX.18): `VatValidation.country` accepts the Northern Ireland code, `XI` joins `VIES_COUNTRIES` and `normalize_country` is not asked about it, with a migration and a `build_tax_context` integration test for a VIES-valid `XI` number (until then `verify_vat_number('XI', ...)` returns "not in VIES", so a `BT` B2B customer is treated as B2C) | P1 | 3 | TAX.18 | A VIES-valid `XI` number is stored and verified, `build_tax_context` yields a reverse-charge decision with `N3.2` for a `BT` B2B delivery; `verify_vat_number` still never raises |

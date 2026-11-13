@@ -61,7 +61,7 @@ def term_page(monkeypatch: pytest.MonkeyPatch) -> None:
         TermTranslationFactory.create(
             term=red, language=language, name=name, slug=slug, status=PUBLISHED
         )
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
     for number, colours in ((1, [red]), (2, []), (3, [red])):
         product = ProductFactory.create(
             vendor=vendor, status=Product.Status.PUBLISHED, price_net=Decimal(10 * number)
