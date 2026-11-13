@@ -182,10 +182,11 @@ def _best_of(run: Callable[[], object], repeats: int = 9) -> float:
 def assert_scales_linearly(make_document: Callable[[int], str], n: int) -> None:
     """Time the strip on sizes n and 4n (best of 9 each, so load spikes drop out) and assert the
     ratio is at most 10. Linear work gives about 4 (up to about 8 under cache and allocator noise
-    on a shared CI runner, seen once at 8.1), quadratic gives 16, so 10 keeps a clear gap on both
-    sides. MAX_SVG_BYTES caps 4n, so the n run cannot be made much longer than 20 ms; that is why
-    the limit is not tighter. Unlike counting calls, this also catches quadratic work done inside
-    the C regex or XML engines. Choose the largest n for which 4n still fits MAX_SVG_BYTES."""
+    on a shared CI runner, seen once at 8.1 and once at 10.1), quadratic gives 16, so 10 keeps a
+    clear gap on both sides; a pair over the limit is measured again, up to three times.
+    MAX_SVG_BYTES caps 4n, so the n run cannot be made much longer than 20 ms; that is why the
+    limit is not tighter. Unlike counting calls, this also catches quadratic work done inside the
+    C regex or XML engines. Choose the largest n for which 4n still fits MAX_SVG_BYTES."""
     small, large = make_document(n).encode(), make_document(4 * n).encode()
     assert len(large) < MAX_SVG_BYTES
 
@@ -196,8 +197,16 @@ def assert_scales_linearly(make_document: Callable[[int], str], n: int) -> None:
 
         return run
 
-    t_small, t_large = _best_of(strip(small)), _best_of(strip(large))
-    assert t_large <= 10 * t_small, f"4n took {t_large / t_small:.1f}x the time of n (limit 10x)"
+    # A shared CI runner can still land one slow sample on the small size (seen at 10.1x), so the
+    # pair is measured up to three times: linear work passes on a later try, quadratic work (about
+    # 16x) fails all three.
+    ratios = []
+    for _ in range(3):
+        t_small, t_large = _best_of(strip(small)), _best_of(strip(large))
+        ratios.append(t_large / t_small)
+        if t_large <= 10 * t_small:
+            return
+    raise AssertionError(f"4n took {min(ratios):.1f}x the time of n at best (limit 10x)")
 
 
 def test_many_comments_are_stripped_in_linear_time() -> None:
