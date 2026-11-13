@@ -7,7 +7,7 @@ outside `/manager/`.
 
 from django.urls import include, path
 
-from . import media, notice_views, views
+from . import media, notice_views, termination_views, views
 
 app_name = "manager"
 
@@ -24,6 +24,17 @@ shop = (
             name="order_action",
         ),
         path("vendor/", views.VendorPickerView.as_view(), name="vendor"),
+        # The 30 days' notice of termination (CMP.5 part 4): the reason, and the data download.
+        path(
+            "termination/",
+            termination_views.VendorTerminationView.as_view(),
+            name="termination",
+        ),
+        path(
+            "termination/data/",
+            termination_views.VendorDataDownloadView.as_view(),
+            name="termination_data",
+        ),
         # The image chooser of the storefront editor (VEN.31, D-34): Wagtail's modal protocol.
         path("media/images/", media.ManagerImageChooseView.as_view(), name="image_choose"),
         path(
@@ -79,6 +90,12 @@ platform = (
         ),
         path("notices/", notice_views.NoticeListView.as_view(), name="notices"),
         path("notices/<uuid:public_id>/", notice_views.NoticeDetailView.as_view(), name="notice"),
+        path("terminations/", termination_views.TerminationListView.as_view(), name="terminations"),
+        path(
+            "terminations/<uuid:public_id>/",
+            termination_views.TerminationDetailView.as_view(),
+            name="termination",
+        ),
     ],
     "platform",
 )

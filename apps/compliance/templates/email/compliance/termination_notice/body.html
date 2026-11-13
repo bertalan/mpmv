@@ -1,0 +1,22 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}We will end the service of {{ vendor_name }} on the platform. This email is the notice of termination and the statement of reasons.{% endblocktranslate %}</p>
+<ul>
+<li>{% translate "Reference" %}: {{ reference }}</li>
+<li>{% translate "Notice given" %}: {{ issued_at }}</li>
+<li>{% translate "The service ends on" %}: {{ effective_at }}</li>
+{% if exception %}<li>{% translate "Shorter notice because" %}: {% if exception == "legal_obligation" %}{% translate "a legal or regulatory obligation" %}{% elif exception == "repeated_infringement" %}{% translate "repeated infringements of the platform terms" %}{% else %}{% translate "illegal content" %}{% endif %}</li>{% endif %}
+<li>{% translate "Facts and circumstances relied on" %}: {{ facts }}</li>
+<li>{% translate "Ground" %}: {{ ground }}</li>
+</ul>
+<p>{% translate "Until the service ends you can keep selling and you can download your data from the Manager (Termination notice page)." %}</p>
+<p>{% translate "How to challenge this decision" %}:</p>
+<ul>
+<li>{% translate "Internal complaint (DSA article 20)" %}</li>
+<li>{% translate "Out-of-court dispute settlement (DSA article 21)" %}</li>
+<li>{% translate "A court" %}</li>
+</ul>
+{% if redress_text %}<p>{{ redress_text|linebreaksbr }}</p>{% endif %}
+</body>
+</html>

@@ -42,7 +42,7 @@ from apps.core.public_forms import Protection, pre_mfa_step, public_form
 from apps.core.services import flag_enabled
 from apps.orders import engine as orders_engine
 from apps.orders.models import VendorOrder, VendorOrderState
-from apps.orders.services import fulfil_vendor_order
+from apps.orders.services import OrdersFrozen, fulfil_vendor_order
 from apps.payments import connect
 from apps.payments.models import ConnectedAccount
 from apps.payments.stripe_provider import client_from_settings
@@ -382,6 +382,8 @@ class VendorOrderActionView(VendorOrderDetailView):
             fulfil_vendor_order(
                 sub, action, actor=actor, ctx=ctx, tracking_number=tracking, carrier=carrier
             )
+        except OrdersFrozen:  # a terminated vendor's orders wait for staff review
+            return self.refused(sub)
         except (orders_engine.IllegalTransition, ValueError):
             return self.refused(sub)
         messages.success(request, _("The order was updated."))
