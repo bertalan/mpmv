@@ -14,6 +14,11 @@ msgid_plural "%(action)s: %(count)d rows done."
 msgstr[0] "%(action)s: %(count)d riga completata."
 msgstr[1] "%(action)s: %(count)d righe completate."
 
+#: apps/manager/templates/email/manager/role_self_assigned/body.html
+#: apps/manager/templates/email/manager/role_self_assigned/body.txt
+msgid "%(actor_name)s gave themselves a platform role. The change is in the audit log."
+msgstr "%(actor_name)s si è assegnato un ruolo di piattaforma. La modifica è nel registro di audit."
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "%(counter)s unused."
 msgid_plural "%(counter)s unused."
@@ -193,6 +198,10 @@ msgstr ""
 #: apps/cms/blocks.py
 msgid "A picture for the banner. If you leave it empty, the banner has no picture."
 msgstr "Un'immagine per il banner. Se la lasci vuota, il banner non ha immagine."
+
+#: apps/manager/templates/email/manager/role_self_assigned/subject.txt
+msgid "A platform owner gave themselves a role"
+msgstr "Un proprietario della piattaforma si è assegnato un ruolo"
 
 #: apps/cms/models.py
 msgid ""
@@ -457,7 +466,8 @@ msgstr "Accettato dal venditore"
 msgid "Access denied"
 msgstr "Accesso negato"
 
-#: apps/seo/site_links.py themes/base/templates/components/user_tools.html
+#: apps/manager/templates/manager/platform/staff_roles.html apps/seo/site_links.py
+#: themes/base/templates/components/user_tools.html
 msgid "Account"
 msgstr "Account"
 
@@ -1095,6 +1105,10 @@ msgstr "Indirizzo email dell’ordine"
 msgid "Email language"
 msgstr "Lingua delle email"
 
+#: apps/manager/forms.py
+msgid "Email of the account"
+msgstr "Email dell'account"
+
 #: apps/accounts/admin.py
 msgid ""
 "Enabled: you set a password now. Disabled: the account is created without a password and cannot "
@@ -1191,6 +1205,14 @@ msgstr "Genera nuovi codici"
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Generating new codes makes every previous code stop working."
 msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Give a role"
+msgstr "Assegna un ruolo"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Give the role"
+msgstr "Assegna il ruolo"
 
 #: apps/cms/models.py
 msgid "Give the screen or page type: letters, digits and . : _ - only."
@@ -1792,6 +1814,10 @@ msgstr "Nessun secondo fattore per ora."
 msgid "No storefront changes yet."
 msgstr "Nessuna modifica al negozio per ora."
 
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Nobody holds a platform role yet."
+msgstr "Nessuno ha ancora un ruolo di piattaforma."
+
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Not connected"
 msgstr "Non collegato"
@@ -2324,6 +2350,19 @@ msgstr "Spazio piattaforma: segnalazioni"
 msgid "Platform space: dashboard"
 msgstr "Spazio piattaforma: cruscotto"
 
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Platform staff"
+msgstr "Staff della piattaforma"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid ""
+"Platform staff hold one or more roles. Vendor members cannot hold a platform role. Changes need "
+"operational mode and are recorded in the audit log."
+msgstr ""
+"Lo staff della piattaforma ha uno o più ruoli. I membri dei venditori non possono avere un ruolo "
+"di piattaforma. Le modifiche richiedono la modalità operativa e sono registrate nel registro di "
+"audit."
+
 #: apps/vendors/templates/email/vendors/profile_reverted/body.html
 #: apps/vendors/templates/email/vendors/profile_reverted/body.txt
 msgid ""
@@ -2437,6 +2476,8 @@ msgstr "Preventivo richiesto"
 msgid "Readiness probe"
 msgstr "Controllo di prontezza"
 
+#: apps/manager/forms.py apps/manager/templates/email/manager/role_self_assigned/body.html
+#: apps/manager/templates/email/manager/role_self_assigned/body.txt
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/profile_changes.html
 #: apps/vendors/templates/email/vendors/profile_reverted/body.html
@@ -2529,6 +2570,10 @@ msgstr "Segnalato"
 msgid "required"
 msgstr "obbligatorio"
 
+#: apps/manager/forms.py
+msgid "Required when you give a role to yourself; kept in the audit log."
+msgstr "Obbligatorio quando assegni un ruolo a te stesso; resta nel registro di audit."
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Restrict and send the statement of reasons"
 msgstr "Limita e invia la motivazione"
@@ -2557,9 +2602,22 @@ msgstr "Annulla questa modifica"
 msgid "Reverted"
 msgstr "Annullata"
 
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Revoke %(role)s"
+msgstr "Revoca %(role)s"
+
 #: apps/seo/site_links.py
 msgid "robots.txt"
 msgstr "robots.txt"
+
+#: apps/manager/forms.py apps/manager/templates/email/manager/role_self_assigned/body.html
+#: apps/manager/templates/email/manager/role_self_assigned/body.txt
+msgid "Role"
+msgstr "Ruolo"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Roles"
+msgstr "Ruoli"
 
 #: apps/catalog/taxonomy.py
 msgid "sameAs links"
@@ -2832,6 +2890,10 @@ msgstr "origine"
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Staff"
 msgstr "Staff"
+
+#: apps/manager/sections.py apps/manager/templates/manager/platform/staff_roles.html
+msgid "Staff and roles"
+msgstr "Staff e ruoli"
 
 #: apps/vendors/models.py
 msgid ""
@@ -3408,6 +3470,10 @@ msgstr ""
 "L'indirizzo email a cui la piattaforma ti scrive per il tuo negozio. Obbligatorio: senza non "
 "possiamo contattarti."
 
+#: apps/manager/forms.py
+msgid "The email of an existing account. Capitals do not matter."
+msgstr "L’email di un account esistente. Le maiuscole non contano."
+
 #: apps/manager/templates/manager/login.html
 msgid ""
 "The email or the password is not correct, or the account is locked for a while. Please try again."
@@ -3983,6 +4049,14 @@ msgstr ""
 "product/vecchia-etichetta/. Obbligatorio: senza, la regola non ha nulla da riconoscere. Ogni "
 "indirizzo può avere una sola regola."
 
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid ""
+"The one-person-team setting is on: one person may hold incompatible roles, such as Finance and "
+"payments with Configuration and tax. Every such grant is audited."
+msgstr ""
+"L'impostazione «team di una persona» è attiva: una persona può avere ruoli incompatibili, come "
+"Finanza e pagamenti con Configurazione e tasse. Ogni assegnazione di questo tipo è registrata."
+
 #: apps/cms/models.py
 msgid ""
 "The opening of the page, built from blocks: say why a seller should join you. If you add none, the"
@@ -4121,6 +4195,10 @@ msgid ""
 msgstr ""
 "I piani tra cui può scegliere un nuovo venditore, affiancati. Se non ne aggiungi, la pagina non "
 "mostra piani."
+
+#: apps/manager/forms.py
+msgid "The platform role to give to that account or to take away from it."
+msgstr "Il ruolo della piattaforma da assegnare a quell’account o da togliergli."
 
 #: apps/vendors/admin.py
 msgid ""
@@ -4310,6 +4388,10 @@ msgstr "Non è stato possibile comprendere la richiesta. Controlla l’indirizzo
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "The request failed."
 msgstr "La richiesta non è riuscita."
+
+#: apps/manager/views.py
+msgid "The role change is recorded."
+msgstr "La modifica del ruolo è registrata."
 
 #: apps/vendors/models.py
 msgid "The rule applies to vendors established in this country. Leave it empty for every country."
@@ -4802,6 +4884,10 @@ msgstr ""
 #: themes/base/templates/components/error_summary.html
 msgid "There is a problem"
 msgstr "Si è verificato un problema"
+
+#: apps/manager/views.py
+msgid "There is no account with that email."
+msgstr "Non c'è nessun account con questa email."
 
 #: themes/base/templates/components/help_entry.html
 msgid "There is no help text for this page yet."

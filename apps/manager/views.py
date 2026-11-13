@@ -23,7 +23,13 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
-from apps.accounts.decorators import mfa_exempt, mfa_redirect, requires_level_method
+from apps.accounts.decorators import (
+    mfa_exempt,
+    mfa_redirect,
+    requires_level,
+    requires_level_method,
+    step_up_required,
+)
 from apps.accounts.forms import ManagerLoginForm
 from apps.accounts.mfa_session import is_recently_verified
 from apps.accounts.models import User
@@ -33,12 +39,14 @@ from apps.catalog.services import product_kpis
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
 from apps.core.public_forms import Protection, pre_mfa_step, public_form
+from apps.core.services import flag_enabled
 from apps.orders import engine as orders_engine
 from apps.orders.models import VendorOrder, VendorOrderState
 from apps.orders.services import fulfil_vendor_order
 from apps.payments import connect
 from apps.payments.models import ConnectedAccount
 from apps.payments.stripe_provider import client_from_settings
+from apps.vendors import services as vendors_services
 from apps.vendors.engine import RICH_TEXT_FIELDS, plain_to_html
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import Source, VendorScopedQuerySet
@@ -56,8 +64,10 @@ from apps.vendors.services import (
     set_vendor_logo,
 )
 
+from . import roles as roles_module
+from . import staff_roles
 from .access import ManagerContext, home_url
-from .forms import ShipmentForm, StorefrontProfileForm, VendorLogoForm
+from .forms import ShipmentForm, StaffRoleForm, StorefrontProfileForm, VendorLogoForm
 from .middleware import manager_context
 from .navigation import Section, registry
 from .spaces import Space
@@ -582,7 +592,7 @@ class PaymentsView(ManagerView):
         context["account"] = self.scoped(ConnectedAccount).first()
         context["sells_online"] = (
             self.manager.vendor is not None
-            and self.manager.vendor.sales_mode_default == Vendor.SalesMode.BUY
+            and vendors_services.vendor_sales_mode(self.manager.vendor) == Vendor.SalesMode.BUY
         )
         return context
 
@@ -621,3 +631,61 @@ class PaymentsView(ManagerView):
         if result.url:
             return HttpResponseRedirect(result.url)
         return HttpResponseRedirect(reverse("manager:shop:payments"))
+
+
+class StaffRolesView(ManagerView):
+    """ "Staff and roles" (CORE.18 2/2): the platform owner lists, grants and revokes roles.
+
+    A thin adapter over `staff_roles`. Granting or revoking is a sensitive action: the session
+    must be in operational mode (`role_grant`), and the owner role also needs a fresh passkey
+    (`owner_role_grant`), exactly as in the Django admin. The service refuses what the rules of
+    spec 02 forbid, and the page shows the refusal.
+    """
+
+    section = "platform.staff_roles"
+    template_name = "manager/platform/staff_roles.html"
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context.setdefault("form", StaffRoleForm(initial={"action": "grant"}))
+        context["members"] = [
+            {
+                "user": user,
+                "roles": [roles_module.role(k) for k in roles_module.ROLE_KEYS if k in held],
+            }
+            for user, held in staff_roles.staff_members()
+        ]
+        context["one_person_team"] = flag_enabled(staff_roles.ONE_PERSON_TEAM)
+        return context
+
+    @requires_level_method("role_grant")  # group 2 (CORE.25); the owner role adds the next gate
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
+        if request.POST.get("role", "") == roles_module.OWNER:
+            return requires_level("owner_role_grant")(step_up_required()(self._change))(request)
+        return step_up_required()(self._change)(request)
+
+    def _change(self, request: HttpRequest, /) -> HttpResponse:
+        form = StaffRoleForm(request.POST)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form))
+        data = form.cleaned_data
+        target = User.objects.filter(email__iexact=data["email"]).first()
+        if target is None:
+            form.add_error("email", _("There is no account with that email."))
+            return self.render_to_response(self.get_context_data(form=form))
+        change = staff_roles.grant_role if data["action"] == "grant" else staff_roles.revoke_role
+        try:
+            change(
+                target,
+                data["role"],
+                actor=request.user,
+                ctx=audit_context(request),
+                reason=data["reason"],
+            )
+        except staff_roles.RoleAssignmentError as error:
+            form.add_error(None, str(error))
+            return self.render_to_response(self.get_context_data(form=form))
+        except PermissionDenied:
+            raise Http404("No such action.") from None
+        messages.success(request, _("The role change is recorded."))
+        return HttpResponseRedirect(reverse("manager:platform:staff_roles"))

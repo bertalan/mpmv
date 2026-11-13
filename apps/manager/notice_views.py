@@ -23,13 +23,15 @@ from apps.compliance.forms import AuthoritiesForm, DecisionForm, RestrictionForm
 from apps.compliance.models import Notice, StatementOfReasons
 from apps.core.audit import audit_context
 
+from .navigation import platform_role
 from .views import ManagerView
 
 SECTION = "platform.notices"
 
 
 def can_review(ctx: Any) -> bool:
-    return services.can_review_notices(ctx.user)
+    """The matrix row (CORE.18) and the permission the services check: both are needed."""
+    return platform_role(SECTION)(ctx) and services.can_review_notices(ctx.user)
 
 
 class NoticeListView(ManagerView):

@@ -40,6 +40,9 @@ ensure_env_file() {
     umask 077
     [ -f "$ENV_FILE" ] || printf 'DJANGO_SECRET_KEY=%s\n' \
       "$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" >"$ENV_FILE"
+    # Privacy pepper (L-3), generated once: replacing it orphans the stored suppression digests.
+    grep -q '^MPMV_PRIVACY_PEPPER=' "$ENV_FILE" || printf 'MPMV_PRIVACY_PEPPER=%s\n' \
+      "$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" >>"$ENV_FILE"
     # Field encryption key (SEC.3), generated once: replacing it makes encrypted data unreadable.
     grep -q '^MPMV_FIELD_ENCRYPTION_KEYS=' "$ENV_FILE" || printf 'MPMV_FIELD_ENCRYPTION_KEYS=local:%s\n' \
       "$(python3 -c 'import base64, secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')" \
