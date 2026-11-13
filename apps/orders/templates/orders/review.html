@@ -7,6 +7,12 @@
 <article class="checkout">
   <h1>{% translate "Review and pay" %}</h1>
   {% include "components/step_indicator.html" with steps=steps current=current_step only %}
-  {% include "orders/_review_body.html" %}
+  <form method="post" action="{% url 'orders:review' %}">
+    {% csrf_token %}
+    {% include "orders/_review_body.html" %}
+    {# Outside #review-body: Turnstile renders a widget once, so a swap must never replace it. #}
+    {% captcha_widget %}
+    {% include "orders/_review_actions.html" %}
+  </form>
 </article>
 {% endblock %}

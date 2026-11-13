@@ -111,10 +111,13 @@ def _customer(request: HttpRequest) -> User | None:
 
 def _preview(request: HttpRequest, cart: Cart, data: dict[str, Any]) -> CheckoutPreview:
     address = data.get("address")
+    vendors = _vendors(cart)
     validation = None
-    if data.get("business") and data.get("vat_validation"):
-        validation = VatValidation.objects.filter(pk=data["vat_validation"]).first()
-    snapshots = state.commission_snapshots(_vendors(cart))
+    # D-28: the answer backs the reverse charge only for the vendors it was checked as.
+    validation_pk = state.vat_validation_for(data, vendors) if data.get("business") else None
+    if validation_pk is not None:
+        validation = VatValidation.objects.filter(pk=validation_pk).first()
+    snapshots = state.commission_snapshots(vendors)
     return build_checkout(
         cart,
         address if isinstance(address, dict) else {},
@@ -216,23 +219,34 @@ def cart_page(request: HttpRequest) -> HttpResponse:
 # --- Details (address, business, VIES) -------------------------------------------------------
 
 
-def _verify_business(cart: Cart, vat_id: str, country: str) -> tuple[VatValidation | None, str]:
+def _verify_business(
+    cart: Cart, vat_id: str, country: str
+) -> tuple[VatValidation | None, list[int], str]:
     """Ask VIES, as every vendor of the cart (D-28), and give back the answer that backs the
-    reverse charge, or None with the reason in words when any vendor lacks the proof."""
+    reverse charge with the ids of the vendors it covers, or None with the reason in words when
+    any vendor lacks the proof."""
     vendors = list(_vendors(cart).values())
     checks = [
         tax_services.verify_vat_number_for_order(country, vat_id, vendor=vendor)
         for vendor in vendors
     ]
     if checks and all(check.verified and check.validation is not None for check in checks):
-        return checks[0].validation, _(
-            "Your VAT number is valid. VAT is not charged where the reverse charge applies."
+        return (
+            checks[0].validation,
+            [vendor.pk for vendor in vendors],
+            _("Your VAT number is valid. VAT is not charged where the reverse charge applies."),
         )
     reasons = {check.reason for check in checks if not check.verified}
     if tax_engine.VAT_REASON_INVALID in reasons:
-        return None, _("VIES says this VAT number is not valid. VAT is charged on your order.")
-    return None, _(
-        "We could not confirm your VAT number with VIES now, so VAT is charged on your order."
+        return (
+            None,
+            [],
+            _("VIES says this VAT number is not valid. VAT is charged on your order."),
+        )
+    return (
+        None,
+        [],
+        _("We could not confirm your VAT number with VIES now, so VAT is charged on your order."),
     )
 
 
@@ -295,9 +309,10 @@ def checkout_page(request: HttpRequest) -> HttpResponse:
         return _details_page(request, form)
     cleaned = form.cleaned_data
     validation: VatValidation | None = None
+    covered: list[int] = []
     note = ""
     if cleaned["is_business"]:
-        validation, note = _verify_business(
+        validation, covered, note = _verify_business(
             cart, cleaned["vat_id"], vat_country(cleaned["vat_id"], cleaned["country"])
         )
     state.save(
@@ -307,6 +322,7 @@ def checkout_page(request: HttpRequest) -> HttpResponse:
         business=bool(cleaned["is_business"]),
         vat_id=cleaned["vat_id"],
         vat_validation=validation.pk if validation is not None else None,
+        vat_vendors=covered,
         vat_note=str(note),
         vat_ok=validation is not None,
         shipping={},
@@ -321,8 +337,17 @@ def _review_context(
     request: HttpRequest, cart: Cart, data: dict[str, Any], **extra: Any
 ) -> dict[str, Any]:
     preview = _preview(request, cart, data)
-    packages = present.package_views(preview, cart, _vendors(cart))
+    vendors = _vendors(cart)
+    packages = present.package_views(preview, cart, vendors)
     open_ = _ordering_open(preview)
+    vat_ok = bool(data.get("vat_ok"))
+    vat_note = data.get("vat_note", "")
+    if vat_ok and state.vat_validation_for(data, vendors) is None:
+        vat_ok = False
+        vat_note = _(
+            "Your cart changed after we checked your VAT number, so VAT is charged on your "
+            "order. Confirm your details again to check it for every seller."
+        )
     return {
         **_steps(3),
         "packages": packages,
@@ -332,8 +357,8 @@ def _review_context(
         "ordering_closed": preview.placeable and not open_,
         "address": data.get("address") or {},
         "email": data.get("email", ""),
-        "vat_note": data.get("vat_note", ""),
-        "vat_ok": bool(data.get("vat_ok")),
+        "vat_note": vat_note,
+        "vat_ok": vat_ok,
         "business": bool(data.get("business")),
         "preview": preview,
         **extra,
@@ -368,7 +393,7 @@ def _refusal_messages(refused: OrderRefused) -> list[str]:
     purpose="Checkout review: place the order (holds stock)",
     task="ORD.5",
     rate_limit="per IP (checkout budget)",
-    templates=("orders/_review_body.html",),
+    templates=("orders/review.html",),
 )
 @require_http_methods(["GET", "POST"])
 def review_page(request: HttpRequest) -> HttpResponse:

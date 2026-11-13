@@ -9,6 +9,7 @@ behind the captcha where they cost something.
 
 import re
 from decimal import Decimal
+from html.parser import HTMLParser
 from typing import Any
 
 import pytest
@@ -27,6 +28,7 @@ from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, FeatureFlag
 from apps.core.services import FLAG_CACHE, save_flag
 from apps.core.tests.factories import PlatformOperatorFactory, utc
+from apps.orders import checkout
 from apps.orders.models import Order
 from apps.orders.ui import state, views
 from apps.shipping.tests.factories import (
@@ -261,6 +263,74 @@ def test_a_valid_business_vat_id_is_checked_with_vies_as_each_vendor(
     assert "Your VAT number is valid" in html
 
 
+def _spy_previews(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, Any]]:
+    """Record the VIES answer each preview was built with, and the preview."""
+    seen: list[tuple[Any, Any]] = []
+    real = checkout.build_checkout
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        preview = real(*args, **kwargs)
+        seen.append((kwargs.get("customer_vat"), preview))
+        return preview
+
+    monkeypatch.setattr(views, "build_checkout", spy)
+    return seen
+
+
+def test_a_vendor_added_after_the_vies_check_gets_no_reverse_charge(
+    client: Client, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D-28: the VIES answer is proof only for the vendors it was asked as. A vendor added to the
+    cart after the details step has no consultation of its own: VAT is charged on everything
+    until the buyer confirms the details again."""
+    settings.VIES_CLIENT = "apps.tax.tests.fakes.ValidViesClient"
+    cart = with_cart(client)
+    add(cart, vendor("Alpha Shop"), "100.00")
+    sign_off_details(
+        client, is_business="on", company="Acme GmbH", vat_id="DE123456789", country="DE"
+    )
+    add(cart, vendor("Beta Shop"), "50.00")
+    seen = _spy_previews(monkeypatch)
+    html = client.get(reverse("orders:review")).content.decode()
+    customer_vat, preview = seen[-1]
+    assert customer_vat is None
+    assert preview.customer_tax_status == "b2c"
+    assert all(p.totals is not None and p.totals.tax_total > 0 for p in preview.packages)
+    assert "Confirm your details again" in html
+    assert "Your VAT number is valid" not in html
+    # Confirming again checks VIES as both vendors: the reverse charge is back.
+    sign_off_details(
+        client, is_business="on", company="Acme GmbH", vat_id="DE123456789", country="DE"
+    )
+    client.get(reverse("orders:review"))
+    customer_vat, preview = seen[-1]
+    assert customer_vat is not None
+    assert preview.customer_tax_status == "b2b"
+
+
+def test_a_two_vendor_cart_checked_as_both_vendors_is_reverse_charged_for_both(
+    client: Client, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings.VIES_CLIENT = "apps.tax.tests.fakes.ValidViesClient"
+    cart = with_cart(client)
+    alpha, beta = vendor("Alpha Shop"), vendor("Beta Shop")
+    add(cart, alpha, "100.00")
+    add(cart, beta, "50.00")
+    sign_off_details(
+        client, is_business="on", company="Acme GmbH", vat_id="DE123456789", country="DE"
+    )
+    saved = client.session[state.SESSION_KEY]
+    assert sorted(saved["vat_vendors"]) == sorted([alpha.pk, beta.pk])
+    seen = _spy_previews(monkeypatch)
+    html = client.get(reverse("orders:review")).content.decode()
+    customer_vat, preview = seen[-1]
+    assert customer_vat is not None
+    assert preview.customer_tax_status == "b2b"
+    assert len(preview.packages) == 2
+    assert all(p.totals is not None and p.totals.tax_total == 0 for p in preview.packages)
+    assert "Your VAT number is valid" in html
+
+
 @pytest.mark.parametrize(
     ("client_path", "message"),
     [
@@ -400,6 +470,60 @@ def test_the_confirmation_needs_the_order_just_placed(client: Client) -> None:
 
 
 # --- Protection -----------------------------------------------------------------------------
+
+
+class _Containers(HTMLParser):
+    """The ids of the elements open around each element with a given class."""
+
+    VOID = frozenset({"area", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source"})
+
+    def __init__(self, css_class: str) -> None:
+        super().__init__()
+        self.css_class = css_class
+        self.stack: list[tuple[str, str]] = []
+        self.found: list[list[str]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        if self.css_class in (values.get("class") or "").split():
+            self.found.append([tag_id or tag_name for tag_name, tag_id in self.stack])
+        if tag not in self.VOID:
+            self.stack.append((tag, values.get("id") or ""))
+
+    def handle_endtag(self, tag: str) -> None:
+        while self.stack:
+            if self.stack.pop()[0] == tag:
+                break
+
+
+def containers(html: str, css_class: str) -> list[list[str]]:
+    parser = _Containers(css_class)
+    parser.feed(html)
+    return parser.found
+
+
+def test_the_captcha_widget_is_outside_the_shipping_swap_target(
+    client: Client, settings: Any, commission: None
+) -> None:
+    """A shipping change swaps #review-body. Turnstile renders its widgets once, when its script
+    loads, so a widget inside the swap target would come back empty and the next "Place order"
+    would carry no token. The widget stays put; the fragment updates only the actions."""
+    cart = with_cart(client)
+    found = vendor("Alpha Shop")
+    add(cart, found, "100.00")
+    sign_off_details(client)
+    settings.CAPTCHA_ENABLED = True
+    settings.TURNSTILE_SITE_KEY = "test-site-key"
+    html = client.get(reverse("orders:review")).content.decode()
+    [around] = containers(html, "cf-turnstile")
+    assert "form" in around  # posted with the order
+    assert "review-body" not in around
+    assert "review-actions" not in around
+    fragment = client.post(
+        reverse("orders:shipping"), {f"ship_{found.public_id}": "unknown"}, HTTP_HX_REQUEST="true"
+    ).content.decode()
+    assert "cf-turnstile" not in fragment
+    assert 'id="review-actions" hx-swap-oob="true"' in fragment
 
 
 def test_the_forms_are_csrf_checked() -> None:

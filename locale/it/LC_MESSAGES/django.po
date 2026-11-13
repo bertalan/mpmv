@@ -691,7 +691,7 @@ msgstr "Back office"
 msgid "Back to my orders"
 msgstr "Torna ai miei ordini"
 
-#: apps/orders/templates/orders/_review_body.html
+#: apps/orders/templates/orders/_review_actions.html
 msgid "Back to the cart"
 msgstr "Torna al carrello"
 
@@ -2432,7 +2432,7 @@ msgstr ""
 msgid "Pick the picture from the library or upload a new one. Required."
 msgstr "Scegli l'immagine dalla libreria o caricane una nuova. Obbligatoria."
 
-#: apps/orders/templates/orders/_review_body.html
+#: apps/orders/templates/orders/_review_actions.html
 msgid "Place order"
 msgstr "Conferma l'ordine"
 
@@ -3032,7 +3032,7 @@ msgstr ""
 msgid "Solve the points above to go on."
 msgstr "Risolvi i punti qui sopra per continuare."
 
-#: apps/orders/templates/orders/_review_body.html
+#: apps/orders/templates/orders/_review_actions.html
 msgid "Solve the points above to place the order."
 msgstr "Risolvi i punti qui sopra per confermare l'ordine."
 
@@ -5782,7 +5782,7 @@ msgstr ""
 msgid "When you buy something, you find it here with its status and tracking."
 msgstr "Quando acquisti qualcosa, lo trovi qui con il suo stato e il tracciamento."
 
-#: apps/orders/templates/orders/_review_body.html
+#: apps/orders/templates/orders/_review_actions.html
 msgid "When you place the order we hold the items for you. Payment follows in the next step."
 msgstr ""
 "Quando confermi l'ordine riserviamo gli articoli per te. Il pagamento segue nel passo successivo."
@@ -6081,6 +6081,14 @@ msgstr "Il tuo account è protetto con un’app di autenticazione."
 #: apps/orders/templates/orders/cart.html
 msgid "Your cart"
 msgstr "Il tuo carrello"
+
+#: apps/orders/ui/views.py
+msgid ""
+"Your cart changed after we checked your VAT number, so VAT is charged on your order. Confirm your "
+"details again to check it for every seller."
+msgstr ""
+"Il tuo carrello è cambiato dopo la verifica della tua partita IVA, quindi sul tuo ordine viene "
+"applicata l'IVA. Conferma di nuovo i tuoi dati per verificarla per ogni venditore."
 
 #: apps/orders/templates/orders/_cart_body.html
 msgid "Your cart is empty"

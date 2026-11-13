@@ -39,6 +39,24 @@ def shipping_choices(data: dict[str, Any]) -> dict[int, str]:
     return {int(vendor_id): str(key) for vendor_id, key in raw.items() if str(vendor_id).isdigit()}
 
 
+def vat_validation_for(data: dict[str, Any], vendor_ids: Iterable[int]) -> int | None:
+    """The stored VIES answer, only while it covers every vendor now in the cart (D-28).
+
+    The details step asks VIES as each vendor of the cart at that moment and remembers which
+    ones (`vat_vendors`). A vendor added later has no consultation of its own, so the answer
+    backs no reverse charge: the buyer is treated as a consumer until the details are confirmed
+    again. None also when nothing was checked or the cart is empty.
+    """
+    pk = data.get("vat_validation")
+    covered = data.get("vat_vendors")
+    wanted = set(vendor_ids)
+    if not pk or not isinstance(covered, list) or not wanted:
+        return None
+    if not wanted <= {int(v) for v in covered if str(v).isdigit()}:
+        return None
+    return int(pk)
+
+
 def commission_snapshots(vendor_ids: Iterable[int]) -> dict[int, dict[str, Any]]:
     """The commission rule snapshot of each vendor, by vendor id (VEN.2 supplies it)."""
     return {}
