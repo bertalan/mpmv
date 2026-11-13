@@ -139,3 +139,19 @@ D-15 are decided and D-05 and D-16 amended in the table at the top. The rows bel
 | L-9 | Cart recovery | Confirmed as proposed | [18](18-promotions-coupons.md) (CMP.32) |
 | L-10 | Refund fee | Owner: accepted with the lawyer's fixes; see D-05 above. Owner's legal review 2026-11-13: no pass-on of the fee to consumers (Codice del consumo artt. 56-57) | [07](07-cart-orders-payments.md) (PAY.4), [04](04-vendors-commissions-ledger.md) (VEN.33), [11](11-compliance.md) (CMP.5) |
 | L-11 | Migration, privacy | Owner: accepted in full; see D-16 above. The "recent login" window is chosen by the vendor in MIG.16 from 1, 2, 3, 6, 12, 24 or 36 months (owner, 2026-11-11) | [13](13-migration-cutover.md) (MIG.4, MIG.16, MIG.9), [02](02-core-identity-permissions.md) (CORE.19) |
+
+## Tax adviser opinion and owner decisions of 2026-11-13
+
+The tax adviser answered Q-87 (RF20) and D-02 bis (Northern Ireland) on 2026-11-13; the rules are in
+TAX.20 and TAX.21. The owner answered the open questions of the register sweep the same day.
+
+| ID | Area | Decision | Recorded in |
+|---|---|---|---|
+| MQ-30 | Tax | RF20 follows two levels: where the sale is taxed (EU 10,000 EUR threshold or destination option), then the franchise only in the vendor's active exemption states; B2B under the franchise is N2.2, never N3.2; domestic and cross-border regimes are two fields; a platform threshold guard and an SME-on-the-web check; RF20 vendors stay on request until TAX.20 (tax adviser) | [05](05-tax.md) (TAX.20) |
+| MQ-31 | Tax | Northern Ireland: OSS vendors use the UK rate under XI; without OSS, below the threshold the vendor's domestic treatment (RF19 0 % N2.2), above it the B2C order is blocked; RF20 never applies to XI (tax adviser; D-02 bis closed) | [05](05-tax.md) (TAX.21) |
+| MQ-32 | Email | The sender is configurable: a self-hosted SMTP server by default, or a generic or preset provider (Q-48) | [01](01-stack-and-architecture.md) (ARC.19) |
+| MQ-33 | Contracts | Any RFC 3161 timestamp service, free ones included, configured by the operator; a qualified one is recommended on LIVE (Q-44) | [04](04-vendors-commissions-ledger.md) (VEN.14) |
+| MQ-34 | Contracts | Signed contracts and evidence kept for the relationship plus 10 years (Q-45) | [04](04-vendors-commissions-ledger.md) (VEN.15) |
+| MQ-35 | Contracts | A new language on an accepted version needs no new acceptance; accepted texts stay locked (Q-57) | [04](04-vendors-commissions-ledger.md) (VEN.16) |
+| MQ-36 | API, privacy | API mutation log kept 12 months (Q-14); API docs on LIVE only for a valid key or staff (Q-13); lockout message "too many attempts, try again in N minutes" (Q-12) | [02](02-core-identity-permissions.md) (CORE.29) |
+| MQ-37 | Security | Breached passwords (Q-11): vendors must change the password and re-authenticate, the operator is notified, no automatic activity blocking; customers must choose a different password | [02](02-core-identity-permissions.md) (CORE.28) |
