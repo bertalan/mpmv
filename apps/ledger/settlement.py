@@ -53,6 +53,14 @@ SETTLEMENT_BLOCKED_VAT_MODE = "ledger.settlement_blocked_vat_mode"
 TRANSFER_FAILED = "ledger.transfer_failed"
 TRANSFER_WITHOUT_ACCOUNT = "ledger.transfer_without_account"
 TRANSFER_BLOCKED = "ledger.transfer_blocked"
+TRANSFER_SKIPPED_REFUNDED = "ledger.transfer_skipped_refunded"
+# Order or package states from which no transfer may leave. A partial refund is included on
+# purpose: the refunded share of each vendor is not known here, so nothing is paid until staff
+# decide (PAY.4 owns the refund accounting).
+# (A paid order cannot be cancelled: the order table refuses it, and `paid_order` excludes
+# cancelled orders anyway. The state stays listed as a second line of defence.)
+_NO_TRANSFER_ORDER_STATES = frozenset({"cancelled", "refunded", "partially_refunded"})
+_NO_TRANSFER_PACKAGE_STATES = frozenset({"cancelled", "refunded"})
 DEFAULT_LOOKBACK_DAYS = 30
 CURRENCY = engine.CURRENCY
 
@@ -71,6 +79,7 @@ class Outcome:
     transfers: list[str] = field(default_factory=list)  # provider transfer ids created or found
     failed: int = 0  # transfers the provider refused
     skipped: int = 0  # vendors without a ready account (receivable kept)
+    refunded: int = 0  # vendor orders not paid because of a refund or a cancellation (audited)
     blocked: int = 0  # vendor orders that cannot be settled (audited)
 
 
@@ -197,9 +206,10 @@ def transfer_payment(payment: Payment, *, ctx: AuditContext | None = None) -> Ou
     order = paid_order(payment)
     provider = registry.configured_provider()
     if order is None or provider is None or vat_mode_blocks(order, ctx):
-        return outcome
+        return outcome  # an unpaid or cancelled order (`paid_order`) is never transferred
     plan = settlement.order_settlement(order)
     paid_total = sum((line.vendor_net for line in plan.vendors if line.transferable), Decimal("0"))
+    charge_check = _ChargeCheck()
     for line in plan.vendors:
         vendor_order = line.vendor_order
         if LedgerEntry.objects.filter(idempotency_key=key(vendor_order, engine.TRANSFER)).exists():
@@ -207,6 +217,11 @@ def transfer_payment(payment: Payment, *, ctx: AuditContext | None = None) -> Ou
         if not LedgerEntry.objects.filter(idempotency_key=key(vendor_order, engine.SALE)).exists():
             continue  # not posted (blocked above): never transfer without ledger lines
         if line.vendor_net <= 0:
+            continue
+        reason = _refund_reason(provider, payment, order, vendor_order, charge_check)
+        if reason:
+            outcome.refunded += 1
+            _problem_once(TRANSFER_SKIPPED_REFUNDED, vendor_order, {"reason": reason}, ctx)
             continue
         if not line.account_ref:
             outcome.skipped += 1
@@ -223,6 +238,47 @@ def transfer_payment(payment: Payment, *, ctx: AuditContext | None = None) -> Ou
             continue
         _send(provider, payment, order, line, ctx, outcome)
     return outcome
+
+
+class _ChargeCheck:
+    """The provider's refunded amount for one payment, read at most once per call."""
+
+    def __init__(self) -> None:
+        self.amount: Decimal | None = None
+
+
+def _refund_reason(
+    provider: PaymentProvider,
+    payment: Payment,
+    order: Order,
+    vendor_order: VendorOrder,
+    check: _ChargeCheck,
+) -> str:
+    """Why this package must not be paid because of a refund or cancellation, or "" when it may.
+
+    Order and package state first (cheap), then the provider's own view of the charge: a refund
+    made in the Stripe dashboard is not in our states yet. Any refund, full or partial, blocks;
+    a charge that cannot be read blocks too (nothing is paid on uncertainty) and is retried."""
+    if order.state in _NO_TRANSFER_ORDER_STATES:
+        return f"order is {order.state}"
+    if vendor_order.state in _NO_TRANSFER_PACKAGE_STATES:
+        return f"package is {vendor_order.state}"
+    reader = getattr(provider, "refunded_amount", None)
+    if reader is None:
+        return ""
+    if check.amount is None:
+        try:
+            check.amount = reader(
+                provider_ref=payment.provider_ref,
+                charge_ref=payment.charge_ref,
+                currency=payment.currency,
+            )
+        except ProviderError as error:
+            logger.warning("refund state unreadable for %s: %s", payment.provider_ref, error)
+            return "refund state of the charge could not be read"
+    if check.amount > 0:
+        return "charge refunded at the provider"
+    return ""
 
 
 def _noted_without_account(
@@ -316,4 +372,5 @@ def settle_pending(*, now: dt.datetime | None = None) -> Outcome:
         total.failed += done.failed
         total.skipped += done.skipped
         total.blocked += done.blocked
+        total.refunded += done.refunded
     return total

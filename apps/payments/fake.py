@@ -104,6 +104,9 @@ class FakePaymentProvider:
         )
         return result
 
+    def refunded_amount(self, *, provider_ref: str, charge_ref: str, currency: str) -> Decimal:
+        return self._refunded.get(provider_ref, Decimal("0"))
+
     def payment_client_secret(self, provider_ref: str, order_ref: str) -> str:
         if (
             provider_ref not in self._payments

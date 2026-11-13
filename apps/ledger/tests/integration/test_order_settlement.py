@@ -27,10 +27,12 @@ from apps.core import tasks
 from apps.core.models import AuditLog
 from apps.core.services import FLAG_CACHE
 from apps.core.tests.factories import PlatformOperatorFactory
+from apps.ledger import engine as ledger_engine
+from apps.ledger import services as ledger_services
 from apps.ledger import settlement
 from apps.ledger.models import LedgerEntry
 from apps.ledger.services import vendor_balance
-from apps.orders.models import Order
+from apps.orders.models import Order, VendorOrder
 from apps.orders.services import place_order
 from apps.orders.tests.integration.test_place_order import (
     COMMISSION,
@@ -371,35 +373,205 @@ def test_every_package_nets_to_zero_after_its_transfer_and_shares_plus_fee_equal
 # --- outbox: the transfer job is a row written inside the paying transaction ------------------
 
 
-def test_a_rolled_back_payment_leaves_no_job_no_ledger_line_and_no_transfer(
+def test_a_rolled_back_paying_transaction_leaves_no_paid_order_no_line_no_job_no_transfer(
     stripe: FakeStripeClient,
 ) -> None:
-    """Procrastinate defers through the Django connection, so the job row is part of the webhook
-    transaction: a rollback removes it with the payment and the lines, and nothing is sent."""
-    from django.db import transaction
-
-    from apps.ledger.receivers import post_and_queue_transfers
-
-    order = two_vendor_order()
-    pay(stripe, order)
-    payment = Payment.objects.get()
-    jobs_before = len(tasks.list_jobs("ledger.transfer_payment"))
-    lines_before = LedgerEntry.objects.count()
+    """The webhook transaction marks the order paid, posts the ledger lines and queues the job
+    (Procrastinate defers through the Django connection). A receiver that fails after all that
+    rolls the whole transaction back: the order is still awaiting payment, and nothing is sent."""
+    from apps.payments.models import ProcessedEvent
+    from apps.payments.signals import on_order_paid
 
     class Boom(Exception):
         pass
 
-    def paying_then_failing() -> None:
-        with transaction.atomic():
-            post_and_queue_transfers(Payment, payment)
-            raise Boom
+    def failing(sender: Any, **kwargs: Any) -> None:
+        # By now the order is paid, the lines are written and the job is queued, in this savepoint.
+        assert Order.objects.get(pk=order.pk).state == "paid"
+        assert LedgerEntry.objects.exists()
+        assert tasks.list_jobs("ledger.transfer_payment", status="todo")
+        raise Boom
 
-    with pytest.raises(Boom):
-        paying_then_failing()
+    order = two_vendor_order()
+    on_order_paid.connect(failing, weak=False)
+    try:
+        with pytest.raises(Boom):
+            pay(stripe, order)
+    finally:
+        on_order_paid.disconnect(failing)
 
-    assert len(tasks.list_jobs("ledger.transfer_payment")) == jobs_before
-    assert LedgerEntry.objects.count() == lines_before
+    assert Order.objects.get(pk=order.pk).state == "awaiting_payment"
+    assert Payment.objects.count() == 0
+    assert ProcessedEvent.objects.count() == 0
+    assert LedgerEntry.objects.count() == 0
+    assert tasks.list_jobs("ledger.transfer_payment") == []
     assert stripe.transfers == {}
+    # The provider's retry runs everything again and settles normally.
+    assert pay(stripe, order).status_code == 200
+    assert len(tasks.list_jobs("ledger.transfer_payment", status="todo")) == 1
+
+
+# --- Stripe succeeded, our write failed ---------------------------------------------------------
+
+
+def test_a_transfer_created_at_stripe_whose_line_failed_is_found_by_the_retry_not_paid_twice(
+    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    order = two_vendor_order()
+    pay(stripe, order)
+    payment = Payment.objects.get()
+    real = ledger_services.record_entry
+
+    def failing_transfer_write(*args: Any, **kwargs: Any) -> Any:
+        if kwargs.get("kind") == "transfer":
+            raise ledger_engine.LedgerError("disk full")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(ledger_services, "record_entry", failing_transfer_write)
+    first = settlement.transfer_payment(payment)
+    assert first.failed == 2
+    assert first.transfers == []
+    assert len(stripe.transfers) == 2  # the money moved at Stripe
+    assert LedgerEntry.objects.filter(kind="transfer").count() == 0
+    sent = dict(stripe.transfers)
+    monkeypatch.undo()
+    stripe._replies.clear()  # the 24 h idempotency keys expired
+    again = settlement.settle_pending()
+    assert stripe.transfers == sent  # found by destination and payment, no second transfer
+    assert sorted(again.transfers) == sorted(sent)
+    recorded = {e.external_ref for e in LedgerEntry.objects.filter(kind="transfer")}
+    assert recorded == set(sent)
+    for vendor_order in order.vendor_orders.all():
+        assert vendor_balance(vendor_order.vendor) == D("0.00")
+
+
+def test_three_vendors_in_one_order_get_three_correct_transfers(stripe: FakeStripeClient) -> None:
+    products = [sellable(), sellable(price_net=D("3.33")), sellable(price_net=D("7.00"))]
+    order, _ = place_order(
+        preview(*[vendor_of(p, line(p, 2), commission_snapshot=RULE) for p in products]),
+        ctx=CTX,
+        now=NOW,
+    )
+    assert order is not None
+    (request,) = stripe.spy.requests  # type: ignore[attr-defined]
+    assert len(request.shares) == 3
+    assert sum((s.amount for s in request.shares), D("0")) + request.platform_fee == request.amount
+    pay(stripe, order)
+    outcome = settlement.transfer_payment(Payment.objects.get())
+    assert len(outcome.transfers) == 3
+    assert len(stripe.transfers) == 3
+    assert sorted(t.amount_minor for t in stripe.transfers.values()) == sorted(
+        int(s.amount * 100) for s in request.shares
+    )
+    for vendor_order in order.vendor_orders.all():
+        assert vendor_balance(vendor_order.vendor) == D("0.00")
+    assert settlement.settle_pending().transfers == []
+    assert len(stripe.transfers) == 3
+
+
+# --- refund or cancellation before a pending transfer -------------------------------------------
+
+
+def skipped_audits() -> Any:
+    return AuditLog.objects.filter(action="ledger.transfer_skipped_refunded")
+
+
+def paid_with_transfers_pending(stripe: FakeStripeClient) -> tuple[Order, Payment]:
+    """Paid, ledger lines posted, every transfer failing so far (Stripe down)."""
+    order = two_vendor_order()
+    pay(stripe, order)
+    payment = Payment.objects.get()
+    real = stripe.create_transfer
+
+    def down(**kwargs: Any) -> Any:
+        raise StripeError("Stripe is down")
+
+    stripe.create_transfer = down  # type: ignore[method-assign]
+    assert settlement.transfer_payment(payment).failed == 2
+    stripe.create_transfer = real  # type: ignore[method-assign]
+    return order, payment
+
+
+def test_a_dashboard_refund_before_the_sweep_pays_nobody_and_is_audited_once(
+    stripe: FakeStripeClient,
+) -> None:
+    order, payment = paid_with_transfers_pending(stripe)
+    stripe.refund_in_dashboard(payment.provider_ref, 4879)  # the full charge, order still "paid"
+    assert Order.objects.get(pk=order.pk).state == "paid"
+    first = settlement.settle_pending()
+    second = settlement.settle_pending()
+    assert first.transfers == second.transfers == []
+    assert first.refunded == 2
+    assert stripe.transfers == {}
+    assert not LedgerEntry.objects.filter(kind="transfer").exists()
+    assert skipped_audits().count() == 2  # one per vendor package, not one per sweep
+    assert {a.after["reason"] for a in skipped_audits()} == {"charge refunded at the provider"}
+
+
+def test_a_partial_dashboard_refund_pays_nobody_and_is_audited_for_staff(
+    stripe: FakeStripeClient,
+) -> None:
+    _, payment = paid_with_transfers_pending(stripe)
+    stripe.refund_in_dashboard(payment.provider_ref, 100)  # 1.00 of 48.79
+    settlement.settle_pending()
+    settlement.settle_pending()
+    assert stripe.transfers == {}
+    assert skipped_audits().count() == 2
+
+
+@pytest.mark.parametrize("state", ["refunded", "partially_refunded"])
+def test_an_order_already_refunded_in_our_states_is_not_paid_by_the_sweep(
+    stripe: FakeStripeClient, state: str
+) -> None:
+    order, _ = paid_with_transfers_pending(stripe)
+    Order.objects.filter(pk=order.pk).update(state="partially_refunded")
+    if state == "refunded":
+        Order.objects.filter(pk=order.pk).update(state="refunded")
+    outcome = settlement.settle_pending()
+    assert outcome.transfers == []
+    assert stripe.transfers == {}
+    assert skipped_audits().count() == 2
+    assert {a.after["reason"] for a in skipped_audits()} == {f"order is {state}"}
+
+
+def test_a_cancelled_package_is_skipped_and_the_others_are_paid(
+    stripe: FakeStripeClient,
+) -> None:
+    order, _ = paid_with_transfers_pending(stripe)
+    vendor_a, vendor_b = order.vendor_orders.order_by("id")
+    VendorOrder.objects.filter(pk=vendor_a.pk).update(state="cancelled")
+    outcome = settlement.settle_pending()
+    assert len(outcome.transfers) == 1  # vendor B only
+    assert not LedgerEntry.objects.filter(vendor_order=vendor_a, kind="transfer").exists()
+    assert LedgerEntry.objects.filter(vendor_order=vendor_b, kind="transfer").exists()
+    assert skipped_audits().get().target_key == str(vendor_a.public_id)
+
+
+def test_a_charge_that_cannot_be_read_is_not_paid_and_is_retried(
+    stripe: FakeStripeClient,
+) -> None:
+    paid_with_transfers_pending(stripe)
+    real = stripe.get_charge
+
+    def down(charge_id: str) -> Any:
+        raise StripeError("Stripe is down")
+
+    stripe.get_charge = down  # type: ignore[method-assign]
+    assert settlement.settle_pending().transfers == []
+    assert stripe.transfers == {}
+    stripe.get_charge = real  # type: ignore[method-assign]
+    assert len(settlement.settle_pending().transfers) == 2  # nothing refunded: paid on retry
+
+
+def test_an_unrefunded_order_is_paid_and_the_charge_is_read_once_per_call(
+    stripe: FakeStripeClient,
+) -> None:
+    pay(stripe, two_vendor_order())
+    outcome = settlement.transfer_payment(Payment.objects.get())
+    assert len(outcome.transfers) == 2
+    assert outcome.refunded == 0
+    assert stripe.calls.count("get_charge") == 1
+    assert not skipped_audits().exists()
 
 
 # --- commission VAT mode (spec 04 section 4.4 case 3, VEN.34) ----------------------------------

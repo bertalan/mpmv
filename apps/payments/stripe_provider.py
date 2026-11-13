@@ -13,6 +13,7 @@ import json
 import time
 from collections.abc import Callable, Sequence
 from datetime import datetime
+from decimal import Decimal
 
 from django.conf import settings
 
@@ -158,6 +159,19 @@ class StripePaymentProvider:
         return TransferResult(
             transfer.id, stripe_engine.from_minor(transfer.amount_minor, request.currency)
         )
+
+    def refunded_amount(self, *, provider_ref: str, charge_ref: str, currency: str) -> Decimal:
+        """What Stripe says was refunded on the payment's charge, refunds made in the Stripe
+        dashboard included (PAY.3 guard: nothing is transferred out of a refunded charge). Raises
+        `ProviderError` when it cannot be read: the caller must then not pay."""
+        try:
+            charge = charge_ref or self._client.get_payment_intent(provider_ref).charge_id
+            if not charge:
+                return Decimal("0")
+            found = self._client.get_charge(charge)
+        except StripeError as error:
+            raise ProviderError(str(error)) from error
+        return stripe_engine.from_minor(found.amount_refunded_minor, currency)
 
     # -- Capability 2: refunds with the provider cost
 
