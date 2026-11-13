@@ -1,0 +1,13 @@
+{% extends "layouts/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Order received" %} · {{ site_name }}{% endblock %}
+{% block head %}{% robots_meta "noindex, nofollow" %}{% endblock %}
+{% block content %}
+<article class="checkout">
+  <h1>{% translate "Order received" %}</h1>
+  <p>{% blocktranslate with number=order.number email=order.email %}Your order number is {{ number }}. We sent a confirmation to {{ email }}.{% endblocktranslate %}</p>
+  {% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=lines total=grand_total only %}
+  {% include "components/alert.html" with level="info" message=_("Online payment is not available yet. The items stay held for you for a short time.") only %}
+  <p><button type="button" class="button" disabled>{% translate "Pay now" %}</button></p>
+</article>
+{% endblock %}

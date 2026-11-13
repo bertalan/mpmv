@@ -15,6 +15,8 @@ Context:
 - `vendor`: the vendor's name.
 - `unit_price`, `total` (required): the formatted unit price and line total.
 - `quantity` (required), `max`: the quantity and its limit.
+- `quantity_name`: the name of the quantity field (default "quantity"); give each line its own
+  when the cart form reads them all (ORD.5 uses `qty_<line id>`).
 - `problem`: a message about the line, shown as a warning.
 {% endcomment %}{% with url=url|safe_href %}<li class="cart-line{% if problem %} cart-line--problem{% endif %}">
   <div class="cart-line__media">{% if image_url %}<img src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="96" height="96" loading="lazy">{% else %}<div class="cart-line__placeholder" aria-hidden="true"></div>{% endif %}</div>
@@ -26,7 +28,7 @@ Context:
     {% if problem %}<p class="cart-line__problem"><strong>{% translate "Warning" %}:</strong> {{ problem }}</p>{% endif %}
   </div>
   <div class="cart-line__actions">
-    {% blocktranslate asvar quantity_label %}Quantity, {{ name }}{% endblocktranslate %}{% include "components/quantity_stepper.html" with id=id|add:"-quantity" label=quantity_label value=quantity max=max hide_label=True only %}
+    {% blocktranslate asvar quantity_label %}Quantity, {{ name }}{% endblocktranslate %}{% include "components/quantity_stepper.html" with id=id|add:"-quantity" name=quantity_name label=quantity_label value=quantity max=max hide_label=True only %}
     {% blocktranslate asvar remove_label %}Remove {{ name }}{% endblocktranslate %}<button type="submit" class="button button--link button--small cart-line__remove" name="remove" value="{{ id }}" aria-label="{{ remove_label }}">{% translate "Remove" %}</button>
   </div>
   <p class="cart-line__total"><span class="visually-hidden">{% translate "Line total" %}: </span>{{ total }}</p>
