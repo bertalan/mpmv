@@ -1646,8 +1646,8 @@ def publish_vendor_terms(
     """Publish the next vendor contract version with clauses (d) to (h) in every drafted language.
 
     Only PUBLISHED texts of the previous version are carried forward, never a machine or
-    reviewed draft. A language without drafted clause wording keeps its published text unchanged
-    (it is not dropped); `vendor_terms_problems` then names the clauses it lacks.
+    reviewed draft. A published language without drafted clause wording is kept and gets the
+    English clause block; `vendor_terms_problems` reports it as untranslated.
     Each drafted text keeps the previous version's text in that language (without its older clause
     block) and ends with the current block. The vendors' acceptance of the version in force then
     applies as for any version (VEN.5): an old acceptance does not cover the new one, so every
@@ -1668,12 +1668,12 @@ def publish_vendor_terms(
         drafted = terms_clauses.LANGUAGES
         for language in (*drafted, *sorted(set(carried) - set(drafted))):
             old = carried.get(language)
-            # A language without drafted wording keeps its published text as it was; a missing
-            # one is not invented (`vendor_terms_problems` reports both).
             title = old.title if old else _VENDOR_TERMS_TITLES[language]
-            body = old.body if old else ""
-            if language in drafted:
-                body = terms_clauses.with_clauses(terms_clauses.VENDOR, language, body)
+            # Every language ends with the clause block; one without drafted wording gets the
+            # English block (`vendor_terms_problems` reports it as untranslated).
+            body = terms_clauses.with_clauses(
+                terms_clauses.VENDOR, language, old.body if old else ""
+            )
             row = VendorContractTranslation(
                 contract=contract, language=language, title=title, body=body, status=published
             )
@@ -1705,6 +1705,8 @@ def vendor_terms_problems(contract: VendorContract | None = None) -> list[str]:
         if text is None and language not in terms_clauses.LANGUAGES:
             problems.append(f"vendor_terms_text_missing:{language}")
             continue
+        if text is not None and language not in terms_clauses.LANGUAGES:
+            problems.append(f"vendor_terms_clauses_untranslated:{language}")
         body = text.body if text else ""
         problems += [
             f"vendor_terms_clause_missing:{language}:{letter}"

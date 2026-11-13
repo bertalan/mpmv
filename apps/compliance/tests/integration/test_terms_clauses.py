@@ -77,13 +77,16 @@ def test_a_published_foreign_text_is_kept_and_a_draft_is_never_published() -> No
     old.translations.create(language="it", title="Bozza", body="Bozza segreta.", status="machine")
     contract = publish()
     de = contract.translations.get(language="de")
-    assert (de.status, de.title, de.body) == ("published", "Alt", "Alte Texte.")
+    assert (de.status, de.title) == ("published", "Alt")
+    assert de.body.startswith("Alte Texte.")
+    assert terms_clauses.missing_clauses(terms_clauses.VENDOR, de.body, "de") == []
+    assert "EUR 2.00" in de.body  # the English block
     it = contract.translations.get(language="it")
     assert "Bozza segreta" not in it.body
     assert it.title == "Condizioni per i venditori"
     assert not contract.translations.exclude(status="published").exists()
     problems = services.vendor_terms_problems(contract)
-    assert "vendor_terms_clause_missing:de:d" in problems  # carried forward, clauses still due
+    assert "vendor_terms_clauses_untranslated:de" in problems
     assert "vendor_terms_text_missing:fr" in problems
     assert "vendor_terms_text_missing:es" in problems
 
