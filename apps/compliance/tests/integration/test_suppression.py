@@ -24,6 +24,11 @@ def pepper() -> object:
         yield
 
 
+def _local_part() -> str:
+    # Letters outside 0-9a-f only: it can never appear by chance inside a hex digest.
+    return "zq" + "".join(secrets.choice("ghijklmnopqrstuvwxyz") for _ in range(8))
+
+
 def test_a_listed_address_is_found_whatever_its_case_and_blanks() -> None:
     suppress_email("Ada@Example.org", ctx=CTX)
     assert is_suppressed("ada@example.org")
@@ -38,10 +43,13 @@ def test_a_plus_tag_is_a_different_mailbox() -> None:
 
 
 def test_only_the_digest_is_stored() -> None:
-    suppress_email("ada@example.org", reason=SuppressedEmail.Reason.COMPLAINT, ctx=CTX)
+    local = _local_part()
+    address = f"{local}@example.org"
+    suppress_email(address, reason=SuppressedEmail.Reason.COMPLAINT, ctx=CTX)
     row = SuppressedEmail.objects.get()
-    assert row.digest == suppression_digest("ada@example.org")
-    assert "ada" not in row.digest
+    assert row.digest == suppression_digest(address)
+    assert address not in row.digest
+    assert local not in row.digest
     assert row.reason == "complaint"
 
 
@@ -59,10 +67,14 @@ def test_dry_run_returns_the_changeset_and_writes_nothing() -> None:
 
 
 def test_adding_writes_one_audit_entry_without_the_address() -> None:
-    suppress_email("ada@example.org", ctx=CTX)
+    local = _local_part()
+    address = f"{local}@example.org"
+    suppress_email(address, ctx=CTX)
     entry = AuditLog.objects.get(action="compliance.suppression.added")
-    assert "ada" not in f"{entry.target_key}{entry.before}{entry.after}"
-    assert entry.target_key == suppression_digest("ada@example.org")[:12]
+    text = f"{entry.target_key}{entry.before}{entry.after}"
+    assert address not in text
+    assert local not in text
+    assert entry.target_key == suppression_digest(address)[:12]
 
 
 def test_adding_twice_changes_and_audits_nothing_more() -> None:
