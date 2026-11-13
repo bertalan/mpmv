@@ -21,7 +21,7 @@ pytestmark = pytest.mark.django_db
 
 
 def active_vendor() -> Vendor:
-    return VendorFactory.create(status=Vendor.Status.ACTIVE)
+    return VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
 
 
 def sellable(vendor: Vendor | None = None, **fields: Any) -> Product:
