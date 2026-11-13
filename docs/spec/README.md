@@ -48,6 +48,7 @@ It also reviews the August 2026 rebuild plan.
 | 15 | [Events](15-events.md) | Event pages (promotions, trade fairs and meetings) in any site language, moderation, RSS and ICS feeds per language, maps and geocoding |
 | 16 | [Trust and community](16-trust-community.md) | Proposal D-37: vendor trust badges, customer reviews, buyer consent, social and blog section (under review) |
 | 17 | [Garage and fitment](17-garage-fitment.md) | D-38 (decided, P1 in slices): the customer's garage (fitment profiles), a sector-neutral fitment taxonomy, editorial make and model articles, filter over ranking, EU rules |
+| 18 | [Coupons and cart recovery](18-promotions-coupons.md) | Proposal D-39: coupon engine funded by whoever sets it up, abandoned-cart reminders, return incentive, VAT and ePrivacy questions |
 | 90 | [Backlog](90-backlog.md) | All micro-tasks by phase (generated) |
 | 91 | [Estimates and plan](91-estimates.md) | Hours, schedule, phases, external costs, measured agent velocity |
 | 92 | [Open decisions](92-open-decisions.md) | 21 decisions with proposals (D-11, D-12 and D-18 decided) |
