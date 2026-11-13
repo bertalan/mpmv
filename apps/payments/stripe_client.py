@@ -31,6 +31,8 @@ class StripeIntent:
     currency: str
     charge_id: str = ""  # `latest_charge`, set once the customer paid
     transfer_group: str = ""
+    # What Stripe.js needs in the browser; never logged (no repr) or stored.
+    client_secret: str = field(default="", repr=False)
 
 
 @dataclass(frozen=True)
@@ -202,6 +204,7 @@ class HttpStripeClient:
             currency=str(data["currency"]).upper(),
             charge_id=str(data.get("latest_charge") or ""),
             transfer_group=str(data.get("transfer_group") or ""),
+            client_secret=str(data.get("client_secret") or ""),
         )
 
     @staticmethod

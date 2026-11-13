@@ -12,7 +12,13 @@ class PaymentsConfig(AppConfig):
 
     def ready(self) -> None:
         from . import checks  # noqa: F401  (registers the PAYMENT_PROVIDER check)
+        from .models import Payment
+        from .order_hook import order_paid_on_payment
         from .registry import register_provider
+        from .signals import on_payment_succeeded
         from .stripe_provider import provider_from_settings
 
+        on_payment_succeeded.connect(
+            order_paid_on_payment, sender=Payment, dispatch_uid="payments.order_paid"
+        )
         register_provider(provider_from_settings)  # Stripe, the only provider at launch (D-09)

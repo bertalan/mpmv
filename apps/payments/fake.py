@@ -16,6 +16,7 @@ from decimal import Decimal
 from .engine import (
     FeeCollection,
     InvalidSignature,
+    PaymentMismatch,
     PaymentRequest,
     PaymentResult,
     PaymentStatus,
@@ -57,7 +58,13 @@ class FakePaymentProvider:
         ref = f"fake_pay_{len(self._payments) + 1}"
         charge = f"fake_ch_{len(self._payments) + 1}"
         transfers = tuple(f"{ref}_tr_{i}" for i, _ in enumerate(request.shares, start=1))
-        result = PaymentResult(ref, PaymentStatus.SUCCEEDED, charge, transfers)
+        result = PaymentResult(
+            ref,
+            PaymentStatus.SUCCEEDED,
+            charge,
+            transfers,
+            client_secret=f"{ref}_secret_{secrets.token_urlsafe(12)}",
+        )
         self._payments[ref] = (request, result)
         self._by_key[request.idempotency_key] = ref
         for transfer, share in zip(transfers, request.shares, strict=True):
@@ -72,6 +79,14 @@ class FakePaymentProvider:
                 )
             )
         return result
+
+    def payment_client_secret(self, provider_ref: str, order_ref: str) -> str:
+        if (
+            provider_ref not in self._payments
+            or self._payments[provider_ref][0].order_ref != order_ref
+        ):
+            raise PaymentMismatch(provider_ref)
+        return self._payments[provider_ref][1].client_secret
 
     def refund(self, request: RefundRequest) -> RefundResult:
         key = f"refund:{request.idempotency_key}"

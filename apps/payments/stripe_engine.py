@@ -28,6 +28,13 @@ def to_minor(amount: Decimal, currency: str) -> int:
     return int(scaled)
 
 
+def round_to_currency(amount: Decimal, currency: str) -> Decimal:
+    """`amount` rounded half up to the currency's minor unit (two decimals, or none for a
+    zero-decimal currency). Used for an order total before it is sent: the provider itself never
+    rounds."""
+    return amount.quantize(Decimal(1).scaleb(-minor_exponent(currency)), rounding=ROUND_HALF_UP)
+
+
 def from_minor(minor: int, currency: str) -> Decimal:
     return Decimal(minor).scaleb(-minor_exponent(currency))
 

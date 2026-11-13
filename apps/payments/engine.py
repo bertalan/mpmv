@@ -33,6 +33,10 @@ class InvalidSignature(Exception):
     """A webhook body whose signature does not verify; the caller answers 400 and stores nothing."""
 
 
+class PaymentMismatch(Exception):
+    """The payment asked for does not belong to the order it was asked for."""
+
+
 class ProviderError(Exception):
     """The provider refused or failed a call; the message is safe to log."""
 
@@ -65,6 +69,9 @@ class PaymentResult:
     # Provider id of the charge each vendor transfer is tied to (D-08 `source_transaction`).
     charge_ref: str = ""
     transfer_refs: Sequence[str] = ()
+    # Shown to the customer's browser only, to confirm the payment there (no card data on our
+    # server); never stored or logged.
+    client_secret: str = field(default="", repr=False)
 
 
 @dataclass(frozen=True)

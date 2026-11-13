@@ -234,6 +234,14 @@ VENDOR_CLOSURE_HOOKS: list[str] = [
 # when its orders must not move (a vendor closed by a termination notice, until staff review it).
 # `orders` cannot import `compliance`, so the path is named here.
 ORDER_FREEZE_HOOKS: list[str] = ["apps.compliance.services.orders_frozen"]
+# PAY.1: the callable `place_order` uses to start the payment (orders cannot import payments).
+ORDER_PAYMENT_STARTER = "apps.payments.checkout.start_payment"
+# PAY.1: the callable that fetches the browser-side secret of an order's payment from the provider
+# (`(provider_ref, order_ref) -> str`); the secret is never kept in the session.
+ORDER_PAYMENT_BROWSER_HOOK = "apps.payments.checkout.client_secret_for"
+# PAY.3 sets this True once the per-vendor transfers exist. Until then a payment would stay whole on
+# the platform account (against D-08), so `manage.py check` refuses LIVE_DATA (payments.E004).
+PAYMENTS_TRANSFERS_WIRED = False
 
 # Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
 # that lists the active vendors established outside a new allowed set.
@@ -592,6 +600,8 @@ PAYMENT_ALLOW_FAKE_PROVIDER = False
 # Stripe (PAY.1, PAY.2): keys come from the environment only and are empty until set; on LIVE and
 # STAGE `manage.py check` refuses an empty key while MPMV_PAYMENT_PROVIDER=stripe (payments.E003).
 STRIPE_SECRET_KEY = env_str("MPMV_STRIPE_SECRET_KEY", "")
+# Public by design: Stripe.js in the browser needs it. Never the secret key.
+STRIPE_PUBLISHABLE_KEY = env_str("MPMV_STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = env_str("MPMV_STRIPE_WEBHOOK_SECRET", "")
 STRIPE_API_VERSION = env_str("MPMV_STRIPE_API_VERSION", "")  # empty: the account's default
 STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300  # Stripe's recommended replay window

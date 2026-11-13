@@ -20,6 +20,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.models import AuditLog
 from apps.core.opschecks import Alert
 from apps.core.services import run_mutation
+from apps.orders import services as orders_services
 
 from . import connect, registry, stripe_engine
 from .changeset_keys import PAYMENT_MODEL, PAYMENT_SUCCEEDED
@@ -30,6 +31,7 @@ from .transfer_alert import PaidPayment, payment_without_transfer_alert
 
 WEBHOOK_ACTOR = "webhook:payments"
 SUCCEEDED_EVENTS = frozenset({"payment_intent.succeeded", "payment.succeeded"})
+FAILED_EVENTS = frozenset({"payment_intent.payment_failed", "payment.failed"})
 ACCOUNT_UPDATED = "account.updated"  # a connected account's onboarding status (VEN.6)
 
 
@@ -77,6 +79,8 @@ def process_webhook(
             )
             if event.type in SUCCEEDED_EVENTS:
                 record_payment_succeeded(provider.code, event, ctx=ctx)
+            elif event.type in FAILED_EVENTS:
+                record_payment_failed_event(event, ctx=ctx)
             elif event.type == ACCOUNT_UPDATED:
                 try:
                     connect.handle_account_updated(event.payload, ctx=ctx)
@@ -130,6 +134,16 @@ def record_payment_succeeded(
     run_mutation(changeset, payment.save, ctx=ctx, action=PAYMENT_SUCCEEDED, dry_run=False)
     on_payment_succeeded.send(sender=Payment, payment=payment)
     return payment
+
+
+def record_payment_failed_event(event: WebhookEvent, *, ctx: AuditContext) -> None:
+    """A failed attempt: the order stays unpaid and the failure is audited (the customer may try
+    again with the same payment until the hold ends)."""
+    obj = event.payload.get("object", event.payload)
+    order_ref = str((obj.get("metadata") or {}).get("order_ref", ""))
+    if not order_ref:  # not an order payment of ours: nothing to record
+        return
+    orders_services.record_payment_failed(order_ref, ctx=ctx)
 
 
 DEFAULT_GRACE_MINUTES = 60

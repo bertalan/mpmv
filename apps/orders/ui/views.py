@@ -4,7 +4,8 @@
 Steps: cart, details (address, and for a business the company and VAT id, checked with VIES),
 review (shipping per vendor package, totals, "place order"), then the confirmation. A page is
 placeable only when `build_checkout` says so; the buttons never offer what the preview refuses.
-Payment is not here (PAY.1): the confirmation shows a placeholder.
+The confirmation page is also the payment page (PAY.1): Stripe.js confirms the payment in the
+browser, so no card data reaches this server; the webhook marks the order paid (PAY.2).
 
 Protection of the public POSTs: CSRF (middleware); the details and the order placement are
 behind Turnstile and a per-IP budget (the VIES lookup and the stock hold are the costly parts);
@@ -16,6 +17,7 @@ import datetime as dt
 import math
 from typing import Any
 
+from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
@@ -24,6 +26,7 @@ from django.urls import reverse
 from django.utils.cache import add_never_cache_headers
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
+from django.views.decorators.csp import csp_override
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.accounts.captcha import captcha_passes
@@ -39,7 +42,17 @@ from apps.core.services import consume_rate_limit
 from apps.orders import engine
 from apps.orders.checkout import build_checkout
 from apps.orders.models import Order
-from apps.orders.services import CheckoutClosed, CheckoutPreview, OrderRefused, place_order
+from apps.orders.services import (
+    PAID_OR_LATER,
+    CheckoutClosed,
+    CheckoutPreview,
+    OrderRefused,
+    PaymentMismatch,
+    PaymentUnavailable,
+    payment_client_secret,
+    place_order,
+    start_payment,
+)
 from apps.tax import engine as tax_engine
 from apps.tax import services as tax_services
 from apps.tax.models import VatValidation
@@ -432,6 +445,10 @@ def review_page(request: HttpRequest) -> HttpResponse:
     if order is None:
         raise Http404
     request.session[state.CONFIRMATION_KEY] = str(order.public_id)
+    if order.payment_intent_ref:
+        request.session[state.PAYMENT_BROWSER_STATE] = order.payment_intent_ref
+    else:  # a failed provider call: the page retries; an earlier order's id must not linger
+        request.session.pop(state.PAYMENT_BROWSER_STATE, None)
     state.clear(request)
     return _private(HttpResponseRedirect(reverse("orders:confirmation")))
 
@@ -465,6 +482,55 @@ def shipping_choice(request: HttpRequest) -> HttpResponse:
 # --- Confirmation ----------------------------------------------------------------------------
 
 
+STRIPE_JS = "https://js.stripe.com"
+
+
+def _payment_csp() -> dict[str, list[str]]:
+    """The payment page's policy: the site's own, plus what Stripe.js needs (it cannot be
+    self-hosted). Only this page gets it."""
+    base: dict[str, list[str]] = {
+        key: list(value) for key, value in settings.SECURE_CSP.items() if isinstance(value, list)
+    }
+    base["script-src"] = [*base["script-src"], STRIPE_JS]
+    base["frame-src"] = [STRIPE_JS, "https://hooks.stripe.com"]
+    base["connect-src"] = [*base["connect-src"], "https://api.stripe.com"]
+    return base
+
+
+def _payment_context(request: HttpRequest, order: Order) -> dict[str, Any] | None:
+    """What the page needs to confirm the payment in the browser, or None when there is nothing
+    to pay (already paid, no provider, or the payments switch is off: the order is kept).
+
+    The session keeps only the payment id; the secret is fetched from the provider on each visit.
+    A payment that is not this order's is a 404."""
+    if order.state != "awaiting_payment" or not settings.STRIPE_PUBLISHABLE_KEY:
+        return None
+    if not order.payment_intent_ref:  # the first attempt failed: ask again, never twice
+        try:
+            start_payment(order, ctx=audit_context(request))
+        except CheckoutClosed:
+            return None
+        order.refresh_from_db()
+        if not order.payment_intent_ref:
+            return None
+    remembered = request.session.get(state.PAYMENT_BROWSER_STATE)
+    if remembered and remembered != order.payment_intent_ref:
+        raise Http404("This payment is not for this order")
+    request.session[state.PAYMENT_BROWSER_STATE] = order.payment_intent_ref
+    try:
+        secret = payment_client_secret(order)
+    except PaymentMismatch as error:
+        raise Http404("This payment is not for this order") from error
+    except PaymentUnavailable:
+        return {"retry": True}
+    return {
+        "publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
+        "client_secret": secret,
+        "return_url": request.build_absolute_uri(reverse("orders:confirmation")),
+    }
+
+
+@csp_override(_payment_csp())
 @require_http_methods(["GET"])
 def confirmation_page(request: HttpRequest) -> HttpResponse:
     public_id = request.session.get(state.CONFIRMATION_KEY)
@@ -481,5 +547,8 @@ def confirmation_page(request: HttpRequest) -> HttpResponse:
             {"label": _("VAT"), "amount": present.money(order.tax_total)},
         ],
         "grand_total": present.money(order.grand_total),
+        "paid": order.state in PAID_OR_LATER,
+        "payment_closed": order.state not in PAID_OR_LATER and order.state != "awaiting_payment",
+        "payment": _payment_context(request, order),
     }
     return _page(request, "orders/confirmation.html", context)
