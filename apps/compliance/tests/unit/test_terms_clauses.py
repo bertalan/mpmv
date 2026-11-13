@@ -1,4 +1,4 @@
-"""CMP.5: the contract clauses (a) to (h) as pure texts (no database)."""
+"""CMP.5: the contract clauses (a) to (i) as pure texts (no database)."""
 
 import pytest
 
@@ -7,7 +7,7 @@ from apps.compliance import terms_clauses as tc
 
 def test_customer_terms_carry_a_to_c_and_vendor_terms_d_to_h() -> None:
     assert [c.letter for c in tc.clauses_for(tc.CUSTOMER)] == ["a", "b", "c"]
-    assert [c.letter for c in tc.clauses_for(tc.VENDOR)] == ["d", "e", "f", "g", "h"]
+    assert [c.letter for c in tc.clauses_for(tc.VENDOR)] == ["d", "e", "f", "g", "h", "i"]
 
 
 @pytest.mark.parametrize("language", ["en", "it"])
@@ -53,6 +53,8 @@ def test_the_owner_review_of_2026_11_13_is_in_the_wording() -> None:
     assert "Legislative Decree 82/2022" in en["g"]
     assert "manleva la piattaforma da reclami di terzi" in it["h"]
     assert "indemnifies the platform against third-party claims" in en["h"]
+    assert "non riducono l'importo comunicato dalla piattaforma" in it["i"]
+    assert "does not reduce the amount the platform reports" in en["i"]
 
 
 @pytest.mark.parametrize("language", ["en", "it"])
@@ -82,7 +84,7 @@ def test_a_block_has_all_clauses_of_a_kind_and_none_of_the_other() -> None:
 def test_a_changed_word_or_a_missing_clause_is_reported() -> None:
     block = tc.clause_block(tc.VENDOR, "en")
     assert tc.missing_clauses(tc.VENDOR, block.replace("EUR 2.00", "about EUR 2"), "en") == ["f"]
-    assert tc.missing_clauses(tc.VENDOR, "", "en") == ["d", "e", "f", "g", "h"]
+    assert tc.missing_clauses(tc.VENDOR, "", "en") == ["d", "e", "f", "g", "h", "i"]
     assert tc.missing_clauses(tc.VENDOR, "", "en", only=["g"]) == ["g"]
 
 

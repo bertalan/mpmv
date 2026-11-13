@@ -196,6 +196,30 @@ CLAUSES: Final[tuple[Clause, ...]] = (
             ),
         },
     ),
+    Clause(
+        "i",
+        VENDOR,
+        "dac7_outside_refunds",
+        {
+            "en": "DAC7 reporting and refunds outside the platform",
+            "it": "Comunicazione DAC7 e rimborsi esterni",
+        },
+        {
+            "en": (
+                "For the annual DAC7 report (Legislative Decree 32/2023) the platform reports only "
+                "the consideration and refunds that pass through its own payment system. A refund "
+                "the vendor makes outside the platform does not reduce the amount the platform "
+                "reports to the tax authority; the vendor documents it in its own accounts."
+            ),
+            "it": (
+                "Ai fini della comunicazione annuale DAC7 (D.Lgs. 32/2023), la piattaforma "
+                "rendiconta i soli corrispettivi e rimborsi transitati tramite il proprio sistema "
+                "di pagamento. Eventuali rimborsi effettuati dal Venditore fuori dalla piattaforma "
+                "non riducono l'importo comunicato dalla piattaforma all'autorità fiscale; resta a "
+                "carico del Venditore documentarli nella propria contabilità."
+            ),
+        },
+    ),
 )
 
 

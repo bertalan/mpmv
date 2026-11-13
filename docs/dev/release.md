@@ -218,6 +218,9 @@ Launch prerequisite: before the first LIVE launch, and before the account activa
 CORE.19 start, the sending domain has SPF, DKIM and DMARC records in place and verified (ARC.19,
 [transactional email](transactional-email.md)).
 
+Seller terms: before the first LIVE launch, once the vendors have published their sales terms (VEN.35), switch on the
+operator setting `require_sales_terms` (ARC.7), so a vendor without terms is on request.
+
 Temporary STAGE tooling: before the first LIVE launch, remove the staff "Site links" page
 (OPS.12, `/_links/`) and its storefront header menu item. It exists for STAGE testing only.
 
