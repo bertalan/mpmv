@@ -1,0 +1,13 @@
+{% load i18n %}{% comment %}
+The "Place order" button, or what to do instead. It sits outside #review-body, next to the
+captcha widget in orders/review.html: a shipping change swaps #review-body and sends this block
+out of band (`oob`), so the Turnstile widget is never replaced and keeps its token.
+{% endcomment %}<div id="review-actions"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {% if placeable %}
+    <p class="helptext">{% translate "When you place the order we hold the items for you. Payment follows in the next step." %}</p>
+    {% include "components/button.html" with label=_("Place order") type="submit" only %}
+  {% else %}
+    <p class="helptext">{% translate "Solve the points above to place the order." %}</p>
+    <p>{% url "orders:cart" as cart_url %}{% include "components/button.html" with label=_("Back to the cart") url=cart_url variant="secondary" only %}</p>
+  {% endif %}
+</div>
