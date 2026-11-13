@@ -57,7 +57,13 @@ class FakePaymentProvider:
         ref = f"fake_pay_{len(self._payments) + 1}"
         charge = f"fake_ch_{len(self._payments) + 1}"
         transfers = tuple(f"{ref}_tr_{i}" for i, _ in enumerate(request.shares, start=1))
-        result = PaymentResult(ref, PaymentStatus.SUCCEEDED, charge, transfers)
+        result = PaymentResult(
+            ref,
+            PaymentStatus.SUCCEEDED,
+            charge,
+            transfers,
+            client_secret=f"{ref}_secret_{secrets.token_urlsafe(12)}",
+        )
         self._payments[ref] = (request, result)
         self._by_key[request.idempotency_key] = ref
         for transfer, share in zip(transfers, request.shares, strict=True):

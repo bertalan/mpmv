@@ -2559,6 +2559,10 @@ msgstr "Pagamento ricevuto"
 msgid "Payment received for order %(order_number)s"
 msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
 
+#: apps/orders/templates/orders/confirmation.html
+msgid "Payment received. Thank you."
+msgstr "Pagamento ricevuto. Grazie."
+
 #: apps/manager/sections.py apps/manager/templates/manager/shop/payments.html
 msgid "Payments"
 msgstr "Pagamenti"

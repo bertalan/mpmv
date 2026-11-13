@@ -30,7 +30,7 @@ from apps.catalog.models import Product, Variant
 from apps.core import flags
 from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.money import CENT
+from apps.core.money import CENT, CURRENCY
 from apps.core.services import audit_changes, flag_enabled
 from apps.shipping.models import Carrier
 from apps.vendors import services as vendors_services
@@ -909,7 +909,9 @@ def place_order(
     rate, reason and VAT nature code come from each line's tax decision. Dry run verifies and
     returns the change set without saving or holding anything.
 
-    The payment (PAY.1) starts only after this transaction commits (`transaction.on_commit`).
+    The payment (PAY.1) starts after this transaction commits: `order.payment_client_secret`
+    holds what the browser needs to confirm it (empty when no provider is configured or the
+    provider failed; `start_payment` can be called again, and never creates a second intent).
     Raises `CheckoutClosed` before anything is read or saved when a kill switch is off (ORD.10).
     """
     ensure_checkout_open([item.vendor for item in preview.vendors])
@@ -971,7 +973,134 @@ def place_order(
             ]
         )
         notifications.notify_order_placed(order)  # ORD.9: in this transaction, not on dry run
+    # The order number is final only now (it may roll back with the transaction), so the provider
+    # hears about it after the commit (ORD.4).
+    order.payment_client_secret = start_payment(order, ctx=ctx)
     return order, changeset
+
+
+# --- payment (PAY.1, PAY.2) ------------------------------------------------------------------
+
+PAYMENT_ACTOR = "webhook:payments"
+
+
+class PaymentUnavailable(Exception):
+    """The payment provider refused or failed; the order stays awaiting payment."""
+
+
+def _open_payment_order(order: Order) -> bool:
+    return order.state == "awaiting_payment" and not order.payment_intent_ref
+
+
+def start_payment(order: Order, *, ctx: AuditContext) -> str:
+    """Create the one payment of an order awaiting payment and return its client secret.
+
+    One payment per order: an order that already has one gets none (returns ""), and the provider
+    call carries a key derived from the order, so a repeat can never charge twice. Returns "" too
+    when no provider is configured. The amount is the order's gross total in `CURRENCY`; the
+    `transfer_group` is the order number (D-08: separate charges and transfers). The PAYMENTS
+    switch refuses a new payment (`CheckoutClosed`, ORD.10); a provider failure leaves the order
+    awaiting payment (`PaymentUnavailable` is swallowed here and the secret is empty)."""
+    starter = getattr(settings, "ORDER_PAYMENT_STARTER", "")
+    order.refresh_from_db()
+    if not starter or not _open_payment_order(order):
+        return ""
+    ensure_checkout_open([sub.vendor for sub in order.vendor_orders.select_related("vendor")])
+    try:
+        started = import_string(starter)(
+            order_ref=order.transfer_group or order.number,
+            amount=order.grand_total,
+            currency=CURRENCY,
+            idempotency_key=f"order-{order.public_id}",
+        )
+    except PaymentUnavailable:
+        return ""
+    if started is None:
+        return ""
+    provider_ref, client_secret = started
+    with transaction.atomic():
+        claimed = Order.objects.filter(pk=order.pk, payment_intent_ref="").update(
+            payment_intent_ref=provider_ref
+        )
+        if claimed:
+            changeset = ChangeSet()
+            changeset.update(
+                "orders.order",
+                str(order.public_id),
+                {"payment_intent_ref": ""},
+                {"payment_intent_ref": provider_ref},
+            )
+            audit_changes(changeset, ctx=ctx, action="orders.payment_started")
+    order.payment_intent_ref = provider_ref
+    return client_secret if claimed else ""
+
+
+def _audit_payment_problem(
+    order_ref: str, action: str, detail: dict[str, Any], ctx: AuditContext
+) -> None:
+    changeset = ChangeSet()
+    changeset.create("orders.order", order_ref, detail)
+    audit_changes(changeset, ctx=ctx, action=action)
+
+
+def mark_order_paid(order_ref: str, *, amount: Decimal, currency: str, ctx: AuditContext) -> bool:
+    """The provider confirmed a payment for the order numbered `order_ref` (PAY.2): move it to
+    `paid`, decrement the stock it held and release the holds, all in the caller's transaction.
+
+    Idempotent: an order already paid is left alone (False). Nothing moves, and the problem is
+    audited for staff, when no order has that number, the order is no longer awaiting payment
+    (a late payment on a cancelled order), or the amount or currency is not the order's gross
+    total. Returns True when the order became paid."""
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(number=order_ref).first()
+        if order is None:
+            _audit_payment_problem(order_ref, "orders.payment_unmatched", {"amount": amount}, ctx)
+            return False
+        if order.state in PAID_OR_LATER:
+            return False
+        if order.state != "awaiting_payment":
+            _audit_payment_problem(
+                order_ref, "orders.payment_late", {"state": order.state, "amount": amount}, ctx
+            )
+            return False
+        if currency.upper() != CURRENCY or amount != order.grand_total:
+            _audit_payment_problem(
+                order_ref,
+                "orders.payment_mismatch",
+                {"paid": amount, "currency": currency, "expected": order.grand_total},
+                ctx,
+            )
+            return False
+        transition_order(order, "paid", ctx=ctx)
+        _decrement_stock(order, ctx=ctx)
+    return True
+
+
+def _decrement_stock(order: Order, *, ctx: AuditContext) -> None:
+    changeset = ChangeSet()
+    holds = list(StockReservation.objects.filter(order=order).order_by("product_id", "variant_id"))
+    for hold in holds:
+        row: Product | Variant
+        if hold.variant_id is not None:
+            row = Variant.objects.select_for_update().get(pk=hold.variant_id)
+            model = "catalog.variant"
+        else:
+            row = Product.objects.select_for_update(of=("self",)).get(pk=hold.product_id)
+            model = "catalog.product"
+        before = row.stock_qty
+        row.stock_qty = max(0, before - hold.quantity)
+        row.save(update_fields=["stock_qty", "updated_at"])
+        changeset.update(
+            model, str(row.public_id), {"stock_qty": before}, {"stock_qty": row.stock_qty}
+        )
+    StockReservation.objects.filter(order=order).delete()
+    audit_changes(changeset, ctx=ctx, action="orders.stock_decremented")
+
+
+def record_payment_failed(order_ref: str, *, ctx: AuditContext) -> None:
+    """The provider reported a failed attempt: the order stays awaiting payment (the customer may
+    try again until the hold ends); the failure is audited."""
+    _audit_payment_problem(order_ref, "orders.payment_failed", {}, ctx)
 
 
 def _line_input(entry: PlaceLine, product: Product, variants: dict[int, Variant]) -> LineInput:

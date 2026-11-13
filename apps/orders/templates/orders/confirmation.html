@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% load i18n %}
+{% load i18n static %}
 {% block title %}{% translate "Order received" %} · {{ site_name }}{% endblock %}
 {% block head %}{% robots_meta "noindex, nofollow" %}{% endblock %}
 {% block content %}
@@ -7,7 +7,22 @@
   <h1>{% translate "Order received" %}</h1>
   <p>{% blocktranslate with number=order.number email=order.email %}Your order number is {{ number }}. We sent a confirmation to {{ email }}.{% endblocktranslate %}</p>
   {% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=lines total=grand_total only %}
-  {% include "components/alert.html" with level="info" message=_("Online payment is not available yet. The items stay held for you for a short time.") only %}
-  <p><button type="button" class="button" disabled>{% translate "Pay now" %}</button></p>
+  {% if paid %}
+    {% include "components/alert.html" with level="success" message=_("Payment received. Thank you.") only %}
+  {% elif payment %}
+    <form id="payment-form" method="get" action="{{ payment.return_url }}"
+          data-publishable-key="{{ payment.publishable_key }}"
+          data-client-secret="{{ payment.client_secret }}"
+          data-return-url="{{ payment.return_url }}">
+      <div id="payment-element"></div>
+      <p id="payment-message" role="alert"></p>
+      <p><button type="submit" class="button">{% translate "Pay now" %}</button></p>
+    </form>
+    <script src="https://js.stripe.com/v3/" nonce="{{ csp_nonce }}"></script>
+    <script src="{% static 'orders/payment.js' %}" nonce="{{ csp_nonce }}" defer></script>
+  {% else %}
+    {% include "components/alert.html" with level="info" message=_("Online payment is not available yet. The items stay held for you for a short time.") only %}
+    <p><button type="button" class="button" disabled>{% translate "Pay now" %}</button></p>
+  {% endif %}
 </article>
 {% endblock %}

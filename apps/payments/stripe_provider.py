@@ -93,6 +93,7 @@ class StripePaymentProvider:
             status=_STATUS.get(intent.status, PaymentStatus.PENDING),
             charge_ref=intent.charge_id,
             transfer_refs=tuple(transfers),
+            client_secret=intent.client_secret,
         )
 
     def _transfer_shares(

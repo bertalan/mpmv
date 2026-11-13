@@ -65,6 +65,9 @@ class PaymentResult:
     # Provider id of the charge each vendor transfer is tied to (D-08 `source_transaction`).
     charge_ref: str = ""
     transfer_refs: Sequence[str] = ()
+    # Shown to the customer's browser only, to confirm the payment there (no card data on our
+    # server); never stored or logged.
+    client_secret: str = field(default="", repr=False)
 
 
 @dataclass(frozen=True)
