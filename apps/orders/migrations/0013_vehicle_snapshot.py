@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("orders", "0011_stock_reservation"),
+        ("orders", "0012_language_default_callable"),
     ]
 
     operations = [

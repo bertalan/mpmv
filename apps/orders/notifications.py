@@ -12,7 +12,8 @@ address it must ship to, never the buyer's email, billing address or other vendo
 payment reference, commission or tax identifier of the buyer enters any context. The platform
 never sends invoices or receipts: the per-vendor confirmation is a non-fiscal document.
 
-Emails render in the order's language snapshot, English when it is not configured.
+Customer emails render in the order's language snapshot, vendor emails in the vendor's mail
+language (ORD.16); the platform language (English) stands in when it is not configured.
 """
 
 import logging
@@ -50,6 +51,8 @@ VENDOR_ORDER_DELIVERED = "orders.vendor_order_delivered"
 ORDER_CANCELLED = "orders.order_cancelled"
 VENDOR_ORDER_CANCELLED = "orders.vendor_order_cancelled"
 VENDOR_ORDER_CANCELLED_NOTICE = "orders.vendor_order_cancelled_notice"
+#: The outbox attachment kind of the non-fiscal PDF (documents.py builds it at send time).
+CONFIRMATION_PDF_KIND = "orders:vendor_confirmation_pdf"
 
 #: The shipping address lines a vendor needs to ship; nothing else of the buyer's data.
 _SHIP_TO_KEYS = ("name", "line1", "line2", "postal_code", "city", "region")
@@ -86,6 +89,12 @@ def _ship_to(order: Order) -> list[str]:
     address = order.shipping_address or {}
     parts = [str(address.get(key, "")).strip() for key in _SHIP_TO_KEYS]
     return [part for part in parts if part] + [order.shipping_country]
+
+
+def _vendor_language(sub: VendorOrder) -> str:
+    """The vendor's mail language (ORD.16), the platform language when it has none. One that is
+    no longer configured falls back the same way when the email is queued."""
+    return str(sub.vendor.mail_language or settings.LANGUAGE_CODE)
 
 
 def _vendor_name(sub: VendorOrder) -> str:
@@ -137,13 +146,15 @@ def notify_order_paid(order: Order) -> None:
                 "lines": _lines(sub),
                 "shipping": _money(sub.shipping_net + sub.shipping_tax_amount),
                 "total": _money(sub.gross_total),
+                # The non-fiscal PDF is built when the email is sent (documents.py), not stored.
+                "attachment": {"kind": CONFIRMATION_PDF_KIND, "ref": str(sub.public_id)},
             },
         )
         if sub.vendor.contact_email:
             enqueue_email(
                 recipient=sub.vendor.contact_email,
                 template_key=VENDOR_NEW_ORDER,
-                language=settings.LANGUAGE_CODE,  # vendors have no language of their own yet
+                language=_vendor_language(sub),
                 idempotency_key=f"vendor-order:{sub.public_id}:new",
                 context={
                     "order_number": order.number,
@@ -201,7 +212,7 @@ def notify_vendor_order_cancelled(sub: VendorOrder) -> None:
         enqueue_email(
             recipient=sub.vendor.contact_email,
             template_key=VENDOR_ORDER_CANCELLED_NOTICE,
-            language=settings.LANGUAGE_CODE,
+            language=_vendor_language(sub),
             idempotency_key=f"vendor-order:{sub.public_id}:cancelled-notice",
             context={
                 "order_number": order.number,

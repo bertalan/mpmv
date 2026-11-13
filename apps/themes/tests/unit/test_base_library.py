@@ -18,6 +18,8 @@ from apps.themes.build import render_themes
 from apps.themes.contract import PAIRS, TEXT, UI
 from apps.themes.tests.builders import SHIPPED_THEMES
 
+pytestmark = pytest.mark.usefixtures("english_interface")
+
 
 @pytest.fixture(autouse=True)
 def _base(settings: SettingsWrapper) -> None:
