@@ -236,7 +236,7 @@ number is sent, so the vendor's number is sent as requester. Fail closed stays.
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
 | TAX.1 | TaxRate, Territory, versioned VendorTaxProfile, VatValidation models | P1 | 8 | ARC.7, VEN.1 | Migrations + admin |
-| TAX.2 | Regime change workflow (vendor request → staff approval), history; a requested start date may be in the past (owner decision Q-77, 2026-11-13): the request is accepted, the reviewing staff member sees a warning listing the orders already placed since that date, which keep the old regime in their snapshot, and approves or rejects knowingly; the decision is audited | P1 | 6 | TAX.1 | Parity with VTO review |
+| TAX.2 | Regime change workflow (vendor request → staff approval), history; a requested start date may be in the past (owner decision Q-77, 2026-11-13): the request is accepted, the reviewing staff member sees a warning listing the orders already placed since that date, which keep the old regime in their snapshot, and approves or rejects knowingly; the decision is audited | P1 | 6 | TAX.1 | Parity with VTO review; orders placed before a back-dated regime change keep their old regime in the snapshot, and the reviewer sees them listed |
 | TAX.3 | `resolve_goods_tax` pure function + T1–T18 case table as parametrized tests | P1 | 12 | TAX.1 | 100% of cases green (T15 included: territories outside the VAT territory resolve to 0% with reason `outside_vat_territory`, using `is_outside_vat_territory` from TAX.7), 100% module coverage |
 | TAX.4 | `resolve_shipping_tax` with proportional split | P1 | 6 | TAX.3 | T8–T13 green |
 | TAX.5 | VIES client with cache, timeout, fail-closed | P1 | 6 | TAX.1 | Test with simulated VIES down |
