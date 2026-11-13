@@ -136,6 +136,7 @@ def test_add_form_offers_only_logos_collection_images(staff_client: Client) -> N
         "https://example.org/a\nhttps://EXAMPLE.org/a/",
         "https://user:pw@example.org/a",
         "http://example.org/a",
+        "https://example.org:99999/a",
     ],
 )
 def test_add_form_refuses_bad_profile_lists(staff_client: Client, profiles: str) -> None:
