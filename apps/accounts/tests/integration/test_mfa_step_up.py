@@ -59,7 +59,7 @@ def test_a_user_without_a_second_factor_is_sent_to_enrolment(client: Client) -> 
 def test_anonymous_visitors_are_sent_to_login(client: Client) -> None:
     response = client.get(reverse("test-sensitive"))
     assert response.status_code == 302
-    assert "/django-admin/login/" in response["Location"]
+    assert urlsplit(response["Location"]).path == "/account/login/"
 
 
 def test_the_verify_page_accepts_a_new_verification_when_already_verified(

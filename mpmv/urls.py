@@ -46,6 +46,7 @@ urlpatterns = [
     path("readyz", readyz, name="readyz"),
     path("robots.txt", robots_view, name="robots_txt"),  # SEO.8
     path("webhooks/email/", email_webhook, name="email_webhook"),
+    path("webhooks/payments/", include("apps.payments.urls")),  # PAY.2
     # Uploaded images and renditions, as images only (THM.12, apps.core.media).
     path("media/<path:path>", serve_media, name="media"),
     path("django-admin/", admin.site.urls),
@@ -58,17 +59,22 @@ urlpatterns = [
     path("account/mfa/", include("apps.accounts.urls")),
     path("account/level/", include("apps.accounts.level_urls")),  # CORE.25 (D-32)
     path("account/link/", include("apps.accounts.action_link_urls")),  # CORE.15
+    path("account/privacy/", include("apps.compliance.account_urls")),  # CMP.4 self-service
+    path("account/orders/", include("apps.orders.account_urls")),  # My orders (ORD.7)
     path("account/", include("apps.manager.account_urls")),  # Manager sign-in (CORE.17)
     path("manager/", include("apps.manager.urls")),  # the Manager's two spaces (CORE.17)
     path("vendor/claim/", include("apps.vendors.urls")),  # claim an imported vendor (VEN.24)
+    path("_help/", include("apps.cms.help_urls")),  # contextual help dialog (ARC.32)
     path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
     path("_styleguide/", include("apps.themes.urls")),
+    # Temporary staff "Site links" page for STAGE testing (OPS.12); remove before LIVE.
+    path("_links/", include("apps.seo.urls")),
     *i18n_patterns(
         path("vendor/apply/", include("apps.vendors.application_urls")),  # "Sell with us" (VEN.22)
         path("", include("apps.catalog.urls")),  # listings (CAT.8): before the CMS catch-all
         path("", include("apps.compliance.urls")),  # DSA contact points (CMP.5)
-        path("", include("apps.seo.urls")),  # cookie settings page (SEO.5)
+        path("", include("apps.seo.consent_urls")),  # cookie settings page (SEO.5)
         path("", include("apps.cms.urls")),
         prefix_default_language=False,
     ),

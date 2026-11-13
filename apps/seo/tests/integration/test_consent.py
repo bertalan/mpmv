@@ -216,6 +216,46 @@ def test_the_banner_markup_does_not_depend_on_the_visitors_choice(client: Client
     assert " hidden" in anonymous.split(">", 1)[0]
 
 
+def test_a_public_page_is_byte_identical_whatever_the_consent_state(client: Client) -> None:
+    """SEO.6 page cache safety: the HTML never holds one visitor's choice or a gated script."""
+    anonymous = client.get("/")
+    accepted = Client()
+    accepted.post("/consent/", {"action": "accept_all"}, headers=SAME_SITE)
+    rejected = Client()
+    rejected.post("/consent/", {"action": "reject_all"}, headers=SAME_SITE)
+    forged = Client()
+    forged.cookies[engine.COOKIE_NAME] = "garbage"
+    bodies = {
+        anonymous.content,
+        accepted.get("/").content,
+        rejected.get("/").content,
+        forged.get("/").content,
+    }
+    assert len(bodies) == 1
+    assert not anonymous.cookies, "a page view must not set a cookie (it would be cached)"
+
+
+def test_a_gated_script_tag_is_the_same_for_every_visitor() -> None:
+    template = Template(
+        '{% load consent %}{% consent_script "statistics" "https://stats.example/a.js" %}'
+    )
+    factory = RequestFactory()
+    plain = template.render(Context({"request": factory.get("/")}))
+    granted_request = factory.get("/")
+    granted_request.COOKIES[engine.COOKIE_NAME] = engine.encode_cookie(
+        engine.ConsentState(
+            decided=True,
+            granted=frozenset({"statistics"}),
+            banner_version=engine.BANNER_VERSION,
+            consent_id=str(uuid.uuid4()),
+        )
+    )
+    granted = template.render(Context({"request": granted_request}))
+    assert plain == granted
+    assert 'type="text/plain"' in plain
+    assert "src=" not in plain.replace("data-src=", "")
+
+
 def test_the_banner_offers_reject_and_accept_with_equal_weight(client: Client) -> None:
     banner = banner_of(client.get("/").content)
     buttons = dict(

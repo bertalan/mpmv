@@ -28,6 +28,7 @@ state; fixed to the bottom of the viewport, last in reading order like in the ta
   <script type="module" src="{% static 'themes/base/js/base.js' %}"></script>
   <script type="module" src="{% static 'themes/base/js/countdown.js' %}"></script>
   <script type="module" src="{% static 'themes/base/js/consent.js' %}"></script>
+  {% help_context as help_chrome %}{% if help_chrome %}<script type="module" src="{% static 'themes/base/js/help.js' %}"></script>{% endif %}
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
   <script src="{% static 'vendor/alpine-csp.min.js' %}" defer></script>
   {% if page %}{% faq_jsonld page %}{% endif %}

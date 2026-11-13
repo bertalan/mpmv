@@ -1,12 +1,27 @@
-{% if mode == "operational" %}
-<div class="session-level session-level--operational" role="status">
-  <strong>Operational mode</strong>
-  <span>About {{ minutes_left }} min left. It also ends when you sign out or after inactivity.</span>
-  <form action="{% url 'levels:end' %}" method="post">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit">End now</button></form>
+{% load i18n static %}{% if mode == "passkey_window" %}
+<div class="session-level session-level--open" role="status">
+  <strong>{% blocktranslate %}Passkey window open: {{ minutes_left }} min left{% endblocktranslate %}</strong>
+  <span>{% translate "It also closes when you sign out or after inactivity." %}</span>
+  <form action="{% url 'levels:close' %}" method="post">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit">{% translate "Close now" %}</button></form>
 </div>
-{% elif mode == "restricted" %}
-<div class="session-level session-level--restricted" role="status">
-  <strong>Secure mode</strong>
-  <span>Sensitive actions ask you to switch to Operational mode or to do them once.</span>
+{% elif mode == "no_window" %}
+{% comment %}D-32 (CORE.25): the way to open the passkey window sits here, not only in the refusal
+page. The form is the one of prompt.html (data-passkey="elevate", driven by accounts/passkey.js);
+without JavaScript the button does nothing and says so. The normal state has no name: a sensitive
+action is always sensitive, the window only lets one fresh passkey cover several of them.{% endcomment %}
+<div class="session-level session-level--closed" role="status">
+  <span>{% translate "Sensitive actions ask for your passkey once, or open a passkey window to cover several in a row." %}</span>
+  {% if may_elevate %}
+  <form data-passkey="elevate" data-csrf-token="{{ csrf_token }}" data-options-url="{% url 'levels:options' %}" data-finish-url="{% url 'levels:window' %}" data-next="{{ request.get_full_path }}">
+    <button type="button" data-passkey-start>{% translate "Open passkey window" %}</button>
+    <noscript><p>{% translate "Passkeys need JavaScript." %}</p></noscript>
+    <p data-passkey-error role="alert" hidden></p>
+  </form>
+  <script src="{% static 'accounts/passkey.js' %}" nonce="{{ csp_nonce }}" defer></script>
+  {% elif can_elevate %}
+  <a href="{{ security_url }}">{% translate "Add a passkey" %}</a>
+  {% else %}
+  <span>{% translate "Your role cannot open a passkey window." %}</span>
+  {% endif %}
 </div>
 {% endif %}

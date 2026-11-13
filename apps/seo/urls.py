@@ -1,10 +1,13 @@
-"""Consent settings page (SEO.5), mounted in `i18n_patterns` so it is shown in the visitor's
-language. The save endpoint has no language prefix: see `save_urls`."""
+"""Routes of the seo app: the temporary staff "Site links" page (OPS.12; remove before LIVE).
+
+Included by name from the root URLconf, so the apps below seo that import `mpmv.urls` in their
+test URLconfs do not import seo.
+"""
 
 from django.urls import path
 
 from . import views
 
 urlpatterns = [
-    path("cookie-settings/", views.consent_preferences, name="consent_preferences"),
+    path("", views.site_links_page, name="site_links"),
 ]

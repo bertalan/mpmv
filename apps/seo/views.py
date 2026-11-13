@@ -10,6 +10,7 @@ import datetime as dt
 import math
 from urllib.parse import urlsplit
 
+from django.contrib.auth.views import redirect_to_login
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.http.response import HttpResponseBase
 from django.shortcuts import render
@@ -17,13 +18,13 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_safe
 
 from apps.core.http import client_ip
 from apps.core.public_forms import Protection, public_form
 from apps.core.services import consume_rate_limit
 
-from . import engine
+from . import engine, site_links
 from .providers import category_texts, get_provider
 
 CHOICE_LIMIT = 20  # a visitor decides once or twice; 20 a minute per IP is generous
@@ -121,3 +122,25 @@ def consent_preferences(request: HttpRequest) -> HttpResponse:
             "preferences_url": reverse("consent_preferences"),
         },
     )
+
+
+@never_cache
+@require_safe
+def site_links_page(request: HttpRequest) -> HttpResponse:
+    """`/_links/`: the temporary staff "Site links" page (OPS.12; remove before LIVE).
+
+    A visitor is sent to the site sign-in page (`LOGIN_URL`) and back; a signed-in user
+    without staff status gets 404, so the page does not exist for them. Never indexed (meta
+    tag, `X-Robots-Tag`, robots.txt) nor stored (`never_cache`).
+    """
+    if not request.user.is_authenticated:
+        return redirect_to_login(request.get_full_path())
+    if not (request.user.is_active and request.user.is_staff):
+        raise Http404
+    response = render(
+        request,
+        "seo/site_links.html",
+        {"sections": site_links.site_link_sections(request)},
+    )
+    response["X-Robots-Tag"] = "noindex, nofollow"
+    return response

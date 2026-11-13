@@ -45,6 +45,9 @@ NOT_SENSITIVE_SERVICES = {
     "apps.cart.services.merge_carts": "a shopper's cart, not a financial or security fact",
     "apps.seo.services.record_consent": "the visitor's own consent decision, itself the "
     "append-only proof log, with no personal data beyond a random id (SEO.5)",
+    # PAY.2: a signed provider webhook has no actor; it builds its own system AuditContext and
+    # writes `payments.payment.succeeded` itself.
+    "apps.payments.services.process_webhook": "audits internally with a system context (no actor)",
 }
 
 

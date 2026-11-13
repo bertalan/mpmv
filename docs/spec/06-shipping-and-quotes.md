@@ -88,9 +88,9 @@ own weight bands, free-shipping threshold and delivery time.
 
 **VAT treatment per method.** `tax_treatment` is stored per method and applied by the tax engine
 (`resolve_shipping_tax`, TAX.4): `follows_goods` (default) treats shipping as ancillary to the goods
-and splits its VAT like the goods ([05](05-tax.md)); `standard_rate` and `exempt` are recorded for the
-cases the tax advisor confirms. Their exact computation belongs to TAX.4 and depends on D-03, which
-is open: SHP.12 only stores the choice.
+and splits its VAT like the goods ([05](05-tax.md)). It is the only value: D-03 is decided (adviser
+opinion 2026-11-11), shipping always follows the goods, and TAX.17 removed `standard_rate` and `exempt`
+(a data migration set stored rows to `follows_goods`).
 
 ### Zones: vendor zones, country groups and postcodes
 
@@ -242,7 +242,7 @@ files are still read (they hold neither), and files are always written in versio
 
 Amounts and weights are decimal strings (`"9.90"`, `"5.000"`), never floats. Lists hold text.
 `tax_treatment` and `over_max_weight` travel as stored data only: their meaning depends on D-03
-(TAX.4) and D-06 (SHP.3). Translated names (method and group names, pickup labels) are not part of
+(TAX.4; after TAX.17 only `follows_goods` is accepted) and D-06 (SHP.3). Translated names (method and group names, pickup labels) are not part of
 the format: they stay with the translation workflow.
 
 **CSV**: the same rows, one per line, with the header `record, code, version, name, priority,
