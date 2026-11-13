@@ -62,3 +62,4 @@ script or style.
   </div>
 {% endblock %}
 {% block footer %}{% if release_version %}<footer class="manager-footer"><p class="manager-footer__version">{% translate "Version" %} {{ release_version }}</p></footer>{% endif %}{% endblock %}
+{% comment %}The back office sets no cookies that need consent and its forms carry a CSRF token; the public consent banner (csrf-exempt by design, for cached pages) does not belong here.{% endcomment %}{% block consent %}{% endblock %}

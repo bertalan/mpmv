@@ -94,6 +94,11 @@ secrets, and the identifier typed in a failed login that matches no account (it 
 of a real address or a password typed in the wrong field; the entry's key is `unknown`).
 Failures refused during a lockout are not audited one by one: the lockout entry covers them.
 
+Not audited on purpose: `seo.consentlog` (SEO.5, D-10), the visitor's own consent decisions. It is
+itself an append-only proof log (time, granted categories, banner version, provider, page
+language and a random consent id; no IP address, no user agent, no account), written through
+`seo.services.record_consent` and never updated. See [consent-providers.md](consent-providers.md).
+
 ## Rules for new code
 
 1. **Classify every model.** Each app's `AppConfig` lists `audited_models` and

@@ -483,6 +483,10 @@ msgstr ""
 msgid "About the shop"
 msgstr "Informazioni sul negozio"
 
+#: apps/seo/templates/seo/consent/_actions.html
+msgid "Accept all"
+msgstr "Accetta tutti"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Accept the order"
 msgstr "Accetta l'ordine"
@@ -573,6 +577,14 @@ msgstr "Tutti"
 #: apps/manager/views.py
 msgid "all languages"
 msgstr "tutte le lingue"
+
+#: apps/seo/admin_views.py
+msgid "Allow search engines to index this site"
+msgstr "Consenti ai motori di ricerca di indicizzare questo sito"
+
+#: apps/seo/models.py
+msgid "allow search engines to index this site"
+msgstr "consenti ai motori di ricerca di indicizzare questo sito"
 
 #: apps/compliance/models.py
 msgid ""
@@ -886,6 +898,10 @@ msgstr "Scegli un venditore attivo o sospeso."
 msgid "Choose a version"
 msgstr "Scegli una versione"
 
+#: apps/seo/templates/seo/consent/banner.html
+msgid "Choose categories"
+msgstr "Scegli le categorie"
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
 msgstr "Scegli come confermare la tua identità dopo la password."
@@ -1048,6 +1064,18 @@ msgstr "Vai al riepilogo"
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "Continue to your request"
 msgstr "Continua con la tua richiesta"
+
+#: apps/seo/templates/seo/consent/_categories.html
+msgid "Cookie categories"
+msgstr "Categorie di cookie"
+
+#: apps/seo/templates/seo/consent/preferences.html apps/seo/templatetags/consent.py
+msgid "Cookie settings"
+msgstr "Impostazioni dei cookie"
+
+#: apps/seo/templates/seo/consent/banner.html
+msgid "Cookies and your privacy"
+msgstr "Cookie e la tua privacy"
 
 #: apps/orders/ui/forms.py
 msgid "Country"
@@ -1721,6 +1749,14 @@ msgstr ""
 msgid "Increase quantity"
 msgstr "Aumenta la quantità"
 
+#: apps/seo/templates/seo/admin/settings.html
+msgid ""
+"Indexing is forced off by the server (MPMV_FORCE_NOINDEX or demo mode). Every page is noindex and "
+"this switch cannot be turned on here."
+msgstr ""
+"Il server impone la non indicizzazione (MPMV_FORCE_NOINDEX o modalità demo). Ogni pagina è noindex"
+" e qui non puoi attivare questo interruttore."
+
 #: themes/base/templates/components/alert.html
 msgid "Information"
 msgstr "Informazione"
@@ -1794,6 +1830,9 @@ msgstr "Articolo"
 msgid "Items"
 msgstr "Articoli"
 
+#: apps/seo/providers.py
+msgid "Keeps the site working: sign-in, cart and security. Always on."
+msgstr "Fa funzionare il sito: accesso, carrello e sicurezza. Sempre attivi."
 #: apps/compliance/forms.py
 msgid "Kept with the notice, not shown to the vendor. Ends the payout freeze."
 msgstr "Conservata con il preavviso, non mostrata al venditore. Termina il blocco dei pagamenti."
@@ -1853,6 +1892,10 @@ msgstr "Note legali"
 #: apps/catalog/taxonomy.py
 msgid "legal name"
 msgstr "ragione sociale"
+
+#: apps/seo/providers.py
+msgid "Lets us measure our adverts and show you offers on other sites."
+msgstr "Ci permette di misurare le nostre pubblicità e di mostrarti offerte su altri siti."
 
 #: apps/manager/forms.py
 msgid "Letters, digits, spaces and . / _ - only."
@@ -1962,6 +2005,10 @@ msgstr "Segna come consegnato"
 msgid "Mark as shipped"
 msgstr "Segna come spedito"
 
+#: apps/seo/providers.py
+msgid "Marketing"
+msgstr "Marketing"
+
 #: apps/manager/templates/manager/platform/dashboard.html
 msgid "Marketplace work across vendors. The menu lists the sections you may open."
 msgstr ""
@@ -1991,6 +2038,10 @@ msgstr "I miei ordini"
 #: apps/catalog/taxonomy.py
 msgid "name"
 msgstr "nome"
+
+#: apps/seo/providers.py
+msgid "Necessary"
+msgstr "Necessari"
 
 #: apps/catalog/templates/catalog/product.html
 msgid "Needed with this product"
@@ -2171,6 +2222,26 @@ msgstr "Segnalante"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "off"
 msgstr "non attiva"
+
+#: apps/seo/models.py
+msgid ""
+"Off (the default): search engines are told not to index any page of this site. On: pages can "
+"appear in search results. It has no effect while the server forces noindex (STAGE or demo)."
+msgstr ""
+"Disattivato (predefinito): ai motori di ricerca viene chiesto di non indicizzare nessuna pagina di"
+" questo sito. Attivato: le pagine possono comparire nei risultati di ricerca. Non ha effetto "
+"finché il server impone noindex (STAGE o demo)."
+
+#: apps/seo/admin_views.py
+msgid ""
+"Off keeps every page noindex (meta tag, X-Robots-Tag header and robots.txt). A new site starts "
+"off. Turn it on only when the shop is open to the public. A stored value takes effect as soon as "
+"the server floor is lifted: re-check it when moving from STAGE to LIVE."
+msgstr ""
+"Disattivato mantiene ogni pagina noindex (meta tag, intestazione X-Robots-Tag e robots.txt). Un "
+"sito nuovo parte disattivato. Attivalo solo quando il negozio è aperto al pubblico. Un valore "
+"salvato ha effetto non appena il server toglie il blocco: ricontrollalo quando passi da STAGE a "
+"LIVE."
 
 #: apps/core/models.py
 msgid ""
@@ -2712,6 +2783,10 @@ msgstr "Posizione"
 msgid "Postcode"
 msgstr "CAP"
 
+#: apps/seo/providers.py
+msgid "Preferences"
+msgstr "Preferenze"
+
 #: apps/manager/templates/manager/list.html
 msgid "Preview"
 msgstr "Anteprima"
@@ -2806,6 +2881,10 @@ msgstr "Quantità, %(name)s"
 msgid "Quote requested"
 msgstr "Preventivo richiesto"
 
+#: apps/seo/templates/seo/consent/banner.html
+msgid "Read more and choose"
+msgstr "Scopri di più e scegli"
+
 #: apps/seo/site_links.py
 msgid "Readiness probe"
 msgstr "Controllo di prontezza"
@@ -2871,6 +2950,10 @@ msgstr "Rimborsato"
 msgid "Register a passkey"
 msgstr "Registra una passkey"
 
+#: apps/seo/templates/seo/consent/_actions.html
+msgid "Reject all"
+msgstr "Rifiuta tutti"
+
 #: apps/catalog/taxonomy_admin.py
 msgid "Reject all brands of the selected batches"
 msgstr "Rifiuta tutti i marchi dei lotti selezionati"
@@ -2886,6 +2969,10 @@ msgstr "Rifiutata"
 #: apps/catalog/taxonomy_admin.py
 msgid "Relative to"
 msgstr "Rispetto a"
+
+#: apps/seo/providers.py
+msgid "Remembers choices you make, such as your garage or your layout."
+msgstr "Ricorda le scelte che fai, come il tuo garage o la disposizione della pagina."
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 #: apps/accounts/templates/accounts/mfa/setup.html themes/base/templates/components/cart_line.html
@@ -2978,13 +3065,17 @@ msgstr "Ruoli"
 msgid "sameAs links"
 msgstr "Link sameAs"
 
-#: apps/manager/templates/manager/shop/profile.html
+#: apps/manager/templates/manager/shop/profile.html apps/seo/admin_views.py
 msgid "Save"
 msgstr "Salva"
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Save logo"
 msgstr "Salva logo"
+
+#: apps/seo/templates/seo/consent/banner.html apps/seo/templates/seo/consent/preferences.html
+msgid "Save my choices"
+msgstr "Salva le mie scelte"
 
 #: apps/compliance/forms.py
 msgid "Say whether the content is illegal or only against the platform terms."
@@ -3035,6 +3126,9 @@ msgstr ""
 "Le azioni sensibili chiedono la tua passkey una volta, oppure apri una finestra passkey per "
 "coprirne diverse di seguito."
 
+#: apps/seo/wagtail_hooks.py
+msgid "SEO"
+msgstr "SEO"
 #: apps/compliance/forms.py
 msgid "Sent to the vendor as the reason for the termination."
 msgstr "Inviato al venditore come motivo della cessazione."
@@ -3042,6 +3136,14 @@ msgstr "Inviato al venditore come motivo della cessazione."
 #: apps/catalog/taxonomy.py
 msgid "SEO description"
 msgstr "Descrizione SEO"
+
+#: apps/seo/admin_views.py apps/seo/models.py
+msgid "SEO settings"
+msgstr "Impostazioni SEO"
+
+#: apps/seo/admin_views.py
+msgid "SEO settings saved."
+msgstr "Impostazioni SEO salvate."
 
 #: apps/catalog/taxonomy.py
 msgid "SEO title"
@@ -3193,6 +3295,11 @@ msgstr "Mostrata sull'articolo. Un articolo importato mantiene la sua data origi
 msgid "Shown to the vendor and kept in the audit log."
 msgstr "Viene mostrato al venditore e conservato nel registro delle operazioni."
 
+#: apps/seo/providers.py
+msgid "Shows us, in aggregate, which pages are used so we can improve the shop."
+msgstr ""
+"Ci mostra, in forma aggregata, quali pagine vengono usate, così possiamo migliorare il negozio."
+
 #: apps/manager/templates/manager/login.html apps/seo/site_links.py
 msgid "Sign in"
 msgstr "Accedi"
@@ -3214,6 +3321,14 @@ msgstr ""
 #: apps/ingest/models.py
 msgid "Since when the item is no longer in the feed. Empty while it is there."
 msgstr "Da quando l'articolo non è più nel flusso. Vuoto finché c'è."
+
+#: apps/seo/admin_views.py
+msgid "Site"
+msgstr "Sito"
+
+#: apps/seo/models.py
+msgid "site"
+msgstr "sito"
 
 #: apps/cms/templatetags/cms_tags.py apps/seo/templates/seo/site_links.html
 msgid "Site links"
@@ -3325,6 +3440,10 @@ msgstr "Inizia a fare acquisti"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Statements of reasons"
 msgstr "Motivazioni"
+
+#: apps/seo/providers.py
+msgid "Statistics"
+msgstr "Statistiche"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
@@ -4995,6 +5114,10 @@ msgstr ""
 "L'unico indirizzo di contatto per le autorità. La legge (DSA articolo 11) ne chiede uno; viene "
 "pubblicato nella pagina pubblica dei contatti."
 
+#: apps/seo/admin_views.py
+msgid "The site these settings belong to; each site has its own switch."
+msgstr "Il sito a cui appartengono queste impostazioni; ogni sito ha il proprio interruttore."
+
 #: apps/themes/models.py
 msgid "The site this theme is for. Each site has one theme."
 msgstr "Il sito a cui si applica questo tema. Ogni sito ha un solo tema."
@@ -5868,6 +5991,22 @@ msgstr ""
 " per ora viene solo salvato). Al massimo 2000 caratteri. Non scrivere dati personali, nomi, "
 "indirizzi email o indirizzi web."
 
+#: apps/seo/templates/seo/consent/banner.html
+msgid ""
+"We always use the cookies the site needs to work. We only use the others if you say yes, and "
+"saying no costs you nothing."
+msgstr ""
+"Usiamo sempre i cookie di cui il sito ha bisogno per funzionare. Usiamo gli altri solo se dici di "
+"sì, e dire di no non ti costa nulla."
+
+#: apps/seo/templates/seo/consent/preferences.html
+msgid ""
+"We always use the cookies the site needs to work. We only use the others if you say yes. You can "
+"change your mind here at any time."
+msgstr ""
+"Usiamo sempre i cookie di cui il sito ha bisogno per funzionare. Usiamo gli altri solo se dici di "
+"sì. Qui puoi cambiare idea in qualsiasi momento."
+
 #: apps/orders/messages.py
 msgid "We are not taking new orders right now. Nothing was charged. Please try again later."
 msgstr "Al momento non accettiamo nuovi ordini. Non ti è stato addebitato nulla. Riprova più tardi."
@@ -6499,6 +6638,13 @@ msgstr ""
 "Il tuo indirizzo di posta elettronica certificata (PEC), se ce l'hai. È obbligatorio quando il "
 "codice destinatario SDI è 0000000."
 
+#: apps/seo/templates/seo/consent/preferences.html
+msgid "Your choice is saved on this device for six months."
+msgstr "La tua scelta resta salvata su questo dispositivo per sei mesi."
+
+#: apps/seo/templates/seo/consent/banner.html
+msgid "Your cookie choice was saved."
+msgstr "La tua scelta sui cookie è stata salvata."
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Your data"
 msgstr "I tuoi dati"

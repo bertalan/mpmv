@@ -1,0 +1,93 @@
+/* Base theme, consent banner and cookie settings page (SEO.5, SEO.9, THM.9). Colours only through
+   tokens, in the pairs of the token contract (text on the surface). Reject and Accept share one
+   button variant, so neither is pushed. */
+@layer components {
+  /* The banner is fixed to the bottom while it shows; consent.js sets --consent-offset to its
+     height so focused elements are never hidden behind it (WCAG 2.4.11) and the page can scroll
+     past it. */
+  html {
+    scroll-padding-block-end: var(--consent-offset, 0px);
+  }
+
+  body {
+    padding-block-end: var(--consent-offset, 0px);
+  }
+
+  .consent-banner {
+    position: fixed;
+    inset-block-end: 0;
+    inset-inline: 0;
+    z-index: 200;
+    max-block-size: 80vh;
+    overflow-y: auto;
+    padding: var(--space-m);
+    border-block-start: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .consent-banner[hidden] {
+    display: none;
+  }
+
+  .consent-banner form {
+    display: grid;
+    gap: var(--space-s);
+    max-inline-size: 60rem;
+    margin-inline: auto;
+  }
+
+  .consent-banner__title {
+    margin: 0;
+  }
+
+  .consent-banner p {
+    margin: 0;
+  }
+
+  .consent-banner__details > summary {
+    cursor: pointer;
+    min-block-size: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .consent-categories {
+    display: grid;
+    gap: var(--space-s);
+    margin: var(--space-s) 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .consent-category {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: var(--space-xs);
+    align-items: center;
+  }
+
+  .consent-category input {
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+  }
+
+  .consent-category__help {
+    grid-column: 2;
+    margin: 0;
+    color: var(--color-text-muted);
+  }
+
+  .consent-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
+  }
+
+  .consent-preferences form {
+    display: grid;
+    gap: var(--space-m);
+    max-inline-size: 40rem;
+  }
+}
