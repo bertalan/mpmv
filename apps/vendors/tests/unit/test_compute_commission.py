@@ -130,36 +130,89 @@ def test_amounts_are_decimal_with_two_places_never_float() -> None:
         assert value == value.quantize(D("0.01"))
 
 
-def test_refund_fee_lines_are_included_and_rounded_up_to_the_euro() -> None:
-    result = commission.compute_commission(
+def refund(event: commission.RefundEvent, gross: str = "122.00") -> commission.RefundLines:
+    return commission.refund_lines(
         snap(),
+        event,
         goods_net=D("100.00"),
-        gross_paid=D("122.00"),
-        refund_provider_costs=[D("3.15"), D("1.20")],
+        gross_paid=D(gross),
         refund_fee_rule=RefundFeeRule(),
     )
-    assert result.refund_fees == (D("6.00"), D("4.00"))
-    assert result.refund_fee_total == D("10.00")
-    assert result.vendor_net == D("85.12")
 
 
-def test_refund_fee_is_zero_on_a_platform_error() -> None:
-    result = commission.compute_commission(
-        snap(),
-        goods_net=D("100.00"),
-        gross_paid=D("122.00"),
-        refund_provider_costs=[D("3.15")],
-        refund_fee_rule=RefundFeeRule(),
-        platform_error=PlatformErrorExclusion(reason="gateway fault", set_by="staff"),
-    )
-    assert result.refund_fee_total == D("0.00")
+def test_compute_commission_has_no_refund_fields() -> None:
+    result = commission.compute_commission(snap(), goods_net=D("100.00"), gross_paid=D("122.00"))
+    assert not any("refund" in field for field in vars(result))
 
 
-def test_refund_costs_without_a_refund_fee_rule_are_refused() -> None:
-    with pytest.raises(ValueError, match="refund"):
-        commission.compute_commission(
-            snap(), goods_net=D("100.00"), gross_paid=D("122.00"), refund_provider_costs=[D("1")]
+def test_review_case_partial_refund_of_61_on_122_with_provider_cost_1_20() -> None:
+    lines = refund(commission.RefundEvent(D("61.00"), D("1.20")))
+    assert lines.commission_reversal == D("10.00")
+    assert lines.payment_fee_reversal == D("3.44")
+    assert lines.refund_fee == D("4.00")
+    # taken back from the vendor: 61 - 10 - 3.44 + 4 = 51.56 (the vendor's net on the refunded
+    # share is 61 - 10 - 3.44 = 47.56, and the refund fee is charged to it on top)
+    assert lines.vendor_clawback == D("51.56")
+
+
+def test_a_full_refund_reverses_the_whole_commission_and_payment_fee() -> None:
+    lines = refund(commission.RefundEvent(D("122.00"), D("3.15")))
+    assert lines.commission_reversal == D("20.00")
+    assert lines.payment_fee_reversal == D("6.88")
+    assert lines.refund_fee == D("6.00")
+
+
+def test_reversal_is_pro_rata_rounded_half_up_per_line() -> None:
+    # refunded 1.00 of 122.00 -> commission 0.1639 -> 0.16, fee 0.0564 -> 0.06
+    lines = refund(commission.RefundEvent(D("1.00"), D("0.00")))
+    assert lines.commission_reversal == D("0.16")
+    assert lines.payment_fee_reversal == D("0.06")
+    assert lines.refund_fee == D("2.00")
+
+
+def test_refund_fee_is_zero_on_a_platform_error_but_the_reversals_stay() -> None:
+    lines = refund(
+        commission.RefundEvent(
+            D("61.00"), D("3.15"), PlatformErrorExclusion(reason="gateway fault", set_by="staff")
         )
+    )
+    assert lines.refund_fee == D("0.00")
+    assert lines.commission_reversal == D("10.00")
+
+
+def test_review_case_mixed_events_3_15_excluded_and_1_20_charged_total_4_00() -> None:
+    excluded = commission.RefundEvent(
+        D("30.00"), D("3.15"), PlatformErrorExclusion(reason="gateway fault", set_by="staff")
+    )
+    charged = commission.RefundEvent(D("30.00"), D("1.20"))
+    fees = [refund(event).refund_fee for event in (excluded, charged)]
+    assert fees == [D("0.00"), D("4.00")]
+    assert sum(fees) == D("4.00")
+
+
+def test_a_refund_above_the_gross_paid_or_negative_is_refused() -> None:
+    with pytest.raises(ValueError, match="refund"):
+        refund(commission.RefundEvent(D("122.01"), D("1.00")))
+    with pytest.raises(ValueError, match="negative"):
+        refund(commission.RefundEvent(D("-1.00"), D("1.00")))
+    with pytest.raises(ValueError, match="negative"):
+        refund(commission.RefundEvent(D("10.00"), D("-1.00")))
+
+
+def test_refund_lines_without_a_rule_snapshot_is_blocking() -> None:
+    with pytest.raises(engine.NoCommissionRule):
+        commission.refund_lines(
+            None,
+            commission.RefundEvent(D("1"), D("1")),
+            goods_net=D("100"),
+            gross_paid=D("122"),
+            refund_fee_rule=RefundFeeRule(),
+        )
+
+
+def test_no_field_passes_the_refund_fee_on_to_the_customer() -> None:
+    lines = refund(commission.RefundEvent(D("61.00"), D("1.20")))
+    assert not any("customer" in f or "consumer" in f for f in vars(lines))
 
 
 def test_a_snapshot_missing_a_field_is_refused() -> None:
