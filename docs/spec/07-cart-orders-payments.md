@@ -232,6 +232,70 @@ per vendor order (`proof_missing`, `proof_partial`, `proof_complete`, `declarati
 staff. The proofs are stored as private documents on the vendor order, with the party that issued
 each of them.
 
+### Checkout legal step (ORD.17, owner decision D-40)
+
+The last step before payment, in the core checkout and in any checkout module, follows the counsel opinion of
+2026-11-13 (questions L-1 to L-6, D-40). Each seller's sales terms must be readable **before** the button: sending them
+only after payment would leave them out of the contract (art. 1341(1) c.c.; artt. 49 and 51 Codice del consumo), and the
+right of withdrawal does not cure missing pre-contractual information (art. 53 extends withdrawal by 12 months; art. 57
+moves the return costs to the seller; the platform answers for its interface under art. 31 DSA).
+
+**Per seller, in that seller's block of the recap** (in clear or in an accordion that opens on the same page):
+
+- the goods, quantities, prices, VAT and that seller's shipping cost;
+- identity: full legal name, "professional seller" status (or not, art. 49-bis), geographic address, VAT or registration
+  number, contact email;
+- the split of obligations: the sales contract is concluded directly with the seller, who is responsible for shipping,
+  conformity, invoicing, returns and withdrawals; the platform provides the marketplace service and collects the payment;
+- the delivery time the seller commits to (a date or a range);
+- withdrawal for consumers: 14 days from delivery, also through the online withdrawal button; who pays the direct cost
+  of returning the goods; for goods that cannot normally be returned by post (pallet, bulky), a reasonable estimate of
+  the maximum return cost (art. 49(1)(i)); if it is missing, the seller pays the return;
+- the legal guarantee reminder (24 months for consumers) and, when the buyer used the garage, the selected item with
+  "Compatibility declared by the seller" (D-38);
+- a link "Sales terms of <seller> (version <n> of <date>, download PDF)" that opens a printable page or downloads the
+  version in force (art. 12(3) D.Lgs. 70/2003, mandatory for business buyers too).
+
+**Right above the button, with no long text in between** (art. 51(2); CJEU C-249/21):
+
+- the short list of goods and the final total with VAT, shipping and every other charge, with the share of each seller;
+- **box 1**, mandatory for every buyer, unticked: the buyer declares to have read and to accept the platform's terms of
+  use **and the sales terms of each seller named in the recap** (one link per seller), and to have read the privacy
+  notice (an acknowledgement, not a consent: the order runs on the contract basis; any marketing consent is a separate,
+  optional, unticked box);
+- **box 2**, only between businesses: a **business buyer** (one who chose to buy as a business and gave a VAT number;
+  the VIES result drives the tax treatment, not box 2: an unverified number still shows box 2, because the buyer
+  declared to act as a business) **and** an Italian party, that
+  is the operator established in Italy (`current_operator()`, never a literal) and/or at least one seller in the cart
+  established in Italy (owner, 2026-11-13). It is the specific approval under artt. 1341 and 1342 c.c. of the onerous
+  clauses, each named by **article number and title** (a generic "I approve all onerous clauses" is not valid): the
+  platform terms' list when the operator is Italian (declared per version of the customer terms of use in the same
+  structured form as VEN.35, kept with the CMP.5 versioned terms; the vendor-contract clauses of CMP.5 are not part of it), then the list each seller in the cart declared for the version
+  in force (VEN.35) when that seller is established in Italy **or its terms choose Italian law**. Any other foreign
+  seller's B2B terms follow its own law (Reg. (EC) 593/2008) and its court clause is valid through the pre-contract
+  link and box 1 (art. 25 Reg. (EU) 1215/2012), so its clauses are not listed (owner chose this variant A, 2026-11-13).
+  The owner chose counsel's option A (2026-11-13): box 2 is never shown to a consumer, because asking a consumer to
+  approve clauses that are void for them (artt. 33-36 Codice del consumo) is a misleading practice;
+- the button, whose label names the obligation to pay: "Confirm order and pay now – EUR <total>" (IT "Conferma ordine e
+  paga ora – EUR <totale>"); never "Complete order" or "Send";
+- after a redirect back from the provider (3-D Secure) and before the webhook: a "payment received, confirming" state
+  with a short HTMX poll; only the webhook marks the order paid.
+
+**Competent court and applicable law** (counsel confirmed the rule):
+
+- consumer: the court of the consumer's residence, never moved by any term (art. 66-bis Codice del consumo; artt. 17-19
+  Reg. (EU) 1215/2012), and the mandatory law of the consumer's habitual residence is kept (art. 6(2) Reg. (EC)
+  593/2008);
+- business: for disputes with the operator, the court of the operator's seat; for the sales contract, the court in the
+  seller's terms, or, when the seller names none, the court of the seller's registered office (the fallback clause in
+  the platform terms). In box 2 the court clause is one of the listed onerous clauses;
+- the terms never link the retired EU ODR platform (Reg. (EU) 2024/3228 repealed Reg. 524/2013 from 2025-07-20).
+
+The confirmation email carries, on a durable medium (the text or a PDF, not only a link), the accepted platform terms and
+each seller's sales terms in the version of the order (art. 51(7)): this is the confirmation duty, never a substitute for
+the information before the button. The ready-made texts of box 1, box 2 and the court clauses are in counsel's opinion
+(kept private); the legal pages and the translations use them.
+
 ## 7.3 Tasks
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
@@ -258,3 +322,5 @@ each of them.
 | ORD.14 | Order privacy masking, the vendor "accounting" role and the Tax/Audit permission (D-29, D-30): in `restricted_tax_only` the personal fields (name, addresses, email, phone, tax ids) are masked (for example `j***@example.com`) in every ordinary vendor, support and customer-facing UI, in the API and in exports; in clear only for the vendor owner, a new vendor role "accounting" (assigned by the owner, own orders only) and the platform Tax/Audit permission (a CORE.18 role); every in-clear view needs a reason and writes an `AuditLog` entry with actor, order, time and reason; Support impersonation never reveals the clear fields | P1 | 10 | ORD.2, CORE.18, CORE.17, ARC.9 | A `restricted_tax_only` seed order is masked for a vendor member, a Support user, the API and the CSV export, and in clear for the vendor owner, a vendor accounting member (own vendor only) and a platform Tax/Audit holder; a reasonless reveal is refused; each reveal writes an `AuditLog` entry with actor, order, time and reason; an `active` order is shown normally; the owner can assign and remove the accounting role and no other member can |
 | ORD.15 | Vendor fiscal evidence package (D-30): a download per order for the vendor, while the order is `active` or `restricted_tax_only`, holding the order snapshot, the VIES log (time, number, returned name) and the transport proofs; personal fields in clear only to those allowed by ORD.14 (every download audited with a reason); no invoices, the platform issues none; refused once the order is `anonymized` | P1 | 6 | ORD.2, ORD.14, VEN.12 | A seed order's package holds the snapshot, the VIES log with the returned name and the transport proofs; a vendor member without the owner or accounting role gets the masked version; the download is in the `AuditLog`; an `anonymized` order has no package |
 | ORD.16 | Email language follow-ups (coherence check 19, ORD.9 1/2 leftovers): the German, French and Spanish bodies of every ORD.9 email are translated (today they fall back to English); vendors get a mail language setting, and vendor mails use it, with the platform language as the fallback | P2 | 4 | ORD.9, I18N.7 | Each ORD.9 email renders in the five languages with no English fallback in de, fr and es (snapshot tests); a vendor with a language set receives mails in it, a vendor with none in the platform language |
+| ORD.17 | Checkout legal step (owner decision D-40 and counsel opinion of 2026-11-13, §Checkout legal step): per-seller recap block (identity, professional status, address, VAT number, contact, split of obligations, delivery time, withdrawal and who pays the return, maximum return-cost estimate for goods not returnable by post, legal guarantee, garage item, link to the seller's terms version with PDF); total with each seller's share right above the button; box 1 for every buyer (platform terms plus each named seller's terms, privacy notice read); box 2 only between businesses with an Italian operator and/or a seller established in Italy or choosing Italian law, built from the Italian operator's and those sellers' declared onerous clauses by article number and title (VEN.35); button "Confirm order and pay now – EUR <total>"; accepted versions (platform terms, one per seller, box 2 text) and the time stored on the order; terms on a durable medium in the confirmation email; "payment received, confirming" state after a provider redirect (only the webhook marks paid); ⚖️ (L) counsel answered L-1 to L-6; phase note: this F2 task waits for the F3 rows VEN.35 and CMP.5, so the checkout legal step ships after them | P1 | 14 | ORD.5, ORD.9, PAY.2, CMP.5, CMP.6, VEN.35 | The order cannot be placed without box 1, nor without box 2 for a business buyer when the operator is Italian or a seller in the cart is established in Italy or chooses Italian law (server-side too); a consumer never sees box 2, also when buying from an Italian seller on an Italian operator; a business with an unverified VAT number still sees it; the operator condition reads `current_operator()` and a test with a non-Italian operator and a foreign seller shows no box 2; a business buying only from a foreign seller on a foreign operator sees no box 2; box 2 names every article by number and title for the Italian operator and each seller in the cart that is established in Italy or whose terms choose Italian law, and no other seller; each seller block shows identity, delivery time, return cost and, for a bulky item, the return-cost estimate, and links a downloadable PDF of the terms version in force; the order stores the platform version, one version per seller, the box 2 text and the time; the button label contains the total; the confirmation email attaches the terms; a redirect before the webhook shows the confirming state and the order stays unpaid until the webhook |
+| ORD.18 | Single-page accordion checkout, the **first paid module** (owner decision D-40): one page with a compact order summary on top; billing, delivery ("same as billing" ticked by default), shipping per vendor package, courier notes and payment as steps; a finished step closes into an editable summary row; totals recalculate after billing (country, VIES); the Stripe Payment Element opens inline before the payment exists and the order and PaymentIntent are created on "Pay now"; progress (addresses, choices, notes, step) saved server-side with the cart and expiring with it, across devices when signed in; keyboard and phone first; Turnstile survives the steps; ORD.17's legal step is reused, not copied; UI only over the core services, which re-check everything; lives in a private module package (ARC.33); its activation option picks the mixed-cart policy (whole marketplace by default, every vendor entitled, or at least one) | P2 | 24 | ARC.33, ORD.17, PAY.3, PAY.4 | With the module on, a mixed 3-vendor cart pays on one page and a reload resumes at the same step; with it off, the core checkout runs; a tampered step (skipped terms, changed price) is refused by the core services |
