@@ -1,0 +1,37 @@
+{% extends "layouts/account.html" %}
+{% load i18n %}
+{% block title %}{% translate "My orders" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block account_content %}
+  <h1>{% translate "My orders" %}</h1>
+  {% if rows %}
+    <div class="table-scroll" role="region" aria-labelledby="orders-caption" tabindex="0">
+      <table class="table">
+        <caption id="orders-caption">{% translate "Your orders, newest first" %}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{% translate "Order" %}</th>
+            <th scope="col">{% translate "Date" %}</th>
+            <th scope="col">{% translate "Status" %}</th>
+            <th scope="col" class="numeric">{% translate "Total" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <th scope="row"><a href="{% url 'customer_order' row.public_id %}">{{ row.number }}</a></th>
+              <td><time datetime="{{ row.placed|date:'c' }}">{{ row.placed|date:"SHORT_DATE_FORMAT" }}</time></td>
+              <td>{{ row.status }}</td>
+              <td class="numeric">{{ row.total }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "components/pagination.html" with page=orders_page.number page_count=orders_page.paginator.num_pages previous_url=previous_url next_url=next_url only %}
+  {% else %}
+    {% translate "You have no orders yet" as empty_title %}
+    {% translate "When you buy something, you find it here with its status and tracking." as empty_text %}
+    {% include "components/empty_state.html" with title=empty_title text=empty_text only %}
+  {% endif %}
+{% endblock %}

@@ -6,6 +6,7 @@ import json
 import posixpath
 import uuid
 from typing import Any, ClassVar, Self
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.contrib.postgres.constraints import ExclusionConstraint
@@ -15,6 +16,7 @@ from django.core.files.base import ContentFile
 from django.core.validators import URLValidator
 from django.db import models, transaction
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from wagtail.images.models import AbstractImage, AbstractRendition, Image, get_upload_to
 from wagtail.models import Collection
 
@@ -35,13 +37,15 @@ from .image_licences import (
     metadata_errors,
     restricted_licence_error,
 )
+from .profile_links import profile_key
 from .svg import LOGO_COLLECTION_NAME, MAX_SVG_BYTES, UnsafeSvgError, sanitise_svg
 
 # The dedicated platform owner permission (spec 02 roles, CMP.13): never implied by staff or
 # admin access, superuser status included. Granted as `core.platform_owner`, directly or through a
 # group, and checked by `services.is_platform_owner`, not `has_perm` (true for any superuser).
 PLATFORM_OWNER_CODENAME = "platform_owner"
-# D-32 (CORE.25): the roles that may switch a session to operational mode ("Do it once" too).
+# D-32 (CORE.25): the roles that may open a passkey window ("Do it once" too). The codename is a
+# stored identifier (roles hold it), so it keeps its name.
 ELEVATE_CODENAME = "elevate"
 
 
@@ -294,7 +298,12 @@ class Versioned(BaseModel):
     Declare `valid_period_check(...)` among the subclass's constraints.
     """
 
-    valid_from = models.DateTimeField()
+    valid_from = models.DateTimeField(
+        help_text=_(
+            "When this version starts to apply. A change is a new version from a date; the "
+            "service that adds it closes the previous one."
+        )
+    )
     valid_to = models.DateTimeField(null=True, blank=True, editable=False)
 
     # The only fields an existing row may write: closing its validity period.
@@ -343,6 +352,41 @@ def validate_language_code(value: str) -> None:
 validate_https_url = URLValidator(schemes=["https"], message="Enter an https:// address.")
 
 
+MAX_OFFICIAL_PROFILES = 10
+
+
+def official_profile_errors(urls: Any) -> list[str]:
+    """One message per refused entry of a list of official profile links: not a string, not an
+    https link, with a user name or password in it, or listed twice."""
+    if not isinstance(urls, list):
+        return ["Enter a list of links."]
+    errors: list[str] = []
+    seen: set[str] = set()
+    if len(urls) > MAX_OFFICIAL_PROFILES:
+        errors.append(f"List at most {MAX_OFFICIAL_PROFILES} profile links.")
+    for url in urls:
+        text = url.strip() if isinstance(url, str) else ""
+        try:
+            validate_https_url(text)
+        except ValidationError:
+            errors.append(f"{text or url!r} is not an https:// link.")
+            continue
+        try:
+            netloc = urlsplit(text).netloc
+        except ValueError:
+            errors.append(f"{text!r} is not an https:// link.")
+            continue
+        if "@" in netloc:
+            errors.append(f"{text!r} must not contain a user name or password.")
+        elif (key := profile_key(text)) is None:
+            errors.append(f"{text!r} is not an https:// link.")
+        elif key in seen:
+            errors.append(f"{text!r} is listed twice.")
+        else:
+            seen.add(key)
+    return errors
+
+
 class PlatformOperator(Versioned):
     """The legal entity running the marketplace, as versioned configuration (ARC.7).
 
@@ -362,25 +406,62 @@ class PlatformOperator(Versioned):
         NONE = "none", "No VAT on commissions and fees"
         STANDARD = "standard", "VAT on commissions and fees under the general rules"
 
-    legal_name = models.CharField(max_length=200)
-    country = CountryField(help_text="Country of establishment (ISO 3166-1 alpha-2).")
-    vat_number = models.CharField("VAT number", max_length=32, help_text="With the country prefix.")
-    tax_regime = models.CharField(max_length=32, choices=TaxRegime.choices)
+    legal_name = models.CharField(
+        max_length=200, help_text=_("The legal name of the company that runs the platform.")
+    )
+    country = CountryField(
+        help_text=_(
+            "The country where the company is established, as a two-letter code such as 'IT'."
+        )
+    )
+    vat_number = models.CharField(
+        "VAT number",
+        max_length=32,
+        help_text=_(
+            "The company's VAT number, starting with the country letters. Ask your "
+            "accountant if you are not sure."
+        ),
+    )
+    tax_regime = models.CharField(
+        max_length=32,
+        choices=TaxRegime.choices,
+        help_text=_(
+            "How the platform itself is treated for VAT: the standard regime, or the small-"
+            "business (flat-rate) scheme with no VAT charged. Ask your accountant if you "
+            "are not sure."
+        ),
+    )
     commission_vat_mode = models.CharField(
-        "commission VAT mode", max_length=16, choices=CommissionVatMode.choices
+        "commission VAT mode",
+        max_length=16,
+        choices=CommissionVatMode.choices,
+        help_text=_(
+            "Whether VAT is added to the platform's commissions and fees. Ask your "
+            "accountant if you are not sure."
+        ),
     )
     dac7_authority_country = CountryField(
         "DAC7 reporting authority country",
-        help_text="Member state whose authority receives the DAC7 report.",
+        help_text=_(
+            "Not used yet: saved for a future feature. The EU country whose tax authority "
+            "will get the DAC7 report. Ask your accountant if you are not sure."
+        ),
     )
     # CMP.3 (owner decision 2026-11-09): staff alerts, e.g. an overdue GPSR safety case, go to
     # the compliance address, else to the support address.
     support_email = models.EmailField(
-        "platform support email", blank=True, help_text="The platform's support address."
+        "platform support email",
+        blank=True,
+        help_text=_(
+            "The address users can write to for help. It is published on the public contact page."
+        ),
     )
     compliance_email = models.EmailField(
         blank=True,
-        help_text="Where compliance alerts go. Empty: the support address.",
+        help_text=_(
+            "Where compliance alerts go, for example an overdue safety case. Leave it empty"
+            " to send them to the support address."
+        ),
     )
     # CMP.5 (DSA articles 11 and 12): the single point of contact for authorities and the means
     # for recipients of the service, published on the public contact page. Recipients reach the
@@ -388,36 +469,75 @@ class PlatformOperator(Versioned):
     authority_contact_email = models.EmailField(
         "authorities' contact email",
         blank=True,
-        help_text="DSA article 11: single point of contact for authorities.",
+        help_text=_(
+            "The single contact address for authorities. The law (DSA article 11) asks for "
+            "one; it is published on the public contact page."
+        ),
     )
     authority_contact_languages = ArrayField(
         models.CharField(max_length=8, validators=[validate_language_code]),
         default=list,
         blank=True,
         verbose_name="authorities' contact languages",
-        help_text="Language codes: an official language, and one widely understood.",
+        help_text=_(
+            "The languages authorities may write in, as codes such as 'en' or 'it', "
+            "separated by commas. Give an official language of the country and one that "
+            "many people understand."
+        ),
     )
     user_contact_url = models.URLField(
         "users' contact form URL",
         validators=[validate_https_url],
         blank=True,
-        help_text="DSA article 12: optional electronic form next to the support email.",
+        help_text=_(
+            "An optional web form for users, next to the support email. It must start with "
+            "https://."
+        ),
     )
     user_contact_languages = ArrayField(
         models.CharField(max_length=8, validators=[validate_language_code]),
         default=list,
         blank=True,
         verbose_name="users' contact languages",
-        help_text="Language codes the support team answers in.",
+        help_text=_(
+            "The languages the support team answers in, as codes such as 'en' or 'it', "
+            "separated by commas."
+        ),
+    )
+    # SEO.8 follow-up (owner decision): the public face of the operator in its Organization
+    # JSON-LD. The logo comes from the platform logos collection with its image licence fields.
+    logo = models.ForeignKey(
+        "core.MediaImage",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_(
+            "The platform's logo, shown to search engines. Pick an image from the "
+            "'Logos and icons' collection that has its licence and author filled in."
+        ),
+    )
+    official_profiles = ArrayField(
+        models.URLField(max_length=300),
+        default=list,
+        blank=True,
+        help_text=_(
+            "Official profiles of the platform, one https:// link each, for search "
+            "engines. Example: its Wikidata item, its LinkedIn page. No user names or passwords."
+        ),
     )
     # D-21, CMP.13: changed only by a platform owner through
     # `apps.core.services.set_allowed_vendor_countries`; other new versions carry it over.
-    # D-32 (CORE.25): the session level timers and the three action lists, sparse over the D-32
+    # D-32 (CORE.25): the passkey window timers and the three action lists, sparse over the D-32
     # defaults (`core.session_policy`); `{}` is the defaults. Tunable without code (trial).
     session_policy = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Session level overrides (timers, lists). Empty: the D-32 defaults.",
+        help_text=_(
+            "Staff session settings that replace the defaults: timers and lists of actions."
+            " Leave it empty to keep the defaults. A value that does not fit is refused "
+            "when you save."
+        ),
     )
     allowed_vendor_countries = ArrayField(
         CountryField(),
@@ -437,7 +557,7 @@ class PlatformOperator(Versioned):
             ),
             (
                 ELEVATE_CODENAME,
-                "May switch a session to operational mode or do a sensitive action once",
+                "May open a passkey window or do a sensitive action once",
             ),
         ]
         constraints = [
@@ -461,6 +581,19 @@ class PlatformOperator(Versioned):
             session_policy.parse_policy(self.session_policy)
         except ValueError as exc:
             raise ValidationError({"session_policy": str(exc)}) from exc
+        problems = official_profile_errors(self.official_profiles)
+        if problems:
+            raise ValidationError({"official_profiles": problems})
+        logo = self.logo
+        if logo is not None:
+            if svg_collection_refusal(logo.collection) is not None:
+                raise ValidationError(
+                    {"logo": "Choose an image from the 'Logos and icons' collection."}
+                )
+            if logo.needs_review:
+                raise ValidationError(
+                    {"logo": "This image has no licence or author yet: complete them first."}
+                )
         # Codes are stored lower-case (`PT-BR` -> `pt-br`), without duplicates.
         for name in ("authority_contact_languages", "user_contact_languages"):
             codes = [code.strip().lower() for code in getattr(self, name) or []]
@@ -487,10 +620,27 @@ class FeatureFlag(BaseModel):
         ON = flags.ON, "On"
         OFF = flags.OFF, "Off"
 
-    name = models.CharField(max_length=flags.NAME_MAX_LENGTH, unique=True)
-    state = models.CharField(max_length=16, choices=State.choices, default=State.DEFAULT)
+    name = models.CharField(
+        max_length=flags.NAME_MAX_LENGTH,
+        unique=True,
+        help_text=_("The name of the feature switch, exactly as it is registered in the code."),
+    )
+    state = models.CharField(
+        max_length=16,
+        choices=State.choices,
+        default=State.DEFAULT,
+        help_text=_(
+            "'Default' follows the setting of this environment, or the default of the code "
+            "if there is none. 'On' and 'Off' switch the feature on or off."
+        ),
+    )
     note = models.CharField(
-        max_length=200, blank=True, help_text="Why it was switched, e.g. the incident reference."
+        max_length=200,
+        blank=True,
+        help_text=_(
+            "Why you changed it, for example an incident reference. It helps the next "
+            "person who looks at it."
+        ),
     )
 
     class Meta:
@@ -521,17 +671,30 @@ class ImageLicence(BaseModel):
     no-derivatives licences are refused. Entries are never deleted while an image uses them.
     """
 
-    code = models.CharField(max_length=40, unique=True, help_text="For example CC-BY-4.0.")
-    name = models.CharField(max_length=100, help_text="Shown in credits, e.g. CC BY 4.0.")
-    url = models.URLField("licence URL", blank=True)
+    code = models.CharField(
+        max_length=40,
+        unique=True,
+        help_text=_("A short code that is unique, for example 'CC-BY-4.0'."),
+    )
+    name = models.CharField(
+        max_length=100, help_text=_("The name shown in image credits, for example 'CC BY 4.0'.")
+    )
+    url = models.URLField(
+        "licence URL", blank=True, help_text=_("A link to the text of the licence. Optional.")
+    )
     attribution_required = models.BooleanField(
-        default=False, help_text="Images under this licence show a credit."
+        default=False, help_text=_("Tick it when images under this licence must show a credit.")
     )
     source_required = models.BooleanField(
-        default=True, help_text="Images under this licence need the URL they come from."
+        default=True,
+        help_text=_("Tick it when images under this licence need the web address they come from."),
     )
     permission_required = models.BooleanField(
-        default=False, help_text="Images need a reference to a stored written permission."
+        default=False,
+        help_text=_(
+            "Tick it when images under this licence need a reference to a written "
+            "permission that is stored."
+        ),
     )
 
     class Meta:

@@ -20,3 +20,14 @@ def theme(request: HttpRequest) -> dict[str, Any]:
         "theme": SimpleLazyObject(lambda: active_theme(request)),
         "help_url": settings.MPMV_HELP_URL,
     }
+
+
+def release(request: HttpRequest) -> dict[str, Any]:
+    """`release_version`: the deployed `MPMV_VERSION` for active staff users only (OPS.14).
+
+    Anyone else gets an empty string, so a public page never reveals the software version.
+    """
+    user = getattr(request, "user", None)
+    if user is not None and user.is_active and user.is_staff:
+        return {"release_version": settings.MPMV_VERSION}
+    return {"release_version": ""}

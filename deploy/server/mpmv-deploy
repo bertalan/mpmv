@@ -406,11 +406,12 @@ deploy() {
   fi
   extract "$version" || die "cannot read the units of $version; nothing changed"
   # A release can need a newer deploy script than the installed one (the Caddy socket switch did):
-  # hand the rest of the deploy to the release's own script, once. Nothing has changed yet.
+  # hand the rest of the deploy to the release's own script, once. Nothing has changed yet. No
+  # loop is possible: the script that runs then is the file compared against, so cmp is equal.
   own="$UNIT_SETS/$version/server/mpmv-deploy"
-  if [ -z "${MPMV_REEXEC:-}" ] && [ -f "$own" ] && ! cmp -s "$own" "$0"; then
+  if [ -f "$own" ] && ! cmp -s "$own" "$0"; then
     log "continuing with the deploy script of $version"
-    MPMV_REEXEC=1 exec /bin/sh "$own" deploy "$version"
+    exec /bin/sh "$own" deploy "$version"
   fi
   doctor_release "$version"
   [ "$FAILURES" -eq 0 ] || die "doctor: $version does not fit this host; nothing changed"

@@ -42,6 +42,8 @@ NOT_SENSITIVE_SERVICES = {
     "apps.cart.services.remove_line": "a shopper's cart, not a financial or security fact",
     "apps.orders.services.hold_stock": "a short-lived cart hold on stock, like the cart itself; "
     "the order that confirms it is audited",
+    "apps.payments.services.process_webhook": "builds its own system audit context for the "
+    "webhook actor; every write it makes (payment, account status, sales mode) is audited",
     "apps.cart.services.merge_carts": "a shopper's cart, not a financial or security fact",
 }
 

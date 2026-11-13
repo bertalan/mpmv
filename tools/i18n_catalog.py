@@ -28,13 +28,60 @@ import polib
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCALE = ROOT / "locale"
-LANGUAGES = ("it",)  # grows with I18N.7 slices: de, fr, es
+LANGUAGES = ("it", "de", "fr", "es")  # grows with I18N.7 slices
 SCOPES = (
     "apps/manager",
     "apps/accounts",
     "apps/orders/templates",
+    "apps/orders/ui",
+    "apps/vendors/templates/email/vendors/profile_reverted",
+    "apps/orders/customer_views.py",  # the customer area labels (ORD.7)
+    "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
+    "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)
+    "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
+    "apps/vendors/models.py",
     "themes/base/templates/layouts",
+    # Brand review models (CAT.20): the rest of the catalog app joins with the storefront I18N.
+    "apps/catalog/taxonomy.py",
+    "apps/catalog/taxonomy_admin.py",
+    # The product page and what it includes (CAT.7); the listings join with the storefront I18N.
+    "apps/catalog/templates/catalog/product.html",
+    "apps/catalog/templates/catalog/includes/stock_status.html",
+    "apps/catalog/templates/catalog/includes/product_card.html",
+    # Temporary staff "Site links" page (OPS.12); remove before LIVE.
+    "apps/seo/site_links.py",
+    "apps/seo/templates/seo/site_links.html",
 )
+# Single storefront modules whose strings the Manager texts quote (shop policy headings).
+EXTRA_FILES = (
+    "apps/vendors/services.py",
+    "apps/cms/templatetags/cms_tags.py",  # the header's "Site links" item (OPS.12)
+)
+# Single Python modules scanned in full: customer-facing messages of apps that are not in SCOPES.
+FILES = ("apps/orders/messages.py",)
+# Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
+# apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
+HELP_TEXT_SCOPES = (
+    "apps/catalog",
+    "apps/cms",
+    "apps/compliance",
+    "apps/core",
+    "apps/events",
+    "apps/ingest",
+    "apps/shipping",
+    "apps/tax",
+    "apps/themes",
+    "apps/vendors",
+)
+# German, French and Spanish start with the order emails (ORD.16); the Manager and account pages
+# join them with their own I18N.7 slices. Italian covers every scope.
+# The customer order pages (ORD.7) join the Manager and account pages in I18N.7.
+_ORDER_EMAILS = ("apps/orders/templates/email", "apps/orders/templates/documents")
+LANGUAGE_SCOPES: dict[str, tuple[str, ...]] = {
+    "de": _ORDER_EMAILS,
+    "fr": _ORDER_EMAILS,
+    "es": _ORDER_EMAILS,
+}
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
     "400.html",
@@ -47,19 +94,30 @@ THEME_FILES = (
         for n in (
             "alert",
             "button",
+            "cart_line",
             "empty_state",
             "error_summary",
             "field",
             "footer",
             "header",
+            "help_entry",
             "icon",
             "language_switcher",
+            "order_summary",
             "pagination",
+            "quantity_stepper",
             "skip_link",
+            "step_indicator",
             "table",
+            "user_tools",
         )
     ),
 )
+# A single-file scope may be narrowed to the classes whose strings the catalog translates.
+ONLY_CLASSES = {
+    "apps/compliance/forms.py": ("WithdrawalLookupForm",),
+    "apps/cms/models.py": ("HelpEntry",),
+}
 SKIP_PARTS = {"tests", "migrations", "static", "node_modules"}
 
 SIMPLE = {"gettext", "gettext_lazy", "gettext_noop", "_", "ugettext"}
@@ -68,15 +126,19 @@ PLURAL = {"ngettext", "ngettext_lazy"}
 CONTEXT_PLURAL = {"npgettext", "npgettext_lazy"}
 
 
-def _files() -> Iterator[Path]:
-    for scope in SCOPES:
-        for path in sorted((ROOT / scope).rglob("*")):
+def _files(scopes: tuple[str, ...] = SCOPES) -> Iterator[Path]:
+    for scope in scopes:
+        base = ROOT / scope
+        for path in [base] if base.is_file() else sorted(base.rglob("*")):
             rel = path.relative_to(ROOT)
             if SKIP_PARTS & set(rel.parts) or path.suffix not in {".py", ".html", ".txt"}:
                 continue
             yield path
-    for name in THEME_FILES:
-        yield ROOT / "themes/base/templates" / name
+    if scopes == SCOPES:
+        for extra in (*FILES, *EXTRA_FILES):
+            yield ROOT / extra
+        for name in THEME_FILES:
+            yield ROOT / "themes/base/templates" / name
 
 
 def _source(path: Path) -> str:
@@ -135,7 +197,11 @@ def _entries(path: Path) -> Iterator[tuple[str, str | None, str | None, int]]:
         yield from _template_entries(path)
         return
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
+    only = ONLY_CLASSES.get(str(path.relative_to(ROOT)))
+    roots: list[ast.AST] = (
+        [n for n in tree.body if isinstance(n, ast.ClassDef) and n.name in only] if only else [tree]
+    )
+    for node in (n for root in roots for n in ast.walk(root)):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
@@ -151,11 +217,43 @@ def _entries(path: Path) -> Iterator[tuple[str, str | None, str | None, int]]:
             yield args[1], args[0], args[2], node.lineno
 
 
-def collect() -> dict[tuple[str, str | None], tuple[str | None, list[str]]]:
+def _help_files() -> Iterator[Path]:
+    for scope in HELP_TEXT_SCOPES:
+        for path in sorted((ROOT / scope).rglob("*.py")):
+            if not SKIP_PARTS & set(path.relative_to(ROOT).parts):
+                yield path
+
+
+def _help_entries(path: Path) -> Iterator[tuple[str, str | None, str | None, int]]:
+    """The gettext calls inside a `help_text=` argument of `path`, and nothing else."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    inside: list[ast.AST] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            inside.extend(kw.value for kw in node.keywords if kw.arg == "help_text")
+    seen: set[int] = set()
+    for root in inside:
+        for node in ast.walk(root):
+            if not isinstance(node, ast.Call) or id(node) in seen:
+                continue
+            seen.add(id(node))
+            func = node.func
+            name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
+            args = [_const(a) for a in node.args]
+            if name in SIMPLE and args and args[0]:
+                yield args[0], None, None, node.lineno
+
+
+def collect(
+    scopes: tuple[str, ...] = SCOPES,
+) -> dict[tuple[str, str | None], tuple[str | None, list[str]]]:
     found: dict[tuple[str, str | None], tuple[str | None, list[str]]] = {}
-    for path in _files():
+    sources = [(path, _entries) for path in _files(scopes)]
+    if scopes == SCOPES:
+        sources += [(path, _help_entries) for path in _help_files()]
+    for path, read in sources:
         rel = str(path.relative_to(ROOT))
-        for msgid, ctx, plural, _line in _entries(path):
+        for msgid, ctx, plural, _line in read(path):
             plural0, places = found.get((msgid, ctx), (plural, []))
             if rel not in places:
                 places.append(rel)
@@ -168,8 +266,8 @@ def _po_path(lang: str) -> Path:
 
 
 def extract() -> None:
-    found = collect()
     for lang in LANGUAGES:
+        found = collect(LANGUAGE_SCOPES.get(lang, SCOPES))
         path = _po_path(lang)
         old = polib.pofile(str(path)) if path.exists() else None
         known = {(e.msgid, e.msgctxt): e for e in old} if old else {}
@@ -221,9 +319,9 @@ def compile_all() -> None:
 
 
 def check() -> int:
-    found = collect()
     bad = 0
     for lang in LANGUAGES:
+        found = collect(LANGUAGE_SCOPES.get(lang, SCOPES))
         path = _po_path(lang)
         po = polib.pofile(str(path))
         have = {(e.msgid, e.msgctxt) for e in po}

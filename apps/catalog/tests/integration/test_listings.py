@@ -32,7 +32,7 @@ pytestmark = pytest.mark.django_db
 
 
 def active_vendor(**kwargs: Any) -> Vendor:
-    return VendorFactory.create(status=Vendor.Status.ACTIVE, **kwargs)
+    return VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True, **kwargs)
 
 
 def listed(**kwargs: Any) -> Product:

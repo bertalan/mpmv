@@ -202,4 +202,4 @@ def test_the_mfa_pages_require_a_signed_in_user(client: Client) -> None:
     for name in ("mfa:setup", "mfa:totp", "mfa:verify", "mfa:overview"):
         response = client.get(reverse(name))
         assert response.status_code == 302
-        assert "/django-admin/login/" in response["Location"]
+        assert response["Location"].startswith("/account/login/?next=")

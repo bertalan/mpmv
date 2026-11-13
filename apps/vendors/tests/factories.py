@@ -12,6 +12,7 @@ from decimal import Decimal
 from typing import Any
 
 import factory
+from django.apps import apps
 from django.db.models import Max
 from django.utils import timezone
 from django.utils.text import slugify
@@ -22,9 +23,11 @@ from apps.core.tests.factories import FeatureFlagFactory
 from apps.core.translations import source_hash
 from apps.vendors import engine
 from apps.vendors.models import (
+    CommissionRule,
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
+    NoTinCountry,
     SelfCertification,
     Vendor,
     VendorApplication,
@@ -33,6 +36,7 @@ from apps.vendors.models import (
     VendorContractTranslation,
     VendorFeatureFlag,
     VendorMember,
+    VendorPlan,
     VendorTranslation,
 )
 
@@ -209,6 +213,22 @@ class VendorFactory(DjangoModelFactory[Vendor]):
         if create and extracted:
             for language in extracted:
                 VendorTranslationFactory.create(vendor=obj, language=language)
+
+    @factory.post_generation
+    def sells_online(obj: Vendor, create: bool, extracted: bool | None, **kwargs: Any) -> None:
+        """`sells_online=True` adds a payout account ready for payouts, so the vendor's `buy`
+        products can be bought (D-19, VEN.6). The account model belongs to payments, above vendors
+        in the app graph: it is looked up by name here, never imported."""
+        if create and extracted:
+            apps.get_model("payments", "ConnectedAccount").objects.create(
+                vendor=obj,
+                provider="stripe",
+                account_ref=f"acct_test_{obj.pk}",
+                status=engine.PAYOUT_ACCOUNT_READY,
+                details_submitted=True,
+                charges_enabled=True,
+                payouts_enabled=True,
+            )
 
 
 class VendorTranslationFactory(DjangoModelFactory[VendorTranslation]):
@@ -414,3 +434,45 @@ class VendorApplicationFactory(DjangoModelFactory[VendorApplication]):
         if create and extracted is not False:
             vendor = VendorFactory.create(contact_email=self.user.email)
             VendorMember.objects.create(vendor=vendor, user=self.user, role=engine.OWNER)
+
+
+class VendorPlanFactory(DjangoModelFactory[VendorPlan]):
+    """A plan without a fee (D-04: plans are only commission rules and limits at launch)."""
+
+    class Meta:
+        model = VendorPlan
+
+    code = factory.Sequence(lambda n: f"plan-{n}")
+    name = factory.Sequence(lambda n: f"Plan {n}")
+
+
+class CommissionRuleFactory(DjangoModelFactory[CommissionRule]):
+    """The platform default rule (20% on net goods, 4% + 2.00 payment fee on the gross paid).
+
+    Consecutive rows are closed one-year periods, adjacent and never overlapping, with counting
+    versions. Pass `valid_to=None` for the open-ended current row, and explicit dates when a
+    test is about validity. For `add_commission_rule`, use `.build()`: the service saves.
+    """
+
+    class Meta:
+        model = CommissionRule
+
+    percent = Decimal("20.00")
+    base = engine.NET_GOODS
+    fee_percent = Decimal("4.00")
+    fee_fixed = Decimal("2.00")
+    fee_base = engine.GROSS_PAID
+    version = factory.Sequence(lambda n: n + 1)
+    valid_from = factory.Sequence(lambda n: dt.datetime(2026 + n, 1, 1, tzinfo=dt.UTC))
+    valid_to = factory.LazyAttribute(lambda o: o.valid_from.replace(year=o.valid_from.year + 1))
+
+
+class NoTinCountryFactory(DjangoModelFactory[NoTinCountry]):
+    """A jurisdiction that issues no TIN; the data migration already seeds the six default ones."""
+
+    class Meta:
+        model = NoTinCountry
+
+    country = factory.Iterator(["NZ", "JP", "CH", "SG", "AU"])
+    reason = "Issues no TIN to individuals."
+    valid_from = dt.date(2024, 1, 1)

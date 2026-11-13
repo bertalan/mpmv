@@ -1,6 +1,7 @@
 """Settings for the automated test suite."""
 
 import os
+import secrets
 import tempfile
 from pathlib import Path
 
@@ -10,6 +11,7 @@ os.environ.setdefault("DJANGO_SECRET_KEY", "test-only-insecure-key")
 os.environ.setdefault("DATABASE_URL", "postgres://mpmv@127.0.0.1:55432/mpmv")
 os.environ.setdefault("DJANGO_ALLOWED_HOSTS", "testserver")
 # A field encryption key generated for this process only (SEC.3): never written anywhere.
+os.environ.setdefault("MPMV_PRIVACY_PEPPER", secrets.token_urlsafe(32))
 os.environ.setdefault("MPMV_FIELD_ENCRYPTION_KEYS", generate_key("test"))
 
 from .base import *  # noqa: F403
@@ -17,8 +19,13 @@ from .base import *  # noqa: F403
 # OPS.5: the technical admin from loopback only, as the test client connects (empty denies all).
 ADMIN_ALLOWED_NETWORKS = ["127.0.0.1/32", "::1/128"]
 
+# Product cards keep their links in the existing tests; the production default (no CAT.7 page yet,
+# so no link) is tested in apps/catalog/tests/integration/test_no_dead_links.py.
+PRODUCT_PAGES_ROUTED = True
+
 # Feature flags: the code defaults, whatever the shell exports, read from the database on every
 # check (tests roll back their writes, so a cached value could leak into the next test).
+PAYMENT_ALLOW_FAKE_PROVIDER = True  # the in-memory provider (PAY.5)
 ALLOW_SEED = True  # the `demo_seed` fixture (ARC.10)
 FEATURE_FLAGS = {}
 FEATURE_FLAGS_CACHE_SECONDS = 0

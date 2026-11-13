@@ -63,7 +63,9 @@ def storefront() -> Vendor:
     terms = LegalPageFactory.create(title="Terms of sale", live=False)
     terms.save_revision().publish()
     VendorRecruitmentPageFactory.create(title="Sell with us")
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, slug="acme", display_name="Acme")
+    vendor = VendorFactory.create(
+        status=Vendor.Status.ACTIVE, sells_online=True, slug="acme", display_name="Acme"
+    )
     for language in ("en", "it"):
         VendorTranslationFactory.create(
             vendor=vendor, language=language, status=TranslationStatus.PUBLISHED
