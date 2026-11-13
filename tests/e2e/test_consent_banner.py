@@ -39,6 +39,20 @@ def serve_gated_tag(page: Page) -> list[str]:
     return requests
 
 
+def consent_script_ready(page: Page) -> None:
+    """Wait until the lazy consent.js has run (it publishes `window.mpmvConsent`).
+
+    base.js imports the script on demand. A click before the import ends is a plain form post
+    that reloads the page, so the saved message never shows. The CSP forbids string
+    `wait_for_function`, hence the poll.
+    """
+    for _ in range(100):
+        if page.evaluate("typeof window.mpmvConsent") == "object":
+            return
+        page.wait_for_timeout(100)
+    pytest.fail("consent.js never published window.mpmvConsent")
+
+
 def test_the_banner_shows_to_a_new_visitor_with_equal_choices(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
@@ -118,7 +132,9 @@ def test_accepting_stores_logs_and_starts_the_held_back_tag(
     assert page.evaluate("window.mpmvConsent.allows('statistics')") is False
     assert page.evaluate("window.mpmvConsent.signals().analytics_storage") == "denied"
 
-    page.get_by_role("button", name="Accept all").click()
+    consent_script_ready(page)
+    with page.expect_response(lambda r: "/consent/" in r.url and r.request.method == "POST"):
+        page.get_by_role("button", name="Accept all").click()
     expect(page.locator("#consent-banner")).to_be_hidden()
     for _ in range(50):  # wait_for_function evaluates a string, which the CSP forbids
         if page.evaluate("window.__gatedRan === true"):
@@ -144,7 +160,9 @@ def test_rejecting_keeps_the_tag_away_and_the_choice_can_change_later(
     requests = serve_gated_tag(page)
     page.goto(f"{live_server.url}/")
     page.evaluate(INJECT_GATED)
-    page.get_by_role("button", name="Reject all").click()
+    consent_script_ready(page)
+    with page.expect_response(lambda r: "/consent/" in r.url and r.request.method == "POST"):
+        page.get_by_role("button", name="Reject all").click()
     expect(page.locator("#consent-banner")).to_be_hidden()
     page.wait_for_timeout(300)
     assert requests == []
@@ -155,7 +173,9 @@ def test_rejecting_keeps_the_tag_away_and_the_choice_can_change_later(
     expect(page.locator("#consent-banner")).to_be_hidden()
     expect(page.locator("#prefs-statistics")).not_to_be_checked()
     page.locator("#prefs-statistics").check()
-    page.get_by_role("button", name="Save my choices").click()
+    consent_script_ready(page)
+    with page.expect_response(lambda r: "/consent/" in r.url and r.request.method == "POST"):
+        page.get_by_role("button", name="Save my choices").click()
     expect(page.locator("#live-region")).to_have_text("Your cookie choice was saved.")
     shot("settings-saved")
     assert ConsentLog.objects.count() == 2
