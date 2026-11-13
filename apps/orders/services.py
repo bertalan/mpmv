@@ -992,7 +992,7 @@ def _open_payment_order(order: Order) -> bool:
     return order.state == "awaiting_payment" and not order.payment_intent_ref
 
 
-def start_payment(order: Order, *, ctx: AuditContext) -> str:
+def start_payment(order: Order, *, ctx: AuditContext, dry_run: bool = False) -> str:
     """Create the one payment of an order awaiting payment and return its client secret.
 
     One payment per order: an order that already has one gets none (returns ""), and the provider
@@ -1006,6 +1006,8 @@ def start_payment(order: Order, *, ctx: AuditContext) -> str:
     if not starter or not _open_payment_order(order):
         return ""
     ensure_checkout_open([sub.vendor for sub in order.vendor_orders.select_related("vendor")])
+    if dry_run:  # the checks above ran; nothing is sent to the provider
+        return ""
     try:
         started = import_string(starter)(
             order_ref=order.transfer_group or order.number,
@@ -1043,34 +1045,42 @@ def _audit_payment_problem(
     audit_changes(changeset, ctx=ctx, action=action)
 
 
-def mark_order_paid(order_ref: str, *, amount: Decimal, currency: str, ctx: AuditContext) -> bool:
+def mark_order_paid(
+    order_ref: str, *, amount: Decimal, currency: str, ctx: AuditContext, dry_run: bool = False
+) -> bool:
     """The provider confirmed a payment for the order numbered `order_ref` (PAY.2): move it to
     `paid`, decrement the stock it held and release the holds, all in the caller's transaction.
 
     Idempotent: an order already paid is left alone (False). Nothing moves, and the problem is
     audited for staff, when no order has that number, the order is no longer awaiting payment
     (a late payment on a cancelled order), or the amount or currency is not the order's gross
-    total. Returns True when the order became paid."""
+    total. Returns True when the order became (or, on a dry run, would become) paid; a dry run
+    writes nothing."""
+
+    def problem(ref: str, action: str, detail: dict[str, Any], ctx: AuditContext) -> None:
+        if not dry_run:
+            _audit_payment_problem(ref, action, detail, ctx)
+
     with transaction.atomic():
         order = Order.objects.select_for_update().filter(number=order_ref).first()
         if order is None:
-            _audit_payment_problem(order_ref, "orders.payment_unmatched", {"amount": amount}, ctx)
+            problem(order_ref, "orders.payment_unmatched", {"amount": amount}, ctx)
             return False
         if order.state in PAID_OR_LATER:
             return False
         if order.state != "awaiting_payment":
-            _audit_payment_problem(
-                order_ref, "orders.payment_late", {"state": order.state, "amount": amount}, ctx
-            )
+            problem(order_ref, "orders.payment_late", {"state": order.state, "amount": amount}, ctx)
             return False
         if currency.upper() != CURRENCY or amount != order.grand_total:
-            _audit_payment_problem(
+            problem(
                 order_ref,
                 "orders.payment_mismatch",
                 {"paid": amount, "currency": currency, "expected": order.grand_total},
                 ctx,
             )
             return False
+        if dry_run:
+            return True
         transition_order(order, "paid", ctx=ctx)
         _decrement_stock(order, ctx=ctx)
     return True

@@ -299,3 +299,20 @@ def test_the_payment_page_gets_the_client_secret_and_a_csp_for_stripe_js(
     policy = response.headers["Content-Security-Policy"]
     assert "https://js.stripe.com" in policy
     assert "unsafe-inline" not in policy
+
+
+def test_a_dry_run_changes_nothing(
+    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from apps.orders.services import mark_order_paid
+
+    monkeypatch.setattr(stripe, "create_payment_intent", failing)
+    order = place(sellable())
+    monkeypatch.undo()
+    assert services.start_payment(order, ctx=CTX, dry_run=True) == ""
+    assert intent_calls(stripe) == 0
+    assert mark_order_paid(
+        order.number, amount=order.grand_total, currency="EUR", ctx=CTX, dry_run=True
+    )
+    order.refresh_from_db()
+    assert order.state == "awaiting_payment"
