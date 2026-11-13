@@ -25,7 +25,8 @@ def load(name: str, monkeypatch: pytest.MonkeyPatch, value: str | None) -> bool:
         monkeypatch.delenv("MPMV_PAGE_CACHE", raising=False)
     else:
         monkeypatch.setenv("MPMV_PAGE_CACHE", value)
-    sys.modules.pop(name, None)
+    for module in MODULES:  # stage re-exports live: reload both, or it keeps live's old value
+        sys.modules.pop(module, None)
     return bool(importlib.import_module(name).PAGE_CACHE_ENABLED)
 
 

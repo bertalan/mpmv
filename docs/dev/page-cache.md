@@ -23,9 +23,12 @@ Consequences for templates and views on cached routes:
 
 - No inline script or style that needs `{% csp_nonce_attr %}`. The theme already ships external
   modules only (spec 14 §14.5).
-- No `{% csrf_token %}`. The language switcher was the one form on every page: it no longer carries
-  a token, and `switch_language` checks `Sec-Fetch-Site` and `Origin` instead (CSRF-exempt, listed
-  in `tests/security_registry.py`).
+- No `{% csrf_token %}`, and no form at all on a cached page. The language switcher renders plain
+  `<a href>` links to the same page under the other language prefix for an anonymous visitor (the
+  URL prefix decides the language: no cookie, no session, no state change on GET). `switch_language`
+  stays a CSRF-protected POST, used by the signed-in switcher and the Manager. A link has no
+  one-time "not available in this language" notice (that needs the session): an untranslated
+  object leads to the other language's home.
 - Anything for a signed-in user (user menu, help button, account links) renders only when
   `request.user.is_authenticated`. Such a visitor has a session cookie, so they bypass the cache
   and the cache never sees their page. Never render a user detail for a visitor without a cookie.

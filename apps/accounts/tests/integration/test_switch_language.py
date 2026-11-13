@@ -71,58 +71,6 @@ def test_switcher_only_accepts_post(client: Client) -> None:
     assert client.get(reverse("switch_language"), {"language": "it"}).status_code == 405
 
 
-def test_switcher_needs_no_csrf_token_so_public_pages_can_be_cached() -> None:
-    """SEO.6: the form sits on every public page, so it carries no per-request token."""
-    client = Client(enforce_csrf_checks=True)
-    response = client.post(reverse("switch_language"), {"language": "it", "next": "/"})
-    assert response.status_code == 302
-
-
-@pytest.mark.parametrize(
-    "headers",
-    [
-        {"Origin": "https://attacker.example"},
-        {"Origin": "null"},
-        {"Sec-Fetch-Site": "cross-site"},
-        {"Sec-Fetch-Site": "same-site"},
-        {"Sec-Fetch-Site": "none"},
-    ],
-)
-def test_switcher_refuses_a_cross_site_post_and_changes_nothing(
-    headers: dict[str, str],
-) -> None:
-    user = UserFactory.create()
-    client = Client(enforce_csrf_checks=True)
-    client.force_login(user)
-    response = client.post(
-        reverse("switch_language"), {"language": "de", "next": "/"}, headers=headers
-    )
-    assert response.status_code == 403
-    user.refresh_from_db()
-    assert user.preferred_language == "en"
-
-
-@pytest.mark.parametrize(
-    "headers",
-    [
-        {"Origin": "http://testserver"},
-        {"Sec-Fetch-Site": "same-origin"},
-        {"Origin": "http://testserver", "Sec-Fetch-Site": "same-origin"},
-    ],
-)
-def test_switcher_accepts_a_same_origin_post(headers: dict[str, str]) -> None:
-    client = Client(enforce_csrf_checks=True)
-    response = client.post(
-        reverse("switch_language"), {"language": "de", "next": "/"}, headers=headers
-    )
-    assert response.status_code == 302
-
-
-def test_switcher_refuses_a_post_without_a_language() -> None:
-    client = Client(enforce_csrf_checks=True)
-    assert client.post(reverse("switch_language"), {"next": "/"}).status_code == 400
-
-
 def test_switcher_remembers_the_choice_of_a_signed_in_user(client: Client) -> None:
     user = UserFactory.create()
     client.force_login(user)

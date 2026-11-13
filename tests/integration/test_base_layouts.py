@@ -112,7 +112,12 @@ def test_the_header_has_the_language_switcher(rendered_page: tuple[str, list[str
     header = html.split('<header class="site-header">', 1)[1].split("</header>", 1)[0]
     assert re.search(r'<nav class="language-switcher" aria-label="Language"', header)
     for code in ("en", "it"):
-        assert f'name="language" value="{code}"' in header
+        # SEO.6: plain links where each language's URL is known, else (sign-in) the POST form
+        assert (
+            f'name="language" value="{code}"' in header
+            or f'hreflang="{code}"' in header
+            or f'lang="{code}" aria-current="true"' in header
+        )
 
 
 def test_the_help_link_sits_in_the_header_and_the_footer(

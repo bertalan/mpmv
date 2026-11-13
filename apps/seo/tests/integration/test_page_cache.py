@@ -16,6 +16,7 @@ from django.db import connection
 from django.http import HttpRequest, HttpResponse
 from django.test import Client, RequestFactory, override_settings
 from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
 from django.utils.csp import LazyNonce
 from wagtail.models import (
     Collection,
@@ -178,11 +179,79 @@ def test_the_stored_entry_holds_no_cookie_and_no_secret_header(
     assert b"csrfmiddlewaretoken" not in stored.content
 
 
-def test_the_language_switcher_carries_no_csrf_token(client: Client, seeded: SeedReport) -> None:
+def test_the_language_switcher_is_plain_links_with_no_csrf_token(
+    client: Client, seeded: SeedReport
+) -> None:
     html = client.get("/").content.decode()
-    assert 'action="/i18n/switch/"' in html
+    switcher = html[html.index('class="language-switcher"') :]
+    switcher = switcher[: switcher.index("</nav>")]
+    assert "<form" not in switcher
+    assert re.search(r'<a [^>]*href="/it/[^"]*"[^>]*hreflang="it"', switcher)
     assert "csrfmiddlewaretoken" not in html
     assert "csrftoken" not in client.cookies
+
+
+def test_a_cached_page_language_link_is_the_prefixed_url_and_following_it_changes_no_state(
+    client: Client, seeded: SeedReport
+) -> None:
+    html = client.get("/").content.decode()
+    href = re.search(r'<a [^>]*href="([^"]+)"[^>]*hreflang="it"', html)
+    assert href
+    target = href.group(1)
+    assert target.startswith("/it/")
+    assert "switch" not in target
+    assert "set_language" not in target
+    response = client.get(target)
+    assert response.status_code == 200
+    assert response.headers["Content-Language"] == "it"
+    assert not response.cookies
+    assert "Set-Cookie" not in response
+    assert not client.cookies
+    assert "sessionid" not in client.cookies
+
+
+def test_the_csrf_failure_page_keeps_its_403_with_the_cache_on(
+    seeded: SeedReport,
+) -> None:
+    strict = Client(enforce_csrf_checks=True)
+    strict.get("/")  # fill the cache first
+    response = strict.post(reverse("switch_language"), {"language": "it", "next": "/"})
+    assert response.status_code == 403
+    assert "X-Page-Cache" not in response or status(response) != "HIT"
+
+
+def test_a_page_with_a_form_is_never_cached() -> None:
+    def with_form(request: HttpRequest) -> HttpResponse:
+        return served(
+            '<html><body><form method="post"><input type="hidden" '
+            'name="csrfmiddlewaretoken" value="x"></form></body></html>'
+        )
+
+    response = make_middleware(with_form)(page_request())
+    assert page_cache.lookup(page_request()) is None
+    assert status(response) == "MISS"  # served, not stored
+
+
+def test_anonymous_visitors_never_share_per_request_data(
+    client: Client, seeded: SeedReport
+) -> None:
+    other = Client()
+    one = client.get("/").content.decode()
+    two = other.get("/").content.decode()
+    assert status(other.get("/")) == "HIT"
+    assert one == two
+    assert "csrfmiddlewaretoken" not in two
+    assert not other.cookies
+    assert not NONCE_IN_HTML.search(two)
+
+
+def test_a_signed_in_visitor_keeps_the_post_switcher_and_is_not_cached(
+    client: Client, seeded: SeedReport
+) -> None:
+    client.force_login(UserFactory.create())
+    response = client.get("/")
+    assert status(response) == "BYPASS"
+    assert 'action="/i18n/switch/"' in response.content.decode()
 
 
 def make_middleware(

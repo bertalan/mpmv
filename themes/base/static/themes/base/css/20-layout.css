@@ -187,7 +187,8 @@
     margin: 0;
   }
 
-  .language-switcher button {
+  .language-switcher button,
+  .language-switcher__link {
     min-block-size: var(--target-min);
     min-inline-size: var(--target-min);
     padding: var(--space-xs) var(--space-s);
@@ -197,11 +198,22 @@
     font-weight: 400;
   }
 
-  .language-switcher button:hover {
+  .language-switcher__link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-s, 0.25rem);
+    text-decoration: none;
+  }
+
+  .language-switcher button:hover,
+  .language-switcher a.language-switcher__link:hover {
     background: var(--color-accent-tint);
   }
 
-  .language-switcher button[aria-current="true"] {
+  .language-switcher button[aria-current="true"],
+  .language-switcher__link[aria-current="true"] {
     color: var(--color-text);
     border-color: var(--color-text);
     font-weight: 700;

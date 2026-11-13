@@ -58,6 +58,23 @@ PUBLIC: dict[str, str] = {
     "catalog:brand": PUBLIC_CATALOG,
     "catalog:term": PUBLIC_CATALOG,
     "catalog:vendor": PUBLIC_CATALOG,
+    "orders:cart": (
+        "Cart page (ORD.5): shows the visitor's own cart, found from their session; a POST "
+        "changes only that cart, is CSRF-checked and has a per-IP budget."
+    ),
+    "orders:checkout": (
+        "Checkout details form (ORD.5): public by design for guests; the page redirects to the "
+        "cart without one; the POST is CSRF-checked, behind Turnstile and a per-IP budget, and "
+        "stores only in the visitor's session."
+    ),
+    "orders:review": (
+        "Checkout review (ORD.5): redirects to the cart or the details without them; the POST "
+        "that places the order is CSRF-checked, behind Turnstile and a per-IP budget."
+    ),
+    "orders:shipping": (
+        "Shipping choice of the checkout (ORD.5): a POST that redirects a visitor without a "
+        "cart; it stores the choice in the visitor's session only, with CSRF and a per-IP budget."
+    ),
     "switch_language": "Stores the visitor's language choice in a cookie.",
     "action_link:open": "Secure action link (CORE.15): the signed token is the credential.",
     "action_link:continue": "Secure action link (CORE.15): the signed token is the credential.",
@@ -131,12 +148,6 @@ PUBLIC: dict[str, str] = {
 # Views that do not check the CSRF token, and what protects them instead.
 CSRF_EXEMPT: dict[str, str] = {
     "email_webhook": "Server-to-server call from the email provider, verified by its signature.",
-    "switch_language": (
-        "Language switcher on every cached public page (SEO.6), which can hold no CSRF token: the "
-        "view refuses a POST whose `Sec-Fetch-Site` or `Origin` is not this site "
-        "(`test_switcher_refuses_a_cross_site_post_and_changes_nothing`), and it only changes the "
-        "visitor's display language."
-    ),
     "payments_webhook": (
         "Server-to-server call from the payment provider, verified by its signature and a "
         "timestamp tolerance (PAY.2)."

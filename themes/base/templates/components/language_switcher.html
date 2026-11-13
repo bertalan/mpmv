@@ -1,9 +1,12 @@
 {% load i18n %}{% comment %}
 Language switcher (THM.3): one button per language, each in its own small form that posts to
 `switch_language`, so it works without JavaScript. The current language is marked
-`aria-current` and disabled. No `{% csrf_token %}` on purpose (SEO.6): the switcher is on every
-cached public page, which can hold nothing per request; `switch_language` checks the request's
-origin instead.
+`aria-current` and disabled.
+
+An anonymous visitor on a page that knows each language's URL (`language.url`) gets plain links
+instead (SEO.6): the URL prefix decides the language, so no cookie, session or CSRF token is
+needed and the page stays cacheable (a form with a token never is). A signed-in user and the
+Manager (no `request` in its context) keep the POST form, which also stores the preference.
 
 Context: `languages`, either the CMS `LanguageLink`s (`code`, `name`, `url`, `current`) or
 Django's language info dicts (`code`, `name_local`) together with `current_language` and
@@ -12,12 +15,14 @@ Django's language info dicts (`code`, `name_local`) together with `current_langu
   <ul>
     {% for language in languages %}
       <li>
-        <form action="{% url 'switch_language' %}" method="post">
+        {% if language.url and request and not request.user.is_authenticated %}{% firstof language.name_local language.name as label %}{% if language.current %}<span class="language-switcher__link" lang="{{ language.code }}" aria-current="true">{{ label|capfirst }}</span>{% else %}<a class="language-switcher__link" href="{{ language.url }}" lang="{{ language.code }}" hreflang="{{ language.code }}">{{ label|capfirst }}</a>{% endif %}
+        {% else %}<form action="{% url 'switch_language' %}" method="post">
+          {% csrf_token %}
           {% if language.url %}<input type="hidden" name="exact" value="1">
           <input type="hidden" name="notice" value="{% if language.available %}0{% else %}1{% endif %}">
           {% endif %}<input type="hidden" name="next" value="{% firstof language.url next_url %}">
           {% firstof language.name_local language.name as label %}<button type="submit" name="language" value="{{ language.code }}" lang="{{ language.code }}"{% if language.current or language.code == current_language %} aria-current="true" disabled{% endif %}>{{ label|capfirst }}</button>
-        </form>
+        </form>{% endif %}
       </li>
     {% endfor %}
   </ul>

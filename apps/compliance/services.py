@@ -39,31 +39,33 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product, ProductStatus
 from apps.catalog.services import save_product
-from apps.cms.services import legal_section_tags, legal_section_texts
+from apps.cms.services import legal_page_plain_text, legal_section_tags, legal_section_texts
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.countries import OFFICIAL_LANGUAGES, InvalidCountry, normalize_country
 from apps.core.flags import TtlCache
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
-from apps.core.privacy import keyed_hash, normalise_email
+from apps.core.privacy import keyed_hash, normalise_email, suppression_digest
 from apps.core.services import (
     NoPlatformOperator,
     audit_changes,
     consume_rate_limit,
     current_operator,
     enqueue_email,
+    run_mutation,
     save_audited,
 )
 from apps.events.models import EventPage
 from apps.events.services import hide_event
 from apps.vendors.engine import SUSPENDED as _SUSPENDED
 from apps.vendors.engine import InvalidTransition
-from apps.vendors.models import Vendor
+from apps.vendors.models import Vendor, VendorContract, VendorContractTranslation
 from apps.vendors.scoping import is_platform_staff
 from apps.vendors.services import change_status as change_vendor_status
+from apps.vendors.services import current_contract, save_contract
 
-from . import engine
+from . import engine, terms_clauses
 from .models import (
     CountryWarningLanguages,
     GpsrInfo,
@@ -72,6 +74,7 @@ from .models import (
     ProductRestriction,
     SafetyCase,
     StatementOfReasons,
+    SuppressedEmail,
     TransparencySubmission,
     VendorGpsrDefaults,
 )
@@ -1632,3 +1635,142 @@ def lift_restriction(
         row.save(update_fields=["lifted_at", "lift_reason", "updated_at"])
         audit_changes(changes, ctx=ctx, action=RESTRICTION_LIFTED)
     return changes
+
+
+# --- CMP.5 contract clauses (a) to (h) as versioned terms
+
+CLAUSES_NOTE: Final = "CMP.5 clauses (a) to (h): payment discharge, Stripe, set-off, refund fee"
+
+
+def publish_vendor_terms(
+    *, valid_from: dt.datetime, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Publish the next vendor contract version with clauses (d) to (h) in every drafted language.
+
+    Only PUBLISHED texts of the previous version are carried forward, never a machine or
+    reviewed draft. A published language without drafted clause wording is kept and gets the
+    English clause block; `vendor_terms_problems` reports it as untranslated.
+    Each drafted text keeps the previous version's text in that language (without its older clause
+    block) and ends with the current block. The vendors' acceptance of the version in force then
+    applies as for any version (VEN.5): an old acceptance does not cover the new one, so every
+    vendor accepts it before activation. Audited through `save_contract`; the texts are draft
+    wording until counsel approves them (CMP.24). Raises what `save_contract` raises.
+    """
+    previous = VendorContract.objects.order_by("-version").first()
+    contract = VendorContract(valid_from=valid_from, note=CLAUSES_NOTE)
+    with transaction.atomic():
+        changes = save_contract(contract, ctx=ctx, dry_run=dry_run)
+        if dry_run:
+            return changes
+        published = VendorContractTranslation.Status.PUBLISHED
+        carried = {
+            text.language: text
+            for text in (previous.translations.filter(status=published) if previous else ())
+        }
+        drafted = terms_clauses.LANGUAGES
+        for language in (*drafted, *sorted(set(carried) - set(drafted))):
+            old = carried.get(language)
+            title = old.title if old else _VENDOR_TERMS_TITLES[language]
+            # Every language ends with the clause block; one without drafted wording gets the
+            # English block (`vendor_terms_problems` reports it as untranslated).
+            body = terms_clauses.with_clauses(
+                terms_clauses.VENDOR, language, old.body if old else ""
+            )
+            row = VendorContractTranslation(
+                contract=contract, language=language, title=title, body=body, status=published
+            )
+            row.full_clean()
+            row.save()
+    return changes
+
+
+_VENDOR_TERMS_TITLES: Final = {"en": "Vendor terms", "it": "Condizioni per i venditori"}
+
+
+def vendor_terms_problems(contract: VendorContract | None = None) -> list[str]:
+    """What is missing in the vendor contract version in force: a message per language and
+    missing clause letter, plus one when no version is in force. Languages checked are the ones
+    with a drafted wording, the site languages and the languages the version has a published
+    text in. Only published texts count; a site language without one reports
+    `vendor_terms_text_missing:<language>`."""
+    contract = contract or current_contract()
+    if contract is None:
+        return ["vendor_terms_missing"]
+    problems: list[str] = []
+    texts = {
+        text.language: text
+        for text in contract.translations.filter(status=VendorContractTranslation.Status.PUBLISHED)
+    }
+    site = [code for code, _name in settings.LANGUAGES]
+    for language in dict.fromkeys((*terms_clauses.LANGUAGES, *site, *sorted(texts))):
+        text = texts.get(language)
+        if text is None and language not in terms_clauses.LANGUAGES:
+            problems.append(f"vendor_terms_text_missing:{language}")
+            continue
+        if text is not None and language not in terms_clauses.LANGUAGES:
+            problems.append(f"vendor_terms_clauses_untranslated:{language}")
+        body = text.body if text else ""
+        problems += [
+            f"vendor_terms_clause_missing:{language}:{letter}"
+            for letter in terms_clauses.missing_clauses(terms_clauses.VENDOR, body, language)
+        ]
+    return problems
+
+
+def customer_terms_problems(languages: Iterable[str] | None = None) -> list[str]:
+    """What is missing in the live customer terms page per language: clauses (a) to (c).
+
+    A language without a drafted wording is checked against the English one. A language
+    without a live terms page reports `customer_terms_missing:<language>`.
+    """
+    problems: list[str] = []
+    for language in languages or terms_clauses.LANGUAGES:
+        text = legal_page_plain_text("terms", language)
+        if text is None:
+            problems.append(f"customer_terms_missing:{language}")
+            continue
+        problems += [
+            f"customer_terms_clause_missing:{language}:{letter}"
+            for letter in terms_clauses.missing_clauses(terms_clauses.CUSTOMER, text, language)
+        ]
+    return problems
+
+
+# --- Marketing suppression list (L-3, PRM.9, PRM.16)
+
+ACTION_SUPPRESSION_ADDED: Final = "compliance.suppression.added"
+SUPPRESSED_EMAIL_MODEL: Final = "compliance.suppressedemail"
+
+
+def is_suppressed(address: str) -> bool:
+    """Whether marketing mail to `address` is blocked (lookup by keyed digest; case and
+    surrounding blanks do not matter)."""
+    if not address.strip():
+        return False
+    return SuppressedEmail.objects.filter(digest=suppression_digest(address)).exists()
+
+
+def suppress_email(
+    address: str,
+    *,
+    reason: str = SuppressedEmail.Reason.UNSUBSCRIBED,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Add `address` to the suppression list. Idempotent: an address already listed changes
+    nothing and writes nothing. The audit entry carries the first 12 characters of the digest and
+    the reason, never the address."""
+    if not address.strip() or "@" not in address:
+        raise ValidationError("not an email address")
+    if reason not in SuppressedEmail.Reason.values:
+        raise ValidationError(f"unknown reason {reason!r}")
+    digest = suppression_digest(address)
+    changeset = ChangeSet()
+    if SuppressedEmail.objects.filter(digest=digest).exists():
+        return changeset
+    changeset.create(SUPPRESSED_EMAIL_MODEL, digest[:12], {"reason": reason})
+
+    def apply() -> None:
+        SuppressedEmail.objects.get_or_create(digest=digest, defaults={"reason": reason})
+
+    return run_mutation(changeset, apply, ctx=ctx, action=ACTION_SUPPRESSION_ADDED, dry_run=dry_run)

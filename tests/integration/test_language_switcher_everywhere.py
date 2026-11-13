@@ -117,6 +117,13 @@ def switcher_forms(response: Any) -> dict[str, dict[str, str]]:
     forms: dict[str, dict[str, str]] = {}
     if nav is None:
         return forms
+    for link in nav.find_all(class_="language-switcher__link"):  # SEO.6: anonymous visitors
+        code = str(link["lang"])
+        forms[code] = {
+            "language": code,
+            "_href": str(link.get("href", "")),
+            "_current": "1" if link.name == "span" else "0",
+        }
     for form in nav.find_all("form"):
         button = form.find("button", attrs={"name": "language"})
         assert button is not None, "a switcher form without its language button"
@@ -185,9 +192,19 @@ def sweep(case: Case, language: str) -> None:
     if forms[language]["_current"] == "1":
         pytest.skip("the current language's button is disabled: nothing to switch")
 
+    path, notice = case.expect[language]
+    if "_href" in forms[language]:
+        # SEO.6: a plain link to the other language's URL; no state is written, so there is no
+        # one-time notice (that needs the session): the visitor lands on the same object or home.
+        response = client.get(forms[language]["_href"], follow=True)
+        assert "sessionid" not in client.cookies, "following a language link wrote a session"
+        assert landing_path(response, forms[language]["_href"]) == path
+        assert response.status_code == case.landing_status
+        assert html_lang(response) == language
+        assert notice_text(language) not in response.content.decode()
+        return
     data = {k: v for k, v in forms[language].items() if not k.startswith("_")}
     response = client.post(forms[language]["_action"], data, follow=True)
-    path, notice = case.expect[language]
     assert response.status_code == case.landing_status, (case.url, language, response.status_code)
     assert landing_path(response, forms[language]["_action"]) == path, (
         f"{case.url} -> {language}: lands on {landing_path(response, '')}, expected {path}"

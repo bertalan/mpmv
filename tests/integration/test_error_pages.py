@@ -66,7 +66,7 @@ def test_404_renders_with_base_and_the_full_chrome(client: Client) -> None:
 
 def test_csrf_failure_renders_with_base(client: Client) -> None:
     client = Client(enforce_csrf_checks=True)
-    response = client.post(reverse("logout"), {"next": "/"})
+    response = client.post(reverse("switch_language"), {"language": "it", "next": "/"})
     assert response.status_code == 403
     html = response.content.decode()
     assert_base_page(html)

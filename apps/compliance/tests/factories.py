@@ -21,10 +21,12 @@ from apps.compliance.models import (
     ProductRestriction,
     SafetyCase,
     StatementOfReasons,
+    SuppressedEmail,
     TransparencySubmission,
     VendorGpsrDefaults,
     WithdrawalStatement,
 )
+from apps.core.privacy import suppression_digest
 from apps.orders.tests.factories import VendorOrderFactory
 from apps.vendors.tests.factories import VendorFactory
 
@@ -154,6 +156,16 @@ class ProductRestrictionFactory(DjangoModelFactory[ProductRestriction]):
 
     product = factory.SubFactory(ProductFactory)
     statement = factory.SubFactory(StatementOfReasonsFactory)
+
+
+class SuppressedEmailFactory(DjangoModelFactory[SuppressedEmail]):
+    """A suppressed address, digested through the real keyed hash."""
+
+    class Meta:
+        model = SuppressedEmail
+
+    digest = factory.Sequence(lambda n: suppression_digest(f"suppressed{n}@example.com"))
+    reason = SuppressedEmail.Reason.UNSUBSCRIBED
 
 
 class WithdrawalStatementFactory(DjangoModelFactory[WithdrawalStatement]):

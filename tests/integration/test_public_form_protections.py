@@ -109,6 +109,8 @@ def test_every_captcha_declaration_is_tested() -> None:
         "dsa_notice",
         "withdrawal",
         "wagtailcore_authenticate_with_password",  # tested in apps/cms (SEC.14)
+        "orders:checkout",  # tested in apps/orders (ORD.5)
+        "orders:review",  # tested in apps/orders (ORD.5)
     }
 
 

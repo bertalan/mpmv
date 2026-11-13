@@ -18,15 +18,18 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin.options import IncorrectLookupParameters
 from django.contrib.admin.views.main import ChangeList
+from django.contrib.postgres.forms import SimpleArrayField
 from django.db.models import Model, Q, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.module_loading import import_string
+from django.utils.translation import gettext_lazy as _
+from wagtail.models import Collection
 
 from . import flags
 from .audit import audit_context
 from .changeset import diff
-from .models import AuditLog, FeatureFlag, ImageLicence, PlatformOperator
+from .models import AuditLog, FeatureFlag, ImageLicence, MediaImage, PlatformOperator
 from .services import (
     NoPlatformOperator,
     check_operator_start,
@@ -41,6 +44,19 @@ from .session_policy import parse_policy
 
 
 class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
+    official_profiles = SimpleArrayField(
+        forms.URLField(max_length=300),
+        delimiter="\n",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 4}),
+        label="Official profiles",
+        help_text=_(
+            "Official profiles of the platform, one https:// link each, for search "
+            "engines. Example: its Wikidata item, its LinkedIn page. No user names or passwords. "
+            "One per line, at most 10."
+        ),
+    )
+
     class Meta:
         model = PlatformOperator
         fields = (
@@ -57,8 +73,22 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             "authority_contact_languages",
             "user_contact_url",
             "user_contact_languages",
+            "logo",
+            "official_profiles",
             "valid_from",
         )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        # Only the platform logos collection (or one below it), never a vendor's or page image.
+        if "logo" not in self.fields:  # a stored row is shown read-only
+            return
+        paths = Collection.objects.filter(svg_policy__isnull=False).values_list("path", flat=True)
+        condition = Q(pk__in=[])
+        for path in paths:
+            condition |= Q(collection__path__startswith=path)
+        field: Any = self.fields["logo"]
+        field.queryset = MediaImage.objects.filter(condition)
 
     def clean_session_policy(self) -> Any:
         return self.cleaned_data.get("session_policy") or {}
@@ -98,8 +128,8 @@ class PlatformOperatorAdmin(admin.ModelAdmin[PlatformOperator]):
     def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return False
 
-    def changelist_view(
-        self, request: HttpRequest, extra_context: dict[str, Any] | None = None
+    def _changelist(
+        self, request: HttpRequest, extra_context: dict[str, Any] | None
     ) -> HttpResponse:
         """Warn when the stored session policy cannot be read (CORE.25: sessions fail closed)."""
         try:
@@ -113,6 +143,43 @@ class PlatformOperatorAdmin(admin.ModelAdmin[PlatformOperator]):
                 "passkey until a new configuration row fixes it.",
             )
         return super().changelist_view(request, extra_context)
+
+    # D-32 group 2 (`operator_config`): any POST (adding a row, admin actions included) and the
+    # delete page need the passkey window or "do it once"; viewing a form stays free, so opening
+    # the add form does not use up a single-use grant.
+    def changeform_view(
+        self,
+        request: HttpRequest,
+        object_id: str | None = None,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        def view(r: HttpRequest) -> HttpResponse:
+            return super(PlatformOperatorAdmin, self).changeform_view(
+                r, object_id, form_url, extra_context
+            )
+
+        if request.method == "POST":
+            return step_up(view, level="operator_config")(request)
+        return view(request)
+
+    def delete_view(
+        self, request: HttpRequest, object_id: str, extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        gated = step_up(
+            lambda r: super(PlatformOperatorAdmin, self).delete_view(r, object_id, extra_context),
+            level="operator_config",
+        )
+        return gated(request)
+
+    def changelist_view(
+        self, request: HttpRequest, extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        if request.method == "POST":  # a list action
+            return step_up(lambda r: self._changelist(r, extra_context), level="operator_config")(
+                request
+            )
+        return self._changelist(request, extra_context)
 
     def save_model(
         self, request: HttpRequest, obj: PlatformOperator, form: Any, change: bool
