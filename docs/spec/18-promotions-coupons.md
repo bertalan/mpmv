@@ -85,7 +85,8 @@ class Redemption(Model):                         # one row per use; the unit of 
 
 **Types.** `percent` (of the eligible line price, optional `max_discount`), `fixed` (an amount off
 the eligible lines, shared as in §18.3), `free_shipping` (zeroes the shipping of the vendor or vendors
-in scope), `gift` (adds a line at full price plus a 100% discount line, ORD.12).
+in scope), `gift` (adds a line at full price plus a 100% discount line, ORD.12; T-7: only as an in-kind
+discount on a paid order, the gift's value at most the value of the paid goods).
 
 **Scope.** A vendor promotion covers that vendor's catalogue only: the whole vendor, a product set or a
 category set. A platform promotion may span vendors, narrowed by categories. A platform promotion
@@ -116,32 +117,46 @@ normalised email (case folded, plus-tags removed) and is best effort; personal c
 
 ### The rule, stated once
 
-**Decided (owner, 2026-11-10, Q-P2):** the vendor pays from its own credit and the coupon applies to
-the total; the platform likewise, from the platform's credit. The promotion's issuer is its funder and
-the only payer. The customer-visible price reduction is identical in both cases. What changes is whose
-credit balance is debited for it: **a funding debit on the issuer's ledger balance, with one ledger kind
-per funder** (`coupon_vendor_funded`, `coupon_platform_funded`), never a hidden line discount.
-**The commission is computed on the pre-coupon total and does not depend on any coupon.**
+**Decided (owner, 2026-11-10, Q-P2; platform coupons on the Q-90 model, owner and adviser
+opinion 2026-11-11, T-1 and T-1 bis):** the promotion's issuer is its funder and the only payer. The
+customer-visible price reduction is identical in both cases, and so is the VAT base: **the discounted
+price** (T-1 bis), because the vendor's own invoice to the customer always shows the coupon as an
+unconditional discount. What changes is who bears it:
+
+- **Vendor coupon:** the vendor bears the discount. The commission is computed on the pre-coupon total
+  and does not depend on the coupon.
+- **Platform coupon (Q-90 model):** the vendor still shows the discount on its invoice, and the
+  platform **reduces its commission** on that vendor order by the same amount. If the coupon is larger
+  than the order's commission, the excess is netted against the same vendor's commissions of the month
+  on the periodic statement (CMP.2); the total of a period never goes below zero, and an excess larger
+  than the whole month's commissions carries over to the next month as a vendor credit against future
+  commissions. **No cash is ever paid out** for a coupon, and there is no "third-party payment" path:
+  the platform's share is never treated as consideration paid by a third party (T-1).
+
+Each funder has its own ledger kinds (below), never a hidden line discount.
 
 | | Vendor promotion | Platform promotion |
 |---|---|---|
 | Customer pays | list price − discount | list price − discount |
-| Vendor's VAT base | open, for the tax advisor (⚖️ T-1): list or list − discount | open (⚖️ T-1) |
-| Vendor receives | list − commission − discount (debited from its credit) | list − commission (full price) |
-| Platform bears | nothing | the discount, debited from the platform's credit (marketing cost) |
+| Vendor's invoice | list price with an unconditional discount | list price with an unconditional discount |
+| Vendor's VAT base | list − discount (T-1 bis) | list − discount (T-1 bis) |
+| Commission | on the list price | on the list price, reduced by the discount (Q-90) |
+| Vendor receives | list − commission − discount | list − commission (as without the coupon) |
+| Platform bears | nothing | the discount, as commission it does not earn (marketing cost) |
 
 ### Commission base (decided)
 
 **Decided (Q-P2): commission is computed on the pre-coupon total (the list price), for both funders.**
 Worked example (owner): item 100, vendor coupon 20, commission 10%: the customer pays 80, the 20 is debited
 from the vendor's credit, commission is 10 on the pre-coupon total, the vendor nets 100 − 10 − 20 = 70. With
-a platform coupon of 20 the 20 comes from the platform's credit and the vendor nets 90.
+a platform coupon of 20 the platform's commission of 10 on that order drops to 0, the other 10 is netted
+against the vendor's other commissions of the month (or carried over), and the vendor nets 90.
 
 Example: line 100, commission 15%, coupon 10. Vendor coupon: customer pays 90, commission 15, vendor
 nets 75, so the vendor paid exactly 10 more than without the coupon. If commission were computed on the
 discounted price (13.50), the vendor would net 76.50: the platform would silently pay 1.50 of a
 coupon the vendor set up, which contradicts the decided rule. For a platform coupon the vendor gets
-85 as if there were no coupon, and the platform pays 10 out of its own pocket.
+85 as if there were no coupon, and the platform gives up 10 of its commission (Q-90).
 
 Why list: (1) it is the only base that makes "whoever sets it up pays" literally true; (2) one rule,
 independent of the funder, so a vendor cannot reduce its commission by discounting and a platform
@@ -189,7 +204,7 @@ reduction the customer sees). New immutable rows:
 class OrderLineDiscount(Model):      # append-only; one row per promotion per line
     order_line; promotion_id (SET_NULL) + promotion_version + code snapshot + label snapshot
     kind; funder ("vendor" | "platform"); funder_vendor (null for platform)
-    amount_net; vat_effect ("reduces_base" | "third_party_consideration")   # §18.4
+    amount_net   # always reduces the VAT base (T-1 bis, §18.4); no VAT-mode field
     rule_snapshot (JSON: percent or fixed value, cap, scope, commission_base mode)
 # VendorOrder: shipping_discount_net, shipping_discount_funder
 # OrderLine: list_unit_price_net (the existing unit_price_net), tax_base_net (what VAT was computed on)
@@ -203,32 +218,39 @@ constraint for single-use codes under `select_for_update`), **redeemed** in `on_
 
 ### Ledger
 
-`LedgerEntry.kind` gains `coupon_vendor_funded` (a debit of the vendor's balance) and
-`coupon_platform_funded` (a debit of the platform's balance), P2, next to the bundle kinds. `sale` is the
-list goods amount in both cases:
+`LedgerEntry.kind` gains, P2, next to the bundle kinds: `coupon_vendor_funded` (the vendor's
+discount, a debit of the vendor's balance), `coupon_platform_discount` (the discount the vendor shows
+on its invoice for a platform coupon), `commission_coupon_reduction` (the platform's commission given
+up for it, at most the order's commission) and `commission_coupon_excess` (the rest, netted on the
+periodic statement). `sale` is the list goods amount in every case:
 
 | Case (line 100, rule 15%, coupon 10) | Rows for the vendor | Vendor net | Platform |
 |---|---|---|---|
 | Vendor-funded | `sale` +100, `commission` −15, `coupon_vendor_funded` −10 | 75 | +15 |
-| Platform-funded | `sale` +100, `commission` −15; platform balance: `coupon_platform_funded` −10 | 85 | +15 − 10 = +5 |
+| Platform-funded (Q-90) | `sale` +100, `coupon_platform_discount` −10, `commission` −15, `commission_coupon_reduction` +10 | 85 | +15 − 10 = +5 |
+| Platform-funded, coupon 20 | `sale` +100, `coupon_platform_discount` −20, `commission` −15, `commission_coupon_reduction` +15, `commission_coupon_excess` +5 (netted on the statement) | 80 on this order, +5 against the month's other commissions | 0 on this order, −5 on the month |
 
-The sum of `sale` and the funding debit always equals what the customer paid for goods, which is what the
-nightly Stripe reconciliation checks. The platform's marketing cost is the sum of `coupon_platform_funded`
-rows, reported to staff (Finance and payments role) per promotion and budget. The transfer to the vendor is
-for the full `vendor_net`, so with a platform coupon the platform balance pays the 10 (⚖️ D-08: the
-top-up comes from the platform's own funds). The ledger is still not accounting (spec 00, 2026-11-07).
-The commission statement (CMP.2) shows both rows. DAC7 (CMP.1) counts the consideration paid or credited
-to the vendor: customer-paid plus platform-funded amounts, so list minus vendor-funded discount.
+The sum of `sale` and the discount row always equals what the customer paid for goods, which is what
+the nightly Stripe reconciliation checks. The transfer for an order never exceeds what its customer
+paid: the platform never tops up a transfer from its own funds. A `commission_coupon_excess` is
+consumed by the vendor's later commissions, month by month, and is never paid out. The platform's
+marketing cost is the sum of `commission_coupon_reduction` and consumed `commission_coupon_excess`
+rows, reported to staff (Finance and payments role) per promotion and budget. The ledger is still not
+accounting (spec 00, 2026-11-07). The commission statement (CMP.2) shows the reduced commission and
+the netted excess. DAC7 (CMP.1, T-6): `Consideration` is what is paid or credited to the vendor net of
+the platform's fees and taxes, and the fees go in `Fees`; on the case above a vendor coupon gives
+Consideration 75 and Fees 15, a platform coupon Consideration 85 and Fees 5.
 
 ### Refunds, withdrawal and returns
 
 - **A refund returns what the customer paid for the line**: list − allocated discount, VAT from the
   snapshot (`tax_base_net`), proportional for a partial quantity. The refund row is that amount.
 - Vendor-funded, line above refunded in full: `refund` −90, `commission_reversal` +15, `coupon_vendor_funded`
-  stays: 100 − 15 − 10 − 90 + 15 = 0. Platform-funded: `refund` −90, `commission_reversal` +15, and
-  the platform's `coupon_platform_funded` is reversed in the platform's own balance (it was never the vendor's
-  money): the vendor side is 100 − 15 − 90 + 15 − 10 = 0 with the platform covering its 10 as before.
-  D-05 applies unchanged (full: commission and fee returned; partial: proportional).
+  stays: 100 − 15 − 10 − 90 + 15 = 0. Platform-funded: `refund` −90, `commission_reversal` of the
+  commission actually charged (+5, that is 15 less the reduction of 10), and the reduction is not
+  given back twice: 100 − 10 − 15 + 10 − 90 + 5 = 0. An excess already netted on an earlier statement
+  is reversed on the next one (CMP.2, T-8). D-05 applies unchanged (full: commission and fee
+  returned; partial: proportional).
 - **No clawback.** Returning part of an order never removes a discount on the lines kept: a minimum
   order or the loss of a gift trigger is checked at order time only. Reason: a penalty for using the
   withdrawal right clashes with directive 2011/83/EU, art. 14 (⚖️ L-9). The cost is bounded by
@@ -245,28 +267,21 @@ to the vendor: customer-paid plus platform-funded amounts, so list minus vendor-
   instruments that only entitle to a price reduction; articles 30a to 30b (single-purpose and
   multi-purpose vouchers) apply to instruments redeemable for goods or services, which is why the design
   issues no stored value (§18.1).
-- **Vendor-funded: open (owner, 2026-11-10).** Because the funding is a debit on the vendor's credit, a
-  vendor-funded coupon is economically a price reduction, but the vendor's VAT base is 80 or 100 in the
-  owner's example, and the advisor must say which (article 73, T-1 now covers both funders). Until then
-  the order stores both figures (`tax_base_net` and the list net) and a `PlatformOperator` setting selects
-  the mode. Shipping discounts follow the same answer. The per-line rounding rule and the 0.50 floor are
-  also confirmed.
-- **Platform-funded: open.** Customer pays 90, vendor receives 100 (90 from the customer, 10 from the
-  platform). Two readings, both stored so that policy can change without a data migration:
-  - **T1, third-party consideration (article 73):** the platform's 10 is paid for the vendor's supply by
-    a third party, so the vendor's base is 100 (`vat_effect = third_party_consideration`) and the
-    vendor's documents show 100, VAT on 100, "discount paid by the platform 10". The customer's gross
-    payment is then less than base plus VAT, which the vendor's invoice must express.
-  - **T2, price reduction financed by the platform:** the vendor's base is 90
-    (`vat_effect = reduces_base`) and the 10 is a separate compensation between platform and vendor,
-    possibly outside VAT or itself a service (⚖️).
-  A `PlatformOperator` setting `platform_funded_coupon_vat_mode` (`t1` | `t2`, versioned) selects the
-  mode, and **platform-funded coupons stay disabled until the advisor answers** (PRM.7). The bundle
-  design (CAT.16) uses a third reading, a reduction of the platform's own commission (Q-90); the
-  advisor should answer both together so the two features do not diverge.
-- Platform costs have no vendor invoice behind them and are not a vendor's VAT-deductible expense;
-  the operator's accountant decides how the platform records and recovers VAT on its own
-  marketing cost (T-3).
+- **Vendor-funded: decided (adviser opinion 2026-11-11, T-1 bis).** The vendor's VAT base is the
+  discounted price (80 in the owner's example), with the discount on the vendor's own invoice. The
+  order stores both figures (`tax_base_net` and the list net) for the statements; there is no mode
+  setting. Per-line `ROUND_HALF_UP` and the 0.50 floor are confirmed (T-2), and a vendor in an
+  exemption or special VAT regime follows the same rule (T-4).
+- **Platform-funded: decided (owner and adviser opinion 2026-11-11, T-1, Q-90).** Customer pays 90.
+  The vendor's invoice shows 100 with an unconditional discount of 10, so its VAT base is 90, and the
+  platform reduces its commission by 10. The vendor receives 85, as without the coupon. There is no
+  "third-party consideration" reading and no VAT-mode setting. This is the same model as the bundle
+  design (CAT.16, Q-90), so the two features do not diverge.
+- **Shipping (T-5).** Platform-paid free shipping follows T-1: the vendor's invoice shows shipping 0,
+  or a 100% discount on it, and the platform reduces its commission by the same amount; the VAT split
+  follows `resolve_shipping_tax` on the reduced amount.
+- Under Q-90 the platform's cost is commission it does not earn, shown on the CMP.2 statement; how
+  the operator records it is for the operator's accountant (T-3) and blocks no row.
 
 ## 18.5 Abandoned-cart detection and recovery
 
@@ -487,11 +502,13 @@ Names are stable test names. Amounts are line net before VAT, rule 15%.
 
 | Case | Setup | Expected |
 |---|---|---|
-| CPN-VENDOR | Vendor coupon 10% on line 100 | Customer 90, commission 15 on the pre-coupon 100, vendor net 75, platform +15, rows `sale` 100, `commission` −15, `coupon_vendor_funded` −10; VAT base 90 or 100 per the T-1 mode |
-| CPN-PLATFORM | Platform coupon 10 on line 100 | Customer 90, vendor net 85, platform +15 − 10, the 10 is a `coupon_platform_funded` debit on the platform's balance, not the vendor's; VAT base per `platform_funded_coupon_vat_mode`; feature off until T-1 is answered |
+| CPN-VENDOR | Vendor coupon 10% on line 100 | Customer 90, commission 15 on the pre-coupon 100, vendor net 75, platform +15, rows `sale` 100, `commission` −15, `coupon_vendor_funded` −10; VAT base 90 (T-1 bis) |
+| CPN-PLATFORM | Platform coupon 10 on line 100 | Customer 90, vendor invoice 100 with an unconditional discount 10 and VAT base 90, commission 15 reduced by 10 to 5, vendor net 85, platform +5; rows `sale` 100, `coupon_platform_discount` −10, `commission` −15, `commission_coupon_reduction` +10; no cash row from the platform |
+| CPN-PLATFORM-EXCESS | Platform coupon 20 on line 100; (a) the vendor's other commissions of the month are 30; (b) it has none | The order's commission drops to 0 and the excess 5 is a `commission_coupon_excess` row; (a) the month's statement total is 25; (b) the month's total is 0, a vendor credit of 5 carries over and reduces the next month's total; no payout or cash line, no negative period total |
 | CPN-FIXED-SPLIT | Fixed 10 on lines 60 and 30 and 10 | Shares 6, 3, 1 (HALF_UP, remainder to largest), sum 10 |
-| CPN-MULTI | Platform fixed 20 across vendors A (100) and B (50) | Shares 13.33 and 6.67, each vendor still receives full price, platform cost 20 |
+| CPN-MULTI | Platform fixed 20 across vendors A (100) and B (50) | Shares 13.33 and 6.67, each vendor's commission is reduced by its share and each vendor still nets list − commission, platform cost 20 as commission not earned |
 | CPN-MINPAY | Coupon makes total 0.10 | Promotion not applied, customer told, no zero-total order |
+| CPN-GIFT-T7 | Gift worth 30 on a cart with paid goods 20; the same gift with paid goods 50; a cart with the gift only | No gift on the first cart, gift line at full price plus a 100% discount on the second, no gift and no order with no paid goods line on the third (T-7) |
 | CPN-STACK | Two qualifying percent coupons on one line | Only the larger applies, never multiplied |
 | CPN-REFUND-VENDOR | Full refund of CPN-VENDOR | Ledger nets to 0, refund = 90 |
 | CPN-REFUND-PARTIAL | Return one of two lines under a fixed coupon | Refund = that line's paid price, no clawback |
@@ -515,12 +532,12 @@ decides. Open owner questions are in §18.12, tax advisor (T-) and counsel (L-) 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
 | PRM.1 | New app `promotions`: `Promotion` (versioned, issuer is funder with a check constraint, no separate funder field), `Coupon`, `Redemption`, scope, limits, activation modes, audited services with `dry_run`; no order or tax import | P2 | 10 | CAT.1, VEN.2, ORD.2 | A promotion with redemptions cannot be edited in place; a vendor promotion cannot scope another vendor's product; a platform promotion needs a budget cap; migrations and import contract green |
-| PRM.2 | Pure `apply_promotions` engine: types percent, fixed, free shipping, gift; one discount per line; fixed-amount sharing with remainder to the largest line; caps and vendor-net clamp; minimum payable total; stacking rules; per-line `ROUND_HALF_UP` | P2 | 12 | PRM.1, TAX.4 | CPN-VENDOR, CPN-FIXED-SPLIT, CPN-MULTI, CPN-MINPAY, CPN-STACK green; a random-cart property test never exceeds the eligible total or makes a negative vendor net |
+| PRM.2 | Pure `apply_promotions` engine: types percent, fixed, free shipping, gift; one discount per line; fixed-amount sharing with remainder to the largest line; caps and vendor-net clamp; minimum payable total; stacking rules; per-line `ROUND_HALF_UP`; gift rule T-7 (in-kind discount on a paid order only, gift value at most the paid goods) | P2 | 12 | PRM.1, TAX.4 | CPN-VENDOR, CPN-GIFT-T7, CPN-FIXED-SPLIT, CPN-MULTI, CPN-MINPAY, CPN-STACK green; a random-cart property test never exceeds the eligible total or makes a negative vendor net |
 | PRM.3 | Cart and checkout integration: apply a code (HTMX, one code slot per funder context), automatic promotions, redemption reserve at `place_order`, confirm in `on_payment_succeeded`, release on cancel and expiry, coupon line in cart and confirmation | P2 | 12 | PRM.2, ORD.4 | CPN-RACE green on PostgreSQL; a cancelled order frees a single-use code; duplicate payment event redeems once |
-| PRM.4 | Order snapshots: `OrderLineDiscount`, `shipping_discount_net`, `tax_base_net`, `list_unit_price_net`; non-fiscal confirmation and CMP.23 export fields; VAT base per the T-1 mode (both figures stored) | P2 | 8 | PRM.3, CMP.23 | A coupon order's confirmation and export show list, vendor-funded and platform-funded discount and VAT base per line; a deleted promotion leaves the snapshot intact |
-| PRM.5 | Commission and ledger: `compute_commission` on the list base, `CommissionRule.coupon_base` (`list` default, `paid`), ledger kinds `coupon_vendor_funded` and `coupon_platform_funded` (a funding debit on the issuer's balance), statement lines, refund and partial refund rows, DAC7 aggregate adjustment, nightly reconciliation | P2 | 12 | PRM.4, VEN.3, PAY.4, CMP.1 | CPN-VENDOR, CPN-PLATFORM, CPN-REFUND-VENDOR and CPN-REFUND-PARTIAL green; statement shows both rows; reconciliation passes; ledger needs human review |
+| PRM.4 | Order snapshots: `OrderLineDiscount`, `shipping_discount_net`, `tax_base_net`, `list_unit_price_net`; non-fiscal confirmation and CMP.23 export fields; VAT base is the discounted price (T-1 bis), list and discounted figures both stored | P2 | 8 | PRM.3, CMP.23 | A coupon order's confirmation and export show list, vendor-funded and platform-funded discount and the discounted VAT base per line; a deleted promotion leaves the snapshot intact |
+| PRM.5 | Commission and ledger: `compute_commission` on the list base, `CommissionRule.coupon_base` (`list` default, `paid`), ledger kinds `coupon_vendor_funded`, `coupon_platform_discount`, `commission_coupon_reduction` and `commission_coupon_excess` (Q-90: a platform coupon reduces the commission, the excess is netted monthly and carried over, never paid in cash), statement lines, refund and partial refund rows, DAC7 aggregate adjustment, nightly reconciliation | P2 | 12 | PRM.4, VEN.3, PAY.4, CMP.1 | CPN-VENDOR, CPN-PLATFORM, CPN-PLATFORM-EXCESS, CPN-REFUND-VENDOR and CPN-REFUND-PARTIAL green; statement shows both rows; reconciliation passes; ledger needs human review |
 | PRM.6 | Vendor promotions in the Manager shop space: create, pause, end, net-effect preview ("you pay X per use"), usage report; creation validation against commission and fee; activation behind the D-32 level and an audit entry | P2 | 10 | PRM.3, CORE.18 | A vendor creates and ends a coupon; the preview matches the ledger; a percent above 100 − commission − fee is refused |
-| PRM.7 | Platform promotions in the platform space: budget caps and alerts, vendor opt-in setting (`CrossVendorConsent.in_platform_coupons`, no row = opted out), 30-day price-history gate, self-dealing exclusion, `platform_funded_coupon_vat_mode`; **blocked until the tax advisor answers T-1** | P2 | 12 | PRM.5, PRM.6 | CPN-GAMING green; a vendor that did not opt in is untouched; the feature flag is off by default; the VAT mode setting changes only new orders |
+| PRM.7 | Platform promotions in the platform space: budget caps and alerts, vendor opt-in setting (`CrossVendorConsent.in_platform_coupons`, no row = opted out), 30-day price-history gate, self-dealing exclusion; VAT and funding per the Q-90 model (T-1, answered 2026-11-11) | P2 | 12 | PRM.5, PRM.6 | CPN-GAMING green; a vendor that did not opt in is untouched; the feature flag is off by default; a platform coupon order gives the CPN-PLATFORM rows |
 | PRM.8 | Abuse and security of the apply endpoint: rate limits per account, IP and session, Turnstile after 5 failures, lockout, uniform answer, constant-time compare, no codes in logs, registration in the SEC.13 register when merged | P2 | 8 | PRM.3 | CPN-BRUTE green; an endpoint sweep finds the form protected; logs contain no code |
 | PRM.9 | Marketing consent and suppression: `MarketingConsent` (purpose, text version, method, timestamp, append-only), checkboxes at signup and checkout, preference toggle (ORD.11), suppression list with salted hashes, one-click unsubscribe (RFC 8058) through CORE.15 links, evidence retention; legal texts through CMP.24 | P2 | 10 | CORE.15, ARC.16, ORD.11, CMP.24 | Consent and withdrawal are recorded; unsubscribe by POST works from the header and the footer; a withdrawn purpose is never sent; texts carry counsel approval |
 | PRM.10 | Abandoned-cart detection and reminder (step 1): 15-minute job, eligibility, quiet hours in the business time zone, caps, `RecoveryDispatch`, CORE.15 `cart_restore` link, marketing email class in five languages with no pixel, consent re-check at send, personalised-offer notice | P2 | 12 | PRM.9, ORD.1, ORD.9 | RCV-GUEST, RCV-CONSENT, RCV-QUIET, RCV-CAP, RCV-PIXEL green; snapshot tests of the email in EN, IT, DE, FR and ES; needs human review |
@@ -539,7 +556,8 @@ Decided 2026-11-10 (owner for Q-P2, Q-P6, Q-P7, Q-P9; lane-a technical defaults 
 
 - **Q-P1.** Decided: no co-funding in v1; a "platform matches the vendor" mode is a later row.
 - **Q-P2.** Decided (owner): funding is a debit on the issuer's credit balance, with a ledger kind per
-  funder; commission on the pre-coupon total (§18.3). The VAT base stays open for the tax advisor (T-1).
+  funder; commission on the pre-coupon total (§18.3). VAT base: the discounted price (T-1 bis); platform
+  coupons follow the Q-90 model (T-1, 2026-11-11).
 - **Q-P3.** Decided: platform promotions are opt-in by the vendor, default off; a vendor can exclude single products.
 - **Q-P4.** Decided as proposed: Finance and payments role, monthly ceiling set by the owner, second approver
   above a threshold, every one audited.
@@ -552,25 +570,32 @@ Decided 2026-11-10 (owner for Q-P2, Q-P6, Q-P7, Q-P9; lane-a technical defaults 
 - **Q-P11.** Decided: agreed (no clawback, no coupon restored after dispatch).
 - **Q-P12.** Decided: yes, reserved words and a platform-wide unique namespace.
 
-Still open: the VAT base of a vendor-funded and of a platform-funded coupon (tax advisor T-1 to T-7), and
-counsel L-1 to L-9. Neither blocks the spec PR; platform-funded coupons stay disabled until T-1 is answered.
+Answered 2026-11-11 (adviser opinion and owner): T-1 to T-8 and counsel L-1 to L-9, recorded in
+[92](92-open-decisions.md), where a row wins over this text if they differ. Nothing in this spec is blocked by them any more; T-3 (how the operator
+books its own cost) is for the operator's accountant and blocks no row.
 
-## 18.13 Open questions for the tax advisor and counsel
+## 18.13 Questions for the tax advisor and counsel (answered)
+
+The answers are in [92](92-open-decisions.md); this list keeps the questions as they were asked.
 
 Tax advisor (⚖️):
 
-- **T-1.** Platform-funded discount on a vendor's supply: third-party consideration under article 73 (vendor base = list, T1)
-  or a price reduction financed by the platform with a separate compensation (vendor base = discounted, T2)? What must
-  the vendor's own invoice show? Answer together with Q-90 (bundles, commission reduction) so both stay consistent.
-- **T-2.** Is the platform's payment to the vendor ever a taxable supply or a "voucher" under articles 30a to 30b? We believe a code
-  that only gives a discount is outside the voucher rules.
-- **T-3.** The platform's own marketing cost: documentation without a vendor invoice, VAT recovery position.
-- **T-4.** Vendor in a flat-rate or special regime (RF20 and the like): any change to the discount base?
-- **T-5.** Free shipping funded by the platform: same treatment as T-1 for the shipping line, and the proportional VAT split on the reduced amount.
-- **T-6.** DAC7: confirm that consideration is customer-paid plus platform-funded, net of vendor-funded discount.
-- **T-7.** Gift lines (ORD.12): already ⚖️ in 07; answer within the same opinion.
+- **T-1.** Platform-funded discount on a vendor's supply. *Answered (owner and adviser, 2026-11-11):*
+  the Q-90 model, the vendor discounts its invoice and the platform reduces its commission; excess
+  netted monthly and carried over, no cash, no third-party consideration path.
+- **T-1 bis.** VAT base of a vendor coupon. *Answered:* the discounted price.
+- **T-2.** Voucher rules, rounding, minimum. *Answered:* a discount-only code is not a voucher (art. 30a
+  and 30b); per-line `ROUND_HALF_UP`; minimum 0.50.
+- **T-3.** The platform's own marketing cost. *For the operator's accountant;* under Q-90 it is
+  commission not earned, shown on the CMP.2 statement.
+- **T-4.** Vendor in a flat-rate or special regime. *Answered:* same rule as the others.
+- **T-5.** Free shipping funded by the platform. *Answered:* as T-1, shipping 0 or a 100% discount on
+  the vendor's invoice, commission reduced by the same amount.
+- **T-6.** DAC7 consideration. *Answered:* net of the platform's fees and taxes, fees in `Fees` (CMP.1).
+- **T-7.** Gift lines (ORD.12). *Answered:* only as an in-kind discount on a paid order, the gift's
+  value at most the paid goods, never a standalone free supply (PRM.2, CPN-GIFT-T7).
 
-Counsel (L-):
+Counsel (L-), answered as L-1 to L-9 in [92](92-open-decisions.md); CMP.32 records them in an ADR:
 
 - **L-1.** Is a cart reminder always a commercial communication needing consent (article 13 ePrivacy; article 130 Codice della
   privacy, Garante practice)? Any case where neutral wording is a service message?
