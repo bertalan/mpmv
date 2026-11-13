@@ -188,6 +188,152 @@ def test_a_json_client_gets_403_with_the_verify_url_when_the_factor_is_stale() -
     assert user.is_active
 
 
+# --- export step-up parity (CMP.33) ------------------------------------------------------------
+
+REFUSED = "compliance.gdpr_export_refused"
+
+
+def stale_factor_client(*, password: str | None = None) -> tuple[Client, User]:
+    user = UserFactory.create(password=password) if password else UserFactory.create()
+    client = Client()
+    verified_login(client, user, verified_at=time.time() - settings.MFA_STEP_UP_MAX_AGE - 600)
+    return client, user
+
+
+def test_export_with_a_second_factor_refuses_the_password_alone() -> None:
+    client, user, password = signed_in(email="mario@example.com")
+    TOTPDeviceFactory.create(user=user)
+
+    response = client.post(reverse("privacy_export"), {"password": password})
+
+    assert response.status_code == 302
+    assert reverse("mfa:verify") in response["Location"]
+    assert not AuditLog.objects.filter(action=gdpr.ACTION_EXPORT).exists()
+
+
+def test_export_step_up_returns_to_the_account_page_after_the_factor() -> None:
+    password = secrets.token_urlsafe(16)
+    client, _user = stale_factor_client(password=password)
+
+    response = client.post(reverse("privacy_export"), {"password": password})
+
+    assert response.status_code == 302
+    assert response["Location"] == (
+        f"{reverse('mfa:verify')}?{urlencode({'next': reverse('privacy_account')})}"
+    )
+
+
+def test_export_with_a_fresh_second_factor_downloads() -> None:
+    user = UserFactory.create(email="mario@example.com")
+    client = Client()
+    verified_login(client, user)
+
+    response = client.post(reverse("privacy_export"))
+
+    assert response.status_code == 200
+    assert json.loads(response.content)["profile"]["email"] == "mario@example.com"
+    assert AuditLog.objects.filter(action=gdpr.ACTION_EXPORT).exists()
+
+
+def test_export_refuses_a_factor_verified_outside_the_window_even_with_the_password() -> None:
+    password = secrets.token_urlsafe(16)
+    client, _user = stale_factor_client(password=password)
+
+    response = client.post(reverse("privacy_export"), {"password": password})
+
+    assert response.status_code == 302
+    assert reverse("mfa:verify") in response["Location"]
+    assert not AuditLog.objects.filter(action=gdpr.ACTION_EXPORT).exists()
+
+
+def test_export_json_client_gets_403_with_the_verify_url() -> None:
+    password = secrets.token_urlsafe(16)
+    client, _user = stale_factor_client(password=password)
+
+    response = client.post(
+        reverse("privacy_export"), {"password": password}, headers={"Accept": "application/json"}
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"error": "mfa_required", "url": reverse("mfa:verify")}
+
+
+def test_export_without_a_second_factor_still_works_with_the_password() -> None:
+    client, _user, password = signed_in()
+    assert client.post(reverse("privacy_export"), {"password": password}).status_code == 200
+
+
+def test_export_and_erasure_share_one_reauthentication_helper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from apps.compliance import privacy_views
+
+    calls: list[bool] = []
+    original = privacy_views._reauth_refusal
+
+    def spy(request: object, **kwargs: bool) -> object:
+        calls.append(kwargs.get("factor_required", False))
+        return original(request, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(privacy_views, "_reauth_refusal", spy)
+    client, _user, password = signed_in()
+    client.post(reverse("privacy_export"), {"password": password})
+    client.post(reverse("privacy_erase"), {"password": password, "confirm": "erase"})
+
+    assert calls == [True, True]
+
+
+def test_refusals_for_a_missing_factor_do_not_use_up_the_export_attempts() -> None:
+    password = secrets.token_urlsafe(16)
+    client, user = stale_factor_client(password=password)
+    for _ in range(4):
+        assert client.post(reverse("privacy_export"), {"password": password}).status_code == 302
+
+    fresh = Client()
+    verified_login(fresh, user)
+
+    assert fresh.post(reverse("privacy_export")).status_code == 200
+
+
+def test_refused_exports_have_their_own_limit_that_bounds_the_audit() -> None:
+    password = secrets.token_urlsafe(16)
+    client, _user = stale_factor_client(password=password)
+    statuses = [
+        client.post(reverse("privacy_export"), {"password": password}).status_code
+        for _ in range(14)
+    ]
+    assert statuses[:10] == [302] * 10
+    assert set(statuses[10:]) == {429}
+    assert AuditLog.objects.filter(action=REFUSED).count() == 10
+
+
+def test_a_wrong_password_still_uses_the_export_limit() -> None:
+    client, _user, _password = signed_in()
+    statuses = [
+        client.post(reverse("privacy_export"), {"password": "x"}).status_code for _ in range(5)
+    ]
+    assert statuses == [403, 403, 403, 429, 429]
+
+
+@pytest.mark.parametrize("name", ["privacy_export", "privacy_erase"])
+def test_actions_are_never_cached(name: str) -> None:
+    password = secrets.token_urlsafe(16)
+    client, _user = stale_factor_client(password=password)
+    response = client.post(reverse(name), {"password": password, "confirm": "erase"})
+    assert "no-store" in response["Cache-Control"]
+
+
+def test_a_refused_export_is_audited_without_personal_data() -> None:
+    password = secrets.token_urlsafe(16)
+    client, user = stale_factor_client(password=password)
+
+    client.post(reverse("privacy_export"), {"password": password})
+
+    entry = AuditLog.objects.get(action=REFUSED)
+    assert entry.target_key == str(user.public_id)
+    assert "mario@example.com" not in f"{entry.before}{entry.after}{entry.actor_label}"
+
+
 # --- erasure -----------------------------------------------------------------------------------
 
 

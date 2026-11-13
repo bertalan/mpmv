@@ -555,6 +555,38 @@ def check_email_settings(
     return errors
 
 
+def check_privacy_pepper(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """The privacy pepper (L-3) is its own secret: LIVE and STAGE refuse a missing one or one
+    equal to SECRET_KEY (core.E901); development and tests only get a warning (core.W901).
+
+    LIVE is `LIVE_DATA`, STAGE is `STAGE` (as in payments.E003): STAGE keeps `LIVE_DATA` off but
+    still holds a pseudonym key worth protecting."""
+    pepper = str(getattr(settings, "PRIVACY_PEPPER", "") or "").strip()
+    strict = bool(getattr(settings, "LIVE_DATA", False) or getattr(settings, "STAGE", False))
+    reused = bool(pepper) and pepper == str(settings.SECRET_KEY)
+    if pepper and not reused:
+        return []
+    problem = "is empty" if not pepper else "equals SECRET_KEY"
+    if strict:
+        return [
+            checks.Error(
+                f"MPMV_PRIVACY_PEPPER {problem}: the suppression list and the privacy counters "
+                "would be keyed on SECRET_KEY, so rotating it would break them.",
+                hint="Set MPMV_PRIVACY_PEPPER to its own random value (mpmv.env.example).",
+                id="core.E901",
+            )
+        ]
+    return [
+        checks.Warning(
+            f"MPMV_PRIVACY_PEPPER {problem}: pseudonyms fall back to SECRET_KEY.",
+            hint="Fine for development and tests; STAGE and LIVE refuse it.",
+            id="core.W901",
+        )
+    ]
+
+
 LIVE_FORBIDDEN_FLAGS = ("DEMO_MODE", "FORCE_NOINDEX")
 
 
