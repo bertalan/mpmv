@@ -76,6 +76,14 @@ PUBLIC: dict[str, str] = {
         "cart; it stores the choice in the visitor's session only, with CSRF and a per-IP budget."
     ),
     "switch_language": "Stores the visitor's language choice in a cookie.",
+    "consent_save": (
+        "Cookie consent choice (SEO.5): the banner on every page posts to it; it stores a random "
+        "id and the categories chosen and sets the visitor's own consent cookie."
+    ),
+    "consent_preferences": (
+        "Cookie settings page (SEO.5): shows the visitor's own choice from their own cookie, "
+        "never cached, and no data of anyone else."
+    ),
     "action_link:open": "Secure action link (CORE.15): the signed token is the credential.",
     "action_link:continue": "Secure action link (CORE.15): the signed token is the credential.",
     "garage_save": (
@@ -160,6 +168,12 @@ PUBLIC: dict[str, str] = {
 # Views that do not check the CSRF token, and what protects them instead.
 CSRF_EXEMPT: dict[str, str] = {
     "email_webhook": "Server-to-server call from the email provider, verified by its signature.",
+    "consent_save": (
+        "The consent banner is the same markup on every cached page, so it cannot carry a CSRF "
+        "token. The view refuses a request whose Origin (or Referer) is not this site, so a form "
+        "on another site cannot give or withdraw consent; it is rate limited per IP "
+        "(`test_a_cross_site_post_cannot_give_or_withdraw_consent`)."
+    ),
     "payments_webhook": (
         "Server-to-server call from the payment provider, verified by its signature and a "
         "timestamp tolerance (PAY.2)."

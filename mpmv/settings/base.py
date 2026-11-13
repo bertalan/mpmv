@@ -259,7 +259,7 @@ TEMPLATES = [
                 "apps.themes.context_processors.theme",
                 "apps.themes.context_processors.release",
             ],
-            "builtins": ["apps.seo.templatetags.seo_robots"],
+            "builtins": ["apps.seo.templatetags.seo_robots", "apps.seo.templatetags.consent"],
             "loaders": [
                 "apps.themes.loaders.ThemeLoader",
                 (
@@ -294,6 +294,13 @@ MPMV_HELP_URL = env_str("MPMV_HELP_URL", "")
 MPMV_VERSION = os.environ.get("MPMV_VERSION", "") or "dev"
 # The vendor guide the help dialog links on vendor-facing screens (ARC.32); empty = no link.
 MPMV_VENDOR_GUIDE_URL = env_str("MPMV_VENDOR_GUIDE_URL", "")
+
+# Consent provider (SEO.9, D-10): the name of the consent tool in use. `self-hosted` is our own
+# minimal banner; an operator adds another by naming its class in MPMV_CONSENT_PROVIDERS
+# ({name: "dotted.path.Class"}) and selecting the name here (docs/dev/consent-providers.md). An
+# unknown name fails the seo.E001 system check.
+MPMV_CONSENT_PROVIDER = env_str("MPMV_CONSENT_PROVIDER", "self-hosted")
+MPMV_CONSENT_PROVIDERS: dict[str, str] = {}
 
 # PostgreSQL is the only datastore (ADR-0001).
 DATABASES = {

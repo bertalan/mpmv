@@ -6,16 +6,22 @@
   noindex; Django still answers its own 400 for a bad Host).
 - A stored "allow" is dormant under the environment floor (D-35): it takes effect the moment
   the floor is lifted, so staff re-check the switch when a site moves from STAGE to LIVE.
+- `record_consent(...)` appends a visitor's consent decision to the log (SEO.5, D-10): the
+  visitor's own act, itself the append-only proof, so no audit entry.
 - `set_site_indexing(...)` is the only writer of `SeoSettings`: staff only, audited, dry-run,
   and it refuses to allow indexing while the environment floor is on.
 """
 
+import datetime as dt
 import logging
+import uuid
+from collections.abc import Iterable
 from typing import Any
 
 from django.core.exceptions import DisallowedHost, PermissionDenied, ValidationError
 from django.db import DatabaseError
 from django.http import HttpRequest
+from django.utils import timezone
 from wagtail.models import Site
 
 from apps.core.audit import AuditContext, user_context
@@ -24,7 +30,8 @@ from apps.core.indexing import is_noindex_forced
 from apps.core.services import save_audited
 from apps.vendors.scoping import is_platform_staff
 
-from .models import SeoSettings
+from . import engine
+from .models import ConsentLog, SeoSettings
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +104,53 @@ def set_site_indexing(
         updated=SEO_SETTINGS_CONFIGURED,
         dry_run=dry_run,
     )
+
+
+# --- Consent log (SEO.5)
+
+
+def record_consent(
+    *,
+    consent_id: str,
+    action: str,
+    granted: Iterable[str],
+    banner_version: str,
+    provider: str,
+    language: str = "",
+    now: dt.datetime | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Append one decision to the consent log; `dry_run` returns the change and writes nothing.
+
+    Only known actions and categories are kept; `consent_id` must be a UUID (hex).
+    """
+    if action not in engine.ACTIONS:
+        raise ValueError(f"Unknown consent action {action!r}")
+    identifier = uuid.UUID(consent_id)
+    kept = [c for c in engine.GATED_CATEGORIES if c in set(granted)]
+    when = now or timezone.now()
+    snapshot = {
+        "consent_id": str(identifier),
+        "action": action,
+        "granted": kept,
+        "banner_version": banner_version,
+        "provider": provider,
+        "language": language[:8],
+        "decided_at": when,
+    }
+    changes = ChangeSet()
+    changes.create("seo.consentlog", str(identifier), snapshot)
+    if not dry_run:
+        ConsentLog.objects.create(
+            consent_id=identifier,
+            action=action,
+            granted=kept,
+            banner_version=banner_version,
+            provider=provider,
+            language=language[:8],
+            decided_at=when,
+        )
+    return changes
 
 
 LOCAL_SUFFIXES = (".local", ".test", ".localhost")

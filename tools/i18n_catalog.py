@@ -33,6 +33,7 @@ SCOPES = (
     "apps/manager",
     "apps/accounts",
     "apps/orders/templates",
+    "apps/seo",
     "apps/orders/ui",
     "apps/vendors/templates/email/vendors/profile_reverted",
     "apps/orders/customer_views.py",  # the customer area labels (ORD.7)

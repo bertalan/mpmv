@@ -54,6 +54,7 @@ urlpatterns = [
     path("admin/", include("apps.core.admin_urls")),  # collection moves keep SVG (THM.12)
     path("admin/", include(wagtailadmin_urls)),  # editors' admin (Wagtail, CMS.1)
     path("i18n/switch/", switch_language, name="switch_language"),
+    path("", include("apps.seo.save_urls")),  # cookie consent choice (SEO.5)
     path("api/v1/", include("apps.api.urls")),
     path("account/mfa/", include("apps.accounts.urls")),
     path("account/level/", include("apps.accounts.level_urls")),  # CORE.25 (D-32)
@@ -74,6 +75,7 @@ urlpatterns = [
         path("", include("apps.orders.ui.urls")),  # cart and checkout (ORD.5)
         path("", include("apps.catalog.urls")),  # listings (CAT.8): before the CMS catch-all
         path("", include("apps.compliance.urls")),  # DSA contact points (CMP.5)
+        path("", include("apps.seo.consent_urls")),  # cookie settings page (SEO.5)
         path("", include("apps.fitment.urls")),  # anonymous garage cookie (FIT.6)
         path("", include("apps.cms.urls")),
         prefix_default_language=False,

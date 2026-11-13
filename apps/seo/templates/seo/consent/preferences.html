@@ -1,0 +1,19 @@
+{% extends "layouts/content.html" %}
+{% load i18n %}
+{% block title %}{% translate "Cookie settings" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block page_content %}
+  <article class="consent-preferences" data-consent-preferences>
+    <h1>{% translate "Cookie settings" %}</h1>
+    <p>{% translate "We always use the cookies the site needs to work. We only use the others if you say yes. You can change your mind here at any time." %}</p>
+    {% if decided %}<p>{% translate "Your choice is saved on this device for six months." %}</p>{% endif %}
+    <form method="post" action="{{ action_url }}" data-consent-form>
+      <input type="hidden" name="next" value="{{ preferences_url }}">
+      {% include "seo/consent/_categories.html" with categories=categories granted=granted idp="prefs" only %}
+      <div class="consent-actions">
+        {% translate "Save my choices" as save_label %}{% include "components/button.html" with label=save_label type="submit" name="action" value="custom" only %}
+      </div>
+      {% include "seo/consent/_actions.html" %}
+    </form>
+  </article>
+{% endblock %}

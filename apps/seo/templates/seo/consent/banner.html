@@ -1,0 +1,20 @@
+{% load i18n static %}{% comment %}
+The consent banner of the self-hosted provider (SEO.5, SEO.9). The same markup on every page and
+for every visitor, so a cached page never carries one person's state: it is `hidden` until the
+theme script finds no valid choice (base.js then loads the lazy consent.js), and then it shows. Without JavaScript the
+form still posts, and the "Cookie settings" link in the footer leads to the preferences page.
+
+Not a modal: it does not trap the focus and never hides the page. `data-*` attributes carry the
+banner version, the cookie name, the Consent Mode v2 signal map and the texts the script announces.
+{% endcomment %}<section class="consent-banner" id="consent-banner" aria-labelledby="consent-banner-title" data-consent-banner data-script="{% static 'themes/base/js/lazy/consent.js' %}" data-version="{{ banner_version }}" data-cookie="{{ cookie_name }}" data-signals="{{ signal_map }}" data-saved="{% translate 'Your cookie choice was saved.' %}" hidden>
+  <form method="post" action="{{ action_url }}" data-consent-form>
+    <h2 id="consent-banner-title" class="consent-banner__title">{% translate "Cookies and your privacy" %}</h2>
+    <p>{% translate "We always use the cookies the site needs to work. We only use the others if you say yes, and saying no costs you nothing." %} <a href="{{ preferences_url }}">{% translate "Read more and choose" %}</a></p>
+    <details class="consent-banner__details">
+      <summary>{% translate "Choose categories" %}</summary>
+      {% include "seo/consent/_categories.html" with categories=categories granted=None idp="banner" only %}
+      {% translate "Save my choices" as save_label %}{% include "components/button.html" with label=save_label type="submit" name="action" value="custom" variant="secondary" only %}
+    </details>
+    {% include "seo/consent/_actions.html" %}
+  </form>
+</section>

@@ -164,6 +164,14 @@ def test_javascript_over_the_budget_fails(themes: Path) -> None:
     assert any("[size]" in f and "JavaScript" in f for f in failures), failures
 
 
+def test_a_lazy_script_is_not_counted_in_the_page_javascript(themes: Path) -> None:
+    theme_dir = write_theme(themes, "lazyjs")
+    lazy = theme_dir / "static" / "themes" / "lazyjs" / "js" / "lazy" / "big.js"
+    lazy.parent.mkdir(parents=True)
+    lazy.write_text(incompressible_css(JS_BUDGET), encoding="utf-8")
+    assert [f for f in failures_of(themes, "lazyjs") if "[size]" in f] == []
+
+
 def test_more_than_four_font_files_fail(themes: Path) -> None:
     theme_dir = write_theme(themes, "fonty")
     names = [f"fonts/display-{weight}.woff2" for weight in (300, 400, 500, 600, 700)]
