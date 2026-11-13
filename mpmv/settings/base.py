@@ -1,5 +1,6 @@
 """Settings shared by every environment."""
 
+import os
 from pathlib import Path
 
 import dj_database_url
@@ -256,6 +257,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.csp",
                 "apps.themes.context_processors.theme",
+                "apps.themes.context_processors.release",
             ],
             "builtins": ["apps.seo.templatetags.seo_robots"],
             "loaders": [
@@ -283,6 +285,9 @@ MPMV_THEME_BUILD_DIR = BASE_DIR / "build" / "themes"
 # Help/contact link shown in the same place in the header and footer of every public page
 # (THM.3, WCAG 3.2.6 consistent help); empty = no help link until a contact page exists.
 MPMV_HELP_URL = env_str("MPMV_HELP_URL", "")
+# The deployed release (OPS.14): baked into the image by the Containerfile (never set in the
+# server env file, which would override it), shown to staff only.
+MPMV_VERSION = os.environ.get("MPMV_VERSION", "") or "dev"
 # The vendor guide the help dialog links on vendor-facing screens (ARC.32); empty = no link.
 MPMV_VENDOR_GUIDE_URL = env_str("MPMV_VENDOR_GUIDE_URL", "")
 
