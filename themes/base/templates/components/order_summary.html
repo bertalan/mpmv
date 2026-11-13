@@ -12,8 +12,11 @@ Context:
 - `lines`: a list of `label` and `amount` (subtotals, shipping per package, discounts).
 - `total` (required): the amount to pay; `total_label` (default "Total").
 - `note`: a line under the total, such as "VAT included".
+- `vehicle`: the FIT.17 sentence naming the vehicle the customer selected, already worded and
+  translated by the caller (`apps.orders.engine.vehicle_line`); shown above the amounts.
 {% endcomment %}<section class="order-summary" aria-labelledby="{{ id }}">
   <h{{ heading_level|default:2 }} id="{{ id }}">{% firstof title _("Order summary") %}</h{{ heading_level|default:2 }}>
+  {% if vehicle %}<p class="order-summary__vehicle">{{ vehicle }}</p>{% endif %}
   <dl class="order-summary__list">
     {% for line in lines %}<div class="order-summary__line"><dt>{{ line.label }}</dt><dd>{{ line.amount }}</dd></div>{% endfor %}
     <div class="order-summary__line order-summary__line--total"><dt class="order-summary__total">{% firstof total_label _("Total") %}</dt><dd>{{ total }}</dd></div>

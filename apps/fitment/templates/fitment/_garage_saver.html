@@ -1,0 +1,33 @@
+{% load i18n %}{% comment %}
+The anonymous garage controls (FIT.6, D-38 Q-G1). Included by the pages that show the garage
+(FIT.9 product page, FIT.8 listings) with `garage_vehicles` (the saved vehicles from
+`services.read_garage`), `garage_candidate` (the vehicle just chosen, or none), `next` and, when
+the storage is off, `garage_storage_off`.
+
+The cookie is technical: it is written only when the visitor presses Save, so there is no
+consent prompt. The label next to the Save button is the wording the spec fixes.
+{% endcomment %}<section class="garage-saver" aria-labelledby="garage-saver-title">
+  <h2 id="garage-saver-title">{% translate "Your vehicles" %}</h2>
+  {% if garage_vehicles %}<ul class="garage-saver__list">
+    {% for vehicle in garage_vehicles %}<li>
+      <span>{{ vehicle.make }}, {{ vehicle.model }}{% if vehicle.year %}, {{ vehicle.year }}{% endif %}</span>
+      <form method="post" action="{% url 'garage_remove' %}">{% csrf_token %}
+        <input type="hidden" name="index" value="{{ forloop.counter0 }}">
+        <input type="hidden" name="next" value="{{ next }}">
+        <button type="submit" class="button button--secondary">{% translate "Remove vehicle" %}</button>
+      </form>
+    </li>{% endfor %}
+  </ul>
+  <form method="post" action="{% url 'garage_forget' %}">{% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="button button--secondary">{% translate "Forget my garage" %}</button>
+  </form>{% endif %}
+  {% if garage_candidate and not garage_storage_off %}<form method="post" action="{% url 'garage_save' %}">{% csrf_token %}
+    <input type="hidden" name="make" value="{{ garage_candidate.make }}">
+    <input type="hidden" name="model" value="{{ garage_candidate.model }}">
+    <input type="hidden" name="year" value="{{ garage_candidate.year }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="button">{% translate "Save this vehicle" %}</button>
+    <p class="garage-saver__label">{% translate "Save this vehicle on this browser for your next visits (you can remove it at any time)" %}</p>
+  </form>{% endif %}
+</section>

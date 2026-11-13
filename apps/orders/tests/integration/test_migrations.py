@@ -4,7 +4,7 @@ import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
-LATEST = "0011_stock_reservation"
+LATEST = "0013_vehicle_snapshot"
 
 
 def migrate(target: str) -> None:

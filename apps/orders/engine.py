@@ -518,3 +518,62 @@ def anonymisable_at_once(
 
 def check_privacy_transition(source: str, target: str) -> None:
     _check(PRIVACY_TRANSITIONS, "an order's privacy status", source, target)
+
+
+# --- vehicle snapshot (FIT.17, D-38 Q-G8) -----------------------------------------------------
+
+VEHICLE_KEYS = ("make", "model", "year")
+VEHICLE_LABEL_MAX = 60
+
+
+def clean_vehicle_snapshot(raw: object) -> dict[str, str]:
+    """The vehicle an order keeps: make, model and year labels as the customer saw them, never a
+    live reference. The caller hands over opaque JSON (orders does not import `fitment`); any
+    other key is dropped, a malformed value is refused. No vehicle (None or empty) is `{}`."""
+    if raw is None or raw == {}:
+        return {}
+    if not isinstance(raw, Mapping):
+        raise ValueError("vehicle snapshot must be a mapping of make, model and year")
+    cleaned: dict[str, str] = {}
+    for key in VEHICLE_KEYS:
+        value = raw.get(key)
+        if not isinstance(value, str):
+            raise ValueError(f"vehicle {key} must be text")
+        text = " ".join(value.split())
+        if len(text) > VEHICLE_LABEL_MAX or any(ord(c) < 32 or ord(c) == 127 for c in value):
+            raise ValueError(f"vehicle {key} is too long or holds control characters")
+        cleaned[key] = text
+    if not cleaned["make"] or not cleaned["model"]:
+        raise ValueError("vehicle make and model are required")
+    return cleaned
+
+
+def vehicle_label(snapshot: Mapping[str, str]) -> str:
+    """The vehicle as one line: "make, model, year" (the year is left out when empty)."""
+    return ", ".join(snapshot[key] for key in VEHICLE_KEYS if snapshot.get(key))
+
+
+# The line shown in the order summary and in the ORD.9 emails (Q-G8). It is part of the order's
+# text in the customer's language, so the five languages live here until ORD.16 moves the order
+# texts to the catalogs; the German, French and Spanish wording awaits native review (I18N.14).
+_VEHICLE_LINE = {
+    "en": "Vehicle selected by the customer in the compatibility filter: {vehicle}"
+    " — compatibility declared by the vendor",
+    "it": "Veicolo selezionato dal cliente nel filtro di compatibilità: {vehicle}"
+    " — compatibilità dichiarata dal venditore",
+    "de": "Vom Kunden im Kompatibilitätsfilter gewähltes Fahrzeug: {vehicle}"
+    " — Kompatibilität vom Verkäufer angegeben",
+    "fr": "Véhicule sélectionné par le client dans le filtre de compatibilité : {vehicle}"
+    " — compatibilité déclarée par le vendeur",
+    "es": "Vehículo seleccionado por el cliente en el filtro de compatibilidad: {vehicle}"
+    " — compatibilidad declarada por el vendedor",
+}
+
+
+def vehicle_line(snapshot: Mapping[str, str], language: str) -> str:
+    """The sentence for the order summary and the emails, in `language` (English when unknown);
+    empty when the order has no vehicle."""
+    label = vehicle_label(snapshot)
+    if not label:
+        return ""
+    return _VEHICLE_LINE.get(language, _VEHICLE_LINE["en"]).format(vehicle=label)
