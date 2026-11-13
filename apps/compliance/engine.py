@@ -391,7 +391,8 @@ def decision_problems(outcome: str, reason: str) -> list[str]:
 
 RESTRICTION_REMOVE: Final = "remove"
 RESTRICTION_SUSPEND: Final = "suspend_account"
-RESTRICTIONS: Final = (RESTRICTION_REMOVE, RESTRICTION_SUSPEND)
+RESTRICTION_TERMINATE: Final = "terminate"  # the whole service ends (P2B art. 4, CMP.5 part 4)
+RESTRICTIONS: Final = (RESTRICTION_REMOVE, RESTRICTION_SUSPEND, RESTRICTION_TERMINATE)
 #: What the restriction is based on: a law (illegal content) or the platform terms.
 GROUND_ILLEGAL: Final = "illegal_content"
 GROUND_TERMS: Final = "terms"
@@ -482,7 +483,9 @@ def transparency_payload(
             "AUTOMATED_DECISION_FULLY" if automated_decision else "AUTOMATED_DECISION_NOT_AUTOMATED"
         ),
     }
-    if restriction == RESTRICTION_SUSPEND:
+    if restriction == RESTRICTION_TERMINATE:
+        payload["decision_account"] = "DECISION_ACCOUNT_TERMINATED"
+    elif restriction == RESTRICTION_SUSPEND:
         payload["decision_account"] = "DECISION_ACCOUNT_SUSPENDED"
         if valid_until is not None:
             payload["end_date_account_restriction"] = valid_until.isoformat()
@@ -497,6 +500,63 @@ def transparency_payload(
     )
     payload[key] = scrub_public_text(explanation)
     return payload
+
+
+# --- Termination of the whole service (P2B art. 4, CMP.5 part 4)
+
+#: The notice before the service of a business user is terminated is at least this long.
+MIN_NOTICE_DAYS: Final = 30
+#: The closed list of reasons that allow a shorter or no notice: a legal or regulatory
+#: obligation that makes the notice impossible, repeated infringements of the terms, illegal
+#: content (P2B art. 4(2) and (4)). Counsel reviews the wording; the code keys on the codes.
+TERMINATION_EXCEPTIONS: Final = ("legal_obligation", "repeated_infringement", "illegal_content")
+
+
+def notice_days(configured: int | None) -> int:
+    """The notice period in days: the configured one, never below `MIN_NOTICE_DAYS`."""
+    if configured is None:
+        return MIN_NOTICE_DAYS
+    return max(MIN_NOTICE_DAYS, int(configured))
+
+
+def default_effective_at(issued_at: dt.datetime, days: int) -> dt.datetime:
+    """When the termination takes effect if staff choose no date: the notice period after the
+    notice (at least `MIN_NOTICE_DAYS`)."""
+    return issued_at + dt.timedelta(days=notice_days(days))
+
+
+def termination_problems(
+    *,
+    facts: str,
+    ground: str,
+    exception: str,
+    issued_at: dt.datetime,
+    effective_at: dt.datetime,
+    days: int | None = None,
+) -> list[str]:
+    """What is wrong with a notice of termination, as field names (empty when fine).
+
+    Without an exception the effective time is at least `notice_days(days)` after the notice;
+    an exception from the closed list allows an earlier time, never one before the notice. The
+    reasons (facts and ground) are always required: they are the statement of reasons (art. 4(1)).
+    """
+    problems: list[str] = []
+    if not facts.strip():
+        problems.append("facts")
+    if not ground.strip():
+        problems.append("ground")
+    if exception and exception not in TERMINATION_EXCEPTIONS:
+        problems.append("exception")
+    allowed = exception in TERMINATION_EXCEPTIONS
+    earliest = issued_at if allowed else default_effective_at(issued_at, notice_days(days))
+    if effective_at < earliest:
+        problems.append("effective_at")
+    return problems
+
+
+def termination_due(effective_at: dt.datetime, *, now: dt.datetime) -> bool:
+    """Whether a pending termination takes effect: at its effective time, never before."""
+    return now >= effective_at
 
 
 # --- Online withdrawal (CMP.6 2/2, directive 2011/83/EU art. 11a as added by 2023/2673; Italy:

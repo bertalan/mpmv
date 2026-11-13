@@ -62,6 +62,7 @@ from apps.compliance.models import (
     ProductRestriction,
     SafetyCase,
     StatementOfReasons,
+    TerminationNotice,
     TransparencySubmission,
     VendorGpsrDefaults,
     WithdrawalStatement,
@@ -72,6 +73,7 @@ from apps.compliance.tests.factories import (
     ProductRestrictionFactory,
     SafetyCaseFactory,
     StatementOfReasonsFactory,
+    TerminationNoticeFactory,
     TransparencySubmissionFactory,
     VendorGpsrDefaultsFactory,
     WithdrawalStatementFactory,
@@ -238,6 +240,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         product=ProductFactory.create(vendor=vendor),
         statement=StatementOfReasonsFactory.create(vendor=vendor),
     ),
+    # An applied notice: a vendor has at most one pending one, and the maker may run twice.
+    TerminationNotice: lambda vendor: TerminationNoticeFactory.create(
+        vendor=vendor, status=TerminationNotice.Status.APPLIED
+    ),
     TransparencySubmission: lambda vendor: TransparencySubmissionFactory.create(
         statement=StatementOfReasonsFactory.create(vendor=vendor)
     ),
@@ -332,6 +338,13 @@ def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[s
 
 def manager_vendor(vendor: Vendor) -> Vendor:
     """The Manager's shop pages show the selected vendor itself (CORE.17)."""
+    return vendor
+
+
+def vendor_with_pending_termination(vendor: Vendor) -> Vendor:
+    """The vendor itself, with a pending notice of termination (CMP.5 part 4) if it has none."""
+    if not TerminationNotice.objects.filter(vendor=vendor, status="pending").exists():
+        TerminationNoticeFactory.create(vendor=vendor)
     return vendor
 
 
@@ -508,6 +521,12 @@ ENDPOINTS: dict[str, Access] = {
         "(`test_staff_and_anonymous_are_refused`)."
     ),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # CMP.5 part 4: the notice of termination and the data download show the selected vendor only.
+    "manager:shop:termination": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # The download exists only while a notice is pending: the vendor made here has one.
+    "manager:shop:termination_data": VendorScopedList(
+        make=vendor_with_pending_termination, identify=vendor_display_name
+    ),
     # ORD.6: the vendor's own orders; another vendor's id is a 404 on the detail and every action.
     "manager:shop:orders": VendorScopedList(
         make=paid_vendor_order,
@@ -549,6 +568,15 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:notice": StaffOnly(
         "One notice of illegal content (CMP.5): platform data, not vendor-owned; needs the "
         "compliance.review_notices permission, so a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "manager:platform:terminations": StaffOnly(
+        "Notices of termination (CMP.5 part 4): platform data; needs the "
+        "compliance.review_notices permission, so a vendor member gets 404."
+    ),
+    "manager:platform:termination": StaffOnly(
+        "One notice of termination (CMP.5 part 4): needs the compliance.review_notices "
+        "permission, so a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "subprocessors": NoVendorData(
