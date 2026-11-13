@@ -73,7 +73,7 @@ def test_an_editor_adds_a_term_landing_page_and_the_term_page_shows_it(
     TermTranslationFactory.create(
         term=term, language="en", name="Weddings", slug="weddings", status=PUBLISHED
     )
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
     vases, linen = _category("Vases"), _category("Linen")
     _product("Ceramic vase", vendor, vases).terms.add(term)
     _product("Linen napkins", vendor, linen).terms.add(term)
@@ -121,7 +121,9 @@ def test_an_editor_adds_a_term_landing_page_and_the_term_page_shows_it(
 def test_a_vendor_landing_page_tells_the_story_and_the_storefront_links_it(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, slug="acme", display_name="Acme")
+    vendor = VendorFactory.create(
+        status=Vendor.Status.ACTIVE, sells_online=True, slug="acme", display_name="Acme"
+    )
     _product("Copper kettle", vendor)
     home = HomePage.objects.get(locale__language_code="en")
     story = VendorLandingPage(

@@ -56,9 +56,8 @@ def tax_setup() -> None:
 def vendor(*, shipping: bool = True, countries: tuple[str, ...] = ("IT",), **fields: Any) -> Vendor:
     """An active Italian domestic vendor with a tax profile and, by default, one IT shipping
     method: 0-5 kg 9.90, 5-10 kg 14.90 net (the default over-band policy is a quote)."""
-    found = VendorFactory.create(
-        status=Vendor.Status.ACTIVE, sells_online=True, country="IT", **fields
-    )
+    fields.setdefault("sells_online", True)
+    found = VendorFactory.create(status=Vendor.Status.ACTIVE, country="IT", **fields)
     VendorTaxProfileFactory.create(vendor=found, valid_from=utc(2027, 1, 1))
     if shipping:
         method = ShippingMethodFactory.create(
@@ -155,6 +154,26 @@ def test_mixed_basket_two_vendors_mixed_vat_quote_and_on_request() -> None:
     assert codes == {engine.SHIPPING_VAT_SPLIT, engine.NEEDS_QUOTE, engine.ON_REQUEST}
     assert result.totals == b_pkg.totals  # only the ready package is added up
     assert [p.vendor for p in result.vendors] == [b]
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"sells_online": False},  # no payout account ready (D-19, derived at read time)
+        {"sales_mode_default": Vendor.SalesMode.ON_REQUEST},  # the vendor chose on request
+    ],
+)
+def test_a_buy_line_of_a_vendor_on_request_is_an_on_request_block(fields: dict[str, Any]) -> None:
+    """A `buy` product of a vendor on request is on request at checkout (VEN.6): a block, never
+    a line without a price reaching the pricing (a cart from before the vendor went on request)."""
+    cart = CartFactory.create()
+    seller = vendor(**fields)
+    add(cart, seller, "40.00")  # sales_mode buy, priced
+    result = preview(cart)
+    (package,) = result.packages
+    assert package.state == engine.BLOCKED
+    assert [x.code for x in package.blocks] == [engine.ON_REQUEST]
+    assert not result.placeable
 
 
 def test_shipping_vat_follows_goods_rate_of_a_reduced_package() -> None:

@@ -83,9 +83,6 @@ class ConnectedAccount(BaseModel):
     payouts_enabled = models.BooleanField(default=False)
     requirements_due = models.JSONField(default=list, blank=True)
     disabled_reason = models.CharField(max_length=128, blank=True)
-    # True while the vendor sells on request only because it has no active account (D-19): the
-    # automatic switch back to sale applies only then, never over a vendor's own choice.
-    on_request_forced = models.BooleanField(default=False)
 
     class Meta:
         constraints = [

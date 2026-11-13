@@ -20,6 +20,7 @@ from apps.payments.stripe_client import StripeAccount
 from apps.payments.stripe_provider import StripePaymentProvider
 from apps.payments.tests.factories import ConnectedAccountFactory
 from apps.payments.tests.fake_stripe import FakeStripeClient
+from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 
@@ -122,32 +123,37 @@ def test_a_suspended_vendor_cannot_onboard(
         start(vendor, owner, stripe, ctx)
 
 
-# --- On request until connected (D-19) and the automatic switch
+# --- On request until connected (D-19), derived at read time: the stored mode is never written
 
 
-def test_starting_the_onboarding_puts_the_vendor_on_request(
+def mode(vendor: Vendor) -> str:
+    """The vendor-level mode buyers get, read fresh (no cached account)."""
+    return vendors_services.vendor_sales_mode(Vendor.objects.get(pk=vendor.pk))
+
+
+def test_starting_the_onboarding_leaves_the_stored_mode_and_the_vendor_is_on_request(
     vendor: Vendor, owner: User, stripe: FakeStripeClient, ctx: AuditContext
 ) -> None:
+    assert mode(vendor) == Vendor.SalesMode.ON_REQUEST  # no account row yet
     start(vendor, owner, stripe, ctx)
     vendor.refresh_from_db()
-    assert vendor.sales_mode_default == Vendor.SalesMode.ON_REQUEST
-    assert ConnectedAccount.objects.get(vendor=vendor).on_request_forced is True
-    assert AuditLog.objects.filter(action="payments.vendor_sales_mode.changed").count() == 1
+    assert vendor.sales_mode_default == Vendor.SalesMode.BUY  # untouched
+    assert mode(vendor) == Vendor.SalesMode.ON_REQUEST  # the account is pending
+    assert not AuditLog.objects.filter(target_model="vendors.vendor").exists()
 
 
-def test_the_vendor_switches_to_sale_when_the_account_becomes_active(
+def test_the_vendor_sells_once_the_account_is_active(
     vendor: Vendor, owner: User, stripe: FakeStripeClient, ctx: AuditContext
 ) -> None:
     start(vendor, owner, stripe, ctx)
     account = ConnectedAccount.objects.get(vendor=vendor)
+    assert mode(vendor) == Vendor.SalesMode.ON_REQUEST
     connect.apply_account_state(account, activate(stripe, account.account_ref), ctx=ctx)
-    vendor.refresh_from_db()
     account.refresh_from_db()
     assert account.status == "active"
+    assert mode(vendor) == Vendor.SalesMode.BUY
+    vendor.refresh_from_db()
     assert vendor.sales_mode_default == Vendor.SalesMode.BUY
-    assert account.on_request_forced is False
-    switches = AuditLog.objects.filter(action="payments.vendor_sales_mode.changed")
-    assert switches.count() == 2  # to on request, then back to sale
 
 
 def test_losing_the_account_puts_the_vendor_back_on_request(
@@ -156,20 +162,28 @@ def test_losing_the_account_puts_the_vendor_back_on_request(
     start(vendor, owner, stripe, ctx)
     account = ConnectedAccount.objects.get(vendor=vendor)
     connect.apply_account_state(account, activate(stripe, account.account_ref), ctx=ctx)
+    assert mode(vendor) == Vendor.SalesMode.BUY
     state = StripeAccount(id=account.account_ref, details_submitted=True, charges_enabled=True)
     connect.apply_account_state(account, state, ctx=ctx)
-    vendor.refresh_from_db()
+    account.refresh_from_db()
     assert account.status == "restricted"
-    assert vendor.sales_mode_default == Vendor.SalesMode.ON_REQUEST
+    assert mode(vendor) == Vendor.SalesMode.ON_REQUEST
+    vendor.refresh_from_db()
+    assert vendor.sales_mode_default == Vendor.SalesMode.BUY  # never written
 
 
-def test_a_vendor_that_chose_on_request_is_not_switched_to_sale(ctx: AuditContext) -> None:
+def test_a_vendor_that_chose_on_request_stays_on_request_after_activation(
+    ctx: AuditContext,
+) -> None:
     vendor = VendorFactory.create(sales_mode_default=Vendor.SalesMode.ON_REQUEST)
     account = ConnectedAccountFactory.create(vendor=vendor)
     state = StripeAccount(
         id=account.account_ref, details_submitted=True, charges_enabled=True, payouts_enabled=True
     )
     connect.apply_account_state(account, state, ctx=ctx)
+    account.refresh_from_db()
+    assert account.status == "active"
+    assert mode(vendor) == Vendor.SalesMode.ON_REQUEST
     vendor.refresh_from_db()
     assert vendor.sales_mode_default == Vendor.SalesMode.ON_REQUEST
 
@@ -215,8 +229,8 @@ def post_event(
 
 
 def test_account_updated_updates_the_status_and_requirements(client: Client, webhook: None) -> None:
-    vendor = VendorFactory.create(sales_mode_default=Vendor.SalesMode.ON_REQUEST)
-    account = ConnectedAccountFactory.create(vendor=vendor, on_request_forced=True)
+    vendor = VendorFactory.create(sales_mode_default=Vendor.SalesMode.BUY)
+    account = ConnectedAccountFactory.create(vendor=vendor)
     response = post_event(
         client,
         "evt_a1",
@@ -235,9 +249,10 @@ def test_account_updated_updates_the_status_and_requirements(client: Client, web
     assert entry.actor_label == "webhook:payments"
 
 
-def test_account_updated_active_switches_the_vendor_to_sale(client: Client, webhook: None) -> None:
-    vendor = VendorFactory.create(sales_mode_default=Vendor.SalesMode.ON_REQUEST)
-    account = ConnectedAccountFactory.create(vendor=vendor, on_request_forced=True)
+def test_account_updated_active_makes_the_vendor_sell(client: Client, webhook: None) -> None:
+    vendor = VendorFactory.create(sales_mode_default=Vendor.SalesMode.BUY)
+    account = ConnectedAccountFactory.create(vendor=vendor)
+    assert mode(vendor) == Vendor.SalesMode.ON_REQUEST
     obj = {
         "id": account.account_ref,
         "details_submitted": True,
@@ -246,9 +261,9 @@ def test_account_updated_active_switches_the_vendor_to_sale(client: Client, webh
     }
     assert post_event(client, "evt_a2", obj).status_code == 200
     assert post_event(client, "evt_a2", obj).status_code == 200  # a redelivery
-    vendor.refresh_from_db()
-    assert vendor.sales_mode_default == Vendor.SalesMode.BUY
-    assert AuditLog.objects.filter(action="payments.vendor_sales_mode.changed").count() == 1
+    assert mode(vendor) == Vendor.SalesMode.BUY
+    assert AuditLog.objects.filter(action="payments.connected_account.updated").count() == 1
+    assert not AuditLog.objects.filter(target_model="vendors.vendor").exists()
 
 
 def test_an_unknown_account_changes_nothing(client: Client, webhook: None) -> None:
@@ -283,3 +298,19 @@ def test_a_demo_account_is_ready_audited_idempotent_and_dry_runnable(ctx: AuditC
     assert (account.account_ref, account.status) == ("acct_demo_7", stripe_engine.ACTIVE)
     assert AuditLog.objects.filter(action="payments.connected_account.created").count() == 1
     assert connect.record_demo_account(vendor, number=8, ctx=ctx).is_empty
+
+
+def test_no_demo_account_on_live_data(ctx: AuditContext, settings: Any) -> None:
+    settings.LIVE_DATA = True
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    with pytest.raises(PermissionDenied):
+        connect.record_demo_account(vendor, number=1, ctx=ctx)
+    assert not ConnectedAccount.objects.filter(vendor=vendor).exists()
+
+
+def test_the_return_from_the_link_skips_a_demo_account(
+    vendor: Vendor, owner: User, stripe: FakeStripeClient, ctx: AuditContext
+) -> None:
+    connect.record_demo_account(vendor, number=3, ctx=ctx)
+    assert connect.refresh_account(vendor, actor=owner, client=stripe, ctx=ctx).is_empty
+    assert ConnectedAccount.objects.get(vendor=vendor).status == stripe_engine.ACTIVE

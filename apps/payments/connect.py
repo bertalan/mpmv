@@ -2,16 +2,19 @@
 
 The vendor owner creates the connected account and gets an onboarding link from the Manager; the
 provider's `account.updated` webhook (and the return from the link) keep the mirrored status up to
-date. A vendor without an active account sells on request only (`sales_mode_default=on_request`:
-catalog visible, no cart) until the account is active, then the switch back to sale is automatic
-and audited. Stripe is reached only through `StripeClient`; the account id comes from our own row,
-never from request data, so a vendor cannot act on another vendor's account.
+date. Nothing here writes the vendor's sales mode: the mode buyers get is derived at read time
+(`vendors.services.effective_sales_mode`), so a vendor without an active account is on request
+(catalog visible, no cart) and a vendor that chose on request stays on request after activation.
+The account status changes are audited (`payments.connected_account.*`). Stripe is reached only
+through `StripeClient`; the account id comes from our own row, never from request data, so a
+vendor cannot act on another vendor's account.
 """
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 
@@ -27,8 +30,6 @@ from .changeset_keys import (
     CONNECTED_ACCOUNT_CREATED,
     CONNECTED_ACCOUNT_MODEL,
     CONNECTED_ACCOUNT_UPDATED,
-    VENDOR_MODEL,
-    VENDOR_SALES_MODE_CHANGED,
 )
 from .models import ConnectedAccount
 from .stripe_client import (
@@ -85,7 +86,10 @@ def record_demo_account(
 
     The id `acct_demo_<n>` is obviously fake and never reaches the provider; the model has no
     demo flag, so the prefix marks the row as test data. Only the demo seed calls this, and the
-    seed refuses to run on live data. Idempotent: a vendor that has an account keeps it as is."""
+    seed refuses to run on live data, and so does this (defence in depth). Idempotent: a vendor
+    that has an account keeps it as is."""
+    if getattr(settings, "LIVE_DATA", False):
+        raise PermissionDenied("Demo payout accounts are never created on live data.")
     if ConnectedAccount.objects.filter(vendor=vendor).exists():
         return ChangeSet()
     account = ConnectedAccount(
@@ -158,7 +162,6 @@ def start_onboarding(
                 changes.changes.extend(changeset.changes)
         else:
             account = existing
-        changes.changes.extend(sync_sales_mode(vendor, ctx=ctx, account=account).changes)
         url = ""
         if not account.is_active:
             url = client.create_account_link(
@@ -185,8 +188,8 @@ def refresh_account(
     comes from our row, never from the request."""
     _require_owner(vendor, actor)
     account = ConnectedAccount.objects.filter(vendor=vendor, provider=PROVIDER).first()
-    if account is None:
-        return ChangeSet()
+    if account is None or account.account_ref.startswith(DEMO_ACCOUNT_PREFIX):
+        return ChangeSet()  # a demo account (STAGE seed) is not known to the provider
     try:
         state = client.get_account(account.account_ref)
     except StripeError as error:
@@ -201,7 +204,8 @@ def apply_account_state(
     ctx: AuditContext,
     dry_run: bool = False,
 ) -> ChangeSet:
-    """Mirror the provider's report on the account row, audit it and sync the vendor's sales mode.
+    """Mirror the provider's report on the account row and audit it. The vendor's stored sales
+    mode is never written: readiness is read from this row (`vendors.services.payout_ready`).
 
     Idempotent: a repeated report changes nothing and audits nothing."""
     changes = ChangeSet()
@@ -224,48 +228,7 @@ def apply_account_state(
         if dry_run:
             return changes
         run_mutation(changes, locked.save, ctx=ctx, action=CONNECTED_ACCOUNT_UPDATED, dry_run=False)
-        changes.changes.extend(sync_sales_mode(locked.vendor, ctx=ctx, account=locked).changes)
     account.refresh_from_db()
-    return changes
-
-
-def sync_sales_mode(
-    vendor: Vendor, *, ctx: AuditContext, account: ConnectedAccount | None = None
-) -> ChangeSet:
-    """Apply D-19 to the vendor's default sales mode, audited.
-
-    No active account and the vendor sells: it goes on request, and the account row (when there
-    is one) remembers that the platform did it. Active account and the platform had forced on
-    request: back to sale. A vendor that chose on request itself is never switched to sale."""
-    if account is None:
-        account = ConnectedAccount.objects.filter(vendor=vendor, provider=PROVIDER).first()
-    active = account is not None and account.is_active
-    forced = account.on_request_forced if account is not None else False
-    changes = ChangeSet()
-    with transaction.atomic():
-        row = Vendor.objects.select_for_update().get(pk=vendor.pk)
-        current = row.sales_mode_default
-        target = current
-        if not active and current == Vendor.SalesMode.BUY:
-            target, forced = Vendor.SalesMode.ON_REQUEST, True
-        elif active and current == Vendor.SalesMode.ON_REQUEST and forced:
-            target, forced = Vendor.SalesMode.BUY, False
-        changes.update(
-            VENDOR_MODEL,
-            str(vendor.public_id),
-            {"sales_mode_default": current},
-            {"sales_mode_default": target},
-        )
-
-        def apply() -> None:
-            row.sales_mode_default = target
-            row.save(update_fields=["sales_mode_default", "updated_at"])
-            vendor.sales_mode_default = target
-            if account is not None and account.on_request_forced != forced:
-                account.on_request_forced = forced
-                account.save(update_fields=["on_request_forced", "updated_at"])
-
-        run_mutation(changes, apply, ctx=ctx, action=VENDOR_SALES_MODE_CHANGED, dry_run=False)
     return changes
 
 

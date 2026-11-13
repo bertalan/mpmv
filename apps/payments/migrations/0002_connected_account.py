@@ -44,7 +44,6 @@ class Migration(migrations.Migration):
                 ("payouts_enabled", models.BooleanField(default=False)),
                 ("requirements_due", models.JSONField(blank=True, default=list)),
                 ("disabled_reason", models.CharField(blank=True, max_length=128)),
-                ("on_request_forced", models.BooleanField(default=False)),
                 (
                     "vendor",
                     models.OneToOneField(

@@ -79,6 +79,7 @@ def tax_setup() -> None:
 
 
 def vendor(name: str = "Rossi Ceramics", *, shipping: bool = True, **fields: Any) -> Vendor:
+    fields.setdefault("sells_online", True)  # a ready payout account (D-19, VEN.6)
     found = VendorFactory.create(
         status=Vendor.Status.ACTIVE, country="IT", display_name=name, **fields
     )
