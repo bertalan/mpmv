@@ -362,24 +362,36 @@ def test_place_order_runs_for_a_placeable_preview_and_shows_the_confirmation(
     assert state.SESSION_KEY not in client.session
 
 
-def test_a_pulled_checkout_switch_shows_the_closed_message_and_places_nothing(
-    client: Client, commission: None
+@pytest.mark.parametrize(
+    ("switch", "message"),
+    [
+        # The preview itself already names a closed checkout switch (ORD.5), before any order.
+        (flags.CHECKOUT, "Ordering is not available"),
+        # The payments switch is only read by `place_order` (ORD.10): the view must turn its
+        # `CheckoutClosed` into the customer message instead of a server error.
+        (flags.PAYMENTS, "We are not taking new orders right now"),
+    ],
+)
+def test_a_pulled_switch_shows_a_customer_message_and_places_nothing(
+    client: Client, commission: None, switch: str, message: str
 ) -> None:
-    """ORD.10: the review page answers a closed kill switch in words, never a server error."""
     cart = with_cart(client)
     add(cart, vendor("Alpha Shop"), "100.00")
     sign_off_details(client)
     FLAG_CACHE.clear()
-    row = FeatureFlag.objects.get(name=flags.CHECKOUT)
+    row = FeatureFlag.objects.get(name=switch)
     row.state = flags.OFF
     staff = AuditContext(
         actor_label="staff:ops@example.com", source=AuditLog.Source.ADMIN, actor_id=7
     )
     save_flag(row, ctx=staff)
-    response = client.post(reverse("orders:review"))
     FLAG_CACHE.clear()
+    try:
+        response = client.post(reverse("orders:review"))
+    finally:
+        FLAG_CACHE.clear()
     assert response.status_code == 200
-    assert "We are not taking new orders right now" in response.content.decode()
+    assert message in response.content.decode()
     assert not Order.objects.exists()
 
 
