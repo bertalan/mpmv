@@ -5786,6 +5786,10 @@ msgstr "Verifica"
 msgid "Verify it is you"
 msgstr "Verifica la tua identità"
 
+#: apps/manager/templates/manager/layout.html themes/base/templates/components/user_tools.html
+msgid "Version"
+msgstr "Versione"
+
 #: apps/orders/ui/views.py
 msgid "VIES says this VAT number is not valid. VAT is charged on your order."
 msgstr "VIES dice che questa partita IVA non è valida. Sul tuo ordine viene applicata l'IVA."
