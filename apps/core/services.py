@@ -133,6 +133,8 @@ OPERATOR_FIELDS = (
     "authority_contact_languages",
     "user_contact_url",
     "user_contact_languages",
+    "logo_id",
+    "official_profiles",
     "allowed_vendor_countries",
     "valid_from",
     "valid_to",
