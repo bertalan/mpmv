@@ -2060,6 +2060,23 @@ msgstr "Segnalante"
 msgid "off"
 msgstr "non attiva"
 
+#: apps/core/models.py
+msgid ""
+"Official profiles of the platform, one https:// link each, for search engines. Example: its "
+"Wikidata item, its LinkedIn page. No user names or passwords."
+msgstr ""
+"Profili ufficiali della piattaforma, un link https:// per riga, per i motori di ricerca. Esempio: "
+"la sua voce su Wikidata, la sua pagina LinkedIn. Nessun nome utente o password."
+
+#: apps/core/admin.py
+msgid ""
+"Official profiles of the platform, one https:// link each, for search engines. Example: its "
+"Wikidata item, its LinkedIn page. No user names or passwords. One per line, at most 10."
+msgstr ""
+"Profili ufficiali della piattaforma, un link https:// per riga, per i motori di ricerca. Esempio: "
+"la sua voce su Wikidata, la sua pagina LinkedIn. Nessun nome utente o password. Uno per riga, al "
+"massimo 10."
+
 #: apps/catalog/taxonomy.py
 msgid "official URL"
 msgstr "URL ufficiale"
@@ -4442,6 +4459,14 @@ msgid ""
 msgstr ""
 "La commissione della piattaforma, in percentuale della base qui sotto, per esempio 20.00. Se è "
 "zero serve un’etichetta promo."
+
+#: apps/core/models.py
+msgid ""
+"The platform's logo, shown to search engines. Pick an image from the 'Logos and icons' collection "
+"that has its licence and author filled in."
+msgstr ""
+"Il logo della piattaforma, mostrato ai motori di ricerca. Scegli un'immagine dalla raccolta «Loghi"
+" e icone» che abbia licenza e autore compilati."
 
 #: apps/compliance/models.py
 msgid "The postal address of the EU responsible person."
