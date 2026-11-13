@@ -23,6 +23,7 @@ from django.db.models import Model, Q, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.module_loading import import_string
+from django.utils.translation import gettext_lazy as _
 from wagtail.models import Collection
 
 from . import flags
@@ -49,8 +50,11 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
         required=False,
         widget=forms.Textarea(attrs={"rows": 4}),
         label="Official profiles",
-        help_text=PlatformOperator._meta.get_field("official_profiles").help_text
-        + " One per line, at most 10.",
+        help_text=_(
+            "Official profiles of the platform, one https:// link each, for search "
+            "engines. Example: its Wikidata item, its LinkedIn page. No user names or passwords. "
+            "One per line, at most 10."
+        ),
     )
 
     class Meta:
