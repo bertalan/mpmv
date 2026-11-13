@@ -15,6 +15,9 @@ from .navigation import Registry, Section, anyone, platform_role, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
 from .spaces import Space
+from .termination_views import PLATFORM_SECTION as TERMINATIONS_SECTION
+from .termination_views import SHOP_SECTION as TERMINATION_SECTION
+from .termination_views import can_give_notice
 
 
 def can_review_profiles_section(ctx: Any) -> bool:
@@ -93,6 +96,25 @@ BUILT_IN = (
         "manager:platform:notices",
         order=60,
         allowed=can_review,
+    ),
+    # CMP.5 part 4: notices of termination, for the staff who review notices (CORE.18).
+    Section(
+        TERMINATIONS_SECTION,
+        Space.PLATFORM,
+        _("Terminations"),
+        "manager:platform:terminations",
+        order=65,
+        allowed=can_give_notice,
+    ),
+    # The vendor's view of its notice and the data download: every member of the vendor, so
+    # nobody working in the shop is surprised by the end of the service.
+    Section(
+        TERMINATION_SECTION,
+        Space.SHOP,
+        _("Termination notice"),
+        "manager:shop:termination",
+        order=90,
+        allowed=anyone,
     ),
     Section(
         "platform.staff_roles",
