@@ -155,7 +155,7 @@ class CountryWarningLanguages(Model):   # platform data: country -> accepted war
   17(3)(e) for contract evidence): contract and signature evidence, tax and DAC7 records, ledger
   entries and order records. Only data not covered by a retention duty is deleted or anonymised
   at once; the retention job anonymises the retained data when its period ends.
-- Record of processing activities and sub-processors (Stripe, carriers, email provider, AI provider, hosting, geocoding providers and map tile upstream of [15](15-events.md)),
+- Record of processing activities and sub-processors (Stripe, carriers, email provider, the AI providers the operator enables (ING.14; a provider a vendor chooses for its own texts is that vendor's processor, the vendor being controller), hosting, geocoding providers and map tile upstream of [15](15-events.md)),
   retention per data type, DPA.
 - No tracking pixels in emails without consent (Garante privacy, provision 284 of 2026-04-17,
   compliance from about 2026-10-29): transactional and service emails (ARC.16, CMP.10 reminders)
