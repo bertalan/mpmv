@@ -1,0 +1,31 @@
+{% extends "layouts/content.html" %}
+{% load i18n %}
+{% block title %}{% translate "Sub-processors" %} · {{ site_name }}{% endblock %}
+{% block page_content %}
+  <article class="subprocessors">
+    <h1>{% translate "Sub-processors" %}</h1>
+    <p>{% translate "These providers process personal data on our behalf. Each one is bound by a data processing agreement." %}</p>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">{% translate "Provider" %}</th>
+          <th scope="col">{% translate "Purpose" %}</th>
+          <th scope="col">{% translate "Data" %}</th>
+          <th scope="col">{% translate "Location" %}</th>
+          <th scope="col">{% translate "Safeguard" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+          <tr>
+            <th scope="row">{% translate entry.name %}</th>
+            <td>{% translate entry.purpose %}</td>
+            <td>{% translate entry.data %}</td>
+            <td>{% translate entry.location %}</td>
+            <td>{% translate entry.safeguard %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </article>
+{% endblock %}

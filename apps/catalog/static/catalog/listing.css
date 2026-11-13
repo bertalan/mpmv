@@ -74,6 +74,22 @@
   margin: 0 0 var(--space-s);
 }
 
+/* Brand page (CAT.20 3/3). */
+.brand-profile {
+  margin-block: var(--space-m);
+}
+
+.brand-profile__logo {
+  max-width: 12rem;
+  height: auto;
+}
+
+.brand-profile__facts {
+  list-style: none;
+  margin: var(--space-s) 0 0;
+  padding: 0;
+}
+
 .store-categories {
   margin-block: var(--space-m);
 }

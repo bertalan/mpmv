@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{{ vendor_name }}: the buyer of order {{ order_number }} declared on {{ submitted_at }} that they withdraw from the contract for your part of the order (reference {{ reference }}).</p>
+<ul>
+{% for line in lines %}<li>{{ line.quantity }} x {{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %}</li>
+{% endfor %}</ul>
+<p>The refund and return follow your usual returns process. The withdrawal is recorded on the platform.</p>
+</body>
+</html>

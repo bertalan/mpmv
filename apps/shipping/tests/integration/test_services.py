@@ -85,12 +85,12 @@ def test_a_method_create_is_audited_with_its_vat_treatment() -> None:
         vendor=VendorFactory.create(),
         zone=ShippingZoneFactory.create(),
         carrier=CarrierFactory.create(),
-        tax_treatment=engine.STANDARD_RATE,
+        tax_treatment=engine.FOLLOWS_GOODS,
         free_shipping_threshold=Decimal("49.00"),
     )
     preview = save_config(method, ctx=CTX, dry_run=True)
     assert preview.changes[0].after is not None
-    assert preview.changes[0].after["tax_treatment"] == "standard_rate"
+    assert preview.changes[0].after["tax_treatment"] == "follows_goods"
     assert not AuditLog.objects.exists()
     save_config(method, ctx=CTX)
     entry = AuditLog.objects.get(action="shipping.shippingmethod.created")

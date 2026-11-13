@@ -1,13 +1,14 @@
-"""Session levels (D-32, CORE.25): `restricted` (default) and `operational` (temporary).
+"""The passkey window (D-32, CORE.25): one fresh passkey for several sensitive actions.
 
-State lives in the Django session: when operational mode started, when the session was last
-active, and the single-use "do it once" grants. The timers and the action lists come from the
-`PlatformOperator` configuration (`core.session_policy`), read per request, so a change in the
-configuration takes effect with no code change.
+A sensitive action is always sensitive; the window grants no extra power. The normal state (no
+window open) has no name. State lives in the Django session: when the passkey window opened, when
+the session was last active, and the single-use "do it once" grants. The timers and the action
+lists come from the `PlatformOperator` configuration (`core.session_policy`), read per request, so
+a change in the configuration takes effect with no code change.
 
 Hooks for later work: CORE.26 (vendor policy) replaces `policy()` with the merge of the platform
 policy and the vendor's tightening for shop-space actions; CORE.24 (session lifetimes) owns the
-12 h staff session and the "log out everywhere" list, and should call `end_operational` when it
+12 h staff session and the "log out everywhere" list, and should call `close_window` when it
 invalidates a session.
 """
 
@@ -36,10 +37,10 @@ from .models import ElevationGrant, PasskeyDevice, User
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["ELEVATE_CODENAME", "OPERATIONAL", "RESTRICTED"]
+__all__ = ["ELEVATE_CODENAME", "NO_WINDOW", "PASSKEY_WINDOW"]
 
-RESTRICTED: Final = session_policy.RESTRICTED
-OPERATIONAL: Final = session_policy.OPERATIONAL
+NO_WINDOW: Final = session_policy.NO_WINDOW
+PASSKEY_WINDOW: Final = session_policy.PASSKEY_WINDOW
 
 STARTED_KEY: Final = "level_started_at"
 ACTIVITY_KEY: Final = "level_last_activity"
@@ -47,8 +48,13 @@ CHALLENGE_TTL: Final = 120  # seconds a passkey challenge for a level ceremony s
 CHALLENGE_KEY: Final = "level_passkey_challenge"
 SINGLE_CHALLENGE_KEY: Final = "level_single_challenge"
 
-SESSION_STARTED: Final = "accounts.session.operational_started"
-SESSION_ENDED: Final = "accounts.session.operational_ended"
+SESSION_STARTED: Final = "accounts.session.window_started"
+SESSION_ENDED: Final = "accounts.session.window_ended"
+# Rows written before the passkey window wording keep these action strings; readers accept both.
+LEGACY_SESSION_STARTED: Final = "accounts.session.operational_started"
+LEGACY_SESSION_ENDED: Final = "accounts.session.operational_ended"
+SESSION_STARTED_ACTIONS: Final = (SESSION_STARTED, LEGACY_SESSION_STARTED)
+SESSION_ENDED_ACTIONS: Final = (SESSION_ENDED, LEGACY_SESSION_ENDED)
 SINGLE_GRANTED: Final = "accounts.session.single_granted"
 SINGLE_USED: Final = "accounts.session.single_used"
 PROMPT: Final = "accounts.session.prompt"
@@ -61,7 +67,7 @@ def policy() -> session_policy.SessionPolicy:
     """The policy of the current `PlatformOperator`; the D-32 defaults before one exists.
 
     A stored mapping that no longer parses (the model validates it, so this is old or hand-made
-    data) fails CLOSED: every action is group 3 until it is fixed, and the error is logged.
+    data) fails CLOSED: every action is critical until it is fixed, and the error is logged.
     """
     try:
         raw = current_operator().session_policy
@@ -70,7 +76,7 @@ def policy() -> session_policy.SessionPolicy:
     try:
         return session_policy.parse_policy(raw)
     except ValueError:
-        logger.error("The stored session policy is invalid: failing closed (all group 3).")
+        logger.error("The stored session policy is invalid: failing closed (all critical).")
         return session_policy.FAIL_CLOSED_POLICY
 
 
@@ -113,17 +119,17 @@ def may_elevate(user: AbstractBaseUser | AnonymousUser) -> bool:
     )
 
 
-# --- The operational state
+# --- The passkey window
 
 
 def current_level(request: HttpRequest) -> str:
     """The level of this request's session. Expiry is enforced by `refresh` in the middleware."""
     session = request.session
-    return OPERATIONAL if session.get(STARTED_KEY) is not None else RESTRICTED
+    return PASSKEY_WINDOW if session.get(STARTED_KEY) is not None else NO_WINDOW
 
 
 def seconds_left(request: HttpRequest) -> int | None:
-    """Seconds until operational mode ends if nothing else happens; None in restricted mode."""
+    """Seconds until the passkey window closes if nothing else happens; None with no window."""
     started, active = request.session.get(STARTED_KEY), request.session.get(ACTIVITY_KEY)
     if started is None or active is None:
         return None
@@ -133,8 +139,8 @@ def seconds_left(request: HttpRequest) -> int | None:
     return max(0, int(left))
 
 
-def start_operational(request: HttpRequest) -> None:
-    """Switch the session to operational mode (the caller verified a fresh passkey)."""
+def open_window(request: HttpRequest) -> None:
+    """Open the passkey window (the caller verified a fresh passkey)."""
     request.session.cycle_key()  # a privilege change: a fixed session id is worthless
     now = time.time()
     renewed = request.session.get(STARTED_KEY) is not None  # a fresh passkey does not reset the cap
@@ -154,8 +160,8 @@ def start_operational(request: HttpRequest) -> None:
     )
 
 
-def end_operational(request: HttpRequest, reason: str) -> None:
-    """Back to restricted: `reason` is idle, cap, manual, logout or invalid."""
+def close_window(request: HttpRequest, reason: str) -> None:
+    """Close the passkey window: `reason` is idle, cap, manual, logout or invalid."""
     session = request.session
     started = session.pop(STARTED_KEY, None)
     session.pop(ACTIVITY_KEY, None)
@@ -169,7 +175,7 @@ def end_operational(request: HttpRequest, reason: str) -> None:
 
 
 def refresh(request: HttpRequest) -> None:
-    """Per request: end an expired operational session, else count this request as activity."""
+    """Per request: close an expired passkey window, else count this request as activity."""
     session = request.session
     if session.get(STARTED_KEY) is None:
         return
@@ -181,13 +187,13 @@ def refresh(request: HttpRequest) -> None:
         now=now,
     )
     if why is not None:
-        end_operational(request, why)
+        close_window(request, why)
     elif not _is_background(request):
         session[ACTIVITY_KEY] = now
 
 
 def _is_background(request: HttpRequest) -> bool:
-    """Polling and prefetch are not the user working: they do not keep the mode alive."""
+    """Polling and prefetch are not the user working: they do not keep the window open."""
     if request.headers.get("X-MPMV-Poll") == "1" or "prefetch" in request.headers.get(
         "Sec-Purpose", ""
     ):
@@ -224,8 +230,8 @@ def _end_on_logout(
 
 @receiver(user_logged_in)
 def _end_on_login(sender: object, request: HttpRequest | None, user: Any, **kwargs: object) -> None:
-    """Signing in again in the same session starts restricted (Django keeps the data of the same
-    user's session)."""
+    """Signing in again in the same session starts with no window (Django keeps the data of the
+    same user's session)."""
     if request is None or not hasattr(request, "session"):
         return
     started = request.session.pop(STARTED_KEY, None)
@@ -363,5 +369,5 @@ def consume_single(request: HttpRequest, action: str, digest: str) -> bool:
 
 
 def record_prompt(request: HttpRequest, action: str, group: int, outcome: str) -> None:
-    """Audit that a user was asked to elevate or confirm (the friction report counts these)."""
+    """Audit that a user was asked for a passkey or a confirmation (the friction report counts)."""
     _record(request, PROMPT, {"action": action, "group": group, "outcome": outcome})

@@ -177,14 +177,19 @@ def check_role_drift(
     Needs the database: runs with `manage.py check --database default` and in the test suite.
     """
     from django.db import DatabaseError, connection
-    from django.db.migrations.recorder import MigrationRecorder
+    from django.db.migrations.loader import MigrationLoader
 
     from .role_groups import role_conflicts, role_drift
 
     try:
-        # `migrate` runs the database checks before it applies anything: until the seed migration
-        # has run, missing groups are expected and must not block the migration that creates them.
-        if SEED_MIGRATION not in MigrationRecorder(connection).applied_migrations():
+        # `migrate` runs the database checks before it applies anything: while a Manager migration
+        # is pending (the seed, or a later one that adds permissions to the groups), the groups are
+        # expected to lag `roles.py` and must not block the migration that syncs them.
+        loader = MigrationLoader(connection, ignore_no_migrations=True)
+        if any(
+            key[0] == SEED_MIGRATION[0] and key not in loader.applied_migrations
+            for key in loader.graph.nodes
+        ):
             return []
         problems, conflicts = role_drift(), role_conflicts()
     except DatabaseError:  # not migrated yet
