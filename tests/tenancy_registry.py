@@ -109,6 +109,8 @@ from apps.orders.tests.factories import (
     VendorOrderFactory,
     paid_vendor_order,
 )
+from apps.payments.models import ConnectedAccount
+from apps.payments.tests.factories import ConnectedAccountFactory
 from apps.shipping.models import (
     PickupOption,
     PickupOptionTranslation,
@@ -280,6 +282,8 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     StockReservation: lambda vendor: StockReservationFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
+    # VEN.6: a vendor's connected payout account.
+    ConnectedAccount: lambda vendor: ConnectedAccountFactory.create(vendor=vendor),
     # EVT.1: a draft event page under the primary language's events index.
     EventPage: lambda vendor: EventPageFactory.create(vendor=vendor),
     VendorEventPolicy: lambda vendor: VendorEventPolicyFactory.create(vendor=vendor),
@@ -484,6 +488,7 @@ ENDPOINTS: dict[str, Access] = {
     "logout": NoVendorData("Sign-out of the Manager."),
     "manager:shop:dashboard": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:shop:profile": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:payments": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # The image chooser of the storefront editor (VEN.31): vendor B's image id is a 404 for A.
     "manager:shop:image_chosen": VendorScoped(make=vendor_image, kwargs=by_pk),
     "manager:shop:image_select_format": VendorScoped(make=vendor_image, kwargs=by_image_id),

@@ -32,7 +32,9 @@ PUBLISHED = TranslationStatus.PUBLISHED
 
 @pytest.fixture
 def product_page() -> None:
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, display_name="Rossi Ceramics")
+    vendor = VendorFactory.create(
+        status=Vendor.Status.ACTIVE, sells_online=True, display_name="Rossi Ceramics"
+    )
     companion = ProductFactory.create(vendor=vendor, status=Product.Status.PUBLISHED)
     ProductTranslationFactory.create(
         product=companion, title="Glaze kit", slug="glaze-kit", status=PUBLISHED

@@ -504,6 +504,10 @@ msgstr "Account"
 msgid "Account security"
 msgstr "Sicurezza dell’account"
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Account status"
+msgstr "Stato dell’account"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Act on the content"
 msgstr "Interveni sul contenuto"
@@ -1015,6 +1019,10 @@ msgstr ""
 "Conferma con la tua passkey per aprire una finestra passkey: copre diverse azioni sensibili di "
 "seguito. Si chiude quando esci, dopo un periodo di inattività o alla durata massima."
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Connect your payout account"
+msgstr "Collega il tuo account per i pagamenti"
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
@@ -1024,6 +1032,10 @@ msgstr "Continua"
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "Continue does not sign you in: the page it opens asks you to confirm who you are."
 msgstr "Continua non ti fa accedere: la pagina che si apre ti chiede di confermare la tua identità."
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Continue the onboarding"
+msgstr "Continua la registrazione"
 
 #: apps/orders/templates/orders/_cart_body.html
 msgid "Continue to checkout"
@@ -1663,11 +1675,14 @@ msgstr ""
 
 #: apps/vendors/models.py
 msgid ""
-"How your products are sold unless a product says otherwise: buyers order and pay online, or they "
-"first send you an enquiry."
+"How your products are sold: buyers order and pay online, or they first send you an enquiry. On "
+"request applies to all your products, even those set to buy. Until your payout account is ready, "
+"your shop is on request whatever you choose."
 msgstr ""
-"Come vendi i tuoi prodotti, salvo diversa indicazione sul singolo prodotto: i clienti ordinano e "
-"pagano online, oppure ti inviano prima una richiesta."
+"Come vendi i tuoi prodotti: i clienti ordinano e pagano online, oppure ti inviano prima una "
+"richiesta. Su richiesta vale per tutti i tuoi prodotti, anche quelli impostati per l'acquisto. "
+"Finché il tuo conto per i pagamenti non è pronto, il tuo negozio è su richiesta qualunque sia la "
+"tua scelta."
 
 #: apps/orders/ui/forms.py
 msgid "I am buying for a business"
@@ -2033,6 +2048,10 @@ msgstr "Nessuna modifica al negozio per ora."
 msgid "Nobody holds a platform role yet."
 msgstr "Nessuno ha ancora un ruolo di piattaforma."
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Not connected"
+msgstr "Non collegato"
+
 #: apps/shipping/models.py
 msgid ""
 "Not used yet at checkout: marks the method to preselect once checkout uses shipping rates. A "
@@ -2182,6 +2201,10 @@ msgstr "attiva"
 msgid "On backorder"
 msgstr "Su ordinazione"
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "On request"
+msgstr "Su richiesta"
+
 #: apps/seo/site_links.py
 msgid "On STAGE and LIVE these may answer only from the server's own network."
 msgstr "Su STAGE e LIVE queste pagine possono rispondere solo dalla rete del server."
@@ -2219,6 +2242,10 @@ msgid "Online payment is not available yet. The items stay held for you for a sh
 msgstr ""
 "Il pagamento online non è ancora disponibile. Gli articoli restano riservati per te per un breve "
 "periodo."
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Online sale"
+msgstr "Vendita online"
 
 #: apps/manager/termination_views.py
 msgid "Only a pending notice can be withdrawn."
@@ -2531,6 +2558,14 @@ msgstr "Pagamento ricevuto"
 #: apps/orders/templates/email/orders/payment_confirmed/subject.txt
 msgid "Payment received for order %(order_number)s"
 msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
+
+#: apps/manager/sections.py apps/manager/templates/manager/shop/payments.html
+msgid "Payments"
+msgstr "Pagamenti"
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Payout account of %(vendor)s."
+msgstr "Account per i pagamenti di %(vendor)s."
 
 #: apps/themes/styleguide.py
 msgid "PDF or image, 5 MB at most."
@@ -2989,6 +3024,10 @@ msgstr "Seleziona almeno una riga."
 msgid "Sell with us (vendor application)"
 msgstr "Vendi con noi (candidatura venditore)"
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Selling mode"
+msgstr "Modalità di vendita"
+
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid ""
 "Sensitive actions ask for your passkey once, or open a passkey window to cover several in a row."
@@ -3304,6 +3343,10 @@ msgstr "stato"
 #: apps/orders/templates/orders/customer_order.html
 msgid "Status history"
 msgstr "Cronologia dello stato"
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Still needed"
+msgstr "Ancora necessario"
 
 #: apps/manager/sections.py apps/manager/templates/manager/platform/profile_changes.html
 msgid "Storefront changes"
@@ -5702,6 +5745,14 @@ msgstr "Togli la spunta per smettere di applicare la regola senza eliminarla."
 msgid "Untick it to switch the carrier off: an inactive carrier offers no rates at all."
 msgstr "Togli la spunta per spegnere il corriere: un corriere non attivo non offre nessuna tariffa."
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid ""
+"Until your payout account is active, your products are shown in the catalog and sold on request: "
+"customers cannot add them to the cart."
+msgstr ""
+"Finché il tuo account per i pagamenti non è attivo, i tuoi prodotti compaiono nel catalogo e si "
+"vendono su richiesta: i clienti non possono aggiungerli al carrello."
+
 #: apps/cms/blocks.py
 msgid "Up to two buttons under the text. If you add none, the banner has no buttons."
 msgstr "Fino a due pulsanti sotto il testo. Se non ne aggiungi, il banner non ha pulsanti."
@@ -6513,6 +6564,11 @@ msgstr ""
 "Il tuo codice per questa versione, per esempio 'TAZZA-ROSSA-01-L'. Obbligatorio. Deve essere "
 "diverso dal codice del prodotto e da quello di ogni altro tuo prodotto o variante: maiuscole e "
 "spazi non rendono diversi due codici."
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Your payout account is active. Customers can buy your products online."
+msgstr ""
+"Il tuo account per i pagamenti è attivo. I clienti possono acquistare i tuoi prodotti online."
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your protection"

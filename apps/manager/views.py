@@ -43,6 +43,10 @@ from apps.core.services import flag_enabled
 from apps.orders import engine as orders_engine
 from apps.orders.models import VendorOrder, VendorOrderState
 from apps.orders.services import OrdersFrozen, fulfil_vendor_order
+from apps.payments import connect
+from apps.payments.models import ConnectedAccount
+from apps.payments.stripe_provider import client_from_settings
+from apps.vendors import services as vendors_services
 from apps.vendors.engine import RICH_TEXT_FIELDS, plain_to_html
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import Source, VendorScopedQuerySet
@@ -566,6 +570,69 @@ def logout(request: HttpRequest) -> HttpResponse:
 
 
 login = LoginView.as_view()
+
+
+class PaymentsView(ManagerView):
+    """The vendor owner connects the payout account (VEN.6, D-19).
+
+    Section `shop.payments`: the `bank_account` action of the role matrix, owners only. The page
+    shows the mirrored status; a POST creates the account if needed and sends the owner to the
+    provider's onboarding link; `?return=1` re-reads the owner's own account on the way back. The
+    account id is never taken from the request."""
+
+    section = "shop.payments"
+    template_name = "manager/shop/payments.html"
+
+    def _vendor_actor(self) -> tuple[Vendor, User]:
+        vendor, actor = self.manager.vendor, self.manager.user
+        if vendor is None or not isinstance(actor, User):
+            raise Http404("No vendor selected.")
+        return vendor, actor
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["account"] = self.scoped(ConnectedAccount).first()
+        context["sells_online"] = (
+            self.manager.vendor is not None
+            and vendors_services.vendor_sales_mode(self.manager.vendor) == Vendor.SalesMode.BUY
+        )
+        return context
+
+    def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        if request.GET.get("return"):
+            vendor, actor = self._vendor_actor()
+            ctx = replace(audit_context(request), source=AuditLog.Source.VENDOR)
+            try:
+                connect.refresh_account(vendor, actor=actor, client=client_from_settings(), ctx=ctx)
+            except ValidationError as error:
+                messages.error(request, "; ".join(error.messages))
+            except PermissionDenied:
+                return self.render_to_response(self.get_context_data(), status=403)
+            return HttpResponseRedirect(reverse("manager:shop:payments"))
+        return super().get(request, *args, **kwargs)
+
+    @requires_level_method("payout_details")  # strictest group (CORE.25): the payout account
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        vendor, actor = self._vendor_actor()
+        ctx = replace(audit_context(request), source=AuditLog.Source.VENDOR)
+        page = request.build_absolute_uri(reverse("manager:shop:payments"))
+        try:
+            result = connect.start_onboarding(
+                vendor,
+                actor=actor,
+                client=client_from_settings(),
+                refresh_url=page,
+                return_url=f"{page}?return=1",
+                ctx=ctx,
+            )
+        except ValidationError as error:
+            messages.error(request, "; ".join(error.messages))
+            return HttpResponseRedirect(reverse("manager:shop:payments"))
+        except PermissionDenied:
+            return self.render_to_response(self.get_context_data(), status=403)
+        if result.url:
+            return HttpResponseRedirect(result.url)
+        return HttpResponseRedirect(reverse("manager:shop:payments"))
 
 
 class StaffRolesView(ManagerView):

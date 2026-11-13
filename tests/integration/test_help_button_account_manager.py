@@ -143,6 +143,7 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:profile": "shop",
         "manager:shop:orders": "shop",
         "manager:shop:order": "shop",
+        "manager:shop:payments": "shop",
         "manager:platform:dashboard": "platform",
         "manager:platform:notices": "platform",
         "manager:platform:notice": "platform",

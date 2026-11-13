@@ -4,7 +4,7 @@ from django.apps import AppConfig
 class PaymentsConfig(AppConfig):
     name = "apps.payments"
     label = "payments"
-    audited_models = ("payment",)
+    audited_models = ("payment", "connectedaccount")
     unaudited_models = {
         "processedevent": "Idempotency record of a webhook event id: no business data; the "
         "payment it confirms is audited (payments.payment.succeeded).",
