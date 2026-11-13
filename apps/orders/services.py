@@ -8,6 +8,7 @@ tracking link (ORD.7).
 """
 
 import datetime as dt
+import logging
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
@@ -85,6 +86,8 @@ class VendorOrderInput:
     tax_profile_snapshot: dict[str, Any] = field(default_factory=dict)
 
 
+logger = logging.getLogger(__name__)
+
 PAID_OR_LATER = frozenset(engine.ORDER_STATES) - engine.ORDER_INITIAL_STATES - {"cancelled"}
 # The shape of `CommissionRule.snapshot()` (VEN.2). Required keys; `promo_label` and `valid_from`
 # are allowed too. A constant copy: orders does not import vendors for this.
@@ -146,6 +149,7 @@ def _order_snapshot(order: Order) -> dict[str, Any]:
         "billing_country": order.billing_country,
         "shipping_country": order.shipping_country,
         "customer_tax_status": order.customer_tax_status,
+        "has_vehicle": bool(order.vehicle_snapshot),
         "goods_net": order.goods_net,
         "shipping_net": order.shipping_net,
         "tax_total": order.tax_total,
@@ -278,6 +282,7 @@ def create_order(
     customer_tax_id: str = "",
     customer_tax_status: str = "b2c",
     vat_validation: dict[str, Any] | None = None,
+    vehicle: dict[str, Any] | None = None,
     state: str = "checkout",
     legacy_wp_order_id: int | None = None,
     placed_at: dt.datetime | None = None,
@@ -328,6 +333,7 @@ def create_order(
         shipping_country=shipping_country,
         customer_tax_status=customer_tax_status,
         vat_validation=vat_validation or {},
+        vehicle_snapshot=engine.clean_vehicle_snapshot(vehicle),
         state=state,
         legacy_wp_order_id=legacy_wp_order_id,
     )
@@ -597,7 +603,12 @@ def _scrub(
             before = _scrub_snapshot(locked)
             _set_scrub_mode(mode)
             _clear_non_fiscal(locked, changeset)
-            values: dict[str, Any] = {"updated_at": stamp, "privacy_status": target}
+            # FIT.17: the vehicle is not a fiscal fact: it goes with the first scrub step.
+            values: dict[str, Any] = {
+                "updated_at": stamp,
+                "privacy_status": target,
+                "vehicle_snapshot": {},
+            }
             if target == "anonymized":
                 values.update(
                     engine.ANONYMISED_ORDER_FIELDS,
@@ -718,6 +729,9 @@ class CheckoutPreview:
     customer_tax_id: str = ""
     customer_tax_status: str = "b2c"
     vat_validation: dict[str, Any] | None = None
+    #: FIT.17: the garage vehicle active at checkout as opaque JSON (make, model, year labels);
+    #: `orders` never imports `fitment`, the checkout adapter passes what the garage shows.
+    vehicle: dict[str, Any] | None = None
     # ORD.3: every vendor package as shown (also the ones that cannot be placed), the blocking
     # messages and the totals of the ready packages. `vendors` holds the ready packages only.
     packages: Sequence[engine.PackageSummary] = ()
@@ -951,6 +965,7 @@ def place_order(
             customer_tax_id=preview.customer_tax_id,
             customer_tax_status=preview.customer_tax_status,
             vat_validation=preview.vat_validation,
+            vehicle=preview.vehicle,
             state="awaiting_payment",
             dry_run=dry_run,
             now=now,
@@ -975,13 +990,20 @@ def place_order(
         notifications.notify_order_placed(order)  # ORD.9: in this transaction, not on dry run
     # The order number is final only now (it may roll back with the transaction), so the provider
     # hears about it after the commit (ORD.4).
-    order.payment_client_secret = start_payment(order, ctx=ctx)
+    # The order is committed: nothing below may raise into the caller. A closed switch or any
+    # failure leaves the order awaiting payment (the payment page asks again) and is audited.
+    try:
+        order.payment_client_secret = start_payment(order, ctx=ctx)
+    except Exception as error:
+        order.payment_client_secret = ""
+        _audit_payment_problem(
+            order.number, "orders.payment_start_failed", {"reason": type(error).__name__}, ctx
+        )
+        logger.warning("payment start failed for order %s: %s", order.number, type(error).__name__)
     return order, changeset
 
 
 # --- payment (PAY.1, PAY.2) ------------------------------------------------------------------
-
-PAYMENT_ACTOR = "webhook:payments"
 
 
 class PaymentMismatch(Exception):
@@ -1050,7 +1072,13 @@ def _audit_payment_problem(
 
 
 def mark_order_paid(
-    order_ref: str, *, amount: Decimal, currency: str, ctx: AuditContext, dry_run: bool = False
+    order_ref: str,
+    *,
+    amount: Decimal,
+    currency: str,
+    ctx: AuditContext,
+    provider_ref: str | None = None,
+    dry_run: bool = False,
 ) -> bool:
     """The provider confirmed a payment for the order numbered `order_ref` (PAY.2): move it to
     `paid`, decrement the stock it held and release the holds, all in the caller's transaction.
@@ -1058,8 +1086,9 @@ def mark_order_paid(
     Idempotent: an order already paid is left alone (False). Nothing moves, and the problem is
     audited for staff, when no order has that number, the order is no longer awaiting payment
     (a late payment on a cancelled order), or the amount or currency is not the order's gross
-    total. Returns True when the order became (or, on a dry run, would become) paid; a dry run
-    writes nothing."""
+    total, or (when `provider_ref` is given) the payment is not the one started for the order
+    (`orders.payment_ref_mismatch`). Returns True when the order became (or, on a dry run, would
+    become) paid; a dry run writes nothing."""
 
     def problem(ref: str, action: str, detail: dict[str, Any], ctx: AuditContext) -> None:
         if not dry_run:
@@ -1074,6 +1103,14 @@ def mark_order_paid(
             return False
         if order.state != "awaiting_payment":
             problem(order_ref, "orders.payment_late", {"state": order.state, "amount": amount}, ctx)
+            return False
+        if provider_ref is not None and provider_ref != order.payment_intent_ref:
+            problem(
+                order_ref,
+                "orders.payment_ref_mismatch",
+                {"paid_with": provider_ref, "expected": order.payment_intent_ref},
+                ctx,
+            )
             return False
         if currency.upper() != CURRENCY or amount != order.grand_total:
             problem(

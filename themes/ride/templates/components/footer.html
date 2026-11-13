@@ -30,6 +30,7 @@ help link.
         </nav>
       {% endif %}
       <p>&copy; {% now "Y" %} {{ site_name }}</p>
+      {% consent_settings_link as consent_link %}{% if consent_link %}<p>{{ consent_link }}</p>{% endif %}
     </div>
   </div>
 </footer>

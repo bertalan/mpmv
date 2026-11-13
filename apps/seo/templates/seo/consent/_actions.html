@@ -1,0 +1,7 @@
+{% load i18n %}{% comment %}
+The three buttons of a consent form (SEO.5): reject and accept carry the same variant, size and
+weight, so neither is pushed. The third saves the categories ticked above it.
+{% endcomment %}<div class="consent-actions">
+  {% translate "Reject all" as reject_label %}{% include "components/button.html" with label=reject_label type="submit" name="action" value="reject_all" variant="secondary" only %}
+  {% translate "Accept all" as accept_label %}{% include "components/button.html" with label=accept_label type="submit" name="action" value="accept_all" variant="secondary" only %}
+</div>

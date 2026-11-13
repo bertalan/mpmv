@@ -268,7 +268,7 @@ TEMPLATES = [
                 "apps.themes.context_processors.theme",
                 "apps.themes.context_processors.release",
             ],
-            "builtins": ["apps.seo.templatetags.seo_robots"],
+            "builtins": ["apps.seo.templatetags.seo_robots", "apps.seo.templatetags.consent"],
             "loaders": [
                 "apps.themes.loaders.ThemeLoader",
                 (
@@ -303,6 +303,13 @@ MPMV_HELP_URL = env_str("MPMV_HELP_URL", "")
 MPMV_VERSION = os.environ.get("MPMV_VERSION", "") or "dev"
 # The vendor guide the help dialog links on vendor-facing screens (ARC.32); empty = no link.
 MPMV_VENDOR_GUIDE_URL = env_str("MPMV_VENDOR_GUIDE_URL", "")
+
+# Consent provider (SEO.9, D-10): the name of the consent tool in use. `self-hosted` is our own
+# minimal banner; an operator adds another by naming its class in MPMV_CONSENT_PROVIDERS
+# ({name: "dotted.path.Class"}) and selecting the name here (docs/dev/consent-providers.md). An
+# unknown name fails the seo.E001 system check.
+MPMV_CONSENT_PROVIDER = env_str("MPMV_CONSENT_PROVIDER", "self-hosted")
+MPMV_CONSENT_PROVIDERS: dict[str, str] = {}
 
 # PostgreSQL is the only datastore (ADR-0001).
 DATABASES = {
@@ -706,6 +713,13 @@ OPS_WAL_MAX_LAG_SECONDS = env_int("MPMV_OPS_WAL_MAX_LAG_SECONDS", 900)  # RPO 15
 OPS_BACKUP_STATUS_FILE = env_str("MPMV_OPS_BACKUP_STATUS_FILE", "")
 OPS_BACKUP_MAX_AGE_HOURS = env_int("MPMV_OPS_BACKUP_MAX_AGE_HOURS", 26)
 # Optional prefix of order numbers, e.g. "MP-" gives "MP-2027-000123" (ORD.2). Empty by default.
+# The anonymous garage cookie `mpmv_garage` (D-38 Q-G1, FIT.6): technical, so no consent gate.
+# `exempt` stores up to three vehicles in the cookie when the visitor presses Save; `off` never
+# writes it (the garage then lasts for the visit only). The lifetime is capped at 12 months
+# (365 days) and a larger value fails a system check.
+GARAGE_ANON_STORAGE = "exempt"
+GARAGE_COOKIE_DAYS = 180
+
 ORDER_NUMBER_PREFIX = ""
 # How long `place_order` holds the stock of an order awaiting payment (ORD.4); paying releases it.
 ORDER_HOLD_MINUTES = 60

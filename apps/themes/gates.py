@@ -46,6 +46,7 @@ from .engine import (
 )
 from .vendored import VENDOR_DIR
 
+LAZY_JS_DIR = "lazy/"  # scripts under js/lazy/ are imported on demand: the JS budget skips them
 CSS_BUDGET = 45 * 1024  # theme.css, compressed (§14.7)
 JS_BUDGET = 40 * 1024  # all JavaScript of a page, htmx and Alpine included, compressed (§14.7)
 MAX_FONT_FILES = 4
@@ -271,6 +272,8 @@ def _check_theme(
             scripts = dict(vendor)
             for s in chain:
                 for name, module in read_js_modules(root / s, s).items():
+                    if name.startswith(LAZY_JS_DIR):
+                        continue  # loaded on demand, not shipped by every page (§14.7)
                     scripts[f"themes/{s}/js/{name}"] = module.encode("utf-8")
             failures += check_sizes(slug, css, scripts)
     assets = theme_assets(theme_dir, slug)

@@ -424,6 +424,14 @@ ENDPOINTS: dict[str, Access] = {
         kwargs={"segment": "shop"},
     ),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
+    "consent_save": NoVendorData(
+        "Cookie consent choice (SEO.5): records the caller's own decision with a random id; "
+        "no vendor data."
+    ),
+    "consent_preferences": NoVendorData(
+        "Cookie settings page (SEO.5): the caller's own choice from their own cookie; no vendor "
+        "data."
+    ),
     "themes:styleguide": StaffOnly("Component samples of the active theme (THM.4), staff only."),
     "site_links": StaffOnly(
         "Temporary list of the site's pages for STAGE testing (OPS.12), staff only; a signed-in "
@@ -574,6 +582,18 @@ ENDPOINTS: dict[str, Access] = {
         "One notice of illegal content (CMP.5): platform data, not vendor-owned; needs the "
         "compliance.review_notices permission, so a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "garage_save": NoVendorData(
+        "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
+        "and the vehicle scheme; no vendor data."
+    ),
+    "garage_remove": NoVendorData(
+        "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
+        "and the vehicle scheme; no vendor data."
+    ),
+    "garage_forget": NoVendorData(
+        "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
+        "and the vehicle scheme; no vendor data."
     ),
     "manager:platform:terminations": StaffOnly(
         "Notices of termination (CMP.5 part 4): platform data; needs the "

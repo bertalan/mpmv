@@ -136,8 +136,10 @@ def test_the_default_variant_is_selected(client: Client) -> None:
         )
     html = client.get(path("en", "mug-en")).content.decode()
     assert "Size VAR-A" in html
-    assert html.count(" checked") == 1
-    checked = html.split(" checked")[0].rsplit("<input", 1)[1]
+    # Scope to the variant picker: the consent banner has its own locked "necessary" checkbox.
+    picker = html.split('<fieldset class="product-variants">', 1)[1].split("</fieldset>", 1)[0]
+    assert picker.count(" checked") == 1
+    checked = picker.split(" checked")[0].rsplit("<input", 1)[1]
     assert 'value="VAR-B"' in checked
 
 

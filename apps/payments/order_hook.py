@@ -20,7 +20,11 @@ WEBHOOK_ACTOR = "webhook:payments"
 def order_paid_on_payment(sender: type[Payment], payment: Payment, **kwargs: Any) -> None:
     ctx = AuditContext(actor_label=WEBHOOK_ACTOR, source=AuditLog.Source.SYSTEM)
     paid = mark_order_paid(
-        payment.order_ref, amount=payment.amount, currency=payment.currency, ctx=ctx
+        payment.order_ref,
+        amount=payment.amount,
+        currency=payment.currency,
+        provider_ref=payment.provider_ref,
+        ctx=ctx,
     )
     if paid:
         on_order_paid.send(sender=Payment, payment=payment)
