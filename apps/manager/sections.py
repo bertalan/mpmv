@@ -14,6 +14,7 @@ from apps.vendors.services import can_review_profiles
 from .navigation import Registry, Section, anyone, platform_role, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
+from .sales_terms_views import SECTION as SALES_TERMS_SECTION
 from .spaces import Space
 from .termination_views import PLATFORM_SECTION as TERMINATIONS_SECTION
 from .termination_views import SHOP_SECTION as TERMINATION_SECTION
@@ -40,6 +41,15 @@ BUILT_IN = (
         _("Storefront profile"),
         "manager:shop:profile",
         order=20,
+        allowed=vendor_action("profile"),
+    ),
+    # The seller's versioned sales terms (VEN.35): owners only, like the profile.
+    Section(
+        SALES_TERMS_SECTION,
+        Space.SHOP,
+        _("Sales terms"),
+        "manager:shop:sales_terms",
+        order=22,
         allowed=vendor_action("profile"),
     ),
     # The payout account (VEN.6): owners only, like the other financial settings.

@@ -41,6 +41,7 @@ SCOPES = (
     "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)
     "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
     "apps/vendors/models.py",
+    "apps/vendors/templates/vendors/terms",  # the public sales terms page (VEN.35)
     "themes/base/templates/layouts",
     # Brand review models (CAT.20): the rest of the catalog app joins with the storefront I18N.
     "apps/catalog/taxonomy.py",

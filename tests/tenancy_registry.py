@@ -138,6 +138,8 @@ from apps.tax.tests.factories import (
 from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
+    SalesTermsInForce,
+    SalesTermsVersion,
     SelfCertification,
     Vendor,
     VendorClaim,
@@ -148,6 +150,8 @@ from apps.vendors.models import (
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
     CrossVendorConsentFactory,
+    SalesTermsInForceFactory,
+    SalesTermsVersionFactory,
     SelfCertificationFactory,
     VendorClaimFactory,
     VendorFeatureFlagFactory,
@@ -191,6 +195,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         vendor=vendor, certified=False
     ),
     SelfCertification: lambda vendor: SelfCertificationFactory.create(vendor=vendor),
+    # VEN.35: a published version of the seller's sales terms and the pointer to the one in force.
+    SalesTermsVersion: lambda vendor: SalesTermsVersionFactory.create(vendor=vendor),
+    SalesTermsInForce: lambda vendor: SalesTermsInForceFactory.create(version__vendor=vendor),
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
     CrossVendorConsent: lambda vendor: CrossVendorConsentFactory.create(vendor=vendor),
     VendorClaim: lambda vendor: VendorClaimFactory.create(vendor=vendor),
@@ -463,6 +470,12 @@ ENDPOINTS: dict[str, Access] = {
         "Secure action link Continue POST (CORE.15): a token of another user or object is "
         "refused before anything is shown."
     ),
+    "vendor_terms:read": NoVendorData(
+        "Sales terms in force of any seller (VEN.35, VEN.32 exception): public by design, behind "
+        "a signed, expiring link; a superseded version and a tampered link are a 404, every read "
+        "is logged.",
+        kwargs={"token": "not-a-token"},
+    ),
     "vendor_claim:claim": NoVendorData(
         "Vendor claim page (VEN.24): without a claim link opened in the session for that vendor "
         "it shows only the generic 'link not valid' page, whoever is signed in.",
@@ -535,6 +548,7 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # CMP.5 part 4: the notice of termination and the data download show the selected vendor only.
+    "manager:shop:sales_terms": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:shop:termination": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # The download exists only while a notice is pending: the vendor made here has one.
     "manager:shop:termination_data": VendorScopedList(

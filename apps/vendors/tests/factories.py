@@ -28,6 +28,8 @@ from apps.vendors.models import (
     CrossVendorConsent,
     LegalFieldRequirement,
     NoTinCountry,
+    SalesTermsInForce,
+    SalesTermsVersion,
     SelfCertification,
     Vendor,
     VendorApplication,
@@ -476,3 +478,45 @@ class NoTinCountryFactory(DjangoModelFactory[NoTinCountry]):
     country = factory.Iterator(["NZ", "JP", "CH", "SG", "AU"])
     reason = "Issues no TIN to individuals."
     valid_from = dt.date(2024, 1, 1)
+
+
+class SalesTermsVersionFactory(DjangoModelFactory[SalesTermsVersion]):
+    """A published version of a seller's sales terms, and the pointer to it (VEN.35).
+
+    The pointer is set unless `in_force=False`; `number` follows the vendor's last version.
+    """
+
+    class Meta:
+        model = SalesTermsVersion
+        skip_postgeneration_save = True
+
+    vendor = factory.SubFactory(VendorFactory)
+    number = factory.LazyAttribute(
+        lambda o: (
+            1
+            if o.vendor.pk is None
+            else SalesTermsVersion.objects.filter(vendor=o.vendor).count() + 1
+        )
+    )
+    effective_from = factory.LazyFunction(lambda: timezone.localdate())
+    body = factory.Sequence(lambda n: f"Sales terms {n}")
+    clauses = factory.LazyFunction(lambda: [{"article": "7", "title": "Limitation of liability"}])
+    governing_law = "IT"
+    delivery_days = 5
+    content_hash = factory.Sequence(lambda n: f"{n:064x}")
+
+    @factory.post_generation
+    def in_force(obj: SalesTermsVersion, create: bool, extracted: Any, **kwargs: Any) -> None:
+        if create and extracted is not False:
+            SalesTermsInForce.objects.update_or_create(vendor=obj.vendor, defaults={"version": obj})
+
+
+class SalesTermsInForceFactory(DjangoModelFactory[SalesTermsInForce]):
+    """The pointer to a version of a seller's sales terms (VEN.35)."""
+
+    class Meta:
+        model = SalesTermsInForce
+        django_get_or_create = ("vendor",)
+
+    version = factory.SubFactory(SalesTermsVersionFactory, in_force=False)
+    vendor = factory.SelfAttribute("version.vendor")

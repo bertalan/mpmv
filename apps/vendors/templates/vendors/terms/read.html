@@ -1,0 +1,22 @@
+{% extends "layouts/account.html" %}
+{% load i18n %}
+{% block title %}{% translate "Sales terms" %} · {{ vendor.display_name }}{% endblock %}
+{% block account_content %}
+<article class="sales-terms">
+  <h1>{% blocktranslate with name=vendor.display_name %}Sales terms of {{ name }}{% endblocktranslate %}</h1>
+  <p>{% blocktranslate with number=version.number date=version.effective_from|date:"Y-m-d" %}Version {{ number }}, in force from {{ date }}.{% endblocktranslate %}</p>
+  <h2>{% translate "Delivery, returns and law" %}</h2>
+  <ul>
+    <li>{% blocktranslate with days=consumer.delivery_days %}Committed delivery time: {{ days }} days.{% endblocktranslate %}</li>
+    <li>{% blocktranslate with country=consumer.governing_law %}Governing law: {{ country }}.{% endblocktranslate %}</li>
+    <li>{% translate "Consumers: disputes go to the court of the consumer's own residence." %}</li>
+    {% if business.b2b_court %}<li>{% blocktranslate with court=business.b2b_court %}Business buyers: the court of {{ court }}.{% endblocktranslate %}</li>{% endif %}
+    <li>{% if consumer.consumer_pays_return %}{% translate "Returns: the consumer bears the direct cost of returning the goods." %} {{ consumer.return_cost_info }}{% else %}{% translate "Returns: the seller bears the cost of returning the goods." %}{% endif %}</li>
+  </ul>
+  <h2>{% translate "Terms" %}</h2>
+  <div class="sales-terms__body">{{ version.body|linebreaks }}</div>
+  <h2>{% translate "Clauses for approval by business buyers (art. 1341 Civil Code)" %}</h2>
+  <ul>{% for clause in version.clauses %}<li>{{ clause.article }}: {{ clause.title }}</li>{% endfor %}</ul>
+  <p><button type="button" onclick="window.print()">{% translate "Print" %}</button></p>
+</article>
+{% endblock %}
