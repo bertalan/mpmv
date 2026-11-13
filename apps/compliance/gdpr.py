@@ -44,6 +44,7 @@ CONCLUDED_ORDER_STATES = frozenset({"closed", "cancelled", "refunded"})
 _NEVER_PAID_LIVE_STATES = ("checkout", "quote_flow", "awaiting_payment")
 
 ACTION_EXPORT = "compliance.gdpr_export"
+ACTION_EXPORT_REFUSED = "compliance.gdpr_export_refused"
 ACTION_ERASURE = "compliance.gdpr_erasure"
 
 

@@ -505,15 +505,19 @@ class PlatformOperator(Versioned):
         null=True,
         blank=True,
         related_name="+",
-        help_text="The platform's logo, shown to search engines. Pick an image from the "
-        "'Logos and icons' collection that has its licence and author filled in.",
+        help_text=_(
+            "The platform's logo, shown to search engines. Pick an image from the "
+            "'Logos and icons' collection that has its licence and author filled in."
+        ),
     )
     official_profiles = ArrayField(
         models.URLField(max_length=300),
         default=list,
         blank=True,
-        help_text="Official profiles of the platform, one https:// link each, for search "
-        "engines. Example: its Wikidata item, its LinkedIn page. No user names or passwords.",
+        help_text=_(
+            "Official profiles of the platform, one https:// link each, for search "
+            "engines. Example: its Wikidata item, its LinkedIn page. No user names or passwords."
+        ),
     )
     # D-21, CMP.13: changed only by a platform owner through
     # `apps.core.services.set_allowed_vendor_countries`; other new versions carry it over.
