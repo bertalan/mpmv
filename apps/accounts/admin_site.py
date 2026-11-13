@@ -34,8 +34,8 @@ class AuditedPasswordChangeView(PasswordChangeView):
             services.record_password_change(
                 user, had_usable_password=had_usable_password, ctx=audit_context(self.request)
             )
-        # The password is a credential change: back to restricted, the key was cycled anyway.
-        levels.end_operational(self.request, "password")
+        # The password is a credential change: close the passkey window (the key was cycled).
+        levels.close_window(self.request, "password")
         return response
 
 

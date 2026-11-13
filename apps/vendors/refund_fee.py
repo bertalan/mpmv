@@ -14,7 +14,8 @@ from collections.abc import Iterable, Mapping
 from decimal import ROUND_CEILING, Decimal
 from typing import Final
 
-CENT: Final = Decimal("0.01")
+from apps.core.money import round_line
+
 EURO: Final = Decimal("1")
 DEFAULT_SURCHARGE: Final = Decimal("2.00")
 NOTICE_DAYS: Final = 15
@@ -29,10 +30,6 @@ class NoticeTooShort(ValueError):
     """A surcharge version takes effect less than 15 days after its notice date."""
 
 
-def _money(value: Decimal) -> Decimal:
-    return value.quantize(CENT)
-
-
 @dataclasses.dataclass(frozen=True)
 class RefundFeeRule:
     """The refund-fee parameters of a plan, as snapshotted on the order."""
@@ -42,9 +39,11 @@ class RefundFeeRule:
     def __post_init__(self) -> None:
         if self.surcharge < 0:
             raise ValueError("The refund-fee surcharge cannot be negative.")
+        if self.surcharge != round_line(self.surcharge):
+            raise ValueError("The refund-fee surcharge allows at most 2 decimals.")
 
     def snapshot(self) -> dict[str, str]:
-        return {SNAPSHOT_KEY: str(_money(self.surcharge))}
+        return {SNAPSHOT_KEY: str(round_line(self.surcharge))}
 
     @classmethod
     def from_snapshot(cls, snapshot: Mapping[str, str]) -> "RefundFeeRule":
@@ -77,7 +76,7 @@ def refund_fee(
     if platform_error is not None:
         return Decimal("0.00")
     total = provider_cost + rule.surcharge
-    return _money(total.quantize(EURO, rounding=ROUND_CEILING))
+    return round_line(total.quantize(EURO, rounding=ROUND_CEILING))
 
 
 def check_notice(notice_date: dt.date, effective_date: dt.date) -> None:

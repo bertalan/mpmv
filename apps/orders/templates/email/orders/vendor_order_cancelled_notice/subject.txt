@@ -1,0 +1,1 @@
+{% load i18n %}{% blocktranslate %}{{ vendor_name }}: order {{ order_number }} cancelled, do not ship{% endblocktranslate %}

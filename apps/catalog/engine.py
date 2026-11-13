@@ -4,11 +4,13 @@ its terms, the shape of a product's typed attributes, variant axes and variants 
 redirect rules: safe same-site paths, matching, loops and chains (CAT.6). No ORM here."""
 
 import datetime as dt
+import json
 import re
 import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
+from html.parser import HTMLParser
 from typing import Any, Protocol, cast
 from urllib.parse import unquote_to_bytes, urlsplit
 from zoneinfo import ZoneInfo
@@ -999,3 +1001,169 @@ def link_field_errors(url: str, same_as: object) -> dict[str, list[str]]:
     elif found := same_as_errors(same_as):
         errors["same_as"] = found
     return errors
+
+
+# --- Brand structured data (CAT.20 3/3, spec 10 SEO.7): graph nodes with stable `@id`s
+
+SCHEMA_ORG = "https://schema.org"
+WIKIDATA_ENTITY = "https://www.wikidata.org/wiki/"
+BRAND_FRAGMENT = "#brand"
+_JSONLD_ESCAPES = {code: f"\\u{code:04x}" for code in (0x3C, 0x3E, 0x26, 0x2028, 0x2029)}
+
+
+def jsonld_text(data: Mapping[str, Any]) -> str:
+    """`data` as JSON safe inside `<script type="application/ld+json">`: markup characters
+    are escaped, so the text cannot close the element or open another."""
+    return json.dumps(data, ensure_ascii=False).translate(_JSONLD_ESCAPES)
+
+
+class _PlainText(HTMLParser):
+    """The text of HTML with entities decoded; script and style content is dropped."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self._skip = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"script", "style"}:
+            self._skip += 1
+        else:
+            self.parts.append(" ")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style"}:
+            self._skip = max(0, self._skip - 1)
+        self.parts.append(" ")
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip:
+            self.parts.append(data)
+
+
+def plain_description(html: str) -> str:
+    """A rich-text description as one line of plain text, for structured data."""
+    parser = _PlainText()
+    parser.feed(html)
+    parser.close()
+    return " ".join("".join(parser.parts).split())
+
+
+def https_links(urls: Iterable[object]) -> list[str]:
+    """The valid absolute `https://` links of `urls`, each once, in order (a stored value that
+    skipped validation never reaches a page)."""
+    found: list[str] = []
+    for url in urls:
+        if isinstance(url, str) and https_url_error(url) is None and url not in found:
+            found.append(url)
+    return found
+
+
+def wikidata_url(wikidata_id: str) -> str:
+    """The Wikidata page of an item ID; empty for no ID or one of the wrong format."""
+    if wikidata_id and wikidata_id_error(wikidata_id) is None:
+        return f"{WIKIDATA_ENTITY}{wikidata_id}"
+    return ""
+
+
+def brand_node_id(paths: Mapping[str, str], *, source: str, site: str) -> str:
+    """The `@id` of a brand: its listing page URL plus `#brand`. The page of the source language
+    when there is one, else the first language by code, so the id is the same whatever language
+    or vendor page asks. Empty when the brand has no public page."""
+    path = paths.get(source) or (paths[min(paths)] if paths else "")
+    return f"{site.rstrip('/')}{path}{BRAND_FRAGMENT}" if path else ""
+
+
+def brand_node(
+    *,
+    node_id: str,
+    name: str,
+    website: str = "",
+    logo_url: str = "",
+    description: str = "",
+    wikidata_id: str = "",
+    same_as: Iterable[object] = (),
+    manufacturer_id: str = "",
+) -> dict[str, Any]:
+    """The schema.org `Brand` node. `sameAs` lists the Wikidata item first, then the https
+    links; an empty value is left out."""
+    links = https_links([wikidata_url(wikidata_id), *same_as])
+    site = website if https_url_error(website) is None else ""
+    optional: dict[str, Any] = {
+        "url": site,
+        "logo": logo_url,
+        "description": description,
+        "sameAs": links,
+        "manufacturer": {"@id": manufacturer_id} if manufacturer_id else "",
+    }
+    node: dict[str, Any] = {"@type": "Brand", "@id": node_id, "name": name}
+    node.update({key: value for key, value in optional.items() if value})
+    return node
+
+
+def manufacturer_node(
+    *,
+    node_id: str,
+    legal_name: str,
+    url: str = "",
+    same_as: Iterable[object] = (),
+    country: str = "",
+    brand_ids: Sequence[str] = (),
+) -> dict[str, Any]:
+    """The schema.org `Organization` node of a brand's manufacturer, pointing at its brands."""
+    site = url if https_url_error(url) is None else ""
+    optional: dict[str, Any] = {
+        "url": site,
+        "sameAs": https_links(same_as),
+        "address": {"@type": "PostalAddress", "addressCountry": country} if country else "",
+        "brand": [{"@id": brand_id} for brand_id in brand_ids],
+    }
+    node: dict[str, Any] = {
+        "@type": "Organization",
+        "@id": node_id,
+        "name": legal_name,
+        "legalName": legal_name,
+    }
+    node.update({key: value for key, value in optional.items() if value})
+    return node
+
+
+def brand_graph(nodes: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    """The `@graph` document of a brand page."""
+    return {"@context": SCHEMA_ORG, "@graph": [dict(node) for node in nodes]}
+
+
+# --- Product structured data (CAT.7, spec 10 SEO.7)
+
+PRODUCT_FRAGMENT = "#product"
+
+
+def product_node(
+    *,
+    url: str,
+    name: str,
+    sku: str,
+    description: str = "",
+    brand_id: str = "",
+    mpn: str = "",
+    gtin: str = "",
+) -> dict[str, Any]:
+    """The schema.org `Product` node of a product page. The brand is a reference to the brand
+    page's node (CAT.20), never a copy. No `offers`: the page shows an interim net price (TAX.12
+    replaces it with the gross one) and an on-request product has none; an empty value is left
+    out."""
+    optional: dict[str, Any] = {
+        "description": description,
+        "brand": {"@id": brand_id} if brand_id else "",
+        "mpn": mpn,
+        "gtin": gtin,
+    }
+    node: dict[str, Any] = {
+        "@type": "Product",
+        "@id": f"{url}{PRODUCT_FRAGMENT}",
+        "url": url,
+        "name": name,
+        "sku": sku,
+    }
+    node.update({key: value for key, value in optional.items() if value})
+    return node

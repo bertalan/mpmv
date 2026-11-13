@@ -1,0 +1,9 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}Order {{ order_number }} was cancelled. Do not ship these items:{% endblocktranslate %}</p>
+<ul>
+{% for line in lines %}<li>{{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}</li>
+{% endfor %}</ul>
+</body>
+</html>

@@ -9,6 +9,7 @@ import time
 
 from django.db import transaction
 from django.http import Http404, HttpRequest, HttpResponse
+from django.urls import NoReverseMatch, reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_safe
 
@@ -53,7 +54,12 @@ def email_webhook(request: HttpRequest) -> HttpResponse:
 @require_safe
 def robots_view(request: HttpRequest) -> HttpResponse:
     """`/robots.txt` (SEO.8): public, no language prefix, no vendor data."""
+    forced = indexing.is_noindex(request)
+    try:
+        sitemap_url = "" if forced else request.build_absolute_uri(reverse("sitemap"))
+    except NoReverseMatch:  # the sitemaps (SEO.2) add the route
+        sitemap_url = ""
     return HttpResponse(
-        indexing.robots_txt(forced=indexing.is_noindex_forced()),
+        indexing.robots_txt(forced=forced, sitemap_url=sitemap_url),
         content_type="text/plain; charset=utf-8",
     )

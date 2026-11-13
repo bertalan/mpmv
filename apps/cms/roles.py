@@ -133,6 +133,7 @@ ADMIN_MENU_ALLOWED: frozenset[str] = frozenset(
         "images",
         "navigation",
         "blog-authors",
+        "help-texts",
         "reports",
         "settings",
         "help",

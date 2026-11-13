@@ -51,7 +51,7 @@ def test_shift_tab_under_a_wrapped_sticky_header_at_800px(
     page.set_viewport_size({"width": 800, "height": 640})
     page.goto(f"{live_server.url}/no-such-page/")
     page.wait_for_load_state("load")
-    assert page.locator(".site-nav li").count() == 4
+    assert page.locator(".site-nav li").count() == 5  # and the "Site links" item (OPS.12)
     header = page.evaluate(HEADER_HEIGHT)
     assert header > 72, f"the header should wrap at 800 px, it is {header} px high"
     # base.js measures the header once it is laid out.

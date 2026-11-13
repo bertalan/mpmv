@@ -61,7 +61,7 @@ def _save(vendor: Vendor, owner: User, field: str, html: str) -> None:
 
 @pytest.mark.parametrize("field", FIELDS)
 def test_formatting_is_kept(vendor: Vendor, owner: User, field: str) -> None:
-    link = '<a href="https://example.org/" rel="noopener noreferrer">x</a>'
+    link = '<a href="https://example.org/" rel="noopener noreferrer nofollow ugc">x</a>'
     html = f"<p><b>Bold</b> <i>it</i></p><ul><li>one</li></ul><p>{link}</p>"
     _save(vendor, owner, field, html)
     assert _stored(vendor, field) == html
@@ -108,17 +108,24 @@ def test_a_missing_id_is_refused(vendor: Vendor, owner: User) -> None:
         _save(vendor, owner, "description", '<embed embedtype="image" id="999999" alt=""/>')
 
 
-def test_own_image_and_document_work_also_in_a_subcollection(vendor: Vendor, owner: User) -> None:
+def test_own_image_works_also_in_a_subcollection(vendor: Vendor, owner: User) -> None:
     own = _collection(vendor)
     child = own.add_child(name="shop-photos")
     image = MediaImageFactory.create(collection=child)
-    doc = _document(own)
-    html = (
-        f'<embed embedtype="image" id="{image.pk}" alt="a" format="fullwidth"/>'
-        f'<p><a id="{doc.pk}" linktype="document">terms</a></p>'  # type: ignore[attr-defined]
-    )
+    html = f'<embed embedtype="image" id="{image.pk}" alt="a" format="fullwidth"/>'
     _save(vendor, owner, "description", html)
     assert str(image.pk) in _stored(vendor, "description")
+
+
+def test_even_an_own_document_link_is_refused_until_private_storage(
+    vendor: Vendor, owner: User
+) -> None:
+    """Owner decision (ARC.15): a vendor PDF would be public by URL, so no document link at all."""
+    doc = _document(_collection(vendor))
+    link = f'<p><a id="{doc.pk}" linktype="document">terms</a></p>'  # type: ignore[attr-defined]
+    with pytest.raises(ValidationError):
+        _save(vendor, owner, "description", link)
+    assert media_problem(vendor, link) is not None
 
 
 def test_render_rechecks_the_collection_and_hides_the_text(client: Client, vendor: Vendor) -> None:
@@ -232,6 +239,9 @@ def test_the_data_migration_converts_plain_text_and_is_idempotent() -> None:
         row.shipping_policy,
         row.cancellation_policy,
     )
+    # Leave the shared test database at the latest schema for the tests that follow.
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
     assert again.source_hash == row.source_hash
     assert not VendorTranslation.objects.get(pk=it.pk).is_stale
 
