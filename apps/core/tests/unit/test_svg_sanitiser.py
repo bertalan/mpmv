@@ -170,7 +170,7 @@ def test_the_output_uses_the_default_svg_namespace() -> None:
 # --- Resource limits (lane-a security review of THM.12)
 
 
-def _best_of(run: Callable[[], object], repeats: int = 5) -> float:
+def _best_of(run: Callable[[], object], repeats: int = 9) -> float:
     best = float("inf")
     for _ in range(repeats):
         started = time.perf_counter()
@@ -180,10 +180,12 @@ def _best_of(run: Callable[[], object], repeats: int = 5) -> float:
 
 
 def assert_scales_linearly(make_document: Callable[[int], str], n: int) -> None:
-    """Time the strip on sizes n and 4n (best of 5 each, so load spikes drop out) and assert the
-    ratio is at most 8: linear work gives about 4, quadratic about 16. Unlike counting calls, this
-    also catches quadratic work done inside the C regex or XML engines. Choose n so that the n run
-    takes about 20 ms or more, which keeps timer noise small."""
+    """Time the strip on sizes n and 4n (best of 9 each, so load spikes drop out) and assert the
+    ratio is at most 10. Linear work gives about 4 (up to about 8 under cache and allocator noise
+    on a shared CI runner, seen once at 8.1), quadratic gives 16, so 10 keeps a clear gap on both
+    sides. MAX_SVG_BYTES caps 4n, so the n run cannot be made much longer than 20 ms; that is why
+    the limit is not tighter. Unlike counting calls, this also catches quadratic work done inside
+    the C regex or XML engines. Choose the largest n for which 4n still fits MAX_SVG_BYTES."""
     small, large = make_document(n).encode(), make_document(4 * n).encode()
     assert len(large) < MAX_SVG_BYTES
 
@@ -195,11 +197,11 @@ def assert_scales_linearly(make_document: Callable[[int], str], n: int) -> None:
         return run
 
     t_small, t_large = _best_of(strip(small)), _best_of(strip(large))
-    assert t_large <= 8 * t_small, f"4n took {t_large / t_small:.1f}x the time of n (limit 8x)"
+    assert t_large <= 10 * t_small, f"4n took {t_large / t_small:.1f}x the time of n (limit 10x)"
 
 
 def test_many_comments_are_stripped_in_linear_time() -> None:
-    assert_scales_linearly(lambda n: f"<svg {SVG}>" + "<!---->x<g/>" * n + "</svg>", 8000)
+    assert_scales_linearly(lambda n: f"<svg {SVG}>" + "<!---->x<g/>" * n + "</svg>", 10000)
     cleaned = sanitise_svg((f"<svg {SVG}>" + "<!---->x<g/>" * 10 + "</svg>").encode()).decode()
     assert "<!--" not in cleaned
 

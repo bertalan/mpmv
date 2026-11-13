@@ -9,21 +9,26 @@ from django.http.response import HttpResponseBase
 from django.middleware.csp import get_nonce
 from django.utils.cache import patch_vary_headers
 
-from apps.core.indexing import NOINDEX, is_noindex_forced
+from apps.core.indexing import NOINDEX, is_noindex
 
 from . import page_cache
 from . import page_cache_engine as engine
 
 
 class ForceNoindexMiddleware:
-    """Defence in depth next to the proxy's header; also covers early returns and 404s."""
+    """`X-Robots-Tag: noindex` when the floor or the site's SEO setting says so.
+
+    Defence in depth next to the proxy's header; also covers early returns and 404s. The verdict
+    is read per request (no server-side page cache holds it), so a toggle change applies to the
+    next response of every page.
+    """
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponseBase:
         response = self.get_response(request)
-        if is_noindex_forced():
+        if is_noindex(request):
             response["X-Robots-Tag"] = NOINDEX
         return response
 
@@ -32,8 +37,9 @@ class PageCacheMiddleware:
     """Serve a CMS page to an anonymous visitor from the cache (SEO.6, docs/dev/page-cache.md).
 
     Listed after LocaleMiddleware (the key needs the language) and outside CSRF, authentication
-    and messages, so a hit costs no database query. Only the Wagtail routes are cached, and only
-    a response that holds nothing per request: `engine.response_skip_reason` refuses a page that
+    and messages, so a hit renders no page (only the indexing verdict query runs). Only the
+    Wagtail routes are cached, and only a response that holds nothing per request:
+    `engine.response_skip_reason` refuses a page that
     generated a CSP nonce, asked for a CSRF token, set a cookie or read the session. The CSP
     header, X-Robots-Tag, HSTS and the rest are added by the middleware around this one, for each
     request, so a hit carries a fresh nonce-less header and the current indexing state.

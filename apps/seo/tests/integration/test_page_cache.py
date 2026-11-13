@@ -12,8 +12,10 @@ from typing import Any
 import pytest
 from django.apps import apps as django_apps
 from django.core.cache import caches
+from django.db import connection
 from django.http import HttpRequest, HttpResponse
 from django.test import Client, RequestFactory, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.utils.csp import LazyNonce
 from wagtail.models import (
     Collection,
@@ -28,6 +30,7 @@ from apps.cms.services import SeedReport, seed_site
 from apps.cms.tests.factories import StandardPageFactory
 from apps.seo import page_cache
 from apps.seo.middleware import PageCacheMiddleware
+from apps.seo.models import SeoSettings
 
 pytestmark = pytest.mark.django_db
 
@@ -84,12 +87,16 @@ def test_the_second_anonymous_visit_is_served_from_the_cache(
     assert first.content == second.content
 
 
-def test_a_hit_runs_no_database_query(
-    client: Client, seeded: SeedReport, django_assert_num_queries: Any
+def test_a_hit_renders_nothing_and_reads_only_the_indexing_policy(
+    client: Client, seeded: SeedReport
 ) -> None:
+    """A hit runs no page query. The only reads left are the per-request indexing verdict of the
+    site (SEO.8 2/2: `Site` and `SeoSettings`), which the outer middleware must make every time."""
     client.get("/")
-    with django_assert_num_queries(0):
+    with CaptureQueriesContext(connection) as captured:
         assert status(client.get("/")) == "HIT"
+    for query in captured.captured_queries:
+        assert "seo_seosettings" in query["sql"] or "wagtailcore_site" in query["sql"], query["sql"]
 
 
 def test_headers_let_a_shared_cache_keep_it_but_always_revalidate(
@@ -397,6 +404,7 @@ def test_a_hit_still_carries_the_forced_noindex_header_and_meta(
 def test_an_indexable_page_is_never_served_noindex_and_back(
     client: Client, seeded: SeedReport
 ) -> None:
+    SeoSettings.objects.create(site=Site.objects.get(is_default_site=True), allow_indexing=True)
     with override_settings(FORCE_NOINDEX=False, DEMO_MODE=False):
         client.get("/")
         indexable = client.get("/")
@@ -536,3 +544,59 @@ def test_the_cache_is_bounded() -> None:
 
     assert settings.PAGE_CACHE_MAX_BYTES == 256 * 1024
     assert settings.CACHES["pagecache"]["OPTIONS"]["MAX_ENTRIES"] == 500
+
+
+# --- merge with main (2026-11): nothing per visitor reaches another visitor
+
+
+def test_two_anonymous_visitors_and_a_signed_in_user_never_share_per_request_data(
+    seeded: SeedReport,
+) -> None:
+    """The cached copy is the same for every anonymous visitor and holds no per-request data:
+    no nonce, CSRF token, flash message, account menu or user data; a signed-in user and a visitor
+    with a flash-message cookie neither read nor fill it."""
+    first, second, signed_in, flashed = Client(), Client(), Client(), Client()
+    user = UserFactory.create()
+    signed_in.force_login(user)
+    assert status(first.get("/")) == "MISS"
+    hit = second.get("/")
+    assert status(hit) == "HIT"
+    html = hit.content.decode()
+    for marker in ("nonce=", "csrfmiddlewaretoken", "site-messages", "user-tools", "data-help-url"):
+        assert marker not in html, marker
+    assert user.email not in html
+    assert "script-src" in hit["Content-Security-Policy"]
+    assert (
+        "nonce-" not in hit["Content-Security-Policy"]
+        or hit["Content-Security-Policy"] != (first.get("/")["Content-Security-Policy"])
+    )
+    # a signed-in render (account menu, CSRF token for sign-out) is never stored or served to others
+    private = signed_in.get("/")
+    assert status(private) == "BYPASS"
+    assert (
+        "csrfmiddlewaretoken" in private.content.decode()
+        or "user-tools" in private.content.decode()
+    )
+    assert status(Client().get("/")) == "HIT"
+    assert "user-tools" not in Client().get("/").content.decode()
+    # a flash message waiting in a cookie bypasses the cache both ways
+    flashed.cookies["messages"] = "x"
+    assert status(flashed.get("/")) == "BYPASS"
+    assert "site-messages" not in Client().get("/").content.decode()
+
+
+def test_switching_the_site_off_in_the_seo_panel_drops_the_cached_page(
+    client: Client, seeded: SeedReport
+) -> None:
+    setting = SeoSettings.objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )
+    with override_settings(FORCE_NOINDEX=False, DEMO_MODE=False):
+        client.get("/")
+        assert status(client.get("/")) == "HIT"
+        setting.allow_indexing = False
+        setting.save()
+        after = client.get("/")
+        assert status(after) == "MISS"
+        assert after["X-Robots-Tag"] == "noindex, nofollow"
+        assert 'content="noindex, nofollow"' in after.content.decode()

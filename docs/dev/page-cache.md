@@ -1,7 +1,7 @@
 # Anonymous page cache (SEO.6, part 1)
 
 With `MPMV_PAGE_CACHE=1` (LIVE and STAGE; off by default, enable after a STAGE soak), public CMS
-pages are served to anonymous visitors from a cache, so a hit costs no database query. Signed-in visitors never touch it. Responsive renditions and the Core Web Vitals
+pages are served to anonymous visitors from a cache, so a hit renders no page (its only queries are the per-request indexing verdict of SEO.8, which must stay fresh). Signed-in visitors never touch it. Responsive renditions and the Core Web Vitals
 budget are later parts of SEO.6.
 
 ## The hard rule

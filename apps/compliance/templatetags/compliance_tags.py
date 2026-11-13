@@ -9,6 +9,10 @@ at checkout (ORD.5), why a product cannot be shipped to `country` (its warnings 
 language of that country, owner decision 2026-11-09) and links to the warnings in the languages
 that exist, on the product page `product_url` (default: the current page). It renders nothing
 when the sale is allowed.
+
+`{% withdrawal_link %}` renders the link labelled "withdraw from contract here" (CMP.6, in the
+active language). Put it where the consumer can always find it: the footer of every page, the
+order confirmation and the customer area.
 """
 
 from typing import Any
@@ -18,7 +22,7 @@ from django.conf import settings
 from django.utils import translation
 
 from apps.catalog.models import Product
-from apps.compliance import services
+from apps.compliance import engine, services
 from apps.core.i18n import translate_path
 
 WARNINGS_ANCHOR = "#product-safety-texts"
@@ -55,3 +59,8 @@ def product_destination_notice(
         for code in check.available_languages
     ]
     return {"check": check, "links": links}
+
+
+@register.inclusion_tag("compliance/includes/withdrawal_link.html")
+def withdrawal_link() -> dict[str, Any]:
+    return {"labels": engine.withdrawal_labels(translation.get_language() or "en")}

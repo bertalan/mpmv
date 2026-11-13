@@ -79,7 +79,12 @@ def test_the_seed_builds_active_vendors_with_every_regime(demo_seed: ChangeSet) 
         profile.full_clean()
         assert ContractAcceptance.objects.filter(vendor=vendor).count() == 1
         assert {t.language for t in vendor.translations.all()} == {"en", "it"}
-        assert vendors_engine.dac7_missing(vendor.legal_identity()) == ()  # VEN.23
+        assert (
+            vendors_engine.dac7_missing(
+                vendor.legal_identity(), vendors_engine.SEEDED_NO_TIN_COUNTRIES
+            )
+            == ()
+        )  # VEN.23
     rf20 = vendors[-1]
     assert rf20.fiscal_regime == "RF20"
     assert rf20.cross_border_franchise_number.endswith("EX")
