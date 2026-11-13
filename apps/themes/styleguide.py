@@ -278,6 +278,10 @@ def sample_library() -> dict[str, Any]:
             {"label": _("Shipping, Vendor A"), "amount": "€ 9.00"},
             {"label": _("Discount"), "amount": "-€ 10.00"},
         ],
+        "summary_vehicle": _(
+            "Vehicle selected by the customer in the compatibility filter: Acme, Roadster, 2019"
+            " \u2014 compatibility declared by the vendor"
+        ),
         "summary_pending": [
             {"label": _("Subtotal"), "amount": "€ 39.00"},
             {"label": _("Shipping"), "amount": _("Calculated at the next step")},

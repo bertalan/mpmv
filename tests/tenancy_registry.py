@@ -575,6 +575,18 @@ ENDPOINTS: dict[str, Access] = {
         "compliance.review_notices permission, so a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
+    "garage_save": NoVendorData(
+        "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
+        "and the vehicle scheme; no vendor data."
+    ),
+    "garage_remove": NoVendorData(
+        "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
+        "and the vehicle scheme; no vendor data."
+    ),
+    "garage_forget": NoVendorData(
+        "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
+        "and the vehicle scheme; no vendor data."
+    ),
     "manager:platform:terminations": StaffOnly(
         "Notices of termination (CMP.5 part 4): platform data; needs the "
         "compliance.review_notices permission, so a vendor member gets 404."

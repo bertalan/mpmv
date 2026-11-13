@@ -15,6 +15,12 @@ class FitmentConfig(AppConfig):
 
         register_builtin_references()
 
+        from django.core import checks
+
+        from .checks import check_garage_cookie_settings
+
+        checks.register(check_garage_cookie_settings)
+
     audited_models = (
         "fitmentscheme",
         "fitmentlevel",
