@@ -22,7 +22,10 @@ from apps.cart.session import GUEST_CART_SESSION_KEY
 from apps.cart.tests.factories import CartFactory, CartLineFactory
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
-from apps.core.models import FeatureFlag
+from apps.core import flags
+from apps.core.audit import AuditContext
+from apps.core.models import AuditLog, FeatureFlag
+from apps.core.services import FLAG_CACHE, save_flag
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.orders.models import Order
 from apps.orders.ui import state, views
@@ -357,6 +360,27 @@ def test_place_order_runs_for_a_placeable_preview_and_shows_the_confirmation(
     assert order.number in page
     assert "Online payment is not available yet" in page
     assert state.SESSION_KEY not in client.session
+
+
+def test_a_pulled_checkout_switch_shows_the_closed_message_and_places_nothing(
+    client: Client, commission: None
+) -> None:
+    """ORD.10: the review page answers a closed kill switch in words, never a server error."""
+    cart = with_cart(client)
+    add(cart, vendor("Alpha Shop"), "100.00")
+    sign_off_details(client)
+    FLAG_CACHE.clear()
+    row = FeatureFlag.objects.get(name=flags.CHECKOUT)
+    row.state = flags.OFF
+    staff = AuditContext(
+        actor_label="staff:ops@example.com", source=AuditLog.Source.ADMIN, actor_id=7
+    )
+    save_flag(row, ctx=staff)
+    response = client.post(reverse("orders:review"))
+    FLAG_CACHE.clear()
+    assert response.status_code == 200
+    assert "We are not taking new orders right now" in response.content.decode()
+    assert not Order.objects.exists()
 
 
 def test_the_confirmation_needs_the_order_just_placed(client: Client) -> None:

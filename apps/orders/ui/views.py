@@ -39,7 +39,7 @@ from apps.core.services import consume_rate_limit
 from apps.orders import engine
 from apps.orders.checkout import build_checkout
 from apps.orders.models import Order
-from apps.orders.services import CheckoutPreview, OrderRefused, place_order
+from apps.orders.services import CheckoutClosed, CheckoutPreview, OrderRefused, place_order
 from apps.tax import engine as tax_engine
 from apps.tax import services as tax_services
 from apps.tax.models import VatValidation
@@ -397,6 +397,10 @@ def review_page(request: HttpRequest) -> HttpResponse:
         return _page(request, "orders/review.html", _review_context(request, cart, data))
     try:
         order, _changes = place_order(preview, ctx=audit_context(request))
+    except CheckoutClosed as closed:
+        # ORD.10: a kill switch is off; nothing was saved. The message names no vendor.
+        context = _review_context(request, cart, data, errors=[closed.customer_message])
+        return _page(request, "orders/review.html", context)
     except OrderRefused as refused:
         context = _review_context(request, cart, data, errors=_refusal_messages(refused))
         return _page(request, "orders/review.html", context)
