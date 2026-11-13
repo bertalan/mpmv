@@ -207,16 +207,37 @@ def _deploy_check(module: str, **extra: str) -> subprocess.CompletedProcess[str]
     )
 
 
-@pytest.mark.parametrize("module", ["mpmv.settings.live", "mpmv.settings.stage"])
-def test_deploy_check_passes(module: str) -> None:
+_BEHIND_CADDY = {
     # Behind Caddy, as in deploy/server/mpmv.env.example (CORE.5).
-    result = _deploy_check(
-        module,
-        MPMV_TRUSTED_PROXY_HEADER="X-Real-IP",
-        MPMV_TRUSTED_PROXIES="10.89.250.0/24",
-        MPMV_ADMIN_ALLOWED_NETWORKS="192.0.2.0/24",  # OPS.5
-    )
+    "MPMV_TRUSTED_PROXY_HEADER": "X-Real-IP",
+    "MPMV_TRUSTED_PROXIES": "10.89.250.0/24",
+    "MPMV_ADMIN_ALLOWED_NETWORKS": "192.0.2.0/24",  # OPS.5
+}
+
+
+def test_deploy_check_passes_on_stage() -> None:
+    """STAGE (live settings, STAGE=1, LIVE_DATA off) stays clean, payments.E004 included.
+
+    deploy/server/mpmv.env.example and deploy/ci/parity-smoke.sh run STAGE with
+    DJANGO_SETTINGS_MODULE=mpmv.settings.stage, which forces LIVE_DATA to False.
+    """
+    result = _deploy_check("mpmv.settings.stage", **_BEHIND_CADDY)
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "payments.E004" not in result.stdout + result.stderr
+
+
+def test_deploy_check_on_live_only_fails_on_unwired_transfers() -> None:
+    """LIVE_DATA is refused until the vendor transfers are wired (payments.E004, D-08).
+
+    payments.E004 is the ONLY expected issue under LIVE_DATA until PAY.3. PAY.3 sets
+    PAYMENTS_TRANSFERS_WIRED to True and must then turn this test back into a plain
+    "passes" assertion (returncode 0, no exception).
+    """
+    result = _deploy_check("mpmv.settings.live", **_BEHIND_CADDY)
+    output = result.stdout + result.stderr
+    assert result.returncode != 0, output
+    assert "payments.E004" in output
+    assert "identified 1 issue" in output, output
 
 
 def test_deploy_check_hints_that_the_admin_is_unreachable_without_networks() -> None:
