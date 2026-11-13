@@ -46,13 +46,14 @@ from apps.core.countries import OFFICIAL_LANGUAGES, InvalidCountry, normalize_co
 from apps.core.flags import TtlCache
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
-from apps.core.privacy import keyed_hash, normalise_email
+from apps.core.privacy import keyed_hash, normalise_email, suppression_digest
 from apps.core.services import (
     NoPlatformOperator,
     audit_changes,
     consume_rate_limit,
     current_operator,
     enqueue_email,
+    run_mutation,
     save_audited,
 )
 from apps.events.models import EventPage
@@ -73,6 +74,7 @@ from .models import (
     ProductRestriction,
     SafetyCase,
     StatementOfReasons,
+    SuppressedEmail,
     TransparencySubmission,
     VendorGpsrDefaults,
 )
@@ -1732,3 +1734,43 @@ def customer_terms_problems(languages: Iterable[str] | None = None) -> list[str]
             for letter in terms_clauses.missing_clauses(terms_clauses.CUSTOMER, text, language)
         ]
     return problems
+
+
+# --- Marketing suppression list (L-3, PRM.9, PRM.16)
+
+ACTION_SUPPRESSION_ADDED: Final = "compliance.suppression.added"
+SUPPRESSED_EMAIL_MODEL: Final = "compliance.suppressedemail"
+
+
+def is_suppressed(address: str) -> bool:
+    """Whether marketing mail to `address` is blocked (lookup by keyed digest; case and
+    surrounding blanks do not matter)."""
+    if not address.strip():
+        return False
+    return SuppressedEmail.objects.filter(digest=suppression_digest(address)).exists()
+
+
+def suppress_email(
+    address: str,
+    *,
+    reason: str = SuppressedEmail.Reason.UNSUBSCRIBED,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Add `address` to the suppression list. Idempotent: an address already listed changes
+    nothing and writes nothing. The audit entry carries the first 12 characters of the digest and
+    the reason, never the address."""
+    if not address.strip() or "@" not in address:
+        raise ValidationError("not an email address")
+    if reason not in SuppressedEmail.Reason.values:
+        raise ValidationError(f"unknown reason {reason!r}")
+    digest = suppression_digest(address)
+    changeset = ChangeSet()
+    if SuppressedEmail.objects.filter(digest=digest).exists():
+        return changeset
+    changeset.create(SUPPRESSED_EMAIL_MODEL, digest[:12], {"reason": reason})
+
+    def apply() -> None:
+        SuppressedEmail.objects.get_or_create(digest=digest, defaults={"reason": reason})
+
+    return run_mutation(changeset, apply, ctx=ctx, action=ACTION_SUPPRESSION_ADDED, dry_run=dry_run)

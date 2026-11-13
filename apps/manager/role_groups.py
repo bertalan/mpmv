@@ -17,6 +17,7 @@ def _permission(models: tuple[Any, Any, Any], label: str, get_model: Any) -> Any
         "core": "platformoperator",
         "vendors": "vendor",
         "manager": "platformaccess",
+        "compliance": "notice",
         "wagtailadmin": "admin",
     }[app_label]
     content_type, _ = content_type_model.objects.get_or_create(app_label=app_label, model=model)
@@ -89,22 +90,28 @@ def role_drift() -> list[str]:
 
 
 def role_conflicts() -> list[str]:
-    """Users in a role group who are vendor members or have no admin access (manager.E005)."""
+    """Users in a role group who are vendor members, customers or have no admin access (E005).
+
+    A customer is an account with orders: the assignment service refuses it, but the Django admin
+    can still put one in a role group, so the check reports it.
+    """
     from django.contrib.auth import get_user_model
     from django.db.models import Q
 
+    from apps.orders.models import Order
     from apps.vendors.models import VendorMember
 
     members = VendorMember.objects.values("user_id")
+    buyers = Order.objects.values("customer_id")
     bad = (
         get_user_model()
         .objects.filter(groups__name__in=roles.group_names())
-        .filter(Q(pk__in=members) | Q(is_staff=False, is_superuser=False))
+        .filter(Q(pk__in=members) | Q(pk__in=buyers) | Q(is_staff=False, is_superuser=False))
         .distinct()
     )
     return [
-        f"{user.get_username()} is in a platform role group but is a vendor member or has no "
-        "admin access; platform roles never mix with vendor membership"
+        f"{user.get_username()} is in a platform role group but is a vendor member, a customer "
+        "or has no admin access; platform roles never mix with vendor membership or shopping"
         for user in bad
     ]
 
@@ -130,3 +137,20 @@ def in_role_group(user: Any) -> bool:
     if not (getattr(user, "is_authenticated", False) and user.is_active):
         return False
     return bool(user.groups.filter(name__in=roles.group_names()).exists())
+
+
+def effective_roles(user: Any) -> frozenset[str]:
+    """`user_roles` plus the owner role of an owner who holds the permission directly.
+
+    The first platform owner is created with the permission itself (ARC.25, the bootstrap
+    command), not with the group; both are the owner role in the matrix. A vendor member holds
+    none (`core.services.holds_permission`).
+    """
+    from apps.core.services import holds_permission
+
+    from .roles import OWNER, PLATFORM_OWNER_PERMISSION
+
+    held = user_roles(user)
+    if OWNER not in held and holds_permission(user, PLATFORM_OWNER_PERMISSION):
+        return held | {OWNER}
+    return held
