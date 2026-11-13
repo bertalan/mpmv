@@ -146,6 +146,7 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:notices": "platform",
         "manager:platform:notice": "platform",
         "manager:platform:profile_changes": "platform",
+        "manager:platform:staff_roles": "platform",
     }
 
 
