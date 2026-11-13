@@ -1,0 +1,30 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Sales terms (VEN.35, owner only): draft and publish a new version. A published version is never
+edited: the next one replaces it as the version in force. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Sales terms" %}</h1>
+  <p class="manager-lead">{% blocktranslate with vendor=manager.vendor.display_name %}The sales terms of {{ vendor }}. Buyers read them before they pay.{% endblocktranslate %}</p>
+  {% if current %}
+    <p>{% blocktranslate with number=current.number date=current.effective_from|date:"Y-m-d" %}Version {{ number }} is in force since {{ date }}.{% endblocktranslate %}
+      <a href="{{ link }}">{% translate "Open the public page" %}</a></p>
+  {% else %}
+    <p>{% translate "No version is published yet. Until you publish one, your products are sold on request only." %}</p>
+  {% endif %}
+  <h2>{% translate "Publish a new version" %}</h2>
+  <p>{% translate "Publishing adds a new version and puts it in force. Orders already placed keep the version they were placed under." %}</p>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" action="{% url 'manager:shop:sales_terms' %}" class="manager-form" novalidate>
+    {% csrf_token %}
+    {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% include "components/button.html" with label=_("Publish") type="submit" only %}
+  </form>
+  <h2>{% translate "Standard clause on applicable law and court" %}</h2>
+  <p>{{ template_clause }}</p>
+  <h2>{% translate "Versions" %}</h2>
+  <ul>
+    {% for version in versions %}<li>{% blocktranslate with number=version.number date=version.effective_from|date:"Y-m-d" %}Version {{ number }}, {{ date }}{% endblocktranslate %}{% if current and version.pk == current.pk %} ({% translate "in force" %}){% endif %}</li>{% endfor %}
+  </ul>
+{% endblock %}

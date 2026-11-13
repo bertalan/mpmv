@@ -19,6 +19,8 @@ class VendorsConfig(AppConfig):
         "crossvendorconsent",
         "vendorplan",
         "commissionrule",
+        "salestermsversion",
+        "salestermsinforce",
         "notincountry",
     )
     unaudited_models = {
