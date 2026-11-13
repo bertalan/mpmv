@@ -59,7 +59,7 @@ def test_a_user_without_a_second_factor_is_sent_to_enrolment(client: Client) -> 
 def test_anonymous_visitors_are_sent_to_login(client: Client) -> None:
     response = client.get(reverse("test-sensitive"))
     assert response.status_code == 302
-    assert "/django-admin/login/" in response["Location"]
+    assert urlsplit(response["Location"]).path == "/account/login/"
 
 
 def test_the_verify_page_accepts_a_new_verification_when_already_verified(
@@ -70,3 +70,18 @@ def test_the_verify_page_accepts_a_new_verification_when_already_verified(
     response = client.post(reverse("mfa:verify"), {"method": "totp", "token": totp_token(device)})
     assert response.status_code == 302
     assert client.get(reverse("test-very-sensitive")).status_code == 200
+
+
+def test_a_post_turned_away_by_step_up_returns_to_the_referer(client: Client) -> None:
+    user = UserFactory.create(staff=True)
+    verified_login(client, user, verified_at=time.time() - 3600)
+    response = client.post(
+        reverse("test-sensitive"), {}, headers={"Referer": "http://testserver/django-admin/"}
+    )
+    parts = urlsplit(response["Location"])
+    assert parts.path == reverse("mfa:verify")
+    assert parse_qs(parts.query)["next"] == ["/django-admin/"]
+    hostile = client.post(
+        reverse("test-sensitive"), {}, headers={"Referer": "https://evil.example/"}
+    )
+    assert parse_qs(urlsplit(hostile["Location"]).query)["next"] == ["/"]

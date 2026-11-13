@@ -104,8 +104,9 @@ def display_unit_price(
     """The net unit price shown in the cart: the variant's override, else the product's price;
     None when the product is not for sale (its price is never public, CAT.14 / Q-31).
 
-    Sale prices are not applied yet: the catalog has no rule for a sale on a variant with an
-    override. The checkout (ORD.3) prices lines with the rule the owner confirms.
+    Sale prices are not applied here yet. The rule is decided (owner, 2026-11-11): a variant's
+    price override wins over the product's sale, so a sale never reaches an overridden variant
+    (`catalog.engine.SALE_APPLIES_TO_OVERRIDDEN_VARIANT`, CMP.6). The checkout (ORD.3) follows it.
     """
     if sales_mode != BUY:
         return None

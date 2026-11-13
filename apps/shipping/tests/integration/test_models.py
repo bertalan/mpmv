@@ -340,14 +340,12 @@ def test_method_keys_are_unique_per_vendor_and_zone() -> None:
 
 
 def test_the_vat_treatment_is_stored_per_method() -> None:
-    # SHP.12 "Done when": stored only; TAX.4 applies it (D-03 is open).
+    # TAX.17 (D-03 decided): shipping VAT always follows the goods; nothing else is accepted.
     method = ShippingMethodFactory.create()
     assert method.tax_treatment == engine.FOLLOWS_GOODS
-    exempt = ShippingMethodFactory.create(tax_treatment=engine.EXEMPT, vendor=method.vendor)
-    exempt.refresh_from_db()
-    assert exempt.tax_treatment == "exempt"
-    with refused(), transaction.atomic():
-        ShippingMethodFactory.create(tax_treatment="force_vat")
+    for other in ("standard_rate", "exempt", "force_vat"):
+        with refused(), transaction.atomic():
+            ShippingMethodFactory.create(tax_treatment=other)
 
 
 def test_method_service_level_is_one_of_the_choices() -> None:

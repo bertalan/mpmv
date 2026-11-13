@@ -1,6 +1,7 @@
 """The theme of each Wagtail Site (spec 14 §14.3, Selection)."""
 
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from wagtail.contrib.settings.models import BaseSiteSetting
 from wagtail.models import Site
 
@@ -18,11 +19,19 @@ class ThemeSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untype
     """
 
     # Editable (Wagtail's is not), so staff pick the site on the add form.
-    site = models.OneToOneField(Site, on_delete=models.CASCADE, verbose_name="site")
+    site = models.OneToOneField(
+        Site,
+        on_delete=models.CASCADE,
+        verbose_name="site",
+        help_text=_("The site this theme is for. Each site has one theme."),
+    )
     theme = models.CharField(
         max_length=32,
         blank=True,
-        help_text="Registered theme slug; empty uses the environment default.",
+        help_text=_(
+            "The name of an installed theme. Leave it empty to use the default theme of the"
+            " environment."
+        ),
     )
 
     class Meta:

@@ -141,7 +141,7 @@ class PlatformOperatorAdmin(admin.ModelAdmin[PlatformOperator]):
         return super().changelist_view(request, extra_context)
 
     # D-32 group 2 (`operator_config`): adding a row, any POST (admin actions included) and the
-    # delete page need operational mode or "do it once"; viewing a stored row stays free.
+    # delete page need the passkey window or "do it once"; viewing a stored row stays free.
     def add_view(
         self, request: HttpRequest, form_url: str = "", extra_context: dict[str, Any] | None = None
     ) -> HttpResponse:

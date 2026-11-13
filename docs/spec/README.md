@@ -46,6 +46,7 @@ It also reviews the August 2026 rebuild plan.
 | 13 | [Migration and cutover](13-migration-cutover.md) | ETL, parity, go-live and rollback runbook |
 | 14 | [Frontend themes](14-frontend-themes.md) | Theme system, design tokens, CSP, WCAG 2.2 AA, first vertical theme |
 | 15 | [Events](15-events.md) | Event pages (promotions, trade fairs and meetings) in any site language, moderation, RSS and ICS feeds per language, maps and geocoding |
+| 17 | [Garage and fitment](17-garage-fitment.md) | D-38 (decided, P1 in slices): the customer's garage (fitment profiles), a sector-neutral fitment taxonomy, editorial make and model articles, filter over ranking, EU rules |
 | 90 | [Backlog](90-backlog.md) | All micro-tasks by phase (generated) |
 | 91 | [Estimates and plan](91-estimates.md) | Hours, schedule, phases, external costs, measured agent velocity |
 | 92 | [Open decisions](92-open-decisions.md) | 21 decisions with proposals (D-11, D-12 and D-18 decided) |

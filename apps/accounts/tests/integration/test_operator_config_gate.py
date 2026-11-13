@@ -1,4 +1,4 @@
-"""D-32 group 2: the PlatformOperator admin needs operational mode (`operator_config`)."""
+"""D-32 sensitive group: the PlatformOperator admin needs a passkey window (`operator_config`)."""
 
 import pytest
 from django.test import Client
@@ -32,17 +32,17 @@ def _client(level: str) -> Client:
     return client
 
 
-def test_restricted_session_cannot_add_a_row() -> None:
-    client = _client(levels.RESTRICTED)
+def test_no_window_session_cannot_add_a_row() -> None:
+    client = _client(levels.NO_WINDOW)
     assert client.get(reverse("admin:core_platformoperator_add")).status_code != 200
     response = client.post(reverse("admin:core_platformoperator_add"), _form())
     assert response.status_code != 302
     assert PlatformOperator.objects.count() == 0
 
 
-def test_restricted_session_cannot_post_the_changelist_or_delete() -> None:
+def test_no_window_session_cannot_post_the_changelist_or_delete() -> None:
     row = PlatformOperatorFactory.create()
-    client = _client(levels.RESTRICTED)
+    client = _client(levels.NO_WINDOW)
     changelist = reverse("admin:core_platformoperator_changelist")
     assert client.post(changelist, {"action": "delete_selected"}).status_code != 302
     delete_url = reverse("admin:core_platformoperator_delete", args=[row.pk])
@@ -50,8 +50,8 @@ def test_restricted_session_cannot_post_the_changelist_or_delete() -> None:
     assert client.get(changelist).status_code == 200  # viewing stays free
 
 
-def test_operational_session_can_add_a_row() -> None:
-    client = _client(levels.OPERATIONAL)
+def test_open_window_session_can_add_a_row() -> None:
+    client = _client(levels.PASSKEY_WINDOW)
     response = client.post(reverse("admin:core_platformoperator_add"), _form())
     assert response.status_code == 302
     assert PlatformOperator.objects.count() == 1

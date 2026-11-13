@@ -8,7 +8,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0021_audit_actor_pseudonymised"),
+        ("core", "0023_passkey_window_permission_name"),
     ]
 
     operations = [
