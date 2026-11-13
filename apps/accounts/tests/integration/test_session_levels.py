@@ -611,6 +611,7 @@ WIRED = {
     "owner_role_grant",
     "payout_details",
     "api_key",
+    "termination_notice",
     "operator_config",
     "profile_revert",
     "notice_decision",
