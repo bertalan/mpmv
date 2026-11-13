@@ -177,3 +177,30 @@ def test_without_javascript_the_settings_page_still_saves_a_choice(
         expect(page.locator("#prefs-marketing")).to_be_checked()
     finally:
         context.close()
+
+
+def test_a_visitor_without_a_decision_loads_consent_js_and_gets_the_banner(
+    page: Page, live_server: LiveServer
+) -> None:
+    loaded: list[str] = []
+    page.on("request", lambda r: loaded.append(r.url))
+    page.goto(f"{live_server.url}/")
+    expect(page.locator("#consent-banner")).to_be_visible()
+    assert any("/js/lazy/consent" in url for url in loaded), loaded
+
+
+def test_a_visitor_with_a_stored_decision_loads_no_consent_script(
+    page: Page, live_server: LiveServer
+) -> None:
+    from apps.seo import engine
+
+    cookie = engine.encode_cookie(
+        engine.ConsentState(True, frozenset(), engine.BANNER_VERSION, "0" * 32)
+    )
+    page.context.add_cookies([{"name": "mpmv_consent", "value": cookie, "url": live_server.url}])
+    loaded: list[str] = []
+    page.on("request", lambda r: loaded.append(r.url))
+    page.goto(f"{live_server.url}/")
+    expect(page.locator("#consent-banner")).to_be_hidden()
+    assert [url for url in loaded if "/js/lazy/consent" in url] == []
+    assert page.evaluate("typeof window.mpmvConsent") == "undefined"
