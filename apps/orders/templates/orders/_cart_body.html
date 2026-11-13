@@ -1,0 +1,23 @@
+{% load i18n %}<div id="cart-body">
+{% if partial %}<div id="live-region" hx-swap-oob="innerHTML">{{ status }}</div>{% endif %}
+{% if empty %}
+  {% url "home" as home_url %}{% include "components/empty_state.html" with title=_("Your cart is empty") text=_("Find something you like.") url=home_url action=_("Start shopping") only %}
+{% else %}
+  {% for message in cart_messages %}{% include "components/alert.html" with level="warning" message=message only %}{% endfor %}
+  <form method="post" action="{% url 'orders:cart' %}" hx-post="{% url 'orders:cart' %}" hx-trigger="change, submit" hx-target="#cart-body" hx-swap="outerHTML">
+    {% csrf_token %}
+    {% for package in packages %}{% include "orders/_package.html" with package=package mode="cart" %}{% endfor %}
+    <p><button type="submit" class="button button--secondary">{% translate "Update cart" %}</button></p>
+  </form>
+  {% if order %}
+    {% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=order.lines total=order.total note=order.note only %}
+  {% else %}
+    <p class="helptext">{% translate "Prices are shown without VAT. Shipping and VAT are worked out at checkout, from your delivery address." %}</p>
+  {% endif %}
+  {% if can_continue %}
+    <p>{% url "orders:checkout" as checkout_url %}{% include "components/button.html" with label=_("Continue to checkout") url=checkout_url only %}</p>
+  {% else %}
+    <p class="helptext">{% translate "Solve the points above to go on." %}</p>
+  {% endif %}
+{% endif %}
+</div>

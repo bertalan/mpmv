@@ -102,13 +102,77 @@ def test_the_password_toggle_is_a_module_without_inline_code() -> None:
     assert "aria-pressed" in text
 
 
+# An htmx partial cannot load the script itself (it is swapped into a page that already has it),
+# so it names the full page that does. The lint checks that page; nothing else is exempt.
+SCRIPT_MARKER = re.compile(r"\{# captcha-script: loaded by (\S+) #\}")
+
+
+def _captcha_script_problem(path: Path, root: Path = ROOT) -> str | None:
+    text = path.read_text(encoding="utf-8")
+    if "{% captcha_widget %}" not in text or "{% captcha_script %}" in text:
+        return None
+    marker = SCRIPT_MARKER.search(text)
+    if marker is None:
+        return f"{path.name}: captcha widget without its script"
+    parent_name = marker.group(1)
+    parents = [
+        *root.glob(f"apps/*/templates/{parent_name}"),
+        *root.glob(f"themes/*/templates/{parent_name}"),
+    ]
+    if not parents:
+        return f"{path.name}: named parent {parent_name} does not exist"
+    parent = parents[0].read_text(encoding="utf-8")
+    if "{% captcha_script %}" not in parent:
+        return f"{path.name}: parent {parent_name} does not load the captcha script"
+    if path.name not in parent:
+        return f"{path.name}: parent {parent_name} does not include the partial"
+    return None
+
+
 @pytest.mark.parametrize("path", TEMPLATE_FILES, ids=lambda p: str(p.relative_to(ROOT)))
 def test_a_page_with_the_captcha_widget_loads_its_script(path: Path) -> None:
     """Without Cloudflare's script the widget never yields a token and the form can never be
     submitted: the user would be locked out of an authentication step."""
-    text = path.read_text(encoding="utf-8")
-    if "{% captcha_widget %}" in text:
-        assert "{% captcha_script %}" in text, f"{path.name}: captcha widget without its script"
+    assert _captcha_script_problem(path) is None
+
+
+def _write(root: Path, name: str, text: str) -> Path:
+    path = root / "apps" / "demo" / "templates" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_a_partial_without_a_marker_still_fails(tmp_path: Path) -> None:
+    partial = _write(tmp_path, "demo/_part.html", "{% captcha_widget %}")
+    assert "without its script" in (_captcha_script_problem(partial, tmp_path) or "")
+
+
+def test_a_partial_passes_when_its_named_parent_loads_the_script(tmp_path: Path) -> None:
+    marker = "{# captcha-script: loaded by demo/page.html #}"
+    partial = _write(tmp_path, "demo/_part.html", marker + "{% captcha_widget %}")
+    _write(tmp_path, "demo/page.html", '{% captcha_script %}{% include "demo/_part.html" %}')
+    assert _captcha_script_problem(partial, tmp_path) is None
+
+
+def test_a_partial_fails_when_its_parent_stops_loading_the_script(tmp_path: Path) -> None:
+    marker = "{# captcha-script: loaded by demo/page.html #}"
+    partial = _write(tmp_path, "demo/_part.html", marker + "{% captcha_widget %}")
+    _write(tmp_path, "demo/page.html", '{% include "demo/_part.html" %}')
+    assert "does not load" in (_captcha_script_problem(partial, tmp_path) or "")
+
+
+def test_a_partial_fails_when_its_parent_does_not_include_it(tmp_path: Path) -> None:
+    marker = "{# captcha-script: loaded by demo/page.html #}"
+    partial = _write(tmp_path, "demo/_part.html", marker + "{% captcha_widget %}")
+    _write(tmp_path, "demo/page.html", "{% captcha_script %}")
+    assert "does not include" in (_captcha_script_problem(partial, tmp_path) or "")
+
+
+def test_a_marker_naming_a_missing_parent_fails(tmp_path: Path) -> None:
+    marker = "{# captcha-script: loaded by demo/gone.html #}"
+    partial = _write(tmp_path, "demo/_part.html", marker + "{% captcha_widget %}")
+    assert "does not exist" in (_captcha_script_problem(partial, tmp_path) or "")
 
 
 @override_settings(CAPTCHA_ENABLED=True, TURNSTILE_SITE_KEY="site-" + secrets.token_hex(4))
