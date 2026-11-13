@@ -217,22 +217,24 @@ def test_the_banner_markup_does_not_depend_on_the_visitors_choice(client: Client
 
 
 def test_a_public_page_is_byte_identical_whatever_the_consent_state(client: Client) -> None:
-    """SEO.6 page cache safety: the HTML never holds one visitor's choice or a gated script."""
-    anonymous = client.get("/")
+    """SEO.6 page cache safety: the HTML never holds one visitor's choice or a gated script.
+
+    The only per-visitor part left is the CSRF token of the language form (#300 never caches a page
+    with a form), so the token is masked before comparing.
+    """
+
+    def page(visitor: Client) -> bytes:
+        return re.sub(rb'(csrfmiddlewaretoken" value=")[^"]+', rb"\1-", visitor.get("/").content)
+
+    anonymous = page(client)
     accepted = Client()
     accepted.post("/consent/", {"action": "accept_all"}, headers=SAME_SITE)
     rejected = Client()
     rejected.post("/consent/", {"action": "reject_all"}, headers=SAME_SITE)
     forged = Client()
     forged.cookies[engine.COOKIE_NAME] = "garbage"
-    bodies = {
-        anonymous.content,
-        accepted.get("/").content,
-        rejected.get("/").content,
-        forged.get("/").content,
-    }
-    assert len(bodies) == 1
-    assert not anonymous.cookies, "a page view must not set a cookie (it would be cached)"
+    assert {anonymous, page(accepted), page(rejected), page(forged)} == {anonymous}
+    assert engine.COOKIE_NAME not in client.cookies, "a page view must not set the consent cookie"
 
 
 def test_a_gated_script_tag_is_the_same_for_every_visitor() -> None:
