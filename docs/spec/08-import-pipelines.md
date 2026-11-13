@@ -56,7 +56,7 @@ apps/ingest/
     yaml_light.py      # vendors without a website (Vendor E): content/vendors/<vendor>/prodotti/<SKU>/source.yaml
     csv_generic.py     # vendors with a CSV export
   extract/             # 5_product_extract.py, extract_utils.py, attribute_builder.py, JSON mappings
-  enrich/              # GeminiClient behind TextEnricher, prompts and policies, content_archive
+  enrich/              # provider clients (Claude, Gemini, OpenAI; see ING.14) behind TextEnricher, prompts and policies, content_archive
   images.py            # image_utility.py
   state.py             # supplier_source_state, product_change_utility, stock_state, missing/image state
   publish.py           # from staging to catalog via catalog.services.upsert_products
@@ -88,7 +88,7 @@ class SupplierAdapter(Protocol):
     def fetch(self, ref: SourceRef) -> RawObservation          # HTML, JSON, XLSX row, YAML
     def extract(self, raw: RawObservation) -> ExtractedProduct # Pydantic, validated
 
-class TextEnricher(Protocol):                                   # interchangeable AI provider
+class TextEnricher(Protocol):                                   # interchangeable AI providers (ING.14)
     def describe(self, product: ExtractedProduct, lang: str, policy: TextPolicy) -> EnrichedText
     def translate(self, text: EnrichedText, target: str) -> EnrichedText
 
@@ -149,7 +149,7 @@ Goal: a vendor with a WooCommerce website is activated **without writing code**.
 | ING.2 | Port of `state.py` (source state, change history, stock state) to Django models + existing tests | P1 | 12 | ING.1 | Current pytest suite passes on the new storage |
 | ING.3 | HTML adapter (Vendor A) + generic Store API adapter | P1 | 12 | ING.2 | Dry-run equivalent to the current one |
 | ING.4 | Port of extraction (step 5) and JSON mappings → MappingTable with FKs | P1 | 10 | ING.1, CAT.2 | Same output as step 5 on 50 sample products |
-| ING.5 | `TextEnricher` (Gemini) with policy, schema validation, version archive; EN texts only until after go-live (D-18; other languages through I18N.4 and I18N.8) | P1 | 8 | ING.1 | Out-of-policy texts end up in review |
+| ING.5 | `TextEnricher` (first provider: Gemini; the others in ING.14) with policy, schema validation, version archive; EN texts only until after go-live (D-18; other languages through I18N.4 and I18N.8) | P1 | 8 | ING.1 | Out-of-policy texts end up in review |
 | ING.6 | Images: hash → storage → rendition pipeline, cover protection | P1 | 6 | CAT.4 | Changed photos detected by hash |
 | ING.7 | `publish_drafts` via `catalog.services` with dry-run and scheduled publication | P1 | 8 | CAT.10 | Draft → published EN product in one step; an IT translation migrated by MIG.3 is kept |
 | ING.8 | `plan_stock_actions` / `plan_price_actions` + jobs and ReviewItem | P1 | 10 | ING.2 | Supplier rules (404, stale, >15%, sales) green |
@@ -158,3 +158,4 @@ Goal: a vendor with a WooCommerce website is activated **without writing code**.
 | ING.11 | Supplier review import | P2 | 4 | ING.1, CMS.6 | Reviews imported with original date |
 | ING.12 | `/api/v1` import API for external vendors (upsert, stock, prices, media) | P2 | 8 | CORE.7, CAT.10 | Sample client in dry-run |
 | ING.13 | Admin checklist and "new vendor from source" wizard | P2 | 8 | ING.9 | Demo vendor activated without code |
+| ING.14 | AI providers for enrichment (owner decision D-13, 2026-11-13): Claude, Gemini and OpenAI clients behind `TextEnricher`, with the same policy, schema validation and archive as ING.5; the operator's default provider and model in the versioned operator settings (ARC.7); a vendor may choose its own provider for its own catalogue texts with its own API key, stored encrypted with a dedicated key-encryption key separate from SECRET_KEY, with a key id and versioning so a rotation keeps old ciphertext readable and a re-encrypt job moves it (added to the SEC.3 field list), set by the vendor owner inside the passkey window (CORE.25, sensitive group) and audited on set, change and delete without the value; the key is vendor-scoped (CORE.3) and only that vendor's jobs can decrypt it, and its usage counted per vendor; a provider failure falls back to no enrichment, never to another provider with the vendor's data without its choice; AI output is never published automatically (review queue); GDPR: the payload sent to a provider is product data only, never customer or personal data; the CMP.4 sub-processor register lists each provider the operator enables; with a vendor-chosen provider the vendor is the controller and the provider its own processor, as the vendor terms say | P2 | 10 | ING.5, ARC.7, SEC.3, CORE.3, CORE.25 | The same product enriched through each of the three providers passes the same schema validation (providers mocked through our interface); a vendor key is never shown again after saving and never logged; a vendor's choice applies only to that vendor's products; a provider error leaves the text unchanged; the key is absent from API serializers, the admin (a write-only masked field), AuditLog payloads, ChangeSet and dry-run output, exceptions, job arguments and the enrichment archive; vendor B can neither read nor use vendor A's key; setting a key without a passkey window is refused; a rotation test decrypts old ciphertext and the re-encrypt job moves it; a test asserts the provider payload holds product data only |
