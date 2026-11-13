@@ -59,7 +59,7 @@ Public media (product images, Wagtail images) stays on its own path and CDN and 
 - **Upload pipeline:** SEC.2 (type sniffing, size cap, re-encoding of images, EXIF stripped).
   PDFs reuse the SEC.2 active-content check (no JavaScript, no launch or embedded-file actions,
   no XFA, encrypted PDFs refused). **Every vendor upload is then scanned by an antivirus engine
-  before acceptance** (SEC.15, scanner container OPS.12): fail closed when the scanner is down or
+  before acceptance** (SEC.15, scanner container OPS.13): fail closed when the scanner is down or
   times out; the scan result and the signature database version are recorded on the document
   version. A file that fails is never stored.
 - **Access rules** (one function, `can_read_document(user, version)`, default deny):
@@ -118,7 +118,7 @@ Public media (product images, Wagtail images) stays on its own path and CDN and 
 | Overwrite or tampering with a relied-on version | Write-once blobs, hash-addressed, DB trigger on referenced versions, restore drill verifies hashes |
 | Path traversal or direct file access | Path built only from `(vendor id, sha256)`, volume outside `MEDIA_ROOT` and outside any static root, internal-only Caddy route (not reachable by a client) |
 | Bearer URL in phase 2 skipping our audit | TTL of 60 seconds or less, issue-time audit, bucket private with no public policy, access keys scoped to one bucket |
-| Scanner bypass (malware accepted when the engine is down, skipped or outdated) | Fail closed: no scan result, no acceptance; no code path stores a file without a recorded result; signature version stored per version; stale signatures alert (OPS.12); on-demand rescan of stored versions after an update |
+| Scanner bypass (malware accepted when the engine is down, skipped or outdated) | Fail closed: no scan result, no acceptance; no code path stores a file without a recorded result; signature version stored per version; stale signatures alert (OPS.13); on-demand rescan of stored versions after an update |
 | Denial of service by large files, zip bombs or slow-scan files | Size cap before the scan, archive limits (depth, entry count, expanded size) refused rather than expanded, scan timeout (30 s), scanner container memory and CPU limits, upload rate limits per vendor, scanner isolated from the app's resources |
 | Scanner compromise through a crafted file | Own container, read-only root filesystem, no network except the private socket, no access to the document store or secrets, signatures volume only |
 | Customer privacy in the audit trail | Pseudonymised reader, no plain identifiers in `AuditLog` |
@@ -142,7 +142,7 @@ Public media (product images, Wagtail images) stays on its own path and CDN and 
 - **Backend:** local private backend on the server first; object storage later behind the same
   interface (owner).
 - **Antivirus from phase 1** (owner): a ClamAV-class scanner in its own container with its own
-  Quadlet unit (OPS.12, lane-a deploys it on STAGE); every vendor upload is scanned before
+  Quadlet unit (OPS.13, lane-a deploys it on STAGE); every vendor upload is scanned before
   acceptance (SEC.15); fail closed when the scanner is down or times out; signatures update
   automatically; scan result and signature version are recorded with the document version.
 - **Customer visibility** (owner): the vendor marks documents customer-visible; the platform can
