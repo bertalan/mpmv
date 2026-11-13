@@ -249,3 +249,83 @@ class WithdrawalLookupForm(forms.Form):
             "confirmation of your withdrawal is sent there. Required."
         ),
     )
+
+
+class TerminationForm(forms.Form):
+    """Staff give a vendor notice that its whole service ends (P2B art. 4, CMP.5 part 4)."""
+
+    vendor = forms.ChoiceField(
+        label=_("Vendor"),
+        help_text=_("Only vendors that are active or suspended can be given notice."),
+    )
+    facts = forms.CharField(
+        label=_("Facts and circumstances"),
+        widget=forms.Textarea(attrs={"rows": 4}),
+        help_text=_("Sent to the vendor as the reason for the termination."),
+    )
+    ground = forms.CharField(
+        label=_("Ground"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text=_("The legal ground or the term of the platform terms the decision rests on."),
+    )
+    exception = forms.ChoiceField(
+        label=_("Shorter notice because"),
+        required=False,
+        choices=[
+            ("", _("None: the full notice of at least 30 days")),
+            ("legal_obligation", _("A legal or regulatory obligation")),
+            ("repeated_infringement", _("Repeated infringements of the platform terms")),
+            ("illegal_content", _("Illegal content")),
+        ],
+        help_text=_(
+            "Leave on the first choice unless one of these applies: it allows a shorter notice."
+        ),
+    )
+    effective_on = forms.DateField(
+        label=_("The service ends on"),
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+        help_text=_(
+            "Leave empty for the shortest allowed date. Without an exception it cannot be "
+            "less than 30 days ahead."
+        ),
+    )
+
+    transparency_explanation = forms.CharField(
+        label=_("Public explanation"),
+        required=False,
+        max_length=2000,
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text=_(
+            "Published in the EU transparency database: no names, emails, web addresses or "
+            "phone numbers. Leave empty for the standard text."
+        ),
+    )
+
+    def __init__(self, *args: Any, vendors: Any = (), **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["vendor"].choices = [  # type: ignore[attr-defined]
+            (str(v.public_id), v.display_name) for v in vendors
+        ]
+
+
+class WithdrawTerminationForm(forms.Form):
+    """Staff withdraw a pending notice of termination."""
+
+    reason = forms.CharField(
+        label=_("Reason"),
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text=_(
+            "Shared with the vendor: it is sent in the email that says its service goes on."
+        ),
+    )
+
+
+class FreezeReviewForm(forms.Form):
+    """The owner records that the frozen orders and payouts of a terminated vendor were reviewed."""
+
+    note = forms.CharField(
+        label=_("Review note"),
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text=_("Kept with the notice, not shown to the vendor. Ends the payout freeze."),
+    )

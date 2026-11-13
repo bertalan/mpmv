@@ -187,6 +187,7 @@ def _deploy_check(module: str, **extra: str) -> subprocess.CompletedProcess[str]
         **inherited,
         "DJANGO_SETTINGS_MODULE": module,
         "DJANGO_SECRET_KEY": secrets.token_urlsafe(64),
+        "MPMV_PRIVACY_PEPPER": secrets.token_urlsafe(32),
         "DJANGO_ALLOWED_HOSTS": "shop.example.com",
         "DATABASE_URL": "postgres://mpmv@127.0.0.1:55432/mpmv",
         "MPMV_BASE_URL": "https://shop.example.com",

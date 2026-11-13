@@ -9,7 +9,7 @@ import datetime as dt
 import hashlib
 import logging
 from collections.abc import Callable, Collection, Mapping
-from typing import Any
+from typing import Any, Protocol
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -3708,3 +3708,56 @@ def confirmable_logo_entry_ids(entries: Collection[AuditLog]) -> set[str]:
         )
     )
     return {k for k, v in wanted.items() if k not in done and v in existing}
+
+
+# --- The sales mode buyers get (VEN.6, D-19)
+#
+# Read at request time from the vendor and its payout account, so existing vendors, new vendors
+# and vendors that never start onboarding are covered without a backfill. The account row lives
+# in `payments` (above vendors in the app graph), so it is reached only through the reverse
+# relation `connected_account`, never imported. Every storefront and checkout decision uses these
+# helpers: the product page, the price filter, the product cards, the cart and the checkout.
+
+PAYOUT_ACCOUNT_STATUS = "connected_account__status"
+
+
+class SoldProduct(Protocol):
+    @property
+    def sales_mode(self) -> str: ...
+
+    @property
+    def vendor(self) -> Vendor: ...
+
+
+def payout_ready(vendor: Vendor) -> bool:
+    """Whether the vendor has a payout account ready for payouts (D-19).
+
+    One query unless `connected_account` was selected with the vendor; a vendor without an
+    account row is not ready."""
+    account = getattr(vendor, "connected_account", None)
+    return account is not None and account.status == engine.PAYOUT_ACCOUNT_READY
+
+
+def vendor_sales_mode(vendor: Vendor) -> str:
+    """The vendor-level mode buyers get: on request without a ready payout account."""
+    return engine.vendor_sales_mode(vendor.sales_mode_default, payout_ready=payout_ready(vendor))
+
+
+def effective_sales_mode(product: SoldProduct) -> str:
+    """The sales mode of `product` as buyers get it: the vendor's on-request mode (chosen, or
+    forced because no payout account is ready) overrides a product set to `buy`."""
+    vendor = product.vendor
+    return engine.effective_sales_mode(
+        product.sales_mode, vendor.sales_mode_default, payout_ready=payout_ready(vendor)
+    )
+
+
+def sells_online(prefix: str = "") -> Q:
+    """The queryset condition for vendors that sell online: a join on the one-to-one payout
+    account, no per-row Python. `prefix` is the path to the vendor, for example "vendor__"."""
+    return Q(
+        **{
+            f"{prefix}sales_mode_default": Vendor.SalesMode.BUY,
+            f"{prefix}{PAYOUT_ACCOUNT_STATUS}": engine.PAYOUT_ACCOUNT_READY,
+        }
+    )

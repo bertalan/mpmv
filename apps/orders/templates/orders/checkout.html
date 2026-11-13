@@ -1,0 +1,33 @@
+{% extends "layouts/base.html" %}
+{% load i18n captcha %}
+{% block title %}{% translate "Checkout" %} · {{ site_name }}{% endblock %}
+{% block head %}{% robots_meta "noindex, nofollow" %}
+{% captcha_script %}{% endblock %}
+{% block content %}
+<article class="checkout">
+  <h1>{% translate "Your details" %}</h1>
+  {% include "components/step_indicator.html" with steps=steps current=current_step only %}
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" action="{% url 'orders:checkout' %}" novalidate>
+    {% csrf_token %}
+    <h2>{% translate "Delivery" %}</h2>
+    {% include "components/field.html" with field=form.email only %}
+    {% include "components/field.html" with field=form.full_name only %}
+    {% include "components/field.html" with field=form.line1 only %}
+    {% include "components/field.html" with field=form.line2 only %}
+    {% include "components/field.html" with field=form.postcode only %}
+    {% include "components/field.html" with field=form.city only %}
+    {% include "components/field.html" with field=form.state only %}
+    {% include "components/field.html" with field=form.country only %}
+    <h2>{% translate "Business purchase" %}</h2>
+    {% include "components/field.html" with field=form.is_business only %}
+    <div class="checkout-business">
+      {% include "components/field.html" with field=form.company only %}
+      {% include "components/field.html" with field=form.vat_id only %}
+    </div>
+    {% captcha_widget %}
+    {% include "components/button.html" with label=_("Continue to review") type="submit" only %}
+  </form>
+  <p class="helptext">{% translate "We use your details only to deliver your order and to issue the invoices of the vendors you buy from." %}</p>
+</article>
+{% endblock %}

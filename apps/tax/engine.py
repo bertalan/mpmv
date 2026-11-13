@@ -4,14 +4,14 @@ workflow, and the rules of the VIES check (TAX.5). No ORM.
 This module holds the vocabulary of the tax configuration and the consistency rules of its
 rows, and the goods tax decision (`resolve_goods_tax`, TAX.3, decision D-01: B2C goods are
 taxed in the delivery country). The shipping tax decision is TAX.4: shipping always follows the
-goods (D-03, TAX.17). D-02 (Northern Ireland) is open: nothing here decides it, and a sale to
-Northern Ireland is blocked (`UnresolvedTerritory`).
+goods (D-03, TAX.17). Northern Ireland follows the EU goods rules (D-02, TAX.18:
+`is_northern_ireland`, `_resolve_northern_ireland`).
 """
 
 import datetime as dt
 import re
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Final, Literal, Protocol
 
@@ -544,7 +544,11 @@ VAT_RESULTS: Final = (VAT_VALID, VAT_INVALID, VAT_UNAVAILABLE)
 # state's service down, too slow, an answer about another number, a prefix that is not the
 # country's) leaves the number not verified and VAT is charged.
 
-VIES_COUNTRIES: Final = EU_MEMBER_STATES  # ISO codes; Northern Ireland (XI) waits for D-02
+# D-02: Northern Ireland (code XI) is not an ISO country. Its VAT numbers are not checked in VIES
+# yet: `VatValidation` cannot store an `XI` row (TAX.19), so the check is "not in VIES" and fails
+# closed.
+NORTHERN_IRELAND_CODE: Final = "XI"
+VIES_COUNTRIES: Final = EU_MEMBER_STATES
 # Countries whose national number may itself start with two letters (the French key), so two
 # leading letters other than the prefix are not a sign of another country's number there.
 NUMBER_MAY_START_WITH_LETTERS: Final = frozenset({"FR"})
@@ -780,9 +784,10 @@ TaxReason = Literal[
     "outside_vat_territory",
 ]
 
-# D-02 (Northern Ireland) is open: `XI`, and GB with a `BT` postcode, block the sale.
-NORTHERN_IRELAND_CODE: Final = "XI"
-NORTHERN_IRELAND_POSTCODE_PREFIX: Final = "BT"
+# D-02 (decided 2026-11-11, TAX.18): a delivery to GB whose normalised postcode matches
+# `^BT[0-9]` is jurisdiction `XI` and follows the EU rules for goods.
+_NORTHERN_IRELAND_POSTCODE = re.compile(r"BT[0-9]", re.ASCII)
+INTRASTAT_NORTHERN_IRELAND: Final = "XI"
 
 # Keys of the legal wording on the order document (the texts live in the CMS and the profile).
 NOTE_REVERSE_CHARGE: Final = "reverse_charge_art196"  # Directive 2006/112/EC art. 196
@@ -812,7 +817,7 @@ class IncompleteTaxProfile(BlockingTaxError, ValueError):
 
 class UnresolvedTerritory(BlockingTaxError):
     """The address (or the vendor) lies in a territory whose VAT treatment is not decided or
-    not supported: Northern Ireland (D-02 open), a `special` territory, a vendor established
+    not supported: a `special` territory, a vendor established
     in a territory with its own rates or outside the VAT area."""
 
 
@@ -896,6 +901,7 @@ class TaxDecision:
     country_of_taxation: str | None
     legal_note_key: str | None  # text on the order document
     nature_code: str | None = None  # Italian e-invoice nature (N1-N7), None when taxed
+    intrastat_country: str | None = None  # Intrastat member-state code when not the country (XI)
 
 
 def _zero(reason: TaxReason, note: str | None, nature: str | None = None) -> TaxDecision:
@@ -939,8 +945,8 @@ def resolve_goods_tax(ctx: TaxContext, category: FiscalCategory) -> TaxDecision:
     if profile.regime == EXEMPT:
         return _exempt(profile, vendor_country=ctx.vendor_country)
 
-    if _is_northern_ireland(ctx.destination_country, ctx.destination_postcode):
-        raise UnresolvedTerritory("sales to Northern Ireland are blocked until D-02 is decided")
+    if is_northern_ireland(ctx.destination_country, ctx.destination_postcode):
+        return _resolve_northern_ireland(ctx, category)
     destination = normalize_country(ctx.destination_country)
     vendor_country = normalize_country(ctx.vendor_country)
     territory = find_territory(destination, ctx.destination_postcode or "", ctx.territories)
@@ -988,12 +994,53 @@ def resolve_goods_tax(ctx: TaxContext, category: FiscalCategory) -> TaxDecision:
     return _taxed(ctx.rates.rate(rate_code, category), REASON_STANDARD_DESTINATION, destination)
 
 
-def _is_northern_ireland(country: str, postcode: str | None) -> bool:
-    code = country.strip().upper()
-    if code == NORTHERN_IRELAND_CODE:
-        return True
-    return code in ("GB", "UK") and normalize_postcode(postcode or "").startswith(
-        NORTHERN_IRELAND_POSTCODE_PREFIX
+def is_northern_ireland(country: str, postcode: str | None) -> bool:
+    """True for an address in Great Britain whose normalised postcode matches `^BT[0-9]` (D-02).
+    `XI` is not a country of an address: it names the jurisdiction this returns True for."""
+    try:
+        code = normalize_country(country)
+    except InvalidCountry:
+        return False
+    return (
+        code == "GB"
+        and _NORTHERN_IRELAND_POSTCODE.match(normalize_postcode(postcode or "")) is not None
+    )
+
+
+def _resolve_northern_ireland(ctx: TaxContext, category: FiscalCategory) -> TaxDecision:
+    """Goods delivered to Northern Ireland follow the EU rules for goods (D-02, TAX.18).
+
+    A business with a VIES-valid number with prefix `XI` buys an intra-EU exempt supply (N3.2,
+    Intrastat `XI`; the vendor keeps proof of delivery).
+    A business with a number of the vendor's own country pays the vendor country's VAT (D-26).
+    Every other customer, a GB-only number included,
+    is a consumer: an EU distance sale at the vendor country's rate while the vendor is under
+    the EUR 10,000 EU threshold, and above it at the UK rate, reported through the vendor's EU OSS
+    under code `XI` with no UK registration. A vendor outside the OSS regime (the DOMESTIC profile,
+    below the threshold) charges its own country's rate. The UK rate is the `XI` rate, else the
+    `GB` rate; a missing one raises `MissingTaxRate`.
+    """
+    vendor_country = normalize_country(ctx.vendor_country)
+    customer = ctx.customer
+    if customer != "b2c" and customer.vat_country == NORTHERN_IRELAND_CODE:
+        decision = _zero(REASON_REVERSE_CHARGE, NOTE_REVERSE_CHARGE)
+        return replace(decision, intrastat_country=INTRASTAT_NORTHERN_IRELAND)
+    if customer != "b2c" and customer.vat_country == vendor_country:
+        # D-26: a number of the vendor's own country cannot take the intra-community exemption
+        # (art. 138): vendor-country VAT, as for any other delivery abroad.
+        return _taxed(
+            ctx.rates.rate(vendor_country, category),
+            REASON_DOMESTIC_VENDOR_COUNTRY,
+            vendor_country,
+        )
+    if ctx.vendor_profile.regime == OSS:
+        table = ctx.rates.rates
+        code = NORTHERN_IRELAND_CODE if (NORTHERN_IRELAND_CODE, category) in table else "GB"
+        return _taxed(
+            ctx.rates.rate(code, category), REASON_STANDARD_DESTINATION, NORTHERN_IRELAND_CODE
+        )
+    return _taxed(
+        ctx.rates.rate(vendor_country, category), REASON_DOMESTIC_VENDOR_COUNTRY, vendor_country
     )
 
 

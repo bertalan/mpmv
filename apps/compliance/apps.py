@@ -15,9 +15,11 @@ class ComplianceConfig(AppConfig):
         "countrywarninglanguages",
         "notice",
         "erasurerequest",
+        "suppressedemail",
         "statementofreasons",
         "productrestriction",
         "transparencysubmission",
+        "terminationnotice",
         "withdrawalstatement",  # CMP.6: written once, only by the audited withdrawal service
     )
 

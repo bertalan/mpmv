@@ -50,6 +50,8 @@ DEFAULT_SENSITIVE_ACTIONS: Final = frozenset(
         "audit_in_clear",
         "bulk_edit",
         "impersonation",
+        "termination_notice",  # CMP.5 part 4: give or withdraw a vendor's notice of termination
+        "operator_config",
         "profile_revert",  # CORE.9 3/3: revert an owner's storefront text or logo change
         "notice_decision",  # CMP.5: review, decide, restrict, tell the authorities
     }

@@ -52,6 +52,35 @@ class StripeRefund:
     fee_minor: int = 0  # fee on the refund's balance transaction (PAY.4 provider cost)
 
 
+@dataclass(frozen=True)
+class StripeAccount:
+    """A connected account as Stripe reports it (VEN.6). Only the fields onboarding reads."""
+
+    id: str
+    details_submitted: bool = False
+    charges_enabled: bool = False
+    payouts_enabled: bool = False
+    requirements_due: tuple[str, ...] = ()  # currently due and past due, sorted
+    disabled_reason: str = ""
+
+
+def account_from_payload(data: Mapping[str, Any]) -> StripeAccount:
+    """The `Account` object of an API answer or of an `account.updated` event."""
+    requirements = data.get("requirements") or {}
+    due = {
+        *(str(x) for x in requirements.get("currently_due") or ()),
+        *(str(x) for x in requirements.get("past_due") or ()),
+    }
+    return StripeAccount(
+        id=str(data["id"]),
+        details_submitted=bool(data.get("details_submitted")),
+        charges_enabled=bool(data.get("charges_enabled")),
+        payouts_enabled=bool(data.get("payouts_enabled")),
+        requirements_due=tuple(sorted(due)),
+        disabled_reason=str(requirements.get("disabled_reason") or ""),
+    )
+
+
 class StripeClient(Protocol):
     def create_payment_intent(
         self,
@@ -90,6 +119,19 @@ class StripeClient(Protocol):
         self, *, transfer_id: str, amount_minor: int, idempotency_key: str
     ) -> str: ...
 
+    def create_account(
+        self,
+        *,
+        country: str,
+        email: str,
+        metadata: Mapping[str, str],
+        idempotency_key: str,
+    ) -> StripeAccount: ...
+
+    def get_account(self, account_id: str) -> StripeAccount: ...
+
+    def create_account_link(self, *, account_id: str, refresh_url: str, return_url: str) -> str: ...
+
 
 Transport = Callable[[urllib.request.Request], bytes]
 
@@ -104,7 +146,7 @@ def _flatten(params: Mapping[str, Any]) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
     for key, value in params.items():
         if isinstance(value, Mapping):
-            pairs.extend((f"{key}[{inner}]", str(v)) for inner, v in value.items())
+            pairs.extend(_flatten({f"{key}[{inner}]": v for inner, v in value.items()}))
         elif isinstance(value, list | tuple):
             pairs.extend((f"{key}[]", str(v)) for v in value)
         else:
@@ -276,3 +318,40 @@ class HttpStripeClient:
             idempotency_key,
         )
         return str(data["id"])
+
+    def create_account(
+        self,
+        *,
+        country: str,
+        email: str,
+        metadata: Mapping[str, str],
+        idempotency_key: str,
+    ) -> StripeAccount:
+        params: dict[str, Any] = {
+            "type": "express",
+            "country": country.upper(),
+            "capabilities": {
+                "card_payments": {"requested": "true"},
+                "transfers": {"requested": "true"},
+            },
+            "metadata": dict(metadata),
+        }
+        if email:
+            params["email"] = email
+        return account_from_payload(self._call("POST", "/accounts", params, idempotency_key))
+
+    def get_account(self, account_id: str) -> StripeAccount:
+        return account_from_payload(self._call("GET", f"/accounts/{account_id}", {}))
+
+    def create_account_link(self, *, account_id: str, refresh_url: str, return_url: str) -> str:
+        data = self._call(
+            "POST",
+            "/account_links",
+            {
+                "account": account_id,
+                "type": "account_onboarding",
+                "refresh_url": refresh_url,
+                "return_url": return_url,
+            },
+        )
+        return str(data["url"])

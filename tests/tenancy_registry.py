@@ -62,6 +62,7 @@ from apps.compliance.models import (
     ProductRestriction,
     SafetyCase,
     StatementOfReasons,
+    TerminationNotice,
     TransparencySubmission,
     VendorGpsrDefaults,
     WithdrawalStatement,
@@ -72,6 +73,7 @@ from apps.compliance.tests.factories import (
     ProductRestrictionFactory,
     SafetyCaseFactory,
     StatementOfReasonsFactory,
+    TerminationNoticeFactory,
     TransparencySubmissionFactory,
     VendorGpsrDefaultsFactory,
     WithdrawalStatementFactory,
@@ -107,6 +109,8 @@ from apps.orders.tests.factories import (
     VendorOrderFactory,
     paid_vendor_order,
 )
+from apps.payments.models import ConnectedAccount
+from apps.payments.tests.factories import ConnectedAccountFactory
 from apps.shipping.models import (
     PickupOption,
     PickupOptionTranslation,
@@ -238,6 +242,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         product=ProductFactory.create(vendor=vendor),
         statement=StatementOfReasonsFactory.create(vendor=vendor),
     ),
+    # An applied notice: a vendor has at most one pending one, and the maker may run twice.
+    TerminationNotice: lambda vendor: TerminationNoticeFactory.create(
+        vendor=vendor, status=TerminationNotice.Status.APPLIED
+    ),
     TransparencySubmission: lambda vendor: TransparencySubmissionFactory.create(
         statement=StatementOfReasonsFactory.create(vendor=vendor)
     ),
@@ -274,6 +282,8 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     StockReservation: lambda vendor: StockReservationFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
+    # VEN.6: a vendor's connected payout account.
+    ConnectedAccount: lambda vendor: ConnectedAccountFactory.create(vendor=vendor),
     # EVT.1: a draft event page under the primary language's events index.
     EventPage: lambda vendor: EventPageFactory.create(vendor=vendor),
     VendorEventPolicy: lambda vendor: VendorEventPolicyFactory.create(vendor=vendor),
@@ -332,6 +342,13 @@ def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[s
 
 def manager_vendor(vendor: Vendor) -> Vendor:
     """The Manager's shop pages show the selected vendor itself (CORE.17)."""
+    return vendor
+
+
+def vendor_with_pending_termination(vendor: Vendor) -> Vendor:
+    """The vendor itself, with a pending notice of termination (CMP.5 part 4) if it has none."""
+    if not TerminationNotice.objects.filter(vendor=vendor, status="pending").exists():
+        TerminationNoticeFactory.create(vendor=vendor)
     return vendor
 
 
@@ -471,6 +488,7 @@ ENDPOINTS: dict[str, Access] = {
     "logout": NoVendorData("Sign-out of the Manager."),
     "manager:shop:dashboard": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:shop:profile": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:payments": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # The image chooser of the storefront editor (VEN.31): vendor B's image id is a 404 for A.
     "manager:shop:image_chosen": VendorScoped(make=vendor_image, kwargs=by_pk),
     "manager:shop:image_select_format": VendorScoped(make=vendor_image, kwargs=by_image_id),
@@ -508,6 +526,12 @@ ENDPOINTS: dict[str, Access] = {
         "(`test_staff_and_anonymous_are_refused`)."
     ),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # CMP.5 part 4: the notice of termination and the data download show the selected vendor only.
+    "manager:shop:termination": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # The download exists only while a notice is pending: the vendor made here has one.
+    "manager:shop:termination_data": VendorScopedList(
+        make=vendor_with_pending_termination, identify=vendor_display_name
+    ),
     # ORD.6: the vendor's own orders; another vendor's id is a 404 on the detail and every action.
     "manager:shop:orders": VendorScopedList(
         make=paid_vendor_order,
@@ -522,6 +546,11 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
+    ),
+    "manager:platform:staff_roles": StaffOnly(
+        "Staff and roles (CORE.18): platform owner only; lists the platform staff and grants or "
+        "revokes roles through the audited service. Every other role, a vendor member and a "
+        "superuser without a role get 404 or the gate's 403 (test_staff_roles)."
     ),
     "manager:platform:profile_changes": StaffOnly(
         "Storefront profile history (CORE.9): platform staff holding the revert permission only; "
@@ -544,6 +573,15 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:notice": StaffOnly(
         "One notice of illegal content (CMP.5): platform data, not vendor-owned; needs the "
         "compliance.review_notices permission, so a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "manager:platform:terminations": StaffOnly(
+        "Notices of termination (CMP.5 part 4): platform data; needs the "
+        "compliance.review_notices permission, so a vendor member gets 404."
+    ),
+    "manager:platform:termination": StaffOnly(
+        "One notice of termination (CMP.5 part 4): needs the compliance.review_notices "
+        "permission, so a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "subprocessors": NoVendorData(
@@ -589,6 +627,22 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "dsa_notice_received": NoVendorData(
         "Thanks page after a report (CMP.5): shows only the reference kept in the session."
+    ),
+    "orders:cart": NoVendorData(
+        "Cart page (ORD.5): shows the caller's own cart, found from their session or account, "
+        "never a cart or a vendor's data chosen by an identifier."
+    ),
+    "orders:checkout": NoVendorData(
+        "Checkout details (ORD.5): the caller's own cart and their own typed details only."
+    ),
+    "orders:review": NoVendorData(
+        "Checkout review (ORD.5): the caller's own cart and session; no identifier in the URL."
+    ),
+    "orders:shipping": NoVendorData(
+        "Shipping choice (ORD.5): stores a choice in the caller's own session for their own cart."
+    ),
+    "orders:confirmation": NoVendorData(
+        "Order confirmation (ORD.5): shows only the order the session just placed, a 404 without."
     ),
     "withdrawal": NoVendorData(
         "Online withdrawal, step one (CMP.6): no vendor data without the order number and email "

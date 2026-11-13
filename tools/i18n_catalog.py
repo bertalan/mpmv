@@ -33,6 +33,7 @@ SCOPES = (
     "apps/manager",
     "apps/accounts",
     "apps/orders/templates",
+    "apps/orders/ui",
     "apps/vendors/templates/email/vendors/profile_reverted",
     "apps/orders/customer_views.py",  # the customer area labels (ORD.7)
     "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
@@ -56,6 +57,8 @@ EXTRA_FILES = (
     "apps/vendors/services.py",
     "apps/cms/templatetags/cms_tags.py",  # the header's "Site links" item (OPS.12)
 )
+# Single Python modules scanned in full: customer-facing messages of apps that are not in SCOPES.
+FILES = ("apps/orders/messages.py",)
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
 HELP_TEXT_SCOPES = (
@@ -91,6 +94,7 @@ THEME_FILES = (
         for n in (
             "alert",
             "button",
+            "cart_line",
             "empty_state",
             "error_summary",
             "field",
@@ -99,8 +103,11 @@ THEME_FILES = (
             "help_entry",
             "icon",
             "language_switcher",
+            "order_summary",
             "pagination",
+            "quantity_stepper",
             "skip_link",
+            "step_indicator",
             "table",
             "user_tools",
         )
@@ -128,7 +135,7 @@ def _files(scopes: tuple[str, ...] = SCOPES) -> Iterator[Path]:
                 continue
             yield path
     if scopes == SCOPES:
-        for extra in EXTRA_FILES:
+        for extra in (*FILES, *EXTRA_FILES):
             yield ROOT / extra
         for name in THEME_FILES:
             yield ROOT / "themes/base/templates" / name

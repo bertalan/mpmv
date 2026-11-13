@@ -21,10 +21,13 @@ from apps.compliance.models import (
     ProductRestriction,
     SafetyCase,
     StatementOfReasons,
+    SuppressedEmail,
+    TerminationNotice,
     TransparencySubmission,
     VendorGpsrDefaults,
     WithdrawalStatement,
 )
+from apps.core.privacy import suppression_digest
 from apps.orders.tests.factories import VendorOrderFactory
 from apps.vendors.tests.factories import VendorFactory
 
@@ -154,6 +157,31 @@ class ProductRestrictionFactory(DjangoModelFactory[ProductRestriction]):
 
     product = factory.SubFactory(ProductFactory)
     statement = factory.SubFactory(StatementOfReasonsFactory)
+
+
+class TerminationNoticeFactory(DjangoModelFactory[TerminationNotice]):
+    """A pending notice of termination given now, effective in 30 days, to an active vendor."""
+
+    class Meta:
+        model = TerminationNotice
+
+    vendor = factory.SubFactory(VendorFactory, status="active")
+    facts = "The storefront keeps selling goods the terms forbid."
+    ground = "Platform terms, prohibited goods"
+    notice_days = 30
+    language = "en"
+    issued_at = factory.LazyFunction(timezone.now)
+    effective_at = factory.LazyAttribute(lambda n: n.issued_at + dt.timedelta(days=30))
+
+
+class SuppressedEmailFactory(DjangoModelFactory[SuppressedEmail]):
+    """A suppressed address, digested through the real keyed hash."""
+
+    class Meta:
+        model = SuppressedEmail
+
+    digest = factory.Sequence(lambda n: suppression_digest(f"suppressed{n}@example.com"))
+    reason = SuppressedEmail.Reason.UNSUBSCRIBED
 
 
 class WithdrawalStatementFactory(DjangoModelFactory[WithdrawalStatement]):
