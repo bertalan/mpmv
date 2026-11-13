@@ -158,11 +158,34 @@ class CatalogLoader:
 
     def _attempt(self, key: str, action: Callable[..., Any], *args: Any) -> Any:
         """Run `action` in a savepoint; a rejected record is reported and the load goes on."""
+        report = self.report
+        marks = (
+            len(self.own.changes),
+            len(report.changes.changes),
+            len(report.translation_queue),
+            len(report.held_back),
+            len(report.dropped),
+            report.skipped_existing,
+            dict(report.created),
+            {name: list(items) for name, items in report.deferred.items()},
+        )
         try:
             with transaction.atomic():
                 return action(*args)
         except (ValidationError, IntegrityError, rules.BadValue, ValueError) as error:
-            self.report.problems.append(f"{key}: {error}")
+            # The savepoint rolled the rows back: forget what was recorded about them, so the
+            # report, the ChangeSet and the audit trail only describe committed objects.
+            del self.own.changes[marks[0] :]
+            del report.changes.changes[marks[1] :]
+            del report.translation_queue[marks[2] :]
+            del report.held_back[marks[3] :]
+            del report.dropped[marks[4] :]
+            report.skipped_existing = marks[5]
+            report.created.clear()
+            report.created.update(marks[6])
+            report.deferred.clear()
+            report.deferred.update(marks[7])
+            report.problems.append(f"{key}: {error}")
             return None
 
     def _created(self, model: str, key: str, after: Mapping[str, Any]) -> None:
