@@ -26,7 +26,7 @@ from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.cms import engine
 from apps.cms.tests.factories import HelpEntryFactory
-from apps.compliance.tests.factories import NoticeFactory
+from apps.compliance.tests.factories import NoticeFactory, TerminationNoticeFactory
 from apps.manager.checks import manager_routes
 from apps.orders.tests.factories import paid_vendor_order
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
@@ -53,6 +53,7 @@ NOT_PAGES = (
     "manager:shop:order_action",
     "manager:platform:profile_revert",  # POST only, redirects to the changes page
     "manager:platform:profile_confirm",  # POST only, redirects to the changes page
+    "manager:shop:termination_data",  # a JSON file download, not a page
     *MODAL_FRAGMENTS,
 )
 
@@ -142,11 +143,15 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:profile": "shop",
         "manager:shop:orders": "shop",
         "manager:shop:order": "shop",
+        "manager:shop:payments": "shop",
         "manager:platform:dashboard": "platform",
         "manager:platform:notices": "platform",
         "manager:platform:notice": "platform",
         "manager:platform:profile_changes": "platform",
         "manager:platform:staff_roles": "platform",
+        "manager:platform:terminations": "platform",
+        "manager:platform:termination": "platform",
+        "manager:shop:termination": "shop",
     }
 
 
@@ -162,11 +167,14 @@ def _open(name: str) -> tuple[Client, str]:
                 "core.platform_owner",
                 "compliance.review_notices",
                 "vendors.revert_storefront_profile",
+                "vendors.view_all_vendors",
             ]
         )
         kwargs = {}
         if name == "manager:platform:notice":
             kwargs = {"public_id": NoticeFactory.create().public_id}
+        if name == "manager:platform:termination":
+            kwargs = {"public_id": TerminationNoticeFactory.create().public_id}
     client = Client()
     verified_login(client, user)  # type: ignore[arg-type]
     return client, reverse(name, kwargs=kwargs)

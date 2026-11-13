@@ -52,7 +52,7 @@ def test_an_editor_adds_a_term_product_grid_to_the_home_page(
     TermTranslationFactory.create(
         term=term, language="en", name="Weddings", slug="weddings", status=PUBLISHED
     )
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
     for title, status in (
         ("Ceramic vase", Product.Status.PUBLISHED),
         ("Linen napkins", Product.Status.PUBLISHED),

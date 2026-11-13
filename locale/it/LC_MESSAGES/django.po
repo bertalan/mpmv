@@ -470,6 +470,15 @@ msgstr ""
 "I primi eventi di un venditore, fino a questo numero, vengono controllati prima di andare online. "
 "Esempio: 3. Obbligatorio."
 
+#: apps/manager/templates/manager/platform/terminations.html
+msgid ""
+"A vendor's service ends at least %(min_days)s days after the notice, unless one of the listed "
+"exceptions applies. The vendor keeps selling and can download its data until then."
+msgstr ""
+"Il servizio di un venditore termina almeno %(min_days)s giorni dopo il preavviso, salvo che valga "
+"una delle eccezioni elencate. Fino ad allora il venditore continua a vendere e può scaricare i "
+"propri dati."
+
 #: apps/manager/forms.py
 msgid "About the shop"
 msgstr "Informazioni sul negozio"
@@ -498,6 +507,10 @@ msgstr "Account"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Account security"
 msgstr "Sicurezza dell’account"
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Account status"
+msgstr "Stato dell’account"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Act on the content"
@@ -556,6 +569,7 @@ msgid "After"
 msgstr "Dopo"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Tutti"
@@ -664,6 +678,10 @@ msgstr "Interno, piano o altro dettaglio. Facoltativo."
 msgid "API documentation"
 msgstr "Documentazione dell'API"
 
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Applied"
+msgstr "Applicata"
+
 #: apps/cms/models.py
 msgid "applies to"
 msgstr "si applica a"
@@ -728,6 +746,10 @@ msgstr "Torna agli ordini"
 #: apps/manager/templates/manager/forbidden.html
 msgid "Back to the site"
 msgstr "Torna al sito"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Back to the terminations"
+msgstr "Torna alle cessazioni"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Back to two-factor settings"
@@ -867,6 +889,10 @@ msgstr ""
 #: apps/manager/sections.py apps/manager/templates/manager/shop/vendor_picker.html
 msgid "Choose a vendor"
 msgstr "Scegli un venditore"
+
+#: apps/manager/termination_views.py
+msgid "Choose a vendor that is active or suspended."
+msgstr "Scegli un venditore attivo o sospeso."
 
 #: apps/catalog/templates/catalog/product.html
 msgid "Choose a version"
@@ -1009,6 +1035,10 @@ msgstr ""
 "Conferma con la tua passkey per aprire una finestra passkey: copre diverse azioni sensibili di "
 "seguito. Si chiude quando esci, dopo un periodo di inattività o alla durata massima."
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Connect your payout account"
+msgstr "Collega il tuo account per i pagamenti"
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
@@ -1018,6 +1048,10 @@ msgstr "Continua"
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "Continue does not sign you in: the page it opens asks you to confirm who you are."
 msgstr "Continua non ti fa accedere: la pagina che si apre ti chiede di confermare la tua identità."
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Continue the onboarding"
+msgstr "Continua la registrazione"
 
 #: apps/orders/templates/orders/_cart_body.html
 msgid "Continue to checkout"
@@ -1129,6 +1163,10 @@ msgstr "Consegna"
 msgid "Delivery details"
 msgstr "Dati di consegna"
 
+#: apps/manager/termination_views.py
+msgid "Describe the facts relied on."
+msgstr "Descrivi i fatti su cui si basa la decisione."
+
 #: apps/cms/models.py
 msgid ""
 "Describe the main picture in a few words, for people who cannot see it. Example: 'Fresh bread on a"
@@ -1200,6 +1238,14 @@ msgstr "Fallo una volta"
 #: apps/orders/customer_views.py
 msgid "done"
 msgstr "completato"
+
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Download my data"
+msgstr "Scarica i miei dati"
+
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Download your shop profile, products and order amounts as a JSON file."
+msgstr "Scarica il profilo del negozio, i prodotti e gli importi degli ordini in un file JSON."
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Drafts"
@@ -1304,6 +1350,11 @@ msgstr ""
 "[{\"code\": \"model_year\", \"kind\": \"number\", \"required\": false, \"label\": \"Anno del "
 "modello\"}]. Lascialo vuoto se non servono. Il tipo è uno tra: text, number, boolean."
 
+#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Facts and circumstances"
+msgstr "Fatti e circostanze"
+
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Field"
 msgstr "Campo"
@@ -1317,11 +1368,13 @@ msgid "File"
 msgstr "File"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filter"
 msgstr "Filtra"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filters"
 msgstr "Filtri"
@@ -1342,6 +1395,10 @@ msgstr "Hai dimenticato le credenziali di accesso?"
 msgid "Form expired"
 msgstr "Modulo scaduto"
 
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Frozen orders and payouts"
+msgstr "Ordini e pagamenti congelati"
+
 #: apps/orders/ui/forms.py
 msgid "Full name"
 msgstr "Nome e cognome"
@@ -1361,6 +1418,18 @@ msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Give a role"
 msgstr "Assegna un ruolo"
+
+#: apps/manager/templates/manager/platform/terminations.html
+msgid "Give notice and tell the vendor"
+msgstr "Dai il preavviso e avvisa il venditore"
+
+#: apps/manager/templates/manager/platform/terminations.html
+msgid "Give notice of termination"
+msgstr "Dai il preavviso di cessazione"
+
+#: apps/manager/termination_views.py
+msgid "Give the legal ground or the term of the terms."
+msgstr "Indica la base giuridica o la clausola dei termini."
 
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Give the role"
@@ -1385,6 +1454,11 @@ msgid ""
 msgstr ""
 "La griglia mostra i prodotti in righe e colonne. La riga li mette su una sola linea che il "
 "visitatore può far scorrere di lato."
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Ground"
+msgstr "Motivo giuridico"
 
 #: apps/shipping/models.py
 msgid ""
@@ -1629,11 +1703,14 @@ msgstr ""
 
 #: apps/vendors/models.py
 msgid ""
-"How your products are sold unless a product says otherwise: buyers order and pay online, or they "
-"first send you an enquiry."
+"How your products are sold: buyers order and pay online, or they first send you an enquiry. On "
+"request applies to all your products, even those set to buy. Until your payout account is ready, "
+"your shop is on request whatever you choose."
 msgstr ""
-"Come vendi i tuoi prodotti, salvo diversa indicazione sul singolo prodotto: i clienti ordinano e "
-"pagano online, oppure ti inviano prima una richiesta."
+"Come vendi i tuoi prodotti: i clienti ordinano e pagano online, oppure ti inviano prima una "
+"richiesta. Su richiesta vale per tutti i tuoi prodotti, anche quelli impostati per l'acquisto. "
+"Finché il tuo conto per i pagamenti non è pronto, il tuo negozio è su richiesta qualunque sia la "
+"tua scelta."
 
 #: apps/orders/ui/forms.py
 msgid "I am buying for a business"
@@ -1756,6 +1833,9 @@ msgstr "Articoli"
 #: apps/seo/providers.py
 msgid "Keeps the site working: sign-in, cart and security. Always on."
 msgstr "Fa funzionare il sito: accesso, carrello e sicurezza. Sempre attivi."
+#: apps/compliance/forms.py
+msgid "Kept with the notice, not shown to the vendor. Ends the payout freeze."
+msgstr "Conservata con il preavviso, non mostrata al venditore. Termina il blocco dei pagamenti."
 
 #: themes/base/templates/components/language_switcher.html
 msgid "Language"
@@ -1768,6 +1848,14 @@ msgstr "Lingua dei testi"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "last used %(used)s"
 msgstr "ultimo uso il %(used)s"
+
+#: apps/compliance/forms.py
+msgid ""
+"Leave empty for the shortest allowed date. Without an exception it cannot be less than 30 days "
+"ahead."
+msgstr ""
+"Lascia vuoto per la data più vicina consentita. Senza eccezione non può essere meno di 30 giorni "
+"avanti."
 
 #: apps/shipping/models.py
 msgid ""
@@ -1792,6 +1880,10 @@ msgid ""
 msgstr ""
 "Lascialo vuoto per tutte le aree, oppure scegli UE o extra UE per applicare la regola a tutti i "
 "venditori con sede lì."
+
+#: apps/compliance/forms.py
+msgid "Leave on the first choice unless one of these applies: it allows a shorter notice."
+msgstr "Lascia la prima scelta, salvo che valga una di queste: consente un preavviso più breve."
 
 #: themes/base/templates/components/footer.html
 msgid "Legal"
@@ -2007,6 +2099,10 @@ msgstr "Nessuna modifica al negozio per ora."
 msgid "Nobody holds a platform role yet."
 msgstr "Nessuno ha ancora un ruolo di piattaforma."
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Not connected"
+msgstr "Non collegato"
+
 #: apps/shipping/models.py
 msgid ""
 "Not used yet at checkout: marks the method to preselect once checkout uses shipping rates. A "
@@ -2088,6 +2184,7 @@ msgid "Nothing has changed yet. Check the changes below, then confirm."
 msgstr "Non è stato ancora modificato nulla. Controlla le modifiche qui sotto, poi conferma."
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Nothing to show."
 msgstr "Niente da mostrare."
@@ -2099,6 +2196,20 @@ msgstr "Ancora niente."
 #: apps/manager/notice_views.py apps/manager/templates/manager/platform/notice_detail.html
 msgid "Notice"
 msgstr "Segnalazione"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Notice given"
+msgstr "Preavviso dato il"
+
+#: apps/manager/termination_views.py
+msgid "Notice of termination"
+msgstr "Preavviso di cessazione"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Notice period (days)"
+msgstr "Durata del preavviso (giorni)"
 
 #: apps/manager/sections.py
 msgid "Notices"
@@ -2161,6 +2272,10 @@ msgstr "attiva"
 msgid "On backorder"
 msgstr "Su ordinazione"
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "On request"
+msgstr "Su richiesta"
+
 #: apps/seo/site_links.py
 msgid "On STAGE and LIVE these may answer only from the server's own network."
 msgstr "Su STAGE e LIVE queste pagine possono rispondere solo dalla rete del server."
@@ -2198,6 +2313,14 @@ msgid "Online payment is not available yet. The items stay held for you for a sh
 msgstr ""
 "Il pagamento online non è ancora disponibile. Gli articoli restano riservati per te per un breve "
 "periodo."
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Online sale"
+msgstr "Vendita online"
+
+#: apps/manager/termination_views.py
+msgid "Only a pending notice can be withdrawn."
+msgstr "Si può ritirare solo un preavviso in corso."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -2289,6 +2412,10 @@ msgstr ""
 "Solo se hai una stabile organizzazione (una filiale o una sede fissa) diversa dalla sede legale: "
 "la sua via, senza il numero civico. Altrimenti lascia vuoto tutto l'indirizzo; se non sei sicuro, "
 "chiedi al tuo commercialista."
+
+#: apps/compliance/forms.py
+msgid "Only vendors that are active or suspended can be given notice."
+msgstr "Il preavviso si può dare solo a venditori attivi o sospesi."
 
 #: apps/events/admin_views.py
 msgid "Only when the event is hidden after a notice."
@@ -2502,6 +2629,14 @@ msgstr "Pagamento ricevuto"
 #: apps/orders/templates/email/orders/payment_confirmed/subject.txt
 msgid "Payment received for order %(order_number)s"
 msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
+
+#: apps/manager/sections.py apps/manager/templates/manager/shop/payments.html
+msgid "Payments"
+msgstr "Pagamenti"
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Payout account of %(vendor)s."
+msgstr "Account per i pagamenti di %(vendor)s."
 
 #: apps/themes/styleguide.py
 msgid "PDF or image, 5 MB at most."
@@ -2725,6 +2860,14 @@ msgstr "Provincia o stato"
 msgid "Published"
 msgstr "Pubblicati"
 
+#: apps/compliance/forms.py
+msgid ""
+"Published in the EU transparency database: no names, emails, web addresses or phone numbers. Leave"
+" empty for the standard text."
+msgstr ""
+"Pubblicata nel database di trasparenza UE: niente nomi, email, indirizzi web o numeri di telefono."
+" Lascia vuoto per il testo standard."
+
 #: apps/manager/templates/manager/shop/order.html apps/orders/templates/orders/customer_order.html
 #: themes/base/templates/components/quantity_stepper.html
 msgid "Quantity"
@@ -2750,6 +2893,7 @@ msgstr "Controllo di prontezza"
 #: apps/manager/templates/email/manager/role_self_assigned/body.txt
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/profile_changes.html
+#: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/vendors/templates/email/vendors/profile_reverted/body.html
 #: apps/vendors/templates/email/vendors/profile_reverted/body.txt
 msgid "Reason"
@@ -2771,6 +2915,10 @@ msgstr "Registra la decisione"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Record the notification"
 msgstr "Registra la comunicazione"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Record the review"
+msgstr "Registra la verifica"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Recovery code"
@@ -2892,6 +3040,10 @@ msgstr "Annullata"
 msgid "Review and pay"
 msgstr "Riepilogo e pagamento"
 
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Reviewed"
+msgstr "Verificato il"
+
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Revoke %(role)s"
 msgstr "Revoca %(role)s"
@@ -2963,6 +3115,10 @@ msgstr "Seleziona almeno una riga."
 msgid "Sell with us (vendor application)"
 msgstr "Vendi con noi (candidatura venditore)"
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Selling mode"
+msgstr "Modalità di vendita"
+
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid ""
 "Sensitive actions ask for your passkey once, or open a passkey window to cover several in a row."
@@ -2973,6 +3129,9 @@ msgstr ""
 #: apps/seo/wagtail_hooks.py
 msgid "SEO"
 msgstr "SEO"
+#: apps/compliance/forms.py
+msgid "Sent to the vendor as the reason for the termination."
+msgstr "Inviato al venditore come motivo della cessazione."
 
 #: apps/catalog/taxonomy.py
 msgid "SEO description"
@@ -2997,6 +3156,10 @@ msgstr "Configura un’app di autenticazione"
 #: apps/accounts/templates/accounts/mfa/setup.html apps/seo/site_links.py
 msgid "Set up two-factor authentication"
 msgstr "Configura la verifica in due passaggi"
+
+#: apps/compliance/forms.py
+msgid "Shared with the vendor: it is sent in the email that says its service goes on."
+msgstr "Condiviso con il venditore: è inviato nell'email che dice che il servizio prosegue."
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Ship the order"
@@ -3078,6 +3241,11 @@ msgstr "Spazio negozio: profilo del negozio"
 #: apps/seo/site_links.py
 msgid "Shops"
 msgstr "Negozi"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Shorter notice because"
+msgstr "Preavviso più breve perché"
 
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Show all"
@@ -3279,6 +3447,8 @@ msgstr "Statistiche"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 #: apps/orders/templates/orders/customer_order.html
 #: apps/orders/templates/orders/customer_orders.html
@@ -3292,6 +3462,10 @@ msgstr "stato"
 #: apps/orders/templates/orders/customer_order.html
 msgid "Status history"
 msgstr "Cronologia dello stato"
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Still needed"
+msgstr "Ancora necessario"
 
 #: apps/manager/sections.py apps/manager/templates/manager/platform/profile_changes.html
 msgid "Storefront changes"
@@ -3372,6 +3546,22 @@ msgstr ""
 #: apps/compliance/forms.py
 msgid "Tell us why you think the content is illegal. Required."
 msgstr "Spiegaci perché ritieni che il contenuto sia illegale. Obbligatorio."
+
+#: apps/manager/sections.py
+msgid "Termination notice"
+msgstr "Preavviso di cessazione"
+
+#: apps/manager/sections.py
+msgid "Terminations"
+msgstr "Cessazioni"
+
+#: apps/manager/termination_views.py
+msgid "That date is too early: the notice is at least 30 days unless an exception applies."
+msgstr "La data è troppo vicina: il preavviso è di almeno 30 giorni, salvo un’eccezione."
+
+#: apps/manager/termination_views.py
+msgid "That reason for a shorter notice is not on the list."
+msgstr "Questo motivo di preavviso più breve non è nell’elenco."
 
 #: apps/vendors/models.py
 msgid ""
@@ -3868,6 +4058,10 @@ msgstr ""
 "Il modulo è stato inviato da una pagina vecchia o scaduta. Torna indietro, ricarica la pagina e "
 "invialo di nuovo."
 
+#: apps/manager/termination_views.py
+msgid "The freeze cannot be reviewed for this notice."
+msgstr "Per questo preavviso non si può registrare la verifica del congelamento."
+
 #: apps/cms/blocks.py
 msgid ""
 "The full address of another website, for example 'https://example.com'. Fill in this or the page "
@@ -4130,6 +4324,11 @@ msgstr ""
 "La forma giuridica della tua attività, come risulta al registro delle imprese. Non sei sicuro di "
 "quale sia? Chiedi al tuo commercialista."
 
+#: apps/compliance/forms.py
+msgid "The legal ground or the term of the platform terms the decision rests on."
+msgstr ""
+"Il fondamento di legge o la clausola dei termini della piattaforma su cui si basa la decisione."
+
 #: apps/core/models.py
 msgid "The legal name of the company that runs the platform."
 msgstr "La ragione sociale dell'azienda che gestisce la piattaforma."
@@ -4373,9 +4572,17 @@ msgstr ""
 "La posizione nord-sud del luogo, un numero da -90 a 90, per esempio 45.464200. Clicca sulla mappa "
 "per compilarlo. Indica sia la latitudine sia la longitudine, oppure nessuna delle due."
 
+#: apps/manager/termination_views.py
+msgid "The notice is recorded and the vendor is told."
+msgstr "Il preavviso è registrato e il venditore ne viene informato."
+
 #: apps/manager/notice_views.py
 msgid "The notice is under review."
 msgstr "La segnalazione è in revisione."
+
+#: apps/manager/termination_views.py
+msgid "The notice is withdrawn and the vendor is told."
+msgstr "Il preavviso è ritirato e il venditore ne viene informato."
 
 #: apps/manager/notice_views.py
 msgid "The notification to the authorities is recorded."
@@ -4572,6 +4779,14 @@ msgstr ""
 #: apps/manager/forms.py
 msgid "The platform role to give to that account or to take away from it."
 msgstr "Il ruolo della piattaforma da assegnare a quell’account o da togliergli."
+
+#: apps/manager/templates/manager/shop/termination.html
+msgid ""
+"The platform will end your service on %(date)s. Until then you can keep selling and you can "
+"download your data."
+msgstr ""
+"La piattaforma terminerà il tuo servizio il %(date)s. Fino ad allora puoi continuare a vendere e "
+"puoi scaricare i tuoi dati."
 
 #: apps/vendors/admin.py
 msgid ""
@@ -4782,6 +4997,10 @@ msgstr "La richiesta non è riuscita."
 msgid "The request is too large."
 msgstr "La richiesta è troppo grande."
 
+#: apps/manager/termination_views.py
+msgid "The review is recorded and the payouts are released."
+msgstr "La verifica è registrata e i pagamenti sono sbloccati."
+
 #: apps/manager/views.py
 msgid "The role change is recorded."
 msgstr "La modifica del ruolo è registrata."
@@ -4803,6 +5022,12 @@ msgstr "L'esecuzione che ha aperto questo caso."
 #: apps/ingest/models.py
 msgid "The run's report, in plain text."
 msgstr "Il resoconto dell'esecuzione, in testo semplice."
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/termination.html
+msgid "The service ends on"
+msgstr "Il servizio termina il"
 
 #: apps/events/models.py
 msgid "The service that found the position from the address. Filled in for you."
@@ -5107,6 +5332,10 @@ msgstr ""
 " per i beni che ne hanno diritto, Libri per i libri con il regime speciale. Se non sei sicuro di "
 "quale si applichi, chiedi al tuo commercialista."
 
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "The vendor is closed. %(count)s open orders and its payouts wait for review."
+msgstr "Il venditore è chiuso. %(count)s ordini aperti e i suoi pagamenti attendono la verifica."
+
 #: apps/vendors/models.py
 msgid "The vendor profile field that must be filled in. Required: a rule needs a field."
 msgstr ""
@@ -5294,6 +5523,10 @@ msgstr "Non c'è nessun account con questa email."
 msgid "There is no help text for this page yet."
 msgstr "Per questa pagina non c’è ancora un testo di aiuto."
 
+#: apps/manager/templates/manager/shop/termination.html
+msgid "There is no termination notice for your shop."
+msgstr "Per il tuo negozio non c’è nessun preavviso di cessazione."
+
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid ""
 "This action (%(action)s) is sensitive: confirm it with your passkey, once or for a few minutes."
@@ -5348,6 +5581,10 @@ msgstr "Questo link ti è stato inviato per email. Premi Continua per aprire la 
 msgid "This needs your passkey"
 msgstr "Serve la tua passkey"
 
+#: apps/manager/termination_views.py
+msgid "This notice is not possible."
+msgstr "Questo preavviso non è possibile."
+
 #: apps/catalog/templates/catalog/product.html
 msgid "This page is not available in your language yet."
 msgstr "Questa pagina non è ancora disponibile nella tua lingua."
@@ -5363,6 +5600,10 @@ msgstr "Questo passaggio non è possibile per la segnalazione nel suo stato attu
 #: apps/manager/views.py
 msgid "This step is not possible in the order's current state."
 msgstr "Questo passaggio non è possibile nello stato attuale dell'ordine."
+
+#: apps/manager/termination_views.py
+msgid "This vendor already has a notice of termination."
+msgstr "Questo venditore ha già un preavviso di cessazione."
 
 #: apps/orders/ui/present.py
 msgid "This vendor does not ship to your address."
@@ -5563,6 +5804,10 @@ msgstr ""
 msgid "Too many attempts. Please try again later."
 msgstr "Troppi tentativi. Riprova più tardi."
 
+#: apps/manager/termination_views.py
+msgid "Too many downloads. Try again later."
+msgstr "Troppi download. Riprova più tardi."
+
 #: apps/orders/ui/views.py
 msgid "Too many requests from this address. Try again later."
 msgstr "Troppe richieste da questo indirizzo. Riprova più tardi."
@@ -5623,6 +5868,14 @@ msgstr "Togli la spunta per smettere di applicare la regola senza eliminarla."
 msgid "Untick it to switch the carrier off: an inactive carrier offers no rates at all."
 msgstr "Togli la spunta per spegnere il corriere: un corriere non attivo non offre nessuna tariffa."
 
+#: apps/manager/templates/manager/shop/payments.html
+msgid ""
+"Until your payout account is active, your products are shown in the catalog and sold on request: "
+"customers cannot add them to the cart."
+msgstr ""
+"Finché il tuo account per i pagamenti non è attivo, i tuoi prodotti compaiono nel catalogo e si "
+"vendono su richiesta: i clienti non possono aggiungerli al carrello."
+
 #: apps/cms/blocks.py
 msgid "Up to two buttons under the text. If you add none, the banner has no buttons."
 msgstr "Fino a due pulsanti sotto il testo. Se non ne aggiungi, il banner non ha pulsanti."
@@ -5681,7 +5934,9 @@ msgstr "IVA inclusa nel totale"
 msgid "VAT number"
 msgstr "Partita IVA"
 
-#: apps/manager/templates/manager/layout.html apps/manager/templates/manager/shop/dashboard.html
+#: apps/manager/templates/manager/layout.html
+#: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/dashboard.html
 msgid "Vendor"
 msgstr "Venditore"
 
@@ -5704,6 +5959,10 @@ msgstr "Verifica"
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Verify it is you"
 msgstr "Verifica la tua identità"
+
+#: apps/manager/templates/manager/layout.html themes/base/templates/components/user_tools.html
+msgid "Version"
+msgstr "Versione"
 
 #: apps/orders/ui/views.py
 msgid "VIES says this VAT number is not valid. VAT is charged on your order."
@@ -6264,6 +6523,18 @@ msgstr ""
 msgid "Wikidata item ID"
 msgstr "ID della voce Wikidata"
 
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Withdraw and tell the vendor"
+msgstr "Ritira e avvisa il venditore"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Withdraw the notice"
+msgstr "Ritira il preavviso"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Withdrawn"
+msgstr "Ritirato"
+
 #: apps/cms/blocks.py
 msgid ""
 "Write your text here. Use the toolbar for headings, bold, lists and links. A heading makes the "
@@ -6295,6 +6566,15 @@ msgstr "Hai effettuato l’accesso come %(user)s e non hai accesso a questa part
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "You are working on %(vendor)s."
 msgstr "Stai lavorando su %(vendor)s."
+
+#: apps/manager/templates/manager/shop/termination.html
+msgid ""
+"You can challenge this decision with an internal complaint (DSA article 20), out-of-court dispute "
+"settlement (DSA article 21) or a court. The platform terms say how."
+msgstr ""
+"Puoi contestare questa decisione con un reclamo interno (articolo 20 DSA), con la risoluzione "
+"extragiudiziale delle controversie (articolo 21 DSA) o davanti a un giudice. I termini della "
+"piattaforma spiegano come."
 
 #: themes/base/templates/403.html
 msgid "You do not have permission to open this page."
@@ -6365,6 +6645,9 @@ msgstr "La tua scelta resta salvata su questo dispositivo per sei mesi."
 #: apps/seo/templates/seo/consent/banner.html
 msgid "Your cookie choice was saved."
 msgstr "La tua scelta sui cookie è stata salvata."
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Your data"
+msgstr "I tuoi dati"
 
 #: apps/orders/templates/orders/checkout.html
 msgid "Your details"
@@ -6427,6 +6710,11 @@ msgstr ""
 "Il tuo codice per questa versione, per esempio 'TAZZA-ROSSA-01-L'. Obbligatorio. Deve essere "
 "diverso dal codice del prodotto e da quello di ogni altro tuo prodotto o variante: maiuscole e "
 "spazi non rendono diversi due codici."
+
+#: apps/manager/templates/manager/shop/payments.html
+msgid "Your payout account is active. Customers can buy your products online."
+msgstr ""
+"Il tuo account per i pagamenti è attivo. I clienti possono acquistare i tuoi prodotti online."
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your protection"

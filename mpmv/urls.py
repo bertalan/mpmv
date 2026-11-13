@@ -76,6 +76,7 @@ urlpatterns = [
         path("", include("apps.catalog.urls")),  # listings (CAT.8): before the CMS catch-all
         path("", include("apps.compliance.urls")),  # DSA contact points (CMP.5)
         path("", include("apps.seo.consent_urls")),  # cookie settings page (SEO.5)
+        path("", include("apps.fitment.urls")),  # anonymous garage cookie (FIT.6)
         path("", include("apps.cms.urls")),
         prefix_default_language=False,
     ),

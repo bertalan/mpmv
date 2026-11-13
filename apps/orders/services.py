@@ -20,6 +20,7 @@ from django.db import connection, transaction
 from django.db.models import Prefetch, QuerySet, Sum
 from django.utils import timezone
 from django.utils.functional import Promise
+from django.utils.module_loading import import_string
 from django.utils.text import slugify
 
 from apps.accounts.models import User
@@ -32,6 +33,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.money import CENT
 from apps.core.services import audit_changes, flag_enabled
 from apps.shipping.models import Carrier
+from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission
 
@@ -144,6 +146,7 @@ def _order_snapshot(order: Order) -> dict[str, Any]:
         "billing_country": order.billing_country,
         "shipping_country": order.shipping_country,
         "customer_tax_status": order.customer_tax_status,
+        "has_vehicle": bool(order.vehicle_snapshot),
         "goods_net": order.goods_net,
         "shipping_net": order.shipping_net,
         "tax_total": order.tax_total,
@@ -276,6 +279,7 @@ def create_order(
     customer_tax_id: str = "",
     customer_tax_status: str = "b2c",
     vat_validation: dict[str, Any] | None = None,
+    vehicle: dict[str, Any] | None = None,
     state: str = "checkout",
     legacy_wp_order_id: int | None = None,
     placed_at: dt.datetime | None = None,
@@ -326,6 +330,7 @@ def create_order(
         shipping_country=shipping_country,
         customer_tax_status=customer_tax_status,
         vat_validation=vat_validation or {},
+        vehicle_snapshot=engine.clean_vehicle_snapshot(vehicle),
         state=state,
         legacy_wp_order_id=legacy_wp_order_id,
     )
@@ -397,6 +402,18 @@ def transition_order(
     return changeset
 
 
+class OrdersFrozen(ValueError):
+    """The vendor's open orders are frozen (a termination awaiting staff review): views answer
+    with a 4xx."""
+
+
+def _orders_frozen(vendor: Vendor) -> bool:
+    """Whether a hook in `settings.ORDER_FREEZE_HOOKS` freezes the vendor's open orders. Hooks
+    are dotted paths (orders never imports the apps that freeze); a voluntary closure freezes
+    nothing."""
+    return any(import_string(path)(vendor) for path in settings.ORDER_FREEZE_HOOKS)
+
+
 def transition_vendor_order(
     sub: VendorOrder,
     target: str,
@@ -421,6 +438,10 @@ def transition_vendor_order(
                 .select_related("vendor", "order")
                 .get(pk=sub.pk)
             )
+            if _orders_frozen(locked.vendor):  # CMP.5 part 4: frozen pending staff review
+                raise OrdersFrozen(
+                    "the vendor's open orders are frozen pending staff review (termination)"
+                )
             before = _vendor_order_snapshot(locked)
             engine.check_vendor_order_transition(locked.state, target)
             if target == "shipped":
@@ -579,7 +600,12 @@ def _scrub(
             before = _scrub_snapshot(locked)
             _set_scrub_mode(mode)
             _clear_non_fiscal(locked, changeset)
-            values: dict[str, Any] = {"updated_at": stamp, "privacy_status": target}
+            # FIT.17: the vehicle is not a fiscal fact: it goes with the first scrub step.
+            values: dict[str, Any] = {
+                "updated_at": stamp,
+                "privacy_status": target,
+                "vehicle_snapshot": {},
+            }
             if target == "anonymized":
                 values.update(
                     engine.ANONYMISED_ORDER_FIELDS,
@@ -700,6 +726,9 @@ class CheckoutPreview:
     customer_tax_id: str = ""
     customer_tax_status: str = "b2c"
     vat_validation: dict[str, Any] | None = None
+    #: FIT.17: the garage vehicle active at checkout as opaque JSON (make, model, year labels);
+    #: `orders` never imports `fitment`, the checkout adapter passes what the garage shows.
+    vehicle: dict[str, Any] | None = None
     # ORD.3: every vendor package as shown (also the ones that cannot be placed), the blocking
     # messages and the totals of the ready packages. `vendors` holds the ready packages only.
     packages: Sequence[engine.PackageSummary] = ()
@@ -789,7 +818,7 @@ def _lock_live_rows(
     products = {
         p.pk: p
         for p in Product.objects.select_for_update(of=("self",))
-        .select_related("vendor")
+        .select_related("vendor__connected_account")
         .filter(pk__in=product_ids)
         .order_by("pk")
     }
@@ -831,7 +860,7 @@ def _verify(
             continue
         error = cart_engine.purchase_error(
             product_status=product.status,
-            sales_mode=product.sales_mode,
+            sales_mode=vendors_services.effective_sales_mode(product),
             vendor_status=product.vendor.status,
             is_variable=product.kind == Product.Kind.VARIABLE,
             has_variant=variant is not None,
@@ -840,7 +869,9 @@ def _verify(
             reasons.append(Refusal("unavailable", product.pk, error))
             continue
         live = cart_engine.display_unit_price(
-            product.price_net, product.sales_mode, variant.price_net_override if variant else None
+            product.price_net,
+            vendors_services.effective_sales_mode(product),
+            variant.price_net_override if variant else None,
         )
         if live != entry.expected_unit_price_net:
             reasons.append(
@@ -929,6 +960,7 @@ def place_order(
             customer_tax_id=preview.customer_tax_id,
             customer_tax_status=preview.customer_tax_status,
             vat_validation=preview.vat_validation,
+            vehicle=preview.vehicle,
             state="awaiting_payment",
             dry_run=dry_run,
             now=now,
@@ -957,7 +989,9 @@ def place_order(
 def _line_input(entry: PlaceLine, product: Product, variants: dict[int, Variant]) -> LineInput:
     variant = variants.get(entry.variant.pk) if entry.variant is not None else None
     unit_price = cart_engine.display_unit_price(
-        product.price_net, product.sales_mode, variant.price_net_override if variant else None
+        product.price_net,
+        vendors_services.effective_sales_mode(product),
+        variant.price_net_override if variant else None,
     )
     if unit_price is None:  # _verify refused anything not for sale
         raise OrderRefused([Refusal("unavailable", product.pk, "This item is not for sale.")])

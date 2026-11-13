@@ -1,0 +1,35 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Payout account (VEN.6, D-19): the owner connects the payment provider account. Until it is active
+the shop sells on request only. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Payments" %}</h1>
+  <p class="manager-lead">{% blocktranslate with vendor=manager.vendor.display_name %}Payout account of {{ vendor }}.{% endblocktranslate %}</p>
+  {% if account and account.is_active %}
+    <p class="manager-lead">{% translate "Your payout account is active. Customers can buy your products online." %}</p>
+  {% else %}
+    <p class="manager-lead">{% translate "Until your payout account is active, your products are shown in the catalog and sold on request: customers cannot add them to the cart." %}</p>
+  {% endif %}
+  <dl class="manager-facts">
+    <dt>{% translate "Account status" %}</dt>
+    <dd>{% if not account %}{% translate "Not connected" %}{% else %}{{ account.get_status_display }}{% endif %}</dd>
+    <dt>{% translate "Selling mode" %}</dt>
+    <dd>{% if sells_online %}{% translate "Online sale" %}{% else %}{% translate "On request" %}{% endif %}</dd>
+    {% if account and account.requirements_due %}
+      <dt>{% translate "Still needed" %}</dt>
+      <dd>{{ account.requirements_due|join:", " }}</dd>
+    {% endif %}
+  </dl>
+  {% if not account or not account.is_active %}
+    <form method="post">
+      {% csrf_token %}
+      {% if account %}
+        {% include "components/button.html" with label=_("Continue the onboarding") type="submit" variant="primary" only %}
+      {% else %}
+        {% include "components/button.html" with label=_("Connect your payout account") type="submit" variant="primary" only %}
+      {% endif %}
+    </form>
+  {% endif %}
+{% endblock %}

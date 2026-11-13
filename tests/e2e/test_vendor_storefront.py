@@ -47,7 +47,9 @@ def _product(title: str, vendor: Vendor, category: object) -> None:
 def test_the_italian_storefront_shows_bio_policies_and_categories(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, slug="acme", display_name="Acme")
+    vendor = VendorFactory.create(
+        status=Vendor.Status.ACTIVE, sells_online=True, slug="acme", display_name="Acme"
+    )
     for language, tagline, bio, policy in (
         ("en", "Copper since 1950", "Our English story.", "Ships in two days."),
         ("it", "Rame dal 1950", "La nostra storia.", "Spedizione in due giorni."),

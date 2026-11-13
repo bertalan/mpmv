@@ -103,7 +103,9 @@ _counter = iter(range(10_000))
 
 def listed(title: str, **kwargs: Any) -> Product:
     """A published product of an active vendor with EN and IT texts."""
-    kwargs.setdefault("vendor", VendorFactory.create(status=Vendor.Status.ACTIVE))
+    kwargs.setdefault(
+        "vendor", VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
+    )
     kwargs.setdefault("status", Product.Status.PUBLISHED)
     product: Product = ProductFactory.create(**kwargs)
     slug = f"{title.lower().replace(' ', '-')}-{next(_counter)}"
@@ -272,7 +274,9 @@ def test_a_grid_without_products_is_left_out(seeded: SeedReport, maker: Term) ->
 
 
 def test_a_vendor_grid_of_a_vendor_no_longer_active_is_left_out(seeded: SeedReport) -> None:
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, slug="acme", display_name="Acme")
+    vendor = VendorFactory.create(
+        status=Vendor.Status.ACTIVE, sells_online=True, slug="acme", display_name="Acme"
+    )
     listed("Acme bag", vendor=vendor)
     home = _home()
     home.body = [_grid("vendor", vendor)]
@@ -308,7 +312,9 @@ def test_a_brand_grid(seeded: SeedReport) -> None:
 
 
 def test_a_vendor_grid(seeded: SeedReport) -> None:
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, slug="acme", display_name="Acme")
+    vendor = VendorFactory.create(
+        status=Vendor.Status.ACTIVE, sells_online=True, slug="acme", display_name="Acme"
+    )
     listed("Acme bag", vendor=vendor)
     listed("Cup")
     html = _publish(_about(), [_grid("vendor", vendor)])
@@ -336,7 +342,7 @@ def test_the_limit_is_bounded(seeded: SeedReport, maker: Term) -> None:
 
 def test_the_grid_needs_exactly_one_source(seeded: SeedReport, maker: Term) -> None:
     block = ProductGridBlock()
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
     for source in (
         [],
         [{"type": "term", "value": maker.pk}, {"type": "vendor", "value": vendor.pk}],
@@ -403,7 +409,7 @@ def _landing_term(n: int) -> Term:
 
 def _queries_to_render(count: int, term: Term) -> int:
     for n in range(count):
-        vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+        vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
         listed(f"Bag {n}", vendor=vendor, price_net=Decimal(n + 1)).terms.add(term)
     home = _home()
     home.body = [_grid("term", term, limit=24)]
