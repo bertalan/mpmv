@@ -144,17 +144,9 @@ class PlatformOperatorAdmin(admin.ModelAdmin[PlatformOperator]):
             )
         return super().changelist_view(request, extra_context)
 
-    # D-32 group 2 (`operator_config`): adding a row, any POST (admin actions included) and the
-    # delete page need the passkey window or "do it once"; viewing a stored row stays free.
-    def add_view(
-        self, request: HttpRequest, form_url: str = "", extra_context: dict[str, Any] | None = None
-    ) -> HttpResponse:
-        gated = step_up(
-            lambda r: super(PlatformOperatorAdmin, self).add_view(r, form_url, extra_context),
-            level="operator_config",
-        )
-        return gated(request)
-
+    # D-32 group 2 (`operator_config`): any POST (adding a row, admin actions included) and the
+    # delete page need the passkey window or "do it once"; viewing a form stays free, so opening
+    # the add form does not use up a single-use grant.
     def changeform_view(
         self,
         request: HttpRequest,
@@ -167,7 +159,7 @@ class PlatformOperatorAdmin(admin.ModelAdmin[PlatformOperator]):
                 r, object_id, form_url, extra_context
             )
 
-        if object_id is None or request.method == "POST":
+        if request.method == "POST":
             return step_up(view, level="operator_config")(request)
         return view(request)
 

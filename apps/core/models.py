@@ -371,12 +371,19 @@ def official_profile_errors(urls: Any) -> list[str]:
         except ValidationError:
             errors.append(f"{text or url!r} is not an https:// link.")
             continue
-        if "@" in urlsplit(text).netloc:
+        try:
+            netloc = urlsplit(text).netloc
+        except ValueError:
+            errors.append(f"{text!r} is not an https:// link.")
+            continue
+        if "@" in netloc:
             errors.append(f"{text!r} must not contain a user name or password.")
-        elif (key := profile_key(text)) in seen:
+        elif (key := profile_key(text)) is None:
+            errors.append(f"{text!r} is not an https:// link.")
+        elif key in seen:
             errors.append(f"{text!r} is listed twice.")
         else:
-            seen.add(key or text)
+            seen.add(key)
     return errors
 
 
