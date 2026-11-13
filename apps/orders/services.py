@@ -8,6 +8,7 @@ tracking link (ORD.7).
 """
 
 import datetime as dt
+import logging
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
@@ -84,6 +85,8 @@ class VendorOrderInput:
     commission_snapshot: dict[str, Any] = field(default_factory=dict)
     tax_profile_snapshot: dict[str, Any] = field(default_factory=dict)
 
+
+logger = logging.getLogger(__name__)
 
 PAID_OR_LATER = frozenset(engine.ORDER_STATES) - engine.ORDER_INITIAL_STATES - {"cancelled"}
 # The shape of `CommissionRule.snapshot()` (VEN.2). Required keys; `promo_label` and `valid_from`
@@ -987,13 +990,20 @@ def place_order(
         notifications.notify_order_placed(order)  # ORD.9: in this transaction, not on dry run
     # The order number is final only now (it may roll back with the transaction), so the provider
     # hears about it after the commit (ORD.4).
-    order.payment_client_secret = start_payment(order, ctx=ctx)
+    # The order is committed: nothing below may raise into the caller. A closed switch or any
+    # failure leaves the order awaiting payment (the payment page asks again) and is audited.
+    try:
+        order.payment_client_secret = start_payment(order, ctx=ctx)
+    except Exception as error:
+        order.payment_client_secret = ""
+        _audit_payment_problem(
+            order.number, "orders.payment_start_failed", {"reason": type(error).__name__}, ctx
+        )
+        logger.warning("payment start failed for order %s: %s", order.number, type(error).__name__)
     return order, changeset
 
 
 # --- payment (PAY.1, PAY.2) ------------------------------------------------------------------
-
-PAYMENT_ACTOR = "webhook:payments"
 
 
 class PaymentMismatch(Exception):
@@ -1062,7 +1072,13 @@ def _audit_payment_problem(
 
 
 def mark_order_paid(
-    order_ref: str, *, amount: Decimal, currency: str, ctx: AuditContext, dry_run: bool = False
+    order_ref: str,
+    *,
+    amount: Decimal,
+    currency: str,
+    ctx: AuditContext,
+    provider_ref: str | None = None,
+    dry_run: bool = False,
 ) -> bool:
     """The provider confirmed a payment for the order numbered `order_ref` (PAY.2): move it to
     `paid`, decrement the stock it held and release the holds, all in the caller's transaction.
@@ -1070,8 +1086,9 @@ def mark_order_paid(
     Idempotent: an order already paid is left alone (False). Nothing moves, and the problem is
     audited for staff, when no order has that number, the order is no longer awaiting payment
     (a late payment on a cancelled order), or the amount or currency is not the order's gross
-    total. Returns True when the order became (or, on a dry run, would become) paid; a dry run
-    writes nothing."""
+    total, or (when `provider_ref` is given) the payment is not the one started for the order
+    (`orders.payment_ref_mismatch`). Returns True when the order became (or, on a dry run, would
+    become) paid; a dry run writes nothing."""
 
     def problem(ref: str, action: str, detail: dict[str, Any], ctx: AuditContext) -> None:
         if not dry_run:
@@ -1086,6 +1103,14 @@ def mark_order_paid(
             return False
         if order.state != "awaiting_payment":
             problem(order_ref, "orders.payment_late", {"state": order.state, "amount": amount}, ctx)
+            return False
+        if provider_ref is not None and provider_ref != order.payment_intent_ref:
+            problem(
+                order_ref,
+                "orders.payment_ref_mismatch",
+                {"paid_with": provider_ref, "expected": order.payment_intent_ref},
+                ctx,
+            )
             return False
         if currency.upper() != CURRENCY or amount != order.grand_total:
             problem(
