@@ -377,30 +377,30 @@ extended to it in TRU.1. The tasks are in §16.12.
   nickname (3.3.7 redundant entry), a character counter as a polite live region, targets of at least
   24 px (2.5.8). The pages are added to the axe audit (CMP.7).
 
-## 16.10 Open owner questions
+## 16.10 Owner questions (answered 2026-11-13, Q-T7 and Q-T8 with counsel)
 
 1. **Q-T1**: is the vendor "reviews" badge (average and count) wanted on listing cards, or only on
-   the vendor page and product page? (Cards are visible everywhere, so most exposed to disputes.)
+   the vendor page and product page? (Cards are visible everywhere, so most exposed to disputes.) **Answered (owner, 2026-11-13): vendor page and product page only, not on listing cards.**
 2. **Q-T2**: product review and vendor review as two kinds (this proposal), or one review per
-   order? One is simpler; two keep complaints about shipping off product pages.
-3. **Q-T3**: the review window (90 days after delivery) and the edit window (30 days).
+   order? One is simpler; two keep complaints about shipping off product pages. **Answered (owner, 2026-11-13): two kinds, product review and vendor review.**
+3. **Q-T3**: the review window (90 days after delivery) and the edit window (30 days). **Answered (owner, 2026-11-13): 90 days after delivery to review, 30 days to edit.**
 4. **Q-T4**: do orders from the legacy shop count for the "orders delivered" and "on MPMV since" badges
-   ("including N orders on our previous shop"), and are legacy buyers ever invited?
+   ("including N orders on our previous shop"), and are legacy buyers ever invited? **Answered (owner, 2026-11-13): legacy orders count, with the "including N orders on our previous shop" wording; legacy buyers are never invited.**
 5. **Q-T5**: may badges ever influence search or listing order? Default: never (it needs the P2B
-   ranking page and the vendor terms first).
-6. **Q-T6**: may a vendor hide an earned badge? Default: no (§16.4).
+   ranking page and the vendor terms first). **Answered (owner, 2026-11-13): yes, later, and only after the P2B ranking page and the vendor-terms clause exist (never at launch).**
+6. **Q-T6**: may a vendor hide an earned badge? Default: no (§16.4). **Answered (owner, 2026-11-13): no.**
 7. **Q-T7**: counsel: are the review invitation and reminder emails service messages or marketing
-   under current Italian and EU practice, and do they need consent?
+   under current Italian and EU practice, and do they need consent? **Sent to counsel (2026-11-13).**
 8. **Q-T8**: counsel: the legal basis for the review itself and for the nickname (consent as written
    here, or legitimate interest), and the default on erasure (the review stays as "Former customer",
-   or is deleted).
+   or is deleted). **Sent to counsel (2026-11-13).**
 9. **Q-T9**: show reviews in their original language only (this proposal), or add machine
-   translation (needs the CMP.8 label)?
-10. **Q-T10**: review photos: later, or never?
-11. **Q-T11**: accept reviews from business buyers, and say so on the page?
+   translation (needs the CMP.8 label)? **Answered (owner, 2026-11-13): add machine translation, labelled "machine translated" (CMP.8) with a link to the original text, which stays the reference.**
+10. **Q-T10**: review photos: later, or never? **Answered (owner, 2026-11-13): later, not at launch (image moderation and personal data in photos first).**
+11. **Q-T11**: accept reviews from business buyers, and say so on the page? **Answered (owner, 2026-11-13): yes, labelled "business purchase" on the review.**
 12. **Q-T12**: a vendor-level rating in the vendor `Organization` markup: a later experiment, or
-    never?
-13. **Q-T13**: vendor updates and a "Community" page: P3 as written here, or dropped?
+    never? **Answered (owner, 2026-11-13): a later, measured experiment, not at launch.**
+13. **Q-T13**: vendor updates and a "Community" page: P3 as written here, or dropped? **Answered (owner, 2026-11-13): kept at P3, after launch.**
 
 ## 16.11 Regression cases
 
