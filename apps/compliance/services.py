@@ -1645,7 +1645,10 @@ def publish_vendor_terms(
 ) -> ChangeSet:
     """Publish the next vendor contract version with clauses (d) to (h) in every drafted language.
 
-    Each text keeps the previous version's text in that language (without its older clause
+    Only PUBLISHED texts of the previous version are carried forward, never a machine or
+    reviewed draft. A language without drafted clause wording keeps its published text unchanged
+    (it is not dropped); `vendor_terms_problems` then names the clauses it lacks.
+    Each drafted text keeps the previous version's text in that language (without its older clause
     block) and ends with the current block. The vendors' acceptance of the version in force then
     applies as for any version (VEN.5): an old acceptance does not cover the new one, so every
     vendor accepts it before activation. Audited through `save_contract`; the texts are draft
@@ -1657,17 +1660,22 @@ def publish_vendor_terms(
         changes = save_contract(contract, ctx=ctx, dry_run=dry_run)
         if dry_run:
             return changes
-        for language in terms_clauses.LANGUAGES:
-            old = previous.translations.filter(language=language).first() if previous else None
+        published = VendorContractTranslation.Status.PUBLISHED
+        carried = {
+            text.language: text
+            for text in (previous.translations.filter(status=published) if previous else ())
+        }
+        drafted = terms_clauses.LANGUAGES
+        for language in (*drafted, *sorted(set(carried) - set(drafted))):
+            old = carried.get(language)
+            # A language without drafted wording keeps its published text as it was; a missing
+            # one is not invented (`vendor_terms_problems` reports both).
             title = old.title if old else _VENDOR_TERMS_TITLES[language]
+            body = old.body if old else ""
+            if language in drafted:
+                body = terms_clauses.with_clauses(terms_clauses.VENDOR, language, body)
             row = VendorContractTranslation(
-                contract=contract,
-                language=language,
-                title=title,
-                body=terms_clauses.with_clauses(
-                    terms_clauses.VENDOR, language, old.body if old else ""
-                ),
-                status=VendorContractTranslation.Status.PUBLISHED,
+                contract=contract, language=language, title=title, body=body, status=published
             )
             row.full_clean()
             row.save()
@@ -1680,13 +1688,23 @@ _VENDOR_TERMS_TITLES: Final = {"en": "Vendor terms", "it": "Condizioni per i ven
 def vendor_terms_problems(contract: VendorContract | None = None) -> list[str]:
     """What is missing in the vendor contract version in force: a message per language and
     missing clause letter, plus one when no version is in force. Languages checked are the ones
-    with a drafted wording."""
+    with a drafted wording, the site languages and the languages the version has a published
+    text in. Only published texts count; a site language without one reports
+    `vendor_terms_text_missing:<language>`."""
     contract = contract or current_contract()
     if contract is None:
         return ["vendor_terms_missing"]
     problems: list[str] = []
-    for language in terms_clauses.LANGUAGES:
-        text = contract.translations.filter(language=language).first()
+    texts = {
+        text.language: text
+        for text in contract.translations.filter(status=VendorContractTranslation.Status.PUBLISHED)
+    }
+    site = [code for code, _name in settings.LANGUAGES]
+    for language in dict.fromkeys((*terms_clauses.LANGUAGES, *site, *sorted(texts))):
+        text = texts.get(language)
+        if text is None and language not in terms_clauses.LANGUAGES:
+            problems.append(f"vendor_terms_text_missing:{language}")
+            continue
         body = text.body if text else ""
         problems += [
             f"vendor_terms_clause_missing:{language}:{letter}"

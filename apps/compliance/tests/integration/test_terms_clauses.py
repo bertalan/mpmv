@@ -46,7 +46,10 @@ def contract_item(vendor: Vendor):  # type: ignore[no-untyped-def]
 def test_the_published_version_carries_clauses_d_to_h_in_english_and_italian() -> None:
     contract = publish()
     assert contract.version == 1
-    assert services.vendor_terms_problems(contract) == []
+    # only the site languages without published text are reported
+    assert all(
+        p.startswith("vendor_terms_text_missing:") for p in services.vendor_terms_problems(contract)
+    )
     for language in ("en", "it"):
         body = contract.translations.get(language=language).body
         assert terms_clauses.missing_clauses(terms_clauses.VENDOR, body, language) == []
@@ -65,6 +68,24 @@ def test_the_new_version_keeps_the_previous_text_before_the_clause_block() -> No
     assert text.title == "Old title"
     assert text.body.startswith("Old terms.")
     assert text.body.count(terms_clauses.BLOCK_MARKER) == 1
+
+
+def test_a_published_foreign_text_is_kept_and_a_draft_is_never_published() -> None:
+    VendorContractFactory.create(valid_from=timezone.now() - dt.timedelta(days=30), languages=[])
+    old = VendorContract.objects.get()
+    old.translations.create(language="de", title="Alt", body="Alte Texte.", status="published")
+    old.translations.create(language="it", title="Bozza", body="Bozza segreta.", status="machine")
+    contract = publish()
+    de = contract.translations.get(language="de")
+    assert (de.status, de.title, de.body) == ("published", "Alt", "Alte Texte.")
+    it = contract.translations.get(language="it")
+    assert "Bozza segreta" not in it.body
+    assert it.title == "Condizioni per i venditori"
+    assert not contract.translations.exclude(status="published").exists()
+    problems = services.vendor_terms_problems(contract)
+    assert "vendor_terms_clause_missing:de:d" in problems  # carried forward, clauses still due
+    assert "vendor_terms_text_missing:fr" in problems
+    assert "vendor_terms_text_missing:es" in problems
 
 
 def test_a_dry_run_publishes_nothing() -> None:
@@ -178,4 +199,5 @@ def test_the_command_publishes_the_vendor_version_and_check_reports_the_customer
     assert VendorContract.objects.count() == 1
     with pytest.raises(CommandError, match="customer_terms_missing:en"):
         call_command("publish_terms_clauses", "--check")
-    assert services.vendor_terms_problems() == []
+    problems = services.vendor_terms_problems()
+    assert all(p.startswith("vendor_terms_text_missing:") for p in problems)
