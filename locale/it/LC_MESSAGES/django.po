@@ -25,9 +25,25 @@ msgid_plural "%(counter)s unused."
 msgstr[0] "%(counter)s non usato."
 msgstr[1] "%(counter)s non usati."
 
+#: apps/orders/ui/present.py
+msgid "%(days)s working days"
+msgstr "%(days)s giorni lavorativi"
+
+#: apps/orders/ui/present.py
+msgid "%(low)s to %(high)s working days"
+msgstr "da %(low)s a %(high)s giorni lavorativi"
+
 #: apps/accounts/mfa_views.py
 msgid "%(name)s removed."
 msgstr "%(name)s rimosso."
+
+#: apps/orders/templates/orders/_package.html
+msgid "%(quantity)s × %(unit_price)s"
+msgstr "%(quantity)s × %(unit_price)s"
+
+#: themes/base/templates/components/cart_line.html
+msgid "%(unit_price)s each"
+msgstr "%(unit_price)s l'uno"
 
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
@@ -209,6 +225,10 @@ msgid ""
 msgstr ""
 "Un ritratto dell'autore, mostrato nella sua pagina. Se lo lasci vuoto, non viene mostrata alcuna "
 "foto."
+
+#: apps/orders/ui/views.py
+msgid "A price changed while you were checking out. Review the new prices."
+msgstr "Un prezzo è cambiato mentre completavi l'ordine. Controlla i nuovi prezzi."
 
 #: apps/catalog/models.py
 msgid ""
@@ -519,6 +539,14 @@ msgstr "Aggiungi al carrello"
 msgid "added %(created)s"
 msgstr "aggiunta il %(created)s"
 
+#: apps/orders/ui/forms.py
+msgid "Address"
+msgstr "Indirizzo"
+
+#: apps/orders/ui/forms.py
+msgid "Address, second line"
+msgstr "Indirizzo, seconda riga"
+
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "After"
 msgstr "Dopo"
@@ -570,6 +598,14 @@ msgstr ""
 "Un'introduzione mostrata nella pagina di questa categoria o etichetta. Puoi usare una "
 "formattazione semplice. Facoltativo."
 
+#: apps/orders/ui/views.py
+msgid "An item is no longer available."
+msgstr "Un articolo non è più disponibile."
+
+#: apps/orders/ui/views.py
+msgid "An item went out of stock."
+msgstr "Un articolo è esaurito."
+
 #: apps/catalog/models.py
 msgid ""
 "An optional lower price in euros without VAT, for example 15.00. It must be below the normal "
@@ -607,6 +643,10 @@ msgid ""
 msgstr ""
 "Un altro tuo prodotto pensato per essere comprato insieme a questo, per esempio la batteria di un "
 "giocattolo. Lascialo vuoto se non ce n'è."
+
+#: apps/orders/ui/forms.py
+msgid "Apartment, floor or other detail. Optional."
+msgstr "Interno, piano o altro dettaglio. Facoltativo."
 
 #: apps/seo/site_links.py
 msgid "API documentation"
@@ -661,6 +701,10 @@ msgstr "Back office"
 msgid "Back to my orders"
 msgstr "Torna ai miei ordini"
 
+#: apps/orders/templates/orders/_review_actions.html
+msgid "Back to the cart"
+msgstr "Torna al carrello"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Back to the notices"
 msgstr "Torna alle segnalazioni"
@@ -701,6 +745,10 @@ msgstr "lotto di marchi"
 msgid "brand batches"
 msgstr "lotti di marchi"
 
+#: apps/orders/templates/orders/checkout.html
+msgid "Business purchase"
+msgstr "Acquisto per un'azienda"
+
 #: apps/catalog/templates/catalog/product.html
 msgid "Buying online opens soon."
 msgstr "Presto potrai comprare online."
@@ -738,6 +786,14 @@ msgstr "Corriere: %(carrier)s"
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Corriere: %(carrier)s. Numero di tracking: %(tracking_number)s."
 
+#: apps/orders/templates/orders/cart.html apps/orders/ui/views.py
+msgid "Cart"
+msgstr "Carrello"
+
+#: apps/orders/ui/views.py
+msgid "Cart updated."
+msgstr "Carrello aggiornato."
+
 #: apps/seo/site_links.py
 msgid "Catalogue: %(taxonomy)s"
 msgstr "Catalogo: %(taxonomy)s"
@@ -754,6 +810,10 @@ msgstr "Catalogo: categorie"
 msgid "Catalogue: products"
 msgstr "Catalogo: prodotti"
 
+#: apps/orders/templates/orders/_review_body.html
+msgid "Change details"
+msgstr "Modifica i dati"
+
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid ""
 "Changes owners made to their storefront texts, policies and logo. They are live at once; revert "
@@ -763,6 +823,14 @@ msgstr ""
 "Modifiche fatte dai titolari ai testi, alle condizioni e al logo del loro negozio. Sono visibili "
 "subito; annullane una indicando un motivo e i titolari ne saranno informati. Una modifica si può "
 "annullare solo finché il testo non è cambiato di nuovo."
+
+#: apps/orders/templates/orders/checkout.html
+msgid "Checkout"
+msgstr "Cassa"
+
+#: themes/base/templates/components/step_indicator.html
+msgid "Checkout steps"
+msgstr "Fasi dell'ordine"
 
 #: apps/compliance/forms.py
 msgid "Choose 'Action taken' if the content was restricted, or 'No action' if it was left as it is."
@@ -795,6 +863,10 @@ msgstr "Scegli una versione"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
 msgstr "Scegli come confermare la tua identità dopo la password."
+
+#: apps/orders/ui/present.py
+msgid "Choose one of the shipping options."
+msgstr "Scegli una delle opzioni di spedizione."
 
 #: apps/cms/blocks.py
 msgid "Choose the category or tag the card leads to. A card to a hidden one is left out."
@@ -841,6 +913,10 @@ msgstr ""
 msgid "Choose where the products come from: one category, tag, brand or shop."
 msgstr "Scegli da dove vengono i prodotti: una categoria, un'etichetta, una marca o un negozio."
 
+#: apps/orders/ui/forms.py
+msgid "City"
+msgstr "Città"
+
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "Close now"
 msgstr "Chiudi ora"
@@ -883,9 +959,17 @@ msgstr ""
 "Nei paesi in cui è previsto lo compiliamo noi quando VIES conferma la partita IVA. Non sei sicuro?"
 " Chiedi al tuo commercialista."
 
+#: apps/orders/ui/forms.py
+msgid "Company name"
+msgstr "Ragione sociale"
+
 #: apps/orders/customer_views.py
 msgid "Completed"
 msgstr "Completato"
+
+#: themes/base/templates/components/step_indicator.html
+msgid "completed"
+msgstr "completata"
 
 #: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
 msgid "Confirm"
@@ -919,9 +1003,21 @@ msgstr "Continua"
 msgid "Continue does not sign you in: the page it opens asks you to confirm who you are."
 msgstr "Continua non ti fa accedere: la pagina che si apre ti chiede di confermare la tua identità."
 
+#: apps/orders/templates/orders/_cart_body.html
+msgid "Continue to checkout"
+msgstr "Vai alla cassa"
+
+#: apps/orders/templates/orders/checkout.html
+msgid "Continue to review"
+msgstr "Vai al riepilogo"
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "Continue to your request"
 msgstr "Continua con la tua richiesta"
+
+#: apps/orders/ui/forms.py
+msgid "Country"
+msgstr "Paese"
 
 #: apps/catalog/taxonomy.py
 msgid "country"
@@ -981,6 +1077,10 @@ msgstr ""
 msgid "Decided"
 msgstr "Deciso"
 
+#: themes/base/templates/components/quantity_stepper.html
+msgid "Decrease quantity"
+msgstr "Diminuisci la quantità"
+
 #: apps/cms/models.py
 msgid "Defaults to 'Apply now'."
 msgstr "Se lo lasci vuoto, il pulsante dice 'Candidati ora'."
@@ -992,6 +1092,14 @@ msgstr "Elimina %(verbose_name_plural)s selezionati"
 #: apps/orders/customer_views.py
 msgid "Delivered"
 msgstr "Consegnato"
+
+#: apps/orders/templates/orders/checkout.html
+msgid "Delivery"
+msgstr "Consegna"
+
+#: apps/orders/templates/orders/_review_body.html
+msgid "Delivery details"
+msgstr "Dati di consegna"
 
 #: apps/cms/models.py
 msgid ""
@@ -1045,6 +1153,10 @@ msgstr "Descrizione"
 msgid "Description of the logo"
 msgstr "Descrizione del logo"
 
+#: apps/orders/ui/views.py
+msgid "Details"
+msgstr "Dati"
+
 #: apps/seo/site_links.py
 msgid "Developer and system"
 msgstr "Sviluppo e sistema"
@@ -1085,6 +1197,10 @@ msgstr "Amministrazione dei redattori (Wagtail)"
 msgid "Email"
 msgstr "Email"
 
+#: apps/orders/ui/forms.py
+msgid "Email address"
+msgstr "Indirizzo email"
+
 #: apps/compliance/forms.py
 msgid "Email address of the order"
 msgstr "Indirizzo email dell’ordine"
@@ -1113,9 +1229,21 @@ msgstr "Inserisci un nome di corriere valido."
 msgid "Enter a valid web address starting with https://"
 msgstr "Inserisci un indirizzo web valido che inizi con https://"
 
+#: apps/orders/ui/views.py
+msgid "Enter a whole number as the quantity."
+msgstr "Inserisci un numero intero come quantità."
+
+#: apps/orders/ui/present.py
+msgid "Enter the delivery address to see shipping and VAT."
+msgstr "Inserisci l'indirizzo di consegna per vedere spedizione e IVA."
+
 #: apps/manager/forms.py
 msgid "Enter the tracking number: letters, digits, spaces and . / _ - only."
 msgstr "Inserisci il numero di tracciamento: solo lettere, cifre, spazi e . / _ -"
+
+#: apps/orders/ui/forms.py
+msgid "Enter this when you buy for a business, or untick the box."
+msgstr "Compila questo campo se acquisti per un'azienda, oppure togli la spunta."
 
 #: apps/seo/site_links.py
 msgid "Erase your account (asks for confirmation)"
@@ -1170,6 +1298,10 @@ msgstr "Filtra"
 msgid "Filters"
 msgstr "Filtri"
 
+#: apps/orders/templates/orders/_cart_body.html
+msgid "Find something you like."
+msgstr "Trova qualcosa che ti piace."
+
 #: themes/base/templates/components/footer.html
 msgid "Footer"
 msgstr "Piè di pagina"
@@ -1181,6 +1313,10 @@ msgstr "Hai dimenticato le credenziali di accesso?"
 #: themes/base/templates/403_csrf.html
 msgid "Form expired"
 msgstr "Modulo scaduto"
+
+#: apps/orders/ui/forms.py
+msgid "Full name"
+msgstr "Nome e cognome"
 
 #: apps/cms/models.py
 msgid "General (every other screen)"
@@ -1209,6 +1345,10 @@ msgstr "Indica la schermata o il tipo di pagina: solo lettere, cifre e . : _ -"
 #: themes/base/templates/layouts/error.html
 msgid "Go to the home page"
 msgstr "Vai alla home page"
+
+#: apps/orders/ui/present.py apps/orders/ui/views.py
+msgid "Goods, excluding VAT"
+msgstr "Merce, IVA esclusa"
 
 #: apps/cms/blocks.py
 msgid ""
@@ -1467,6 +1607,10 @@ msgstr ""
 "Come vendi i tuoi prodotti, salvo diversa indicazione sul singolo prodotto: i clienti ordinano e "
 "pagano online, oppure ti inviano prima una richiesta."
 
+#: apps/orders/ui/forms.py
+msgid "I am buying for a business"
+msgstr "Acquisto per un'azienda"
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
 "If you are not signed in, Continue signs you in once with this link; you will still confirm it is "
@@ -1495,6 +1639,10 @@ msgid ""
 msgstr ""
 "Nel calcolo delle tariffe la spedizione è gratuita quando la merce nel pacco vale almeno questo "
 "importo, IVA esclusa. Lascialo vuoto se non vuoi la spedizione gratuita."
+
+#: themes/base/templates/components/quantity_stepper.html
+msgid "Increase quantity"
+msgstr "Aumenta la quantità"
 
 #: themes/base/templates/components/alert.html
 msgid "Information"
@@ -1616,6 +1764,10 @@ msgstr "ragione sociale"
 #: apps/manager/forms.py
 msgid "Letters, digits, spaces and . / _ - only."
 msgstr "Solo lettere, cifre, spazi e . / _ -"
+
+#: apps/orders/templates/orders/_package.html themes/base/templates/components/cart_line.html
+msgid "Line total"
+msgstr "Totale riga"
 
 #: apps/manager/media.py
 msgid "Link text"
@@ -1952,6 +2104,12 @@ msgid ""
 msgstr ""
 "Una o due frasi sotto il titolo, fino a 400 caratteri. Se le lasci vuote, si vede solo il titolo."
 
+#: apps/orders/templates/orders/confirmation.html
+msgid "Online payment is not available yet. The items stay held for you for a short time."
+msgstr ""
+"Il pagamento online non è ancora disponibile. Gli articoli restano riservati per te per un breve "
+"periodo."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "Only approved brands have a public page and can be picked by every vendor. Use the approve, reject"
@@ -2121,6 +2279,27 @@ msgstr "Numero d’ordine"
 msgid "Order placed"
 msgstr "Ordine effettuato"
 
+#: apps/orders/templates/orders/confirmation.html
+msgid "Order received"
+msgstr "Ordine ricevuto"
+
+#: themes/base/templates/components/order_summary.html
+msgid "Order summary"
+msgstr "Riepilogo dell'ordine"
+
+#: apps/orders/templates/orders/_cart_body.html apps/orders/templates/orders/_review_body.html
+#: apps/orders/templates/orders/confirmation.html
+msgid "Order total"
+msgstr "Totale dell'ordine"
+
+#: apps/orders/ui/present.py
+msgid "Ordering is not available right now. Please try again later."
+msgstr "In questo momento non è possibile ordinare. Riprova più tardi."
+
+#: apps/orders/templates/orders/_review_body.html
+msgid "Ordering is not open yet. Your cart is kept."
+msgstr "Gli ordini non sono ancora aperti. Il tuo carrello viene conservato."
+
 #: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
 msgstr "Ordini"
@@ -2223,6 +2402,10 @@ msgstr "Le passkey richiedono JavaScript."
 msgid "Password"
 msgstr "Password"
 
+#: apps/orders/templates/orders/confirmation.html
+msgid "Pay now"
+msgstr "Paga ora"
+
 #: apps/orders/customer_views.py
 msgid "Payment received"
 msgstr "Pagamento ricevuto"
@@ -2274,6 +2457,10 @@ msgstr ""
 #: apps/cms/blocks.py
 msgid "Pick the picture from the library or upload a new one. Required."
 msgstr "Scegli l'immagine dalla libreria o caricane una nuova. Obbligatoria."
+
+#: apps/orders/templates/orders/_review_actions.html
+msgid "Place order"
+msgstr "Conferma l'ordine"
 
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
@@ -2368,6 +2555,10 @@ msgstr ""
 msgid "Position"
 msgstr "Posizione"
 
+#: apps/orders/ui/forms.py
+msgid "Postcode"
+msgstr "CAP"
+
 #: apps/manager/templates/manager/list.html
 msgid "Preview"
 msgstr "Anteprima"
@@ -2392,6 +2583,14 @@ msgstr "Prezzo su richiesta"
 #: apps/orders/templates/orders/customer_order.html
 msgid "Price with VAT"
 msgstr "Prezzo con IVA"
+
+#: apps/orders/templates/orders/_cart_body.html
+msgid ""
+"Prices are shown without VAT. Shipping and VAT are worked out at checkout, from your delivery "
+"address."
+msgstr ""
+"I prezzi sono senza IVA. Spedizione e IVA vengono calcolate alla cassa, in base al tuo indirizzo "
+"di consegna."
 
 #: apps/seo/site_links.py
 msgid "Privacy and your data"
@@ -2425,13 +2624,22 @@ msgstr "Prodotti"
 msgid "proposed by"
 msgstr "proposto da"
 
+#: apps/orders/ui/forms.py
+msgid "Province or state"
+msgstr "Provincia o stato"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Published"
 msgstr "Pubblicati"
 
 #: apps/manager/templates/manager/shop/order.html apps/orders/templates/orders/customer_order.html
+#: themes/base/templates/components/quantity_stepper.html
 msgid "Quantity"
 msgstr "Quantità"
+
+#: themes/base/templates/components/cart_line.html
+msgid "Quantity, %(name)s"
+msgstr "Quantità, %(name)s"
 
 #: apps/orders/customer_views.py
 msgid "Quote requested"
@@ -2514,9 +2722,13 @@ msgid "Relative to"
 msgstr "Rispetto a"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/base/templates/components/cart_line.html
 msgid "Remove"
 msgstr "Rimuovi"
+
+#: themes/base/templates/components/cart_line.html
+msgid "Remove %(name)s"
+msgstr "Rimuovi %(name)s"
 
 #: apps/manager/forms.py
 msgid "Remove the logo"
@@ -2530,6 +2742,10 @@ msgstr "Segnala contenuti illegali (DSA)"
 #: apps/manager/templates/manager/platform/notices.html
 msgid "Reported"
 msgstr "Segnalato"
+
+#: apps/orders/templates/orders/_package.html
+msgid "Request a quote"
+msgstr "Richiedi un preventivo"
 
 #: themes/base/templates/components/field.html
 msgid "required"
@@ -2566,6 +2782,10 @@ msgstr "Annulla questa modifica"
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Reverted"
 msgstr "Annullata"
+
+#: apps/orders/templates/orders/review.html apps/orders/ui/views.py
+msgid "Review and pay"
+msgstr "Riepilogo e pagamento"
 
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Revoke %(role)s"
@@ -2674,17 +2894,39 @@ msgstr "Spedire a:"
 msgid "Shipped"
 msgstr "Spedito"
 
-#: apps/vendors/services.py
+#: apps/orders/templates/orders/_package.html apps/vendors/services.py
 msgid "Shipping"
 msgstr "Spedizione"
+
+#: apps/orders/ui/present.py
+msgid ""
+"Shipping on a package with different VAT rates cannot be ordered yet. Order these items in "
+"separate orders."
+msgstr ""
+"La spedizione di un pacco con aliquote IVA diverse non si può ancora ordinare. Ordina questi "
+"articoli in ordini separati."
 
 #: apps/manager/forms.py
 msgid "Shipping policy"
 msgstr "Condizioni di spedizione"
 
+#: apps/orders/ui/present.py
+msgid "Shipping to your address needs a quote from the vendor. Ask the vendor for a quote."
+msgstr ""
+"La spedizione al tuo indirizzo richiede un preventivo del venditore. Chiedi un preventivo al "
+"venditore."
+
+#: apps/orders/templates/orders/_review_body.html
+msgid "Shipping updated."
+msgstr "Spedizione aggiornata."
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "Shipping with VAT"
 msgstr "Spedizione con IVA"
+
+#: apps/orders/ui/present.py apps/orders/ui/views.py
+msgid "Shipping, excluding VAT"
+msgstr "Spedizione, IVA esclusa"
 
 #: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
@@ -2806,6 +3048,10 @@ msgstr "Venduto da"
 msgid "Sold by %(name)s"
 msgstr "Venduto da %(name)s"
 
+#: apps/orders/templates/orders/_package.html themes/base/templates/components/cart_line.html
+msgid "Sold by %(vendor)s"
+msgstr "Venduto da %(vendor)s"
+
 #: apps/vendors/models.py
 msgid ""
 "Sole traders only: if your country issues no tax identification number, the city and country where"
@@ -2839,6 +3085,14 @@ msgid ""
 msgstr ""
 "Solo ditte individuali: il tuo cognome, come sul documento d'identità. Compare nelle fatture che "
 "ti emettiamo."
+
+#: apps/orders/templates/orders/_cart_body.html
+msgid "Solve the points above to go on."
+msgstr "Risolvi i punti qui sopra per continuare."
+
+#: apps/orders/templates/orders/_review_actions.html
+msgid "Solve the points above to place the order."
+msgstr "Risolvi i punti qui sopra per confermare l'ordine."
 
 #: themes/base/templates/500.html
 msgid "Something went wrong"
@@ -2877,6 +3131,10 @@ msgstr ""
 msgid "Start review"
 msgstr "Avvia la revisione"
 
+#: apps/orders/templates/orders/_cart_body.html
+msgid "Start shopping"
+msgstr "Inizia a fare acquisti"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Statements of reasons"
 msgstr "Motivazioni"
@@ -2912,6 +3170,10 @@ msgstr "Profilo del negozio"
 #: apps/manager/views.py
 msgid "Storefront profile saved."
 msgstr "Profilo del negozio salvato."
+
+#: apps/orders/ui/forms.py
+msgid "Street and house number. Required: the carrier needs it to deliver."
+msgstr "Via e numero civico. Obbligatorio: il corriere ne ha bisogno per consegnare."
 
 #: apps/seo/site_links.py
 msgid "Styleguide"
@@ -3315,6 +3577,10 @@ msgid ""
 msgstr ""
 "Il paese in cui ha sede il produttore, come codice di due lettere, per esempio 'IT'. Se è fuori "
 "dall'UE devi compilare anche il responsabile UE."
+
+#: apps/orders/ui/forms.py
+msgid "The country where we deliver. Required: shipping and VAT depend on it."
+msgstr "Il paese in cui consegniamo. Obbligatorio: spedizione e IVA dipendono da questo."
 
 #: apps/vendors/models.py
 msgid ""
@@ -3730,6 +3996,10 @@ msgstr ""
 msgid "The legal name of the company that runs the platform."
 msgstr "La ragione sociale dell'azienda che gestisce la piattaforma."
 
+#: apps/orders/ui/forms.py
+msgid "The legal name of your business. Required when you buy for a business."
+msgstr "La ragione sociale della tua azienda. Obbligatoria se acquisti per un'azienda."
+
 #: apps/tax/models.py
 msgid ""
 "The legal note printed on order documents for this regime, in this language. Ask your accountant "
@@ -3873,6 +4143,10 @@ msgid ""
 msgstr ""
 "Il nome del metodo in questa lingua, per esempio 'Consegna standard'. Compare ai clienti quando il"
 " checkout userà la spedizione."
+
+#: apps/orders/ui/forms.py
+msgid "The name of the person who receives the parcel. Required for the carrier."
+msgstr "Il nome della persona che riceve il pacco. Obbligatorio per il corriere."
 
 #: apps/shipping/models.py
 msgid ""
@@ -4022,6 +4296,10 @@ msgstr ""
 "L'apertura della pagina, costruita a blocchi: spiega perché un venditore dovrebbe unirsi a voi. Se"
 " non ne aggiungi, la pagina parte dai piani."
 
+#: apps/orders/ui/views.py
+msgid "The order could not be placed."
+msgstr "Non è stato possibile completare l'ordine."
+
 #: apps/catalog/attributes.py
 msgid ""
 "The order in which a product lists its attributes: lower numbers come first. Leave 0 if the order "
@@ -4169,6 +4447,10 @@ msgstr ""
 msgid "The postal address of the EU responsible person."
 msgstr "L'indirizzo postale del responsabile UE."
 
+#: apps/orders/ui/forms.py
+msgid "The postal code of the delivery address. Required: it decides the shipping."
+msgstr "Il CAP dell'indirizzo di consegna. Obbligatorio: determina la spedizione."
+
 #: apps/events/models.py
 msgid "The postal code of the place, for example '20121'."
 msgstr "Il CAP del luogo, per esempio '20121'."
@@ -4273,6 +4555,10 @@ msgstr ""
 "I prodotti che porti o metti in offerta a questo evento. Puoi scegliere solo i tuoi prodotti. "
 "Lascia vuoto se non ce n'è nessuno."
 
+#: apps/orders/ui/forms.py
+msgid "The province or state, where your country uses one. Optional."
+msgstr "La provincia o lo stato, se il tuo paese ne usa uno. Facoltativo."
+
 #: apps/shipping/models.py
 msgid "The provinces or states in the area, as codes separated by commas, for example 'SS' or 'NU'."
 msgstr ""
@@ -4345,6 +4631,10 @@ msgstr "Non è stato possibile comprendere la richiesta. Controlla l’indirizzo
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "The request failed."
 msgstr "La richiesta non è riuscita."
+
+#: apps/orders/ui/views.py
+msgid "The request is too large."
+msgstr "La richiesta è troppo grande."
 
 #: apps/manager/views.py
 msgid "The role change is recorded."
@@ -4615,6 +4905,10 @@ msgstr ""
 "Il titolo che vuoi far mostrare ai motori di ricerca per questa pagina, meglio sotto i 60 "
 "caratteri. Facoltativo: puoi lasciarlo vuoto."
 
+#: apps/orders/ui/forms.py
+msgid "The town or city of the delivery address. Required."
+msgstr "Il comune o la città dell'indirizzo di consegna. Obbligatorio."
+
 #: apps/events/models.py
 msgid "The town or city of the place, for example 'Milano'."
 msgstr "Il paese o la città del luogo, per esempio 'Milano'."
@@ -4735,7 +5029,7 @@ msgid "The vendor's newest products shown after the story; 0 shows none."
 msgstr ""
 "I prodotti più recenti del venditore mostrati dopo la storia. Con 0 non se ne mostra nessuno."
 
-#: apps/accounts/decorators.py
+#: apps/accounts/decorators.py apps/orders/ui/views.py
 msgid "The verification failed. Please reload the page and try again."
 msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
 
@@ -4870,10 +5164,31 @@ msgstr "Questo browser non supporta le passkey."
 msgid "This content is not available in this language."
 msgstr "Questo contenuto non è disponibile in questa lingua."
 
+#: apps/orders/ui/forms.py
+msgid "This does not look like an EU VAT number. Check the prefix and the digits."
+msgstr "Questa non sembra una partita IVA dell'UE. Controlla il prefisso e le cifre."
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "This is your order reference, not an invoice. Each seller issues its own invoice."
 msgstr ""
 "Questo è il riferimento del tuo ordine, non una fattura. Ogni venditore emette la propria fattura."
+
+#: apps/orders/ui/present.py
+msgid "This item cannot be bought right now."
+msgstr "Questo articolo non si può acquistare in questo momento."
+
+#: apps/orders/ui/present.py
+msgid "This item has no price yet."
+msgstr "Questo articolo non ha ancora un prezzo."
+
+#: apps/orders/ui/present.py
+msgid "This item is out of stock, or fewer are available than the quantity in your cart."
+msgstr ""
+"Questo articolo è esaurito, oppure ne sono disponibili meno della quantità nel tuo carrello."
+
+#: apps/orders/ui/present.py
+msgid "This item is sold on request only. Ask the vendor for a quote."
+msgstr "Questo articolo si vende solo su richiesta. Chiedi un preventivo al venditore."
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "This link was sent to you by email. Press Continue to open the page it leads to."
@@ -4898,6 +5213,10 @@ msgstr "Questo passaggio non è possibile per la segnalazione nel suo stato attu
 #: apps/manager/views.py
 msgid "This step is not possible in the order's current state."
 msgstr "Questo passaggio non è possibile nello stato attuale dell'ordine."
+
+#: apps/orders/ui/present.py
+msgid "This vendor does not ship to your address."
+msgstr "Questo venditore non spedisce al tuo indirizzo."
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "This vendor is closed, so its shop pages are no longer available."
@@ -5029,6 +5348,14 @@ msgid "Tick the box to confirm the statement. Without it the report cannot be se
 msgstr ""
 "Spunta la casella per confermare la dichiarazione. Senza non si può inviare la segnalazione."
 
+#: apps/orders/ui/forms.py
+msgid ""
+"Tick this to enter your company and VAT number. A valid EU VAT number can remove the VAT on a "
+"cross-border purchase."
+msgstr ""
+"Spunta questa casella per inserire azienda e partita IVA. Una partita IVA UE valida può togliere "
+"l'IVA in un acquisto tra paesi."
+
 #: apps/cms/blocks.py
 msgid "Tick to add a 'See all' link under the products, to the full list."
 msgstr "Spunta per aggiungere sotto i prodotti un link 'Vedi tutti', verso l'elenco completo."
@@ -5086,8 +5413,13 @@ msgstr ""
 msgid "Too many attempts. Please try again later."
 msgstr "Troppi tentativi. Riprova più tardi."
 
+#: apps/orders/ui/views.py
+msgid "Too many requests from this address. Try again later."
+msgstr "Troppe richieste da questo indirizzo. Riprova più tardi."
+
 #: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_order.html
 #: apps/orders/templates/orders/customer_orders.html
+#: themes/base/templates/components/order_summary.html
 msgid "Total"
 msgstr "Totale"
 
@@ -5096,6 +5428,10 @@ msgstr "Totale"
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Total: %(total)s EUR"
 msgstr "Totale: %(total)s EUR"
+
+#: apps/orders/templates/orders/_package.html
+msgid "Totals for this vendor"
+msgstr "Totali per questo venditore"
 
 #: apps/orders/templates/orders/customer_order.html
 msgid "Track the parcel"
@@ -5141,6 +5477,14 @@ msgstr "Togli la spunta per spegnere il corriere: un corriere non attivo non off
 msgid "Up to two buttons under the text. If you add none, the banner has no buttons."
 msgstr "Fino a due pulsanti sotto il testo. Se non ne aggiungi, il banner non ha pulsanti."
 
+#: apps/orders/templates/orders/_cart_body.html
+msgid "Update cart"
+msgstr "Aggiorna il carrello"
+
+#: apps/orders/templates/orders/_review_body.html
+msgid "Update shipping"
+msgstr "Aggiorna la spedizione"
+
 #: apps/manager/media.py
 msgid "Upload"
 msgstr "Carica"
@@ -5175,6 +5519,18 @@ msgstr "Usa un codice di recupero"
 msgid "Use this device's screen lock or a security key."
 msgstr "Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
 
+#: apps/orders/ui/present.py apps/orders/ui/views.py
+msgid "VAT"
+msgstr "IVA"
+
+#: apps/orders/ui/present.py
+msgid "VAT included in the total"
+msgstr "IVA inclusa nel totale"
+
+#: apps/orders/ui/forms.py
+msgid "VAT number"
+msgstr "Partita IVA"
+
 #: apps/manager/templates/manager/layout.html apps/manager/templates/manager/shop/dashboard.html
 msgid "Vendor"
 msgstr "Venditore"
@@ -5199,6 +5555,10 @@ msgstr "Verifica"
 msgid "Verify it is you"
 msgstr "Verifica la tua identità"
 
+#: apps/orders/ui/views.py
+msgid "VIES says this VAT number is not valid. VAT is charged on your order."
+msgstr "VIES dice che questa partita IVA non è valida. Sul tuo ordine viene applicata l'IVA."
+
 #: apps/orders/customer_views.py
 msgid "Waiting for payment"
 msgstr "In attesa di pagamento"
@@ -5207,7 +5567,8 @@ msgstr "In attesa di pagamento"
 msgid "Waiting for the seller"
 msgstr "In attesa del venditore"
 
-#: themes/base/templates/components/alert.html
+#: apps/orders/templates/orders/_package.html themes/base/templates/components/alert.html
+#: themes/base/templates/components/cart_line.html
 msgid "Warning"
 msgstr "Attenzione"
 
@@ -5225,9 +5586,21 @@ msgstr ""
 msgid "We are not taking new orders right now. Nothing was charged. Please try again later."
 msgstr "Al momento non accettiamo nuovi ordini. Non ti è stato addebitato nulla. Riprova più tardi."
 
+#: apps/orders/ui/present.py
+msgid "We cannot calculate the VAT for this vendor's items to your address. Contact the vendor."
+msgstr ""
+"Non possiamo calcolare l'IVA degli articoli di questo venditore per il tuo indirizzo. Contatta il "
+"venditore."
+
 #: themes/base/templates/500.html
 msgid "We could not complete your request. Please try again in a few minutes."
 msgstr "Non siamo riusciti a completare la richiesta. Riprova tra qualche minuto."
+
+#: apps/orders/ui/views.py
+msgid "We could not confirm your VAT number with VIES now, so VAT is charged on your order."
+msgstr ""
+"Ora non riusciamo a confermare la tua partita IVA con VIES, quindi sul tuo ordine viene applicata "
+"l'IVA."
 
 #: apps/orders/templates/email/orders/order_received/subject.txt
 msgid "We received your order %(order_number)s"
@@ -5254,6 +5627,21 @@ msgstr ""
 #: apps/themes/styleguide.py
 msgid "We send the order confirmation here."
 msgstr "Qui ti mandiamo la conferma dell'ordine."
+
+#: apps/orders/ui/forms.py
+msgid ""
+"We send the order confirmation to this address. Required: without it we cannot confirm your order."
+msgstr ""
+"Inviamo la conferma dell'ordine a questo indirizzo. Obbligatorio: senza non possiamo confermare il"
+" tuo ordine."
+
+#: apps/orders/templates/orders/checkout.html
+msgid ""
+"We use your details only to deliver your order and to issue the invoices of the vendors you buy "
+"from."
+msgstr ""
+"Usiamo i tuoi dati solo per consegnare l'ordine e per emettere le fatture dei venditori da cui "
+"acquisti."
 
 #: apps/manager/media.py
 msgid "Web address"
@@ -5479,6 +5867,11 @@ msgstr ""
 #: apps/orders/templates/orders/customer_orders.html
 msgid "When you buy something, you find it here with its status and tracking."
 msgstr "Quando acquisti qualcosa, lo trovi qui con il suo stato e il tracciamento."
+
+#: apps/orders/templates/orders/_review_actions.html
+msgid "When you place the order we hold the items for you. Payment follows in the next step."
+msgstr ""
+"Quando confermi l'ordine riserviamo gli articoli per te. Il pagamento segue nel passo successivo."
 
 #: apps/catalog/models.py
 msgid ""
@@ -5771,6 +6164,26 @@ msgstr "Il tuo account è protetto con una passkey."
 msgid "Your account is protected with an authenticator app."
 msgstr "Il tuo account è protetto con un’app di autenticazione."
 
+#: apps/orders/templates/orders/cart.html
+msgid "Your cart"
+msgstr "Il tuo carrello"
+
+#: apps/orders/ui/views.py
+msgid ""
+"Your cart changed after we checked your VAT number, so VAT is charged on your order. Confirm your "
+"details again to check it for every seller."
+msgstr ""
+"Il tuo carrello è cambiato dopo la verifica della tua partita IVA, quindi sul tuo ordine viene "
+"applicata l'IVA. Conferma di nuovo i tuoi dati per verificarla per ogni venditore."
+
+#: apps/orders/templates/orders/_cart_body.html
+msgid "Your cart is empty"
+msgstr "Il tuo carrello è vuoto"
+
+#: apps/orders/ui/present.py
+msgid "Your cart is empty."
+msgstr "Il tuo carrello è vuoto."
+
 #: apps/vendors/models.py
 msgid ""
 "Your certified email (PEC) address, if you have one. It is required when the SDI recipient code is"
@@ -5778,6 +6191,10 @@ msgid ""
 msgstr ""
 "Il tuo indirizzo di posta elettronica certificata (PEC), se ce l'hai. È obbligatorio quando il "
 "codice destinatario SDI è 0000000."
+
+#: apps/orders/templates/orders/checkout.html
+msgid "Your details"
+msgstr "I tuoi dati"
 
 #: apps/compliance/forms.py
 msgid ""
@@ -5810,6 +6227,10 @@ msgstr ""
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."
 msgstr "Il tuo nome. Obbligatorio, tranne per una segnalazione di materiale pedopornografico."
+
+#: apps/orders/templates/orders/confirmation.html
+msgid "Your order number is %(number)s. We sent a confirmation to %(email)s."
+msgstr "Il numero del tuo ordine è %(number)s. Abbiamo inviato una conferma a %(email)s."
 
 #: apps/orders/templates/orders/customer_orders.html
 msgid "Your orders, newest first"
@@ -5867,6 +6288,18 @@ msgstr ""
 "La tua storia, mostrata nella pagina del tuo negozio nella lingua scelta qui sopra. Fino a circa "
 "10.000 caratteri, formattazione compresa. Viene mantenuta solo la formattazione che offre "
 "l’editor."
+
+#: apps/orders/ui/views.py
+msgid "Your VAT number is valid. VAT is not charged where the reverse charge applies."
+msgstr "La tua partita IVA è valida. L'IVA non viene applicata dove vale il reverse charge."
+
+#: apps/orders/ui/forms.py
+msgid ""
+"Your VAT number with the country prefix, for example DE123456789. We check it with the EU VIES "
+"service. Required when you buy for a business."
+msgstr ""
+"La tua partita IVA con il prefisso del paese, per esempio DE123456789. La verifichiamo con il "
+"servizio europeo VIES. Obbligatoria se acquisti per un'azienda."
 
 #: apps/vendors/models.py
 msgid ""
