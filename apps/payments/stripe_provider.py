@@ -28,6 +28,8 @@ from .engine import (
     ProviderError,
     RefundRequest,
     RefundResult,
+    TransferRequest,
+    TransferResult,
     WebhookEvent,
     validate_payment_request,
 )
@@ -113,6 +115,49 @@ class StripePaymentProvider:
             )
             refs.append(transfer.id)
         return refs
+
+    def transfer(self, request: TransferRequest) -> TransferResult:
+        """One vendor's transfer, tied to the order's charge with `source_transaction` (D-08).
+
+        Safe to call again: an existing transfer of this payment to this account in the order's
+        transfer group is returned instead of a second one (Stripe's idempotency key only lasts
+        24 hours), and a different amount there is an error, never silently accepted."""
+        minor = stripe_engine.to_minor(request.amount, request.currency)
+        if minor <= 0:
+            raise ProviderError("transfer amount must be positive")
+        try:
+            charge = (
+                request.charge_ref
+                or self._client.get_payment_intent(request.provider_ref).charge_id
+            )
+            if not charge:
+                raise ProviderError("the payment has no charge to transfer from yet")
+            for existing in self._client.list_transfers(transfer_group=request.order_ref):
+                if (
+                    existing.destination == request.vendor_account_ref
+                    and existing.payment_ref == request.provider_ref
+                ):
+                    if existing.amount_minor != minor:
+                        raise ProviderError("a transfer with another amount already exists")
+                    return TransferResult(existing.id, request.amount)
+            transfer = self._client.create_transfer(
+                amount_minor=minor,
+                currency=request.currency,
+                destination=request.vendor_account_ref,
+                transfer_group=request.order_ref,
+                source_transaction=charge,
+                metadata={
+                    "payment_ref": request.provider_ref,
+                    "order_ref": request.order_ref,
+                    "vendor_order": request.reference,
+                },
+                idempotency_key=request.idempotency_key,
+            )
+        except StripeError as error:
+            raise ProviderError(str(error)) from error
+        return TransferResult(
+            transfer.id, stripe_engine.from_minor(transfer.amount_minor, request.currency)
+        )
 
     # -- Capability 2: refunds with the provider cost
 
