@@ -366,3 +366,37 @@ def test_every_package_nets_to_zero_after_its_transfer_and_shares_plus_fee_equal
     assert all(e.amount == e.amount.quantize(D("0.01")) for e in LedgerEntry.objects.all())
     (transfer,) = stripe.transfers.values()
     assert D(transfer.amount_minor) / 100 == request.shares[0].amount
+
+
+# --- outbox: the transfer job is a row written inside the paying transaction ------------------
+
+
+def test_a_rolled_back_payment_leaves_no_job_no_ledger_line_and_no_transfer(
+    stripe: FakeStripeClient,
+) -> None:
+    """Procrastinate defers through the Django connection, so the job row is part of the webhook
+    transaction: a rollback removes it with the payment and the lines, and nothing is sent."""
+    from django.db import transaction
+
+    from apps.ledger.receivers import post_and_queue_transfers
+
+    order = two_vendor_order()
+    pay(stripe, order)
+    payment = Payment.objects.get()
+    jobs_before = len(tasks.list_jobs("ledger.transfer_payment"))
+    lines_before = LedgerEntry.objects.count()
+
+    class Boom(Exception):
+        pass
+
+    def paying_then_failing() -> None:
+        with transaction.atomic():
+            post_and_queue_transfers(Payment, payment)
+            raise Boom
+
+    with pytest.raises(Boom):
+        paying_then_failing()
+
+    assert len(tasks.list_jobs("ledger.transfer_payment")) == jobs_before
+    assert LedgerEntry.objects.count() == lines_before
+    assert stripe.transfers == {}
