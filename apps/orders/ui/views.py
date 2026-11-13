@@ -43,6 +43,7 @@ from apps.orders import engine
 from apps.orders.checkout import build_checkout
 from apps.orders.models import Order
 from apps.orders.services import (
+    PAID_OR_LATER,
     CheckoutClosed,
     CheckoutPreview,
     OrderRefused,
@@ -444,7 +445,8 @@ def review_page(request: HttpRequest) -> HttpResponse:
     if order is None:
         raise Http404
     request.session[state.CONFIRMATION_KEY] = str(order.public_id)
-    request.session[state.PAYMENT_BROWSER_STATE] = order.payment_intent_ref
+    if order.payment_intent_ref:  # empty after a failed provider call: the page retries
+        request.session[state.PAYMENT_BROWSER_STATE] = order.payment_intent_ref
     state.clear(request)
     return _private(HttpResponseRedirect(reverse("orders:confirmation")))
 
@@ -510,7 +512,7 @@ def _payment_context(request: HttpRequest, order: Order) -> dict[str, Any] | Non
         if not order.payment_intent_ref:
             return None
     remembered = request.session.get(state.PAYMENT_BROWSER_STATE)
-    if remembered is not None and remembered != order.payment_intent_ref:
+    if remembered and remembered != order.payment_intent_ref:
         raise Http404("This payment is not for this order")
     request.session[state.PAYMENT_BROWSER_STATE] = order.payment_intent_ref
     try:
@@ -543,7 +545,8 @@ def confirmation_page(request: HttpRequest) -> HttpResponse:
             {"label": _("VAT"), "amount": present.money(order.tax_total)},
         ],
         "grand_total": present.money(order.grand_total),
-        "paid": order.state != "awaiting_payment",
+        "paid": order.state in PAID_OR_LATER,
+        "payment_closed": order.state not in PAID_OR_LATER and order.state != "awaiting_payment",
         "payment": _payment_context(request, order),
     }
     return _page(request, "orders/confirmation.html", context)

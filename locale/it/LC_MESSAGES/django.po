@@ -5470,6 +5470,10 @@ msgstr "Serve la tua passkey"
 msgid "This notice is not possible."
 msgstr "Questo preavviso non è possibile."
 
+#: apps/orders/templates/orders/confirmation.html
+msgid "This order is no longer open for payment."
+msgstr "Questo ordine non è più aperto al pagamento."
+
 #: apps/catalog/templates/catalog/product.html
 msgid "This page is not available in your language yet."
 msgstr "Questa pagina non è ancora disponibile nella tua lingua."
