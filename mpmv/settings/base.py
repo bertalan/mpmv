@@ -61,6 +61,10 @@ ALLOW_SEED = env_bool("MPMV_ALLOW_SEED", default=False)
 DEMO_MODE = env_bool("MPMV_DEMO_MODE", default=False)
 FORCE_NOINDEX = env_bool("MPMV_FORCE_NOINDEX", default=False)
 LIVE_DATA = False
+# Secret key of the privacy pseudonyms (apps.core.privacy: counters, suppression list, L-3). Kept
+# outside the database, apart from SECRET_KEY so rotating one does not change the other. Empty
+# falls back to SECRET_KEY: fine in dev and tests; LIVE and STAGE refuse it (core.E901).
+PRIVACY_PEPPER = env_str("MPMV_PRIVACY_PEPPER", "")
 # True only in mpmv.settings.stage: the checks that guard LIVE (e.g. payments.E003) apply there too.
 STAGE = False
 

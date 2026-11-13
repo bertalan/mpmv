@@ -23,6 +23,7 @@ REVERT_PROFILE_PERMISSION: Final = "vendors.revert_storefront_profile"  # CORE.9
 EDITORS_ADMIN_PERMISSION: Final = "wagtailadmin.access_admin"
 # Opens a passkey window (CORE.25). Owner decision 2026-11-12 (D-32): owner, support and finance.
 ELEVATE_PERMISSION: Final = "core.elevate"
+REVIEW_NOTICES_PERMISSION: Final = "compliance.review_notices"  # CMP.5, Catalog and moderation
 
 
 class Access(StrEnum):
@@ -72,6 +73,7 @@ ROLES: Final[tuple[Role, ...]] = (
         (
             "manager.platform_catalog",
             VIEW_ALL_VENDORS_PERMISSION,
+            REVIEW_NOTICES_PERMISSION,
             REVERT_PROFILE_PERMISSION,
             EDITORS_ADMIN_PERMISSION,
         ),
@@ -95,6 +97,7 @@ ROLES: Final[tuple[Role, ...]] = (
         (
             PLATFORM_OWNER_PERMISSION,
             VIEW_ALL_VENDORS_PERMISSION,
+            REVIEW_NOTICES_PERMISSION,
             REVERT_PROFILE_PERMISSION,
             EDITORS_ADMIN_PERMISSION,
             ELEVATE_PERMISSION,
@@ -207,6 +210,10 @@ def render_matrix_doc() -> str:
         "# Platform roles and the role-permission matrix (CORE.18)",
         "",
         "<!-- Generated from apps/manager/roles.py by `make docs`; do not edit by hand. -->",
+        "",
+        "Every change to the permissions of a role needs a new `manager` data migration that "
+        "calls `sync_role_groups`: the drift check (manager.E004) skips only while a manager "
+        "migration is pending, so without one `migrate` on a deployed database fails.",
         "",
         "## Roles",
         "",

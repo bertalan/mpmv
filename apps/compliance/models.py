@@ -433,6 +433,30 @@ class ErasureRequest(BaseModel):
         return f"erasure of user {self.user_id} ({'done' if self.completed_at else 'pending'})"
 
 
+class SuppressedEmail(BaseModel):
+    """An address that must receive no marketing message (L-3, PRM.9, PRM.16).
+
+    Holds only the HMAC-SHA256 of the normalised address (`apps.core.privacy.suppression_digest`),
+    keyed on the privacy pepper kept outside the database: the table cannot be reversed by
+    hashing guessed addresses without that key, and there is no per-row salt, so a lookup is one
+    indexed equality."""
+
+    class Reason(models.TextChoices):
+        UNSUBSCRIBED = "unsubscribed", "Unsubscribed"
+        COMPLAINT = "complaint", "Spam complaint"
+        BOUNCE = "bounce", "Hard bounce"
+        MANUAL = "manual", "Added by staff"
+
+    digest = models.CharField(max_length=64, unique=True, editable=False)
+    reason = models.CharField(max_length=16, choices=Reason.choices, default=Reason.UNSUBSCRIBED)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self) -> str:
+        return f"suppressed {self.digest[:8]}"
+
+
 class StatementOfReasons(BaseModel):
     """The statement of reasons a vendor gets for a restriction (DSA art. 17, P2B art. 4).
 
