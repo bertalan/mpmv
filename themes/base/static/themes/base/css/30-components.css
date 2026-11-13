@@ -691,3 +691,9 @@
     border: 0;
   }
 }
+
+/* Checkout (ORD.5): the business fields show with their checkbox; without the checkbox ticked
+   they stay out of the page and of the tab order. No script: the rule reads the form's state. */
+form:not(:has(input[name="is_business"]:checked)) .checkout-business {
+  display: none;
+}

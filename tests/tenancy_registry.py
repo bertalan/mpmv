@@ -623,6 +623,22 @@ ENDPOINTS: dict[str, Access] = {
     "dsa_notice_received": NoVendorData(
         "Thanks page after a report (CMP.5): shows only the reference kept in the session."
     ),
+    "orders:cart": NoVendorData(
+        "Cart page (ORD.5): shows the caller's own cart, found from their session or account, "
+        "never a cart or a vendor's data chosen by an identifier."
+    ),
+    "orders:checkout": NoVendorData(
+        "Checkout details (ORD.5): the caller's own cart and their own typed details only."
+    ),
+    "orders:review": NoVendorData(
+        "Checkout review (ORD.5): the caller's own cart and session; no identifier in the URL."
+    ),
+    "orders:shipping": NoVendorData(
+        "Shipping choice (ORD.5): stores a choice in the caller's own session for their own cart."
+    ),
+    "orders:confirmation": NoVendorData(
+        "Order confirmation (ORD.5): shows only the order the session just placed, a 404 without."
+    ),
     "withdrawal": NoVendorData(
         "Online withdrawal, step one (CMP.6): no vendor data without the order number and email "
         "of a contract; captcha and a rate limit guard the POST."
