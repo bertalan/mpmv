@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **332** in **20** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2675 h** (P1 2153 h · P2 460 h · P3 62 h)
+- Micro-tasks: **333** in **20** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2678 h** (P1 2156 h · P2 460 h · P3 62 h)
 - P1 critical path (schedule lower bound with full parallelism): **153 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CORE.2 → CORE.3 → CORE.17 → CORE.18 → FIT.1 → FIT.5 → FIT.7 → FIT.8 → FIT.10 → FIT.12
 
 ## By macro area
@@ -18,7 +18,7 @@
 | CORE | Identity, permissions, API, backoffice | 26 | 199 | 4 | 6 | 209 |
 | CAT | Product catalog | 20 | 150 | 60 | 0 | 210 |
 | VEN | Vendors, commissions, ledger | 32 | 254 | 26 | 0 | 280 |
-| TAX | Tax engine | 16 | 62 | 31 | 0 | 93 |
+| TAX | Tax engine | 17 | 65 | 31 | 0 | 96 |
 | SHP | Shipping and quotes | 14 | 96 | 28 | 0 | 124 |
 | ORD | Cart, orders, returns | 15 | 118 | 18 | 0 | 136 |
 | PAY | Payments (Stripe Connect) | 6 | 40 | 4 | 16 | 60 |
@@ -34,7 +34,7 @@
 | SEC | Security | 11 | 70 | 0 | 0 | 70 |
 | OPS | Operations | 12 | 19 | 37 | 8 | 64 |
 | MIG | Migration and cutover | 21 | 135 | 29 | 0 | 164 |
-| **Total** | | **332** | **2153** | **460** | **62** | **2675** |
+| **Total** | | **333** | **2156** | **460** | **62** | **2678** |
 
 ## By phase
 
@@ -160,7 +160,7 @@
 | THM.6 | First vertical theme `ride`: colour tokens from the operator palette (§14.4, §14.12), type scale, spacing and shapes from the reference template's visual language, self-hosted Barlow and Barlow Condensed (OFL 1.1, from upstream), SVG icon subset, header, hero and home block overrides, placeholder imagery, `LICENSES.toml` | P1 | 8 | THM.4, CMS.2 | Home page renders with `ride` and passes the THM.5 gates; no file derived from the reference template (PR checklist) |
 | THM.12 | Modern image formats: `WAGTAILIMAGES_FORMAT_CONVERSIONS` sends raster renditions to WebP (animated GIFs keep their format), `<picture>` renditions in AVIF, WebP and JPEG with `srcset`, `sizes`, width and height in CMS, catalog and theme templates, `fetchpriority="high"` on the LCP hero, AVIF dropped with a warning when the image library cannot encode it; uploads open to JPEG, PNG, WebP, AVIF and GIF, originals re-encoded without metadata (SEC.2); SVG only for logos and icons, checked at upload against an allow-list with a safe parser (no scripts, event handlers, `foreignObject`, external references, `url()` in styles, DTD or entities) and served same-origin as `image/svg+xml` with a restrictive CSP | P1 | 6 | THM.4, CMS.8 | Pages serve AVIF and WebP with a JPEG fallback and correct `srcset` and `sizes`; a PNG upload renders as WebP; a scripted SVG is refused; unit tests run the sanitiser on a corpus of malicious SVGs, integration tests cover the renditions, and an e2e test finds AVIF and WebP sources in a page's `<picture>` with no CSP violation |
 
-### F2 — Checkout: tax, shipping, orders, payments (38 tasks, 326 h)
+### F2 — Checkout: tax, shipping, orders, payments (39 tasks, 329 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -176,6 +176,7 @@
 | TAX.13 | Exemption reasons per country (owner decision MQ-3): each exemption reason declares the country of the law that defines it (IT for `art74_publishing` and `flat_rate_forfettario`; `other` stores the country of the law cited in its legal note), and the profile consistency check refuses a reason whose country differs from the country of the vendor's VAT registration, on the staff direct path and on TAX.2 approval alike; the check also runs on a VAT number change; staff enter the law country of existing `other` profiles by hand (MQ-15) | P1 | 3 | TAX.2, VEN.12 | An Italian vendor saves `art74_publishing`; a German vendor is refused `art74_publishing` and `flat_rate_forfettario`; a staff-added profile and an approved request give the same refusal; changing an exempt Italian vendor's VAT number to another country is reported; `other` without a country is refused; no data migration fills the country of an existing `other` profile, and such a profile stays in the inconsistency report until staff enter the country (owner decision MQ-15) |
 | TAX.17 | Shipping VAT always follows the goods (D-03, decided: adviser opinion 2026-11-11; follow-up of TAX.4 and SHP.12): `ShippingMethod.tax_treatment` keeps only `follows_goods`; the `standard_rate` and `exempt` values and any "force VAT" carrier option are removed, with a data migration that sets every stored method to `follows_goods` and reports the rows it changed; `UnsupportedShippingTreatment` and its branch in `resolve_shipping_tax` go; the shipping configuration import (spec 06) refuses any other value; the pro-rata split by net goods amount, rounding cent on the largest base, is final; the PR is flagged for human review (tax code) | P1 | 3 | TAX.4, SHP.12 | No model choice, Manager form or import accepts a treatment other than following the goods (tests); the data migration turns a seeded `standard_rate` method into `follows_goods` and lists it in its report; an import row with `exempt` is refused with a clear message; T8–T13 stay green; `UnsupportedShippingTreatment` no longer exists |
 | TAX.18 | Northern Ireland goods rules (D-02, decided: adviser opinion 2026-11-11; owner, 2026-11-11: open Northern Ireland now; replaces the blocking error for `XI` of TAX.3 and TAX.7): a delivery country GB with a normalised postcode matching `^BT[0-9]` resolves to jurisdiction `XI`; B2C is an EU distance sale of goods counted in the vendor's EUR 10,000 EU threshold (TAX.8), and above it, or by the vendor's option, the UK VAT rate applies, reported through the vendor's EU OSS under code `XI` (TAX.10), with no UK registration; B2B with a VIES-valid number with prefix `XI` is an intra-EU exempt supply (nature `N3.2`, Intrastat `XI`) and the vendor keeps proof of delivery; a GB-only VAT number is treated as B2C; the CMP.14 UK lead-only rule never applies to an `XI` delivery; the PR is flagged for human review (tax code) | P1 | 6 | TAX.3, TAX.5, TAX.7 | Regression cases: a `BT1 1AA` B2C delivery below the threshold gets the vendor's domestic rate and the same above the threshold gets the UK rate with OSS code `XI`; a `BT` B2B delivery with a VIES-valid `XI` number gets 0% with `N3.2` and Intrastat `XI`; a GB-only number on a `BT` delivery is B2C; a GB postcode not matching `^BT[0-9]` stays under the UK rules (CMP.14); lowercase and spaced `bt1 1aa` matches after normalisation; the `XI` blocking error is gone |
+| TAX.19 | XI VAT numbers: store `VatValidation` for `XI` (follow-up of TAX.18): `VatValidation.country` accepts the Northern Ireland code, `XI` joins `VIES_COUNTRIES` and `normalize_country` is not asked about it, with a migration and a `build_tax_context` integration test for a VIES-valid `XI` number (until then `verify_vat_number('XI', ...)` returns "not in VIES", so a `BT` B2B customer is treated as B2C) | P1 | 3 | TAX.18 | A VIES-valid `XI` number is stored and verified, `build_tax_context` yields a reverse-charge decision with `N3.2` for a `BT` B2B delivery; `verify_vat_number` still never raises |
 | SHP.1 | Carrier, Zone, VendorZoneRate, WeightBand (exclusion constraint), PickupOption, ConfigVersion models | P1 | 10 | VEN.1 | DB constraints tested |
 | SHP.2 | Legacy cases 1–7 against the `match_postcode` and `resolve_zone` pure functions that SHP.12 built; destination country normalised before matching (`EL` → `GR`, `UK` → `GB`), postcode patterns parsed once per zone, a spaced dash range (`70000 - 74999`) refused like the old range form | P1 | 6 | SHP.12 | Cases 1–7 green; an `EL` destination matches a `GR` zone; `70000 - 74999` is refused with the `..` hint |
 | SHP.3 | `quote_shipping` with Rates/IndicativeRates/NeedsQuote/Blocked outcomes, over-band policy, pickup, free-shipping threshold per method; over-band policy (owner decision D-06, 2026-11-11): a weight above the last band of a method answers `NeedsQuote`, the default `over_max_weight` is `quote`, and `last_band` and `block` stay as per-method options | P1 | 8 | SHP.2, SHP.12, SHP.14 | Cases 8–13 green; a package heavier than the last band of a method with the default policy returns `NeedsQuote` (not the last band price, not `Blocked`); a method set to `last_band` or `block` keeps its own outcome; the default of a new method is `quote` |

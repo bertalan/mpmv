@@ -1922,6 +1922,14 @@ msgstr "Su STAGE e LIVE queste pagine possono rispondere solo dalla rete del ser
 msgid "One line under the shop name. Plain text."
 msgstr "Una riga sotto il nome del negozio. Testo semplice."
 
+#: apps/orders/messages.py
+msgid ""
+"One of the shops in your cart cannot take orders right now. Nothing was charged. Remove its items "
+"or try again later."
+msgstr ""
+"Uno dei negozi nel tuo carrello al momento non può accettare ordini. Non ti è stato addebitato "
+"nulla. Rimuovi i suoi prodotti o riprova più tardi."
+
 #: apps/events/models.py
 msgid ""
 "One or two sentences that tell what the event is, up to 300 characters. They are shown in the "
@@ -5174,6 +5182,10 @@ msgstr ""
 "Attenzione: questo testo è pensato per il database di trasparenza dell'UE (l'invio non c'è ancora,"
 " per ora viene solo salvato). Al massimo 2000 caratteri. Non scrivere dati personali, nomi, "
 "indirizzi email o indirizzi web."
+
+#: apps/orders/messages.py
+msgid "We are not taking new orders right now. Nothing was charged. Please try again later."
+msgstr "Al momento non accettiamo nuovi ordini. Non ti è stato addebitato nulla. Riprova più tardi."
 
 #: themes/base/templates/500.html
 msgid "We could not complete your request. Please try again in a few minutes."
