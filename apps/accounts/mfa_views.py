@@ -50,7 +50,7 @@ def _may_enrol(request: HttpRequest) -> bool:
 
 
 def _wants_uv(request: HttpRequest) -> bool:
-    """`?factor=passkey`: a sensitive action (D-32 group 3) asks for a passkey with user
+    """`?factor=passkey`: a sensitive action (D-32 critical) asks for a passkey with user
     verification; only such a verification counts for it."""
     return request.GET.get("factor") == "passkey"
 
@@ -80,7 +80,23 @@ def _bad_request(error: str) -> JsonResponse:
 def setup(request: HttpRequest) -> HttpResponse:
     if not _may_enrol(request):
         return mfa_redirect(request, "mfa:verify")
+    user = _user(request)
     next_url = safe_next(request)
+    passkeys = [
+        {
+            "device": device,
+            "remove_url": reverse(
+                "mfa:remove_device",
+                kwargs={"kind": services.PASSKEY, "public_id": device.public_id},
+            ),
+        }
+        for device in PasskeyDevice.objects.filter(user=user, confirmed=True).order_by("created_at")
+    ]
+    has_totp = TOTPDevice.objects.filter(user=user, confirmed=True).exists()
+    required = services.mfa_required(user)
+    # The "your role requires a factor" notice: only for a user with none, or one sent here by
+    # the MFA gate (a redirect with `next`); the Account menu and the banner say `from=security`.
+    sent_by_gate = "next" in request.GET and request.GET.get("from") != "security"
     return render(
         request,
         "accounts/mfa/setup.html",
@@ -89,7 +105,10 @@ def setup(request: HttpRequest) -> HttpResponse:
             "totp_url": _with_next("mfa:totp", next_url),
             "register_options_url": reverse("mfa:passkey_register_options"),
             "register_url": _with_next("mfa:passkey_register", next_url),
-            "required": services.mfa_required(_user(request)),
+            "required": required,
+            "passkeys": passkeys,
+            "has_totp": has_totp,
+            "show_required": required and (not (passkeys or has_totp) or sent_by_gate),
         },
     )
 
@@ -150,7 +169,7 @@ def verify(request: HttpRequest) -> HttpResponse:
     if not services.has_second_factor(user):
         return mfa_redirect(request, "mfa:setup", next_url=safe_next(request))
     next_url = safe_next(request)
-    # D-32 group 3: the action asked for a passkey, so a code or recovery code is not offered.
+    # D-32 critical: the action asked for a passkey, so a code or recovery code is not offered.
     passkey_only = (request.POST.get("factor") or request.GET.get("factor")) == "passkey"
     error = ""
     method: str | None = None
@@ -375,6 +394,6 @@ def remove_device(request: HttpRequest, kind: str, public_id: str) -> HttpRespon
             messages.success(req, gettext("%(name)s removed.") % {"name": device.name})
         return HttpResponseRedirect(reverse("mfa:overview"))
 
-    if services.removal_weakens_mfa(device):  # D-32 group 3: the last factor or last passkey
+    if services.removal_weakens_mfa(device):  # D-32 critical: the last factor or last passkey
         return requires_level("mfa_disable")(remove)(request)
     return remove(request)

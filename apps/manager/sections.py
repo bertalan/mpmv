@@ -5,12 +5,21 @@ pages of CORE.9, VEN.9, VEN.15, VEN.20, EVT.4, ORD.6 and CAT.18, and the platfor
 whose role checks CORE.18 defines.
 """
 
+from typing import Any
+
 from django.utils.translation import gettext_lazy as _
+
+from apps.vendors.services import can_review_profiles
 
 from .navigation import Registry, Section, anyone, platform_role, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
 from .spaces import Space
+
+
+def can_review_profiles_section(ctx: Any) -> bool:
+    return can_review_profiles(ctx.user)
+
 
 BUILT_IN = (
     Section(
@@ -67,6 +76,15 @@ BUILT_IN = (
         "manager:platform:dashboard",
         order=10,
         allowed=anyone,
+    ),
+    # Staff with the revert permission (CORE.9 3/3): history of owners' profile changes, revert.
+    Section(
+        "platform.profile_changes",
+        Space.PLATFORM,
+        _("Storefront changes"),
+        "manager:platform:profile_changes",
+        order=20,
+        allowed=can_review_profiles_section,
     ),
     Section(
         NOTICES_SECTION,

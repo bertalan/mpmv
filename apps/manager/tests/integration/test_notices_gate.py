@@ -36,12 +36,12 @@ def test_a_role_only_owner_can_read_notices(client: Client) -> None:
     assert client.get(URL).status_code == 200
 
 
-def test_migration_0003_gives_existing_catalog_and_owner_groups_the_permission() -> None:
+def test_migration_0006_gives_existing_catalog_and_owner_groups_the_permission() -> None:
     import importlib
 
     from django.apps import apps as django_apps
 
-    migration = importlib.import_module("apps.manager.migrations.0003_catalog_review_notices")
+    migration = importlib.import_module("apps.manager.migrations.0006_catalog_review_notices")
     for key in ("catalog", "owner"):
         group = Group.objects.get(name=roles.role(key).group)
         group.permissions.remove(*group.permissions.filter(codename="review_notices"))

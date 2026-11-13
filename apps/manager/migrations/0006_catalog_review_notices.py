@@ -16,7 +16,7 @@ def seed(apps, schema_editor):  # type: ignore[no-untyped-def]
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("manager", "0002_seed_role_groups"),
+        ("manager", "0005_role_groups_revert_profile"),
         ("compliance", "0005_erasure_request"),
     ]
     operations = [migrations.RunPython(seed, migrations.RunPython.noop)]

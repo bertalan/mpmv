@@ -301,7 +301,7 @@ def test_a_grant_through_the_page(client: Client) -> None:
 
 def test_a_grant_without_operational_mode_is_refused_with_an_explanation(client: Client) -> None:
     owner, target = staff("owner"), UserFactory.create(staff=True)
-    login(client, owner, level=levels.RESTRICTED)
+    login(client, owner, level=levels.NO_WINDOW)
     response = client.post(URL, grant_post(target.email, "support"))
     assert response.status_code == 403
     assert held(target) == frozenset()
@@ -330,7 +330,7 @@ def test_the_owner_role_needs_a_fresh_passkey(client: Client) -> None:
 
 def test_a_revocation_through_the_page_needs_the_same_step_up(client: Client) -> None:
     owner, target = staff("owner"), staff("support")
-    login(client, owner, level=levels.RESTRICTED)
+    login(client, owner, level=levels.NO_WINDOW)
     post = {"action": "revoke", "email": target.email, "role": "support", "reason": ""}
     assert client.post(URL, post).status_code == 403
     assert held(target) == {"support"}

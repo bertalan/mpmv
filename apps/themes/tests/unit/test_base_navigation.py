@@ -28,6 +28,8 @@ from apps.themes.build import render_themes
 from apps.themes.styleguide import COMPONENTS
 from apps.themes.tests.builders import SHIPPED_THEMES
 
+pytestmark = pytest.mark.usefixtures("english_interface")
+
 ROOT = Path(__file__).resolve().parents[4]
 INTERACTIVE = re.compile(r"<(?:a|button|input|select|textarea|details)[\s>]")
 

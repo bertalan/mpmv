@@ -17,6 +17,12 @@ from typing import Final
 
 PLATFORM_OWNER_PERMISSION: Final = "core.platform_owner"
 VIEW_ALL_VENDORS_PERMISSION: Final = "vendors.view_all_vendors"  # Q-34
+REVERT_PROFILE_PERMISSION: Final = "vendors.revert_storefront_profile"  # CORE.9, Q-16
+# Wagtail's access to the editors' admin: the roles that edit or read the help texts (ARC.32,
+# lane-a on #86) hold it, so the Help item and the "Help texts" snippet are reachable.
+EDITORS_ADMIN_PERMISSION: Final = "wagtailadmin.access_admin"
+# Opens a passkey window (CORE.25). Owner decision 2026-11-12 (D-32): owner, support and finance.
+ELEVATE_PERMISSION: Final = "core.elevate"
 REVIEW_NOTICES_PERMISSION: Final = "compliance.review_notices"  # CMP.5, Catalog and moderation
 
 
@@ -64,25 +70,38 @@ ROLES: Final[tuple[Role, ...]] = (
         CATALOG,
         "Platform: catalog and moderation",
         "Catalog and moderation",
-        ("manager.platform_catalog", VIEW_ALL_VENDORS_PERMISSION, REVIEW_NOTICES_PERMISSION),
+        (
+            "manager.platform_catalog",
+            VIEW_ALL_VENDORS_PERMISSION,
+            REVIEW_NOTICES_PERMISSION,
+            REVERT_PROFILE_PERMISSION,
+            EDITORS_ADMIN_PERMISSION,
+        ),
     ),
     Role(
         FINANCE,
         "Platform: finance and payments",
         "Finance and payments",
-        ("manager.platform_finance", VIEW_ALL_VENDORS_PERMISSION),
+        ("manager.platform_finance", VIEW_ALL_VENDORS_PERMISSION, ELEVATE_PERMISSION),
     ),
     Role(
         SUPPORT,
         "Platform: support",
         "Support",
-        ("manager.platform_support", VIEW_ALL_VENDORS_PERMISSION),
+        ("manager.platform_support", VIEW_ALL_VENDORS_PERMISSION, ELEVATE_PERMISSION),
     ),
     Role(
         OWNER,
         "Platform: owner",
         "Platform owner",
-        (PLATFORM_OWNER_PERMISSION, VIEW_ALL_VENDORS_PERMISSION, REVIEW_NOTICES_PERMISSION),
+        (
+            PLATFORM_OWNER_PERMISSION,
+            VIEW_ALL_VENDORS_PERMISSION,
+            REVIEW_NOTICES_PERMISSION,
+            REVERT_PROFILE_PERMISSION,
+            EDITORS_ADMIN_PERMISSION,
+            ELEVATE_PERMISSION,
+        ),
     ),
 )
 
@@ -102,10 +121,8 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.owner_settings": {CONFIG: R, OWNER: E},
     "platform.catalog": {CATALOG: E, SUPPORT: R, OWNER: R},
     "platform.moderation": {CATALOG: E, OWNER: R},
-    "platform.notices": {
-        CATALOG: E,
-        OWNER: R,
-    },  # CMP.5; the view also needs compliance.review_notices
+    "platform.notices": {CATALOG: E, OWNER: R},  # CMP.5; still gated by compliance.review_notices
+    "platform.profile_changes": {CATALOG: E, OWNER: E},  # CORE.9: history and revert
     "platform.vendors": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: R, OWNER: E},
     "platform.vendor_approval": {CATALOG: E, OWNER: E},
     "platform.vendor_closure": {OWNER: E},
@@ -127,6 +144,7 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.catalog": "Platform: catalog, categories, attributes, taxonomies, imports",
     "platform.moderation": "Platform: moderation (vendor events, storefront changes, content)",
     "platform.notices": "Platform: notices of illegal content (CMP.5)",
+    "platform.profile_changes": "Platform: storefront profile changes, history and revert (CORE.9)",
     "platform.vendors": "Platform: vendors (applications, plans)",
     "platform.vendor_approval": "Platform: approve or suspend a vendor (step-up, reason)",
     "platform.vendor_closure": "Platform: close a vendor definitively",
