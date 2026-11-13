@@ -303,3 +303,105 @@ def test_entry_helpers_split_slug_history_from_redirect_rows() -> None:
 
 def test_the_build_is_deterministic() -> None:
     assert build() == build(products=tuple(reversed((PRODUCT_A, PRODUCT_TRASH, PRODUCT_DRAFT))))
+
+
+# --- Hardening: real URL names, open redirects, one-hop everywhere, idempotency ---
+
+
+def _reverse_in(language: str, name: str, **kwargs: str) -> str:
+    from django.urls import reverse
+    from django.utils import translation
+
+    from apps.catalog import slugs
+
+    segments = {"catalog:product": slugs.PRODUCT_SEGMENTS, "catalog:brand": slugs.BRAND_SEGMENTS}
+    with translation.override(language):
+        return reverse(name, kwargs={"segment": segments[name][language], **kwargs})
+
+
+def test_targets_built_with_reverse_resolve_to_the_real_catalog_urls() -> None:
+    en = _reverse_in("en", "catalog:product", slug="widget")
+    it = _reverse_in("it", "catalog:product", slug="widget")
+    brand = _reverse_in("en", "catalog:brand", slug="acme")
+    product = ProductIn(
+        key="r",
+        status="publish",
+        targets={"en": en, "it": it},
+        current_slugs={"en": "widget-old-en", "it": "widget-old-it"},
+    )
+    result = build(
+        products=(product,),
+        blog_posts=(),
+        tags=(),
+        categories=(),
+        retired_skus=(),
+        brands=(BrandIn(language="en", slug="old-acme", target=brand),),
+    )
+    en_entry = result.resolve("/product/widget-old-en/")
+    it_entry = result.resolve("/it/prodotto/widget-old-it/")
+    brand_entry = result.resolve("/brand/old-acme/")
+    assert en_entry is not None
+    assert en_entry.target == en
+    assert it_entry is not None
+    assert it_entry.target == it
+    assert brand_entry is not None
+    assert brand_entry.target == brand
+    assert not result.issues
+
+
+def test_open_redirect_targets_are_refused() -> None:
+    bad = (
+        "//evil.example.test/x/",
+        "https://evil.example.test/x/",
+        "http://evil.example.test/",
+        "/\\evil.example.test/",
+        "javascript:alert(1)",
+        "/ok/\n/evil/",
+        "/a/../b/",
+    )
+    tags = tuple(TagIn("en", f"t{i}", target) for i, target in enumerate(bad))
+    result = build(products=(), blog_posts=(), categories=(), brands=(), retired_skus=(), tags=tags)
+    assert not result.entries
+    assert len(result.issues) == len(bad)
+    assert {i.kind for i in result.issues} == {rm.ISSUE_INVALID}
+
+
+def test_every_redirect_target_is_a_local_path_and_never_a_source() -> None:
+    result = build()
+    sources = {e.source for e in result.entries}
+    for entry in result.entries:
+        if entry.target is None:
+            continue
+        assert entry.target.startswith("/")
+        assert not entry.target.startswith("//")
+        assert "://" not in entry.target
+        assert "\\" not in entry.target
+        assert entry.target not in sources
+        assert entry.source != entry.target
+
+
+def test_two_sources_chaining_through_another_source_stay_one_hop() -> None:
+    tags = (
+        TagIn("en", "a", "/tag-product/b/"),
+        TagIn("en", "b", "/models/final/"),
+    )
+    result = build(products=(), blog_posts=(), categories=(), brands=(), retired_skus=(), tags=tags)
+    first = result.resolve("/tag-product/a/")
+    assert first is not None
+    assert first.target == "/models/final/"
+    assert all(e.target not in {x.source for x in result.entries} for e in result.entries)
+
+
+def test_feeding_the_output_back_changes_nothing() -> None:
+    first = build()
+    second = build()
+    assert first == second
+    tags = tuple(
+        TagIn("it" if e.source.startswith("/it/") else "en", e.source.rsplit("/", 2)[-2], e.target)
+        for e in first.entries
+        if e.target and e.origin == rm.ORIGIN_MERGED_TAG
+    )
+    again = build(products=(), blog_posts=(), categories=(), brands=(), retired_skus=(), tags=tags)
+    assert {(e.source, e.target) for e in again.entries} == {
+        (e.source, e.target) for e in first.entries if e.origin == rm.ORIGIN_MERGED_TAG
+    }
