@@ -266,3 +266,20 @@ def test_an_unknown_account_changes_nothing(client: Client, webhook: None) -> No
 
 def test_a_payload_without_an_account_id_is_malformed(client: Client, webhook: None) -> None:
     assert post_event(client, "evt_a4", {"charges_enabled": True}).status_code == 400
+
+
+# --- Demo payout accounts (ARC.10 seed, owner decision 2026-11-13)
+
+
+def test_a_demo_account_is_ready_audited_idempotent_and_dry_runnable(ctx: AuditContext) -> None:
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    preview = connect.record_demo_account(vendor, number=7, ctx=ctx, dry_run=True)
+    assert not preview.is_empty
+    assert not ConnectedAccount.objects.filter(vendor=vendor).exists()
+
+    connect.record_demo_account(vendor, number=7, ctx=ctx)
+
+    account = ConnectedAccount.objects.get(vendor=vendor)
+    assert (account.account_ref, account.status) == ("acct_demo_7", stripe_engine.ACTIVE)
+    assert AuditLog.objects.filter(action="payments.connected_account.created").count() == 1
+    assert connect.record_demo_account(vendor, number=8, ctx=ctx).is_empty

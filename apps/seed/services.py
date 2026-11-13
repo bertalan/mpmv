@@ -71,6 +71,7 @@ from apps.core.services import (
 from apps.core.text import slugify
 from apps.events.models import EventIndexPage, EventPage
 from apps.events.services import ensure_event_indexes
+from apps.payments import connect as payments_connect
 from apps.shipping import config_format as shipping_format
 from apps.shipping.config_io import import_config
 from apps.shipping.models import (
@@ -668,6 +669,9 @@ def _vendor(run: _Run, index: int, spec: data.VendorSeed, contract: VendorContra
         run.add(
             tax_services.configure_vendor_tax_profile(profile, approver=_operator(run), ctx=run.ctx)
         )
+
+    if spec.payout_account:
+        run.add(payments_connect.record_demo_account(vendor, number=index + 1, ctx=run.ctx))
 
     def text(language: str) -> VendorTranslation:
         # Rich text (D-34): the seed writes paragraphs, as the editor does.

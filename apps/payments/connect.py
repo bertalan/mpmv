@@ -75,6 +75,34 @@ def has_active_account(vendor: Vendor) -> bool:
     ).exists()
 
 
+DEMO_ACCOUNT_PREFIX = "acct_demo_"
+
+
+def record_demo_account(
+    vendor: Vendor, *, number: int, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """A ready payout account for a demo vendor (ARC.10 seed only, owner decision 2026-11-13).
+
+    The id `acct_demo_<n>` is obviously fake and never reaches the provider; the model has no
+    demo flag, so the prefix marks the row as test data. Only the demo seed calls this, and the
+    seed refuses to run on live data. Idempotent: a vendor that has an account keeps it as is."""
+    if ConnectedAccount.objects.filter(vendor=vendor).exists():
+        return ChangeSet()
+    account = ConnectedAccount(
+        vendor=vendor,
+        provider=PROVIDER,
+        account_ref=f"{DEMO_ACCOUNT_PREFIX}{number}",
+        status=stripe_engine.ACTIVE,
+        details_submitted=True,
+        charges_enabled=True,
+        payouts_enabled=True,
+    )
+    changes = ChangeSet()
+    changes.create(CONNECTED_ACCOUNT_MODEL, str(vendor.public_id), _snapshot(account))
+    run_mutation(changes, account.save, ctx=ctx, action=CONNECTED_ACCOUNT_CREATED, dry_run=dry_run)
+    return changes
+
+
 def start_onboarding(
     vendor: Vendor,
     *,
