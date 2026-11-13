@@ -80,7 +80,7 @@ then one transfer per vendor with `source_transaction` = the order's charge. The
 what stays on the platform's Stripe balance. Everything goes through the `StripeClient` interface
 (`stripe_client.py`); tests use `apps/payments/tests/fake_stripe.py` and never touch the network.
 Keys: `MPMV_STRIPE_SECRET_KEY`, `MPMV_STRIPE_WEBHOOK_SECRET` (empty by default; `payments.E003`
-refuses an empty one on LIVE and STAGE). Webhook: `POST /webhooks/payments/`, CSRF-exempt, signature
+refuses an empty one on LIVE and STAGE; `payments.E004` refuses LIVE while `PAYMENTS_TRANSFERS_WIRED` is False, which PAY.3 turns on). Webhook: `POST /webhooks/payments/`, CSRF-exempt, signature
 and 300 s timestamp tolerance checked first, event ids stored in `ProcessedEvent` (a replay does
 nothing), then the `on_payment_succeeded` signal (`apps/payments/signals.py`) inside the same
-transaction. Ledger posting (PAY.3, needs VEN.4) and the order state change connect to that signal.
+transaction. The order state change is connected (`order_hook.py`, `mark_order_paid`, PAY.2); ledger posting (PAY.3, needs VEN.4) connects to the same signal.
