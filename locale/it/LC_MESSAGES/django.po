@@ -4584,6 +4584,10 @@ msgid "the passkey was not accepted"
 msgstr "la passkey non è stata accettata"
 
 #: apps/orders/templates/orders/confirmation.html
+msgid "Your payment is being processed. This page updates when it is confirmed; do not pay again."
+msgstr "Il pagamento è in elaborazione. Questa pagina si aggiorna alla conferma; non pagare di nuovo."
+
+#: apps/orders/templates/orders/confirmation.html
 msgid "The payment form could not be loaded. Please reload this page in a moment."
 msgstr "Impossibile caricare il modulo di pagamento. Ricarica la pagina tra un momento."
 

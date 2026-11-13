@@ -8,11 +8,18 @@ the payment succeeds (PAY.3), not here.
 
 from decimal import Decimal
 
+from apps.orders.services import PaymentInProgress as OrderPaymentInProgress
 from apps.orders.services import PaymentMismatch as OrderPaymentMismatch
 from apps.orders.services import PaymentUnavailable
 
 from . import registry, stripe_engine
-from .engine import PaymentMismatch, PaymentRequest, PaymentStatus, ProviderError
+from .engine import (
+    PaymentInProgress,
+    PaymentMismatch,
+    PaymentRequest,
+    PaymentStatus,
+    ProviderError,
+)
 
 
 def start_payment(
@@ -49,8 +56,8 @@ def start_payment(
 def client_secret_for(provider_ref: str, order_ref: str) -> str:
     """The browser-side secret of an order's payment, fetched from the provider on each payment
     page (the session keeps only the payment id). Raises the orders `PaymentMismatch` when the
-    payment is not this order's, and `PaymentUnavailable` when the provider fails or cannot
-    return a secret."""
+    payment is not this order's, `PaymentInProgress` when it is processing or succeeded, and
+    `PaymentUnavailable` when the provider fails or cannot return a secret."""
     provider = registry.configured_provider()
     fetch = getattr(provider, "payment_client_secret", None)
     if fetch is None:
@@ -59,5 +66,7 @@ def client_secret_for(provider_ref: str, order_ref: str) -> str:
         return str(fetch(provider_ref, order_ref))
     except PaymentMismatch as error:
         raise OrderPaymentMismatch(provider_ref) from error
+    except PaymentInProgress as error:
+        raise OrderPaymentInProgress(provider_ref) from error
     except ProviderError as error:
         raise PaymentUnavailable(str(error)) from error

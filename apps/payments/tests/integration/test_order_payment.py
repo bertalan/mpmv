@@ -359,3 +359,48 @@ def test_a_dry_run_changes_nothing(
     )
     order.refresh_from_db()
     assert order.state == "awaiting_payment"
+
+
+# --- lane-a review points of the payment start and the paid mark (#429) ------------------------
+
+
+def test_a_payment_with_another_reference_does_not_mark_the_order_paid(
+    stripe: FakeStripeClient,
+) -> None:
+    order = place(sellable())
+    paid = services.mark_order_paid(
+        order.number,
+        amount=order.grand_total,
+        currency="EUR",
+        provider_ref="pi_someone_else",
+        ctx=CTX,
+    )
+    order.refresh_from_db()
+    assert paid is False
+    assert order.state == "awaiting_payment"
+    assert AuditLog.objects.filter(action="orders.payment_ref_mismatch").count() == 1
+
+
+def test_the_right_reference_marks_the_order_paid(stripe: FakeStripeClient) -> None:
+    order = place(sellable())
+    assert services.mark_order_paid(
+        order.number,
+        amount=order.grand_total,
+        currency="EUR",
+        provider_ref=order.payment_intent_ref,
+        ctx=CTX,
+    )
+
+
+def test_a_failure_after_the_commit_never_raises_into_the_caller(
+    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def closed(order: Order, **kwargs: Any) -> str:
+        raise CheckoutClosed("payments", "site")
+
+    monkeypatch.setattr(services, "start_payment", closed)
+    order = place(sellable())  # the order is committed and awaits payment; no exception
+    assert order.state == "awaiting_payment"
+    assert order.payment_client_secret == ""
+    assert Order.objects.filter(pk=order.pk, state="awaiting_payment").exists()
+    assert AuditLog.objects.filter(action="orders.payment_start_failed").count() == 1

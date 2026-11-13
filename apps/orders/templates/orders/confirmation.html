@@ -11,6 +11,8 @@
     {% include "components/alert.html" with level="success" message=_("Payment received. Thank you.") only %}
   {% elif payment_closed %}
     {% include "components/alert.html" with level="info" message=_("This order is no longer open for payment.") only %}
+  {% elif payment.in_progress %}
+    {% include "components/alert.html" with level="info" message=_("Your payment is being processed. This page updates when it is confirmed; do not pay again.") only %}
   {% elif payment.retry %}
     {% include "components/alert.html" with level="warning" message=_("The payment form could not be loaded. Please reload this page in a moment.") only %}
   {% elif payment %}
