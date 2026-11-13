@@ -7,7 +7,7 @@
 ## Summary
 
 - Micro-tasks: **348** in **21** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2781 h** (P1 2156 h · P2 547 h · P3 78 h)
+- Estimated hours (development + automated tests, AI-assisted development): **2775 h** (P1 2156 h · P2 541 h · P3 78 h)
 - P1 critical path (schedule lower bound with full parallelism): **153 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CORE.2 → CORE.3 → CORE.17 → CORE.18 → FIT.1 → FIT.5 → FIT.7 → FIT.8 → FIT.10 → FIT.12
 
 ## By macro area
@@ -24,9 +24,9 @@
 | PAY | Payments (Stripe Connect) | 6 | 40 | 4 | 16 | 60 |
 | ING | Supplier import and pipelines | 13 | 92 | 26 | 0 | 118 |
 | I18N | Multilingual | 15 | 76 | 9 | 0 | 85 |
-| CMS | Wagtail content | 15 | 62 | 27 | 0 | 89 |
+| CMS | Wagtail content | 15 | 62 | 21 | 0 | 83 |
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
-| TRU | Trust, reviews and community | 11 | 0 | 70 | 16 | 86 |
+| TRU | Trust, reviews and community (D-37 proposal) | 11 | 0 | 70 | 16 | 86 |
 | FIT | Garage and fitment (D-38) | 17 | 170 | 0 | 14 | 184 |
 | THM | Frontend themes | 12 | 76 | 12 | 0 | 88 |
 | SEO | SEO, feeds, analytics | 9 | 44 | 18 | 0 | 62 |
@@ -35,7 +35,7 @@
 | SEC | Security | 11 | 70 | 0 | 0 | 70 |
 | OPS | Operations | 12 | 19 | 37 | 8 | 64 |
 | MIG | Migration and cutover | 21 | 135 | 29 | 0 | 164 |
-| **Total** | | **348** | **2156** | **547** | **78** | **2781** |
+| **Total** | | **348** | **2156** | **541** | **78** | **2775** |
 
 ## By phase
 
@@ -319,7 +319,7 @@
 | MIG.17 | Shipping configuration migration: the MIG.1 extractor exports the legacy shipping option (zones with countries, postcode ranges and priority, the world catch-all, carriers per vendor with weight bands and surcharges, pickup options, quote settings) to the intermediate format, and the SHP.5 loader writes the `shipping` models; the marketplace plugin's own shipping tables are treated as a derived mirror and never used as a source | P1 | 4 | MIG.12, SHP.5 | A fresh-dump run loads the configuration with no duplicates on reload; the §13.3 shipping parity (200 vendor × country × postcode × weight combinations) shows no difference; the world catch-all and every pickup option are present; a value that does not parse is reported, never defaulted |
 | MIG.20 | Refunds migration (owner decision 2026-11-11, relayed by lane-a, #86): refund child orders and marketplace refund requests are stored inside the historical order (refunded amount, date, reason); there is no separate refund model for legacy data; no new ledger entry and no tax recalculation | P1 | 4 | MIG.4 | A migrated order shows its refunded amount, date and reason; the MIG.5 parity report reconciles order total minus refunds against the legacy figures; a refund amount that does not parse as `Decimal` is rejected with a report; the migration writes no ledger entry for a refund (MIG.8 covers balances); no refund model or table exists for legacy data |
 
-### F6 — After go-live (P2) (89 tasks, 657 h)
+### F6 — After go-live (P2) (89 tasks, 651 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -355,7 +355,7 @@
 | ING.13 | Admin checklist and "new vendor from source" wizard | P2 | 8 | ING.9 | Demo vendor activated without code |
 | I18N.8 | Visitor content translation after go-live (D-18): products, categories, taxonomy terms, vendor storefronts, CMS pages, blog and landing pages, with the method the owner chooses (AI, professional or other) through the I18N.4 queue; per-language coverage report | P2 | 6 | I18N.4, I18N.3, I18N.6 | Per-language coverage report; only published translations appear in hreflang and sitemaps |
 | I18N.10 | User text stored in NFC (SEC.5 hostile-input finding F3, proposed on PR #166, registered by coherence check 7; owner: "non-NFC forms (store NFC)"): forms, API schemas and importers normalise free text to Unicode NFC at the service boundary; the SKU match key of spec 03 stays NFKC | P2 | 3 | — | Text entered through a form, the API or an importer is stored in NFC; the F3 strict xfail in `tests/integration/test_hostile_input_outputs.py` passes and its mark is removed |
-| CMS.6 | Reviews: model, purchase verification, supplier import, moderation, vendor reply; designed in [16](16-trust-community.md) (D-37 proposal: two review kinds, delivered orders only, in the `trust` app); the rows TRU.3 and TRU.4 build the submission and moderation | P2 | 10 | ORD.2 | AggregateRating schema only with valid reviews |
+| CMS.6 | Review models (D-37 proposal, designed in [16](16-trust-community.md), in the `trust` app): `ProductReview`, `VendorReview`, `ReviewReply`, `ReviewRevision`, with the verified-purchase link to a delivered order line and the origin fields of supplier-imported reviews (ING.11); submission is TRU.3, moderation TRU.4, markup TRU.8 | P2 | 4 | ORD.2, TRU.1 | A customer review cannot be saved without a delivered order line of its author; a supplier-imported review carries its origin and original date and is never marked as a verified purchase; AggregateRating schema only with valid reviews |
 | CMS.13 | Editor-built form pages on Wagtail's `FormPage` (owner decision D-36, unscheduled): an editor builds a form page without code; the spam check is Turnstile through `CaptchaVerifier`, submissions are kept per the retention rules of D-29 and D-30 with a purge job, and every form page is listed automatically in the SEC.13 register of public forms (SEC.13 is in an open PR, so it is not a dependency until it merges) | P2 | 6 | CMS.1 | A form page published by an editor refuses a submission without a valid Turnstile token, appears in the SEC.13 register without a manual step, and its submissions are deleted at the end of their retention period |
 | CMS.14 | Reusable content snippet block (owner decision D-36): a content snippet written once and placed in any page body by a chooser; translatable through wagtail-localize, with a moderation step before an edit reaches the pages that use it; the editor sees where a snippet is used | P2 | 5 | CMS.2, I18N.3 | Editing a snippet changes every page that places it after approval; an unpublished snippet renders nothing; a translated page shows the snippet's own translation and falls back as the rest of the page does |
 | CMS.15 | `download` block (owner decision D-36): a link to a file from the media library showing its file type and size in text before the click, with a human-readable title | P2 | 3 | CMS.2 | The block shows "PDF, 1.2 MB" computed from the file; a missing file hides the block; the link text names the file and its type for a screen reader |
@@ -364,7 +364,7 @@
 | EVT.17 | Google option after go-live (owner decision: no Google at go-live): Google Geocoding adapter last in the chain and off without a key; vendored GoogleMutant on the official Maps JavaScript API (never direct tile URLs), per-site setting and key; consent purpose and click-to-load placeholder; Google CSP sources with nonce only on consented Google-map responses, security review of the exception; `geo_expires_at` (30 days), confirmation request and daily expiry job; Google-geocoded points never on a non-Google map and never in feeds, JSON-LD or the index map | P2 | 8 | EVT.12, EVT.15, SEO.5, ARC.9, ARC.16 | Regression cases 26–28 green; with consent, a Google-geocoded point renders on the Google layer and the CSP e2e check passes on that response; Google tile URLs never appear in any request |
 | TRU.1 | `trust` app and rules: `TrustRules` (versioned, staff-editable with audit, dry-run preview), `VendorTrustInputs`, pure `compute_vendor_trust` for badges 1 to 7 with tiers and hysteresis, append-only `VendorTrustSnapshot`; import contracts extended | P2 | 10 | ORD.2, VEN.5, ARC.18 | The §16.11 cases 4, 6 and 7 pass on the engine with no database; a new rules version changes a vendor's result and the old snapshot keeps its `rules_version` |
 | TRU.2 | Snapshot service and refresh: inputs built from orders, returns and vendors with the §16.5 exclusions, nightly task for active vendors, dirty marking and 15-minute recompute on order, return, review and suspension events, cache purge, `AuditLog` on gain and loss | P2 | 8 | TRU.1, ORD.6, SEO.6 | A review removal updates the vendor's snapshot within 15 minutes; an excluded order does not move any count; a suspended vendor has no public panel |
-| TRU.3 | Review submission: `ProductReview`, `VendorReview`, `ReviewReply`, `ReviewRevision`; eligibility and window; single-use signed link for guest buyers; platform invitation and one reminder; edit, withdraw, delete; vendor reply; supplier-imported reviews in their own block (ING.11) | P2 | 10 | CMS.6, ARC.16, ORD.6, TRU.1 | §16.11 cases 1 to 3 pass; a vendor invitation or incentive field does not exist; an imported review never counts in a snapshot or in markup |
+| TRU.3 | Review submission on CMS.6's models: eligibility and window; single-use signed link for guest buyers; platform invitation and one reminder; edit, withdraw, delete; vendor reply; supplier-imported reviews in their own block (ING.11) | P2 | 10 | CMS.6, ARC.16, ORD.6, TRU.1 | §16.11 cases 1 to 3 pass; a vendor invitation or incentive field does not exist; an imported review never counts in a snapshot or in markup |
 | TRU.4 | Review moderation: automatic checks, staff queue in the Manager for Catalog and moderation, `review` as a CMP.5 notice target, closed removal reasons, statement of reasons and appeal route to the author and the vendor, vendor reply moderation | P2 | 8 | TRU.3, CMP.5 | A notice against a review gets a tracked outcome; a removal emails a statement of reasons; a negative review with no listed reason cannot be removed; the Catalog and moderation role sees the queue and Finance does not |
 | TRU.5 | Community profile and consent: `CommunityProfile` with levels 0 to 2, per-vendor regular-customers opt-in asked once after the second delivered order, nickname rules, versioned consent text and withdrawal, erasure per CMP.4 | P2 | 8 | TRU.3, CMP.4, CMP.24 | §16.11 case 8; nothing is pre-ticked and both buttons weigh the same; an erased account's reviews show "Former customer"; a nickname that is a reserved word is refused |
 | TRU.6 | Anti-gaming: nightly `TrustFlag` rules (§16.5 point 4), staff queue, exclude-orders and suspend-badge actions with reasons and audit | P2 | 8 | TRU.2, TRU.4 | Seeded burst, duplicate-text and young-account cases raise a flag and change nothing by themselves; a staff exclusion lowers the count and is audited |

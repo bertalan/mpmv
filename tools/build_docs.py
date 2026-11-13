@@ -50,7 +50,7 @@ MACRO = {
     "I18N": "Multilingual",
     "CMS": "Wagtail content",
     "EVT": "Events, feeds and maps",
-    "TRU": "Trust, reviews and community",
+    "TRU": "Trust, reviews and community (D-37 proposal)",
     "FIT": "Garage and fitment (D-38)",
     "THM": "Frontend themes",
     "SEO": "SEO, feeds, analytics",
