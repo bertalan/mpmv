@@ -53,3 +53,22 @@ def shot(page: Page, request: pytest.FixtureRequest) -> Callable[[str], Path]:
         return path
 
     return take
+
+
+@pytest.fixture(autouse=True)
+def _consent_decided(request: pytest.FixtureRequest) -> None:
+    """Start every browser with a consent choice already made (SEO.5), so the banner does not
+    sit over the pages the other tests drive. A test that meets the banner is marked
+    `consent_banner`."""
+    if "page" not in request.fixturenames or request.node.get_closest_marker("consent_banner"):
+        return
+    from apps.seo import engine
+
+    cookie = engine.encode_cookie(
+        engine.ConsentState(True, frozenset(), engine.BANNER_VERSION, "0" * 32)
+    )
+    page: Page = request.getfixturevalue("page")
+    page.context.add_init_script(
+        "try { if (!document.cookie.includes('mpmv_consent=')) "
+        f"document.cookie = 'mpmv_consent={cookie}; path=/; max-age=86400'; }} catch (e) {{}}"
+    )

@@ -1,8 +1,14 @@
 // Alpine components of the base theme (THM.3, spec 14 §14.5).
 //
-// Loaded with type="module" before the vendored Alpine CSP build, so the components are
-// registered on `alpine:init`, before Alpine starts. The CSP build evaluates only property and
-// method names, so every value a template binds is a method here.
+// A module loaded before the vendored Alpine CSP build: components register on `alpine:init`.
+// The CSP build binds only property and method names.
+
+{
+  const { cookie, version, script } = document.querySelector("[data-consent-banner]")?.dataset ?? {};
+  if (script && (!document.cookie.includes(`${cookie}=v1.${version}.`) || document.querySelector("[data-consent-preferences],[data-consent]"))) {
+    import(script);
+  }
+}
 
 document.addEventListener("alpine:init", () => {
   // Disclosure navigation: a button that shows and hides the main menu on narrow screens.

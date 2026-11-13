@@ -197,6 +197,8 @@ class Order(_StateGuarded):
         null=True, blank=True, editable=False, help_text="When the personal fields were replaced."
     )
     payment_intent_ref = models.CharField(max_length=255, blank=True)
+    # Not stored: set by `place_order` for the one request that confirms the payment in the browser.
+    payment_client_secret: str = ""
     transfer_group = models.CharField(max_length=64, blank=True)
     legacy_wp_order_id = models.PositiveBigIntegerField(null=True, blank=True, unique=True)
 

@@ -1,0 +1,15 @@
+{% load i18n %}{% comment %}
+The consent categories as a fieldset of checkboxes (SEO.5). `categories` come from the provider;
+`granted` (a list of category codes) pre-selects the boxes on the preferences page, and `idp` is
+a prefix that keeps the ids unique when the form appears twice on a page. Necessary is always on
+and cannot be unticked.
+{% endcomment %}<fieldset class="consent-categories">
+  <legend>{% translate "Cookie categories" %}</legend>
+  {% for category in categories %}
+    <div class="consent-category">
+      <input type="checkbox" id="{{ idp }}-{{ category.code }}" name="categories" value="{{ category.code }}"{% if category.locked %} checked disabled{% elif category.code in granted %} checked{% endif %} aria-describedby="{{ idp }}-{{ category.code }}-help">
+      <label for="{{ idp }}-{{ category.code }}">{{ category.label }}</label>
+      <p id="{{ idp }}-{{ category.code }}-help" class="consent-category__help">{{ category.help }}</p>
+    </div>
+  {% endfor %}
+</fieldset>

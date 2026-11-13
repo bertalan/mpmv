@@ -263,7 +263,12 @@ def _ids() -> list[str]:
 
 @pytest.mark.parametrize("flag", ["LIVE_DATA", "STAGE"])
 def test_stripe_without_keys_is_refused_on_live_and_stage(flag: str) -> None:
-    with override_settings(PAYMENT_PROVIDER="stripe", STRIPE_SECRET_KEY="", **{flag: True}):
+    with override_settings(
+        PAYMENT_PROVIDER="stripe",
+        STRIPE_SECRET_KEY="",
+        PAYMENTS_TRANSFERS_WIRED=True,
+        **{flag: True},
+    ):
         assert _ids() == ["payments.E003"]
 
 
@@ -272,7 +277,9 @@ def test_stripe_with_keys_passes_and_a_dev_machine_may_lack_them() -> None:
         "STRIPE_SECRET_KEY": secrets.token_urlsafe(16),
         "STRIPE_WEBHOOK_SECRET": secrets.token_urlsafe(16),
     }
-    with override_settings(PAYMENT_PROVIDER="stripe", LIVE_DATA=True, **keys):
+    with override_settings(
+        PAYMENT_PROVIDER="stripe", LIVE_DATA=True, PAYMENTS_TRANSFERS_WIRED=True, **keys
+    ):
         assert _ids() == []
     with override_settings(PAYMENT_PROVIDER="stripe", STRIPE_SECRET_KEY=""):
         assert _ids() == []

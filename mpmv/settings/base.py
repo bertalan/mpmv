@@ -234,6 +234,14 @@ VENDOR_CLOSURE_HOOKS: list[str] = [
 # when its orders must not move (a vendor closed by a termination notice, until staff review it).
 # `orders` cannot import `compliance`, so the path is named here.
 ORDER_FREEZE_HOOKS: list[str] = ["apps.compliance.services.orders_frozen"]
+# PAY.1: the callable `place_order` uses to start the payment (orders cannot import payments).
+ORDER_PAYMENT_STARTER = "apps.payments.checkout.start_payment"
+# PAY.1: the callable that fetches the browser-side secret of an order's payment from the provider
+# (`(provider_ref, order_ref) -> str`); the secret is never kept in the session.
+ORDER_PAYMENT_BROWSER_HOOK = "apps.payments.checkout.client_secret_for"
+# PAY.3 sets this True once the per-vendor transfers exist. Until then a payment would stay whole on
+# the platform account (against D-08), so `manage.py check` refuses LIVE_DATA (payments.E004).
+PAYMENTS_TRANSFERS_WIRED = False
 
 # Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
 # that lists the active vendors established outside a new allowed set.
@@ -259,7 +267,7 @@ TEMPLATES = [
                 "apps.themes.context_processors.theme",
                 "apps.themes.context_processors.release",
             ],
-            "builtins": ["apps.seo.templatetags.seo_robots"],
+            "builtins": ["apps.seo.templatetags.seo_robots", "apps.seo.templatetags.consent"],
             "loaders": [
                 "apps.themes.loaders.ThemeLoader",
                 (
@@ -294,6 +302,13 @@ MPMV_HELP_URL = env_str("MPMV_HELP_URL", "")
 MPMV_VERSION = os.environ.get("MPMV_VERSION", "") or "dev"
 # The vendor guide the help dialog links on vendor-facing screens (ARC.32); empty = no link.
 MPMV_VENDOR_GUIDE_URL = env_str("MPMV_VENDOR_GUIDE_URL", "")
+
+# Consent provider (SEO.9, D-10): the name of the consent tool in use. `self-hosted` is our own
+# minimal banner; an operator adds another by naming its class in MPMV_CONSENT_PROVIDERS
+# ({name: "dotted.path.Class"}) and selecting the name here (docs/dev/consent-providers.md). An
+# unknown name fails the seo.E001 system check.
+MPMV_CONSENT_PROVIDER = env_str("MPMV_CONSENT_PROVIDER", "self-hosted")
+MPMV_CONSENT_PROVIDERS: dict[str, str] = {}
 
 # PostgreSQL is the only datastore (ADR-0001).
 DATABASES = {
@@ -585,6 +600,8 @@ PAYMENT_ALLOW_FAKE_PROVIDER = False
 # Stripe (PAY.1, PAY.2): keys come from the environment only and are empty until set; on LIVE and
 # STAGE `manage.py check` refuses an empty key while MPMV_PAYMENT_PROVIDER=stripe (payments.E003).
 STRIPE_SECRET_KEY = env_str("MPMV_STRIPE_SECRET_KEY", "")
+# Public by design: Stripe.js in the browser needs it. Never the secret key.
+STRIPE_PUBLISHABLE_KEY = env_str("MPMV_STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = env_str("MPMV_STRIPE_WEBHOOK_SECRET", "")
 STRIPE_API_VERSION = env_str("MPMV_STRIPE_API_VERSION", "")  # empty: the account's default
 STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300  # Stripe's recommended replay window

@@ -1,11 +1,10 @@
 // Contextual help (ARC.32, components/user_tools.html).
 //
 // The help button and the user menu's "Help" item open the native modal <dialog id="help-dialog">.
-// This module reveals them (`hidden` without a script), fetches the screen's entry (GET, same
-// origin, never cached) into the dialog, lists the page's form fields under it from the labels
-// and help texts already in the page, returns the focus to the button on close and closes the
-// menu on Escape, a click outside or focus leaving it. No keyboard shortcut; the server's HTML is
-// inserted as parsed nodes, the page's text as text. No inline script or style (strict CSP).
+// This module reveals them, fetches the screen's entry (GET, same origin, never cached) into the
+// dialog, lists the page's form fields from the labels and help texts already in the page, and
+// manages focus and the menu's closing. The server's HTML is inserted as parsed nodes, the page's
+// text as text. No inline script or style (strict CSP).
 
 const root = document.querySelector(".user-tools[data-help-url]");
 const dialog = document.getElementById("help-dialog");

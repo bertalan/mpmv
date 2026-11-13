@@ -57,6 +57,7 @@ class FakeStripeClient:
             currency=currency.upper(),
             charge_id=f"ch_{secrets.token_hex(6)}" if self.confirm else "",
             transfer_group=transfer_group,
+            client_secret=f"{intent_id}_secret_{secrets.token_urlsafe(12)}",
         )
         self.intents[intent_id] = intent
         self._replies[f"pi:{idempotency_key}"] = intent
