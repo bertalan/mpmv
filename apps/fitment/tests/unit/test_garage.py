@@ -49,20 +49,30 @@ def test_a_hostile_or_broken_value_is_an_empty_garage(raw: str | None) -> None:
     assert garage.parse(raw) == Garage((), active=None)
 
 
-def test_extra_keys_and_extra_vehicles_are_dropped() -> None:
+def test_extra_vehicles_are_dropped() -> None:
     payload = {
         "v": 1,
         "active": 0,
-        "vehicles": [
-            {"make": "Acme", "model": "Roadster", "year": "2019", "plate": "XX000XX", "id": 3},
-            {"make": "Acme", "model": "Tourer", "year": "2021"},
-            {"make": "Bolt", "model": "Mini", "year": ""},
-            {"make": "Bolt", "model": "Maxi", "year": "2020"},
-        ],
+        "vehicles": [A.as_dict(), B.as_dict(), C.as_dict(), D.as_dict()],
     }
     parsed = garage.parse(encode(payload))
     assert parsed.vehicles == (A, B, C)
     assert parsed.active == 0
+
+
+@pytest.mark.parametrize(
+    "extra_vehicle_key", [{"plate": "XX000XX"}, {"id": 3}, {"name": "Pay at example.test"}]
+)
+def test_a_vehicle_with_an_extra_key_makes_the_cookie_invalid(
+    extra_vehicle_key: dict[str, object],
+) -> None:
+    payload = {"v": 1, "active": 0, "vehicles": [{**A.as_dict(), **extra_vehicle_key}]}
+    assert garage.parse(encode(payload)) == garage.EMPTY
+
+
+def test_a_vehicle_missing_the_year_key_or_a_top_level_extra_key_is_invalid() -> None:
+    assert garage.parse(encode({"v": 1, "vehicles": [{"make": "A", "model": "B"}]})) == garage.EMPTY
+    assert garage.parse(encode({"v": 1, "name": "x", "vehicles": [A.as_dict()]})) == garage.EMPTY
 
 
 def test_an_out_of_range_active_index_means_the_first_vehicle() -> None:

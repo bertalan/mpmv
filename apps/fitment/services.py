@@ -787,7 +787,22 @@ def read_garage(request: HttpRequest) -> garage.Garage:
     stored server-side."""
     if not anon_storage_enabled():
         return garage.EMPTY
-    return garage.parse(request.COOKIES.get(garage.COOKIE_NAME))
+    return validated_garage(garage.parse(request.COOKIES.get(garage.COOKIE_NAME)))
+
+
+def validated_garage(parsed: garage.Garage) -> garage.Garage:
+    """Every vehicle checked against the catalogue (node exists and is active, year in range);
+    the labels kept are the catalogue's own. One miss makes the cookie invalid: an empty garage
+    (spec 17 section 17.4.2). The views clear the cookie on the next garage action."""
+    checked: list[garage.Vehicle] = []
+    for vehicle in parsed.vehicles:
+        try:
+            checked.append(vehicle_from_labels(vehicle.make, vehicle.model, vehicle.year))
+        except FitmentError:
+            return garage.EMPTY
+    if not checked:
+        return garage.EMPTY
+    return garage.Garage(tuple(checked), parsed.active)
 
 
 def active_vehicle(request: HttpRequest) -> dict[str, str] | None:

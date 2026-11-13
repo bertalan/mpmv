@@ -12,6 +12,7 @@ from django.urls import reverse
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.fitment import garage, services
+from apps.fitment.models import FitmentNode, NodeStatus
 from apps.fitment.tests.factories import FitmentNodeFactory, FitmentSchemeFactory
 
 pytestmark = pytest.mark.django_db
@@ -125,6 +126,77 @@ def test_forget_deletes_the_cookie_and_remove_still_works_when_storage_is_off(
         == 0
     )
     assert client.post(reverse("garage_forget")).cookies[garage.COOKIE_NAME]["max-age"] == 0
+
+
+def test_off_mode_deletes_the_cookie_even_with_vehicles_left(
+    client: Client, make_model: None, settings: SettingsWrapper
+) -> None:
+    save(client)
+    save(client, model="Tourer")
+    settings.GARAGE_ANON_STORAGE = "off"
+    response = client.post(reverse("garage_remove"), {"index": "0"})
+    assert response.cookies[garage.COOKIE_NAME]["max-age"] == 0
+    assert response.cookies[garage.COOKIE_NAME].value == ""
+
+
+def _request_with(rf: RequestFactory, value: str) -> Any:
+    request = rf.get("/")
+    request.COOKIES = {garage.COOKIE_NAME: value}
+    return request
+
+
+def _forged(rf: RequestFactory, vehicles: list[dict[str, str]]) -> Any:
+    value = garage.Garage(tuple(garage.Vehicle(**v) for v in vehicles), 0)
+    return _request_with(rf, garage.dumps(value))
+
+
+@pytest.mark.parametrize(
+    "vehicle",
+    [
+        {"make": "Pay at example.test", "model": "Roadster", "year": ""},
+        {"make": "Acme", "model": "Not a model", "year": ""},
+    ],
+)
+def test_free_text_or_an_unknown_vehicle_in_the_cookie_never_reaches_the_snapshot(
+    make_model: None, rf: RequestFactory, vehicle: dict[str, str]
+) -> None:
+    request = _forged(rf, [vehicle])
+    assert services.read_garage(request) == garage.EMPTY
+    assert services.active_vehicle(request) is None
+
+
+def test_one_bad_vehicle_makes_the_whole_cookie_invalid(
+    make_model: None, rf: RequestFactory
+) -> None:
+    good = {"make": "Acme", "model": "Roadster", "year": ""}
+    bad = {"make": "Acme", "model": "Nope", "year": ""}
+    assert services.read_garage(_forged(rf, [good, bad])) == garage.EMPTY
+
+
+def test_an_inactive_node_in_the_cookie_is_rejected(
+    client: Client, make_model: None, rf: RequestFactory
+) -> None:
+    save(client)
+    value = client.cookies[garage.COOKIE_NAME].value
+    node = FitmentNode.objects.get(name="Roadster")
+    node.status = NodeStatus.RETIRED
+    node.save()
+    assert services.active_vehicle(_request_with(rf, value)) is None
+
+
+def test_the_labels_kept_are_the_catalogue_names(make_model: None, rf: RequestFactory) -> None:
+    request = _forged(rf, [{"make": "acme", "model": "ROADSTER", "year": ""}])
+    assert services.active_vehicle(request) == {"make": "Acme", "model": "Roadster", "year": ""}
+
+
+def test_an_invalid_cookie_is_cleared_by_the_next_garage_action(
+    client: Client, make_model: None
+) -> None:
+    client.cookies[garage.COOKIE_NAME] = garage.dumps(
+        garage.Garage((garage.Vehicle("Evil", "x", ""),), 0)
+    )
+    response = client.post(reverse("garage_remove"), {"index": "0"})
+    assert response.cookies[garage.COOKIE_NAME]["max-age"] == 0
 
 
 def test_the_active_vehicle_comes_from_the_cookie_only(

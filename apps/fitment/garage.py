@@ -26,6 +26,8 @@ SAVE_LABEL = (
     "Save this vehicle on this browser for your next visits (you can remove it at any time)"
 )
 
+_TOP_KEYS = {"v", "vehicles", "active"}
+_VEHICLE_KEYS = {"make", "model", "year"}
 _FORBIDDEN = set("<>\"'`\\&{}")
 
 
@@ -89,14 +91,16 @@ def parse(raw: str | None) -> Garage:
         return EMPTY
     if not isinstance(payload, dict) or payload.get("v") != VERSION:
         return EMPTY
+    if not set(payload) <= _TOP_KEYS:
+        return EMPTY  # any other field makes the cookie invalid (spec 17 section 17.4.2)
     items = payload.get("vehicles")
     if not isinstance(items, list):
         return EMPTY
     vehicles: list[Vehicle] = []
     for item in items:
-        if not isinstance(item, dict):
+        if not isinstance(item, dict) or set(item) != _VEHICLE_KEYS:
             return EMPTY
-        vehicle = make_vehicle(item.get("make"), item.get("model"), item.get("year", ""))
+        vehicle = make_vehicle(item.get("make"), item.get("model"), item["year"])
         if vehicle is None:
             return EMPTY
         if vehicle not in vehicles:

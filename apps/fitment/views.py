@@ -39,7 +39,7 @@ def _back(request: HttpRequest) -> HttpResponseRedirect:
 
 
 def _write(response: HttpResponse, value: garage.Garage) -> HttpResponse:
-    if not value.vehicles:
+    if not value.vehicles or not services.anon_storage_enabled():  # off never writes the cookie
         response.delete_cookie(garage.COOKIE_NAME, samesite="Lax")
         return response
     response.set_cookie(
@@ -78,7 +78,8 @@ def remove_vehicle(request: HttpRequest) -> HttpResponse:
         index = int(request.POST.get("index", ""))
     except ValueError:
         return HttpResponse(status=400)
-    current = garage.parse(request.COOKIES.get(garage.COOKIE_NAME))  # also when storage is off now
+    # Also when storage is off (the cookie is then deleted by `_write`); an invalid one is cleared.
+    current = services.validated_garage(garage.parse(request.COOKIES.get(garage.COOKIE_NAME)))
     return _write(_back(request), garage.remove(current, index))
 
 
