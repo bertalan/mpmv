@@ -32,6 +32,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.money import CENT
 from apps.core.services import audit_changes, flag_enabled
 from apps.shipping.models import Carrier
+from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission
 
@@ -789,7 +790,7 @@ def _lock_live_rows(
     products = {
         p.pk: p
         for p in Product.objects.select_for_update(of=("self",))
-        .select_related("vendor")
+        .select_related("vendor__connected_account")
         .filter(pk__in=product_ids)
         .order_by("pk")
     }
@@ -831,9 +832,8 @@ def _verify(
             continue
         error = cart_engine.purchase_error(
             product_status=product.status,
-            sales_mode=product.sales_mode,
+            sales_mode=vendors_services.effective_sales_mode(product),
             vendor_status=product.vendor.status,
-            vendor_sales_mode=product.vendor.sales_mode_default,
             is_variable=product.kind == Product.Kind.VARIABLE,
             has_variant=variant is not None,
         )
@@ -841,7 +841,9 @@ def _verify(
             reasons.append(Refusal("unavailable", product.pk, error))
             continue
         live = cart_engine.display_unit_price(
-            product.price_net, product.sales_mode, variant.price_net_override if variant else None
+            product.price_net,
+            vendors_services.effective_sales_mode(product),
+            variant.price_net_override if variant else None,
         )
         if live != entry.expected_unit_price_net:
             reasons.append(
@@ -958,7 +960,9 @@ def place_order(
 def _line_input(entry: PlaceLine, product: Product, variants: dict[int, Variant]) -> LineInput:
     variant = variants.get(entry.variant.pk) if entry.variant is not None else None
     unit_price = cart_engine.display_unit_price(
-        product.price_net, product.sales_mode, variant.price_net_override if variant else None
+        product.price_net,
+        vendors_services.effective_sales_mode(product),
+        variant.price_net_override if variant else None,
     )
     if unit_price is None:  # _verify refused anything not for sale
         raise OrderRefused([Refusal("unavailable", product.pk, "This item is not for sale.")])

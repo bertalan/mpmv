@@ -20,6 +20,7 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.catalog.models import Product, Variant
 from apps.core.changeset import ChangeSet
+from apps.vendors import services as vendors
 
 from . import engine
 from .models import Cart, CartLine
@@ -120,6 +121,12 @@ def get_or_create_cart(
     return cart
 
 
+# The vendor and its payout account, read with the product: the sales mode buyers get depends
+# on both (`vendors.services.effective_sales_mode`, D-19).
+_VENDOR_ACCOUNT = "vendor__connected_account"
+_LINE_VENDOR_ACCOUNT = "product__vendor__connected_account"
+
+
 def _touch(cart_id: int) -> None:
     Cart.objects.filter(pk=cart_id).update(updated_at=timezone.now())
 
@@ -133,9 +140,8 @@ def _purchase_limit(product: Product, variant: Variant | None) -> int:
         raise ValidationError({"variant": "This variant does not belong to the product."})
     error = engine.purchase_error(
         product_status=product.status,
-        sales_mode=product.sales_mode,
+        sales_mode=vendors.effective_sales_mode(product),
         vendor_status=product.vendor.status,
-        vendor_sales_mode=product.vendor.sales_mode_default,
         is_variable=product.kind == Product.Kind.VARIABLE,
         has_variant=variant is not None,
     )
@@ -148,7 +154,9 @@ def _purchase_limit(product: Product, variant: Variant | None) -> int:
 
 def _unit_price(product: Product, variant: Variant | None) -> Decimal | None:
     override = variant.price_net_override if variant is not None else None
-    return engine.display_unit_price(product.price_net, product.sales_mode, override)
+    return engine.display_unit_price(
+        product.price_net, vendors.effective_sales_mode(product), override
+    )
 
 
 def _check_quantity(quantity: int, limit: int) -> None:
@@ -175,7 +183,7 @@ def add_to_cart(
         raise ValidationError({"quantity": "The quantity must be at least 1."})
     with transaction.atomic():
         Cart.objects.select_for_update().get(pk=cart.pk)  # one change at a time per cart
-        product = Product.objects.select_related("vendor").get(pk=product.pk)
+        product = Product.objects.select_related(_VENDOR_ACCOUNT).get(pk=product.pk)
         variant = None if variant is None else Variant.objects.get(pk=variant.pk)
         limit = _purchase_limit(product, variant)
         price = _unit_price(product, variant)
@@ -209,7 +217,7 @@ def set_line_quantity(line: CartLine, quantity: int, *, dry_run: bool = False) -
         return remove_line(line, dry_run=dry_run)
     with transaction.atomic():
         line = CartLine.objects.select_for_update().get(pk=line.pk)
-        product = Product.objects.select_related("vendor").get(pk=line.product_id)
+        product = Product.objects.select_related(_VENDOR_ACCOUNT).get(pk=line.product_id)
         limit = _purchase_limit(product, line.variant)
         _check_quantity(quantity, limit)
         changeset = ChangeSet()
@@ -289,7 +297,7 @@ def merge_carts(guest: Cart, user: User, *, dry_run: bool = False) -> CartMerge 
             return None
         guest = current
         target = next((cart for cart in locked if cart.pk != guest.pk), None)
-        guest_lines = list(guest.lines.select_related("product__vendor", "variant"))
+        guest_lines = list(guest.lines.select_related(_LINE_VENDOR_ACCOUNT, "variant"))
         target_lines = (
             [] if target is None else list(target.lines.select_related("product", "variant"))
         )
@@ -410,7 +418,7 @@ def vendor_packages(cart: Cart) -> list[engine.VendorPackage[CartLine]]:
 
     This is the per-vendor split that shipping, tax and the order build on (SHP.4, ORD.3).
     """
-    lines = cart.lines.select_related("product", "variant").order_by("created_at", "id")
+    lines = cart.lines.select_related(_LINE_VENDOR_ACCOUNT, "variant").order_by("created_at", "id")
     return engine.group_by_vendor(
         engine.PricedLine(
             item=line,

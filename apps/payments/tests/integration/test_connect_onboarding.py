@@ -174,23 +174,6 @@ def test_a_vendor_that_chose_on_request_is_not_switched_to_sale(ctx: AuditContex
     assert vendor.sales_mode_default == Vendor.SalesMode.ON_REQUEST
 
 
-def test_cart_refuses_a_vendor_on_request(ctx: AuditContext) -> None:
-    from apps.cart import engine
-
-    def error(**extra: str) -> str | None:
-        return engine.purchase_error(
-            product_status="published",
-            sales_mode="buy",
-            vendor_status="active",
-            is_variable=False,
-            has_variant=False,
-            **extra,
-        )
-
-    assert error() is None
-    assert error(vendor_sales_mode="on_request") is not None
-
-
 # --- Refresh on return and the webhook
 
 

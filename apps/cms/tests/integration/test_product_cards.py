@@ -98,7 +98,7 @@ def test_a_retired_draft_or_closed_vendor_product_disappears(seeded: SeedReport)
 def test_only_products_published_in_the_page_language_are_shown(seeded: SeedReport) -> None:
     both = listed("Blue bowl")
     english_only = ProductFactory.create(
-        vendor=VendorFactory.create(status=Vendor.Status.ACTIVE),
+        vendor=VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True),
         status=Product.Status.PUBLISHED,
     )
     ProductTranslationFactory.create(

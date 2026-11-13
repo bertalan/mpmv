@@ -1451,11 +1451,14 @@ msgstr ""
 
 #: apps/vendors/models.py
 msgid ""
-"How your products are sold unless a product says otherwise: buyers order and pay online, or they "
-"first send you an enquiry."
+"How your products are sold: buyers order and pay online, or they first send you an enquiry. On "
+"request applies to all your products, even those set to buy. Until your payout account is ready, "
+"your shop is on request whatever you choose."
 msgstr ""
-"Come vendi i tuoi prodotti, salvo diversa indicazione sul singolo prodotto: i clienti ordinano e "
-"pagano online, oppure ti inviano prima una richiesta."
+"Come vendi i tuoi prodotti: i clienti ordinano e pagano online, oppure ti inviano prima una "
+"richiesta. Su richiesta vale per tutti i tuoi prodotti, anche quelli impostati per l'acquisto. "
+"Finché il tuo conto per i pagamenti non è pronto, il tuo negozio è su richiesta qualunque sia la "
+"tua scelta."
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""

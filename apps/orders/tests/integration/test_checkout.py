@@ -56,7 +56,9 @@ def tax_setup() -> None:
 def vendor(*, shipping: bool = True, countries: tuple[str, ...] = ("IT",), **fields: Any) -> Vendor:
     """An active Italian domestic vendor with a tax profile and, by default, one IT shipping
     method: 0-5 kg 9.90, 5-10 kg 14.90 net (the default over-band policy is a quote)."""
-    found = VendorFactory.create(status=Vendor.Status.ACTIVE, country="IT", **fields)
+    found = VendorFactory.create(
+        status=Vendor.Status.ACTIVE, sells_online=True, country="IT", **fields
+    )
     VendorTaxProfileFactory.create(vendor=found, valid_from=utc(2027, 1, 1))
     if shipping:
         method = ShippingMethodFactory.create(
@@ -272,7 +274,7 @@ def test_buyer_choice_of_shipping_rate_and_an_unknown_key() -> None:
 def test_a_vendor_without_a_tax_profile_blocks_only_its_package() -> None:
     cart = CartFactory.create()
     good = vendor()
-    broken = VendorFactory.create(status=Vendor.Status.ACTIVE, country="IT")
+    broken = VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True, country="IT")
     add(cart, good, "10.00")
     add(cart, broken, "10.00")
     result = preview(cart)
