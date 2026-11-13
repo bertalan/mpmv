@@ -445,8 +445,10 @@ def review_page(request: HttpRequest) -> HttpResponse:
     if order is None:
         raise Http404
     request.session[state.CONFIRMATION_KEY] = str(order.public_id)
-    if order.payment_intent_ref:  # empty after a failed provider call: the page retries
+    if order.payment_intent_ref:
         request.session[state.PAYMENT_BROWSER_STATE] = order.payment_intent_ref
+    else:  # a failed provider call: the page retries; an earlier order's id must not linger
+        request.session.pop(state.PAYMENT_BROWSER_STATE, None)
     state.clear(request)
     return _private(HttpResponseRedirect(reverse("orders:confirmation")))
 

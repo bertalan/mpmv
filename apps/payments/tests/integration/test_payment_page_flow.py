@@ -70,3 +70,31 @@ def test_a_cancelled_order_is_not_shown_as_paid(
     assert "Payment received" not in html
     assert "no longer open for payment" in html
     assert "payment-form" not in html
+
+
+def test_a_failed_second_order_in_the_same_session_still_retries(
+    client: Client,
+    commission: None,  # noqa: F811
+    stripe: FakeStripeClient,  # noqa: F811
+    settings: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings.STRIPE_PUBLISHABLE_KEY = "pk_" + secrets.token_urlsafe(12)
+    shop = vendor("Alpha Shop")
+    add(with_cart(client), shop, "100.00")
+    sign_off_details(client)
+    assert client.post(reverse("orders:review")).status_code == 302
+    first = Order.objects.get()
+    assert client.session["checkout_payment_ref"] == first.payment_intent_ref
+    real = stripe.create_payment_intent
+    monkeypatch.setattr(stripe, "create_payment_intent", failing)
+    add(with_cart(client), shop, "50.00")
+    sign_off_details(client)
+    assert client.post(reverse("orders:review")).status_code == 302
+    second = Order.objects.exclude(pk=first.pk).get()
+    assert second.payment_intent_ref == ""
+    assert "checkout_payment_ref" not in client.session
+    monkeypatch.setattr(stripe, "create_payment_intent", real)
+    response = client.get(reverse("orders:confirmation"))
+    assert response.status_code == 200
+    assert "payment-form" in response.content.decode()
