@@ -33,6 +33,10 @@ class InvalidSignature(Exception):
     """A webhook body whose signature does not verify; the caller answers 400 and stores nothing."""
 
 
+class PaymentMismatch(Exception):
+    """The payment asked for does not belong to the order it was asked for."""
+
+
 class ProviderError(Exception):
     """The provider refused or failed a call; the message is safe to log."""
 

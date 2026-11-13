@@ -46,6 +46,9 @@ from apps.orders.services import (
     CheckoutClosed,
     CheckoutPreview,
     OrderRefused,
+    PaymentMismatch,
+    PaymentUnavailable,
+    payment_client_secret,
     place_order,
     start_payment,
 )
@@ -441,7 +444,7 @@ def review_page(request: HttpRequest) -> HttpResponse:
     if order is None:
         raise Http404
     request.session[state.CONFIRMATION_KEY] = str(order.public_id)
-    request.session[state.PAYMENT_BROWSER_STATE] = order.payment_client_secret
+    request.session[state.PAYMENT_BROWSER_STATE] = order.payment_intent_ref
     state.clear(request)
     return _private(HttpResponseRedirect(reverse("orders:confirmation")))
 
@@ -492,19 +495,30 @@ def _payment_csp() -> dict[str, list[str]]:
 
 def _payment_context(request: HttpRequest, order: Order) -> dict[str, Any] | None:
     """What the page needs to confirm the payment in the browser, or None when there is nothing
-    to pay (already paid, no provider, or the payments switch is off: the order is kept)."""
+    to pay (already paid, no provider, or the payments switch is off: the order is kept).
+
+    The session keeps only the payment id; the secret is fetched from the provider on each visit.
+    A payment that is not this order's is a 404."""
     if order.state != "awaiting_payment" or not settings.STRIPE_PUBLISHABLE_KEY:
         return None
-    secret = request.session.get(state.PAYMENT_BROWSER_STATE)
-    if not isinstance(secret, str) or not secret:
-        try:  # the first attempt failed or the page was reached later: ask again, never twice
-            secret = start_payment(order, ctx=audit_context(request))
+    if not order.payment_intent_ref:  # the first attempt failed: ask again, never twice
+        try:
+            start_payment(order, ctx=audit_context(request))
         except CheckoutClosed:
             return None
-        if secret:
-            request.session[state.PAYMENT_BROWSER_STATE] = secret
-    if not secret:
-        return None
+        order.refresh_from_db()
+        if not order.payment_intent_ref:
+            return None
+    remembered = request.session.get(state.PAYMENT_BROWSER_STATE)
+    if remembered is not None and remembered != order.payment_intent_ref:
+        raise Http404("This payment is not for this order")
+    request.session[state.PAYMENT_BROWSER_STATE] = order.payment_intent_ref
+    try:
+        secret = payment_client_secret(order)
+    except PaymentMismatch as error:
+        raise Http404("This payment is not for this order") from error
+    except PaymentUnavailable:
+        return {"retry": True}
     return {
         "publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
         "client_secret": secret,

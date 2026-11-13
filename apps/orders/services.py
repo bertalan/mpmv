@@ -984,6 +984,10 @@ def place_order(
 PAYMENT_ACTOR = "webhook:payments"
 
 
+class PaymentMismatch(Exception):
+    """The payment reference does not belong to this order (the page answers 404)."""
+
+
 class PaymentUnavailable(Exception):
     """The payment provider refused or failed; the order stays awaiting payment."""
 
@@ -1251,3 +1255,15 @@ def carrier_tracking_templates(names: Iterable[str]) -> dict[str, str]:
         )
     )
     return {name: carriers[code] for name, code in wanted.items() if carriers.get(code)}
+
+
+def payment_client_secret(order: Order) -> str:
+    """The browser-side secret of the order's payment, asked from the provider each time (never
+    stored). Raises `PaymentMismatch` when the provider says the payment is not this order's and
+    `PaymentUnavailable` when it cannot answer."""
+    fetcher = getattr(settings, "ORDER_PAYMENT_BROWSER_HOOK", "")
+    if not fetcher or not order.payment_intent_ref:
+        raise PaymentUnavailable("no payment to confirm")
+    return str(
+        import_string(fetcher)(order.payment_intent_ref, order.transfer_group or order.number)
+    )

@@ -16,6 +16,7 @@ from decimal import Decimal
 from .engine import (
     FeeCollection,
     InvalidSignature,
+    PaymentMismatch,
     PaymentRequest,
     PaymentResult,
     PaymentStatus,
@@ -78,6 +79,14 @@ class FakePaymentProvider:
                 )
             )
         return result
+
+    def payment_client_secret(self, provider_ref: str, order_ref: str) -> str:
+        if (
+            provider_ref not in self._payments
+            or self._payments[provider_ref][0].order_ref != order_ref
+        ):
+            raise PaymentMismatch(provider_ref)
+        return self._payments[provider_ref][1].client_secret
 
     def refund(self, request: RefundRequest) -> RefundResult:
         key = f"refund:{request.idempotency_key}"

@@ -4583,6 +4583,10 @@ msgstr "La passkey non ha funzionato."
 msgid "the passkey was not accepted"
 msgstr "la passkey non è stata accettata"
 
+#: apps/orders/templates/orders/confirmation.html
+msgid "The payment form could not be loaded. Please reload this page in a moment."
+msgstr "Impossibile caricare il modulo di pagamento. Ricarica la pagina tra un momento."
+
 #: apps/vendors/admin.py
 msgid ""
 "The payment provider's fixed fee per payment, in euro, for example 2.00. Enter 0 if there is none."

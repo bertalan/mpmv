@@ -236,6 +236,12 @@ VENDOR_CLOSURE_HOOKS: list[str] = [
 ORDER_FREEZE_HOOKS: list[str] = ["apps.compliance.services.orders_frozen"]
 # PAY.1: the callable `place_order` uses to start the payment (orders cannot import payments).
 ORDER_PAYMENT_STARTER = "apps.payments.checkout.start_payment"
+# PAY.1: the callable that fetches the browser-side secret of an order's payment from the provider
+# (`(provider_ref, order_ref) -> str`); the secret is never kept in the session.
+ORDER_PAYMENT_BROWSER_HOOK = "apps.payments.checkout.client_secret_for"
+# PAY.3 sets this True once the per-vendor transfers exist. Until then a payment would stay whole on
+# the platform account (against D-08), so `manage.py check` refuses LIVE_DATA (payments.E004).
+PAYMENTS_TRANSFERS_WIRED = False
 
 # Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
 # that lists the active vendors established outside a new allowed set.

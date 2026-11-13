@@ -67,6 +67,10 @@ def failing(**kwargs: Any) -> Any:
     raise StripeError("down")
 
 
+def failing_get(intent_id: str) -> Any:
+    raise StripeError("down")
+
+
 def intent_calls(client: FakeStripeClient) -> int:
     return client.calls.count("create_payment_intent")
 
@@ -288,7 +292,6 @@ def test_the_payment_page_gets_the_client_secret_and_a_csp_for_stripe_js(
     order = place(sellable())
     session = client.session
     session["checkout_confirmation"] = str(order.public_id)
-    session["checkout_payment_secret"] = order.payment_client_secret
     session.save()
     response = client.get(reverse("orders:confirmation"))
     html = response.content.decode()
@@ -299,6 +302,46 @@ def test_the_payment_page_gets_the_client_secret_and_a_csp_for_stripe_js(
     policy = response.headers["Content-Security-Policy"]
     assert "https://js.stripe.com" in policy
     assert "unsafe-inline" not in policy
+    assert order.payment_client_secret not in str(dict(client.session))  # only the id is kept
+    assert client.session["checkout_payment_ref"] == order.payment_intent_ref
+
+
+def payment_page(client: Client, order: Order, settings: Any) -> Any:
+    settings.STRIPE_PUBLISHABLE_KEY = "pk_" + secrets.token_urlsafe(12)
+    session = client.session
+    session["checkout_confirmation"] = str(order.public_id)
+    session.save()
+    return client.get(reverse("orders:confirmation"))
+
+
+def test_an_intent_of_another_order_is_a_404(
+    stripe: FakeStripeClient, settings: Any, client: Client
+) -> None:
+    order, other = place(sellable()), place(sellable())
+    Order.objects.filter(pk=order.pk).update(payment_intent_ref=other.payment_intent_ref)
+    order.refresh_from_db()
+    assert payment_page(client, order, settings).status_code == 404
+
+
+def test_a_payment_id_that_is_not_the_sessions_is_a_404(
+    stripe: FakeStripeClient, settings: Any, client: Client
+) -> None:
+    order = place(sellable())
+    session = client.session
+    session["checkout_payment_ref"] = "pi_someone_else"
+    session.save()
+    assert payment_page(client, order, settings).status_code == 404
+
+
+def test_a_provider_error_on_the_payment_page_is_a_retry_message_not_a_500(
+    stripe: FakeStripeClient, settings: Any, client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    order = place(sellable())
+    monkeypatch.setattr(stripe, "get_payment_intent", failing_get)
+    response = payment_page(client, order, settings)
+    assert response.status_code == 200
+    assert "reload this page" in response.content.decode()
+    assert "payment-form" not in response.content.decode()
 
 
 def test_a_dry_run_changes_nothing(

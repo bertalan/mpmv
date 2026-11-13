@@ -14,7 +14,7 @@ from django.http import HttpRequest
 
 SESSION_KEY = "checkout_state"
 CONFIRMATION_KEY = "checkout_confirmation"
-PAYMENT_BROWSER_STATE = "checkout_payment_secret"  # the browser-side payment secret (PAY.1)
+PAYMENT_BROWSER_STATE = "checkout_payment_ref"  # the payment id only, never its secret (PAY.1)
 
 
 def load(request: HttpRequest) -> dict[str, Any]:
