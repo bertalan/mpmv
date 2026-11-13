@@ -8,7 +8,9 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push cancels an older run on a PR branch, but never on main: every main commit
+  # keeps its own verdict, so a release can be gated on its exact sha (OPS release slot).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
