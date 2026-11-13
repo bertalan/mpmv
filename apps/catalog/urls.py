@@ -1,5 +1,6 @@
 """Public catalog routes, mounted inside `i18n_patterns` before the CMS pages (CAT.8, D-07).
 
+The product page (CAT.7) lives on the product segment, with the slug of the page language.
 Each fixed segment answers in every spelling (`/it/brand/…` finds the brand page, which then
 redirects to `/it/marchio/…`). A taxonomy page has no fixed segment: its first segment matches
 only the published slug of a taxonomy with term pages, in some language, so every other path
@@ -44,6 +45,11 @@ urlpatterns = [
         rf"^(?P<segment>{_segments(slugs.CATEGORY_SEGMENTS)})/(?P<slugs>{SLUG_PATH})/$",
         views.category_listing,
         name="category",
+    ),
+    re_path(
+        rf"^(?P<segment>{_segments(slugs.PRODUCT_SEGMENTS)})/(?P<slug>[-a-zA-Z0-9_]+)/$",
+        views.product_detail,
+        name="product",
     ),
     re_path(
         rf"^(?P<segment>{_segments(slugs.BRAND_SEGMENTS)})/(?P<slug>[-a-z0-9_]+)/$",

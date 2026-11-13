@@ -375,16 +375,7 @@ def test_m1_the_mainland_of_that_country_keeps_the_country_rate() -> None:
     assert d.rate == D("23")
 
 
-# M2: D-02 is open: Northern Ireland and `special` territories block the sale
-SPECIAL_RULES = (*TERRITORIES, engine.territory_rule("XI", "GB", engine.SPECIAL, ["BT*"]))
-
-
-@pytest.mark.parametrize(
-    ("country", "postcode"), [("XI", None), ("GB", "BT1 1AA"), ("gb", "bt71 4ab"), ("GB", "BT")]
-)
-def test_m2_northern_ireland_blocks_the_sale(country: str, postcode: str | None) -> None:
-    with pytest.raises(engine.UnresolvedTerritory):
-        engine.resolve_goods_tax(ctx(destination=country, postcode=postcode), engine.STANDARD)
+# M2: `special` territories block the sale; Northern Ireland (D-02) is in test_northern_ireland.py
 
 
 def test_m2_great_britain_is_still_an_export() -> None:

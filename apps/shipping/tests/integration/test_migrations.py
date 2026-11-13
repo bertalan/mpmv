@@ -142,3 +142,40 @@ def test_the_migration_keeps_zones_that_are_already_valid() -> None:
     executor.loader.build_graph()
     executor.migrate(executor.loader.graph.leaf_nodes())
     assert ShippingZone.objects.count() == 2
+
+
+BEFORE_FOLLOWS_GOODS = [("shipping", "0010_seed_special_areas")]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_tax17_other_vat_treatments_become_follows_goods_and_are_reported(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate(BEFORE_FOLLOWS_GOODS)
+    old_apps = executor.loader.project_state(BEFORE_FOLLOWS_GOODS).apps
+    OldZone = old_apps.get_model("shipping", "ShippingZone")
+    OldCarrier = old_apps.get_model("shipping", "Carrier")
+    OldMethod = old_apps.get_model("shipping", "ShippingMethod")
+
+    vendor = VendorFactory.create()
+    zone = OldZone.objects.create(code="tax17", name="Tax 17", priority=10, countries=["IT"])
+    carrier = OldCarrier.objects.create(code="tax17-carrier")
+    changed = {}
+    for key, treatment in (("a", "standard_rate"), ("b", "exempt"), ("c", "follows_goods")):
+        changed[key] = OldMethod.objects.create(
+            vendor_id=vendor.pk, zone=zone, carrier=carrier, key=key, tax_treatment=treatment
+        ).pk
+
+    executor.loader.build_graph()
+    with caplog.at_level("WARNING"):
+        executor.migrate(executor.loader.graph.leaf_nodes())
+
+    assert set(ShippingMethod.objects.values_list("tax_treatment", flat=True)) == {
+        engine.FOLLOWS_GOODS
+    }
+    text = caplog.text
+    assert f"method {changed['a']} " in text
+    assert f"method {changed['b']} " in text
+    assert f"method {changed['c']} " not in text
+    assert "2 shipping method(s) set to follows_goods" in text

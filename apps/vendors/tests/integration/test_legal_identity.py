@@ -361,7 +361,7 @@ def test_a_vendor_allowed_a_payout_has_the_dac7_dataset_and_a_party_block(seeded
     for vendor in payout_ready_vendors():
         assert_payout_allowed(vendor)  # does not raise
         identity = Vendor.objects.get(pk=vendor.pk).legal_identity()
-        assert engine.dac7_missing(identity) == (), vendor.country
+        assert engine.dac7_missing(identity, engine.SEEDED_NO_TIN_COUNTRIES) == (), vendor.country
         engine.fatturapa_party(identity, engine.CESSIONARIO)
 
 
