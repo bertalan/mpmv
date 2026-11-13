@@ -2080,13 +2080,18 @@ ON_REQUEST: Final = "on_request"
 PAYOUT_ACCOUNT_READY: Final = "active"
 
 
-def vendor_sales_mode(vendor_mode: str, *, payout_ready: bool) -> str:
+def vendor_sales_mode(vendor_mode: str, *, payout_ready: bool, terms_ok: bool = True) -> str:
     """The vendor-level mode buyers get: on request without a payout account ready for payouts
-    (D-19), whatever the stored default says; otherwise the vendor's own default."""
-    return vendor_mode if payout_ready else ON_REQUEST
+    (D-19), whatever the stored default says; otherwise the vendor's own default.
+
+    `terms_ok` is False when the platform requires sales terms (VEN.35) and the vendor has none
+    in force: that is on request too."""
+    return vendor_mode if payout_ready and terms_ok else ON_REQUEST
 
 
-def effective_sales_mode(product_mode: str, vendor_mode: str, *, payout_ready: bool) -> str:
+def effective_sales_mode(
+    product_mode: str, vendor_mode: str, *, payout_ready: bool, terms_ok: bool = True
+) -> str:
     """The sales mode of a product as buyers get it.
 
     The vendor's on-request mode (chosen, or forced by D-19 because no payout account is ready)
@@ -2094,4 +2099,4 @@ def effective_sales_mode(product_mode: str, vendor_mode: str, *, payout_ready: b
     on-request vendor never turns a catalog-only product into an enquiry."""
     if product_mode != BUY:
         return product_mode
-    return vendor_sales_mode(vendor_mode, payout_ready=payout_ready)
+    return vendor_sales_mode(vendor_mode, payout_ready=payout_ready, terms_ok=terms_ok)

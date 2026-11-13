@@ -191,3 +191,71 @@ class StaffRoleForm(forms.Form):
 
         super().__init__(*args, **kwargs)
         self.fields["role"].choices = [(r.key, r.label) for r in roles.ROLES]  # type: ignore[attr-defined]
+
+
+class SalesTermsForm(forms.Form):
+    """A new version of the seller's sales terms (VEN.35). The service owns the rules."""
+
+    body = forms.CharField(
+        label=_("Sales terms"),
+        help_text=_(
+            "The full text of your sales terms. Buyers read it before they pay. Required: "
+            "a version without a text cannot be published."
+        ),
+        widget=forms.Textarea(attrs={"rows": 14}),
+        max_length=60_000,
+    )
+    clauses = forms.CharField(
+        label=_("Onerous clauses"),
+        help_text=_(
+            "The clauses of your terms that need the separate approval of business buyers "
+            "(art. 1341, second paragraph, of the Civil Code), one per line as: article "
+            "number | title. For example: 7 | Limitation of liability. Required."
+        ),
+        widget=forms.Textarea(attrs={"rows": 5}),
+    )
+    governing_law = forms.CharField(
+        label=_("Governing law"),
+        help_text=_(
+            "The country whose law governs your terms, as a two-letter code, for example IT. "
+            "Required."
+        ),
+        max_length=2,
+    )
+    b2b_court = forms.CharField(
+        label=_("Court for business buyers"),
+        help_text=_(
+            "The city of the court that decides disputes with business buyers. Leave it empty "
+            "to use the court of your registered office. It never applies to consumers: their "
+            "court is always the one of their own residence."
+        ),
+        max_length=120,
+        required=False,
+    )
+    delivery_days = forms.IntegerField(
+        label=_("Delivery time in days"),
+        help_text=_("The delivery time you commit to, in days from the order. Required."),
+        min_value=0,
+        max_value=365,
+    )
+    return_cost_bearer = forms.ChoiceField(
+        label=_("Who pays the return"),
+        help_text=_(
+            "Who pays the direct cost of sending goods back after a withdrawal. If you leave it "
+            "empty, you pay. The consumer pays only if you choose it here and explain it below. "
+            "There is never a fee for handling a refund."
+        ),
+        choices=[("", _("The seller (default)")), ("consumer", _("The consumer"))],
+        required=False,
+    )
+    return_cost_info = forms.CharField(
+        label=_("Return cost information"),
+        help_text=_(
+            "What the buyer is told before the order about the cost of returning goods, for "
+            "example how it is calculated. Without this text the consumer cannot be asked to "
+            "pay and you pay."
+        ),
+        widget=forms.Textarea(attrs={"rows": 3}),
+        max_length=1000,
+        required=False,
+    )

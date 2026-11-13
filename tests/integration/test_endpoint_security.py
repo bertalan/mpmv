@@ -232,7 +232,8 @@ def check_refused(
             response_body(response), tenants(), *target.objects, known=target.path
         )
         assert not leaked, f"{endpoint.key}: {caller} sees Vendor B's data: {leaked}"
-    assert tables <= GET_WRITES_ALLOWED, f"{endpoint.key}: {caller} {method} wrote {tables}"
+    reviewed = GET_WRITES_ALLOWED | set(GET_WRITES_BY_ENDPOINT.get(endpoint.key, {}))
+    assert tables <= reviewed, f"{endpoint.key}: {caller} {method} wrote {tables}"
 
 
 def routes_to(endpoint: Endpoint, path: str) -> bool:
@@ -465,6 +466,7 @@ OWNER_ONLY_WEB = frozenset(
     {
         "manager:shop:profile",  # CORE.9
         "manager:shop:payments",  # VEN.6 (`bank_account`)
+        "manager:shop:sales_terms",  # VEN.35 (`profile`)
         "manager:shop:image_choose",  # VEN.31
         "manager:shop:image_results",
         "manager:shop:image_chosen",

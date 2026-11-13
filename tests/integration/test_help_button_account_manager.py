@@ -152,6 +152,7 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:terminations": "platform",
         "manager:platform:termination": "platform",
         "manager:shop:termination": "shop",
+        "manager:shop:sales_terms": "shop",
     }
 
 

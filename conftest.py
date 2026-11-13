@@ -156,6 +156,17 @@ def _no_language_leaks_between_tests() -> "Iterator[None]":
     translation.deactivate()
 
 
+@pytest.fixture(autouse=True)
+def _no_operator_setting_leaks_between_tests() -> "Iterator[None]":
+    """The process copy of the operator's sales-terms setting is dropped around each test: a
+    rolled-back operator row does not fire a signal."""
+    from apps.vendors.services import forget_require_terms
+
+    forget_require_terms()
+    yield
+    forget_require_terms()
+
+
 @pytest.fixture
 def superuser(db: None) -> "User":
     """A logged-in-ready superuser, shared by the admin tests of every app.

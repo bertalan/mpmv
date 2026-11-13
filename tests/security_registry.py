@@ -214,6 +214,12 @@ IDOR_REVIEWED: dict[str, str] = {
         "from the gate, `test_a_vendor_member_cannot_reach_the_page_or_the_revert`); the entry is "
         "an audit entry of any vendor, which staff may review by design."
     ),
+    "vendor_terms:read": (
+        "Public by design (VEN.35, VEN.32 exception): the signed link names the version in "
+        "force of one seller, whose terms anyone may read before ordering; a superseded or "
+        "tampered link is a 404 and every read is logged "
+        "(`test_the_version_in_force_is_readable_without_an_order_and_a_superseded_one_is_not`)."
+    ),
     "vendor_claim:claim": (
         "The page answers only for the vendor whose email-bound claim link was opened in this "
         "session (VEN.24); another vendor's public id is refused with 403 "
@@ -260,6 +266,10 @@ OBJECT_PATHS: dict[str, ObjectKwargs] = {
 # Routes with an identifier, called with placeholder parameters, that may answer 404 to a caller
 # who is not signed in or not allowed, with why that 404 hides nothing.
 PLACEHOLDER_404: dict[str, str] = {
+    "vendor_terms:read": (
+        "Public by design (VEN.35): the signed token is the credential; a tampered, expired or "
+        "superseded token is a 404 for everyone, and the route shows only the terms in force."
+    ),
     "media": MEDIA,
     "wagtailadmin_password_reset_confirm": (
         "Password reset confirmation of the editors' admin, public by design (PUBLIC): the uid "
@@ -270,6 +280,12 @@ PLACEHOLDER_404: dict[str, str] = {
 
 # Tables a GET of one endpoint may also write, with the reason.
 GET_WRITES_BY_ENDPOINT: dict[str, dict[str, str]] = {
+    "vendor_terms:read": {
+        "core_auditlog": (
+            "Every read of the sales terms in force, and every denied attempt, is logged (VEN.35, "
+            "VEN.32 exception): the entry holds the result and the version, never the reader."
+        ),
+    },
     "wagtailadmin_account": {
         "wagtailusers_userprofile": (
             "Wagtail creates the signed-in user's own preferences row, with defaults, the first "

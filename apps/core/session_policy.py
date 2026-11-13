@@ -54,6 +54,7 @@ DEFAULT_SENSITIVE_ACTIONS: Final = frozenset(
         "operator_config",
         "profile_revert",  # CORE.9 3/3: revert an owner's storefront text or logo change
         "notice_decision",  # CMP.5: review, decide, restrict, tell the authorities
+        "sales_terms_publish",  # VEN.35: a seller publishes a new version of its sales terms
     }
 )
 DEFAULT_CRITICAL_ACTIONS: Final = frozenset(

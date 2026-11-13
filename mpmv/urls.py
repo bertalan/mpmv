@@ -64,6 +64,7 @@ urlpatterns = [
     path("account/", include("apps.manager.account_urls")),  # Manager sign-in (CORE.17)
     path("manager/", include("apps.manager.urls")),  # the Manager's two spaces (CORE.17)
     path("vendor/claim/", include("apps.vendors.urls")),  # claim an imported vendor (VEN.24)
+    path("vendor/terms/", include("apps.vendors.terms_urls")),  # sales terms in force (VEN.35)
     path("_help/", include("apps.cms.help_urls")),  # contextual help dialog (ARC.32)
     path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.

@@ -310,6 +310,7 @@ def test_the_cards_load_their_texts_in_a_fixed_number_of_queries(
             assert client.get("/compatibility/maker/").status_code == 200
         return len(queries)
 
+    count()  # the first request also reads the operator setting once (then cached)
     before = count()
     for n in range(3):
         listed(f"Extra bag {n}").terms.add(shop["maker"])

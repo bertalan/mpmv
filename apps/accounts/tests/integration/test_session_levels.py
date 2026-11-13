@@ -615,6 +615,7 @@ WIRED = {
     "operator_config",
     "profile_revert",
     "notice_decision",
+    "sales_terms_publish",
     "bulk_edit",
 }
 # Actions whose web view does not exist yet: nothing to decorate (follow-ups in the PR).

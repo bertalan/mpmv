@@ -1647,3 +1647,145 @@ class NoTinCountry(BaseModel):
 
     def window(self) -> "engine.NoTinWindow":
         return engine.NoTinWindow(str(self.country), self.valid_from, self.valid_to)
+
+
+class SalesTermsVersion(BaseModel):
+    """One published version of a seller's sales terms (VEN.35, owner decision D-40).
+
+    Immutable (database trigger): a change is a new version, never an edit. `SalesTermsInForce`
+    points at the version in force; the checkout snapshots a version's id (ORD.17). There is no
+    field for a refund or return handling fee: the law allows none (artt. 56-57 Codice del
+    consumo). The PDF store of VEN.32 is not built yet, so the text lives in `body`.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.PROTECT,
+        related_name="sales_terms_versions",
+        help_text=_("The seller these terms belong to."),
+    )
+    number = models.PositiveIntegerField(
+        editable=False,
+        help_text=_("The version number of these terms for this seller: 1, 2, 3 and so on."),
+    )
+    effective_from = models.DateField(
+        help_text=_("The day these terms were published. Orders placed after it use this text.")
+    )
+    body = models.TextField(
+        help_text=_("The full text of your sales terms. Buyers read it before they pay. Required.")
+    )
+    clauses = models.JSONField(
+        default=list,
+        help_text=_(
+            "The onerous clauses of these terms (art. 1341, second paragraph, of the Civil "
+            "Code): for each, the article number and its title. Shown to business buyers in "
+            "the second approval box. Required."
+        ),
+    )
+    governing_law = CountryField(
+        help_text=_("The country whose law governs these terms. Required.")
+    )
+    b2b_court = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text=_(
+            "The city of the court that decides disputes with business buyers. Empty means the "
+            "court of your registered office. It never applies to consumers: their court is "
+            "always the one of their own residence."
+        ),
+    )
+    delivery_days = models.PositiveSmallIntegerField(
+        help_text=_("The delivery time you commit to, in days from the order. Required.")
+    )
+    return_cost_bearer = models.CharField(
+        max_length=10,
+        blank=True,
+        choices=[("seller", _("Seller")), ("consumer", _("Consumer"))],
+        help_text=_(
+            "Who pays the direct cost of sending goods back after a withdrawal. Empty means you "
+            "pay. The consumer pays only if you choose it here and explain it below."
+        ),
+    )
+    return_cost_info = models.TextField(
+        blank=True,
+        max_length=1000,
+        help_text=_(
+            "The information shown to the buyer before the order about the cost of returning "
+            "goods. Without it the consumer cannot be asked to pay and you pay."
+        ),
+    )
+    content_hash = models.CharField(
+        max_length=64,
+        editable=False,
+        help_text=_("A fingerprint (SHA-256) of this version, to prove later it was not changed."),
+    )
+
+    class Meta:
+        ordering = ["vendor_id", "-number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vendor", "number"], name="vendors_salesterms_vendor_number_unique"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor_id} v{self.number}"
+
+    def hash_fields(self) -> dict[str, Any]:
+        """The stored, normalized values `content_hash` is computed over (never raw input)."""
+        return {
+            "body": self.body,
+            "clauses": self.clauses,
+            "governing_law": str(self.governing_law),
+            "b2b_court": self.b2b_court,
+            "delivery_days": self.delivery_days,
+            "return_cost_bearer": self.return_cost_bearer,
+            "return_cost_info": self.return_cost_info,
+        }
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "vendor": str(self.vendor.public_id),
+            "number": self.number,
+            "effective_from": self.effective_from.isoformat(),
+            "clauses": self.clauses,
+            "governing_law": str(self.governing_law),
+            "b2b_court": self.b2b_court,
+            "delivery_days": self.delivery_days,
+            "return_cost_bearer": self.return_cost_bearer,
+            "content_hash": self.content_hash,
+        }
+
+
+class SalesTermsInForce(BaseModel):
+    """The pointer to the version of a seller's sales terms in force (VEN.35).
+
+    The pointer changes, the versions stay. One row per vendor.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.OneToOneField(
+        Vendor,
+        on_delete=models.PROTECT,
+        related_name="sales_terms_in_force",
+        help_text=_("The seller."),
+    )
+    version = models.ForeignKey(
+        SalesTermsVersion,
+        on_delete=models.PROTECT,
+        related_name="+",
+        help_text=_("The version of the seller's sales terms that is in force."),
+    )
+
+    def __str__(self) -> str:
+        return f"{self.vendor_id} in force: {self.version_id}"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.version_id is not None and self.version.vendor_id != self.vendor_id:
+            raise ValidationError({"version": _("The version belongs to another seller.")})
