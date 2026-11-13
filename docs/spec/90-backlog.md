@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **373** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2981 h** (P1 2195 h · P2 698 h · P3 88 h)
+- Micro-tasks: **374** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2984 h** (P1 2195 h · P2 701 h · P3 88 h)
 - P1 critical path (schedule lower bound with full parallelism): **153 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CORE.2 → CORE.3 → CORE.17 → CORE.18 → FIT.1 → FIT.5 → FIT.7 → FIT.8 → FIT.10 → FIT.12
 
 ## By macro area
@@ -30,13 +30,13 @@
 | TRU | Trust, reviews and community (D-37 proposal) | 11 | 0 | 70 | 16 | 86 |
 | FIT | Garage and fitment (D-38) | 17 | 170 | 0 | 14 | 184 |
 | THM | Frontend themes | 12 | 76 | 12 | 0 | 88 |
-| SEO | SEO, feeds, analytics | 9 | 44 | 18 | 0 | 62 |
+| SEO | SEO, feeds, analytics | 10 | 44 | 21 | 0 | 65 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
 | CMP | Compliance | 33 | 190 | 88 | 0 | 278 |
 | SEC | Security | 12 | 76 | 0 | 0 | 76 |
 | OPS | Operations | 14 | 25 | 37 | 8 | 70 |
 | MIG | Migration and cutover | 21 | 135 | 29 | 0 | 164 |
-| **Total** | | **373** | **2195** | **698** | **88** | **2981** |
+| **Total** | | **374** | **2195** | **701** | **88** | **2984** |
 
 ## By phase
 
@@ -326,7 +326,7 @@
 | MIG.17 | Shipping configuration migration: the MIG.1 extractor exports the legacy shipping option (zones with countries, postcode ranges and priority, the world catch-all, carriers per vendor with weight bands and surcharges, pickup options, quote settings) to the intermediate format, and the SHP.5 loader writes the `shipping` models; the marketplace plugin's own shipping tables are treated as a derived mirror and never used as a source | P1 | 4 | MIG.12, SHP.5 | A fresh-dump run loads the configuration with no duplicates on reload; the §13.3 shipping parity (200 vendor × country × postcode × weight combinations) shows no difference; the world catch-all and every pickup option are present; a value that does not parse is reported, never defaulted |
 | MIG.20 | Refunds migration (owner decision 2026-11-11, relayed by lane-a, #86): refund child orders and marketplace refund requests are stored inside the historical order (refunded amount, date, reason); there is no separate refund model for legacy data; no new ledger entry and no tax recalculation | P1 | 4 | MIG.4 | A migrated order shows its refunded amount, date and reason; the MIG.5 parity report reconciles order total minus refunds against the legacy figures; a refund amount that does not parse as `Decimal` is rejected with a report; the migration writes no ledger entry for a refund (MIG.8 covers balances); no refund model or table exists for legacy data |
 
-### F6 — After go-live (P2) (107 tasks, 808 h)
+### F6 — After go-live (P2) (108 tasks, 811 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -411,6 +411,7 @@
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget; cacheability rules taken from wagtail-cache (owner decision D-36; the list below is the minimum and the spike checks it against the package): only anonymous `GET` and `HEAD` with a 200 answer are cached, nothing with a session, cart, consent or CSRF cookie or a `Vary: Cookie`, nothing in the Manager or admin, the key includes the locale and the host, a publish or unpublish purges the page and the pages that list it; **a cached page never carries a per-request CSP nonce** (replaying one nonce to every visitor defeats it), so a page that needs a nonce is not cacheable; package or mirror decided at a short spike inside this row | P2 | 6 | THM.3 | LCP < 2.5 s on product page; tests: a cacheable public response has no `nonce` attribute and its CSP has no nonce source, a page that needs a nonce is served uncached; a cart, consent, Manager or logged-in request is never cached; a locale change and a publish purge the right entries |
 | SEO.9 | `ConsentProvider` interface and docs (owner decision D-10, 2026-11-11): the consent banner is one provider behind an interface (state of each category, gating of tags and e-commerce events, consent log, change of choice); the self-hosted one of SEO.5 is the default and an operator who prefers an external certified CMP plugs it in through a setting, not a fork; `docs/dev/consent-providers.md` "how to add a consent provider" lists what a provider must do (block before consent, signal state, keep proof, CSP and script allow-list per the §14 rule) | P2 | 4 | SEO.5 | The doc exists; the setting selects the provider and an unknown value fails a system check; a test provider replaces the default without changing the tag-gating code; no tag fires before consent with either provider |
+| SEO.10 | Vendor role in product structured data (producer or reseller) (owner 2026-11-13 via lane-a): `Vendor.default_product_role` (choices producer, reseller; blank means unknown) and the per-product override `Product.vendor_role` (blank means use the vendor default); in every role the vendor stays the offer's `seller`; `brand` is the CAT.20 Brand when set (a producer vendor is the brand only when CAT.20 has none, so one GTIN gives one brand `@id`); `manufacturer` is the CAT.20 Manufacturer when set, else the producer vendor; reseller and unknown take both from CAT.20 only, and an unknown role never names the vendor as manufacturer (conservative, never invented); the vendor field is edited in the Manager vendor settings and the product field in the product form (catalog area); help texts in EN and IT; a migration in each app (vendors and catalog); offers wait for TAX.12, as the product page already says | P2 | 3 | SEO.7, CAT.7, CAT.20 | JSON-LD snapshot for each of producer, reseller and unknown; the product override wins over the vendor default; help texts exist in EN and IT; a migration adds the two fields; regression tests: with an unknown role the vendor is never the `manufacturer`; for a reseller or unknown role without a CAT.20 Manufacturer no `manufacturer` is emitted; for a producer without a CAT.20 Manufacturer the vendor is the `manufacturer`; a producer's and a reseller's pages for the same GTIN share the brand `@id`; a CAT.20 Manufacturer wins over a producer vendor |
 | AI.1 | MCP server: auth, read tools (catalog, orders, quotes, simulations, reports) | P2 | 12 | CORE.7 | Tools usable from Claude Code with scopes |
 | AI.2 | Mutating MCP tools with dry-run, confirmation and audit | P2 | 10 | AI.1 | Every mutation has a diff and an audit entry |
 | CMP.16 | Swiss threshold response, ⚖️ (L) decided with the tax advisor: Swiss VAT registration as supplier, or a Swiss row in the CMP.14 lead-only rules | P2 | 3 | CMP.14, CMP.15 | With the Swiss rule active, a Swiss consumer's small consignment becomes a lead and a larger one stays a normal order; the customer terms mention Switzerland |
