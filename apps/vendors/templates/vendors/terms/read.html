@@ -1,10 +1,11 @@
 {% extends "layouts/account.html" %}
-{% load i18n %}
+{% load i18n static %}
+{% block head %}<script type="module" src="{% static 'vendors/print-button.js' %}"></script>{% endblock %}
 {% block title %}{% translate "Sales terms" %} · {{ vendor.display_name }}{% endblock %}
 {% block account_content %}
 <article class="sales-terms">
   <h1>{% blocktranslate with name=vendor.display_name %}Sales terms of {{ name }}{% endblocktranslate %}</h1>
-  <p>{% blocktranslate with number=version.number date=version.effective_from|date:"Y-m-d" %}Version {{ number }}, in force from {{ date }}.{% endblocktranslate %}</p>
+  <p>{% blocktranslate with number=version.number date=version.effective_from|date:"Y-m-d" %}Version {{ number }}, in force from {{ date }}.{% endblocktranslate %} {% blocktranslate with hash=version.content_hash|slice:":12" %}Fingerprint {{ hash }}.{% endblocktranslate %}</p>
   <h2>{% translate "Delivery, returns and law" %}</h2>
   <ul>
     <li>{% blocktranslate with days=consumer.delivery_days %}Committed delivery time: {{ days }} days.{% endblocktranslate %}</li>
@@ -17,6 +18,6 @@
   <div class="sales-terms__body">{{ version.body|linebreaks }}</div>
   <h2>{% translate "Clauses for approval by business buyers (art. 1341 Civil Code)" %}</h2>
   <ul>{% for clause in version.clauses %}<li>{{ clause.article }}: {{ clause.title }}</li>{% endfor %}</ul>
-  <p><button type="button" onclick="window.print()">{% translate "Print" %}</button></p>
+  <p><button type="button" data-print>{% translate "Print" %}</button></p>
 </article>
 {% endblock %}

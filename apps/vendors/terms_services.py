@@ -130,9 +130,7 @@ def publish_sales_terms(
             return_cost_bearer=str(values.get("return_cost_bearer") or ""),
             return_cost_info=str(values.get("return_cost_info") or "").strip(),
         )
-        version.content_hash = engine.content_hash(
-            {**values, "body": version.body, "clauses": version.clauses}
-        )
+        version.content_hash = engine.content_hash(version.hash_fields())
         changes.create(
             "vendors.salestermsversion",
             f"{vendor.public_id}:{version.number}",

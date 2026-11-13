@@ -463,6 +463,16 @@ class PlatformOperator(Versioned):
             " to send them to the support address."
         ),
     )
+    # VEN.35 (D-40): off by default; switching it on makes every seller without sales terms in
+    # force sell on request only. A versioned setting like the rest of this row.
+    require_sales_terms = models.BooleanField(
+        default=False,
+        help_text=_(
+            "When on, a seller who has not published sales terms sells on request only. "
+            "Sellers who have published terms are not affected. Leave it off until your "
+            "sellers have had time to publish their terms."
+        ),
+    )
     # CMP.5 (DSA articles 11 and 12): the single point of contact for authorities and the means
     # for recipients of the service, published on the public contact page. Recipients reach the
     # platform at `support_email` and, optionally, at a contact form (`user_contact_url`).

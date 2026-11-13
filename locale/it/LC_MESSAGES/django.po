@@ -1058,6 +1058,10 @@ msgstr ""
 msgid "Connect your payout account"
 msgstr "Collega il tuo account per i pagamenti"
 
+#: apps/vendors/models.py
+msgid "Consumer"
+msgstr "Consumatore"
+
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Consumers: disputes go to the court of the consumer's own residence."
 msgstr "Consumatori: le controversie spettano al giudice del luogo di residenza del consumatore."
@@ -1417,6 +1421,10 @@ msgstr "Filtri"
 #: apps/orders/templates/orders/_cart_body.html
 msgid "Find something you like."
 msgstr "Trova qualcosa che ti piace."
+
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Fingerprint %(hash)s."
+msgstr "Impronta %(hash)s."
 
 #: themes/base/templates/components/footer.html
 msgid "Footer"
@@ -3224,6 +3232,10 @@ msgstr "Seleziona almeno una riga."
 #: apps/seo/site_links.py
 msgid "Sell with us (vendor application)"
 msgstr "Vendi con noi (candidatura venditore)"
+
+#: apps/vendors/models.py
+msgid "Seller"
+msgstr "Venditore"
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Selling mode"
@@ -5653,6 +5665,10 @@ msgid "The verification failed. Please reload the page and try again."
 msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
 
 #: apps/vendors/models.py
+msgid "The version belongs to another seller."
+msgstr "La versione appartiene a un altro venditore."
+
+#: apps/vendors/models.py
 msgid "The version number of these terms for this seller: 1, 2, 3 and so on."
 msgstr "Il numero di versione di queste condizioni per questo venditore: 1, 2, 3 e così via."
 
@@ -6507,6 +6523,16 @@ msgstr ""
 " della pagina del tuo negozio. Se la lasci vuota, la sezione non viene mostrata. Fino a circa "
 "5.000 caratteri, formattazione compresa. Se non sei sicuro di cosa preveda la legge, chiedi a un "
 "consulente legale."
+
+#: apps/core/models.py
+msgid ""
+"When on, a seller who has not published sales terms sells on request only. Sellers who have "
+"published terms are not affected. Leave it off until your sellers have had time to publish their "
+"terms."
+msgstr ""
+"Se attivo, un venditore che non ha pubblicato le condizioni di vendita vende solo su richiesta. I "
+"venditori che le hanno pubblicate non sono toccati. Lascialo disattivato finché i venditori non "
+"hanno avuto il tempo di pubblicarle."
 
 #: apps/ingest/models.py
 msgid "When the case was decided."

@@ -9,10 +9,12 @@ from django.shortcuts import render
 from django.views.decorators.http import require_GET
 
 from apps.core.http import client_ip
+from apps.core.i18n import language_switch_home
 
 from . import terms_services as services
 
 
+@language_switch_home
 @require_GET
 def read(request: HttpRequest, token: str) -> HttpResponse:
     version = services.read_terms(token, ctx=services.anonymous_reader(client_ip(request)))

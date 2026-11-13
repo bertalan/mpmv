@@ -5,13 +5,14 @@ from typing import Any
 
 import pytest
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import connection, transaction
+from django.db import DatabaseError, connection, transaction
 from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
+from apps.vendors import terms_engine as engine
 from apps.vendors import terms_services as ts
 from apps.vendors.models import SalesTermsInForce, SalesTermsVersion, Vendor
 from apps.vendors.tests.factories import (
@@ -77,10 +78,10 @@ def test_a_stored_version_cannot_be_updated_or_deleted() -> None:
     vendor = VendorFactory.create()
     ts.publish_sales_terms(vendor, values(), actor=owner_of(vendor), ctx=CTX)
     version = SalesTermsVersion.objects.get()
-    with pytest.raises(Exception, match="append-only"), transaction.atomic():
+    with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():
         SalesTermsVersion.objects.filter(pk=version.pk).update(body="edited")
     with (
-        pytest.raises(Exception, match="append-only"),
+        pytest.raises(DatabaseError, match="append-only"),
         transaction.atomic(),
         connection.cursor() as cursor,
     ):
@@ -240,3 +241,53 @@ def test_the_factory_makes_a_version_in_force_and_one_that_is_not() -> None:
 def test_the_pointer_factory_points_a_vendor_at_a_version() -> None:
     pointer = SalesTermsInForceFactory.create()
     assert ts.version_in_force(pointer.vendor) == pointer.version
+
+
+def test_the_content_hash_is_recomputable_from_the_stored_row() -> None:
+    vendor = VendorFactory.create()
+    raw = values(
+        governing_law="it",
+        b2b_court="  Milan ",
+        return_cost_bearer=None,
+        return_cost_info="  ",
+        body="  Text  ",
+    )
+    ts.publish_sales_terms(vendor, raw, actor=owner_of(vendor), ctx=CTX)
+    stored = SalesTermsVersion.objects.get(vendor=vendor)
+    assert stored.governing_law == "IT"
+    assert stored.b2b_court == "Milan"
+    assert stored.content_hash == engine.content_hash(
+        {
+            "body": stored.body,
+            "clauses": stored.clauses,
+            "governing_law": str(stored.governing_law),
+            "b2b_court": stored.b2b_court,
+            "delivery_days": stored.delivery_days,
+            "return_cost_bearer": stored.return_cost_bearer,
+            "return_cost_info": stored.return_cost_info,
+        }
+    )
+
+
+def test_an_expired_link_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    vendor = VendorFactory.create()
+    version = SalesTermsVersionFactory.create(vendor=vendor)
+    link = ts.terms_url(version)
+    assert Client().get(link).status_code == 200
+    monkeypatch.setattr(ts, "LINK_MAX_AGE", -1)  # every signed token is now older than allowed
+    assert Client().get(link).status_code == 404
+
+
+def test_a_pointer_to_another_sellers_version_is_invalid() -> None:
+    version = SalesTermsVersionFactory.create(in_force=False)
+    pointer = SalesTermsInForce(vendor=VendorFactory.create(), version=version)
+    with pytest.raises(ValidationError):
+        pointer.clean()
+
+
+def test_the_print_button_has_no_inline_handler() -> None:
+    version = SalesTermsVersionFactory.create()
+    body = Client().get(ts.terms_url(version)).content.decode()
+    assert "onclick" not in body
+    assert "data-print" in body
+    assert "vendors/print-button.js" in body

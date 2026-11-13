@@ -1703,7 +1703,7 @@ class SalesTermsVersion(BaseModel):
     return_cost_bearer = models.CharField(
         max_length=10,
         blank=True,
-        choices=[("seller", "Seller"), ("consumer", "Consumer")],
+        choices=[("seller", _("Seller")), ("consumer", _("Consumer"))],
         help_text=_(
             "Who pays the direct cost of sending goods back after a withdrawal. Empty means you "
             "pay. The consumer pays only if you choose it here and explain it below."
@@ -1733,6 +1733,18 @@ class SalesTermsVersion(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.vendor_id} v{self.number}"
+
+    def hash_fields(self) -> dict[str, Any]:
+        """The stored, normalized values `content_hash` is computed over (never raw input)."""
+        return {
+            "body": self.body,
+            "clauses": self.clauses,
+            "governing_law": str(self.governing_law),
+            "b2b_court": self.b2b_court,
+            "delivery_days": self.delivery_days,
+            "return_cost_bearer": self.return_cost_bearer,
+            "return_cost_info": self.return_cost_info,
+        }
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -1772,3 +1784,8 @@ class SalesTermsInForce(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.vendor_id} in force: {self.version_id}"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.version_id is not None and self.version.vendor_id != self.vendor_id:
+            raise ValidationError({"version": _("The version belongs to another seller.")})
