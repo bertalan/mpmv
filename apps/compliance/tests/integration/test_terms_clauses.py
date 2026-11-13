@@ -59,6 +59,41 @@ def test_the_published_version_carries_clauses_d_to_h_in_english_and_italian() -
     assert entry.actor_label == "staff:legal"
 
 
+@pytest.mark.parametrize(
+    ("language", "amount", "pass_on"),
+    [
+        ("en", "EUR 2.00", ("pass it on", "return terms")),
+        ("it", "EUR 2,00", ("trasferirlo", "condizioni di reso")),
+    ],
+)
+def test_the_published_refund_fee_clause_has_no_pass_on_sentence(
+    language: str, amount: str, pass_on: tuple[str, str]
+) -> None:
+    # Owner's legal review 2026-11-13: Codice del consumo artt. 56-57 forbid charging the consumer
+    # refund handling costs, so the vendor terms never let the vendor pass the fee on.
+    body = publish().translations.get(language=language).body
+    assert body.count(amount) == 1
+    for phrase in pass_on:
+        assert phrase not in body.lower()
+
+
+def test_a_version_with_the_old_wording_is_reported_and_republishing_makes_a_new_version() -> None:
+    # The version in force before the owner's review carried the pass-on sentence in (f).
+    old_fee = "The vendor may pass it on in its own return terms within the law. "
+    first = publish()
+    text = first.translations.get(language="en")
+    head, fee_end = text.body.split("rounded up to the whole euro. ", 1)
+    type(text).objects.filter(pk=text.pk).update(
+        body=f"{head}rounded up to the whole euro. {old_fee}{fee_end}"
+    )
+    assert "vendor_terms_clause_missing:en:f" in services.vendor_terms_problems(first)
+    later = publish()
+    assert later.version == first.version + 1
+    assert "pass it on" in first.translations.get(language="en").body
+    assert "pass it on" not in later.translations.get(language="en").body
+    assert "vendor_terms_clause_missing:en:f" not in services.vendor_terms_problems(later)
+
+
 def test_the_new_version_keeps_the_previous_text_before_the_clause_block() -> None:
     VendorContractFactory.create(valid_from=timezone.now() - dt.timedelta(days=30), languages=[])
     old = VendorContract.objects.get()
