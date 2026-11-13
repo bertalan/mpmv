@@ -25,6 +25,7 @@ from apps.cms.tests.factories import StandardPageFactory
 from apps.core.changeset import ChangeSet
 from apps.core.models import AuditLog
 from apps.events.models import EventPage
+from apps.payments.models import ConnectedAccount
 from apps.seed import data
 from apps.seed.apps import check_not_allowed_on_live
 from apps.seed.services import (
@@ -40,6 +41,7 @@ from apps.shipping.models import ShippingMethod, ShippingZone, SpecialAreaTreatm
 from apps.tax.models import TaxRate
 from apps.tax.services import current_tax_profile
 from apps.vendors import engine as vendors_engine
+from apps.vendors import services as vendors_services
 from apps.vendors.models import ContractAcceptance, Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -58,6 +60,7 @@ SEEDED_MODELS = (
     StandardPage,
     LegalPage,
     EventPage,
+    ConnectedAccount,
     User,
     AuditLog,
 )
@@ -79,7 +82,12 @@ def test_the_seed_builds_active_vendors_with_every_regime(demo_seed: ChangeSet) 
         profile.full_clean()
         assert ContractAcceptance.objects.filter(vendor=vendor).count() == 1
         assert {t.language for t in vendor.translations.all()} == {"en", "it"}
-        assert vendors_engine.dac7_missing(vendor.legal_identity()) == ()  # VEN.23
+        assert (
+            vendors_engine.dac7_missing(
+                vendor.legal_identity(), vendors_engine.SEEDED_NO_TIN_COUNTRIES
+            )
+            == ()
+        )  # VEN.23
     rf20 = vendors[-1]
     assert rf20.fiscal_regime == "RF20"
     assert rf20.cross_border_franchise_number.endswith("EX")
@@ -126,6 +134,21 @@ def test_the_seed_configures_shipping_with_island_surcharges(demo_seed: ChangeSe
     )
     assert sicily.exists()
     assert {t.mode for t in sicily} == {"surcharge"}
+
+
+def test_most_demo_vendors_sell_online_and_one_stays_on_request(demo_seed: ChangeSet) -> None:
+    """Owner decision 2026-11-13: demo vendors get test payout accounts (`acct_demo_<n>`, never
+    sent to the provider), except one, so STAGE shows both the cart and the on-request case."""
+    modes = {v.slug: vendors_services.vendor_sales_mode(v) for v in seed_vendors()}
+    selling = [slug for slug, mode in modes.items() if mode == vendors_engine.BUY]
+    on_request = [slug for slug, mode in modes.items() if mode == vendors_engine.ON_REQUEST]
+    assert len(selling) > len(modes) // 2
+    assert on_request == [spec.slug for spec in data.VENDORS if not spec.payout_account]
+    assert len(on_request) >= 1
+    refs = list(ConnectedAccount.objects.values_list("account_ref", flat=True))
+    assert len(refs) == len(selling)
+    assert all(ref.startswith("acct_demo_") for ref in refs)
+    assert set(ConnectedAccount.objects.values_list("status", flat=True)) == {"active"}
 
 
 def test_a_second_run_changes_nothing(demo_seed: ChangeSet) -> None:

@@ -1,0 +1,22 @@
+{% load i18n %}<section class="package" aria-labelledby="{{ package.summary_id }}-title">
+  <h2 id="{{ package.summary_id }}-title">{% blocktranslate with vendor=package.vendor %}Sold by {{ vendor }}{% endblocktranslate %}</h2>
+  {% for message in package.messages %}{% include "components/alert.html" with level="warning" message=message only %}{% endfor %}
+  {% if package.quote_url %}<p><a class="button button--secondary" href="{{ package.quote_url }}">{% translate "Request a quote" %}</a></p>{% endif %}
+  <ul class="cart-lines" role="list">
+    {% for line in package.lines %}{% if mode == "cart" %}{% with qname="qty_"|add:line.id %}{% include "components/cart_line.html" with id=line.id name=line.name unit_price=line.unit_price quantity=line.quantity total=line.total problem=line.problem quantity_name=qname only %}{% endwith %}{% else %}<li class="cart-line"><div class="cart-line__details"><p class="cart-line__name">{{ line.name }}</p><p class="cart-line__unit">{% blocktranslate with unit_price=line.unit_price quantity=line.quantity %}{{ quantity }} × {{ unit_price }}{% endblocktranslate %}</p>{% if line.problem %}<p class="cart-line__problem"><strong>{% translate "Warning" %}:</strong> {{ line.problem }}</p>{% endif %}</div><p class="cart-line__total"><span class="visually-hidden">{% translate "Line total" %}: </span>{{ line.total }}</p></li>{% endif %}{% endfor %}
+  </ul>
+  {% if mode == "review" and package.options %}
+  <fieldset class="field field--group">
+    <legend>{% translate "Shipping" %}</legend>
+    {% for option in package.options %}
+    <div class="field__check">
+      <input type="radio" id="{{ package.summary_id }}-ship-{{ forloop.counter }}" name="{{ package.field_name }}" value="{{ option.key }}"{% if option.checked %} checked{% endif %} hx-post="{% url 'orders:shipping' %}" hx-trigger="change" hx-target="#review-body" hx-swap="outerHTML">
+      <label for="{{ package.summary_id }}-ship-{{ forloop.counter }}">{{ option.label }}, {{ option.price }}{% if option.delivery %} ({{ option.delivery }}){% endif %}</label>
+    </div>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
+  {% if package.total and packages|length > 1 %}
+    {% include "components/order_summary.html" with id=package.summary_id|add:"-summary" title=_("Totals for this vendor") heading_level=3 lines=package.summary_lines total=package.total note=package.note only %}
+  {% endif %}
+</section>

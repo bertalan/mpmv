@@ -18,6 +18,7 @@ import hashlib
 import json
 from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass, field
+from html import unescape
 from typing import Any
 
 from django.conf import settings
@@ -653,6 +654,20 @@ def legal_section_texts(kind: str, language: str, sections: Iterable[str]) -> di
         if text:
             found.setdefault(block.value["section"], text)
     return found
+
+
+def legal_page_plain_text(kind: str, language: str) -> str | None:
+    """The plain text (title and body) of the live legal page `kind` in `language`, or None when
+    there is no such page. Read by `apps.compliance` (CMP.5) to check that the terms carry their
+    clauses; whitespace is not normalised here."""
+    page = (
+        LegalPage.objects.live()
+        .filter(kind=kind, alias_of__isnull=True, locale__language_code=language)
+        .first()
+    )
+    if page is None:
+        return None
+    return unescape(strip_tags(str(page.body)))
 
 
 def _seed_legal_placeholders(home: HomePage, report: SeedReport) -> None:

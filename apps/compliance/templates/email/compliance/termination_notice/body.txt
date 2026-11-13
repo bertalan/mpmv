@@ -1,0 +1,18 @@
+{% load i18n %}{% blocktranslate %}We will end the service of {{ vendor_name }} on the platform. This email is the notice of termination and the statement of reasons.{% endblocktranslate %}
+
+{% translate "Reference" %}: {{ reference }}
+{% translate "Notice given" %}: {{ issued_at }}
+{% translate "The service ends on" %}: {{ effective_at }}
+{% if exception %}{% translate "Shorter notice because" %}: {% if exception == "legal_obligation" %}{% translate "a legal or regulatory obligation" %}{% elif exception == "repeated_infringement" %}{% translate "repeated infringements of the platform terms" %}{% else %}{% translate "illegal content" %}{% endif %}
+{% endif %}{% translate "Facts and circumstances relied on" %}: {{ facts }}
+{% translate "Ground" %}: {{ ground }}
+
+{% translate "Until the service ends you can keep selling and you can download your data from the Manager (Termination notice page)." %}
+
+{% translate "How to challenge this decision" %}:
+- {% translate "Internal complaint (DSA article 20)" %}
+- {% translate "Out-of-court dispute settlement (DSA article 21)" %}
+- {% translate "A court" %}
+{% if redress_text %}
+{{ redress_text }}
+{% endif %}

@@ -1,4 +1,4 @@
-"""CORE.25 (D-32): bank details are a group 3 action (`payout_details`) in the vendors admin."""
+"""CORE.25 (D-32): bank details are a critical action (`payout_details`) in the vendors admin."""
 
 import pytest
 from django.test import Client
@@ -27,12 +27,12 @@ def test_changing_bank_details_needs_a_per_action_passkey(client: Client) -> Non
 
 def test_changing_bank_details_is_refused_in_restricted_mode(client: Client) -> None:
     vendor = VendorFactory.create()
-    verified_login(client, UserFactory.create(superuser=True), level=levels.RESTRICTED)
+    verified_login(client, UserFactory.create(superuser=True), level=levels.NO_WINDOW)
     assert _post(client, vendor.pk).status_code == 403  # type: ignore[attr-defined]
 
 
 def test_other_vendor_edits_are_not_gated(client: Client) -> None:
     vendor = VendorFactory.create()
-    verified_login(client, UserFactory.create(superuser=True), level=levels.RESTRICTED)
+    verified_login(client, UserFactory.create(superuser=True), level=levels.NO_WINDOW)
     response = client.get(reverse("admin:vendors_vendor_change", args=[vendor.pk]))
     assert response.status_code == 200

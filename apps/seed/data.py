@@ -372,6 +372,9 @@ class VendorSeed:
     oss_since: dt.date | None = None
     share_capital: Decimal | None = None
     enquiries: bool = False
+    # A ready test payout account (`acct_demo_<n>`, owner decision 2026-11-13), so the demo cart
+    # can buy its products. False keeps the vendor on request (D-19): STAGE shows both cases.
+    payout_account: bool = True
 
     @property
     def slug(self) -> str:
@@ -483,6 +486,7 @@ VENDORS: Final = (
         quote_areas=(),
         closed_areas=("it-livigno", "it-campione"),
         enquiries=True,
+        payout_account=False,  # the demo vendor on request: enquiries, no cart (D-19)
     ),
     VendorSeed(
         letter="C",

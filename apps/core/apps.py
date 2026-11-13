@@ -41,10 +41,12 @@ class CoreConfig(AppConfig):
             check_field_encryption_keys,
             check_image_upload_limits,
             check_live_site_flags,
+            check_privacy_pepper,
             check_public_forms,
             check_trusted_proxy_for_deploy,
             translation_models,
         )
+        from .language_checks import check_language_settings
 
         checks.register(translation_models)
         checks.register(check_audit_policy, checks.Tags.security)
@@ -56,7 +58,9 @@ class CoreConfig(AppConfig):
         checks.register(check_field_encryption_keys, checks.Tags.security)
         checks.register(check_encrypted_data, checks.Tags.database)
         checks.register(check_feature_flag_settings)
+        checks.register(check_language_settings)
         checks.register(check_email_settings)
+        checks.register(check_privacy_pepper, checks.Tags.security)
         checks.register(check_avif_support)
         checks.register(check_image_upload_limits)
         checks.register(check_live_site_flags, checks.Tags.security, deploy=True)

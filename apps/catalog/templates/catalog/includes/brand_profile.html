@@ -1,0 +1,17 @@
+{% load i18n wagtailcore_tags %}{% comment %}
+The brand's public content on its page (CAT.20 3/3): logo, description in the page language
+(none while untranslated, never another language's text), official website, Wikidata link and
+manufacturer. Needs `brand_profile` (`services.BrandProfile`); the description is cleaned by the
+CMS rich-text sanitiser, the links are validated https URLs.
+{% endcomment %}<section class="brand-profile" aria-labelledby="brand-profile-heading">
+  <h2 id="brand-profile-heading" class="visually-hidden">{% translate "About this brand" %}</h2>
+  {% if brand_profile.logo %}<img class="brand-profile__logo" src="{{ brand_profile.logo.file.url }}" alt="{{ brand_profile.logo_alt }}" width="{{ brand_profile.logo.width }}" height="{{ brand_profile.logo.height }}">{% endif %}
+  {% if brand_profile.description %}<div class="brand-description">{{ brand_profile.description|richtext }}</div>{% endif %}
+  {% if brand_profile.website or brand_profile.wikidata_url or brand_profile.manufacturer %}
+    <ul class="brand-profile__facts">
+      {% if brand_profile.website %}<li><a href="{{ brand_profile.website }}" rel="noopener">{% translate "Official website" %}</a></li>{% endif %}
+      {% if brand_profile.wikidata_url %}<li><a href="{{ brand_profile.wikidata_url }}" rel="noopener">{% translate "Wikidata" %}</a></li>{% endif %}
+      {% if brand_profile.manufacturer %}<li>{% blocktranslate with name=brand_profile.manufacturer.legal_name %}Made by {{ name }}{% endblocktranslate %}{% if brand_profile.manufacturer.country %} ({{ brand_profile.manufacturer.country.name }}){% endif %}</li>{% endif %}
+    </ul>
+  {% endif %}
+</section>

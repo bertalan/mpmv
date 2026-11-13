@@ -30,6 +30,26 @@ def admin_open(settings: Any) -> None:
     settings.ADMIN_ALLOWED_NETWORKS = ["0.0.0.0/0", "::/0"]
 
 
+@pytest.fixture
+def default_languages(settings: Any) -> None:
+    """I18N.15: pins the default language set (English primary, then it, de, fr, es) for tests
+    whose subject is exactly that set. The suite also runs with another `MPMV_LANGUAGES` (CI job
+    `it,de`), so a test must not read the default from the environment it runs in."""
+    from mpmv.settings.languages import DEFAULT_LANGUAGE_CODES, language_settings
+
+    settings.LANGUAGE_CODE, settings.LANGUAGES = language_settings(DEFAULT_LANGUAGE_CODES)
+    settings.WAGTAIL_CONTENT_LANGUAGES = settings.LANGUAGES
+
+
+@pytest.fixture
+def english_interface(default_languages: None) -> "Iterator[None]":
+    """Renders in English: for tests that assert the English msgids of the interface."""
+    from django.utils import translation
+
+    with translation.override("en"):
+        yield
+
+
 # Fixed seed for Faker and factory_boy, so a failure replays with the same data.
 FACTORY_SEED = int(os.environ.get("MPMV_TEST_SEED", "20271"))
 

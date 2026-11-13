@@ -1,7 +1,9 @@
 """Vendors, their legal identity and their per-language storefront texts and policies (spec 04
 §4.2, VEN.1, VEN.12).
 
-Fields owned by later tasks are added there: `plan` (VEN.2), `payout_account` (VEN.6),
+Fields owned by later tasks are added there: `plan` (VEN.19: the per-vendor plan assignment with
+its effective-dated history; VEN.2 only defines `VendorPlan` and the rules),
+`payout_account` (VEN.6),
 `dac7_complete` (CMP.1), `logo` (media/images). Storefront texts follow the shared translation
 workflow (`apps.core.models.TranslationModel`, I18N.2). Which legal fields are required, and for
 what, is data: `LegalFieldRequirement` (VEN.12). The versioned vendor contract and its
@@ -9,11 +11,16 @@ append-only acceptances are VEN.5.
 """
 
 import dataclasses
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, ClassVar
 
 from django.conf import settings
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import DateRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models.functions import Coalesce
+from django.utils.translation import gettext_lazy as _
 from wagtail.fields import RichTextField
 
 from apps.core.fields import (
@@ -28,7 +35,10 @@ from apps.core.models import (
     BaseModel,
     FeatureFlag,
     TranslationModel,
+    TsTzRange,
+    Versioned,
     resolve_translation,
+    valid_period_check,
 )
 from apps.core.translations import Resolved, source_hash
 
@@ -113,9 +123,6 @@ class ViesStatus(models.TextChoices):
 PROVINCE_CHOICES = [(code, code) for code in sorted(engine.PROVINCE_CODES)]
 
 
-PROVINCE_HELP = "Italy: the 2-letter province code (e.g. RM). Elsewhere: state or region."
-
-
 class Vendor(BaseModel):
     Status = VendorStatus
     SalesMode = VendorSalesMode
@@ -127,13 +134,30 @@ class Vendor(BaseModel):
     vendor_scope: ClassVar[str] = "pk"
     objects = VendorScopedManager()
 
-    legal_name = models.CharField(max_length=200)
-    display_name = models.CharField(max_length=150)
+    legal_name = models.CharField(
+        max_length=200,
+        help_text=_(
+            "The full legal name of your business as in the company register, or your own "
+            "first and last name if you are a sole trader. It appears on invoices and "
+            "contracts. Required: the profile cannot be saved without it."
+        ),
+    )
+    display_name = models.CharField(
+        max_length=150,
+        help_text=_(
+            "The shop name your buyers see, for example 'Rossi Ceramics'. Required: the "
+            "shop cannot be shown without a name."
+        ),
+    )
     slug = models.SlugField(
         max_length=engine.SLUG_MAX_LENGTH,
         unique=True,
         blank=True,
-        help_text="Leave empty to generate it from the display name. Changing it breaks URLs.",
+        help_text=_(
+            "The short name in your shop's web address, for example 'rossi-ceramics'. Leave"
+            " it empty and we make it from the shop name. Changing it later breaks the "
+            "links people already have."
+        ),
     )
     # Changed only through `services.change_status`, which checks the state machine and audits.
     status = models.CharField(
@@ -146,15 +170,63 @@ class Vendor(BaseModel):
         editable=False,
         help_text="1 for the first onboarding, one more each time staff reopen the closed vendor.",
     )
-    country = CountryField(help_text="Country of establishment (ISO 3166-1 alpha-2).")
-    contact_email = models.EmailField()
-    phone = models.CharField(max_length=32, blank=True)
-    sales_mode_default = models.CharField(
-        max_length=16, choices=SalesMode.choices, default=SalesMode.BUY
+    country = CountryField(
+        help_text=_(
+            "The country where your business is established, as in the company register. It"
+            " decides which legal details we ask you for. Required: the profile cannot be "
+            "saved without it."
+        )
     )
-    enquiries_enabled = models.BooleanField(default=False)
+    contact_email = models.EmailField(
+        help_text=_(
+            "The email address where the platform writes to you about your shop. Required: "
+            "without it we cannot reach you."
+        )
+    )
+    phone = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text=_(
+            "A phone number where we can reach you, with the country prefix, for example "
+            "+39 06 1234 5678. Optional, up to 32 characters."
+        ),
+    )
+    # ORD.16: the language of the vendor's order emails (new order, cancelled order). Empty means
+    # the platform language (`settings.LANGUAGE_CODE`); a language that is no longer configured
+    # falls back to it as well (`core.services.email_language`).
+    mail_language = LanguageField(
+        _("Email language"),
+        blank=True,
+        help_text=_(
+            "The language of the order emails we send you, for example a new order to ship. "
+            "Leave it empty to receive them in English."
+        ),
+    )
+    sales_mode_default = models.CharField(
+        max_length=16,
+        choices=SalesMode.choices,
+        default=SalesMode.BUY,
+        help_text=_(
+            "How your products are sold: buyers order and pay online, or they first send you "
+            "an enquiry. On request applies to all your products, even those set to buy. "
+            "Until your payout account is ready, your shop is on request whatever you choose."
+        ),
+    )
+    enquiries_enabled = models.BooleanField(
+        default=False,
+        help_text=_(
+            "Tick it if you want to accept enquiries from buyers about your products. "
+            "Unticked: you do not take enquiries."
+        ),
+    )
     legacy_wp_user_id = models.PositiveBigIntegerField(
-        null=True, blank=True, unique=True, help_text="Vendor user id in the legacy system."
+        null=True,
+        blank=True,
+        unique=True,
+        help_text=_(
+            "Staff only: the vendor's user number in the old system, kept to link migrated "
+            "data. Leave it as it is."
+        ),
     )
     # The storefront logo (CORE.9 part 2b). Written only by `services.set_vendor_logo` and
     # `remove_vendor_logo` (owner, audited), which store the image in the vendor's own Wagtail
@@ -178,24 +250,60 @@ class Vendor(BaseModel):
     # --- Legal and e-invoicing identity (VEN.12). Every field is optional while the profile is
     # edited; `LegalFieldRequirement` says which ones a payout needs. Values that are present
     # are validated by `engine.identity_errors` (see `clean_fields`).
-    legal_form = models.CharField(max_length=24, choices=LegalForm.choices, blank=True)
+    legal_form = models.CharField(
+        max_length=24,
+        choices=LegalForm.choices,
+        blank=True,
+        help_text=_(
+            "The legal form of your business, as in the company register. Not sure which "
+            "one you are? Ask your accountant."
+        ),
+    )
     first_name = models.CharField(
-        max_length=60, blank=True, help_text="Sole proprietors: first name (FatturaPA Nome)."
+        max_length=60,
+        blank=True,
+        help_text=_(
+            "Sole traders only: your first name, as on your identity document. It goes on "
+            "the invoices we issue to you."
+        ),
     )
     last_name = models.CharField(
-        max_length=60, blank=True, help_text="Sole proprietors: last name (FatturaPA Cognome)."
+        max_length=60,
+        blank=True,
+        help_text=_(
+            "Sole traders only: your last name, as on your identity document. It goes on "
+            "the invoices we issue to you."
+        ),
     )
     # DAC7 (VEN.23), sole proprietors: personal data, encrypted at rest and masked in the audit
     # log (SEC.3).
     date_of_birth = EncryptedDateField(
-        null=True, blank=True, help_text="DAC7, sole proprietors: date of birth."
+        null=True,
+        blank=True,
+        help_text=_(
+            "Sole traders only: your date of birth. It is asked for the platform's yearly "
+            "DAC7 reporting duty, and it is stored encrypted."
+        ),
     )
     place_of_birth = EncryptedCharField(
         max_length=100,
         blank=True,
-        help_text="DAC7, sole proprietors whose TIN country issues no TIN: city and country.",
+        help_text=_(
+            "Sole traders only: if your country issues no tax identification number, the "
+            "city and country where you were born. It is asked for the platform's yearly "
+            "DAC7 reporting duty and stored encrypted. Not sure? Ask your accountant."
+        ),
     )
-    vat_number = models.CharField("VAT number", max_length=32, blank=True)
+    vat_number = models.CharField(
+        "VAT number",
+        max_length=32,
+        blank=True,
+        help_text=_(
+            "Your VAT number, with or without the country prefix, for example "
+            "IT12345678901. We check it in the EU VIES register. Not sure if you have one? "
+            "Ask your accountant."
+        ),
+    )
     # Written by `services.check_vat_number` only; reset when the VAT number changes.
     vies_status = models.CharField(
         "VIES status",
@@ -211,107 +319,279 @@ class Vendor(BaseModel):
         "tax code (codice fiscale) or TIN",
         max_length=32,
         blank=True,
-        help_text="Italy: 16 characters, or 11 digits for entities. Elsewhere: the national TIN.",
+        help_text=_(
+            "Italy: your codice fiscale, 16 characters for a person or 11 digits for a "
+            "company. Elsewhere: your national tax identification number (TIN). It is "
+            "stored encrypted."
+        ),
     )
     tin_country = CountryField(
         "TIN issuing country",
         blank=True,
-        help_text="DAC7: the country that issued the TIN (format checked for that country).",
+        help_text=_(
+            "The country that issued your tax identification number. We check the format "
+            "for that country. It is asked for the platform's yearly DAC7 reporting duty."
+        ),
     )
     tin_same_as_vat = models.BooleanField(
         "TIN same as the VAT number",
         default=False,
         help_text=(
-            "Entities whose TIN is their VAT number: the TIN is filled from the VAT number once "
-            "VIES says it is valid."
+            _(
+                "Companies only: tick it if your tax identification number is the same as your "
+                "VAT number. In the countries where this is allowed we fill it in once VIES "
+                "confirms the VAT number. Not sure? Ask your accountant."
+            )
         ),
     )
     tax_residence_country = CountryField(
-        "country of tax residence", blank=True, help_text="DAC7: the Member State of residence."
+        "country of tax residence",
+        blank=True,
+        help_text=_(
+            "The country where you are resident for tax. It is asked for the platform's "
+            "yearly DAC7 reporting duty. Not sure? Ask your accountant."
+        ),
     )
     fiscal_regime = models.CharField(
         max_length=4,
         choices=FiscalRegime.choices,
         blank=True,
-        help_text="The regime declared on invoices (FatturaPA RegimeFiscale; RF19 = forfettario).",
+        help_text=_(
+            "The tax regime that applies to your business, chosen from the official "
+            "FatturaPA list (RF19 is the flat-rate regime, forfettario). Not sure which one"
+            " applies? Ask your accountant: we cannot choose it for you."
+        ),
     )
     cross_border_franchise_number = models.CharField(
         "cross-border franchise number",
         max_length=20,
         blank=True,
         help_text=(
-            "RF20 only: the number with the suffix EX issued by the member state of "
-            "establishment for the cross-border VAT franchise (e.g. DE123456789EX)."
+            _(
+                "Only for regime RF20: the number ending in EX that your country of "
+                "establishment issued for the cross-border VAT franchise, for example "
+                "DE123456789EX."
+            )
         ),
     )
-    ateco_code = models.CharField("ATECO code", max_length=8, blank=True)
-    eori = models.CharField("EORI number", max_length=17, blank=True)
+    ateco_code = models.CharField(
+        "ATECO code",
+        max_length=8,
+        blank=True,
+        help_text=_(
+            "Italy only: the ATECO code of your business activity, for example 47.91.10. It"
+            " is on your VAT registration; if you do not know it, ask your accountant."
+        ),
+    )
+    eori = models.CharField(
+        "EORI number",
+        max_length=17,
+        blank=True,
+        help_text=_(
+            "Your EORI number, the customs identification number for businesses that move "
+            "goods in or out of the EU. Leave it empty if you do not have one."
+        ),
+    )
     business_registration_number = models.CharField(
         "business registration number",
         max_length=40,
         blank=True,
-        help_text="DAC7, entities: the company register number (in Italy, the REA number).",
+        help_text=_(
+            "Companies only: the number from the company register (in Italy, the REA "
+            "number), if you have one. It is asked for the platform's yearly DAC7 reporting"
+            " duty."
+        ),
     )
-    registered_street = models.CharField("registered office street", max_length=200, blank=True)
+    registered_street = models.CharField(
+        "registered office street",
+        max_length=200,
+        blank=True,
+        help_text=_(
+            "The street of your registered office (sede legale), as in the company "
+            "register, without the number."
+        ),
+    )
     registered_street_number = models.CharField(
-        "registered office street number", max_length=16, blank=True
+        "registered office street number",
+        max_length=16,
+        blank=True,
+        help_text=_("The street number of your registered office, for example 12/B."),
     )
     registered_postal_code = models.CharField(
-        "registered office postal code", max_length=16, blank=True
+        "registered office postal code",
+        max_length=16,
+        blank=True,
+        help_text=_("The postal code of your registered office, for example 00184."),
     )
-    registered_city = models.CharField("registered office city", max_length=100, blank=True)
+    registered_city = models.CharField(
+        "registered office city",
+        max_length=100,
+        blank=True,
+        help_text=_("The city of your registered office."),
+    )
     registered_province = models.CharField(
-        "registered office province", max_length=64, blank=True, help_text=PROVINCE_HELP
+        "registered office province",
+        max_length=64,
+        blank=True,
+        help_text=_(
+            "Italy: the 2-letter province code, for example RM. Elsewhere: the state or region."
+        ),
     )
-    registered_country = CountryField("registered office country", blank=True)
-    rea_office = models.CharField("REA office", max_length=2, choices=PROVINCE_CHOICES, blank=True)
-    rea_number = models.CharField("REA number", max_length=20, blank=True)
-    share_capital = MoneyField(null=True, blank=True)
-    sole_shareholder = models.CharField(max_length=2, choices=SoleShareholder.choices, blank=True)
+    registered_country = CountryField(
+        "registered office country",
+        blank=True,
+        help_text=_("The country of your registered office."),
+    )
+    rea_office = models.CharField(
+        "REA office",
+        max_length=2,
+        choices=PROVINCE_CHOICES,
+        blank=True,
+        help_text=_(
+            "Italy only: the province of the company register office (REA) where your "
+            "company is registered, for example RM."
+        ),
+    )
+    rea_number = models.CharField(
+        "REA number",
+        max_length=20,
+        blank=True,
+        help_text=_("Italy only: your REA number from the company register, for example 123456."),
+    )
+    share_capital = MoneyField(
+        null=True,
+        blank=True,
+        help_text=_(
+            "Companies only: the share capital as in the company register, for example 10000.00."
+        ),
+    )
+    sole_shareholder = models.CharField(
+        max_length=2,
+        choices=SoleShareholder.choices,
+        blank=True,
+        help_text=_(
+            "Companies only: SU if one person owns all the shares, SM if there are several "
+            "shareholders. Not sure? Ask your accountant."
+        ),
+    )
     liquidation_status = models.CharField(
-        max_length=2, choices=LiquidationStatus.choices, blank=True
+        max_length=2,
+        choices=LiquidationStatus.choices,
+        blank=True,
+        help_text=_(
+            "Companies only: LS if your company is in liquidation, LN if it is not, as in "
+            "the company register."
+        ),
     )
     sdi_recipient_code = models.CharField(
         "SDI recipient code",
         max_length=7,
         blank=True,
         help_text=(
-            f"7 characters; {engine.SDI_PEC_CODE} when invoices go to the PEC address, "
-            f"{engine.SDI_FOREIGN_CODE} for vendors established outside Italy."
+            _(
+                "The 7-character code of the SDI channel (the Italian tax system) that receives"
+                " e-invoices addressed to you. 0000000 is used together with a PEC address, "
+                "which you give in the PEC field; XXXXXXX is for businesses established outside"
+                " Italy. Your accountant or invoicing software can tell you the code."
+            )
         ),
     )
-    pec = models.EmailField("PEC address", blank=True, help_text="Certified email (PEC).")
+    pec = models.EmailField(
+        "PEC address",
+        blank=True,
+        help_text=_(
+            "Your certified email (PEC) address, if you have one. It is required when the "
+            "SDI recipient code is 0000000."
+        ),
+    )
     fiscal_representative_name = models.CharField(
-        max_length=80, blank=True, help_text="Non-EU vendors: the fiscal representative in Italy."
+        max_length=80,
+        blank=True,
+        help_text=_(
+            "Only if you are established outside the EU and have appointed a fiscal "
+            "representative in Italy: their name, as in the appointment. Otherwise leave it"
+            " empty."
+        ),
     )
     fiscal_representative_vat_number = models.CharField(
-        "fiscal representative VAT number", max_length=16, blank=True
+        "fiscal representative VAT number",
+        max_length=16,
+        blank=True,
+        help_text=_(
+            "The Italian VAT number of your fiscal representative (11 digits). Leave it "
+            "empty if you have none."
+        ),
     )
     establishment_street = models.CharField(
-        "permanent establishment street", max_length=200, blank=True
+        "permanent establishment street",
+        max_length=200,
+        blank=True,
+        help_text=_(
+            "Only if you have a permanent establishment (a branch or fixed place of "
+            "business) apart from your registered office: its street, without the number. "
+            "Otherwise leave the whole address empty; if unsure, ask your accountant."
+        ),
     )
     establishment_street_number = models.CharField(
-        "permanent establishment street number", max_length=16, blank=True
+        "permanent establishment street number",
+        max_length=16,
+        blank=True,
+        help_text=_("The street number of your permanent establishment, for example 12/B."),
     )
     establishment_postal_code = models.CharField(
-        "permanent establishment postal code", max_length=16, blank=True
+        "permanent establishment postal code",
+        max_length=16,
+        blank=True,
+        help_text=_("The postal code of your permanent establishment, for example 00184."),
     )
     establishment_city = models.CharField(
-        "permanent establishment city", max_length=100, blank=True
+        "permanent establishment city",
+        max_length=100,
+        blank=True,
+        help_text=_("The city of your permanent establishment."),
     )
     establishment_province = models.CharField(
-        "permanent establishment province", max_length=64, blank=True, help_text=PROVINCE_HELP
+        "permanent establishment province",
+        max_length=64,
+        blank=True,
+        help_text=_(
+            "Italy: the 2-letter province code, for example RM. Elsewhere: the state or region."
+        ),
     )
-    establishment_country = CountryField("permanent establishment country", blank=True)
+    establishment_country = CountryField(
+        "permanent establishment country",
+        blank=True,
+        help_text=_("The country of your permanent establishment."),
+    )
     # SEC.3: encrypted at rest and masked in the audit log.
-    iban = EncryptedCharField("IBAN", max_length=34, blank=True)
-    bic = models.CharField("BIC", max_length=11, blank=True)
-    bank_name = models.CharField(max_length=100, blank=True)
+    iban = EncryptedCharField(
+        "IBAN",
+        max_length=34,
+        blank=True,
+        help_text=_(
+            "The IBAN of the bank account that receives your payouts. Check it carefully: a"
+            " wrong IBAN can delay your payment. It is stored encrypted."
+        ),
+    )
+    bic = models.CharField(
+        "BIC",
+        max_length=11,
+        blank=True,
+        help_text=_("The BIC (SWIFT) code of your bank, 8 or 11 characters, if you have it."),
+    )
+    bank_name = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text=_("The name of your bank. Optional: it helps us recognise the account."),
+    )
     account_holder_name = models.CharField(
         "account holder name",
         max_length=140,
         blank=True,
-        help_text="DAC7: only when the account holder is not the vendor.",
+        help_text=_(
+            "Only if the bank account is not in the name of your business: the name of the "
+            "account holder. It is asked for the platform's yearly DAC7 reporting duty."
+        ),
     )
 
     _stored_vat_number: str | None = None  # VAT number as loaded, to reset the VIES status
@@ -320,6 +600,10 @@ class Vendor(BaseModel):
         ordering = ["display_name", "id"]
         permissions = [
             ("view_all_vendors", "Platform staff: can see every vendor's data (spec 02, Q-34)"),
+            (
+                "revert_storefront_profile",
+                "Platform staff: can revert storefront profile changes (Q-16)",
+            ),
         ]
         constraints = [
             models.CheckConstraint(
@@ -457,11 +741,43 @@ class VendorTranslation(TranslationModel):
     )
 
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="translations")
-    tagline = models.CharField(max_length=200, blank=True)
-    description = RichTextField(blank=True)
-    shipping_policy = RichTextField(blank=True)
-    refund_policy = RichTextField(blank=True)
-    cancellation_policy = RichTextField(blank=True)
+    tagline = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text=_(
+            "A short line under your shop name, up to 200 characters, for example 'Handmade"
+            " ceramics from Umbria'. Leave it empty to show none."
+        ),
+    )
+    description = RichTextField(
+        blank=True,
+        help_text=_(
+            "Tell buyers about your shop: who you are and what you make or sell. Leave it "
+            "empty and your shop page has no description."
+        ),
+    )
+    shipping_policy = RichTextField(
+        blank=True,
+        help_text=_(
+            "Tell buyers how and when you ship, and what it costs. Buyers read it in your "
+            "shop before they order."
+        ),
+    )
+    refund_policy = RichTextField(
+        blank=True,
+        help_text=_(
+            "Tell buyers how to ask for a refund, how long it takes and who pays the return"
+            " shipping. Buyers read it in your shop before they order."
+        ),
+    )
+    cancellation_policy = RichTextField(
+        blank=True,
+        help_text=_(
+            "Tell buyers until when they can cancel an order and how, for example 'before "
+            "the parcel is handed to the courier'. Buyers read it in your shop before they "
+            "order."
+        ),
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["vendor", "language"]
@@ -620,20 +936,54 @@ class LegalFieldRequirement(BaseModel):
 
     Purpose = RequirementPurpose
 
-    country = CountryField(blank=True, help_text="Empty: every country.")
+    country = CountryField(
+        blank=True,
+        help_text=_(
+            "The rule applies to vendors established in this country. Leave it empty for "
+            "every country."
+        ),
+    )
     region = models.CharField(
         max_length=8,
         choices=RequirementRegion.choices,
         blank=True,
-        help_text="Empty: every region. EU or non-EU: every vendor established there.",
+        help_text=_(
+            "Leave it empty for every region, or choose EU or non-EU to apply the rule to "
+            "every vendor established there."
+        ),
     )
     legal_form = models.CharField(
-        max_length=24, choices=LegalForm.choices, blank=True, help_text="Empty: every legal form."
+        max_length=24,
+        choices=LegalForm.choices,
+        blank=True,
+        help_text=_(
+            "The rule applies to vendors with this legal form. Leave it empty for every legal form."
+        ),
     )
-    field_name = models.CharField("field", max_length=64, choices=LEGAL_FIELD_CHOICES)
-    purpose = models.CharField(max_length=16, choices=Purpose.choices, default=Purpose.PAYOUT)
-    active = models.BooleanField(default=True, help_text="Inactive rules are ignored.")
-    note = models.CharField(max_length=200, blank=True, help_text="Why the field is required.")
+    field_name = models.CharField(
+        "field",
+        max_length=64,
+        choices=LEGAL_FIELD_CHOICES,
+        help_text=_(
+            "The vendor profile field that must be filled in. Required: a rule needs a field."
+        ),
+    )
+    purpose = models.CharField(
+        max_length=16,
+        choices=Purpose.choices,
+        default=Purpose.PAYOUT,
+        help_text=_(
+            "What the field is needed for: a payout request or the activation of the vendor."
+        ),
+    )
+    active = models.BooleanField(
+        default=True, help_text=_("Untick it to stop applying the rule without deleting it.")
+    )
+    note = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text=_("Why the field is required, for the record. Up to 200 characters."),
+    )
 
     class Meta:
         ordering = ["purpose", "country", "legal_form", "field_name"]
@@ -700,8 +1050,20 @@ class VendorContract(BaseModel):
     """
 
     version = models.PositiveIntegerField(unique=True, editable=False)
-    valid_from = models.DateTimeField(help_text="When this version replaces the previous one.")
-    note = models.CharField(max_length=200, blank=True, help_text="Internal: what changed.")
+    valid_from = models.DateTimeField(
+        help_text=_(
+            "When this version replaces the previous one. Required. Once a vendor has "
+            "accepted the version it can no longer be changed."
+        )
+    )
+    note = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text=_(
+            "Internal note on what changed in this version. Vendors do not see it. Up to "
+            "200 characters."
+        ),
+    )
 
     class Meta:
         ordering = ["-version"]
@@ -752,7 +1114,12 @@ class VendorContractTranslation(TranslationModel):
         VendorContract, on_delete=models.CASCADE, related_name="translations"
     )
     title = models.CharField(max_length=200)
-    body = models.TextField()
+    body = models.TextField(
+        help_text=_(
+            "The full text of the contract in this language. Required. Once a vendor has "
+            "accepted the version it is final: new terms need a new version."
+        )
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["contract", "language"]
@@ -802,18 +1169,42 @@ class ContractAcceptance(BaseModel):
     objects = VendorScopedManager()
 
     vendor = models.ForeignKey(
-        Vendor, on_delete=models.PROTECT, related_name="contract_acceptances"
+        Vendor,
+        on_delete=models.PROTECT,
+        related_name="contract_acceptances",
+        help_text=_("The vendor that accepted the contract."),
     )
     contract = models.ForeignKey(
-        VendorContract, on_delete=models.PROTECT, related_name="acceptances"
+        VendorContract,
+        on_delete=models.PROTECT,
+        related_name="acceptances",
+        help_text=_("The contract version that was accepted."),
     )
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="contract_acceptances"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="contract_acceptances",
+        help_text=_("The person who accepted the contract on behalf of the vendor."),
     )
-    language = LanguageField()
-    text_hash = models.CharField(max_length=64, help_text="SHA-256 of the accepted text.")
-    accepted_at = models.DateTimeField()
-    ip = models.GenericIPAddressField("IP address", null=True, blank=True)
+    language = LanguageField(
+        help_text=_("The language of the text that was shown when the contract was accepted.")
+    )
+    text_hash = models.CharField(
+        max_length=64,
+        help_text=_(
+            "A fingerprint (SHA-256) of the exact text that was accepted, to prove later "
+            "that it has not changed."
+        ),
+    )
+    accepted_at = models.DateTimeField(help_text=_("When the contract was accepted."))
+    ip = models.GenericIPAddressField(
+        "IP address",
+        null=True,
+        blank=True,
+        help_text=_(
+            "The IP address the acceptance came from, kept as evidence. Empty if it was not known."
+        ),
+    )
     # The vendor's `onboarding_round` when accepted: after a reopen (VEN.21) the same version is
     # accepted again, in the new round.
     onboarding_round = models.PositiveIntegerField(default=1, editable=False)
@@ -889,13 +1280,32 @@ class VendorFeatureFlag(BaseModel):
     vendor_scope: ClassVar[str] = "vendor"
     objects = VendorScopedManager()
 
-    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="feature_flags")
-    flag = models.ForeignKey(FeatureFlag, on_delete=models.PROTECT, related_name=VENDOR_OVERRIDES)
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.CASCADE,
+        related_name="feature_flags",
+        help_text=_("The vendor this setting applies to."),
+    )
+    flag = models.ForeignKey(
+        FeatureFlag,
+        on_delete=models.PROTECT,
+        related_name=VENDOR_OVERRIDES,
+        help_text=_("The feature to switch on or off for this vendor."),
+    )
     enabled = models.BooleanField(
-        default=False, help_text="Unticked: the feature is off for this vendor."
+        default=False,
+        help_text=_(
+            "Ticked: the feature is on for this vendor. Unticked: it is off, whatever the "
+            "platform setting is. An emergency switch can only be turned off here."
+        ),
     )
     note = models.CharField(
-        max_length=200, blank=True, help_text="Why it was switched, e.g. the incident reference."
+        max_length=200,
+        blank=True,
+        help_text=_(
+            "Why it was switched, for example the incident or request reference. Up to 200 "
+            "characters."
+        ),
     )
 
     class Meta:
@@ -934,17 +1344,26 @@ class CrossVendorConsent(BaseModel):
     objects = VendorScopedManager()
 
     vendor = models.ForeignKey(
-        Vendor, on_delete=models.PROTECT, related_name="cross_vendor_consents"
+        Vendor,
+        on_delete=models.PROTECT,
+        related_name="cross_vendor_consents",
+        help_text=_("The vendor this consent belongs to."),
     )
     in_suggestions = models.BooleanField(
         "in other vendors' suggestions",
         default=False,
-        help_text="Its products may be suggested (cross-sell, up-sell) by other vendors.",
+        help_text=_(
+            "Tick it to let other vendors suggest your products next to theirs. Unticked: "
+            "your products are not suggested by others."
+        ),
     )
     in_bundles = models.BooleanField(
         "in other parties' bundles",
         default=False,
-        help_text="Its products may be part of bundles created by others (CAT.16).",
+        help_text=_(
+            "Tick it to let others include your products in the bundles they create. "
+            "Unticked: they cannot."
+        ),
     )
     valid_from = models.DateTimeField()
     set_by = models.CharField(max_length=150, help_text="Who recorded this version.")
@@ -997,3 +1416,234 @@ class VendorApplication(BaseModel):
 
     def __str__(self) -> str:
         return f"application of {self.user_id} (link v{self.version})"
+
+
+TWO_PLACES = Decimal("0.01")
+
+
+class VendorPlan(BaseModel):
+    """A plan: a bundle of limits and features, data not code (spec 04, VEN.2).
+
+    At launch a plan is only a commission scope (`CommissionRule.plan`) and limits (D-04: no
+    paid-plan fee is charged before VEN.19). `features` is a JSON object of flags such as
+    `featured` or `api_sync`. Changes go through `services.save_plan` (audited).
+
+    Which plan a vendor is on is not stored here: the assignment, with effective dates, belongs
+    to VEN.19. Until then `services.commission_rule_for` takes the plan as an argument, and the
+    caller must pass the plan in force at the time of the order (never today's plan for an old
+    order).
+    """
+
+    code = models.SlugField(max_length=32, unique=True)
+    name = models.CharField(max_length=80)
+    max_products = models.PositiveIntegerField(null=True, blank=True, help_text="Empty: unlimited.")
+    features = models.JSONField(default=dict, blank=True, help_text="Feature flags (an object).")
+    monthly_fee = MoneyField(
+        null=True, blank=True, help_text="Not charged before VEN.19 (D-04); empty: no fee."
+    )
+
+    class Meta:
+        ordering = ["code"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(monthly_fee__isnull=True) | models.Q(monthly_fee__gte=0),
+                name="vendors_plan_fee_not_negative",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def clean(self) -> None:
+        if not isinstance(self.features, dict):
+            raise ValidationError({"features": "Features must be a JSON object."})
+
+
+class CommissionRule(Versioned):
+    """A versioned commission rule (VEN.2): never edited, a change is a new row valid from a date.
+
+    Scope: one vendor, one plan, or neither (the platform default); `engine.select_rule` picks
+    vendor, then plan, then default. The database refuses overlapping periods within a scope, an
+    implicit 0% (a zero percent needs a `promo_label`), out-of-range rates, and, with a trigger
+    (migration 0027), any edit or delete: the only write an existing row takes is closing
+    `valid_to` once. Orders freeze `snapshot()`, never a live reference.
+    """
+
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="commission_rules",
+        help_text="Empty: not specific to one vendor.",
+    )
+    plan = models.ForeignKey(
+        VendorPlan,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="commission_rules",
+        help_text="Empty: not specific to one plan.",
+    )
+    version = models.PositiveIntegerField(
+        editable=False, help_text="Counts up within the scope, from 1."
+    )
+    percent = models.DecimalField(max_digits=5, decimal_places=2, help_text="E.g. 20.00.")
+    base = models.CharField(max_length=24, choices=[(b, b) for b in engine.COMMISSION_BASES])
+    fee_percent = models.DecimalField(
+        "payment fee percent", max_digits=5, decimal_places=2, help_text="E.g. 4.00."
+    )
+    fee_fixed = MoneyField("payment fee fixed", help_text="E.g. 2.00.")
+    fee_base = models.CharField(
+        max_length=16,
+        choices=[(b, b) for b in engine.FEE_BASES],
+        default=engine.GROSS_PAID,
+    )
+    promo_label = models.CharField(max_length=80, blank=True, help_text="E.g. launch promo.")
+
+    class Meta:
+        ordering = ["vendor_id", "plan_id", "-valid_from"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(percent__gte=0, percent__lte=100),
+                name="vendors_commissionrule_percent_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(percent__gt=0) | ~models.Q(promo_label=""),
+                name="vendors_commissionrule_no_implicit_zero",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fee_percent__gte=0, fee_percent__lte=100),
+                name="vendors_commissionrule_fee_percent_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fee_fixed__gte=0),
+                name="vendors_commissionrule_fee_fixed_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(base__in=engine.COMMISSION_BASES),
+                name="vendors_commissionrule_base_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fee_base__in=engine.FEE_BASES),
+                name="vendors_commissionrule_fee_base_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(vendor__isnull=True) | models.Q(plan__isnull=True),
+                name="vendors_commissionrule_one_scope",
+            ),
+            valid_period_check("vendors_commissionrule_valid_to_after_valid_from"),
+            models.UniqueConstraint(
+                Coalesce("vendor", models.Value(0)),
+                Coalesce("plan", models.Value(0)),
+                "version",
+                name="vendors_commissionrule_unique_version",
+            ),
+            ExclusionConstraint(
+                name="vendors_commissionrule_no_overlap",
+                expressions=[
+                    (Coalesce("vendor", models.Value(0)), RangeOperators.EQUAL),
+                    (Coalesce("plan", models.Value(0)), RangeOperators.EQUAL),
+                    (TsTzRange("valid_from", "valid_to"), RangeOperators.OVERLAPS),
+                ],
+                violation_error_message="Commission rules of one scope must not overlap.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        who = self.vendor or self.plan or "default"
+        return f"{who} v{self.version}: {self.percent}% from {self.valid_from:%Y-%m-%d}"
+
+    def clean(self) -> None:
+        # A field that failed its own validation is None here: its error is already reported.
+        if None in (self.percent, self.fee_percent, self.fee_fixed):
+            return
+        errors = engine.commission_rule_errors(
+            percent=self.percent,
+            base=self.base,
+            fee_percent=self.fee_percent,
+            fee_fixed=self.fee_fixed,
+            fee_base=self.fee_base,
+            promo_label=self.promo_label,
+        )
+        if self.vendor_id is not None and self.plan_id is not None:
+            errors["plan"] = "A rule is for a vendor or for a plan, not both."
+        if errors:
+            raise ValidationError(errors)
+
+    def snapshot(self) -> dict[str, Any]:
+        """What an order freezes (ORD.2): JSON-safe, with the rule id and version, and without
+        the closing date, which can still change after the order."""
+        return {
+            "rule_id": str(self.public_id),
+            "version": self.version,
+            "percent": str(self.percent.quantize(TWO_PLACES, ROUND_HALF_UP)),
+            "base": self.base,
+            "fee_percent": str(self.fee_percent.quantize(TWO_PLACES, ROUND_HALF_UP)),
+            "fee_fixed": str(self.fee_fixed.quantize(TWO_PLACES, ROUND_HALF_UP)),
+            "fee_base": self.fee_base,
+            "promo_label": self.promo_label,
+            "valid_from": self.valid_from.isoformat(),
+        }
+
+
+class DateRangeExpr(models.Func):
+    """PostgreSQL `daterange(lower, upper)` (`[)`); a NULL upper bound means open-ended."""
+
+    function = "DATERANGE"
+    output_field = DateRangeField()
+
+
+class NoTinCountry(BaseModel):
+    """A jurisdiction that issues no TIN (VEN.27, owner decision MQ-16).
+
+    For an individual whose TIN country is listed, the DAC7 check accepts the place of birth
+    instead of a TIN (`engine.dac7_check`). Staff-editable data with history: a row is valid over
+    the calendar days `[valid_from, valid_to)` (business time zone), a removal only sets
+    `valid_to`, and an addition starts a new row, so "was X a no-TIN country on day D" has one
+    answer forever. Changes go through `services.add_no_tin_country` and
+    `remove_no_tin_country`, which audit them with a reason. Migration 0028 seeds the six
+    countries that were a code constant.
+    """
+
+    country = CountryField(
+        help_text=_("The country whose authorities issue no tax identification number (TIN).")
+    )
+    reason = models.CharField(max_length=300, help_text=_("Why this country issues no TIN."))
+    valid_from = models.DateField(
+        help_text="First day (business time zone) on which the country counts as issuing no TIN."
+    )
+    valid_to = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Day on which it stops counting (not included); empty while it still counts.",
+    )
+    removal_reason = models.CharField(
+        max_length=300, blank=True, help_text="Why staff removed the country; empty while listed."
+    )
+
+    class Meta:
+        ordering = ["country", "-valid_from"]
+        verbose_name = "no-TIN country"
+        verbose_name_plural = "no-TIN countries"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(valid_to__isnull=True)
+                | models.Q(valid_to__gte=models.F("valid_from")),
+                name="vendors_notincountry_valid_period",
+            ),
+            ExclusionConstraint(
+                name="vendors_notincountry_no_overlap",
+                expressions=[
+                    ("country", RangeOperators.EQUAL),
+                    (DateRangeExpr("valid_from", "valid_to"), RangeOperators.OVERLAPS),
+                ],
+                violation_error_message="This country is already on the list for those days.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.country)
+
+    def window(self) -> "engine.NoTinWindow":
+        return engine.NoTinWindow(str(self.country), self.valid_from, self.valid_to)

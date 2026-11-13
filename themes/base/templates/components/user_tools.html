@@ -1,0 +1,27 @@
+{% load i18n %}{% comment %}
+User tools (ARC.32): for a signed-in user only, at the right end of the header's tools: the help
+button, then the user menu, then the help dialog. The context variable `help` comes from the
+`help_context` tag (cms_tags) and is empty for a visitor, so a public page carries none of this.
+
+The button is a real `<button>` named "Help for this page", 44 px square, in the header bar on
+every screen width (never floating). The menu is a native `<details>` disclosure, so it works
+without a script; its "Help" item opens the same dialog. The dialog is the library's native modal
+(components/dialog.html): focus stays inside it, Escape closes it and the script returns the focus
+to the button. The body is fetched when it opens, from `data-help-url` with the screen's route
+name, page type and language, and the script lists the page's form fields under it. Both
+openers are `hidden` until the script runs: without it there is nothing that does nothing.
+
+Context: `help` (url, route, page_type, language) and the CSRF token for the sign-out form.
+{% endcomment %}{% if help %}<div class="user-tools" data-help-url="{{ help.url }}" data-help-route="{{ help.route }}" data-help-type="{{ help.page_type }}" data-help-lang="{{ help.language }}" data-help-fields-title="{% translate 'Fields on this page' %}" data-help-error="{% translate 'The help text could not be loaded. Try again.' %}">
+  <button type="button" class="help-button" data-help-open aria-haspopup="dialog" aria-controls="help-dialog" aria-label="{% translate 'Help for this page' %}" hidden>{% include "components/icon.html" with name="help" only %}</button>
+  <details class="user-menu">
+    <summary class="user-menu__summary">{% translate "Account" %}</summary>
+    <ul class="user-menu__list">
+      <li><button type="button" class="user-menu__item" data-help-open aria-haspopup="dialog" aria-controls="help-dialog" hidden>{% translate "Help" %}</button></li>
+      {% url 'mfa:setup' as security_url %}{% if security_url %}<li><a class="user-menu__item" href="{{ security_url }}?from=security">{% translate "Security" %}</a></li>{% endif %}
+      {% if release_version %}<li><span class="user-menu__version">{% translate "Version" %} {{ release_version }}</span></li>{% endif %}
+      <li><form action="{% url 'logout' %}" method="post">{% csrf_token %}<button type="submit" class="user-menu__item">{% translate "Sign out" %}</button></form></li>
+    </ul>
+  </details>
+  {% include "components/dialog.html" with id="help-dialog" title=_("Help for this page") body=_("Loading help…") only %}
+</div>{% endif %}

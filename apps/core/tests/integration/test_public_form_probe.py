@@ -38,6 +38,8 @@ def sample_path(route: str) -> str:
     path = route.replace("[<lang>/]", "")
 
     def fill(match: re.Match[str]) -> str:
+        if match.group(1) == "uuid":
+            return "00000000-0000-0000-0000-000000000000"
         return "1" if match.group(1) in (None, "int") else "x"
 
     path = REGEX_GROUP.sub(lambda m: m.group(1) or "x", path)

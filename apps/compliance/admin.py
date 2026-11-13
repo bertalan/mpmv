@@ -14,6 +14,7 @@ from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest
+from django.utils.translation import gettext_lazy as _
 
 from apps.core.audit import audit_context
 
@@ -238,8 +239,11 @@ class CountryWarningLanguagesForm(forms.ModelForm[CountryWarningLanguages]):
     """Languages as one comma-separated field; the service validates them again."""
 
     languages = forms.CharField(
-        help_text="ISO 639-1 codes separated by commas, e.g. fr, nl, de. Warnings in any one "
-        "of them unblock sale into the country."
+        help_text=_(
+            "The languages in which this country accepts product warnings, as two-letter codes "
+            "such as 'fr, nl, de', separated by commas. Warnings in any one of them are "
+            "enough to sell the product into the country."
+        )
     )
 
     class Meta:

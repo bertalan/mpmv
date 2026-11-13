@@ -32,8 +32,9 @@ Who owns a file: a vendor, or the platform (`vendor=None`).
   replace its stored bands; a method that lists none keeps them (`ParsedConfig.band_methods`).
   Its special-area treatments follow the same rule (`ParsedConfig.treatment_methods`).
 
-`tax_treatment` and `over_max_weight` travel as stored data only: their meaning belongs to TAX.4
-(D-03) and SHP.3 (D-06).
+`tax_treatment` travels as stored data and accepts only `follows_goods` (TAX.17, D-03: shipping
+VAT always follows the goods); `over_max_weight` is stored data only, its meaning belongs to SHP.3
+(D-06).
 """
 
 from collections import defaultdict

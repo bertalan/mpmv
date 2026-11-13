@@ -9,10 +9,23 @@ from apps.manager import roles
 # Spelled out on purpose: a change to roles.py must change this table too.
 EXPECTED = {
     "config": {"manager.platform_config"},
-    "catalog": {"manager.platform_catalog", "vendors.view_all_vendors"},
-    "finance": {"manager.platform_finance", "vendors.view_all_vendors"},
-    "support": {"manager.platform_support", "vendors.view_all_vendors"},
-    "owner": {"core.platform_owner", "vendors.view_all_vendors"},
+    "catalog": {
+        "manager.platform_catalog",
+        "vendors.view_all_vendors",
+        "compliance.review_notices",
+        "vendors.revert_storefront_profile",
+        "wagtailadmin.access_admin",
+    },
+    "finance": {"manager.platform_finance", "vendors.view_all_vendors", "core.elevate"},
+    "support": {"manager.platform_support", "vendors.view_all_vendors", "core.elevate"},
+    "owner": {
+        "core.platform_owner",
+        "vendors.view_all_vendors",
+        "compliance.review_notices",
+        "vendors.revert_storefront_profile",
+        "wagtailadmin.access_admin",
+        "core.elevate",
+    },
 }
 
 
@@ -25,6 +38,12 @@ def test_each_role_gets_exactly_its_permissions(role: roles.Role) -> None:
 def test_only_the_owner_role_holds_platform_owner() -> None:
     holders = [r.key for r in roles.ROLES if roles.PLATFORM_OWNER_PERMISSION in r.permissions]
     assert holders == ["owner"]
+
+
+def test_only_owner_support_and_finance_can_open_a_passkey_window() -> None:
+    """Owner decision 2026-11-12 (D-32): these three roles hold core.elevate, no other."""
+    holders = {r.key for r in roles.ROLES if roles.ELEVATE_PERMISSION in r.permissions}
+    assert holders == {"owner", "support", "finance"}
 
 
 def test_the_configuration_role_has_no_platform_wide_vendor_read() -> None:
