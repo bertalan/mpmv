@@ -38,6 +38,7 @@ from apps.core.models import MediaImage
 from apps.core.money import CURRENCY
 from apps.core.services import audit_changes, holds_permission, run_mutation, save_audited
 from apps.core.text import ascii_int
+from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedQuerySet, is_platform_staff
 from apps.vendors.services import ensure_vendor_can_write, vendors_in_suggestions
@@ -1542,7 +1543,7 @@ def listed_products() -> "VendorScopedQuerySet[Product]":
     """
     return Product.objects.filter(
         status=ProductStatus.PUBLISHED, vendor__status=Vendor.Status.ACTIVE
-    )
+    ).select_related("vendor__connected_account")  # the sales mode buyers get (D-19, VEN.6)
 
 
 def _in_subtrees(field: str, paths: Iterable[str]) -> Q:
@@ -1583,7 +1584,13 @@ def listing_products(
     for group in (*scope_terms, *filters.term_groups):
         products = _matching(products, _in_subtrees("terms", group))
     if filters.price_min is not None or filters.price_max is not None:
-        products = products.filter(sales_mode=SalesMode.BUY, price_net__isnull=False)
+        # Only products buyers can buy have a public price: the vendor's on-request mode (chosen,
+        # or forced by D-19 without a ready payout account) overrides a `buy` product (VEN.6).
+        products = products.filter(
+            vendors_services.sells_online("vendor__"),
+            sales_mode=SalesMode.BUY,
+            price_net__isnull=False,
+        )
         if filters.price_min is not None:
             products = products.filter(price_net__gte=filters.price_min)
         if filters.price_max is not None:
@@ -2156,7 +2163,10 @@ def product_cards(products: Sequence[Product], language: str) -> list[ProductCar
     """The cards of `products`, in order; their texts in one query. A card whose product has
     no published text in `language` links to its URL in the language of the text it shows."""
     rows = list(products)
-    models.prefetch_related_objects(rows, "translations")
+    # A vendor on request (chosen, or forced by D-19 without a ready payout account) shows no
+    # price on its cards (VEN.6). Listings select the vendor and its account with the products
+    # (`listed_products`), so this fetches nothing for them.
+    models.prefetch_related_objects(rows, "translations", "vendor__connected_account")
     cards: list[ProductCard] = []
     for product in rows:
         # Resolved in Python from the prefetched rows: `product.translation()` filters the
@@ -2176,7 +2186,16 @@ def product_cards(products: Sequence[Product], language: str) -> list[ProductCar
                 resolved.language, text.slug, default_language=settings.LANGUAGE_CODE
             )
         cards.append(
-            ProductCard(title=title, url=url, price=engine.public_price(product), image_alt=title)
+            ProductCard(
+                title=title,
+                url=url,
+                price=(
+                    engine.public_price(product)
+                    if vendors_services.effective_sales_mode(product) == SalesMode.BUY
+                    else None
+                ),
+                image_alt=title,
+            )
         )
     return cards
 

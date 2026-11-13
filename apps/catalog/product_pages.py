@@ -17,6 +17,7 @@ from django.db.models import prefetch_related_objects
 
 from apps.core import translations
 from apps.core.models import MediaImage
+from apps.vendors import services as vendors
 from apps.vendors.models import Vendor
 
 from . import engine, services, slugs
@@ -87,7 +88,7 @@ def gallery(product: Product, language: str) -> list[GalleryImage]:
     return []
 
 
-def _variants(product: Product, language: str) -> list[VariantChoice]:
+def _variants(product: Product, language: str, *, on_request: bool) -> list[VariantChoice]:
     rows = list(product.variants.all())
     if not rows:
         return []
@@ -99,7 +100,7 @@ def _variants(product: Product, language: str) -> list[VariantChoice]:
             VariantChoice(
                 sku=str(row.sku),
                 label=text.label if text is not None else str(row.sku),
-                price=engine.public_variant_price(product, row),
+                price=None if on_request else engine.public_variant_price(product, row),
                 stock_status=str(row.stock_status),
                 selected=row is chosen,
             )
@@ -132,7 +133,11 @@ def find(slug: str, language: str) -> ProductPage | None:
             product__status__in=PUBLIC_STATUSES,
             product__vendor__status=Vendor.Status.ACTIVE,
         )
-        .select_related("product__vendor", "product__brand", "product__required_companion")
+        .select_related(
+            "product__vendor__connected_account",
+            "product__brand",
+            "product__required_companion",
+        )
         .order_by("language")
     )
     found = next((row for row in rows if row.language == language), None)
@@ -150,7 +155,8 @@ def _build(product: Product, language: str) -> ProductPage | None:
     if text is None or not text.slug or resolved.language is None:
         return None
     paths = _paths(product)
-    on_request = product.sales_mode != SalesMode.BUY
+    # The vendor's on-request mode (chosen, or forced by D-19) overrides the product (VEN.6).
+    on_request = vendors.effective_sales_mode(product) != SalesMode.BUY
     retired = product.status == ProductStatus.RETIRED
     return ProductPage(
         product=product,
@@ -161,12 +167,12 @@ def _build(product: Product, language: str) -> ProductPage | None:
         requested=language,
         shown=resolved.language,
         paths=paths,
-        price=engine.public_price(product),
+        price=None if on_request else engine.public_price(product),
         on_request=on_request,
         purchasable=not on_request and not retired,
         retired=retired,
         stock_status=str(product.stock_status),
-        variants=_variants(product, language),
+        variants=_variants(product, language, on_request=on_request),
         companion=_companion(product, language),
         gallery=gallery(product, language),
     )

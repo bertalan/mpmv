@@ -31,6 +31,7 @@ from apps.shipping.services import quote_shipping
 from apps.tax import engine as tax_engine
 from apps.tax import services as tax_services
 from apps.tax.models import VatValidation
+from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
 
 from . import engine
@@ -54,8 +55,10 @@ def _line_blocks(
     """Why this line cannot be bought now: on request, not for sale, no price, out of stock."""
     product, variant = line.product, line.variant
     vendor_id = vendor.pk
-    if product.sales_mode == Product.SalesMode.ON_REQUEST:
-        # Also a vendor without Stripe Connect (D-19): its products are sold on request.
+    # The mode buyers get: a vendor on request (by choice, or without a payout account ready for
+    # payouts, D-19) makes its `buy` products on request (VEN.6).
+    sales_mode = vendors_services.effective_sales_mode(product)
+    if sales_mode == Product.SalesMode.ON_REQUEST:
         return [
             _block(
                 engine.ON_REQUEST,
@@ -66,7 +69,7 @@ def _line_blocks(
         ]
     error = cart_engine.purchase_error(
         product_status=product.status,
-        sales_mode=product.sales_mode,
+        sales_mode=sales_mode,
         vendor_status=vendor.status,
         is_variable=product.kind == Product.Kind.VARIABLE,
         has_variant=variant is not None,

@@ -12,6 +12,7 @@ from decimal import Decimal
 from typing import Any
 
 import factory
+from django.apps import apps
 from django.db.models import Max
 from django.utils import timezone
 from django.utils.text import slugify
@@ -212,6 +213,22 @@ class VendorFactory(DjangoModelFactory[Vendor]):
         if create and extracted:
             for language in extracted:
                 VendorTranslationFactory.create(vendor=obj, language=language)
+
+    @factory.post_generation
+    def sells_online(obj: Vendor, create: bool, extracted: bool | None, **kwargs: Any) -> None:
+        """`sells_online=True` adds a payout account ready for payouts, so the vendor's `buy`
+        products can be bought (D-19, VEN.6). The account model belongs to payments, above vendors
+        in the app graph: it is looked up by name here, never imported."""
+        if create and extracted:
+            apps.get_model("payments", "ConnectedAccount").objects.create(
+                vendor=obj,
+                provider="stripe",
+                account_ref=f"acct_test_{obj.pk}",
+                status=engine.PAYOUT_ACCOUNT_READY,
+                details_submitted=True,
+                charges_enabled=True,
+                payouts_enabled=True,
+            )
 
 
 class VendorTranslationFactory(DjangoModelFactory[VendorTranslation]):

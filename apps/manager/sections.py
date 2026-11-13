@@ -42,6 +42,15 @@ BUILT_IN = (
         order=20,
         allowed=vendor_action("profile"),
     ),
+    # The payout account (VEN.6): owners only, like the other financial settings.
+    Section(
+        "shop.payments",
+        Space.SHOP,
+        _("Payments"),
+        "manager:shop:payments",
+        order=40,
+        allowed=vendor_action("bank_account"),
+    ),
     # The image chooser of the storefront editor (VEN.31): a modal, not a page, so not in the
     # menu. Owners only, like the profile it serves.
     Section(
