@@ -72,7 +72,7 @@ def sample_document() -> dict[str, Any]:
                 "max_delivery_days": None,
                 "is_default": False,
                 "free_shipping_threshold": None,
-                "tax_treatment": "exempt",
+                "tax_treatment": "follows_goods",
                 "over_max_weight": "quote",
                 "bands": [],
             },

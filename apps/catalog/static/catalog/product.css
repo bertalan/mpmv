@@ -1,0 +1,50 @@
+/* Minimal product page layout (CAT.7); the themes restyle it (THM.7). A static file, never
+   inline styles: the CSP has no 'unsafe-inline' (SEC.1). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.product-page {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.product-gallery ul,
+.product-variants ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.product-gallery ul {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+}
+
+.product-gallery img {
+  max-width: 100%;
+  height: auto;
+}
+
+.product-variants {
+  border: 0;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.product-price {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.product-notice,
+.product-retired {
+  border-inline-start: 0.25rem solid currentcolor;
+  padding-inline-start: 0.75rem;
+}

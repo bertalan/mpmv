@@ -88,9 +88,9 @@ own weight bands, free-shipping threshold and delivery time.
 
 **VAT treatment per method.** `tax_treatment` is stored per method and applied by the tax engine
 (`resolve_shipping_tax`, TAX.4): `follows_goods` (default) treats shipping as ancillary to the goods
-and splits its VAT like the goods ([05](05-tax.md)); `standard_rate` and `exempt` were recorded for the
-cases the tax advisor might confirm. D-03 is decided (adviser opinion 2026-11-11): shipping always follows the goods,
-so TAX.17 removes the other two values.
+and splits its VAT like the goods ([05](05-tax.md)). It is the only value: D-03 is decided (adviser
+opinion 2026-11-11), shipping always follows the goods, and TAX.17 removed `standard_rate` and `exempt`
+(a data migration set stored rows to `follows_goods`).
 
 ### Zones: vendor zones, country groups and postcodes
 

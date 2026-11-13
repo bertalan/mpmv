@@ -46,7 +46,8 @@ def test_a_stream_rich_text_block_is_stored_without_active_markup() -> None:
 
 def test_a_clean_text_is_stored_byte_for_byte() -> None:
     clean = (
-        '<h2>T</h2><p>a <b>b</b> <a href="https://example.org/" rel="noopener noreferrer">l</a>'
+        '<h2>T</h2><p>a <b>b</b> <a href="https://example.org/"'
+        ' rel="noopener noreferrer nofollow ugc">l</a>'
         " &amp; c</p>"
     )
     page = BlogIndexPageFactory.create(intro=clean)

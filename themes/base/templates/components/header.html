@@ -1,4 +1,4 @@
-{% load i18n theme_tags %}{% comment %}
+{% load i18n theme_tags cms_tags %}{% comment %}
 Site header (THM.3, spec 14 §14.6): site name, the main navigation as a disclosure, the help
 link and the language switcher.
 
@@ -27,6 +27,7 @@ switcher is left out.
     <div class="site-header__tools">
       {% include "components/help_link.html" %}
       {% if languages %}{% include "components/language_switcher.html" %}{% endif %}
+      {% help_context as help %}{% include "components/user_tools.html" %}
     </div>
   </div>
 </header>

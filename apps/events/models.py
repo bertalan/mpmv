@@ -77,6 +77,7 @@ from apps.cms.blocks import (
     LaunchCountdownBlock,
     ProductCardsBlock,
     ProductGridBlock,
+    paragraph_block,
 )
 from apps.cms.models import CountdownCacheMixin
 from apps.core.fields import CountryField
@@ -133,7 +134,7 @@ def event_blocks() -> list[tuple[str, blocks.Block]]:
     the cards (checked against the vendor's own products), not the grid.
     """
     return [
-        ("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES, label=_("Rich text"))),
+        ("paragraph", paragraph_block()),
         ("figure", FigureBlock()),
         ("gallery", GalleryBlock()),
         ("cta", CallToActionBlock()),
@@ -153,7 +154,15 @@ class EventIndexPage(Page):  # type: ignore[misc]  # Wagtail is untyped
     The listing, calendar and feed routes come with EVT.6 and EVT.9.
     """
 
-    intro = RichTextField(_("introduction"), features=RICH_TEXT_FEATURES, blank=True)
+    intro = RichTextField(
+        _("introduction"),
+        features=RICH_TEXT_FEATURES,
+        blank=True,
+        help_text=_(
+            "A few words shown at the top of the events list. "
+            "If you leave it empty, the list starts right under the title."
+        ),
+    )
 
     content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("intro")]
     parent_page_types: ClassVar[list[str]] = ["cms.HomePage"]
@@ -373,71 +382,276 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
         blank=True,
         on_delete=models.PROTECT,
         related_name="+",
-        help_text=_("Empty for a platform event (staff only)."),
+        help_text=_(
+            "The shop that organises the event. Leave it empty for an event of the platform "
+            "itself, "
+            "which only the platform staff can see and edit."
+        ),
     )
-    event_type = models.CharField(_("type"), max_length=16, choices=EventType.choices)
+    event_type = models.CharField(
+        _("type"),
+        max_length=16,
+        choices=EventType.choices,
+        help_text=_(
+            "Choose what kind of event it is: a promotion (an offer, with no place), "
+            "a trade fair or meeting, or something else. Required."
+        ),
+    )
     original_locale = models.ForeignKey(
         "wagtailcore.Locale",
         verbose_name=_("original language"),
         on_delete=models.PROTECT,
         related_name="+",
+        help_text=_(
+            "The language the event was first written in. It is set when the event is created "
+            "and you cannot change it."
+        ),
     )
     summary = models.CharField(
-        _("summary"), max_length=300, help_text=_("Shown in listings, feeds and search results.")
+        _("summary"),
+        max_length=300,
+        help_text=_(
+            "One or two sentences that tell what the event is, up to 300 characters. "
+            "They are shown in the events list, in calendar feeds and in search results. "
+            "Required: the event cannot be saved without it."
+        ),
     )
 
     # When: timed events use timestamps, all-day events dates (inclusive end).
-    all_day = models.BooleanField(_("all day"), default=False)
-    starts_at = models.DateTimeField(_("starts at"), null=True, blank=True)
-    ends_at = models.DateTimeField(_("ends at"), null=True, blank=True)
-    start_date = models.DateField(_("first day"), null=True, blank=True)
-    end_date = models.DateField(_("last day"), null=True, blank=True)
-    timezone = models.CharField(_("time zone"), max_length=64, default=default_timezone)
+    all_day = models.BooleanField(
+        _("all day"),
+        default=False,
+        help_text=_(
+            "Tick it for an event with no set hours, such as a sale lasting several days. "
+            "You then give the first and last day instead of the start and end times."
+        ),
+    )
+    starts_at = models.DateTimeField(
+        _("starts at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "The day and hour the event begins, in the time zone below. "
+            "Required unless the event lasts all day."
+        ),
+    )
+    ends_at = models.DateTimeField(
+        _("ends at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "The day and hour the event ends. It must be after the start. "
+            "Required unless the event lasts all day."
+        ),
+    )
+    start_date = models.DateField(
+        _("first day"),
+        null=True,
+        blank=True,
+        help_text=_("The first day of an all-day event. Required when 'All day' is ticked."),
+    )
+    end_date = models.DateField(
+        _("last day"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "The last day of an all-day event, included. Use the same day as the first day for "
+            "a one-day event. Required when 'All day' is ticked."
+        ),
+    )
+    timezone = models.CharField(
+        _("time zone"),
+        max_length=64,
+        default=default_timezone,
+        help_text=_(
+            "The time zone where the event takes place, for example 'Europe/Rome'. "
+            "The start and end times above are read in it."
+        ),
+    )
     rrule = models.CharField(
         _("recurrence rule"),
         max_length=500,
         blank=True,
-        help_text=_("An RFC 5545 RRULE, for example FREQ=YEARLY;COUNT=3."),
+        help_text=_(
+            "Only for an event that repeats. Write the rule, for example FREQ=YEARLY;COUNT=3 "
+            "repeats it every year, three times. If you leave it empty, the event happens once."
+        ),
     )
     exdates = ArrayField(
-        models.DateTimeField(), verbose_name=_("excluded occurrences"), default=list, blank=True
+        models.DateTimeField(),
+        verbose_name=_("excluded occurrences"),
+        default=list,
+        blank=True,
+        help_text=_(
+            "Dates and times of a repeating event that are skipped, for example a holiday. "
+            "If you leave it empty, nothing is skipped."
+        ),
     )
     exdate_days = ArrayField(
-        models.DateField(), verbose_name=_("excluded days"), default=list, blank=True
+        models.DateField(),
+        verbose_name=_("excluded days"),
+        default=list,
+        blank=True,
+        help_text=_(
+            "Days of a repeating all-day event that are skipped, for example a holiday. "
+            "If you leave it empty, no day is skipped."
+        ),
     )
 
     # Where.
     attendance = models.CharField(
-        _("attendance"), max_length=16, choices=Attendance.choices, blank=True
+        _("attendance"),
+        max_length=16,
+        choices=Attendance.choices,
+        blank=True,
+        help_text=_(
+            "How people take part: in person, online or both. "
+            "Required for every event except a promotion, which has no place."
+        ),
     )
-    online_url = models.URLField(_("online link"), max_length=500, blank=True)
-    venue_name = models.CharField(_("venue"), max_length=200, blank=True)
-    street = models.CharField(_("street"), max_length=200, blank=True)
-    postcode = models.CharField(_("postcode"), max_length=16, blank=True)
-    city = models.CharField(_("city"), max_length=100, blank=True)
-    region = models.CharField(_("region"), max_length=100, blank=True)
-    country = CountryField(_("country"), blank=True)
-    booth = models.CharField(_("booth"), max_length=50, blank=True)
+    online_url = models.URLField(
+        _("online link"),
+        max_length=500,
+        blank=True,
+        help_text=_(
+            "Where people join an online event, starting with https://. "
+            "Only for online or mixed events; leave it empty for the others."
+        ),
+    )
+    venue_name = models.CharField(
+        _("venue"),
+        max_length=200,
+        blank=True,
+        help_text=_(
+            "The name of the place, for example 'Fiera di Milano'. "
+            "If you leave it empty, only the address is shown."
+        ),
+    )
+    street = models.CharField(
+        _("street"),
+        max_length=200,
+        blank=True,
+        help_text=_(
+            "The street and number, for example 'Via Roma 12'. "
+            "It is also used to find the place on the map."
+        ),
+    )
+    postcode = models.CharField(
+        _("postcode"),
+        max_length=16,
+        blank=True,
+        help_text=_("The postal code of the place, for example '20121'."),
+    )
+    city = models.CharField(
+        _("city"),
+        max_length=100,
+        blank=True,
+        help_text=_("The town or city of the place, for example 'Milano'."),
+    )
+    region = models.CharField(
+        _("region"),
+        max_length=100,
+        blank=True,
+        help_text=_("The region or province of the place, for example 'Lombardia'. Optional."),
+    )
+    country = CountryField(
+        _("country"),
+        blank=True,
+        help_text=_("The country of the place. It helps find the right spot on the map."),
+    )
+    booth = models.CharField(
+        _("booth"),
+        max_length=50,
+        blank=True,
+        help_text=_(
+            "Where to find you inside a fair, for example 'Hall 3, stand B12'. "
+            "If you leave it empty, no stand is shown."
+        ),
+    )
     latitude = models.DecimalField(
-        _("latitude"), max_digits=9, decimal_places=6, null=True, blank=True
+        _("latitude"),
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text=_(
+            "The north-south position of the place, a number from -90 to 90, for example "
+            "45.464200. "
+            "Click the map to fill it in. Give both latitude and longitude, or neither."
+        ),
     )
     longitude = models.DecimalField(
-        _("longitude"), max_digits=9, decimal_places=6, null=True, blank=True
+        _("longitude"),
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text=_(
+            "The east-west position of the place, a number from -180 to 180, for example 9.190000. "
+            "Click the map to fill it in. Give both latitude and longitude, or neither."
+        ),
     )
     geo_source = models.CharField(
-        _("coordinates source"), max_length=16, choices=GeoSource.choices, blank=True
+        _("coordinates source"),
+        max_length=16,
+        choices=GeoSource.choices,
+        blank=True,
+        help_text=_(
+            "How the position was found: from the address, placed on the map or typed by hand. "
+            "It is filled in for you."
+        ),
     )
-    geo_provider = models.CharField(_("geocoding provider"), max_length=32, blank=True)
-    geo_precision = models.CharField(_("geocoding precision"), max_length=16, blank=True)
-    geo_confidence = models.FloatField(_("geocoding confidence"), null=True, blank=True)
-    geo_at = models.DateTimeField(_("geocoded at"), null=True, blank=True)
+    geo_provider = models.CharField(
+        _("geocoding provider"),
+        max_length=32,
+        blank=True,
+        help_text=_("The service that found the position from the address. Filled in for you."),
+    )
+    geo_precision = models.CharField(
+        _("geocoding precision"),
+        max_length=16,
+        blank=True,
+        help_text=_(
+            "How exact the position found from the address is, for example a street or a town. "
+            "Filled in for you."
+        ),
+    )
+    geo_confidence = models.FloatField(
+        _("geocoding confidence"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "How sure the service is about the position, from 0 (not sure) to 1 (very sure). "
+            "Filled in for you."
+        ),
+    )
+    geo_at = models.DateTimeField(
+        _("geocoded at"),
+        null=True,
+        blank=True,
+        help_text=_("When the position was found from the address. Filled in for you."),
+    )
 
     # Links and image.
     products = ParentalManyToManyField(
-        "catalog.Product", verbose_name=_("products"), blank=True, related_name="event_pages"
+        "catalog.Product",
+        verbose_name=_("products"),
+        blank=True,
+        related_name="event_pages",
+        help_text=_(
+            "The products you bring or put on offer at this event. "
+            "You can only choose your own products. Leave it empty if none applies."
+        ),
     )
     categories = ParentalManyToManyField(
-        "catalog.Category", verbose_name=_("categories"), blank=True, related_name="event_pages"
+        "catalog.Category",
+        verbose_name=_("categories"),
+        blank=True,
+        related_name="event_pages",
+        help_text=_(
+            "The product categories the event is about, so visitors can find it from them. "
+            "Leave it empty if none applies."
+        ),
     )
     listing_image = models.ForeignKey(
         get_image_model_string(),
@@ -446,6 +660,10 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
+        help_text=_(
+            "The picture shown next to the event in lists and feeds. "
+            "If you leave it empty, the event is listed without a picture."
+        ),
     )
 
     # State: `status` is denormalised (services.sync_event_status) from each page's own `live`
@@ -459,9 +677,32 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
         db_index=True,
         editable=False,
     )
-    sequence = models.PositiveIntegerField(_("ICS sequence"), default=0)
-    cancelled_at = models.DateTimeField(_("cancelled at"), null=True, blank=True)
-    hidden_at = models.DateTimeField(_("hidden at"), null=True, blank=True)
+    sequence = models.PositiveIntegerField(
+        _("ICS sequence"),
+        default=0,
+        help_text=_(
+            "Counts how many times the date, time or place changed after publishing, so that "
+            "people's calendar apps update their copy. The platform fills it in."
+        ),
+    )
+    cancelled_at = models.DateTimeField(
+        _("cancelled at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the event was cancelled. Empty for an event that is going ahead. "
+            "The platform fills it in."
+        ),
+    )
+    hidden_at = models.DateTimeField(
+        _("hidden at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the platform staff hid the event from the public. Empty for a visible event. "
+            "The platform fills it in."
+        ),
+    )
     hidden_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name=_("hidden by"),
@@ -469,12 +710,42 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
+        help_text=_("The staff member who hid the event. The platform fills it in."),
     )
-    hidden_reason = models.TextField(_("reason for hiding"), blank=True)
-    dsa_notice_ref = models.CharField(_("DSA notice"), max_length=64, blank=True)
-    content_changed_at = models.DateTimeField(_("content changed at"), null=True, blank=True)
+    hidden_reason = models.TextField(
+        _("reason for hiding"),
+        blank=True,
+        help_text=_("Why the event was hidden. The vendor can read it. The platform fills it in."),
+    )
+    dsa_notice_ref = models.CharField(
+        _("DSA notice"),
+        max_length=64,
+        blank=True,
+        help_text=_(
+            "The reference of the report that led to hiding the event, if there was one. "
+            "The platform fills it in."
+        ),
+    )
+    content_changed_at = models.DateTimeField(
+        _("content changed at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "The last time a change that matters to calendars was published. "
+            "The platform fills it in."
+        ),
+    )
 
-    body = StreamField(event_blocks(), blank=True, verbose_name=_("body"))
+    body = StreamField(
+        event_blocks(),
+        blank=True,
+        verbose_name=_("body"),
+        help_text=_(
+            "The full description of the event, built from blocks: text, pictures, questions "
+            "and a countdown. Drag blocks to reorder them. If you add none, only the summary is "
+            "shown."
+        ),
+    )
 
     override_translatable_fields: ClassVar[list[SynchronizedField]] = [
         SynchronizedField(name, overridable=False) for name in SYNCHRONISED_FIELDS
