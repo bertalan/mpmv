@@ -1833,6 +1833,7 @@ msgstr "Articoli"
 #: apps/seo/providers.py
 msgid "Keeps the site working: sign-in, cart and security. Always on."
 msgstr "Fa funzionare il sito: accesso, carrello e sicurezza. Sempre attivi."
+
 #: apps/compliance/forms.py
 msgid "Kept with the notice, not shown to the vendor. Ends the payout freeze."
 msgstr "Conservata con il preavviso, non mostrata al venditore. Termina il blocco dei pagamenti."
@@ -3126,12 +3127,13 @@ msgstr ""
 "Le azioni sensibili chiedono la tua passkey una volta, oppure apri una finestra passkey per "
 "coprirne diverse di seguito."
 
-#: apps/seo/wagtail_hooks.py
-msgid "SEO"
-msgstr "SEO"
 #: apps/compliance/forms.py
 msgid "Sent to the vendor as the reason for the termination."
 msgstr "Inviato al venditore come motivo della cessazione."
+
+#: apps/seo/wagtail_hooks.py
+msgid "SEO"
+msgstr "SEO"
 
 #: apps/catalog/taxonomy.py
 msgid "SEO description"
@@ -6645,6 +6647,7 @@ msgstr "La tua scelta resta salvata su questo dispositivo per sei mesi."
 #: apps/seo/templates/seo/consent/banner.html
 msgid "Your cookie choice was saved."
 msgstr "La tua scelta sui cookie è stata salvata."
+
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Your data"
 msgstr "I tuoi dati"
