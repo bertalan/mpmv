@@ -17,7 +17,7 @@ opinion 2026-11-11, owner decision T-1):
 
 Amounts are `Decimal`, rounded `ROUND_HALF_UP` per line; the refund fee comes from
 `apps.vendors.refund_fee` (the ceil to the euro is its one exception). The ledger wiring that
-feeds these inputs is a follow-up (apps/ledger is empty).
+feeds these inputs is a follow-up (apps/ledger now exists on main, VEN.4).
 """
 
 import dataclasses
