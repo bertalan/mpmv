@@ -64,6 +64,7 @@ shop = (
 platform = (
     [
         path("", views.PlatformDashboardView.as_view(), name="dashboard"),
+        path("staff/", views.StaffRolesView.as_view(), name="staff_roles"),
         path("profile-changes/", views.ProfileChangesView.as_view(), name="profile_changes"),
         path(
             "profile-changes/<uuid:entry>/revert/",
