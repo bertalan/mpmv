@@ -2069,3 +2069,29 @@ def logo_alt_errors(alt: str) -> str | None:
     if _HTML_MARKUP.search(alt):
         return "Write plain text: HTML tags are not accepted."
     return None
+
+
+# --- The sales mode buyers get (VEN.6, D-19): derived at read time, never backfilled.
+
+BUY: Final = "buy"
+ON_REQUEST: Final = "on_request"
+# The payout account status that lets a vendor sell online. The payments app owns the account and
+# uses this same value (`payments.stripe_engine.ACTIVE`).
+PAYOUT_ACCOUNT_READY: Final = "active"
+
+
+def vendor_sales_mode(vendor_mode: str, *, payout_ready: bool) -> str:
+    """The vendor-level mode buyers get: on request without a payout account ready for payouts
+    (D-19), whatever the stored default says; otherwise the vendor's own default."""
+    return vendor_mode if payout_ready else ON_REQUEST
+
+
+def effective_sales_mode(product_mode: str, vendor_mode: str, *, payout_ready: bool) -> str:
+    """The sales mode of a product as buyers get it.
+
+    The vendor's on-request mode (chosen, or forced by D-19 because no payout account is ready)
+    overrides a product set to `buy`. A product that is not `buy` keeps its own mode: an
+    on-request vendor never turns a catalog-only product into an enquiry."""
+    if product_mode != BUY:
+        return product_mode
+    return vendor_sales_mode(vendor_mode, payout_ready=payout_ready)

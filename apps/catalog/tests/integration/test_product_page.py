@@ -47,7 +47,9 @@ def path(language: str, slug: str) -> str:
 
 
 def live(**kwargs: Any) -> Product:
-    kwargs.setdefault("vendor", VendorFactory.create(status=Vendor.Status.ACTIVE))
+    kwargs.setdefault(
+        "vendor", VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
+    )
     kwargs.setdefault("status", Product.Status.PUBLISHED)
     product = ProductFactory.create(**kwargs)
     for language in configured_languages():
@@ -150,7 +152,8 @@ def test_a_variant_price_override_shows(client: Client) -> None:
 
 def test_a_missing_translation_shows_the_source_text_with_a_notice(client: Client) -> None:
     product = ProductFactory.create(
-        vendor=VendorFactory.create(status=Vendor.Status.ACTIVE), status=Product.Status.PUBLISHED
+        vendor=VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True),
+        status=Product.Status.PUBLISHED,
     )
     ProductTranslationFactory.create(
         product=product, language="en", title="Only English", slug="only-english", status=PUBLISHED
@@ -163,7 +166,7 @@ def test_a_missing_translation_shows_the_source_text_with_a_notice(client: Clien
 
 
 def test_the_required_companion_is_shown_when_published(client: Client) -> None:
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
     companion = live(vendor=vendor)
     companion.translations.update(title="Battery pack")
     product = ProductFactory.create(
@@ -177,7 +180,7 @@ def test_the_required_companion_is_shown_when_published(client: Client) -> None:
 
 
 def test_a_draft_companion_is_not_exposed(client: Client) -> None:
-    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
     companion = live(vendor=vendor, status=Product.Status.DRAFT)
     companion.translations.update(title="Secret draft")
     product = ProductFactory.create(

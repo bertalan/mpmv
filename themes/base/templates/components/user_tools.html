@@ -19,6 +19,7 @@ Context: `help` (url, route, page_type, language) and the CSRF token for the sig
     <ul class="user-menu__list">
       <li><button type="button" class="user-menu__item" data-help-open aria-haspopup="dialog" aria-controls="help-dialog" hidden>{% translate "Help" %}</button></li>
       {% url 'mfa:setup' as security_url %}{% if security_url %}<li><a class="user-menu__item" href="{{ security_url }}?from=security">{% translate "Security" %}</a></li>{% endif %}
+      {% if release_version %}<li><span class="user-menu__version">{% translate "Version" %} {{ release_version }}</span></li>{% endif %}
       <li><form action="{% url 'logout' %}" method="post">{% csrf_token %}<button type="submit" class="user-menu__item">{% translate "Sign out" %}</button></form></li>
     </ul>
   </details>

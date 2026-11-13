@@ -61,4 +61,4 @@ script or style.
     {% block manager_content %}{% endblock %}
   </div>
 {% endblock %}
-{% block footer %}{% endblock %}
+{% block footer %}{% if release_version %}<footer class="manager-footer"><p class="manager-footer__version">{% translate "Version" %} {{ release_version }}</p></footer>{% endif %}{% endblock %}

@@ -82,15 +82,17 @@ def purchase_error(
 ) -> str | None:
     """Why this product (and variant) cannot go in a cart, or None.
 
-    Only a published `buy` product of an active vendor can be bought. A variable product is
-    bought as one of its variants; a simple product has none.
+    Only a published `buy` product of an active vendor can be bought. `sales_mode` is the mode
+    buyers get (`vendors.services.effective_sales_mode`): a vendor on request, by choice or
+    because no payout account is ready (D-19, VEN.6), makes its products on request. A variable
+    product is bought as one of its variants; a simple product has none.
     """
     if product_status != PUBLISHED:
         return "This product is not for sale."
-    if sales_mode != BUY:
-        return "This product is available on request only."
     if vendor_status != VENDOR_ACTIVE:
         return "This vendor is not selling at the moment."
+    if sales_mode != BUY:
+        return "This product is available on request only."
     if is_variable and not has_variant:
         return "Choose a variant of this product."
     if has_variant and not is_variable:

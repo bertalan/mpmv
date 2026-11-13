@@ -1,5 +1,6 @@
 """Settings shared by every environment."""
 
+import os
 from pathlib import Path
 
 import dj_database_url
@@ -229,6 +230,11 @@ VENDOR_CLOSURE_HOOKS: list[str] = [
     "apps.api.services.revoke_vendor_keys",  # the vendor's API keys
 ]
 
+# Freezes of a vendor's open orders (CMP.5 part 4): each hook takes the vendor and returns True
+# when its orders must not move (a vendor closed by a termination notice, until staff review it).
+# `orders` cannot import `compliance`, so the path is named here.
+ORDER_FREEZE_HOOKS: list[str] = ["apps.compliance.services.orders_frozen"]
+
 # Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
 # that lists the active vendors established outside a new allowed set.
 VENDORS_OUTSIDE_COUNTRIES_HOOK = "apps.vendors.services.active_vendors_outside"
@@ -251,6 +257,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.csp",
                 "apps.themes.context_processors.theme",
+                "apps.themes.context_processors.release",
             ],
             "builtins": ["apps.seo.templatetags.seo_robots"],
             "loaders": [
@@ -278,6 +285,9 @@ MPMV_THEME_BUILD_DIR = BASE_DIR / "build" / "themes"
 # Help/contact link shown in the same place in the header and footer of every public page
 # (THM.3, WCAG 3.2.6 consistent help); empty = no help link until a contact page exists.
 MPMV_HELP_URL = env_str("MPMV_HELP_URL", "")
+# The deployed release (OPS.14): baked into the image by the Containerfile (never set in the
+# server env file, which would override it), shown to staff only.
+MPMV_VERSION = os.environ.get("MPMV_VERSION", "") or "dev"
 # The vendor guide the help dialog links on vendor-facing screens (ARC.32); empty = no link.
 MPMV_VENDOR_GUIDE_URL = env_str("MPMV_VENDOR_GUIDE_URL", "")
 
@@ -421,6 +431,9 @@ COMPLIANCE_PUBLIC_HOLIDAYS: list[str] = []
 # The country -> accepted warnings languages map (CMP.3) is cached per process this long; a staff
 # edit drops this process's copy at once, other processes reload within this time.
 COMPLIANCE_COUNTRY_LANGUAGES_CACHE_SECONDS = 300
+# Days between a notice of termination and the closure of the vendor (P2B art. 4, CMP.5 part 4).
+# Never below 30: a lower value is raised to 30 by `compliance.engine.notice_days`.
+TERMINATION_NOTICE_DAYS = 30
 # CMP.6: the withdrawal period in days from receipt of the goods. The directive grants 14 and the
 # code never goes below it; a longer period is a platform choice (open owner question).
 WITHDRAWAL_PERIOD_DAYS = 14

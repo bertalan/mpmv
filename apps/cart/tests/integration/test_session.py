@@ -41,7 +41,7 @@ def visitor_request(language: str = "en") -> HttpRequest:
 
 def sellable() -> Product:
     return ProductFactory.create(
-        vendor=VendorFactory.create(status=Vendor.Status.ACTIVE),
+        vendor=VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True),
         status=Product.Status.PUBLISHED,
         stock_qty=10,
         price_net=Decimal("10.00"),

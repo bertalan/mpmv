@@ -249,6 +249,15 @@ class CountryWarningLanguages(Model):   # platform data: country -> accepted war
   vendor terms. The internal complaint system and mediators (articles 11, 12) are not required for
   a small enterprise. Versioned vendor terms with tracked acceptance and 15 days' notice of changes
   are VEN.5 and VEN.13 to VEN.16.
+  Part 4 (termination): staff give a vendor notice that its whole service ends; the notice carries
+  the reasons (it is the statement of reasons) and takes effect at least 30 days later
+  (`TERMINATION_NOTICE_DAYS`, never below 30; the database refuses less). Only an exception from a
+  closed list (legal or regulatory obligation, repeated infringements of the terms, illegal
+  content) allows a shorter notice. The vendor is emailed in its language (English fallback), keeps
+  selling, sees the reason and can download its data during the notice; staff can withdraw the
+  notice; an hourly job closes the vendor through the vendor closure service at the effective time,
+  never earlier. Giving or withdrawing a notice is a group 2 session-level action
+  (`termination_notice`, CORE.25) of the platform owner (read for catalog staff).
 
 ### Vendor contracts: language and acceptance evidence
 - The vendor contract follows the vendor's language (EN, IT, DE, FR, ES), one text per language,

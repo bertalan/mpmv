@@ -207,8 +207,9 @@ class Vendor(BaseModel):
         choices=SalesMode.choices,
         default=SalesMode.BUY,
         help_text=_(
-            "How your products are sold unless a product says otherwise: buyers order and "
-            "pay online, or they first send you an enquiry."
+            "How your products are sold: buyers order and pay online, or they first send you "
+            "an enquiry. On request applies to all your products, even those set to buy. "
+            "Until your payout account is ready, your shop is on request whatever you choose."
         ),
     )
     enquiries_enabled = models.BooleanField(

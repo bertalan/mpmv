@@ -60,7 +60,7 @@ class FakeTax:
 
 def sellable(vendor: Vendor | None = None, **fields: Any) -> Product:
     values: dict[str, Any] = {
-        "vendor": vendor or VendorFactory.create(status=Vendor.Status.ACTIVE),
+        "vendor": vendor or VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True),
         "status": Product.Status.PUBLISHED,
         "stock_qty": 10,
         "price_net": Decimal("10.00"),
@@ -140,7 +140,7 @@ def test_a_placed_order_awaits_payment_with_snapshots_and_totals() -> None:
 @pytest.mark.django_db
 def test_a_variant_override_price_is_the_live_price() -> None:
     variable = ProductFactory.create(
-        vendor=VendorFactory.create(status=Vendor.Status.ACTIVE),
+        vendor=VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True),
         kind=Product.Kind.VARIABLE,
         status=Product.Status.PUBLISHED,
         price_net=Decimal("10.00"),

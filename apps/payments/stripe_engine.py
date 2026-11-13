@@ -84,3 +84,17 @@ def reversal_amounts(
         )
         reversals.append(min(int(part), held))
     return reversals
+
+
+PENDING = "pending"  # onboarding not finished: details not submitted yet
+RESTRICTED = "restricted"  # details submitted but charges or payouts are not enabled
+# The account can receive transfers and pay out (VEN.6, D-19); the storefront reads the same
+# value as `vendors.engine.PAYOUT_ACCOUNT_READY` (kept in step by a unit test).
+ACTIVE = "active"
+
+
+def connect_status(*, details_submitted: bool, charges_enabled: bool, payouts_enabled: bool) -> str:
+    """Where a connected account stands. Only `active` lets a vendor sell online (D-19)."""
+    if charges_enabled and payouts_enabled and details_submitted:
+        return ACTIVE
+    return RESTRICTED if details_submitted else PENDING

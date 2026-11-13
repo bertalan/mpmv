@@ -6,7 +6,8 @@ import factory
 from django.utils import timezone
 from factory.django import DjangoModelFactory
 
-from apps.payments.models import Payment, ProcessedEvent
+from apps.payments.models import ConnectedAccount, Payment, ProcessedEvent
+from apps.vendors.tests.factories import VendorFactory
 
 
 class ProcessedEventFactory(DjangoModelFactory[ProcessedEvent]):
@@ -29,3 +30,12 @@ class PaymentFactory(DjangoModelFactory[Payment]):
     amount = Decimal("10.00")
     currency = "EUR"
     succeeded_at = factory.LazyFunction(timezone.now)
+
+
+class ConnectedAccountFactory(DjangoModelFactory[ConnectedAccount]):
+    class Meta:
+        model = ConnectedAccount
+
+    vendor = factory.SubFactory(VendorFactory)
+    provider = "stripe"
+    account_ref = factory.Sequence(lambda n: f"acct_factory_{n}")

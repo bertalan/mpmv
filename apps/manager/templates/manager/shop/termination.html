@@ -1,0 +1,22 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}The vendor's notice of termination (P2B art. 4): the reason and the dates, and the data download.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}: {{ manager.vendor.display_name }}</h1>
+  {% if notice %}
+    <p>{% blocktranslate with date=notice.effective_at|date:"Y-m-d" %}The platform will end your service on {{ date }}. Until then you can keep selling and you can download your data.{% endblocktranslate %}</p>
+    <dl class="manager-details">
+      <dt>{% translate "Notice given" %}</dt><dd>{{ notice.issued_at|date:"SHORT_DATETIME_FORMAT" }}</dd>
+      <dt>{% translate "The service ends on" %}</dt><dd>{{ notice.effective_at|date:"Y-m-d H:i" }}</dd>
+      {% if notice.exception %}<dt>{% translate "Shorter notice because" %}</dt><dd>{{ notice.get_exception_display }}</dd>{% endif %}
+      <dt>{% translate "Facts and circumstances" %}</dt><dd>{{ notice.facts|linebreaksbr }}</dd>
+      <dt>{% translate "Ground" %}</dt><dd>{{ notice.ground|linebreaksbr }}</dd>
+    </dl>
+    <p>{% translate "You can challenge this decision with an internal complaint (DSA article 20), out-of-court dispute settlement (DSA article 21) or a court. The platform terms say how." %}</p>
+  {% else %}
+    <p>{% translate "There is no termination notice for your shop." %}</p>
+  {% endif %}
+  <h2>{% translate "Your data" %}</h2>
+  <p>{% translate "Download your shop profile, products and order amounts as a JSON file." %}</p>
+  <p><a class="button" href="{% url 'manager:shop:termination_data' %}" download>{% translate "Download my data" %}</a></p>
+{% endblock %}
