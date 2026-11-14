@@ -156,6 +156,10 @@ class FakeStripeClient:
             return cached
         if transfer_id not in self.transfers:
             raise StripeError("No such transfer")
+        held = self.transfers[transfer_id].amount_minor
+        taken = sum(minor for tid, minor in self.reversals if tid == transfer_id)
+        if amount_minor <= 0 or taken + amount_minor > held:  # Stripe: never more than the transfer
+            raise StripeError("Reversal amount is greater than the transfer's remaining amount")
         self.reversals.append((transfer_id, amount_minor))
         reversal = f"trr_{secrets.token_hex(6)}"
         self._replies[f"rv:{idempotency_key}"] = reversal

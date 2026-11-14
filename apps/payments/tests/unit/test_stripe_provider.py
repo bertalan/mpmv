@@ -21,6 +21,7 @@ from apps.payments.engine import (
     PaymentStatus,
     ProviderError,
     RefundRequest,
+    TransferReversal,
     VendorShare,
 )
 from apps.payments.stripe_client import HttpStripeClient, StripeError
@@ -105,6 +106,52 @@ def test_refund_without_reversal_leaves_the_transfers() -> None:
     paid = harness.provider.create_payment(request())
     harness.provider.refund(
         RefundRequest(paid.provider_ref, Decimal("10.00"), "EUR", "rf", reverse_vendor_shares=False)
+    )
+    assert harness.client.reversals == []
+
+
+def test_refund_with_named_reversals_reverses_only_those_transfers() -> None:
+    """PAY.4: one vendor refunds its own package; the other vendors' transfers are untouched."""
+    harness = Harness(FakeStripeClient(refund_fee_minor=45))
+    paid = harness.provider.create_payment(request())
+    mine = next(iter(harness.client.transfers))
+    refund = harness.provider.refund(
+        RefundRequest(
+            paid.provider_ref,
+            Decimal("20.00"),
+            "EUR",
+            "rf-named",
+            reverse_vendor_shares=False,
+            reversals=(TransferReversal(mine, Decimal("12.50")),),
+        )
+    )
+    assert harness.client.reversals == [(mine, 1250)]
+    assert len(refund.reversal_refs) == 1
+    assert refund.provider_cost == Decimal("0.45")
+
+
+def test_a_reversal_above_what_the_transfer_holds_is_refused_by_the_provider() -> None:
+    harness = Harness()
+    paid = harness.provider.create_payment(request())
+    transfer = next(iter(harness.client.transfers.values()))
+    too_much = Decimal(transfer.amount_minor) / 100 + Decimal("0.01")
+    with pytest.raises(ProviderError):
+        harness.provider.refund(
+            RefundRequest(
+                paid.provider_ref,
+                Decimal("1.00"),
+                "EUR",
+                "rf-too-much",
+                reversals=(TransferReversal(transfer.id, too_much),),
+            )
+        )
+
+
+def test_an_empty_reversal_list_reverses_nothing_even_with_the_default_flag() -> None:
+    harness = Harness()
+    paid = harness.provider.create_payment(request())
+    harness.provider.refund(
+        RefundRequest(paid.provider_ref, Decimal("10.00"), "EUR", "rf-dup", reversals=())
     )
     assert harness.client.reversals == []
 
