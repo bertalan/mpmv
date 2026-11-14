@@ -75,7 +75,7 @@ class OrderSettlement:
         return tuple(
             VendorShare(v.account_ref, stripe_engine.round_to_currency(v.vendor_net, currency))
             for v in self.vendors
-            if v.transferable
+            if v.transferable and not v.demo_account  # demo accounts never reach Stripe
         )
 
 

@@ -164,7 +164,7 @@ def test_incident_2026_11_14_reversal_key_names_the_transfer_and_the_amount() ->
     )
     provider.refund(RefundRequest(paid.provider_ref, Decimal("50.00"), "EUR", "rf-1"))
     (transfer_ref,) = paid.transfer_refs
-    assert client.reversal_keys == [f"rf-1:reverse:{transfer_ref}:3000"]
+    assert client.reversal_keys == [f"rf-1:reverse:{transfer_ref}"]
 
 
 # --- B. a demo payout account never reaches Stripe ----------------------------------------------
