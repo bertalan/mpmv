@@ -666,6 +666,10 @@ ENDPOINTS: dict[str, Access] = {
         "Cart page (ORD.5): shows the caller's own cart, found from their session or account, "
         "never a cart or a vendor's data chosen by an identifier."
     ),
+    "orders:cart_add": NoVendorData(
+        "Add to cart (ORD.19): adds a public product to the caller's own cart, found from their "
+        "session or account; it reads and shows no vendor data."
+    ),
     "orders:checkout": NoVendorData(
         "Checkout details (ORD.5): the caller's own cart and their own typed details only."
     ),

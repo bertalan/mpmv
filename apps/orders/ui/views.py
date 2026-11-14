@@ -15,6 +15,7 @@ cart or session. Pages are never cached or indexed.
 
 import datetime as dt
 import math
+import uuid
 from typing import Any
 
 from django.conf import settings
@@ -25,6 +26,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.cache import add_never_cache_headers
 from django.utils.formats import number_format
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 from django.views.decorators.csp import csp_override
@@ -35,6 +37,7 @@ from apps.accounts.models import User
 from apps.cart import services as cart_services
 from apps.cart.models import Cart
 from apps.cart.session import current_cart
+from apps.catalog.models import Product
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
 from apps.core.privacy import keyed_hash
@@ -229,6 +232,76 @@ def cart_page(request: HttpRequest) -> HttpResponse:
         context = {**_cart_context(request, cart, status), "partial": True}
         return _page(request, "orders/_cart_body.html", context)
     return _page(request, "orders/cart.html", _cart_context(request, cart))
+
+
+@public_form(
+    protection=Protection.ALLOW,
+    purpose="Cart: add a product from its page",
+    task="ORD.19",
+    reason=(
+        "it adds only to the visitor's own guest or user cart, found from the session, and "
+        "calls nothing external; the sales mode is checked again on the server"
+    ),
+    rate_limit="per IP (cart budget)",
+)
+@require_POST
+def cart_add(request: HttpRequest) -> HttpResponse:
+    """Add the product (and variant) of a product page's form to the visitor's cart (ORD.19).
+
+    With htmx the answer is a small fragment (the message and the cart count); without it, a
+    redirect back to the page with the message, or to the cart after a success.
+    """
+    wait = _budget(request, "cart", CART_LIMIT)
+    if wait:
+        return _too_many(wait)
+    problems: list[str] = []
+    product = _posted_product(request)
+    variant = None
+    quantity = 1
+    try:
+        quantity = int(request.POST.get("quantity", "1").strip() or "1")
+    except ValueError:
+        problems.append(_("Enter a whole number as the quantity."))
+    if product is None:
+        problems.append(_("We could not find this product."))
+    elif not problems:
+        sku = request.POST.get("variant", "").strip()
+        if sku:
+            variant = product.variants.filter(sku=sku).first()
+            if variant is None:
+                problems.append(_("Choose one of the versions of this product."))
+    cart = None
+    if product is not None and not problems:
+        cart = current_cart(request, create=True)
+        try:
+            if cart is None:
+                raise ValidationError(_("We could not open your cart."))
+            cart_services.add_to_cart(cart, product, variant=variant, quantity=quantity)
+        except ValidationError as error:
+            problems.extend(error.messages)
+    ok = not problems
+    count = sum(line.quantity for line in cart.lines.all()) if cart is not None else 0
+    if _htmx(request):
+        message = " ".join(problems) or _("Added to your cart.")
+        context = {"ok": ok, "message": message, "problems": problems, "count": count}
+        return _page(request, "orders/_added.html", context)
+    if ok:
+        messages.success(request, _("Added to your cart."))
+        return _private(HttpResponseRedirect(reverse("orders:cart")))
+    for problem in problems:
+        messages.warning(request, problem)
+    target = request.POST.get("next", "")
+    if not url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()}):
+        target = reverse("orders:cart")
+    return _private(HttpResponseRedirect(target))
+
+
+def _posted_product(request: HttpRequest) -> Product | None:
+    try:
+        public_id = uuid.UUID(request.POST.get("product", ""))
+    except ValueError:
+        return None
+    return Product.objects.filter(public_id=public_id).first()
 
 
 # --- Details (address, business, VIES) -------------------------------------------------------

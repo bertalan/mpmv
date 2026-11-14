@@ -568,6 +568,11 @@ msgid "added %(created)s"
 msgstr "aggiunta il %(created)s"
 
 #: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/forms.py
+#: apps/orders/ui/views.py
+msgid "Added to your cart."
+msgstr "Aggiunto al carrello."
+
+#: apps/orders/ui/forms.py
 msgid "Address"
 msgstr "Indirizzo"
 
@@ -802,10 +807,6 @@ msgstr "Acquirenti professionali: il tribunale di %(court)s."
 msgid "Business purchase"
 msgstr "Acquisto per un'azienda"
 
-#: apps/catalog/templates/catalog/product.html
-msgid "Buying online opens soon."
-msgstr "Presto potrai comprare online."
-
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "Cancel"
 msgstr "Annulla"
@@ -928,6 +929,10 @@ msgstr "Scegli come confermare la tua identità dopo la password."
 #: apps/orders/ui/present.py
 msgid "Choose one of the shipping options."
 msgstr "Scegli una delle opzioni di spedizione."
+
+#: apps/orders/ui/views.py
+msgid "Choose one of the versions of this product."
+msgstr "Scegli una delle versioni di questo prodotto."
 
 #: apps/cms/blocks.py
 msgid "Choose the category or tag the card leads to. A card to a hidden one is left out."
@@ -6401,6 +6406,12 @@ msgstr "Versioni"
 msgid "VIES says this VAT number is not valid. VAT is charged on your order."
 msgstr "VIES dice che questa partita IVA non è valida. Sul tuo ordine viene applicata l'IVA."
 
+#: apps/orders/templates/orders/_added.html
+msgid "View your cart: %(counter)s item"
+msgid_plural "View your cart: %(counter)s items"
+msgstr[0] "Vai al tuo carrello: %(counter)s articolo"
+msgstr[1] "Vai al tuo carrello: %(counter)s articoli"
+
 #: apps/orders/customer_views.py
 msgid "Waiting for payment"
 msgstr "In attesa di pagamento"
@@ -6459,6 +6470,14 @@ msgid "We could not confirm your VAT number with VIES now, so VAT is charged on 
 msgstr ""
 "Ora non riusciamo a confermare la tua partita IVA con VIES, quindi sul tuo ordine viene applicata "
 "l'IVA."
+
+#: apps/orders/ui/views.py
+msgid "We could not find this product."
+msgstr "Non abbiamo trovato questo prodotto."
+
+#: apps/orders/ui/views.py
+msgid "We could not open your cart."
+msgstr "Non siamo riusciti ad aprire il tuo carrello."
 
 #: apps/orders/templates/email/orders/order_received/subject.txt
 msgid "We received your order %(order_number)s"
