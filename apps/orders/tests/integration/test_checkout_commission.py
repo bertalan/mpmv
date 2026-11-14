@@ -30,6 +30,9 @@ pytestmark = pytest.mark.django_db
 
 D = Decimal
 
+# ORD.17: box 1 is mandatory for every buyer (these buyers are consumers, so no box 2).
+BOX1 = {"accept_terms": "on"}
+
 
 def default_rule() -> CommissionRule:
     return CommissionRuleFactory.create(valid_from=utc(2026, 1, 1), valid_to=None)
@@ -43,8 +46,8 @@ def test_a_platform_default_rule_opens_ordering(client: Client) -> None:
     sign_off_details(client)
     html = client.get(reverse("orders:review")).content.decode()
     assert "Ordering is not open yet" not in html
-    assert "Place order" in html
-    response = client.post(reverse("orders:review"))
+    assert "Confirm order and pay now" in html
+    response = client.post(reverse("orders:review"), BOX1)
     assert response.status_code == 302
     placed = VendorOrder.objects.get(order=Order.objects.get(), vendor=seller)
     assert placed.commission_snapshot == rule.snapshot()
@@ -59,7 +62,7 @@ def test_a_vendor_rule_wins_over_the_platform_default(client: Client) -> None:
     cart = with_cart(client)
     add(cart, seller, "100.00")
     sign_off_details(client)
-    assert client.post(reverse("orders:review")).status_code == 302
+    assert client.post(reverse("orders:review"), BOX1).status_code == 302
     placed = VendorOrder.objects.get(vendor=seller)
     assert placed.commission_snapshot == own.snapshot()
     assert placed.commission_snapshot["percent"] == "12.50"
@@ -71,7 +74,7 @@ def test_no_rule_at_all_keeps_ordering_closed(client: Client) -> None:
     sign_off_details(client)
     html = client.get(reverse("orders:review")).content.decode()
     assert "Ordering is not open yet" in html
-    assert "Place order" not in html
+    assert "Confirm order and pay now" not in html
     client.post(reverse("orders:review"))
     assert not Order.objects.exists()
 
