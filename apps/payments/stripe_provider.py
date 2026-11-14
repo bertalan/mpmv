@@ -245,10 +245,8 @@ class StripePaymentProvider:
                 self._client.create_transfer_reversal(
                     transfer_id=transfer.id,
                     amount_minor=minor,
-                    # The transfer names the destination; the amount is in the key too, so a
-                    # changed amount gets a fresh key instead of Stripe's idempotency_error.
-                    # (idempotency_error), never a second reversal (review of #477).
-                    # (idempotency_error), never become a second reversal (review of #477).
+                    # Same refund, same transfer, same key: a changed amount on a retry must fail
+                    # closed (idempotency_error), never become a second reversal (review of #477).
                     idempotency_key=f"{request.idempotency_key}:reverse:{transfer.id}",
                 )
 
