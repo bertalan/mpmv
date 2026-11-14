@@ -6053,6 +6053,14 @@ msgstr ""
 "Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può essere modificato. "
 "Contatta l’assistenza per farlo riaprire."
 
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid ""
+"This window covers only the sensitive actions of this shop that its owner confirms. It never "
+"covers another shop."
+msgstr ""
+"Questa finestra copre solo le azioni sensibili di questo negozio che il suo titolare conferma. Non"
+" copre mai un altro negozio."
+
 #: apps/manager/forms.py
 msgid ""
 "Tick it and save to delete the current logo. A new image and the description above are then "

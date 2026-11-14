@@ -181,6 +181,8 @@ STEP_UP_DECORATOR = "apps.accounts.decorators.step_up_required"
 # Path prefixes whose requests (polling) do not count as activity for the passkey window (CORE.25).
 SESSION_LEVEL_POLL_PATHS: tuple[str, ...] = ()
 LEVEL_DECORATOR = "apps.accounts.decorators.requires_level"  # CORE.25 (D-32)
+# Shop ownership for the passkey levels (D-32 amendment 2026-11-14): accounts never imports vendors.
+SHOP_OWNER_CHECK = "apps.vendors.services.is_vendor_owner"
 # Role-matrix check (CORE.18) for admin pages of lower apps, which cannot import the Manager.
 PLATFORM_SECTION_CHECK = "apps.manager.access.may_access_section"
 # The Manager login (CORE.17): where the Manager gate sends anonymous visitors.
