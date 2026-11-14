@@ -5,6 +5,7 @@ the visitor then goes through the cart and checkout to the payment page (the fak
 card data, no Stripe). Only the VIES client is replaced, as in the ORD.5 e2e.
 """
 
+import re
 from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
@@ -66,7 +67,8 @@ def test_a_visitor_goes_from_the_product_page_to_the_payment_page(
     fill_delivery(page)
     page.locator("#id_city").press("Enter")
     expect(page.get_by_role("heading", level=1)).to_have_text("Review and pay")
-    page.get_by_role("button", name="Place order").click()
+    page.get_by_label(re.compile("I have read and accept")).check()  # ORD.17 box 1
+    page.get_by_role("button", name=re.compile("Confirm order and pay now")).click()
     expect(page.get_by_role("heading", level=1)).to_have_text("Order received")
     check_page(page)
     assert Order.objects.get().grand_total == Decimal("256.08")  # 2 x 100 + 9.90, VAT 22%
