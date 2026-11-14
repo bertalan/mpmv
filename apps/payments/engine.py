@@ -37,6 +37,10 @@ class PaymentMismatch(Exception):
     """The payment asked for does not belong to the order it was asked for."""
 
 
+class PaymentInProgress(Exception):
+    """The customer's payment is processing or already succeeded: no form must be shown again."""
+
+
 class ProviderError(Exception):
     """The provider refused or failed a call; the message is safe to log."""
 

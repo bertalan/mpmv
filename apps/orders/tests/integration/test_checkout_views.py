@@ -354,7 +354,7 @@ def test_the_review_shows_shipping_choice_totals_and_the_pay_step(
     assert 'type="radio"' in html
     assert "Standard" in html
     assert "134.08" in html
-    assert "Place order" in html
+    assert "Confirm order and pay now" in html
 
 
 def test_the_shipping_choice_is_kept_and_answers_a_fragment_for_htmx(
@@ -380,7 +380,7 @@ def test_a_package_that_needs_a_quote_cannot_be_ordered(client: Client, commissi
     html = client.get(reverse("orders:review")).content.decode()
     assert "needs a quote" in html
     assert "Request a quote" in html
-    assert "Place order" not in html
+    assert "Confirm order and pay now" not in html
     assert client.post(reverse("orders:review")).status_code == 200
     assert not Order.objects.exists()
 
@@ -400,7 +400,7 @@ def test_ordering_is_closed_while_no_commission_rule_exists(client: Client) -> N
     sign_off_details(client)
     html = client.get(reverse("orders:review")).content.decode()
     assert "Ordering is not open yet" in html
-    assert "Place order" not in html
+    assert "Confirm order and pay now" not in html
     client.post(reverse("orders:review"))
     assert not Order.objects.exists()
 
@@ -411,7 +411,7 @@ def test_place_order_runs_for_a_placeable_preview_and_shows_the_confirmation(
     cart = with_cart(client)
     add(cart, vendor("Alpha Shop"), "100.00")
     sign_off_details(client)
-    response = client.post(reverse("orders:review"))
+    response = client.post(reverse("orders:review"), {"accept_terms": "on"})
     assert response.status_code == 302
     assert response["Location"] == reverse("orders:confirmation")
     order = Order.objects.get()
@@ -448,7 +448,7 @@ def test_a_pulled_switch_shows_a_customer_message_and_places_nothing(
     save_flag(row, ctx=staff)
     FLAG_CACHE.clear()
     try:
-        response = client.post(reverse("orders:review"))
+        response = client.post(reverse("orders:review"), {"accept_terms": "on"})
     finally:
         FLAG_CACHE.clear()
     assert response.status_code == 200

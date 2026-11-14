@@ -164,6 +164,21 @@ class Order(_StateGuarded):
         blank=True,
         help_text=("FIT.17: the selected vehicle (make, model, year labels)."),
     )
+    terms_acceptance = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "ORD.17: what the buyer accepted at checkout: the customer terms version (id, number, "
+            "hash), one terms version per seller (id, number, hash), box 1, and box 2 with its "
+            "text when it was shown."
+        ),
+    )
+    terms_accepted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="ORD.17: when the buyer accepted the terms at checkout.",
+    )
     state = models.CharField(
         max_length=24, choices=OrderState.choices, default=OrderState.CHECKOUT, db_index=True
     )

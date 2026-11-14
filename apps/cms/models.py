@@ -530,14 +530,29 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
         ),
     )
 
+    onerous_clauses = models.JSONField(
+        _("onerous clauses"),
+        default=list,
+        blank=True,
+        help_text=_(
+            "Only for the customer terms: the onerous clauses of this text (art. 1341, second "
+            "paragraph, of the Civil Code), each with its article number and title, for example "
+            '[{"article": "12", "title": "Competent court"}]. Business buyers approve '
+            "them one by one at checkout when the operator is established in Italy. Each "
+            "published version keeps its own list."
+        ),
+    )
+
     content_panels: ClassVar[list[Any]] = [
         *Page.content_panels,
         FieldPanel("kind"),
         FieldPanel("effective_date"),
         FieldPanel("body"),
+        FieldPanel("onerous_clauses"),
     ]
     override_translatable_fields: ClassVar[list[BaseTranslatableField]] = [
-        LanguageOwnField("effective_date")
+        LanguageOwnField("effective_date"),
+        LanguageOwnField("onerous_clauses"),
     ]
     parent_page_types: ClassVar[list[str]] = ["cms.HomePage"]
     subpage_types: ClassVar[list[str]] = []
@@ -548,6 +563,16 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
 
     def clean(self) -> None:
         super().clean()
+        clauses = self.onerous_clauses
+        if not isinstance(clauses, list) or any(
+            not isinstance(row, dict)
+            or not str(row.get("article", "")).strip()
+            or not str(row.get("title", "")).strip()
+            for row in clauses
+        ):
+            raise ValidationError(
+                {"onerous_clauses": _("Every clause needs an article number and a title.")}
+            )
         if self.pk is None or self.effective_date is None:
             return
         latest = self.versions.order_by("-number").first()
@@ -569,7 +594,11 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
 
     def content(self) -> dict[str, Any]:
         """What a version records: compared with the last version on every publish."""
-        return {**self.text(), "effective_date": self.effective_date.isoformat()}
+        return {
+            **self.text(),
+            "effective_date": self.effective_date.isoformat(),
+            "onerous_clauses": list(self.onerous_clauses or []),
+        }
 
     def text(self) -> dict[str, Any]:
         return {"title": self.title, "body": stream_data(self.body)}
@@ -637,6 +666,15 @@ class LegalPageVersion(models.Model):
     title = models.CharField(_("title"), max_length=255)
     effective_date = models.DateField(_("effective date"))
     body = body_field(legal_sections=True)
+    onerous_clauses = models.JSONField(
+        _("onerous clauses"),
+        default=list,
+        blank=True,
+        help_text=_(
+            "The onerous clauses declared with this version (article number and title), "
+            "copied from the page when it was published."
+        ),
+    )
     published_at = models.DateTimeField(_("published at"))
     published_by = models.CharField(_("published by"), max_length=150)
 
@@ -656,7 +694,11 @@ class LegalPageVersion(models.Model):
         super().save(*args, **kwargs)
 
     def content(self) -> dict[str, Any]:
-        return {**self.text(), "effective_date": self.effective_date.isoformat()}
+        return {
+            **self.text(),
+            "effective_date": self.effective_date.isoformat(),
+            "onerous_clauses": list(self.onerous_clauses or []),
+        }
 
     def text(self) -> dict[str, Any]:
         return {"title": self.title, "body": stream_data(self.body)}

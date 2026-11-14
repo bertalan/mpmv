@@ -6,6 +6,7 @@ violation. VIES is a fake `ViesClient`, the only boundary replaced: the commissi
 is a real platform default row, and the pages, `build_checkout` and `place_order` are real.
 """
 
+import re
 from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
@@ -101,7 +102,13 @@ def test_a_private_buyer_goes_from_the_cart_to_the_confirmation(
     expect(page.locator(".order-summary").last).to_contain_text("256.08")  # 2 x 100 + 9.90, VAT 22%
     shot("3-review")
     check_page(page)
-    page.get_by_role("button", name="Place order").click()
+    # ORD.17: box 1 is unticked and mandatory; the button names the obligation to pay.
+    pay = page.get_by_role("button", name=re.compile("Confirm order and pay now"))
+    expect(page.get_by_label(re.compile("I have read and accept"))).not_to_be_checked()
+    expect(page.get_by_label(re.compile("specifically approve"))).to_have_count(0)  # a consumer
+    expect(pay).to_contain_text("256.08")
+    page.get_by_label(re.compile("I have read and accept")).check()
+    pay.click()
 
     expect(page.get_by_role("heading", level=1)).to_have_text("Order received")
     expect(page.get_by_role("button", name="Pay now")).to_be_disabled()
@@ -141,6 +148,8 @@ def test_a_blocked_package_explains_itself_and_offers_a_quote(
     page.get_by_role("button", name="Continue to review").click()
     expect(page.get_by_text("needs a quote from the vendor")).to_be_visible()
     expect(page.get_by_role("link", name="Request a quote")).to_be_visible()
-    expect(page.get_by_role("button", name="Place order")).to_have_count(0)
+    expect(page.get_by_role("button", name=re.compile("Confirm order and pay now"))).to_have_count(
+        0
+    )
     shot("blocked-review")
     check_page(page)
