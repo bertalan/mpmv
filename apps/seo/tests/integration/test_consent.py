@@ -138,6 +138,10 @@ def test_a_cross_site_post_cannot_give_or_withdraw_consent(client: Client) -> No
         {},
         {"Origin": "https://evil.example"},
         {"Referer": "https://evil.example/"},
+        {"Sec-Fetch-Site": "cross-site"},
+        {"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"},
+        # The view reads Origin/Referer only: Sec-Fetch-Site alone proves nothing to it.
+        {"Sec-Fetch-Site": "same-origin"},
     ):
         response = client.post("/consent/", {"action": "accept_all"}, headers=headers)
         assert response.status_code == 403
