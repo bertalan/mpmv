@@ -6058,8 +6058,8 @@ msgid ""
 "This window covers only the sensitive actions of this shop that its owner confirms. It never "
 "covers another shop."
 msgstr ""
-"Questa finestra copre solo le azioni sensibili di questo negozio che il suo titolare conferma. "
-"Non copre mai un altro negozio."
+"Questa finestra copre solo le azioni sensibili di questo negozio che il suo titolare conferma. Non"
+" copre mai un altro negozio."
 
 #: apps/manager/forms.py
 msgid ""
