@@ -25,7 +25,7 @@ msgid_plural "%(counter)s unused."
 msgstr[0] "%(counter)s non usato."
 msgstr[1] "%(counter)s non usati."
 
-#: apps/orders/ui/present.py
+#: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/present.py
 msgid "%(days)s working days"
 msgstr "%(days)s giorni lavorativi"
 
@@ -94,6 +94,10 @@ msgstr "(si apre il sito del corriere)"
 #: apps/catalog/taxonomy_admin.py
 msgid "-- root --"
 msgstr "-- radice --"
+
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "24 months for consumers."
+msgstr "24 mesi per i consumatori."
 
 #: apps/ingest/models.py
 msgid "A blocking case stops its run from ending as succeeded until it is decided."
@@ -563,6 +567,7 @@ msgstr "Aggiungi al carrello"
 msgid "added %(created)s"
 msgstr "aggiunta il %(created)s"
 
+#: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/forms.py
 #: apps/orders/ui/views.py
 msgid "Added to your cart."
 msgstr "Aggiunto al carrello."
@@ -708,6 +713,10 @@ msgstr "Approva le proposte selezionate"
 #: apps/catalog/taxonomy.py
 msgid "Approved"
 msgstr "Approvata"
+
+#: apps/orders/templates/orders/_legal_boxes.html
+msgid "Article %(article)s: %(title)s"
+msgstr "Articolo %(article)s: %(title)s"
 
 #: apps/cms/models.py
 msgid "Articles or pages to suggest under the products. If you add none, nothing is suggested."
@@ -1028,6 +1037,10 @@ msgstr ""
 msgid "Company name"
 msgstr "Ragione sociale"
 
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "Competent court"
+msgstr "Foro competente"
+
 #: apps/orders/customer_views.py
 msgid "Completed"
 msgstr "Completato"
@@ -1043,6 +1056,10 @@ msgstr "Conferma"
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Confirm and delete the old logo"
 msgstr "Conferma ed elimina il vecchio logo"
+
+#: apps/orders/ui/views.py
+msgid "Confirm order and pay now – EUR %(total)s"
+msgstr "Conferma ordine e paga ora – EUR %(total)s"
 
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid "Confirm with your passkey to allow this one action. No passkey window opens."
@@ -1066,9 +1083,21 @@ msgstr "Collega il tuo account per i pagamenti"
 msgid "Consumer"
 msgstr "Consumatore"
 
+#: apps/orders/templates/orders/_legal_recap.html
+msgid ""
+"Consumers have 14 days from delivery to withdraw. As a business you have no right of withdrawal "
+"unless the seller's terms say so."
+msgstr ""
+"I consumatori hanno 14 giorni dalla consegna per recedere. Come azienda non hai diritto di "
+"recesso, salvo che lo preveda il venditore nelle sue condizioni."
+
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Consumers: disputes go to the court of the consumer's own residence."
 msgstr "Consumatori: le controversie spettano al giudice del luogo di residenza del consumatore."
+
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "Contact"
+msgstr "Contatto"
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
@@ -1127,6 +1156,10 @@ msgstr ""
 #: apps/manager/forms.py
 msgid "Court for business buyers"
 msgstr "Foro per gli acquirenti professionali"
+
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "Court of %(court)s"
+msgstr "Foro di %(court)s"
 
 #: apps/orders/customer_views.py
 msgid "current step"
@@ -1197,6 +1230,10 @@ msgstr "Consegna"
 #: apps/orders/templates/orders/_review_body.html
 msgid "Delivery details"
 msgstr "Dati di consegna"
+
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "Delivery time"
+msgstr "Tempo di consegna"
 
 #: apps/manager/forms.py
 msgid "Delivery time in days"
@@ -1305,6 +1342,16 @@ msgid ""
 msgstr ""
 "Ogni codice ti fa accedere una sola volta se perdi l’app di autenticazione o la passkey. "
 "Conservali subito in un luogo sicuro: vengono mostrati solo questa volta."
+
+#: apps/orders/templates/orders/_legal_recap.html
+msgid ""
+"Each purchase is a contract directly with the seller. The seller is responsible for shipping, "
+"conformity, invoicing, returns and withdrawals. The marketplace provides the service and collects "
+"the payment."
+msgstr ""
+"Ogni acquisto è un contratto direttamente con il venditore. Il venditore è responsabile di "
+"spedizione, conformità, fatturazione, resi e recessi. Il marketplace offre il servizio e incassa "
+"il pagamento."
 
 #: apps/seo/site_links.py
 msgid "Editors' admin (Wagtail)"
@@ -1433,6 +1480,10 @@ msgstr "Impronta %(hash)s."
 #: themes/base/templates/components/footer.html
 msgid "Footer"
 msgstr "Piè di pagina"
+
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "For disputes with the marketplace operator: %(court)s."
+msgstr "Per le controversie con il gestore del marketplace: %(court)s."
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Forgotten your login credentials?"
@@ -1771,6 +1822,16 @@ msgstr ""
 msgid "I am buying for a business"
 msgstr "Acquisto per un'azienda"
 
+#: apps/orders/templates/orders/_legal_boxes.html
+msgid "I have read and accept the marketplace terms and the sales terms of each seller named above."
+msgstr ""
+"Ho letto e accetto le condizioni del marketplace e le condizioni di vendita di ciascun venditore "
+"indicato sopra."
+
+#: apps/orders/templates/orders/_legal_boxes.html
+msgid "I specifically approve the onerous clauses listed above, one by one."
+msgstr "Approvo specificamente, una per una, le clausole onerose elencate sopra."
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
 "If you are not signed in, Continue signs you in once with this link; you will still confirm it is "
@@ -1949,6 +2010,10 @@ msgstr "Lascia la prima scelta, salvo che valga una di queste: consente un preav
 msgid "Legal"
 msgstr "Note legali"
 
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "Legal guarantee"
+msgstr "Garanzia legale"
+
 #: apps/catalog/taxonomy.py
 msgid "legal name"
 msgstr "ragione sociale"
@@ -2069,6 +2134,10 @@ msgstr "Segna come spedito"
 msgid "Marketing"
 msgstr "Marketing"
 
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "Marketplace terms (version %(number)s)"
+msgstr "Condizioni del marketplace (versione %(number)s)"
+
 #: apps/manager/templates/manager/platform/dashboard.html
 msgid "Marketplace work across vendors. The menu lists the sections you may open."
 msgstr ""
@@ -2150,6 +2219,10 @@ msgstr "nessuna registrazione di passkey in corso"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
+
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "No seller terms published."
+msgstr "Il venditore non ha pubblicato condizioni di vendita."
 
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "No storefront changes yet."
@@ -2441,6 +2514,18 @@ msgstr ""
 "Solo per il regime RF20: il numero che termina con EX rilasciato dal tuo paese di stabilimento per"
 " il regime di franchigia IVA transfrontaliera, per esempio DE123456789EX."
 
+#: apps/cms/models.py
+msgid ""
+"Only for the customer terms: the onerous clauses of this text (art. 1341, second paragraph, of the"
+" Civil Code), each with its article number and title, for example [{\"article\": \"12\", "
+"\"title\": \"Competent court\"}]. Business buyers approve them one by one at checkout when the "
+"operator is established in Italy. Each published version keeps its own list."
+msgstr ""
+"Solo per le condizioni per i clienti: le clausole onerose di questo testo (art. 1341, secondo "
+"comma, del codice civile), ciascuna con numero di articolo e titolo, per esempio [{\"article\": "
+"\"12\", \"title\": \"Foro competente\"}]. Gli acquirenti aziendali le approvano una per una al "
+"checkout quando il gestore ha sede in Italia. Ogni versione pubblicata conserva il proprio elenco."
+
 #: apps/tax/models.py
 msgid ""
 "Only for the exempt regime: why the vendor charges no VAT, the flat-rate scheme or another reason."
@@ -2713,7 +2798,14 @@ msgstr "Pagamento ricevuto"
 msgid "Payment received for order %(order_number)s"
 msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
 
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/_payment_status.html
+msgid ""
+"Payment received, confirming. This page updates when the payment is confirmed; do not pay again."
+msgstr ""
+"Pagamento ricevuto, in conferma. Questa pagina si aggiorna alla conferma del pagamento; non pagare"
+" di nuovo."
+
+#: apps/orders/templates/orders/_payment_status.html
 msgid "Payment received. Thank you."
 msgstr "Pagamento ricevuto. Grazie."
 
@@ -2768,10 +2860,6 @@ msgstr ""
 #: apps/cms/blocks.py
 msgid "Pick the picture from the library or upload a new one. Required."
 msgstr "Scegli l'immagine dalla libreria o caricane una nuova. Obbligatoria."
-
-#: apps/orders/templates/orders/_review_actions.html
-msgid "Place order"
-msgstr "Conferma l'ordine"
 
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
@@ -2915,6 +3003,10 @@ msgstr "Stampa"
 msgid "Privacy and your data"
 msgstr "Privacy e i tuoi dati"
 
+#: apps/orders/templates/orders/_legal_boxes.html
+msgid "Privacy notice"
+msgstr "Informativa sulla privacy"
+
 #: apps/seo/site_links.py
 msgid "Privacy requests (staff)"
 msgstr "Richieste privacy (staff)"
@@ -2938,6 +3030,10 @@ msgstr "Le pagine prodotto non esistono ancora (CAT.7): i prodotti compariranno 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Products"
 msgstr "Prodotti"
+
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "professional seller"
+msgstr "venditore professionale"
 
 #: apps/catalog/taxonomy.py
 msgid "proposed by"
@@ -3191,6 +3287,15 @@ msgstr "Condizioni di vendita"
 msgid "Sales terms of %(name)s"
 msgstr "Condizioni di vendita di %(name)s"
 
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "Sales terms of %(name)s (version %(number)s of %(date)s), print or download"
+msgstr "Condizioni di vendita di %(name)s (versione %(number)s del %(date)s), stampa o scarica"
+
+#: apps/orders/templates/email/orders/order_received/body.html
+#: apps/orders/templates/email/orders/order_received/body.txt
+msgid "Sales terms of %(name)s (version %(number)s)"
+msgstr "Condizioni di vendita di %(name)s (versione %(number)s)"
+
 #: apps/catalog/taxonomy.py
 msgid "sameAs links"
 msgstr "Link sameAs"
@@ -3245,7 +3350,7 @@ msgstr "Seleziona almeno una riga."
 msgid "Sell with us (vendor application)"
 msgstr "Vendi con noi (candidatura venditore)"
 
-#: apps/vendors/models.py
+#: apps/orders/templates/orders/_legal_recap.html apps/vendors/models.py
 msgid "Seller"
 msgstr "Venditore"
 
@@ -3539,6 +3644,10 @@ msgstr "Qualcosa è andato storto"
 msgid "source"
 msgstr "origine"
 
+#: apps/orders/templates/orders/_legal_boxes.html
+msgid "Specific approval of onerous clauses (articles 1341 and 1342 of the Italian Civil Code)"
+msgstr "Approvazione specifica delle clausole onerose (artt. 1341 e 1342 del codice civile)"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Staff"
 msgstr "Staff"
@@ -3694,7 +3803,7 @@ msgstr "Preavviso di cessazione"
 msgid "Terminations"
 msgstr "Cessazioni"
 
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/orders/templates/orders/_legal_boxes.html apps/vendors/templates/vendors/terms/read.html
 msgid "Terms"
 msgstr "Condizioni"
 
@@ -4132,6 +4241,10 @@ msgstr ""
 "Il paese la cui legge regola le tue condizioni, con il codice di due lettere, per esempio IT. "
 "Obbligatorio.Il paese la cui legge regola le tue condizioni, con il codice di due lettere, per "
 "esempio IT. Obbligatorio."
+
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "The court for any dispute is the one of your own place of residence."
+msgstr "Per qualsiasi controversia il foro competente è quello del tuo luogo di residenza."
 
 #: apps/vendors/admin.py
 msgid ""
@@ -4866,6 +4979,14 @@ msgstr ""
 "L'impostazione «team di una persona» è attiva: una persona può avere ruoli incompatibili, come "
 "Finanza e pagamenti con Configurazione e tasse. Ogni assegnazione di questo tipo è registrata."
 
+#: apps/cms/models.py
+msgid ""
+"The onerous clauses declared with this version (article number and title), copied from the page "
+"when it was published."
+msgstr ""
+"Le clausole onerose dichiarate con questa versione (numero di articolo e titolo), copiate dalla "
+"pagina quando è stata pubblicata."
+
 #: apps/vendors/models.py
 msgid ""
 "The onerous clauses of these terms (art. 1341, second paragraph, of the Civil Code): for each, the"
@@ -5470,6 +5591,11 @@ msgstr ""
 "I prodotti più recenti dell'etichetta mostrati per ogni categoria. Con 0 non si mostra nessuna "
 "sezione per categoria."
 
+#: apps/orders/templates/email/orders/order_received/body.html
+#: apps/orders/templates/email/orders/order_received/body.txt
+msgid "The terms you accepted, kept here for your records."
+msgstr "Le condizioni che hai accettato, riportate qui per i tuoi archivi."
+
 #: apps/manager/templates/manager/shop/profile.html
 msgid ""
 "The text in this language is a machine draft and is not public yet. Edit and save it to publish "
@@ -5872,7 +5998,7 @@ msgstr "Serve la tua passkey"
 msgid "This notice is not possible."
 msgstr "Questo preavviso non è possibile."
 
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/_payment_status.html
 msgid "This order is no longer open for payment."
 msgstr "Questo ordine non è più aperto al pagamento."
 
@@ -6221,7 +6347,7 @@ msgstr "IVA"
 msgid "VAT included in the total"
 msgstr "IVA inclusa nel totale"
 
-#: apps/orders/ui/forms.py
+#: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/forms.py
 msgid "VAT number"
 msgstr "Partita IVA"
 
@@ -6254,6 +6380,11 @@ msgstr "Verifica la tua identità"
 #: apps/manager/templates/manager/layout.html themes/base/templates/components/user_tools.html
 msgid "Version"
 msgstr "Versione"
+
+#: apps/orders/templates/email/orders/order_received/body.html
+#: apps/orders/templates/email/orders/order_received/body.txt
+msgid "version %(number)s"
+msgstr "versione %(number)s"
 
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "Version %(number)s is in force since %(date)s."
@@ -6380,6 +6511,10 @@ msgid ""
 msgstr ""
 "Inviamo la conferma dell'ordine a questo indirizzo. Obbligatorio: senza non possiamo confermare il"
 " tuo ordine."
+
+#: apps/orders/templates/orders/_legal_boxes.html
+msgid "we use your data to carry out this order. Read the notice to know more."
+msgstr "usiamo i tuoi dati per eseguire questo ordine. Leggi l'informativa per saperne di più."
 
 #: apps/orders/templates/orders/checkout.html
 msgid ""
@@ -6841,6 +6976,10 @@ msgstr ""
 "Chi ha scritto l'articolo. Il nome compare sotto il titolo e rimanda alla pagina dell'autore. Se "
 "lo lasci vuoto, non viene mostrato alcun autore."
 
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "Who you buy from and on which terms"
+msgstr "Da chi compri e a quali condizioni"
+
 #: apps/ingest/models.py
 msgid ""
 "Why a person must look: price jump, sale, identity change, stale item or ambiguous SKU match."
@@ -6898,6 +7037,10 @@ msgstr "Ritira e avvisa il venditore"
 msgid "Withdraw the notice"
 msgstr "Ritira il preavviso"
 
+#: apps/orders/templates/orders/_legal_recap.html
+msgid "Withdrawal"
+msgstr "Recesso"
+
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Withdrawn"
 msgstr "Ritirato"
@@ -6952,6 +7095,22 @@ msgid "You have %(counter)s unused recovery code."
 msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Hai %(counter)s codice di recupero non usato."
 msgstr[1] "Hai %(counter)s codici di recupero non usati."
+
+#: apps/orders/templates/orders/_legal_recap.html
+msgid ""
+"You have 14 days from delivery to withdraw, also through the online withdrawal button. The seller "
+"pays the cost of returning the goods."
+msgstr ""
+"Hai 14 giorni dalla consegna per recedere, anche con il pulsante di recesso online. Il venditore "
+"paga il costo della restituzione dei beni."
+
+#: apps/orders/templates/orders/_legal_recap.html
+msgid ""
+"You have 14 days from delivery to withdraw, also through the online withdrawal button. You pay the"
+" direct cost of returning the goods. %(info)s"
+msgstr ""
+"Hai 14 giorni dalla consegna per recedere, anche con il pulsante di recesso online. Paghi tu il "
+"costo diretto della restituzione dei beni. %(info)s"
 
 #: apps/orders/templates/orders/customer_orders.html
 msgid "You have no orders yet"

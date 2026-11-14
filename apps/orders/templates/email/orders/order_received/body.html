@@ -3,5 +3,12 @@
 <body>
 <p>{% if customer_name %}{% blocktranslate %}Hello {{ customer_name }},{% endblocktranslate %}{% else %}{% translate "Hello," %}{% endif %}</p>
 <p>{% blocktranslate %}We received your order {{ order_number }} (total {{ total }} EUR). We will confirm it when the payment is complete.{% endblocktranslate %}</p>
+{% if terms.platform or terms.sellers %}<hr>
+<p>{% translate "The terms you accepted, kept here for your records." %}</p>
+{% if terms.platform %}<h2>{{ terms.platform.title }} ({% blocktranslate with number=terms.platform.number %}version {{ number }}{% endblocktranslate %})</h2>
+<div>{{ terms.platform.text|linebreaks }}</div>{% endif %}
+{% for seller in terms.sellers %}<h2>{% blocktranslate with name=seller.name number=seller.number %}Sales terms of {{ name }} (version {{ number }}){% endblocktranslate %}</h2>
+<div>{{ seller.text|linebreaks }}</div>
+{% endfor %}{% endif %}
 </body>
 </html>
