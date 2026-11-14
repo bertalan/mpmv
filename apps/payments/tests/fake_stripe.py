@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 
 from apps.payments.stripe_client import (
     StripeAccount,
+    StripeCharge,
     StripeError,
     StripeIntent,
     StripeRefund,
@@ -67,6 +68,23 @@ class FakeStripeClient:
         if intent_id not in self.intents:
             raise StripeError("No such payment_intent")
         return self.intents[intent_id]
+
+    def get_charge(self, charge_id: str) -> StripeCharge:
+        self.calls.append("get_charge")
+        for intent in self.intents.values():
+            if intent.charge_id == charge_id:
+                return StripeCharge(
+                    charge_id,
+                    intent.amount_minor,
+                    intent.currency,
+                    self._refunded.get(intent.id, 0),
+                )
+        raise StripeError("No such charge")
+
+    def refund_in_dashboard(self, intent_id: str, amount_minor: int) -> None:
+        """A refund made in the Stripe dashboard: the app never saw it, only the charge shows it."""
+        already = self._refunded.get(intent_id, 0)
+        self._refunded[intent_id] = already + amount_minor
 
     def create_transfer(
         self,

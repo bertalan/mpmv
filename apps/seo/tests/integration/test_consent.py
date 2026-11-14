@@ -197,6 +197,72 @@ def test_the_settings_page_works_in_italian(client: Client) -> None:
     assert "Impostazioni dei cookie" in html
 
 
+def checked_boxes(html: str) -> set[str]:
+    return {
+        m.group(1)
+        for m in re.finditer(r'id="prefs-(\w+)"[^>]*\schecked', html)
+        if m.group(1) != "necessary"
+    }
+
+
+def test_a_form_save_on_the_settings_page_comes_back_with_saved_marker(client: Client) -> None:
+    response = client.post(
+        "/consent/",
+        {"action": "accept_all", "next": "/cookie-settings/"},
+        headers=SAME_SITE,
+    )
+    assert (response.status_code, response["Location"]) == (303, "/cookie-settings/?saved=1")
+
+
+def test_the_saved_marker_is_added_only_for_the_settings_page(client: Client) -> None:
+    response = client.post(
+        "/consent/", {"action": "accept_all", "next": "/blog/"}, headers=SAME_SITE
+    )
+    assert response["Location"] == "/blog/"
+    off_site = client.post(
+        "/consent/",
+        {"action": "accept_all", "next": "https://evil.example/cookie-settings/"},
+        headers=SAME_SITE,
+    )
+    assert off_site["Location"] == "/"
+
+
+def test_the_settings_page_shows_a_visible_notice_after_a_save(client: Client) -> None:
+    for action, boxes in (
+        ("accept_all", set(engine.GATED_CATEGORIES)),
+        ("reject_all", set()),
+    ):
+        client.post("/consent/", {"action": action, "next": "/cookie-settings/"}, headers=SAME_SITE)
+        html = client.get("/cookie-settings/?saved=1").content.decode()
+        assert re.search(
+            r'role="status" data-consent-notice>\s*<p><strong>Your cookie choice was saved\.', html
+        )
+        assert checked_boxes(html) == boxes
+    assert "Only necessary cookies are on." in html
+
+
+def test_the_notice_names_the_optional_categories_that_are_on(client: Client) -> None:
+    client.post("/consent/", {"action": "custom", "categories": ["statistics"]}, headers=SAME_SITE)
+    html = client.get("/cookie-settings/?saved=1").content.decode()
+    assert "Optional cookies on: Statistics." in html
+    assert checked_boxes(html) == {"statistics"}
+
+
+def test_no_notice_without_the_marker_or_without_a_decision(client: Client) -> None:
+    undecided = client.get("/cookie-settings/?saved=1").content.decode()
+    assert "data-consent-notice hidden" in undecided
+    client.post("/consent/", {"action": "accept_all"}, headers=SAME_SITE)
+    plain = client.get("/cookie-settings/").content.decode()
+    assert "data-consent-notice hidden" in plain
+
+
+def test_the_settings_notice_is_translated(client: Client) -> None:
+    client.post("/consent/", {"action": "reject_all"}, headers=SAME_SITE)
+    html = client.get("/it/cookie-settings/?saved=1").content.decode()
+    assert "La tua scelta sui cookie è stata salvata." in html
+    assert "Solo i cookie necessari sono attivi." in html
+
+
 # --- The banner is the same for everyone (page cache safe)
 
 

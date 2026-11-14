@@ -239,9 +239,10 @@ ORDER_PAYMENT_STARTER = "apps.payments.checkout.start_payment"
 # PAY.1: the callable that fetches the browser-side secret of an order's payment from the provider
 # (`(provider_ref, order_ref) -> str`); the secret is never kept in the session.
 ORDER_PAYMENT_BROWSER_HOOK = "apps.payments.checkout.client_secret_for"
-# PAY.3 sets this True once the per-vendor transfers exist. Until then a payment would stay whole on
-# the platform account (against D-08), so `manage.py check` refuses LIVE_DATA (payments.E004).
-PAYMENTS_TRANSFERS_WIRED = False
+# PAY.3: True because a paid order now posts the vendor ledger lines and queues one transfer per
+# vendor package (apps.ledger.settlement). Were it False, a payment would stay whole on the
+# platform account (against D-08) and `manage.py check` would refuse LIVE_DATA (payments.E004).
+PAYMENTS_TRANSFERS_WIRED = True
 
 # Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
 # that lists the active vendors established outside a new allowed set.

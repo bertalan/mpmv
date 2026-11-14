@@ -283,3 +283,17 @@ def test_stripe_with_keys_passes_and_a_dev_machine_may_lack_them() -> None:
         assert _ids() == []
     with override_settings(PAYMENT_PROVIDER="stripe", STRIPE_SECRET_KEY=""):
         assert _ids() == []
+
+
+def test_refunded_amount_reports_a_dashboard_refund_and_fails_closed() -> None:
+    harness = Harness()
+    result = harness.provider.create_payment(request())
+    intent = next(iter(harness.client.intents.values()))
+    args = {"provider_ref": result.provider_ref, "charge_ref": result.charge_ref, "currency": "EUR"}
+    assert harness.provider.refunded_amount(**args) == Decimal("0.00")
+    harness.client.refund_in_dashboard(intent.id, 250)
+    assert harness.provider.refunded_amount(**args) == Decimal("2.50")
+    with pytest.raises(ProviderError):
+        harness.provider.refunded_amount(
+            provider_ref="pi_x", charge_ref="ch_unknown", currency="EUR"
+        )

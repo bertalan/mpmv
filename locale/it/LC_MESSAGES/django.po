@@ -2480,6 +2480,10 @@ msgstr ""
 "la sua via, senza il numero civico. Altrimenti lascia vuoto tutto l'indirizzo; se non sei sicuro, "
 "chiedi al tuo commercialista."
 
+#: apps/seo/templates/seo/consent/preferences.html
+msgid "Only necessary cookies are on."
+msgstr "Solo i cookie necessari sono attivi."
+
 #: apps/compliance/forms.py
 msgid "Only vendors that are active or suspended can be given notice."
 msgstr "Il preavviso si può dare solo a venditori attivi o sospesi."
@@ -2496,6 +2500,10 @@ msgstr "Apri la finestra passkey"
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "Open the public page"
 msgstr "Apri la pagina pubblica"
+
+#: apps/seo/templates/seo/consent/preferences.html
+msgid "Optional cookies on:"
+msgstr "Cookie facoltativi attivi:"
 
 #: apps/catalog/taxonomy_admin.py
 msgid "Optional text that replaces the generated credit line. Example: 'Logo: Acme Ltd'."
@@ -6983,7 +6991,7 @@ msgstr ""
 msgid "Your choice is saved on this device for six months."
 msgstr "La tua scelta resta salvata su questo dispositivo per sei mesi."
 
-#: apps/seo/templates/seo/consent/banner.html
+#: apps/seo/templates/seo/consent/banner.html apps/seo/templates/seo/consent/preferences.html
 msgid "Your cookie choice was saved."
 msgstr "La tua scelta sui cookie è stata salvata."
 
