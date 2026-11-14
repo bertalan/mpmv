@@ -5602,7 +5602,9 @@ msgstr ""
 msgid ""
 "The terms changed while you were checking out. Read the new versions and tick the boxes again to "
 "place the order."
-msgstr "I termini sono cambiati durante l'acquisto. Leggi le nuove versioni e seleziona di nuovo le caselle per effettuare l'ordine."
+msgstr ""
+"I termini sono cambiati durante l'acquisto. Leggi le nuove versioni e seleziona di nuovo le "
+"caselle per effettuare l'ordine."
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
