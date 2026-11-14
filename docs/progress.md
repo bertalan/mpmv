@@ -163,12 +163,16 @@ part of the done-when still open) · `not started`.
 | FIT.1 | partial: 1 of 2 (data model and services); the Manager platform pages are open | #286 | New app `apps/fitment` (migration `fitment/0001`): `FitmentScheme`, `FitmentLevel`, `FitmentNode` tree with aliases, merge history and notes, pure `engine.py`, audited services with `dry_run`, a reference registry for FIT.2 and FIT.5; `FitmentCategory` rows replace a `Category` field so the catalog never depends on fitment (deviation from spec 17, stated in the PR); import contract that tax, shipping, cart, orders and themes never import it |
 | VEN.4 | done | #350 | New app `apps/ledger` (migrations `ledger/0001`, `0002`): append-only `LedgerEntry` with database triggers against UPDATE and DELETE, signed `Decimal` amounts, an idempotency key, `record_entry` (audit `ledger.entry_recorded`, dry run) and the balance and the statement as the sum of entries. Ledger code, needs human review |
 | VEN.33 | partial: the pure refund fee engine and the surcharge on the plan rule; the vendor terms clause is in CMP.5 | #318, #343 | `vendors/refund_fee.py`: provider cost plus surcharge, `ROUND_CEILING` to the whole euro (the one explicit exception to `ROUND_HALF_UP`), the owner's regression cases. Nothing charges the fee yet (PAY.4). Money code, needs human review |
+| VEN.35 | done (part 1; the PDF is VEN.36) | #448 | Versioned seller sales terms and pre-contractual data (`vendors/0033`, `0034` append-only `SalesTermsVersion`), the `require_sales_terms` operator rollout setting (`core/0025`). Landed before check 28 and missing from this file until check 29 |
 | PAY.5 | done | #326 | `PaymentProvider` interface, registry that refuses a provider missing a capability, system checks `payments.E001` to `E003`, fake provider, contract tests and `docs/dev/payment-providers.md` |
-| PAY.1 | partial: the Stripe provider; checkout creates one PaymentIntent per order; the vendor transfers are PAY.3 | #351, #429 | #351: `payments/stripe_provider.py` and `stripe_client.py`. #429: `payments/checkout.py` `start_payment` (one payment per order, `transfer_group` = the order number, the whole amount stays on the platform until PAY.3), reached through `ORDER_PAYMENT_STARTER`; the session keeps only the payment id and the client secret is asked from the provider on each payment page, never stored; check `payments.E004` refuses LIVE while `PAYMENTS_TRANSFERS_WIRED` is False (PAY.3 turns it on). Payments code, needs human review |
-| PAY.2 | partial: webhook, idempotency, the audit row and the order marked paid; no ledger posting yet | #351, #429 | Signed, idempotent webhook (`payments/0001`, `Payment`), audit `payments.payment.succeeded`, signal `on_payment_succeeded`. #429: `payments/order_hook.py` receives it and calls `mark_order_paid` in the webhook transaction (a failure rolls the payment row back so the provider retries). Payments code, needs human review |
+| PAY.1 | partial: the Stripe provider; checkout creates one PaymentIntent per order with the real per-vendor split; the transfers are PAY.3 | #351, #429, #452 | #351: `payments/stripe_provider.py`. #429: one PaymentIntent per order. #452: the intent is built from `payments.settlement` |
+| PAY.2 | done | #351, #429, #452, #465 | Signed, idempotent webhook (`payments.processedevent`), the audit row, the order marked paid, and the paid order posts the ledger and queues the transfers (#452). #465: the Connect webhook accepts its own signing secret (`MPMV_STRIPE_CONNECT_WEBHOOK_SECRET`), the platform secret stays for customer payments |
+| PAY.3 | done (D-08, D-41) | #452 | `apps/ledger/settlement.py`: a paid order posts one ledger line set per vendor and queues one transfer per vendor package as a transactional outbox job (a rollback leaves no job); `payments/settlement.py` computes each vendor net; a refunded or partially refunded package is never transferred (`ledger.transfer_skipped_refunded`); a platform with `commission_vat_mode` not `none` refuses to settle (`ledger.settlement_blocked_vat_mode`, until VEN.34); a vendor with no ready account stays a receivable. `PAYMENTS_TRANSFERS_WIRED` is True, so `payments.E004` no longer stops LIVE. Needs human review |
 | PAY.4 | partial: the pure refund fee engine only (VEN.33); refunds are not built | #318 | See VEN.33 |
 | SHP.4 | done | #354 | Shipping cost per vendor package through `quote_shipping` and the tax engine |
 | ORD.3 | done | #354 | `build_checkout`: per-vendor packages, tax, shipping, blocking messages, preview; mixed-rate shipping VAT regression test. Money and tax code, needs human review |
+| ORD.17 | done (customer terms clause lists pending counsel) | #463 | Checkout legal step (D-40, variant A): seller recap, box 1 and box 2, order terms snapshot in `terms_acceptance`, terms in the confirmation email, confirming poll after the provider redirect. Box 2 lists only seller clauses until counsel enters `onerous_clauses` in the CMS |
+| ORD.19 | done | #469 | `cart_add` on the product page: POST with CSRF, cart rate budget, HTMX fragment and no-JS redirect; the sales mode is checked again by `add_to_cart` (`effective_sales_mode`) |
 | ORD.10 | partial: the switch and the alert; nothing yet reports STAGE | #353 | `ensure_checkout_open` in `place_order` (the `checkout` and `payments` switches, platform and every vendor), `manage.py check_payments` alert on a payment without transfer; the done-when "verified on STAGE" is open |
 | ORD.5 | partial: the cart and checkout UI, B2B fields, VIES, place order, the payment page | #360, #429 | `orders/ui` (HTMX): cart, review and checkout, conditional B2B fields, VIES, captcha, the confirmation page. #429: `place_order` starts the payment after the transaction commits and the payment page (`orders/static/orders/payment.js`) confirms it with the browser-side secret. Orders code, needs human review |
 | TAX.17 | done | #323 | Shipping VAT always follows the goods (`shipping/0012`, `0013` data and schema); #323 was closed and its content merged through #325 |
@@ -972,7 +976,19 @@ Compliance, security and content:
 | #331 | FIT.6, FIT.17 | Garage cookie validation and the order vehicle snapshot |
 | #341 | MIG.3 | Catalog loader (1) |
 | #330 | SEO.5, SEO.9 | Consent banner and `ConsentProvider` |
-| (this PR) | none | Coherence check 28 |
+| #437 | none | Coherence check 28 |
+| #448 | VEN.35 | Seller versioned sales terms |
+| #449 | VEN.35, VEN.36 | Spec: VEN.35 in two parts, `require_sales_terms` |
+| #452 | PAY.3 | Ledger lines from the paid order and per-vendor transfers (D-08) |
+| #454 | TAX, CORE, VEN | Spec: adviser rules for RF20 and XI, register decisions MQ-38 to MQ-44 |
+| #458 | SEC.2 | SVG linear-time test retry |
+| #460 | SEO.9 | Cookie settings: saved notice and checkbox sync |
+| #462 | none | Coherence check 28 follow-ups |
+| #463 | ORD.17 | Checkout legal step (D-40) |
+| #465 | PAY.2 | Connect webhook signing secret |
+| #467 | ORD.5, VEN.2 | Checkout takes the commission rule in force |
+| #469 | ORD.19 | Add to cart from the product page |
+| (this PR) | none | Coherence check 29 |
 
 ## Coherence checks
 
@@ -1985,3 +2001,26 @@ Findings and actions:
 9. Info. The delta touches money, payments, orders and compliance code: VEN.3, VEN.6, PAY.1, PAY.2, ORD.4, ORD.5, FIT.17, CMP.5 (#291, #426) and SEO.5 (consent log). All need human review, and the legal wording needs counsel (CMP.24).
 
 Verdict: GO with follow-ups. No blocker for the merged code; findings 1 and 2 matter before any LIVE payment. The payments, orders, ledger and legal code need human review.
+
+### Coherence check 29 (main at c45180ee)
+
+Scope: main at c45180ee, the merges after check 28 (#437): the trains #461, #464, #466, #468 and #470, #459, and #463. They carry #452 (PAY.3), #454 (spec: adviser rules for RF20 and XI, MQ-38 to MQ-44), #458, #460 (SEO.9), #462 (check 28 follow-ups), #465 (PAY.2 Connect secret), #467 (ORD.5, VEN.2), #469 (ORD.19) and #463 (ORD.17); 26 non-merge commits. #448 and #449 (VEN.35) landed before check 28 and had no row; covered here.
+
+| Area | Result |
+|---|---|
+| Code vs spec | PAY.3: `PAYMENTS_TRANSFERS_WIRED = True` in `base.py` with the reason in the comment, `payments.E004` only fires when it is False (`test_transfers_wired_check.py`), so LIVE no longer stops on it; the ledger settlement posts the lines and queues one outbox transfer per vendor package, skips a refunded or partially refunded package and refuses to settle when `commission_vat_mode` is not `none` (`ledger.settlement_blocked_vat_mode`, spec 04 4.4 case 3). That also closes check 28 finding 2: the mode is now read. ORD.19: `cart_add` is `require_POST` with no `csrf_exempt`, has the cart rate budget, and the server re-checks the sales mode through `add_to_cart` and `effective_sales_mode`. PAY.2 (#465): `STRIPE_CONNECT_WEBHOOK_SECRET` is a separate setting (`MPMV_STRIPE_CONNECT_WEBHOOK_SECRET`) passed to the provider as `connect_webhook_secret`; the platform secret is untouched. ORD.5 (#467): `commission_snapshots` in `orders/ui/state.py` calls `commission_rule_for`; the stub is gone on main. ORD.17 (#463) is merged: the terms snapshot goes in `terms_acceptance` (`orders/0014`). D-08, D-40 and D-41 are in the register with their rows (PAY.3, ORD.17, VEN.35, PAY.4) and agree with the code. |
+| Spec and docs | `progress.md` had no rows for PAY.3, ORD.17, ORD.19 and VEN.35 and stale PAY.1 and PAY.2 rows; added or updated here, with the merge list (#448, #449, #452, #454, #458, #460, #462, #463, #465, #467, #469). `make docs` freshness passes. `audit-trail.md` has the PAY.3 settlement actions (`ledger.posting_blocked`, `transfer_failed`, `transfer_without_account`, `transfer_blocked`, `transfer_skipped_refunded`, `settlement_blocked_vat_mode`). `payment-providers.md` has the Stripe idempotency keys and cached errors section. |
+| Hygiene | Single migration leaf per app: accounts 0009, api 0007, cart 0002, catalog 0015, cms 0018, compliance 0010, core 0025, events 0005, fitment 0001, ingest 0002, ledger 0002, manager 0006, orders 0014, payments 0002, seo 0002, shipping 0013, tax 0010, themes 0002, vendors 0034 (mcp has none). `makemigrations --check`: no changes. |
+| Gates | `make check` pass. Unit, integration and e2e suites not run locally; CI on main is the gate. |
+
+Findings and actions:
+
+1. Closed here: check 28 finding 1 (PAY.3 landed, LIVE is no longer stopped by `payments.E004`); finding 2 (`commission_vat_mode` is read by the settlement); finding 3 (the orders migration test derives the leaf), finding 4 (consent Sec-Fetch-Site and cross-site cases) and finding 5 (the catalog loader test) all by #462; the missing `progress.md` rows.
+2. Major for go-live, still open: PAY.4 (refunds) is not built. The PAY.3 guard stops a transfer to a refunded package, but no code refunds the customer or reverses a transfer; staff decide by hand until PAY.4.
+3. Minor, open: the platform settles only with `commission_vat_mode` `none`; any other mode blocks every paid order until VEN.34. The demo seed sets `STANDARD`, so a seeded platform shows `ledger.settlement_blocked_vat_mode`. Action: VEN.34, or have the seed use `none`.
+4. Minor, open: the Stripe idempotency cached-error limitation (`payment-providers.md`): a repeated key replays Stripe's first error for 24 hours, so a retry of a failed vendor transfer under the same key does not make a fresh attempt. Documented in `payment-providers.md`, no code change planned.
+5. Minor, open: ORD.17 follow-ups: box 2 lists only seller clauses until counsel enters the customer terms clauses (`onerous_clauses`) in the CMS; the owner has to confirm that "marketplace terms" are the CMS page of kind `terms`, and that a seller with no published terms shows a notice and stores null; the PDF of a terms version is VEN.36.
+6. Minor, carried over from checks 27 and 28 and still open: VEN.33, CMP.2 and PAY.4 are pure engines (finding 2 of check 27, now partly covered by PAY.3 posting); SEO.7 partial; `PRIVACY_PEPPER` has no document; TAX.18 and TAX.19 (XI VAT numbers, the adviser rules of #454 are spec only); ORD.10 on STAGE; art. 1341 comma 2 marking in code waits for VEN.13 and VEN.14; the check 26 follow-ups.
+7. Info. The delta touches money, payments, ledger, orders and compliance code: PAY.1 to PAY.3, ORD.5, ORD.17, ORD.19, VEN.35. All need human review; the legal wording needs counsel (CMP.24).
+
+Verdict: GO with follow-ups. No blocker for the merged code. Finding 2 (no refunds) matters before any LIVE payment. The payments, ledger, orders and legal code need human review.
