@@ -10,4 +10,5 @@
 {% endif %}{% for seller in terms.sellers %}
 === {% blocktranslate with name=seller.name number=seller.number %}Sales terms of {{ name }} (version {{ number }}){% endblocktranslate %} ===
 {{ seller.text }}
-{% endfor %}{% endif %}
+{% if seller.url %}{% translate "Read this version online:" %} {{ seller.url }}
+{% endif %}{% endfor %}{% endif %}

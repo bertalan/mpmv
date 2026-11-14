@@ -567,12 +567,11 @@ msgstr "Aggiungi al carrello"
 msgid "added %(created)s"
 msgstr "aggiunta il %(created)s"
 
-#: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/forms.py
 #: apps/orders/ui/views.py
 msgid "Added to your cart."
 msgstr "Aggiunto al carrello."
 
-#: apps/orders/ui/forms.py
+#: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/forms.py
 msgid "Address"
 msgstr "Indirizzo"
 
@@ -3089,6 +3088,14 @@ msgstr "Preventivo richiesto"
 msgid "Read more and choose"
 msgstr "Scopri di più e scegli"
 
+#: apps/orders/templates/email/orders/order_received/body.html
+msgid "Read this version online"
+msgstr "Leggi questa versione online"
+
+#: apps/orders/templates/email/orders/order_received/body.txt
+msgid "Read this version online:"
+msgstr "Leggi questa versione online:"
+
 #: apps/seo/site_links.py
 msgid "Readiness probe"
 msgstr "Controllo di prontezza"
@@ -5590,6 +5597,14 @@ msgid "The term's newest products shown for each category; 0 shows no category s
 msgstr ""
 "I prodotti più recenti dell'etichetta mostrati per ogni categoria. Con 0 non si mostra nessuna "
 "sezione per categoria."
+
+#: apps/orders/ui/views.py
+msgid ""
+"The terms changed while you were checking out. Read the new versions and tick the boxes again to "
+"place the order."
+msgstr ""
+"I termini sono cambiati durante l'acquisto. Leggi le nuove versioni e seleziona di nuovo le "
+"caselle per effettuare l'ordine."
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt

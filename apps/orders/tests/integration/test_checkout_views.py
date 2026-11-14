@@ -112,6 +112,14 @@ def sign_off_details(client: Client, **extra: str) -> Any:
     return client.post(reverse("orders:checkout"), {**DETAILS, **extra})
 
 
+def post_review(client: Client, boxes: dict[str, str] | None = None) -> Any:
+    """Place the order as a browser does: the hidden terms stamps of the page come back with the
+    boxes (ORD.17b)."""
+    html = client.get(reverse("orders:review")).content.decode()
+    stamps = dict(re.findall(r'<input type="hidden" name="(terms_[^"]+)" value="([^"]*)"', html))
+    return client.post(reverse("orders:review"), {**stamps, **(boxes or {})})
+
+
 @pytest.fixture
 def commission() -> None:
     """The platform default commission rule in force (VEN.2): the real seam, no stub."""
@@ -411,7 +419,7 @@ def test_place_order_runs_for_a_placeable_preview_and_shows_the_confirmation(
     cart = with_cart(client)
     add(cart, vendor("Alpha Shop"), "100.00")
     sign_off_details(client)
-    response = client.post(reverse("orders:review"), {"accept_terms": "on"})
+    response = post_review(client, {"accept_terms": "on"})
     assert response.status_code == 302
     assert response["Location"] == reverse("orders:confirmation")
     order = Order.objects.get()
@@ -448,7 +456,7 @@ def test_a_pulled_switch_shows_a_customer_message_and_places_nothing(
     save_flag(row, ctx=staff)
     FLAG_CACHE.clear()
     try:
-        response = client.post(reverse("orders:review"), {"accept_terms": "on"})
+        response = post_review(client, {"accept_terms": "on"})
     finally:
         FLAG_CACHE.clear()
     assert response.status_code == 200

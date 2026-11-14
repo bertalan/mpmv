@@ -13,6 +13,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
@@ -67,6 +68,10 @@ class LegalStep:
     @property
     def box2_required(self) -> bool:
         return bool(self.box2_groups)
+
+    @property
+    def stamps(self) -> list[tuple[str, str]]:
+        return list(shown_stamps(self).items())
 
     def box2_text(self) -> list[str]:
         return [
@@ -167,8 +172,8 @@ def build_step(vendors: Sequence[Vendor], *, language: str, business: bool) -> L
 def check(step: LegalStep, post: Mapping[str, Any]) -> list[str]:
     """What is missing from the submitted boxes, in words. A box counts only when sent as `on`."""
     codes = engine.acceptance_errors(
-        box1=_ticked(post, engine.BOX1),
-        box2=_ticked(post, engine.BOX2),
+        box1=ticked(post, engine.BOX1),
+        box2=ticked(post, engine.BOX2),
         box2_shown=step.box2_required,
     )
     words = {
@@ -178,7 +183,7 @@ def check(step: LegalStep, post: Mapping[str, Any]) -> list[str]:
     return [words[code] for code in codes]
 
 
-def _ticked(post: Mapping[str, Any], name: str) -> bool:
+def ticked(post: Mapping[str, Any], name: str) -> bool:
     return str(post.get(name, "")).lower() in {"on", "true", "1", "yes"}
 
 
@@ -201,6 +206,7 @@ def acceptance(step: LegalStep, *, now: dt.datetime | None = None) -> dict[str, 
         "sellers": [
             {
                 "vendor": s.public_id,
+                "vendor_name": s.name,
                 "version_id": s.version_id,
                 "number": s.version_number,
                 "content_hash": s.content_hash,
@@ -213,6 +219,30 @@ def acceptance(step: LegalStep, *, now: dt.datetime | None = None) -> dict[str, 
             "text": step.box2_text(),
         },
     }
+
+
+PLATFORM_FIELD = "terms_platform"
+SELLER_FIELD = "terms_seller_"
+
+
+def shown_stamps(step: LegalStep) -> dict[str, str]:
+    """The versions the page shows, as the hidden fields that come back with the boxes: the
+    platform version (id and hash) and each seller's (id and hash); empty when none is shown."""
+    platform = step.platform
+    stamps = {
+        PLATFORM_FIELD: "" if platform is None else f"{platform.version_id}:{platform.sha256}"
+    }
+    for seller in step.sellers:
+        stamps[SELLER_FIELD + seller.public_id] = (
+            f"{seller.version_id}:{seller.content_hash}" if seller.has_terms else ""
+        )
+    return stamps
+
+
+def versions_changed(step: LegalStep, post: Mapping[str, Any]) -> bool:
+    """True when what the buyer saw is not what is in force now (or the stamps are missing):
+    the acceptance must never name a version the buyer did not see."""
+    return any(post.get(name) != value for name, value in shown_stamps(step).items())
 
 
 def terms_documents(order_terms: Mapping[str, Any]) -> dict[str, Any]:
@@ -236,7 +266,9 @@ def terms_documents(order_terms: Mapping[str, Any]) -> dict[str, Any]:
         if version is not None:
             documents["sellers"].append(
                 {
-                    "name": version.vendor.display_name,
+                    "name": entry.get("vendor_name") or version.vendor.display_name,
+                    "url": settings.SITE_BASE_URL.rstrip("/")
+                    + terms_services.accepted_terms_url(version),
                     "number": version.number,
                     "text": version.body,
                 }
