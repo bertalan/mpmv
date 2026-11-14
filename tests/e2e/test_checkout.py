@@ -2,8 +2,8 @@
 
 Done when: "Checkout keyboard-accessible". Both paths run from the cart to the confirmation with
 the keyboard-reachable controls only; every page passes axe (WCAG 2.2 AA) and raises no CSP
-violation. VIES is a fake `ViesClient` and the commission rule (VEN.2) a stub: only the
-boundaries are replaced, the pages, `build_checkout` and `place_order` are real.
+violation. VIES is a fake `ViesClient`, the only boundary replaced: the commission rule (VEN.2)
+is a real platform default row, and the pages, `build_checkout` and `place_order` are real.
 """
 
 import re
@@ -23,10 +23,10 @@ from apps.cart.session import GUEST_CART_SESSION_KEY
 from apps.cart.tests.factories import CartFactory
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.orders.models import Order
-from apps.orders.tests.integration.test_checkout_views import COMMISSION, add, vendor
-from apps.orders.ui import state
+from apps.orders.tests.integration.test_checkout_views import add, vendor
 from apps.tax import engine as tax
 from apps.tax.tests.factories import TaxRateFactory
+from apps.vendors.tests.factories import CommissionRuleFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 
@@ -34,17 +34,15 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 
 @pytest.fixture
-def shop(monkeypatch: pytest.MonkeyPatch, settings: Any) -> Cart:
-    """A guest cart with two vendors' goods, the tax rates, a fake VIES and a commission stub."""
+def shop(settings: Any) -> Cart:
+    """A guest cart with a vendor's goods, the tax rates, a fake VIES and the default rule."""
     PlatformOperatorFactory.create(open_ended=True, valid_from=utc(2026, 1, 1), country="IT")
     for country, rate in (("IT", "22"), ("DE", "19")):
         TaxRateFactory.create(
             country=country, category=tax.STANDARD, rate=Decimal(rate), valid_from=utc(2026, 1, 1)
         )
     settings.VIES_CLIENT = "apps.tax.tests.fakes.ValidViesClient"
-    monkeypatch.setattr(
-        state, "commission_snapshots", lambda ids: {pk: dict(COMMISSION) for pk in ids}
-    )
+    CommissionRuleFactory.create(valid_from=utc(2026, 1, 1), valid_to=None)
     cart = CartFactory.create()
     add(cart, vendor("Rossi Ceramics"), "100.00", "Blue vase")
     return cart
