@@ -1,0 +1,27 @@
+{% load i18n %}{% comment %}
+Box 1 for every buyer, box 2 only for a business buyer with an Italian party (ORD.17, D-40,
+counsel variant A). Both unticked, mandatory, enforced on the server too. The privacy notice is a
+link, never a box. Sits right above the pay button (_review_actions.html).
+{% endcomment %}{% if legal %}
+<fieldset class="field field--group legal-boxes">
+  <legend class="visually-hidden">{% translate "Terms" %}</legend>
+  <div class="field__check">
+    <input type="checkbox" id="accept-terms" name="accept_terms" required>
+    <label for="accept-terms">{% translate "I have read and accept the marketplace terms and the sales terms of each seller named above." %}</label>
+  </div>
+  <p class="helptext">{% if legal.privacy_url %}<a href="{{ legal.privacy_url }}" target="_blank" rel="noopener">{% translate "Privacy notice" %}</a>{% else %}{% translate "Privacy notice" %}{% endif %}: {% translate "we use your data to carry out this order. Read the notice to know more." %}</p>
+  {% if legal.box2_required %}
+  <div class="legal-box2">
+    <p id="onerous-title"><strong>{% translate "Specific approval of onerous clauses (articles 1341 and 1342 of the Italian Civil Code)" %}</strong></p>
+    {% for group in legal.box2_groups %}
+    <p>{{ group.label }}</p>
+    <ul>{% for article, title in group.clauses %}<li>{% blocktranslate %}Article {{ article }}: {{ title }}{% endblocktranslate %}</li>{% endfor %}</ul>
+    {% endfor %}
+    <div class="field__check">
+      <input type="checkbox" id="accept-onerous" name="accept_onerous" required aria-describedby="onerous-title">
+      <label for="accept-onerous">{% translate "I specifically approve the onerous clauses listed above, one by one." %}</label>
+    </div>
+  </div>
+  {% endif %}
+</fieldset>
+{% endif %}

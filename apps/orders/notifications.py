@@ -24,7 +24,7 @@ from django.conf import settings
 
 from apps.core.services import enqueue_email as _enqueue_email
 
-from . import engine
+from . import engine, legal
 from .models import Order, OrderLine, PrivacyStatus, VendorOrder
 
 logger = logging.getLogger(__name__)
@@ -114,6 +114,9 @@ def notify_order_placed(order: Order) -> None:
             "order_number": order.number,
             "customer_name": order.customer_name,
             "total": _money(order.grand_total),
+            # ORD.17: the accepted terms on a durable medium (art. 51(7)): the text, in the
+            # versions of the order, not a link.
+            "terms": legal.terms_documents(order.terms_acceptance or {}),
         },
     )
 

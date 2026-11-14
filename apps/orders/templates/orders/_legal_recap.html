@@ -1,0 +1,33 @@
+{% load i18n %}{% comment %}
+The legal recap (ORD.17, D-40): one block per seller, read before the pay button. Included in
+#review-body, so it follows the shipping choice. Nothing here is a box: the boxes sit right above
+the button (_legal_boxes.html).
+{% endcomment %}{% if legal %}
+<section class="legal-recap" aria-labelledby="legal-recap-title">
+  <h2 id="legal-recap-title">{% translate "Who you buy from and on which terms" %}</h2>
+  <p>{% translate "Each purchase is a contract directly with the seller. The seller is responsible for shipping, conformity, invoicing, returns and withdrawals. The marketplace provides the service and collects the payment." %}</p>
+  {% for seller in legal.sellers %}
+  <section class="legal-recap__seller" aria-labelledby="legal-seller-{{ forloop.counter }}">
+    <h3 id="legal-seller-{{ forloop.counter }}">{{ seller.name }}</h3>
+    <dl>
+      <dt>{% translate "Seller" %}</dt><dd>{{ seller.legal_name }} ({% translate "professional seller" %})</dd>
+      {% if seller.address %}<dt>{% translate "Address" %}</dt><dd>{{ seller.address }}</dd>{% endif %}
+      {% if seller.vat_number %}<dt>{% translate "VAT number" %}</dt><dd>{{ seller.vat_number }}</dd>{% endif %}
+      {% if seller.contact_email %}<dt>{% translate "Contact" %}</dt><dd>{{ seller.contact_email }}</dd>{% endif %}
+      {% if seller.has_terms %}
+      <dt>{% translate "Delivery time" %}</dt><dd>{% blocktranslate with days=seller.delivery_days %}{{ days }} working days{% endblocktranslate %}</dd>
+      <dt>{% translate "Withdrawal" %}</dt><dd>{% if legal.business %}{% translate "Consumers have 14 days from delivery to withdraw. As a business you have no right of withdrawal unless the seller's terms say so." %}{% elif seller.consumer_pays_return %}{% blocktranslate with info=seller.return_cost_info %}You have 14 days from delivery to withdraw, also through the online withdrawal button. You pay the direct cost of returning the goods. {{ info }}{% endblocktranslate %}{% else %}{% translate "You have 14 days from delivery to withdraw, also through the online withdrawal button. The seller pays the cost of returning the goods." %}{% endif %}</dd>
+      <dt>{% translate "Legal guarantee" %}</dt><dd>{% translate "24 months for consumers." %}</dd>
+      <dt>{% translate "Competent court" %}</dt><dd>{% if legal.business %}{% if seller.court %}{% blocktranslate with court=seller.court %}Court of {{ court }}{% endblocktranslate %}{% endif %}{% else %}{{ seller.court }}{% endif %}</dd>
+      {% endif %}
+    </dl>
+    {% if seller.has_terms %}
+    <p><a href="{{ seller.terms_url }}" target="_blank" rel="noopener">{% blocktranslate with name=seller.name number=seller.version_number date=seller.version_date|date:"SHORT_DATE_FORMAT" %}Sales terms of {{ name }} (version {{ number }} of {{ date }}), print or download{% endblocktranslate %}</a></p>
+    {% else %}
+    <p>{% translate "No seller terms published." %}</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+  {% if legal.platform %}<p><a href="{{ legal.platform_url }}" target="_blank" rel="noopener">{% blocktranslate with number=legal.platform.number %}Marketplace terms (version {{ number }}){% endblocktranslate %}</a>{% if not legal.business %} {% blocktranslate %}The court for any dispute is the one of your own place of residence.{% endblocktranslate %}{% else %} {% blocktranslate with court=legal.platform_court %}For disputes with the marketplace operator: {{ court }}.{% endblocktranslate %}{% endif %}</p>{% endif %}
+</section>
+{% endif %}

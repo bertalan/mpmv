@@ -25,6 +25,7 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.cache import add_never_cache_headers
+from django.utils.formats import number_format
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
@@ -42,7 +43,7 @@ from apps.core.http import client_ip
 from apps.core.privacy import keyed_hash
 from apps.core.public_forms import Protection, public_form
 from apps.core.services import consume_rate_limit
-from apps.orders import engine
+from apps.orders import engine, legal
 from apps.orders.checkout import build_checkout
 from apps.orders.models import Order
 from apps.orders.services import (
@@ -50,6 +51,7 @@ from apps.orders.services import (
     CheckoutClosed,
     CheckoutPreview,
     OrderRefused,
+    PaymentInProgress,
     PaymentMismatch,
     PaymentUnavailable,
     payment_client_secret,
@@ -434,8 +436,19 @@ def _review_context(
             "Your cart changed after we checked your VAT number, so VAT is charged on your "
             "order. Confirm your details again to check it for every seller."
         )
+    business = bool(data.get("business")) and bool(str(data.get("vat_id") or "").strip())
+    step_vendors = [item.vendor for item in preview.vendors] or list(vendors.values())
+    legal_step = legal.build_step(step_vendors, language=get_language() or "en", business=business)
+    totals = preview.totals
     return {
         **_steps(3),
+        "legal": legal_step,
+        "pay_label": _("Confirm order and pay now – EUR %(total)s")  # noqa: RUF001
+        % {
+            "total": number_format(totals.grand_total, 2, use_l10n=True, force_grouping=True)
+            if totals is not None
+            else ""
+        },
         "packages": packages,
         "cart_messages": present.cart_blocks(preview),
         "order": present.order_totals(preview),
@@ -506,8 +519,17 @@ def review_page(request: HttpRequest) -> HttpResponse:
     preview = _preview(request, cart, data)
     if not preview.placeable or not _ordering_open(preview):
         return _page(request, "orders/review.html", _review_context(request, cart, data))
+    context = _review_context(request, cart, data)
+    step = context["legal"]
+    legal_errors = legal.check(step, request.POST)
+    if legal_errors:
+        return _page(
+            request, "orders/review.html", {**context, "errors": legal_errors, "legal_errors": True}
+        )
     try:
-        order, _changes = place_order(preview, ctx=audit_context(request))
+        order, _changes = place_order(
+            preview, ctx=audit_context(request), terms_acceptance=legal.acceptance(step)
+        )
     except CheckoutClosed as closed:
         # ORD.10: a kill switch is off; nothing was saved. The message names no vendor.
         context = _review_context(request, cart, data, errors=[closed.customer_message])
@@ -594,6 +616,8 @@ def _payment_context(request: HttpRequest, order: Order) -> dict[str, Any] | Non
         secret = payment_client_secret(order)
     except PaymentMismatch as error:
         raise Http404("This payment is not for this order") from error
+    except PaymentInProgress:
+        return {"in_progress": True}
     except PaymentUnavailable:
         return {"retry": True}
     return {
@@ -612,6 +636,16 @@ def confirmation_page(request: HttpRequest) -> HttpResponse:
     order = Order.objects.filter(public_id=public_id).first()
     if order is None:
         raise Http404("No order was just placed")
+    if _htmx(request):
+        # The "confirming" poll (ORD.17): the order row only, never the provider. Only the
+        # webhook moves the order to paid; this answers what it already did.
+        paid = order.state in PAID_OR_LATER
+        closed = not paid and order.state != "awaiting_payment"
+        return _page(
+            request,
+            "orders/_payment_status.html",
+            {"paid": paid, "payment_closed": closed, "polling": not paid and not closed},
+        )
     context = {
         "order": order,
         "lines": [

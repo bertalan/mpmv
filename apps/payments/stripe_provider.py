@@ -21,6 +21,7 @@ from . import stripe_engine
 from .engine import (
     FeeCollection,
     InvalidSignature,
+    PaymentInProgress,
     PaymentMismatch,
     PaymentRequest,
     PaymentResult,
@@ -40,6 +41,8 @@ from .stripe_client import (
     StripeError,
     StripeIntent,
 )
+
+IN_PROGRESS = frozenset({"processing", "succeeded"})  # a payment the customer already made
 
 _STATUS = {
     "succeeded": PaymentStatus.SUCCEEDED,
@@ -179,13 +182,16 @@ class StripePaymentProvider:
 
     def payment_client_secret(self, provider_ref: str, order_ref: str) -> str:
         """The browser-side secret of an existing payment, fetched from Stripe; raises
-        `PaymentMismatch` unless the payment carries this order as its transfer group."""
+        `PaymentMismatch` unless the payment carries this order as its transfer group, and
+        `PaymentInProgress` once it is processing or succeeded."""
         try:
             intent = self._client.get_payment_intent(provider_ref)
         except StripeError as error:
             raise ProviderError(str(error)) from error
         if intent.transfer_group != order_ref:
             raise PaymentMismatch(provider_ref)
+        if intent.status in IN_PROGRESS:  # no form again: the webhook is about to confirm
+            raise PaymentInProgress(provider_ref)
         return intent.client_secret
 
     def refund(self, request: RefundRequest) -> RefundResult:
