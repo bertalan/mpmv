@@ -7,6 +7,7 @@ every request carrying an `Idempotency-Key`.
 """
 
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -20,7 +21,61 @@ TIMEOUT_SECONDS = 20
 
 
 class StripeError(Exception):
-    """Stripe refused or failed a call. The message never carries a key."""
+    """Stripe refused or failed a call. The message never carries a key or a request body.
+
+    For an HTTP error it keeps Stripe's `error.type`, `error.code` and `decline_code` (and builds
+    the message from them, "Stripe 400 idempotency_error on /transfers"), never Stripe's own
+    message text: it can echo request parameters, such as the idempotency key."""
+
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        status: int | None = None,
+        error_type: str = "",
+        code: str = "",
+        decline_code: str = "",
+        path: str = "",
+    ) -> None:
+        self.status = status
+        self.error_type = error_type
+        self.code = code
+        self.decline_code = decline_code
+        if not message:
+            label = " ".join(part for part in (error_type, code, decline_code) if part)
+            message = f"Stripe {status}" + (f" {label}" if label else "")
+            message += f" on {path}" if path else ""
+        super().__init__(message)
+
+
+_ERROR_TOKEN = re.compile(r"[a-z0-9_]{1,64}")
+
+
+def _error_token(value: object) -> str:
+    """A Stripe error identifier (`idempotency_error`, `card_declined`), or "" for anything else:
+    only plain identifiers are kept, so nothing from the request can be echoed into a log."""
+    text = str(value or "")
+    return text if _ERROR_TOKEN.fullmatch(text) else ""
+
+
+def http_error(status: int, body: bytes, path: str) -> StripeError:
+    """The `StripeError` of an HTTP error answer, from the `error` object of its JSON body."""
+    detail: object = {}
+    try:
+        payload = json.loads(body or b"{}")
+    except ValueError:
+        payload = {}
+    if isinstance(payload, dict):
+        detail = payload.get("error") or {}
+    if not isinstance(detail, dict):
+        detail = {}
+    return StripeError(
+        status=status,
+        error_type=_error_token(detail.get("type")),
+        code=_error_token(detail.get("code")),
+        decline_code=_error_token(detail.get("decline_code")),
+        path=path,
+    )
 
 
 @dataclass(frozen=True)
@@ -44,6 +99,7 @@ class StripeTransfer:
     created: datetime
     payment_ref: str = ""  # the PaymentIntent id, from the transfer metadata
     transfer_group: str = ""
+    vendor_order: str = ""  # the vendor order's public id, from the transfer metadata
 
 
 @dataclass(frozen=True)
@@ -200,7 +256,11 @@ class HttpStripeClient:
         try:
             payload = json.loads(self.transport(request))
         except urllib.error.HTTPError as error:
-            raise StripeError(f"Stripe answered HTTP {error.code} on {path}") from None
+            try:
+                body = error.read()
+            except OSError:
+                body = b""
+            raise http_error(error.code, body, path) from None
         except (urllib.error.URLError, TimeoutError, ValueError):
             raise StripeError(f"Stripe call to {path} failed") from None
         if not isinstance(payload, dict):
@@ -229,6 +289,7 @@ class HttpStripeClient:
             created=datetime.fromtimestamp(int(data["created"]), tz=UTC),
             payment_ref=str((data.get("metadata") or {}).get("payment_ref", "")),
             transfer_group=str(data.get("transfer_group") or ""),
+            vendor_order=str((data.get("metadata") or {}).get("vendor_order", "")),
         )
 
     def create_payment_intent(

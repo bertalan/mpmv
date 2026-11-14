@@ -101,22 +101,49 @@ request still in flight). Two rules follow:
 
 - A retry with the same key after a failed request returns the same stored error, not a fresh
   attempt. It does not help to retry quickly with an unchanged request.
-- A key must never be reused for a request with different parameters (Stripe answers with an
-  idempotency error). Our keys are derived from what identifies the request: the order-derived
-  PaymentIntent key, `<key>:transfer:<n>`, `<key>:reverse:<transfer>` and, in the PAY.3
-  settlement sweep (`apps/ledger/settlement.py`), `transfer:<order>:<vendor>`. If the amount or
-  the destination of a payment can change, the key has to change with it.
+- A key must never be reused for a request with different parameters (Stripe answers HTTP 400
+  `idempotency_error`). Every key names what identifies its request, the parameters that may
+  change included:
+  - PAY.3 settlement sweep (`apps/ledger/settlement.py`, built by
+    `stripe_engine.transfer_idempotency_key`):
+    `transfer:<order>:<vendor>:<destination>:<amount in minor units>:<CURRENCY>`. A key longer
+    than Stripe's 255 characters keeps `transfer:<order>:<vendor>:` and replaces the rest with a
+    32-character SHA-256 prefix.
+  - Refund reversals: `<refund key>:reverse:<transfer>:<amount in minor units>` (the transfer id
+    names the destination).
+  - The order-derived PaymentIntent key and its `<key>:transfer:<n>` shares, made once at
+    checkout.
+
+Incident (STAGE, 2026-11-14): the transfer key used to be `transfer:<order>:<vendor>`. The sweep
+first sent a transfer to a demo payout account, Stripe refused it and stored the answer; after
+the vendor was linked to a real connected account every retry got `idempotency_error` for 24
+hours. With the destination and the amount in the key, a relinked vendor gets a fresh key at once.
 
 How the code behaves: the sweep (`transfer_payment`, `settle_pending`) retries a vendor transfer
 by calling `StripeProvider.transfer`, which first lists the transfers of the order's transfer
-group and returns an existing one for the same payment and destination (an amount mismatch is an
-error). That lookup is what makes the retry safe after the 24 hours, and after a transfer that was
-created but not recorded. It does not help after a failed create: no transfer exists, so the
-sweep sends the create again with the same key.
+group:
 
-Known limitation: if Stripe stored an error for `transfer:<order>:<vendor>` (for example a
-temporary balance or account problem that was later fixed), every sweep inside the next 24 hours
-gets the same stored error back and the transfer stays pending; the sweep audits the failure once
-and retries on its next run, and the first run after the window expires sends a fresh request.
-There is no key rotation on error. Errors that Stripe does not store (validation failures, a
-concurrent duplicate) are not affected.
+- a transfer of the same payment to the same destination is returned, never repeated (an amount
+  mismatch is a `TransferConflict`). That lookup makes the retry safe after the 24 hours, and
+  after a transfer that was created but not recorded;
+- a transfer of the same payment for the same vendor order (`metadata[vendor_order]`) to another
+  destination is a `TransferConflict`: the vendor was relinked after the money left. Nothing new
+  is created; the sweep audits `ledger.transfer_blocked` once with the existing transfer id and
+  staff decide.
+
+A demo payout account (`acct_demo_<n>`, `connect.record_demo_account`, STAGE seed only) never
+reaches Stripe: the sweep skips it before any provider call and audits `ledger.transfer_blocked`
+with reason `demo_account` once (the vendor balance stays the receivable), and
+`StripeProvider.transfer` refuses it too before calling the client.
+
+Remaining limitation: if Stripe stored an error for an unchanged request (for example a temporary
+balance problem that was later fixed), every sweep inside the next 24 hours gets the same stored
+error back; each failure is audited as `ledger.transfer_failed` and the first run after the window
+sends a fresh request. There is no key rotation on error. Errors that Stripe does not store
+(validation failures, a concurrent duplicate) are not affected.
+
+Error reporting: `StripeError` keeps Stripe's `error.type`, `error.code` and `decline_code`
+(plain identifiers only) and the HTTP status, and its message is built from them, e.g.
+`Stripe 400 idempotency_error on /transfers`; that text is the `ledger.transfer_failed` reason.
+Stripe's own message text, the request body and the idempotency key are never logged: the
+message can echo request parameters.

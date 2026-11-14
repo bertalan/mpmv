@@ -48,6 +48,11 @@ class VendorSettlement:
         return round_line(self.sale + self.shipping)
 
     @property
+    def demo_account(self) -> bool:
+        """The ready account is a demo one (STAGE seed): no transfer ever reaches the provider."""
+        return stripe_engine.is_demo_account(self.account_ref)
+
+    @property
     def transferable(self) -> bool:
         return bool(self.account_ref) and self.vendor_net > 0
 

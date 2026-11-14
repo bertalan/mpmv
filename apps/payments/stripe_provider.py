@@ -30,6 +30,7 @@ from .engine import (
     ProviderError,
     RefundRequest,
     RefundResult,
+    TransferConflict,
     TransferRequest,
     TransferResult,
     WebhookEvent,
@@ -127,7 +128,11 @@ class StripePaymentProvider:
 
         Safe to call again: an existing transfer of this payment to this account in the order's
         transfer group is returned instead of a second one (Stripe's idempotency key only lasts
-        24 hours), and a different amount there is an error, never silently accepted."""
+        24 hours). A different amount there, or a transfer of the same vendor order to another
+        account (the vendor was relinked), is a `TransferConflict`, never a second transfer.
+        A demo payout account (`acct_demo_`) is refused before any call to Stripe."""
+        if stripe_engine.is_demo_account(request.vendor_account_ref):
+            raise ProviderError("demo payout account: never sent to the provider")
         minor = stripe_engine.to_minor(request.amount, request.currency)
         if minor <= 0:
             raise ProviderError("transfer amount must be positive")
@@ -139,13 +144,20 @@ class StripePaymentProvider:
             if not charge:
                 raise ProviderError("the payment has no charge to transfer from yet")
             for existing in self._client.list_transfers(transfer_group=request.order_ref):
-                if (
-                    existing.destination == request.vendor_account_ref
-                    and existing.payment_ref == request.provider_ref
-                ):
+                if existing.payment_ref != request.provider_ref:
+                    continue
+                if existing.destination == request.vendor_account_ref:
                     if existing.amount_minor != minor:
-                        raise ProviderError("a transfer with another amount already exists")
+                        raise TransferConflict(
+                            "a transfer with another amount already exists",
+                            transfer_ref=existing.id,
+                        )
                     return TransferResult(existing.id, request.amount)
+                if request.reference and existing.vendor_order == request.reference:
+                    raise TransferConflict(
+                        "a transfer of this vendor order to another account exists",
+                        transfer_ref=existing.id,
+                    )
             transfer = self._client.create_transfer(
                 amount_minor=minor,
                 currency=request.currency,
@@ -233,7 +245,9 @@ class StripePaymentProvider:
                 self._client.create_transfer_reversal(
                     transfer_id=transfer.id,
                     amount_minor=minor,
-                    idempotency_key=f"{request.idempotency_key}:reverse:{transfer.id}",
+                    # The transfer names the destination; the amount is in the key too, so a
+                    # changed amount gets a fresh key instead of Stripe's idempotency_error.
+                    idempotency_key=f"{request.idempotency_key}:reverse:{transfer.id}:{minor}",
                 )
 
     # -- Capability 3: payout reconciliation
