@@ -25,6 +25,7 @@ from apps.payments.engine import (
     PaymentStatus,
     ProviderError,
     RefundRequest,
+    TransferRequest,
     VendorShare,
     capability_problems,
 )
@@ -72,6 +73,39 @@ class PaymentProviderContract:
         assert result.status in set(PaymentStatus)
         assert result.provider_ref
         assert len(result.transfer_refs) == 2  # one transfer per vendor (PAY.3)
+
+    def test_transfer_pays_a_vendor_once_per_key(self) -> None:
+        provider = self.make_provider()
+        paid = provider.create_payment(self.request())
+        ask = TransferRequest(
+            "order-1", paid.provider_ref, paid.charge_ref, "acct-c", Decimal("12.00"), "EUR", "t-1"
+        )
+        first = provider.transfer(ask)
+        assert first.transfer_ref
+        assert first.amount == Decimal("12.00")
+        assert provider.transfer(ask) == first
+
+    def test_transfer_of_an_unknown_payment_or_a_zero_amount_is_refused(self) -> None:
+        provider = self.make_provider()
+        paid = provider.create_payment(self.request())
+        with pytest.raises(ProviderError):
+            provider.transfer(
+                TransferRequest(
+                    "order-1", "no-such-payment", "ch", "acct-c", Decimal("1.00"), "EUR", "t-2"
+                )
+            )
+        with pytest.raises(ProviderError):
+            provider.transfer(
+                TransferRequest(
+                    "order-1",
+                    paid.provider_ref,
+                    paid.charge_ref,
+                    "acct-c",
+                    Decimal("0"),
+                    "EUR",
+                    "t-3",
+                )
+            )
 
     def test_payment_is_idempotent_on_its_key(self) -> None:
         provider = self.make_provider()

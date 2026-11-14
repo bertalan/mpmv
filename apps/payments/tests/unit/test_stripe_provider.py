@@ -172,6 +172,51 @@ def test_no_webhook_secret_refuses_everything() -> None:
         provider.parse_webhook(body, header)
 
 
+def _with_connect(connect: str) -> tuple[StripePaymentProvider, str]:
+    platform = secrets.token_urlsafe(24)
+    provider = StripePaymentProvider(
+        FakeStripeClient(),
+        webhook_secret=platform,
+        connect_webhook_secret=connect,
+        clock=lambda: NOW,
+    )
+    return provider, platform
+
+
+def test_platform_secret_passes_with_connect_secret_set() -> None:
+    provider, platform = _with_connect(secrets.token_urlsafe(24))
+    body, header = _signed(platform, int(NOW))
+    assert provider.parse_webhook(body, header).event_id == "e"
+
+
+def test_connect_secret_passes_when_set() -> None:
+    connect = secrets.token_urlsafe(24)
+    provider, _ = _with_connect(connect)
+    body, header = _signed(connect, int(NOW))
+    assert provider.parse_webhook(body, header).event_id == "e"
+
+
+def test_connect_secret_fails_when_not_set() -> None:
+    provider, _ = _with_connect("")
+    body, header = _signed(secrets.token_urlsafe(24), int(NOW))
+    with pytest.raises(InvalidSignature):
+        provider.parse_webhook(body, header)
+
+
+def test_empty_secrets_never_verify_an_empty_key_signature() -> None:
+    provider, _ = _with_connect("")
+    body, header = _signed("", int(NOW))
+    with pytest.raises(InvalidSignature):
+        provider.parse_webhook(body, header)
+
+
+def test_wrong_signature_fails_with_both_secrets() -> None:
+    provider, _ = _with_connect(secrets.token_urlsafe(24))
+    body, header = _signed(secrets.token_urlsafe(24), int(NOW))
+    with pytest.raises(InvalidSignature):
+        provider.parse_webhook(body, header)
+
+
 def test_any_of_several_v1_signatures_may_match() -> None:
     harness = Harness()
     body, header = _signed(harness.secret, int(NOW))
@@ -283,3 +328,17 @@ def test_stripe_with_keys_passes_and_a_dev_machine_may_lack_them() -> None:
         assert _ids() == []
     with override_settings(PAYMENT_PROVIDER="stripe", STRIPE_SECRET_KEY=""):
         assert _ids() == []
+
+
+def test_refunded_amount_reports_a_dashboard_refund_and_fails_closed() -> None:
+    harness = Harness()
+    result = harness.provider.create_payment(request())
+    intent = next(iter(harness.client.intents.values()))
+    args = {"provider_ref": result.provider_ref, "charge_ref": result.charge_ref, "currency": "EUR"}
+    assert harness.provider.refunded_amount(**args) == Decimal("0.00")
+    harness.client.refund_in_dashboard(intent.id, 250)
+    assert harness.provider.refunded_amount(**args) == Decimal("2.50")
+    with pytest.raises(ProviderError):
+        harness.provider.refunded_amount(
+            provider_ref="pi_x", charge_ref="ch_unknown", currency="EUR"
+        )

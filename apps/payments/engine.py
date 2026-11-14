@@ -79,6 +79,32 @@ class PaymentResult:
 
 
 @dataclass(frozen=True)
+class TransferRequest:
+    """One vendor's share of a settled payment (PAY.3, D-08), sent after the charge exists.
+
+    `charge_ref` may be empty when the confirmation did not carry it: the provider then reads it
+    from the payment. `idempotency_key` is stable per order and vendor, so a retry after a failure
+    can never pay the vendor twice. `reference` is the vendor order's public id, for the provider's
+    metadata and reconciliation.
+    """
+
+    order_ref: str  # the transfer group: the order number
+    provider_ref: str  # the payment (PaymentIntent) the charge belongs to
+    charge_ref: str
+    vendor_account_ref: str
+    amount: Decimal
+    currency: str
+    idempotency_key: str
+    reference: str = ""
+
+
+@dataclass(frozen=True)
+class TransferResult:
+    transfer_ref: str
+    amount: Decimal
+
+
+@dataclass(frozen=True)
 class RefundRequest:
     provider_ref: str
     amount: Decimal
@@ -134,6 +160,12 @@ class PaymentProvider(Protocol):
         """Capability 1: collect, with fee and vendor shares separated per `fee_collection`."""
         ...
 
+    def transfer(self, request: TransferRequest) -> TransferResult:
+        """Capability 1b (PAY.3): pay one vendor its share of a settled payment, tied to the
+        charge (D-08 `source_transaction`). Idempotent on the key and never a second transfer
+        for the same payment and vendor account; raises `ProviderError` on failure."""
+        ...
+
     def refund(self, request: RefundRequest) -> RefundResult:
         """Capability 2: full or partial refund, reporting the provider cost for PAY.4."""
         ...
@@ -150,6 +182,7 @@ class PaymentProvider(Protocol):
 REQUIRED_METHODS = (
     "supported_methods",
     "create_payment",
+    "transfer",
     "refund",
     "list_payouts",
     "parse_webhook",

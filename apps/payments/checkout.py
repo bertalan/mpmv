@@ -3,22 +3,27 @@
 `apps.orders` cannot import this app (layers), so `settings.ORDER_PAYMENT_STARTER` names
 `start_payment` and orders imports it by path. Separate charges and transfers (D-08): one charge on
 the platform account, `transfer_group` = the order number; the per-vendor transfers are made after
-the payment succeeds (PAY.3), not here.
+the payment succeeds (PAY.3), not here. The PaymentIntent still carries the real split: the vendor
+shares and the platform fee, from the same figures the ledger and the transfers use.
 """
 
 from decimal import Decimal
 
+from django.db.models import Q
+
+from apps.orders.models import Order
 from apps.orders.services import PaymentInProgress as OrderPaymentInProgress
 from apps.orders.services import PaymentMismatch as OrderPaymentMismatch
 from apps.orders.services import PaymentUnavailable
 
-from . import registry, stripe_engine
+from . import registry, settlement, stripe_engine
 from .engine import (
     PaymentInProgress,
     PaymentMismatch,
     PaymentRequest,
     PaymentStatus,
     ProviderError,
+    VendorShare,
 )
 
 
@@ -29,20 +34,23 @@ def start_payment(
     while no provider is configured.
 
     `amount` is the order's gross total, rounded half up to the currency's minor unit. The shares
-    are not known here, so the whole amount is the platform's until PAY.3 splits it. Raises
-    `PaymentUnavailable` when the provider refuses or fails."""
+    are each vendor's net (`settlement`); the platform fee is what is left, so shares plus fee equal
+    the amount. A vendor without a ready account or a usable commission snapshot has no share: its
+    money stays in the platform fee and is handled after payment (never lost, see `settlement`).
+    Raises `PaymentUnavailable` when the provider refuses or fails."""
     provider = registry.configured_provider()
     if provider is None:
         return None
     charge = stripe_engine.round_to_currency(amount, currency)
+    shares = _shares(order_ref, currency, charge)
     try:
         result = provider.create_payment(
             PaymentRequest(
                 order_ref=order_ref,
                 currency=currency,
                 amount=charge,
-                shares=(),
-                platform_fee=charge,
+                shares=shares,
+                platform_fee=charge - sum((s.amount for s in shares), Decimal("0")),
                 idempotency_key=idempotency_key,
             )
         )
@@ -51,6 +59,16 @@ def start_payment(
     if result.status is PaymentStatus.FAILED:
         return None
     return result.provider_ref, result.client_secret
+
+
+def _shares(order_ref: str, currency: str, charge: Decimal) -> tuple[VendorShare, ...]:
+    order = Order.objects.filter(Q(transfer_group=order_ref) | Q(number=order_ref)).first()
+    if order is None:
+        return ()
+    shares = settlement.order_settlement(order).shares(currency)
+    if sum((s.amount for s in shares), Decimal("0")) > charge:
+        return ()  # inconsistent totals: never promise vendors more than the charge
+    return shares
 
 
 def client_secret_for(provider_ref: str, order_ref: str) -> str:

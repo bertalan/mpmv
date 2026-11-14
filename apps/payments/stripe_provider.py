@@ -13,6 +13,7 @@ import json
 import time
 from collections.abc import Callable, Sequence
 from datetime import datetime
+from decimal import Decimal
 
 from django.conf import settings
 
@@ -29,6 +30,8 @@ from .engine import (
     ProviderError,
     RefundRequest,
     RefundResult,
+    TransferRequest,
+    TransferResult,
     WebhookEvent,
     validate_payment_request,
 )
@@ -57,11 +60,13 @@ class StripePaymentProvider:
         client: StripeClient,
         *,
         webhook_secret: str,
+        connect_webhook_secret: str = "",
         tolerance: int = stripe_engine.DEFAULT_TOLERANCE_SECONDS,
         clock: Callable[[], float] = time.time,
     ) -> None:
         self._client = client
         self._webhook_secret = webhook_secret
+        self._connect_webhook_secret = connect_webhook_secret
         self._tolerance = tolerance
         self._clock = clock
 
@@ -116,6 +121,62 @@ class StripePaymentProvider:
             )
             refs.append(transfer.id)
         return refs
+
+    def transfer(self, request: TransferRequest) -> TransferResult:
+        """One vendor's transfer, tied to the order's charge with `source_transaction` (D-08).
+
+        Safe to call again: an existing transfer of this payment to this account in the order's
+        transfer group is returned instead of a second one (Stripe's idempotency key only lasts
+        24 hours), and a different amount there is an error, never silently accepted."""
+        minor = stripe_engine.to_minor(request.amount, request.currency)
+        if minor <= 0:
+            raise ProviderError("transfer amount must be positive")
+        try:
+            charge = (
+                request.charge_ref
+                or self._client.get_payment_intent(request.provider_ref).charge_id
+            )
+            if not charge:
+                raise ProviderError("the payment has no charge to transfer from yet")
+            for existing in self._client.list_transfers(transfer_group=request.order_ref):
+                if (
+                    existing.destination == request.vendor_account_ref
+                    and existing.payment_ref == request.provider_ref
+                ):
+                    if existing.amount_minor != minor:
+                        raise ProviderError("a transfer with another amount already exists")
+                    return TransferResult(existing.id, request.amount)
+            transfer = self._client.create_transfer(
+                amount_minor=minor,
+                currency=request.currency,
+                destination=request.vendor_account_ref,
+                transfer_group=request.order_ref,
+                source_transaction=charge,
+                metadata={
+                    "payment_ref": request.provider_ref,
+                    "order_ref": request.order_ref,
+                    "vendor_order": request.reference,
+                },
+                idempotency_key=request.idempotency_key,
+            )
+        except StripeError as error:
+            raise ProviderError(str(error)) from error
+        return TransferResult(
+            transfer.id, stripe_engine.from_minor(transfer.amount_minor, request.currency)
+        )
+
+    def refunded_amount(self, *, provider_ref: str, charge_ref: str, currency: str) -> Decimal:
+        """What Stripe says was refunded on the payment's charge, refunds made in the Stripe
+        dashboard included (PAY.3 guard: nothing is transferred out of a refunded charge). Raises
+        `ProviderError` when it cannot be read: the caller must then not pay."""
+        try:
+            charge = charge_ref or self._client.get_payment_intent(provider_ref).charge_id
+            if not charge:
+                return Decimal("0")
+            found = self._client.get_charge(charge)
+        except StripeError as error:
+            raise ProviderError(str(error)) from error
+        return stripe_engine.from_minor(found.amount_refunded_minor, currency)
 
     # -- Capability 2: refunds with the provider cost
 
@@ -198,9 +259,20 @@ class StripePaymentProvider:
     # -- Capability 4: signed, idempotent webhooks
 
     def parse_webhook(self, body: bytes, signature: str) -> WebhookEvent:
-        stripe_engine.verify_signature(
-            body, signature, self._webhook_secret, now=self._clock(), tolerance=self._tolerance
-        )
+        # Stripe signs `account.updated` (Connect endpoint) with its own secret: any one may verify.
+        # An empty Connect secret is ignored. Failures raise InvalidSignature without any secret.
+        secrets_to_try = [self._webhook_secret]
+        if self._connect_webhook_secret:
+            secrets_to_try.append(self._connect_webhook_secret)
+        for index, secret in enumerate(secrets_to_try):
+            try:
+                stripe_engine.verify_signature(
+                    body, signature, secret, now=self._clock(), tolerance=self._tolerance
+                )
+                break
+            except InvalidSignature:
+                if index == len(secrets_to_try) - 1:
+                    raise
         try:
             data = json.loads(body)
             return WebhookEvent(str(data["id"]), str(data["type"]), dict(data.get("data", {})))
@@ -218,6 +290,7 @@ def provider_from_settings() -> StripePaymentProvider:
     return StripePaymentProvider(
         HttpStripeClient(settings.STRIPE_SECRET_KEY, api_version=settings.STRIPE_API_VERSION),
         webhook_secret=settings.STRIPE_WEBHOOK_SECRET,
+        connect_webhook_secret=settings.STRIPE_CONNECT_WEBHOOK_SECRET,
         tolerance=settings.STRIPE_WEBHOOK_TOLERANCE_SECONDS,
     )
 
