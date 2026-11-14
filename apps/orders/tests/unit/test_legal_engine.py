@@ -75,3 +75,12 @@ def test_box_2_leaves_out_an_italian_party_with_no_onerous_clauses() -> None:
     empty = engine.Party("platform", "Operator", "IT", "", ())
     assert engine.box2_parties([empty], business=True, operator_country="IT") == []
     assert not engine.box2_required([empty], business=True, operator_country="IT")
+
+
+def test_the_platform_court_sentence_never_ends_with_a_full_stop() -> None:
+    from apps.orders.legal import platform_court_text
+
+    assert platform_court_text("Example Operator S.r.l.").endswith("S.r.l")
+    assert platform_court_text("Example Operator Ltd") == (
+        "the court of the seat of Example Operator Ltd"
+    )
