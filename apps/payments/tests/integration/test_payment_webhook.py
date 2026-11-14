@@ -180,3 +180,18 @@ def test_a_dry_run_reports_and_stores_nothing() -> None:
     assert result.outcome is services.Outcome.PROCESSED
     assert not ProcessedEvent.objects.exists()
     assert not Payment.objects.exists()
+
+
+def test_the_same_url_accepts_the_connect_secret_only_when_it_is_set(client: Client) -> None:
+    connect = secrets.token_urlsafe(24)
+    body = event()
+    assert post(client, body, secret=connect).status_code == 400
+    registry.unregister_provider("stripe")
+    registry.register_provider(
+        lambda: StripePaymentProvider(
+            FakeStripeClient(), webhook_secret=SECRET, connect_webhook_secret=connect
+        )
+    )
+    assert post(client, body, secret=connect).status_code == 200
+    assert post(client, body, secret=SECRET).status_code == 200  # replay: idempotent no-op
+    assert post(client, body, secret=secrets.token_urlsafe(24)).status_code == 400
