@@ -34,6 +34,11 @@ PUBLISHED: Final = "vendor.sales_terms.published"
 READ: Final = "vendor.sales_terms.read"
 LINK_SALT: Final = "vendors:sales-terms:link"
 LINK_MAX_AGE: Final = 24 * 3600  # seconds; the link is multi-use within this time
+# ORD.17b: the link in a buyer's confirmation email names the exact version the buyer accepted,
+# which may since have been superseded. It has its own salt (a link of the 24-hour kind never
+# opens a superseded version) and lives as long as the tax retention period of the order.
+ARCHIVE_SALT: Final = "vendors:sales-terms:accepted-link"
+ARCHIVE_MAX_AGE: Final = 10 * 365 * 24 * 3600
 
 
 @dataclass(frozen=True)
@@ -152,23 +157,40 @@ def terms_url(version: SalesTermsVersion) -> str:
     return reverse("vendor_terms:read", args=[token])
 
 
+def accepted_terms_url(version: SalesTermsVersion) -> str:
+    """The link to the exact version a buyer accepted, readable also once it is superseded."""
+    token = signing.dumps(str(version.public_id), salt=ARCHIVE_SALT)
+    return reverse("vendor_terms:read", args=[token])
+
+
+def _candidate(token: str) -> tuple[SalesTermsVersion | None, bool]:
+    """The version a token names and whether it is an accepted-terms link (any version)."""
+    for salt, max_age in ((LINK_SALT, LINK_MAX_AGE), (ARCHIVE_SALT, ARCHIVE_MAX_AGE)):
+        try:
+            public_id = signing.loads(token, salt=salt, max_age=max_age)
+            found = (
+                SalesTermsVersion.objects.select_related("vendor")
+                .filter(public_id=public_id)
+                .first()
+            )
+        except (signing.BadSignature, ValueError, ValidationError):
+            continue
+        return found, salt == ARCHIVE_SALT
+    return None, False
+
+
 def read_terms(token: str, *, ctx: AuditContext) -> SalesTermsVersion | None:
-    """The version a link names, if it is valid and still in force; every attempt is logged.
+    """The version a link names, if it is valid and, for a 24-hour link, still in force (an
+    accepted-terms link opens its version also when superseded); every attempt is logged.
 
     A tampered or expired token, an unknown version and a superseded one all answer None.
     The log holds the result and the version, never the reader's name or address.
     """
     version: SalesTermsVersion | None = None
-    try:
-        public_id = signing.loads(token, salt=LINK_SALT, max_age=LINK_MAX_AGE)
-        candidate = (
-            SalesTermsVersion.objects.select_related("vendor").filter(public_id=public_id).first()
-        )
-    except (signing.BadSignature, ValueError, ValidationError):
-        candidate = None
+    candidate, archived = _candidate(token)
     if candidate is not None:
         pointer = SalesTermsInForce.objects.filter(vendor=candidate.vendor).first()
-        if pointer is not None and pointer.version_id == candidate.pk:
+        if archived or (pointer is not None and pointer.version_id == candidate.pk):
             version = candidate
     if version is None:
         record(ctx, READ, "vendors.salestermsversion", "", None, {"result": "denied"})

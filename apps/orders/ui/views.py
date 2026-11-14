@@ -421,6 +421,9 @@ def checkout_page(request: HttpRequest) -> HttpResponse:
 # --- Review ----------------------------------------------------------------------------------
 
 
+LEGAL_TICKS_KEY = "legal_ticks"
+
+
 def _review_context(
     request: HttpRequest, cart: Cart, data: dict[str, Any], **extra: Any
 ) -> dict[str, Any]:
@@ -443,6 +446,7 @@ def _review_context(
     return {
         **_steps(3),
         "legal": legal_step,
+        "ticks": extra.get("ticks") or {},
         "pay_label": _("Confirm order and pay now – EUR %(total)s")  # noqa: RUF001
         % {
             "total": number_format(totals.grand_total, 2, use_l10n=True, force_grouping=True)
@@ -503,7 +507,13 @@ def review_page(request: HttpRequest) -> HttpResponse:
     if not data.get("address"):
         return redirect("orders:checkout")
     if request.method == "GET":
-        return _page(request, "orders/review.html", _review_context(request, cart, data))
+        # The no-JS "Update shipping" round trip keeps the ticks for exactly one render.
+        ticks = data.get(LEGAL_TICKS_KEY)
+        if ticks:
+            state.save(request, **{LEGAL_TICKS_KEY: None})
+        return _page(
+            request, "orders/review.html", _review_context(request, cart, data, ticks=ticks)
+        )
     data = _save_shipping(request, cart, data)
     if not captcha_passes(request):
         context = _review_context(
@@ -521,6 +531,16 @@ def review_page(request: HttpRequest) -> HttpResponse:
         return _page(request, "orders/review.html", _review_context(request, cart, data))
     context = _review_context(request, cart, data)
     step = context["legal"]
+    if legal.versions_changed(step, request.POST):
+        # A terms version changed between render and submit: show the new versions, place
+        # nothing, leave the boxes unticked (the page holds the new stamps).
+        notice = _(
+            "The terms changed while you were checking out. Read the new versions and tick the "
+            "boxes again to place the order."
+        )
+        return _page(
+            request, "orders/review.html", {**context, "errors": [notice], "legal_errors": True}
+        )
     legal_errors = legal.check(step, request.POST)
     if legal_errors:
         return _page(
@@ -568,9 +588,14 @@ def shipping_choice(request: HttpRequest) -> HttpResponse:
     if wait:
         return _too_many(wait)
     data = _save_shipping(request, cart, data)
+    ticks = {
+        "terms": legal.ticked(request.POST, "accept_terms"),
+        "onerous": legal.ticked(request.POST, "accept_onerous"),
+    }
     if not _htmx(request):
+        state.save(request, **{LEGAL_TICKS_KEY: ticks if any(ticks.values()) else None})
         return _private(HttpResponseRedirect(reverse("orders:review")))
-    context = _review_context(request, cart, data, partial=True)
+    context = _review_context(request, cart, data, partial=True, ticks=ticks)
     return _page(request, "orders/_review_body.html", context)
 
 

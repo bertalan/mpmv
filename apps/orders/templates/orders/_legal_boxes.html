@@ -5,8 +5,9 @@ link, never a box. Sits right above the pay button (_review_actions.html).
 {% endcomment %}{% if legal %}
 <fieldset class="field field--group legal-boxes">
   <legend class="visually-hidden">{% translate "Terms" %}</legend>
+  {% for name, value in legal.stamps %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
   <div class="field__check">
-    <input type="checkbox" id="accept-terms" name="accept_terms" required>
+    <input type="checkbox" id="accept-terms" name="accept_terms" required{% if ticks.terms %} checked{% endif %}>
     <label for="accept-terms">{% translate "I have read and accept the marketplace terms and the sales terms of each seller named above." %}</label>
   </div>
   <p class="helptext">{% if legal.privacy_url %}<a href="{{ legal.privacy_url }}" target="_blank" rel="noopener">{% translate "Privacy notice" %}</a>{% else %}{% translate "Privacy notice" %}{% endif %}: {% translate "we use your data to carry out this order. Read the notice to know more." %}</p>
@@ -18,7 +19,7 @@ link, never a box. Sits right above the pay button (_review_actions.html).
     <ul>{% for article, title in group.clauses %}<li>{% blocktranslate %}Article {{ article }}: {{ title }}{% endblocktranslate %}</li>{% endfor %}</ul>
     {% endfor %}
     <div class="field__check">
-      <input type="checkbox" id="accept-onerous" name="accept_onerous" required aria-describedby="onerous-title">
+      <input type="checkbox" id="accept-onerous" name="accept_onerous" required{% if ticks.onerous %} checked{% endif %} aria-describedby="onerous-title">
       <label for="accept-onerous">{% translate "I specifically approve the onerous clauses listed above, one by one." %}</label>
     </div>
   </div>

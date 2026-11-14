@@ -9,6 +9,7 @@
 <div>{{ terms.platform.text|linebreaks }}</div>{% endif %}
 {% for seller in terms.sellers %}<h2>{% blocktranslate with name=seller.name number=seller.number %}Sales terms of {{ name }} (version {{ number }}){% endblocktranslate %}</h2>
 <div>{{ seller.text|linebreaks }}</div>
+{% if seller.url %}<p><a href="{{ seller.url }}">{% translate "Read this version online" %}</a></p>{% endif %}
 {% endfor %}{% endif %}
 </body>
 </html>
