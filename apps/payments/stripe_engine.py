@@ -14,6 +14,32 @@ from .engine import InvalidSignature, ProviderError
 # Currencies Stripe counts without minor units; every other one is taken as two decimals.
 ZERO_DECIMAL = frozenset({"BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA", "PYG", "RWF"})
 DEFAULT_TOLERANCE_SECONDS = 300
+# A demo payout account (ARC.10 seed, `connect.record_demo_account`): never sent to Stripe.
+DEMO_ACCOUNT_PREFIX = "acct_demo_"
+MAX_IDEMPOTENCY_KEY = 255  # Stripe's limit on the `Idempotency-Key` header
+
+
+def is_demo_account(account_ref: str) -> bool:
+    return account_ref.startswith(DEMO_ACCOUNT_PREFIX)
+
+
+def transfer_idempotency_key(
+    *, order_ref: str, vendor_ref: str, destination: str, amount: Decimal, currency: str
+) -> str:
+    """The key of one vendor transfer: `transfer:<order>:<vendor>:<destination>:<minor>:<CUR>`.
+
+    Stripe binds a key to the parameters of its first request and stores the answer, an error
+    included, for 24 hours. A key that named only the order and the vendor got `idempotency_error`
+    on every retry once the vendor was linked to another account (STAGE, 2026-11-14), so every
+    parameter that may change is part of the key. A longer key than Stripe accepts keeps the
+    order and the vendor and replaces the rest with a hash."""
+    minor = to_minor(amount, currency)
+    head = f"transfer:{order_ref}:{vendor_ref}"
+    key = f"{head}:{destination}:{minor}:{currency.upper()}"
+    if len(key) <= MAX_IDEMPOTENCY_KEY:
+        return key
+    digest = hashlib.sha256(f"{destination}:{minor}:{currency.upper()}".encode()).hexdigest()
+    return f"{head}:{digest[:32]}"
 
 
 def minor_exponent(currency: str) -> int:
