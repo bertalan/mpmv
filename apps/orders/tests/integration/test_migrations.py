@@ -3,8 +3,16 @@
 import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.loader import MigrationLoader
 
-LATEST = "0013_vehicle_snapshot"
+
+def _orders_leaf() -> str:
+    leaves = MigrationLoader(connection).graph.leaf_nodes("orders")
+    assert len(leaves) == 1, f"orders has several migration leaves: {leaves}"
+    return leaves[0][1]
+
+
+LATEST = _orders_leaf()
 
 
 def migrate(target: str) -> None:
