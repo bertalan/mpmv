@@ -56,6 +56,9 @@ per line.
 - Fee collection is split or deferred.
 - Reports its supported methods and refuses an unsupported one.
 - A payment gives one transfer per vendor; the same idempotency key returns the same result.
+- `transfer(TransferRequest)` (PAY.3) pays one vendor its share after the payment settled, tied to
+  the charge; it is idempotent on the key and never makes a second transfer for the same payment and
+  account (a retry after the provider's key window must find the first one).
 - An unbalanced payment (shares plus fee differ from the amount) is refused.
 - A refund reports the provider cost, reverses the shares, is idempotent, and cannot exceed the
   payment.

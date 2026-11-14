@@ -10,3 +10,9 @@ from django.dispatch import Signal
 
 # sender: the `Payment` class; kwargs: `payment` (the saved row).
 on_payment_succeeded = Signal()
+
+# `on_order_paid` (PAY.3): sent, in the same transaction, right after the payment moved its order
+# to `paid` (not when the order was already paid, or the payment did not match it). The ledger
+# posts the vendor lines and queues the transfers from here. sender: the `Payment` class; kwargs:
+# `payment`. Receivers must be idempotent.
+on_order_paid = Signal()

@@ -55,6 +55,16 @@ class StripeRefund:
 
 
 @dataclass(frozen=True)
+class StripeCharge:
+    """A charge as Stripe reports it, for the refund guard of the transfer sweep (PAY.3)."""
+
+    id: str
+    amount_minor: int
+    currency: str
+    amount_refunded_minor: int = 0  # refunds made anywhere, the Stripe dashboard included
+
+
+@dataclass(frozen=True)
 class StripeAccount:
     """A connected account as Stripe reports it (VEN.6). Only the fields onboarding reads."""
 
@@ -96,6 +106,8 @@ class StripeClient(Protocol):
     ) -> StripeIntent: ...
 
     def get_payment_intent(self, intent_id: str) -> StripeIntent: ...
+
+    def get_charge(self, charge_id: str) -> StripeCharge: ...
 
     def create_transfer(
         self,
@@ -245,6 +257,18 @@ class HttpStripeClient:
 
     def get_payment_intent(self, intent_id: str) -> StripeIntent:
         return self._intent(self._call("GET", f"/payment_intents/{intent_id}", {}))
+
+    def get_charge(self, charge_id: str) -> StripeCharge:
+        data = self._call("GET", f"/charges/{charge_id}", {})
+        try:
+            return StripeCharge(
+                id=str(data["id"]),
+                amount_minor=int(data["amount"]),
+                currency=str(data["currency"]).upper(),
+                amount_refunded_minor=int(data.get("amount_refunded") or 0),
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            raise StripeError(f"Unexpected Stripe answer on /charges/{charge_id}") from error
 
     def create_transfer(
         self,

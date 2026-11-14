@@ -24,6 +24,8 @@ from .engine import (
     ProviderError,
     RefundRequest,
     RefundResult,
+    TransferRequest,
+    TransferResult,
     WebhookEvent,
     validate_payment_request,
 )
@@ -42,6 +44,7 @@ class FakePaymentProvider:
         self._refunds: dict[str, RefundResult] = {}
         self._refunded: dict[str, Decimal] = {}
         self._payouts: list[PayoutRecord] = []
+        self._transfers: dict[str, TransferResult] = {}
         self.reversed_transfers: list[str] = []
 
     def supported_methods(self) -> Sequence[str]:
@@ -79,6 +82,30 @@ class FakePaymentProvider:
                 )
             )
         return result
+
+    def transfer(self, request: TransferRequest) -> TransferResult:
+        if request.idempotency_key in self._transfers:
+            return self._transfers[request.idempotency_key]
+        if request.provider_ref not in self._payments:
+            raise ProviderError("unknown payment")
+        if request.amount <= 0:
+            raise ProviderError("transfer amount must be positive")
+        result = TransferResult(f"fake_tr_x{len(self._transfers) + 1}", request.amount)
+        self._transfers[request.idempotency_key] = result
+        self._payouts.append(
+            PayoutRecord(
+                result.transfer_ref,
+                request.vendor_account_ref,
+                request.amount,
+                request.currency,
+                datetime.now().astimezone(),
+                request.provider_ref,
+            )
+        )
+        return result
+
+    def refunded_amount(self, *, provider_ref: str, charge_ref: str, currency: str) -> Decimal:
+        return self._refunded.get(provider_ref, Decimal("0"))
 
     def payment_client_secret(self, provider_ref: str, order_ref: str) -> str:
         if (
