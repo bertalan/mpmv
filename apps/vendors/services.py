@@ -611,6 +611,14 @@ def member_role(user: User, vendor: Vendor) -> str | None:
     )
 
 
+def is_vendor_owner(user: AbstractBaseUser | AnonymousUser, vendor: object) -> bool:
+    """Whether `user` is an active OWNER member of `vendor` now (`settings.SHOP_OWNER_CHECK`: the
+    passkey levels let a shop owner confirm its own shop's owner actions, D-32 amendment)."""
+    if not (isinstance(vendor, Vendor) and isinstance(user, User) and user.is_active):
+        return False
+    return member_role(user, vendor) == engine.OWNER
+
+
 def has_vendor_permission(user: User, vendor: Vendor, action: str) -> bool:
     """Whether `user` may perform `action` on `vendor` as one of its members.
 

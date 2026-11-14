@@ -6,6 +6,14 @@ the session was last active, and the single-use "do it once" grants. The timers 
 lists come from the `PlatformOperator` configuration (`core.session_policy`), read per request, so
 a change in the configuration takes effect with no code change.
 
+A vendor owner holds no `elevate` permission (only platform roles do), yet the shop space gates
+some of its own actions (D-32 amendment, owner 2026-11-14). For the actions in
+`SHOP_OWNER_ACTIONS`, and only on a shop they own, a vendor owner with a passkey may "Do it once"
+and may open a passkey window scoped to that one shop: it covers only those actions of that shop,
+never a platform action and never another shop, and ownership is re-checked on every covered
+action. The shop is the view's (`requires_level(..., shop=...)`); ownership comes from
+`settings.SHOP_OWNER_CHECK`, since accounts never imports vendors.
+
 Hooks for later work: CORE.26 (vendor policy) replaces `policy()` with the merge of the platform
 policy and the vendor's tightening for shop-space actions; CORE.24 (session lifetimes) owns the
 12 h staff session and the "log out everywhere" list, and should call `close_window` when it
@@ -17,6 +25,7 @@ import hashlib
 import json
 import logging
 import time
+from collections.abc import Mapping
 from typing import Any, Final
 
 from django.conf import settings
@@ -26,6 +35,7 @@ from django.db import IntegrityError, transaction
 from django.dispatch import receiver
 from django.http import HttpRequest
 from django.utils import timezone
+from django.utils.module_loading import import_string
 
 from apps.core import session_policy
 from apps.core.audit import audit_context, record, user_context
@@ -47,6 +57,12 @@ ACTIVITY_KEY: Final = "level_last_activity"
 CHALLENGE_TTL: Final = 120  # seconds a passkey challenge for a level ceremony stays valid
 CHALLENGE_KEY: Final = "level_passkey_challenge"
 SINGLE_CHALLENGE_KEY: Final = "level_single_challenge"
+WINDOW_SHOP_KEY: Final = "level_window_shop"  # the one shop a vendor owner's window covers
+SHOP_OFFERS_KEY: Final = "level_shop_offers"  # prompts offered to a vendor owner, newest last
+MAX_SHOP_OFFERS: Final = 8
+
+# Shop-space actions a vendor owner may confirm for their own shop (D-32 amendment 2026-11-14).
+SHOP_OWNER_ACTIONS: Final = frozenset({"payout_details", "sales_terms_publish"})
 
 SESSION_STARTED: Final = "accounts.session.window_started"
 SESSION_ENDED: Final = "accounts.session.window_ended"
@@ -119,6 +135,64 @@ def may_elevate(user: AbstractBaseUser | AnonymousUser) -> bool:
     )
 
 
+def shop_key(shop: object) -> str:
+    """The scope a shop gives a grant or a window: its model label and primary key."""
+    meta = getattr(shop, "_meta", None)
+    label = meta.label_lower if meta is not None else type(shop).__name__.lower()
+    return f"{label}:{getattr(shop, 'pk', None)}"
+
+
+def is_shop_owner(user: AbstractBaseUser | AnonymousUser, shop: object) -> bool:
+    """Whether `user` owns `shop` now, through `settings.SHOP_OWNER_CHECK` (read on each call)."""
+    check = import_string(settings.SHOP_OWNER_CHECK)
+    return bool(check(user, shop))
+
+
+def may_confirm(user: AbstractBaseUser | AnonymousUser, action: str, shop: object | None) -> bool:
+    """Whether `user` may confirm `action` with a passkey here, once or with a window.
+
+    Staff with `core.elevate` may, as before. A vendor owner may only for an action of
+    `SHOP_OWNER_ACTIONS` on `shop`, a shop they own (re-checked on each call), with a passkey.
+    """
+    if may_elevate(user):
+        return True
+    return (
+        shop is not None
+        and action in SHOP_OWNER_ACTIONS
+        and isinstance(user, User)
+        and user.is_active
+        and has_passkey(user)
+        and is_shop_owner(user, shop)
+    )
+
+
+def offer_shop_confirmation(request: HttpRequest, action: str, digest: str, shop: object) -> None:
+    """Remember that the prompt offered a vendor owner this action on this shop: the passkey
+    endpoints accept a vendor owner only for an offer the server made."""
+    offers = [
+        offer
+        for offer in request.session.get(SHOP_OFFERS_KEY, [])
+        if isinstance(offer, Mapping) and offer.get("digest") != digest
+    ]
+    offers.append({"action": action, "digest": digest, "shop": shop_key(shop)})
+    request.session[SHOP_OFFERS_KEY] = offers[-MAX_SHOP_OFFERS:]
+
+
+def shop_offer(request: HttpRequest, action: str | None = None, digest: str | None = None) -> str:
+    """The shop of the newest offer to this vendor owner matching `action` and `digest` (any
+    offer when both are None), or "". Never for a deactivated user or one without a passkey."""
+    user = request.user
+    if not (isinstance(user, User) and user.is_active and has_passkey(user)):
+        return ""
+    for offer in reversed(request.session.get(SHOP_OFFERS_KEY, [])):
+        if not isinstance(offer, Mapping) or offer.get("action") not in SHOP_OWNER_ACTIONS:
+            continue
+        if action is None or (offer.get("action") == action and offer.get("digest") == digest):
+            shop = offer.get("shop")
+            return shop if isinstance(shop, str) else ""
+    return ""
+
+
 # --- The passkey window
 
 
@@ -139,24 +213,50 @@ def seconds_left(request: HttpRequest) -> int | None:
     return max(0, int(left))
 
 
-def open_window(request: HttpRequest) -> None:
-    """Open the passkey window (the caller verified a fresh passkey)."""
+def open_window(request: HttpRequest, *, shop: str | None = None) -> None:
+    """Open the passkey window (the caller verified a fresh passkey).
+
+    `shop` (a `shop_key`) scopes a vendor owner's window to that shop's owner actions; a window
+    for another scope starts anew rather than widening the old one.
+    """
     request.session.cycle_key()  # a privilege change: a fixed session id is worthless
     now = time.time()
-    renewed = request.session.get(STARTED_KEY) is not None  # a fresh passkey does not reset the cap
+    session = request.session
+    # A fresh passkey does not reset the cap, unless the scope changes.
+    renewed = session.get(STARTED_KEY) is not None and session.get(WINDOW_SHOP_KEY) == shop
     if not renewed:
-        request.session[STARTED_KEY] = now
-    request.session[ACTIVITY_KEY] = now
+        session[STARTED_KEY] = now
+    if shop is None:
+        session.pop(WINDOW_SHOP_KEY, None)
+    else:
+        session[WINDOW_SHOP_KEY] = shop
+    session[ACTIVITY_KEY] = now
     pol = policy()
-    _record(
-        request,
-        SESSION_STARTED,
-        {
-            "kind": "session",
-            "idle_minutes": pol.idle_minutes,
-            "cap_minutes": pol.cap_minutes,
-            "renewed": renewed,
-        },
+    after: dict[str, Any] = {
+        "kind": "session",
+        "idle_minutes": pol.idle_minutes,
+        "cap_minutes": pol.cap_minutes,
+        "renewed": renewed,
+    }
+    if shop is not None:
+        after["shop"] = shop
+    _record(request, SESSION_STARTED, after)
+
+
+def window_covers(request: HttpRequest, action: str, shop: object | None) -> bool:
+    """Whether an open window covers `action` here. A window with no shop scope (opened with
+    `elevate`) covers every action, as before; a vendor owner's window covers only the owner
+    actions of its own shop, with ownership re-checked now."""
+    if current_level(request) != PASSKEY_WINDOW:
+        return False
+    scope = request.session.get(WINDOW_SHOP_KEY)
+    if scope is None:
+        return True
+    return (
+        shop is not None
+        and shop_key(shop) == scope
+        and action in SHOP_OWNER_ACTIONS
+        and may_confirm(request.user, action, shop)
     )
 
 
@@ -165,6 +265,7 @@ def close_window(request: HttpRequest, reason: str) -> None:
     session = request.session
     started = session.pop(STARTED_KEY, None)
     session.pop(ACTIVITY_KEY, None)
+    session.pop(WINDOW_SHOP_KEY, None)
     if started is None:
         return
     _record(
@@ -236,6 +337,8 @@ def _end_on_login(sender: object, request: HttpRequest | None, user: Any, **kwar
         return
     started = request.session.pop(STARTED_KEY, None)
     request.session.pop(ACTIVITY_KEY, None)
+    request.session.pop(WINDOW_SHOP_KEY, None)
+    request.session.pop(SHOP_OFFERS_KEY, None)
     if started is None or user is None:
         return
     model, key = _target(user)
@@ -259,8 +362,9 @@ def _file_digest(upload: Any) -> str:
     return sha.hexdigest()
 
 
-def params_digest(request: HttpRequest) -> str:
-    """A digest of what this request does: method, path, sorted query, and the body.
+def params_digest(request: HttpRequest, *, shop: object | None = None) -> str:
+    """A digest of what this request does: method, path, sorted query, the body, and the shop
+    the view acts on when it names one (a grant for one shop never fits another).
 
     A form body is its sorted fields (the CSRF token excluded) and the name and content hash of
     each uploaded file; any other body is hashed as JSON in canonical form when it parses, else
@@ -288,8 +392,11 @@ def params_digest(request: HttpRequest) -> str:
             body = {"json": json.loads(raw)} if raw else {"empty": True}
         except ValueError:
             body = {"raw": hashlib.sha256(raw).hexdigest()}
+    parts: list[Any] = [request.method, request.path, query, body]
+    if shop is not None:
+        parts.append({"shop": shop_key(shop)})
     material = json.dumps(
-        [request.method, request.path, query, body],
+        parts,
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=True,
@@ -350,13 +457,16 @@ def spend_grant(session_key: str, user: Any, action: str, digest: str) -> bool:
     return spent == 1
 
 
-def grant_single(request: HttpRequest, action: str, digest: str) -> None:
+def grant_single(request: HttpRequest, action: str, digest: str, *, shop: str = "") -> None:
     if not request.session.session_key:
         request.session.create()
     ttl = policy().single_seconds
     assert request.session.session_key  # noqa: S101  # created above
     create_grant(request.session.session_key, request.user, action, digest, ttl=ttl)
-    _record(request, SINGLE_GRANTED, {"kind": "single", "action": action, "seconds": ttl})
+    after: dict[str, Any] = {"kind": "single", "action": action, "seconds": ttl}
+    if shop:
+        after["shop"] = shop
+    _record(request, SINGLE_GRANTED, after)
 
 
 def consume_single(request: HttpRequest, action: str, digest: str) -> bool:

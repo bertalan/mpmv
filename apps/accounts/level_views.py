@@ -70,6 +70,30 @@ def _require_elevate(request: HttpRequest) -> None:
         raise PermissionDenied
 
 
+def _window_scope(request: HttpRequest) -> str | None:
+    """None for staff with `elevate` (a full window); else the shop of the newest owner-action
+    prompt the server showed this vendor owner (a window scoped to it). Refused otherwise."""
+    if levels.may_elevate(request.user):
+        return None
+    shop = levels.shop_offer(request)
+    if not shop:
+        raise PermissionDenied
+    return shop
+
+
+def _once_scope(request: HttpRequest, action: object, digest: object) -> str:
+    """An empty scope for staff with `elevate`; else the shop of the matching offer to this vendor
+    owner (the view re-checks ownership when the grant is spent). Refused otherwise."""
+    if levels.may_elevate(request.user):
+        return ""
+    if not isinstance(action, str) or not isinstance(digest, str):
+        raise PermissionDenied
+    shop = levels.shop_offer(request, action, digest)
+    if not shop:
+        raise PermissionDenied
+    return shop
+
+
 # Sensitive and critical actions (groups 2 and 3) may be done once; a critical one only with its
 # own fresh passkey assertion with user
 # verification (every `_assert` requires it, bound to this action and digest, single use, 120 s).
@@ -98,12 +122,13 @@ def options(request: HttpRequest) -> JsonResponse:
 @signed_in
 @require_POST
 def window(request: HttpRequest) -> JsonResponse:
-    """Verify a fresh passkey assertion and open the passkey window."""
-    _require_elevate(request)
+    """Verify a fresh passkey assertion and open the passkey window (scoped to one shop for a
+    vendor owner)."""
+    shop = _window_scope(request)
     result = _assert(request, levels.CHALLENGE_KEY)
     if isinstance(result, JsonResponse):
         return result
-    levels.open_window(request)
+    levels.open_window(request, shop=shop)
     return JsonResponse({"redirect": safe_next(request)})
 
 
@@ -116,9 +141,9 @@ def window(request: HttpRequest) -> JsonResponse:
 @require_POST
 def once_options(request: HttpRequest) -> JsonResponse:
     """Passkey request options for one action, bound to it and its parameters."""
-    _require_elevate(request)
     body = _json_body(request)
     action, digest = body.get("action"), body.get("digest")
+    _once_scope(request, action, digest)
     if not isinstance(action, str) or not isinstance(digest, str) or not action or not digest:
         return _bad_request("an action and its parameters digest are required")
     if not DIGEST.fullmatch(digest):
@@ -137,15 +162,17 @@ def once_options(request: HttpRequest) -> JsonResponse:
 @require_POST
 def once(request: HttpRequest) -> JsonResponse:
     """Verify a fresh passkey assertion and authorise the bound action once."""
-    _require_elevate(request)
+    if not levels.may_elevate(request.user) and not levels.shop_offer(request):
+        raise PermissionDenied  # before the assertion: no ceremony for who may never pass
     result = _assert(request, levels.SINGLE_CHALLENGE_KEY)
     if isinstance(result, JsonResponse):
         return result
+    shop = _once_scope(request, result.get("action"), result.get("digest"))
     if (
         levels.policy().group_of(result["action"]) not in ONCE_GROUPS
     ):  # the policy may have changed meanwhile
         return _bad_request("this action cannot be done once")
-    levels.grant_single(request, result["action"], result["digest"])
+    levels.grant_single(request, result["action"], result["digest"], shop=shop)
     return JsonResponse({"granted": True})
 
 
