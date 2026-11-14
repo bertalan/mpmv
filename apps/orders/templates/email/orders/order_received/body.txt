@@ -1,3 +1,13 @@
 {% load i18n %}{% if customer_name %}{% blocktranslate %}Hello {{ customer_name }},{% endblocktranslate %}{% else %}{% translate "Hello," %}{% endif %}
 
 {% blocktranslate %}We received your order {{ order_number }} (total {{ total }} EUR). We will confirm it when the payment is complete.{% endblocktranslate %}
+{% if terms.platform or terms.sellers %}
+
+{% translate "The terms you accepted, kept here for your records." %}
+{% if terms.platform %}
+=== {{ terms.platform.title }} ({% blocktranslate with number=terms.platform.number %}version {{ number }}{% endblocktranslate %}) ===
+{{ terms.platform.text }}
+{% endif %}{% for seller in terms.sellers %}
+=== {% blocktranslate with name=seller.name number=seller.number %}Sales terms of {{ name }} (version {{ number }}){% endblocktranslate %} ===
+{{ seller.text }}
+{% endfor %}{% endif %}

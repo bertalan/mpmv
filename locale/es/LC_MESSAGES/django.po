@@ -115,6 +115,11 @@ msgstr "Pedido %(order_number)s: una parte de tu pedido se ha cancelado"
 msgid "Payment received for order %(order_number)s"
 msgstr "Pago recibido por el pedido %(order_number)s"
 
+#: apps/orders/templates/email/orders/order_received/body.html
+#: apps/orders/templates/email/orders/order_received/body.txt
+msgid "Sales terms of %(name)s (version %(number)s)"
+msgstr "Condiciones de venta de %(name)s (versión %(number)s)"
+
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "Ship to:"
@@ -126,11 +131,21 @@ msgstr "Enviar a:"
 msgid "Shipping: %(shipping)s EUR"
 msgstr "Envío: %(shipping)s EUR"
 
+#: apps/orders/templates/email/orders/order_received/body.html
+#: apps/orders/templates/email/orders/order_received/body.txt
+msgid "The terms you accepted, kept here for your records."
+msgstr "Las condiciones que aceptaste, guardadas aquí para tus archivos."
+
 #: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Total: %(total)s EUR"
 msgstr "Total: %(total)s EUR"
+
+#: apps/orders/templates/email/orders/order_received/body.html
+#: apps/orders/templates/email/orders/order_received/body.txt
+msgid "version %(number)s"
+msgstr "versión %(number)s"
 
 #: apps/orders/templates/email/orders/order_received/subject.txt
 msgid "We received your order %(order_number)s"

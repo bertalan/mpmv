@@ -7,12 +7,8 @@
   <h1>{% translate "Order received" %}</h1>
   <p>{% blocktranslate with number=order.number email=order.email %}Your order number is {{ number }}. We sent a confirmation to {{ email }}.{% endblocktranslate %}</p>
   {% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=lines total=grand_total only %}
-  {% if paid %}
-    {% include "components/alert.html" with level="success" message=_("Payment received. Thank you.") only %}
-  {% elif payment_closed %}
-    {% include "components/alert.html" with level="info" message=_("This order is no longer open for payment.") only %}
-  {% elif payment.in_progress %}
-    {% include "components/alert.html" with level="info" message=_("Payment received, confirming. This page updates when the payment is confirmed; do not pay again.") only %}
+  {% if paid or payment_closed or payment.in_progress %}
+    {% include "orders/_payment_status.html" with polling=payment.in_progress %}
   {% elif payment.retry %}
     {% include "components/alert.html" with level="warning" message=_("The payment form could not be loaded. Please reload this page in a moment.") only %}
   {% elif payment %}

@@ -41,7 +41,7 @@ def test_a_failed_first_call_then_a_retry_on_the_payment_page_works(
     cart = with_cart(client)
     add(cart, vendor("Alpha Shop"), "100.00")
     sign_off_details(client)
-    assert client.post(reverse("orders:review")).status_code == 302
+    assert client.post(reverse("orders:review"), {"accept_terms": "on"}).status_code == 302
     order = Order.objects.get()
     assert order.payment_intent_ref == ""
     assert not client.session.get("checkout_payment_ref")  # no empty id remembered
@@ -64,7 +64,7 @@ def test_a_cancelled_order_is_not_shown_as_paid(
     cart = with_cart(client)
     add(cart, vendor("Alpha Shop"), "100.00")
     sign_off_details(client)
-    client.post(reverse("orders:review"))
+    client.post(reverse("orders:review"), {"accept_terms": "on"})
     Order.objects.update(state="cancelled")
     html = client.get(reverse("orders:confirmation")).content.decode()
     assert "Payment received" not in html
@@ -83,14 +83,14 @@ def test_a_failed_second_order_in_the_same_session_still_retries(
     shop = vendor("Alpha Shop")
     add(with_cart(client), shop, "100.00")
     sign_off_details(client)
-    assert client.post(reverse("orders:review")).status_code == 302
+    assert client.post(reverse("orders:review"), {"accept_terms": "on"}).status_code == 302
     first = Order.objects.get()
     assert client.session["checkout_payment_ref"] == first.payment_intent_ref
     real = stripe.create_payment_intent
     monkeypatch.setattr(stripe, "create_payment_intent", failing)
     add(with_cart(client), shop, "50.00")
     sign_off_details(client)
-    assert client.post(reverse("orders:review")).status_code == 302
+    assert client.post(reverse("orders:review"), {"accept_terms": "on"}).status_code == 302
     second = Order.objects.exclude(pk=first.pk).get()
     assert second.payment_intent_ref == ""
     assert "checkout_payment_ref" not in client.session
@@ -114,10 +114,46 @@ def test_the_page_says_payment_in_progress_when_the_customer_already_paid(
     settings.STRIPE_PUBLISHABLE_KEY = "pk_" + secrets.token_urlsafe(12)
     add(with_cart(client), vendor("Alpha Shop"), "100.00")
     sign_off_details(client)
-    client.post(reverse("orders:review"))
+    client.post(reverse("orders:review"), {"accept_terms": "on"})
     order = Order.objects.get()
     intent = stripe.intents[order.payment_intent_ref]
     stripe.intents[intent.id] = dataclasses.replace(intent, status=status)
     html = client.get(reverse("orders:confirmation")).content.decode()
     assert "Payment received, confirming" in html
     assert "payment-form" not in html
+
+
+def test_the_confirming_state_polls_until_the_webhook_marks_the_order_paid(
+    client: Client,
+    commission: None,  # noqa: F811
+    stripe: FakeStripeClient,  # noqa: F811
+    settings: Any,
+) -> None:
+    """ORD.17: HTMX polls the page (no inline script); only the webhook marks the order paid."""
+    import dataclasses
+
+    settings.STRIPE_PUBLISHABLE_KEY = "pk_" + secrets.token_urlsafe(12)
+    add(with_cart(client), vendor("Alpha Shop"), "100.00")
+    sign_off_details(client)
+    client.post(reverse("orders:review"), {"accept_terms": "on"})
+    order = Order.objects.get()
+    intent = stripe.intents[order.payment_intent_ref]
+    stripe.intents[intent.id] = dataclasses.replace(intent, status="processing")
+    page = client.get(reverse("orders:confirmation")).content.decode()
+    assert 'hx-get="' + reverse("orders:confirmation") + '"' in page
+    assert 'hx-trigger="every 3s"' in page
+    assert "<script>" not in page
+    assert "onclick" not in page
+    # A poll before the webhook: still confirming, still polling, the order still unpaid.
+    poll = client.get(reverse("orders:confirmation"), HTTP_HX_REQUEST="true").content.decode()
+    assert "<html" not in poll
+    assert "hx-trigger" in poll
+    assert "confirming" in poll
+    order.refresh_from_db()
+    assert order.state == "awaiting_payment"
+    # The webhook (not the poll) marks it paid: the next poll shows it and stops polling.
+    Order.objects.filter(pk=order.pk).update(state="paid")
+    poll = client.get(reverse("orders:confirmation"), HTTP_HX_REQUEST="true").content.decode()
+    assert "Payment received. Thank you." in poll
+    assert "hx-get" not in poll
+    assert "hx-trigger" not in poll

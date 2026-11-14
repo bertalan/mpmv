@@ -1,0 +1,13 @@
+{% load i18n %}{% comment %}
+The payment status of the confirmation page (ORD.17). While the payment is confirming it polls
+the same URL with HTMX (no script of ours, so the CSP is untouched); once the webhook has marked
+the order paid, the answer has no hx- attributes and the polling stops.
+{% endcomment %}<div id="payment-status"{% if polling %} hx-get="{% url 'orders:confirmation' %}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %} aria-live="polite">
+  {% if paid %}
+    {% include "components/alert.html" with level="success" message=_("Payment received. Thank you.") only %}
+  {% elif payment_closed %}
+    {% include "components/alert.html" with level="info" message=_("This order is no longer open for payment.") only %}
+  {% else %}
+    {% include "components/alert.html" with level="info" message=_("Payment received, confirming. This page updates when the payment is confirmed; do not pay again.") only %}
+  {% endif %}
+</div>

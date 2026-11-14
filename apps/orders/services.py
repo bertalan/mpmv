@@ -283,6 +283,7 @@ def create_order(
     customer_tax_status: str = "b2c",
     vat_validation: dict[str, Any] | None = None,
     vehicle: dict[str, Any] | None = None,
+    terms_acceptance: dict[str, Any] | None = None,
     state: str = "checkout",
     legacy_wp_order_id: int | None = None,
     placed_at: dt.datetime | None = None,
@@ -334,6 +335,8 @@ def create_order(
         customer_tax_status=customer_tax_status,
         vat_validation=vat_validation or {},
         vehicle_snapshot=engine.clean_vehicle_snapshot(vehicle),
+        terms_acceptance=terms_acceptance or {},
+        terms_accepted_at=(now or timezone.now()) if terms_acceptance else None,
         state=state,
         legacy_wp_order_id=legacy_wp_order_id,
     )
@@ -913,6 +916,7 @@ def place_order(
     ctx: AuditContext,
     dry_run: bool = False,
     now: dt.datetime | None = None,
+    terms_acceptance: dict[str, Any] | None = None,
 ) -> tuple[Order | None, ChangeSet]:
     """Place the order in one transaction: verify the live prices and stock (rows locked), create
     the order awaiting payment with its snapshots, and confirm the stock holds.
@@ -966,6 +970,7 @@ def place_order(
             customer_tax_status=preview.customer_tax_status,
             vat_validation=preview.vat_validation,
             vehicle=preview.vehicle,
+            terms_acceptance=terms_acceptance,
             state="awaiting_payment",
             dry_run=dry_run,
             now=now,
