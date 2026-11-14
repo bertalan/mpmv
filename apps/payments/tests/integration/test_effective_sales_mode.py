@@ -5,6 +5,7 @@ a product set to `buy`. No backfill: the answer comes from the account row (or i
 Lives in payments because only payments may know both the account row and the storefront.
 """
 
+import datetime as dt
 from decimal import Decimal
 from typing import Any
 
@@ -23,12 +24,13 @@ from apps.catalog.models import Product
 from apps.catalog.services import ListingFilter
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
 from apps.core.i18n import configured_languages
-from apps.core.models import TranslationStatus
+from apps.core.models import PlatformOperator, TranslationStatus
+from apps.core.tests.factories import PlatformOperatorFactory
 from apps.payments import stripe_engine
 from apps.payments.tests.factories import ConnectedAccountFactory
 from apps.vendors import services as vendors
 from apps.vendors.models import Vendor
-from apps.vendors.tests.factories import VendorFactory
+from apps.vendors.tests.factories import SalesTermsVersionFactory, VendorFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -157,5 +159,45 @@ def test_the_buy_filter_is_one_query_for_many_vendors(
             vendor=vendor, status=Product.Status.PUBLISHED, price_net=PRICE
         )
         assert live_without_text.pk
-    with django_assert_num_queries(1):
+    # One constant lookup of the operator setting (VEN.35), then one query whatever the vendors.
+    with django_assert_num_queries(2):
         assert len(priced()) == 3
+
+
+# --- VEN.35: the operator setting `require_sales_terms` (versioned, off by default)
+
+
+def _require_terms(on: bool) -> None:
+    PlatformOperator.objects.all().delete()
+    PlatformOperatorFactory.create(
+        open_ended=True,
+        valid_from=dt.datetime(2020, 1, 1, tzinfo=dt.UTC),
+        require_sales_terms=on,
+    )
+
+
+def test_without_the_setting_a_vendor_without_terms_sells_by_purchase() -> None:
+    _require_terms(False)
+    vendor = active_vendor()
+    ready(vendor)
+    assert vendors.effective_sales_mode(live(vendor)) == "buy"
+    assert vendors.vendor_sales_mode(vendor) == "buy"
+
+
+def test_with_the_setting_a_vendor_without_terms_is_on_request() -> None:
+    _require_terms(True)
+    vendor = active_vendor()
+    ready(vendor)
+    product = live(vendor)
+    assert vendors.effective_sales_mode(product) == "on_request"
+    assert vendors.vendor_sales_mode(vendor) == "on_request"
+    assert not Vendor.objects.filter(vendors.sells_online()).filter(pk=vendor.pk).exists()
+
+
+def test_with_the_setting_a_vendor_with_terms_in_force_keeps_its_mode() -> None:
+    _require_terms(True)
+    vendor = active_vendor()
+    ready(vendor)
+    SalesTermsVersionFactory.create(vendor=vendor)
+    assert vendors.effective_sales_mode(live(vendor)) == "buy"
+    assert Vendor.objects.filter(vendors.sells_online()).filter(pk=vendor.pk).exists()

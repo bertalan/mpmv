@@ -20,6 +20,7 @@ from django.contrib.sessions.backends.base import SessionBase
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.db.models import OuterRef, ProtectedError, Q, QuerySet, Subquery
+from django.db.models.signals import post_delete, post_save
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.module_loading import import_string
@@ -48,7 +49,14 @@ from apps.accounts.services import (
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
 from apps.core.fields import read_upload
-from apps.core.models import AuditLog, ImageLicence, MediaImage, resolve_translation
+from apps.core.flags import TtlCache
+from apps.core.models import (
+    AuditLog,
+    ImageLicence,
+    MediaImage,
+    PlatformOperator,
+    resolve_translation,
+)
 from apps.core.services import (
     NoPlatformOperator,
     allowed_vendor_countries,
@@ -71,6 +79,7 @@ from .models import (
     CrossVendorConsent,
     LegalFieldRequirement,
     NoTinCountry,
+    SalesTermsInForce,
     SelfCertification,
     Vendor,
     VendorApplication,
@@ -3738,9 +3747,46 @@ def payout_ready(vendor: Vendor) -> bool:
     return account is not None and account.status == engine.PAYOUT_ACCOUNT_READY
 
 
+# This process's copy of the operator's `require_sales_terms`, so a listing of many products
+# reads it once, not once per product. Any save or delete of an operator row drops it, and other
+# processes reload within the TTL.
+REQUIRE_TERMS_TTL_SECONDS = 5
+_REQUIRE_TERMS: TtlCache[bool] = TtlCache()
+
+
+def _load_require_terms() -> bool:
+    try:
+        return current_operator().require_sales_terms
+    except NoPlatformOperator:
+        return False
+
+
+def sales_terms_required() -> bool:
+    """Whether the operator requires sales terms to sell online (VEN.35, off by default)."""
+    return _REQUIRE_TERMS.get(_load_require_terms, ttl=REQUIRE_TERMS_TTL_SECONDS)
+
+
+def forget_require_terms(**_: Any) -> None:
+    _REQUIRE_TERMS.clear()
+
+
+post_save.connect(forget_require_terms, sender=PlatformOperator)
+post_delete.connect(forget_require_terms, sender=PlatformOperator)
+
+
+def terms_ok(vendor: Vendor, *, required: bool | None = None) -> bool:
+    """False when sales terms are required and the vendor has none in force."""
+    if not (sales_terms_required() if required is None else required):
+        return True
+    return SalesTermsInForce.objects.filter(vendor=vendor).exists()
+
+
 def vendor_sales_mode(vendor: Vendor) -> str:
-    """The vendor-level mode buyers get: on request without a ready payout account."""
-    return engine.vendor_sales_mode(vendor.sales_mode_default, payout_ready=payout_ready(vendor))
+    """The vendor-level mode buyers get: on request without a ready payout account, or without
+    sales terms in force when the platform requires them."""
+    return engine.vendor_sales_mode(
+        vendor.sales_mode_default, payout_ready=payout_ready(vendor), terms_ok=terms_ok(vendor)
+    )
 
 
 def effective_sales_mode(product: SoldProduct) -> str:
@@ -3748,16 +3794,22 @@ def effective_sales_mode(product: SoldProduct) -> str:
     forced because no payout account is ready) overrides a product set to `buy`."""
     vendor = product.vendor
     return engine.effective_sales_mode(
-        product.sales_mode, vendor.sales_mode_default, payout_ready=payout_ready(vendor)
+        product.sales_mode,
+        vendor.sales_mode_default,
+        payout_ready=payout_ready(vendor),
+        terms_ok=terms_ok(vendor),
     )
 
 
 def sells_online(prefix: str = "") -> Q:
     """The queryset condition for vendors that sell online: a join on the one-to-one payout
     account, no per-row Python. `prefix` is the path to the vendor, for example "vendor__"."""
-    return Q(
+    condition = Q(
         **{
             f"{prefix}sales_mode_default": Vendor.SalesMode.BUY,
             f"{prefix}{PAYOUT_ACCOUNT_STATUS}": engine.PAYOUT_ACCOUNT_READY,
         }
     )
+    if sales_terms_required():
+        condition &= Q(**{f"{prefix}sales_terms_in_force__isnull": False})
+    return condition

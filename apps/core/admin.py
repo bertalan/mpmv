@@ -68,6 +68,7 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             "dac7_authority_country",
             "support_email",
             "compliance_email",
+            "require_sales_terms",
             "session_policy",
             "authority_contact_email",
             "authority_contact_languages",

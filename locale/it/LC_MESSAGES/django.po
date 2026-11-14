@@ -160,6 +160,13 @@ msgstr ""
 "Un'impronta (SHA-256) del testo esatto che è stato accettato, per dimostrare in seguito che non è "
 "cambiato."
 
+#: apps/vendors/models.py
+msgid "A fingerprint (SHA-256) of this version, to prove later it was not changed."
+msgstr ""
+"Un'impronta (SHA-256) di questa versione, per dimostrare in seguito che non è stata "
+"modificata.Un'impronta (SHA-256) di questa versione, per dimostrare in seguito che non è stata "
+"modificata."
+
 #: apps/ingest/models.py
 msgid "A fingerprint of the data. The same data is stored once per item."
 msgstr "Un'impronta dei dati. Gli stessi dati vengono salvati una sola volta per articolo."
@@ -779,6 +786,10 @@ msgstr "lotto di marchi"
 msgid "brand batches"
 msgstr "lotti di marchi"
 
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Business buyers: the court of %(court)s."
+msgstr "Acquirenti professionali: il tribunale di %(court)s."
+
 #: apps/orders/templates/orders/checkout.html
 msgid "Business purchase"
 msgstr "Acquisto per un'azienda"
@@ -959,9 +970,17 @@ msgstr "Scegli da dove vengono i prodotti: una categoria, un'etichetta, una marc
 msgid "City"
 msgstr "Città"
 
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Clauses for approval by business buyers (art. 1341 Civil Code)"
+msgstr "Clausole da approvare da parte degli acquirenti professionali (art. 1341 Codice civile)"
+
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "Close now"
 msgstr "Chiudi ora"
+
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Committed delivery time: %(days)s days."
+msgstr "Tempo di consegna garantito: %(days)s giorni."
 
 #: apps/vendors/models.py
 msgid ""
@@ -1039,6 +1058,14 @@ msgstr ""
 msgid "Connect your payout account"
 msgstr "Collega il tuo account per i pagamenti"
 
+#: apps/vendors/models.py
+msgid "Consumer"
+msgstr "Consumatore"
+
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Consumers: disputes go to the court of the consumer's own residence."
+msgstr "Consumatori: le controversie spettano al giudice del luogo di residenza del consumatore."
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
@@ -1092,6 +1119,10 @@ msgid ""
 msgstr ""
 "Conta quante volte data, ora o luogo sono cambiati dopo la pubblicazione, così che i calendari "
 "delle persone aggiornino la loro copia. Lo compila la piattaforma."
+
+#: apps/manager/forms.py
+msgid "Court for business buyers"
+msgstr "Foro per gli acquirenti professionali"
 
 #: apps/orders/customer_views.py
 msgid "current step"
@@ -1162,6 +1193,14 @@ msgstr "Consegna"
 #: apps/orders/templates/orders/_review_body.html
 msgid "Delivery details"
 msgstr "Dati di consegna"
+
+#: apps/manager/forms.py
+msgid "Delivery time in days"
+msgstr "Tempo di consegna in giorni"
+
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Delivery, returns and law"
+msgstr "Consegna, resi e legge"
 
 #: apps/manager/termination_views.py
 msgid "Describe the facts relied on."
@@ -1383,6 +1422,10 @@ msgstr "Filtri"
 msgid "Find something you like."
 msgstr "Trova qualcosa che ti piace."
 
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Fingerprint %(hash)s."
+msgstr "Impronta %(hash)s."
+
 #: themes/base/templates/components/footer.html
 msgid "Footer"
 msgstr "Piè di pagina"
@@ -1446,6 +1489,14 @@ msgstr "Vai alla home page"
 #: apps/orders/ui/present.py apps/orders/ui/views.py
 msgid "Goods, excluding VAT"
 msgstr "Merce, IVA esclusa"
+
+#: apps/manager/forms.py
+msgid "Governing law"
+msgstr "Legge applicabile"
+
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Governing law: %(country)s."
+msgstr "Legge applicabile: %(country)s."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -1732,6 +1783,10 @@ msgstr "Immagini"
 #: apps/catalog/taxonomy.py
 msgid "import batch"
 msgstr "lotto di importazione"
+
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid "in force"
+msgstr "in vigore"
 
 #: apps/catalog/templates/catalog/includes/stock_status.html
 msgid "In stock"
@@ -2096,6 +2151,13 @@ msgstr "Nessun secondo fattore per ora."
 msgid "No storefront changes yet."
 msgstr "Nessuna modifica al negozio per ora."
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid "No version is published yet. Until you publish one, your products are sold on request only."
+msgstr ""
+"Nessuna versione è ancora pubblicata. Finché non ne pubblichi una, i tuoi prodotti si vendono solo"
+" su richiesta.Nessuna versione è ancora pubblicata. Finché non ne pubblichi una, i tuoi prodotti "
+"si vendono solo su richiesta."
+
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Nobody holds a platform role yet."
 msgstr "Nessuno ha ancora un ruolo di piattaforma."
@@ -2309,6 +2371,10 @@ msgid ""
 msgstr ""
 "Una o due frasi sotto il titolo, fino a 400 caratteri. Se le lasci vuote, si vede solo il titolo."
 
+#: apps/manager/forms.py
+msgid "Onerous clauses"
+msgstr "Clausole onerose"
+
 #: apps/orders/templates/orders/confirmation.html
 msgid "Online payment is not available yet. The items stay held for you for a short time."
 msgstr ""
@@ -2426,6 +2492,10 @@ msgstr "Solo quando l'evento viene nascosto in seguito a una segnalazione."
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid "Open passkey window"
 msgstr "Apri la finestra passkey"
+
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid "Open the public page"
+msgstr "Apri la pagina pubblica"
 
 #: apps/catalog/taxonomy_admin.py
 msgid "Optional text that replaces the generated credit line. Example: 'Logo: Acme Ltd'."
@@ -2825,6 +2895,10 @@ msgstr ""
 "I prezzi sono senza IVA. Spedizione e IVA vengono calcolate alla cassa, in base al tuo indirizzo "
 "di consegna."
 
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Print"
+msgstr "Stampa"
+
 #: apps/seo/site_links.py
 msgid "Privacy and your data"
 msgstr "Privacy e i tuoi dati"
@@ -2861,6 +2935,14 @@ msgstr "proposto da"
 msgid "Province or state"
 msgstr "Provincia o stato"
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid "Publish"
+msgstr "Pubblica"
+
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid "Publish a new version"
+msgstr "Pubblica una nuova versione"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Published"
 msgstr "Pubblicati"
@@ -2872,6 +2954,15 @@ msgid ""
 msgstr ""
 "Pubblicata nel database di trasparenza UE: niente nomi, email, indirizzi web o numeri di telefono."
 " Lascia vuoto per il testo standard."
+
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid ""
+"Publishing adds a new version and puts it in force. Orders already placed keep the version they "
+"were placed under."
+msgstr ""
+"La pubblicazione aggiunge una nuova versione e la mette in vigore. Gli ordini già effettuati "
+"restano con la versione con cui sono stati fatti.La pubblicazione aggiunge una nuova versione e la"
+" mette in vigore. Gli ordini già effettuati restano con la versione con cui sono stati fatti."
 
 #: apps/manager/templates/manager/shop/order.html apps/orders/templates/orders/customer_order.html
 #: themes/base/templates/components/quantity_stepper.html
@@ -3021,6 +3112,10 @@ msgstr "Limita e invia la motivazione"
 msgid "Retired"
 msgstr "Ritirati"
 
+#: apps/manager/forms.py
+msgid "Return cost information"
+msgstr "Informazioni sul costo del reso"
+
 #: apps/vendors/services.py
 msgid "Returns and refunds"
 msgstr "Resi e rimborsi"
@@ -3028,6 +3123,14 @@ msgstr "Resi e rimborsi"
 #: apps/manager/forms.py
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
+
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Returns: the consumer bears the direct cost of returning the goods."
+msgstr "Resi: il costo diretto di restituzione dei beni è a carico del consumatore."
+
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Returns: the seller bears the cost of returning the goods."
+msgstr "Resi: il costo di restituzione dei beni è a carico del venditore."
 
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "revert"
@@ -3065,6 +3168,16 @@ msgstr "Ruolo"
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Roles"
 msgstr "Ruoli"
+
+#: apps/manager/forms.py apps/manager/sections.py
+#: apps/manager/templates/manager/shop/sales_terms.html
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Sales terms"
+msgstr "Condizioni di vendita"
+
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Sales terms of %(name)s"
+msgstr "Condizioni di vendita di %(name)s"
 
 #: apps/catalog/taxonomy.py
 msgid "sameAs links"
@@ -3119,6 +3232,10 @@ msgstr "Seleziona almeno una riga."
 #: apps/seo/site_links.py
 msgid "Sell with us (vendor application)"
 msgstr "Vendi con noi (candidatura venditore)"
+
+#: apps/vendors/models.py
+msgid "Seller"
+msgstr "Venditore"
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Selling mode"
@@ -3435,6 +3552,10 @@ msgstr ""
 "di azioni. Lascialo vuoto per tenere i valori predefiniti. Un valore che non va bene viene "
 "rifiutato al salvataggio."
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid "Standard clause on applicable law and court"
+msgstr "Clausola tipo su legge applicabile e foro"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
 msgstr "Avvia la revisione"
@@ -3560,6 +3681,10 @@ msgstr "Preavviso di cessazione"
 #: apps/manager/sections.py
 msgid "Terminations"
 msgstr "Cessazioni"
+
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Terms"
+msgstr "Condizioni"
 
 #: apps/manager/termination_views.py
 msgid "That date is too early: the notice is at least 30 days unless an exception applies."
@@ -3794,12 +3919,49 @@ msgid "The change was reverted and the owners were told."
 msgstr "La modifica è stata annullata e i titolari sono stati avvisati."
 
 #: apps/vendors/models.py
+msgid ""
+"The city of the court that decides disputes with business buyers. Empty means the court of your "
+"registered office. It never applies to consumers: their court is always the one of their own "
+"residence."
+msgstr ""
+"La città del tribunale che decide le controversie con gli acquirenti professionali. Se è vuota "
+"vale il tribunale della tua sede legale. Non si applica mai ai consumatori: il loro foro è sempre "
+"quello della loro residenza.La città del tribunale che decide le controversie con gli acquirenti "
+"professionali. Se è vuota vale il tribunale della tua sede legale. Non si applica mai ai "
+"consumatori: il loro foro è sempre quello della loro residenza."
+
+#: apps/manager/forms.py
+msgid ""
+"The city of the court that decides disputes with business buyers. Leave it empty to use the court "
+"of your registered office. It never applies to consumers: their court is always the one of their "
+"own residence."
+msgstr ""
+"La città del tribunale che decide le controversie con gli acquirenti professionali. Lasciala vuota"
+" per usare il tribunale della tua sede legale. Non si applica mai ai consumatori: il loro foro è "
+"sempre quello della loro residenza.La città del tribunale che decide le controversie con gli "
+"acquirenti professionali. Lasciala vuota per usare il tribunale della tua sede legale. Non si "
+"applica mai ai consumatori: il loro foro è sempre quello della loro residenza."
+
+#: apps/vendors/models.py
 msgid "The city of your permanent establishment."
 msgstr "La città della tua stabile organizzazione."
 
 #: apps/vendors/models.py
 msgid "The city of your registered office."
 msgstr "La città della tua sede legale."
+
+#: apps/manager/forms.py
+msgid ""
+"The clauses of your terms that need the separate approval of business buyers (art. 1341, second "
+"paragraph, of the Civil Code), one per line as: article number | title. For example: 7 | "
+"Limitation of liability. Required."
+msgstr ""
+"Le clausole delle tue condizioni che richiedono l'approvazione specifica degli acquirenti "
+"professionali (art. 1341, secondo comma, del Codice civile), una per riga nella forma: numero "
+"dell'articolo | titolo. Per esempio: 7 | Limitazione di responsabilità. Obbligatorio.Le clausole "
+"delle tue condizioni che richiedono l'approvazione specifica degli acquirenti professionali (art. "
+"1341, secondo comma, del Codice civile), una per riga nella forma: numero dell'articolo | titolo. "
+"Per esempio: 7 | Limitazione di responsabilità. Obbligatorio."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -3824,6 +3986,10 @@ msgid ""
 msgstr ""
 "La partita IVA dell'azienda, che inizia con le lettere del paese. Se non sei sicuro, chiedi al tuo"
 " commercialista."
+
+#: apps/manager/forms.py
+msgid "The consumer"
+msgstr "Il consumatore"
 
 #: apps/manager/notice_views.py
 msgid "The content could not be restricted: check the notice status and target."
@@ -3944,6 +4110,17 @@ msgstr ""
 msgid "The country whose authorities issue no tax identification number (TIN)."
 msgstr "Il paese le cui autorità non rilasciano un codice fiscale estero (TIN)."
 
+#: apps/vendors/models.py
+msgid "The country whose law governs these terms. Required."
+msgstr "Il paese la cui legge regola queste condizioni. Obbligatorio."
+
+#: apps/manager/forms.py
+msgid "The country whose law governs your terms, as a two-letter code, for example IT. Required."
+msgstr ""
+"Il paese la cui legge regola le tue condizioni, con il codice di due lettere, per esempio IT. "
+"Obbligatorio.Il paese la cui legge regola le tue condizioni, con il codice di due lettere, per "
+"esempio IT. Obbligatorio."
+
 #: apps/vendors/admin.py
 msgid ""
 "The date and time the rule starts to apply, in Rome time. The rule before it ends at this moment. "
@@ -3989,6 +4166,13 @@ msgstr ""
 "Il giorno e l'ora in cui iniziano i saldi. Serve un prezzo scontato. Lascialo vuoto se i saldi non"
 " hanno una data di inizio."
 
+#: apps/vendors/models.py
+msgid "The day these terms were published. Orders placed after it use this text."
+msgstr ""
+"Il giorno in cui queste condizioni sono state pubblicate. Gli ordini fatti dopo usano questo "
+"testo.Il giorno in cui queste condizioni sono state pubblicate. Gli ordini fatti dopo usano questo"
+" testo."
+
 #: apps/cms/models.py
 msgid ""
 "The day this text starts to apply, for example 2026-12-01. It cannot be earlier than the date of "
@@ -4004,6 +4188,10 @@ msgstr "La decisione è registrata e il segnalante ne viene informato."
 #: apps/ingest/models.py
 msgid "The decision: pending, accepted, rejected or deferred."
 msgstr "La decisione: in attesa, accettato, rifiutato o rimandato."
+
+#: apps/manager/forms.py apps/vendors/models.py
+msgid "The delivery time you commit to, in days from the order. Required."
+msgstr "Il tempo di consegna che ti impegni a rispettare, in giorni dall'ordine. Obbligatorio."
 
 #: apps/compliance/models.py
 msgid "The destination country, as a two-letter code such as 'IT'. Each country has one row."
@@ -4128,6 +4316,23 @@ msgstr ""
 "usare una formattazione semplice. Facoltativo, ma con un testo chiaro chi compra decide più in "
 "fretta."
 
+#: apps/vendors/models.py
+msgid "The full text of your sales terms. Buyers read it before they pay. Required."
+msgstr ""
+"Il testo completo delle tue condizioni di vendita. Gli acquirenti lo leggono prima di pagare. "
+"Obbligatorio.Il testo completo delle tue condizioni di vendita. Gli acquirenti lo leggono prima di"
+" pagare. Obbligatorio."
+
+#: apps/manager/forms.py
+msgid ""
+"The full text of your sales terms. Buyers read it before they pay. Required: a version without a "
+"text cannot be published."
+msgstr ""
+"Il testo completo delle tue condizioni di vendita. Gli acquirenti lo leggono prima di pagare. "
+"Obbligatorio: una versione senza testo non si può pubblicare.Il testo completo delle tue "
+"condizioni di vendita. Gli acquirenti lo leggono prima di pagare. Obbligatorio: una versione senza"
+" testo non si può pubblicare."
+
 #: apps/compliance/forms.py
 msgid ""
 "The full web address of the page that shows the content, starting with http:// or https://. "
@@ -4170,6 +4375,16 @@ msgstr ""
 "L'importazione che ha portato questo marchio, quando non è stato proposto a mano. I marchi di un "
 "lotto vengono rivisti insieme e non contano nel limite di proposte manuali del venditore. Esempio:"
 " 'listino di primavera'."
+
+#: apps/vendors/models.py
+msgid ""
+"The information shown to the buyer before the order about the cost of returning goods. Without it "
+"the consumer cannot be asked to pay and you pay."
+msgstr ""
+"Le informazioni mostrate all'acquirente prima dell'ordine sul costo della restituzione dei beni. "
+"Senza di esse non si può chiedere al consumatore di pagare e paghi tu.Le informazioni mostrate "
+"all'acquirente prima dell'ordine sul costo della restituzione dei beni. Senza di esse non si può "
+"chiedere al consumatore di pagare e paghi tu."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -4639,6 +4854,17 @@ msgstr ""
 "L'impostazione «team di una persona» è attiva: una persona può avere ruoli incompatibili, come "
 "Finanza e pagamenti con Configurazione e tasse. Ogni assegnazione di questo tipo è registrata."
 
+#: apps/vendors/models.py
+msgid ""
+"The onerous clauses of these terms (art. 1341, second paragraph, of the Civil Code): for each, the"
+" article number and its title. Shown to business buyers in the second approval box. Required."
+msgstr ""
+"Le clausole onerose di queste condizioni (art. 1341, secondo comma, del Codice civile): per "
+"ognuna, il numero dell'articolo e il titolo. Mostrate agli acquirenti professionali nella seconda "
+"casella di approvazione. Obbligatorio.Le clausole onerose di queste condizioni (art. 1341, secondo"
+" comma, del Codice civile): per ognuna, il numero dell'articolo e il titolo. Mostrate agli "
+"acquirenti professionali nella seconda casella di approvazione. Obbligatorio."
+
 #: apps/cms/models.py
 msgid ""
 "The opening of the page, built from blocks: say why a seller should join you. If you add none, the"
@@ -5033,6 +5259,22 @@ msgstr "L'esecuzione che ha aperto questo caso."
 msgid "The run's report, in plain text."
 msgstr "Il resoconto dell'esecuzione, in testo semplice."
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid "The sales terms of %(vendor)s. Buyers read them before they pay."
+msgstr "Le condizioni di vendita di %(vendor)s. Gli acquirenti le leggono prima di pagare."
+
+#: apps/manager/forms.py
+msgid "The seller (default)"
+msgstr "Il venditore (predefinito)"
+
+#: apps/vendors/models.py
+msgid "The seller these terms belong to."
+msgstr "Il venditore a cui appartengono queste condizioni."
+
+#: apps/vendors/models.py
+msgid "The seller."
+msgstr "Il venditore."
+
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/termination.html
@@ -5422,6 +5664,18 @@ msgstr ""
 msgid "The verification failed. Please reload the page and try again."
 msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
 
+#: apps/vendors/models.py
+msgid "The version belongs to another seller."
+msgstr "La versione appartiene a un altro venditore."
+
+#: apps/vendors/models.py
+msgid "The version number of these terms for this seller: 1, 2, 3 and so on."
+msgstr "Il numero di versione di queste condizioni per questo venditore: 1, 2, 3 e così via."
+
+#: apps/vendors/models.py
+msgid "The version of the seller's sales terms that is in force."
+msgstr "La versione delle condizioni di vendita del venditore che è in vigore."
+
 #: apps/compliance/models.py
 msgid ""
 "The warnings that come with the product, in this language. A product with warnings is not sold "
@@ -5536,6 +5790,17 @@ msgstr "Per questa pagina non c’è ancora un testo di aiuto."
 #: apps/manager/templates/manager/shop/termination.html
 msgid "There is no termination notice for your shop."
 msgstr "Per il tuo negozio non c’è nessun preavviso di cessazione."
+
+#: apps/manager/sales_terms_views.py
+msgid ""
+"These terms are governed by the law of [country]. Disputes with business buyers are decided by the"
+" court of [city]. For consumers, the court of their residence is always competent."
+msgstr ""
+"Le presenti condizioni sono regolate dalla legge di [paese]. Le controversie con gli acquirenti "
+"professionali sono decise dal tribunale di [città]. Per i consumatori è sempre competente il "
+"giudice del luogo di residenza.Le presenti condizioni sono regolate dalla legge di [paese]. Le "
+"controversie con gli acquirenti professionali sono decise dal tribunale di [città]. Per i "
+"consumatori è sempre competente il giudice del luogo di residenza."
 
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid ""
@@ -5978,6 +6243,22 @@ msgstr "Verifica la tua identità"
 msgid "Version"
 msgstr "Versione"
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid "Version %(number)s is in force since %(date)s."
+msgstr "La versione %(number)s è in vigore dal %(date)s."
+
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid "Version %(number)s, %(date)s"
+msgstr "Versione %(number)s, %(date)s"
+
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Version %(number)s, in force from %(date)s."
+msgstr "Versione %(number)s, in vigore dal %(date)s."
+
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid "Versions"
+msgstr "Versioni"
+
 #: apps/orders/ui/views.py
 msgid "VIES says this VAT number is not valid. VAT is charged on your order."
 msgstr "VIES dice che questa partita IVA non è valida. Sul tuo ordine viene applicata l'IVA."
@@ -6145,6 +6426,16 @@ msgstr ""
 msgid "What the authority asks or what the notice reports, in a few sentences. Required."
 msgstr "Che cosa chiede l'autorità o che cosa segnala l'avviso, in poche frasi. Obbligatorio."
 
+#: apps/manager/forms.py
+msgid ""
+"What the buyer is told before the order about the cost of returning goods, for example how it is "
+"calculated. Without this text the consumer cannot be asked to pay and you pay."
+msgstr ""
+"Cosa viene detto all'acquirente prima dell'ordine sul costo di restituzione dei beni, per esempio "
+"come si calcola. Senza questo testo non si può chiedere al consumatore di pagare e paghi tu.Cosa "
+"viene detto all'acquirente prima dell'ordine sul costo di restituzione dei beni, per esempio come "
+"si calcola. Senza questo testo non si può chiedere al consumatore di pagare e paghi tu."
+
 #: apps/vendors/admin.py
 msgid ""
 "What the commission percentage is applied to. It is frozen on every order at the time of purchase."
@@ -6232,6 +6523,16 @@ msgstr ""
 " della pagina del tuo negozio. Se la lasci vuota, la sezione non viene mostrata. Fino a circa "
 "5.000 caratteri, formattazione compresa. Se non sei sicuro di cosa preveda la legge, chiedi a un "
 "consulente legale."
+
+#: apps/core/models.py
+msgid ""
+"When on, a seller who has not published sales terms sells on request only. Sellers who have "
+"published terms are not affected. Leave it off until your sellers have had time to publish their "
+"terms."
+msgstr ""
+"Se attivo, un venditore che non ha pubblicato le condizioni di vendita vende solo su richiesta. I "
+"venditori che le hanno pubblicate non sono toccati. Lascialo disattivato finché i venditori non "
+"hanno avuto il tempo di pubblicarle."
 
 #: apps/ingest/models.py
 msgid "When the case was decided."
@@ -6467,6 +6768,32 @@ msgid ""
 msgstr ""
 "Chi produce il prodotto: nome, ragione sociale o marchio. Compila insieme i quattro campi del "
 "produttore: un prodotto che li lascia tutti vuoti usa i valori predefiniti del suo venditore."
+
+#: apps/vendors/models.py
+msgid ""
+"Who pays the direct cost of sending goods back after a withdrawal. Empty means you pay. The "
+"consumer pays only if you choose it here and explain it below."
+msgstr ""
+"Chi paga il costo diretto di rispedizione dei beni dopo un recesso. Se è vuoto paghi tu. Il "
+"consumatore paga solo se lo scegli qui e lo spieghi sotto.Chi paga il costo diretto di "
+"rispedizione dei beni dopo un recesso. Se è vuoto paghi tu. Il consumatore paga solo se lo scegli "
+"qui e lo spieghi sotto."
+
+#: apps/manager/forms.py
+msgid ""
+"Who pays the direct cost of sending goods back after a withdrawal. If you leave it empty, you pay."
+" The consumer pays only if you choose it here and explain it below. There is never a fee for "
+"handling a refund."
+msgstr ""
+"Chi paga il costo diretto di rispedizione dei beni dopo un recesso. Se lo lasci vuoto, paghi tu. "
+"Il consumatore paga solo se lo scegli qui e lo spieghi sotto. Non c'è mai una commissione per la "
+"gestione del rimborso.Chi paga il costo diretto di rispedizione dei beni dopo un recesso. Se lo "
+"lasci vuoto, paghi tu. Il consumatore paga solo se lo scegli qui e lo spieghi sotto. Non c'è mai "
+"una commissione per la gestione del rimborso."
+
+#: apps/manager/forms.py
+msgid "Who pays the return"
+msgstr "Chi paga il reso"
 
 #: apps/cms/models.py
 msgid ""
@@ -6756,6 +7083,10 @@ msgstr ""
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
 msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
+
+#: apps/manager/sales_terms_views.py
+msgid "Your sales terms are published and in force."
+msgstr "Le tue condizioni di vendita sono pubblicate e in vigore."
 
 #: apps/manager/forms.py
 msgid ""
