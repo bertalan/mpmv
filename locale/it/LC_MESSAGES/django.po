@@ -567,12 +567,11 @@ msgstr "Aggiungi al carrello"
 msgid "added %(created)s"
 msgstr "aggiunta il %(created)s"
 
-#: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/forms.py
 #: apps/orders/ui/views.py
 msgid "Added to your cart."
 msgstr "Aggiunto al carrello."
 
-#: apps/orders/ui/forms.py
+#: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/forms.py
 msgid "Address"
 msgstr "Indirizzo"
 
@@ -6037,6 +6036,14 @@ msgid ""
 msgstr ""
 "Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può essere modificato. "
 "Contatta l’assistenza per farlo riaprire."
+
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid ""
+"This window covers only the sensitive actions of this shop that its owner confirms. It never "
+"covers another shop."
+msgstr ""
+"Questa finestra copre solo le azioni sensibili di questo negozio che il suo titolare conferma. "
+"Non copre mai un altro negozio."
 
 #: apps/manager/forms.py
 msgid ""

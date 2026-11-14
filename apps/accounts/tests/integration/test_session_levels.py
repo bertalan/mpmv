@@ -1222,3 +1222,29 @@ def test_an_expired_unspent_grant_does_not_block_a_new_one() -> None:
     levels.create_grant("s", user, "export", "d", ttl=-5)
     levels.create_grant("s", user, "export", "d", ttl=120)
     assert levels.spend_grant("s", user, "export", "d")
+
+
+# --- D-32 amendment (owner 2026-11-14): shop owners confirm their own shop's owner actions
+
+
+def test_staff_with_elevate_keep_the_full_prompt_with_no_shop_note(client: Client) -> None:
+    user, _ = _staff_with_passkey()
+    _no_window_session(client, user)
+    refused = client.get(reverse("test-export"))
+    assert refused.context["can_do_once"]
+    assert refused.context["can_elevate"]
+    assert not refused.context["shop_window"]
+    assert "never covers another shop" not in refused.content.decode()
+    assert not client.session.get(levels.SHOP_OFFERS_KEY)
+
+
+def test_a_user_without_elevate_and_without_a_shop_is_never_offered_a_confirmation(
+    client: Client,
+) -> None:
+    user, _ = _staff_with_passkey(elevate=False)
+    _no_window_session(client, user)
+    refused = client.get(reverse("test-export"))
+    assert not refused.context["can_do_once"]
+    assert "Your role may not open a passkey window" in refused.content.decode()
+    for action in sorted(levels.SHOP_OWNER_ACTIONS):
+        assert not levels.may_confirm(user, action, None)
