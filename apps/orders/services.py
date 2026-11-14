@@ -7,6 +7,7 @@ per changed object (SEC.4). `tax` is never imported here; `shipping` only for th
 tracking link (ORD.7).
 """
 
+import contextlib
 import datetime as dt
 import logging
 import uuid
@@ -33,7 +34,7 @@ from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.models import AuditLog
 from apps.core.money import CENT, CURRENCY
-from apps.core.services import audit_changes, flag_enabled
+from apps.core.services import NoPlatformOperator, audit_changes, current_operator, flag_enabled
 from apps.shipping.models import Carrier
 from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
@@ -202,6 +203,18 @@ def _vendor_identity(vendor: Vendor) -> dict[str, Any]:
     }
 
 
+def _frozen_commission(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """The rule snapshot plus the operator's refund-fee surcharge in force now (PAY.4, ARC.7), so a
+    later operator version never changes the fee of this order's refunds. The ceil-to-the-euro
+    rule is fixed in code, not configurable, so there is nothing else to freeze."""
+    frozen = dict(snapshot)
+    if "refund_fee_surcharge" not in frozen:
+        # no operator configured yet: the refund reads the version at creation time
+        with contextlib.suppress(NoPlatformOperator):
+            frozen["refund_fee_surcharge"] = str(current_operator().refund_fee_surcharge)
+    return frozen
+
+
 def _build_vendor_order(
     order: Order, item: VendorOrderInput
 ) -> tuple[VendorOrder, list[OrderLine], engine.Totals]:
@@ -242,7 +255,7 @@ def _build_vendor_order(
         state=item.state,
         vendor_snapshot=_vendor_identity(item.vendor),
         shipping_choice=item.shipping_choice,
-        commission_snapshot=item.commission_snapshot,
+        commission_snapshot=_frozen_commission(item.commission_snapshot),
         tax_profile_snapshot=item.tax_profile_snapshot,
     )
     lines = [

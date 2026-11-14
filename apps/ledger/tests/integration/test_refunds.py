@@ -478,22 +478,72 @@ def test_with_commission_reversal_off_no_reversal_line_is_written(
     assert kinds(sub)["transfer_reversal"] == D("61.00")  # the whole refunded gross comes back
 
 
-def test_the_surcharge_is_the_operator_default_read_at_refund_time(
+def test_a_later_operator_surcharge_does_not_change_the_fee_of_an_existing_order(
     stripe: FakeStripeClient,
 ) -> None:
     sub = pay(stripe, place_409())
+    assert sub.commission_snapshot["refund_fee_surcharge"] == "2.00"  # frozen at placement
     set_operator(refund_fee_surcharge=D("3.00"))  # a version after the order was placed
     refund_through(sub, AMOUNT("amount", amount=D("61.00")))
-    assert kinds(sub)["refund_fee"] == D("-5.00")  # ceil(1.20 + 3.00)
+    assert kinds(sub)["refund_fee"] == D("-4.00")  # ceil(1.20 + 2.00)
 
 
-def test_a_surcharge_frozen_on_the_order_rule_wins_over_the_operator_default(
+def test_an_order_without_a_frozen_surcharge_uses_the_version_at_its_creation() -> None:
+    later = set_operator(refund_fee_surcharge=D("9.00"))
+    second = dt.timedelta(seconds=1)
+    # an order placed before the surcharge was frozen: never the live value
+    assert refunds._fee_rule({}, later.valid_from - second).surcharge == D("2.00")
+    assert refunds._fee_rule({}, later.valid_from + second).surcharge == D("9.00")
+
+
+# --- reversal failure after the provider refund, replay of a completing refund ----------------
+
+
+def test_a_failed_reversal_keeps_the_refund_pending_and_the_sweep_completes_it(
     stripe: FakeStripeClient,
 ) -> None:
-    sub = pay(stripe, place_409({**RULE, "refund_fee_surcharge": "0.00"}))
-    set_operator(refund_fee_surcharge=D("9.00"))
+    sub = pay(stripe, place_409())
+    request_id = rid()
+    stripe.fail_reversals = 1
+    refund_through(sub, AMOUNT("amount", amount=D("61.00")), request_id=request_id)
+    refund = Refund.objects.get()
+    assert refund.reversal_pending
+    assert refund.provider_refund_ref
+    assert kinds(sub)["refund"] == D("-61.00")
+    assert AuditLog.objects.filter(action=refunds.REFUND_REVERSAL_PENDING).exists()
+    # a retry of the same request finds the Refund, never refunds again, and clears the reversal
+    refund_through(sub, AMOUNT("amount", amount=D("61.00")), request_id=request_id)
+    refund.refresh_from_db()
+    assert not refund.reversal_pending
+    assert stripe.calls.count("create_refund") == 1
+    assert Refund.objects.count() == 1
+    assert AuditLog.objects.filter(action=refunds.REFUND_REVERSAL_DONE).exists()
+
+
+def test_the_sweep_retries_the_reversal_under_the_same_key(stripe: FakeStripeClient) -> None:
+    sub = pay(stripe, place_409())
+    stripe.fail_reversals = 1
     refund_through(sub, AMOUNT("amount", amount=D("61.00")))
-    assert kinds(sub)["refund_fee"] == D("-2.00")  # ceil(1.20 + 0.00)
+    assert refunds.retry_pending_reversals() == 1
+    assert not Refund.objects.get().reversal_pending
+    assert stripe.calls.count("create_refund") == 1
+    assert len(stripe.reversals) == 1  # one reversal, taken once
+    assert refunds.retry_pending_reversals() == 0
+
+
+def test_a_replay_of_a_refund_that_completed_the_package_returns_the_same_result(
+    stripe: FakeStripeClient,
+) -> None:
+    sub = pay(stripe, place_409())
+    request_id = rid()
+    whole = AMOUNT("amount", amount=D("122.00"))
+    refund_through(sub, whole, request_id=request_id)
+    sub.refresh_from_db()
+    assert sub.state in {"cancelled", "refunded"}
+    again = refund_through(sub, whole, request_id=request_id)
+    assert again.is_empty
+    assert Refund.objects.count() == 1
+    assert stripe.calls.count("create_refund") == 1
 
 
 # --- outside the platform ---------------------------------------------------------------------

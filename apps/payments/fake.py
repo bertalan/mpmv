@@ -26,6 +26,7 @@ from .engine import (
     RefundResult,
     TransferRequest,
     TransferResult,
+    TransferReversal,
     WebhookEvent,
     validate_payment_request,
 )
@@ -137,6 +138,12 @@ class FakePaymentProvider:
         )
         self._refunds[key] = refund
         return refund
+
+    def reverse_transfers(
+        self, *, idempotency_key: str, currency: str, reversals: Sequence[TransferReversal]
+    ) -> Sequence[str]:
+        self.reversed_transfers.extend(r.transfer_ref for r in reversals)
+        return tuple(f"fake_trr_{r.transfer_ref}" for r in reversals)
 
     def list_payouts(self, since: datetime) -> Sequence[PayoutRecord]:
         return [payout for payout in self._payouts if payout.paid_at >= since]

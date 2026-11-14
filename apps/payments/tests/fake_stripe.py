@@ -27,6 +27,7 @@ class FakeStripeClient:
         self.reversals: list[tuple[str, int]] = []
         self.transfer_calls: list[dict[str, object]] = []
         self.calls: list[str] = []
+        self.fail_reversals = 0  # the next N transfer reversals fail (a Stripe outage)
         self.accounts: dict[str, StripeAccount] = {}
         self.account_calls: list[dict[str, object]] = []
         self.links: list[str] = []
@@ -151,6 +152,9 @@ class FakeStripeClient:
         self, *, transfer_id: str, amount_minor: int, idempotency_key: str
     ) -> str:
         self.calls.append("create_transfer_reversal")
+        if self.fail_reversals > 0:
+            self.fail_reversals -= 1
+            raise StripeError("Stripe is unavailable")
         if (cached := self._replay(f"rv:{idempotency_key}")) is not None:
             assert isinstance(cached, str)
             return cached

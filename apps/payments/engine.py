@@ -137,6 +137,15 @@ class RefundResult:
     reversal_refs: Sequence[str] = ()
 
 
+class TransferReversalFailed(ProviderError):
+    """The provider refund SUCCEEDED but taking the vendor's share back failed (PAY.4): the buyer
+    is already refunded, so the caller must record the refund and retry only the reversal."""
+
+    def __init__(self, message: str, result: "RefundResult") -> None:
+        super().__init__(message)
+        self.result = result
+
+
 @dataclass(frozen=True)
 class PayoutRecord:
     """One line the provider reports for reconciliation with the ledger (PAY.3)."""
@@ -183,6 +192,13 @@ class PaymentProvider(Protocol):
 
     def refund(self, request: RefundRequest) -> RefundResult:
         """Capability 2: full or partial refund, reporting the provider cost for PAY.4."""
+        ...
+
+    def reverse_transfers(
+        self, *, idempotency_key: str, currency: str, reversals: Sequence[TransferReversal]
+    ) -> Sequence[str]:
+        """Retry only the transfer reversals of a refund whose provider refund went through; the
+        keys are `<idempotency_key>:reverse:<transfer>`, the same as in `refund`."""
         ...
 
     def list_payouts(self, since: datetime) -> Sequence[PayoutRecord]:

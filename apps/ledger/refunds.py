@@ -47,16 +47,23 @@ from django.db import transaction
 from django.db.models import QuerySet, Sum
 from django.utils import timezone
 
+from apps.core.alerts import raise_alert
 from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.models import PLATFORM_ERROR, PLATFORM_REFUND_CASES, PlatformOperator
+from apps.core.models import PLATFORM_ERROR, PLATFORM_REFUND_CASES, AuditLog
 from apps.core.money import round_line
+from apps.core.opschecks import Alert
 from apps.core.services import audit_changes, current_operator
 from apps.orders import services as orders_services
 from apps.orders.models import Order, OrderLine, VendorOrder
 from apps.payments import registry
 from apps.payments import settlement as payments_settlement
-from apps.payments.engine import ProviderError, RefundRequest, TransferReversal
+from apps.payments.engine import (
+    ProviderError,
+    RefundRequest,
+    TransferReversal,
+    TransferReversalFailed,
+)
 from apps.payments.models import Payment
 from apps.vendors import engine as vendor_engine
 from apps.vendors.commission import RefundEvent, compute_commission, refund_lines
@@ -71,6 +78,8 @@ REFUND_MODEL = "ledger.refund"
 REFUND_RECORDED = "ledger.refund_recorded"
 REFUND_MARKED_OUTSIDE = "ledger.refund_marked_outside"
 REFUND_FEE_EXCLUDED = "ledger.refund_fee_excluded"
+REFUND_REVERSAL_PENDING = "ledger.refund_reversal_pending"
+REFUND_REVERSAL_DONE = "ledger.refund_reversal_done"
 ZERO = Decimal("0.00")
 MOVED = (RefundChannel.THROUGH_PLATFORM, RefundChannel.PLATFORM_INITIATED)
 _REQUEST_ID = re.compile(r"[A-Za-z0-9_.-]{8,64}")
@@ -147,14 +156,14 @@ def _stored(
     return refund_engine.normalised_lines(selection, _line_figures(sub), already)
 
 
-def _fee_rule(snapshot: dict[str, object], operator: PlatformOperator) -> RefundFeeRule:
-    """The plan's surcharge when the order's frozen rule carries one, else the operator's default
-    read now (ARC.7: the version in force at refund time)."""
+def _fee_rule(snapshot: dict[str, object], placed_at: dt.datetime) -> RefundFeeRule:
+    """The surcharge frozen on the order's rule at placement. An order placed before it was frozen
+    gets the operator version in force when the order was created, never the live value."""
     if SNAPSHOT_SURCHARGE_KEY in snapshot:
         return RefundFeeRule.from_snapshot(
             {SNAPSHOT_SURCHARGE_KEY: str(snapshot[SNAPSHOT_SURCHARGE_KEY])}
         )
-    return RefundFeeRule(surcharge=round_line(operator.refund_fee_surcharge))
+    return RefundFeeRule(surcharge=round_line(current_operator(placed_at).refund_fee_surcharge))
 
 
 def _snapshot_of(sub: VendorOrder) -> dict[str, object]:
@@ -308,10 +317,11 @@ def _refund_money(
     with transaction.atomic():
         sub = _lock(vendor_order)
         _check_paid(sub)
+        if _replay(sub, key, channel, selection):
+            _finish_pending_reversal(key)
+            return result
         if sub.state in {"cancelled", "refunded"}:
             raise RefundRefused(f"the vendor order is {sub.state}: nothing is left to refund")
-        if _replay(sub, key, channel, selection):
-            return result
         operator = current_operator()
         gross = _gross_of(sub, selection, MOVED)
         refunded_before = _sum(_group(sub, MOVED), "refunded_gross")
@@ -319,7 +329,7 @@ def _refund_money(
             raise RefundRefused("the refund exceeds what is left of the vendor order")
         payment = _payment_of(sub.order)
         snapshot = _snapshot_of(sub)
-        rule = _fee_rule(snapshot, operator)
+        rule = _fee_rule(snapshot, sub.order.created_at)
         reverse = (
             channel == RefundChannel.PLATFORM_INITIATED or operator.reverse_fees_on_vendor_refund
         )
@@ -374,8 +384,12 @@ def _refund_money(
                     ),
                 )
             )
+        except TransferReversalFailed as error:
+            answer, pending = error.result, True  # the buyer IS refunded: record it, retry later
         except (ProviderError, registry.UnknownProvider) as error:
             raise RefundFailed(str(error)) from error
+        else:
+            pending = False
         final = lines_for(round_line(answer.provider_cost))
         refund.commission_reversal = final.commission_reversal
         refund.payment_fee_reversal = final.payment_fee_reversal
@@ -383,11 +397,14 @@ def _refund_money(
         refund.provider_cost = round_line(answer.provider_cost)
         refund.provider_refund_ref = answer.refund_ref
         refund.transfer_reversed = reversal_amount
+        refund.reversal_pending = pending
         refund.save()
         _write_lines(sub, refund, answer.refund_ref, answer.reversal_refs, transfer, ctx)
         changes = ChangeSet()
         changes.create(REFUND_MODEL, str(refund.public_id), _created(refund))
         audit_changes(changes, ctx=ctx, action=REFUND_RECORDED)
+        if pending:
+            _flag_pending_reversal(refund, ctx)
         if exclusion is not None:
             flagged = ChangeSet()
             flagged.create(
@@ -405,6 +422,84 @@ def _refund_money(
         result.changes = changes.changes
         result.refund = refund
     return result
+
+
+def _flag_pending_reversal(refund: Refund, ctx: AuditContext) -> None:
+    """Audit and alert staff: the buyer is refunded but the vendor's share is not yet taken back."""
+    flagged = ChangeSet()
+    flagged.create(
+        REFUND_MODEL,
+        str(refund.public_id),
+        {
+            VENDOR_FIELD: str(refund.vendor.public_id),
+            "provider_refund_ref": refund.provider_refund_ref,
+            "transfer_reversed": refund.transfer_reversed,
+        },
+    )
+    audit_changes(flagged, ctx=ctx, action=REFUND_REVERSAL_PENDING)
+    raise_alert(
+        Alert(
+            f"refund-reversal:{refund.public_id}",
+            "A refund went through but the vendor's transfer reversal failed; it is retried",
+            {"refund": str(refund.public_id), "order": refund.vendor_order.order.number},
+        )
+    )
+
+
+def _transfer_ref(sub: VendorOrder) -> str:
+    entry = LedgerEntry.objects.filter(idempotency_key=settlement.key(sub, engine.TRANSFER)).first()
+    return entry.external_ref if entry is not None else ""
+
+
+def _finish_pending_reversal(key: str) -> bool:
+    """Retry only the transfer reversal of the refund with this key, under the same provider key
+    `<key>:reverse:<transfer>` (the provider refund is never called again). True when done or
+    when nothing was pending."""
+    refund = (
+        Refund.objects.select_for_update()
+        .select_related("vendor", "vendor_order__order")
+        .filter(idempotency_key=key, reversal_pending=True)
+        .first()
+    )
+    if refund is None:
+        return True
+    sub = refund.vendor_order
+    transfer = _transfer_ref(sub)
+    ctx = AuditContext(actor_label="system:refund-reversal", source=AuditLog.Source.SYSTEM)
+    try:
+        payment = _payment_of(sub.order)
+        refs = registry.get_provider(payment.provider).reverse_transfers(
+            idempotency_key=key,
+            currency=payment.currency,
+            reversals=((TransferReversal(transfer, refund.transfer_reversed),))
+            if transfer and refund.transfer_reversed > 0
+            else (),
+        )
+    except (ProviderError, registry.UnknownProvider, RefundRefused):
+        _flag_pending_reversal(refund, ctx)
+        return False
+    refund.reversal_pending = False
+    refund.save(update_fields=["reversal_pending"])
+    done = ChangeSet()
+    done.create(
+        REFUND_MODEL,
+        str(refund.public_id),
+        {VENDOR_FIELD: str(refund.vendor.public_id), "reversal_refs": list(refs)},
+    )
+    audit_changes(done, ctx=ctx, action=REFUND_REVERSAL_DONE)
+    return True
+
+
+def retry_pending_reversals() -> int:
+    """The sweep: retry each pending transfer reversal; returns how many cleared."""
+    keys = list(
+        Refund.objects.filter(reversal_pending=True).values_list("idempotency_key", flat=True)
+    )
+    cleared = 0
+    for key in keys:
+        with transaction.atomic():
+            cleared += _finish_pending_reversal(key)
+    return cleared
 
 
 @dataclass(frozen=True)
@@ -618,4 +713,5 @@ __all__ = [
     "mark_refunded_outside",
     "refund_by_platform",
     "refund_through_platform",
+    "retry_pending_reversals",
 ]

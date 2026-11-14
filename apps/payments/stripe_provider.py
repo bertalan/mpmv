@@ -9,6 +9,7 @@ collection and no operator bank account as payee.
 The provider talks to Stripe through `StripeClient` only (`stripe_client.py`).
 """
 
+import dataclasses
 import json
 import time
 from collections.abc import Callable, Sequence
@@ -33,6 +34,7 @@ from .engine import (
     TransferRequest,
     TransferResult,
     TransferReversal,
+    TransferReversalFailed,
     WebhookEvent,
     validate_payment_request,
 )
@@ -206,19 +208,31 @@ class StripePaymentProvider:
                 amount_minor=refund_minor,
                 idempotency_key=request.idempotency_key,
             )
-            reversal_refs: list[str] = []
-            if request.reversals is not None:
-                reversal_refs = self._reverse_given(request, request.reversals)
-            elif request.reverse_vendor_shares:
-                self._reverse_transfers(request, intent, refund_minor)
         except StripeError as error:
             raise ProviderError(str(error)) from error
-        return RefundResult(
+        result = RefundResult(
             refund_ref=refund.id,
             amount=stripe_engine.from_minor(refund.amount_minor, request.currency),
             provider_cost=stripe_engine.from_minor(refund.fee_minor, request.currency),
-            reversal_refs=tuple(reversal_refs),
         )
+        try:
+            if request.reversals is not None:
+                reversal_refs = self._reverse_given(request, request.reversals)
+                result = dataclasses.replace(result, reversal_refs=tuple(reversal_refs))
+            elif request.reverse_vendor_shares:
+                self._reverse_transfers(request, intent, refund_minor)
+        except StripeError as error:
+            raise TransferReversalFailed(str(error), result) from error
+        return result
+
+    def reverse_transfers(
+        self, *, idempotency_key: str, currency: str, reversals: Sequence[TransferReversal]
+    ) -> Sequence[str]:
+        request = RefundRequest("", Decimal("0"), currency, idempotency_key)
+        try:
+            return self._reverse_given(request, reversals)
+        except StripeError as error:
+            raise ProviderError(str(error)) from error
 
     def _reverse_given(
         self, request: RefundRequest, reversals: Sequence[TransferReversal]

@@ -50,7 +50,7 @@ def test_a_platform_default_rule_opens_ordering(client: Client) -> None:
     response = client.post(reverse("orders:review"), BOX1)
     assert response.status_code == 302
     placed = VendorOrder.objects.get(order=Order.objects.get(), vendor=seller)
-    assert placed.commission_snapshot == rule.snapshot()
+    assert placed.commission_snapshot == {**rule.snapshot(), "refund_fee_surcharge": "2.00"}
 
 
 def test_a_vendor_rule_wins_over_the_platform_default(client: Client) -> None:
@@ -64,7 +64,7 @@ def test_a_vendor_rule_wins_over_the_platform_default(client: Client) -> None:
     sign_off_details(client)
     assert client.post(reverse("orders:review"), BOX1).status_code == 302
     placed = VendorOrder.objects.get(vendor=seller)
-    assert placed.commission_snapshot == own.snapshot()
+    assert placed.commission_snapshot == {**own.snapshot(), "refund_fee_surcharge": "2.00"}
     assert placed.commission_snapshot["percent"] == "12.50"
 
 
