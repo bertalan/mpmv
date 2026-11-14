@@ -86,6 +86,7 @@ from apps.tax import services as tax_services
 from apps.tax.models import TaxRate, VendorTaxProfile
 from apps.vendors import engine as vendors_engine
 from apps.vendors import services as vendors_services
+from apps.vendors import terms_services
 from apps.vendors.models import (
     CommissionRule,
     ContractAcceptance,
@@ -176,6 +177,7 @@ def seed(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
         vendors = [_vendor(run, index, spec, contract) for index, spec in enumerate(data.VENDORS)]
         _carriers(run)
         for vendor, spec in zip(vendors, data.VENDORS, strict=True):
+            _sales_terms(run, vendor, spec)
             _products(run, vendor, spec, catalog)
             _shipping(run, vendor, spec)
         images = _images(run)
@@ -343,6 +345,22 @@ def _commission_rule(run: _Run) -> None:
         valid_from=start,
     )
     run.add(vendors_services.add_commission_rule(rule, ctx=run.ctx))
+
+
+def _sales_terms(run: _Run, vendor: Vendor, spec: data.VendorSeed) -> None:
+    """Publish the vendor's sales terms (VEN.35) unless a version is in force.
+
+    Goes through the publish service as the vendor's owner. Versions are immutable records, so
+    `reset` keeps them (like commission rules) and a re-seed finds one in force.
+    """
+    if terms_services.version_in_force(vendor) is not None:
+        return
+    owner = User.objects.get(email__iexact=spec.owner_email)
+    run.add(
+        terms_services.publish_sales_terms(
+            vendor, data.SALES_TERMS[spec.letter].values(), actor=owner, ctx=run.ctx
+        )
+    )
 
 
 def _contract(run: _Run) -> VendorContract:
@@ -1175,12 +1193,16 @@ def _legal_page(
             effective_date=data.LEGAL_EFFECTIVE,
             body=[("paragraph", spec.body["en"])],
         )
+        _set_clauses(page, kind, "en")
         home.add_child(instance=page)
         page = _publish(page)
         run.created("cms.legalpage", page.url_path)
-    elif not page.live:
+    elif _set_clauses(page, kind, "en") or not page.live:
+        was_live = page.live
         _publish(page)
-        run.changes.update("cms.legalpage", page.url_path, {"live": False}, {"live": True})
+        run.changes.update(
+            "cms.legalpage", page.url_path, {"live": was_live}, {"live": True, "version": "new"}
+        )
     for language in ("it",):
         locale = locales.get(language)
         if locale is None:
@@ -1188,7 +1210,12 @@ def _legal_page(
         existing = page.get_translation_or_none(locale)
         if existing is not None:
             existing = existing.specific
-            if not existing.live:
+            if _set_clauses(existing, kind, language):
+                _publish(existing)
+                run.changes.update(
+                    "cms.legalpage", existing.url_path, {"onerous_clauses": []}, {"version": "new"}
+                )
+            elif not existing.live:
                 _publish(existing)
                 run.changes.update(
                     "cms.legalpage", existing.url_path, {"live": False}, {"live": True}
@@ -1198,8 +1225,27 @@ def _legal_page(
         copy.title = copy.draft_title = spec.title[language]
         copy.slug = spec.slug[language]
         copy.body = [("paragraph", spec.body[language])]
+        _set_clauses(copy, kind, language)
         copy = _publish(copy)
         run.created("cms.legalpage", copy.url_path)
+
+
+def _set_clauses(page: LegalPage, kind: str, language: str) -> bool:
+    """Give the customer Terms of sale page its onerous clauses when it has none (ORD.17).
+
+    True when the page changed: the caller publishes it, which records a new LegalPageVersion.
+    A page whose clauses a person already wrote is left alone.
+    """
+    if kind != "terms":
+        return False
+    # A translation starts as a copy of the source page, so it holds the English list.
+    untouched = [[], data.PLATFORM_TERMS_CLAUSES["en"]] if language != "en" else [[]]
+    if (page.onerous_clauses or []) not in untouched:
+        return False
+    if page.onerous_clauses == data.PLATFORM_TERMS_CLAUSES[language]:
+        return False
+    page.onerous_clauses = list(data.PLATFORM_TERMS_CLAUSES[language])
+    return True
 
 
 def _seed_pages(model: Any, slugs: Iterable[str]) -> list[Any]:

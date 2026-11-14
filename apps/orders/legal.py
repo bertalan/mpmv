@@ -157,11 +157,18 @@ def build_step(vendors: Sequence[Vendor], *, language: str, business: bool) -> L
         sellers=sellers,
         box2_groups=[Box2Group(p.label, p.clauses) for p in shown],
         platform_court=(
-            _("the court of the seat of %(operator)s") % {"operator": operator_name}
+            platform_court_text(operator_name)
             if business
             else _("the court of your own place of residence")
         ),
     )
+
+
+def platform_court_text(operator_name: str) -> str:
+    """The business court sentence without a final full stop: the template ends it with one,
+    so a name like "Example S.r.l." must not give two."""
+    text = _("the court of the seat of %(operator)s") % {"operator": operator_name}
+    return text.rstrip().removesuffix(".")
 
 
 def check(step: LegalStep, post: Mapping[str, Any]) -> list[str]:

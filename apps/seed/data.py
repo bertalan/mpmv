@@ -12,7 +12,7 @@ its rows again by these keys, and `--reset` removes only rows that carry them.
 import datetime as dt
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Final
+from typing import Any, Final
 
 # Synthetic vendors and events located in Italy, one of the EU member states the demo uses.
 ITALY: Final = "IT"  # country-literal: synthetic demo data, not the platform country
@@ -604,6 +604,122 @@ VENDORS: Final = (
         closed_areas=("fr-guadeloupe", "fr-martinique", "fr-guiana", "fr-reunion", "fr-mayotte"),
     ),
 )
+
+# --- Sales terms (VEN.35) and the customer Terms of sale clauses (ORD.17)
+
+
+@dataclass(frozen=True)
+class SalesTermsSeed:
+    """One vendor's sales terms version: the fields `publish_sales_terms` takes (VEN.35).
+
+    The clause list can never be empty (a version without it cannot be published), so the
+    variety between vendors is in the clauses themselves. The court is a city near the vendor's
+    demo address; the law is the vendor's own country.
+    """
+
+    body: Texts
+    clauses: tuple[tuple[str, Texts], ...]  # (article, title by language)
+    governing_law: str
+    b2b_court: str
+    delivery_days: int
+    return_cost_bearer: str = ""
+    return_cost_info: str = ""
+
+    def values(self, language: str = "en") -> dict[str, Any]:
+        body = "\n\n".join(self.body[code] for code in ("it", "en"))
+        return {
+            "body": body,
+            "clauses": [
+                {"article": article, "title": titles[language]} for article, titles in self.clauses
+            ],
+            "governing_law": self.governing_law,
+            "b2b_court": self.b2b_court,
+            "delivery_days": self.delivery_days,
+            "return_cost_bearer": self.return_cost_bearer,
+            "return_cost_info": self.return_cost_info,
+        }
+
+
+_LIABILITY: Final[Texts] = {"en": "Limitation of liability", "it": "Limitazione di responsabilità"}
+_COURT: Final[Texts] = {"en": "Competent court", "it": "Foro competente"}
+_TERMINATION: Final[Texts] = {
+    "en": "Right to terminate the contract",
+    "it": "Facoltà di recedere dal contratto",
+}
+_TACIT: Final[Texts] = {"en": "Tacit renewal", "it": "Tacita proroga o rinnovo del contratto"}
+_ARBITRATION: Final[Texts] = {"en": "Arbitration clause", "it": "Clausola compromissoria"}
+_DEFENCES: Final[Texts] = {
+    "en": "Restriction of the right to raise defences",
+    "it": "Limitazione della facoltà di opporre eccezioni",
+}
+
+
+def _terms_body(shop: str) -> Texts:
+    return {
+        "it": f"Condizioni generali di vendita di {shop} (testo dimostrativo inventato). "
+        "Gli ordini sono confermati per email. La consegna avviene all'indirizzo indicato "
+        "nell'ordine. Per i consumatori valgono il diritto di recesso e la garanzia legale.",
+        "en": f"General terms of sale of {shop} (invented demo text). Orders are confirmed by "
+        "email. Goods are delivered to the address given in the order. Consumers keep the right "
+        "of withdrawal and the legal guarantee.",
+    }
+
+
+SALES_TERMS: Final[dict[str, SalesTermsSeed]] = {
+    "A": SalesTermsSeed(
+        body=_terms_body("Vendor A Workshop"),
+        clauses=(("7", _LIABILITY), ("12", _COURT)),
+        governing_law=ITALY,
+        b2b_court="Firenze",
+        delivery_days=5,
+    ),
+    "B": SalesTermsSeed(
+        body=_terms_body("Vendor B"),
+        clauses=(("5", _TERMINATION), ("8", _LIABILITY), ("11", _TACIT), ("14", _COURT)),
+        governing_law=ITALY,
+        b2b_court="Milano",
+        delivery_days=7,
+        return_cost_bearer="consumer",
+        return_cost_info="The direct cost of sending the goods back after a withdrawal is paid "
+        "by the buyer. Estimate for a parcel up to 5 kg: 12 euro.",
+    ),
+    "C": SalesTermsSeed(
+        body=_terms_body("Vendor C"),
+        clauses=(("9", _COURT),),
+        governing_law=ITALY,
+        b2b_court="Bologna",
+        delivery_days=4,
+    ),
+    "D": SalesTermsSeed(
+        body=_terms_body("Vendor D"),
+        clauses=(("6", _LIABILITY), ("10", _ARBITRATION), ("13", _COURT)),
+        governing_law="DE",
+        b2b_court="Berlin",
+        delivery_days=10,
+        return_cost_bearer="consumer",
+        return_cost_info="The buyer pays the direct cost of returning the goods after a "
+        "withdrawal. Estimate: 15 euro.",
+    ),
+    "E": SalesTermsSeed(
+        body=_terms_body("Vendor E Studio"),
+        clauses=(("4", _DEFENCES), ("8", _LIABILITY)),
+        governing_law="FR",
+        b2b_court="Lyon",
+        delivery_days=8,
+    ),
+}
+
+#: The customer "Terms of sale" CMS page lists these onerous clauses (art. 1341(2) c.c.).
+PLATFORM_TERMS_CLAUSES: Final[dict[str, list[dict[str, str]]]] = {
+    "en": [
+        {"article": "9", "title": "Limitation of liability"},
+        {"article": "14", "title": "Competent court"},
+    ],
+    "it": [
+        {"article": "9", "title": "Limitazione di responsabilità"},
+        {"article": "14", "title": "Foro competente"},
+    ],
+}
 
 # --- Products
 
