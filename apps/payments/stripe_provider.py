@@ -32,6 +32,7 @@ from .engine import (
     RefundResult,
     TransferRequest,
     TransferResult,
+    TransferReversal,
     WebhookEvent,
     validate_payment_request,
 )
@@ -205,7 +206,10 @@ class StripePaymentProvider:
                 amount_minor=refund_minor,
                 idempotency_key=request.idempotency_key,
             )
-            if request.reverse_vendor_shares:
+            reversal_refs: list[str] = []
+            if request.reversals is not None:
+                reversal_refs = self._reverse_given(request, request.reversals)
+            elif request.reverse_vendor_shares:
                 self._reverse_transfers(request, intent, refund_minor)
         except StripeError as error:
             raise ProviderError(str(error)) from error
@@ -213,7 +217,26 @@ class StripePaymentProvider:
             refund_ref=refund.id,
             amount=stripe_engine.from_minor(refund.amount_minor, request.currency),
             provider_cost=stripe_engine.from_minor(refund.fee_minor, request.currency),
+            reversal_refs=tuple(reversal_refs),
         )
+
+    def _reverse_given(
+        self, request: RefundRequest, reversals: Sequence[TransferReversal]
+    ) -> list[str]:
+        """Reverse exactly the transfers the caller names (PAY.4): one reversal per transfer."""
+        refs: list[str] = []
+        for reversal in reversals:
+            minor = stripe_engine.to_minor(reversal.amount, request.currency)
+            if minor <= 0:
+                raise ProviderError("a transfer reversal must be positive")
+            refs.append(
+                self._client.create_transfer_reversal(
+                    transfer_id=reversal.transfer_ref,
+                    amount_minor=minor,
+                    idempotency_key=f"{request.idempotency_key}:reverse:{reversal.transfer_ref}",
+                )
+            )
+        return refs
 
     def _reverse_transfers(
         self, request: RefundRequest, intent: StripeIntent, refund_minor: int

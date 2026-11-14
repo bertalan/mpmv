@@ -72,6 +72,13 @@ def test_the_d41_refund_settings_are_saved_from_the_admin_form(staff_client: Cli
     assert stored.platform_refund_cases == ["platform_error"]
 
 
+def test_an_empty_surcharge_in_the_admin_form_means_the_default(staff_client: Client) -> None:
+    data = _form()
+    data["refund_fee_surcharge"] = ""
+    assert staff_client.post(reverse("admin:core_platformoperator_add"), data).status_code == 302
+    assert str(PlatformOperator.objects.get().refund_fee_surcharge) == "2.00"
+
+
 def test_adding_a_new_row_closes_the_current_one(staff_client: Client) -> None:
     staff_client.post(reverse("admin:core_platformoperator_add"), _form())
     staff_client.post(

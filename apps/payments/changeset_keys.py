@@ -6,3 +6,8 @@ PAYMENT_SUCCEEDED = "payments.payment.succeeded"
 CONNECTED_ACCOUNT_MODEL = "payments.connectedaccount"
 CONNECTED_ACCOUNT_CREATED = "payments.connected_account.created"
 CONNECTED_ACCOUNT_UPDATED = "payments.connected_account.updated"
+
+# PAY.4 (#438 review): a payment that succeeded on an order already paid is refunded in full.
+PAYMENT_DUPLICATE_FLAGGED = "payments.payment.duplicate_flagged"
+PAYMENT_DUPLICATE_REFUNDED = "payments.payment.duplicate_refunded"
+PAYMENT_DUPLICATE_REFUND_FAILED = "payments.payment.duplicate_refund_failed"

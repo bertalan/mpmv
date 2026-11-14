@@ -28,6 +28,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import QuerySet, Sum
 from django.utils import timezone
 
 from apps.core.audit import VENDOR_FIELD, AuditContext
@@ -42,7 +43,7 @@ from apps.payments.models import Payment
 from apps.vendors.engine import NoCommissionRule
 
 from . import engine, services
-from .models import LedgerEntry
+from .models import LedgerEntry, Refund, RefundChannel
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +55,11 @@ TRANSFER_FAILED = "ledger.transfer_failed"
 TRANSFER_WITHOUT_ACCOUNT = "ledger.transfer_without_account"
 TRANSFER_BLOCKED = "ledger.transfer_blocked"
 TRANSFER_SKIPPED_REFUNDED = "ledger.transfer_skipped_refunded"
-# Order or package states from which no transfer may leave. A partial refund is included on
-# purpose: the refunded share of each vendor is not known here, so nothing is paid until staff
-# decide (PAY.4 owns the refund accounting).
+# Order or package states from which no transfer may leave. `partially_refunded` blocks too,
+# unless the platform itself recorded the refund (`recorded_refunded`, PAY.4): a refund through
+# the platform is a `Refund` row with ledger lines per vendor package, so a pending transfer is
+# reduced by it, or dropped when nothing is left (`transferable_net`). A partial refund nobody
+# recorded (a state set by hand, the Stripe dashboard) keeps blocking everything.
 # (A paid order cannot be cancelled: the order table refuses it, and `paid_order` excludes
 # cancelled orders anyway. The state stays listed as a second line of defence.)
 _NO_TRANSFER_ORDER_STATES = frozenset({"cancelled", "refunded", "partially_refunded"})
@@ -113,7 +116,10 @@ def _problem_once(
 
 
 def paid_order(payment: Payment) -> Order | None:
-    """The paid order this payment settles, or None (unknown order, not paid, other amount)."""
+    """The paid order this payment settles, or None (unknown order, not paid, other amount, or a
+    duplicate payment: PAY.4 refunds it in full and nothing is posted or transferred from it)."""
+    if payment.duplicate:
+        return None
     order = Order.objects.filter(number=payment.order_ref).first()
     if order is None or order.state not in PAID_OR_LATER:
         return None
@@ -211,33 +217,88 @@ def transfer_payment(payment: Payment, *, ctx: AuditContext | None = None) -> Ou
     paid_total = sum((line.vendor_net for line in plan.vendors if line.transferable), Decimal("0"))
     charge_check = _ChargeCheck()
     for line in plan.vendors:
-        vendor_order = line.vendor_order
-        if LedgerEntry.objects.filter(idempotency_key=key(vendor_order, engine.TRANSFER)).exists():
-            continue
-        if not LedgerEntry.objects.filter(idempotency_key=key(vendor_order, engine.SALE)).exists():
-            continue  # not posted (blocked above): never transfer without ledger lines
-        if line.vendor_net <= 0:
-            continue
-        reason = _refund_reason(provider, payment, order, vendor_order, charge_check)
-        if reason:
-            outcome.refunded += 1
-            _problem_once(TRANSFER_SKIPPED_REFUNDED, vendor_order, {"reason": reason}, ctx)
-            continue
-        if not line.account_ref:
-            outcome.skipped += 1
-            _noted_without_account(vendor_order, line, ctx)
-            continue
-        if paid_total > payment.amount:
-            outcome.blocked += 1
-            _problem_once(
-                TRANSFER_BLOCKED,
-                vendor_order,
-                {"reason": "the vendor shares exceed the payment", "payment": payment.amount},
-                ctx,
-            )
-            continue
-        _send(provider, payment, order, line, ctx, outcome)
+        # The vendor order row is locked while its transfer is decided and sent: a refund through
+        # the platform (`apps.ledger.refunds`) takes the same lock, so a transfer and a refund of
+        # one package never interleave (PAY.4).
+        with transaction.atomic():
+            VendorOrder.objects.select_for_update().filter(pk=line.vendor_order.pk).first()
+            _transfer_vendor(provider, payment, order, line, paid_total, charge_check, ctx, outcome)
     return outcome
+
+
+def _transfer_vendor(
+    provider: PaymentProvider,
+    payment: Payment,
+    order: Order,
+    line: settlement.VendorSettlement,
+    paid_total: Decimal,
+    charge_check: "_ChargeCheck",
+    ctx: AuditContext,
+    outcome: Outcome,
+) -> None:
+    vendor_order = line.vendor_order
+    vendor_order.refresh_from_db(fields=["state"])
+    if LedgerEntry.objects.filter(idempotency_key=key(vendor_order, engine.TRANSFER)).exists():
+        return
+    if not LedgerEntry.objects.filter(idempotency_key=key(vendor_order, engine.SALE)).exists():
+        return  # not posted (blocked above): never transfer without ledger lines
+    if line.vendor_net <= 0:
+        return
+    reason = _refund_reason(provider, payment, order, vendor_order, charge_check)
+    if reason:
+        outcome.refunded += 1
+        _problem_once(TRANSFER_SKIPPED_REFUNDED, vendor_order, {"reason": reason}, ctx)
+        return
+    amount = transferable_net(vendor_order, line.vendor_net)
+    if amount <= 0:  # refunded before the transfer: nothing is left to send (PAY.4)
+        outcome.refunded += 1
+        _problem_once(
+            TRANSFER_SKIPPED_REFUNDED, vendor_order, {"reason": "refunded before the transfer"}, ctx
+        )
+        return
+    if not line.account_ref:
+        outcome.skipped += 1
+        _noted_without_account(vendor_order, line, ctx)
+        return
+    if paid_total > payment.amount:
+        outcome.blocked += 1
+        _problem_once(
+            TRANSFER_BLOCKED,
+            vendor_order,
+            {"reason": "the vendor shares exceed the payment", "payment": payment.amount},
+            ctx,
+        )
+        return
+    _send(provider, payment, order, line, amount, ctx, outcome)
+
+
+# Ledger kinds that move money to or from the vendor's account: not part of what is still owed.
+_TRANSFER_KINDS = (engine.TRANSFER, engine.TRANSFER_REVERSAL)
+
+
+def moved_refunds(vendor_order: VendorOrder) -> "QuerySet[Refund]":
+    """The refunds of a package that moved money (through the platform, or by the platform);
+    the vendor's outside-the-platform marks move nothing and are not here."""
+    return Refund.objects.filter(
+        vendor_order=vendor_order,
+        channel__in=[RefundChannel.THROUGH_PLATFORM, RefundChannel.PLATFORM_INITIATED],
+    )
+
+
+def transferable_net(vendor_order: VendorOrder, vendor_net: Decimal) -> Decimal:
+    """What a still-pending transfer may send (PAY.4): the paid-time `vendor_net`, reduced by
+    every refund of the package (the refund line, the reversed commission and collection cost and
+    the refund fee are all ledger lines). Without a refund it is `vendor_net`. Zero or less means
+    the refund took it all: no transfer is made, and no reverse transfer follows for a transfer
+    that never existed."""
+    if not moved_refunds(vendor_order).exists():
+        return vendor_net
+    owed = (
+        LedgerEntry.objects.filter(vendor_order=vendor_order)
+        .exclude(kind__in=_TRANSFER_KINDS)
+        .aggregate(total=Sum("amount"))["total"]
+    )
+    return engine.money(owed or Decimal("0"))
 
 
 class _ChargeCheck:
@@ -259,7 +320,9 @@ def _refund_reason(
     Order and package state first (cheap), then the provider's own view of the charge: a refund
     made in the Stripe dashboard is not in our states yet. Any refund, full or partial, blocks;
     a charge that cannot be read blocks too (nothing is paid on uncertainty) and is retried."""
-    if order.state in _NO_TRANSFER_ORDER_STATES:
+    if order.state in _NO_TRANSFER_ORDER_STATES and not (
+        order.state == "partially_refunded" and recorded_refunded(order) > 0
+    ):
         return f"order is {order.state}"
     if vendor_order.state in _NO_TRANSFER_PACKAGE_STATES:
         return f"package is {vendor_order.state}"
@@ -276,9 +339,19 @@ def _refund_reason(
         except ProviderError as error:
             logger.warning("refund state unreadable for %s: %s", payment.provider_ref, error)
             return "refund state of the charge could not be read"
-    if check.amount > 0:
-        return "charge refunded at the provider"
+    if check.amount > recorded_refunded(order):
+        return "charge refunded at the provider"  # more than the platform recorded
     return ""
+
+
+def recorded_refunded(order: Order) -> Decimal:
+    """What the platform itself refunded on this order's payment (`Refund` rows that moved money).
+    A refund at the provider above this figure was made elsewhere, e.g. in the Stripe dashboard."""
+    total = Refund.objects.filter(
+        vendor_order__order=order,
+        channel__in=[RefundChannel.THROUGH_PLATFORM, RefundChannel.PLATFORM_INITIATED],
+    ).aggregate(total=Sum("refunded_gross"))["total"]
+    return engine.money(total or Decimal("0"))
 
 
 def _noted_without_account(
@@ -299,6 +372,7 @@ def _send(
     payment: Payment,
     order: Order,
     line: settlement.VendorSettlement,
+    amount: Decimal,
     ctx: AuditContext,
     outcome: Outcome,
 ) -> None:
@@ -310,7 +384,7 @@ def _send(
                 provider_ref=payment.provider_ref,
                 charge_ref=payment.charge_ref,
                 vendor_account_ref=line.account_ref,
-                amount=line.vendor_net,
+                amount=amount,
                 currency=payment.currency,
                 idempotency_key=f"transfer:{order.public_id}:{vendor_order.vendor.public_id}",
                 reference=str(vendor_order.public_id),
@@ -325,14 +399,15 @@ def _send(
         services.record_entry(
             vendor_order.vendor,
             kind=engine.TRANSFER,
-            amount=-line.vendor_net,
+            amount=-amount,
             idempotency_key=key(vendor_order, engine.TRANSFER),
             ctx=ctx,
             vendor_order=vendor_order,
             source_ref=order.number,
             external_ref=result.transfer_ref,
             gateway_account=line.account_ref,
-            memo="vendor net transferred to the connected account",
+            memo="vendor net transferred to the connected account"
+            + (" (reduced by a refund)" if amount != line.vendor_net else ""),
         )
     except _POSTING_ERRORS as error:  # the money moved: the next sweep records it (same transfer)
         outcome.failed += 1
@@ -356,10 +431,17 @@ def pending_payments(*, now: dt.datetime | None = None) -> list[Payment]:
             transferred = LedgerEntry.objects.filter(
                 idempotency_key=key(vendor_order, engine.TRANSFER)
             ).exists()
-            if not transferred:
+            if not transferred and not _refunded_away(vendor_order):
                 pending.append(payment)
                 break
     return pending
+
+
+def _refunded_away(vendor_order: VendorOrder) -> bool:
+    """A package whose refunds took everything the transfer would have sent (PAY.4)."""
+    if not moved_refunds(vendor_order).exists():
+        return False
+    return transferable_net(vendor_order, Decimal("0")) <= 0
 
 
 def settle_pending(*, now: dt.datetime | None = None) -> Outcome:

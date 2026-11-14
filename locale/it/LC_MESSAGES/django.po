@@ -567,12 +567,11 @@ msgstr "Aggiungi al carrello"
 msgid "added %(created)s"
 msgstr "aggiunta il %(created)s"
 
-#: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/forms.py
 #: apps/orders/ui/views.py
 msgid "Added to your cart."
 msgstr "Aggiunto al carrello."
 
-#: apps/orders/ui/forms.py
+#: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/forms.py
 msgid "Address"
 msgstr "Indirizzo"
 
@@ -3998,6 +3997,23 @@ msgstr ""
 "Il nome del corriere in questa lingua, per esempio 'Corriere standard'. Compare ai clienti quando "
 "il checkout userà la spedizione."
 
+#: apps/core/models.py
+msgid ""
+"The cases where the platform refunds a buyer on its own: its own error, or a seller who defaults "
+"(for example, never ships). Leave a case out to switch it off."
+msgstr ""
+"I casi in cui la piattaforma rimborsa l'acquirente di propria iniziativa: un suo errore, o un "
+"venditore inadempiente (ad esempio non spedisce mai). Lascia fuori un caso per disattivarlo."
+
+#: apps/core/admin.py
+msgid ""
+"The cases where the platform refunds a buyer on its own: its own error, or a seller who defaults "
+"(for example, never ships). Leave a case unticked to switch it off."
+msgstr ""
+"I casi in cui la piattaforma rimborsa l'acquirente di propria iniziativa: un suo errore, o un "
+"venditore inadempiente (ad esempio non spedisce mai). Lascia un caso senza spunta per "
+"disattivarlo."
+
 #: apps/ingest/models.py
 msgid "The catalogue product the case is about, if it is about one."
 msgstr "Il prodotto del catalogo a cui si riferisce il caso, se riguarda un prodotto."
@@ -4370,6 +4386,15 @@ msgid "The first day of an all-day event. Required when 'All day' is ticked."
 msgstr ""
 "Il primo giorno di un evento che dura tutto il giorno. Obbligatorio quando 'Tutto il giorno' è "
 "spuntato."
+
+#: apps/core/models.py
+msgid ""
+"The fixed part of the refund fee in EUR, added to the payment provider's real cost and rounded up "
+"to the whole euro. A seller's plan can set its own amount."
+msgstr ""
+"La parte fissa della commissione di rimborso in EUR, aggiunta al costo reale del fornitore di "
+"pagamenti e arrotondata per eccesso all'euro intero. Il piano di un venditore può fissare un "
+"importo proprio."
 
 #: themes/base/templates/403_csrf.html
 msgid "The form was sent from an old or expired page. Go back, reload the page and send it again."
@@ -6684,6 +6709,26 @@ msgstr ""
 " della pagina del tuo negozio. Se la lasci vuota, la sezione non viene mostrata. Fino a circa "
 "5.000 caratteri, formattazione compresa. Se non sei sicuro di cosa preveda la legge, chiedi a un "
 "consulente legale."
+
+#: apps/core/models.py
+msgid ""
+"When on, a refund the seller makes through the platform gives the commission and the collection "
+"cost of the refunded share back to the seller. When off, the seller keeps paying them."
+msgstr ""
+"Se attivo, un rimborso che il venditore fa tramite la piattaforma restituisce al venditore la "
+"commissione e il costo di incasso della quota rimborsata. Se disattivo, il venditore continua a "
+"pagarli."
+
+#: apps/core/models.py
+msgid ""
+"When on, a seller may refund a buyer without the platform and mark it as 'refunded outside the "
+"platform'. Nothing moves in the seller's balance and the platform is not liable for that refund. "
+"When off, the seller can only refund through the platform."
+msgstr ""
+"Se attivo, un venditore può rimborsare un acquirente senza la piattaforma e segnarlo come "
+"«rimborsato fuori dalla piattaforma». Nel saldo del venditore non si muove nulla e la piattaforma "
+"non risponde di quel rimborso. Se disattivo, il venditore può rimborsare solo tramite la "
+"piattaforma."
 
 #: apps/core/models.py
 msgid ""

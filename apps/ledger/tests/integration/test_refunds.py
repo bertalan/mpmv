@@ -34,6 +34,7 @@ from apps.ledger import refunds, settlement
 from apps.ledger.models import LedgerEntry, Refund
 from apps.ledger.refund_engine import RefundSelection
 from apps.ledger.services import vendor_balance
+from apps.ledger.tests.factories import RefundFactory
 from apps.orders.models import Order, VendorOrder
 from apps.orders.services import place_order
 from apps.orders.tests.integration.test_place_order import (
@@ -736,3 +737,40 @@ def test_the_refund_service_ignores_a_duplicate_payment(stripe: FakeStripeClient
     assert payment.duplicate is False
     assert refund.provider_refund_ref.startswith("re_")
     assert duplicate_ref not in stripe._refunded
+
+
+# --- the database refuses a refund row that breaks the rules ----------------------------------
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"declared_method": ""},  # an outside mark needs its method
+        {"declared_date": None},  # and its date
+        {"channel": "through_platform"},  # only an outside mark carries a declared date
+        {"platform_error": True},  # the platform-error flag needs a reason
+        {"refunded_gross": D("0.00")},
+    ],
+)
+def test_the_database_refuses_a_refund_row_that_breaks_the_rules(fields: dict[str, Any]) -> None:
+    from django.db import IntegrityError, transaction
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        RefundFactory.create(**fields)
+
+
+def test_the_refund_row_factory_builds_a_valid_outside_mark() -> None:
+    row = RefundFactory.create()
+    assert row.channel == "outside_platform"
+    assert row.vendor_order.vendor_id == row.vendor_id
+
+
+def test_a_dry_run_of_the_state_roll_changes_no_state(stripe: FakeStripeClient) -> None:
+    from apps.orders.services import apply_refund_to_states
+
+    sub = pay(stripe, place_409())
+    changes = apply_refund_to_states(sub, fully_refunded=True, ctx=CTX, dry_run=True)
+    assert [c.model for c in changes.changes] == ["orders.vendororder", "orders.order"]
+    sub.refresh_from_db()
+    sub.order.refresh_from_db()
+    assert (sub.state, sub.order.state) == ("pending", "paid")

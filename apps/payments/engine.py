@@ -105,13 +105,27 @@ class TransferResult:
 
 
 @dataclass(frozen=True)
+class TransferReversal:
+    """Take `amount` back from one transfer the platform made to a vendor (PAY.4, D-41)."""
+
+    transfer_ref: str
+    amount: Decimal
+
+
+@dataclass(frozen=True)
 class RefundRequest:
     provider_ref: str
     amount: Decimal
     currency: str
     idempotency_key: str
-    # D-08: a refund takes the vendors' shares back from the vendors (`reverse_transfer`).
+    # D-08: a refund takes the vendors' shares back from the vendors (`reverse_transfer`), pro
+    # rata over every transfer of the payment. Ignored when `reversals` is given.
     reverse_vendor_shares: bool = True
+    # PAY.4: exactly these transfers are reversed, by these amounts, and no other. Used when one
+    # vendor refunds its own package: the other vendors' shares are never touched. An empty
+    # tuple with `reverse_vendor_shares=False` reverses nothing (a duplicate payment, or a
+    # transfer that was never created).
+    reversals: Sequence[TransferReversal] | None = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +134,7 @@ class RefundResult:
     amount: Decimal
     # The real provider cost of the refund, from the balance transaction (PAY.4, D-05).
     provider_cost: Decimal
+    reversal_refs: Sequence[str] = ()
 
 
 @dataclass(frozen=True)

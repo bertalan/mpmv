@@ -286,7 +286,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     VendorOrder: lambda vendor: VendorOrderFactory.create(vendor=vendor),
     LedgerEntry: lambda vendor: LedgerEntryFactory.create(vendor=vendor),
     # PAY.4: a refund mark of one of the vendor's own orders.
-    Refund: lambda vendor: RefundFactory.create(vendor_order_vendor=vendor),
+    Refund: lambda vendor: RefundFactory.create(vendor=vendor),
     OrderLine: lambda vendor: OrderLineFactory.create(vendor_order__vendor=vendor),
     StockReservation: lambda vendor: StockReservationFactory.create(
         product=ProductFactory.create(vendor=vendor)

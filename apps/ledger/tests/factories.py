@@ -65,19 +65,14 @@ class LedgerEntryFactory(DjangoModelFactory[LedgerEntry]):
 
 class RefundFactory(DjangoModelFactory[Refund]):
     """An outside-the-platform mark (D-41): moves no money, so it needs no provider or ledger
-    line. `vendor` is the vendor of the vendor order."""
+    line. The vendor order belongs to `vendor`."""
 
     class Meta:
         model = Refund
         skip_postgeneration_save = True
 
-    class Params:
-        vendor_order_vendor = factory.SubFactory(VendorFactory)
-
-    vendor_order = factory.LazyAttribute(
-        lambda o: VendorOrderFactory.create(vendor=o.vendor_order_vendor)
-    )
-    vendor = factory.LazyAttribute(lambda o: o.vendor_order.vendor)
+    vendor = factory.SubFactory(VendorFactory)
+    vendor_order = factory.SubFactory(VendorOrderFactory, vendor=factory.SelfAttribute("..vendor"))
     channel = RefundChannel.OUTSIDE_PLATFORM
     idempotency_key = factory.Sequence(lambda n: f"test-refund-{n}")
     request = factory.LazyFunction(lambda: {"mode": "amount", "lines": [], "amount": "5.00"})
