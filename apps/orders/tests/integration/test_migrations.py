@@ -9,7 +9,7 @@ from django.db.migrations.loader import MigrationLoader
 def _orders_leaf() -> str:
     leaves = MigrationLoader(connection).graph.leaf_nodes("orders")
     assert len(leaves) == 1, f"orders has several migration leaves: {leaves}"
-    return leaves[0][1]
+    return str(leaves[0][1])
 
 
 LATEST = _orders_leaf()
