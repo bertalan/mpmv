@@ -116,6 +116,14 @@ msgid "Payment received for order %(order_number)s"
 msgstr "Pago recibido por el pedido %(order_number)s"
 
 #: apps/orders/templates/email/orders/order_received/body.html
+msgid "Read this version online"
+msgstr "Leer esta versión en línea"
+
+#: apps/orders/templates/email/orders/order_received/body.txt
+msgid "Read this version online:"
+msgstr "Leer esta versión en línea:"
+
+#: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 msgid "Sales terms of %(name)s (version %(number)s)"
 msgstr "Condiciones de venta de %(name)s (versión %(number)s)"
