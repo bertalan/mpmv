@@ -604,6 +604,9 @@ STRIPE_SECRET_KEY = env_str("MPMV_STRIPE_SECRET_KEY", "")
 # Public by design: Stripe.js in the browser needs it. Never the secret key.
 STRIPE_PUBLISHABLE_KEY = env_str("MPMV_STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = env_str("MPMV_STRIPE_WEBHOOK_SECRET", "")
+# Optional second signing secret: the Stripe "Connected accounts" endpoint (account.updated) has
+# its own. Empty: ignored. The same URL accepts events signed with either secret.
+STRIPE_CONNECT_WEBHOOK_SECRET = env_str("MPMV_STRIPE_CONNECT_WEBHOOK_SECRET", "")
 STRIPE_API_VERSION = env_str("MPMV_STRIPE_API_VERSION", "")  # empty: the account's default
 STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300  # Stripe's recommended replay window
 

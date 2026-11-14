@@ -82,6 +82,11 @@ charges and transfers: one PaymentIntent per order with `transfer_group` = the o
 then one transfer per vendor with `source_transaction` = the order's charge. The platform fee is
 what stays on the platform's Stripe balance. Everything goes through the `StripeClient` interface
 (`stripe_client.py`); tests use `apps/payments/tests/fake_stripe.py` and never touch the network.
+Stripe has two endpoint kinds, each with its own signing secret, both pointing at the same URL
+`/webhooks/payments/`: the platform endpoint (`payment_intent.*`, secret `MPMV_STRIPE_WEBHOOK_SECRET`)
+and the "Connected accounts" endpoint (`account.updated`, optional secret
+`MPMV_STRIPE_CONNECT_WEBHOOK_SECRET`). An event is accepted if either secret verifies; an empty
+Connect secret is ignored.
 Keys: `MPMV_STRIPE_SECRET_KEY`, `MPMV_STRIPE_WEBHOOK_SECRET` (empty by default; `payments.E003`
 refuses an empty one on LIVE and STAGE; `payments.E004` refuses LIVE while `PAYMENTS_TRANSFERS_WIRED` is False, which PAY.3 turns on). Webhook: `POST /webhooks/payments/`, CSRF-exempt, signature
 and 300 s timestamp tolerance checked first, event ids stored in `ProcessedEvent` (a replay does
