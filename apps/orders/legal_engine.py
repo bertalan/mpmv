@@ -49,7 +49,11 @@ def box2_parties(parties: Iterable[Party], *, business: bool, operator_country: 
     """The parties whose clauses box 2 lists; empty for a consumer (box 2 is then not shown)."""
     if not business:
         return []
-    return [p for p in parties if party_is_italian(p, operator_country=operator_country)]
+    # A party with no onerous clauses has nothing to approve specifically: listing it would be
+    # the generic approval that artt. 1341-1342 do not accept, so box 2 leaves it out.
+    return [
+        p for p in parties if p.clauses and party_is_italian(p, operator_country=operator_country)
+    ]
 
 
 def box2_required(parties: Iterable[Party], *, business: bool, operator_country: str) -> bool:
