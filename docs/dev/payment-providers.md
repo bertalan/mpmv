@@ -84,3 +84,31 @@ refuses an empty one on LIVE and STAGE; `payments.E004` refuses LIVE while `PAYM
 and 300 s timestamp tolerance checked first, event ids stored in `ProcessedEvent` (a replay does
 nothing), then the `on_payment_succeeded` signal (`apps/payments/signals.py`) inside the same
 transaction. The order state change is connected (`order_hook.py`, `mark_order_paid`, PAY.2); ledger posting (PAY.3, needs VEN.4) connects to the same signal.
+
+### Stripe idempotency keys and cached errors
+
+Stripe stores the response to a request, an error response included, for an idempotency key for
+24 hours (it does not store requests that fail validation before they start or that collide with a
+request still in flight). Two rules follow:
+
+- A retry with the same key after a failed request returns the same stored error, not a fresh
+  attempt. It does not help to retry quickly with an unchanged request.
+- A key must never be reused for a request with different parameters (Stripe answers with an
+  idempotency error). Our keys are derived from what identifies the request: the order-derived
+  PaymentIntent key, `<key>:transfer:<n>`, `<key>:reverse:<transfer>` and, in the PAY.3
+  settlement sweep (`apps/ledger/settlement.py`), `transfer:<order>:<vendor>`. If the amount or
+  the destination of a payment can change, the key has to change with it.
+
+How the code behaves: the sweep (`transfer_payment`, `settle_pending`) retries a vendor transfer
+by calling `StripeProvider.transfer`, which first lists the transfers of the order's transfer
+group and returns an existing one for the same payment and destination (an amount mismatch is an
+error). That lookup is what makes the retry safe after the 24 hours, and after a transfer that was
+created but not recorded. It does not help after a failed create: no transfer exists, so the
+sweep sends the create again with the same key.
+
+Known limitation: if Stripe stored an error for `transfer:<order>:<vendor>` (for example a
+temporary balance or account problem that was later fixed), every sweep inside the next 24 hours
+gets the same stored error back and the transfer stays pending; the sweep audits the failure once
+and retries on its next run, and the first run after the window expires sends a fresh request.
+There is no key rotation on error. Errors that Stripe does not store (validation failures, a
+concurrent duplicate) are not affected.
