@@ -72,6 +72,6 @@ def test_a_box_that_is_not_shown_is_never_required() -> None:
 
 def test_box_2_leaves_out_an_italian_party_with_no_onerous_clauses() -> None:
     """Box 2 is a specific approval: an Italian party with nothing listed is not shown (review)."""
-    empty = engine.Party("platform", "Operator", "IT", "", type(CLAUSES)())
+    empty = engine.Party("platform", "Operator", "IT", "", ())
     assert engine.box2_parties([empty], business=True, operator_country="IT") == []
     assert not engine.box2_required([empty], business=True, operator_country="IT")
