@@ -12,9 +12,6 @@ def _orders_leaf() -> str:
     return str(leaves[0][1])
 
 
-LATEST = _orders_leaf()
-
-
 def migrate(target: str) -> None:
     executor = MigrationExecutor(connection)
     executor.migrate([("orders", target)])
@@ -22,6 +19,7 @@ def migrate(target: str) -> None:
 
 @pytest.mark.django_db(transaction=True)
 def test_migrating_back_to_0003_leaves_working_guards_and_forward_again_works() -> None:
+    latest = _orders_leaf()
     try:
         migrate("0003_database_guards")
         with connection.cursor() as cursor:
@@ -37,4 +35,4 @@ def test_migrating_back_to_0003_leaves_working_guards_and_forward_again_works() 
             cursor.execute("SELECT count(*) FROM orders_order")
             assert cursor.fetchone() == (1,)
     finally:
-        migrate(LATEST)
+        migrate(latest)
