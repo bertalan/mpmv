@@ -98,3 +98,26 @@ def test_a_failed_second_order_in_the_same_session_still_retries(
     response = client.get(reverse("orders:confirmation"))
     assert response.status_code == 200
     assert "payment-form" in response.content.decode()
+
+
+@pytest.mark.parametrize("status", ["processing", "succeeded"])
+def test_the_page_says_payment_in_progress_when_the_customer_already_paid(
+    client: Client,
+    commission: None,  # noqa: F811
+    stripe: FakeStripeClient,  # noqa: F811
+    settings: Any,
+    status: str,
+) -> None:
+    """PAY.2 review point: coming back before the webhook shows no second form."""
+    import dataclasses
+
+    settings.STRIPE_PUBLISHABLE_KEY = "pk_" + secrets.token_urlsafe(12)
+    add(with_cart(client), vendor("Alpha Shop"), "100.00")
+    sign_off_details(client)
+    client.post(reverse("orders:review"))
+    order = Order.objects.get()
+    intent = stripe.intents[order.payment_intent_ref]
+    stripe.intents[intent.id] = dataclasses.replace(intent, status=status)
+    html = client.get(reverse("orders:confirmation")).content.decode()
+    assert "Payment received, confirming" in html
+    assert "payment-form" not in html

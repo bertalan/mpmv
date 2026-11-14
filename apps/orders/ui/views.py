@@ -47,6 +47,7 @@ from apps.orders.services import (
     CheckoutClosed,
     CheckoutPreview,
     OrderRefused,
+    PaymentInProgress,
     PaymentMismatch,
     PaymentUnavailable,
     payment_client_secret,
@@ -521,6 +522,8 @@ def _payment_context(request: HttpRequest, order: Order) -> dict[str, Any] | Non
         secret = payment_client_secret(order)
     except PaymentMismatch as error:
         raise Http404("This payment is not for this order") from error
+    except PaymentInProgress:
+        return {"in_progress": True}
     except PaymentUnavailable:
         return {"retry": True}
     return {

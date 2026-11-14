@@ -1010,6 +1010,10 @@ class PaymentMismatch(Exception):
     """The payment reference does not belong to this order (the page answers 404)."""
 
 
+class PaymentInProgress(Exception):
+    """The customer's payment is processing or already succeeded: the page shows no form (PAY.2)."""
+
+
 class PaymentUnavailable(Exception):
     """The payment provider refused or failed; the order stays awaiting payment."""
 
