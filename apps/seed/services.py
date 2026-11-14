@@ -87,6 +87,7 @@ from apps.tax.models import TaxRate, VendorTaxProfile
 from apps.vendors import engine as vendors_engine
 from apps.vendors import services as vendors_services
 from apps.vendors.models import (
+    CommissionRule,
     ContractAcceptance,
     Vendor,
     VendorContract,
@@ -168,6 +169,7 @@ def seed(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     run = _Run(ctx=ctx)
     with _rolled_back_if(dry_run, run), _operator_session(run):
         _platform(run)
+        _commission_rule(run)
         contract = _contract(run)
         _tax_rates(run)
         catalog = _catalog_structure(run)
@@ -312,6 +314,35 @@ def _platform(run: _Run) -> None:
             valid_from=data.SEED_EPOCH,
         )
         run.add(configure_platform_operator(operator, ctx=run.ctx))
+
+
+def _commission_rule(run: _Run) -> None:
+    """The platform default commission rule (spec 04's example) when no default rule is open.
+
+    It starts now, or where a closed default rule ends if that is later: rules never start in the
+    past (VEN.2). A default rule that closed in the past can only be followed by a backdated
+    import, so the seed leaves that to staff. Rules are never deleted: `reset` keeps it.
+    """
+    latest = (
+        CommissionRule.objects.filter(vendor__isnull=True, plan__isnull=True)
+        .order_by("-version")
+        .first()
+    )
+    if latest is not None and latest.valid_to is None:
+        return
+    now = timezone.now()
+    start = now if latest is None or latest.valid_to is None else latest.valid_to
+    if start < now:
+        return
+    rule = CommissionRule(
+        percent=data.DEFAULT_COMMISSION_PERCENT,
+        base=data.DEFAULT_COMMISSION_BASE,
+        fee_percent=data.DEFAULT_FEE_PERCENT,
+        fee_fixed=data.DEFAULT_FEE_FIXED,
+        fee_base=data.DEFAULT_FEE_BASE,
+        valid_from=start,
+    )
+    run.add(vendors_services.add_commission_rule(rule, ctx=run.ctx))
 
 
 def _contract(run: _Run) -> VendorContract:

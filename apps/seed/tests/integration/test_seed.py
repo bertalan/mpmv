@@ -10,6 +10,7 @@ from decimal import Decimal
 import pytest
 from django.core.management import CommandError, call_command
 from django.test import Client, override_settings
+from django.utils import timezone
 from wagtail.models import Locale
 
 from apps.accounts.models import User
@@ -24,6 +25,7 @@ from apps.cms.models import HomePage, LegalPage, StandardPage
 from apps.cms.tests.factories import StandardPageFactory
 from apps.core.changeset import ChangeSet
 from apps.core.models import AuditLog
+from apps.core.tests.factories import utc
 from apps.events.models import EventPage
 from apps.payments.models import ConnectedAccount
 from apps.seed import data
@@ -42,8 +44,8 @@ from apps.tax.models import TaxRate
 from apps.tax.services import current_tax_profile
 from apps.vendors import engine as vendors_engine
 from apps.vendors import services as vendors_services
-from apps.vendors.models import ContractAcceptance, Vendor
-from apps.vendors.tests.factories import VendorFactory
+from apps.vendors.models import CommissionRule, ContractAcceptance, Vendor
+from apps.vendors.tests.factories import CommissionRuleFactory, VendorFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -57,6 +59,7 @@ SEEDED_MODELS = (
     ShippingMethod,
     SpecialAreaTreatment,
     TaxRate,
+    CommissionRule,
     StandardPage,
     LegalPage,
     EventPage,
@@ -291,3 +294,31 @@ def test_seed_and_reset_refuse_to_run_where_not_allowed(allow: bool, live_data: 
         with pytest.raises(CommandError, match="never runs on LIVE"):
             call_command("seed", "--reset")
     assert not Vendor.objects.exists()
+
+
+def test_the_seed_opens_ordering_with_the_spec_default_commission_rule(
+    demo_seed: ChangeSet,
+) -> None:
+    """VEN.2 / ORD.5: a demo checkout can place orders, at spec 04's example rule."""
+    rule = CommissionRule.objects.get(vendor__isnull=True, plan__isnull=True)
+    assert (rule.percent, rule.base) == (Decimal("20.00"), vendors_engine.NET_GOODS)
+    assert (rule.fee_percent, rule.fee_fixed) == (Decimal("4.00"), Decimal("2.00"))
+    assert rule.fee_base == vendors_engine.GROSS_PAID
+    assert rule.valid_to is None
+    assert AuditLog.objects.filter(action=vendors_services.COMMISSION_RULE_ADDED).count() == 1
+    for vendor in seed_vendors():
+        assert vendors_services.commission_rule_for(vendor, at=timezone.now()) == rule
+
+    seed(ctx=TEST_CONTEXT)
+    reset(ctx=TEST_CONTEXT)
+    seed(ctx=TEST_CONTEXT)
+
+    assert CommissionRule.objects.count() == 1  # idempotent, and a reset keeps it
+
+
+def test_the_seed_keeps_an_open_default_rule_staff_configured() -> None:
+    own = CommissionRuleFactory.create(
+        percent=Decimal("15.00"), valid_from=utc(2026, 1, 1), valid_to=None
+    )
+    seed(ctx=TEST_CONTEXT)
+    assert list(CommissionRule.objects.all()) == [own]

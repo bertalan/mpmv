@@ -30,6 +30,13 @@ REOPEN_REASON: Final = "Synthetic demo data seeded again after a reset (ARC.10).
 
 OPERATOR_NAME: Final = "Demo Marketplace Operator S.r.l."
 CONTRACT_NOTE: Final = "Synthetic demo contract (ARC.10)."
+# The platform default commission rule of spec 04's example: 20% on the net goods, payment fee
+# 4% + 2.00 on the gross paid. Seeded only while no default rule is open (VEN.2).
+DEFAULT_COMMISSION_PERCENT: Final = Decimal("20.00")
+DEFAULT_COMMISSION_BASE: Final = "net_goods"
+DEFAULT_FEE_PERCENT: Final = Decimal("4.00")
+DEFAULT_FEE_FIXED: Final = Decimal("2.00")
+DEFAULT_FEE_BASE: Final = "gross_paid"
 CONTRACT_TEXTS: Final[dict[str, tuple[str, str]]] = {
     "en": (
         "Vendor agreement (demo)",
