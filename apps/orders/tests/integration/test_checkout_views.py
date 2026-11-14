@@ -40,21 +40,12 @@ from apps.shipping.tests.factories import (
 from apps.tax import engine as tax
 from apps.tax.tests.factories import TaxRateFactory, VendorTaxProfileFactory
 from apps.vendors.models import Vendor
-from apps.vendors.tests.factories import VendorFactory
+from apps.vendors.tests.factories import CommissionRuleFactory, VendorFactory
 
 pytestmark = pytest.mark.django_db
 
 D = Decimal
 NBSP = "\N{NO-BREAK SPACE}"
-COMMISSION = {
-    "rule_id": "default",
-    "version": 1,
-    "percent": "10.00",
-    "base": "goods",
-    "fee_percent": "1.40",
-    "fee_fixed": "0.25",
-    "fee_base": "gross",
-}
 DETAILS = {
     "email": "buyer@example.com",
     "full_name": "Mario Rossi",
@@ -122,10 +113,9 @@ def sign_off_details(client: Client, **extra: str) -> Any:
 
 
 @pytest.fixture
-def commission(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        state, "commission_snapshots", lambda ids: {pk: dict(COMMISSION) for pk in ids}
-    )
+def commission() -> None:
+    """The platform default commission rule in force (VEN.2): the real seam, no stub."""
+    CommissionRuleFactory.create(valid_from=utc(2026, 1, 1), valid_to=None)
 
 
 # --- Cart -----------------------------------------------------------------------------------
