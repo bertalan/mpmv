@@ -57,11 +57,13 @@ class StripePaymentProvider:
         client: StripeClient,
         *,
         webhook_secret: str,
+        connect_webhook_secret: str = "",
         tolerance: int = stripe_engine.DEFAULT_TOLERANCE_SECONDS,
         clock: Callable[[], float] = time.time,
     ) -> None:
         self._client = client
         self._webhook_secret = webhook_secret
+        self._connect_webhook_secret = connect_webhook_secret
         self._tolerance = tolerance
         self._clock = clock
 
@@ -251,9 +253,20 @@ class StripePaymentProvider:
     # -- Capability 4: signed, idempotent webhooks
 
     def parse_webhook(self, body: bytes, signature: str) -> WebhookEvent:
-        stripe_engine.verify_signature(
-            body, signature, self._webhook_secret, now=self._clock(), tolerance=self._tolerance
-        )
+        # Stripe signs `account.updated` (Connect endpoint) with its own secret: any one may verify.
+        # An empty Connect secret is ignored. Failures raise InvalidSignature without any secret.
+        secrets_to_try = [self._webhook_secret]
+        if self._connect_webhook_secret:
+            secrets_to_try.append(self._connect_webhook_secret)
+        for index, secret in enumerate(secrets_to_try):
+            try:
+                stripe_engine.verify_signature(
+                    body, signature, secret, now=self._clock(), tolerance=self._tolerance
+                )
+                break
+            except InvalidSignature:
+                if index == len(secrets_to_try) - 1:
+                    raise
         try:
             data = json.loads(body)
             return WebhookEvent(str(data["id"]), str(data["type"]), dict(data.get("data", {})))
@@ -271,6 +284,7 @@ def provider_from_settings() -> StripePaymentProvider:
     return StripePaymentProvider(
         HttpStripeClient(settings.STRIPE_SECRET_KEY, api_version=settings.STRIPE_API_VERSION),
         webhook_secret=settings.STRIPE_WEBHOOK_SECRET,
+        connect_webhook_secret=settings.STRIPE_CONNECT_WEBHOOK_SECRET,
         tolerance=settings.STRIPE_WEBHOOK_TOLERANCE_SECONDS,
     )
 
