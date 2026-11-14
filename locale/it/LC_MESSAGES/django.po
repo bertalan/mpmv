@@ -567,12 +567,11 @@ msgstr "Aggiungi al carrello"
 msgid "added %(created)s"
 msgstr "aggiunta il %(created)s"
 
-#: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/forms.py
 #: apps/orders/ui/views.py
 msgid "Added to your cart."
 msgstr "Aggiunto al carrello."
 
-#: apps/orders/ui/forms.py
+#: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/forms.py
 msgid "Address"
 msgstr "Indirizzo"
 
