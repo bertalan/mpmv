@@ -5,6 +5,7 @@ licence allow list, the transactional email outbox."""
 import json
 import posixpath
 import uuid
+from decimal import Decimal
 from typing import Any, ClassVar, Self
 from urllib.parse import urlsplit
 
@@ -13,7 +14,7 @@ from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import ArrayField, DateTimeRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.core.validators import URLValidator
+from django.core.validators import MinValueValidator, URLValidator
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -387,6 +388,21 @@ def official_profile_errors(urls: Any) -> list[str]:
     return errors
 
 
+DEFAULT_REFUND_FEE_SURCHARGE = Decimal("2.00")
+PLATFORM_ERROR = "platform_error"
+VENDOR_DEFAULT = "vendor_default"
+PLATFORM_REFUND_CASES = (PLATFORM_ERROR, VENDOR_DEFAULT)
+PLATFORM_REFUND_CASE_CHOICES = [
+    (PLATFORM_ERROR, "Platform error"),
+    (VENDOR_DEFAULT, "Seller default"),
+]
+
+
+def default_platform_refund_cases() -> list[str]:
+    """D-41: the platform refunds on its own only for its error or a vendor default."""
+    return list(PLATFORM_REFUND_CASES)
+
+
 class PlatformOperator(Versioned):
     """The legal entity running the marketplace, as versioned configuration (ARC.7).
 
@@ -471,6 +487,44 @@ class PlatformOperator(Versioned):
             "When on, a seller who has not published sales terms sells on request only. "
             "Sellers who have published terms are not affected. Leave it off until your "
             "sellers have had time to publish their terms."
+        ),
+    )
+    # D-41, ARC.7 (owner decision 2026-11-13): who refunds and through which channel. Read at
+    # refund time from the version in force, never from the order. Defaults reproduce D-05.
+    vendors_may_refund_outside = models.BooleanField(
+        default=True,
+        help_text=_(
+            "When on, a seller may refund a buyer without the platform and mark it as "
+            "'refunded outside the platform'. Nothing moves in the seller's balance and the "
+            "platform is not liable for that refund. When off, the seller can only refund "
+            "through the platform."
+        ),
+    )
+    reverse_fees_on_vendor_refund = models.BooleanField(
+        default=True,
+        help_text=_(
+            "When on, a refund the seller makes through the platform gives the commission and "
+            "the collection cost of the refunded share back to the seller. When off, the "
+            "seller keeps paying them."
+        ),
+    )
+    refund_fee_surcharge = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=DEFAULT_REFUND_FEE_SURCHARGE,
+        validators=[MinValueValidator(Decimal("0"))],
+        help_text=_(
+            "The fixed part of the refund fee in EUR, added to the payment provider's real "
+            "cost and rounded up to the whole euro. A seller's plan can set its own amount."
+        ),
+    )
+    platform_refund_cases = ArrayField(
+        models.CharField(max_length=32, choices=PLATFORM_REFUND_CASE_CHOICES),
+        default=default_platform_refund_cases,
+        blank=True,
+        help_text=_(
+            "The cases where the platform refunds a buyer on its own: its own error, or a "
+            "seller who defaults (for example, never ships). Leave a case out to switch it off."
         ),
     )
     # CMP.5 (DSA articles 11 and 12): the single point of contact for authorities and the means

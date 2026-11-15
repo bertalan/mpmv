@@ -78,10 +78,14 @@ class PayoutAccount(Model):
 class LedgerEntry(Model):                      # append-only, never UPDATE/DELETE
     vendor; vendor_order = FK(VendorOrder, null=True)
     kind = CharField(choices=["sale", "shipping", "commission", "payment_fee", "refund",
-                              "commission_reversal", "adjustment", "payout", "transfer",
+                              "commission_reversal", "payment_fee_reversal", "refund_fee",
+                              "transfer_reversal", "adjustment", "payout", "transfer",
                               "plan_fee", "bundle_discount_vendor_funded",
                               "bundle_discount_platform_funded"])
                               # plan_fee: VEN.19 (P2); bundle discounts: CAT.17 (P2, spec 03)
+                              # PAY.4: payment_fee_reversal (collection cost given back) and
+                              # transfer_reversal (credit: the provider took the vendor's share
+                              # back from its transfer) join refund_fee; see ledger/refunds.py
     amount = MoneyField()                      # sign: + vendor credit, − vendor debit
     platform_entity = FK(PlatformOperator)     # multi-entity (e.g. relocation to another EU country)
     gateway_account; external_ref (tr_…, po_…, re_…)

@@ -29,6 +29,9 @@ class FakeStripeClient:
         self.reversals: list[tuple[str, int]] = []
         self.transfer_calls: list[dict[str, object]] = []
         self.calls: list[str] = []
+        self.fail_reversals = 0  # the next N transfer reversals fail (a Stripe outage)
+        # the next N transfer reversals are recorded at Stripe, then the answer is lost
+        self.lose_reversal_answers = 0
         self.accounts: dict[str, StripeAccount] = {}
         self.account_calls: list[dict[str, object]] = []
         self.links: list[str] = []
@@ -168,14 +171,24 @@ class FakeStripeClient:
         self, *, transfer_id: str, amount_minor: int, idempotency_key: str
     ) -> str:
         self.calls.append("create_transfer_reversal")
+        if self.fail_reversals > 0:
+            self.fail_reversals -= 1
+            raise StripeError("Stripe is unavailable")
         if (cached := self._replay(f"rv:{idempotency_key}")) is not None:
             assert isinstance(cached, str)
             return cached
         if transfer_id not in self.transfers:
             raise StripeError("No such transfer")
+        held = self.transfers[transfer_id].amount_minor
+        taken = sum(minor for tid, minor in self.reversals if tid == transfer_id)
+        if amount_minor <= 0 or taken + amount_minor > held:  # Stripe: never more than the transfer
+            raise StripeError("Reversal amount is greater than the transfer's remaining amount")
         self.reversals.append((transfer_id, amount_minor))
         reversal = f"trr_{secrets.token_hex(6)}"
         self._replies[f"rv:{idempotency_key}"] = reversal
+        if self.lose_reversal_answers > 0:  # Stripe reversed it, the answer never came back
+            self.lose_reversal_answers -= 1
+            raise StripeError("Connection reset while reading the answer")
         return reversal
 
     # -- Connect onboarding (VEN.6)

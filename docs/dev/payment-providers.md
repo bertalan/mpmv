@@ -109,8 +109,9 @@ request still in flight). Two rules follow:
     `transfer:<order>:<vendor>:<destination>:<amount in minor units>:<CURRENCY>`. A key longer
     than Stripe's 255 characters keeps `transfer:<order>:<vendor>:` and replaces the rest with a
     32-character SHA-256 prefix.
-  - Refund reversals: `<refund key>:reverse:<transfer>:<amount in minor units>` (the transfer id
-    names the destination).
+  - Refund reversals: `<refund key>:reverse:<transfer>`, amount-free on purpose (the transfer id
+    names the destination). The same refund and transfer always get the same key, so a retry with
+    a changed amount fails closed with `idempotency_error` instead of becoming a second reversal.
   - The order-derived PaymentIntent key and its `<key>:transfer:<n>` shares, made once at
     checkout.
 

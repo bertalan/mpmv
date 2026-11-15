@@ -120,25 +120,35 @@ def refund_lines(
     gross_paid: Decimal,
     refund_fee_rule: RefundFeeRule,
     shipping_net: Decimal = ZERO,
+    refunded_before: Decimal = ZERO,
 ) -> RefundLines:
     """The ledger lines of ONE refund event (D-05, L-10); call it once per event.
 
     The commission and the collection cost are reversed pro rata on the refunded share of
-    `gross_paid` (`ROUND_HALF_UP` per line). The refund fee is provider cost plus the plan's
-    surcharge, rounded up to the whole euro, or 0 when the event carries a platform-error
-    exclusion. The fee is charged to the vendor only; it is never passed on to the customer.
+    `gross_paid`, rounded cumulatively (`ROUND_HALF_UP`): with `refunded_before` already refunded
+    by earlier events, this event gives back round(X*(before+gross)/paid) - round(X*before/paid),
+    so the events of a package together give back exactly what was paid, the last one taking the
+    remainder. The refund fee is provider cost plus the plan's surcharge, rounded up to the whole
+    euro, or 0 when the event carries a platform-error exclusion. The fee is charged to the vendor
+    only; it is never passed on to the customer.
     """
-    if event.refunded_gross < 0 or event.provider_cost < 0:
+    if event.refunded_gross < 0 or event.provider_cost < 0 or refunded_before < 0:
         raise ValueError("Amounts cannot be negative.")
-    if event.refunded_gross > gross_paid:
+    if event.refunded_gross + refunded_before > gross_paid:
         raise ValueError("A refund cannot exceed the gross paid.")
     paid = compute_commission(
         rule_snapshot, goods_net=goods_net, gross_paid=gross_paid, shipping_net=shipping_net
     )
-    share = event.refunded_gross / gross_paid if gross_paid else ZERO
+
+    def back(total: Decimal) -> Decimal:
+        if not gross_paid:
+            return ZERO
+        after = round_line(total * (refunded_before + event.refunded_gross) / gross_paid)
+        return after - round_line(total * refunded_before / gross_paid)
+
     return RefundLines(
-        commission_reversal=round_line(paid.commission * share),
-        payment_fee_reversal=round_line(paid.payment_fee * share),
+        commission_reversal=back(paid.commission),
+        payment_fee_reversal=back(paid.payment_fee),
         refund_fee=refund_fee(
             event.provider_cost, refund_fee_rule, platform_error=event.platform_error
         ),

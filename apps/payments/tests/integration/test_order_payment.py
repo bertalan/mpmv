@@ -381,8 +381,31 @@ def test_a_payment_with_another_reference_does_not_mark_the_order_paid(
     assert AuditLog.objects.filter(action="orders.payment_ref_mismatch").count() == 1
 
 
+def test_an_order_with_no_stored_reference_treats_any_payment_as_a_mismatch(
+    stripe: FakeStripeClient,
+) -> None:
+    """#438 review: no payment was started for the order (empty stored reference), so a payment
+    that names a reference is another payment: audited, the order stays unpaid."""
+    order = place(sellable())
+    Order.objects.filter(pk=order.pk).update(payment_intent_ref="")
+    paid = services.mark_order_paid(
+        order.number,
+        amount=order.grand_total,
+        currency="EUR",
+        provider_ref="pi_anything",
+        ctx=CTX,
+    )
+    order.refresh_from_db()
+    assert paid is False
+    assert order.state == "awaiting_payment"
+    mismatch = AuditLog.objects.get(action="orders.payment_ref_mismatch")
+    assert mismatch.after is not None
+    assert mismatch.after["expected"] == ""
+
+
 def test_the_right_reference_marks_the_order_paid(stripe: FakeStripeClient) -> None:
     order = place(sellable())
+    assert order.payment_intent_ref  # the reference under test is not empty (#438 review)
     assert services.mark_order_paid(
         order.number,
         amount=order.grand_total,
