@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **389** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3128 h** (P1 2276 h · P2 764 h · P3 88 h)
+- Micro-tasks: **390** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3131 h** (P1 2279 h · P2 764 h · P3 88 h)
 - P1 critical path (schedule lower bound with full parallelism): **153 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CORE.2 → CORE.3 → CORE.17 → CORE.18 → FIT.1 → FIT.5 → FIT.7 → FIT.8 → FIT.10 → FIT.12
 
 ## By macro area
@@ -15,7 +15,7 @@
 | Macro | Area | Tasks | P1 h | P2 h | P3 h | Total h |
 |---|---|---:|---:|---:|---:|---:|
 | ARC | Architecture and foundations | 31 | 196 | 46 | 0 | 242 |
-| CORE | Identity, permissions, API, backoffice | 28 | 209 | 4 | 6 | 219 |
+| CORE | Identity, permissions, API, backoffice | 29 | 212 | 4 | 6 | 222 |
 | CAT | Product catalog | 20 | 150 | 60 | 0 | 210 |
 | VEN | Vendors, commissions, ledger | 38 | 278 | 43 | 0 | 321 |
 | TAX | Tax engine | 21 | 96 | 37 | 0 | 133 |
@@ -36,11 +36,11 @@
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 14 | 25 | 37 | 8 | 70 |
 | MIG | Migration and cutover | 21 | 135 | 29 | 0 | 164 |
-| **Total** | | **389** | **2276** | **764** | **88** | **3128** |
+| **Total** | | **390** | **2279** | **764** | **88** | **3131** |
 
 ## By phase
 
-### F0 — Foundations (69 tasks, 486 h)
+### F0 — Foundations (70 tasks, 489 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -96,6 +96,7 @@
 | CORE.27 | Migration safety for roles and checks (coherence check 19, follow-up of #269 and #274): the database-backed system checks never block `migrate` while their app still has pending migrations (the check skips, and a post-migrate pass or `check --deploy` runs it once the app is fully migrated); any change to `apps/manager/roles.py` ships a data migration that syncs the role groups, with a test that fails when the group definitions and the migrated state differ | P1 | 3 | CORE.18 | A `migrate` from the previous release's schema succeeds with checks on; a test with a pending manager migration shows the checks skipping and not erroring; a `roles.py` change without a sync migration fails the drift test |
 | CORE.28 | Breached-password check (owner decision Q-11, 2026-11-13): Have I Been Pwned range API with k-anonymity (only the first 5 characters of the SHA-1 are sent) behind our own interface, checked when a password is set and at each login. **Vendor members**: a password found in a breach forces a password change and a fresh authentication before any other action, is audited and notifies the marketplace operator's staff; no automatic blocking of the account's activity (the vendor already needs MFA, CORE.4, and the passkey window for sensitive actions, D-32). **Customers**: a breached password is refused when set, and at login the customer must choose a different one before continuing. The service down: setting the password and logging in go on, and the check runs again next time | P1 | 6 | CORE.1, CORE.4 | A known-breached password is refused at sign-up; a vendor member logging in with one is sent to the change page and every other page refuses until the change, with an audit entry and a staff notification; a customer is asked for a new one; the service mocked as down lets the login through; no full hash or password leaves the server (test on the request) |
 | CORE.29 | API and login follow-ups (owner decisions Q-12, Q-13, Q-14, 2026-11-13): after too many failed attempts the login says "too many attempts, try again in N minutes" (the lock also applies to unknown emails, so it reveals nothing); the API documentation (Swagger) is open locally and on STAGE and, on LIVE, served only to a valid API key or a signed-in staff member; the API mutation log (with IP addresses) is kept 12 months and then purged by a nightly job (retention listed with the others in CMP.4); it holds only the key id, vendor, endpoint, method, status, time and IP address, never request or response bodies, tokens or personal data | P1 | 4 | CORE.5, CORE.12, CORE.14, CMP.4 | A locked login shows the waiting time for a known and an unknown email alike; the LIVE settings answer 404 to an anonymous request for the docs and 200 to a valid key or staff; the purge removes rows older than 12 months and keeps newer ones |
+| CORE.30 | Platform map (owner request 2026-11-15): a page in the Manager platform space listing every area of the site as links, grouped: storefront (home, catalog, cart, cookie settings, legal pages), customer account, Manager shop space (one group per vendor: dashboard, profile, payments, sales terms, orders — staff land there through the existing impersonation/support path only if that exists, otherwise list the URLs as plain text for staff), Manager platform space (every page), Wagtail admin, setup if not completed. Only platform staff (owner, support, finance roles — reuse the existing platform-space permission) see it; vendors and anonymous visitors get the same answer as other platform pages. No secrets, hostnames or server details on the page; the Django admin, which is loopback only, is not linked | P1 | 3 | CORE.9 | A staff user sees the page with a link for every named Manager URL (the test derives the list from the URL resolver, so a new Manager page without a map entry fails it), a vendor member gets the platform-space refusal, an anonymous user is sent to login; the platform dashboard links to the map |
 | SEC.0 | Immediate actions from §12.1 on the current system | P1 | 3 | — | Confidential §12.1 checklist completed and recorded |
 | SEC.1 | HTTP hardening + CSP + cookies + headers (automated tests) | P1 | 6 | ARC.3 | Header scan passed |
 | SEC.2 | Secure uploads and image re-encoding | P1 | 4 | CAT.4, ARC.15 | Tests with malicious files |
