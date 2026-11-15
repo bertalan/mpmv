@@ -59,7 +59,7 @@ ignore = ["RUF012"]
 "**/tests/**" = ["S101", "S105", "S106"]
 "tests/**" = ["S101", "S105", "S106"]
 "conftest.py" = ["S101"]
-"tools/**" = ["S", "E501", "RUF005"]
+"tools/**" = ["E501", "RUF005"]
 
 [tool.mypy]
 python_version = "3.13"

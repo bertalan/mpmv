@@ -13,6 +13,7 @@ import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 import pytest
 from django.test import Client, override_settings
@@ -47,7 +48,10 @@ DENIED_FEATURES = ("camera", "microphone", "geolocation", "payment", "usb")
 
 def security_settings(module: str) -> dict[str, Any]:
     """Security-related settings declared by an environment's settings module."""
-    settings_module = importlib.import_module(module)
+    # The test settings' placeholder key says "insecure", which the LIVE settings refuse (SEC.5).
+    base = importlib.import_module("mpmv.settings.base")
+    with mock.patch.object(base, "SECRET_KEY", secrets.token_urlsafe(50)):
+        settings_module = importlib.import_module(module)
     return {
         name: getattr(settings_module, name)
         for name in dir(settings_module)

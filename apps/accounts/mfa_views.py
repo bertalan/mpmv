@@ -13,7 +13,7 @@ import segno
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -38,7 +38,9 @@ signed_in = login_required(login_url=settings.MFA_LOGIN_URL)
 
 def _user(request: HttpRequest) -> User:
     user = request.user
-    assert isinstance(user, User)  # noqa: S101  # guaranteed by `signed_in`
+    # Guaranteed by `signed_in`; an explicit check, since `python -O` strips asserts (S101).
+    if not isinstance(user, User):
+        raise PermissionDenied
     return user
 
 

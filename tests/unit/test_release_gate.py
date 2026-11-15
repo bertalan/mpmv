@@ -128,7 +128,7 @@ def test_the_smoke_refuses_to_run_outside_a_hosted_ci_runner(
     """It overwrites ~/.config/mpmv and the units: never on a server or a workstation."""
     env = {"PATH": os.environ["PATH"], "HOME": str(tmp_path), **ci_env}
     result = subprocess.run(  # noqa: S603 (fixed script path)
-        ["bash", str(SMOKE), "mpmv-app:ci"],  # noqa: S607
+        ["bash", str(SMOKE), "mpmv-app:ci"],  # noqa: S607 (bash from PATH, as in CI)
         env=env,
         capture_output=True,
         text=True,

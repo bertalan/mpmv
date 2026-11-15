@@ -84,11 +84,16 @@ Three things report known vulnerabilities:
 - **Dependabot alerts** (repository *Security* tab) read the dependency graph and open
   **security update PRs** right away, outside the weekly schedule and without the cooldown.
   These are not grouped. Review them first.
-- **`pip-audit`** runs in every CI build (`make audit`) and fails on any known vulnerability in
-  the pinned dependencies. A new advisory can turn `main` red without a code change: fix it with
-  the Dependabot security PR or `uv lock --upgrade-package <name>`. If no fixed version exists
-  yet, an ignore (`--ignore-vuln <ID>` in the `audit` target) needs a task, a justification and a
-  date to look again, all in the PR.
+- **`pip-audit`** (SEC.5) runs in the *Static checks* job of every CI build (`make audit`): a
+  pinned pip-audit release (`PIP_AUDIT_VERSION` in the Makefile) checks the hashed requirements
+  exported from `uv.lock`. pip-audit reports no severity, so there is no severity threshold:
+  **every** known vulnerability fails the build, which covers high and critical ones and more.
+  A new advisory can turn `main` red without a code change: fix it with the Dependabot security
+  PR or `uv lock --upgrade-package <name>`. If no fixed version exists yet, add a reviewed entry
+  to `tools/pip_audit_ignore.toml` (advisory id, package, backlog task, reason, `expires` at
+  most 90 days ahead) and explain it in the PR. `tools/audit_ignores.py` turns the entries into
+  `--ignore-vuln` flags and fails the audit once an entry has expired, so each exception is
+  reviewed again. The audit needs the network, so it is not part of the offline `make check`.
 - **The SBOMs** below can be scanned at any time, for example
   `grype sbom:build/sbom/mpmv-image-arm64.cdx.json` for the image's OS packages.
 

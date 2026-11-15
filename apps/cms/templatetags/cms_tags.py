@@ -131,4 +131,4 @@ def faq_jsonld(page: Any) -> SafeString:
         return mark_safe("")
     # JSON with <, > and & escaped: it cannot leave its script element (`jsonld_text`).
     data = jsonld_text(faq_page_jsonld(questions))
-    return mark_safe(f'<script type="application/ld+json">{data}</script>')  # noqa: S308
+    return mark_safe(f'<script type="application/ld+json">{data}</script>')  # noqa: S308 (escaped by jsonld_text)
