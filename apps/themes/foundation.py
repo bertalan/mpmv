@@ -6,6 +6,7 @@ of `apps/themes/vendored.py`. `foundation_files` returns them after the hash che
 or tampered file stops the build, the gates and `manage.py check`.
 """
 
+import re
 from pathlib import Path
 
 from .engine import ThemeError
@@ -40,6 +41,18 @@ def foundation_files(theme_dir: Path, slug: str, foundation: str) -> tuple[str, 
         raise ThemeError("; ".join(problems))
     directory = foundation_dir(theme_dir, slug)
     return (
-        (directory / BOOTSTRAP_CSS).read_text(encoding="utf-8"),
-        (directory / BOOTSTRAP_JS).read_text(encoding="utf-8"),
+        _without_source_map((directory / BOOTSTRAP_CSS).read_text(encoding="utf-8")),
+        _without_source_map((directory / BOOTSTRAP_JS).read_text(encoding="utf-8")),
     )
+
+
+SOURCE_MAP_COMMENT = re.compile(
+    r"^\s*(?://|/\*)# sourceMappingURL=\S+(?:\s*\*/)?\s*$", re.MULTILINE
+)
+
+
+def _without_source_map(text: str) -> str:
+    """The vendored text without its `sourceMappingURL` comment: no `.map` file is vendored, and
+    the manifest storage of `collectstatic` stops the image build on a reference to a missing
+    file. The vendored file itself stays byte-identical; only the built copy drops the line."""
+    return SOURCE_MAP_COMMENT.sub("", text).rstrip("\n") + "\n"

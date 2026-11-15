@@ -218,7 +218,10 @@ def test_the_bundle_is_copied_to_the_build_for_ride_only(tmp_path: Path) -> None
     out = tmp_path / "build"
     build_themes(SHIPPED_THEMES, out)
     copied = out / "themes" / "ride" / "vendor" / "bootstrap.bundle.min.js"
-    assert copied.read_bytes() == (VENDORED / "bootstrap.bundle.min.js").read_bytes()
+    upstream = (VENDORED / "bootstrap.bundle.min.js").read_text(encoding="utf-8")
+    # The copy is upstream minus its sourceMappingURL comment (no .map is vendored).
+    kept = [line for line in upstream.splitlines() if "sourceMappingURL" not in line]
+    assert copied.read_text(encoding="utf-8").splitlines() == kept
 
 
 def test_ride_passes_the_gates_with_bootstrap_inside() -> None:
@@ -236,3 +239,13 @@ def test_the_vendored_framework_files_are_not_touched_by_the_commit_hooks() -> N
         assert not (folder / name).read_bytes().endswith(b"\n"), name
     hooks = (Path(__file__).resolve().parents[4] / ".pre-commit-config.yaml").read_text()
     assert hooks.count("themes/[^/]+/static/themes/[^/]+/vendor") == 2
+
+
+def test_the_built_framework_has_no_source_map_reference() -> None:
+    """No `.map` is vendored, and the manifest storage stops collectstatic on a missing file."""
+    from apps.themes.foundation import foundation_files
+
+    root = Path(__file__).resolve().parents[4] / "themes" / "ride"
+    css, js = foundation_files(root, "ride", "bootstrap-5.3")
+    assert "sourceMappingURL" not in css
+    assert "sourceMappingURL" not in js
