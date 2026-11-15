@@ -327,13 +327,6 @@ def test_changing_ones_own_password_ends_the_other_sessions_only(
     assert AuditLog.objects.filter(action=services.CREDENTIAL_CHANGED).count() == 1
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Finding: Django's session auth hash covers the password only, so re-addressing an "
-    "account (e.g. after a takeover) leaves the attacker's sessions signed in. Owner: CORE.24 "
-    "(every session of a user ends on a credential change; the email address must join the "
-    "list, propose it there). Remove the xfail when it lands.",
-)
 def test_an_email_change_ends_the_users_other_sessions(
     victim_sessions: Callable[[User], Client],
 ) -> None:
@@ -345,14 +338,6 @@ def test_an_email_change_ends_the_users_other_sessions(
     assert not _signed_in(stolen)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Finding: an MFA reset (lost device, suspected takeover) deletes the factors but keeps "
-    "the user's sessions signed in; a stolen session of a staff member then reaches the "
-    "enrolment page and can bind the attacker's own authenticator. Needs the reset to end the "
-    "user's sessions. Owner: CORE.24 (\"every session of a user is invalidated when the password, "
-    'an MFA device or a role changes"). Remove the xfail when it lands.',
-)
 def test_an_mfa_reset_ends_the_users_sessions(
     victim_sessions: Callable[[User], Client],
 ) -> None:
