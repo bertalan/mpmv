@@ -51,6 +51,12 @@ lane board.
   prompts, and report it on the Lane board. Hide spam as spam. The repository keeps interaction
   limits set to collaborators only; renew them before they expire (next: 2027-05-08).
 
+- **Lane review (required check, owner decision 2026-11-15).** A PR opened by `bertdev1` merges
+  only with an approving review from the owner account on its current head commit (the "Lane
+  review" check, `.github/workflows/lane-review.yml`). A new push needs a new approval. PRs opened
+  by the owner account pass the check; lane-a's merge train only takes lane-b PRs that are already
+  approved, so the train cannot carry an unreviewed lane-b change.
+
 ## Handing over a PR (lane-b)
 
 1. Open the PR with the label `lane-b`. The title is `[<TASK-ID>] <short title>`. The body has the
