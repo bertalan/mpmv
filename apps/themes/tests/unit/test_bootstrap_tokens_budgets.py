@@ -6,7 +6,6 @@ strings; and the base CSS and Bootstrap never define the same class without a re
 """
 
 import re
-import shutil
 from pathlib import Path
 
 import pytest
@@ -228,7 +227,9 @@ def test_a_bootstrap_theme_over_its_js_limit_fails(tmp_path: Path) -> None:
 def test_a_bootstrap_theme_within_generous_limits_passes(tmp_path: Path) -> None:
     root = tmp_path / "themes"
     foundation_theme(root)
-    shutil.copy(RIDE / "LICENSES.toml", root / "ride" / "LICENSES.toml")
+    licences = (RIDE / "LICENSES.toml").read_text(encoding="utf-8")
+    bootstrap = next(b for b in licences.split("[[asset]]") if 'name = "Bootstrap"' in b)
+    (root / "ride" / "LICENSES.toml").write_text("[[asset]]" + bootstrap, encoding="utf-8")
     with_budgets(root, 200, 200)
     assert ride_failures(root) == []
 
