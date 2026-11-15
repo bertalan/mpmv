@@ -68,7 +68,9 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(default=timezone.now)
     # CORE.24: copied into each session at login; a session whose copy differs is flushed on its
     # next request, so ending sessions also reaches those the index never saw.
-    session_generation = models.PositiveIntegerField(default=0, editable=False)
+    # db_default: rows inserted by historical models in migration tests (and old workers
+    # during a deploy) do not know the column (CORE.24).
+    session_generation = models.PositiveIntegerField(default=0, db_default=0, editable=False)
 
     objects: ClassVar[UserManager] = UserManager()
 

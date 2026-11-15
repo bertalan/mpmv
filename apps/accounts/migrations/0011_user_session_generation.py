@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='user',
             name='session_generation',
-            field=models.PositiveIntegerField(default=0, editable=False),
+            field=models.PositiveIntegerField(default=0, db_default=0, editable=False),
         ),
     ]
