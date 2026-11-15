@@ -7,6 +7,7 @@ Test data comes from factory_boy factories, reseeded before every test (ARC.12).
 """
 
 import os
+import zlib
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -101,7 +102,33 @@ def suite_for(path: Path) -> str | None:
     return None
 
 
+def _shard_selector() -> tuple[int, int] | None:
+    """ARC.34: `MPMV_TEST_SHARD=i/N` (1-based) keeps only the tests whose hash falls in shard i.
+
+    The split is by test id (crc32): deterministic, no timing data, evenly sized, and every test
+    runs in exactly one shard.
+    """
+    raw = os.environ.get("MPMV_TEST_SHARD", "").strip()
+    if not raw:
+        return None
+    index, _, total = raw.partition("/")
+    if not (index.isdigit() and total.isdigit() and 1 <= int(index) <= int(total)):
+        raise pytest.UsageError(f"MPMV_TEST_SHARD must look like 2/4, got {raw!r}")
+    return int(index), int(total)
+
+
+def _in_shard(item: pytest.Item, index: int, total: int) -> bool:
+    return zlib.crc32(item.nodeid.encode()) % total == index - 1
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    shard = _shard_selector()
+    if shard is not None:
+        kept = [item for item in items if _in_shard(item, *shard)]
+        dropped = [item for item in items if not _in_shard(item, *shard)]
+        if dropped:
+            config.hook.pytest_deselected(items=dropped)
+        items[:] = kept
     for item in items:
         suite = suite_for(Path(str(item.path)))
         if suite is None:
@@ -152,6 +179,26 @@ def _reproducible_factories(factory_seed: int) -> None:
     factory.random.reseed_random(factory_seed)
     for factory_class in app_factories():
         factory_class.reset_sequence()
+
+
+@pytest.fixture(autouse=True)
+def _migration_tests_start_from_flushed_tables(request: pytest.FixtureRequest) -> None:
+    """A test that rolls migrations back starts from empty tables, whatever ran before it.
+
+    Reversing past `events.0002` deletes the event pages through historical models; with rows
+    left by `post_migrate` (the Events index page) that delete cascades into tables of models the
+    same rollback has already dropped (`cms_blogindexpage`, ...). The old single-job run only
+    passed because an earlier transactional test had flushed its worker's database (ARC.34: a
+    shard may start with the migration test). The test would flush the database afterwards
+    anyway, and these tests run last (see `xdist_group` above).
+    """
+    module = request.module
+    if "MigrationExecutor" not in vars(module) or not _flushes_database(request.node):
+        return
+    request.getfixturevalue("transactional_db")
+    from django.core.management import call_command
+
+    call_command("flush", interactive=False, inhibit_post_migrate=True, verbosity=0)
 
 
 @pytest.fixture(autouse=True)
