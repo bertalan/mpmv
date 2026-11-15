@@ -37,7 +37,7 @@ Rules:
   (`legal_note_key`). The process is an AI draft followed by human review of checkout, emails and
   legal or tax wording (I18N.7). Content shown to visitors (products, categories and taxonomy terms,
   vendor storefront texts, CMS pages, blog, landing pages) follows two rules at go-live (owner
-  decision of 2026-11-07). The **existing Italian texts** of the current site are migrated and
+  decision of 2026-11-07). The **existing Italian texts** of the current site (confirmed by the owner on 2026-11-15, Q-71, D-18 bis) are migrated and
   published in IT (MIG.3 for vendors, catalog and taxonomies, MIG.7 for pages and blog), so the
   current IT URLs keep their content. **New** visitor content created after the migration (new
   products from the pipelines, new pages and articles) stays EN only until after go-live, and DE, FR
