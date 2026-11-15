@@ -85,7 +85,7 @@ part of the done-when still open) · `not started`.
 | TAX.13 | done | #138 | Exemption reasons tied to their law's country. Tax code, flagged for careful human review |
 | VEN.23 | done | #137 | DAC7 seller dataset |
 | ARC.20 | done | #132 | Trusted input for AI agents |
-| ARC.10 | done | #150 | Synthetic data seed (`make seed`) |
+| ARC.10 | done | #150, #480 | Synthetic data seed (`make seed`); #480 publishes one sales terms version per demo vendor and onerous clauses on the demo Terms of sale pages |
 | CMS.10 | done | #126, #275 | Product grid block. #275 adds the SEO.7 `ItemList` through `graph_nodes` and places the grid in the blog, term landing, vendor landing and event bodies |
 | CMS.11 | done | #275 | `product_cards` block (grid or row of hand-picked products, listed and page-language only, no price for on-request items) and the product chooser with search (name in any language, SKU, brand, vendor) and vendor, brand and category filters, scoped to the member's own vendors; vendor event bodies allow cards of own products and grids sourced from the vendor itself. Migrations cms 0015, events 0004. Security-relevant scoping, needs human review |
 | CORE.15 | done | #140, #163 | Secure action links, review follow-ups |
@@ -172,6 +172,10 @@ part of the done-when still open) · `not started`.
 | SHP.4 | done | #354 | Shipping cost per vendor package through `quote_shipping` and the tax engine |
 | ORD.3 | done | #354 | `build_checkout`: per-vendor packages, tax, shipping, blocking messages, preview; mixed-rate shipping VAT regression test. Money and tax code, needs human review |
 | ORD.17 | done (customer terms clause lists pending counsel) | #463 | Checkout legal step (D-40, variant A): seller recap, box 1 and box 2, order terms snapshot in `terms_acceptance`, terms in the confirmation email, confirming poll after the provider redirect. Box 2 lists only seller clauses until counsel enters `onerous_clauses` in the CMS |
+| ORD.17b | done | #473 | ORD.17 follow-ups: version stamps on the terms snapshot, kept ticks, `orders/0015` makes `terms_acceptance` not editable, confirmation email text. Orders code, needs human review |
+| CORE.25, VEN.6 (shop owner passkey) | done: follow-ups open | #474 | D-32 amendment (2026-11-14): on a shop they own, a vendor owner with a passkey may "Do it once" and open a passkey window scoped to that shop for `payout_details` and `sales_terms_publish`; the owner check is `settings.SHOP_OWNER_CHECK`, re-read on each call. Found on STAGE: no vendor owner could connect a payout account. Security code, needs human review |
+| PAY.3 (transfer key) | done | #477 | The transfer key names destination, amount and currency; a transfer of the same payment to another account is blocked and audited once (`ledger.transfer_blocked`); demo payout accounts (`acct_demo_`) are skipped before any provider call; `StripeError` keeps Stripe's error type and code. Closes the STAGE incident of 2026-11-14. Payments code, needs human review |
+| VEN.38 | spec only | #479 | D-43: vendor configuration form with Collection costs and Commissions tabs, fixed fees once per vendor order; VEN.19 charges per billing period; VEN.33 order-handling fee defined. No code |
 | ORD.19 | done | #469 | `cart_add` on the product page: POST with CSRF, cart rate budget, HTMX fragment and no-JS redirect; the sales mode is checked again by `add_to_cart` (`effective_sales_mode`) |
 | ORD.10 | partial: the switch and the alert; nothing yet reports STAGE | #353 | `ensure_checkout_open` in `place_order` (the `checkout` and `payments` switches, platform and every vendor), `manage.py check_payments` alert on a payment without transfer; the done-when "verified on STAGE" is open |
 | ORD.5 | partial: the cart and checkout UI, B2B fields, VIES, place order, the payment page | #360, #429 | `orders/ui` (HTMX): cart, review and checkout, conditional B2B fields, VIES, captcha, the confirmation page. #429: `place_order` starts the payment after the transaction commits and the payment page (`orders/static/orders/payment.js`) confirms it with the browser-side secret. Orders code, needs human review |
@@ -988,7 +992,13 @@ Compliance, security and content:
 | #465 | PAY.2 | Connect webhook signing secret |
 | #467 | ORD.5, VEN.2 | Checkout takes the commission rule in force |
 | #469 | ORD.19 | Add to cart from the product page |
-| (this PR) | none | Coherence check 29 |
+| #472 | none | Coherence check 29 |
+| #473 | ORD.17 | Checkout legal step follow-ups (ORD.17b) |
+| #474 | CORE.25, VEN.6 | A shop owner confirms its own shop's owner actions (D-32 amendment) |
+| #477 | PAY.3 | Transfer key names destination and amount |
+| #479 | VEN.38, VEN.19, VEN.33 | Spec: vendor economic configuration (D-43) |
+| #480 | ARC.10, VEN.35, ORD.17 | Demo seed publishes sales terms and onerous clauses |
+| (this PR) | none | Coherence check 30 |
 
 ## Coherence checks
 
@@ -2024,3 +2034,23 @@ Findings and actions:
 7. Info. The delta touches money, payments, ledger, orders and compliance code: PAY.1 to PAY.3, ORD.5, ORD.17, ORD.19, VEN.35. All need human review; the legal wording needs counsel (CMP.24).
 
 Verdict: GO with follow-ups. No blocker for the merged code. Finding 2 (no refunds) matters before any LIVE payment. The payments, ledger, orders and legal code need human review.
+
+### Coherence check 30 (main at 6cb3033d)
+
+Scope: main at 6cb3033d, the merges after check 29 (#472): #473 (ORD.17b), #474 (CORE.25, VEN.6 shop owner passkey), #477 (PAY.3 transfer key), #479 (D-43 spec: VEN.38, VEN.19, VEN.33) and #480 (demo seed sales terms), through the trains #475, #478 and #481.
+
+| Area | Result |
+|---|---|
+| Code vs spec | #474 matches the D-32 amendment: `levels.may_confirm` lets a vendor owner confirm only `SHOP_OWNER_ACTIONS` on a shop `is_shop_owner` says they own, re-checked on each call through `settings.SHOP_OWNER_CHECK` (`apps.vendors.services.is_vendor_owner`); spec 02 and D-32 carry the amendment. #477 matches PAY.3 and `payment-providers.md` (transfer key with destination and amount, blocked and demo-account cases). #473 and #480 match ORD.17 and VEN.35 (no change of status). #479 is spec only: no code reads `fee_fixed` per vendor order or the billing period yet. |
+| Spec and backlog | VEN.38 is a new row (P-table total 3128), VEN.19 and VEN.33 reworded, D-43 in the register; `90-backlog.md` and `backlog.csv` were regenerated by `make docs` in #479 (not edited by hand), freshness passes. `progress.md` had no rows for ORD.17b, the #474 amendment, the PAY.3 transfer key and VEN.38; added here with the merge list. |
+| Docs | Relative links in the touched docs resolve; `payment-providers.md` was updated by #477. |
+| Gates | `make check` pass. Unit, integration and e2e suites not run locally; CI on main is the gate. |
+
+Findings and actions:
+
+1. Minor, open: #474 hardening. (a) The window path in `levels.py` has a window that is not scoped to the shop on every code path; (b) `SHOP_OWNER_CHECK` should fail closed (a wrong dotted path or an exception must deny, not raise); (c) offers should be popped after use, including in `close_window`; (d) the shop should be in `SINGLE_USED` and `record_prompt` so the audit and the friction report name it; (e) a test for a vendor owner demoted during an open window is missing. Security code: needs human review before more vendor owner actions join `SHOP_OWNER_ACTIONS`.
+2. Minor, open: the spec has no rule for a per-vendor fixed fee yet in the fee engine; D-43 and VEN.38 define the fixed amount once per vendor order, and the settlement still reads the plan rule. Action: VEN.38 and a spec line in spec 04 for the per-vendor fixed fee rule before the form is built.
+3. Minor, open: carried over from check 29 and still open: PAY.4 (no refunds; matters before any LIVE payment), the platform settles only with `commission_vat_mode` `none` (VEN.34), the Stripe cached-error limitation (now narrowed by the new transfer key), ORD.17 customer terms clauses pending counsel, VEN.36, VEN.33 and CMP.2 pure engines, SEO.7 partial, `PRIVACY_PEPPER` document, TAX.18 and TAX.19, ORD.10 on STAGE.
+4. Info. The delta touches security, payments, ledger and orders code: CORE.25, VEN.6, PAY.3, ORD.17b. All need human review; the legal wording needs counsel (CMP.24).
+
+Verdict: GO with follow-ups. No blocker for the merged code. The #474 hardening items should land before more shop owner actions are added. PAY.4 still matters before any LIVE payment.
