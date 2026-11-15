@@ -7,7 +7,7 @@ from django.urls import reverse
 
 from apps.accounts import levels
 from apps.accounts.tests.factories import UserFactory
-from apps.accounts.tests.mfa import verified_login
+from apps.accounts.tests.mfa import grant_elevate, verified_login
 from apps.core.models import PlatformOperator
 from apps.core.tests.factories import PlatformOperatorFactory
 
@@ -31,7 +31,9 @@ def _form() -> dict[str, str]:
 
 def _client(level: str) -> Client:
     client = Client()
-    verified_login(client, UserFactory.create(superuser=True), level=level, passkey=True)
+    user = UserFactory.create(superuser=True)
+    verified_login(client, user, level=level, passkey=True)
+    grant_elevate(user)  # grants are minted and spent only for who may elevate (CORE.25)
     return client
 
 

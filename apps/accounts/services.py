@@ -894,11 +894,23 @@ def save_group(group: Group, *, ctx: AuditContext, dry_run: bool = False) -> Cha
 
 
 def record_group_access_change(
-    group: Group, before: Mapping[str, Any], *, ctx: AuditContext
-) -> None:
+    group: Group, before: Mapping[str, Any], *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
     changeset = ChangeSet()
     changeset.update(GROUP_MODEL, group.name, before, group_access_snapshot(group))
+    if dry_run:
+        return changeset
     audit_changes(changeset, ctx=ctx, action=GROUP_ACCESS_CHANGED)
+    if not changeset.is_empty:
+        _end_member_sessions(group, ctx=ctx)  # CORE.25: members may have lost `elevate`
+    return changeset
+
+
+def _end_member_sessions(group: Group, *, ctx: AuditContext) -> None:
+    """End the sessions (and so the passkey windows) of every member of `group`: a role change
+    must not leave a step-up open for staff who just lost the right to it."""
+    for member in group.user_set.all():
+        end_sessions_after_change(member, reason="role", ctx=ctx)
 
 
 def delete_group(group: Group, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
@@ -906,7 +918,14 @@ def delete_group(group: Group, *, ctx: AuditContext, dry_run: bool = False) -> C
     changeset.delete(
         GROUP_MODEL, group.name, {**group_snapshot(group), **group_access_snapshot(group)}
     )
-    return run_mutation(changeset, group.delete, ctx=ctx, action=GROUP_DELETED, dry_run=dry_run)
+    members = list(group.user_set.all()) if not dry_run else []
+
+    def apply() -> None:
+        group.delete()
+        for member in members:  # CORE.25: they lost the group's permissions
+            end_sessions_after_change(member, reason="role", ctx=ctx)
+
+    return run_mutation(changeset, apply, ctx=ctx, action=GROUP_DELETED, dry_run=dry_run)
 
 
 # --- Secure action links (CORE.15, spec 02 "Secure action links")

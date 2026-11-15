@@ -71,3 +71,13 @@ def test_the_check_fails_when_mfa_runs_before_authentication(settings: SettingsW
     mfa = "apps.accounts.middleware.MfaRequiredMiddleware"
     settings.MIDDLEWARE = [mfa, *(m for m in settings.MIDDLEWARE if m != mfa)]
     assert [e.id for e in check_mfa_middleware(None)] == ["accounts.E002"]
+
+
+def test_the_shop_owner_check_must_be_importable(settings: SettingsWrapper) -> None:
+    from apps.accounts.checks import check_shop_owner_check
+
+    assert check_shop_owner_check(None) == []
+    broken_paths = ("apps.no_such_module.is_owner", "apps.accounts.levels.no_such_fn", "nodots")
+    for broken in broken_paths:
+        settings.SHOP_OWNER_CHECK = broken
+        assert [e.id for e in check_shop_owner_check(None)] == ["accounts.E003"], broken

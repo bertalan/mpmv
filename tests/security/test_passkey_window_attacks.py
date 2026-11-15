@@ -218,9 +218,9 @@ def test_a_window_stops_working_when_the_ownership_is_taken_away(
     assert SalesTermsVersion.objects.filter(vendor=shop_a).count() == 1
     # Nor can the demoted user confirm again: no offer is left, so no new window opens.
     options = _post(client, "levels:options")
-    if options.status_code == 200:
-        credential = authenticator.get(options.json()["publicKey"])
-        assert _post(client, "levels:window", {"credential": credential}).status_code == 403
+    assert options.status_code == 200
+    credential = authenticator.get(options.json()["publicKey"])
+    assert _post(client, "levels:window", {"credential": credential}).status_code == 403
     assert client.post(TERMS, TERMS_DATA).status_code in {403, 404}
     assert SalesTermsVersion.objects.filter(vendor=shop_a).count() == 1
 
@@ -304,13 +304,6 @@ def _audit_after(action: str) -> list[dict[str, Any]]:
     ]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "CORE.25 hardening item 1, deferred: the test helper verified_login opens an unscoped "
-        "window for any user, so 30+ fixture-based tests rely on it; see the PR follow-ups"
-    ),
-)
 def test_an_unscoped_window_covers_nothing_for_a_user_without_elevate(
     attacker: User, shop_a: Vendor
 ) -> None:
@@ -412,3 +405,25 @@ def test_the_audit_names_the_shop_on_the_prompt_and_on_the_spent_grant(
     assert _do_it_once(client, authenticator, refused).status_code == 200
     assert client.post(TERMS, TERMS_DATA).status_code == 302
     assert _audit_after(levels.SINGLE_USED)[-1]["shop"] == shop
+
+
+def test_the_critical_prompt_audit_names_the_shop(
+    client: Client, attacker: User, shop_a: Vendor
+) -> None:
+    """A critical action inside a shop window, without a fresh passkey, is audited as
+    `passkey_required` with the shop it was on."""
+    from apps.accounts.mfa_session import VERIFIED_KIND_SESSION_KEY
+
+    authenticator = _enrol_passkey(attacker)
+    _sign_in(client, attacker, shop_a)
+    client.post(TERMS, TERMS_DATA)
+    assert _open_window(client, authenticator).status_code == 200
+    session = client.session
+    session[VERIFIED_KIND_SESSION_KEY] = "totp"  # the last verification is no longer a passkey
+    session.save()
+    # The shop window covers payout_details, a critical action: it still asks for a fresh passkey.
+    assert client.post(PAYMENTS).status_code == 302  # to mfa:verify for the fresh passkey
+    rows = [a for a in _audit_after(levels.PROMPT) if a["outcome"] == "passkey_required"]
+    assert rows
+    assert rows[-1]["shop"] == levels.shop_key(shop_a)
+    assert rows[-1]["action"] == "payout_details"
