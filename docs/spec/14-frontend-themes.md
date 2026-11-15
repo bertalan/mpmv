@@ -18,6 +18,17 @@ vertical) only adds a visual identity on top. This document replaces the single 
   theme (§14.8). It is not reused as code: Bootstrap 4 and jQuery are end of life, the template
   loads three carousel libraries and third-party fonts and maps, uses inline scripts and styles that
   the CSP blocks, removes every focus outline, and fails several WCAG contrast and semantics checks.
+- **Owner decision Q-98 (2026-11-15): the `ride` theme is improved, not cut down.** It rebuilds the
+  look of the reference template faithfully, with our own markup and styles and the template only
+  as the visual model, on **Bootstrap 5.3** (MIT; 5.3.9 at the time of writing, 6.0 is still an
+  alpha and is not used). This supersedes the earlier "no Bootstrap, scroll-snap carousel, no
+  counters, no animation libraries" text of this spec: hero slider and carousels, scroll reveal,
+  header search overlay, mini-cart, page banners with breadcrumb, counters and progress bars come
+  back (§14.9 parity table, THM.13 to THM.16). The clean-room rule for the template's own files
+  stays (§14.8), and so do WCAG 2.2 AA and the strict CSP.
+- **`base` stays framework-free** (system fonts, plain CSS, no Bootstrap): it is the neutral
+  fallback every theme falls back to, and its size and audit budget would not survive a framework.
+  Bootstrap is a dependency of the `ride` chain only (§14.5, "Bootstrap in `ride`").
 
 ## 14.2 What a theme is
 
@@ -30,7 +41,7 @@ logic) with a fixed layout:
 | `tokens.toml` | Design tokens (§14.4); a child theme lists only the tokens it changes |
 | `templates/` | Template overrides, same relative paths as the templates they replace (`layouts/`, `components/`, or any app template such as `catalog/product_detail.html`) |
 | `static/themes/<slug>/css/` | CSS sources in cascade layers (§14.5) |
-| `static/themes/<slug>/js/` | Small ES modules registering Alpine components; no third-party code |
+| `static/themes/<slug>/js/` | Small ES modules registering Alpine components, plus, for `ride`, small modules that drive the vendored Bootstrap JS; no other third-party code |
 | `static/themes/<slug>/fonts/`, `icons/`, `img/` | Self-hosted woff2 fonts, an SVG icon sprite, placeholder imagery |
 | `LICENSES.toml` | One entry per font, icon set and image: source URL, author, SPDX licence id, files covered |
 
@@ -137,6 +148,21 @@ secondary `#FBA926` (background only) with `#1A1A1A` text, secondary hover `#E89
 text `#BE5900`, and `#0580FA` as the dark-mode accent. Layout, type scale and component shapes
 still follow the reference template's visual language. `base` keeps a neutral palette.
 
+**Tokens and Bootstrap.** Tokens stay the single source of colours, type, space, radii and
+shadows. For a theme that declares `foundation = "bootstrap-5.3"` (§14.5) the build also emits a
+generated `bootstrap-map` block in `@layer tokens` that sets Bootstrap's own custom properties
+from the semantic tokens: `--bs-primary` and `--bs-primary-rgb` from `accent`, `--bs-secondary*`
+from `secondary`, `--bs-body-color`, `--bs-body-bg`, `--bs-body-font-family`, `--bs-heading-color`,
+`--bs-link-color*` and `--bs-link-hover-color*` from the text, surface and link tokens,
+`--bs-border-color`, `--bs-border-radius*` from `radius-*`, `--bs-box-shadow*`, `--bs-focus-ring-*`
+from `focus`, and the `--bs-success`, `--bs-info`, `--bs-warning`, `--bs-danger` families from the
+status tokens (with their `-rgb`, `-text-emphasis`, `-bg-subtle` and `-border-subtle` variants
+derived by the same helpers as §14.12). Component variables (`--bs-btn-*`, `--bs-card-*`,
+`--bs-navbar-*` and the like) are set in `ride` component CSS from those. The contract pairs of
+this section are checked on the semantic tokens, so a Bootstrap component can only show colours
+that passed the contract; a test also fails when the generated map leaves a Bootstrap colour
+variable that a component uses at its upstream default.
+
 Dark mode is not required at go-live. The semantic tier allows it later as a second token set
 under `prefers-color-scheme: dark`, validated with the same pairs.
 
@@ -163,6 +189,68 @@ Alpine.js, CSS with a lightweight build). Recorded in an ADR in THM.1.
 - Icons: one SVG sprite per theme, referenced with `<svg><use href="…#icon">` (same origin).
   Decorative icons get `aria-hidden="true"`; icon-only buttons get a visible-on-focus or
   `aria-label` text.
+
+### Bootstrap in `ride`
+
+Decision (owner Q-98, recorded in an addendum to ADR-0008 by THM.13): the `ride` theme builds on
+the **official Bootstrap 5.3 distribution files, vendored unchanged**, not on its Sass sources.
+
+- **What is vendored.** `bootstrap.min.css` (the non-RTL build) and `bootstrap.bundle.min.js`
+  (Bootstrap plus Popper, UMD) of one pinned 5.3.x release, taken from the upstream release
+  archive, under `themes/ride/static/themes/ride/vendor/bootstrap/`, with the upstream
+  `LICENSE` (MIT). `static/vendor/VENDORED.toml` gets two entries (version, source URL, SHA-256,
+  licence MIT) and the existing unit test checks the hashes; `themes/ride/LICENSES.toml` gets an
+  entry of kind `framework`. No source maps, no Bootstrap Icons (icons stay the Lucide sprite),
+  no jQuery (Bootstrap 5 has none).
+- **Why not Sass.** Compiling Bootstrap from its Sass needs Dart Sass (a Node or Dart binary, or a
+  deprecated Python binding), which breaks the "no Node, no npm" rule of ADR-0008 and adds a
+  supply chain and an image build stage for one theme. Bootstrap 5.3 exposes colours, type,
+  radii, shadows and each component's look as CSS custom properties, so mapping our tokens onto
+  them (§14.4) gives the same theming with files that can be checked against upstream's hash and
+  upgraded by replacing two files. The price is unused CSS and no Sass-level customisation; both
+  are accepted and measured by the budgets of §14.7.
+- **Layers.** The build wraps the vendored CSS in a layer, `@layer bootstrap { … }`, and the
+  layer order of a Bootstrap theme becomes `reset, bootstrap, tokens, base, layout, components,
+  utilities, overrides` (the generated token map and every `ride` rule therefore beat Bootstrap
+  without `!important` or specificity tricks). The `ride` chain leaves out `base`'s `reset` layer,
+  because Bootstrap's Reboot replaces it. A unit test lists the selectors that `base` CSS and
+  Bootstrap both define (`.btn`, `.card`, `.alert` and the like) and fails on an overlap that is
+  not whitelisted with a reason, so the two never fight silently. `ride` templates that override a
+  `base` component use Bootstrap's classes; ride-only classes use a `ride-` prefix.
+- **Manifest.** `theme.toml` gets an optional `foundation = "bootstrap-5.3"` key (system check:
+  the vendored files must exist and the hash must match). Only a theme that declares it receives
+  the wrapper, the token map and the Bootstrap script tag; `base` and any later framework-free
+  theme are unaffected.
+- **JavaScript.** `bootstrap.bundle.min.js` is loaded as a classic `<script defer src>` from
+  `'self'`, before the theme modules. Theme modules (`ride/js/`) do the glue Bootstrap does not:
+  carousel pause button, no autoplay under `prefers-reduced-motion`, focus handling for the search
+  overlay, lazy content for the mini-cart, and re-initialising Bootstrap components inside
+  fragments that HTMX swaps in. Only the data API and the programmatic API are used.
+
+Bootstrap under the strict CSP, checked against the 5.3 sources and enforced by the CSP lint:
+
+- Bootstrap JS needs no inline code and no `eval`. Its `data-bs-*` attributes are plain data read
+  by delegated listeners; none of them contains an expression. Components that build markup from a
+  template string (tooltip, popover) and the `data-bs-html` and `data-bs-template` options are not
+  used and the lint rejects them; our own toast is the live region of §14.9. Dropdown, collapse,
+  modal, offcanvas, carousel, tabs and accordion are used.
+- Bootstrap JS changes layout through the CSSOM (`element.style.x = …`, for example the body
+  padding while a modal is open, the collapse height, Popper's position). The CSP blocks `style`
+  attributes in markup and `setAttribute("style", …)`, not property assignment through the
+  CSSOM, so this is allowed; an e2e test with the `securitypolicyviolation` listener covers the
+  modal, offcanvas, dropdown and carousel to prove it.
+- The dist CSS contains **`data:` URI images** (navbar toggler, carousel arrows, close button,
+  select arrow, accordion chevron, checkbox and radio marks, validation icons). `img-src`
+  stays without `data:`: `ride` overrides those properties (variables or single rules) with
+  `url()` to same-origin SVG files of its own, and a build check fails when the built
+  `theme.css` still contains `url(data:`.
+- Bootstrap's documentation examples use `style="width: 25%"` on progress bars and
+  `--bs-aspect-ratio` inline on `.ratio`. `ride` components use `<progress>` (styled like
+  Bootstrap's bar), width step classes and the fixed `.ratio-*` classes instead; the template lint
+  already rejects `style`.
+- Bootstrap's default focus ring (a translucent box-shadow) and some default hover colours do not
+  pass the contract; `ride` sets `--bs-focus-ring-*` and an outline rule from `--color-focus` and
+  keeps the 2 px outline of §14.6.
 
 CSP rules for every theme (SEC.1 policy, no `unsafe-inline`, no `unsafe-eval`):
 
@@ -202,14 +290,14 @@ Rules built into `base` and enforced for every theme:
 | Focus | `:focus-visible` outline of at least 2 px in `--color-focus` (≥ 3:1), never removed | 2.4.7 |
 | Focus not obscured | `scroll-padding-top: var(--header-offset)` for the sticky header, the header's real height that the theme script keeps up to date (falling back to `--header-height`, its minimum); the consent banner never covers the focused element (it is either the first thing in the focus order and a non-modal region that reserves its own space at the bottom, or a modal dialog that traps focus) | 2.4.11 |
 | Target size | Every pointer target at least 24×24 CSS px, or spaced so a 24 px circle fits; primary controls 44 px high | 2.5.8 |
-| Dragging | Carousels, galleries and the price filter work with buttons and inputs; no drag-only interaction | 2.5.7 |
+| Dragging | Carousels, galleries and the price filter work with buttons and inputs; no drag-only interaction (Bootstrap's carousel swipe is an extra, never the only way) | 2.5.7 |
 | Consistent help | The help/contact link sits in the same place in the header and footer on every page, including checkout | 3.2.6 |
 | Forms | Visible labels (never placeholder-only), `autocomplete` tokens on personal data, inline errors tied with `aria-describedby`, an error summary with links on submit | 1.3.5, 3.3.1, 3.3.2, 3.3.3 |
 | Redundant entry | Checkout offers "billing same as shipping" and pre-fills from the account and the previous step | 3.3.7 |
 | Authentication | No cognitive test; paste allowed; password managers and passkeys work (§14.7) | 3.3.8 |
 | Colour and contrast | Token contract pairs (§14.4); stock, sale and error states also have text or an icon with text | 1.4.1, 1.4.3, 1.4.11 |
 | Reflow and spacing | Usable at 320 CSS px and at 200% zoom; no fixed heights on text containers | 1.4.4, 1.4.10, 1.4.12 |
-| Motion | No autoplay; animation only inside `prefers-reduced-motion: no-preference` | 2.2.2, 2.3.3 (advisory) |
+| Motion | Carousels start paused and never autoplay under `prefers-reduced-motion: reduce`; where autoplay is enabled it has a visible pause/play button and pauses on hover and focus; reveal and counter animation only inside `prefers-reduced-motion: no-preference`, and content is fully visible without it | 2.2.2, 2.3.3 (advisory) |
 | Status messages | HTMX cart and filter updates announced through one polite live region | 4.1.3 |
 | Images | Alt text from the translatable alt fields (spec 09); decorative images `alt=""` | 1.1.1 |
 
@@ -239,8 +327,8 @@ the anonymous page cache on.
 
 | Budget | Limit | Checked by |
 |---|---|---|
-| CSS per theme (`theme.css`, Brotli) | ≤ 45 KB | unit test on the build output (THM.5) |
-| JavaScript total, including htmx and Alpine (Brotli) | ≤ 40 KB | unit test (THM.5) |
+| CSS per theme (`theme.css`, compressed) | ≤ 45 KB (`base`); ≤ 75 KB for a theme with `foundation = "bootstrap-5.3"` (provisional, THM.13 sets the final value) | unit test on the build output (THM.5, THM.13) |
+| JavaScript total, including htmx and Alpine (compressed) | ≤ 40 KB (`base`); ≤ 75 KB for a Bootstrap theme (provisional) | unit test (THM.5, THM.13) |
 | Web fonts | ≤ 2 families, ≤ 4 woff2 files, Latin + Latin Extended-A subsets, `font-display: swap`, one preload | `LICENSES.toml` and build check (THM.5) |
 | LCP (mobile, 4G profile) | < 2.5 s | SEO.6 on STAGE |
 | CLS | < 0.1 (images and embeds always have width and height or `aspect-ratio`) | SEO.6 |
@@ -252,21 +340,41 @@ limit applies to the file as served compressed, not to the raw file. The THM.5 g
 gzip at level 9, an upper bound for Brotli, so a file within the budget in gzip is within it in
 Brotli too.
 
+**Budgets for a Bootstrap theme (owner decision Q-98).** The vendored Bootstrap 5.3 files are
+about 30 KB (CSS) and 23 KB (bundle JS) compressed, before any `ride` rule, so the single budgets
+above cannot hold for `ride`. The limit becomes **per theme**, declared in the manifest
+(`css_budget_kb`, `js_budget_kb`), with `base` keeping 45 and 40. The provisional figures are an
+upper estimate (Bootstrap about 30 KB plus `base` and `ride` CSS about 25 KB plus headroom;
+Bootstrap bundle, htmx, Alpine and theme modules about 60 KB). THM.13 measures the real sizes and
+writes the final limits into the manifest and into this table; they are a ceiling that THM.5
+enforces, never a target, and raising one needs a reviewed manifest change. The anonymous page
+cache, hashed long-lived static files and compression make the extra transfer a first-visit cost.
+If the measured LCP on STAGE (SEO.6) regresses, the first remedy is splitting the CSS in the build
+(Bootstrap components a page does not use, loaded per template), not dropping features.
+
 No preloader, no hero video by default, the LCP image is an `<img>` with `fetchpriority="high"`
 and responsive renditions (`srcset`, AVIF/WebP) from the media pipeline.
 
 ## 14.8 Clean-room and licence rule
 
 - The owner's reference template (kept in `private/`) is a **visual reference only**: layout,
-  hierarchy, spacing, palette, typography and component shapes. Its HTML, CSS, SCSS, JavaScript,
-  images, icons and fonts are never copied, adapted or committed, and its product, author and
-  marketplace are never named in versioned files. Class names, markup and CSS are written from
-  scratch for MPMV.
+  hierarchy, spacing, palette, typography, component shapes, sections and interactions. Its HTML,
+  CSS, SCSS, JavaScript, images, icons and fonts are never copied, adapted or committed (the
+  marketplace's Regular licence forbids redistributing its source files, and a public repository
+  redistributes), and its product, author and marketplace are never named in versioned files, even
+  though the author allows removing the credit. Markup, class names beyond Bootstrap's own, and
+  CSS are written from scratch for MPMV, with the template as the visual model and never pasted
+  from. Owner decision Q-98 (2026-11-15) lets `ride` reproduce the template's look and sections
+  faithfully, built on **Bootstrap 5.3** (§14.5); that is a different thing from the template's
+  own code, which stays out.
+- **Bootstrap** is an MIT-licensed dependency vendored unchanged (§14.5): its upstream `LICENSE`
+  file ships next to it, `LICENSES.toml` lists it (kind `framework`, SPDX `MIT`) and the licence
+  gate allows that kind for MIT only.
 - Fonts: only SIL OFL 1.1 or Apache 2.0 fonts downloaded from their upstream project, self-hosted.
   Paid or unknown-licence fonts from the reference template are not reused. `ride` uses Barlow
   (body) and Barlow Condensed (display), OFL 1.1, downloaded from the upstream project (owner
   decision Q-62).
-- Icons: an MIT or ISC licensed SVG icon set (subset), never icon fonts.
+- Icons: an MIT or ISC licensed SVG icon set (subset), never icon fonts (Bootstrap Icons' font included).
 - Images: placeholders made for MPMV (licence CC0, own work) in the theme. Real photos are
   uploaded through the CMS and catalog, never committed, and are either self-produced (by the
   operator or the vendors) or taken from free-licence sources that allow commercial use (CC0 or a
@@ -275,7 +383,8 @@ and responsive renditions (`srcset`, AVIF/WebP) from the media pipeline.
   author or credit, and the credit is shown where the licence requires attribution
   ([10](10-content-seo-ai.md) §10.2, CMS.8). No stock photos in the repository.
 - Every asset is listed in the theme's `LICENSES.toml`; a test fails on an asset without an entry
-  or on a licence outside the allow list (`OFL-1.1`, `Apache-2.0`, `MIT`, `ISC`, `CC0-1.0`).
+  or on a licence outside the allow list (`OFL-1.1`, `Apache-2.0`, `MIT`, `ISC`, `CC0-1.0`). Kinds:
+  `font`, `icons`, `image` and, from THM.13, `framework` (`MIT` only).
 
 ## 14.9 Pages and components
 
@@ -307,6 +416,43 @@ events, which the owner later asked for as a module of their own:
 - The countdown is kept for announcing a product launch, as the **launch countdown** StreamField
   block usable in CMS pages and articles ([10](10-content-seo-ai.md) §10.2, CMS.9). `base` provides
   its component; vertical themes restyle it.
+
+### `ride` component parity (owner decision Q-98)
+
+`ride` rebuilds the reference template's look and every part of it that matters for a selling
+marketplace, on Bootstrap 5.3. "Template" below means the owner's reference template as a visual
+model only; every counterpart is our own markup. Tasks: THM.13 (foundation), THM.14 (motion and
+carousels), THM.15 (header, overlays, banners, footer), THM.16 (THM.8 pages onto Bootstrap), THM.7
+and THM.9 (catalog, content and system pages).
+
+| Template component or page | `ride` counterpart (Bootstrap 5.3 part) | Task |
+|---|---|---|
+| Full-height hero slider with stacked large headings, scroll-down cue | `HeroBlock` slides in a Bootstrap carousel (fade or slide), one `<h1>` on the page (slides use `<h2>` and `<p>`), pause/play button, previous/next buttons, indicators as labelled buttons, no autoplay by default | THM.14 |
+| Product, brand/vendor, testimonial and blog strips (sliders in the template) | Bootstrap carousel with multi-item responsive slides (1, 2 or 4 per view by breakpoint, items grouped by a template tag), same controls; the scroll-snap strip of `base` stays as the no-JavaScript fallback | THM.14 |
+| Scroll reveal animations | `ride/js/reveal.js` (IntersectionObserver) adds `.is-visible` to elements marked `data-reveal`; CSS transitions only inside `prefers-reduced-motion: no-preference`; content visible without script | THM.14 |
+| Counters ("fun facts") | `counter` component: the final number is in the HTML; the script counts up once when visible, off under reduced motion; screen readers get the final value only | THM.14 |
+| Progress bars | `progress` component on `<progress>` (or `<meter>`) styled like Bootstrap's bar, label and value as text | THM.14 |
+| Header: top bar, logo, menu with dropdown sub-menus, burger menu | Bootstrap navbar with dropdowns (keyboard operable) and an offcanvas mobile menu; sticky with `--header-offset` kept for 2.4.11; consistent help link (3.2.6) | THM.15 |
+| Header search popup | Search form in a full-screen Bootstrap modal, focus on the field, Escape closes; the results page stays a normal GET | THM.15 |
+| Header cart icon and mini-cart list | Offcanvas mini-cart (end side), content loaded with HTMX from the cart service, count in a live region, links to cart and checkout | THM.15 |
+| Header "info, location, message" popups | Dropped: no marketplace use (the help link and the contact page cover it) | - |
+| Page banner and breadcrumb (seven variants) | One `page_banner` component with image or colour background, title, optional lead and breadcrumb (`aria-label`, `aria-current`; JSON-LD stays in `seo`), used by listings, content and account pages | THM.15 |
+| Dark footer with widget columns, social links, back-to-top button | Footer with up to four widget columns from the CMS, payment and legal links, labelled social links, back-to-top button (shown after scroll, keyboard reachable, no motion under reduced motion) | THM.15 |
+| Section title (overline and heading) | `section_title` component and heading scale | THM.6 (done), THM.14 |
+| Buttons (filled, grey, outline dark, outline accent; three sizes) | Bootstrap `.btn` variants mapped on tokens; sizes with 44 px primary targets; the raised shadow is `--shadow-raised`, not a glow on every button | THM.13 |
+| Product card, blog card, brand tile, testimonial card | Bootstrap card plus `ride` modifiers; sale and stock badges carry text | THM.7, THM.9 |
+| Shop grid with tabs and pagination | Listings with HTMX filters and numbered pagination styled as Bootstrap `.pagination`; category tabs only for short sets (Bootstrap tabs) | THM.7 |
+| Product details: gallery with thumbnails, tabs, accordion, related products | Gallery (carousel with thumbnail buttons plus the `<dialog>` zoom of `base`), Bootstrap accordion for specs and FAQ, tabs for description, specs and reviews, related products strip | THM.7 |
+| Cart, checkout, payment, sign in, sign up, customer area | The THM.8 pages (PR #502 and #503 merge as they are) moved onto Bootstrap classes; the Payment Element keeps its Appearance API | THM.16 |
+| Blog index and post, about, contact, 404 | Content layouts with page banner; the contact map is a link; error pages | THM.9 |
+| Forms: underline inputs, validation states with icons, nice-select | Bootstrap form controls with visible labels, `.is-invalid` plus text and icon, native `<select>` | THM.13, THM.16 |
+| Modals and popovers | Bootstrap modal and offcanvas for dialogs; popovers are not used | THM.15 |
+| Alert, cookie notice | Bootstrap alert; consent banner (SEO.5) restyled, never covering focus | THM.9 |
+| Video play button and popup | Link or consent-gated embed (SEO.5) opened in a Bootstrap modal after consent | THM.14 |
+| Preloader spinner | Dropped: it hides content and hurts LCP; loading states use the HTMX indicator | - |
+| Home variants (three) | One home template; the hero block has a `layout` choice (slider, single image, split), so editors get the variants without three templates | THM.14 |
+| Tours, trails, packages, pricing, team | Dropped (owner decision Q-61); events have their own module ([15](15-events.md)) | - |
+| Coming-soon countdown | Launch countdown block (CMS.9), restyled | THM.14 |
 
 Component library in `base` (`templates/components/`, one file per component, documented context,
 included with `only`): skip link, header and disclosure navigation, language switcher, search
@@ -499,8 +645,9 @@ Unit tests (THM.11):
 
 ## 14.13 Tasks
 
-THM.1 to THM.5 build the system and `base`; THM.6 to THM.10 build the first vertical theme; THM.11
-is vendor branding; THM.12 delivers the AVIF/WebP renditions of §14.7 and safe SVG logos. Both `base` and `ride` ship at go-live (Q-60), so THM.6 to THM.10 are P1.
+THM.1 to THM.5 build the system and `base`; THM.6 to THM.10 and THM.13 to THM.16 build the first
+vertical theme (THM.13 to THM.16 follow owner decision Q-98: Bootstrap 5.3 foundation and component
+parity, §14.9); THM.11 is vendor branding; THM.12 delivers the AVIF/WebP renditions of §14.7 and safe SVG logos. Both `base` and `ride` ship at go-live (Q-60), so THM.6 to THM.10 and THM.13 to THM.16 are P1.
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
@@ -510,9 +657,13 @@ is vendor branding; THM.12 delivers the AVIF/WebP renditions of §14.7 and safe 
 | THM.4 | `base` component library (§14.9) and staff-only styleguide page | P1 | 12 | THM.3 | Every component renders in every state on `/_styleguide/` with no CSP violation; e2e screenshots saved |
 | THM.5 | Theme quality gates, parametrised over registered themes: CSP template lint, axe-core (`wcag22aa`) on the styleguide, visual comparison harness with CI-only baselines, size budgets, `LICENSES.toml` check | P1 | 6 | THM.4, ARC.11 | A theme with a 3:1 text pair, an inline style, an unlicensed font or a CSS file of 50 KB compressed fails CI (the limit applies to the compressed file, owner decision MQ-14); `base` passes |
 | THM.6 | First vertical theme `ride`: colour tokens from the operator palette (§14.4, §14.12), type scale, spacing and shapes from the reference template's visual language, self-hosted Barlow and Barlow Condensed (OFL 1.1, from upstream), SVG icon subset, header, hero and home block overrides, placeholder imagery, `LICENSES.toml` | P1 | 8 | THM.4, CMS.2 | Home page renders with `ride` and passes the THM.5 gates; no file derived from the reference template (PR checklist) |
-| THM.7 | `ride` catalog pages: listings with filters, search results, product card, product page, vendor storefront | P1 | 6 | THM.6, CAT.7, CAT.8, VEN.10, TAX.12 | Catalog key pages pass the THM.5 gates at 360, 768 and 1280 px |
+| THM.7 | `ride` catalog pages on Bootstrap 5.3: listings with filters and numbered pagination, search results, product card, product page (gallery carousel with thumbnails and zoom `<dialog>`, tabs, accordion, related strip), vendor storefront, page banner with breadcrumb | P1 | 8 | THM.13, THM.14, THM.15, CAT.7, CAT.8, VEN.10, TAX.12 | Catalog key pages pass the THM.5 gates (axe `wcag22aa`, CSP, budgets) at 360, 768 and 1280 px; the gallery carousel and tabs work with the keyboard only; reduced motion shows no animation |
 | THM.8 | `ride` cart, checkout and account pages: cart, checkout steps, Payment Element appearance from tokens, order confirmation, customer area, sign in and up, MFA, password reset | P1 | 6 | THM.6, ORD.5, ORD.7 | A keyboard-only e2e checkout completes in test mode with `ride`; the Payment Element uses the theme's colours and fonts |
-| THM.9 | `ride` content and system pages: blog, standard, legal, contact, term and vendor landing, vendor recruitment, 404 and 500, consent banner styling | P1 | 4 | THM.6, CMS.3, CMS.4, CMS.5, SEO.5 | Content key pages and the consent banner pass the THM.5 gates; focus is never hidden by the banner or the sticky header |
-| THM.10 | Visual regression baselines for `base` and `ride`: styleguide and key pages at three widths, CI job, update procedure in the developer docs | P1 | 4 | THM.5, THM.7, THM.8, THM.9 | CI compares every key page with its baseline; an intentional change needs a reviewed baseline update |
+| THM.9 | `ride` content and system pages on Bootstrap 5.3: blog, standard, legal, contact, term and vendor landing, vendor recruitment, 404 and 500, testimonial and blog carousels, consent banner styling, consent-gated video modal | P1 | 5 | THM.13, THM.14, THM.15, CMS.3, CMS.4, CMS.5, SEO.5 | Content key pages and the consent banner pass the THM.5 gates at 360, 768 and 1280 px; focus is never hidden by the banner or the sticky header; the video modal opens only after consent |
+| THM.10 | Visual regression baselines for `base` and `ride`: styleguide and key pages at three widths (carousels on the first slide, search overlay and mini-cart open, reveal disabled for stable shots), CI job, update procedure in the developer docs | P1 | 4 | THM.5, THM.7, THM.8, THM.9, THM.14, THM.15, THM.16 | CI compares every key page with its baseline; an intentional change needs a reviewed baseline update |
 | THM.11 | Vendor branding (paid plan option): `BrandPalette` and `VendorBranding` in `vendors` with explicit foreground per role, the nine presets (operator palette included) seeded by a data migration, every preset editable, `derive_palette`, `check_brand_palette` over every registered theme's surface, `nearest_compliant` and `suggest_foreground` offered in one click, logo and banner (CMS.8 images), `render_brand_css` to a hashed same-origin file, storefront and product page hooks gated by `plan_allows`, preview, audit | P2 | 12 | VEN.19, THM.4, VEN.10, CAT.7, CMS.8 | The §14.12 unit tests pass (nine presets valid, `#C65D00` fixed close to `#BE5900`, fixed point unchanged, white on `#FBA926` gives None and `#1A1A1A` as foreground); a custom palette with a 3:1 pair is rejected with its ratio and a one-click fix; a branded vendor's storefront and product pages load its stylesheet with no CSP violation and pass axe; listings and checkout never load it; a vendor whose plan loses the entitlement renders with the theme only and keeps its stored branding |
 | THM.12 | Modern image formats: `WAGTAILIMAGES_FORMAT_CONVERSIONS` sends raster renditions to WebP (animated GIFs keep their format), `<picture>` renditions in AVIF, WebP and JPEG with `srcset`, `sizes`, width and height in CMS, catalog and theme templates, `fetchpriority="high"` on the LCP hero, AVIF dropped with a warning when the image library cannot encode it; uploads open to JPEG, PNG, WebP, AVIF and GIF, originals re-encoded without metadata (SEC.2); SVG only for logos and icons, checked at upload against an allow-list with a safe parser (no scripts, event handlers, `foreignObject`, external references, `url()` in styles, DTD or entities) and served same-origin as `image/svg+xml` with a restrictive CSP | P1 | 6 | THM.4, CMS.8 | Pages serve AVIF and WebP with a JPEG fallback and correct `srcset` and `sizes`; a PNG upload renders as WebP; a scripted SVG is refused; unit tests run the sanitiser on a corpus of malicious SVGs, integration tests cover the renditions, and an e2e test finds AVIF and WebP sources in a page's `<picture>` with no CSP violation |
+| THM.13 | Bootstrap 5.3 foundation for `ride` (owner decision Q-98): ADR-0008 addendum; vendored `bootstrap.min.css` and `bootstrap.bundle.min.js` (pinned 5.3.x, upstream MIT licence file, `VENDORED.toml` and `LICENSES.toml` entries of kind `framework`); `foundation` key in `theme.toml` with a system check; the build wraps the CSS in `@layer bootstrap`, generates the token to `--bs-*` map (§14.4) and drops `base`'s reset for the `ride` chain; every `data:` URI of the dist CSS replaced by same-origin SVG; focus ring and contrast fixes; per-theme budgets (`css_budget_kb`, `js_budget_kb`) in `gates.py` with the measured final limits written into §14.7; CSP lint rejects tooltip, popover, `data-bs-html` and `data-bs-template`; selector-collision test between `base` and Bootstrap; buttons, forms, alerts, badges, cards and pagination mapped on tokens and shown in the styleguide | P1 | 12 | THM.6, THM.5 | `ride` builds with Bootstrap 5.3 and a unit test checks the vendored hashes (a tampered file fails); the built `theme.css` has no `url(data:`; the token-map test shows no Bootstrap colour variable at its upstream default; `base` output is unchanged; the THM.5 gates pass for both themes with per-theme budgets (a `ride` over its limit fails, `base` still fails over 45 KB); axe `wcag22aa` is clean on the styleguide at 360, 768 and 1280 px; no `securitypolicyviolation` while a modal and a dropdown are opened with the keyboard |
+| THM.14 | `ride` motion and carousel components: hero slider (`layout` choice slider, single image, split), multi-item strips (products, vendors, testimonials, blog), gallery carousel with thumbnail buttons, each with pause/play, previous/next and labelled indicators and no autoplay unless the editor enables it (then paused on hover and focus, off under `prefers-reduced-motion`); `reveal.js` (IntersectionObserver, `data-reveal`); counters; `<progress>` component; section title; launch countdown restyle; consent-gated video modal; all in the styleguide; no Slick, Owl, Swiper, WOW.js, animate.css or jQuery | P1 | 12 | THM.13, THM.4, CMS.2, CMS.9 | Carousels operate with Tab, Enter, Space and arrow keys only and expose `aria-roledescription="carousel"` and labelled slides; with `prefers-reduced-motion: reduce` nothing animates or autoplays and every revealed element is visible; with JavaScript off all slides and counter values are readable; axe `wcag22aa` clean and zero CSP violations on the styleguide and the `ride` home at 360, 768 and 1280 px; the built JS stays within the `ride` budget |
+| THM.15 | `ride` header, overlays and chrome: Bootstrap navbar with dropdown sub-menus and offcanvas mobile menu, header search overlay (modal), mini-cart offcanvas fed by HTMX with a live-region count, `page_banner` with breadcrumb, dark footer with CMS widget columns, social links and back-to-top button, sticky header with `--header-offset` | P1 | 10 | THM.13, THM.4, ORD.5, CMS.4 | Menu, search overlay and mini-cart open, trap focus, close with Escape and return focus to the trigger, with the keyboard only; adding a product updates the mini-cart and the announced count without a reload; a focused element is never hidden by the sticky header (2.4.11); axe `wcag22aa` clean and zero CSP violations on home, listing and product at 360, 768 and 1280 px; the help link is in the same place on every page including checkout |
+| THM.16 | Move the THM.8 pages (PR #502 and #503, merged as they are) onto Bootstrap 5.3 classes and components: cart, checkout steps with the step indicator, order confirmation, customer area tables, sign in and up, MFA, password reset; Payment Element appearance unchanged | P1 | 5 | THM.13, THM.8 | The keyboard-only e2e checkout of THM.8 still completes in test mode; the THM.5 gates and axe `wcag22aa` pass on every moved page at 360, 768 and 1280 px; no `securitypolicyviolation`; the diff removes the THM.8 classes that Bootstrap now provides |

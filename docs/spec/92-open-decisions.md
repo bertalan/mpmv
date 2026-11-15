@@ -168,3 +168,9 @@ TAX.20 and TAX.21. The owner answered the open questions of the register sweep t
 | MQ-42 | Tax | A regime change may start in the past; staff see the orders already placed, which keep the old regime (Q-77) | [05](05-tax.md) (TAX.2) |
 | MQ-43 | Customer account | Preferences: requests and quotes, followed vendors, event notifications, email and newsletter, wish and gift lists, other marketing opt-ins (Q-84) | [07](07-cart-orders-payments.md) (ORD.11) |
 | MQ-44 | Docs | The security requirements of spec 12 are renamed SR-n so they do not clash with the SEC task IDs (Q-19, lane-a; done in a later docs PR) | [12](12-security-infra-operations.md) |
+
+## Owner decision of 2026-11-15 (themes)
+
+| ID | Area | Decision | Recorded in |
+|---|---|---|---|
+| MQ-45 | Themes | The `ride` theme is improved, not cut down (Q-98): it rebuilds the look of the owner's reference template faithfully on Bootstrap 5.3 (MIT, vendored dist files, tokens mapped on `--bs-*` custom properties, no Sass, no Node), with our own markup and styles; hero slider and carousels (pause control, no autoplay without it), scroll reveal, header search overlay, mini-cart offcanvas, page banners with breadcrumb, counters and progress bars come back; no template file is committed and the template, author and marketplace are never named; `base` stays framework-free; the per-theme CSS and JavaScript budgets are revisited in THM.13 | [14](14-frontend-themes.md) (§14.1, §14.5, §14.7, §14.9, THM.7, THM.9, THM.10, THM.13 to THM.16) |
