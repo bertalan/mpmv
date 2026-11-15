@@ -7,7 +7,14 @@
     return;
   }
   var stripe = Stripe(form.dataset.publishableKey);
-  var elements = stripe.elements({ clientSecret: form.dataset.clientSecret });
+  // THM.8: the theme's colours, font and radius, as literal values (Stripe cannot read our CSS).
+  var appearance;
+  try {
+    appearance = JSON.parse(form.dataset.appearance || "{}");
+  } catch (error) {
+    appearance = {};
+  }
+  var elements = stripe.elements({ clientSecret: form.dataset.clientSecret, appearance: appearance });
   elements.create("payment").mount("#payment-element");
   var message = document.getElementById("payment-message");
   var button = form.querySelector("button[type=submit]");

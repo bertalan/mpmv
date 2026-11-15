@@ -22,7 +22,8 @@ from pytest_django.live_server_helper import LiveServer
 from apps.cart.models import Cart
 from apps.payments.tests.fake_stripe import FakeStripeClient
 from apps.payments.tests.integration.test_order_payment import stripe  # noqa: F401 (fixture)
-from tests.e2e.test_checkout import check_page, open_with_cart, shop  # noqa: F401 (fixture)
+from tests.e2e.test_checkout import check_page as _check_page
+from tests.e2e.test_checkout import open_with_cart, shop  # noqa: F401 (fixture)
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -54,6 +55,11 @@ window.Stripe = function (key) {
 """
 
 WIDTHS = (360, 768, 1280)
+
+
+def check_page(page: Page) -> None:
+    page.wait_for_load_state("load")  # the stylesheet is in: axe measures the styled page
+    _check_page(page)
 
 
 @pytest.fixture(autouse=True)
@@ -112,9 +118,13 @@ def test_a_keyboard_only_checkout_completes_with_ride(
     ):
         tab_to(page, page.locator(field))
         page.keyboard.type(value)
+    tab_to(page, page.locator("#id_country"))
+    page.keyboard.type("Ital")  # a focused select picks the option by its first letters
+    expect(page.locator("#id_country")).to_have_value("IT")
     check_page(page)
     shot("2-details")
-    page.keyboard.press("Enter")  # submits the form from the last field
+    tab_to(page, page.get_by_role("button", name="Continue to review"))
+    page.keyboard.press("Enter")
 
     expect(page.get_by_role("heading", level=1)).to_have_text("Review and pay")
     check_page(page)

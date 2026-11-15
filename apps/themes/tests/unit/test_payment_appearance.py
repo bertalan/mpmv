@@ -6,8 +6,6 @@ from the resolved tokens of the active theme: colours, font family and radius.
 
 import json
 
-import pytest
-
 from apps.themes.appearance import active_payment_appearance, payment_appearance
 from apps.themes.build import read_manifest_sources, read_tokens
 from apps.themes.engine import build_registry, resolve_tokens
@@ -55,7 +53,6 @@ def test_every_text_pair_of_the_appearance_meets_aa() -> None:
     assert contrast_ratio(variables["colorDanger"], variables["colorBackground"]) >= 4.5
 
 
-@pytest.mark.django_db
 def test_the_active_theme_chooses_the_appearance() -> None:
     with use_theme("ride"):
         assert active_payment_appearance()["variables"]["colorPrimary"] == "#046BD2"
