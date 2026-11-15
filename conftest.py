@@ -182,6 +182,26 @@ def _reproducible_factories(factory_seed: int) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _migration_tests_start_from_flushed_tables(request: pytest.FixtureRequest) -> None:
+    """A test that rolls migrations back starts from empty tables, whatever ran before it.
+
+    Reversing past `events.0002` deletes the event pages through historical models; with rows
+    left by `post_migrate` (the Events index page) that delete cascades into tables of models the
+    same rollback has already dropped (`cms_blogindexpage`, ...). The old single-job run only
+    passed because an earlier transactional test had flushed its worker's database (ARC.34: a
+    shard may start with the migration test). The test would flush the database afterwards
+    anyway, and these tests run last (see `xdist_group` above).
+    """
+    module = request.module
+    if "MigrationExecutor" not in vars(module) or not _flushes_database(request.node):
+        return
+    request.getfixturevalue("transactional_db")
+    from django.core.management import call_command
+
+    call_command("flush", interactive=False, inhibit_post_migrate=True, verbosity=0)
+
+
+@pytest.fixture(autouse=True)
 def _no_language_leaks_between_tests() -> "Iterator[None]":
     """A request activates its language (LocaleMiddleware, a user's preference) and nothing
     deactivates it, so the next test of the thread would resolve `i18n_patterns` URLs in it."""

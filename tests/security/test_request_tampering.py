@@ -9,6 +9,7 @@ test.
 import importlib
 import re
 import secrets
+import sys
 import uuid
 from pathlib import Path
 from typing import Any
@@ -272,11 +273,21 @@ def test_a_forged_host_header_is_refused(client: Client) -> None:
     assert EVIL not in response.content.decode()
 
 
-def test_a_forwarded_host_header_is_ignored(client: Client) -> None:
+def test_a_forwarded_host_header_is_ignored(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The proxy's X-Forwarded-Host is never trusted: links and redirects keep our host."""
     assert not settings.USE_X_FORWARDED_HOST
+    # The live settings refuse the placeholder key that settings.test sets by default, so the
+    # test brings its own generated key and never depends on what ran before it.
+    # base is already imported with the placeholder, so patch its value; the env var follows suit.
+    key = secrets.token_urlsafe(50)
+    monkeypatch.setenv("DJANGO_SECRET_KEY", key)
+    monkeypatch.setattr("mpmv.settings.base.SECRET_KEY", key)
     for module in ("mpmv.settings.live", "mpmv.settings.stage"):
+        monkeypatch.delitem(sys.modules, module, raising=False)
         assert not getattr(importlib.import_module(module), "USE_X_FORWARDED_HOST", False)
+        monkeypatch.delitem(sys.modules, module, raising=False)
     user = UserFactory.create(staff=True)
     device = TOTPDeviceFactory.create(user=user)
     password_login(client, user)
