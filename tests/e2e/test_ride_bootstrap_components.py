@@ -83,7 +83,7 @@ def test_the_modal_opens_traps_focus_and_closes_with_the_keyboard(
 
 @pytest.mark.parametrize(
     "selector",
-    ["#sg-foundation .btn-primary", "#sg-foundation .form-control", "#sg-foundation .page-link"],
+    ["#sg-foundation .btn-primary", "#sg-foundation .form-control", "#sg-foundation a.page-link"],
 )
 def test_focus_rings_of_bootstrap_components_are_visible(
     selector: str, page: Page, live_server: LiveServer, settings: SettingsWrapper

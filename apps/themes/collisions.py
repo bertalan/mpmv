@@ -39,20 +39,23 @@ def colliding_classes(base_css: str, bootstrap_css: str) -> set[str]:
 
 
 # Accepted overlaps: class -> why `base` and Bootstrap may both style it.
-_PENDING = (
-    "base component rule in a later layer than Bootstrap's: the base look wins in the ride chain "
-    "until THM.13 part 3 maps this component on Bootstrap's classes and drops the base rule"
+_MAPPED = (
+    "base keeps its own markup and rules, in a later layer than Bootstrap's, so the base look wins "
+    "on the properties it sets; ride maps the Bootstrap variables of this component on the same "
+    "tokens (40-bootstrap-components.css), so a Bootstrap-classed element shows the same look"
 )
 ALLOWED_COLLISIONS: Mapping[str, str] = {
-    "accordion": _PENDING,
-    "alert": _PENDING,
-    "badge": _PENDING,
-    "breadcrumb": _PENDING,
-    "card": _PENDING,
-    "carousel": _PENDING,
-    "pagination": _PENDING,
-    "table": _PENDING,
-    "toast": _PENDING,
+    "accordion": _MAPPED,
+    "alert": _MAPPED,
+    "badge": _MAPPED,
+    "breadcrumb": _MAPPED,
+    "card": _MAPPED,
+    "carousel": (
+        "ride ships no carousel markup and maps nothing for it; the base rule wins if one is added"
+    ),
+    "pagination": _MAPPED,
+    "table": _MAPPED,
+    "toast": _MAPPED,
     "visually-hidden": (
         "the same clip-based utility in both: the layers are equal in effect, so the later base "
         "rule changes nothing visible and keeps the helper without Bootstrap"

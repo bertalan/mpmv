@@ -1,0 +1,461 @@
+/* Ride: Bootstrap components on tokens (THM.13 part 3, spec 14 §14.4, §14.9). The vendored
+   Bootstrap sets each component's colours as literals on the variant classes, so every variant
+   used here is mapped again on semantic tokens; the pairs (text on fill) are the contract pairs
+   of the token table. The `.text-bg-*` and `.bg-*` helpers use !important inside Bootstrap's
+   layer and cannot be overridden from a later one: ride shows the secondary role with `.btn-*`
+   and `.badge--secondary` instead, never with `.text-bg-secondary` or `.text-bg-warning`.
+   Colours only through tokens. */
+@layer overrides {
+  /* Bootstrap components: buttons. Sizes keep the 44 px primary target (WCAG 2.5.8). */
+
+  .btn {
+    --bs-btn-padding-x: var(--space-m);
+    --bs-btn-padding-y: var(--space-xs);
+    --bs-btn-font-family: var(--font-body);
+    --bs-btn-font-size: 1em;
+    --bs-btn-font-weight: 700;
+    --bs-btn-line-height: 1.2;
+    --bs-btn-border-width: 2px;
+    --bs-btn-border-radius: var(--button-radius);
+    --bs-btn-focus-box-shadow: none;
+    --bs-btn-box-shadow: none;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    min-block-size: var(--target-primary);
+    min-inline-size: var(--target-primary);
+    color: var(--bs-btn-color);
+    background-color: var(--bs-btn-bg);
+    border-color: var(--bs-btn-border-color);
+    letter-spacing: 0.02em;
+  }
+
+  .btn:hover {
+    color: var(--bs-btn-hover-color);
+    background-color: var(--bs-btn-hover-bg);
+    border-color: var(--bs-btn-hover-border-color);
+  }
+
+  .btn-check:checked + .btn,
+  :not(.btn-check) + .btn:active,
+  .btn:first-child:active,
+  .btn.active,
+  .btn.show {
+    color: var(--bs-btn-active-color);
+    background-color: var(--bs-btn-active-bg);
+    border-color: var(--bs-btn-active-border-color);
+  }
+
+  .btn:disabled,
+  .btn.disabled,
+  fieldset:disabled .btn {
+    color: var(--bs-btn-disabled-color);
+    background-color: var(--bs-btn-disabled-bg);
+    border-color: var(--bs-btn-disabled-border-color);
+    cursor: default;
+  }
+
+  .btn-sm {
+    --bs-btn-padding-y: 0.125rem;
+    --bs-btn-padding-x: var(--space-s);
+    --bs-btn-font-size: 0.875em;
+
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+  }
+
+  .btn-lg {
+    --bs-btn-padding-x: var(--space-l);
+    --bs-btn-font-size: var(--step-1);
+
+    min-block-size: calc(var(--target-primary) + var(--space-s));
+  }
+
+  .btn-primary {
+    --bs-btn-color: var(--color-text-inverse);
+    --bs-btn-bg: var(--color-accent);
+    --bs-btn-border-color: var(--color-accent);
+    --bs-btn-hover-color: var(--color-text-inverse);
+    --bs-btn-hover-bg: var(--color-accent-hover);
+    --bs-btn-hover-border-color: var(--color-accent-hover);
+    --bs-btn-active-color: var(--color-text-inverse);
+    --bs-btn-active-bg: var(--color-accent-hover);
+    --bs-btn-active-border-color: var(--color-accent-hover);
+    --bs-btn-disabled-color: var(--color-text-inverse);
+    --bs-btn-disabled-bg: var(--color-accent);
+    --bs-btn-disabled-border-color: var(--color-accent);
+  }
+
+  .btn-secondary {
+    --bs-btn-color: var(--color-on-secondary);
+    --bs-btn-bg: var(--color-secondary);
+    --bs-btn-border-color: var(--color-secondary);
+    --bs-btn-hover-color: var(--color-on-secondary);
+    --bs-btn-hover-bg: var(--color-secondary-hover);
+    --bs-btn-hover-border-color: var(--color-secondary-hover);
+    --bs-btn-active-color: var(--color-on-secondary);
+    --bs-btn-active-bg: var(--color-secondary-hover);
+    --bs-btn-active-border-color: var(--color-secondary-hover);
+    --bs-btn-disabled-color: var(--color-on-secondary);
+    --bs-btn-disabled-bg: var(--color-secondary);
+    --bs-btn-disabled-border-color: var(--color-secondary);
+  }
+
+  .btn-warning {
+    --bs-btn-color: var(--color-on-secondary);
+    --bs-btn-bg: var(--color-secondary);
+    --bs-btn-border-color: var(--color-secondary);
+    --bs-btn-hover-color: var(--color-on-secondary);
+    --bs-btn-hover-bg: var(--color-secondary-hover);
+    --bs-btn-hover-border-color: var(--color-secondary-hover);
+    --bs-btn-active-color: var(--color-on-secondary);
+    --bs-btn-active-bg: var(--color-secondary-hover);
+    --bs-btn-active-border-color: var(--color-secondary-hover);
+    --bs-btn-disabled-color: var(--color-on-secondary);
+    --bs-btn-disabled-bg: var(--color-secondary);
+    --bs-btn-disabled-border-color: var(--color-secondary);
+  }
+
+  .btn-success {
+    --bs-btn-color: var(--color-text-inverse);
+    --bs-btn-bg: var(--color-success);
+    --bs-btn-border-color: var(--color-success);
+    --bs-btn-hover-color: var(--color-text-inverse);
+    --bs-btn-hover-bg: color-mix(in srgb, var(--color-success) 82%, black);
+    --bs-btn-hover-border-color: color-mix(in srgb, var(--color-success) 82%, black);
+    --bs-btn-active-color: var(--color-text-inverse);
+    --bs-btn-active-bg: color-mix(in srgb, var(--color-success) 82%, black);
+    --bs-btn-active-border-color: color-mix(in srgb, var(--color-success) 82%, black);
+    --bs-btn-disabled-color: var(--color-text-inverse);
+    --bs-btn-disabled-bg: var(--color-success);
+    --bs-btn-disabled-border-color: var(--color-success);
+  }
+
+  .btn-danger {
+    --bs-btn-color: var(--color-text-inverse);
+    --bs-btn-bg: var(--color-danger);
+    --bs-btn-border-color: var(--color-danger);
+    --bs-btn-hover-color: var(--color-text-inverse);
+    --bs-btn-hover-bg: color-mix(in srgb, var(--color-danger) 82%, black);
+    --bs-btn-hover-border-color: color-mix(in srgb, var(--color-danger) 82%, black);
+    --bs-btn-active-color: var(--color-text-inverse);
+    --bs-btn-active-bg: color-mix(in srgb, var(--color-danger) 82%, black);
+    --bs-btn-active-border-color: color-mix(in srgb, var(--color-danger) 82%, black);
+    --bs-btn-disabled-color: var(--color-text-inverse);
+    --bs-btn-disabled-bg: var(--color-danger);
+    --bs-btn-disabled-border-color: var(--color-danger);
+  }
+
+  .btn-info {
+    --bs-btn-color: var(--color-text-inverse);
+    --bs-btn-bg: var(--color-info);
+    --bs-btn-border-color: var(--color-info);
+    --bs-btn-hover-color: var(--color-text-inverse);
+    --bs-btn-hover-bg: color-mix(in srgb, var(--color-info) 82%, black);
+    --bs-btn-hover-border-color: color-mix(in srgb, var(--color-info) 82%, black);
+    --bs-btn-active-color: var(--color-text-inverse);
+    --bs-btn-active-bg: color-mix(in srgb, var(--color-info) 82%, black);
+    --bs-btn-active-border-color: color-mix(in srgb, var(--color-info) 82%, black);
+    --bs-btn-disabled-color: var(--color-text-inverse);
+    --bs-btn-disabled-bg: var(--color-info);
+    --bs-btn-disabled-border-color: var(--color-info);
+  }
+
+  .btn-dark {
+    --bs-btn-color: var(--color-text-inverse);
+    --bs-btn-bg: var(--color-surface-inverse);
+    --bs-btn-border-color: var(--color-surface-inverse);
+    --bs-btn-hover-color: var(--color-text-inverse);
+    --bs-btn-hover-bg: var(--color-heading);
+    --bs-btn-hover-border-color: var(--color-heading);
+    --bs-btn-active-color: var(--color-text-inverse);
+    --bs-btn-active-bg: var(--color-heading);
+    --bs-btn-active-border-color: var(--color-heading);
+    --bs-btn-disabled-color: var(--color-text-inverse);
+    --bs-btn-disabled-bg: var(--color-surface-inverse);
+    --bs-btn-disabled-border-color: var(--color-surface-inverse);
+  }
+
+  .btn-outline-primary {
+    --bs-btn-color: var(--color-accent);
+    --bs-btn-border-color: var(--color-accent);
+    --bs-btn-hover-color: var(--color-text-inverse);
+    --bs-btn-hover-bg: var(--color-accent);
+    --bs-btn-hover-border-color: var(--color-accent);
+    --bs-btn-active-color: var(--color-text-inverse);
+    --bs-btn-active-bg: var(--color-accent);
+    --bs-btn-active-border-color: var(--color-accent);
+    --bs-btn-disabled-color: var(--color-accent);
+    --bs-btn-disabled-border-color: var(--color-accent);
+  }
+
+  .btn-outline-secondary {
+    --bs-btn-color: var(--color-surface-inverse);
+    --bs-btn-border-color: var(--color-surface-inverse);
+    --bs-btn-hover-color: var(--color-text-inverse);
+    --bs-btn-hover-bg: var(--color-surface-inverse);
+    --bs-btn-hover-border-color: var(--color-surface-inverse);
+    --bs-btn-active-color: var(--color-text-inverse);
+    --bs-btn-active-bg: var(--color-surface-inverse);
+    --bs-btn-active-border-color: var(--color-surface-inverse);
+    --bs-btn-disabled-color: var(--color-surface-inverse);
+    --bs-btn-disabled-border-color: var(--color-surface-inverse);
+  }
+
+  .btn-outline-dark {
+    --bs-btn-color: var(--color-surface-inverse);
+    --bs-btn-border-color: var(--color-surface-inverse);
+    --bs-btn-hover-color: var(--color-text-inverse);
+    --bs-btn-hover-bg: var(--color-surface-inverse);
+    --bs-btn-hover-border-color: var(--color-surface-inverse);
+    --bs-btn-active-color: var(--color-text-inverse);
+    --bs-btn-active-bg: var(--color-surface-inverse);
+    --bs-btn-active-border-color: var(--color-surface-inverse);
+    --bs-btn-disabled-color: var(--color-surface-inverse);
+    --bs-btn-disabled-border-color: var(--color-surface-inverse);
+  }
+
+  .btn-outline-danger {
+    --bs-btn-color: var(--color-danger);
+    --bs-btn-border-color: var(--color-danger);
+    --bs-btn-hover-color: var(--color-text-inverse);
+    --bs-btn-hover-bg: var(--color-danger);
+    --bs-btn-hover-border-color: var(--color-danger);
+    --bs-btn-active-color: var(--color-text-inverse);
+    --bs-btn-active-bg: var(--color-danger);
+    --bs-btn-active-border-color: var(--color-danger);
+    --bs-btn-disabled-color: var(--color-danger);
+    --bs-btn-disabled-border-color: var(--color-danger);
+  }
+
+  /* Forms: controls keep base's 44 px height and token colours; Bootstrap's focus glow and
+     blue border are replaced by the outline below. */
+
+  .form-control,
+  .form-select {
+    --bs-border-color: var(--color-border-control);
+
+    min-block-size: var(--target-primary);
+    color: var(--color-text);
+    background-color: var(--color-surface);
+    border-color: var(--color-border-control);
+    border-radius: var(--radius-control);
+  }
+
+  .form-control::placeholder {
+    color: var(--color-text-muted);
+    opacity: 1;
+  }
+
+  .form-text {
+    color: var(--color-text-muted);
+  }
+
+  .form-check-input {
+    --bs-form-check-bg: var(--color-surface);
+
+    border-color: var(--color-border-control);
+  }
+
+  .form-check-input:checked {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+
+  .form-control.is-invalid,
+  .form-select.is-invalid {
+    border-color: var(--color-danger);
+  }
+
+  .invalid-feedback {
+    color: var(--color-danger);
+  }
+
+  .form-control.is-valid,
+  .form-select.is-valid {
+    border-color: var(--color-success);
+  }
+
+  .valid-feedback {
+    color: var(--color-success);
+  }
+
+  /* Alerts, badges, cards. */
+
+  .alert {
+    --bs-alert-padding-x: var(--space-m);
+    --bs-alert-padding-y: var(--space-s);
+    --bs-alert-margin-bottom: var(--space-m);
+    --bs-alert-border-radius: var(--radius-card);
+  }
+
+  .badge {
+    --bs-badge-padding-x: var(--space-s);
+    --bs-badge-padding-y: 0.35em;
+    --bs-badge-font-weight: 700;
+    --bs-badge-border-radius: var(--radius-pill);
+  }
+
+  .badge--secondary {
+    color: var(--color-on-secondary);
+    background-color: var(--color-secondary);
+  }
+
+  .card {
+    --bs-card-spacer-x: var(--space-m);
+    --bs-card-spacer-y: var(--space-m);
+    --bs-card-border-color: var(--color-border);
+    --bs-card-border-radius: var(--radius-card);
+    --bs-card-inner-border-radius: calc(var(--radius-card) - 1px);
+    --bs-card-cap-bg: var(--color-surface-sunken);
+    --bs-card-cap-color: var(--color-heading);
+    --bs-card-bg: var(--color-surface);
+    --bs-card-color: var(--color-text);
+    --bs-card-title-color: var(--color-heading);
+    --bs-card-subtitle-color: var(--color-text-muted);
+  }
+
+  /* Pagination: 44 px targets, the accent for the current page. */
+
+  .pagination {
+    --bs-pagination-padding-x: var(--space-m);
+    --bs-pagination-padding-y: var(--space-xs);
+    --bs-pagination-color: var(--color-link);
+    --bs-pagination-bg: var(--color-surface);
+    --bs-pagination-border-color: var(--color-border-control);
+    --bs-pagination-border-radius: var(--radius-control);
+    --bs-pagination-hover-color: var(--color-accent-hover);
+    --bs-pagination-hover-bg: var(--color-accent-tint);
+    --bs-pagination-hover-border-color: var(--color-border-control);
+    --bs-pagination-focus-color: var(--color-accent-hover);
+    --bs-pagination-focus-bg: var(--color-accent-tint);
+    --bs-pagination-focus-box-shadow: none;
+    --bs-pagination-active-color: var(--color-text-inverse);
+    --bs-pagination-active-bg: var(--color-accent);
+    --bs-pagination-active-border-color: var(--color-accent);
+    --bs-pagination-disabled-color: var(--color-text-muted);
+    --bs-pagination-disabled-bg: var(--color-surface-sunken);
+    --bs-pagination-disabled-border-color: var(--color-border);
+  }
+
+  .page-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-block-size: var(--target-primary);
+    min-inline-size: var(--target-primary);
+  }
+
+  /* Accordion, breadcrumb, table, toast, dropdown, modal. */
+
+  .accordion {
+    --bs-accordion-color: var(--color-text);
+    --bs-accordion-bg: var(--color-surface);
+    --bs-accordion-border-color: var(--color-border);
+    --bs-accordion-border-radius: var(--radius-card);
+    --bs-accordion-inner-border-radius: calc(var(--radius-card) - 1px);
+    --bs-accordion-btn-color: var(--color-heading);
+    --bs-accordion-btn-bg: var(--color-surface);
+    --bs-accordion-btn-focus-box-shadow: none;
+    --bs-accordion-active-color: var(--color-accent-hover);
+    --bs-accordion-active-bg: var(--color-accent-tint);
+  }
+
+  .breadcrumb {
+    --bs-breadcrumb-divider-color: var(--color-text-muted);
+    --bs-breadcrumb-item-active-color: var(--color-text-muted);
+  }
+
+  .table {
+    --bs-table-color: var(--color-text);
+    --bs-table-bg: transparent;
+    --bs-table-border-color: var(--color-border);
+    --bs-table-striped-color: var(--color-text);
+    --bs-table-striped-bg: var(--color-surface-raised);
+    --bs-table-hover-color: var(--color-text);
+    --bs-table-hover-bg: var(--color-accent-tint);
+  }
+
+  .toast {
+    --bs-toast-color: var(--color-text);
+    --bs-toast-bg: var(--color-surface);
+    --bs-toast-border-color: var(--color-border);
+    --bs-toast-border-radius: var(--radius-card);
+    --bs-toast-header-color: var(--color-text-muted);
+    --bs-toast-header-bg: var(--color-surface-sunken);
+    --bs-toast-header-border-color: var(--color-border);
+  }
+
+  .dropdown-menu {
+    --bs-dropdown-color: var(--color-text);
+    --bs-dropdown-bg: var(--color-surface);
+    --bs-dropdown-border-color: var(--color-border);
+    --bs-dropdown-border-radius: var(--radius-card);
+    --bs-dropdown-link-color: var(--color-text);
+    --bs-dropdown-link-hover-color: var(--color-heading);
+    --bs-dropdown-link-hover-bg: var(--color-accent-tint);
+    --bs-dropdown-link-active-color: var(--color-text-inverse);
+    --bs-dropdown-link-active-bg: var(--color-accent);
+    --bs-dropdown-divider-bg: var(--color-border);
+  }
+
+  .dropdown-item {
+    min-block-size: var(--target-primary);
+    display: flex;
+    align-items: center;
+  }
+
+  .modal {
+    --bs-modal-color: var(--color-text);
+    --bs-modal-bg: var(--color-surface);
+    --bs-modal-border-color: var(--color-border);
+    --bs-modal-border-radius: var(--radius-card);
+    --bs-modal-inner-border-radius: calc(var(--radius-card) - 1px);
+    --bs-modal-header-border-color: var(--color-border);
+    --bs-modal-footer-border-color: var(--color-border);
+    --bs-modal-padding: var(--space-m);
+  }
+
+  .modal-backdrop {
+    --bs-backdrop-bg: var(--color-overlay);
+    --bs-backdrop-opacity: var(--scrim-opacity);
+  }
+
+  .btn-close {
+    --bs-btn-close-focus-shadow: none;
+    --bs-btn-close-focus-opacity: 1;
+
+    min-block-size: var(--target-primary);
+    min-inline-size: var(--target-primary);
+    box-sizing: border-box;
+  }
+
+  /* Focus: Bootstrap draws a 25 % glow (under 3:1) and sets outline 0; the theme's outline
+     in the focus colour replaces it on every focusable component (WCAG 2.4.7, 2.4.11). */
+
+  .btn:focus-visible,
+  .btn-close:focus-visible,
+  .page-link:focus-visible,
+  .dropdown-item:focus-visible,
+  .accordion-button:focus-visible,
+  .form-control:focus,
+  .form-select:focus,
+  .form-check-input:focus,
+  .accordion-button:focus,
+  .btn-close:focus {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-offset);
+    box-shadow: none;
+  }
+
+  .form-control:focus,
+  .form-select:focus {
+    border-color: var(--color-border-control);
+  }
+
+  .page-link:focus-visible {
+    z-index: 3;
+  }
+}

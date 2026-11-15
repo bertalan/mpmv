@@ -1,0 +1,106 @@
+{% load i18n %}{% comment %}
+Bootstrap components in the look of `ride` (THM.13 part 3): buttons, forms, alerts, badges,
+cards, pagination, a dropdown and a modal. Markup only: no inline style, no inline handler;
+the bundle reads the data-bs-* attributes (strict CSP, spec 14 §14.5).
+{% endcomment %}
+  <section id="sg-foundation" aria-labelledby="sg-foundation-title">
+    <h2 id="sg-foundation-title">{% translate "Bootstrap components" %}</h2>
+
+    <h3>{% translate "Buttons" %}</h3>
+    <p class="d-flex flex-wrap gap-2">
+      <button type="button" class="btn btn-primary">{% translate "Primary" %}</button>
+      <button type="button" class="btn btn-secondary">{% translate "Secondary" %}</button>
+      <button type="button" class="btn btn-dark">{% translate "Dark" %}</button>
+      <button type="button" class="btn btn-danger">{% translate "Danger" %}</button>
+      <button type="button" class="btn btn-outline-primary">{% translate "Outline accent" %}</button>
+      <button type="button" class="btn btn-outline-dark">{% translate "Outline dark" %}</button>
+      <button type="button" class="btn btn-primary btn-sm">{% translate "Small" %}</button>
+      <button type="button" class="btn btn-primary btn-lg">{% translate "Large" %}</button>
+      <button type="button" class="btn btn-primary" disabled>{% translate "Disabled" %}</button>
+    </p>
+
+    <h3>{% translate "Forms" %}</h3>
+    <form class="row g-3" novalidate>
+      <div class="col-md-6">
+        <label class="form-label" for="sg-bs-name">{% translate "Name" %}</label>
+        <input class="form-control" id="sg-bs-name" type="text" autocomplete="name" aria-describedby="sg-bs-name-help">
+        <div id="sg-bs-name-help" class="form-text">{% translate "As on your documents." %}</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="sg-bs-email">{% translate "Email" %}</label>
+        <input class="form-control is-invalid" id="sg-bs-email" type="email" autocomplete="email" value="no-at-sign" aria-invalid="true" aria-describedby="sg-bs-email-error">
+        <div id="sg-bs-email-error" class="invalid-feedback">{% translate "Enter an email address with an at sign." %}</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="sg-bs-size">{% translate "Size" %}</label>
+        <select class="form-select" id="sg-bs-size">
+          <option>{% translate "Small" %}</option>
+          <option>{% translate "Medium" %}</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="sg-bs-news" checked>
+          <label class="form-check-label" for="sg-bs-news">{% translate "Send me the newsletter" %}</label>
+        </div>
+      </div>
+    </form>
+
+    <h3>{% translate "Alerts and badges" %}</h3>
+    <div class="alert alert-success" role="status">{% translate "Saved." %}</div>
+    <div class="alert alert-danger" role="alert">{% translate "The payment failed." %}</div>
+    <div class="alert alert-info" role="status">{% translate "Delivery takes three days." %}</div>
+    <p class="d-flex flex-wrap gap-2">
+      <span class="badge text-bg-primary">{% translate "New" %}</span>
+      <span class="badge text-bg-dark">{% translate "Used" %}</span>
+      <span class="badge text-bg-danger">{% translate "Sale" %}</span>
+      <span class="badge text-bg-success">{% translate "In stock" %}</span>
+      <span class="badge badge--secondary">{% translate "Featured" %}</span>
+    </p>
+
+    <h3>{% translate "Card" %}</h3>
+    <div class="card">
+      <div class="card-body">
+        <h4 class="card-title">{% translate "Winter gloves" %}</h4>
+        <p class="card-text">{% translate "Waterproof, lined, sizes S to XL." %}</p>
+        <a class="btn btn-primary" href="#sg-foundation">{% translate "View" %}</a>
+      </div>
+    </div>
+
+    <h3>{% translate "Pagination" %}</h3>
+    <nav aria-label="{% translate 'Bootstrap pagination' %}">
+      <ul class="pagination">
+        <li class="page-item disabled"><span class="page-link">{% translate "Previous" %}</span></li>
+        <li class="page-item active" aria-current="page"><a class="page-link" href="#sg-foundation" aria-label="{% translate 'Page 1' %}">1</a></li>
+        <li class="page-item"><a class="page-link" href="#sg-foundation" aria-label="{% translate 'Page 2' %}">2</a></li>
+        <li class="page-item"><a class="page-link" href="#sg-foundation">{% translate "Next" %}</a></li>
+      </ul>
+    </nav>
+
+    <h3>{% translate "Dropdown and modal" %}</h3>
+    <div class="d-flex flex-wrap gap-2 align-items-start">
+      <div class="dropdown">
+        <button class="btn btn-outline-dark dropdown-toggle" type="button" id="sg-dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">{% translate "Sort by" %}</button>
+        <ul class="dropdown-menu" id="sg-dropdown-menu" aria-labelledby="sg-dropdown-toggle">
+          <li><a class="dropdown-item" href="#sg-foundation">{% translate "Price, low to high" %}</a></li>
+          <li><a class="dropdown-item" href="#sg-foundation">{% translate "Newest" %}</a></li>
+        </ul>
+      </div>
+      <button type="button" class="btn btn-primary" id="sg-modal-open" data-bs-toggle="modal" data-bs-target="#sg-modal">{% translate "Open dialog" %}</button>
+    </div>
+    <div class="modal fade" id="sg-modal" tabindex="-1" aria-labelledby="sg-modal-title" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title" id="sg-modal-title">{% translate "Remove this item?" %}</h4>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+          </div>
+          <div class="modal-body"><p>{% translate "The item leaves your cart." %}</p></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-dark" data-bs-dismiss="modal">{% translate "Keep it" %}</button>
+            <button type="button" class="btn btn-danger" data-bs-dismiss="modal">{% translate "Remove" %}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
