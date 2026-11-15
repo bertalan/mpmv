@@ -100,8 +100,8 @@ from apps.ingest.tests.factories import (
     SourceObservationFactory,
     SupplierSourceFactory,
 )
-from apps.ledger.models import LedgerEntry
-from apps.ledger.tests.factories import LedgerEntryFactory
+from apps.ledger.models import LedgerEntry, Refund
+from apps.ledger.tests.factories import LedgerEntryFactory, RefundFactory
 from apps.orders.models import OrderLine, StockReservation, VendorOrder
 from apps.orders.tests.factories import (
     OrderLineFactory,
@@ -285,6 +285,8 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     # ORD.2: a sub-order of its own order, and a line of such a sub-order.
     VendorOrder: lambda vendor: VendorOrderFactory.create(vendor=vendor),
     LedgerEntry: lambda vendor: LedgerEntryFactory.create(vendor=vendor),
+    # PAY.4: a refund mark of one of the vendor's own orders.
+    Refund: lambda vendor: RefundFactory.create(vendor=vendor),
     OrderLine: lambda vendor: OrderLineFactory.create(vendor_order__vendor=vendor),
     StockReservation: lambda vendor: StockReservationFactory.create(
         product=ProductFactory.create(vendor=vendor)

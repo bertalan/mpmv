@@ -22,14 +22,18 @@ def staff_client(
     return mfa_login(client, superuser)
 
 
-def _form(**overrides: str) -> dict[str, str]:
-    data = {
+def _form(**overrides: str | list[str]) -> dict[str, str | list[str]]:
+    data: dict[str, str | list[str]] = {
         "legal_name": "Example Marketplace Ltd",
         "country": "at",
         "vat_number": "ATU00000000",
         "tax_regime": "small_business",
         "commission_vat_mode": "none",
         "dac7_authority_country": "AT",
+        "vendors_may_refund_outside": "on",
+        "reverse_fees_on_vendor_refund": "on",
+        "refund_fee_surcharge": "2.00",
+        "platform_refund_cases": ["platform_error", "vendor_default"],
         "valid_from_0": "2027-01-01",
         "valid_from_1": "00:00:00",
     }
@@ -55,6 +59,24 @@ def test_adding_through_the_admin_goes_through_the_audited_service(
     assert entry.source == "admin"
     assert entry.actor_label.startswith("staff:")
     assert "@" not in entry.actor_label  # pseudonymous: the public id, never the address
+
+
+def test_the_d41_refund_settings_are_saved_from_the_admin_form(staff_client: Client) -> None:
+    data = _form(refund_fee_surcharge="3.50", platform_refund_cases=["platform_error"])
+    del data["vendors_may_refund_outside"]  # an unticked box: vendors may not refund outside
+    assert staff_client.post(reverse("admin:core_platformoperator_add"), data).status_code == 302
+    stored = PlatformOperator.objects.get()
+    assert stored.vendors_may_refund_outside is False
+    assert stored.reverse_fees_on_vendor_refund is True
+    assert str(stored.refund_fee_surcharge) == "3.50"
+    assert stored.platform_refund_cases == ["platform_error"]
+
+
+def test_an_empty_surcharge_in_the_admin_form_means_the_default(staff_client: Client) -> None:
+    data = _form()
+    data["refund_fee_surcharge"] = ""
+    assert staff_client.post(reverse("admin:core_platformoperator_add"), data).status_code == 302
+    assert str(PlatformOperator.objects.get().refund_fee_surcharge) == "2.00"
 
 
 def test_adding_a_new_row_closes_the_current_one(staff_client: Client) -> None:

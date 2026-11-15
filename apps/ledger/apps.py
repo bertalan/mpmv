@@ -6,7 +6,7 @@ class LedgerConfig(AppConfig):
     label = "ledger"
 
     # Audit policy (SEC.4, docs/dev/audit-trail.md).
-    audited_models = ("ledgerentry",)
+    audited_models = ("ledgerentry", "refund")
 
     def ready(self) -> None:
         from apps.payments.models import Payment

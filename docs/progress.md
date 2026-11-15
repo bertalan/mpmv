@@ -120,7 +120,7 @@ part of the done-when still open) · `not started`.
 | I18N.7 | partial: 1 of n (Manager and account strings in Italian) | #245 | Italian catalog for the Manager and account strings through `tools/i18n_catalog.py` (extract, compile, check; `make check` runs the check) |
 | CAT.19 | done | #154 | Vendor products in the Manager shop space |
 | VEN.24 | done | #141 | Claim an imported vendor (legal email or registered PEC) |
-| SEC.5 | partial: items 6, 7, 9 and 10 of the security wave open | #162, #169, #166, #171 | Security headers by response type, endpoint sweep, hostile-input corpus, rate-limit tests |
+| SEC.5 | partial: items 6, 7, 9 and 10 of the security wave open; items 6 and 10: WIP on lane-b/sec-5-attacks-accounts-wip, lane-b/sec-5-attacks-abuse-wip, lane-b/sec-5-attacks-business-wip and lane-b/sec-5-supply-chain-wip, unreviewed, 6 days behind main | #162, #169, #166, #171 | Security headers by response type, endpoint sweep, hostile-input corpus, rate-limit tests |
 | CAT.9 | done | #167 | Product search: full-text per language, trigram, SKU prefix |
 | CORE.20 | done | #171 | Per-IP limit on refused API keys |
 | CMS.3 | done | #156 | Blog: index and post pages, scheduling, translatable authors with author pages, ProfilePage/Person and BlogPosting JSON-LD, choosers, `import_article` |
@@ -168,7 +168,8 @@ part of the done-when still open) · `not started`.
 | PAY.1 | partial: the Stripe provider; checkout creates one PaymentIntent per order with the real per-vendor split; the transfers are PAY.3 | #351, #429, #452 | #351: `payments/stripe_provider.py`. #429: one PaymentIntent per order. #452: the intent is built from `payments.settlement` |
 | PAY.2 | done | #351, #429, #452, #465 | Signed, idempotent webhook (`payments.processedevent`), the audit row, the order marked paid, and the paid order posts the ledger and queues the transfers (#452). #465: the Connect webhook accepts its own signing secret (`MPMV_STRIPE_CONNECT_WEBHOOK_SECRET`), the platform secret stays for customer payments |
 | PAY.3 | done (D-08, D-41) | #452 | `apps/ledger/settlement.py`: a paid order posts one ledger line set per vendor and queues one transfer per vendor package as a transactional outbox job (a rollback leaves no job); `payments/settlement.py` computes each vendor net; a refunded or partially refunded package is never transferred (`ledger.transfer_skipped_refunded`); a platform with `commission_vat_mode` not `none` refuses to settle (`ledger.settlement_blocked_vat_mode`, until VEN.34); a vendor with no ready account stays a receivable. `PAYMENTS_TRANSFERS_WIRED` is True, so `payments.E004` no longer stops LIVE. Needs human review |
-| PAY.4 | partial: the pure refund fee engine only (VEN.33); refunds are not built | #318 | See VEN.33 |
+| PAY.4 | partial: refunds through and outside the platform, duplicate payment refunds; open: fixes 4 to 6, chargebacks, the vendor refund action (PAY.7) | #318, #476 | `ledger/refund_engine.py` (pure) and `ledger/refunds.py` (service: `dry_run`, `AuditLog`, replay by key, reverse transfer from the vendor's share, refund fee with the L-10 exclusion flag, outside mark with declared date and method); `payments/duplicates.py` refunds a second payment in full with no fee; `PlatformOperator` refund settings (core 0026); ledger 0003 to 0005, payments 0003. Ledger and payments code, needs human review |
+| PAY.7 | spec only | #485 | Vendor refund action through the platform (PAY.4 part b): `vendor_refund` critical action, the owner's isolation tests (404 not 403, grant bound to action, digest and shop). No code |
 | SHP.4 | done | #354 | Shipping cost per vendor package through `quote_shipping` and the tax engine |
 | ORD.3 | done | #354 | `build_checkout`: per-vendor packages, tax, shipping, blocking messages, preview; mixed-rate shipping VAT regression test. Money and tax code, needs human review |
 | ORD.17 | done (customer terms clause lists pending counsel) | #463 | Checkout legal step (D-40, variant A): seller recap, box 1 and box 2, order terms snapshot in `terms_acceptance`, terms in the confirmation email, confirming poll after the provider redirect. Box 2 lists only seller clauses until counsel enters `onerous_clauses` in the CMS |
@@ -998,7 +999,10 @@ Compliance, security and content:
 | #477 | PAY.3 | Transfer key names destination and amount |
 | #479 | VEN.38, VEN.19, VEN.33 | Spec: vendor economic configuration (D-43) |
 | #480 | ARC.10, VEN.35, ORD.17 | Demo seed publishes sales terms and onerous clauses |
-| (this PR) | none | Coherence check 30 |
+| #482 | none | Coherence check 30 |
+| #476 | PAY.4 | Refunds through and outside the platform, duplicate payment refunds |
+| #485 | PAY.7, PAY.4 | Spec: vendor refund action with isolation tests |
+| (this PR) | none | Coherence check 31 |
 
 ## Coherence checks
 
@@ -2054,3 +2058,24 @@ Findings and actions:
 4. Info. The delta touches security, payments, ledger and orders code: CORE.25, VEN.6, PAY.3, ORD.17b. All need human review; the legal wording needs counsel (CMP.24).
 
 Verdict: GO with follow-ups. No blocker for the merged code. The #474 hardening items should land before more shop owner actions are added. PAY.4 still matters before any LIVE payment.
+
+### Coherence check 31 (main at 5fa7c54f)
+
+Scope: main at 5fa7c54f, the merges after check 30 (#482): #476 (PAY.4 refunds through and outside the platform, with the duplicate payment refund; ledger 0003 to 0005, core 0026, payments 0003) and #485 (spec PAY.7, the vendor refund action), through the trains #483 and #486.
+
+| Area | Result |
+|---|---|
+| Code vs spec | #476 matches the PAY.4 row: pure `refund_engine`, service in `ledger/refunds.py` with `dry_run` and `AuditLog`, pro rata reversal of commission and collection cost, refund fee from the provider cost plus surcharge frozen on the refund, L-10 exclusion flag, outside refunds with a declared date and method, duplicate payment refunded in full with no fee and no vendor share reversed (`payments/duplicates.py`), operator refund settings from D-41. Chargebacks and the vendor-facing refund action are not in the code. #485 is spec only: no `vendor_refund` action exists yet in `levels.py`. |
+| Spec and backlog | PAY.7 is a new row; `90-backlog.md` and `backlog.csv` were regenerated by `make docs` in #485, freshness passes. The `progress.md` PAY.4 row still said "refunds are not built"; corrected here, PAY.7 and the merge list added. |
+| Docs | `audit-trail.md` lists every new action: `ledger.refund_recorded`, `ledger.refund_fee_excluded`, `ledger.refund_marked_outside`, `ledger.refund_reversal_pending`, `ledger.refund_reversal_done`, `ledger.refund_states_pending`, `payments.payment.duplicate_flagged`, `.duplicate_refunded` and `.duplicate_refund_failed`. `payment-providers.md` now says the refund reversal key is `<refund key>:reverse:<transfer>`, amount-free on purpose, so a retry with another amount fails closed. |
+| Gates | `make check` pass. Unit, integration and e2e suites not run locally; CI on main is the gate. |
+
+Findings and actions:
+
+1. Minor, open: #476 non-blocking review items. (a) a test for the savepoint around the state update; (b) the reversal sweep stops on the first exception instead of going on with the next refund; (c) `_apply_states` catches a broad `Exception`; (d) a pending reversal is audited again on each retry; (e) the cleared count the sweep returns is not exact; (f) optional: squash the ledger migrations 0003 to 0005 before LIVE.
+2. Major for go-live, open: PAY.4 is partial. Fixes 4 to 6 of the PAY.4 review and chargebacks (dispute cost as provider cost) are not built. No vendor can start a refund yet: staff refund by hand through the service.
+3. Major for the vendor channel, open: PAY.7 code not started (the `vendor_refund` critical action, the per-action rule in `levels.may_confirm`, the shop-scoped lookup, the owner's four isolation tests). Human review required when built.
+4. Minor, open: carried over from check 30 and still open: the #474 hardening items (finding 1), the per-vendor fixed fee rule (finding 2), the `commission_vat_mode` `none` limit (VEN.34), the Stripe cached-error limitation, ORD.17 customer terms clauses pending counsel, VEN.36, VEN.33 and CMP.2 pure engines, SEO.7 partial, `PRIVACY_PEPPER` document, TAX.18 and TAX.19, ORD.10 on STAGE.
+5. Info. The delta touches payments, ledger, orders and tax-adjacent code: PAY.4, `settlement.py`, `orders/services.py`, `vendors/commission.py`. All need human review.
+
+Verdict: GO with follow-ups. No blocker for a STAGE release. Finding 2 still matters before any LIVE payment.

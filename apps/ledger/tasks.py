@@ -5,7 +5,7 @@ import logging
 from apps.core.tasks import NO_RETRY, locked, periodic, task
 from apps.payments.models import Payment
 
-from . import settlement
+from . import refunds, settlement
 
 logger = logging.getLogger(__name__)
 
@@ -30,3 +30,13 @@ def settle_pending_payments(timestamp: int) -> None:
     a vendor whose account became ready, a posting that was blocked and fixed). Idempotent."""
     outcome = settlement.settle_pending()
     logger.info("ledger.settle_pending_payments: %s", outcome)
+
+
+@periodic("*/10 * * * *")
+@locked()
+@task("ledger.retry_pending_refund_reversals", retry=NO_RETRY)
+def retry_pending_refund_reversals(timestamp: int) -> None:
+    """Every 10 minutes: retry the transfer reversal of each refund the provider already paid
+    out to the buyer (PAY.4), under the same idempotency key. Idempotent."""
+    cleared = refunds.retry_pending_reversals()
+    logger.info("ledger.retry_pending_refund_reversals: %s cleared", cleared)
