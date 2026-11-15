@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% load i18n static %}
+{% load i18n static theme_tags %}
 {% block title %}{% translate "Order received" %} · {{ site_name }}{% endblock %}
 {% block head %}{% robots_meta "noindex, nofollow" %}{% endblock %}
 {% block content %}
@@ -15,7 +15,8 @@
     <form id="payment-form" method="get" action="{{ payment.return_url }}"
           data-publishable-key="{{ payment.publishable_key }}"
           data-client-secret="{{ payment.client_secret }}"
-          data-return-url="{{ payment.return_url }}">
+          data-return-url="{{ payment.return_url }}"
+          data-appearance="{% payment_appearance_json %}">
       <div id="payment-element"></div>
       <p id="payment-message" role="alert"></p>
       <p><button type="submit" class="button">{% translate "Pay now" %}</button></p>

@@ -6,9 +6,12 @@
   the default for a missing or unreadable value.
 """
 
+import json
+
 from django import template
 
 from .. import engine
+from ..appearance import active_payment_appearance
 
 register = template.Library()
 
@@ -21,3 +24,9 @@ def safe_href(value: object) -> str:
 @register.filter
 def heading_level(value: object, default: int = 3) -> int:
     return engine.heading_level(value, default)
+
+
+@register.simple_tag
+def payment_appearance_json() -> str:
+    """The Stripe Payment Element appearance of the active theme as JSON, for a data attribute."""
+    return json.dumps(active_payment_appearance(), sort_keys=True)
