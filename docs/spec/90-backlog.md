@@ -6,15 +6,15 @@
 
 ## Summary
 
-- Micro-tasks: **394** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3142 h** (P1 2282 h · P2 772 h · P3 88 h)
+- Micro-tasks: **395** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3146 h** (P1 2286 h · P2 772 h · P3 88 h)
 - P1 critical path (schedule lower bound with full parallelism): **153 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CORE.2 → CORE.3 → CORE.17 → CORE.18 → FIT.1 → FIT.5 → FIT.7 → FIT.8 → FIT.10 → FIT.12
 
 ## By macro area
 
 | Macro | Area | Tasks | P1 h | P2 h | P3 h | Total h |
 |---|---|---:|---:|---:|---:|---:|
-| ARC | Architecture and foundations | 31 | 196 | 46 | 0 | 242 |
+| ARC | Architecture and foundations | 32 | 200 | 46 | 0 | 246 |
 | CORE | Identity, permissions, API, backoffice | 30 | 213 | 4 | 6 | 223 |
 | CAT | Product catalog | 21 | 152 | 60 | 0 | 212 |
 | VEN | Vendors, commissions, ledger | 39 | 280 | 43 | 0 | 323 |
@@ -36,11 +36,11 @@
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 14 | 25 | 37 | 8 | 70 |
 | MIG | Migration and cutover | 21 | 135 | 29 | 0 | 164 |
-| **Total** | | **394** | **2282** | **772** | **88** | **3142** |
+| **Total** | | **395** | **2286** | **772** | **88** | **3146** |
 
 ## By phase
 
-### F0 — Foundations (71 tasks, 490 h)
+### F0 — Foundations (72 tasks, 494 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -70,6 +70,7 @@
 | ARC.29 | Refuse `MPMV_DEMO_MODE` and `MPMV_FORCE_NOINDEX` in the LIVE settings through a Django system check registered with a deploy tag, so a stray demo or force-noindex flag on LIVE cannot noindex the shop (finding from the SEO.8 review); the check has its own error id, a message naming the offending variable and runs under `manage.py check --deploy` | P1 | 2 | ARC.22, SEO.8 | `manage.py check --deploy` with the LIVE settings fails with the check's error id and a clear message when `MPMV_DEMO_MODE` is true, and likewise for `MPMV_FORCE_NOINDEX`; it passes with both off and with STAGE settings; a unit test covers each case |
 | ARC.30 | Plain-language help on every editor field (owner request of 2026-11-11, rule in the cross-cutting conventions "Field help"): a sweep test walks the Wagtail page and snippet models and their panels, the StreamField block definitions, the Manager forms and the Django admin forms of the editor-facing apps, and fails on any editor-facing field without `help_text`, naming the model or form and the field; a short allow-list (in one file, each entry with a reason) covers self-explanatory fields such as a title; a second check fails when a help text has no Italian entry in the catalog; the help-text guideline (what to enter, why, example or limit; what happens if a required field is empty) is written in `docs/dev` with good and bad examples. Fields that fail today are listed in the test as a counted baseline that only shrinks, removed as ARC.31 fixes them | P1 | 8 | CMS.2, I18N.9, VEN.31 | The sweep test fails on a seed model, block and Manager form field added without `help_text`; it passes for an allow-listed field and fails for an allow-list entry with no reason; a help text missing in the Italian catalog fails the catalog check; the baseline count is printed and a test fails if it grows; the guideline page exists |
 | ARC.32 | Contextual help button (owner request of 2026-11-11, placement decided by lane-a), everywhere a signed-in user can be: storefront, account, Manager, the Wagtail admin and the technical Django admin. Placement: a real button with a question mark in a circle in the top bar, right side, immediately left of the user menu, in the same spot in every space; the Wagtail admin gets it through hooks (global admin JS and CSS and a header or menu item), the Django admin through an `admin/base_site.html` override; on narrow screens it stays in the header bar, never floating over content or the cart and checkout buttons; the user menu also has a "Help" item that opens the same modal. Content: a translatable `HelpEntry` snippet (wagtail-localize) keyed by route name or page type, rich text cleaned by the CMS.12 sanitiser, editable by platform staff, with a general entry as fallback when no entry matches; vendor-facing pages may link to the vendor guide. Synergy with ARC.30: on a page with a form the modal also lists "Fields on this page" with each field's help text, read from the same form definitions. Accessibility (CMP.9, WCAG 2.2 AA): button with the accessible name "Help for this page", modal dialog with focus trap, Esc closes it, focus returns to the button, no single-key shortcut, target at least 44 px. CSP: no inline script or style; the modal body is fetched from a server endpoint or rendered server-side per language; nothing user-specific or uncached-sensitive is placed in a cached page (the button is in the signed-in chrome only, which is never cached). Shipped in parts (shared component and storefront, account and Manager, Wagtail admin, Django admin) once the ARC.30 rule exists. Admin placement (deviation accepted by lane-a, 2026-11-11): Wagtail 8.1 has no header or account-menu hook, so in the Wagtail admin the help is a "Help for this page" item in the sidebar Help menu; in the Django admin it is a button left of `#user-tools`. The roles that edit snippets (Catalog and moderation, platform owner) get `wagtailadmin.access_admin` through the role sync | P1 | 20 | ARC.30, CMS.12, CMP.9, I18N.9, CORE.17 | A sweep test over the URL map of every space, both admins included, finds the button on every signed-in page and none on an anonymous page; the modal opens the entry for the route or page type and the general entry for a route without one; a page with a form lists its fields with their help texts; an a11y e2e check passes (accessible name, focus trap, Esc, focus return, 44 px, no single-key shortcut, axe clean) in each space; no CSP violation on any page with the button; a cached public page carries no help markup; e2e screenshots on desktop and on mobile width show the button in the header and the open modal |
+| ARC.34 | CI speed (owner decision 2026-11-15, no new infrastructure): the "Unit + integration" job runs as 4 parallel shards (deterministic crc32 split of the test ids through `MPMV_TEST_SHARD=i/N` in `conftest.py`, each shard with its own PostgreSQL service) and a job checks that the shard union equals the full collection, each test once; PRs that change only `docs/**`, `*.md`, spec files or locale catalogs skip the container image and E2E jobs but keep static checks, secret scan and the tests; the required check names stay stable (an aggregate "Unit + integration" needing the shards, and gate jobs "Container image" and "E2E (Playwright)" that report success when their job was skipped on purpose); dependency caches (uv, Playwright browsers) keyed on the lockfile | P1 | 4 | ARC.4 | A PR waits about 6 to 8 minutes on "Unit + integration" instead of 20; a docs-only PR skips image and E2E; branch protection needs no change; the shard check fails when a test is missing or duplicated |
 | CORE.1 | Custom `User`, login via email, preferred language | P1 | 6 | ARC.6 | Initial migration with custom User; a second account with the same email (any letter case) is refused with a message that suggests a second mailbox or plus addressing, and `name+shop@` is accepted as a distinct address (owner note 2026-11-09) |
 | CORE.2 | `VendorMember` with owner/staff roles, per-role permissions | P1 | 6 | CORE.1, VEN.1 | Role matrix tested |
 | CORE.3 | `VendorScopedQuerySet` + 404 helper + reusable cross-tenant test fixture | P1 | 8 | CORE.2 | Negative tests generated for every endpoint |

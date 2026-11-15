@@ -101,7 +101,16 @@ def test_ci_runs_the_parity_smoke_on_each_architecture_after_the_build() -> None
 def test_required_check_names_stay_the_same() -> None:
     names = {job.get("name", key) for key, job in load(CI)["jobs"].items()}
     assert names >= REQUIRED_CHECKS
-    assert names - REQUIRED_CHECKS == {"Container image (${{ matrix.arch }})"}
+    # The helper jobs behind the required gates (ARC.34: test shards, docs-only skip, E2E run);
+    # none of them may take a required name.
+    assert names - REQUIRED_CHECKS == {
+        "Container image (${{ matrix.arch }})",
+        "Unit + integration (shard ${{ matrix.shard }}/4)",
+        "Test shards cover the suite",
+        "Language and upgrade checks",
+        "Changed files",
+        "E2E (Playwright) run",
+    }
 
 
 def test_a_release_is_pushed_only_after_the_smoke_passes() -> None:
