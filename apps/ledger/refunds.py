@@ -29,10 +29,13 @@ CMP.2 statement).
 A refund BEFORE the pending transfer needs no reverse transfer: `settlement.transferable_net`
 reduces the transfer by the refund lines, or drops it when nothing is left.
 
-Safety: the vendor order row is locked for the whole event; the provider call carries a key built
-from the caller's `request_id`, so a repeat after a lost answer replays the same refund and the
-ledger keys make the lines idempotent. The provider is called inside the transaction on purpose
-(like the transfer): a failure raises `RefundFailed` and nothing is written.
+Safety: the Order and then the vendor order row are locked for the whole event (the lock order of
+the order transitions); the provider call carries a key built from the caller's `request_id`, so
+a repeat after a lost answer replays the same refund and the ledger keys make the lines
+idempotent. The provider is called inside the transaction on purpose (like the transfer): a
+failure raises `RefundFailed` and nothing is written. Once the provider has refunded, the Refund
+and its lines are always kept: a failed reversal leaves `reversal_pending`, a failed state update
+leaves `states_pending`, and the sweep or a replay of the request finishes them.
 """
 
 import datetime as dt
@@ -44,7 +47,7 @@ from typing import Any
 
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import QuerySet, Sum
+from django.db.models import Q, QuerySet, Sum
 from django.utils import timezone
 
 from apps.core.alerts import raise_alert
@@ -80,6 +83,7 @@ REFUND_MARKED_OUTSIDE = "ledger.refund_marked_outside"
 REFUND_FEE_EXCLUDED = "ledger.refund_fee_excluded"
 REFUND_REVERSAL_PENDING = "ledger.refund_reversal_pending"
 REFUND_REVERSAL_DONE = "ledger.refund_reversal_done"
+REFUND_STATES_PENDING = "ledger.refund_states_pending"
 ZERO = Decimal("0.00")
 MOVED = (RefundChannel.THROUGH_PLATFORM, RefundChannel.PLATFORM_INITIATED)
 _REQUEST_ID = re.compile(r"[A-Za-z0-9_.-]{8,64}")
@@ -115,8 +119,11 @@ def _check_request_id(request_id: str) -> None:
 
 
 def _lock(vendor_order: VendorOrder) -> VendorOrder:
+    """Lock the Order, then the VendorOrder: the order of `transition_vendor_order` and
+    `apply_refund_to_states`, so a refund and a fulfilment step never deadlock."""
+    Order.objects.select_for_update().filter(pk=vendor_order.order_id).first()
     return (
-        VendorOrder.objects.select_for_update()
+        VendorOrder.objects.select_for_update(of=("self",))
         .select_related("order", "vendor")
         .get(pk=vendor_order.pk)
     )
@@ -318,7 +325,7 @@ def _refund_money(
         sub = _lock(vendor_order)
         _check_paid(sub)
         if _replay(sub, key, channel, selection):
-            _finish_pending_reversal(key)
+            _finish_pending(key)
             return result
         if sub.state in {"cancelled", "refunded"}:
             raise RefundRefused(f"the vendor order is {sub.state}: nothing is left to refund")
@@ -417,11 +424,49 @@ def _refund_money(
                 },
             )
             audit_changes(flagged, ctx=ctx, action=REFUND_FEE_EXCLUDED)
-        done = _sum(_group(sub, MOVED), "refunded_gross") >= sub.gross_total
-        orders_services.apply_refund_to_states(sub, fully_refunded=done, ctx=ctx)
+        _apply_states(refund, ctx)
         result.changes = changes.changes
         result.refund = refund
     return result
+
+
+def _apply_states(refund: Refund, ctx: AuditContext) -> bool:
+    """Roll the order states forward for a recorded refund, in a savepoint. The buyer is already
+    refunded at the provider, so a failure here (a deadlock, a state the machine refuses) must
+    not roll back the Refund and its ledger lines: the refund is kept with `states_pending`,
+    audited and alerted once, and the sweep or a replay of the same request finishes it. True
+    when the states were applied."""
+    sub = refund.vendor_order
+    done = _sum(_group(sub, MOVED), "refunded_gross") >= sub.gross_total
+    try:
+        with transaction.atomic():
+            orders_services.apply_refund_to_states(sub, fully_refunded=done, ctx=ctx)
+    except Exception:
+        if not refund.states_pending:
+            refund.states_pending = True
+            refund.save(update_fields=["states_pending"])
+            flagged = ChangeSet()
+            flagged.create(
+                REFUND_MODEL,
+                str(refund.public_id),
+                {
+                    VENDOR_FIELD: str(refund.vendor.public_id),
+                    "provider_refund_ref": refund.provider_refund_ref,
+                },
+            )
+            audit_changes(flagged, ctx=ctx, action=REFUND_STATES_PENDING)
+            raise_alert(
+                Alert(
+                    f"refund-states:{refund.public_id}",
+                    "A refund went through but the order states were not updated; it is retried",
+                    {"refund": str(refund.public_id), "order": sub.order.number},
+                )
+            )
+        return False
+    if refund.states_pending:
+        refund.states_pending = False
+        refund.save(update_fields=["states_pending"])
+    return True
 
 
 def _flag_pending_reversal(refund: Refund, ctx: AuditContext) -> None:
@@ -451,21 +496,38 @@ def _transfer_ref(sub: VendorOrder) -> str:
     return entry.external_ref if entry is not None else ""
 
 
-def _finish_pending_reversal(key: str) -> bool:
-    """Retry only the transfer reversal of the refund with this key, under the same provider key
-    `<key>:reverse:<transfer>` (the provider refund is never called again). True when done or
-    when nothing was pending."""
-    refund = (
-        Refund.objects.select_for_update()
-        .select_related("vendor", "vendor_order__order")
-        .filter(idempotency_key=key, reversal_pending=True)
+def _finish_pending(key: str) -> bool:
+    """Finish what the refund with this key left pending after the provider refund: the
+    transfer reversal, then the order states. The provider refund is never called again. Locks
+    Order, then VendorOrder, then the Refund row (the refund path's one lock order). True when
+    nothing is left pending."""
+    found = (
+        Refund.objects.filter(idempotency_key=key)
+        .filter(Q(reversal_pending=True) | Q(states_pending=True))
+        .values_list("vendor_order_id", flat=True)
         .first()
     )
-    if refund is None:
+    if found is None:
         return True
+    _lock(VendorOrder.objects.select_related("order").get(pk=found))
+    refund = (
+        Refund.objects.select_for_update(of=("self",))
+        .select_related("vendor", "vendor_order__order")
+        .get(idempotency_key=key)
+    )
+    ctx = AuditContext(actor_label="system:refund-reversal", source=AuditLog.Source.SYSTEM)
+    reversed_ok = not refund.reversal_pending or _finish_pending_reversal(refund, ctx)
+    states_ok = not refund.states_pending or _apply_states(refund, ctx)
+    return reversed_ok and states_ok
+
+
+def _finish_pending_reversal(refund: Refund, ctx: AuditContext) -> bool:
+    """Retry only the transfer reversal of this refund, under the same provider key
+    `<key>:reverse:<transfer>`, so a reversal that reached the provider but whose answer was lost
+    is replayed, never made twice. True when done."""
+    key = refund.idempotency_key
     sub = refund.vendor_order
     transfer = _transfer_ref(sub)
-    ctx = AuditContext(actor_label="system:refund-reversal", source=AuditLog.Source.SYSTEM)
     try:
         payment = _payment_of(sub.order)
         refs = registry.get_provider(payment.provider).reverse_transfers(
@@ -491,14 +553,17 @@ def _finish_pending_reversal(key: str) -> bool:
 
 
 def retry_pending_reversals() -> int:
-    """The sweep: retry each pending transfer reversal; returns how many cleared."""
+    """The sweep: finish each refund left pending after the provider refund (its transfer
+    reversal, its order states); returns how many cleared."""
     keys = list(
-        Refund.objects.filter(reversal_pending=True).values_list("idempotency_key", flat=True)
+        Refund.objects.filter(Q(reversal_pending=True) | Q(states_pending=True)).values_list(
+            "idempotency_key", flat=True
+        )
     )
     cleared = 0
     for key in keys:
         with transaction.atomic():
-            cleared += _finish_pending_reversal(key)
+            cleared += _finish_pending(key)
     return cleared
 
 
@@ -527,6 +592,7 @@ def _figures(
     """`refund_lines` for this event, the reversals capped so that all the events of the package
     together never give back more than the commission and collection cost it paid."""
     str_snapshot = {k: str(v) for k, v in snapshot.items()}
+    moved = _group(sub, MOVED)
     lines = refund_lines(
         str_snapshot,
         RefundEvent(gross, provider_cost, exclusion),
@@ -534,6 +600,7 @@ def _figures(
         gross_paid=sub.gross_total,
         refund_fee_rule=rule,
         shipping_net=sub.shipping_net,
+        refunded_before=_sum(moved, "refunded_gross"),  # cumulative: the last takes the rest
     )
     if not reverse:
         return _Figures(ZERO, ZERO, lines.refund_fee)
@@ -543,7 +610,6 @@ def _figures(
         gross_paid=sub.gross_total,
         shipping_net=sub.shipping_net,
     )
-    moved = _group(sub, MOVED)
     commission_left = max(ZERO, paid.commission - _sum(moved, "commission_reversal"))
     fee_left = max(ZERO, paid.payment_fee - _sum(moved, "payment_fee_reversal"))
     return _Figures(

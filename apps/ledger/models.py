@@ -109,8 +109,8 @@ class Refund(models.Model):
     `through_platform` and `platform_initiated` rows moved money (provider refund, ledger lines);
     their amounts count against the vendor order's gross. `outside_platform` is only the vendor's
     mark with its declared date and method: it moves nothing, the platform is not liable for it
-    and the DAC7 consideration is unchanged. Rows are never edited (but `reversal_pending` clears);
-    a mistake is a new event.
+    and the DAC7 consideration is unchanged. Rows are never edited (but the `*_pending` flags
+    clear); a mistake is a new event.
     Written by `apps.ledger.refunds` only; the idempotency key is the caller's request id.
     """
 
@@ -132,8 +132,11 @@ class Refund(models.Model):
     transfer_reversed = MoneyField(default=0)
     provider_refund_ref = models.CharField(max_length=128, blank=True)
     # The provider refunded the buyer but taking the vendor's share back failed: the sweep retries
-    # the reversal under the same key until it clears (the only field changed after the insert).
+    # the reversal under the same key until it clears (changed after the insert, like the next).
     reversal_pending = models.BooleanField(default=False)
+    # The refund and its lines are recorded but the order states were not rolled forward (a
+    # deadlock, a refused transition): the sweep or a replay applies them.
+    states_pending = models.BooleanField(default=False)
     # L-10: set by platform staff only; the reason is required.
     platform_error = models.BooleanField(default=False)
     platform_error_reason = models.TextField(blank=True)

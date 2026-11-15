@@ -63,12 +63,15 @@ class RefundSelection:
         return sorted(ids) == sorted(line_id for line_id, _ in self.lines)
 
 
-def unit_gross(figures: LineFigures, quantity: int) -> Decimal:
-    """The gross of `quantity` units of a line: the whole gross for the whole line, else the
-    line's gross pro rata, `ROUND_HALF_UP`."""
-    if quantity == figures.quantity:
-        return round_line(figures.gross)
-    return round_line(figures.gross * quantity / figures.quantity)
+def unit_gross(figures: LineFigures, quantity: int, already: int = 0) -> Decimal:
+    """The gross of `quantity` units of a line after `already` units were refunded, rounded
+    cumulatively: round(G*(already+q)/Q) - round(G*already/Q), `ROUND_HALF_UP`. The parts of a
+    line always add up to its gross exactly (10.00 x 3 refunded 1+1+1 is 3.33+3.34+3.33)."""
+
+    def upto(units: int) -> Decimal:
+        return round_line(figures.gross * units / figures.quantity)
+
+    return upto(already + quantity) - upto(already)
 
 
 def refunded_quantities(requests: Iterable[Mapping[str, object]]) -> dict[int, int]:
@@ -109,11 +112,12 @@ def refunded_gross_of(
         if line_id not in lines:
             raise InvalidRefundRequest("a line does not belong to this order")
         figures = lines[line_id]
-        left = figures.quantity - already.get(line_id, 0)
+        done = already.get(line_id, 0)
+        left = figures.quantity - done
         quantity = left if selection.mode == MODE_LINE else asked
         if quantity < 1 or quantity > left:
             raise InvalidRefundRequest(f"line {line_id}: {left} unit(s) left, asked {quantity}")
-        total += unit_gross(figures, quantity)
+        total += unit_gross(figures, quantity, done)
     return round_line(total)
 
 

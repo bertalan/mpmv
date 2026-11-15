@@ -546,6 +546,139 @@ def test_a_replay_of_a_refund_that_completed_the_package_returns_the_same_result
     assert stripe.calls.count("create_refund") == 1
 
 
+def test_a_lost_reversal_answer_is_retried_under_the_same_key_and_reverses_once(
+    stripe: FakeStripeClient,
+) -> None:
+    sub = pay(stripe, place_409())
+    stripe.lose_reversal_answers = 1  # Stripe reverses, then the answer never comes back
+    refund_through(sub, AMOUNT("amount", amount=D("61.00")))
+    assert Refund.objects.get().reversal_pending
+    assert len(stripe.reversals) == 1  # already taken at Stripe
+    assert refunds.retry_pending_reversals() == 1
+    assert not Refund.objects.get().reversal_pending
+    # the retry replayed the first reversal under the same key: still exactly one
+    transfer = LedgerEntry.objects.get(vendor_order=sub, kind="transfer").external_ref
+    assert [t for t, _ in stripe.reversals] == [transfer]
+
+
+# --- lock order, a failure after the provider call ------------------------------------------
+
+
+def test_the_refund_locks_the_order_before_the_vendor_order(stripe: FakeStripeClient) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    sub = pay(stripe, place_409())
+    with CaptureQueriesContext(connection) as queries:
+        refund_through(sub, AMOUNT("amount", amount=D("61.00")))
+    locks = [q["sql"] for q in queries.captured_queries if "FOR UPDATE" in q["sql"]]
+    tables = [
+        "order" if 'FROM "orders_order"' in sql else "vendor_order"
+        for sql in locks
+        if 'FROM "orders_order"' in sql or 'FROM "orders_vendororder"' in sql
+    ]
+    assert tables[:2] == ["order", "vendor_order"]
+
+
+def test_a_failure_after_the_provider_refund_keeps_the_refund_and_the_sweep_completes_it(
+    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from django.db import OperationalError
+
+    from apps.orders import services as orders_services
+
+    order = place_409()
+    sub = pay(stripe, order)
+    real = orders_services.apply_refund_to_states
+
+    def deadlock(*args: Any, **kwargs: Any) -> Any:
+        raise OperationalError("deadlock detected")
+
+    monkeypatch.setattr(orders_services, "apply_refund_to_states", deadlock)
+    refund_through(sub, AMOUNT("amount", amount=D("122.00")))
+    # the buyer is refunded at Stripe: the Refund and its ledger lines are kept, nothing is lost
+    refund = Refund.objects.get()
+    assert refund.provider_refund_ref
+    assert refund.states_pending
+    assert kinds(sub)["refund"] == D("-122.00")
+    assert kinds(sub)["transfer_reversal"] == D("95.12")
+    assert AuditLog.objects.filter(action=refunds.REFUND_STATES_PENDING).exists()
+    sub.refresh_from_db()
+    assert sub.state == "pending"
+
+    monkeypatch.setattr(orders_services, "apply_refund_to_states", real)
+    assert refunds.retry_pending_reversals() == 1
+    refund.refresh_from_db()
+    assert not refund.states_pending
+    sub.refresh_from_db()
+    order.refresh_from_db()
+    assert sub.state == "cancelled"
+    assert order.state == "refunded"
+    assert stripe.calls.count("create_refund") == 1
+    assert refunds.retry_pending_reversals() == 0
+
+
+def test_a_replay_completes_the_states_left_pending(
+    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from django.db import OperationalError
+
+    from apps.orders import services as orders_services
+
+    order = place_409()
+    sub = pay(stripe, order)
+    real = orders_services.apply_refund_to_states
+
+    def deadlock(*args: Any, **kwargs: Any) -> Any:
+        raise OperationalError("deadlock detected")
+
+    monkeypatch.setattr(orders_services, "apply_refund_to_states", deadlock)
+    request_id = rid()
+    refund_through(sub, AMOUNT("amount", amount=D("61.00")), request_id=request_id)
+    monkeypatch.setattr(orders_services, "apply_refund_to_states", real)
+    refund_through(sub, AMOUNT("amount", amount=D("61.00")), request_id=request_id)
+    assert not Refund.objects.get().states_pending
+    order.refresh_from_db()
+    assert order.state == "partially_refunded"
+    assert stripe.calls.count("create_refund") == 1
+
+
+# --- cumulative rounding: the last refund takes the remainder ---------------------------------
+
+
+def test_one_unit_at_a_time_refunds_the_whole_line_and_closes_the_package(
+    stripe: FakeStripeClient,
+) -> None:
+    # 3 x 10.01 net + 22% VAT = 36.64 gross: 12.2133 a unit, so per-unit rounding left a cent
+    product = sellable(price_net=D("10.01"))
+    order, _ = place_order(
+        preview(
+            vendor_of(
+                product,
+                line(product, 3),
+                shipping_net=D("0.00"),
+                shipping_tax=None,
+                commission_snapshot=RULE,
+            )
+        ),
+        ctx=CTX,
+        now=NOW,
+    )
+    assert order is not None
+    sub = pay(stripe, order)
+    only = sub.lines.get()
+    for _ in range(3):
+        refund_through(sub, AMOUNT("quantity", ((only.pk, 1),)))
+    assert kinds_sum(sub, "refund") == -sub.gross_total
+    assert kinds_sum(sub, "commission_reversal") == -kinds_sum(sub, "commission")
+    assert kinds_sum(sub, "payment_fee_reversal") == -kinds_sum(sub, "payment_fee")
+    assert kinds_sum(sub, "transfer_reversal") == -kinds_sum(sub, "transfer")
+    sub.refresh_from_db()
+    order.refresh_from_db()
+    assert sub.state == "cancelled"
+    assert order.state == "refunded"
+
+
 # --- outside the platform ---------------------------------------------------------------------
 
 

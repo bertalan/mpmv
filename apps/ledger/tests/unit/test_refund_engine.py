@@ -74,6 +74,21 @@ def test_more_units_than_are_left_is_refused() -> None:
         gross(RefundSelection("line", ((1, 3),)), {1: 3})
 
 
+def test_quantity_refunds_round_cumulatively_so_the_line_adds_up_exactly() -> None:
+    # 10.00 x 3 refunded 1 + 1 + 1: 3.33, 3.34, 3.33 (never 9.99)
+    parts = [gross(RefundSelection("quantity", ((3, 1),)), {3: done}) for done in (0, 1, 2)]
+    assert parts == [D("3.33"), D("3.34"), D("3.33")]
+    assert sum(parts) == D("10.00")
+
+
+def test_two_units_of_a_five_cent_line_refund_exactly_five_cents() -> None:
+    lines = {4: LineFigures(4, 2, D("0.05"))}
+    first = engine.refunded_gross_of(RefundSelection("quantity", ((4, 1),)), lines, {})
+    second = engine.refunded_gross_of(RefundSelection("quantity", ((4, 1),)), lines, {4: 1})
+    assert (first, second) == (D("0.03"), D("0.02"))
+    assert first + second == D("0.05")
+
+
 def test_already_refunded_quantities_add_up_over_stored_requests() -> None:
     stored = [
         RefundSelection("quantity", ((1, 1),)).snapshot(),
