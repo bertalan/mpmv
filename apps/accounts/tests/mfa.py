@@ -6,6 +6,7 @@ tests that act as staff log in through `verified_login` (or the root `mfa_login`
 
 import time
 
+from django.contrib.auth.models import Permission
 from django.test import Client
 from django_otp import DEVICE_ID_SESSION_KEY
 from django_otp.oath import TOTP
@@ -17,8 +18,8 @@ from apps.accounts.mfa_session import (
     VERIFIED_KIND_SESSION_KEY,
     VERIFIED_UV_SESSION_KEY,
 )
-from apps.accounts.models import User
-from apps.accounts.tests.factories import TOTPDeviceFactory
+from apps.accounts.models import PasskeyDevice, User
+from apps.accounts.tests.factories import PasskeyDeviceFactory, TOTPDeviceFactory
 
 
 def totp_token(device: TOTPDevice, *, offset_steps: int = 0) -> str:
@@ -26,6 +27,16 @@ def totp_token(device: TOTPDevice, *, offset_steps: int = 0) -> str:
     totp = TOTP(device.bin_key, device.step, device.t0, device.digits, device.drift)
     totp.time = time.time() + offset_steps * device.step
     return str(totp.token()).zfill(device.digits)
+
+
+def grant_elevate(user: User) -> None:
+    """Give `user` what `levels.may_elevate` asks: `core.elevate` and a confirmed passkey."""
+    permission = Permission.objects.get(
+        content_type__app_label="core", codename=levels.ELEVATE_CODENAME
+    )
+    user.user_permissions.add(permission)
+    if not PasskeyDevice.objects.filter(user=user, confirmed=True).exists():
+        PasskeyDeviceFactory.create(user=user)
 
 
 def verified_login(
@@ -36,12 +47,17 @@ def verified_login(
     verified_at: float | None = None,
     level: str = levels.PASSKEY_WINDOW,
     passkey: bool = False,
+    elevate: bool = True,
 ) -> TOTPDevice:
     """Log `user` in with a second factor already verified (a confirmed TOTP device).
 
     The passkey window is open by default, so tests of other features reach sensitive
     views; pass `level=levels.NO_WINDOW` for what a real login gives (CORE.25). `passkey=True`
     also records a fresh passkey with user verification, as a critical action asks.
+
+    An unscoped window covers only a user who may elevate (CORE.25), as production opens it
+    only for them: a full window therefore also gives the user `core.elevate` and an enrolled
+    passkey. Pass `elevate=False` to keep the window but not the right (it then covers nothing).
     """
     device = device or TOTPDeviceFactory.create(user=user)
     client.force_login(user)
@@ -52,6 +68,8 @@ def verified_login(
         session[VERIFIED_KIND_SESSION_KEY] = "passkey"
         session[VERIFIED_UV_SESSION_KEY] = True
     if level == levels.PASSKEY_WINDOW:
+        if elevate:
+            grant_elevate(user)
         session[levels.STARTED_KEY] = session[levels.ACTIVITY_KEY] = time.time()
     session.save()
     return device

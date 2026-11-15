@@ -276,13 +276,14 @@ def open_window(request: HttpRequest, *, shop: str | None = None) -> None:
 
 def window_covers(request: HttpRequest, action: str, shop: object | None) -> bool:
     """Whether an open window covers `action` here. A window with no shop scope (opened with
-    `elevate`) covers every action, as before; a vendor owner's window covers only the owner
-    actions of its own shop, with ownership re-checked now."""
+    `elevate`) covers every action only while its user may still elevate (re-checked now: staff
+    who lose `elevate`, or their passkeys, keep no step-up); a vendor owner's window covers only
+    the owner actions of its own shop, with ownership re-checked now."""
     if current_level(request) != PASSKEY_WINDOW:
         return False
     scope = request.session.get(WINDOW_SHOP_KEY)
     if scope is None:
-        return True
+        return may_elevate(request.user)
     return (
         shop is not None
         and shop_key(shop) == scope

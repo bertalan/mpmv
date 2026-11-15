@@ -7,6 +7,7 @@ from typing import Any
 from django.apps import AppConfig
 from django.conf import settings
 from django.core.checks import CheckMessage, Error
+from django.utils.module_loading import import_string
 
 
 def check_captcha_settings(
@@ -51,3 +52,20 @@ def check_mfa_middleware(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
             id="accounts.E002",
         )
     ]
+
+
+def check_shop_owner_check(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
+    """`SHOP_OWNER_CHECK` decides who may confirm a shop action; a path that cannot be imported
+    would silently deny every vendor owner (the check fails closed), so catch it at startup."""
+    try:
+        import_string(settings.SHOP_OWNER_CHECK)
+    except (ImportError, AttributeError):
+        return [
+            Error(
+                "SHOP_OWNER_CHECK cannot be imported.",
+                hint="Set it to the dotted path of the function (user, shop) -> bool that "
+                "says whether the user owns the shop.",
+                id="accounts.E003",
+            )
+        ]
+    return []
