@@ -99,6 +99,15 @@ BUILT_IN = (
         order=10,
         allowed=anyone,
     ),
+    # CORE.30: the platform map, open to every role that opens the dashboard.
+    Section(
+        "platform.map",
+        Space.PLATFORM,
+        _("Platform map"),
+        "manager:platform:map",
+        order=15,
+        allowed=platform_role("platform.map"),
+    ),
     # Staff with the revert permission (CORE.9 3/3): history of owners' profile changes, revert.
     Section(
         "platform.profile_changes",

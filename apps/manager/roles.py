@@ -117,6 +117,7 @@ E, R, A, RA = Access.EDIT, Access.READ, Access.ACTION, Access.READ_ACTION
 # Section key -> {role key: access}. Keys are the Manager registry's section keys.
 MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.dashboard": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: R, OWNER: R},
+    "platform.map": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: R, OWNER: R},  # CORE.30
     "platform.config": {CONFIG: E, OWNER: R},
     "platform.owner_settings": {CONFIG: R, OWNER: E},
     "platform.catalog": {CATALOG: E, SUPPORT: R, OWNER: R},
@@ -141,6 +142,7 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
 
 SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.dashboard": "Platform: dashboard",
+    "platform.map": "Platform: map of the site (CORE.30)",
     "platform.config": "Platform: configuration and tax (ARC.24)",
     "platform.owner_settings": "Platform: owner-only settings (CMP.13, CMP.11 approvals)",
     "platform.catalog": "Platform: catalog, categories, attributes, taxonomies, imports",
