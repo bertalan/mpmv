@@ -19,6 +19,17 @@ msgstr[1] "%(action)s: %(count)d righe completate."
 msgid "%(actor_name)s gave themselves a platform role. The change is in the audit log."
 msgstr "%(actor_name)s si è assegnato un ruolo di piattaforma. La modifica è nel registro di audit."
 
+#: apps/accounts/templates/accounts/sessions/list.html
+#: apps/manager/templates/manager/platform/user_sessions.html
+msgid "%(browser)s on %(system)s"
+msgstr "%(browser)s su %(system)s"
+
+#: apps/manager/templates/manager/platform/sessions_panic.html
+msgid "%(counter)s session is open now."
+msgid_plural "%(counter)s sessions are open now."
+msgstr[0] "%(counter)s sessione è aperta ora."
+msgstr[1] "%(counter)s sessioni sono aperte ora."
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "%(counter)s unused."
 msgid_plural "%(counter)s unused."
@@ -746,6 +757,10 @@ msgstr "Autorità informate: %(authority)s, %(at)s."
 msgid "Back office"
 msgstr "Back office"
 
+#: apps/accounts/templates/accounts/sessions/list.html
+msgid "Back to account security"
+msgstr "Torna alla sicurezza dell'account"
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "Back to my orders"
 msgstr "Torna ai miei ordini"
@@ -1075,6 +1090,10 @@ msgstr ""
 "Conferma con la tua passkey per aprire una finestra passkey: copre diverse azioni sensibili di "
 "seguito. Si chiude quando esci, dopo un periodo di inattività o alla durata massima."
 
+#: apps/manager/forms.py
+msgid "Confirmation"
+msgstr "Conferma"
+
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Connect your payout account"
 msgstr "Collega il tuo account per i pagamenti"
@@ -1317,6 +1336,10 @@ msgstr "Dati"
 msgid "Developer and system"
 msgstr "Sviluppo e sistema"
 
+#: apps/manager/templates/manager/platform/user_sessions.html
+msgid "Device"
+msgstr "Dispositivo"
+
 #: themes/base/templates/components/alert.html
 msgid "Dismiss"
 msgstr "Chiudi"
@@ -1399,6 +1422,26 @@ msgstr ""
 "Abilitata: imposti subito una password. Disabilitata: l'account viene creato senza password e non "
 "può accedere con una password finché non ne viene impostata una."
 
+#: apps/manager/sections.py apps/manager/templates/manager/platform/sessions_panic.html
+msgid "End every session"
+msgstr "Termina ogni sessione"
+
+#: apps/manager/session_views.py
+msgid "END EVERY SESSION"
+msgstr "TERMINA OGNI SESSIONE"
+
+#: apps/accounts/templates/accounts/sessions/list.html
+msgid "End this session"
+msgstr "Termina questa sessione"
+
+#: apps/manager/templates/manager/platform/user_sessions.html
+msgid "End this user's sessions"
+msgstr "Termina le sessioni di questo utente"
+
+#: apps/accounts/templates/accounts/sessions/list.html
+msgid "Ending a session does not revoke API keys or links sent by email."
+msgstr "Terminare una sessione non revoca le chiavi API né i link inviati per email."
+
 #: apps/manager/forms.py
 msgid "Enter a valid carrier name."
 msgstr "Inserisci un nome di corriere valido."
@@ -1431,6 +1474,21 @@ msgstr "Cancella il tuo account (chiede conferma)"
 msgid "Error"
 msgstr "Errore"
 
+#: apps/manager/session_views.py
+msgid "Every other session has ended. The platform staff were told."
+msgstr "Tutte le altre sessioni sono terminate. Lo staff della piattaforma è stato avvisato."
+
+#: apps/manager/session_views.py
+msgid "Every session of that account has ended."
+msgstr "Tutte le sessioni di quell'account sono terminate."
+
+#: apps/manager/templates/manager/platform/sessions_panic.html
+msgid ""
+"Every user, staff and vendors included, is signed out everywhere. Only this session stays. API "
+"keys and links sent by email are not affected: revoke them separately."
+msgstr ""
+"Ogni utente, staff e venditori compresi, viene disconnesso ovunque. Resta solo questa sessione. Le"
+" chiavi API e i link inviati per email non cambiano: revocali a parte."
 #: apps/manager/templates/manager/platform/map.html
 msgid ""
 "Every area of the site in one place. Shop space pages are listed as text: staff do not open them "
@@ -1491,9 +1549,21 @@ msgstr "Filtra"
 msgid "Filters"
 msgstr "Filtri"
 
+#: apps/manager/templates/manager/platform/user_sessions.html
+msgid ""
+"Find an account to see where it is signed in. Ending its sessions signs it out everywhere; it does"
+" not revoke API keys or links sent by email."
+msgstr ""
+"Cerca un account per vedere dove ha effettuato l'accesso. Terminarne le sessioni lo disconnette "
+"ovunque; non revoca le chiavi API né i link inviati per email."
+
 #: apps/orders/templates/orders/_cart_body.html
 msgid "Find something you like."
 msgstr "Trova qualcosa che ti piace."
+
+#: apps/manager/templates/manager/platform/user_sessions.html
+msgid "Find the account"
+msgstr "Cerca l'account"
 
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Fingerprint %(hash)s."
@@ -1992,9 +2062,17 @@ msgstr "Lingua"
 msgid "Language of the texts"
 msgstr "Lingua dei testi"
 
+#: apps/manager/templates/manager/platform/user_sessions.html
+msgid "Last used"
+msgstr "Ultimo uso"
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "last used %(used)s"
 msgstr "ultimo uso il %(used)s"
+
+#: apps/accounts/templates/accounts/sessions/list.html
+msgid "Last used %(used)s"
+msgstr "Ultimo uso %(used)s"
 
 #: apps/compliance/forms.py
 msgid ""
@@ -2079,6 +2157,10 @@ msgstr "Caricamento dell’aiuto…"
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Log in"
 msgstr "Accedi"
+
+#: apps/accounts/templates/accounts/sessions/list.html
+msgid "Log out everywhere else"
+msgstr "Esci da tutte le altre sessioni"
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Logo"
@@ -2214,6 +2296,14 @@ msgstr "Necessari"
 msgid "Needed with this product"
 msgstr "Ti serve insieme a questo prodotto"
 
+#: apps/manager/templates/manager/platform/user_sessions.html
+msgid "Network"
+msgstr "Rete"
+
+#: apps/accounts/templates/accounts/sessions/list.html
+msgid "Network %(network)s"
+msgstr "Rete %(network)s"
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "never used"
 msgstr "mai usata"
@@ -2261,6 +2351,10 @@ msgstr "Nessun secondo fattore per ora."
 #: apps/orders/templates/orders/_legal_recap.html
 msgid "No seller terms published."
 msgstr "Il venditore non ha pubblicato condizioni di vendita."
+
+#: apps/accounts/templates/accounts/sessions/list.html
+msgid "No session is recorded yet."
+msgstr "Nessuna sessione registrata."
 
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "No storefront changes yet."
@@ -3394,6 +3488,10 @@ msgstr "Cerca per nome, SKU, marchio o venditore, poi clicca sul prodotto."
 msgid "Security"
 msgstr "Sicurezza"
 
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "See where you are signed in"
+msgstr "Guarda dove hai effettuato l'accesso"
+
 #: apps/manager/templates/manager/list.html
 msgid "Select"
 msgstr "Seleziona"
@@ -3448,6 +3546,10 @@ msgstr "Impostazioni SEO salvate."
 #: apps/catalog/taxonomy.py
 msgid "SEO title"
 msgstr "Titolo SEO"
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Sessions"
+msgstr "Sessioni"
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Set up an authenticator app"
@@ -3613,6 +3715,14 @@ msgstr "Accedi"
 #: themes/base/templates/components/user_tools.html
 msgid "Sign out"
 msgstr "Esci"
+
+#: apps/accounts/templates/accounts/sessions/list.html
+msgid "Sign out of this session"
+msgstr "Esci da questa sessione"
+
+#: apps/manager/templates/manager/platform/user_sessions.html
+msgid "Signed-in sessions"
+msgstr "Sessioni attive"
 
 #: apps/catalog/models.py
 msgid ""
@@ -3881,6 +3991,10 @@ msgstr "Cessazioni"
 #: apps/orders/templates/orders/_legal_boxes.html apps/vendors/templates/vendors/terms/read.html
 msgid "Terms"
 msgstr "Condizioni"
+
+#: apps/manager/session_views.py
+msgid "That account had no session to end."
+msgstr "Quell'account non aveva sessioni da terminare."
 
 #: apps/manager/termination_views.py
 msgid "That date is too early: the notice is at least 30 days unless an exception applies."
@@ -5519,6 +5633,10 @@ msgstr "Il servizio termina il"
 msgid "The service that found the position from the address. Filled in for you."
 msgstr "Il servizio che ha trovato la posizione dall'indirizzo. Compilato per te."
 
+#: apps/accounts/session_views.py
+msgid "The session has ended."
+msgstr "La sessione è terminata."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "The set of categories or tags this one belongs to, for example 'season'. Required. It cannot be "
@@ -6026,7 +6144,7 @@ msgstr ""
 msgid "There is a problem"
 msgstr "Si è verificato un problema"
 
-#: apps/manager/views.py
+#: apps/manager/session_views.py apps/manager/views.py
 msgid "There is no account with that email."
 msgstr "Non c'è nessun account con questa email."
 
@@ -6038,6 +6156,18 @@ msgstr "Per questa pagina non c’è ancora un testo di aiuto."
 msgid "There is no termination notice for your shop."
 msgstr "Per il tuo negozio non c’è nessun preavviso di cessazione."
 
+#: apps/accounts/session_views.py
+msgid "There were no other sessions."
+msgstr "Non c'erano altre sessioni."
+
+#: apps/accounts/templates/accounts/sessions/list.html
+msgid ""
+"These are the browsers and devices signed in to your account. If you do not recognise one, end it "
+"and change your password."
+msgstr ""
+"Questi sono i browser e i dispositivi collegati al tuo account. Se non ne riconosci uno, terminalo"
+" e cambia la password."
+
 #: apps/manager/sales_terms_views.py
 msgid ""
 "These terms are governed by the law of [country]. Disputes with business buyers are decided by the"
@@ -6048,6 +6178,10 @@ msgstr ""
 "giudice del luogo di residenza.Le presenti condizioni sono regolate dalla legge di [paese]. Le "
 "controversie con gli acquirenti professionali sono decise dal tribunale di [città]. Per i "
 "consumatori è sempre competente il giudice del luogo di residenza."
+
+#: apps/manager/templates/manager/platform/user_sessions.html
+msgid "This account is not signed in anywhere."
+msgstr "Questo account non ha sessioni attive."
 
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid ""
@@ -6118,6 +6252,10 @@ msgstr "Questa pagina non è ancora disponibile nella tua lingua."
 #: apps/catalog/templates/catalog/product.html
 msgid "This product is no longer available."
 msgstr "Questo prodotto non è più disponibile."
+
+#: apps/accounts/templates/accounts/sessions/list.html
+msgid "this session"
+msgstr "questa sessione"
 
 #: apps/manager/notice_views.py
 msgid "This step is not possible for the notice in its status."
@@ -6318,6 +6456,10 @@ msgstr ""
 "chiuso dopo una verifica; il venditore ripete poi l’onboarding, compresa l’accettazione del "
 "contratto in vigore."
 
+#: apps/manager/templates/manager/platform/sessions_panic.html
+msgid "To confirm, type <strong>%(word)s</strong>."
+msgstr "Per confermare, scrivi <strong>%(word)s</strong>."
+
 #: apps/shipping/models.py
 msgid ""
 "To limit the zone to some postcodes, list them separated by commas: a prefix such as 'BT*', a "
@@ -6395,6 +6537,19 @@ msgstr "Impostazioni della verifica in due passaggi"
 msgid "Type part of a product name, SKU, brand or vendor name."
 msgstr "Scrivi una parte del nome del prodotto, dello SKU, del marchio o del nome del venditore."
 
+#: apps/manager/session_views.py
+msgid "Type the words exactly as shown."
+msgstr "Scrivi le parole esattamente come indicato."
+
+#: apps/manager/forms.py
+msgid "Type the words shown above, in capitals, to end every session."
+msgstr "Scrivi in maiuscolo le parole indicate sopra per terminare ogni sessione."
+
+#: apps/accounts/templates/accounts/sessions/list.html
+#: apps/manager/templates/manager/platform/user_sessions.html
+msgid "Unknown device"
+msgstr "Dispositivo sconosciuto"
+
 #: apps/vendors/models.py
 msgid "Untick it to stop applying the rule without deleting it."
 msgstr "Togli la spunta per smettere di applicare la regola senza eliminarla."
@@ -6456,6 +6611,10 @@ msgstr "Usa un codice di recupero"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Use this device's screen lock or a security key."
 msgstr "Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
+
+#: apps/manager/sections.py apps/manager/templates/manager/platform/user_sessions.html
+msgid "User sessions"
+msgstr "Sessioni utente"
 
 #: apps/orders/ui/present.py apps/orders/ui/views.py
 msgid "VAT"
@@ -7147,6 +7306,14 @@ msgstr ""
 "Perché esiste la regola, per esempio un codice prodotto ritirato. È solo un'etichetta per te e i "
 "tuoi colleghi: non cambia nulla per i visitatori."
 
+#: apps/manager/forms.py
+msgid ""
+"Why the sessions end, for example a suspected takeover. Kept in the audit log; do not write "
+"personal data in it."
+msgstr ""
+"Perché le sessioni terminano, ad esempio un sospetto furto dell'account. Resta nel registro di "
+"audit; non scrivere dati personali."
+
 #: apps/vendors/models.py
 msgid "Why this country issues no TIN."
 msgstr "Perché questo paese non rilascia il TIN."
@@ -7210,6 +7377,10 @@ msgstr ""
 #: apps/manager/templates/manager/forbidden.html
 msgid "You are signed in as %(user)s, and you do not have access to this part of the site."
 msgstr "Hai effettuato l’accesso come %(user)s e non hai accesso a questa parte del sito."
+
+#: apps/accounts/session_views.py
+msgid "You are signed out everywhere else."
+msgstr "Sei uscito da tutte le altre sessioni."
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "You are working on %(vendor)s."
@@ -7410,6 +7581,10 @@ msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
 #: apps/manager/sales_terms_views.py
 msgid "Your sales terms are published and in force."
 msgstr "Le tue condizioni di vendita sono pubblicate e in vigore."
+
+#: apps/accounts/templates/accounts/sessions/list.html
+msgid "Your sessions"
+msgstr "Le tue sessioni"
 
 #: apps/manager/forms.py
 msgid ""

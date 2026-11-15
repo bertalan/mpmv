@@ -1,0 +1,21 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+End every session (CORE.24, the platform owner only): the panic button. Every user is signed
+out everywhere except this session. It asks for a fresh passkey each time and the typed word,
+is audited with the count and mails the platform staff. API keys and links sent by email are
+not sessions and stay valid: revoke them separately.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "End every session" %}</h1>
+  {% translate "Every user, staff and vendors included, is signed out everywhere. Only this session stays. API keys and links sent by email are not affected: revoke them separately." as panic_warning %}
+  {% include "components/alert.html" with level="warning" message=panic_warning only %}
+  <p class="manager-lead">{% blocktranslate count counter=live %}{{ counter }} session is open now.{% plural %}{{ counter }} sessions are open now.{% endblocktranslate %}</p>
+  <p>{% blocktranslate %}To confirm, type <strong>{{ word }}</strong>.{% endblocktranslate %}</p>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" action="{% url 'manager:platform:sessions_panic' %}" class="manager-form" novalidate>
+    {% csrf_token %}
+    {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% include "components/button.html" with label=_("End every session") type="submit" only %}
+  </form>
+{% endblock %}

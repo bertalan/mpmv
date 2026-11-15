@@ -66,6 +66,8 @@ PLATFORM_PAGES: Final[Pages] = (
     (gettext_noop("Dashboard"), "manager:platform:dashboard"),
     (gettext_noop("Platform map"), "manager:platform:map"),
     (gettext_noop("Staff and roles"), "manager:platform:staff_roles"),
+    (gettext_noop("User sessions"), "manager:platform:user_sessions"),
+    (gettext_noop("End every session"), "manager:platform:sessions_panic"),
     (gettext_noop("Storefront changes"), "manager:platform:profile_changes"),
     (gettext_noop("Notices"), "manager:platform:notices"),
     (gettext_noop("Terminations"), "manager:platform:terminations"),
@@ -94,6 +96,7 @@ NOT_LISTED: Final = frozenset(
         "manager:platform:profile_confirm",
         "manager:platform:notice",
         "manager:platform:termination",
+        "manager:platform:user_sessions_find",
     }
 )
 

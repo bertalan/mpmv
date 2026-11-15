@@ -54,6 +54,7 @@ NOT_PAGES = (
     "manager:platform:profile_revert",  # POST only, redirects to the changes page
     "manager:platform:profile_confirm",  # POST only, redirects to the changes page
     "manager:shop:termination_data",  # a JSON file download, not a page
+    "manager:platform:user_sessions_find",  # POST only, redirects to the sessions page
     *MODAL_FRAGMENTS,
 )
 
@@ -150,6 +151,8 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:notice": "platform",
         "manager:platform:profile_changes": "platform",
         "manager:platform:staff_roles": "platform",
+        "manager:platform:user_sessions": "platform",
+        "manager:platform:sessions_panic": "platform",
         "manager:platform:terminations": "platform",
         "manager:platform:termination": "platform",
         "manager:shop:termination": "shop",
