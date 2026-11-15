@@ -78,7 +78,6 @@ def test_the_dashboard_links_to_the_map(client: Client, platform_staff: User) ->
 ACCOUNT = "/account/orders/"
 
 
-
 def test_a_vendor_owner_reaches_the_manager_from_the_site(client: Client, owner: User) -> None:
     verified_login(client, owner)
     page = client.get(ACCOUNT).text
