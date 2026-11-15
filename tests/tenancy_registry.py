@@ -586,6 +586,10 @@ ENDPOINTS: dict[str, Access] = {
         "User sessions (CORE.24): Support and the platform owner only; a vendor member gets the "
         "platform gate's refusal and other roles 404 (test_session_control)."
     ),
+    "manager:platform:user_sessions_find": StaffOnly(
+        "Account lookup of User sessions (CORE.24): Support and the platform owner only, POST "
+        "with CSRF so the email never reaches a URL; redirects with the public id."
+    ),
     "manager:platform:sessions_panic": StaffOnly(
         "End every session (CORE.24): the platform owner only; Support, other roles and a "
         "vendor member are refused (test_session_control)."

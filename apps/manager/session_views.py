@@ -48,19 +48,14 @@ class UserSessionsView(ManagerView):
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        lookup = UserLookupForm(self.request.GET if "email" in self.request.GET else None)
         target = kwargs.get("target")
         public_id = self.request.GET.get("user", "")
-        if target is None and public_id:  # back from an action: no email in the URL
+        if target is None and public_id:  # the account is named by its public id, never its email
             try:
                 target = User.objects.filter(public_id=public_id).first()
             except ValidationError:
                 target = None
-        if target is None and "email" in self.request.GET and lookup.is_valid():
-            target = User.objects.filter(email__iexact=lookup.cleaned_data["email"]).first()
-            if target is None:
-                lookup.add_error("email", _("There is no account with that email."))
-        context["lookup"] = lookup
+        context.setdefault("lookup", UserLookupForm())
         context["target"] = target
         if target is not None:
             context["sessions"] = accounts_services.user_sessions(target)
@@ -94,6 +89,33 @@ class UserSessionsView(ManagerView):
         if target != actor:  # Support who ended their own sessions is signed out now
             url += f"?user={target.public_id}"
         return HttpResponseRedirect(url)
+
+
+class UserLookupView(ManagerView):
+    """Find the account by email: a POST with CSRF, so the email never reaches a URL (proxy logs,
+    browser history); the answer redirects to the page with the account's public id."""
+
+    section = USER_SESSIONS_SECTION
+    template_name = "manager/platform/user_sessions.html"
+    http_method_names = ["post"]
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context.setdefault("lookup", UserLookupForm())
+        context["target"] = None
+        return context
+
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        lookup = UserLookupForm(request.POST)
+        target = None
+        if lookup.is_valid():
+            target = User.objects.filter(email__iexact=lookup.cleaned_data["email"]).first()
+            if target is None:
+                lookup.add_error("email", _("There is no account with that email."))
+        if target is None:
+            return self.render_to_response(self.get_context_data(lookup=lookup), status=400)
+        url = reverse("manager:platform:user_sessions")
+        return HttpResponseRedirect(f"{url}?user={target.public_id}")
 
 
 class EndEverySessionView(ManagerView):

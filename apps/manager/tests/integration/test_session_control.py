@@ -24,6 +24,7 @@ from apps.vendors.tests.factories import VendorMemberFactory
 pytestmark = pytest.mark.django_db
 
 USER_SESSIONS = "/manager/platform/sessions/"
+FIND = "/manager/platform/sessions/find/"
 PANIC = "/manager/platform/sessions/end-every-session/"
 WORD = "END EVERY SESSION"
 CTX = AuditContext(actor_label="test", source=AuditLog.Source.ADMIN)
@@ -60,7 +61,9 @@ def test_support_sees_a_users_sessions_and_ends_them_with_a_reason() -> None:
     client, support = staff_client("support", passkey=True)
     target = UserFactory.create(email="buyer@example.com")
     victim = signed_in_client(target)
-    page = client.get(USER_SESSIONS, {"email": "BUYER@example.com"})
+    found = client.post(FIND, {"email": "BUYER@example.com"})
+    assert found.status_code == 302
+    page = client.get(found["Location"])
     assert page.status_code == 200
     assert b"End this user" in page.content
     response = client.post(
@@ -133,6 +136,40 @@ def test_the_support_service_dry_run_ends_nothing() -> None:
     assert not changes.is_empty
     assert is_signed_in(victim)
     assert not AuditLog.objects.filter(action=services.SESSIONS_ENDED).exists()
+
+
+def test_the_lookup_never_puts_the_email_in_a_url() -> None:
+    """Review of #491: the email must not reach proxy logs or the browser history."""
+    client, _ = staff_client("support", passkey=True)
+    target = UserFactory.create(email="private.person@example.com")
+    found = client.post(FIND, {"email": "private.person@example.com"})
+    assert found.status_code == 302
+    assert "private" not in found["Location"]
+    assert "%40" not in found["Location"]
+    assert "@" not in found["Location"]
+    assert found["Location"].endswith(f"?user={target.public_id}")
+    ended = client.post(USER_SESSIONS, {"user": str(target.public_id), "reason": "Takeover"})
+    assert "private" not in ended["Location"]
+    assert "@" not in ended["Location"]
+    # A GET with the email in the query string looks nothing up.
+    page = client.get(USER_SESSIONS, {"email": "private.person@example.com"})
+    assert page.status_code == 200
+    assert b"private.person@example.com" not in page.content
+
+
+def test_the_lookup_is_a_post_with_csrf() -> None:
+    client, support = staff_client("support", passkey=True)
+    assert client.get(FIND).status_code == 405
+    strict = Client(enforce_csrf_checks=True)
+    verified_login(strict, support, passkey=True)
+    assert strict.post(FIND, {"email": "someone@example.com"}).status_code == 403
+
+
+def test_an_unknown_email_is_reported_on_the_page() -> None:
+    client, _ = staff_client("support", passkey=True)
+    response = client.post(FIND, {"email": "nobody@example.com"})
+    assert response.status_code == 400
+    assert b"There is no account with that email." in response.content
 
 
 # --- The platform owner: "End every session"

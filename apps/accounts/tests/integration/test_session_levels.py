@@ -674,6 +674,9 @@ MANAGER_UNGATED: dict[str, str] = {
         "answers with the format form and the embed of an own image already chosen: stores nothing"
     ),
     "apps.manager.views.LoginView": "the sign-in form itself, before any session level exists",
+    "apps.manager.session_views.UserLookupView": (
+        "finds an account by email (CORE.24): a read sent as POST so the email stays out of URLs"
+    ),
     "apps.manager.views.logout": "sign-out: ends the session, nothing to protect",
 }
 MUTATING = ("post", "put", "patch", "delete")

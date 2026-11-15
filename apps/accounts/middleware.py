@@ -10,6 +10,7 @@ verification; JSON clients get 403.
 from collections.abc import Callable
 from typing import Any
 
+from django.contrib.auth.models import AnonymousUser
 from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from django.utils import translation
@@ -23,7 +24,7 @@ from .mfa_session import is_verified
 from .models import User
 from .services import has_second_factor, mfa_required
 from .session_language import SESSION_LANGUAGE_KEY
-from .session_store import touch_session
+from .session_store import generation_matches, touch_session
 
 # Signing out is always possible: the staff admin's and the editors' (Wagtail, CMS.1).
 EXEMPT_VIEW_NAMES = frozenset({"admin:logout", "wagtailadmin_logout"})
@@ -116,8 +117,10 @@ class PreferredLanguageMiddleware:
 class SessionIndexMiddleware:
     """CORE.24: keep the session index fresh and name the request's session to the services.
 
-    A signed-in request refreshes its `UserSession` row at most every `SESSION_TOUCH_SECONDS`
-    (at once when the row is missing, e.g. a session from before the index). The request's
+    A session whose copy of the user's session generation is old was ended (also when the
+    index never saw it): it is flushed and the request is anonymous. Otherwise the request
+    refreshes its `UserSession` row at most every `SESSION_TOUCH_SECONDS` (at once when the row
+    is missing), never the session data, so the session's expiry does not move. The request's
     session is bound for `services.end_sessions_after_change`, so a change a user makes to their
     own account keeps the session they made it from.
     """
@@ -129,12 +132,17 @@ class SessionIndexMiddleware:
         session = getattr(request, "session", None)
         user = getattr(request, "user", None)
         if session is not None and isinstance(user, User) and user.is_authenticated:
-            touch_session(
-                user,
-                session,
-                user_agent=request.headers.get("user-agent"),
-                ip=client_ip(request),
-            )
+            if not generation_matches(user, session):
+                # This user's sessions were ended after this one signed in (CORE.24).
+                session.flush()
+                request.user = AnonymousUser()
+            else:
+                touch_session(
+                    user,
+                    session,
+                    user_agent=request.headers.get("user-agent"),
+                    ip=client_ip(request),
+                )
         token = services.bind_current_session(session)
         try:
             return self.get_response(request)

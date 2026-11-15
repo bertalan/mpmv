@@ -66,6 +66,9 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False, help_text="Can log into the staff admin.")
     date_joined = models.DateTimeField(default=timezone.now)
+    # CORE.24: copied into each session at login; a session whose copy differs is flushed on its
+    # next request, so ending sessions also reaches those the index never saw.
+    session_generation = models.PositiveIntegerField(default=0, editable=False)
 
     objects: ClassVar[UserManager] = UserManager()
 

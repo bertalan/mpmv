@@ -69,6 +69,7 @@ def test_a_customer_removing_the_last_factor_disables_mfa() -> None:
     assert set(AuditLog.objects.values_list("action", flat=True)) == {
         "accounts.mfa.device_removed",
         "accounts.mfa.disabled",
+        "accounts.sessions.ended",  # CORE.24: the session generation moves
     }
 
 

@@ -22,7 +22,7 @@ from django.contrib.sessions.models import Session
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Model
+from django.db.models import F, Model
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.crypto import salted_hmac
@@ -62,6 +62,7 @@ from .models import (
     UserSession,
     normalize_email_address,
 )
+from .session_store import SESSION_GENERATION_KEY, SessionStore
 
 # --- Login and registration protection (CORE.5, spec 02 "Authentication")
 #
@@ -1515,29 +1516,60 @@ def end_sessions(
     """End the live sessions of `user` but `keep_session_key`; with `only` (the public id of one
     of them), just that one.
 
-    One audit entry with the count, the reason (a short code: `password`, `mfa_reset`, `others`,
-    `support`...) and Support's `note`; nothing to end is a no-op with no entry. API keys and
-    signed links are not sessions and stay valid.
+    Ending all but one also moves the user's session generation, so a session the index never
+    saw (an old worker, a rolled-back index row) is flushed on its next request; the kept
+    session gets the new generation. Ending one session (`only`) deletes just that one.
+
+    One audit entry with the count, the generation, the reason (a short code: `password`,
+    `mfa_reset`, `others`, `support`...) and Support's `note`. Ending one session that is not
+    there is a no-op with no entry. API keys and signed links are not sessions and stay valid.
     """
     rows = [row for row in user_sessions(user) if row.session_key != keep_session_key]
     if only is not None:
         rows = [row for row in rows if str(row.public_id) == only]
     changeset = ChangeSet()
-    if rows:
-        after: dict[str, Any] = {"sessions": 0, "reason": reason, "kept": bool(keep_session_key)}
-        if only is not None:
-            after["session"] = only
-        if note:
-            after["note"] = note
-        changeset.update(USER_MODEL, str(user.public_id), {"sessions": len(rows)}, after)
+    before: dict[str, Any] = {"sessions": len(rows)}
+    after: dict[str, Any] = {"sessions": 0, "reason": reason, "kept": bool(keep_session_key)}
+    if only is not None:
+        after["session"] = only
+    else:
+        generation = _generation_of(user)
+        before["generation"], after["generation"] = generation, generation + 1
+    if note:
+        after["note"] = note
+    if rows or only is None:
+        changeset.update(USER_MODEL, str(user.public_id), before, after)
     keys = [row.session_key for row in rows]
-    return run_mutation(
-        changeset,
-        lambda: _delete_sessions(keys),
-        ctx=ctx,
-        action=SESSIONS_ENDED,
-        dry_run=dry_run,
-    )
+
+    def apply() -> None:
+        _delete_sessions(keys)
+        if only is None:
+            User.objects.filter(pk=user.pk).update(session_generation=F("session_generation") + 1)
+            user.session_generation = _generation_of(user)
+            _carry_generation(keep_session_key, user.session_generation)
+
+    return run_mutation(changeset, apply, ctx=ctx, action=SESSIONS_ENDED, dry_run=dry_run)
+
+
+def _generation_of(user: User) -> int:
+    found = User.objects.filter(pk=user.pk).values_list("session_generation", flat=True).first()
+    return found or 0
+
+
+def _carry_generation(keep_session_key: str | None, generation: int) -> None:
+    """Give the kept session the user's new generation, so it stays signed in."""
+    if not keep_session_key:
+        return
+    current = _current_session.get()
+    if current is not None and current.session_key == keep_session_key:
+        current[SESSION_GENERATION_KEY] = generation  # saved with this request's response
+        return
+    store = SessionStore(keep_session_key)
+    if not store.exists(keep_session_key):
+        return
+    store.load()
+    store[SESSION_GENERATION_KEY] = generation
+    store.save()
 
 
 def end_sessions_after_change(
@@ -1626,6 +1658,9 @@ def end_all_sessions(
     def apply() -> None:
         Session.objects.exclude(session_key=keep).delete()
         UserSession.objects.exclude(session_key=keep).delete()
+        # Sessions out of the index or written back by an old worker end on their next request.
+        User.objects.update(session_generation=F("session_generation") + 1)
+        _carry_generation(keep_session_key, _generation_of(actor))
 
     run_mutation(changeset, apply, ctx=audit, action=ALL_SESSIONS_ENDED, dry_run=False)
     raise_alert(

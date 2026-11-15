@@ -22,7 +22,8 @@ from . import engine
 if TYPE_CHECKING:
     from .models import User
 
-SESSION_INDEX_KEY: Final = "session_index"  # in the session: [indexed key, last touch (epoch s)]
+# CORE.24: the user's session generation at login (see `User.session_generation`).
+SESSION_GENERATION_KEY: Final = "session_generation"
 
 
 class SessionStore(db.SessionStore):
@@ -68,43 +69,57 @@ def index_session(
     ip: str | None,
     now: dt.datetime | None = None,
 ) -> None:
-    """Record or refresh `session` of `user` in the index (bookkeeping, not audited)."""
+    """Record or refresh `session` of `user` in the index (bookkeeping, not audited). Only the
+    index row is written: the session data is left alone."""
     key = session.session_key
     if not key:
         return
-    moment = now or timezone.now()
-    device = engine.device_summary(user_agent)
     from .models import UserSession
 
     UserSession.objects.update_or_create(
-        session_key=key,
-        defaults={
-            "user": user,
-            "last_seen": moment,
-            "browser": device.browser,
-            "system": device.system,
-            "network": engine.network_prefix(ip),
-        },
+        session_key=key, defaults={"user": user, **_row_values(user_agent, ip, now)}
     )
-    session[SESSION_INDEX_KEY] = [key, moment.timestamp()]
+
+
+def _row_values(user_agent: str | None, ip: str | None, now: dt.datetime | None) -> dict[str, Any]:
+    device = engine.device_summary(user_agent)
+    return {
+        "last_seen": now or timezone.now(),
+        "browser": device.browser,
+        "system": device.system,
+        "network": engine.network_prefix(ip),
+    }
 
 
 def touch_session(
     user: "User", session: SessionBase, *, user_agent: str | None, ip: str | None
 ) -> None:
-    """Refresh the index row of `session` at most every `SESSION_TOUCH_SECONDS`, or at once when
-    the session was never indexed or its key changed, so most requests write nothing."""
-    marker = session.get(SESSION_INDEX_KEY)
-    now = timezone.now()
-    fresh = (
-        isinstance(marker, list)
-        and len(marker) == 2  # [key, epoch seconds]
-        and marker[0] == session.session_key
-        and isinstance(marker[1], int | float)
-        and now.timestamp() - marker[1] < settings.SESSION_TOUCH_SECONDS
+    """Refresh the index row of `session` when it is older than `SESSION_TOUCH_SECONDS`, or add
+    it when missing (a session from before the index).
+
+    One conditional UPDATE that matches nothing on most requests. It never writes to the session
+    itself, so it never extends the session's expiry: a touch cannot make a session rolling.
+    """
+    key = session.session_key
+    if not key:
+        return
+    from .models import UserSession
+
+    values = _row_values(user_agent, ip, None)
+    stale = values["last_seen"] - dt.timedelta(seconds=settings.SESSION_TOUCH_SECONDS)
+    rows = UserSession.objects.filter(session_key=key, user=user)
+    if rows.filter(last_seen__lte=stale).update(**values) or rows.exists():
+        return
+    UserSession.objects.bulk_create(
+        [UserSession(user=user, session_key=key, **values)], ignore_conflicts=True
     )
-    if not fresh:
-        index_session(user, session, user_agent=user_agent, ip=ip, now=now)
+
+
+def generation_matches(user: "User", session: SessionBase) -> bool:
+    """The session carries the user's current generation (a session from before the generation
+    existed counts as generation 0)."""
+    stored = session.get(SESSION_GENERATION_KEY, 0)
+    return isinstance(stored, int) and stored == user.session_generation
 
 
 def prune_session_index(user: "User") -> None:

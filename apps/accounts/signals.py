@@ -18,7 +18,7 @@ from .services import (
     set_preferred_language,
 )
 from .session_language import SESSION_LANGUAGE_KEY
-from .session_store import index_session, prune_session_index
+from .session_store import SESSION_GENERATION_KEY, index_session, prune_session_index
 
 
 def count_failed_login(
@@ -68,6 +68,9 @@ def index_session_on_login(
     if request is None or session is None or not isinstance(user, User):
         return
     prune_session_index(user)
+    # Read from the database: the instance passed to `login` may predate an ended-sessions bump.
+    generation = User.objects.filter(pk=user.pk).values_list("session_generation", flat=True)
+    session[SESSION_GENERATION_KEY] = generation.first() or 0
     index_session(
         user, session, user_agent=request.headers.get("user-agent"), ip=client_ip(request)
     )

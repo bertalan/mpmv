@@ -5,6 +5,7 @@ client after `force_login`, and a session that ended is gone from the session ta
 request is anonymous. Needs human review: authentication code.
 """
 
+import datetime as dt
 import secrets
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -16,18 +17,19 @@ from django.contrib.auth.models import Permission
 from django.contrib.sessions.models import Session
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
-from apps.accounts import services
+from apps.accounts import levels, services
 from apps.accounts.models import User, UserSession
-from apps.accounts.session_store import SESSION_INDEX_KEY, SessionStore, index_session
+from apps.accounts.session_store import SessionStore, index_session
 from apps.accounts.tests.factories import (
     PasskeyDeviceFactory,
     TOTPDeviceFactory,
     UserFactory,
     UserSessionFactory,
 )
-from apps.accounts.tests.mfa import totp_token
+from apps.accounts.tests.mfa import totp_token, verified_login
 from apps.core.audit import AuditContext, user_context
 from apps.core.models import AuditLog
 
@@ -140,11 +142,66 @@ def test_a_session_from_before_the_index_joins_it_on_its_next_request() -> None:
     user = UserFactory.create()
     client = signed_in_client(user)
     UserSession.objects.all().delete()
-    session = client.session
-    session.pop(SESSION_INDEX_KEY)
-    session.save()
     client.get(LIST)
     assert UserSession.objects.filter(user=user, session_key=key_of(client)).exists()
+
+
+def test_a_touch_never_modifies_the_django_session(settings: object) -> None:
+    """Review of #491: a touch must not make a staff session rolling (expire_date stays)."""
+    settings.SESSION_TOUCH_SECONDS = 0  # type: ignore[attr-defined]
+    user = UserFactory.create(staff=True)
+    client = Client()
+    verified_login(client, user, level=levels.NO_WINDOW)
+    before = Session.objects.get(session_key=key_of(client))
+    seen = UserSession.objects.get(session_key=key_of(client)).last_seen
+    Session.objects.filter(pk=before.pk).update(expire_date=before.expire_date)  # pin it
+    pinned = Session.objects.get(pk=before.pk).expire_date
+    assert client.get(LIST).status_code == 200
+    assert Session.objects.get(pk=before.pk).expire_date == pinned
+    assert Session.objects.get(pk=before.pk).session_data == before.session_data
+    assert UserSession.objects.get(session_key=key_of(client)).last_seen > seen
+
+
+def test_a_session_with_no_index_row_is_still_ended() -> None:
+    """Review of #491: a session the index never saw (an old worker, a rolled-back row) ends
+    through the per-user session generation."""
+    user = UserFactory.create()
+    keep, unknown = signed_in_client(user), signed_in_client(user)
+    UserSession.objects.filter(session_key=key_of(unknown)).delete()
+    services.end_sessions(user, keep_session_key=key_of(keep), reason="others", ctx=SYSTEM)
+    response = unknown.get(LIST)
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("login"))
+    assert keep.get(LIST).status_code == 200  # the kept session is still valid
+
+
+def test_a_session_written_back_after_the_panic_button_is_still_ended() -> None:
+    """An old worker that saves a session after the panic button deleted it (no index row)
+    gets it flushed on the next request: the generation moved for every user."""
+    owner, user = UserFactory.create(platform_role="owner"), UserFactory.create()
+    caller, unknown = signed_in_client(owner), signed_in_client(user)
+    saved = Session.objects.get(session_key=key_of(unknown))
+    services.end_all_sessions(actor=owner, keep_session_key=key_of(caller), ctx=SYSTEM)
+    Session.objects.create(
+        session_key=saved.session_key,
+        session_data=saved.session_data,
+        expire_date=saved.expire_date,
+    )
+    response = unknown.get(LIST)
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("login"))
+    assert is_signed_in(caller)
+    assert not caller.get(LIST)["Location"].startswith(reverse("login"))  # MFA setup, signed in
+
+
+def test_a_session_signed_in_before_a_bump_is_refused_after_it() -> None:
+    """A session that still carries an old generation (a worker that missed the delete) is
+    flushed on its next request."""
+    user = UserFactory.create()
+    client = signed_in_client(user)
+    User.objects.filter(pk=user.pk).update(session_generation=user.session_generation + 5)
+    assert client.get(LIST).status_code == 302
+    assert not Session.objects.filter(session_key=key_of(client)).exists()
 
 
 # --- end_sessions
@@ -161,8 +218,8 @@ def test_end_sessions_keeps_the_named_session_and_audits_the_count() -> None:
     assert not is_signed_in(other)
     assert not is_signed_in(third)
     entry = AuditLog.objects.get(action=services.SESSIONS_ENDED)
-    assert entry.before == {"sessions": 2}
-    assert entry.after == {"sessions": 0, "reason": "others", "kept": True}
+    assert entry.before == {"sessions": 2, "generation": 0}
+    assert entry.after == {"sessions": 0, "generation": 1, "reason": "others", "kept": True}
     assert entry.target_key == str(user.public_id)
 
 
@@ -175,10 +232,12 @@ def test_end_sessions_dry_run_changes_and_audits_nothing() -> None:
     assert not AuditLog.objects.filter(action=services.SESSIONS_ENDED).exists()
 
 
-def test_nothing_to_end_writes_no_audit_entry() -> None:
+def test_with_no_indexed_session_the_generation_still_moves_and_is_audited() -> None:
     user = UserFactory.create()
-    assert services.end_sessions(user, reason="others", ctx=SYSTEM).is_empty
-    assert not AuditLog.objects.filter(action=services.SESSIONS_ENDED).exists()
+    assert not services.end_sessions(user, reason="others", ctx=SYSTEM).is_empty
+    user.refresh_from_db()
+    assert user.session_generation == 1
+    assert ended_entry()["generation"] == 1
 
 
 def test_end_sessions_touches_only_that_user() -> None:
@@ -212,10 +271,26 @@ def test_a_password_change_by_staff_ends_every_session() -> None:
 
 
 def test_a_completed_password_reset_ends_every_session() -> None:
+    """Review of #491 point 4: the reset path goes through `record_password_change`."""
     user = UserFactory.create()
     client = signed_in_client(user)
     services.complete_password_reset(user, secrets.token_urlsafe(16), ctx=SYSTEM)
     assert not is_signed_in(client)
+    assert not UserSession.objects.filter(user=user).exists()
+    assert ended_entry()["reason"] == "password"
+
+
+def test_the_daily_task_clears_expired_sessions_and_their_index_rows() -> None:
+    from apps.accounts.tasks import clear_sessions
+
+    user = UserFactory.create()
+    live, old = signed_in_client(user), signed_in_client(user)
+    past = timezone.now() - dt.timedelta(days=1)
+    Session.objects.filter(session_key=key_of(old)).update(expire_date=past)
+    clear_sessions.func(timestamp=int(timezone.now().timestamp()))
+    assert not Session.objects.filter(session_key=key_of(old)).exists()
+    assert not UserSession.objects.filter(session_key=key_of(old)).exists()
+    assert UserSession.objects.filter(session_key=key_of(live)).exists()
 
 
 def test_an_email_change_ends_the_users_other_sessions() -> None:
@@ -384,3 +459,26 @@ def test_the_actions_need_post_and_csrf(name: str) -> None:
     strict.force_login(user)
     assert strict.post(url).status_code == 403
     assert is_signed_in(client)
+
+
+def test_the_backfill_indexes_signed_in_sessions_in_batches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Migration 0010 (batched): every live signed-in session of an existing user gets a row;
+    anonymous sessions and already indexed ones are skipped."""
+    import importlib
+
+    from django.apps import apps as django_apps
+
+    migration = importlib.import_module("apps.accounts.migrations.0010_user_session")
+    monkeypatch.setattr(migration, "BATCH", 2)
+    users = UserFactory.create_batch(3)
+    clients = [signed_in_client(user) for user in users]
+    anonymous = SessionStore()
+    anonymous["anything"] = 1
+    anonymous.save()
+    UserSession.objects.filter(user__in=users[:2]).delete()
+    migration.index_existing_sessions(django_apps, None)
+    for user, client in zip(users, clients, strict=True):
+        assert UserSession.objects.filter(user=user, session_key=key_of(client)).exists()
+    assert UserSession.objects.count() == 3

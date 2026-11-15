@@ -8,6 +8,8 @@ from django.conf import settings
 from django.db import migrations, models
 from django.utils import timezone
 
+BATCH = 1000
+
 
 def index_existing_sessions(apps: Any, schema_editor: Any) -> None:
     """CORE.24: index the signed-in sessions that exist before the index, so ending a user's
@@ -20,13 +22,39 @@ def index_existing_sessions(apps: Any, schema_editor: Any) -> None:
     User = apps.get_model("accounts", "User")
     now = timezone.now()
     store = SessionStore()
-    for row in Session.objects.filter(expire_date__gt=now).iterator():
-        user_id = store.decode(row.session_data).get(SESSION_KEY)
-        if user_id is None or not User.objects.filter(pk=user_id).exists():
-            continue
-        UserSession.objects.get_or_create(
-            session_key=row.session_key, defaults={"user_id": user_id, "last_seen": now}
+    rows = (
+        Session.objects.filter(expire_date__gt=now)
+        .only("session_key", "session_data")
+        .iterator(chunk_size=BATCH)
+    )
+    batch: list[tuple[str, int]] = []
+
+    def flush() -> None:
+        # One existence query per batch: sessions of deleted users are skipped.
+        known = set(
+            User.objects.filter(pk__in={pk for _, pk in batch}).values_list("pk", flat=True)
         )
+        UserSession.objects.bulk_create(
+            [
+                UserSession(session_key=key, user_id=pk, last_seen=now)
+                for key, pk in batch
+                if pk in known
+            ],
+            ignore_conflicts=True,
+        )
+        batch.clear()
+
+    for row in rows:
+        raw = store.decode(row.session_data).get(SESSION_KEY)
+        try:
+            user_id = int(str(raw))
+        except (TypeError, ValueError):
+            continue
+        batch.append((row.session_key, user_id))
+        if len(batch) >= BATCH:
+            flush()
+    if batch:
+        flush()
 
 
 class Migration(migrations.Migration):

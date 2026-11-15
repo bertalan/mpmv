@@ -9,7 +9,9 @@ written to the audit log. API keys and links sent by email are not sessions and 
   <h1>{% translate "User sessions" %}</h1>
   <p class="manager-lead">{% translate "Find an account to see where it is signed in. Ending its sessions signs it out everywhere; it does not revoke API keys or links sent by email." %}</p>
   {% include "components/error_summary.html" with form=lookup only %}
-  <form method="get" action="{% url 'manager:platform:user_sessions' %}" class="manager-form" novalidate>
+  {# POST, so the email never reaches a URL (proxy logs, browser history). #}
+  <form method="post" action="{% url 'manager:platform:user_sessions_find' %}" class="manager-form" novalidate>
+    {% csrf_token %}
     {% for field in lookup.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
     {% include "components/button.html" with label=_("Find the account") type="submit" variant="secondary" only %}
   </form>

@@ -80,6 +80,7 @@ platform = (
         path("staff/", views.StaffRolesView.as_view(), name="staff_roles"),
         # CORE.24: one user's sessions (Support) and the owner's "End every session".
         path("sessions/", session_views.UserSessionsView.as_view(), name="user_sessions"),
+        path("sessions/find/", session_views.UserLookupView.as_view(), name="user_sessions_find"),
         path(
             "sessions/end-every-session/",
             session_views.EndEverySessionView.as_view(),
