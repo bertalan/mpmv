@@ -1,0 +1,34 @@
+# Lane review (ARC.20, owner decision 2026-11-15): a PR opened by lane-b's account needs an
+# approving review from the owner account (lane-a) on its current head commit. PRs opened by the
+# owner account (lane-a, merge trains, coherence checks) pass. The job reads only the GitHub API:
+# it never checks out or runs PR code, so pull_request_target is safe here.
+name: Lane review
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  lane-review:
+    name: Lane review
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Lane-b PRs need lane-a's approval on the head commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          OWNER: bertalan
+          LANE_B: bertdev1
+        run: |
+          if [ "$AUTHOR" = "$OWNER" ]; then echo "Opened by the owner account: no lane review needed."; exit 0; fi
+          if [ "$AUTHOR" != "$LANE_B" ]; then echo "Opened by $AUTHOR: not a lane account, needs the owner's approval."; fi
+          state=$(gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
+            --jq "[.[] | select(.user.login == \"$OWNER\" and .commit_id == \"$HEAD\" and (.state == \"APPROVED\" or .state == \"CHANGES_REQUESTED\"))] | last | .state // \"\"")
+          echo "Latest owner review on $HEAD: ${state:-none}"
+          test "$state" = APPROVED
