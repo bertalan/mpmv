@@ -58,6 +58,8 @@ def verified_login(
     An unscoped window covers only a user who may elevate (CORE.25), as production opens it
     only for them: a full window therefore also gives the user `core.elevate` and an enrolled
     passkey. Pass `elevate=False` to keep the window but not the right (it then covers nothing).
+    Negative tests about a role that must NOT reach a gated view should pass `elevate=False`
+    (or `level=levels.NO_WINDOW`): the default would hand that role `elevate` and hide the bug.
     """
     device = device or TOTPDeviceFactory.create(user=user)
     client.force_login(user)

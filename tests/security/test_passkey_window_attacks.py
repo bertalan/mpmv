@@ -422,7 +422,7 @@ def test_the_critical_prompt_audit_names_the_shop(
     session[VERIFIED_KIND_SESSION_KEY] = "totp"  # the last verification is no longer a passkey
     session.save()
     # The shop window covers payout_details, a critical action: it still asks for a fresh passkey.
-    assert client.post(PAYMENTS).status_code in {302, 403}
+    assert client.post(PAYMENTS).status_code == 302  # to mfa:verify for the fresh passkey
     rows = [a for a in _audit_after(levels.PROMPT) if a["outcome"] == "passkey_required"]
     assert rows
     assert rows[-1]["shop"] == levels.shop_key(shop_a)
