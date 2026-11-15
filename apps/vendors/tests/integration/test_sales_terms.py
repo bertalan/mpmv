@@ -291,3 +291,20 @@ def test_the_print_button_has_no_inline_handler() -> None:
     assert "onclick" not in body
     assert "data-print" in body
     assert "vendors/print-button.js" in body
+
+
+def test_an_accepted_terms_link_opens_a_superseded_version_and_never_a_forged_one() -> None:
+    """ORD.17b: the confirmation email links the exact version the buyer accepted."""
+    vendor = VendorFactory.create()
+    actor = owner_of(vendor)
+    ts.publish_sales_terms(vendor, values(body="Old text"), actor=actor, ctx=CTX)
+    old = current(vendor)
+    ts.publish_sales_terms(vendor, values(body="New text"), actor=actor, ctx=CTX)
+    link = ts.accepted_terms_url(old)
+    client = Client()
+    response = client.get(link)
+    assert response.status_code == 200
+    assert b"Old text" in response.content
+    assert client.get(ts.terms_url(old)).status_code == 404  # the 24-hour link stays in-force only
+    token = link.rstrip("/").rsplit("/", 1)[1]
+    assert client.get(reverse("vendor_terms:read", args=[token + "x"])).status_code == 404

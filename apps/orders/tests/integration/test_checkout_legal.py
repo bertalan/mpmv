@@ -27,6 +27,7 @@ from apps.orders.tests.integration.test_checkout_views import (  # noqa: F401 (f
     NBSP,
     add,
     commission,
+    post_review,
     sign_off_details,
     tax_setup,
     vendor,
@@ -91,7 +92,7 @@ def review(client: Client, **details: str) -> str:
 
 
 def place(client: Client, boxes: dict[str, str]) -> Any:
-    return client.post(reverse("orders:review"), boxes)
+    return post_review(client, boxes)
 
 
 def checkboxes(html: str) -> list[str]:
@@ -381,3 +382,148 @@ def test_the_step_texts_are_built_from_the_pure_rules_only(client: Client) -> No
     assert step.sellers == []
     assert NBSP
     assert DETAILS
+
+
+# --- ORD.17b: follow-ups -----------------------------------------------------------------------
+
+
+def stamps(html: str) -> dict[str, str]:
+    return dict(re.findall(r'<input type="hidden" name="(terms_[^"]+)" value="([^"]*)"', html))
+
+
+def test_a_version_published_between_render_and_submit_re_renders_and_places_nothing(
+    client: Client,
+    commission: None,  # noqa: F811
+) -> None:
+    publish_terms()
+    shop = seller("Alpha Shop")
+    add(with_cart(client), shop, "30.00")
+    html = review(client)
+    seen = stamps(html)
+    assert set(seen) == {"terms_platform", f"terms_seller_{shop.public_id}"}
+    SalesTermsVersionFactory.create(vendor=shop, body="Published while the buyer read")
+    response = client.post(reverse("orders:review"), {**seen, **BOX1})
+    assert response.status_code == 200
+    assert not Order.objects.exists()
+    page = response.content.decode()
+    assert "The terms changed while you were checking out" in page
+    assert stamps(page) != seen  # the page now carries the new version
+    assert "version 2" in page
+    assert "checked" not in re.search(r'<input type="checkbox" id="accept-terms"[^>]*>', page)[0]  # type: ignore[index]
+    assert client.post(reverse("orders:review"), {**stamps(page), **BOX1}).status_code == 302
+    entry = Order.objects.get().terms_acceptance["sellers"][0]
+    assert entry["number"] == 2
+
+
+def test_a_new_platform_version_or_missing_stamps_also_place_nothing(
+    client: Client,
+    commission: None,  # noqa: F811
+) -> None:
+    page = publish_terms()
+    add(with_cart(client), seller("Alpha Shop"), "30.00")
+    seen = stamps(review(client))
+    assert client.post(reverse("orders:review"), BOX1).status_code == 200  # no stamps at all
+    page.body = [("paragraph", "<p>A newer platform text</p>")]
+    page.effective_date = dt.date(2026, 6, 1)
+    page.save_revision().publish()
+    assert page.versions.count() == 2
+    assert client.post(reverse("orders:review"), {**seen, **BOX1}).status_code == 200
+    assert not Order.objects.exists()
+
+
+def ticked(html: str) -> list[str]:
+    return re.findall(r'<input type="checkbox" id="(accept-[^"]+)"[^>]* checked', html)
+
+
+def test_the_ticks_survive_the_htmx_shipping_change(
+    client: Client,
+    commission: None,  # noqa: F811
+) -> None:
+    publish_terms()
+    operator("IT")
+    shop = seller("Alpha Shop")
+    add(with_cart(client), shop, "30.00")
+    review(client, **BUSINESS)
+    posted = dict(BOX2)
+    fragment = client.post(reverse("orders:shipping"), posted, HTTP_HX_REQUEST="true")
+    assert ticked(fragment.content.decode()) == ["accept-terms", "accept-onerous"]
+    unticked = client.post(reverse("orders:shipping"), {}, HTTP_HX_REQUEST="true")
+    assert ticked(unticked.content.decode()) == []
+
+
+def test_the_ticks_survive_the_no_js_update_shipping_path_once(
+    client: Client,
+    commission: None,  # noqa: F811
+) -> None:
+    publish_terms()
+    shop = seller("Alpha Shop")
+    add(with_cart(client), shop, "30.00")
+    review(client)
+    response = client.post(reverse("orders:shipping"), BOX1)
+    assert response.status_code == 302
+    assert ticked(client.get(reverse("orders:review")).content.decode()) == ["accept-terms"]
+    assert ticked(client.get(reverse("orders:review")).content.decode()) == []  # one render only
+
+
+def test_terms_acceptance_is_not_editable_and_cannot_change_after_placement(
+    client: Client,
+    commission: None,  # noqa: F811
+) -> None:
+    from django import forms
+    from django.contrib import admin
+
+    from apps.orders.models import TermsAcceptanceLocked
+
+    assert Order._meta.get_field("terms_acceptance").editable is False
+    assert "terms_acceptance" not in forms.modelform_factory(Order, fields="__all__").base_fields
+    if Order in admin.site._registry:
+        assert "terms_acceptance" not in admin.site._registry[Order].get_fields(None)  # type: ignore[arg-type]
+    publish_terms()
+    add(with_cart(client), seller("Alpha Shop"), "30.00")
+    review(client)
+    place(client, BOX1)
+    order = Order.objects.get()
+    order.terms_acceptance = {**order.terms_acceptance, "box1": False}
+    with pytest.raises(TermsAcceptanceLocked):
+        order.save()
+    with pytest.raises(TermsAcceptanceLocked):
+        order.save(update_fields=["terms_acceptance"])
+    order.refresh_from_db()
+    assert order.terms_acceptance["box1"] is True
+    order.payment_intent_ref = "pi_other"
+    order.save()  # an unrelated save is fine
+
+
+def test_the_acceptance_snapshots_the_vendor_name_and_the_email_links_the_accepted_version(
+    client: Client,
+    commission: None,  # noqa: F811
+) -> None:
+    from django.core import signing  # noqa: F401
+
+    publish_terms()
+    shop = seller("Alpha Shop")
+    add(with_cart(client), shop, "30.00")
+    review(client)
+    place(client, BOX1)
+    order = Order.objects.get()
+    assert order.terms_acceptance["sellers"][0]["vendor_name"] == "Alpha Shop"
+    Vendor.objects.filter(pk=shop.pk).update(display_name="Renamed Shop")
+    SalesTermsVersionFactory.create(vendor=shop, body="A later version")  # supersedes version 1
+    from apps.core.services import render_email
+
+    context = OutboxEmail.objects.get(template_key="orders.order_received").context_data
+    entry = context["terms"]["sellers"][0]
+    assert entry["name"] == "Alpha Shop"  # the name at acceptance time
+    assert entry["url"].startswith("http")
+    path = entry["url"].split("/", 3)[3]
+    page = Client().get("/" + path)
+    assert page.status_code == 200  # the superseded version stays readable
+    assert "Terms of Alpha Shop" in page.content.decode()
+    assert "A later version" not in page.content.decode()
+    rendered = render_email("orders.order_received", "en", context)
+    assert entry["url"] in rendered.text_body
+    assert entry["url"] in rendered.html_body
+    from apps.vendors import terms_services
+
+    first = shop.sales_terms_versions.get(body="Terms of Alpha Shop")
+    assert Client().get(terms_services.terms_url(first)).status_code == 404

@@ -605,3 +605,82 @@ def test_mode_none_settles_as_before(stripe: FakeStripeClient) -> None:
     pay(stripe, order)
     assert len(settlement.transfer_payment(Payment.objects.get()).transfers) == 2
     assert not AuditLog.objects.filter(action="ledger.settlement_blocked_vat_mode").exists()
+
+
+# --- STAGE incident 2026-11-14: a transfer stuck on a cached Stripe idempotency key --------------
+
+
+def blocked_audits(reason: str) -> Any:
+    return AuditLog.objects.filter(action="ledger.transfer_blocked", after__reason=reason)
+
+
+def test_incident_2026_11_14_a_relinked_vendor_is_paid_despite_the_cached_error(
+    stripe: FakeStripeClient,
+) -> None:
+    order = two_vendor_order()
+    vendor_a, _ = order.vendor_orders.order_by("id")
+    old = f"acct_test_{vendor_a.vendor_id}"
+    stripe.refused_destinations.add(old)  # Stripe refuses it and stores the answer for 24 h
+    pay(stripe, order)
+    payment = Payment.objects.get()
+    first = settlement.transfer_payment(payment)
+    assert first.failed == 1
+    failed = AuditLog.objects.filter(action="ledger.transfer_failed")
+    assert list(failed.values_list("after__reason", flat=True)) == [
+        "Stripe 400 invalid_request_error account_invalid"
+    ]
+    ConnectedAccount.objects.filter(vendor=vendor_a.vendor).update(account_ref="acct_real_1")
+    again = settlement.settle_pending()  # inside the 24 h: a fresh key, not idempotency_error
+    assert again.failed == 0
+    assert len(again.transfers) == 1
+    transfer = LedgerEntry.objects.get(vendor_order=vendor_a, kind="transfer")
+    assert stripe.transfers[transfer.external_ref].destination == "acct_real_1"
+    assert vendor_balance(vendor_a.vendor) == D("0.00")
+    assert settlement.pending_payments() == []
+
+
+def test_incident_2026_11_14_a_transfer_made_to_the_old_account_is_not_doubled(
+    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    order = two_vendor_order()
+    vendor_a, _ = order.vendor_orders.order_by("id")
+    pay(stripe, order)
+    payment = Payment.objects.get()
+    real = ledger_services.record_entry
+
+    def failing_transfer_write(*args: Any, **kwargs: Any) -> Any:
+        if kwargs.get("kind") == "transfer":
+            raise ledger_engine.LedgerError("disk full")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(ledger_services, "record_entry", failing_transfer_write)
+    settlement.transfer_payment(payment)  # the money moved at Stripe, the lines were not written
+    monkeypatch.undo()
+    sent = dict(stripe.transfers)
+    ConnectedAccount.objects.filter(vendor=vendor_a.vendor).update(account_ref="acct_real_1")
+    first = settlement.settle_pending()
+    second = settlement.settle_pending()
+    assert stripe.transfers == sent  # never a second transfer to the new account
+    assert first.blocked == second.blocked == 1
+    assert not LedgerEntry.objects.filter(vendor_order=vendor_a, kind="transfer").exists()
+    (audit,) = blocked_audits("a transfer of this vendor order to another account exists")
+    assert audit.after["transfer"] in sent  # staff see which transfer to check
+
+
+def test_incident_2026_11_14_a_demo_account_is_never_sent_to_stripe(
+    stripe: FakeStripeClient,
+) -> None:
+    order = two_vendor_order()
+    vendor_a, _ = order.vendor_orders.order_by("id")
+    ConnectedAccount.objects.filter(vendor=vendor_a.vendor).update(account_ref="acct_demo_1")
+    pay(stripe, order)
+    payment = Payment.objects.get()
+    first = settlement.transfer_payment(payment)
+    second = settlement.settle_pending()
+    assert first.blocked == second.blocked == 1
+    assert first.failed == second.failed == 0
+    assert "acct_demo_1" not in {c["destination"] for c in stripe.transfer_calls}
+    assert len(stripe.transfers) == 1  # vendor B is paid as usual
+    assert blocked_audits("demo_account").count() == 1  # once, not on every sweep
+    assert not AuditLog.objects.filter(action="ledger.transfer_failed").exists()
+    assert vendor_balance(vendor_a.vendor) == D("27.82")  # the receivable stays on the ledger

@@ -45,6 +45,15 @@ class ProviderError(Exception):
     """The provider refused or failed a call; the message is safe to log."""
 
 
+class TransferConflict(ProviderError):
+    """A transfer of this payment for this vendor order already exists with another destination
+    or amount. Retrying cannot fix it and must never pay twice: staff check `transfer_ref`."""
+
+    def __init__(self, message: str, *, transfer_ref: str) -> None:
+        super().__init__(message)
+        self.transfer_ref = transfer_ref
+
+
 @dataclass(frozen=True)
 class VendorShare:
     """What one vendor receives from a payment, at the provider's connected account."""
@@ -83,9 +92,11 @@ class TransferRequest:
     """One vendor's share of a settled payment (PAY.3, D-08), sent after the charge exists.
 
     `charge_ref` may be empty when the confirmation did not carry it: the provider then reads it
-    from the payment. `idempotency_key` is stable per order and vendor, so a retry after a failure
-    can never pay the vendor twice. `reference` is the vendor order's public id, for the provider's
-    metadata and reconciliation.
+    from the payment. `idempotency_key` names the order, the vendor, the destination, the amount
+    and the currency (`stripe_engine.transfer_idempotency_key`): a plain retry reuses it, a
+    relinked account gets a fresh one. `reference` is the vendor order's public id, for the
+    provider's metadata and reconciliation: a transfer already made for it to another account is a
+    `TransferConflict`, never a second transfer.
     """
 
     order_ref: str  # the transfer group: the order number

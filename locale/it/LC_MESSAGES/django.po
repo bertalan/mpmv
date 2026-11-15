@@ -3088,6 +3088,14 @@ msgstr "Preventivo richiesto"
 msgid "Read more and choose"
 msgstr "Scopri di più e scegli"
 
+#: apps/orders/templates/email/orders/order_received/body.html
+msgid "Read this version online"
+msgstr "Leggi questa versione online"
+
+#: apps/orders/templates/email/orders/order_received/body.txt
+msgid "Read this version online:"
+msgstr "Leggi questa versione online:"
+
 #: apps/seo/site_links.py
 msgid "Readiness probe"
 msgstr "Controllo di prontezza"
@@ -5616,6 +5624,14 @@ msgstr ""
 "I prodotti più recenti dell'etichetta mostrati per ogni categoria. Con 0 non si mostra nessuna "
 "sezione per categoria."
 
+#: apps/orders/ui/views.py
+msgid ""
+"The terms changed while you were checking out. Read the new versions and tick the boxes again to "
+"place the order."
+msgstr ""
+"I termini sono cambiati durante l'acquisto. Leggi le nuove versioni e seleziona di nuovo le "
+"caselle per effettuare l'ordine."
+
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 msgid "The terms you accepted, kept here for your records."
@@ -6062,6 +6078,14 @@ msgid ""
 msgstr ""
 "Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può essere modificato. "
 "Contatta l’assistenza per farlo riaprire."
+
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid ""
+"This window covers only the sensitive actions of this shop that its owner confirms. It never "
+"covers another shop."
+msgstr ""
+"Questa finestra copre solo le azioni sensibili di questo negozio che il suo titolare conferma. Non"
+" copre mai un altro negozio."
 
 #: apps/manager/forms.py
 msgid ""

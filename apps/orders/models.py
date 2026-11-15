@@ -119,6 +119,10 @@ class _StateGuarded(BaseModel):
         self._stored_state = state
 
 
+class TermsAcceptanceLocked(Exception):
+    """A save tried to change `Order.terms_acceptance` after it was set (ORD.17b)."""
+
+
 class Order(_StateGuarded):
     _machine = staticmethod(engine.check_order_transition)
     _initial_states = engine.ORDER_INITIAL_STATES
@@ -167,6 +171,7 @@ class Order(_StateGuarded):
     terms_acceptance = models.JSONField(
         default=dict,
         blank=True,
+        editable=False,
         help_text=(
             "ORD.17: what the buyer accepted at checkout: the customer terms version (id, number, "
             "hash), one terms version per seller (id, number, hash), box 1, and box 2 with its "
@@ -256,6 +261,18 @@ class Order(_StateGuarded):
         fresh = adding and self.legacy_wp_order_id is None
         if fresh:
             self.created_at = timezone.now()
+        update_fields = kwargs.get("update_fields")
+        if not adding and (update_fields is None or "terms_acceptance" in update_fields):
+            stored = (
+                type(self)
+                .objects.filter(pk=self.pk)
+                .values_list("terms_acceptance", flat=True)
+                .first()
+            )
+            if stored and stored != self.terms_acceptance:
+                raise TermsAcceptanceLocked(
+                    "ORD.17: what the buyer accepted at checkout is never changed afterwards."
+                )
         if adding:
             self.tax_retention_until = engine.tax_retention_until(self.created_at, business_tz())
         super().save(*args, **kwargs)

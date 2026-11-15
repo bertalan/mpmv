@@ -24,6 +24,7 @@ from .engine import (
     ProviderError,
     RefundRequest,
     RefundResult,
+    TransferConflict,
     TransferRequest,
     TransferResult,
     TransferReversal,
@@ -46,6 +47,8 @@ class FakePaymentProvider:
         self._refunded: dict[str, Decimal] = {}
         self._payouts: list[PayoutRecord] = []
         self._transfers: dict[str, TransferResult] = {}
+        # (payment, vendor order) -> (destination, transfer): one transfer per vendor order
+        self._by_reference: dict[tuple[str, str], tuple[str, TransferResult]] = {}
         self.reversed_transfers: list[str] = []
 
     def supported_methods(self) -> Sequence[str]:
@@ -91,8 +94,19 @@ class FakePaymentProvider:
             raise ProviderError("unknown payment")
         if request.amount <= 0:
             raise ProviderError("transfer amount must be positive")
+        made = self._by_reference.get((request.provider_ref, request.reference))
+        if request.reference and made is not None and made[0] != request.vendor_account_ref:
+            raise TransferConflict(
+                "a transfer of this vendor order to another account exists",
+                transfer_ref=made[1].transfer_ref,
+            )
         result = TransferResult(f"fake_tr_x{len(self._transfers) + 1}", request.amount)
         self._transfers[request.idempotency_key] = result
+        if request.reference:
+            self._by_reference[(request.provider_ref, request.reference)] = (
+                request.vendor_account_ref,
+                result,
+            )
         self._payouts.append(
             PayoutRecord(
                 result.transfer_ref,

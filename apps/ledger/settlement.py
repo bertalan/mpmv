@@ -11,8 +11,13 @@ is zero for the package.
 Rules that keep money safe:
 - Ledger lines never wait for the transfer: they are written in the payment's transaction, so the
   order stays paid and the vendor's balance is right even when Stripe is down.
-- Every step is idempotent: ledger keys are per vendor order and kind, the transfer key is per order
-  and vendor (also sent to Stripe), so a redelivery or a retry never writes or pays twice.
+- Every step is idempotent: ledger keys are per vendor order and kind, the transfer key names the
+  order, the vendor, the destination, the amount and the currency (sent to Stripe, which binds a
+  key to its first parameters), so a redelivery or a retry never writes or pays twice, and a
+  relinked payout account gets a fresh key. A transfer of the vendor order already made to another
+  account is never doubled: it is audited once (`TRANSFER_BLOCKED`) for staff.
+- A demo payout account (STAGE seed, `acct_demo_`) never reaches the provider: audited once as
+  blocked (`demo_account`); its ledger balance stays the receivable.
 - A failed transfer is audited and left for the next sweep (`transfer_pending_payments`); nothing
   is rolled back.
 - A vendor without a ready payout account, or whose snapshot cannot be used, gets no transfer. The
@@ -37,8 +42,13 @@ from apps.core.models import AuditLog, PlatformOperator
 from apps.core.services import NoPlatformOperator, audit_changes, current_operator
 from apps.orders.models import Order, VendorOrder
 from apps.orders.services import PAID_OR_LATER
-from apps.payments import registry, settlement
-from apps.payments.engine import PaymentProvider, ProviderError, TransferRequest
+from apps.payments import registry, settlement, stripe_engine
+from apps.payments.engine import (
+    PaymentProvider,
+    ProviderError,
+    TransferConflict,
+    TransferRequest,
+)
 from apps.payments.models import Payment
 from apps.vendors.engine import NoCommissionRule
 
@@ -55,6 +65,7 @@ TRANSFER_FAILED = "ledger.transfer_failed"
 TRANSFER_WITHOUT_ACCOUNT = "ledger.transfer_without_account"
 TRANSFER_BLOCKED = "ledger.transfer_blocked"
 TRANSFER_SKIPPED_REFUNDED = "ledger.transfer_skipped_refunded"
+DEMO_ACCOUNT = "demo_account"  # `TRANSFER_BLOCKED` reason: a demo payout account, never paid
 # Order or package states from which no transfer may leave. `partially_refunded` blocks too,
 # unless the platform itself recorded the refund (`recorded_refunded`, PAY.4): a refund through
 # the platform is a `Refund` row with ledger lines per vendor package, so a pending transfer is
@@ -244,6 +255,15 @@ def _transfer_vendor(
         return  # not posted (blocked above): never transfer without ledger lines
     if line.vendor_net <= 0:
         return
+    if line.demo_account:  # before any provider call, the refund check included
+        outcome.blocked += 1
+        _problem_once(
+            TRANSFER_BLOCKED,
+            vendor_order,
+            {"reason": DEMO_ACCOUNT, "receivable": line.vendor_net},
+            ctx,
+        )
+        return
     reason = _refund_reason(provider, payment, order, vendor_order, charge_check)
     if reason:
         outcome.refunded += 1
@@ -386,10 +406,26 @@ def _send(
                 vendor_account_ref=line.account_ref,
                 amount=amount,
                 currency=payment.currency,
-                idempotency_key=f"transfer:{order.public_id}:{vendor_order.vendor.public_id}",
+                idempotency_key=stripe_engine.transfer_idempotency_key(
+                    order_ref=str(order.public_id),
+                    vendor_ref=str(vendor_order.vendor.public_id),
+                    destination=line.account_ref,
+                    amount=amount,  # the reduced amount when a refund came first (PAY.4)
+                    currency=payment.currency,
+                ),
                 reference=str(vendor_order.public_id),
             )
         )
+    except TransferConflict as error:  # retrying cannot fix it: audited once, staff decide
+        outcome.blocked += 1
+        _problem_once(
+            TRANSFER_BLOCKED,
+            vendor_order,
+            {"reason": str(error), "transfer": error.transfer_ref, "account": line.account_ref},
+            ctx,
+        )
+        logger.warning("transfer blocked for %s: %s", vendor_order.public_id, error)
+        return
     except ProviderError as error:
         outcome.failed += 1
         _problem(TRANSFER_FAILED, vendor_order, {"reason": str(error)}, ctx)

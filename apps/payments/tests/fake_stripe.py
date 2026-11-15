@@ -1,7 +1,9 @@
 """In-memory `StripeClient` for tests: the only double of Stripe, behind our own interface.
 
-It behaves like Stripe where the provider relies on it: idempotency keys replay the first answer,
-a refund above the charge is refused, a transfer needs a charge. No network, no key.
+It behaves like Stripe where the provider relies on it: idempotency keys replay the first answer
+(an error answer of a transfer included), a reused transfer key with other parameters gets
+Stripe's `idempotency_error`, a refund above the charge is refused, a transfer needs a charge and
+a destination in `refused_destinations` is refused. No network, no key.
 """
 
 import secrets
@@ -32,6 +34,7 @@ class FakeStripeClient:
         self.account_calls: list[dict[str, object]] = []
         self.links: list[str] = []
         self._replies: dict[str, object] = {}
+        self.refused_destinations: set[str] = set()  # Stripe answers 400 for these accounts
         self._refunded: dict[str, int] = {}
 
     def _replay(self, key: str) -> object | None:
@@ -102,11 +105,24 @@ class FakeStripeClient:
         self.transfer_calls.append(
             {"source_transaction": source_transaction, "destination": destination}
         )
+        params = (amount_minor, currency.upper(), destination, transfer_group, source_transaction)
         if (cached := self._replay(f"tr:{idempotency_key}")) is not None:
-            assert isinstance(cached, StripeTransfer)
-            return cached
+            assert isinstance(cached, tuple)
+            sent, answer = cached
+            if sent != params:  # Stripe: the key is bound to the first request's parameters
+                raise StripeError(status=400, error_type="idempotency_error")
+            if isinstance(answer, StripeError):  # Stripe stores an error answer for 24 hours
+                raise answer
+            assert isinstance(answer, StripeTransfer)
+            return answer
         if not any(i.charge_id == source_transaction for i in self.intents.values()):
             raise StripeError("No such charge")
+        if destination in self.refused_destinations:
+            error = StripeError(
+                status=400, error_type="invalid_request_error", code="account_invalid"
+            )
+            self._replies[f"tr:{idempotency_key}"] = (params, error)
+            raise error
         transfer = StripeTransfer(
             id=f"tr_{secrets.token_hex(6)}",
             destination=destination,
@@ -115,9 +131,10 @@ class FakeStripeClient:
             created=datetime.now(UTC),
             payment_ref=metadata.get("payment_ref", ""),
             transfer_group=transfer_group,
+            vendor_order=metadata.get("vendor_order", ""),
         )
         self.transfers[transfer.id] = transfer
-        self._replies[f"tr:{idempotency_key}"] = transfer
+        self._replies[f"tr:{idempotency_key}"] = (params, transfer)
         return transfer
 
     def list_transfers(
