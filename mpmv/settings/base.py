@@ -138,6 +138,8 @@ MIDDLEWARE = [
     # SEC.14: rate limit and captcha for Wagtail's page view restriction forms (after CSRF).
     "apps.cms.middleware.PageRestrictionProtectionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # CORE.24: the per-user session index (last use) and the session a self-service change keeps.
+    "apps.accounts.middleware.SessionIndexMiddleware",
     # I18N.12: the stored language of a signed-in user on unprefixed areas (Manager, account).
     "apps.accounts.middleware.PreferredLanguageMiddleware",
     # SEC.5: pages for a signed-in user are never stored by a shared cache.
@@ -641,6 +643,9 @@ SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 # Everything is same-origin: no other site embeds our resources (apps.core.middleware).
 CROSS_ORIGIN_RESOURCE_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
+# CORE.24: Django's database backend, which also keeps the per-user session index in step.
+SESSION_ENGINE = "apps.accounts.session_store"
+SESSION_TOUCH_SECONDS = 300  # how often a request refreshes its session's "last used" time
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = True

@@ -464,6 +464,12 @@ ENDPOINTS: dict[str, Access] = {
         OWN_ACCOUNT + " The factor is looked up among the user's own.",
         kwargs={"kind": "totp", "public_id": "0"},
     ),
+    "sessions:list": NoVendorData(OWN_ACCOUNT + " The user's own sessions (CORE.24)."),
+    "sessions:end_others": NoVendorData(OWN_ACCOUNT + " Ends the user's own other sessions."),
+    "sessions:end_one": NoVendorData(
+        OWN_ACCOUNT + " The session is looked up among the user's own (CORE.24).",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
     "action_link:open": NoVendorData(
         "Secure action link (CORE.15): a Continue page for a signed token; shows no object.",
         kwargs={"token": "not-a-token"},
@@ -575,6 +581,14 @@ ENDPOINTS: dict[str, Access] = {
         "Staff and roles (CORE.18): platform owner only; lists the platform staff and grants or "
         "revokes roles through the audited service. Every other role, a vendor member and a "
         "superuser without a role get 404 or the gate's 403 (test_staff_roles)."
+    ),
+    "manager:platform:user_sessions": StaffOnly(
+        "User sessions (CORE.24): Support and the platform owner only; a vendor member gets the "
+        "platform gate's refusal and other roles 404 (test_session_control)."
+    ),
+    "manager:platform:sessions_panic": StaffOnly(
+        "End every session (CORE.24): the platform owner only; Support, other roles and a "
+        "vendor member are refused (test_session_control)."
     ),
     "manager:platform:profile_changes": StaffOnly(
         "Storefront profile history (CORE.9): platform staff holding the revert permission only; "

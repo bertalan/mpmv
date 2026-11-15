@@ -92,8 +92,8 @@ def test_reset_mfa_deletes_every_factor_and_forces_a_new_enrolment(client: Clien
     assert audit.actor_label == CTX.actor_label
     assert audit.before is not None
     assert audit.before["factors"] == ["passkey", "recovery_codes", "totp"]
-    # The open session was verified by a device that no longer exists.
-    assert client.get("/django-admin/")["Location"].startswith(reverse("mfa:setup"))
+    # CORE.24: the reset also ended the open session, so it is back at the sign-in page.
+    assert "login" in client.get("/django-admin/")["Location"]
 
 
 def test_reset_mfa_dry_run_changes_nothing() -> None:

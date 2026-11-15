@@ -12,8 +12,13 @@ from apps.core.http import client_ip
 from apps.core.i18n import configured_languages
 
 from .models import User
-from .services import record_failed_login, record_successful_login, set_preferred_language
+from .services import (
+    record_failed_login,
+    record_successful_login,
+    set_preferred_language,
+)
 from .session_language import SESSION_LANGUAGE_KEY
+from .session_store import index_session, prune_session_index
 
 
 def count_failed_login(
@@ -52,3 +57,17 @@ def seed_language_on_login(
         and user.preferred_language == settings.LANGUAGE_CODE
     ):
         set_preferred_language(user, chosen)
+
+
+def index_session_on_login(
+    sender: Any, request: HttpRequest | None, user: AbstractBaseUser, **kwargs: Any
+) -> None:
+    """CORE.24: the new session joins the user's session index (the key is final by now: Django
+    rotated it before sending the signal), and rows of sessions that are gone are dropped."""
+    session = getattr(request, "session", None)
+    if request is None or session is None or not isinstance(user, User):
+        return
+    prune_session_index(user)
+    index_session(
+        user, session, user_agent=request.headers.get("user-agent"), ip=client_ip(request)
+    )

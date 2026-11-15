@@ -1,0 +1,45 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+User sessions (CORE.24, Support and the platform owner): find an account, see where it is signed
+in and end every session of it. Ending asks for a fresh passkey each time and a reason, and is
+written to the audit log. API keys and links sent by email are not sessions and stay valid.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "User sessions" %}</h1>
+  <p class="manager-lead">{% translate "Find an account to see where it is signed in. Ending its sessions signs it out everywhere; it does not revoke API keys or links sent by email." %}</p>
+  {% include "components/error_summary.html" with form=lookup only %}
+  <form method="get" action="{% url 'manager:platform:user_sessions' %}" class="manager-form" novalidate>
+    {% for field in lookup.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% include "components/button.html" with label=_("Find the account") type="submit" variant="secondary" only %}
+  </form>
+  {% if target %}
+    <h2>{{ target.full_name|default:target.email }}</h2>
+    <div class="table-scroll" role="region" aria-labelledby="sessions-caption" tabindex="0">
+      <table class="table">
+        <caption id="sessions-caption">{% translate "Signed-in sessions" %}</caption>
+        <thead><tr>
+          <th scope="col">{% translate "Device" %}</th>
+          <th scope="col">{% translate "Last used" %}</th>
+          <th scope="col">{% translate "Network" %}</th>
+        </tr></thead>
+        <tbody>
+          {% for session in sessions %}<tr>
+            <th scope="row">{% if session.browser and session.system %}{% blocktranslate with browser=session.browser system=session.system %}{{ browser }} on {{ system }}{% endblocktranslate %}{% elif session.browser or session.system %}{{ session.browser }}{{ session.system }}{% else %}{% translate "Unknown device" %}{% endif %}</th>
+            <td>{{ session.last_seen|date:"DATETIME_FORMAT" }}</td>
+            <td>{{ session.network|default:"-" }}</td>
+          </tr>
+          {% empty %}<tr><td colspan="3">{% translate "This account is not signed in anywhere." %}</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <h2>{% translate "End this user's sessions" %}</h2>
+    {% include "components/error_summary.html" with form=form only %}
+    <form method="post" action="{% url 'manager:platform:user_sessions' %}" class="manager-form" novalidate>
+      {% csrf_token %}
+      {{ form.user }}
+      {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+      {% include "components/button.html" with label=_("End this user's sessions") type="submit" only %}
+    </form>
+  {% endif %}
+{% endblock %}

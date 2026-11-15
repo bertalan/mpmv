@@ -14,13 +14,16 @@ from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from django.utils import translation
 
+from apps.core.http import client_ip
 from apps.core.i18n import configured_languages, translate_path
 
-from . import levels
+from . import levels, services
 from .decorators import MFA_EXEMPT_ATTR, mfa_redirect
 from .mfa_session import is_verified
+from .models import User
 from .services import has_second_factor, mfa_required
 from .session_language import SESSION_LANGUAGE_KEY
+from .session_store import touch_session
 
 # Signing out is always possible: the staff admin's and the editors' (Wagtail, CMS.1).
 EXEMPT_VIEW_NAMES = frozenset({"admin:logout", "wagtailadmin_logout"})
@@ -108,3 +111,32 @@ class PreferredLanguageMiddleware:
         return translate_path(path, language) != path or (
             translation.get_language_from_path(path) is not None
         )
+
+
+class SessionIndexMiddleware:
+    """CORE.24: keep the session index fresh and name the request's session to the services.
+
+    A signed-in request refreshes its `UserSession` row at most every `SESSION_TOUCH_SECONDS`
+    (at once when the row is missing, e.g. a session from before the index). The request's
+    session is bound for `services.end_sessions_after_change`, so a change a user makes to their
+    own account keeps the session they made it from.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        session = getattr(request, "session", None)
+        user = getattr(request, "user", None)
+        if session is not None and isinstance(user, User) and user.is_authenticated:
+            touch_session(
+                user,
+                session,
+                user_agent=request.headers.get("user-agent"),
+                ip=client_ip(request),
+            )
+        token = services.bind_current_session(session)
+        try:
+            return self.get_response(request)
+        finally:
+            services.unbind_current_session(token)

@@ -231,3 +231,30 @@ class ElevationGrant(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.action} for {self.user_id} until {self.expires_at:%H:%M:%S}"
+
+
+class UserSession(BaseModel):
+    """One signed-in session of a user, in the per-user session index (CORE.24).
+
+    Sessions stay in Django's database backend; this row only lets the account page list them
+    and the services end them per user. It is written on login, follows a rotated key
+    (`session_store.SessionStore`), goes with the session and is touched at most every
+    `SESSION_TOUCH_SECONDS`. It holds a browser family, an operating system and the network
+    prefix, never the raw User-Agent or the full IP address. `public_id` names the session on
+    pages; the key never leaves the server.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="session_index"
+    )
+    session_key = models.CharField(max_length=40, unique=True)
+    last_seen = models.DateTimeField()
+    browser = models.CharField(max_length=32, blank=True)
+    system = models.CharField(max_length=32, blank=True)
+    network = models.CharField(max_length=64, blank=True)  # /24 (IPv4) or /48 (IPv6)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "last_seen"])]
+
+    def __str__(self) -> str:
+        return f"session of {self.user_id} seen {self.last_seen:%Y-%m-%d %H:%M}"

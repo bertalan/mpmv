@@ -617,6 +617,8 @@ WIRED = {
     "notice_decision",
     "sales_terms_publish",
     "bulk_edit",
+    "sessions_end_user",  # CORE.24
+    "sessions_end_all",  # CORE.24
 }
 # Actions whose web view does not exist yet: nothing to decorate (follow-ups in the PR).
 NOT_BUILT = {"tax_in_clear", "export", "backup", "impersonation"}
