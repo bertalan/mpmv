@@ -25,6 +25,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from .bootstrap_map import bootstrap_map_css
 from .build import (
     DEFAULT_THEMES_DIR,
     OUTPUT_PREFIX,
@@ -50,10 +51,6 @@ from .vendored import VENDOR_DIR
 LAZY_JS_DIR = "lazy/"  # scripts under js/lazy/ are imported on demand: the JS budget skips them
 CSS_BUDGET = 45 * 1024  # theme.css, compressed (§14.7)
 JS_BUDGET = 40 * 1024  # all JavaScript of a page, htmx and Alpine included, compressed (§14.7)
-# A theme with a foundation carries the framework's CSS and bundle: provisional limits of §14.7
-# until the per-theme manifest budgets (THM.13 part 2).
-FOUNDATION_CSS_BUDGET = 75 * 1024
-FOUNDATION_JS_BUDGET = 75 * 1024
 MAX_FONT_FILES = 4
 MAX_FONT_FAMILIES = 2
 FONT_SUFFIX = ".woff2"
@@ -291,6 +288,7 @@ def _check_theme(
                 tokens_css=render_tokens_css(tokens),
                 sources={s: read_css_sources(root / s, s) for s in chain},
                 foundation_css=foundation_css,
+                bootstrap_map=bootstrap_map_css(tokens) if foundation_css is not None else None,
             )
             scripts = dict(vendor)
             if bundle is not None:
@@ -300,13 +298,13 @@ def _check_theme(
                     if name.startswith(LAZY_JS_DIR):
                         continue  # loaded on demand, not shipped by every page (§14.7)
                     scripts[f"themes/{s}/js/{name}"] = module.encode("utf-8")
-            framework = declared is not None
+            manifest = registry[slug]
             failures += check_sizes(
                 slug,
                 css,
                 scripts,
-                css_budget=FOUNDATION_CSS_BUDGET if framework else CSS_BUDGET,
-                js_budget=FOUNDATION_JS_BUDGET if framework else JS_BUDGET,
+                css_budget=(manifest.css_budget_kb or CSS_BUDGET // 1024) * 1024,
+                js_budget=(manifest.js_budget_kb or JS_BUDGET // 1024) * 1024,
             )
     assets = theme_assets(theme_dir, slug)
     licences = read_licences(theme_dir)

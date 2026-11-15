@@ -53,7 +53,14 @@ UNTHEMED_PREFIXES = (
 UNTHEMED_DIRECTORY_PREFIX = "admin"
 
 _REQUIRED = ("slug", "name", "version")
-_OPTIONAL = ("parent", "description", "direction", "foundation")
+_OPTIONAL = (
+    "parent",
+    "description",
+    "direction",
+    "foundation",
+    "css_budget_kb",
+    "js_budget_kb",
+)
 FOUNDATIONS = ("bootstrap-5.3",)  # CSS frameworks a theme may declare (spec 14 §14.5)
 
 
@@ -72,12 +79,23 @@ class ThemeManifest:
     description: str = ""
     direction: str = "ltr"
     foundation: str | None = None  # a name of FOUNDATIONS: the vendored framework under it
+    css_budget_kb: int | None = None  # compressed theme.css limit; None keeps the default (§14.7)
+    js_budget_kb: int | None = None  # compressed JavaScript limit of a page; None keeps the default
 
 
 def _text(data: Mapping[str, object], key: str) -> str:
     value = data.get(key)
     if not isinstance(value, str) or not value.strip():
         raise ThemeError(f"{key!r} must be a non-empty string")
+    return value
+
+
+def _budget(data: Mapping[str, object], key: str) -> int | None:
+    if key not in data:
+        return None
+    value = data[key]
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ThemeError(f"{key} must be a whole number of kilobytes, 1 or more")
     return value
 
 
@@ -109,6 +127,7 @@ def parse_manifest(data: Mapping[str, object], *, dirname: str) -> ThemeManifest
         foundation = data["foundation"]
         if foundation not in FOUNDATIONS:
             raise ThemeError(f"foundation {foundation!r} must be one of {', '.join(FOUNDATIONS)}")
+    budgets = {key: _budget(data, key) for key in ("css_budget_kb", "js_budget_kb")}
     return ThemeManifest(
         slug=slug,
         name=name,
@@ -117,6 +136,8 @@ def parse_manifest(data: Mapping[str, object], *, dirname: str) -> ThemeManifest
         description=description,
         direction=str(direction),
         foundation=str(foundation) if foundation is not None else None,
+        css_budget_kb=budgets["css_budget_kb"],
+        js_budget_kb=budgets["js_budget_kb"],
     )
 
 
@@ -522,6 +543,7 @@ def build_theme_css(
     tokens_css: str,
     sources: Mapping[str, Sequence[str]],
     foundation_css: str | None = None,
+    bootstrap_map: str | None = None,
 ) -> str:
     """One minified `theme.css`: the layer order, the tokens, then the CSS sources of the chain.
 
@@ -541,6 +563,8 @@ def build_theme_css(
     external, _files = externalise_svgs(foundation_css.removeprefix('@charset "UTF-8";'))
     parts = [f"@layer {', '.join(FOUNDATION_CSS_LAYERS)};", f"@layer bootstrap{{{external}}}"]
     parts.append(tokens_css)
+    if bootstrap_map is not None:
+        parts.append(bootstrap_map)
     for slug in reversed(chain):
         parts.extend(strip_layer(source, "reset") for source in sources.get(slug, ()))
     return minify_css("\n".join(parts)) + "\n"

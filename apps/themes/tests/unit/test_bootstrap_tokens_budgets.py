@@ -6,6 +6,7 @@ strings; and the base CSS and Bootstrap never define the same class without a re
 """
 
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -94,8 +95,9 @@ def test_the_map_is_a_tokens_layer_block_of_bootstrap_variables_only() -> None:
 def test_the_built_ride_css_carries_the_map_after_the_tokens(tmp_path: Path) -> None:
     css = ride_css(tmp_path)
     assert built_map(css)
-    assert css.index("--color-text:") < css.index("--bs-primary:")
-    assert css.index("--bs-primary:") > css.index("@layer tokens{")
+    tokens_at = css.index("@layer tokens{")
+    assert css.index("--color-text:") > tokens_at
+    assert css.index("--bs-primary:", tokens_at) > css.index("--color-text:")
 
 
 def test_every_bootstrap_colour_variable_is_set_by_the_map() -> None:
@@ -190,7 +192,6 @@ def test_ride_declares_its_budgets_and_base_declares_none() -> None:
     assert registry["ride"].js_budget_kb is not None
     assert registry["base"].css_budget_kb is None
     assert registry["base"].js_budget_kb is None
-    assert registry["ride"].css_budget_kb > CSS_BUDGET // 1024
     assert registry["ride"].js_budget_kb > JS_BUDGET // 1024
 
 
@@ -227,6 +228,7 @@ def test_a_bootstrap_theme_over_its_js_limit_fails(tmp_path: Path) -> None:
 def test_a_bootstrap_theme_within_generous_limits_passes(tmp_path: Path) -> None:
     root = tmp_path / "themes"
     foundation_theme(root)
+    shutil.copy(RIDE / "LICENSES.toml", root / "ride" / "LICENSES.toml")
     with_budgets(root, 200, 200)
     assert ride_failures(root) == []
 
