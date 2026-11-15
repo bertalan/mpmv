@@ -1,12 +1,17 @@
-"""MFA routes (CORE.4), mounted without a language prefix under /account/mfa/."""
+"""MFA routes (CORE.4), mounted without a language prefix under /account/mfa/.
 
-from django.urls import path
+Every MFA page is `never_cache` (SEC.5): they show TOTP secrets, recovery codes and the user's
+factors, which no browser, proxy or CDN cache may keep.
+"""
+
+from django.urls import URLPattern, path
+from django.views.decorators.cache import never_cache
 
 from . import mfa_views
 
 app_name = "mfa"
 
-urlpatterns = [
+_routes: list[URLPattern] = [
     path("", mfa_views.overview, name="overview"),
     path("setup/", mfa_views.setup, name="setup"),
     path("totp/", mfa_views.totp, name="totp"),
@@ -29,4 +34,8 @@ urlpatterns = [
         mfa_views.remove_device,
         name="remove_device",
     ),
+]
+
+urlpatterns = [
+    path(str(route.pattern), never_cache(route.callback), name=route.name) for route in _routes
 ]

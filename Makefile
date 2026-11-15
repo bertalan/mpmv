@@ -1,6 +1,6 @@
 # MPMV task runner. Local containers use Apple `container` (ADR-0002); no Docker, no compose.
 .DEFAULT_GOAL := help
-.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate seed run assets worker test test-unit test-e2e e2e-baselines test-all check lint fmt typecheck imports theme-gates audit sbom
+.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate seed run assets worker test test-unit test-e2e e2e-baselines test-all test-security-slow check lint fmt typecheck imports theme-gates audit sbom
 
 DB_NAME      := mpmv-db
 DB_IMAGE     := docker.io/library/postgres:17
@@ -115,6 +115,9 @@ e2e-baselines: db ## Rewrite the visual baselines in tests/e2e/baselines/ (CI: t
 	MPMV_VISUAL=update uv run pytest -m e2e -k visual_baseline
 
 test-all: test test-e2e ## All three suites
+
+test-security-slow: db ## Nightly attack scenarios (SEC.5): the 100 KB ReDoS sweep
+	uv run pytest -m security_slow
 
 lint: ## Lint with ruff
 	uv run ruff check .

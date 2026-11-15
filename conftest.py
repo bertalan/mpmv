@@ -1,6 +1,10 @@
 """Root pytest configuration: every test belongs to exactly one suite (ADR-0006).
 
 The suite comes from the directory: .../tests/unit/, .../tests/integration/ or tests/e2e/.
+The attack scenarios in tests/security/ (SEC.5) mix suites in one module per category, so each of
+their tests names its suite with an explicit `unit` or `integration` marker instead.
+Tests marked `security_slow` (the nightly ReDoS sweep) run only when the `-m` expression names
+`security_slow`; `make test` and CI deselect them.
 Test data comes from factory_boy factories, reseeded before every test (ARC.12).
 """
 
@@ -24,6 +28,9 @@ if TYPE_CHECKING:
 FACTORY_SEED = int(os.environ.get("MPMV_TEST_SEED", "20271"))
 
 SUITES = ("unit", "integration", "e2e")
+# Directories whose tests carry their suite as a marker rather than in the path.
+MARKED_SUITE_DIRS = ("security",)
+SLOW_SECURITY = "security_slow"
 
 
 def suite_for(path: Path) -> str | None:
@@ -34,9 +41,26 @@ def suite_for(path: Path) -> str | None:
     return None
 
 
+def _marked_suite(item: pytest.Item) -> str | None:
+    """The suite of a test in a MARKED_SUITE_DIRS directory: its one `unit`/`integration` marker."""
+    if not any(part in MARKED_SUITE_DIRS for part in Path(str(item.path)).parts[:-1]):
+        return None
+    marked = {mark.name for mark in item.iter_markers() if mark.name in SUITES}
+    if len(marked) != 1 or "e2e" in marked:
+        raise pytest.UsageError(
+            f"{item.nodeid}: a test in tests/security needs exactly one unit or integration marker"
+        )
+    return marked.pop()
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    if SLOW_SECURITY not in (config.option.markexpr or ""):
+        slow = [item for item in items if item.get_closest_marker(SLOW_SECURITY) is not None]
+        if slow:
+            config.hook.pytest_deselected(items=slow)
+            items[:] = [item for item in items if item.get_closest_marker(SLOW_SECURITY) is None]
     for item in items:
-        suite = suite_for(Path(str(item.path)))
+        suite = suite_for(Path(str(item.path))) or _marked_suite(item)
         if suite is None:
             raise pytest.UsageError(
                 f"{item.nodeid}: tests must live under tests/unit, tests/integration or tests/e2e"
