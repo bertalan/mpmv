@@ -33,10 +33,12 @@ from .engine import (
     build_registry,
     build_theme_css,
     check_tokens,
+    externalise_svgs,
     parse_tokens,
     render_tokens_css,
     resolve_tokens,
 )
+from .foundation import BUNDLE_OUTPUT, foundation_files
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_THEMES_DIR = PROJECT_DIR / "themes"
@@ -152,8 +154,20 @@ def render_themes(themes_root: Path, contract: TokenContract = TOKEN_CONTRACT) -
             continue
         tokens_css = render_tokens_css(tokens)
         outputs[f"{OUTPUT_PREFIX}/{slug}/tokens.css"] = tokens_css
+        foundation_css = None
+        foundation = registry.foundation(slug)
+        if foundation is not None:
+            owner, name = foundation
+            try:
+                foundation_css, bundle = foundation_files(themes_root / owner, owner, name)
+            except ThemeError as exc:
+                errors.append(f"themes/{owner}: {exc}")
+                continue
+            outputs[f"{OUTPUT_PREFIX}/{slug}/{BUNDLE_OUTPUT}"] = bundle
+            for path, svg in externalise_svgs(foundation_css)[1].items():
+                outputs[f"{OUTPUT_PREFIX}/{slug}/{path}"] = svg
         outputs[f"{OUTPUT_PREFIX}/{slug}/theme.css"] = build_theme_css(
-            chain, tokens_css=tokens_css, sources=sources
+            chain, tokens_css=tokens_css, sources=sources, foundation_css=foundation_css
         )
         for relative, module in read_js_modules(themes_root / slug, slug).items():
             outputs[f"{OUTPUT_PREFIX}/{slug}/js/{relative}"] = module

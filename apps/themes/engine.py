@@ -13,10 +13,12 @@ token contract (`contract.py`) with `contrast_ratio`, and `render_tokens_css` /
 `build_theme_css` write the CSS that `build.py` saves.
 """
 
+import hashlib
 import posixpath
 import re
 from collections.abc import Container, Mapping, Sequence
 from dataclasses import dataclass, field
+from urllib.parse import unquote
 
 BASE_THEME = "base"
 DIRECTIONS = ("ltr",)  # right-to-left languages are not planned (spec 09)
@@ -51,7 +53,8 @@ UNTHEMED_PREFIXES = (
 UNTHEMED_DIRECTORY_PREFIX = "admin"
 
 _REQUIRED = ("slug", "name", "version")
-_OPTIONAL = ("parent", "description", "direction")
+_OPTIONAL = ("parent", "description", "direction", "foundation")
+FOUNDATIONS = ("bootstrap-5.3",)  # CSS frameworks a theme may declare (spec 14 §14.5)
 
 
 class ThemeError(ValueError):
@@ -68,6 +71,7 @@ class ThemeManifest:
     parent: str | None  # None only for `base`
     description: str = ""
     direction: str = "ltr"
+    foundation: str | None = None  # a name of FOUNDATIONS: the vendored framework under it
 
 
 def _text(data: Mapping[str, object], key: str) -> str:
@@ -100,6 +104,11 @@ def parse_manifest(data: Mapping[str, object], *, dirname: str) -> ThemeManifest
     direction = data.get("direction", "ltr")
     if direction not in DIRECTIONS:
         raise ThemeError(f"direction {direction!r} is not supported ({', '.join(DIRECTIONS)})")
+    foundation = None
+    if "foundation" in data:
+        foundation = data["foundation"]
+        if foundation not in FOUNDATIONS:
+            raise ThemeError(f"foundation {foundation!r} must be one of {', '.join(FOUNDATIONS)}")
     return ThemeManifest(
         slug=slug,
         name=name,
@@ -107,6 +116,7 @@ def parse_manifest(data: Mapping[str, object], *, dirname: str) -> ThemeManifest
         parent=parent,
         description=description,
         direction=str(direction),
+        foundation=str(foundation) if foundation is not None else None,
     )
 
 
@@ -143,6 +153,14 @@ class ThemeRegistry:
 
     def __getitem__(self, slug: str) -> ThemeManifest:
         return self.manifests[slug]
+
+    def foundation(self, slug: str) -> tuple[str, str] | None:
+        """(theme that declares it, foundation name) for the nearest foundation in the chain."""
+        for member in self.chain(slug):
+            name = self.manifests[member].foundation
+            if name is not None:
+                return member, name
+        return None
 
     def chain(self, slug: str) -> tuple[str, ...]:
         """The chain of a registered theme; LookupError for any other slug."""
@@ -223,6 +241,17 @@ def pick_theme(site_choice: str, env_default: str, registry: Container[str]) -> 
 
 TOKENS_FILE = "tokens.toml"
 CSS_LAYERS = ("reset", "tokens", "base", "layout", "components", "utilities", "overrides")
+# A theme with a foundation (spec 14 §14.5): the framework's layer sits between reset and tokens.
+FOUNDATION_CSS_LAYERS = (
+    "reset",
+    "bootstrap",
+    "tokens",
+    "base",
+    "layout",
+    "components",
+    "utilities",
+    "overrides",
+)
 
 Tokens = Mapping[str, str]
 
@@ -488,18 +517,88 @@ def minify_css(css: str) -> str:
 
 
 def build_theme_css(
-    chain: Sequence[str], *, tokens_css: str, sources: Mapping[str, Sequence[str]]
+    chain: Sequence[str],
+    *,
+    tokens_css: str,
+    sources: Mapping[str, Sequence[str]],
+    foundation_css: str | None = None,
 ) -> str:
     """One minified `theme.css`: the layer order, the tokens, then the CSS sources of the chain.
 
     Sources are concatenated from `base` down to the theme itself, each theme's files in the
     given order; the layer statement comes first, so the cascade follows the layers, not the
     file order.
+
+    With `foundation_css` (the framework's CSS, spec 14 §14.5) it is wrapped in `@layer
+    bootstrap`, its `data:` URIs become same-origin SVG paths (`externalise_svgs`), and the
+    `reset` layer of every source is dropped: the framework's own reboot replaces it.
     """
-    parts = [f"@layer {', '.join(CSS_LAYERS)};", tokens_css]
+    if foundation_css is None:
+        parts = [f"@layer {', '.join(CSS_LAYERS)};", tokens_css]
+        for slug in reversed(chain):
+            parts.extend(sources.get(slug, ()))
+        return minify_css("\n".join(parts)) + "\n"
+    external, _files = externalise_svgs(foundation_css.removeprefix('@charset "UTF-8";'))
+    parts = [f"@layer {', '.join(FOUNDATION_CSS_LAYERS)};", f"@layer bootstrap{{{external}}}"]
+    parts.append(tokens_css)
     for slug in reversed(chain):
-        parts.extend(sources.get(slug, ()))
+        parts.extend(strip_layer(source, "reset") for source in sources.get(slug, ()))
     return minify_css("\n".join(parts)) + "\n"
+
+
+SVG_DIR = "svg"  # next to theme.css: externalised images are `svg/bs-<hash>.svg`
+_DATA_SVG_RE = re.compile(
+    r"""url\(\s*(?:"data:image/svg\+xml,([^"]*)"|'data:image/svg\+xml,([^']*)')\s*\)"""
+)
+_ANY_DATA_URI_RE = re.compile(r"""url\(\s*["']?data:""", re.IGNORECASE)
+
+
+def externalise_svgs(css: str) -> tuple[str, dict[str, str]]:
+    """Replace each `url("data:image/svg+xml,…")` by `url("svg/bs-<sha256[:12]>.svg")`.
+
+    Returns the new CSS and the files (path relative to theme.css -> SVG text). The path comes
+    from the image's own hash, so equal images share a file and the output is deterministic.
+    Any other `data:` URI is an error: the CSP's `img-src` has no `data:` (spec 14 §14.5).
+    """
+    files: dict[str, str] = {}
+
+    def replace(match: re.Match[str]) -> str:
+        payload = match.group(1) if match.group(1) is not None else match.group(2)
+        svg = unquote(payload)
+        digest = hashlib.sha256(svg.encode("utf-8")).hexdigest()[:12]
+        path = f"{SVG_DIR}/bs-{digest}.svg"
+        files[path] = svg
+        return f'url("{path}")'
+
+    result = _DATA_SVG_RE.sub(replace, css)
+    if _ANY_DATA_URI_RE.search(result):
+        raise ThemeError("the framework CSS holds a data: URI that is not an SVG image")
+    return result, files
+
+
+def strip_layer(css: str, layer: str) -> str:
+    """`css` without its top-level `@layer <layer> { … }` blocks (braces and strings balanced)."""
+    out: list[str] = []
+    position = 0
+    for match in re.finditer(rf"@layer\s+{re.escape(layer)}\s*\{{", css):
+        if match.start() < position:
+            continue
+        depth, index = 1, match.end()
+        while depth and index < len(css):
+            if css[index] in "\"'":
+                end = index + 1
+                while end < len(css) and css[end] != css[index]:
+                    end += 2 if css[end] == "\\" else 1
+                index = end
+            elif css[index] == "{":
+                depth += 1
+            elif css[index] == "}":
+                depth -= 1
+            index += 1
+        out.append(css[position : match.start()])
+        position = index
+    out.append(css[position:])
+    return "".join(out)
 
 
 # --- Component helpers (THM.4, spec 14 §14.9)

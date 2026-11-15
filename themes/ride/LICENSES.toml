@@ -49,3 +49,14 @@ license = "CC0-1.0"
 # Our own work: simple vector shapes, no photograph. Shown behind the hero until an editor
 # chooses a hero image.
 files = ["images/hero-placeholder.svg"]
+
+[[asset]]
+name = "Bootstrap"
+kind = "framework"
+source = "https://github.com/twbs/bootstrap/releases/tag/v5.3.9"
+author = "The Bootstrap Authors"
+license = "MIT"
+# Release 5.3.9, official dist files unchanged: vendor/bootstrap/bootstrap.min.css and
+# bootstrap.bundle.min.js (code, hashed in VENDORED.toml). The dist zip has no LICENSE file; the
+# one here is the standard MIT text with upstream's copyright line.
+files = ["vendor/bootstrap/LICENSE", "vendor/bootstrap/VENDORED.toml"]
