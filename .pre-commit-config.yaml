@@ -4,10 +4,10 @@ repos:
     hooks:
       # Vendored files stay byte-identical to upstream: VENDORED.toml records their SHA-256.
       - id: end-of-file-fixer
-        exclude: ^(apps/themes/static/vendor|tests/e2e/vendor)/
+        exclude: ^(apps/themes/static/vendor|tests/e2e/vendor|themes/[^/]+/static/themes/[^/]+/vendor)/
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
-        exclude: ^(apps/themes/static/vendor|tests/e2e/vendor)/
+        exclude: ^(apps/themes/static/vendor|tests/e2e/vendor|themes/[^/]+/static/themes/[^/]+/vendor)/
       - id: check-toml
       - id: check-yaml
       - id: check-added-large-files
