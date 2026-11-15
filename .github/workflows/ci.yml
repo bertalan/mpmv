@@ -6,6 +6,8 @@ name: CI
 
 on:
   pull_request:
+    # ready_for_review: a draft skips E2E and the image build; marking it ready must run them.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
