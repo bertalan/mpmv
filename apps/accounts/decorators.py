@@ -193,9 +193,10 @@ def requires_level[**P](action: str, *, shop: ShopOf | None = None) -> Callable[
             digest = levels.params_digest(request, shop=target)
             scope = levels.shop_key(target) if target is not None else ""
             if not levels.window_covers(request, action, target):
-                # A grant on a shop is spent only while the user still owns it (or holds
-                # `elevate`); its digest names the shop, so it never fits another one.
-                rechecked = target is None or levels.may_confirm(request.user, action, target)
+                # A grant is spent only while the user may still confirm it: `elevate` (with a
+                # passkey) for a platform action, ownership of the shop (or `elevate`) for a shop
+                # action; its digest names the shop, so it never fits another one.
+                rechecked = levels.may_confirm(request.user, action, target)
                 if rechecked and levels.consume_single(request, action, digest, shop=scope):
                     return view(request, *args, **kwargs)
                 return _prompt(request, action, group, digest, target)

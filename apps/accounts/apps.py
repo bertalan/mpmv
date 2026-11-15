@@ -29,7 +29,7 @@ class AccountsConfig(AppConfig):
     def ready(self) -> None:
         from django.contrib.auth.signals import user_logged_in, user_login_failed
 
-        from .checks import check_captcha_settings, check_mfa_middleware
+        from .checks import check_captcha_settings, check_mfa_middleware, check_shop_owner_check
         from .signals import (
             count_failed_login,
             index_session_on_login,
@@ -43,3 +43,4 @@ class AccountsConfig(AppConfig):
         user_logged_in.connect(index_session_on_login, dispatch_uid="accounts.index_session")
         checks.register(check_captcha_settings, checks.Tags.security)
         checks.register(check_mfa_middleware, checks.Tags.security)
+        checks.register(check_shop_owner_check, checks.Tags.security)

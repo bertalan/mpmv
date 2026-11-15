@@ -1,0 +1,224 @@
+/* Ride: cart, checkout steps, review with the legal step, payment and confirmation (THM.8).
+   All rules sit in `overrides`. Colours only through tokens; an operator palette changes them. */
+@layer overrides {
+  .checkout {
+    max-inline-size: 60rem;
+    margin-inline: auto;
+  }
+
+  .checkout > h1 {
+    font-family: var(--font-display);
+    margin-block-end: var(--space-m);
+  }
+
+  .checkout h2 {
+    font-family: var(--font-display);
+    font-size: var(--step-2);
+  }
+
+  /* --- Step indicator: a ruled bar; the current step has a filled accent number. */
+
+  .steps__list {
+    gap: var(--space-s) var(--space-l);
+    padding-block-end: var(--space-s);
+    border-block-end: 2px solid var(--color-border);
+  }
+
+  .steps__step {
+    font-family: var(--font-display);
+    font-size: var(--step-1);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .steps__number {
+    border-radius: var(--radius-round);
+  }
+
+  .steps__step--current .steps__number {
+    background: var(--color-accent);
+    color: var(--color-text-inverse);
+  }
+
+  /* --- Cart lines and vendor packages: one card per vendor, rows ruled inside it. */
+
+  .package {
+    margin-block-end: var(--space-l);
+    padding: var(--space-m);
+    border: 1px solid var(--color-border);
+    border-block-start: 0.25rem solid var(--color-accent);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+
+  .package > h2 {
+    margin-block-start: 0;
+    font-size: var(--step-2);
+  }
+
+  .cart-lines > .cart-line + .cart-line {
+    border-block-start: 1px solid var(--color-border);
+  }
+
+  .cart-line__name {
+    font-weight: 700;
+  }
+
+  .cart-line__name a {
+    color: var(--color-heading);
+  }
+
+  .cart-line__total {
+    font-family: var(--font-display);
+    font-size: var(--step-2);
+    font-weight: 700;
+    color: var(--color-heading);
+  }
+
+  .cart-line--problem {
+    outline: 2px solid var(--color-danger);
+    outline-offset: -2px;
+    border-radius: var(--radius-control);
+  }
+
+  .cart-line__remove {
+    color: var(--color-link);
+  }
+
+  /* --- Order summary: the total in condensed type under a heavy rule. */
+
+  .order-summary {
+    border-radius: var(--radius-card);
+    background: var(--color-surface-raised);
+  }
+
+  .order-summary > h2,
+  .order-summary > h3 {
+    font-family: var(--font-display);
+  }
+
+  .order-summary__line--total {
+    font-family: var(--font-display);
+    font-size: var(--step-3);
+    border-block-start-color: var(--color-accent);
+  }
+
+  /* --- Legal step (ORD.17): the seller recap and the two boxes read as a document. */
+
+  .legal-recap {
+    margin-block: var(--space-l);
+    padding: var(--space-m);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-surface-raised);
+  }
+
+  .legal-recap > h2 {
+    margin-block-start: 0;
+  }
+
+  .legal-recap__seller {
+    margin-block: var(--space-m);
+    padding: var(--space-m);
+    border: 1px solid var(--color-border);
+    border-inline-start: 0.25rem solid var(--color-accent);
+    border-radius: var(--radius-control);
+    background: var(--color-surface);
+  }
+
+  .legal-recap__seller h3 {
+    margin-block-start: 0;
+    font-family: var(--font-display);
+  }
+
+  .legal-recap__seller dl {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-xs) var(--space-m);
+    margin: 0;
+  }
+
+  .legal-recap__seller dt {
+    color: var(--color-text-muted);
+    font-weight: 700;
+  }
+
+  .legal-recap__seller dd {
+    margin: 0 0 var(--space-xs);
+    overflow-wrap: anywhere;
+  }
+
+  @media (min-width: 40rem) {
+    .legal-recap__seller dl {
+      grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr);
+    }
+
+    .legal-recap__seller dd {
+      margin: 0;
+    }
+  }
+
+  .legal-boxes {
+    margin-block: var(--space-m);
+    padding: var(--space-m);
+    border: 2px solid var(--color-border-strong);
+    border-radius: var(--radius-card);
+    background: var(--color-surface-sunken);
+  }
+
+  .legal-box2 {
+    margin-block-start: var(--space-m);
+    padding-block-start: var(--space-m);
+    border-block-start: 1px solid var(--color-border-strong);
+  }
+
+  .legal-boxes .field__check label {
+    font-weight: 600;
+  }
+
+  #review-actions button[type="submit"],
+  #review-actions .button {
+    inline-size: 100%;
+    font-size: var(--step-1);
+  }
+
+  @media (min-width: 40rem) {
+    #review-actions button[type="submit"],
+    #review-actions .button {
+      inline-size: auto;
+    }
+  }
+
+  /* --- Payment: the Stripe iframe sits in a card; its own look comes from the appearance object. */
+
+  #payment-form {
+    max-inline-size: 36rem;
+    margin-block: var(--space-m);
+    padding: var(--space-m);
+    border: 1px solid var(--color-border);
+    border-block-start: 0.25rem solid var(--color-accent);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+
+  #payment-message {
+    color: var(--color-danger);
+    font-weight: 600;
+  }
+
+  #payment-form button[type="submit"] {
+    inline-size: 100%;
+  }
+
+  /* --- Confirming state: a calm panel, never a spinner-only message. */
+
+  #payment-status {
+    margin-block: var(--space-m);
+  }
+
+  #payment-status .alert {
+    border-radius: var(--radius-card);
+    font-size: var(--step-1);
+  }
+}

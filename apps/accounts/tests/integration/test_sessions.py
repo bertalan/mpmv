@@ -482,3 +482,55 @@ def test_the_backfill_indexes_signed_in_sessions_in_batches(
     for user, client in zip(users, clients, strict=True):
         assert UserSession.objects.filter(user=user, session_key=key_of(client)).exists()
     assert UserSession.objects.count() == 3
+
+
+def _elevate_group() -> Any:
+    from django.contrib.auth.models import Group
+
+    group = Group.objects.create(name=f"elevators-{secrets.token_hex(4)}")
+    group.permissions.add(Permission.objects.get(codename=levels.ELEVATE_CODENAME))
+    return group
+
+
+def test_removing_elevate_from_a_group_ends_its_members_sessions_and_windows() -> None:
+    """CORE.25: staff who lose `elevate` through their role keep no passkey window."""
+    group = _elevate_group()
+    user = UserFactory.create(staff=True)
+    user.groups.add(group)
+    client = Client()
+    verified_login(client, user, elevate=False)  # the window is open, the right is the group's
+    assert is_signed_in(client)
+    before = services.group_access_snapshot(group)
+    group.permissions.clear()
+    services.record_group_access_change(group, before, ctx=SYSTEM)
+    assert not is_signed_in(client)
+    assert ended_entry()["reason"] == "role"
+
+
+def test_deleting_a_group_ends_its_members_sessions() -> None:
+    group = _elevate_group()
+    user = UserFactory.create(staff=True)
+    user.groups.add(group)
+    client = signed_in_client(user)
+    services.delete_group(group, ctx=SYSTEM)
+    assert not is_signed_in(client)
+
+
+def test_a_group_change_with_no_effect_keeps_the_members_sessions() -> None:
+    group = _elevate_group()
+    user = UserFactory.create(staff=True)
+    user.groups.add(group)
+    client = signed_in_client(user)
+    services.record_group_access_change(group, services.group_access_snapshot(group), ctx=SYSTEM)
+    assert is_signed_in(client)
+
+
+def test_removing_a_direct_elevate_permission_closes_the_window() -> None:
+    user = UserFactory.create(staff=True)
+    client = Client()
+    verified_login(client, user)  # grants the direct elevate permission and a passkey
+    assert is_signed_in(client)
+    before = services.access_snapshot(user)
+    user.user_permissions.remove(Permission.objects.get(codename=levels.ELEVATE_CODENAME))
+    services.record_access_change(user, before, ctx=SYSTEM)
+    assert not is_signed_in(client)
