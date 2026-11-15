@@ -129,6 +129,8 @@ def window(request: HttpRequest) -> JsonResponse:
     if isinstance(result, JsonResponse):
         return result
     levels.open_window(request, shop=shop)
+    if shop is not None:
+        levels.drop_shop_offers(request, shop=shop)  # spent: a new window needs a new prompt
     return JsonResponse({"redirect": safe_next(request)})
 
 
@@ -173,6 +175,10 @@ def once(request: HttpRequest) -> JsonResponse:
     ):  # the policy may have changed meanwhile
         return _bad_request("this action cannot be done once")
     levels.grant_single(request, result["action"], result["digest"], shop=shop)
+    if shop:
+        levels.drop_shop_offers(
+            request, shop=shop, action=result["action"], digest=result["digest"]
+        )
     return JsonResponse({"granted": True})
 
 

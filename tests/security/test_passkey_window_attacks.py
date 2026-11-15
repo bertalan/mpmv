@@ -216,6 +216,13 @@ def test_a_window_stops_working_when_the_ownership_is_taken_away(
     after = client.post(TERMS, TERMS_DATA | {"body": "After the demotion"})
     assert after.status_code in {403, 404}
     assert SalesTermsVersion.objects.filter(vendor=shop_a).count() == 1
+    # Nor can the demoted user confirm again: no offer is left, so no new window opens.
+    options = _post(client, "levels:options")
+    if options.status_code == 200:
+        credential = authenticator.get(options.json()["publicKey"])
+        assert _post(client, "levels:window", {"credential": credential}).status_code == 403
+    assert client.post(TERMS, TERMS_DATA).status_code in {403, 404}
+    assert SalesTermsVersion.objects.filter(vendor=shop_a).count() == 1
 
 
 @pytest.mark.parametrize("started_ago", [60 * 60 * 24, 60 * 60 * 4])
@@ -284,3 +291,124 @@ def test_a_shop_owner_cannot_act_on_another_shops_order_by_its_public_id(
         assert client.get(f"{orders}{tampered}/").status_code == 404
         assert client.post(f"{orders}{tampered}/accept/").status_code == 404
     assert VendorOrder.objects.get(pk=foreign.pk).state == state
+
+
+# --- CORE.25 hardening (#474 security review follow-ups)
+
+
+def _audit_after(action: str) -> list[dict[str, Any]]:
+    return [
+        row.after
+        for row in AuditLog.objects.filter(action=action).order_by("id")
+        if isinstance(row.after, dict)
+    ]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "CORE.25 hardening item 1, deferred: the test helper verified_login opens an unscoped "
+        "window for any user, so 30+ fixture-based tests rely on it; see the PR follow-ups"
+    ),
+)
+def test_an_unscoped_window_covers_nothing_for_a_user_without_elevate(
+    attacker: User, shop_a: Vendor
+) -> None:
+    """A window with no shop scope covers every action only for staff with `elevate`: a vendor
+    owner who somehow holds one (or staff who lost `elevate`) gets no fallback."""
+    from django.contrib.sessions.backends.db import SessionStore
+    from django.test import RequestFactory
+
+    request = RequestFactory().post(TERMS)
+    request.user = attacker
+    request.session = SessionStore()
+    request.session[levels.STARTED_KEY] = time.time()
+    request.session[levels.ACTIVITY_KEY] = time.time()
+    assert levels.current_level(request) == levels.PASSKEY_WINDOW
+    assert not levels.window_covers(request, "sales_terms_publish", shop_a)
+    assert not levels.window_covers(request, "sales_terms_publish", None)
+
+
+@pytest.mark.parametrize("check", ["apps.no_such_module.is_owner", "raise"])
+def test_a_broken_shop_owner_check_fails_closed_and_is_logged(
+    settings: Any,
+    attacker: User,
+    shop_a: Vendor,
+    check: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    settings.SHOP_OWNER_CHECK = f"{__name__}._raising_owner_check" if check == "raise" else check
+    _enrol_passkey(attacker)
+    with caplog.at_level("WARNING", logger="apps.accounts.levels"):
+        assert levels.is_shop_owner(attacker, shop_a) is False
+        assert not levels.may_confirm(attacker, "sales_terms_publish", shop_a)
+    assert any("SHOP_OWNER_CHECK" in rec.getMessage() for rec in caplog.records)
+
+
+def _raising_owner_check(user: object, shop: object) -> bool:
+    raise LookupError("the owner lookup failed")
+
+
+def test_a_broken_shop_owner_check_never_answers_500(
+    client: Client, settings: Any, attacker: User, shop_a: Vendor
+) -> None:
+    _enrol_passkey(attacker)
+    _sign_in(client, attacker, shop_a)
+    settings.SHOP_OWNER_CHECK = f"{__name__}._raising_owner_check"
+    response = client.post(TERMS, TERMS_DATA)
+    assert response.status_code in {403, 404}
+    assert SalesTermsVersion.objects.filter(vendor=shop_a).count() == 0
+
+
+def test_the_shop_offer_is_popped_once_a_window_opens(
+    client: Client, attacker: User, shop_a: Vendor
+) -> None:
+    authenticator = _enrol_passkey(attacker)
+    _sign_in(client, attacker, shop_a)
+    client.post(TERMS, TERMS_DATA)
+    assert client.session.get(levels.SHOP_OFFERS_KEY)
+    assert _open_window(client, authenticator).status_code == 200
+    assert not client.session.get(levels.SHOP_OFFERS_KEY)
+    # The offer is spent: another window for the shop needs a new prompt first.
+    assert client.post(reverse("levels:close")).status_code in {200, 302}
+    assert _open_window(client, authenticator).status_code == 403
+
+
+def test_the_shop_offer_is_popped_once_a_do_it_once_is_granted(
+    client: Client, attacker: User, shop_a: Vendor
+) -> None:
+    authenticator = _enrol_passkey(attacker)
+    _sign_in(client, attacker, shop_a)
+    refused = client.post(TERMS, TERMS_DATA)
+    assert _do_it_once(client, authenticator, refused).status_code == 200
+    assert not client.session.get(levels.SHOP_OFFERS_KEY)
+    again = _post(
+        client,
+        "levels:once_options",
+        {"action": refused.context["action"], "digest": refused.context["digest"]},
+    )
+    assert again.status_code == 403
+
+
+def test_closing_the_window_drops_the_shop_offers(
+    client: Client, attacker: User, shop_a: Vendor
+) -> None:
+    _enrol_passkey(attacker)
+    _sign_in(client, attacker, shop_a)
+    client.post(TERMS, TERMS_DATA)
+    assert client.session.get(levels.SHOP_OFFERS_KEY)
+    assert client.post(reverse("levels:close")).status_code in {200, 302}
+    assert not client.session.get(levels.SHOP_OFFERS_KEY)
+
+
+def test_the_audit_names_the_shop_on_the_prompt_and_on_the_spent_grant(
+    client: Client, attacker: User, shop_a: Vendor
+) -> None:
+    authenticator = _enrol_passkey(attacker)
+    _sign_in(client, attacker, shop_a)
+    refused = client.post(TERMS, TERMS_DATA)
+    shop = levels.shop_key(shop_a)
+    assert _audit_after(levels.PROMPT)[-1]["shop"] == shop
+    assert _do_it_once(client, authenticator, refused).status_code == 200
+    assert client.post(TERMS, TERMS_DATA).status_code == 302
+    assert _audit_after(levels.SINGLE_USED)[-1]["shop"] == shop
