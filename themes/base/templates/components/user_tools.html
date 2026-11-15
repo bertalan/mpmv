@@ -1,4 +1,4 @@
-{% load i18n %}{% comment %}
+{% load i18n manager_tags %}{% comment %}
 User tools (ARC.32): for a signed-in user only, at the right end of the header's tools: the help
 button, then the user menu, then the help dialog. The context variable `help` comes from the
 `help_context` tag (cms_tags) and is empty for a visitor, so a public page carries none of this.
@@ -18,6 +18,7 @@ Context: `help` (url, route, page_type, language) and the CSRF token for the sig
     <summary class="user-menu__summary">{% translate "Account" %}</summary>
     <ul class="user-menu__list">
       <li><button type="button" class="user-menu__item" data-help-open aria-haspopup="dialog" aria-controls="help-dialog" hidden>{% translate "Help" %}</button></li>
+      {% manager_entry as manager_link %}{% if manager_link %}<li><a class="user-menu__item" href="{{ manager_link.url }}">{{ manager_link.label }}</a></li>{% endif %}
       {% url 'mfa:setup' as security_url %}{% if security_url %}<li><a class="user-menu__item" href="{{ security_url }}?from=security">{% translate "Security" %}</a></li>{% endif %}
       {% if release_version %}<li><span class="user-menu__version">{% translate "Version" %} {{ release_version }}</span></li>{% endif %}
       <li><form action="{% url 'logout' %}" method="post">{% csrf_token %}<button type="submit" class="user-menu__item">{% translate "Sign out" %}</button></form></li>

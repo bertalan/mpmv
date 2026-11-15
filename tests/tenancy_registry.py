@@ -577,6 +577,10 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
+    "manager:platform:map": StaffOnly(
+        "Platform map (CORE.30): platform staff only, links only, no tenant data; a vendor member "
+        "gets the platform-space refusal (test_platform_map)."
+    ),
     "manager:platform:staff_roles": StaffOnly(
         "Staff and roles (CORE.18): platform owner only; lists the platform staff and grants or "
         "revokes roles through the audited service. Every other role, a vendor member and a "

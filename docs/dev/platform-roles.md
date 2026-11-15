@@ -23,6 +23,7 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Section | Configuration and tax | Catalog and moderation | Finance and payments | Support | Platform owner | Tech. superuser |
 |---|---|---|---|---|---|---|
 | Platform: dashboard | R | R | R | R | R |  |
+| Platform: map of the site (CORE.30) | R | R | R | R | R |  |
 | Platform: configuration and tax (ARC.24) | E |  |  |  | R |  |
 | Platform: owner-only settings (CMP.13, CMP.11 approvals) | R |  |  |  | E |  |
 | Platform: catalog, categories, attributes, taxonomies, imports |  | E |  | R | R |  |

@@ -65,7 +65,7 @@ from apps.vendors.services import (
 )
 
 from . import roles as roles_module
-from . import staff_roles
+from . import site_map, staff_roles
 from .access import ManagerContext, home_url
 from .forms import ShipmentForm, StaffRoleForm, StorefrontProfileForm, VendorLogoForm
 from .middleware import manager_context
@@ -393,6 +393,18 @@ class VendorOrderActionView(VendorOrderDetailView):
 class PlatformDashboardView(ManagerView):
     section = "platform.dashboard"
     template_name = "manager/platform/dashboard.html"
+
+
+class PlatformMapView(ManagerView):
+    """The platform map (CORE.30): every area of the site as links, for platform staff."""
+
+    section = "platform.map"
+    template_name = "manager/platform/map.html"
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["groups"] = site_map.build_map()
+        return context
 
 
 def _is_uuid(value: str) -> bool:

@@ -854,7 +854,7 @@ msgstr "Corriere: %(carrier)s"
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Corriere: %(carrier)s. Numero di tracking: %(tracking_number)s."
 
-#: apps/orders/templates/orders/cart.html apps/orders/ui/views.py
+#: apps/manager/site_map.py apps/orders/templates/orders/cart.html apps/orders/ui/views.py
 msgid "Cart"
 msgstr "Carrello"
 
@@ -920,7 +920,8 @@ msgstr ""
 "Scegli una pagina di questo sito a cui rimandare. Compila questo campo oppure l'indirizzo web qui "
 "sotto, non entrambi."
 
-#: apps/manager/sections.py apps/manager/templates/manager/shop/vendor_picker.html
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/shop/vendor_picker.html
 msgid "Choose a vendor"
 msgstr "Scegli un venditore"
 
@@ -1101,6 +1102,10 @@ msgstr "Collega il tuo account per i pagamenti"
 msgid "Consumer"
 msgstr "Consumatore"
 
+#: apps/manager/site_map.py
+msgid "Consumer information"
+msgstr "Informazioni per i consumatori"
+
 #: apps/orders/templates/orders/_legal_recap.html
 msgid ""
 "Consumers have 14 days from delivery to withdraw. As a business you have no right of withdrawal "
@@ -1147,7 +1152,8 @@ msgstr "Continua con la tua richiesta"
 msgid "Cookie categories"
 msgstr "Categorie di cookie"
 
-#: apps/seo/templates/seo/consent/preferences.html apps/seo/templatetags/consent.py
+#: apps/manager/site_map.py apps/seo/templates/seo/consent/preferences.html
+#: apps/seo/templatetags/consent.py
 msgid "Cookie settings"
 msgstr "Impostazioni dei cookie"
 
@@ -1187,12 +1193,17 @@ msgstr "passaggio attuale"
 msgid "Customer"
 msgstr "Cliente"
 
+#: apps/manager/site_map.py
+msgid "Customer account"
+msgstr "Account cliente"
+
 #: apps/manager/forms.py
 msgid "Customers see this text. A change is live at once and the moderators are told."
 msgstr ""
 "I clienti vedono questo testo. Una modifica è visibile subito e i moderatori vengono avvisati."
 
-#: apps/manager/sections.py apps/manager/templates/manager/platform/dashboard.html
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/platform/dashboard.html
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Dashboard"
 msgstr "Dashboard"
@@ -1353,7 +1364,7 @@ msgstr "Scarica il profilo del negozio, i prodotti e gli importi degli ordini in
 msgid "Drafts"
 msgstr "Bozze"
 
-#: apps/seo/site_links.py
+#: apps/manager/site_map.py apps/seo/site_links.py
 msgid "DSA points of contact"
 msgstr "Punti di contatto DSA"
 
@@ -1374,6 +1385,10 @@ msgstr ""
 "Ogni acquisto è un contratto direttamente con il venditore. Il venditore è responsabile di "
 "spedizione, conformità, fatturazione, resi e recessi. Il marketplace offre il servizio e incassa "
 "il pagamento."
+
+#: apps/manager/site_map.py
+msgid "Editors' admin"
+msgstr "Admin redazionale"
 
 #: apps/seo/site_links.py
 msgid "Editors' admin (Wagtail)"
@@ -1474,6 +1489,13 @@ msgid ""
 msgstr ""
 "Ogni utente, staff e venditori compresi, viene disconnesso ovunque. Resta solo questa sessione. Le"
 " chiavi API e i link inviati per email non cambiano: revocali a parte."
+#: apps/manager/templates/manager/platform/map.html
+msgid ""
+"Every area of the site in one place. Shop space pages are listed as text: staff do not open them "
+"directly."
+msgstr ""
+"Tutte le aree del sito in un unico posto. Le pagine dello spazio negozio sono elencate come testo:"
+" lo staff non le apre direttamente."
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Exact location"
@@ -1701,6 +1723,10 @@ msgstr "testo di aiuto"
 #: apps/manager/wagtail_hooks.py
 msgid "Help texts"
 msgstr "Testi di aiuto"
+
+#: apps/manager/site_map.py
+msgid "Home"
+msgstr "Home"
 
 #: apps/manager/forms.py
 msgid ""
@@ -2192,13 +2218,21 @@ msgstr "Gestisci i codici di recupero"
 msgid "Manage two-factor settings and recovery codes"
 msgstr "Gestisci la verifica in due passaggi e i codici di recupero"
 
-#: apps/seo/site_links.py
+#: apps/manager/templatetags/manager_tags.py apps/seo/site_links.py
 msgid "Manager"
 msgstr "Manager"
+
+#: apps/manager/site_map.py
+msgid "Manager platform space"
+msgstr "Spazio piattaforma del Manager"
 
 #: apps/manager/templates/manager/layout.html
 msgid "Manager sections"
 msgstr "Sezioni del Manager"
+
+#: apps/manager/site_map.py
+msgid "Manager shop space: %(vendor)s"
+msgstr "Spazio negozio del Manager: %(vendor)s"
 
 #: apps/catalog/taxonomy.py
 msgid "manufacturer"
@@ -2242,9 +2276,13 @@ msgstr "Unisci in"
 msgid "Merge the selected brands into another brand"
 msgstr "Unisci i marchi selezionati in un altro marchio"
 
-#: apps/orders/templates/orders/customer_orders.html
+#: apps/manager/site_map.py apps/orders/templates/orders/customer_orders.html
 msgid "My orders"
 msgstr "I miei ordini"
+
+#: apps/manager/templatetags/manager_tags.py
+msgid "My shop"
+msgstr "Il mio negozio"
 
 #: apps/catalog/taxonomy.py
 msgid "name"
@@ -2445,7 +2483,7 @@ msgstr "Preavviso di cessazione"
 msgid "Notice period (days)"
 msgstr "Durata del preavviso (giorni)"
 
-#: apps/manager/sections.py
+#: apps/manager/sections.py apps/manager/site_map.py
 msgid "Notices"
 msgstr "Segnalazioni"
 
@@ -2778,7 +2816,7 @@ msgstr "In questo momento non è possibile ordinare. Riprova più tardi."
 msgid "Ordering is not open yet. Your cart is kept."
 msgstr "Gli ordini non sono ancora aperti. Il tuo carrello viene conservato."
 
-#: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
+#: apps/manager/sections.py apps/manager/site_map.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
 msgstr "Ordini"
 
@@ -2903,7 +2941,8 @@ msgstr ""
 msgid "Payment received. Thank you."
 msgstr "Pagamento ricevuto. Grazie."
 
-#: apps/manager/sections.py apps/manager/templates/manager/shop/payments.html
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/shop/payments.html
 msgid "Payments"
 msgstr "Pagamenti"
 
@@ -2986,6 +3025,11 @@ msgstr ""
 #: apps/manager/templates/manager/layout.html
 msgid "Platform"
 msgstr "Piattaforma"
+
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/platform/dashboard.html
+msgid "Platform map"
+msgstr "Mappa della piattaforma"
 
 #: apps/seo/site_links.py
 msgid "Platform space: content reports"
@@ -3093,7 +3137,7 @@ msgstr ""
 msgid "Print"
 msgstr "Stampa"
 
-#: apps/seo/site_links.py
+#: apps/manager/site_map.py apps/seo/site_links.py
 msgid "Privacy and your data"
 msgstr "Privacy e i tuoi dati"
 
@@ -3105,7 +3149,7 @@ msgstr "Informativa sulla privacy"
 msgid "Privacy requests (staff)"
 msgstr "Richieste privacy (staff)"
 
-#: apps/seo/site_links.py
+#: apps/manager/site_map.py apps/seo/site_links.py
 msgid "Privacy sub-processors"
 msgstr "Sub-responsabili del trattamento"
 
@@ -3293,6 +3337,10 @@ msgstr "Rimuovi %(name)s"
 msgid "Remove the logo"
 msgstr "Rimuovi il logo"
 
+#: apps/manager/site_map.py
+msgid "Report illegal content"
+msgstr "Segnala contenuti illegali"
+
 #: apps/seo/site_links.py
 msgid "Report illegal content (DSA)"
 msgstr "Segnala contenuti illegali (DSA)"
@@ -3379,7 +3427,7 @@ msgstr "Ruolo"
 msgid "Roles"
 msgstr "Ruoli"
 
-#: apps/manager/forms.py apps/manager/sections.py
+#: apps/manager/forms.py apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Sales terms"
@@ -3452,6 +3500,10 @@ msgstr "Seleziona"
 msgid "Select at least one row."
 msgstr "Seleziona almeno una riga."
 
+#: apps/manager/site_map.py
+msgid "Sell with us"
+msgstr "Vendi con noi"
+
 #: apps/seo/site_links.py
 msgid "Sell with us (vendor application)"
 msgstr "Vendi con noi (candidatura venditore)"
@@ -3506,6 +3558,10 @@ msgstr "Configura un’app di autenticazione"
 #: apps/accounts/templates/accounts/mfa/setup.html apps/seo/site_links.py
 msgid "Set up two-factor authentication"
 msgstr "Configura la verifica in due passaggi"
+
+#: apps/manager/site_map.py
+msgid "Setup"
+msgstr "Configurazione iniziale"
 
 #: apps/compliance/forms.py
 msgid "Shared with the vendor: it is sent in the email that says its service goes on."
@@ -3650,7 +3706,7 @@ msgid "Shows us, in aggregate, which pages are used so we can improve the shop."
 msgstr ""
 "Ci mostra, in forma aggregata, quali pagine vengono usate, così possiamo migliorare il negozio."
 
-#: apps/manager/templates/manager/login.html apps/seo/site_links.py
+#: apps/manager/site_map.py apps/manager/templates/manager/login.html apps/seo/site_links.py
 msgid "Sign in"
 msgstr "Accedi"
 
@@ -3770,7 +3826,8 @@ msgstr "Approvazione specifica delle clausole onerose (artt. 1341 e 1342 del cod
 msgid "Staff"
 msgstr "Staff"
 
-#: apps/manager/sections.py apps/manager/templates/manager/platform/staff_roles.html
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Staff and roles"
 msgstr "Staff e ruoli"
 
@@ -3833,15 +3890,25 @@ msgstr "Cronologia dello stato"
 msgid "Still needed"
 msgstr "Ancora necessario"
 
-#: apps/manager/sections.py apps/manager/templates/manager/platform/profile_changes.html
+#: apps/manager/site_map.py
+msgid "Storefront"
+msgstr "Vetrina"
+
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Storefront changes"
 msgstr "Modifiche al negozio"
+
+#: apps/manager/site_map.py
+msgid "Storefront page"
+msgstr "Pagina vetrina"
 
 #: apps/seo/site_links.py
 msgid "Storefront pages: %(language)s"
 msgstr "Pagine del negozio: %(language)s"
 
-#: apps/manager/sections.py apps/manager/templates/manager/shop/profile.html
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/shop/profile.html
 msgid "Storefront profile"
 msgstr "Profilo del negozio"
 
@@ -3913,11 +3980,11 @@ msgstr ""
 msgid "Tell us why you think the content is illegal. Required."
 msgstr "Spiegaci perché ritieni che il contenuto sia illegale. Obbligatorio."
 
-#: apps/manager/sections.py
+#: apps/manager/sections.py apps/manager/site_map.py
 msgid "Termination notice"
 msgstr "Preavviso di cessazione"
 
-#: apps/manager/sections.py
+#: apps/manager/sections.py apps/manager/site_map.py
 msgid "Terminations"
 msgstr "Cessazioni"
 
@@ -6453,7 +6520,8 @@ msgstr "Numero di tracciamento"
 msgid "Tracking number: %(number)s"
 msgstr "Numero di tracciamento: %(number)s"
 
-#: apps/accounts/templates/accounts/mfa/overview.html apps/seo/site_links.py
+#: apps/accounts/templates/accounts/mfa/overview.html apps/manager/site_map.py
+#: apps/seo/site_links.py
 msgid "Two-factor authentication"
 msgstr "Verifica in due passaggi"
 
@@ -7274,7 +7342,7 @@ msgstr "Ritira e avvisa il venditore"
 msgid "Withdraw the notice"
 msgstr "Ritira il preavviso"
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/manager/site_map.py apps/orders/templates/orders/_legal_recap.html
 msgid "Withdrawal"
 msgstr "Recesso"
 

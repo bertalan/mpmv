@@ -77,6 +77,7 @@ shop = (
 platform = (
     [
         path("", views.PlatformDashboardView.as_view(), name="dashboard"),
+        path("map/", views.PlatformMapView.as_view(), name="map"),
         path("staff/", views.StaffRolesView.as_view(), name="staff_roles"),
         # CORE.24: one user's sessions (Support) and the owner's "End every session".
         path("sessions/", session_views.UserSessionsView.as_view(), name="user_sessions"),
