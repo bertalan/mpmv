@@ -120,7 +120,7 @@ part of the done-when still open) · `not started`.
 | I18N.7 | partial: 1 of n (Manager and account strings in Italian) | #245 | Italian catalog for the Manager and account strings through `tools/i18n_catalog.py` (extract, compile, check; `make check` runs the check) |
 | CAT.19 | done | #154 | Vendor products in the Manager shop space |
 | VEN.24 | done | #141 | Claim an imported vendor (legal email or registered PEC) |
-| SEC.5 | partial: items 6, 7, 9 and 10 of the security wave open | #162, #169, #166, #171 | Security headers by response type, endpoint sweep, hostile-input corpus, rate-limit tests |
+| SEC.5 | partial: items 6, 7, 9 and 10 of the security wave open; items 6 and 10: WIP on lane-b/sec-5-attacks-accounts-wip, lane-b/sec-5-attacks-abuse-wip, lane-b/sec-5-attacks-business-wip and lane-b/sec-5-supply-chain-wip, unreviewed, 6 days behind main | #162, #169, #166, #171 | Security headers by response type, endpoint sweep, hostile-input corpus, rate-limit tests |
 | CAT.9 | done | #167 | Product search: full-text per language, trigram, SKU prefix |
 | CORE.20 | done | #171 | Per-IP limit on refused API keys |
 | CMS.3 | done | #156 | Blog: index and post pages, scheduling, translatable authors with author pages, ProfilePage/Person and BlogPosting JSON-LD, choosers, `import_article` |
