@@ -74,7 +74,11 @@ For parallel work (worktrees, agents), set `MPMV_TEST_DB_NAME=test_mpmv_<branch>
 database run last, one group per test, see `conftest.py`). pytest-django gives every worker its own database, named
 `$MPMV_TEST_DB_NAME` plus `_gw0`, `_gw1`, and so on. Locally the default is 2 workers, which is safe
 on a low-RAM machine; use `make test MPMV_TEST_WORKERS=4` to raise it, or `0` to run serially. CI
-uses `-n auto`. Several worktrees can still share one PostgreSQL: set `MPMV_TEST_DB_NAME` per branch,
+splits the suite into 4 shards (ARC.34: `MPMV_TEST_SHARD=i/4`, a deterministic crc32 split of the test ids in
+`conftest.py`, each shard on its own runner and PostgreSQL service; `tools/check_test_shards.py 4` checks that the
+shards together hold every test once) and uses `-n auto` inside each shard. To reproduce one shard locally, run
+`MPMV_TEST_SHARD=2/4 make test`. A pull request that changes only docs, markdown, spec files or locale catalogs
+skips the image and E2E jobs; a draft skips them too, and marking it ready runs them. Several worktrees can still share one PostgreSQL: set `MPMV_TEST_DB_NAME` per branch,
 and run the full suite under the `flock` rule. Tests must not depend on order or on state shared
 between files (module globals, fixed ports, fixed file names): use `tmp_path` and per-test data.
 
