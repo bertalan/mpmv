@@ -43,6 +43,11 @@ counts the earlier totals.
 The garage (owner decision D-38, 2026-11-10, [17](17-garage-fitment.md)) adds FIT.1 to FIT.15 as P1 in six
 slices: +16 tasks, +170 h of P1 (FIT.16, 14 h, is P3). The P1 critical path grows from 147 to 153 h (the FIT chain becomes the longest).
 
+Owner decisions of 2026-11-15: I18N.4 (the translation queue, 8 h) moves from P1 to P2 because visitor
+content stays English at go-live (Q-49); VEN.39 (2 h, audit of every vendor text) and CORE.31 (1 h,
+regression pins for the API keys of inactive vendors) are added as P1. Net: -5 h of P1, +8 h of P2.
+The generated backlog has the current totals.
+
 The public STAGE demo mode (owner decision 2026-11-08) adds the row ARC.22: +1 task, +6 h of P1.
 
 The owner's decision D-07 (2026-11-07: descriptive `/{taxonomy}/{term}/` URLs, legacy tag URLs
