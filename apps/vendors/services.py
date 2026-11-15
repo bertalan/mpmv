@@ -489,7 +489,7 @@ def ensure_vendor_can_write(vendor: Vendor) -> str:
         raise RuntimeError("ensure_vendor_can_write must run inside the write transaction")
     with connection.cursor() as cursor:
         cursor.execute(
-            f"SELECT status FROM {connection.ops.quote_name(Vendor._meta.db_table)} "  # noqa: S608
+            f"SELECT status FROM {connection.ops.quote_name(Vendor._meta.db_table)} "  # noqa: S608 (quoted model name, bound id)
             "WHERE id = %s FOR SHARE",
             [vendor.pk],
         )

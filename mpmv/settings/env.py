@@ -11,10 +11,14 @@ _FALSE = {"0", "false", "no", "off", ""}
 
 
 def env_str(name: str, default: str | None = None) -> str:
-    value = os.environ.get(name, default)
-    if value is None:
-        raise ImproperlyConfigured(f"Missing required environment variable {name}")
-    return value
+    """The variable's value; without a default it is required, and set-but-empty counts as
+    missing (an env file with `NAME=` must not start the app with an empty secret, SEC.5)."""
+    value = os.environ.get(name)
+    if default is None:
+        if value is None or not value.strip():
+            raise ImproperlyConfigured(f"Missing required environment variable {name}")
+        return value
+    return default if value is None else value
 
 
 def env_bool(name: str, default: bool = False) -> bool:

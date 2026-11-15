@@ -33,7 +33,7 @@ def force_state(table: str, pk: int, state: str) -> None:
     """Put a row in any state, skipping the triggers (test set-up only)."""
     with connection.cursor() as cursor:
         cursor.execute("SET LOCAL session_replication_role = replica")
-        cursor.execute(f"UPDATE {table} SET state = %s WHERE id = %s", [state, pk])  # noqa: S608
+        cursor.execute(f"UPDATE {table} SET state = %s WHERE id = %s", [state, pk])  # noqa: S608 (table name set by the test, values bound)
         cursor.execute("SET LOCAL session_replication_role = origin")
 
 

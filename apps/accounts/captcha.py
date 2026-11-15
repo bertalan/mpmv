@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 TURNSTILE_SCRIPT_URL = "https://challenges.cloudflare.com/turnstile/v0/api.js"
 # The name of the hidden input the widget adds to the form (a field name, not a secret).
-TOKEN_FIELD = "cf-turnstile-response"  # noqa: S105
+TOKEN_FIELD = "cf-turnstile-response"  # noqa: S105 (a form field name)
 
 Transport = Callable[[str, Mapping[str, str], float], Mapping[str, Any]]
 
@@ -40,7 +40,7 @@ class CaptchaVerifier(Protocol):
 def _post_form(url: str, data: Mapping[str, str], timeout: float) -> Mapping[str, Any]:
     body = urllib.parse.urlencode(data).encode()
     request = urllib.request.Request(url, data=body, method="POST")  # noqa: S310 (fixed https URL)
-    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 (fixed https URL)
         answer = json.loads(response.read())
     if not isinstance(answer, dict):
         raise ValueError("siteverify did not answer with a JSON object")

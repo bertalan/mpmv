@@ -1,0 +1,12 @@
+# Reviewed pip-audit exceptions (SEC.5, docs/dev/dependency-updates.md).
+#
+# pip-audit reports no severity, so `make audit` fails on every known vulnerability in uv.lock.
+# Add an entry only when no fixed release exists yet, in a PR that explains it. Every field is
+# required; `expires` is a date at most 90 days ahead, and an expired entry fails the audit.
+#
+# [[ignore]]
+# id = "GHSA-xxxx-xxxx-xxxx"   # or PYSEC-, CVE-, OSV- id, as pip-audit prints it
+# package = "example"
+# task = "SEC.5"               # the backlog task that tracks the fix
+# reason = "No fixed release yet; the vulnerable code path is never called because ..."
+# expires = 2026-12-31

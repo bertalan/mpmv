@@ -131,7 +131,7 @@ def test_the_smoke_refuses_to_run_outside_a_hosted_ci_runner(
     """It overwrites ~/.config/mpmv and the units: never on a server or a workstation."""
     env = {"PATH": os.environ["PATH"], "HOME": str(tmp_path), **ci_env}
     result = subprocess.run(  # noqa: S603 (fixed script path)
-        ["bash", str(SMOKE), "mpmv-app:ci"],  # noqa: S607
+        ["bash", str(SMOKE), "mpmv-app:ci"],  # noqa: S607 (bash from PATH, as in CI)
         env=env,
         capture_output=True,
         text=True,
@@ -208,7 +208,7 @@ PREVIOUS = ROOT / "deploy" / "ci" / "previous-release.sh"
 
 def git(*args: str, cwd: Path) -> None:
     subprocess.run(  # noqa: S603 (fixed git calls in a temporary repository)
-        ["git", *args],  # noqa: S607
+        ["git", *args],  # noqa: S607 (the tool comes from PATH, as in CI)
         cwd=cwd,
         check=True,
         capture_output=True,
@@ -238,7 +238,7 @@ def clone_with_tags(tmp_path: Path, tags: list[str]) -> Path:
 
 def previous_release(clone: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603 (fixed script path)
-        ["bash", str(PREVIOUS), str(clone), *args],  # noqa: S607
+        ["bash", str(PREVIOUS), str(clone), *args],  # noqa: S607 (the tool comes from PATH, as in CI)
         capture_output=True,
         text=True,
         check=False,
@@ -318,7 +318,7 @@ def test_the_upgrade_path_is_required_on_main_and_release_tags_only(
     event: str, ref: str, expected: str
 ) -> None:
     result = subprocess.run(  # noqa: S603 (fixed script path)
-        ["bash", str(POLICY)],  # noqa: S607
+        ["bash", str(POLICY)],  # noqa: S607 (the tool comes from PATH, as in CI)
         env={"PATH": os.environ["PATH"], "GITHUB_EVENT_NAME": event, "GITHUB_REF": ref},
         capture_output=True,
         text=True,
@@ -333,7 +333,7 @@ HANDS_OVER = ROOT / "deploy" / "ci" / "hands-over.sh"
 
 def hands_over(script: Path) -> int:
     return subprocess.run(  # noqa: S603 (fixed script path)
-        ["bash", str(HANDS_OVER), str(script)],  # noqa: S607
+        ["bash", str(HANDS_OVER), str(script)],  # noqa: S607 (the tool comes from PATH, as in CI)
         capture_output=True,
         check=False,
     ).returncode

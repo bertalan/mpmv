@@ -37,7 +37,7 @@ def database_dump() -> str:
         rows: list[str] = []
         for table in tables:
             quoted = connection.ops.quote_name(table)
-            cursor.execute(f"SELECT row_to_json(t)::text FROM {quoted} t")  # noqa: S608
+            cursor.execute(f"SELECT row_to_json(t)::text FROM {quoted} t")  # noqa: S608 (quoted model name)
             rows.extend(row[0] for row in cursor.fetchall())
     return "\n".join(rows)
 
@@ -57,7 +57,7 @@ def set_raw(vendor: Vendor, column: str, value: str) -> None:
     with connection.cursor() as cursor:
         quoted = connection.ops.quote_name(column)
         cursor.execute(
-            f"UPDATE vendors_vendor SET {quoted} = %s WHERE id = %s",  # noqa: S608
+            f"UPDATE vendors_vendor SET {quoted} = %s WHERE id = %s",  # noqa: S608 (quoted model name, bound values)
             [value, vendor.pk],
         )
 
