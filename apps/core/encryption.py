@@ -85,7 +85,7 @@ def key_usage(connection: BaseDatabaseWrapper, table: str, column: str) -> dict[
     quoted_table, quoted_column = _names(connection, table, column)
     with connection.cursor() as cursor:
         cursor.execute(
-            f"SELECT CASE WHEN {quoted_column} LIKE %s THEN split_part({quoted_column}, ':', 2)"  # noqa: S608
+            f"SELECT CASE WHEN {quoted_column} LIKE %s THEN split_part({quoted_column}, ':', 2)"  # noqa: S608 (quoted model names, bound values)
             f" ELSE '' END AS key_id, count(*),"
             f" min(CASE WHEN {quoted_column} LIKE %s THEN {quoted_column} END)"
             f" FROM {quoted_table} WHERE {quoted_column} <> '' GROUP BY 1 ORDER BY 1",
@@ -114,7 +114,7 @@ def stale_rows(
     params = [f"{crypto.PREFIX}:%", primary] * len(columns)
     with connection.cursor() as cursor:
         cursor.execute(
-            f"SELECT {quoted} FROM {connection.ops.quote_name(table)}"  # noqa: S608
+            f"SELECT {quoted} FROM {connection.ops.quote_name(table)}"  # noqa: S608 (quoted model names, bound values)
             f" WHERE {conditions} ORDER BY 1 FOR UPDATE",
             params,
         )
@@ -167,7 +167,7 @@ def verify_column(
     quoted_table, quoted_column = _names(connection, model._meta.db_table, column.column)
     with connection.chunked_cursor() as cursor:
         cursor.execute(
-            f"SELECT {quoted_key}, {quoted_column} FROM {quoted_table}"  # noqa: S608
+            f"SELECT {quoted_key}, {quoted_column} FROM {quoted_table}"  # noqa: S608 (quoted model names, no values)
             f" WHERE {quoted_column} <> '' ORDER BY 1"
         )
         while rows := cursor.fetchmany(1000):

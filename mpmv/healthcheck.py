@@ -30,7 +30,7 @@ def probe(url: str, host: str, timeout: float = 5.0) -> bool:
         url, headers={"Host": host}
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 (same fixed loopback URL)
             return bool(response.status == 200)
     except (urllib.error.URLError, OSError):
         return False

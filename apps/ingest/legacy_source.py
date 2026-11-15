@@ -176,7 +176,7 @@ class LegacyReader:
         Trashed posts are not products (see `redirect_sources`)."""
         report = ProductReport()
         rows = self.query(
-            f"SELECT p.id, p.post_type, p.post_status, p.post_author, p.post_parent, "  # noqa: S608
+            f"SELECT p.id, p.post_type, p.post_status, p.post_author, p.post_parent, "  # noqa: S608 (table names from the fixed prefix, values bound; read-only verb guard in query())
             f"tr.trid, tr.language_code FROM {self.t('posts')} p "
             f"LEFT JOIN {self.t('translations')} tr ON tr.element_id = p.id "
             "AND tr.element_type = 'post_' || p.post_type "
@@ -216,7 +216,7 @@ class LegacyReader:
         maps = code_maps or RedirectCodeMaps()
         out: list[RedirectSource] = []
         posts = self.query(
-            f"SELECT p.id, p.post_status, p.post_name, COALESCE(tr.language_code, '') "  # noqa: S608
+            f"SELECT p.id, p.post_status, p.post_name, COALESCE(tr.language_code, '') "  # noqa: S608 (table names from the fixed prefix, values bound; read-only verb guard in query())
             f"FROM {self.t('posts')} p LEFT JOIN {self.t('translations')} tr "
             "ON tr.element_id = p.id AND tr.element_type = 'post_' || p.post_type "
             "WHERE p.post_type = 'product' ORDER BY p.id"
@@ -263,7 +263,7 @@ class LegacyReader:
         return {
             r[0]: (r[1], r[2])
             for r in self.query(
-                f"SELECT id, post_status, post_date FROM {self.t('posts')} "  # noqa: S608
+                f"SELECT id, post_status, post_date FROM {self.t('posts')} "  # noqa: S608 (table names from the fixed prefix, values bound; read-only verb guard in query())
                 "WHERE post_type = 'shop_order' ORDER BY id"
             )
         }
@@ -296,7 +296,7 @@ class LegacyReader:
             report.orders.append(LegacyOrder(oid, status, _dt(created), total, meta[oid]))
         secondary: dict[int, rules.OrderSnapshot] = {}
         for oid, status, total_raw in self.query(
-            f"SELECT id, status, total_amount FROM {self.t('orders_secondary')} ORDER BY id"  # noqa: S608
+            f"SELECT id, status, total_amount FROM {self.t('orders_secondary')} ORDER BY id"  # noqa: S608 (table names from the fixed prefix, values bound; read-only verb guard in query())
         ):
             try:
                 secondary[oid] = rules.OrderSnapshot(oid, status, rules.parse_money(total_raw))
@@ -310,7 +310,7 @@ class LegacyReader:
     def _guard_items(self, order_ids: Sequence[int]) -> None:
         wanted = set(order_ids)
         for oid, item_type, name in self.query(
-            f"SELECT order_id, order_item_type, order_item_name FROM {self.t('order_items')}"  # noqa: S608
+            f"SELECT order_id, order_item_type, order_item_name FROM {self.t('order_items')}"  # noqa: S608 (table names from the fixed prefix, values bound; read-only verb guard in query())
         ):
             if oid in wanted:
                 rules.guard_vat_like_fee(item_type, name)
@@ -322,7 +322,7 @@ class LegacyReader:
     ) -> list[LegacyCustomer]:
         """Active customers: role filter first, then the activity rule. The window is the
         vendor's MIG.16 choice, passed in."""
-        users = [r[0] for r in self.query(f"SELECT id FROM {self.t('users')} ORDER BY id")]  # noqa: S608
+        users = [r[0] for r in self.query(f"SELECT id FROM {self.t('users')} ORDER BY id")]  # noqa: S608 (table names from the fixed prefix, values bound; read-only verb guard in query())
         meta = self._meta("usermeta", "user_id", users, ["capabilities", "last_active"])
         last_order: dict[int, datetime] = {}
         orders = self._posts_orders()

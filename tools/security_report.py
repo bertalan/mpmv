@@ -79,7 +79,8 @@ def junit_summary(paths: list[Path]) -> Summary:
     for path in paths:
         if not path.is_file():
             continue
-        for case in ET.parse(path).getroot().iter("testcase"):
+        root = ET.parse(path).getroot()  # noqa: S314 (JUnit XML written by our own pytest run)
+        for case in root.iter("testcase"):
             summary.total += 1
             name = case_name(case.get("classname", ""), case.get("name", ""))
             if case.find("failure") is not None:
@@ -169,7 +170,12 @@ def issue_body(
 
 
 def gh(*args: str) -> str:
-    return subprocess.run(["gh", *args], check=True, capture_output=True, text=True).stdout
+    return subprocess.run(  # noqa: S603 (fixed gh CLI, arguments built in this file)
+        ["gh", *args],  # noqa: S607 (gh from PATH on the CI runner)
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
 
 
 def open_issues() -> list[dict[str, object]]:
@@ -187,7 +193,8 @@ def open_issues() -> list[dict[str, object]]:
             "100",
         )
     )
-    assert isinstance(found, list)
+    if not isinstance(found, list):
+        raise TypeError("gh issue list did not return a JSON array")
     return found
 
 
