@@ -8,7 +8,10 @@
 | Micro-tasks (ID, priority, hours, deps, done-when) | Task tables in each `docs/spec/NN-*.md` | Yes |
 | Backlog by phase, CSV export | `docs/spec/90-backlog.md`, `docs/spec/backlog.csv` | **No**, run `make docs` |
 | Open decisions | `docs/spec/92-open-decisions.md` | Yes, and close each one with an ADR |
-| Architecture decisions | `docs/adr/NNNN-*.md` | Yes, never rewrite an accepted ADR; supersede it |
+| Architecture decisions | `docs/adr/NNNN-*.md` | Yes, never rewrite the decision of an accepted ADR; supersede it |
+
+An accepted ADR may get form-only corrections (wording, links, removing an external reference)
+without changing its decision. A change of decision needs a new ADR that supersedes it.
 
 Everything in the repository is in English: spec, ADRs, code, comments, docstrings, commit messages
 and developer docs.
