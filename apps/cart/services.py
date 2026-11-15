@@ -170,8 +170,9 @@ def add_to_cart(
     ValidationError when the item cannot be bought or the total exceeds the available stock.
     The line remembers the current display price (`added_price_net`).
     """
-    if quantity < 1:
-        raise ValidationError({"quantity": "The quantity must be at least 1."})
+    error = engine.count_error(quantity)
+    if error is not None:
+        raise ValidationError({"quantity": error})
     with transaction.atomic():
         Cart.objects.select_for_update().get(pk=cart.pk)  # one change at a time per cart
         product = Product.objects.select_related("vendor").get(pk=product.pk)
@@ -204,6 +205,8 @@ def add_to_cart(
 
 def set_line_quantity(line: CartLine, quantity: int, *, dry_run: bool = False) -> ChangeSet:
     """Set the line's quantity; 0 removes the line. Refused above the available stock."""
+    if not engine.is_whole_quantity(quantity):
+        raise ValidationError({"quantity": "The quantity must be a whole number."})
     if quantity <= 0:
         return remove_line(line, dry_run=dry_run)
     with transaction.atomic():

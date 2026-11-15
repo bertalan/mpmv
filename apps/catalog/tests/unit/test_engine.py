@@ -47,6 +47,14 @@ def test_negative_prices_are_refused() -> None:
         engine.to_price("-0.01")
 
 
+@pytest.mark.parametrize("raw", ["10000000000.00", "1e30", Decimal("1E+400")])
+def test_prices_a_money_column_cannot_hold_are_refused(raw: object) -> None:
+    """SEC.5: above DecimalField(12, 2) the database would fail the request with a 500."""
+    assert engine.to_price(engine.MAX_PRICE) == engine.MAX_PRICE
+    with pytest.raises(ValueError, match="largest amount"):
+        engine.to_price(raw)
+
+
 def test_a_regular_price_without_a_sale_is_valid() -> None:
     assert engine.price_errors(Decimal("10.00"), None, None, None) == {}
 

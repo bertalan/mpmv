@@ -58,10 +58,26 @@ def line_limit(available: int | None) -> int:
     return max(0, min(available, MAX_LINE_QUANTITY))
 
 
-def quantity_error(quantity: int, *, limit: int) -> str | None:
-    """Why a line cannot hold `quantity` units, or None."""
+def is_whole_quantity(quantity: object) -> bool:
+    """A count of units: an int, not a bool, a float or a Decimal (the database would truncate
+    1.5 to 1 without a word)."""
+    return isinstance(quantity, int) and not isinstance(quantity, bool)
+
+
+def count_error(quantity: object) -> str | None:
+    """Why `quantity` is not a number of units to add, or None."""
+    if not isinstance(quantity, int) or isinstance(quantity, bool):
+        return "The quantity must be a whole number."
     if quantity < 1:
         return "The quantity must be at least 1."
+    return None
+
+
+def quantity_error(quantity: int, *, limit: int) -> str | None:
+    """Why a line cannot hold `quantity` units, or None."""
+    error = count_error(quantity)
+    if error is not None:
+        return error
     if limit <= 0:
         return "This item is out of stock."
     if quantity > limit:

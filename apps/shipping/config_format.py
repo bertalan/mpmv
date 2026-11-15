@@ -40,6 +40,7 @@ the same rule (`ParsedConfig.treatment_methods`).
 import csv
 import io
 import json
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Final
@@ -189,6 +190,13 @@ CSV_COLUMNS: Final = (
     "extra_days",
 )
 FILE: Final = "file"  # the ref of issues that concern the whole file
+
+# A spreadsheet runs a cell that starts with one of these as a formula (CSV injection). On export
+# such a text cell gets a leading apostrophe, which spreadsheets show as text and the import
+# removes again; plain numbers such as -5 are left alone. Escaping every cell that starts with
+# apostrophes and a trigger keeps the round trip exact for any text.
+_FORMULA_START: Final = re.compile(r"'*[=+\-@\t\r]")
+_PLAIN_NUMBER: Final = re.compile(r"[+-]?\d+(\.\d+)?")
 
 type MethodId = tuple[str, str, str]  # (zone_scope, zone code, method key)
 
@@ -431,8 +439,21 @@ def _add_csv_row(parsed: ParsedConfig, ref: str, cells: Mapping[str, str]) -> No
     _add_row(parsed, record, ref, values, method=method)
 
 
+def _escape_formula(cell: str) -> str:
+    if _FORMULA_START.match(cell) and not _PLAIN_NUMBER.fullmatch(cell):
+        return "'" + cell
+    return cell
+
+
+def _unescape_formula(cell: str) -> str:
+    if cell.startswith("'") and _escape_formula(cell[1:]) == cell:
+        return cell[1:]
+    return cell
+
+
 def _put_cell(values: dict[str, Any], name: str, cell: str) -> None:
     """A CSV cell as the value a JSON document would hold; an empty optional cell is left out."""
+    cell = _unescape_formula(cell)
     if name in LIST_FIELDS:
         values[name] = [item.strip() for item in cell.split(LIST_SEPARATOR)] if cell.strip() else []
     elif name in BOOLEAN_FIELDS:
@@ -588,5 +609,5 @@ def _csv_cell(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, list | tuple):
-        return LIST_SEPARATOR.join(str(item) for item in value)
-    return str(to_jsonable(value))
+        return _escape_formula(LIST_SEPARATOR.join(str(item) for item in value))
+    return _escape_formula(str(to_jsonable(value)))

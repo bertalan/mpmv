@@ -61,6 +61,13 @@ def sku_warnings(raw: str) -> list[str]:
     return warnings
 
 
+# The largest amount a MoneyField holds (12 digits, 2 decimals): above it the database refuses
+# the row with an error instead of a validation message.
+MAX_PRICE = Decimal("9999999999.99")
+# The largest stock count an IntegerField holds.
+MAX_STOCK_QTY = 2**31 - 1
+
+
 def to_price(value: object) -> Decimal:
     """An exact, non-negative amount with 2 decimals.
 
@@ -70,6 +77,8 @@ def to_price(value: object) -> Decimal:
     amount = to_decimal(value)
     if not amount.is_finite():
         raise ValueError(f"{value!r} is not a finite amount")
+    if abs(amount) > MAX_PRICE:  # before quantize, which fails on a huge exponent
+        raise ValueError(f"{value!r} is above the largest amount, {MAX_PRICE}")
     if amount != amount.quantize(CENT):
         raise ValueError(f"{value!r} has more than 2 decimals")
     if amount < 0:
