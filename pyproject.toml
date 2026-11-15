@@ -120,6 +120,7 @@ markers = [
   "unit: pure functions, no database (ADR-0006)",
   "integration: real Django + PostgreSQL",
   "e2e: Playwright against a live server",
+  "security: attack scenarios in tests/security (SEC.5), run with the integration suite",
 ]
 
 [tool.coverage.run]

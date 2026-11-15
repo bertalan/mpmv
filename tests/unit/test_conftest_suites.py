@@ -13,6 +13,7 @@ from conftest import suite_for
         ("apps/tax/tests/unit/test_engine.py", "unit"),
         ("apps/orders/tests/integration/test_services.py", "integration"),
         ("tests/e2e/test_checkout.py", "e2e"),
+        ("tests/security/test_accounts_attacks.py", "integration"),
         ("tests/test_loose.py", None),
     ],
 )
