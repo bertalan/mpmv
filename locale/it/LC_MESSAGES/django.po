@@ -1422,7 +1422,8 @@ msgstr ""
 "Abilitata: imposti subito una password. Disabilitata: l'account viene creato senza password e non "
 "può accedere con una password finché non ne viene impostata una."
 
-#: apps/manager/sections.py apps/manager/templates/manager/platform/sessions_panic.html
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/platform/sessions_panic.html
 msgid "End every session"
 msgstr "Termina ogni sessione"
 
@@ -1474,6 +1475,14 @@ msgstr "Cancella il tuo account (chiede conferma)"
 msgid "Error"
 msgstr "Errore"
 
+#: apps/manager/templates/manager/platform/map.html
+msgid ""
+"Every area of the site in one place. Shop space pages are listed as text: staff do not open them "
+"directly."
+msgstr ""
+"Tutte le aree del sito in un unico posto. Le pagine dello spazio negozio sono elencate come testo:"
+" lo staff non le apre direttamente."
+
 #: apps/manager/session_views.py
 msgid "Every other session has ended. The platform staff were told."
 msgstr "Tutte le altre sessioni sono terminate. Lo staff della piattaforma è stato avvisato."
@@ -1489,13 +1498,6 @@ msgid ""
 msgstr ""
 "Ogni utente, staff e venditori compresi, viene disconnesso ovunque. Resta solo questa sessione. Le"
 " chiavi API e i link inviati per email non cambiano: revocali a parte."
-#: apps/manager/templates/manager/platform/map.html
-msgid ""
-"Every area of the site in one place. Shop space pages are listed as text: staff do not open them "
-"directly."
-msgstr ""
-"Tutte le aree del sito in un unico posto. Le pagine dello spazio negozio sono elencate come testo:"
-" lo staff non le apre direttamente."
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Exact location"
@@ -6612,7 +6614,8 @@ msgstr "Usa un codice di recupero"
 msgid "Use this device's screen lock or a security key."
 msgstr "Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
 
-#: apps/manager/sections.py apps/manager/templates/manager/platform/user_sessions.html
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/platform/user_sessions.html
 msgid "User sessions"
 msgstr "Sessioni utente"
 
