@@ -48,6 +48,11 @@ content stays English at go-live (Q-49); VEN.39 (2 h, audit of every vendor text
 regression pins for the API keys of inactive vendors) are added as P1. Net: -5 h of P1, +8 h of P2.
 The generated backlog has the current totals.
 
+Owner and adviser decisions of 2026-11-15 (spec only): `ride` on Bootstrap 5.3 adds THM.13 to THM.16
+(39 h of P1) and revises THM.7, THM.9 and THM.10 (spec 14, Q-98); the tax adviser answers (D-46) move
+VEN.34 from P2 to P1 (12 h) and add CMP.34 and ARC.35; ARC.34 (CI speed, 4 h) is P1. From check 31 to
+check 32 the generated totals went from 2,282 to 2,344 h of P1 and from 3,134 to 3,202 h in all.
+
 The public STAGE demo mode (owner decision 2026-11-08) adds the row ARC.22: +1 task, +6 h of P1.
 
 The owner's decision D-07 (2026-11-07: descriptive `/{taxonomy}/{term}/` URLs, legacy tag URLs
