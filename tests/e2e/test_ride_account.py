@@ -34,7 +34,7 @@ def _ride(settings: SettingsWrapper, live_server: LiveServer, _cms_site: None) -
 
 def _check(page: Page, width: int) -> None:
     expect(page.locator("html")).to_have_attribute("data-theme", "ride")
-    panel = page.locator(".account-page")
+    panel = page.locator(".account-page, .privacy-account")
     expect(panel).to_have_count(1)
     style = panel.evaluate(
         "e => { const s = getComputedStyle(e); return {w: s.maxWidth, top: s.borderTopWidth}; }"
