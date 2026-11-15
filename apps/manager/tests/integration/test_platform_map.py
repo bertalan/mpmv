@@ -73,3 +73,36 @@ def test_the_dashboard_links_to_the_map(client: Client, platform_staff: User) ->
     VendorFactory.create()
     verified_login(client, platform_staff)
     assert f'href="{MAP}"' in client.get(PLATFORM).text
+
+
+ACCOUNT = "/account/orders/"
+
+
+
+def test_a_vendor_owner_reaches_the_manager_from_the_site(client: Client, owner: User) -> None:
+    verified_login(client, owner)
+    page = client.get(ACCOUNT).text
+    assert page.count('href="/manager/shop/"') == 2  # header account menu and account area
+    assert "My shop" in page
+
+
+def test_platform_staff_reach_the_manager_from_the_site(
+    client: Client, platform_staff: User
+) -> None:
+    verified_login(client, platform_staff)
+    page = client.get(ACCOUNT).text
+    assert page.count(f'href="{PLATFORM}"') == 2
+    assert ">Manager</a>" in page
+
+
+def test_a_plain_customer_gets_no_manager_entry(client: Client, customer: User) -> None:
+    client.force_login(customer)
+    page = client.get(ACCOUNT).text
+    assert "/manager/" not in page
+    assert "My shop" not in page
+
+
+def test_an_anonymous_visitor_gets_no_manager_entry(client: Client) -> None:
+    response = client.get("/cookie-settings/")
+    assert response.status_code == 200
+    assert "/manager/" not in response.text

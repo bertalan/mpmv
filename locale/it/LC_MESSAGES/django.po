@@ -2136,7 +2136,7 @@ msgstr "Gestisci i codici di recupero"
 msgid "Manage two-factor settings and recovery codes"
 msgstr "Gestisci la verifica in due passaggi e i codici di recupero"
 
-#: apps/seo/site_links.py
+#: apps/manager/templatetags/manager_tags.py apps/seo/site_links.py
 msgid "Manager"
 msgstr "Manager"
 
@@ -2197,6 +2197,10 @@ msgstr "Unisci i marchi selezionati in un altro marchio"
 #: apps/manager/site_map.py apps/orders/templates/orders/customer_orders.html
 msgid "My orders"
 msgstr "I miei ordini"
+
+#: apps/manager/templatetags/manager_tags.py
+msgid "My shop"
+msgstr "Il mio negozio"
 
 #: apps/catalog/taxonomy.py
 msgid "name"
