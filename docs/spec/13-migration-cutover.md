@@ -260,7 +260,10 @@ they follow the same staggered switch as product URLs:
 ## 13.4 Cutover runbook
 
 1. T−7 days: DNS TTL lowered; open quotes closed or scheduled; communication to vendors; a site
-   banner announces the change a few days before launch (L-11).
+   banner announces the change a few days before launch (L-11). Fiscal set-up (D-46): the first
+   `PlatformOperator` version is in force with regime RF19, and the operator has registered on
+   the Agenzia delle Entrate portal for DAC7 (Provvedimento of 20/11/2023), which must precede the
+   first filing; the annual DAC7 filing (CMP.1) is due by 31 January.
 2. T−1: final dress rehearsal; go/no-go on the parity reports, zero in-progress legacy orders and
    no open vendor payout on the legacy site (owner decision 2026-11-12, relayed by lane-a, #86).
 3. T0: WordPress freeze (maintenance mode, no checkout); final ETL; parity reports. In-flight
