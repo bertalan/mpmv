@@ -23,6 +23,7 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Section | Configuration and tax | Catalog and moderation | Finance and payments | Support | Platform owner | Tech. superuser |
 |---|---|---|---|---|---|---|
 | Platform: dashboard | R | R | R | R | R |  |
+| Platform: map of the site (CORE.30) | R | R | R | R | R |  |
 | Platform: configuration and tax (ARC.24) | E |  |  |  | R |  |
 | Platform: owner-only settings (CMP.13, CMP.11 approvals) | R |  |  |  | E |  |
 | Platform: catalog, categories, attributes, taxonomies, imports |  | E |  | R | R |  |
@@ -35,6 +36,8 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Platform: close a vendor definitively |  |  |  |  | E |  |
 | Platform: orders and customers |  |  | R | R+A | R |  |
 | Platform: support actions (unlock, resend link) |  |  |  | A | A |  |
+| Platform: a user's sessions, end them (CORE.24) |  |  |  | A | A |  |
+| Platform: end every session, the panic button (CORE.24) |  |  |  |  | E |  |
 | Platform: account activation and service messages (CORE.19) |  |  |  | A | E |  |
 | Platform: start an impersonation session (CORE.10) |  |  |  | A |  |  |
 | Platform: impersonation policy and full-access grants | R |  |  | R | R | E |

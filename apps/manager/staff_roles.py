@@ -28,6 +28,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Q
 
+from apps.accounts.services import end_sessions_after_change
 from apps.core.audit import AuditContext, user_context
 from apps.core.changeset import ChangeSet
 from apps.core.models import PLATFORM_OWNER_CODENAME
@@ -155,6 +156,8 @@ def _grant_locked(
 
     def apply() -> None:
         target.groups.add(Group.objects.get(name=roles.role(role_key).group))
+        # CORE.24: a role change ends the account's other sessions.
+        end_sessions_after_change(target, reason="role", ctx=_audit_context(actor, ctx))
         if self_assigned:
             _notify_self_assignment(actor, role_key, reason)
 
@@ -216,6 +219,7 @@ def revoke_role(
                 target.user_permissions.remove(
                     *target.user_permissions.filter(codename=PLATFORM_OWNER_CODENAME)
                 )
+            end_sessions_after_change(target, reason="role", ctx=_audit_context(actor, ctx))
 
         return run_mutation(
             changes, apply, ctx=_audit_context(actor, ctx), action=REVOKE_ACTION, dry_run=dry_run

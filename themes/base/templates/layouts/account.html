@@ -4,7 +4,7 @@ Layout of the customer and vendor areas and the sign-in steps (THM.3, spec 14 §
 pages have no language prefix and no CMS page, so the language switcher returns to the same
 path instead of a translated page. Pages fill `account_content` and set `title`.
 {% endcomment %}
-{% load i18n cms_tags %}
+{% load i18n cms_tags manager_tags %}
 {% block title %}{{ site_name }}{% endblock %}
 {% block header %}
   {% navigation_links "header" as header_links %}
@@ -13,6 +13,7 @@ path instead of a translated page. Pages fill `account_content` and set `title`.
 {% endblock %}
 {% block content %}
   <div class="account-page">
+    {% manager_entry as manager_link %}{% if manager_link %}<p class="account-page__manager"><a href="{{ manager_link.url }}">{{ manager_link.label }}</a></p>{% endif %}
     {% block account_content %}{% endblock %}
   </div>
 {% endblock %}

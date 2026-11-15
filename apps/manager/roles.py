@@ -117,6 +117,7 @@ E, R, A, RA = Access.EDIT, Access.READ, Access.ACTION, Access.READ_ACTION
 # Section key -> {role key: access}. Keys are the Manager registry's section keys.
 MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.dashboard": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: R, OWNER: R},
+    "platform.map": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: R, OWNER: R},  # CORE.30
     "platform.config": {CONFIG: E, OWNER: R},
     "platform.owner_settings": {CONFIG: R, OWNER: E},
     "platform.catalog": {CATALOG: E, SUPPORT: R, OWNER: R},
@@ -130,6 +131,8 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.vendor_closure": {OWNER: E},
     "platform.orders_customers": {FINANCE: R, SUPPORT: RA, OWNER: R},
     "platform.support_actions": {SUPPORT: A, OWNER: A},
+    "platform.user_sessions": {SUPPORT: A, OWNER: A},  # CORE.24: end one user's sessions
+    "platform.sessions_panic": {OWNER: E},  # CORE.24: the "End every session" panic button
     "platform.activation": {SUPPORT: A, OWNER: E},
     "platform.impersonation_start": {SUPPORT: A},  # config: A only if the policy enables it
     "platform.impersonation_policy": {CONFIG: R, SUPPORT: R, OWNER: R, SUPERUSER: E},
@@ -141,6 +144,7 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
 
 SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.dashboard": "Platform: dashboard",
+    "platform.map": "Platform: map of the site (CORE.30)",
     "platform.config": "Platform: configuration and tax (ARC.24)",
     "platform.owner_settings": "Platform: owner-only settings (CMP.13, CMP.11 approvals)",
     "platform.catalog": "Platform: catalog, categories, attributes, taxonomies, imports",
@@ -153,6 +157,8 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.vendor_closure": "Platform: close a vendor definitively",
     "platform.orders_customers": "Platform: orders and customers",
     "platform.support_actions": "Platform: support actions (unlock, resend link)",
+    "platform.user_sessions": "Platform: a user's sessions, end them (CORE.24)",
+    "platform.sessions_panic": "Platform: end every session, the panic button (CORE.24)",
     "platform.activation": "Platform: account activation and service messages (CORE.19)",
     "platform.impersonation_start": "Platform: start an impersonation session (CORE.10)",
     "platform.impersonation_policy": "Platform: impersonation policy and full-access grants",

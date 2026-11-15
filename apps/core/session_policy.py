@@ -11,7 +11,8 @@ A sensitive action is always sensitive: the passkey window grants no extra power
 fresh passkey cover several sensitive actions for a limited time. Groups: 1 everyday (free),
 2 sensitive (a passkey once, or an open window), 3 critical (a fresh passkey each time, even with
 the window open). An action named in no list fails closed to sensitive. The floor actions (payout
-and bank details, the owner-role grant, MFA disable, `bootstrap_platform_owner`) are critical
+and bank details, the owner-role grant, MFA disable, `bootstrap_platform_owner`, and ending a
+user's sessions or every session, CORE.24) are critical
 whatever the lists say (CORE.26 reuses this floor for the vendor layer).
 
 Policies stored before the wording change use the list keys `restricted`, `operational` and
@@ -58,10 +59,24 @@ DEFAULT_SENSITIVE_ACTIONS: Final = frozenset(
     }
 )
 DEFAULT_CRITICAL_ACTIONS: Final = frozenset(
-    {"payout_details", "owner_role_grant", "mfa_disable", "bootstrap_platform_owner"}
+    {
+        "payout_details",
+        "owner_role_grant",
+        "mfa_disable",
+        "bootstrap_platform_owner",
+        "sessions_end_user",
+        "sessions_end_all",
+    }
 )
 FLOOR_CRITICAL_ACTIONS: Final = frozenset(
-    {"payout_details", "owner_role_grant", "mfa_disable", "bootstrap_platform_owner"}
+    {
+        "payout_details",
+        "owner_role_grant",
+        "mfa_disable",
+        "bootstrap_platform_owner",
+        "sessions_end_user",
+        "sessions_end_all",
+    }
 )
 
 _LISTS = ("everyday", "sensitive", "critical")

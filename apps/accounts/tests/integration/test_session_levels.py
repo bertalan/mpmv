@@ -617,6 +617,8 @@ WIRED = {
     "notice_decision",
     "sales_terms_publish",
     "bulk_edit",
+    "sessions_end_user",  # CORE.24
+    "sessions_end_all",  # CORE.24
 }
 # Actions whose web view does not exist yet: nothing to decorate (follow-ups in the PR).
 NOT_BUILT = {"tax_in_clear", "export", "backup", "impersonation"}
@@ -672,6 +674,9 @@ MANAGER_UNGATED: dict[str, str] = {
         "answers with the format form and the embed of an own image already chosen: stores nothing"
     ),
     "apps.manager.views.LoginView": "the sign-in form itself, before any session level exists",
+    "apps.manager.session_views.UserLookupView": (
+        "finds an account by email (CORE.24): a read sent as POST so the email stays out of URLs"
+    ),
     "apps.manager.views.logout": "sign-out: ends the session, nothing to protect",
 }
 MUTATING = ("post", "put", "patch", "delete")

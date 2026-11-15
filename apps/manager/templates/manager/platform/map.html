@@ -1,0 +1,17 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}Platform map (CORE.30): every area of the site, grouped, for platform staff.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p class="manager-lead">{% translate "Every area of the site in one place. Shop space pages are listed as text: staff do not open them directly." %}</p>
+  {% for group in groups %}
+    <section aria-labelledby="map-group-{{ forloop.counter }}">
+      <h2 id="map-group-{{ forloop.counter }}">{{ group.title }}</h2>
+      <ul>
+        {% for entry in group.entries %}
+          <li>{% if entry.link %}<a href="{{ entry.path }}">{{ entry.label }}</a>{% else %}{{ entry.label }}: <code>{{ entry.path }}</code>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endfor %}
+{% endblock %}

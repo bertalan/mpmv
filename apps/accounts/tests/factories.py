@@ -21,6 +21,7 @@ from apps.accounts.models import (
     RecoveryCode,
     RecoveryCodeDevice,
     User,
+    UserSession,
 )
 
 
@@ -175,3 +176,29 @@ class ActionLinkIssueFactory(DjangoModelFactory[ActionLinkIssue]):
     object_key = factory.Sequence(lambda n: f"doc-{n}")
     user = factory.SubFactory(UserFactory)
     generation = 1
+
+
+class UserSessionFactory(DjangoModelFactory[UserSession]):
+    """An index row with a live session row behind it (CORE.24), so it is listed and endable."""
+
+    class Meta:
+        model = UserSession
+        skip_postgeneration_save = True
+
+    user = factory.SubFactory(UserFactory)
+    session_key = factory.LazyFunction(lambda: secrets.token_hex(16))
+    last_seen = factory.LazyFunction(timezone.now)
+    browser = "Firefox"
+    system = "Linux"
+    network = "192.0.2.0/24"
+
+    @factory.post_generation
+    def live(obj: UserSession, create: bool, extracted: bool | None, **kwargs: Any) -> None:
+        if not create or extracted is False:
+            return
+        from django.contrib.sessions.models import Session
+
+        Session.objects.get_or_create(
+            session_key=obj.session_key,
+            defaults={"session_data": "", "expire_date": timezone.now() + timedelta(days=1)},
+        )

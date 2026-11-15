@@ -259,3 +259,36 @@ class SalesTermsForm(forms.Form):
         max_length=1000,
         required=False,
     )
+
+
+class UserLookupForm(forms.Form):
+    """Find the account whose sessions Support looks at (CORE.24)."""
+
+    email = forms.EmailField(
+        label=_("Email of the account"),
+        help_text=_("The email of an existing account. Capitals do not matter."),
+    )
+
+
+class EndUserSessionsForm(forms.Form):
+    """Support ends every session of one account (CORE.24); the service owns the rules."""
+
+    user = forms.UUIDField(widget=forms.HiddenInput)
+    reason = forms.CharField(
+        label=_("Reason"),
+        max_length=500,
+        help_text=_(
+            "Why the sessions end, for example a suspected takeover. Kept in the audit log; do "
+            "not write personal data in it."
+        ),
+    )
+
+
+class EndEverySessionForm(forms.Form):
+    """The platform owner's panic button (CORE.24): the fixed word confirms it."""
+
+    confirm = forms.CharField(
+        label=_("Confirmation"),
+        max_length=100,
+        help_text=_("Type the words shown above, in capitals, to end every session."),
+    )

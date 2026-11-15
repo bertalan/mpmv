@@ -147,8 +147,10 @@ def test_the_user_menu_closes_when_focus_leaves_it_and_stays_keyboard_usable(
     assert menu.evaluate("(el) => el.open")
     page.keyboard.press("Tab")  # into the menu: stays open
     assert menu.evaluate("(el) => el.open")
-    for _ in range(3):  # past the last item and out of the menu
+    for _ in range(10):  # past the last item and out of the menu, whatever its length
         page.keyboard.press("Tab")
+        if not menu.evaluate("(el) => el.contains(document.activeElement)"):
+            break
     assert not menu.evaluate("(el) => el.open")
     summary.focus()
     page.keyboard.press("Enter")
