@@ -9,6 +9,7 @@ collection and no operator bank account as payee.
 The provider talks to Stripe through `StripeClient` only (`stripe_client.py`).
 """
 
+import dataclasses
 import json
 import time
 from collections.abc import Callable, Sequence
@@ -33,6 +34,8 @@ from .engine import (
     TransferConflict,
     TransferRequest,
     TransferResult,
+    TransferReversal,
+    TransferReversalFailed,
     WebhookEvent,
     validate_payment_request,
 )
@@ -217,15 +220,51 @@ class StripePaymentProvider:
                 amount_minor=refund_minor,
                 idempotency_key=request.idempotency_key,
             )
-            if request.reverse_vendor_shares:
-                self._reverse_transfers(request, intent, refund_minor)
         except StripeError as error:
             raise ProviderError(str(error)) from error
-        return RefundResult(
+        result = RefundResult(
             refund_ref=refund.id,
             amount=stripe_engine.from_minor(refund.amount_minor, request.currency),
             provider_cost=stripe_engine.from_minor(refund.fee_minor, request.currency),
         )
+        try:
+            if request.reversals is not None:
+                reversal_refs = self._reverse_given(request, request.reversals)
+                result = dataclasses.replace(result, reversal_refs=tuple(reversal_refs))
+            elif request.reverse_vendor_shares:
+                self._reverse_transfers(request, intent, refund_minor)
+        except StripeError as error:
+            raise TransferReversalFailed(str(error), result) from error
+        return result
+
+    def reverse_transfers(
+        self, *, idempotency_key: str, currency: str, reversals: Sequence[TransferReversal]
+    ) -> Sequence[str]:
+        request = RefundRequest("", Decimal("0"), currency, idempotency_key)
+        try:
+            return self._reverse_given(request, reversals)
+        except StripeError as error:
+            raise ProviderError(str(error)) from error
+
+    def _reverse_given(
+        self, request: RefundRequest, reversals: Sequence[TransferReversal]
+    ) -> list[str]:
+        """Reverse exactly the transfers the caller names (PAY.4): one reversal per transfer."""
+        refs: list[str] = []
+        for reversal in reversals:
+            minor = stripe_engine.to_minor(reversal.amount, request.currency)
+            if minor <= 0:
+                raise ProviderError("a transfer reversal must be positive")
+            refs.append(
+                self._client.create_transfer_reversal(
+                    transfer_id=reversal.transfer_ref,
+                    amount_minor=minor,
+                    # Amount-free like `_reverse_transfers`: a changed amount on a retry must fail
+                    # closed (idempotency_error), never become a second reversal (review of #477).
+                    idempotency_key=f"{request.idempotency_key}:reverse:{reversal.transfer_ref}",
+                )
+            )
+        return refs
 
     def _reverse_transfers(
         self, request: RefundRequest, intent: StripeIntent, refund_minor: int

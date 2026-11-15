@@ -27,6 +27,7 @@ from .engine import (
     TransferConflict,
     TransferRequest,
     TransferResult,
+    TransferReversal,
     WebhookEvent,
     validate_payment_request,
 )
@@ -140,11 +141,23 @@ class FakePaymentProvider:
         if request.amount <= 0 or already + request.amount > paid.amount:
             raise ProviderError("refund exceeds the payment")
         self._refunded[request.provider_ref] = already + request.amount
-        if request.reverse_vendor_shares:
+        reversal_refs: tuple[str, ...] = ()
+        if request.reversals is not None:
+            self.reversed_transfers.extend(r.transfer_ref for r in request.reversals)
+            reversal_refs = tuple(f"fake_trr_{r.transfer_ref}" for r in request.reversals)
+        elif request.reverse_vendor_shares:
             self.reversed_transfers.extend(result.transfer_refs)
-        refund = RefundResult(f"fake_re_{len(self._refunds) + 1}", request.amount, self.refund_cost)
+        refund = RefundResult(
+            f"fake_re_{len(self._refunds) + 1}", request.amount, self.refund_cost, reversal_refs
+        )
         self._refunds[key] = refund
         return refund
+
+    def reverse_transfers(
+        self, *, idempotency_key: str, currency: str, reversals: Sequence[TransferReversal]
+    ) -> Sequence[str]:
+        self.reversed_transfers.extend(r.transfer_ref for r in reversals)
+        return tuple(f"fake_trr_{r.transfer_ref}" for r in reversals)
 
     def list_payouts(self, since: datetime) -> Sequence[PayoutRecord]:
         return [payout for payout in self._payouts if payout.paid_at >= since]

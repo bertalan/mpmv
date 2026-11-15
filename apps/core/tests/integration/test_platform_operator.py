@@ -195,3 +195,48 @@ def test_operator_has_no_einvoice_channel_field() -> None:
     names = {f.name for f in PlatformOperator._meta.get_fields()}
     assert "einvoice_channel" not in names
     assert not hasattr(PlatformOperator, "EInvoiceChannel")
+
+
+# --- D-41 refund settings (PAY.4, ARC.7) --------------------------------------------------------
+
+
+def test_the_refund_settings_default_to_the_d05_behaviour() -> None:
+    op = PlatformOperatorFactory.create(open_ended=True)
+    assert op.vendors_may_refund_outside is True
+    assert op.reverse_fees_on_vendor_refund is True
+    assert str(op.refund_fee_surcharge) == "2.00"
+    assert op.platform_refund_cases == ["platform_error", "vendor_default"]
+
+
+def test_a_new_version_carries_its_own_refund_settings_and_the_old_row_is_unchanged() -> None:
+    old = PlatformOperatorFactory.create(valid_from=utc(2026), open_ended=True)
+    new = PlatformOperatorFactory.build(
+        valid_from=utc(2027),
+        vendors_may_refund_outside=False,
+        reverse_fees_on_vendor_refund=False,
+        refund_fee_surcharge="3.00",
+        platform_refund_cases=["platform_error"],
+    )
+    configure_platform_operator(new, ctx=CTX)
+    assert current_operator(utc(2026, 6)).pk == old.pk
+    assert current_operator(utc(2027, 6)).vendors_may_refund_outside is False
+    stored = PlatformOperator.objects.get(pk=old.pk)
+    assert stored.vendors_may_refund_outside is True
+    assert str(stored.refund_fee_surcharge) == "2.00"
+    created = AuditLog.objects.filter(action="core.platform_operator.configured").latest("id")
+    assert created.after is not None
+    assert created.after["refund_fee_surcharge"] == "3.00"
+    assert created.after["platform_refund_cases"] == ["platform_error"]
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("refund_fee_surcharge", "-1.00"),
+        ("platform_refund_cases", ["something_else"]),
+    ],
+)
+def test_invalid_refund_settings_are_rejected(field: str, value: object) -> None:
+    op = PlatformOperatorFactory.build(**{field: value})
+    with pytest.raises(ValidationError):
+        op.full_clean(validate_constraints=False)
