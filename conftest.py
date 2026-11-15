@@ -7,6 +7,7 @@ Test data comes from factory_boy factories, reseeded before every test (ARC.12).
 """
 
 import os
+import zlib
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -101,7 +102,33 @@ def suite_for(path: Path) -> str | None:
     return None
 
 
+def _shard_selector() -> tuple[int, int] | None:
+    """ARC.34: `MPMV_TEST_SHARD=i/N` (1-based) keeps only the tests whose hash falls in shard i.
+
+    The split is by test id (crc32): deterministic, no timing data, evenly sized, and every test
+    runs in exactly one shard.
+    """
+    raw = os.environ.get("MPMV_TEST_SHARD", "").strip()
+    if not raw:
+        return None
+    index, _, total = raw.partition("/")
+    if not (index.isdigit() and total.isdigit() and 1 <= int(index) <= int(total)):
+        raise pytest.UsageError(f"MPMV_TEST_SHARD must look like 2/4, got {raw!r}")
+    return int(index), int(total)
+
+
+def _in_shard(item: pytest.Item, index: int, total: int) -> bool:
+    return zlib.crc32(item.nodeid.encode()) % total == index - 1
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    shard = _shard_selector()
+    if shard is not None:
+        kept = [item for item in items if _in_shard(item, *shard)]
+        dropped = [item for item in items if not _in_shard(item, *shard)]
+        if dropped:
+            config.hook.pytest_deselected(items=dropped)
+        items[:] = kept
     for item in items:
         suite = suite_for(Path(str(item.path)))
         if suite is None:
