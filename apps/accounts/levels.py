@@ -143,9 +143,17 @@ def shop_key(shop: object) -> str:
 
 
 def is_shop_owner(user: AbstractBaseUser | AnonymousUser, shop: object) -> bool:
-    """Whether `user` owns `shop` now, through `settings.SHOP_OWNER_CHECK` (read on each call)."""
-    check = import_string(settings.SHOP_OWNER_CHECK)
-    return bool(check(user, shop))
+    """Whether `user` owns `shop` now, through `settings.SHOP_OWNER_CHECK` (read on each call).
+
+    Fails closed: a check that cannot be imported or that raises means "not an owner" (logged),
+    never a server error.
+    """
+    try:
+        check = import_string(settings.SHOP_OWNER_CHECK)
+        return bool(check(user, shop))
+    except Exception:
+        logger.exception("SHOP_OWNER_CHECK failed: treated as not an owner")
+        return False
 
 
 def may_confirm(user: AbstractBaseUser | AnonymousUser, action: str, shop: object | None) -> bool:
@@ -191,6 +199,29 @@ def shop_offer(request: HttpRequest, action: str | None = None, digest: str | No
             shop = offer.get("shop")
             return shop if isinstance(shop, str) else ""
     return ""
+
+
+def drop_shop_offers(
+    request: HttpRequest, *, shop: str, action: str | None = None, digest: str | None = None
+) -> None:
+    """Forget the offers spent by a confirmation: every offer on `shop` once a window opens for
+    it, or the one offer of `action` and `digest` once it is done once. A new confirmation needs
+    a new prompt, so a stale offer never outlives a lost ownership."""
+    kept = [
+        offer
+        for offer in request.session.get(SHOP_OFFERS_KEY, [])
+        if isinstance(offer, Mapping)
+        and not (
+            offer.get("shop") == shop
+            and (
+                action is None or (offer.get("action") == action and offer.get("digest") == digest)
+            )
+        )
+    ]
+    if kept:
+        request.session[SHOP_OFFERS_KEY] = kept
+    else:
+        request.session.pop(SHOP_OFFERS_KEY, None)
 
 
 # --- The passkey window
@@ -266,6 +297,7 @@ def close_window(request: HttpRequest, reason: str) -> None:
     started = session.pop(STARTED_KEY, None)
     session.pop(ACTIVITY_KEY, None)
     session.pop(WINDOW_SHOP_KEY, None)
+    session.pop(SHOP_OFFERS_KEY, None)
     if started is None:
         return
     _record(
@@ -469,15 +501,25 @@ def grant_single(request: HttpRequest, action: str, digest: str, *, shop: str = 
     _record(request, SINGLE_GRANTED, after)
 
 
-def consume_single(request: HttpRequest, action: str, digest: str) -> bool:
-    """Use the grant for exactly this action and parameters, once."""
+def consume_single(request: HttpRequest, action: str, digest: str, *, shop: str = "") -> bool:
+    """Use the grant for exactly this action and parameters, once; `shop` (a `shop_key`) names
+    the shop it acted on in the audit."""
     key = request.session.session_key
     if not key or not spend_grant(key, request.user, action, digest):
         return False
-    _record(request, SINGLE_USED, {"kind": "single", "action": action})
+    after: dict[str, Any] = {"kind": "single", "action": action}
+    if shop:
+        after["shop"] = shop
+    _record(request, SINGLE_USED, after)
     return True
 
 
-def record_prompt(request: HttpRequest, action: str, group: int, outcome: str) -> None:
-    """Audit that a user was asked for a passkey or a confirmation (the friction report counts)."""
-    _record(request, PROMPT, {"action": action, "group": group, "outcome": outcome})
+def record_prompt(
+    request: HttpRequest, action: str, group: int, outcome: str, *, shop: str = ""
+) -> None:
+    """Audit that a user was asked for a passkey or a confirmation (the friction report counts);
+    `shop` (a `shop_key`) names the shop the action was on."""
+    after: dict[str, Any] = {"action": action, "group": group, "outcome": outcome}
+    if shop:
+        after["shop"] = shop
+    _record(request, PROMPT, after)
