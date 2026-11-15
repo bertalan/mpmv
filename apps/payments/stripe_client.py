@@ -207,7 +207,7 @@ Transport = Callable[[urllib.request.Request], bytes]
 
 
 def _urlopen(request: urllib.request.Request) -> bytes:
-    with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310
+    with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310 (fixed https API_BASE)
         return bytes(response.read())
 
 
@@ -247,7 +247,7 @@ class HttpStripeClient:
                 url += "?" + urllib.parse.urlencode(pairs)
         else:
             data = urllib.parse.urlencode(pairs).encode()
-        request = urllib.request.Request(url, data=data, method=method)  # noqa: S310
+        request = urllib.request.Request(url, data=data, method=method)  # noqa: S310 (fixed https API_BASE)
         request.add_header("Authorization", f"Bearer {self.secret_key}")
         if idempotency_key:
             request.add_header("Idempotency-Key", idempotency_key)

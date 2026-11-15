@@ -34,13 +34,13 @@ def _rewrite(
         for column in COLUMNS:
             name = quote(column)
             cursor.execute(
-                f"SELECT {pk}, {name} FROM {table} WHERE {name} <> '' FOR UPDATE"  # noqa: S608
+                f"SELECT {pk}, {name} FROM {table} WHERE {name} <> '' FOR UPDATE"  # noqa: S608 (names quoted from the model, values bound)
             )
             for key, value in cursor.fetchall():
                 new = convert(keyring, value, _context(column))
                 if new is not None:
                     cursor.execute(
-                        f"UPDATE {table} SET {name} = %s WHERE {pk} = %s",  # noqa: S608
+                        f"UPDATE {table} SET {name} = %s WHERE {pk} = %s",  # noqa: S608 (names quoted from the model, values bound)
                         [new, key],
                     )
 

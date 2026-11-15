@@ -56,7 +56,7 @@ def seeded() -> None:
 def raw_column(vendor: Vendor, column: str) -> str:
     with connection.cursor() as cursor:
         cursor.execute(
-            f"SELECT {connection.ops.quote_name(column)} FROM vendors_vendor WHERE id = %s",  # noqa: S608
+            f"SELECT {connection.ops.quote_name(column)} FROM vendors_vendor WHERE id = %s",  # noqa: S608 (quoted model name)
             [vendor.pk],
         )
         return str(cursor.fetchone()[0])

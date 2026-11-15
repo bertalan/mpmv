@@ -1,9 +1,16 @@
 """Production. Everything comes from the environment; nothing has a default."""
 
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *  # noqa: F403
 from .base import MIDDLEWARE as _BASE_MIDDLEWARE
-from .base import SECURE_CSP
+from .base import SECRET_KEY, SECURE_CSP
 from .env import env_bool
+
+# SEC.5: the dev and test placeholder keys (and Django's generated ones) say "insecure"; a copied
+# one must never sign sessions or tokens here. The message never repeats the key.
+if "insecure" in SECRET_KEY.lower():
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY is a dev or test placeholder: set a real key.")
 
 # TLS terminates at the proxy (spec 12.4), which forwards the original scheme.
 # Real customers and vendors: the demo seed (ARC.10) never runs here, even if allowed.
