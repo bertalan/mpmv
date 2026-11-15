@@ -54,6 +54,7 @@ part of the done-when still open) · `not started`.
 | CAT.14 | done | #80, #94, #116 | Catalogue integrity rules |
 | CAT.3 | done | #84, #96, #116 | Typed attributes, translated values and variant axes |
 | CAT.5 | done | #81, #116, #221 | SKU-free product slugs, SlugHistory and 301 redirects. #221 (D-25): the slug is the title without the `-{lang}` suffix, `catalog/0010` reslugs existing products on the historical models with audit, old slugs answer one 301 |
+| CAT.21 | done | #221 | Formerly CAT.5b: `catalog/0010` reslugs existing products to the D-25 slug through the slug service (dry run, audit, history rows, one 301 per old slug) |
 | CAT.6 | done | #174 | Redirect model, admin, `import_redirects`, resolved in the middleware |
 | THM.1 | done | #88 | Theme registry, loader and per-site theme |
 | ARC.18 | done | #106 | Engine purity contract and dry-run exception guard |

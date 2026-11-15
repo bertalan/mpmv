@@ -85,7 +85,7 @@ def _d25_migration() -> Any:
 
 @pytest.mark.django_db
 def test_d25_migration_dry_run_changes_nothing() -> None:
-    """CAT.5b: a dry run lists the reslugs and writes neither slugs, history nor audit."""
+    """CAT.21: a dry run lists the reslugs and writes neither slugs, history nor audit."""
     from django.apps import apps
 
     from apps.catalog.models import SlugHistory
@@ -107,7 +107,7 @@ def test_d25_migration_dry_run_changes_nothing() -> None:
 def test_d25_migration_reslugs_both_legacy_shapes_on_the_historical_state(
     client: Client,
 ) -> None:
-    """CAT.5b: `{title}-{lang}` and `{title}-{lang}-{sku}` slugs end as history with one 301."""
+    """CAT.21: `{title}-{lang}` and `{title}-{lang}-{sku}` slugs end as history with one 301."""
     from django.apps import apps as django_apps
 
     from apps.catalog.models import ProductTranslation, SlugHistory
