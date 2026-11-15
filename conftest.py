@@ -1,6 +1,8 @@
 """Root pytest configuration: every test belongs to exactly one suite (ADR-0006).
 
 The suite comes from the directory: .../tests/unit/, .../tests/integration/ or tests/e2e/.
+The attack scenarios in tests/security/ (SEC.5) run in the integration suite, on every PR, and
+also carry the `security` marker (`pytest -m security`).
 Test data comes from factory_boy factories, reseeded before every test (ARC.12).
 """
 
@@ -54,6 +56,8 @@ def english_interface(default_languages: None) -> "Iterator[None]":
 FACTORY_SEED = int(os.environ.get("MPMV_TEST_SEED", "20271"))
 
 SUITES = ("unit", "integration", "e2e")
+# Directories whose tests join a suite under another name: attack scenarios need the full stack.
+SUITE_ALIASES = {"security": "integration"}
 
 # Hypothesis profiles for every `@given` test (SEC.5). `ci` is the default: a fixed example
 # sequence, no example database and no per-example deadline, because one slow example on a
@@ -92,6 +96,8 @@ def suite_for(path: Path) -> str | None:
     for part in reversed(path.parts[:-1]):
         if part in SUITES:
             return part
+        if part in SUITE_ALIASES:
+            return SUITE_ALIASES[part]
     return None
 
 
@@ -100,11 +106,14 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         suite = suite_for(Path(str(item.path)))
         if suite is None:
             raise pytest.UsageError(
-                f"{item.nodeid}: tests must live under tests/unit, tests/integration or tests/e2e"
+                f"{item.nodeid}: tests must live under tests/unit, tests/integration, tests/e2e "
+                "or tests/security"
             )
         if suite == "unit" and item.get_closest_marker("django_db") is not None:
             raise pytest.UsageError(f"{item.nodeid}: unit tests must not use the database")
         item.add_marker(getattr(pytest.mark, suite))
+        if "security" in Path(str(item.path)).parts[:-1]:
+            item.add_marker(pytest.mark.security)
         if _flushes_database(item):
             # Under xdist (--dist loadgroup) a transactional test flushes the rows its worker's
             # database got from data migrations. pytest-django runs those tests last; the group
