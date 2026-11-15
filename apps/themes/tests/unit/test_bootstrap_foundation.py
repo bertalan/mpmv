@@ -225,3 +225,14 @@ def test_ride_passes_the_gates_with_bootstrap_inside() -> None:
     """The provisional Bootstrap-theme budgets of §14.7 (75 KB each) hold; part 2 makes them
     per-theme manifest keys."""
     assert [str(f) for f in run_gates(SHIPPED_THEMES) if f.theme == "ride"] == []
+
+
+def test_the_vendored_framework_files_are_not_touched_by_the_commit_hooks() -> None:
+    """Upstream's minified files end without a newline: a hook that adds one breaks the hash."""
+    from pathlib import Path
+
+    folder = Path(__file__).resolve().parents[4] / "themes/ride/static/themes/ride/vendor/bootstrap"
+    for name in ("bootstrap.min.css", "bootstrap.bundle.min.js"):
+        assert not (folder / name).read_bytes().endswith(b"\n"), name
+    hooks = (Path(__file__).resolve().parents[4] / ".pre-commit-config.yaml").read_text()
+    assert hooks.count("themes/[^/]+/static/themes/[^/]+/vendor") == 2
