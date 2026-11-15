@@ -315,7 +315,7 @@ def _run_limited(body: str) -> int:
         "from apps.orders import pdf_render\n"
         "pdf_render.apply_limits(memory_bytes=100_000_000, cpu_seconds=1)\n" + body
     )
-    return subprocess.run(  # noqa: S603
+    return subprocess.run(  # noqa: S603 (this interpreter and a fixed code string)
         [sys.executable, "-c", code], cwd=ROOT, capture_output=True, timeout=60, check=False
     ).returncode
 
@@ -329,7 +329,7 @@ def test_the_parent_process_never_imports_weasyprint() -> None:
         "assert 'weasyprint' not in sys.modules\n"
     )
     env = {**os.environ, "DJANGO_SETTINGS_MODULE": "mpmv.settings.test"}
-    result = subprocess.run(  # noqa: S603
+    result = subprocess.run(  # noqa: S603 (this interpreter and a fixed code string)
         [sys.executable, "-c", code],
         cwd=ROOT,
         env=env,
