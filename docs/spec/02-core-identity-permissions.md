@@ -279,7 +279,10 @@ The groups:
 3. **Critical** (a per-action fresh passkey, even with the window open): payout and bank details;
    granting the owner, superuser or `platform_owner` role; disabling MFA or removing the last
    passkey; `bootstrap_platform_owner` (CORE.23); ending one user's sessions (`sessions_end_user`) or
-   every session (`sessions_end_all`, CORE.24).
+   every session (`sessions_end_all`, CORE.24); a vendor refund (`vendor_refund`, PAY.7); the
+   order amendments that raise a price (`order_amend_price_up`), change an address
+   (`order_amend_address`) or refund money (D-47, ORD.20 to ORD.22, one passkey per amendment
+   bound to its digest and shop; [07](07-cart-orders-payments.md) §Order amendments).
 
 The step-up list under Authentication above stays the list of actions that ask for a fresh second
 factor; for staff and vendor-member sessions the three groups above take precedence over it.
