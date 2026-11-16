@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from django.core.exceptions import ValidationError
 from django.test import Client
+from django.test.utils import override_settings
 from pytest_django.fixtures import Settings as SettingsWrapper
 from wagtail import blocks
 
@@ -19,7 +20,6 @@ from apps.cms.blocks import HeroBlock, StripBlock
 from apps.cms.models import HomePage, body_field
 from apps.cms.services import seed_site
 from apps.core.tests.factories import MediaImageFactory
-from apps.themes.services import use_theme
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("english_interface")]
 
@@ -47,7 +47,7 @@ def hero(**fields: Any) -> Any:
 
 
 def render(theme: str, block: blocks.Block, value: Any, **context: Any) -> str:
-    with use_theme(theme):
+    with override_settings(MPMV_THEME_DEFAULT=theme):
         return str(block.render(value, context=context)).strip()
 
 
@@ -120,7 +120,7 @@ def test_ride_slider_autoplay_is_off_unless_the_editor_enables_it() -> None:
 
 def test_two_sliders_on_one_page_get_distinct_ids() -> None:
     value, other = hero(layout="slider", slides=SLIDES), hero(layout="slider", slides=SLIDES)
-    with use_theme("ride"):
+    with override_settings(MPMV_THEME_DEFAULT="ride"):
         from django.template import engines
 
         template = engines["django"].from_string(
