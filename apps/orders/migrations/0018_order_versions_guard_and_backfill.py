@@ -5,9 +5,16 @@ The trigger refuses any DELETE and any UPDATE of a version, except the anonymisa
 
 The backfill writes v1 of each vendor order from its lines and snapshot fields, as
 `apps.orders.versions.version_one_snapshot` does, frozen here so a later change of that code
-does not change this migration.
+does not change this migration. Lines placed before ORD.20 have no fiscal-category or weight
+snapshot: the backfill takes them from the product as it is now (no variant override, which the
+line does not record), the only source left for those rows.
+
+Size on LIVE: the backfill goes row by row (one vendor order, its lines and one insert at a time,
+`iterator()`), inside the migration's transaction. That is fine for the order volume of the
+first LIVE deploy; a much larger table would need a batched management command instead.
 """
 
+import re
 import zoneinfo
 from decimal import Decimal
 from typing import Any
@@ -45,11 +52,17 @@ DROP FUNCTION IF EXISTS orders_vendororderversion_guard();
 """
 
 
+_NORTHERN_IRELAND = re.compile(r"BT[0-9]")
+
+
 def _country(rate: Decimal, reason: str, sub: Any) -> str | None:
     if rate == 0:
         return None
     if reason == "domestic_vendor_country":
         return str((sub.vendor_snapshot or {}).get("country") or sub.vendor.country)
+    postcode = re.sub(r"\s+", "", str((sub.order.shipping_address or {}).get("postcode") or ""))
+    if sub.order.shipping_country == "GB" and _NORTHERN_IRELAND.match(postcode.upper()):
+        return "XI"  # an OSS sale to Northern Ireland is taxed in XI (TAX.18)
     return str(sub.order.shipping_country)
 
 
@@ -82,7 +95,14 @@ def backfill(apps: Any, schema_editor: Any) -> None:
         # legacy row with no recorded payment falls back to its creation day.
         on = (sub.order.paid_at or sub.order.created_at).astimezone(tz).date().isoformat()
         lines = []
-        for line in line_model.objects.filter(vendor_order=sub).order_by("id"):
+        for line in (
+            line_model.objects.filter(vendor_order=sub).select_related("product").order_by("id")
+        ):
+            product = line.product
+            category = line.fiscal_category or (product.fiscal_category if product else "")
+            weight = line.weight_kg if line.weight_kg is not None else (
+                product.weight_kg if product else None
+            )
             lines.append(
                 {
                     "line_key": str(line.public_id),
@@ -106,6 +126,8 @@ def backfill(apps: Any, schema_editor: Any) -> None:
                     "product_id": line.product_id,
                     "variant_label": line.variant_label,
                     "replaces": "",
+                    "fiscal_category": category,
+                    "weight_kg": None if weight is None else str(weight),
                 }
             )
         choice = dict(sub.shipping_choice or {})
@@ -171,7 +193,8 @@ def backfill(apps: Any, schema_editor: Any) -> None:
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("orders", "0016_order_amendments"),
+        ("orders", "0017_orderline_amendment_snapshots"),
+        ("catalog", "0015_field_help_text"),
     ]
 
     operations = [

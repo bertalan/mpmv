@@ -29,7 +29,6 @@ from django.http import Http404
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.catalog.models import Product
 from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.countries import InvalidCountry
@@ -103,15 +102,6 @@ def _place(country: str, postcode: str) -> str:
     return country
 
 
-def above_distance_sales_threshold(vendor: Any) -> bool:
-    """Whether the vendor is above the EUR 10,000 EU distance-sales threshold (TAX.20, TAX.21).
-
-    The vendor's threshold declaration is not recorded yet (TAX.20): until it is, the answer is
-    yes (fail closed), so an amendment never moves a package of a vendor without OSS into a
-    destination the vendor might not be allowed to serve."""
-    return True
-
-
 def _offer(rate: shipping_engine.ShippingRate) -> am.ShippingOffer:
     return am.ShippingOffer(
         key=rate.key,
@@ -125,17 +115,14 @@ def _offer(rate: shipping_engine.ShippingRate) -> am.ShippingOffer:
 
 
 def _package(sub: VendorOrder, snapshot: am.VersionSnapshot) -> shipping_engine.VendorPackage:
-    # The weight of a deleted product is unknown (0): the shipping engine then asks a quote.
-    weights: dict[int | None, Decimal | None] = dict(
-        Product.objects.filter(
-            pk__in=[line.product_id for line in snapshot.lines if line.product_id]
-        ).values_list("pk", "weight_kg")
-    )
+    """The package as the shipping engine reads it, from the weights snapshotted when the order
+    was placed (never the live product). A legacy line without a weight counts 0 kg: the shipping
+    engine then asks a quote, which refuses the change."""
     return shipping_engine.VendorPackage(
         vendor_id=sub.vendor_id,
         lines=tuple(
             shipping_engine.PackageLine(
-                weight_kg=weights.get(line.product_id) or Decimal("0"),
+                weight_kg=line.weight_kg or Decimal("0"),
                 quantity=line.quantity,
                 net_goods=line.net,
             )
@@ -177,11 +164,16 @@ def check_destination(
     categories: Mapping[str, str],
     at: dt.datetime,
 ) -> tuple[tax_engine.TaxContext, am.ShippingOffer]:
-    """Run the checkout's eligibility and blocking checks on a new delivery address (spec 07,
-    "Territory change"): the address is complete, VAT can be decided for every line, Northern
-    Ireland is not served by a vendor above the threshold without OSS, and the package's shipping
-    method has an exact price there. Returns the tax context at `at` for the new destination and
-    the method quoted again. Raises `AmendmentBlocked` with a plain reason otherwise."""
+    """Check a new delivery address and quote the package's method again for it.
+
+    The address must be complete and the package's shipping method must have an exact price
+    there. When the address moves to another country or tax territory, the checks of a new
+    checkout run too (spec 07, "Territory change"), the same as `checkout.build_checkout`: the
+    tax context and a goods decision for every line (the tax engine's own rules, Northern Ireland
+    included), and a business order is refused until the VIES check of the new destination exists
+    (ORD.21). A correction inside the same territory runs no territory check. Returns the tax
+    context at `at` for the new destination and the method quoted again; raises
+    `AmendmentBlocked` with a plain reason otherwise."""
     missing = engine.missing_address_fields(address)
     if missing:
         raise AmendmentRefused(
@@ -195,6 +187,13 @@ def check_destination(
     except InvalidCountry:
         raise AmendmentRefused(f"{country!r} is not a country the address can be in.") from None
     place = _place(destination.country, postcode)
+
+    def blocked(error: Exception) -> AmendmentBlocked:
+        return AmendmentBlocked(
+            f"VAT cannot be decided for a delivery to {place}, so the address cannot be changed "
+            f"to it ({error})."
+        )
+
     try:
         tax = tax_services.build_tax_context(
             sub.vendor,
@@ -202,32 +201,21 @@ def check_destination(
             destination_postcode=postcode,
             at=at,
         )
-        for category in set(categories.values()):
-            tax_engine.resolve_goods_tax(tax, category)
     except (tax_engine.BlockingTaxError, LookupError) as error:
-        raise AmendmentBlocked(
-            f"VAT cannot be decided for a delivery to {place}, so the address cannot be changed "
-            f"to it ({error})."
-        ) from None
-    if (
-        tax_engine.is_northern_ireland(destination.country, postcode)
-        and tax.vendor_profile.regime != tax_engine.OSS
-        and above_distance_sales_threshold(sub.vendor)
-    ):
-        raise AmendmentBlocked(
-            "The seller cannot deliver to Northern Ireland, so the address cannot be changed to "
-            "it: a seller above the EUR 10,000 EU distance-sales threshold must be registered "
-            "for OSS to sell there."
-        )
+        raise blocked(error) from None
     territory_before = am.tax_territory(
         str(address_before.get("country") or ""),
         str(address_before.get("postcode") or ""),
         tax.territories,
     )
-    if (
-        sub.order.customer_tax_status != "b2c"
-        and am.tax_territory(destination.country, postcode, tax.territories) != territory_before
-    ):
+    moved = am.tax_territory(destination.country, postcode, tax.territories) != territory_before
+    if moved:
+        try:
+            for category in set(categories.values()):
+                tax_engine.resolve_goods_tax(tax, category)
+        except (tax_engine.BlockingTaxError, LookupError) as error:
+            raise blocked(error) from None
+    if moved and sub.order.customer_tax_status != "b2c":
         raise AmendmentBlocked(
             f"This is a business order, so the address cannot be moved to {place} without a new "
             "VAT number check for that destination, which amendments do not support yet."
@@ -246,16 +234,8 @@ def check_destination(
 
 
 def _categories(snapshot: am.VersionSnapshot) -> dict[str, str]:
-    by_product = dict(
-        Product.objects.filter(
-            pk__in=[line.product_id for line in snapshot.lines if line.product_id]
-        ).values_list("pk", "fiscal_category")
-    )
-    return {
-        line.line_key: by_product[line.product_id]
-        for line in snapshot.lines
-        if line.product_id in by_product
-    }
+    """The fiscal category of each line, as snapshotted when the order was placed."""
+    return {line.line_key: line.fiscal_category for line in snapshot.lines if line.fiscal_category}
 
 
 def _recompute(
@@ -349,17 +329,6 @@ def _amendment_snapshot(amendment: OrderAmendment) -> dict[str, Any]:
     }
 
 
-def _version_snapshot(version: VendorOrderVersion) -> dict[str, Any]:
-    return {
-        VENDOR_FIELD: str(version.vendor_order.vendor.public_id),
-        "number": version.number,
-        "goods_net": version.goods_net,
-        "shipping_net": version.shipping_net,
-        "tax_total": version.tax_total,
-        "gross_total": version.gross_total,
-    }
-
-
 # --- drafting -----------------------------------------------------------------------------------
 
 
@@ -444,6 +413,9 @@ def draft_amendment(
                 )
             version = versions.current_version(locked)
             preview, resolved, _ = _recompute(locked, version, changes, at=stamp)
+            error = am.staff_carrier_error(initiator, preview, resolved)
+            if error:
+                raise AmendmentRefused(error)
             result = am.classify_amendment(preview, resolved, initiator)
             amendment = OrderAmendment(
                 vendor_order=locked,
@@ -554,7 +526,7 @@ def apply_amendment(
                 changeset.create(
                     "orders.vendororderversion",
                     str(version.public_id),
-                    _version_snapshot(version),
+                    versions.audit_snapshot(version),
                 )
                 action = "orders.amendment.apply"
             changeset.update(

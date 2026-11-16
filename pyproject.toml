@@ -143,6 +143,7 @@ markers = [
   "keep_seeded_territories: tax integration test that runs against the territories seeded by migration 0006 (TAX.7)",
   "security_slow: slow security cases, run nightly by security-nightly (SEC.5)",
   "security: attack scenarios in tests/security (SEC.5), run with the integration suite",
+  "rate_change: ORD.20 amendment test whose standard rate changes from 22 % to 23 % by a TAX.6 validity period",
 ]
 
 [tool.coverage.run]

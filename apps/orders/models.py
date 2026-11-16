@@ -433,6 +433,18 @@ class OrderLine(BaseModel):
         max_length=16, blank=True, help_text="N-code when no VAT is charged (TAX.3); else blank."
     )
     legal_note_key = models.CharField(max_length=64, blank=True)
+    fiscal_category = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text="ORD.20 snapshot: the product's fiscal category when ordered (blank: legacy).",
+    )
+    weight_kg = models.DecimalField(
+        max_digits=9,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text="ORD.20 snapshot: one unit's weight in kg (variant override included).",
+    )
 
     class Meta:
         ordering = ["vendor_order", "id"]
@@ -745,3 +757,16 @@ class OrderAmendment(BaseModel):
     @property
     def is_open(self) -> bool:
         return self.state in OPEN_AMENDMENT_STATES
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """A closed amendment (applied, declined, expired, withdrawn, superseded, discarded) is a
+        record of what happened: saving it again is refused. Only the anonymisation scrub rewrites
+        its personal fields, through a queryset update (D-29)."""
+        if not self._state.adding:
+            stored = type(self).objects.filter(pk=self.pk).values_list("state", flat=True).first()
+            if stored is not None and stored not in OPEN_AMENDMENT_STATES:
+                raise PermissionError(f"An amendment that is {stored} cannot be changed")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> Any:
+        raise PermissionError("An amendment is kept as a record; discard a draft instead")

@@ -152,7 +152,7 @@ def version_one(vendor: Vendor | None = None, **fields: object) -> VendorOrderVe
     from apps.orders import versions
 
     sub = VendorOrderFactory.create(**({"vendor": vendor} if vendor else {}), **fields)
-    return versions.current_version(sub)
+    return versions.create_version_one(sub, list(sub.lines.all()))
 
 
 class OrderAmendmentFactory(DjangoModelFactory[OrderAmendment]):

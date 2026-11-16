@@ -31,6 +31,7 @@ from apps.orders.models import (
     VendorOrderVersion,
 )
 from apps.orders.services import LineInput, VendorOrderInput
+from apps.orders.tests.control import plainly
 from apps.orders.tests.factories import (
     OrderAmendmentFactory,
     VendorOrderVersionFactory,
@@ -65,24 +66,48 @@ COMMISSION = {
 }
 
 
+# TAX.6 validity: the standard rate goes from 22 % to 23 % at this time (test `rate_change`).
+RATE_CHANGE = utc(2027, 3, 3)
+
+
 @pytest.fixture(autouse=True)
-def tax_setup() -> None:
+def tax_setup(request: pytest.FixtureRequest) -> None:
     PlatformOperatorFactory.create(open_ended=True, valid_from=utc(2026, 1, 1), country="IT")
+    if request.node.get_closest_marker("rate_change") is None:
+        TaxRateFactory.create(
+            country="IT",
+            category=tax.STANDARD,
+            rate=D("22"),
+            valid_from=utc(2026, 1, 1),
+            open_ended=True,
+        )
+        return
     TaxRateFactory.create(
         country="IT",
         category=tax.STANDARD,
         rate=D("22"),
         valid_from=utc(2026, 1, 1),
-        open_ended=True,
+        valid_to=RATE_CHANGE,
+    )
+    TaxRateFactory.create(
+        country="IT", category=tax.STANDARD, rate=D("23"), valid_from=RATE_CHANGE, open_ended=True
     )
 
 
-def method(seller: Vendor, key: str, cost: str, max_days: int, *, default: bool = False) -> None:
-    """A method of the vendor's IT zone (one zone per vendor, shared by its methods)."""
+def method(
+    seller: Vendor,
+    key: str,
+    cost: str,
+    max_days: int,
+    *,
+    default: bool = False,
+    countries: tuple[str, ...] = ("IT",),
+) -> None:
+    """A method of the vendor's zone (one zone per vendor, shared by its methods)."""
     existing = ShippingMethod.objects.filter(vendor=seller).first()
     found = ShippingMethodFactory.create(
         vendor=seller,
-        zone=existing.zone if existing else ShippingZoneFactory.create(countries=["IT"]),
+        zone=existing.zone if existing else ShippingZoneFactory.create(countries=list(countries)),
         key=key,
         is_default=default,
         min_delivery_days=1,
@@ -92,10 +117,11 @@ def method(seller: Vendor, key: str, cost: str, max_days: int, *, default: bool 
     WeightBandFactory.create(method=found, from_kg=D("0"), to_kg=D("30"), cost_net=D(cost))
 
 
-def seller() -> Vendor:
+def seller(countries: tuple[str, ...] = ("IT",)) -> Vendor:
+    """An Italian vendor without OSS (domestic_only) with one 10.00 method, 5 days."""
     found = VendorFactory.create(status=Vendor.Status.ACTIVE, country="IT", sells_online=True)
     VendorTaxProfileFactory.create(vendor=found, valid_from=utc(2026, 1, 1))
-    method(found, "standard", "10.00", 5, default=True)
+    method(found, "standard", "10.00", 5, default=True, countries=countries)
     return found
 
 
@@ -109,21 +135,27 @@ def product(owner: Vendor, price: str) -> Product:
     )
 
 
-def seed(owner: Vendor | None = None, *, pay: bool = True) -> VendorOrder:
-    """The ORD.20 seed order, paid (or only placed, awaiting payment)."""
+def seed(
+    owner: Vendor | None = None, *, pay: bool = True, address: dict[str, str] | None = None
+) -> VendorOrder:
+    """The ORD.20 seed order, paid (or only placed, awaiting payment), delivered to `address`
+    (Rome by default). Lines carry the fiscal-category and weight snapshots of `place_order`."""
     owner = owner or seller()
+    address = address or ROME
     a, b = product(owner, "50.00"), product(owner, "30.00")
+    snap = {"fiscal_category": tax.STANDARD, "weight_kg": D("0.500")}
+    reason = tax.REASON_DOMESTIC_VENDOR_COUNTRY
     lines = [
-        LineInput(a, "SKU-A", "A", D("50.00"), 2, D("22"), tax.REASON_DOMESTIC_VENDOR_COUNTRY),
-        LineInput(b, "SKU-B", "B", D("30.00"), 1, D("22"), tax.REASON_DOMESTIC_VENDOR_COUNTRY),
+        LineInput(a, "SKU-A", "A", D("50.00"), 2, D("22"), reason, **snap),  # type: ignore[arg-type]
+        LineInput(b, "SKU-B", "B", D("30.00"), 1, D("22"), reason, **snap),  # type: ignore[arg-type]
     ]
     order, _ = services.create_order(
         email="buyer@example.com",
         language="en",
-        billing_address=ROME,
-        billing_country="IT",
-        shipping_address=ROME,
-        shipping_country="IT",
+        billing_address=address,
+        billing_country=address["country"],
+        shipping_address=address,
+        shipping_country=address["country"],
         vendor_orders=[
             VendorOrderInput(
                 vendor=owner,
@@ -552,3 +584,160 @@ def test_staff_cannot_change_prices() -> None:
             actor=staff,
             staff_note="customer called",
         )
+
+
+# --- second review of #551 ------------------------------------------------------------------
+
+
+def test_v1_is_in_the_audit_entry_of_the_payment() -> None:
+    sub = seed()
+    entry = AuditLog.objects.get(
+        action="orders.transition",
+        target_model="orders.vendororderversion",
+        target_key=str(sub.versions.get().public_id),
+    )
+    assert entry.after is not None
+    assert entry.after["gross_total"] in ("170.80", D("170.80"), 170.8), plainly(
+        "the payment's audit entry must record v1 with gross 170.80", f"it recorded {entry.after}"
+    )
+
+
+@pytest.mark.rate_change
+def test_a_rate_changed_by_law_after_the_order_never_re_rates_the_paid_portion() -> None:
+    sub = seed()  # placed and paid at 22 % (now), before RATE_CHANGE
+    amendment, _ = draft(sub, am.RemoveLine(key_of(sub, "SKU-B")))  # NOW is after RATE_CHANGE
+    assert amendment is not None
+    assert amendment.preview["refund"] == "36.60", plainly(
+        "removing B after the rate went from 22 % to 23 % must still refund 36.60",
+        f"the draft refunds {amendment.preview['refund']}",
+    )
+    reversed_b = [
+        m for m in amendment.preview["tax_movements"] if m["part"] == key_of(sub, "SKU-B")
+    ]
+    assert [(m["tax"], m["rate"]) for m in reversed_b] == [("-6.60", "22.000")], plainly(
+        "B's VAT must be reversed at 22 %, the rate it was paid at", f"it moved {reversed_b}"
+    )
+    after = am.VersionSnapshot.from_json(sub.versions.get().snapshot)  # v1, still current
+    a_line = next(line for line in after.lines if line.sku == "SKU-A")
+    assert [p.rate for p in a_line.portions] == [D("22.000")]
+
+
+def test_staff_cannot_change_the_delivery_time_or_choose_a_dearer_carrier() -> None:
+    from django.contrib.auth.models import Permission
+
+    from apps.accounts.tests.factories import UserFactory
+
+    sub = seed()
+    method(sub.vendor, "express", "14.00", 6)
+    staff = UserFactory.create(is_staff=True)
+    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    with pytest.raises(amendments.AmendmentRefused) as refused:
+        draft(sub, am.ChangeDeliveryTime(9), actor=staff, staff_note="customer called")
+    assert "delivery times" in str(refused.value), plainly(
+        "staff changing the delivery time must be refused naming delivery times",
+        f"the message was {refused.value}",
+    )
+    with pytest.raises(amendments.AmendmentRefused) as refused:
+        draft(
+            sub,
+            am.ChangeCarrier(am.ShippingOffer("express", "", D("0"))),
+            actor=staff,
+            staff_note="customer called",
+        )
+    assert "same or a lower price" in str(refused.value), plainly(
+        "staff choosing a dearer carrier must be refused with the same-or-lower-price rule",
+        f"the message was {refused.value}",
+    )
+    assert not OrderAmendment.objects.exists()
+
+
+NORTHERN_IRELAND = {
+    "line1": "1 High Street",
+    "city": "Belfast",
+    "postcode": "BT1 1AA",
+    "country": "GB",
+}
+
+
+def ni_seller() -> Vendor:
+    """A vendor without OSS shipping to IT and GB, with a fixed price (no surcharge) for the
+    seeded Northern Ireland special area instead of the default quote."""
+    from apps.shipping import engine as shipping_engine
+    from apps.shipping.models import SpecialArea
+    from apps.shipping.tests.factories import SpecialAreaTreatmentFactory
+
+    found = seller(countries=("IT", "GB"))
+    SpecialAreaTreatmentFactory.create(
+        method=ShippingMethod.objects.get(vendor=found),
+        area=SpecialArea.objects.get(code="gb-northern-ireland"),
+        mode=shipping_engine.SURCHARGE,
+        surcharge_type=shipping_engine.FIXED,
+        surcharge=D("0.00"),
+    )
+    return found
+
+
+def test_a_house_number_fix_inside_northern_ireland_passes() -> None:
+    sub = seed(ni_seller(), address=NORTHERN_IRELAND)
+    amendment, _ = draft(sub, move_to("GB", "BT1 2AB"), customer_request=CUSTOMER_ASKED)
+    assert amendment is not None
+    assert amendment.kind == "minor", plainly(
+        "a house-number fix inside Northern Ireland asked by the customer must be minor",
+        f"it was {amendment.kind}: {amendment.reasons}",
+    )
+
+
+def test_a_move_to_northern_ireland_follows_the_checkout_rules() -> None:
+    """Checkout lets a vendor without OSS sell to XI at its own rate (tax engine, TAX.18), so the
+    amendment allows it too: proposed as a substantial change, never blocked."""
+    sub = seed(ni_seller())
+    amendment, _ = draft(sub, move_to("GB", "BT1 1AA"), customer_request=CUSTOMER_ASKED)
+    assert amendment is not None, "a move the checkout allows must be drafted"
+    assert amendment.kind == "substantial", plainly(
+        "a move from IT to Northern Ireland must be substantial", f"it was {amendment.kind}"
+    )
+
+
+def test_v1_of_an_oss_sale_to_northern_ireland_is_taxed_in_xi() -> None:
+    from apps.orders import versions
+
+    sub = seed(seller(countries=("IT", "GB")), address=NORTHERN_IRELAND, pay=False)
+    line = sub.lines.get(sku="SKU-A")
+    country = versions._country_of_taxation(D("20"), tax.REASON_STANDARD_DESTINATION, sub)
+    assert country == "XI", plainly(
+        "an OSS sale to a BT postcode must be taxed in XI", f"it was taxed in {country}"
+    )
+    assert line.fiscal_category == tax.STANDARD
+
+
+def test_anonymisation_scrubs_the_address_and_words_kept_on_amendments() -> None:
+    sub = seed()
+    amendment, _ = draft(sub, move_to("IT", "00100"), customer_request=CUSTOMER_ASKED)
+    assert amendment is not None
+    backdate(sub.order, timezone.now() - dt.timedelta(days=365 * 12))
+    services.anonymise_order(sub.order, ctx=CTX)
+    amendment.refresh_from_db()
+    address = next(c["address"] for c in amendment.changes if c["kind"] == "address")
+    assert address == {"anonymised": True, "country": "IT"}, plainly(
+        "anonymisation must replace the new address kept in the amendment's changes",
+        f"it is {address}",
+    )
+    assert amendment.customer_request["text"] == engine.ANONYMISED, plainly(
+        "anonymisation must replace the customer's own words",
+        f"they are {amendment.customer_request['text']!r}",
+    )
+    assert amendment.customer_request["channel"] == "email"
+
+
+def test_a_closed_amendment_is_frozen() -> None:
+    sub = seed()
+    actor = owner_of(sub)
+    amendment, _ = draft(sub, am.RemoveLine(key_of(sub, "SKU-B")), actor=actor)
+    assert amendment is not None
+    amendments.discard_amendment(amendment, actor=actor, ctx=CTX)
+    amendment.reason = "rewritten later"
+    with pytest.raises(PermissionError):
+        amendment.save()
+    with pytest.raises(PermissionError):
+        amendment.delete()
+    assert OrderAmendment.objects.get(pk=amendment.pk).reason == "Out of stock at the supplier"

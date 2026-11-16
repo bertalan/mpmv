@@ -11,6 +11,7 @@ from decimal import Decimal
 import pytest
 
 from apps.orders import amendment_engine as am
+from apps.orders.tests.control import plainly
 from apps.tax import engine as tax
 
 D = Decimal
@@ -145,9 +146,15 @@ def test_lowering_a_to_45_refunds_12_20_and_reverses_1_00_commission() -> None:
         f"lowering A must reverse 1.00 commission, got {preview.commission_delta}"
     )
     a = preview.after.line("A")
-    assert a is not None
-    assert [(p.net, p.tax, p.rate) for p in a.portions] == [(D("90.00"), D("19.80"), D("22.000"))]
-    assert kind_of(preview, changes).kind == am.MINOR, "a lower price must be a minor change"
+    assert a is not None, "line A must stay in the order after a lower price"
+    portions = [(p.net, p.tax, p.rate) for p in a.portions]
+    assert portions == [(D("90.00"), D("19.80"), D("22.000"))], plainly(
+        "A at 45.00 must keep one 22 % portion of 90.00 net and 19.80 VAT", f"it has {portions}"
+    )
+    result = kind_of(preview, changes)
+    assert result.kind == am.MINOR, plainly(
+        "a lower price must be a minor change", f"it was classified {result.kind}"
+    )
 
 
 def test_mixed_rates_removal_re_splits_shipping_vat_and_refunds_54_60() -> None:
@@ -162,19 +169,6 @@ def test_mixed_rates_removal_re_splits_shipping_vat_and_refunds_54_60() -> None:
         f"without B the shipping VAT must be 2.20 (all at 22 %), got {preview.after.shipping.tax}"
     )
     assert preview.refund == D("54.60"), f"removing B must refund 54.60, got {preview.refund}"
-
-
-def test_a_rate_changed_by_law_never_re_rates_a_paid_portion() -> None:
-    preview = am.recompute_vendor_order(seed(), [am.RemoveLine("B")], ctx(RATES_23))
-    assert preview.refund == D("36.60"), (
-        f"removing B after 22 % became 23 % must still refund 36.60, got {preview.refund}"
-    )
-    a = preview.after.line("A")
-    assert a is not None
-    assert [(p.rate, p.tax, p.tax_on) for p in a.portions] == [
-        (D("22.000"), D("22.00"), ORDER_DAY)
-    ], f"the unchanged A must keep its 22 % portion of the order day (VAT 22.00), got {a.portions}"
-    assert [p.rate for p in preview.after.shipping.portions] == [D("22.000")]
 
 
 def test_an_increase_adds_a_portion_on_the_amendment_date_at_the_new_rate() -> None:
@@ -196,11 +190,13 @@ def test_a_reduction_after_an_increment_reduces_the_newest_portion_first() -> No
         raised.after, [am.ChangePrice("A", D("52.00"))], ctx(RATES_23)
     )
     a = lowered.after.line("A")
-    assert a is not None
-    assert [(p.net, p.rate) for p in a.portions] == [
-        (D("100.00"), D("22.000")),
-        (D("4.00"), D("23.000")),
-    ]
+    assert a is not None, "line A must stay in the order after a lower price"
+    portions = [(p.net, p.rate) for p in a.portions]
+    assert portions == [(D("100.00"), D("22.000")), (D("4.00"), D("23.000"))], plainly(
+        "lowering A from 55.00 to 52.00 must reduce the newest 23 % portion first (10.00 -> 4.00) "
+        "and keep the paid 22 % base",
+        f"the portions are {portions}",
+    )
 
 
 def test_lower_quantity_takes_its_discount_share_with_it() -> None:
@@ -215,8 +211,11 @@ def test_lower_quantity_takes_its_discount_share_with_it() -> None:
     )
     preview = am.recompute_vendor_order(version(discounted), [am.ChangeQuantity("A", 1)], ctx())
     a = preview.after.line("A")
-    assert a is not None
-    assert (a.discount_net, a.net) == (D("5.00"), D("45.00"))
+    assert a is not None, "line A must stay in the order after a lower quantity"
+    assert (a.discount_net, a.net) == (D("5.00"), D("45.00")), plainly(
+        "one of two units removed must take half the 10.00 discount (5.00) and leave 45.00 net",
+        f"the line has discount {a.discount_net} and net {a.net}",
+    )
 
 
 def test_a_removal_that_would_raise_the_gross_is_substantial() -> None:
@@ -361,10 +360,74 @@ def test_a_territory_change_re_taxes_every_line_on_the_amendment_date() -> None:
 
 def test_staff_may_not_change_prices() -> None:
     error = am.staff_change_error(am.SUPPORT, [am.ChangePrice("A", D("1.00"))])
-    assert error is not None
-    assert "products, quantities and prices" in error
-    assert am.staff_change_error(am.SUPPORT, [address("IT", "00100")]) is None
+    assert error is not None, plainly("Support changing a price must be refused", "it was allowed")
+    assert "prices" in error, plainly("the refusal must name prices", f"it said {error!r}")
+    assert am.staff_change_error(am.SUPPORT, [address("IT", "00100")]) is None, plainly(
+        "Support may fix an address the customer asked for", "it was refused"
+    )
     assert am.staff_change_error(am.VENDOR_MEMBER, [am.ChangePrice("A", D("1.00"))]) is None
+
+
+def test_staff_may_not_change_the_delivery_time() -> None:
+    error = am.staff_change_error(am.PLATFORM_OWNER, [am.ChangeDeliveryTime(9)])
+    assert error is not None, plainly(
+        "the platform owner changing the delivery time must be refused (spec 07 roles)",
+        "it was allowed",
+    )
+    assert "delivery times" in error, plainly("the refusal must name delivery times", error)
+
+
+def test_staff_may_change_the_carrier_only_at_the_same_or_a_lower_price() -> None:
+    for net, refused in (("14.00", True), ("10.00", False), ("6.00", False)):
+        changes: list[am.AmendmentChange] = [am.ChangeCarrier(offer(net, 3))]
+        preview = am.recompute_vendor_order(seed(), changes, ctx())
+        error = am.staff_carrier_error(am.SUPPORT, preview, changes)
+        assert (error is not None) == refused, plainly(
+            f"Support choosing a carrier at {net} net (customer paid 10.00) must be "
+            + ("refused" if refused else "allowed"),
+            f"the answer was {error!r}",
+        )
+    dearer: list[am.AmendmentChange] = [am.ChangeCarrier(offer("14.00", 3))]
+    preview = am.recompute_vendor_order(seed(), dearer, ctx())
+    assert am.staff_carrier_error(am.VENDOR_OWNER, preview, dearer) is None, plainly(
+        "the vendor may choose a dearer carrier and absorb it", "it was refused"
+    )
+
+
+def test_a_territory_change_re_taxes_the_shipping_on_the_amendment_date_too() -> None:
+    preview = am.recompute_vendor_order(seed(), [address("IT", "23041")], ctx())
+    dates = [p.tax_on for p in preview.after.shipping.portions]
+    assert dates, "the package has shipping, so it must have shipping portions"
+    assert set(dates) == {AMEND_DAY}, plainly(
+        "after a move to another tax territory every shipping portion must be taxed on the "
+        f"amendment date {AMEND_DAY}",
+        f"the shipping portions carry {dates}",
+    )
+
+
+def test_an_address_whose_method_is_three_days_slower_is_substantial() -> None:
+    change = am.ChangeAddress(
+        address={"line1": "2 Via Nuova", "city": "X", "postcode": "00100", "country": "IT"},
+        requested_by_customer=True,
+        shipping=am.ShippingOffer(key="standard", label="Standard", net=D("10.00"), max_days=6),
+    )
+    changes: list[am.AmendmentChange] = [change]
+    result = kind_of(am.recompute_vendor_order(seed(), changes, ctx()), changes)
+    assert result.kind == am.SUBSTANTIAL, plainly(
+        "an address fix whose shipping takes 3 more days must be substantial",
+        f"it was classified {result.kind}",
+    )
+
+
+def test_anonymisation_replaces_the_address_kept_in_the_changes() -> None:
+    stored = [am.change_to_json(address("IT", "00100")), am.change_to_json(am.RemoveLine("B"))]
+    scrubbed = am.scrub_changes(stored)
+    assert scrubbed[0]["address"] == {"anonymised": True, "country": "IT"}, plainly(
+        "the address in the changes must become the placeholder with only the country",
+        f"it is {scrubbed[0]['address']}",
+    )
+    assert scrubbed[1] == stored[1]
+    assert am.scrub_changes(scrubbed) == scrubbed, "a second scrub must change nothing"
 
 
 def test_changes_and_snapshots_survive_a_json_round_trip() -> None:

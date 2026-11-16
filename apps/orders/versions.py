@@ -11,6 +11,9 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 
+from apps.core.audit import VENDOR_FIELD
+from apps.tax.engine import NORTHERN_IRELAND_CODE, is_northern_ireland
+
 from . import amendment_engine as am
 from .models import OrderLine, VendorOrder, VendorOrderVersion
 from .tz import business_tz
@@ -21,11 +24,15 @@ DOMESTIC_REASON = "domestic_vendor_country"
 def _country_of_taxation(rate: Decimal, reason: str, sub: VendorOrder) -> str | None:
     """What the tax engine decided as the country of taxation (TaxDecision), which the order
     line does not store: none for a zero rate, the vendor's country for a domestic sale, else the
-    delivery country."""
+    delivery country, which is `XI` for Northern Ireland (an OSS sale to `BT*` is taxed there,
+    TAX.18)."""
     if rate == 0:
         return None
     if reason == DOMESTIC_REASON:
         return str((sub.vendor_snapshot or {}).get("country") or sub.vendor.country)
+    postcode = str((sub.order.shipping_address or {}).get("postcode") or "")
+    if is_northern_ireland(sub.order.shipping_country, postcode):
+        return NORTHERN_IRELAND_CODE
     return str(sub.order.shipping_country)
 
 
@@ -67,6 +74,8 @@ def version_one_snapshot(sub: VendorOrder, lines: Sequence[OrderLine]) -> am.Ver
                 portions=(portion,),
                 product_id=line.product_id,
                 variant_label=line.variant_label,
+                fiscal_category=line.fiscal_category,
+                weight_kg=line.weight_kg,
             )
         )
     choice: dict[str, Any] = dict(sub.shipping_choice or {})
@@ -182,14 +191,25 @@ def create_next_version(
 
 
 def current_version(sub: VendorOrder) -> VendorOrderVersion:
-    """The current version of `sub`, writing v1 first when the order has none (an order made
-    outside `create_order`, such as a test fixture)."""
-    if sub.current_version_id is not None:
-        return VendorOrderVersion.objects.get(pk=sub.current_version_id)
-    existing = VendorOrderVersion.objects.filter(vendor_order=sub).order_by("-number").first()
-    if existing is not None:
-        return existing
-    return create_version_one(sub, list(OrderLine.objects.filter(vendor_order=sub)))
+    """The current version of `sub`. Every paid vendor order has one: v1 is written when the
+    payment succeeds, and migration 0017 wrote it for the orders paid before."""
+    if sub.current_version_id is None:
+        raise am.AmendmentRefused(
+            "This package has no version yet: it can be amended only once its order is paid."
+        )
+    return VendorOrderVersion.objects.get(pk=sub.current_version_id)
+
+
+def audit_snapshot(version: VendorOrderVersion) -> dict[str, Any]:
+    """What the audit trail keeps of a version (no address: personal data)."""
+    return {
+        VENDOR_FIELD: str(version.vendor_order.vendor.public_id),
+        "number": version.number,
+        "goods_net": version.goods_net,
+        "shipping_net": version.shipping_net,
+        "tax_total": version.tax_total,
+        "gross_total": version.gross_total,
+    }
 
 
 def delivery_address(sub: VendorOrder, version: VendorOrderVersion) -> dict[str, Any]:

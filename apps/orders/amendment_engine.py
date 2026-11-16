@@ -178,6 +178,11 @@ class VersionLine:
     product_id: int | None = None
     variant_label: str = ""
     replaces: str = ""
+    # Snapshots taken when the order was placed (never the live product): the fiscal category
+    # decides the tax of an increment or a territory change; the unit weight (variant override
+    # included) re-quotes the shipping. Empty / None for a legacy line without them.
+    fiscal_category: str = ""
+    weight_kg: Decimal | None = None
 
     @property
     def net(self) -> Decimal:
@@ -203,6 +208,8 @@ class VersionLine:
             "product_id": self.product_id,
             "variant_label": self.variant_label,
             "replaces": self.replaces,
+            "fiscal_category": self.fiscal_category,
+            "weight_kg": None if self.weight_kg is None else str(self.weight_kg),
         }
 
     @classmethod
@@ -218,6 +225,8 @@ class VersionLine:
             product_id=data.get("product_id"),
             variant_label=str(data.get("variant_label") or ""),
             replaces=str(data.get("replaces") or ""),
+            fiscal_category=str(data.get("fiscal_category") or ""),
+            weight_kg=None if data.get("weight_kg") is None else _dec(data["weight_kg"]),
         )
 
 
@@ -332,6 +341,7 @@ class NewLine:
     fiscal_category: str
     product_id: int | None = None
     variant_label: str = ""
+    weight_kg: Decimal | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -343,6 +353,7 @@ class NewLine:
             "fiscal_category": self.fiscal_category,
             "product_id": self.product_id,
             "variant_label": self.variant_label,
+            "weight_kg": None if self.weight_kg is None else str(self.weight_kg),
         }
 
     @classmethod
@@ -356,6 +367,7 @@ class NewLine:
             fiscal_category=str(data["fiscal_category"]),
             product_id=data.get("product_id"),
             variant_label=str(data.get("variant_label") or ""),
+            weight_kg=None if data.get("weight_kg") is None else _dec(data["weight_kg"]),
         )
 
 
@@ -500,6 +512,21 @@ def change_to_json(change: AmendmentChange, *, with_address: bool = True) -> dic
         case ChangeDeliveryTime(max_days=max_days, min_days=min_days):
             data.update(max_days=max_days, min_days=min_days)
     return data
+
+
+ANONYMISED_ADDRESS: Final = {"anonymised": True}
+
+
+def scrub_changes(changes: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """The stored changes with every delivery address replaced by the anonymised placeholder
+    (D-29); the country is kept, as on the order."""
+    scrubbed = []
+    for data in changes:
+        item = dict(data)
+        if item.get("kind") == ChangeAddress.kind and "address" in item:
+            item["address"] = {**ANONYMISED_ADDRESS, "country": item.get("country", "")}
+        scrubbed.append(item)
+    return scrubbed
 
 
 def change_from_json(data: Mapping[str, Any]) -> AmendmentChange:
@@ -737,8 +764,8 @@ def _decide(ctx: RecomputeContext, key: str, category: str | None) -> TaxDecisio
     category = category or ctx.categories.get(key)
     if not category:
         raise AmendmentRefused(
-            "The product of this line is no longer in the catalogue, so its tax cannot be "
-            "decided again; the line can only be reduced or removed."
+            "The fiscal category of this line was not recorded when it was sold, so its tax "
+            "cannot be decided again; the line can only be reduced or removed."
         )
     return resolve_goods_tax(ctx.tax, category)
 
@@ -757,6 +784,8 @@ def _new_line(line: NewLine, ctx: RecomputeContext, *, replaces: str = "") -> Ve
         product_id=line.product_id,
         variant_label=line.variant_label,
         replaces=replaces,
+        fiscal_category=line.fiscal_category,
+        weight_kg=line.weight_kg,
     )
 
 
@@ -765,14 +794,18 @@ def _shipping_portions(
     lines: Sequence[VersionLine],
     net: Decimal,
     previous: Sequence[VersionPortion],
+    *,
+    retaxed: bool = False,
 ) -> tuple[VersionPortion, ...]:
-    """TAX.17: the shipping split over the goods, each line under its base decision."""
+    """TAX.17: the shipping split over the goods, each line under its base decision. A portion
+    whose rate and reason were already in the previous version keeps its `tax_on`; after a
+    territory change (`retaxed`) every portion is taxed again on the amendment's tax date."""
     if not lines or net == 0:
         return ()
     goods = [(line.net, line.portions[0].decision) for line in lines if line.portions]
     if not goods:
         return ()
-    dates = {(p.rate, p.reason): p.tax_on for p in previous}
+    dates = {} if retaxed else {(p.rate, p.reason): p.tax_on for p in previous}
     return tuple(
         VersionPortion(
             net=portion.net,
@@ -850,7 +883,11 @@ def recompute_vendor_order(
                     unit_price_net=line.unit_price_net,
                     quantity=quantity,
                     discount_net=discount,
-                    increment=(_decide(ctx, key, None) if quantity > line.quantity else None),
+                    increment=(
+                        _decide(ctx, key, line.fiscal_category)
+                        if quantity > line.quantity
+                        else None
+                    ),
                     tax_on=ctx.tax_on,
                 )
             case ChangePrice(line_key=key, unit_price_net=price):
@@ -862,7 +899,7 @@ def recompute_vendor_order(
                     unit_price_net=price,
                     quantity=line.quantity,
                     discount_net=discount,
-                    increment=_decide(ctx, key, None) if higher else None,
+                    increment=_decide(ctx, key, line.fiscal_category) if higher else None,
                     tax_on=ctx.tax_on,
                 )
             case AddLine(line=new):
@@ -910,7 +947,7 @@ def recompute_vendor_order(
     if territory_changed:  # a change of regime: every line reversed and taxed again
         for key in order:
             line = lines[key]
-            decision = _decide(ctx, key, None)
+            decision = _decide(ctx, key, line.fiscal_category)
             lines[key] = replace(
                 line, portions=(VersionPortion.taxed(line.net, decision, ctx.tax_on),)
             )
@@ -919,7 +956,13 @@ def recompute_vendor_order(
     new_lines = tuple(lines[key] for key in order)
     shipping = replace(
         shipping,
-        portions=_shipping_portions(ctx, new_lines, shipping.net, version.shipping.portions),
+        portions=_shipping_portions(
+            ctx,
+            new_lines,
+            shipping.net,
+            version.shipping.portions,
+            retaxed=territory_changed,
+        ),
     )
     after = VersionSnapshot(
         lines=new_lines,
@@ -1038,6 +1081,12 @@ def classify_amendment(
                     reasons.append("the new address changes the tax")
                 if after.shipping.net > before.shipping.net:
                     reasons.append("the new address costs more to ship")
+                if change.shipping is not None:  # the method quoted again for the new address
+                    slower = _slower(
+                        before.shipping.max_days, change.shipping.max_days, comparable_delay_days
+                    )
+                    if slower:
+                        reasons.append(f"at the new address {slower}")
     if preview.money_delta > 0:
         reasons.append(
             f"the recompute raises what the customer pays by {preview.money_delta} EUR, and a "
@@ -1062,12 +1111,33 @@ def staff_change_error(initiator: str, changes: Sequence[AmendmentChange]) -> st
     if initiator not in STAFF_INITIATORS:
         return None
     for change in changes:
-        if isinstance(change, ChangeCarrier | ChangeDeliveryTime):
+        if isinstance(change, ChangeCarrier):
             continue
         if isinstance(change, ChangeAddress) and change.requested_by_customer:
             continue
         return (
             "Platform staff may only change the carrier, or the address when the customer asks; "
-            "products, quantities and prices are changed by the vendor, who is the seller."
+            "products, quantities, prices and delivery times are changed by the vendor, who is "
+            "the seller."
         )
+    return None
+
+
+def staff_carrier_error(
+    initiator: str, preview: AmendmentPreview, changes: Sequence[AmendmentChange]
+) -> str | None:
+    """Spec 07 roles: platform staff change the carrier only to one at the same or a lower price
+    (a dearer one would make the vendor pay a cost it did not choose). Checked on the quoted
+    price, after the recompute. None when allowed."""
+    if initiator not in STAFF_INITIATORS:
+        return None
+    paid = preview.before.shipping.net
+    for change in changes:
+        if isinstance(change, ChangeCarrier) and change.offer.net > paid:
+            return (
+                f"Platform staff may change the carrier only to one at the same or a lower price: "
+                f"{change.offer.label or change.offer.key} costs {change.offer.net} EUR net, more "
+                f"than the {paid} EUR the customer paid for shipping. The vendor can make this "
+                "change itself."
+            )
     return None
