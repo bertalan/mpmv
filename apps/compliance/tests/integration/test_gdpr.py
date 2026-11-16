@@ -405,6 +405,7 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
     handled = {
         "cart.cart": "exported, deleted",
         "orders.order": "exported, restricted or anonymised through ORD.2",
+        "orders.orderamendment": "vendor member or staff actor (ORD.20), refused like vendor users",
         "accounts.passkeydevice": "exported by name, deleted",
         "accounts.recoverycodedevice": "exported by name, deleted",
         "accounts.elevationgrant": "short-lived step-up grant (hashes only), deleted on erasure",

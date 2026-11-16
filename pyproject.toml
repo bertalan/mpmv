@@ -319,7 +319,14 @@ forbidden_modules = ["apps.events"]
 [[tool.importlinter.contracts]]
 name = "Engines are pure: no Django, models or services in apps.*.engine (ARC.18)"
 type = "forbidden"
-# ORD.20: the amendment engine is a separate pure module of orders.
-source_modules = ["apps.*.engine", "apps.orders.amendment_engine"]
+source_modules = ["apps.*.engine"]
+forbidden_modules = ["django", "apps.*.models", "apps.*.services"]
+ignore_imports = ["apps.core.text -> django"]
+
+# ORD.20: the order amendment engine is a pure module of orders too (same rule as ARC.18).
+[[tool.importlinter.contracts]]
+name = "The order amendment engine is pure: no Django, models or services (ARC.18, ORD.20)"
+type = "forbidden"
+source_modules = ["apps.orders.amendment_engine"]
 forbidden_modules = ["django", "apps.*.models", "apps.*.services"]
 ignore_imports = ["apps.core.text -> django"]

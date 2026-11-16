@@ -665,7 +665,9 @@ class OrderAmendment(BaseModel):
     from_version = models.ForeignKey(
         VendorOrderVersion, on_delete=models.PROTECT, related_name="amendments_from"
     )
-    changes = models.JSONField(default=list, help_text="Typed changes (amendment_engine).")
+    changes = models.JSONField(
+        default=list, blank=True, help_text="Typed changes (amendment_engine)."
+    )
     kind = models.CharField(max_length=16, choices=AmendmentKind.choices)
     reasons = models.JSONField(
         default=list, blank=True, help_text="Why the change is substantial, in plain words."
@@ -691,7 +693,9 @@ class OrderAmendment(BaseModel):
         default=AmendmentState.DRAFT,
         db_index=True,
     )
-    preview = models.JSONField(default=dict, help_text="The recompute: before, after and money.")
+    preview = models.JSONField(
+        default=dict, blank=True, help_text="The recompute: before, after and money."
+    )
     fallback = models.CharField(
         max_length=32, choices=AmendmentFallback.choices, default=AmendmentFallback.KEEP
     )

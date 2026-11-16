@@ -102,12 +102,20 @@ from apps.ingest.tests.factories import (
 )
 from apps.ledger.models import LedgerEntry, Refund
 from apps.ledger.tests.factories import LedgerEntryFactory, RefundFactory
-from apps.orders.models import OrderLine, StockReservation, VendorOrder
+from apps.orders.models import (
+    OrderAmendment,
+    OrderLine,
+    StockReservation,
+    VendorOrder,
+    VendorOrderVersion,
+)
 from apps.orders.tests.factories import (
+    OrderAmendmentFactory,
     OrderLineFactory,
     StockReservationFactory,
     VendorOrderFactory,
     paid_vendor_order,
+    version_one,
 )
 from apps.payments.models import ConnectedAccount
 from apps.payments.tests.factories import ConnectedAccountFactory
@@ -288,6 +296,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     # PAY.4: a refund mark of one of the vendor's own orders.
     Refund: lambda vendor: RefundFactory.create(vendor=vendor),
     OrderLine: lambda vendor: OrderLineFactory.create(vendor_order__vendor=vendor),
+    # ORD.20: v1 of one of the vendor's orders, and a draft amendment on such an order.
+    VendorOrderVersion: lambda vendor: version_one(vendor),
+    OrderAmendment: lambda vendor: OrderAmendmentFactory.create(from_version=version_one(vendor)),
     StockReservation: lambda vendor: StockReservationFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),

@@ -28,6 +28,7 @@ from apps.orders.models import (
     VendorOrderVersion,
 )
 from apps.orders.services import LineInput, VendorOrderInput
+from apps.orders.tests.factories import OrderAmendmentFactory, VendorOrderVersionFactory
 from apps.shipping.models import ShippingMethod
 from apps.shipping.tests.factories import (
     ShippingMethodFactory,
@@ -427,17 +428,11 @@ def test_an_apply_on_a_stale_version_is_superseded_and_moves_nothing() -> None:
     )
     assert amendment is not None
     # Another path moved the version under the draft (set-up: a sibling applied amendment).
-    other = OrderAmendment.objects.create(
-        vendor_order=sub,
-        from_version=amendment.from_version,
-        changes=[],
-        kind="minor",
-        initiator="vendor_owner",
-        reason="set-up",
-        state=AmendmentState.APPLIED,
+    other = OrderAmendmentFactory.create(
+        from_version=amendment.from_version, state=AmendmentState.APPLIED
     )
     v1 = amendment.from_version
-    moved = VendorOrderVersion.objects.create(
+    moved = VendorOrderVersionFactory.create(
         vendor_order=sub,
         number=2,
         amendment=other,
