@@ -6700,6 +6700,10 @@ msgstr "Versioni"
 msgid "VIES says this VAT number is not valid. VAT is charged on your order."
 msgstr "VIES dice che questa partita IVA non è valida. Sul tuo ordine viene applicata l'IVA."
 
+#: themes/ride/templates/components/header.html
+msgid "View cart"
+msgstr "Vai al carrello"
+
 #: apps/orders/templates/orders/_added.html
 msgid "View your cart: %(counter)s item"
 msgid_plural "View your cart: %(counter)s items"
