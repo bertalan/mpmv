@@ -230,3 +230,16 @@ def test_a_product_tile_is_not_one_giant_link() -> None:
     assert re.search(
         r'class="button button--small[^"]*"[^>]*>View<span class="visually-hidden">', html
     )
+
+
+def test_the_mini_cart_request_is_background_and_skipped_on_sign_in_pages() -> None:
+    """The mini-cart's htmx request is not user activity (X-MPMV-Poll) and never runs on the
+    sign-in, second-factor or passkey pages, where it could race the session write of a login."""
+    from pathlib import Path
+
+    header = (
+        Path(__file__).resolve().parents[4] / "themes/ride/templates/components/header.html"
+    ).read_text(encoding="utf-8")
+    assert 'hx-headers=\'{"X-MPMV-Poll": "1"}\'' in header
+    for guard in ('app_name != "mfa"', 'app_name != "levels"', '"login" not in page_path'):
+        assert header.count(guard) == 2, guard  # the trigger link and the offcanvas agree
