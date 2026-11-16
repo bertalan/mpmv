@@ -167,6 +167,23 @@ def test_events_of_a_suspended_vendor_are_404(client: Client) -> None:
     assert "Suspended fair" not in _get(client, _index_url())
 
 
+def test_the_ics_of_a_non_live_or_hidden_event_is_404_without_a_public_cache(
+    client: Client,
+) -> None:
+    draft = _event(10, publish=False)
+    pending = _event(10, publish=False, title="Pending fair")
+    pending.save_revision()  # a submitted revision still waiting for review: not live
+    unpublished = _event(10)
+    unpublished.unpublish()
+    hidden = _event(10)
+    EventPage.objects.filter(pk=hidden.pk).update(hidden_at=timezone.now())
+    suspended = _event(10, vendor=VendorFactory.create(status=Vendor.Status.SUSPENDED))
+    for page in (draft, pending, unpublished, hidden, suspended):
+        response = client.get(f"{page.url}calendar.ics")
+        assert response.status_code == 404, page.title
+        assert "public" not in response.get("Cache-Control", "")
+
+
 # --- Month calendar and archive
 
 
