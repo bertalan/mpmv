@@ -382,14 +382,16 @@ def test_a_shop_that_is_not_active_yet_gets_a_message_not_an_error(
     assert not EventPage.objects.filter(vendor=applicant).exists()
 
 
-def test_the_pages_render_under_the_ride_theme(signed_in: Client, vendor: Vendor) -> None:
-    from apps.themes.services import use_theme
-
+def test_the_pages_render_under_the_ride_theme(
+    signed_in: Client, vendor: Vendor, settings: Any
+) -> None:
+    # The site default theme, not apps.themes: the "No app imports themes" contract.
+    settings.MPMV_THEME_DEFAULT = "ride"
     page = _publish(_event(vendor, title="Ride fair"))
-    with use_theme("ride"):
-        for url in (reverse(LIST), reverse(NEW), _urls(page)["edit"], _urls(page)["cancel"]):
-            response = signed_in.get(url)
-            assert response.status_code == 200, url
-        html = signed_in.get(_urls(page)["edit"]).text
+    for url in (reverse(LIST), reverse(NEW), _urls(page)["edit"], _urls(page)["cancel"]):
+        response = signed_in.get(url)
+        assert response.status_code == 200, url
+        assert 'data-theme="ride"' in response.text, url
+    html = signed_in.get(_urls(page)["edit"]).text
     assert 'name="recurrence"' in html
     assert 'name="title"' in html
