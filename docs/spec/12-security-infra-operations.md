@@ -30,7 +30,7 @@ because the task SEC.2 (uploads) used the same ID.
 |---|---|---|
 | SEC.1 | Access model | MFA, step-up, per-role session lifetimes, the passkey window (D-32), session list and invalidation (see [02](02-core-identity-permissions.md), CORE.24, CORE.25) |
 | SEC-R2 | Tenant isolation as a tested invariant | Automated negative tests for every endpoint, view and MCP tool |
-| SEC.3 | HTTP hardening | CSP without `unsafe-inline` (native since Django 6.0), HSTS, `Secure`/`HttpOnly`/`SameSite` cookies, security headers |
+| SEC.3 | HTTP hardening | CSP without `unsafe-inline` (native since Django 6.0; the Matomo host is allowed only when the tracker is not proxied, SEO.5), HSTS (staged at launch, MIG.22), `Secure`/`HttpOnly`/`SameSite` cookies, security headers |
 | SEC.4 | Uploads | Server-side MIME validation, size limits, image re-encoding, no unsanitized SVG. Final caps of task SEC.2: 60 megapixels for still images (also Pillow's decompression-bomb threshold), 16 megapixels for animations, 40 megapixels for the stored original, 16,000 px per side, 300 frames, 25 MB per file; one image decode at a time per process (decode lock; a second upload waits up to `MPMV_IMAGE_DECODE_WAIT_SECONDS`, then gets a "try again" error); every cap is an environment setting checked at startup |
 | SEC.5 | Secrets | Env or vault only; secret scanning in pre-commit and CI; documented rotation |
 | SEC.6 | Field-level encryption | IBAN, KYC documents, DAC7 data; key in KMS or in a file outside the DB, rotatable |

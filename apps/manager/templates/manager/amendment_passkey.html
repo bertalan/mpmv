@@ -1,0 +1,29 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+The passkey prompt of a critical order change (ORD.20 part 3, CORE.25): a fresh passkey for this
+one change, every time, even with a passkey window open. accounts/passkey.js runs the "Do it
+once" ceremony bound to the change's digest (data-passkey="once"), then submits the replay form,
+which repeats the POST that asked. The response is never cached. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Confirm with your passkey" %}</h1>
+  <p>{% blocktranslate with what=action_label %}This change of order {{ number }} is {{ what }}: confirm it with your passkey. The confirmation is for this change only, once.{% endblocktranslate %}</p>
+  <p class="manager-lead">{{ message }}</p>
+  {% if can_confirm %}
+    <form data-passkey="once" data-csrf-token="{{ csrf_token }}" data-options-url="{% url 'levels:once_options' %}" data-finish-url="{% url 'levels:once' %}" data-action="{{ action }}" data-digest="{{ digest }}" data-replay="replay-form">
+      {% include "components/button.html" with label=_("Confirm with my passkey") type="submit" only %}
+      <noscript><p>{% translate "Passkeys need JavaScript." %}</p></noscript>
+      <p data-passkey-error role="alert" hidden></p>
+    </form>
+    <form id="replay-form" method="post" action="{{ replay_url }}">
+      {% csrf_token %}{% for key, value in replay_fields %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+    </form>
+    {% include "accounts/mfa/_passkey_script.html" %}
+  {% elif not has_passkey %}
+    <p>{% url 'mfa:overview' as overview_url %}{% blocktranslate %}Your account has no passkey yet. <a href="{{ overview_url }}">Add a passkey</a> to be able to confirm this.{% endblocktranslate %}</p>
+  {% else %}
+    <p>{% translate "Your role may not confirm this change. Ask the shop's owner or a member who handles orders." %}</p>
+  {% endif %}
+  <p><a href="{{ back_url }}">{% translate "Back to the change" %}</a></p>
+{% endblock %}
