@@ -1,0 +1,15 @@
+{% load i18n %}{% comment %}
+Order summary of `ride` (THM.16): the `base` contract (titled section, description list, the
+total last, amounts arrive formatted) as a Bootstrap card. Context as in `base`: `id`, `title`,
+`heading_level`, `lines`, `total`, `total_label`, `note`, `vehicle`.
+{% endcomment %}<section class="order-summary card mb-4" aria-labelledby="{{ id }}">
+  <div class="card-body">
+    <h{{ heading_level|default:2 }} id="{{ id }}" class="card-title {% if heading_level and heading_level != 2 %}h5{% else %}h4{% endif %}">{% firstof title _("Order summary") %}</h{{ heading_level|default:2 }}>
+    {% if vehicle %}<p class="order-summary__vehicle">{{ vehicle }}</p>{% endif %}
+    <dl class="order-summary__list mb-0">
+      {% for line in lines %}<div class="order-summary__line d-flex justify-content-between gap-3 py-2 border-bottom"><dt class="fw-normal">{{ line.label }}</dt><dd class="mb-0">{{ line.amount }}</dd></div>{% endfor %}
+      <div class="order-summary__line order-summary__line--total d-flex justify-content-between gap-3 pt-3 fw-bold fs-4"><dt class="order-summary__total">{% firstof total_label _("Total") %}</dt><dd class="mb-0">{{ total }}</dd></div>
+    </dl>
+    {% if note %}<p class="order-summary__note form-text mb-0 mt-2">{{ note }}</p>{% endif %}
+  </div>
+</section>

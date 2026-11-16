@@ -1,0 +1,22 @@
+{% load i18n theme_tags %}{% comment %}
+Cart line of `ride` (THM.16): the `base` component's contract (list item of a package; the
+quantity stepper and the remove button belong to the cart form; a problem is said in words) as a
+Bootstrap list-group item on the grid. Same context as `base`; the placeholder box of `base` is
+decorative and is not drawn.
+{% endcomment %}{% with url=url|safe_href %}<li class="cart-line list-group-item py-3{% if problem %} cart-line--problem border border-2 border-danger{% endif %}">
+  <div class="row g-3 align-items-center">
+    {% if image_url %}<div class="col-auto"><img class="rounded" src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="96" height="96" loading="lazy"></div>{% endif %}
+    <div class="col-12 col-md">
+      <p class="cart-line__name fw-bold mb-1">{% if url %}<a class="link-body-emphasis" href="{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</p>
+      {% if variant %}<p class="cart-line__variant mb-1">{{ variant }}</p>{% endif %}
+      {% if vendor %}<p class="cart-line__vendor form-text mb-1">{% blocktranslate %}Sold by {{ vendor }}{% endblocktranslate %}</p>{% endif %}
+      <p class="cart-line__unit form-text mb-0">{% blocktranslate %}{{ unit_price }} each{% endblocktranslate %}</p>
+      {% if problem %}<p class="cart-line__problem text-danger mb-0 mt-1"><strong>{% translate "Warning" %}:</strong> {{ problem }}</p>{% endif %}
+    </div>
+    <div class="col-7 col-md-auto d-flex flex-wrap align-items-center gap-2">
+      {% blocktranslate asvar quantity_label %}Quantity, {{ name }}{% endblocktranslate %}{% include "components/quantity_stepper.html" with id=id|add:"-quantity" name=quantity_name label=quantity_label value=quantity max=max hide_label=True only %}
+      {% blocktranslate asvar remove_label %}Remove {{ name }}{% endblocktranslate %}<button type="submit" class="cart-line__remove btn btn-outline-secondary btn-sm" name="remove" value="{{ id }}" aria-label="{{ remove_label }}">{% translate "Remove" %}</button>
+    </div>
+    <p class="cart-line__total col-5 col-md-2 mb-0 text-end h5"><span class="visually-hidden">{% translate "Line total" %}: </span>{{ total }}</p>
+  </div>
+</li>{% endwith %}

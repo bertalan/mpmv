@@ -178,6 +178,19 @@ LIVE (SEC.1); the lifetime depends on the role:
 - **Customers** (no vendor membership, no staff flag): a rolling session, 14 days.
 - **Staff and vendor members**, in the Manager and in the admins: an idle timeout of 30 minutes and
   an absolute lifetime of 12 hours, both values on the `PlatformOperator` configuration.
+  - The keys are `customer_days`, `staff_idle_minutes` and `staff_absolute_hours` in the
+    operator's session policy (next to the passkey window timers), so a new configuration version
+    changes them with no code change.
+  - The role is read on every request, never at sign-in. "Staff" means the staff flag, superusers,
+    every role that must use MFA (vendor members, CMS editors) and platform staff (the platform
+    owner and the platform roles, who need not hold the staff flag). A customer who becomes staff
+    gets the staff limits on the next request.
+  - The idle time counts from the last request that is not polling or prefetch. The absolute time
+    counts from the password (or sign-in link) login and survives a key change; a second-factor
+    check or the passkey window never restarts it, and the passkey window ends with its session.
+  - An expired session is ended on its next request: it is deleted with its index row, audited
+    without personal data (reason `idle`, `absolute` or `invalid`), and the user goes to the login
+    page with a message (JSON clients get 401).
 - The account page lists the user's sessions (device summary, last use, approximate network) and
   has "Log out everywhere else" and the end of a single session (POST with CSRF).
 - All of a user's other sessions are invalidated when the password, an MFA device (added, removed

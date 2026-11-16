@@ -1,0 +1,12 @@
+{% extends "layouts/base.html" %}
+{% load i18n %}{% comment %}Cart page of `ride` (THM.16): the app template's structure on the Bootstrap
+container classes. `.checkout` stays as the width hook of the cart and checkout pages.{% endcomment %}
+{% block title %}{% translate "Cart" %} · {{ site_name }}{% endblock %}
+{% block head %}{% robots_meta "noindex, nofollow" %}{% endblock %}
+{% block content %}
+<article class="checkout mx-auto">
+  <h1 class="mb-3">{% translate "Your cart" %}</h1>
+  {% if not empty %}{% include "components/step_indicator.html" with steps=steps current=current_step only %}{% endif %}
+  {% include "orders/_cart_body.html" %}
+</article>
+{% endblock %}
