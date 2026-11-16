@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **401** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3202 h** (P1 2344 h · P2 770 h · P3 88 h)
+- Micro-tasks: **402** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3204 h** (P1 2344 h · P2 772 h · P3 88 h)
 - P1 critical path (schedule lower bound with full parallelism): **153 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CORE.2 → CORE.3 → CORE.17 → CORE.18 → FIT.1 → FIT.5 → FIT.7 → FIT.8 → FIT.10 → FIT.12
 
 ## By macro area
@@ -19,7 +19,7 @@
 | CAT | Product catalog | 21 | 152 | 60 | 0 | 212 |
 | VEN | Vendors, commissions, ledger | 39 | 292 | 35 | 0 | 327 |
 | TAX | Tax engine | 21 | 96 | 37 | 0 | 133 |
-| SHP | Shipping and quotes | 14 | 96 | 28 | 0 | 124 |
+| SHP | Shipping and quotes | 15 | 96 | 30 | 0 | 126 |
 | ORD | Cart, orders, returns | 19 | 148 | 42 | 0 | 190 |
 | PAY | Payments (Stripe Connect) | 7 | 46 | 4 | 16 | 66 |
 | PRM | Coupons and cart recovery | 16 | 0 | 143 | 10 | 153 |
@@ -36,7 +36,7 @@
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 14 | 25 | 37 | 8 | 70 |
 | MIG | Migration and cutover | 21 | 135 | 29 | 0 | 164 |
-| **Total** | | **401** | **2344** | **770** | **88** | **3202** |
+| **Total** | | **402** | **2344** | **772** | **88** | **3204** |
 
 ## By phase
 
@@ -347,7 +347,7 @@
 | MIG.17 | Shipping configuration migration: the MIG.1 extractor exports the legacy shipping option (zones with countries, postcode ranges and priority, the world catch-all, carriers per vendor with weight bands and surcharges, pickup options, quote settings) to the intermediate format, and the SHP.5 loader writes the `shipping` models; the marketplace plugin's own shipping tables are treated as a derived mirror and never used as a source | P1 | 4 | MIG.12, SHP.5 | A fresh-dump run loads the configuration with no duplicates on reload; the §13.3 shipping parity (200 vendor × country × postcode × weight combinations) shows no difference; the world catch-all and every pickup option are present; a value that does not parse is reported, never defaulted |
 | MIG.20 | Refunds migration (owner decision 2026-11-11, relayed by lane-a, #86): refund child orders and marketplace refund requests are stored inside the historical order (refunded amount, date, reason); there is no separate refund model for legacy data; no new ledger entry and no tax recalculation | P1 | 4 | MIG.4 | A migrated order shows its refunded amount, date and reason; the MIG.5 parity report reconciles order total minus refunds against the legacy figures; a refund amount that does not parse as `Decimal` is rejected with a report; the migration writes no ledger entry for a refund (MIG.8 covers balances); no refund model or table exists for legacy data |
 
-### F6 — After go-live (P2) (114 tasks, 880 h)
+### F6 — After go-live (P2) (115 tasks, 882 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -378,6 +378,7 @@
 | SHP.7 | Cart simulator (admin + `/shipping/simulate`) | P2 | 6 | SHP.4 | Parity with the current simulator on seed cases |
 | SHP.8 | Daily health check + report | P2 | 6 | SHP.1, ARC.9, ARC.16 | Email report with the 7 checks |
 | SHP.11 | Rate export for Google Merchant | P2 | 4 | SHP.12 | Feed without hardcoded rates |
+| SHP.15 | Remaining special areas (owner decision Q-97): Greece Ionian islands (`49*`, `28*`, `29*`, `31*`), Sporades (`370*`, Skyros `34007`), Kythira and Antikythira (`801*`, with the Ionian islands), Saronic islands (exact codes `18010`, `18020`, `18040`, `18050`, and `189*`; Methana stays mainland) and Northern Ireland (`BT*`, remote, shipping only: the tax territory logic of TAX.7 is unchanged), seeded by an idempotent data migration | P2 | 2 | SHP.14 | One address per new area resolves to it; Patras, Athens, Piraeus, London and Glasgow codes stay mainland; the seed is idempotent and its reverse removes only its own areas |
 | ORD.11 | Customer account: preferences and request history (scope to be defined with the owner): one section listing the customer's product information and quote requests and holding preferences such as followed vendors and event notifications; placeholder, hours to be re-estimated once the scope is agreed; scope decided by the owner (Q-84, 2026-11-13): the customer's information and quote requests with their history; the vendors the customer follows and their news; event notifications (EVT.16); email preferences and newsletter consent (language, frequency; every marketing consent separate, optional and unticked); wish lists and **gift lists** of products the customer would like to receive, shareable by a private link; other marketing preferences, each an explicit opt-in | P2 | 4 | ORD.7, SHP.10 | The owner has agreed the scope, this row is re-estimated and the section is detailed in §7.2 before any code is written |
 | ORD.12 | Free-gift promotion (owner decision MQ-9): triggered by a coupon code or a cart condition; adds the gift product at full price plus a 100% discount line; discount funded by its issuer only (vendor, or platform on the Q-90 model; spec 18 §18.3, no co-funding in v1), gift stock reserved like any line, a per-customer limit; VAT and commission per line; gift rule (T-7, adviser opinion 2026-11-11): a gift is allowed only as an in-kind discount on a paid order, with the gift's value at most the value of the paid goods, never a standalone free supply | P2 | 10 | ORD.4, CAT.17 | A qualifying cart gets the gift line at full price and a 100% discount line; no line is priced 0.00; a vendor-funded and a platform-funded gift give the CPN-VENDOR and CPN-PLATFORM ledger rows; a customer over the limit gets no second gift; an out-of-stock gift is not added; VAT and commission are computed per line; a cart whose gift value would exceed the value of its paid goods gets no gift; an order with no paid goods line gets no gift |
 | ORD.16 | Email language follow-ups (coherence check 19, ORD.9 1/2 leftovers): the German, French and Spanish bodies of every ORD.9 email are translated (today they fall back to English); vendors get a mail language setting, and vendor mails use it, with the platform language as the fallback | P2 | 4 | ORD.9, I18N.7 | Each ORD.9 email renders in the five languages with no English fallback in de, fr and es (snapshot tests); a vendor with a language set receives mails in it, a vendor with none in the platform language |
