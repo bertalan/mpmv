@@ -4,6 +4,7 @@ Rendered with the `ride` theme active, without a request: the shell parts are pu
 """
 
 import re
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -110,10 +111,63 @@ def test_without_search_and_cart_urls_no_dead_link_is_rendered() -> None:
     assert 'href=""' not in html
 
 
-def test_the_header_has_no_popup_markup() -> None:
+def test_the_header_has_no_native_dialog_markup() -> None:
     html = render("components/header.html", site_name="Ride", links=LINKS)
     assert "<dialog" not in html
-    assert "popup" not in html.lower()
+
+
+def test_the_search_link_is_a_modal_trigger_that_still_leads_to_the_search_page() -> None:
+    html = render("components/header.html", site_name="Ride", links=LINKS, search_url="/search/")
+    trigger = re.search(r'<a[^>]*href="/search/"[^>]*>', html)
+    assert trigger
+    assert 'data-bs-toggle="modal"' in trigger.group(0)
+    assert 'data-bs-target="#search-modal"' in trigger.group(0)
+    modal = re.search(r'<div[^>]*id="search-modal"[^>]*>', html)
+    assert modal
+    assert 'class="modal' in modal.group(0)
+    assert 'aria-labelledby="search-modal-title"' in modal.group(0)
+    form = re.search(r'<form[^>]*role="search"[^>]*>', html)
+    assert form
+    assert 'action="/search/"' in form.group(0)
+    assert 'name="q"' in html
+    assert re.search(r'<button[^>]*data-bs-dismiss="modal"[^>]*aria-label="Close"', html)
+
+
+def test_the_cart_link_opens_an_offcanvas_with_a_live_region_count_and_an_htmx_body() -> None:
+    html = render("components/header.html", site_name="Ride", links=LINKS, cart_url="/cart/")
+    trigger = re.search(r'<a[^>]*href="/cart/"[^>]*>', html)
+    assert trigger
+    assert 'data-bs-toggle="offcanvas"' in trigger.group(0)
+    assert 'data-bs-target="#mini-cart-offcanvas"' in trigger.group(0)
+    panel = re.search(r'<div[^>]*id="mini-cart-offcanvas"[^>]*>', html)
+    assert panel
+    assert "offcanvas-end" in panel.group(0)
+    assert 'aria-labelledby="mini-cart-title"' in panel.group(0)
+    body = re.search(r'<div[^>]*id="mini-cart-body"[^>]*>', html)
+    assert body
+    assert 'hx-get="/cart/"' in body.group(0)
+    assert 'hx-select="#cart-body"' in body.group(0)
+    assert re.search(r'<span[^>]*id="cart-count"[^>]*aria-live="polite"', html)
+    assert re.search(r'<a[^>]*href="/cart/"[^>]*>[^<]*View cart', html)
+
+
+def test_the_cart_body_says_how_many_items_it_holds() -> None:
+    empty = render("orders/_cart_body.html", empty=True)
+    assert 'data-cart-count="0"' in empty
+    assert "Your cart is empty" in empty
+    assert 'data-cart-label="Your cart is empty"' in empty
+
+
+def test_the_item_count_adds_the_quantities_of_every_line_of_every_package() -> None:
+    from apps.themes.templatetags.theme_tags import cart_item_count
+
+    packages = [
+        SimpleNamespace(lines=[SimpleNamespace(quantity=3), SimpleNamespace(quantity=1)]),
+        SimpleNamespace(lines=[SimpleNamespace(quantity=2)]),
+    ]
+    assert cart_item_count(packages) == 6
+    assert cart_item_count("") == 0
+    assert cart_item_count(None) == 0
 
 
 def test_the_hero_has_one_h1_a_lead_a_primary_and_a_secondary_button() -> None:
