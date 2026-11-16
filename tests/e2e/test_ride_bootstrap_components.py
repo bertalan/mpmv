@@ -70,6 +70,9 @@ def test_the_modal_opens_traps_focus_and_closes_with_the_keyboard(
     modal = page.locator("#sg-modal")
     expect(modal).to_be_visible()
     expect(modal).to_have_attribute("aria-modal", "true")
+    # Bootstrap moves focus into the dialog and starts its focus trap only once the fade-in
+    # transition has ended ("shown"); Tab before that can leave the page (flaky on CI).
+    page.wait_for_function("() => !!document.activeElement.closest('#sg-modal')")
     for _ in range(6):  # Tab never leaves the dialog
         page.keyboard.press("Tab")
         assert page.evaluate("() => !!document.activeElement.closest('#sg-modal')")
