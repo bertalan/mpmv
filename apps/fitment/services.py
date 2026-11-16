@@ -769,7 +769,7 @@ def set_fitment_relevant(
                 )
             else:
                 FitmentCategory.objects.filter(category__in=todo).delete()
-            refresh_always_visible(categories=todo)
+            _refresh_always_visible(categories=todo)
 
         return run_mutation(
             changeset, apply, ctx=ctx, action=CATEGORY_RELEVANCE_CHANGED, dry_run=dry_run
@@ -887,7 +887,7 @@ def _is_always_visible(product: Product, mode: str, relevant_ids: set[int]) -> b
     return mode == engine.UNIVERSAL or product.category_id not in relevant_ids
 
 
-def refresh_always_visible(*, categories: Iterable[Category]) -> None:
+def _refresh_always_visible(*, categories: Iterable[Category]) -> None:
     """After the operator marks or unmarks categories: refresh the denormalised flag of the
     declarations of their products."""
     relevant = relevant_category_ids()

@@ -82,6 +82,8 @@ from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
+from apps.fitment.models import ProductFitment, ProductFitmentState
+from apps.fitment.tests.factories import ProductFitmentFactory, ProductFitmentStateFactory
 from apps.ingest.models import (
     ImportRun,
     MappingTable,
@@ -211,6 +213,12 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     VendorClaim: lambda vendor: VendorClaimFactory.create(vendor=vendor),
     Product: lambda vendor: ProductFactory.create(vendor=vendor),
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    ProductFitmentState: lambda vendor: ProductFitmentStateFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    ProductFitment: lambda vendor: ProductFitmentFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
     SlugHistory: lambda vendor: SlugHistoryFactory.create(

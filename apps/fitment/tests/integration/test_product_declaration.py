@@ -15,6 +15,8 @@ from apps.fitment.tests.factories import (
     FitmentCategoryFactory,
     FitmentNodeFactory,
     FitmentNoteFactory,
+    ProductFitmentFactory,
+    ProductFitmentStateFactory,
 )
 
 pytestmark = pytest.mark.django_db
@@ -203,3 +205,11 @@ def test_rows_pointing_at_a_node_block_its_deletion_and_follow_a_merge(
         ProductFitment.objects.filter(product=product).values_list("node_id", flat=True)
     ) == [target.pk]
     assert ProductFitment.objects.get(product=product).node_path == target.path
+
+
+def test_the_factories_make_rows_the_vendor_scoped_manager_returns() -> None:
+    state = ProductFitmentStateFactory.create()
+    row = ProductFitmentFactory.create(product=state.product)
+    assert row.node_path == row.node.path
+    assert ProductFitmentState.objects.filter(pk=state.pk).exists()
+    assert ProductFitment.objects.filter(pk=row.pk).exists()

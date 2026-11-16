@@ -21,6 +21,7 @@ from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
 from apps.catalog.models import Category, Product
 from apps.core.fields import LanguageField
 from apps.core.models import BaseModel, TranslationModel
+from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
 
@@ -383,6 +384,9 @@ class ProductFitmentState(BaseModel):
 
     Mode = DeclarationMode
 
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects = VendorScopedManager()
+
     product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name="fitment_state")
     mode = models.CharField(
         _("declaration"),
@@ -423,6 +427,9 @@ class ProductFitment(BaseModel):
     """One row of the fitment table: a product fits (or, excluded, does not fit) a node."""
 
     Source = FitmentSourceKind
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects = VendorScopedManager()
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="fitments")
     node = models.ForeignKey(
