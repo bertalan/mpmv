@@ -20,7 +20,6 @@ from django.urls import reverse
 from django.utils import formats
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
-
 from wagtail.models import Locale
 
 from apps.accounts.decorators import requires_level_method

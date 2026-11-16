@@ -18,12 +18,13 @@ from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
+from apps.cms.services import seed_site
 from apps.events.models import EVENT_MODERATORS, EventPage
 from apps.events.services import ensure_event_review_workflow
 from apps.events.tests.factories import primary_index
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
-from tests.e2e.csp import RECORD_CSP_VIOLATIONS
+from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_manager_events import _press
 from tests.e2e.test_manager_shell import _accessible, _login
@@ -45,6 +46,7 @@ def _add_paragraph(page: Page, text: str) -> None:
 def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
+    seed_site()
     ensure_event_review_workflow()
     primary_index()
     vendor_password = secrets.token_urlsafe(16)  # generated: no credential literals in git
@@ -53,7 +55,9 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     shop = VendorFactory.create(display_name="Shop North", status=Vendor.Status.ACTIVE)
     VendorMemberFactory.create(vendor=shop, user=seller)
     staff_password = secrets.token_urlsafe(16)
-    staff = UserFactory.create(email="moderator@example.com", password=staff_password, superuser=True)
+    staff = UserFactory.create(
+        email="moderator@example.com", password=staff_password, superuser=True
+    )
     staff.groups.add(Group.objects.get(name=EVENT_MODERATORS))
     staff_device = TOTPDeviceFactory.create(user=staff)
     page.add_init_script(RECORD_CSP_VIOLATIONS)
@@ -75,6 +79,7 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     expect(page).to_have_url(re.compile(r"/manager/shop/events/[0-9a-f-]+/$"))
     seller.preferred_language = "en"
     seller.save()
+    page.reload()  # the saved page was shown in Italian; the rest of the test reads English
     expect(page.get_by_role("heading", name="Edit the event")).to_be_visible()
     event = EventPage.objects.get(title="Saldi d'autunno")
     assert event.locale.language_code == "it"
@@ -99,7 +104,7 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     page.get_by_role("link", name="Saldi d'autunno").click()
     page.get_by_role("button", name="More actions").click()
     page.get_by_role("button", name="Request changes").click()
-    page.get_by_label("Comment").fill(COMMENT)
+    page.locator("textarea[name=comment]:visible").fill(COMMENT)
     shot("request-changes")
     page.get_by_role("button", name="Request changes").last.click()
     expect(page.locator(".messages")).to_be_visible()
@@ -107,7 +112,32 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     # The comment shows in the vendor area.
     page.context.clear_cookies()
     _login(page, live_server.url, "seller@example.com", vendor_password)
+    verify_with_totp(page, totp_token(seller_device, offset_steps=1), window=True)
     page.goto(f"{live_server.url}/manager/shop/events/")
     expect(page.locator("main")).to_contain_text(COMMENT)
     _accessible(page)
     shot("vendor-comment")
+
+    # The vendor resubmits and the moderator approves in the Wagtail admin.
+    page.goto(f"{live_server.url}/manager/shop/events/{event.public_id}/")
+    _press(page, "Submit for review")
+    expect(page.locator("main")).to_contain_text("Awaiting review")
+    page.context.clear_cookies()
+    page.goto(f"{live_server.url}/admin/login/")
+    page.locator("input[name=username]").fill("moderator@example.com")
+    page.locator("input[name=password]").fill(staff_password)
+    page.get_by_role("button", name="Sign in").click()
+    verify_with_totp(page, totp_token(staff_device, offset_steps=1))
+    page.goto(f"{live_server.url}/admin/events/review/")
+    page.get_by_role("link", name="Saldi d'autunno").click()
+    approve = page.get_by_role("button", name="Approve and Publish", exact=True)
+    if not approve.is_visible():
+        page.get_by_role("button", name="More actions").click()
+    approve.click()
+    expect(page.locator(".messages")).to_contain_text("Saldi d'autunno")
+    published = EventPage.objects.get(pk=event.pk)
+    assert published.live
+    assert published.status == EventPage.Status.PUBLISHED
+    assert csp_violations(page) == [] or all(
+        "wagtailadmin/js/vendor.js" in v for v in csp_violations(page)
+    )

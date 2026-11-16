@@ -17,6 +17,7 @@ from wagtail.models import WorkflowState
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
+from apps.cms.services import seed_site
 from apps.core.models import AuditLog
 from apps.events import services
 from apps.events.models import EVENT_MODERATORS, EventPage
@@ -157,10 +158,10 @@ def test_creating_an_event_saves_a_draft_of_the_shop(signed_in: Client, vendor: 
 
 
 def test_a_new_event_is_written_in_the_active_language(signed_in: Client) -> None:
-    services.ensure_event_indexes()
+    seed_site()  # a home page per language, then an events index for each
     User.objects.update(preferred_language="it")  # I18N.12: decides the Manager's language
     response = signed_in.post(reverse(NEW), _post_data())
-    assert response.status_code == 302
+    assert response.status_code == 302, response.context["form"].errors
     page = EventPage.objects.get(title="Autumn fair")
     assert page.locale.language_code == "it"
     assert page.original_locale.language_code == "it"
