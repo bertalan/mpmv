@@ -1129,9 +1129,14 @@ class IcsEvent:
     longitude: str = ""
 
 
+# Control characters other than TAB and LF (CR is already folded into LF): not allowed in TEXT.
+_ICS_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+
+
 def ics_escape(text: str) -> str:
     """TEXT values: backslash, semicolon and comma escaped, line breaks as `\\n` (§3.3.11)."""
     flat = text.replace("\r\n", "\n").replace("\r", "\n")
+    flat = _ICS_CONTROL.sub("", flat)
     return flat.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
 

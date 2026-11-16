@@ -899,7 +899,9 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
         """
         if not self.is_publicly_visible():
             raise Http404
-        if path_components == [engine.ICS_PATH]:  # Wagtail's own routes always end in a slash
+        if path_components == [engine.ICS_PATH]:
+            if not self.live:  # Wagtail's own `live` check sits in `super().route()`, skipped here
+                raise Http404  # Wagtail's own routes always end in a slash
             return RouteResult(self, kwargs={"ics": True})
         return super().route(request, path_components)
 

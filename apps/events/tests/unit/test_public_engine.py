@@ -102,6 +102,10 @@ def test_ics_escape_handles_the_special_characters() -> None:
     assert engine.ics_escape("a,b;c\\d\ne") == "a\\,b\\;c\\\\d\\ne"
 
 
+def test_ics_escape_strips_control_characters() -> None:
+    assert engine.ics_escape("a\x00b\x0bc\x1fd\x7fe\te") == "abcde\te"
+
+
 def test_ics_fold_keeps_lines_within_75_octets_and_utf8_whole() -> None:
     text = "SUMMARY:" + "è" * 100
     folded = engine.ics_fold(text)
