@@ -30,5 +30,8 @@
 <h2>{% translate "Passkey" %}</h2>
 <p>{% translate "Use this device's screen lock or a security key." %}</p>
 {% include "accounts/mfa/_passkey_register_form.html" with add_another=passkeys %}
+
+<h2>{% translate "Sessions" %}</h2>
+<p><a href="{% url 'sessions:list' %}">{% translate "See where you are signed in" %}</a></p>
 {% include "accounts/mfa/_passkey_script.html" %}
 {% endblock %}

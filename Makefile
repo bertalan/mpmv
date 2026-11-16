@@ -159,10 +159,15 @@ imports: ## Enforce the app dependency graph (spec 01 §1.3)
 theme-gates: ## Theme quality gates: contract, CSP lint, size budgets, fonts, licences (THM.5)
 	uv run python -m apps.themes.gates
 
+# SEC.5: fails on any known vulnerability (pip-audit has no severity); reviewed exceptions only
+# through tools/pip_audit_ignore.toml. Needs the network, so it is not part of `make check`.
+PIP_AUDIT_VERSION := 2.10.1
 audit: ## Scan pinned dependencies for known vulnerabilities (pip-audit)
 	@mkdir -p build
-	uv export --no-emit-project --format requirements-txt > build/requirements.txt
-	uvx pip-audit --strict --disable-pip --require-hashes -r build/requirements.txt
+	uv export --frozen --no-emit-project --format requirements-txt > build/requirements.txt
+	uv run python tools/audit_ignores.py > build/pip-audit-ignores.txt
+	uvx pip-audit@$(PIP_AUDIT_VERSION) --strict --disable-pip --require-hashes \
+		-r build/requirements.txt $$(cat build/pip-audit-ignores.txt)
 
 # OPS.4: the image SBOM comes from syft in CI (docs/dev/dependency-updates.md).
 sbom: ## CycloneDX SBOM of the production Python environment (no dev group) in build/sbom/

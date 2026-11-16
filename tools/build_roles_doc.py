@@ -14,8 +14,8 @@ def render() -> str:
     spec = importlib.util.spec_from_file_location(
         "_platform_roles", ROOT / "apps" / "manager" / "roles.py"
     )
-    assert spec is not None
-    assert spec.loader is not None
+    if spec is None or spec.loader is None:
+        raise ImportError("cannot load apps/manager/roles.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)

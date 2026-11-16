@@ -5,8 +5,8 @@
   inline script or style (the CSP has no 'unsafe-inline'). Shows published data only: the
   `ProductPage` built by `product_pages.find`. The price is the listings' interim net price
   (TODO(TAX.12): the gross amount at the delivery country's rate replaces it, see
-  includes/product_card.html). The cart is not built yet: the variant choice and the buy button
-  are a disabled placeholder (no form until the cart exists). `related` (CAT.15) holds the related products and other sellers.
+  includes/product_card.html). The variant choice and the buy button are a POST form (ORD.19)
+  shown only when the product sells online; htmx swaps the answer into #add-to-cart-result. `related` (CAT.15) holds the related products and other sellers.
 {% endcomment %}
 {% block title %}{{ page_data.title }}{% if site_name %} · {{ site_name }}{% endif %}{% endblock %}
 {% block description %}{% if page_data.short_description %}<meta name="description" content="{{ page_data.short_description }}">{% endif %}{% endblock %}
@@ -48,7 +48,10 @@
           <p class="product-price">{% if page_data.price is not None %}<data value="{{ page_data.price|unlocalize }}">{{ currency }} {{ page_data.price }}</data> <small>{% translate "excl. VAT" %}</small>{% endif %}</p>
           <p class="product-stock">{% include "catalog/includes/stock_status.html" with status=page_data.stock_status %}</p>
         {% endif %}
-        <div class="product-form">
+        <form class="product-form" method="post" action="{% url 'orders:cart_add' %}" hx-post="{% url 'orders:cart_add' %}" hx-target="#add-to-cart-result" hx-swap="innerHTML">
+          {% csrf_token %}
+          <input type="hidden" name="product" value="{{ page_data.product.public_id }}">
+          <input type="hidden" name="next" value="{{ request.path }}">
           {% if page_data.variants %}
             <fieldset class="product-variants">
               <legend>{% translate "Choose a version" %}</legend>
@@ -62,9 +65,10 @@
               </ul>
             </fieldset>
           {% endif %}
-          <button type="button" disabled aria-disabled="true">{% translate "Add to cart" %}</button>
-          <p class="product-form-note">{% translate "Buying online opens soon." %}</p>
-        </div>
+          {% include "components/quantity_stepper.html" with id="product-quantity" value=1 only %}
+          <button type="submit" class="button">{% translate "Add to cart" %}</button>
+          <div id="add-to-cart-result"></div>
+        </form>
       {% endif %}
       <p class="product-vendor">{% translate "Sold by" %} <a href="{{ vendor_url }}">{{ page_data.vendor.display_name }}</a></p>
     </section>

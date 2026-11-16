@@ -19,15 +19,30 @@ class AccountsConfig(AppConfig):
         "actionlinkissue",
         "elevationgrant",  # CORE.25: grant and use are audited as `accounts.session.single_*`
     )
+    unaudited_models = {
+        "usersession": (
+            "CORE.24 session index (bookkeeping of live sessions: device family, network "
+            "prefix, last use); ending sessions is audited as `accounts.sessions.ended*`"
+        ),
+    }
 
     def ready(self) -> None:
         from django.contrib.auth.signals import user_logged_in, user_login_failed
 
-        from .checks import check_captcha_settings, check_mfa_middleware
-        from .signals import count_failed_login, reset_after_login, seed_language_on_login
+        from .checks import check_captcha_settings, check_mfa_middleware, check_shop_owner_check
+        from .lifetimes import stamp_on_login
+        from .signals import (
+            count_failed_login,
+            index_session_on_login,
+            reset_after_login,
+            seed_language_on_login,
+        )
 
         user_login_failed.connect(count_failed_login, dispatch_uid="accounts.count_failed_login")
         user_logged_in.connect(reset_after_login, dispatch_uid="accounts.reset_after_login")
         user_logged_in.connect(seed_language_on_login, dispatch_uid="accounts.seed_language")
+        user_logged_in.connect(index_session_on_login, dispatch_uid="accounts.index_session")
+        user_logged_in.connect(stamp_on_login, dispatch_uid="accounts.session_lifetime")
         checks.register(check_captcha_settings, checks.Tags.security)
         checks.register(check_mfa_middleware, checks.Tags.security)
+        checks.register(check_shop_owner_check, checks.Tags.security)

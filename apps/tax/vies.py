@@ -63,7 +63,7 @@ def post_json(url: str, data: Mapping[str, Any], timeout: float) -> Mapping[str,
         headers={"Content-Type": "application/json", "Accept": "application/json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 - same configured https URL
             return _json_object(response.read())
     except urllib.error.HTTPError as exc:
         with exc:

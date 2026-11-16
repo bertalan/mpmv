@@ -1,0 +1,19 @@
+{% extends "layouts/account.html" %}
+{% load i18n %}
+{% block title %}{% translate "Authenticator app" %} · MPMV{% endblock %}
+{% block account_content %}
+<h1>{% translate "Set up an authenticator app" %}</h1>
+<p>{% translate "Scan this QR code with your authenticator app, then enter the 6-digit code it shows." %}</p>
+<figure>{{ qr_svg|safe }}</figure>
+<p>{% translate "Cannot scan? Enter this key:" %} <code id="totp-secret">{{ secret }}</code></p>
+<form method="post" class="col-md-8 col-lg-6 p-0">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  {% if error %}<div class="alert alert-danger" id="mfa-error" role="alert">{{ error }}</div>{% endif %}
+  <div class="mb-3">
+    <label class="form-label" for="id_token">{% translate "Authentication code" %}</label>
+    <input class="form-control{% if error %} is-invalid{% endif %}" id="id_token" name="token" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" required autofocus{% if error %} aria-invalid="true" aria-describedby="mfa-error"{% endif %}>
+  </div>
+  <button type="submit" class="btn btn-primary">{% translate "Confirm" %}</button>
+</form>
+{% endblock %}

@@ -100,8 +100,8 @@ from apps.ingest.tests.factories import (
     SourceObservationFactory,
     SupplierSourceFactory,
 )
-from apps.ledger.models import LedgerEntry
-from apps.ledger.tests.factories import LedgerEntryFactory
+from apps.ledger.models import LedgerEntry, Refund
+from apps.ledger.tests.factories import LedgerEntryFactory, RefundFactory
 from apps.orders.models import OrderLine, StockReservation, VendorOrder
 from apps.orders.tests.factories import (
     OrderLineFactory,
@@ -285,6 +285,8 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     # ORD.2: a sub-order of its own order, and a line of such a sub-order.
     VendorOrder: lambda vendor: VendorOrderFactory.create(vendor=vendor),
     LedgerEntry: lambda vendor: LedgerEntryFactory.create(vendor=vendor),
+    # PAY.4: a refund mark of one of the vendor's own orders.
+    Refund: lambda vendor: RefundFactory.create(vendor=vendor),
     OrderLine: lambda vendor: OrderLineFactory.create(vendor_order__vendor=vendor),
     StockReservation: lambda vendor: StockReservationFactory.create(
         product=ProductFactory.create(vendor=vendor)
@@ -462,6 +464,12 @@ ENDPOINTS: dict[str, Access] = {
         OWN_ACCOUNT + " The factor is looked up among the user's own.",
         kwargs={"kind": "totp", "public_id": "0"},
     ),
+    "sessions:list": NoVendorData(OWN_ACCOUNT + " The user's own sessions (CORE.24)."),
+    "sessions:end_others": NoVendorData(OWN_ACCOUNT + " Ends the user's own other sessions."),
+    "sessions:end_one": NoVendorData(
+        OWN_ACCOUNT + " The session is looked up among the user's own (CORE.24).",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
     "action_link:open": NoVendorData(
         "Secure action link (CORE.15): a Continue page for a signed token; shows no object.",
         kwargs={"token": "not-a-token"},
@@ -569,10 +577,26 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
+    "manager:platform:map": StaffOnly(
+        "Platform map (CORE.30): platform staff only, links only, no tenant data; a vendor member "
+        "gets the platform-space refusal (test_platform_map)."
+    ),
     "manager:platform:staff_roles": StaffOnly(
         "Staff and roles (CORE.18): platform owner only; lists the platform staff and grants or "
         "revokes roles through the audited service. Every other role, a vendor member and a "
         "superuser without a role get 404 or the gate's 403 (test_staff_roles)."
+    ),
+    "manager:platform:user_sessions": StaffOnly(
+        "User sessions (CORE.24): Support and the platform owner only; a vendor member gets the "
+        "platform gate's refusal and other roles 404 (test_session_control)."
+    ),
+    "manager:platform:user_sessions_find": StaffOnly(
+        "Account lookup of User sessions (CORE.24): Support and the platform owner only, POST "
+        "with CSRF so the email never reaches a URL; redirects with the public id."
+    ),
+    "manager:platform:sessions_panic": StaffOnly(
+        "End every session (CORE.24): the platform owner only; Support, other roles and a "
+        "vendor member are refused (test_session_control)."
     ),
     "manager:platform:profile_changes": StaffOnly(
         "Storefront profile history (CORE.9): platform staff holding the revert permission only; "
@@ -665,6 +689,10 @@ ENDPOINTS: dict[str, Access] = {
     "orders:cart": NoVendorData(
         "Cart page (ORD.5): shows the caller's own cart, found from their session or account, "
         "never a cart or a vendor's data chosen by an identifier."
+    ),
+    "orders:cart_add": NoVendorData(
+        "Add to cart (ORD.19): adds a public product to the caller's own cart, found from their "
+        "session or account; it reads and shows no vendor data."
     ),
     "orders:checkout": NoVendorData(
         "Checkout details (ORD.5): the caller's own cart and their own typed details only."

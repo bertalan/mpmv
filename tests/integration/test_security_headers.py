@@ -13,6 +13,7 @@ import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 import pytest
 from django.test import Client, override_settings
@@ -52,7 +53,10 @@ DENIED_FEATURES = ("camera", "microphone", "geolocation", "payment", "usb")
 
 def security_settings(module: str) -> dict[str, Any]:
     """Security-related settings declared by an environment's settings module."""
-    settings_module = importlib.import_module(module)
+    # The test settings' placeholder key says "insecure", which the LIVE settings refuse (SEC.5).
+    base = importlib.import_module("mpmv.settings.base")
+    with mock.patch.object(base, "SECRET_KEY", secrets.token_urlsafe(50)):
+        settings_module = importlib.import_module(module)
     return {
         name: getattr(settings_module, name)
         for name in dir(settings_module)
@@ -226,18 +230,14 @@ def test_deploy_check_passes_on_stage() -> None:
     assert "payments.E004" not in result.stdout + result.stderr
 
 
-def test_deploy_check_on_live_only_fails_on_unwired_transfers() -> None:
-    """LIVE_DATA is refused until the vendor transfers are wired (payments.E004, D-08).
-
-    payments.E004 is the ONLY expected issue under LIVE_DATA until PAY.3. PAY.3 sets
-    PAYMENTS_TRANSFERS_WIRED to True and must then turn this test back into a plain
-    "passes" assertion (returncode 0, no exception).
-    """
+def test_deploy_check_on_live_passes_once_transfers_are_wired() -> None:
+    """PAY.3 wired the vendor transfers (PAYMENTS_TRANSFERS_WIRED): payments.E004 is gone and the
+    deploy gate under LIVE_DATA passes, with no issue left."""
     result = _deploy_check("mpmv.settings.live", **_BEHIND_CADDY)
     output = result.stdout + result.stderr
-    assert result.returncode != 0, output
-    assert "payments.E004" in output
-    assert "identified 1 issue" in output, output
+    assert result.returncode == 0, output
+    assert "payments.E004" not in output
+    assert "System check identified no issues" in output, output
 
 
 def test_deploy_check_hints_that_the_admin_is_unreachable_without_networks() -> None:

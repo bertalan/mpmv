@@ -6,12 +6,15 @@
 - Step-up: a verification is fresh while it is younger than a max age.
 - Passkeys: thin wrappers around py_webauthn for the registration and authentication
   ceremonies, as a second factor (user verification preferred, "none" attestation).
+- Session index (CORE.24): a short device summary and the network prefix of a session, so the
+  index never keeps the raw user agent or the full IP address.
 - Secure action links (CORE.15): the claims a link token carries and the checks on them.
   Signing the token is Django's job and lives in `services`.
 """
 
 import hashlib
 import hmac
+import ipaddress
 import json
 import secrets
 from base64 import b32encode, urlsafe_b64decode, urlsafe_b64encode
@@ -384,3 +387,63 @@ def email_recipient(email: str) -> str:
 def action_nonce_digest(nonce: str) -> str:
     """SHA-256 of a link nonce: the key of its single-use record."""
     return hashlib.sha256(nonce.encode()).hexdigest()
+
+
+# --- Session index (CORE.24): what the account page shows of a session, nothing more
+
+# Order matters: Edge and Opera also name Chrome, Chrome also names Safari.
+_BROWSERS: Final = (
+    ("Edg/", "Edge"),
+    ("OPR/", "Opera"),
+    ("Firefox/", "Firefox"),
+    ("FxiOS/", "Firefox"),
+    ("CriOS/", "Chrome"),
+    ("Chrome/", "Chrome"),
+    ("Safari/", "Safari"),
+)
+_SYSTEMS: Final = (
+    ("iPhone", "iOS"),
+    ("iPad", "iPadOS"),
+    ("Android", "Android"),
+    ("Windows", "Windows"),
+    ("CrOS", "ChromeOS"),
+    ("Mac OS X", "macOS"),
+    ("Macintosh", "macOS"),
+    ("Linux", "Linux"),
+)
+IPV4_PREFIX: Final = 24
+IPV6_PREFIX: Final = 48
+
+
+@dataclass(frozen=True)
+class DeviceSummary:
+    browser: str  # "" when unknown
+    system: str  # "" when unknown
+
+
+def device_summary(user_agent: str | None) -> DeviceSummary:
+    """The browser family and operating system named by a User-Agent, from fixed lists only.
+
+    Nothing of the header itself is kept (no version, no build, no free text), so the summary
+    cannot fingerprint a device beyond what the account page needs."""
+    text = user_agent or ""
+    browser = next((name for token, name in _BROWSERS if token in text), "")
+    system = next((name for token, name in _SYSTEMS if token in text), "")
+    return DeviceSummary(browser, system)
+
+
+def network_prefix(ip: str | None) -> str:
+    """The network of an address, never the address: a /24 for IPv4, a /48 for IPv6 ("" if
+    missing or unparseable). An IPv4-mapped IPv6 address counts as IPv4."""
+    if not ip or not ip.strip():
+        return ""
+    try:
+        address = ipaddress.ip_address(ip.strip())
+    except ValueError:
+        return ""
+    if isinstance(address, ipaddress.IPv6Address):
+        if address.ipv4_mapped is not None:
+            address = address.ipv4_mapped
+        else:
+            return str(ipaddress.IPv6Network((address, IPV6_PREFIX), strict=False))
+    return str(ipaddress.IPv4Network((address, IPV4_PREFIX), strict=False))

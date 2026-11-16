@@ -170,6 +170,25 @@ def test_reversal_is_pro_rata_rounded_half_up_per_line() -> None:
     assert lines.refund_fee == D("2.00")
 
 
+def test_reversals_round_cumulatively_so_the_events_give_back_exactly_what_was_paid() -> None:
+    # 122.00 refunded 1.00 at a time: per event the commission would round 0.1639 -> 0.16 every
+    # time (19.52 in all); cumulative rounding gives back exactly 20.00 and 6.88.
+    commission_back = payment_fee_back = D("0.00")
+    for before in range(122):
+        lines = commission.refund_lines(
+            snap(),
+            commission.RefundEvent(D("1.00"), D("0.00")),
+            goods_net=D("100.00"),
+            gross_paid=D("122.00"),
+            refund_fee_rule=RefundFeeRule(),
+            refunded_before=D(before),
+        )
+        commission_back += lines.commission_reversal
+        payment_fee_back += lines.payment_fee_reversal
+    assert commission_back == D("20.00")
+    assert payment_fee_back == D("6.88")
+
+
 def test_refund_fee_is_zero_on_a_platform_error_but_the_reversals_stay() -> None:
     lines = refund(
         commission.RefundEvent(

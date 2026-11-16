@@ -65,7 +65,7 @@ from apps.vendors.services import (
 )
 
 from . import roles as roles_module
-from . import staff_roles
+from . import site_map, staff_roles
 from .access import ManagerContext, home_url
 from .forms import ShipmentForm, StaffRoleForm, StorefrontProfileForm, VendorLogoForm
 from .middleware import manager_context
@@ -395,6 +395,18 @@ class PlatformDashboardView(ManagerView):
     template_name = "manager/platform/dashboard.html"
 
 
+class PlatformMapView(ManagerView):
+    """The platform map (CORE.30): every area of the site as links, for platform staff."""
+
+    section = "platform.map"
+    template_name = "manager/platform/map.html"
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["groups"] = site_map.build_map()
+        return context
+
+
 def _is_uuid(value: str) -> bool:
     try:
         uuid.UUID(value)
@@ -611,7 +623,8 @@ class PaymentsView(ManagerView):
             return HttpResponseRedirect(reverse("manager:shop:payments"))
         return super().get(request, *args, **kwargs)
 
-    @requires_level_method("payout_details")  # strictest group (CORE.25): the payout account
+    # Strictest group (CORE.25): the payout account. Its owner confirms it (D-32 amendment).
+    @requires_level_method("payout_details", shop=lambda view, request: view.manager.vendor)
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         vendor, actor = self._vendor_actor()
         ctx = replace(audit_context(request), source=AuditLog.Source.VENDOR)

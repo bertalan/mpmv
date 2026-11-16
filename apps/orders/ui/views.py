@@ -15,6 +15,7 @@ cart or session. Pages are never cached or indexed.
 
 import datetime as dt
 import math
+import uuid
 from typing import Any
 
 from django.conf import settings
@@ -24,6 +25,8 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.cache import add_never_cache_headers
+from django.utils.formats import number_format
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 from django.views.decorators.csp import csp_override
@@ -34,12 +37,13 @@ from apps.accounts.models import User
 from apps.cart import services as cart_services
 from apps.cart.models import Cart
 from apps.cart.session import current_cart
+from apps.catalog.models import Product
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
 from apps.core.privacy import keyed_hash
 from apps.core.public_forms import Protection, public_form
 from apps.core.services import consume_rate_limit
-from apps.orders import engine
+from apps.orders import engine, legal
 from apps.orders.checkout import build_checkout
 from apps.orders.models import Order
 from apps.orders.services import (
@@ -47,6 +51,7 @@ from apps.orders.services import (
     CheckoutClosed,
     CheckoutPreview,
     OrderRefused,
+    PaymentInProgress,
     PaymentMismatch,
     PaymentUnavailable,
     payment_client_secret,
@@ -229,6 +234,76 @@ def cart_page(request: HttpRequest) -> HttpResponse:
     return _page(request, "orders/cart.html", _cart_context(request, cart))
 
 
+@public_form(
+    protection=Protection.ALLOW,
+    purpose="Cart: add a product from its page",
+    task="ORD.19",
+    reason=(
+        "it adds only to the visitor's own guest or user cart, found from the session, and "
+        "calls nothing external; the sales mode is checked again on the server"
+    ),
+    rate_limit="per IP (cart budget)",
+)
+@require_POST
+def cart_add(request: HttpRequest) -> HttpResponse:
+    """Add the product (and variant) of a product page's form to the visitor's cart (ORD.19).
+
+    With htmx the answer is a small fragment (the message and the cart count); without it, a
+    redirect back to the page with the message, or to the cart after a success.
+    """
+    wait = _budget(request, "cart", CART_LIMIT)
+    if wait:
+        return _too_many(wait)
+    problems: list[str] = []
+    product = _posted_product(request)
+    variant = None
+    quantity = 1
+    try:
+        quantity = int(request.POST.get("quantity", "1").strip() or "1")
+    except ValueError:
+        problems.append(_("Enter a whole number as the quantity."))
+    if product is None:
+        problems.append(_("We could not find this product."))
+    elif not problems:
+        sku = request.POST.get("variant", "").strip()
+        if sku:
+            variant = product.variants.filter(sku=sku).first()
+            if variant is None:
+                problems.append(_("Choose one of the versions of this product."))
+    cart = None
+    if product is not None and not problems:
+        cart = current_cart(request, create=True)
+        try:
+            if cart is None:
+                raise ValidationError(_("We could not open your cart."))
+            cart_services.add_to_cart(cart, product, variant=variant, quantity=quantity)
+        except ValidationError as error:
+            problems.extend(error.messages)
+    ok = not problems
+    count = sum(line.quantity for line in cart.lines.all()) if cart is not None else 0
+    if _htmx(request):
+        message = " ".join(problems) or _("Added to your cart.")
+        context = {"ok": ok, "message": message, "problems": problems, "count": count}
+        return _page(request, "orders/_added.html", context)
+    if ok:
+        messages.success(request, _("Added to your cart."))
+        return _private(HttpResponseRedirect(reverse("orders:cart")))
+    for problem in problems:
+        messages.warning(request, problem)
+    target = request.POST.get("next", "")
+    if not url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()}):
+        target = reverse("orders:cart")
+    return _private(HttpResponseRedirect(target))
+
+
+def _posted_product(request: HttpRequest) -> Product | None:
+    try:
+        public_id = uuid.UUID(request.POST.get("product", ""))
+    except ValueError:
+        return None
+    return Product.objects.filter(public_id=public_id).first()
+
+
 # --- Details (address, business, VIES) -------------------------------------------------------
 
 
@@ -346,6 +421,9 @@ def checkout_page(request: HttpRequest) -> HttpResponse:
 # --- Review ----------------------------------------------------------------------------------
 
 
+LEGAL_TICKS_KEY = "legal_ticks"
+
+
 def _review_context(
     request: HttpRequest, cart: Cart, data: dict[str, Any], **extra: Any
 ) -> dict[str, Any]:
@@ -361,8 +439,20 @@ def _review_context(
             "Your cart changed after we checked your VAT number, so VAT is charged on your "
             "order. Confirm your details again to check it for every seller."
         )
+    business = bool(data.get("business")) and bool(str(data.get("vat_id") or "").strip())
+    step_vendors = [item.vendor for item in preview.vendors] or list(vendors.values())
+    legal_step = legal.build_step(step_vendors, language=get_language() or "en", business=business)
+    totals = preview.totals
     return {
         **_steps(3),
+        "legal": legal_step,
+        "ticks": extra.get("ticks") or {},
+        "pay_label": _("Confirm order and pay now – EUR %(total)s")  # noqa: RUF001
+        % {
+            "total": number_format(totals.grand_total, 2, use_l10n=True, force_grouping=True)
+            if totals is not None
+            else ""
+        },
         "packages": packages,
         "cart_messages": present.cart_blocks(preview),
         "order": present.order_totals(preview),
@@ -417,7 +507,13 @@ def review_page(request: HttpRequest) -> HttpResponse:
     if not data.get("address"):
         return redirect("orders:checkout")
     if request.method == "GET":
-        return _page(request, "orders/review.html", _review_context(request, cart, data))
+        # The no-JS "Update shipping" round trip keeps the ticks for exactly one render.
+        ticks = data.get(LEGAL_TICKS_KEY)
+        if ticks:
+            state.save(request, **{LEGAL_TICKS_KEY: None})
+        return _page(
+            request, "orders/review.html", _review_context(request, cart, data, ticks=ticks)
+        )
     data = _save_shipping(request, cart, data)
     if not captcha_passes(request):
         context = _review_context(
@@ -433,8 +529,27 @@ def review_page(request: HttpRequest) -> HttpResponse:
     preview = _preview(request, cart, data)
     if not preview.placeable or not _ordering_open(preview):
         return _page(request, "orders/review.html", _review_context(request, cart, data))
+    context = _review_context(request, cart, data)
+    step = context["legal"]
+    if legal.versions_changed(step, request.POST):
+        # A terms version changed between render and submit: show the new versions, place
+        # nothing, leave the boxes unticked (the page holds the new stamps).
+        notice = _(
+            "The terms changed while you were checking out. Read the new versions and tick the "
+            "boxes again to place the order."
+        )
+        return _page(
+            request, "orders/review.html", {**context, "errors": [notice], "legal_errors": True}
+        )
+    legal_errors = legal.check(step, request.POST)
+    if legal_errors:
+        return _page(
+            request, "orders/review.html", {**context, "errors": legal_errors, "legal_errors": True}
+        )
     try:
-        order, _changes = place_order(preview, ctx=audit_context(request))
+        order, _changes = place_order(
+            preview, ctx=audit_context(request), terms_acceptance=legal.acceptance(step)
+        )
     except CheckoutClosed as closed:
         # ORD.10: a kill switch is off; nothing was saved. The message names no vendor.
         context = _review_context(request, cart, data, errors=[closed.customer_message])
@@ -473,9 +588,14 @@ def shipping_choice(request: HttpRequest) -> HttpResponse:
     if wait:
         return _too_many(wait)
     data = _save_shipping(request, cart, data)
+    ticks = {
+        "terms": legal.ticked(request.POST, "accept_terms"),
+        "onerous": legal.ticked(request.POST, "accept_onerous"),
+    }
     if not _htmx(request):
+        state.save(request, **{LEGAL_TICKS_KEY: ticks if any(ticks.values()) else None})
         return _private(HttpResponseRedirect(reverse("orders:review")))
-    context = _review_context(request, cart, data, partial=True)
+    context = _review_context(request, cart, data, partial=True, ticks=ticks)
     return _page(request, "orders/_review_body.html", context)
 
 
@@ -521,6 +641,8 @@ def _payment_context(request: HttpRequest, order: Order) -> dict[str, Any] | Non
         secret = payment_client_secret(order)
     except PaymentMismatch as error:
         raise Http404("This payment is not for this order") from error
+    except PaymentInProgress:
+        return {"in_progress": True}
     except PaymentUnavailable:
         return {"retry": True}
     return {
@@ -539,6 +661,16 @@ def confirmation_page(request: HttpRequest) -> HttpResponse:
     order = Order.objects.filter(public_id=public_id).first()
     if order is None:
         raise Http404("No order was just placed")
+    if _htmx(request):
+        # The "confirming" poll (ORD.17): the order row only, never the provider. Only the
+        # webhook moves the order to paid; this answers what it already did.
+        paid = order.state in PAID_OR_LATER
+        closed = not paid and order.state != "awaiting_payment"
+        return _page(
+            request,
+            "orders/_payment_status.html",
+            {"paid": paid, "payment_closed": closed, "polling": not paid and not closed},
+        )
     context = {
         "order": order,
         "lines": [

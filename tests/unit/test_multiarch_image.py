@@ -73,11 +73,15 @@ def test_ci_required_check_passes_only_when_both_architectures_pass() -> None:
     named = [key for key, job in jobs.items() if job.get("name") == REQUIRED_CHECK]
     assert named == ["image"]
     gate = jobs["image"]
-    assert gate["needs"] == "image-build"
+    assert "image-build" in gate["needs"]
     # Without always() a failed build would skip the gate, and a skipped required check passes.
     assert gate["if"] == "always()"
     assert gate["env"]["BUILD_RESULT"] == "${{ needs.image-build.result }}"
-    assert 'test "$BUILD_RESULT" = success' in scripts(gate)
+    run = scripts(gate)
+    assert 'test "$BUILD_RESULT" = success' in run
+    # ARC.34: a skipped build passes only when it was skipped on purpose (draft or docs-only PR).
+    assert 'test "$BUILD_RESULT" = skipped && {' in run
+    assert '"$HEAVY" = false' in run
 
 
 def test_release_builds_each_architecture_natively_and_pushes_by_digest() -> None:

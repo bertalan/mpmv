@@ -85,6 +85,22 @@
     gap: var(--space-s);
   }
 
+  .consent-notice {
+    max-inline-size: 40rem;
+    padding: var(--space-s) var(--space-m);
+    border: 2px solid currentcolor;
+    border-inline-start-width: 0.5rem;
+    border-radius: var(--radius-s, 0.25rem);
+  }
+
+  .consent-notice[hidden] {
+    display: none;
+  }
+
+  .consent-notice p {
+    margin: 0;
+  }
+
   .consent-preferences form {
     display: grid;
     gap: var(--space-m);

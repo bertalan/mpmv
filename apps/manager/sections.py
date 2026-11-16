@@ -15,6 +15,7 @@ from .navigation import Registry, Section, anyone, platform_role, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
 from .sales_terms_views import SECTION as SALES_TERMS_SECTION
+from .session_views import PANIC_SECTION, USER_SESSIONS_SECTION
 from .spaces import Space
 from .termination_views import PLATFORM_SECTION as TERMINATIONS_SECTION
 from .termination_views import SHOP_SECTION as TERMINATION_SECTION
@@ -99,6 +100,15 @@ BUILT_IN = (
         order=10,
         allowed=anyone,
     ),
+    # CORE.30: the platform map, open to every role that opens the dashboard.
+    Section(
+        "platform.map",
+        Space.PLATFORM,
+        _("Platform map"),
+        "manager:platform:map",
+        order=15,
+        allowed=platform_role("platform.map"),
+    ),
     # Staff with the revert permission (CORE.9 3/3): history of owners' profile changes, revert.
     Section(
         "platform.profile_changes",
@@ -142,6 +152,24 @@ BUILT_IN = (
         "manager:platform:staff_roles",
         order=90,
         allowed=platform_role("platform.staff_roles"),
+    ),
+    # CORE.24: Support and the owner see one user's sessions and end them.
+    Section(
+        USER_SESSIONS_SECTION,
+        Space.PLATFORM,
+        _("User sessions"),
+        "manager:platform:user_sessions",
+        order=70,
+        allowed=platform_role(USER_SESSIONS_SECTION),
+    ),
+    # CORE.24: the platform owner's panic button, last in the menu.
+    Section(
+        PANIC_SECTION,
+        Space.PLATFORM,
+        _("End every session"),
+        "manager:platform:sessions_panic",
+        order=95,
+        allowed=platform_role(PANIC_SECTION),
     ),
 )
 

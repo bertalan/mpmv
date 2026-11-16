@@ -29,6 +29,7 @@ buttons do nothing and say so.{% endcomment %}
   <section>
     <h2>{% translate "Passkey window" %}</h2>
     <p>{% translate "Confirm with your passkey to open a passkey window: it covers several sensitive actions in a row. It closes when you sign out, after a period of inactivity or at a maximum duration." %}</p>
+    {% if shop_window %}<p>{% translate "This window covers only the sensitive actions of this shop that its owner confirms. It never covers another shop." %}</p>{% endif %}
     <form data-passkey="elevate" data-csrf-token="{{ csrf_token }}" data-options-url="{% url 'levels:options' %}" data-finish-url="{% url 'levels:window' %}" data-next="{{ replay_url }}">
       <button type="button" data-passkey-start>{% translate "Open passkey window" %}</button>
       <noscript><p>{% translate "Passkeys need JavaScript." %}</p></noscript>

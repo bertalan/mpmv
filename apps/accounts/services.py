@@ -4,21 +4,25 @@ import datetime as dt
 import hmac
 import logging
 import time
+import uuid
 from collections.abc import Callable, Iterable, Mapping
+from contextvars import ContextVar, Token
 from dataclasses import dataclass, field, replace
 from typing import Any
 from urllib.parse import urlencode
 
 import django_otp
 from django.conf import settings
+from django.contrib.auth import SESSION_KEY
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser, Group, Permission
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.backends.base import SessionBase
+from django.contrib.sessions.models import Session
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Model
+from django.db.models import F, Model
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.crypto import salted_hmac
@@ -27,10 +31,12 @@ from django_otp.oath import TOTP as OathTOTP
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from django_otp.util import random_hex
 
+from apps.core.alerts import raise_alert
 from apps.core.audit import AuditContext, record, user_context
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
+from apps.core.opschecks import Alert
 from apps.core.privacy import keyed_hash
 from apps.core.services import (
     audit_changes,
@@ -53,8 +59,10 @@ from .models import (
     RecoveryCode,
     RecoveryCodeDevice,
     User,
+    UserSession,
     normalize_email_address,
 )
+from .session_store import SESSION_GENERATION_KEY, SessionStore
 
 # --- Login and registration protection (CORE.5, spec 02 "Authentication")
 #
@@ -365,6 +373,7 @@ def regenerate_recovery_codes(
 def _after_enrolment(device: SecondFactor, ctx: AuditContext) -> Enrolment:
     """Audit a confirmed factor; give the user a first set of recovery codes if they have none."""
     record(ctx, ENROLLED, _label(device), _key(device), None, _snapshot(device))
+    end_sessions_after_change(device.user, reason="mfa_added", ctx=ctx)  # CORE.24
     codes: list[str] = []
     if not RecoveryCodeDevice.objects.filter(user=device.user).exists():
         codes = regenerate_recovery_codes(device.user, ctx=ctx).codes
@@ -545,6 +554,7 @@ def remove_device(device: AnyDevice, *, ctx: AuditContext, dry_run: bool = False
         key = _key(device)
         device.delete()
         record(ctx, DEVICE_REMOVED, _label(device), key, before, None)
+        end_sessions_after_change(user, reason="mfa_removed", ctx=ctx)  # CORE.24
         if disabling:
             if recovery is not None:
                 recovery.delete()
@@ -569,8 +579,9 @@ def removal_weakens_mfa(device: AnyDevice) -> bool:
 def reset_mfa(user: User, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Delete every factor and recovery code of `user` (lost device, offboarding).
 
-    A required-role user is sent back to enrolment on their next request, and sessions that
-    were verified by a deleted device stop counting as verified.
+    A required-role user is sent back to enrolment on their next request. Every session of the
+    user ends, the caller's own included (CORE.24): a stolen session must never reach the
+    enrolment page and bind the attacker's own authenticator.
     """
     devices: list[AnyDevice] = [
         *TOTPDevice.objects.filter(user=user),
@@ -580,13 +591,17 @@ def reset_mfa(user: User, *, ctx: AuditContext, dry_run: bool = False) -> Change
     changeset = ChangeSet()
     for device in devices:
         changeset.delete(_label(device), _key(device), _snapshot(device))
-    if dry_run or changeset.is_empty:
+    if dry_run:
+        return changeset
+    if changeset.is_empty:
+        end_sessions(user, reason="mfa_reset", ctx=ctx)  # CORE.24: no factor, still none kept
         return changeset
     factors = sorted({kind_of(device) for device in devices})
     with transaction.atomic():
         for device in devices:
             device.delete()
         record(ctx, DISABLED, "accounts.user", str(user.public_id), {"factors": factors}, None)
+        end_sessions(user, reason="mfa_reset", ctx=ctx)  # CORE.24: none kept
     return changeset
 
 
@@ -655,31 +670,70 @@ def access_snapshot(user: User) -> dict[str, Any]:
     }
 
 
+# A change to one of these ends the user's other sessions (CORE.24), with this reason.
+_SESSION_FIELDS = {
+    "email": "email",
+    "is_active": "account",
+    "is_staff": "account",
+    "is_superuser": "account",
+}
+
+
 def save_user(user: User, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
-    """Create or update `user` (profile, active, staff and superuser flags), audited."""
-    return save_audited(
-        user,
-        user_snapshot,
-        key=str(user.public_id),
-        ctx=ctx,
-        created=USER_CREATED,
-        updated=USER_UPDATED,
-        dry_run=dry_run,
-    )
+    """Create or update `user` (profile, active, staff and superuser flags), audited.
+
+    A new email address or a changed active, staff or superuser flag ends the user's other
+    sessions (CORE.24): the current one stays only when the user changed their own account.
+    """
+    with transaction.atomic():
+        changes = save_audited(
+            user,
+            user_snapshot,
+            key=str(user.public_id),
+            ctx=ctx,
+            created=USER_CREATED,
+            updated=USER_UPDATED,
+            dry_run=dry_run,
+        )
+        updates = [change for change in changes.changes if change.before is not None]
+        changed = {name for change in updates for name in change.fields}
+        reasons = sorted({_SESSION_FIELDS[name] for name in changed if name in _SESSION_FIELDS})
+        if reasons and not dry_run:
+            end_sessions_after_change(user, reason=",".join(reasons), ctx=ctx)
+    return changes
 
 
-def record_access_change(user: User, before: Mapping[str, Any], *, ctx: AuditContext) -> None:
+def record_access_change(
+    user: User, before: Mapping[str, Any], *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
     """Audit group and permission changes a form has just saved (in the same transaction)."""
     changeset = ChangeSet()
     changeset.update(USER_MODEL, str(user.public_id), before, access_snapshot(user))
+    if dry_run:
+        return changeset
     audit_changes(changeset, ctx=ctx, action=ACCESS_CHANGED)
+    if not changeset.is_empty:
+        end_sessions_after_change(user, reason="role", ctx=ctx)  # CORE.24
+    return changeset
 
 
-def record_password_change(user: User, *, had_usable_password: bool, ctx: AuditContext) -> None:
+def record_password_change(
+    user: User, *, had_usable_password: bool, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
     """Audit a password set by staff, for someone else or themselves.
 
-    Only whether a usable password exists is stored, never the hash.
+    Only whether a usable password exists is stored, never the hash. The user's other sessions
+    end (CORE.24); the current one stays only when the user changed their own password.
     """
+    changeset = ChangeSet()
+    changeset.update(
+        USER_MODEL,
+        str(user.public_id),
+        {"has_usable_password": had_usable_password, "password": "previous"},
+        {"has_usable_password": user.has_usable_password(), "password": "new"},
+    )
+    if dry_run:
+        return changeset
     record(
         ctx,
         CREDENTIAL_CHANGED,
@@ -688,6 +742,8 @@ def record_password_change(user: User, *, had_usable_password: bool, ctx: AuditC
         {"has_usable_password": had_usable_password},
         {"has_usable_password": user.has_usable_password()},
     )
+    end_sessions_after_change(user, reason="password", ctx=ctx)
+    return changeset
 
 
 # --- Unlocking an account (CORE.8, owner decision Q-18)
@@ -838,11 +894,23 @@ def save_group(group: Group, *, ctx: AuditContext, dry_run: bool = False) -> Cha
 
 
 def record_group_access_change(
-    group: Group, before: Mapping[str, Any], *, ctx: AuditContext
-) -> None:
+    group: Group, before: Mapping[str, Any], *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
     changeset = ChangeSet()
     changeset.update(GROUP_MODEL, group.name, before, group_access_snapshot(group))
+    if dry_run:
+        return changeset
     audit_changes(changeset, ctx=ctx, action=GROUP_ACCESS_CHANGED)
+    if not changeset.is_empty:
+        _end_member_sessions(group, ctx=ctx)  # CORE.25: members may have lost `elevate`
+    return changeset
+
+
+def _end_member_sessions(group: Group, *, ctx: AuditContext) -> None:
+    """End the sessions (and so the passkey windows) of every member of `group`: a role change
+    must not leave a step-up open for staff who just lost the right to it."""
+    for member in group.user_set.all():
+        end_sessions_after_change(member, reason="role", ctx=ctx)
 
 
 def delete_group(group: Group, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
@@ -850,7 +918,14 @@ def delete_group(group: Group, *, ctx: AuditContext, dry_run: bool = False) -> C
     changeset.delete(
         GROUP_MODEL, group.name, {**group_snapshot(group), **group_access_snapshot(group)}
     )
-    return run_mutation(changeset, group.delete, ctx=ctx, action=GROUP_DELETED, dry_run=dry_run)
+    members = list(group.user_set.all()) if not dry_run else []
+
+    def apply() -> None:
+        group.delete()
+        for member in members:  # CORE.25: they lost the group's permissions
+            end_sessions_after_change(member, reason="role", ctx=ctx)
+
+    return run_mutation(changeset, apply, ctx=ctx, action=GROUP_DELETED, dry_run=dry_run)
 
 
 # --- Secure action links (CORE.15, spec 02 "Secure action links")
@@ -1389,3 +1464,230 @@ def send_action_link_email(
                 snapshot["generation"] = str(claims.generation)
             record(ctx, ACTION_LINK_SENT, audit_model, audit_key, None, snapshot)
     return changes
+
+
+# --- Sessions (CORE.24, spec 02 §Session lifetimes and control)
+#
+# Sessions stay in Django's database backend; `UserSession` indexes them per user. Ending a
+# session deletes its row from the session table, so the next request with that cookie is
+# anonymous at once. API keys and signed action links are not sessions: nothing here touches
+# them.
+
+SESSIONS_ENDED = "accounts.sessions.ended"  # one user's sessions (self-service, a change, Support)
+ALL_SESSIONS_ENDED = "accounts.sessions.ended_all"  # the platform owner's panic button
+SESSION_MODEL = "sessions.session"
+SUPPORT_SESSION_PERMISSIONS = ("manager.platform_support", "core.platform_owner")
+PANIC_PERMISSION = "core.platform_owner"
+PANIC_ALERT = "accounts:sessions_ended_all"
+REASON_MAX = 500
+
+# The session of the request being served, set by `SessionIndexMiddleware`. A change a user makes
+# to their own account keeps it (`end_sessions_after_change`); outside a request it is None.
+_current_session: ContextVar[SessionBase | None] = ContextVar("current_session", default=None)
+
+
+def bind_current_session(session: SessionBase | None) -> Token[SessionBase | None]:
+    return _current_session.set(session)
+
+
+def unbind_current_session(token: Token[SessionBase | None]) -> None:
+    _current_session.reset(token)
+
+
+def _live_keys() -> Any:
+    return Session.objects.filter(expire_date__gt=timezone.now()).values("session_key")
+
+
+def user_sessions(user: User) -> list[UserSession]:
+    """The live sessions of `user`, most recently used first."""
+    return list(
+        UserSession.objects.filter(user=user, session_key__in=_live_keys()).order_by(
+            "-last_seen", "-id"
+        )
+    )
+
+
+def current_session_key() -> str | None:
+    session = _current_session.get()
+    return session.session_key if session is not None else None
+
+
+def _delete_sessions(keys: list[str]) -> None:
+    Session.objects.filter(session_key__in=keys).delete()
+    UserSession.objects.filter(session_key__in=keys).delete()
+    # The request's own session was ended: empty it, so the response signs the user out
+    # cleanly instead of failing to save a deleted session.
+    session = _current_session.get()
+    if session is not None and session.session_key in keys:
+        session.flush()
+
+
+def end_sessions(
+    user: User,
+    *,
+    keep_session_key: str | None = None,
+    reason: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
+    only: str | None = None,
+    note: str = "",
+) -> ChangeSet:
+    """End the live sessions of `user` but `keep_session_key`; with `only` (the public id of one
+    of them), just that one.
+
+    Ending all but one also moves the user's session generation, so a session the index never
+    saw (an old worker, a rolled-back index row) is flushed on its next request; the kept
+    session gets the new generation. Ending one session (`only`) deletes just that one.
+
+    One audit entry with the count, the generation, the reason (a short code: `password`,
+    `mfa_reset`, `others`, `support`...) and Support's `note`. Ending one session that is not
+    there is a no-op with no entry. API keys and signed links are not sessions and stay valid.
+    """
+    rows = [row for row in user_sessions(user) if row.session_key != keep_session_key]
+    if only is not None:
+        rows = [row for row in rows if str(row.public_id) == only]
+    changeset = ChangeSet()
+    before: dict[str, Any] = {"sessions": len(rows)}
+    after: dict[str, Any] = {"sessions": 0, "reason": reason, "kept": bool(keep_session_key)}
+    if only is not None:
+        after["session"] = only
+    else:
+        generation = _generation_of(user)
+        before["generation"], after["generation"] = generation, generation + 1
+    if note:
+        after["note"] = note
+    if rows or only is None:
+        changeset.update(USER_MODEL, str(user.public_id), before, after)
+    keys = [row.session_key for row in rows]
+
+    def apply() -> None:
+        _delete_sessions(keys)
+        if only is None:
+            User.objects.filter(pk=user.pk).update(session_generation=F("session_generation") + 1)
+            user.session_generation = _generation_of(user)
+            _carry_generation(keep_session_key, user.session_generation)
+
+    return run_mutation(changeset, apply, ctx=ctx, action=SESSIONS_ENDED, dry_run=dry_run)
+
+
+def _generation_of(user: User) -> int:
+    found = User.objects.filter(pk=user.pk).values_list("session_generation", flat=True).first()
+    return found or 0
+
+
+def _carry_generation(keep_session_key: str | None, generation: int) -> None:
+    """Give the kept session the user's new generation, so it stays signed in."""
+    if not keep_session_key:
+        return
+    current = _current_session.get()
+    if current is not None and current.session_key == keep_session_key:
+        current[SESSION_GENERATION_KEY] = generation  # saved with this request's response
+        return
+    store = SessionStore(keep_session_key)
+    if not store.exists(keep_session_key):
+        return
+    store.load()
+    store[SESSION_GENERATION_KEY] = generation
+    store.save()
+
+
+def end_sessions_after_change(
+    user: User, *, reason: str, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """End the other sessions of `user` after a change to their credentials or access.
+
+    A change the user made to their own account in this request keeps this request's session; a
+    change by anyone else (staff, a vendor owner, a command) keeps none. Call it in the
+    transaction of the change.
+    """
+    session = _current_session.get()
+    keep = None
+    if (
+        session is not None
+        and ctx.actor_id is not None
+        and ctx.actor_id == user.pk
+        and str(session.get(SESSION_KEY, "")) == str(user.pk)
+    ):
+        keep = session.session_key
+    return end_sessions(user, keep_session_key=keep, reason=reason, ctx=ctx, dry_run=dry_run)
+
+
+def clean_reason(reason: str) -> str:
+    """A required free-text reason on one line, at most `REASON_MAX` characters."""
+    text = " ".join(reason.split())
+    if not text:
+        raise ValidationError("A reason is required.")
+    if len(text) > REASON_MAX:
+        raise ValidationError(f"The reason is longer than {REASON_MAX} characters.")
+    return text
+
+
+def may_end_user_sessions(actor: User) -> bool:
+    """Support and the platform owner (the role permissions, a superuser passes)."""
+    return bool(
+        actor.is_active
+        and (actor.is_superuser or holds_permission(actor, *SUPPORT_SESSION_PERMISSIONS))
+    )
+
+
+def support_end_sessions(
+    target: User, *, actor: User, reason: str, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Support ends every session of `target` ("End this user's sessions", CORE.24).
+
+    The actor must be active and hold the Support role permission or the platform owner one (a
+    superuser passes). The reason is required and kept in the audit entry. No session is kept,
+    not even the actor's own when the target is the actor. API keys are not touched.
+    """
+    if not may_end_user_sessions(actor):
+        raise PermissionDenied
+    note = clean_reason(reason)
+    audit = replace(user_context(actor, ctx.ip), request_id=ctx.request_id)
+    return end_sessions(target, reason="support", note=note, ctx=audit, dry_run=dry_run)
+
+
+def may_end_all_sessions(actor: AbstractBaseUser | AnonymousUser) -> bool:
+    """The platform owner only: the permission, never `has_perm` (a bare superuser is refused)."""
+    return bool(actor.is_active and holds_permission(actor, PANIC_PERMISSION))
+
+
+def end_all_sessions(
+    *, actor: User, keep_session_key: str | None, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """The panic button (CORE.24): end every session of every user but `keep_session_key`.
+
+    Platform owner only. Audited with the count, and an alert email goes to the platform staff
+    through the OPS.2 alert path. API keys and signed links are not sessions and stay valid.
+    """
+    if not may_end_all_sessions(actor):
+        raise PermissionDenied
+    keep = keep_session_key or ""
+    count = Session.objects.exclude(session_key=keep).filter(expire_date__gt=timezone.now()).count()
+    changeset = ChangeSet()
+    changeset.update(
+        SESSION_MODEL,
+        "all",
+        {"sessions": count},
+        {"sessions": 0, "kept": bool(keep_session_key)},
+    )
+    if dry_run:
+        return changeset
+    audit = replace(user_context(actor, ctx.ip), request_id=ctx.request_id)
+
+    def apply() -> None:
+        Session.objects.exclude(session_key=keep).delete()
+        UserSession.objects.exclude(session_key=keep).delete()
+        # Sessions out of the index or written back by an old worker end on their next request.
+        User.objects.update(session_generation=F("session_generation") + 1)
+        _carry_generation(keep_session_key, _generation_of(actor))
+
+    run_mutation(changeset, apply, ctx=audit, action=ALL_SESSIONS_ENDED, dry_run=False)
+    raise_alert(
+        Alert(
+            PANIC_ALERT,
+            "The platform owner ended every session",
+            {"sessions": str(count), "actor": str(actor.public_id)},
+        ),
+        dedup=f":{uuid.uuid4()}",  # every press is mailed, never folded into an earlier one
+    )
+    return changeset

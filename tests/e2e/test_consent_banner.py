@@ -183,6 +183,99 @@ def test_rejecting_keeps_the_tag_away_and_the_choice_can_change_later(
     expect(page.locator("#prefs-statistics")).to_be_checked()
 
 
+def save_on_settings(page: Page, button: str) -> None:
+    consent_script_ready(page)
+    with page.expect_response(lambda r: "/consent/" in r.url and r.request.method == "POST"):
+        page.get_by_role("button", name=button).click()
+
+
+def consent_cookie_categories(page: Page) -> set[str]:
+    match = re.search(
+        r"mpmv_consent=v1\.\w+\.[0-9a-f]{32}\.([a-z-]*)", page.evaluate("document.cookie")
+    )
+    assert match, "no consent cookie"
+    return {c for c in match[1].split("-") if c}
+
+
+def wait_gated(page: Page) -> bool:
+    for _ in range(30):
+        if page.evaluate("window.__gatedRan === true"):
+            return True
+        page.wait_for_timeout(100)
+    return False
+
+
+def test_the_settings_page_confirms_accept_all_and_reject_all_visibly(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    requests = serve_gated_tag(page)
+    page.goto(f"{live_server.url}/cookie-settings/")
+    page.evaluate(INJECT_GATED)
+    notice = page.locator("[data-consent-notice]")
+    expect(notice).to_be_hidden()
+
+    save_on_settings(page, "Accept all")
+    expect(notice).to_be_visible()
+    expect(notice).to_have_attribute("role", "status")
+    expect(notice).to_contain_text("Your cookie choice was saved.")
+    expect(notice).to_contain_text("Optional cookies on: Preferences, Statistics, Marketing.")
+    for code in ("preferences", "statistics", "marketing"):
+        expect(page.locator(f"#prefs-{code}")).to_be_checked()
+    assert consent_cookie_categories(page) == {"preferences", "statistics", "marketing"}
+    assert wait_gated(page)
+    assert len(requests) == 1
+    shot("settings-accept-all")
+
+    save_on_settings(page, "Reject all")  # a started script cannot be taken back: the page reloads
+    expect(notice).to_be_visible()
+    expect(notice).to_contain_text("Your cookie choice was saved.")
+    expect(notice).to_contain_text("Only necessary cookies are on.")
+    for code in ("preferences", "statistics", "marketing"):
+        expect(page.locator(f"#prefs-{code}")).not_to_be_checked()
+    assert consent_cookie_categories(page) == set()
+    shot("settings-reject-all")
+
+    page.goto(f"{live_server.url}/cookie-settings/")
+    page.evaluate(INJECT_GATED)
+    expect(notice).to_be_hidden()
+    page.wait_for_timeout(300)
+    assert page.evaluate("window.__gatedRan === true") is False
+    assert [log.action for log in ConsentLog.objects.order_by("id")] == ["accept_all", "reject_all"]
+
+
+def test_a_custom_save_honours_only_the_ticked_category(
+    page: Page, live_server: LiveServer
+) -> None:
+    requests = serve_gated_tag(page)
+    page.goto(f"{live_server.url}/cookie-settings/")
+    page.evaluate(INJECT_GATED)
+    page.evaluate(
+        "() => { const held = document.createElement('script'); held.type = 'text/plain'; "
+        "held.dataset.consent = 'marketing'; held.dataset.src = '/__marketing-tag.js'; "
+        "document.body.append(held); }"
+    )
+    marketing: list[str] = []
+
+    def fulfil_marketing(route) -> None:  # type: ignore[no-untyped-def]
+        marketing.append(route.request.url)
+        route.fulfill(body="", content_type="text/javascript")
+
+    page.route("**/__marketing-tag.js", fulfil_marketing)
+    page.locator("#prefs-statistics").check()
+    save_on_settings(page, "Save my choices")
+    notice = page.locator("[data-consent-notice]")
+    expect(notice).to_be_visible()
+    expect(notice).to_contain_text("Optional cookies on: Statistics.")
+    expect(page.locator("#prefs-statistics")).to_be_checked()
+    expect(page.locator("#prefs-preferences")).not_to_be_checked()
+    expect(page.locator("#prefs-marketing")).not_to_be_checked()
+    assert consent_cookie_categories(page) == {"statistics"}
+    assert wait_gated(page)
+    page.wait_for_timeout(300)
+    assert len(requests) == 1
+    assert marketing == []
+
+
 def test_without_javascript_the_settings_page_still_saves_a_choice(
     browser: Browser,
     live_server: LiveServer,

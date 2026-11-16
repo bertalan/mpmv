@@ -207,7 +207,7 @@ def test_a_client_setting_the_scrub_mode_does_not_unlock_other_columns(
     with pytest.raises(IntegrityError):
         run_sql(
             ("SELECT set_config('mpmv.order_scrub', %s, true)", [mode]),
-            (f"UPDATE orders_order SET {assignment} WHERE id = %s", [order.pk]),  # noqa: S608
+            (f"UPDATE orders_order SET {assignment} WHERE id = %s", [order.pk]),  # noqa: S608 (column assignment written in the test, values bound)
         )
 
 
@@ -334,7 +334,7 @@ def test_after_anonymisation_the_personal_fields_are_immutable_again() -> None:
 def scrub_sql(order: Order, mode: str, assignment: str, *params: Any) -> None:
     run_sql(
         ("SELECT set_config('mpmv.order_scrub', %s, true)", [mode]),
-        (f"UPDATE orders_order SET {assignment} WHERE id = %s", [*params, order.pk]),  # noqa: S608
+        (f"UPDATE orders_order SET {assignment} WHERE id = %s", [*params, order.pk]),  # noqa: S608 (column assignment written in the test, values bound)
     )
 
 

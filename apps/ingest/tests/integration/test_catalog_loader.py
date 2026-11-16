@@ -378,7 +378,7 @@ def test_a_rejected_record_leaves_no_trace_in_the_report_or_the_audit_trail() ->
     data = bundle()
     data["posts"] = [
         # The comma decimal fails after the product, its queue entry and a new value were written.
-        post(10, "en", 1, "BAD-1", attributes={"pa_width": "12,5", "pa_color": ["blue"]}),
+        post(10, "en", 1, "BAD-1", attributes={"pa_color": ["blue"], "pa_width": "12,5"}),
         post(11, "en", 2, "OK-1"),
     ]
     report = load(data)

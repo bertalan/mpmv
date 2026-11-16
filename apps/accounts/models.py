@@ -66,6 +66,11 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False, help_text="Can log into the staff admin.")
     date_joined = models.DateTimeField(default=timezone.now)
+    # CORE.24: copied into each session at login; a session whose copy differs is flushed on its
+    # next request, so ending sessions also reaches those the index never saw.
+    # db_default: rows inserted by historical models in migration tests (and old workers
+    # during a deploy) do not know the column (CORE.24).
+    session_generation = models.PositiveIntegerField(default=0, db_default=0, editable=False)
 
     objects: ClassVar[UserManager] = UserManager()
 
@@ -231,3 +236,30 @@ class ElevationGrant(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.action} for {self.user_id} until {self.expires_at:%H:%M:%S}"
+
+
+class UserSession(BaseModel):
+    """One signed-in session of a user, in the per-user session index (CORE.24).
+
+    Sessions stay in Django's database backend; this row only lets the account page list them
+    and the services end them per user. It is written on login, follows a rotated key
+    (`session_store.SessionStore`), goes with the session and is touched at most every
+    `SESSION_TOUCH_SECONDS`. It holds a browser family, an operating system and the network
+    prefix, never the raw User-Agent or the full IP address. `public_id` names the session on
+    pages; the key never leaves the server.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="session_index"
+    )
+    session_key = models.CharField(max_length=40, unique=True)
+    last_seen = models.DateTimeField()
+    browser = models.CharField(max_length=32, blank=True)
+    system = models.CharField(max_length=32, blank=True)
+    network = models.CharField(max_length=64, blank=True)  # /24 (IPv4) or /48 (IPv6)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "last_seen"])]
+
+    def __str__(self) -> str:
+        return f"session of {self.user_id} seen {self.last_seen:%Y-%m-%d %H:%M}"

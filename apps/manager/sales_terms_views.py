@@ -59,7 +59,8 @@ class SalesTermsView(ManagerView):
         )
         return context
 
-    @requires_level_method("sales_terms_publish")  # group 2 (CORE.25)
+    # Group 2 (CORE.25); the shop owner confirms it, once or in a window (D-32 amendment).
+    @requires_level_method("sales_terms_publish", shop=lambda view, request: view.manager.vendor)
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         vendor, actor = self.manager.vendor, self.manager.user
         if vendor is None or not isinstance(actor, User):

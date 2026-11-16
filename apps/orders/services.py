@@ -7,6 +7,7 @@ per changed object (SEC.4). `tax` is never imported here; `shipping` only for th
 tracking link (ORD.7).
 """
 
+import contextlib
 import datetime as dt
 import logging
 import uuid
@@ -31,8 +32,9 @@ from apps.catalog.models import Product, Variant
 from apps.core import flags
 from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
+from apps.core.models import AuditLog
 from apps.core.money import CENT, CURRENCY
-from apps.core.services import audit_changes, flag_enabled
+from apps.core.services import NoPlatformOperator, audit_changes, current_operator, flag_enabled
 from apps.shipping.models import Carrier
 from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
@@ -94,7 +96,7 @@ PAID_OR_LATER = frozenset(engine.ORDER_STATES) - engine.ORDER_INITIAL_STATES - {
 # The VIES log kept in the snapshot (D-30): time, consultation number and the name VIES returned.
 VIES_KEYS = ("at", "consultation", "name")
 COMMISSION_KEYS = ("rule_id", "version", "percent", "base", "fee_percent", "fee_fixed", "fee_base")
-COMMISSION_OPTIONAL_KEYS = ("promo_label", "valid_from")
+COMMISSION_OPTIONAL_KEYS = ("promo_label", "valid_from", "refund_fee_surcharge")
 MAX_PREFIX_LENGTH = 14  # number = prefix + "YYYY-" + 6+ digits must fit in 32 characters
 
 # --- numbering -------------------------------------------------------------------------------
@@ -201,6 +203,18 @@ def _vendor_identity(vendor: Vendor) -> dict[str, Any]:
     }
 
 
+def _frozen_commission(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """The rule snapshot plus the operator's refund-fee surcharge in force now (PAY.4, ARC.7), so a
+    later operator version never changes the fee of this order's refunds. The ceil-to-the-euro
+    rule is fixed in code, not configurable, so there is nothing else to freeze."""
+    frozen = dict(snapshot)
+    if "refund_fee_surcharge" not in frozen:
+        # no operator configured yet: the refund reads the version at creation time
+        with contextlib.suppress(NoPlatformOperator):
+            frozen["refund_fee_surcharge"] = str(current_operator().refund_fee_surcharge)
+    return frozen
+
+
 def _build_vendor_order(
     order: Order, item: VendorOrderInput
 ) -> tuple[VendorOrder, list[OrderLine], engine.Totals]:
@@ -241,7 +255,7 @@ def _build_vendor_order(
         state=item.state,
         vendor_snapshot=_vendor_identity(item.vendor),
         shipping_choice=item.shipping_choice,
-        commission_snapshot=item.commission_snapshot,
+        commission_snapshot=_frozen_commission(item.commission_snapshot),
         tax_profile_snapshot=item.tax_profile_snapshot,
     )
     lines = [
@@ -283,6 +297,7 @@ def create_order(
     customer_tax_status: str = "b2c",
     vat_validation: dict[str, Any] | None = None,
     vehicle: dict[str, Any] | None = None,
+    terms_acceptance: dict[str, Any] | None = None,
     state: str = "checkout",
     legacy_wp_order_id: int | None = None,
     placed_at: dt.datetime | None = None,
@@ -334,6 +349,8 @@ def create_order(
         customer_tax_status=customer_tax_status,
         vat_validation=vat_validation or {},
         vehicle_snapshot=engine.clean_vehicle_snapshot(vehicle),
+        terms_acceptance=terms_acceptance or {},
+        terms_accepted_at=(now or timezone.now()) if terms_acceptance else None,
         state=state,
         legacy_wp_order_id=legacy_wp_order_id,
     )
@@ -481,6 +498,63 @@ def transition_vendor_order(
     except _DryRunRollback:
         pass
     sub.refresh_from_db()
+    return changeset
+
+
+_REFUND_PACKAGE_TARGET = {
+    "pending": "cancelled",  # nothing was accepted yet: the machine has no pending -> refunded
+    "accepted": "refunded",
+    "shipped": "refunded",
+    "delivered": "refunded",
+    "completed": "refunded",
+}
+_REFUNDABLE_ORDER_STATES = frozenset({"paid", "in_fulfillment", "fulfilled"})
+
+
+def apply_refund_to_states(
+    vendor_order: VendorOrder, *, fully_refunded: bool, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Roll the order states forward after money was refunded on a vendor package (PAY.4).
+
+    Called by the ledger in the refund's transaction. A fully refunded package becomes `refunded`
+    (`cancelled` when the vendor had not accepted it: the machine has no `pending -> refunded`
+    arrow); a package refunded in part keeps its state. The order becomes `partially_refunded`
+    from `paid`, `in_fulfillment` or `fulfilled`, and `refunded` once every package is refunded
+    or cancelled. A `closed` order keeps its state (the machine has no arrow out of it): the
+    refund is still recorded by the ledger. Not blocked by a frozen vendor (a termination freezes
+    fulfilment, never a buyer's refund). Audited as `orders.transition`. A dry run returns the
+    ChangeSet and changes nothing.
+    """
+    changeset = ChangeSet()
+    try:
+        with transaction.atomic():
+            order = Order.objects.select_for_update().get(pk=vendor_order.order_id)
+            sub = VendorOrder.objects.select_for_update().get(pk=vendor_order.pk)
+            if fully_refunded and sub.state in _REFUND_PACKAGE_TARGET:
+                before = _vendor_order_snapshot(sub)
+                sub.state = _REFUND_PACKAGE_TARGET[sub.state]
+                sub.save(update_fields=["state", "updated_at"])
+                changeset.update(
+                    "orders.vendororder", str(sub.public_id), before, _vendor_order_snapshot(sub)
+                )
+            order_before = _order_snapshot(order)
+            if order.state in _REFUNDABLE_ORDER_STATES:
+                order.state = "partially_refunded"
+                order.save(update_fields=["state", "updated_at"])
+            if order.state == "partially_refunded":
+                states = set(order.vendor_orders.values_list("state", flat=True))
+                if states <= {"refunded", "cancelled"}:
+                    order.state = "refunded"
+                    order.save(update_fields=["state", "updated_at"])
+            changeset.update(
+                "orders.order", str(order.public_id), order_before, _order_snapshot(order)
+            )
+            if dry_run:
+                raise _DryRunRollback
+            audit_changes(changeset, ctx=ctx, action="orders.transition")
+    except _DryRunRollback:
+        pass
+    vendor_order.refresh_from_db()
     return changeset
 
 
@@ -913,6 +987,7 @@ def place_order(
     ctx: AuditContext,
     dry_run: bool = False,
     now: dt.datetime | None = None,
+    terms_acceptance: dict[str, Any] | None = None,
 ) -> tuple[Order | None, ChangeSet]:
     """Place the order in one transaction: verify the live prices and stock (rows locked), create
     the order awaiting payment with its snapshots, and confirm the stock holds.
@@ -926,6 +1001,9 @@ def place_order(
     The payment (PAY.1) starts after this transaction commits: `order.payment_client_secret`
     holds what the browser needs to confirm it (empty when no provider is configured or the
     provider failed; `start_payment` can be called again, and never creates a second intent).
+    A failure of that start after the commit is caught here, never raised: it is audited as
+    `orders.payment_start_failed` and logged, the order stays awaiting payment and the payment
+    page starts the payment again.
     Raises `CheckoutClosed` before anything is read or saved when a kill switch is off (ORD.10).
     """
     ensure_checkout_open([item.vendor for item in preview.vendors])
@@ -966,6 +1044,7 @@ def place_order(
             customer_tax_status=preview.customer_tax_status,
             vat_validation=preview.vat_validation,
             vehicle=preview.vehicle,
+            terms_acceptance=terms_acceptance,
             state="awaiting_payment",
             dry_run=dry_run,
             now=now,
@@ -1008,6 +1087,10 @@ def place_order(
 
 class PaymentMismatch(Exception):
     """The payment reference does not belong to this order (the page answers 404)."""
+
+
+class PaymentInProgress(Exception):
+    """The customer's payment is processing or already succeeded: the page shows no form (PAY.2)."""
 
 
 class PaymentUnavailable(Exception):
@@ -1087,7 +1170,9 @@ def mark_order_paid(
     audited for staff, when no order has that number, the order is no longer awaiting payment
     (a late payment on a cancelled order), or the amount or currency is not the order's gross
     total, or (when `provider_ref` is given) the payment is not the one started for the order
-    (`orders.payment_ref_mismatch`). Returns True when the order became (or, on a dry run, would
+    (`orders.payment_ref_mismatch`; an order with no stored payment reference yet counts as a
+    mismatch too, because no payment was started for it, so its payment is not accepted). Returns
+    True when the order became (or, on a dry run, would
     become) paid; a dry run writes nothing."""
 
     def problem(ref: str, action: str, detail: dict[str, Any], ctx: AuditContext) -> None:
@@ -1124,6 +1209,41 @@ def mark_order_paid(
             return True
         transition_order(order, "paid", ctx=ctx)
         _decrement_stock(order, ctx=ctx)
+    return True
+
+
+def flag_duplicate_payment(
+    order_ref: str, *, provider_ref: str, amount: Decimal, ctx: AuditContext
+) -> bool:
+    """A confirmed payment that did not move the order because the order is already paid with
+    another payment (PAY.4, #438 review): money taken with no order behind it.
+
+    True, after auditing `orders.payment_duplicate` once for that payment, when the order numbered
+    `order_ref` is paid (or later, refunds included) and `provider_ref` is not the payment stored
+    on the order (an empty stored reference counts as another payment). False for the order's own
+    payment, an unknown order and an order that is not paid yet (`mark_order_paid` handles those).
+    The caller refunds it in full and alerts staff; nothing on the order or its vendors changes.
+    """
+    order = Order.objects.filter(number=order_ref).first()
+    if order is None or order.state not in PAID_OR_LATER:
+        return False
+    if provider_ref == order.payment_intent_ref:
+        return False
+    already = AuditLog.objects.filter(
+        action="orders.payment_duplicate", target_key=order_ref, after__paid_with=provider_ref
+    ).exists()
+    if not already:
+        _audit_payment_problem(
+            order_ref,
+            "orders.payment_duplicate",
+            {
+                "paid_with": provider_ref,
+                "expected": order.payment_intent_ref,
+                "amount": amount,
+                "state": order.state,
+            },
+            ctx,
+        )
     return True
 
 

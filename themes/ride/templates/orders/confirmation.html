@@ -1,0 +1,37 @@
+{% extends "layouts/base.html" %}
+{% load i18n static theme_tags %}{% comment %}Order confirmation of `ride` (THM.16). The Payment Element container sits in a
+Bootstrap card on the grid; its ids, data attributes and scripts are the app template's, and the
+Stripe Appearance still comes from the theme tokens.{% endcomment %}
+{% block title %}{% translate "Order received" %} · {{ site_name }}{% endblock %}
+{% block head %}{% robots_meta "noindex, nofollow" %}{% endblock %}
+{% block content %}
+<article class="checkout mx-auto">
+  <h1 class="mb-3">{% translate "Order received" %}</h1>
+  <p>{% blocktranslate with number=order.number email=order.email %}Your order number is {{ number }}. We sent a confirmation to {{ email }}.{% endblocktranslate %}</p>
+  {% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=lines total=grand_total only %}
+  {% if paid or payment_closed or payment.in_progress %}
+    {% include "orders/_payment_status.html" with polling=payment.in_progress %}
+  {% elif payment.retry %}
+    {% include "components/alert.html" with level="warning" message=_("The payment form could not be loaded. Please reload this page in a moment.") only %}
+  {% elif payment %}
+    <div class="row"><div class="col-lg-8 col-xl-6">
+    <form id="payment-form" class="card border-top border-4 border-primary mb-4" method="get" action="{{ payment.return_url }}"
+          data-publishable-key="{{ payment.publishable_key }}"
+          data-client-secret="{{ payment.client_secret }}"
+          data-return-url="{{ payment.return_url }}"
+          data-appearance="{% payment_appearance_json %}">
+      <div class="card-body">
+        <div id="payment-element"></div>
+        <p id="payment-message" class="text-danger fw-semibold mt-2" role="alert"></p>
+        <button type="submit" class="btn btn-primary btn-lg w-100">{% translate "Pay now" %}</button>
+      </div>
+    </form>
+    </div></div>
+    <script src="https://js.stripe.com/v3/" nonce="{{ csp_nonce }}"></script>
+    <script src="{% static 'orders/payment.js' %}" nonce="{{ csp_nonce }}" defer></script>
+  {% else %}
+    {% include "components/alert.html" with level="info" message=_("Online payment is not available yet. The items stay held for you for a short time.") only %}
+    <p><button type="button" class="btn btn-primary btn-lg" disabled>{% translate "Pay now" %}</button></p>
+  {% endif %}
+</article>
+{% endblock %}

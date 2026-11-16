@@ -9,10 +9,12 @@ collection and no operator bank account as payee.
 The provider talks to Stripe through `StripeClient` only (`stripe_client.py`).
 """
 
+import dataclasses
 import json
 import time
 from collections.abc import Callable, Sequence
 from datetime import datetime
+from decimal import Decimal
 
 from django.conf import settings
 
@@ -20,6 +22,7 @@ from . import stripe_engine
 from .engine import (
     FeeCollection,
     InvalidSignature,
+    PaymentInProgress,
     PaymentMismatch,
     PaymentRequest,
     PaymentResult,
@@ -28,6 +31,11 @@ from .engine import (
     ProviderError,
     RefundRequest,
     RefundResult,
+    TransferConflict,
+    TransferRequest,
+    TransferResult,
+    TransferReversal,
+    TransferReversalFailed,
     WebhookEvent,
     validate_payment_request,
 )
@@ -37,6 +45,8 @@ from .stripe_client import (
     StripeError,
     StripeIntent,
 )
+
+IN_PROGRESS = frozenset({"processing", "succeeded"})  # a payment the customer already made
 
 _STATUS = {
     "succeeded": PaymentStatus.SUCCEEDED,
@@ -54,11 +64,13 @@ class StripePaymentProvider:
         client: StripeClient,
         *,
         webhook_secret: str,
+        connect_webhook_secret: str = "",
         tolerance: int = stripe_engine.DEFAULT_TOLERANCE_SECONDS,
         clock: Callable[[], float] = time.time,
     ) -> None:
         self._client = client
         self._webhook_secret = webhook_secret
+        self._connect_webhook_secret = connect_webhook_secret
         self._tolerance = tolerance
         self._clock = clock
 
@@ -114,17 +126,87 @@ class StripePaymentProvider:
             refs.append(transfer.id)
         return refs
 
+    def transfer(self, request: TransferRequest) -> TransferResult:
+        """One vendor's transfer, tied to the order's charge with `source_transaction` (D-08).
+
+        Safe to call again: an existing transfer of this payment to this account in the order's
+        transfer group is returned instead of a second one (Stripe's idempotency key only lasts
+        24 hours). A different amount there, or a transfer of the same vendor order to another
+        account (the vendor was relinked), is a `TransferConflict`, never a second transfer.
+        A demo payout account (`acct_demo_`) is refused before any call to Stripe."""
+        if stripe_engine.is_demo_account(request.vendor_account_ref):
+            raise ProviderError("demo payout account: never sent to the provider")
+        minor = stripe_engine.to_minor(request.amount, request.currency)
+        if minor <= 0:
+            raise ProviderError("transfer amount must be positive")
+        try:
+            charge = (
+                request.charge_ref
+                or self._client.get_payment_intent(request.provider_ref).charge_id
+            )
+            if not charge:
+                raise ProviderError("the payment has no charge to transfer from yet")
+            for existing in self._client.list_transfers(transfer_group=request.order_ref):
+                if existing.payment_ref != request.provider_ref:
+                    continue
+                if existing.destination == request.vendor_account_ref:
+                    if existing.amount_minor != minor:
+                        raise TransferConflict(
+                            "a transfer with another amount already exists",
+                            transfer_ref=existing.id,
+                        )
+                    return TransferResult(existing.id, request.amount)
+                if request.reference and existing.vendor_order == request.reference:
+                    raise TransferConflict(
+                        "a transfer of this vendor order to another account exists",
+                        transfer_ref=existing.id,
+                    )
+            transfer = self._client.create_transfer(
+                amount_minor=minor,
+                currency=request.currency,
+                destination=request.vendor_account_ref,
+                transfer_group=request.order_ref,
+                source_transaction=charge,
+                metadata={
+                    "payment_ref": request.provider_ref,
+                    "order_ref": request.order_ref,
+                    "vendor_order": request.reference,
+                },
+                idempotency_key=request.idempotency_key,
+            )
+        except StripeError as error:
+            raise ProviderError(str(error)) from error
+        return TransferResult(
+            transfer.id, stripe_engine.from_minor(transfer.amount_minor, request.currency)
+        )
+
+    def refunded_amount(self, *, provider_ref: str, charge_ref: str, currency: str) -> Decimal:
+        """What Stripe says was refunded on the payment's charge, refunds made in the Stripe
+        dashboard included (PAY.3 guard: nothing is transferred out of a refunded charge). Raises
+        `ProviderError` when it cannot be read: the caller must then not pay."""
+        try:
+            charge = charge_ref or self._client.get_payment_intent(provider_ref).charge_id
+            if not charge:
+                return Decimal("0")
+            found = self._client.get_charge(charge)
+        except StripeError as error:
+            raise ProviderError(str(error)) from error
+        return stripe_engine.from_minor(found.amount_refunded_minor, currency)
+
     # -- Capability 2: refunds with the provider cost
 
     def payment_client_secret(self, provider_ref: str, order_ref: str) -> str:
         """The browser-side secret of an existing payment, fetched from Stripe; raises
-        `PaymentMismatch` unless the payment carries this order as its transfer group."""
+        `PaymentMismatch` unless the payment carries this order as its transfer group, and
+        `PaymentInProgress` once it is processing or succeeded."""
         try:
             intent = self._client.get_payment_intent(provider_ref)
         except StripeError as error:
             raise ProviderError(str(error)) from error
         if intent.transfer_group != order_ref:
             raise PaymentMismatch(provider_ref)
+        if intent.status in IN_PROGRESS:  # no form again: the webhook is about to confirm
+            raise PaymentInProgress(provider_ref)
         return intent.client_secret
 
     def refund(self, request: RefundRequest) -> RefundResult:
@@ -138,15 +220,51 @@ class StripePaymentProvider:
                 amount_minor=refund_minor,
                 idempotency_key=request.idempotency_key,
             )
-            if request.reverse_vendor_shares:
-                self._reverse_transfers(request, intent, refund_minor)
         except StripeError as error:
             raise ProviderError(str(error)) from error
-        return RefundResult(
+        result = RefundResult(
             refund_ref=refund.id,
             amount=stripe_engine.from_minor(refund.amount_minor, request.currency),
             provider_cost=stripe_engine.from_minor(refund.fee_minor, request.currency),
         )
+        try:
+            if request.reversals is not None:
+                reversal_refs = self._reverse_given(request, request.reversals)
+                result = dataclasses.replace(result, reversal_refs=tuple(reversal_refs))
+            elif request.reverse_vendor_shares:
+                self._reverse_transfers(request, intent, refund_minor)
+        except StripeError as error:
+            raise TransferReversalFailed(str(error), result) from error
+        return result
+
+    def reverse_transfers(
+        self, *, idempotency_key: str, currency: str, reversals: Sequence[TransferReversal]
+    ) -> Sequence[str]:
+        request = RefundRequest("", Decimal("0"), currency, idempotency_key)
+        try:
+            return self._reverse_given(request, reversals)
+        except StripeError as error:
+            raise ProviderError(str(error)) from error
+
+    def _reverse_given(
+        self, request: RefundRequest, reversals: Sequence[TransferReversal]
+    ) -> list[str]:
+        """Reverse exactly the transfers the caller names (PAY.4): one reversal per transfer."""
+        refs: list[str] = []
+        for reversal in reversals:
+            minor = stripe_engine.to_minor(reversal.amount, request.currency)
+            if minor <= 0:
+                raise ProviderError("a transfer reversal must be positive")
+            refs.append(
+                self._client.create_transfer_reversal(
+                    transfer_id=reversal.transfer_ref,
+                    amount_minor=minor,
+                    # Amount-free like `_reverse_transfers`: a changed amount on a retry must fail
+                    # closed (idempotency_error), never become a second reversal (review of #477).
+                    idempotency_key=f"{request.idempotency_key}:reverse:{reversal.transfer_ref}",
+                )
+            )
+        return refs
 
     def _reverse_transfers(
         self, request: RefundRequest, intent: StripeIntent, refund_minor: int
@@ -166,6 +284,8 @@ class StripePaymentProvider:
                 self._client.create_transfer_reversal(
                     transfer_id=transfer.id,
                     amount_minor=minor,
+                    # Same refund, same transfer, same key: a changed amount on a retry must fail
+                    # closed (idempotency_error), never become a second reversal (review of #477).
                     idempotency_key=f"{request.idempotency_key}:reverse:{transfer.id}",
                 )
 
@@ -192,9 +312,20 @@ class StripePaymentProvider:
     # -- Capability 4: signed, idempotent webhooks
 
     def parse_webhook(self, body: bytes, signature: str) -> WebhookEvent:
-        stripe_engine.verify_signature(
-            body, signature, self._webhook_secret, now=self._clock(), tolerance=self._tolerance
-        )
+        # Stripe signs `account.updated` (Connect endpoint) with its own secret: any one may verify.
+        # An empty Connect secret is ignored. Failures raise InvalidSignature without any secret.
+        secrets_to_try = [self._webhook_secret]
+        if self._connect_webhook_secret:
+            secrets_to_try.append(self._connect_webhook_secret)
+        for index, secret in enumerate(secrets_to_try):
+            try:
+                stripe_engine.verify_signature(
+                    body, signature, secret, now=self._clock(), tolerance=self._tolerance
+                )
+                break
+            except InvalidSignature:
+                if index == len(secrets_to_try) - 1:
+                    raise
         try:
             data = json.loads(body)
             return WebhookEvent(str(data["id"]), str(data["type"]), dict(data.get("data", {})))
@@ -212,6 +343,7 @@ def provider_from_settings() -> StripePaymentProvider:
     return StripePaymentProvider(
         HttpStripeClient(settings.STRIPE_SECRET_KEY, api_version=settings.STRIPE_API_VERSION),
         webhook_secret=settings.STRIPE_WEBHOOK_SECRET,
+        connect_webhook_secret=settings.STRIPE_CONNECT_WEBHOOK_SECRET,
         tolerance=settings.STRIPE_WEBHOOK_TOLERANCE_SECONDS,
     )
 

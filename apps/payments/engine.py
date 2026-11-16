@@ -37,8 +37,21 @@ class PaymentMismatch(Exception):
     """The payment asked for does not belong to the order it was asked for."""
 
 
+class PaymentInProgress(Exception):
+    """The customer's payment is processing or already succeeded: no form must be shown again."""
+
+
 class ProviderError(Exception):
     """The provider refused or failed a call; the message is safe to log."""
+
+
+class TransferConflict(ProviderError):
+    """A transfer of this payment for this vendor order already exists with another destination
+    or amount. Retrying cannot fix it and must never pay twice: staff check `transfer_ref`."""
+
+    def __init__(self, message: str, *, transfer_ref: str) -> None:
+        super().__init__(message)
+        self.transfer_ref = transfer_ref
 
 
 @dataclass(frozen=True)
@@ -75,13 +88,55 @@ class PaymentResult:
 
 
 @dataclass(frozen=True)
+class TransferRequest:
+    """One vendor's share of a settled payment (PAY.3, D-08), sent after the charge exists.
+
+    `charge_ref` may be empty when the confirmation did not carry it: the provider then reads it
+    from the payment. `idempotency_key` names the order, the vendor, the destination, the amount
+    and the currency (`stripe_engine.transfer_idempotency_key`): a plain retry reuses it, a
+    relinked account gets a fresh one. `reference` is the vendor order's public id, for the
+    provider's metadata and reconciliation: a transfer already made for it to another account is a
+    `TransferConflict`, never a second transfer.
+    """
+
+    order_ref: str  # the transfer group: the order number
+    provider_ref: str  # the payment (PaymentIntent) the charge belongs to
+    charge_ref: str
+    vendor_account_ref: str
+    amount: Decimal
+    currency: str
+    idempotency_key: str
+    reference: str = ""
+
+
+@dataclass(frozen=True)
+class TransferResult:
+    transfer_ref: str
+    amount: Decimal
+
+
+@dataclass(frozen=True)
+class TransferReversal:
+    """Take `amount` back from one transfer the platform made to a vendor (PAY.4, D-41)."""
+
+    transfer_ref: str
+    amount: Decimal
+
+
+@dataclass(frozen=True)
 class RefundRequest:
     provider_ref: str
     amount: Decimal
     currency: str
     idempotency_key: str
-    # D-08: a refund takes the vendors' shares back from the vendors (`reverse_transfer`).
+    # D-08: a refund takes the vendors' shares back from the vendors (`reverse_transfer`), pro
+    # rata over every transfer of the payment. Ignored when `reversals` is given.
     reverse_vendor_shares: bool = True
+    # PAY.4: exactly these transfers are reversed, by these amounts, and no other. Used when one
+    # vendor refunds its own package: the other vendors' shares are never touched. An empty
+    # tuple with `reverse_vendor_shares=False` reverses nothing (a duplicate payment, or a
+    # transfer that was never created).
+    reversals: Sequence[TransferReversal] | None = None
 
 
 @dataclass(frozen=True)
@@ -90,6 +145,16 @@ class RefundResult:
     amount: Decimal
     # The real provider cost of the refund, from the balance transaction (PAY.4, D-05).
     provider_cost: Decimal
+    reversal_refs: Sequence[str] = ()
+
+
+class TransferReversalFailed(ProviderError):
+    """The provider refund SUCCEEDED but taking the vendor's share back failed (PAY.4): the buyer
+    is already refunded, so the caller must record the refund and retry only the reversal."""
+
+    def __init__(self, message: str, result: "RefundResult") -> None:
+        super().__init__(message)
+        self.result = result
 
 
 @dataclass(frozen=True)
@@ -130,8 +195,21 @@ class PaymentProvider(Protocol):
         """Capability 1: collect, with fee and vendor shares separated per `fee_collection`."""
         ...
 
+    def transfer(self, request: TransferRequest) -> TransferResult:
+        """Capability 1b (PAY.3): pay one vendor its share of a settled payment, tied to the
+        charge (D-08 `source_transaction`). Idempotent on the key and never a second transfer
+        for the same payment and vendor account; raises `ProviderError` on failure."""
+        ...
+
     def refund(self, request: RefundRequest) -> RefundResult:
         """Capability 2: full or partial refund, reporting the provider cost for PAY.4."""
+        ...
+
+    def reverse_transfers(
+        self, *, idempotency_key: str, currency: str, reversals: Sequence[TransferReversal]
+    ) -> Sequence[str]:
+        """Retry only the transfer reversals of a refund whose provider refund went through; the
+        keys are `<idempotency_key>:reverse:<transfer>`, the same as in `refund`."""
         ...
 
     def list_payouts(self, since: datetime) -> Sequence[PayoutRecord]:
@@ -146,6 +224,7 @@ class PaymentProvider(Protocol):
 REQUIRED_METHODS = (
     "supported_methods",
     "create_payment",
+    "transfer",
     "refund",
     "list_payouts",
     "parse_webhook",

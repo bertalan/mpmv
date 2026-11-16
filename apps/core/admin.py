@@ -11,6 +11,7 @@ and vendor. It asks for a fresh second factor through `settings.STEP_UP_DECORATO
 
 import datetime as dt
 from collections.abc import Callable, Iterator
+from decimal import Decimal
 from typing import Any
 
 from django import forms
@@ -29,7 +30,15 @@ from wagtail.models import Collection
 from . import flags
 from .audit import audit_context
 from .changeset import diff
-from .models import AuditLog, FeatureFlag, ImageLicence, MediaImage, PlatformOperator
+from .models import (
+    DEFAULT_REFUND_FEE_SURCHARGE,
+    PLATFORM_REFUND_CASE_CHOICES,
+    AuditLog,
+    FeatureFlag,
+    ImageLicence,
+    MediaImage,
+    PlatformOperator,
+)
 from .services import (
     NoPlatformOperator,
     check_operator_start,
@@ -57,6 +66,18 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
         ),
     )
 
+    platform_refund_cases = forms.MultipleChoiceField(
+        choices=PLATFORM_REFUND_CASE_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Platform-initiated refund cases",
+        help_text=_(
+            "The cases where the platform refunds a buyer on its own: its own error, or a "
+            "seller who defaults (for example, never ships). Leave a case unticked to switch "
+            "it off."
+        ),
+    )
+
     class Meta:
         model = PlatformOperator
         fields = (
@@ -69,6 +90,10 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             "support_email",
             "compliance_email",
             "require_sales_terms",
+            "vendors_may_refund_outside",
+            "reverse_fees_on_vendor_refund",
+            "refund_fee_surcharge",
+            "platform_refund_cases",
             "session_policy",
             "authority_contact_email",
             "authority_contact_languages",
@@ -81,6 +106,9 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        # D-41: an empty surcharge means the default, so a form from before PAY.4 still saves.
+        if "refund_fee_surcharge" in self.fields:
+            self.fields["refund_fee_surcharge"].required = False
         # Only the platform logos collection (or one below it), never a vendor's or page image.
         if "logo" not in self.fields:  # a stored row is shown read-only
             return
@@ -90,6 +118,10 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             condition |= Q(collection__path__startswith=path)
         field: Any = self.fields["logo"]
         field.queryset = MediaImage.objects.filter(condition)
+
+    def clean_refund_fee_surcharge(self) -> Decimal:
+        value: Decimal | None = self.cleaned_data.get("refund_fee_surcharge")
+        return DEFAULT_REFUND_FEE_SURCHARGE if value is None else value
 
     def clean_session_policy(self) -> Any:
         return self.cleaned_data.get("session_policy") or {}

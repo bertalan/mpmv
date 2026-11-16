@@ -3,8 +3,13 @@
 import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.loader import MigrationLoader
 
-LATEST = "0013_vehicle_snapshot"
+
+def _orders_leaf() -> str:
+    leaves = MigrationLoader(connection).graph.leaf_nodes("orders")
+    assert len(leaves) == 1, f"orders has several migration leaves: {leaves}"
+    return str(leaves[0][1])
 
 
 def migrate(target: str) -> None:
@@ -14,6 +19,7 @@ def migrate(target: str) -> None:
 
 @pytest.mark.django_db(transaction=True)
 def test_migrating_back_to_0003_leaves_working_guards_and_forward_again_works() -> None:
+    latest = _orders_leaf()
     try:
         migrate("0003_database_guards")
         with connection.cursor() as cursor:
@@ -29,4 +35,4 @@ def test_migrating_back_to_0003_leaves_working_guards_and_forward_again_works() 
             cursor.execute("SELECT count(*) FROM orders_order")
             assert cursor.fetchone() == (1,)
     finally:
-        migrate(LATEST)
+        migrate(latest)

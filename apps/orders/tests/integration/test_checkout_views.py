@@ -40,21 +40,12 @@ from apps.shipping.tests.factories import (
 from apps.tax import engine as tax
 from apps.tax.tests.factories import TaxRateFactory, VendorTaxProfileFactory
 from apps.vendors.models import Vendor
-from apps.vendors.tests.factories import VendorFactory
+from apps.vendors.tests.factories import CommissionRuleFactory, VendorFactory
 
 pytestmark = pytest.mark.django_db
 
 D = Decimal
 NBSP = "\N{NO-BREAK SPACE}"
-COMMISSION = {
-    "rule_id": "default",
-    "version": 1,
-    "percent": "10.00",
-    "base": "goods",
-    "fee_percent": "1.40",
-    "fee_fixed": "0.25",
-    "fee_base": "gross",
-}
 DETAILS = {
     "email": "buyer@example.com",
     "full_name": "Mario Rossi",
@@ -121,11 +112,18 @@ def sign_off_details(client: Client, **extra: str) -> Any:
     return client.post(reverse("orders:checkout"), {**DETAILS, **extra})
 
 
+def post_review(client: Client, boxes: dict[str, str] | None = None) -> Any:
+    """Place the order as a browser does: the hidden terms stamps of the page come back with the
+    boxes (ORD.17b)."""
+    html = client.get(reverse("orders:review")).content.decode()
+    stamps = dict(re.findall(r'<input type="hidden" name="(terms_[^"]+)" value="([^"]*)"', html))
+    return client.post(reverse("orders:review"), {**stamps, **(boxes or {})})
+
+
 @pytest.fixture
-def commission(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        state, "commission_snapshots", lambda ids: {pk: dict(COMMISSION) for pk in ids}
-    )
+def commission() -> None:
+    """The platform default commission rule in force (VEN.2): the real seam, no stub."""
+    CommissionRuleFactory.create(valid_from=utc(2026, 1, 1), valid_to=None)
 
 
 # --- Cart -----------------------------------------------------------------------------------
@@ -364,7 +362,7 @@ def test_the_review_shows_shipping_choice_totals_and_the_pay_step(
     assert 'type="radio"' in html
     assert "Standard" in html
     assert "134.08" in html
-    assert "Place order" in html
+    assert "Confirm order and pay now" in html
 
 
 def test_the_shipping_choice_is_kept_and_answers_a_fragment_for_htmx(
@@ -390,7 +388,7 @@ def test_a_package_that_needs_a_quote_cannot_be_ordered(client: Client, commissi
     html = client.get(reverse("orders:review")).content.decode()
     assert "needs a quote" in html
     assert "Request a quote" in html
-    assert "Place order" not in html
+    assert "Confirm order and pay now" not in html
     assert client.post(reverse("orders:review")).status_code == 200
     assert not Order.objects.exists()
 
@@ -410,7 +408,7 @@ def test_ordering_is_closed_while_no_commission_rule_exists(client: Client) -> N
     sign_off_details(client)
     html = client.get(reverse("orders:review")).content.decode()
     assert "Ordering is not open yet" in html
-    assert "Place order" not in html
+    assert "Confirm order and pay now" not in html
     client.post(reverse("orders:review"))
     assert not Order.objects.exists()
 
@@ -421,7 +419,7 @@ def test_place_order_runs_for_a_placeable_preview_and_shows_the_confirmation(
     cart = with_cart(client)
     add(cart, vendor("Alpha Shop"), "100.00")
     sign_off_details(client)
-    response = client.post(reverse("orders:review"))
+    response = post_review(client, {"accept_terms": "on"})
     assert response.status_code == 302
     assert response["Location"] == reverse("orders:confirmation")
     order = Order.objects.get()
@@ -458,7 +456,7 @@ def test_a_pulled_switch_shows_a_customer_message_and_places_nothing(
     save_flag(row, ctx=staff)
     FLAG_CACHE.clear()
     try:
-        response = client.post(reverse("orders:review"))
+        response = post_review(client, {"accept_terms": "on"})
     finally:
         FLAG_CACHE.clear()
     assert response.status_code == 200

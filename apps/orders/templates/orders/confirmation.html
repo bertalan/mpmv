@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% load i18n static %}
+{% load i18n static theme_tags %}
 {% block title %}{% translate "Order received" %} · {{ site_name }}{% endblock %}
 {% block head %}{% robots_meta "noindex, nofollow" %}{% endblock %}
 {% block content %}
@@ -7,17 +7,16 @@
   <h1>{% translate "Order received" %}</h1>
   <p>{% blocktranslate with number=order.number email=order.email %}Your order number is {{ number }}. We sent a confirmation to {{ email }}.{% endblocktranslate %}</p>
   {% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=lines total=grand_total only %}
-  {% if paid %}
-    {% include "components/alert.html" with level="success" message=_("Payment received. Thank you.") only %}
-  {% elif payment_closed %}
-    {% include "components/alert.html" with level="info" message=_("This order is no longer open for payment.") only %}
+  {% if paid or payment_closed or payment.in_progress %}
+    {% include "orders/_payment_status.html" with polling=payment.in_progress %}
   {% elif payment.retry %}
     {% include "components/alert.html" with level="warning" message=_("The payment form could not be loaded. Please reload this page in a moment.") only %}
   {% elif payment %}
     <form id="payment-form" method="get" action="{{ payment.return_url }}"
           data-publishable-key="{{ payment.publishable_key }}"
           data-client-secret="{{ payment.client_secret }}"
-          data-return-url="{{ payment.return_url }}">
+          data-return-url="{{ payment.return_url }}"
+          data-appearance="{% payment_appearance_json %}">
       <div id="payment-element"></div>
       <p id="payment-message" role="alert"></p>
       <p><button type="submit" class="button">{% translate "Pay now" %}</button></p>

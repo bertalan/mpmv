@@ -47,6 +47,15 @@ def _next_url(request: HttpRequest) -> str:
     return "/"
 
 
+def _with_saved_marker(target: str) -> str:
+    """Add `?saved=1` when the redirect goes back to the settings page (the visible notice)."""
+    parts = urlsplit(target)
+    if parts.path.rstrip("/") != reverse("consent_preferences").rstrip("/"):
+        return target
+    query = [q for q in parts.query.split("&") if q and not q.startswith("saved=")]
+    return parts._replace(query="&".join([*query, "saved=1"])).geturl()
+
+
 def _set_cookie(
     response: HttpResponseBase, request: HttpRequest, state: engine.ConsentState
 ) -> None:
@@ -97,7 +106,7 @@ def consent_save(request: HttpRequest) -> HttpResponseBase:
             }
         )
     else:
-        response = HttpResponseRedirect(_next_url(request), status=303)
+        response = HttpResponseRedirect(_with_saved_marker(_next_url(request)), status=303)
     response["Cache-Control"] = "no-store"
     _set_cookie(response, request, state)
     return response
@@ -111,11 +120,17 @@ def consent_preferences(request: HttpRequest) -> HttpResponse:
     if not provider.accepts_choices:
         raise Http404("This site's consent tool has no settings page of ours")
     state = provider.state(request)
+    categories = category_texts()
+    saved = state.decided and request.GET.get("saved") == "1"
     return render(
         request,
         "seo/consent/preferences.html",
         {
-            "categories": category_texts(),
+            "categories": categories,
+            "saved": saved,
+            "optional_on": [
+                c["label"] for c in categories if not c["locked"] and c["code"] in state.granted
+            ],
             "granted": sorted(state.granted),
             "decided": state.decided,
             "action_url": reverse("consent_save"),

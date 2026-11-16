@@ -25,6 +25,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from .bootstrap_map import bootstrap_map_css
 from .build import (
     DEFAULT_THEMES_DIR,
     OUTPUT_PREFIX,
@@ -44,6 +45,7 @@ from .engine import (
     render_tokens_css,
     resolve_tokens,
 )
+from .foundation import BUNDLE_OUTPUT, foundation_files
 from .vendored import VENDOR_DIR
 
 LAZY_JS_DIR = "lazy/"  # scripts under js/lazy/ are imported on demand: the JS budget skips them
@@ -58,6 +60,7 @@ ALLOWED_LICENCES_BY_KIND: Mapping[str, frozenset[str]] = {
     "font": frozenset({"OFL-1.1", "Apache-2.0"}),
     "icons": frozenset({"MIT", "ISC"}),
     "image": frozenset({"CC0-1.0"}),
+    "framework": frozenset({"MIT"}),
 }
 ALLOWED_ASSET_LICENCES = frozenset().union(*ALLOWED_LICENCES_BY_KIND.values())
 ASSET_KINDS = frozenset(ALLOWED_LICENCES_BY_KIND)
@@ -84,26 +87,33 @@ def _kb(size: int) -> str:
     return f"{size / 1024:.1f} KB"
 
 
-def check_sizes(slug: str, css: str, scripts: Mapping[str, bytes]) -> list[GateFailure]:
+def check_sizes(
+    slug: str,
+    css: str,
+    scripts: Mapping[str, bytes],
+    *,
+    css_budget: int = CSS_BUDGET,
+    js_budget: int = JS_BUDGET,
+) -> list[GateFailure]:
     """The CSS and JavaScript budgets of one theme (§14.7)."""
     failures = []
     css_size = compressed_size(css.encode("utf-8"))
-    if css_size > CSS_BUDGET:
+    if css_size > css_budget:
         failures.append(
             GateFailure(
                 slug,
                 "size",
-                f"theme.css is {_kb(css_size)} compressed, over the {_kb(CSS_BUDGET)} budget",
+                f"theme.css is {_kb(css_size)} compressed, over the {_kb(css_budget)} budget",
             )
         )
     js_size = sum(compressed_size(data) for data in scripts.values())
-    if js_size > JS_BUDGET:
+    if js_size > js_budget:
         failures.append(
             GateFailure(
                 slug,
                 "size",
                 f"JavaScript is {_kb(js_size)} compressed ({', '.join(sorted(scripts))}), "
-                f"over the {_kb(JS_BUDGET)} budget",
+                f"over the {_kb(js_budget)} budget",
             )
         )
     return failures
@@ -264,18 +274,38 @@ def _check_theme(
         violations = check_tokens(tokens, TOKEN_CONTRACT)
         failures += [GateFailure(slug, "tokens", str(v)) for v in violations]
         if not violations:
+            foundation_css, bundle = None, None
+            declared = registry.foundation(slug)
+            if declared is not None:
+                try:
+                    foundation_css, bundle = foundation_files(
+                        root / declared[0], declared[0], declared[1]
+                    )
+                except ThemeError as exc:
+                    failures.append(GateFailure(slug, "foundation", str(exc)))
             css = build_theme_css(
                 chain,
                 tokens_css=render_tokens_css(tokens),
                 sources={s: read_css_sources(root / s, s) for s in chain},
+                foundation_css=foundation_css,
+                bootstrap_map=bootstrap_map_css(tokens) if foundation_css is not None else None,
             )
             scripts = dict(vendor)
+            if bundle is not None:
+                scripts[BUNDLE_OUTPUT] = bundle.encode("utf-8")
             for s in chain:
                 for name, module in read_js_modules(root / s, s).items():
                     if name.startswith(LAZY_JS_DIR):
                         continue  # loaded on demand, not shipped by every page (§14.7)
                     scripts[f"themes/{s}/js/{name}"] = module.encode("utf-8")
-            failures += check_sizes(slug, css, scripts)
+            manifest = registry[slug]
+            failures += check_sizes(
+                slug,
+                css,
+                scripts,
+                css_budget=(manifest.css_budget_kb or CSS_BUDGET // 1024) * 1024,
+                js_budget=(manifest.js_budget_kb or JS_BUDGET // 1024) * 1024,
+            )
     assets = theme_assets(theme_dir, slug)
     licences = read_licences(theme_dir)
     failures += check_licences(slug, assets, licences)

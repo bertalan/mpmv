@@ -1,7 +1,9 @@
 """LIVE/STAGE settings serve the static files collected into the image (ARC.5)."""
 
 import runpy
+import secrets
 from typing import Any
+from unittest import mock
 
 from django.conf import settings
 from django.utils.module_loading import import_string
@@ -11,7 +13,9 @@ from apps.cms.staticfiles import StaticFilesStorage
 
 
 def live_settings() -> dict[str, Any]:
-    return runpy.run_module("mpmv.settings.live")
+    # The test settings' placeholder key says "insecure", which the LIVE settings refuse (SEC.5).
+    with mock.patch("mpmv.settings.base.SECRET_KEY", secrets.token_urlsafe(50)):
+        return runpy.run_module("mpmv.settings.live")
 
 
 # The middleware that only add security headers (SEC.1). WhiteNoise answers static files itself,
