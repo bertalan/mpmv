@@ -90,7 +90,10 @@ def _moderation(page: EventPage) -> str:
 
 
 def _active_locale() -> Locale | None:
-    """The Wagtail locale of the interface language, for a new event (EVT.8 adds the choice)."""
+    """The Wagtail locale of the interface language, for a new event (EVT.8 adds the choice).
+
+    None when no locale exists for that language: the caller then falls back to the default
+    locale silently, until EVT.8 adds the language field."""
     return Locale.objects.filter(language_code=(get_language() or "").split("-")[0]).first()
 
 
