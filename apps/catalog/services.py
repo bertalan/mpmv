@@ -2157,6 +2157,11 @@ class ProductCard:
     image_alt: str = ""
     # A Wagtail image: rendered as AVIF/WebP/JPEG renditions (THM.12) instead of `image_url`.
     image: MediaImage | None = None
+    # The product's fiscal category: templates turn the net price into the VAT-inclusive
+    # consumer price with the tax app's `consumer_price` tag (TAX.12).
+    fiscal_category: str = "standard"
+    # The seller: the price shown is what checkout charges for this vendor (its VAT regime).
+    vendor: Vendor | None = None
 
 
 def product_cards(products: Sequence[Product], language: str) -> list[ProductCard]:
@@ -2195,6 +2200,8 @@ def product_cards(products: Sequence[Product], language: str) -> list[ProductCar
                     else None
                 ),
                 image_alt=title,
+                fiscal_category=product.fiscal_category,
+                vendor=product.vendor,
             )
         )
     return cards

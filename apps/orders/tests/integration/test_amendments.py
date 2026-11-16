@@ -566,12 +566,12 @@ def test_an_apply_on_a_stale_version_is_superseded_and_moves_nothing() -> None:
     )
 
 
-def test_an_apply_that_moves_money_waits_for_part_two() -> None:
+def test_an_apply_that_moves_money_needs_a_passkey_and_moves_nothing_without_it() -> None:
     sub = seed()
     actor = owner_of(sub)
     amendment, _ = draft(sub, am.RemoveLine(key_of(sub, "SKU-B")), actor=actor)
     assert amendment is not None
-    with pytest.raises(amendments.AmendmentRefused, match="moves money"):
+    with pytest.raises(amendments.PasskeyRequired, match="refunds money"):
         amendments.apply_amendment(amendment, actor=actor, ctx=CTX, now=NOW)
     assert VendorOrderVersion.objects.filter(vendor_order=sub).count() == 1
 
