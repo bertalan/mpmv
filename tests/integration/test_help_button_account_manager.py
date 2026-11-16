@@ -27,6 +27,7 @@ from apps.accounts.tests.mfa import verified_login
 from apps.cms import engine
 from apps.cms.tests.factories import HelpEntryFactory
 from apps.compliance.tests.factories import NoticeFactory, TerminationNoticeFactory
+from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.manager.checks import manager_routes
 from apps.orders.tests.factories import paid_vendor_order
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
@@ -51,6 +52,7 @@ MODAL_FRAGMENTS = (
 # Routes that answer a redirect or an action, not a page of the shell.
 NOT_PAGES = (
     "manager:shop:order_action",
+    "manager:shop:event_submit",  # EVT.4: POST only, redirects to the events list
     "manager:platform:profile_revert",  # POST only, redirects to the changes page
     "manager:platform:profile_confirm",  # POST only, redirects to the changes page
     "manager:shop:termination_data",  # a JSON file download, not a page
@@ -157,6 +159,10 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:termination": "platform",
         "manager:shop:termination": "shop",
         "manager:shop:sales_terms": "shop",
+        "manager:shop:events": "shop",  # EVT.4
+        "manager:shop:event_new": "shop",
+        "manager:shop:event_edit": "shop",
+        "manager:shop:event_cancel": "shop",  # the confirmation page
     }
 
 
@@ -166,6 +172,11 @@ def _open(name: str) -> tuple[Client, str]:
         kwargs = {}
         if name == "manager:shop:order":
             kwargs = {"public_id": paid_vendor_order(vendor).public_id}  # type: ignore[arg-type]
+        if name in ("manager:shop:event_edit", "manager:shop:event_cancel"):
+            primary_index()
+            event = EventPageFactory.create(vendor=vendor)
+            event.save_revision().publish()  # a published event can be cancelled
+            kwargs = {"public_id": event.public_id}
     else:
         user = UserFactory.create(
             permissions=[

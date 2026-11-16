@@ -574,6 +574,26 @@ ENDPOINTS: dict[str, Access] = {
         methods=("POST",),
         sample={"public_id": NIL_UUID},
     ),
+    # EVT.4: the vendor's own events; another vendor's id is a 404 on every view that takes one.
+    "manager:shop:events": VendorScopedList(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        identify=lambda event: str(event.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:event_new": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:event_edit": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_submit": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_cancel": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
