@@ -61,6 +61,12 @@ NOT_PAGES = (
     "manager:platform:profile_confirm",  # POST only, redirects to the changes page
     "manager:shop:termination_data",  # a JSON file download, not a page
     "manager:platform:user_sessions_find",  # POST only, redirects to the sessions page
+    # ORD.20 part 3: POST only, they redirect to the amendment page (or show the passkey prompt).
+    "manager:shop:amendment_apply",
+    "manager:shop:amendment_discard",
+    "manager:platform:amendment_apply",
+    "manager:platform:amendment_discard",
+    "manager:platform:order_cancel",
     *MODAL_FRAGMENTS,
 )
 
@@ -169,6 +175,10 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:event_cancel": "shop",  # the confirmation page
         "manager:shop:event_block_add": "shop",  # EVT.4 part 2
         "manager:shop:event_images": "shop",
+        "manager:shop:order_amend": "shop",  # ORD.20 part 3
+        "manager:platform:orders": "platform",
+        "manager:platform:order": "platform",
+        "manager:platform:amendment_settings": "platform",
     }
 
 
@@ -176,7 +186,7 @@ def _open(name: str) -> tuple[Client, str]:
     if _manager_pages()[name] == "shop":
         user, vendor = _shop_owner()
         kwargs = {}
-        if name == "manager:shop:order":
+        if name in ("manager:shop:order", "manager:shop:order_amend"):
             kwargs = {"public_id": paid_vendor_order(vendor).public_id}  # type: ignore[arg-type]
         if name in (
             "manager:shop:event_edit",
@@ -201,6 +211,8 @@ def _open(name: str) -> tuple[Client, str]:
             kwargs = {"public_id": NoticeFactory.create().public_id}
         if name == "manager:platform:termination":
             kwargs = {"public_id": TerminationNoticeFactory.create().public_id}
+        if name == "manager:platform:order":
+            kwargs = {"public_id": paid_vendor_order().public_id}
     client = Client()
     verified_login(client, user)  # type: ignore[arg-type]
     return client, reverse(name, kwargs=kwargs)

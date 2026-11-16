@@ -28,6 +28,34 @@
           </li>
         {% endfor %}
       </ol>
+      {% if part.offer %}
+        <section class="order-offer alert alert-warning" aria-labelledby="offer-{{ forloop.counter }}" data-cancel-rest-offer>
+          <h3 class="h5" id="offer-{{ forloop.counter }}">{% translate "An item was not available" %}</h3>
+          <p>{% translate "You can cancel the rest of this package free of charge until it is shipped, and get back everything you paid for it." %}{% if part.offer.hold_until %} {% blocktranslate with when=part.offer.hold_until|date:"DATETIME_FORMAT" %}The seller will not ship it before {{ when }}.{% endblocktranslate %}{% endif %}</p>
+          <form class="d-inline-block me-2 mb-2" method="post" action="{{ part.offer.cancel_url }}">
+            {% csrf_token %}
+            {% include "components/button.html" with label=_("Cancel the rest of the order and refund everything") type="submit" variant="danger" only %}
+          </form>
+          <form class="d-inline-block me-2 mb-2" method="post" action="{{ part.offer.keep_url }}">
+            {% csrf_token %}
+            {% include "components/button.html" with label=_("Keep the rest") type="submit" variant="secondary" only %}
+          </form>
+        </section>
+      {% endif %}
+      {% if part.versions %}
+        <h3 class="h5" id="versions-{{ forloop.counter }}">{% translate "Changes to this package" %}</h3>
+        <ol class="order-versions list-unstyled" aria-labelledby="versions-{{ forloop.counter }}" data-versions>
+          {% for version in part.versions %}
+            <li data-version="{{ version.number }}">
+              <strong>{% blocktranslate with n=version.number %}Version {{ n }}{% endblocktranslate %}</strong>,
+              <time datetime="{{ version.at|date:'c' }}">{{ version.at|date:"DATE_FORMAT" }}</time>:
+              {% for text in version.changes %}{{ text }}{% if not forloop.last %}; {% endif %}{% endfor %}.
+              {% if version.refund %}{% blocktranslate with amount=version.refund %}{{ amount }} refunded.{% endblocktranslate %}{% endif %}
+              {% blocktranslate with total=version.total %}New total {{ total }}.{% endblocktranslate %}
+            </li>
+          {% endfor %}
+        </ol>
+      {% endif %}
       {% if part.tracking %}
         <h3 class="h5">{% translate "Tracking" %}</h3>
         <p>

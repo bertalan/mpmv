@@ -112,6 +112,7 @@ REFUND_DUE_DAYS = 14
 REFUND_ALERT_DAYS_BEFORE = 4
 CAUSE_AMENDMENT = "amendment"
 CAUSE_CANCEL_REST = "cancel_rest"
+CAUSE_CANCEL_PACKAGE = "cancel_package"  # the shop or staff cancel it (ORD.20)
 SUCCEEDED = "succeeded"
 FAILED_STATUSES = frozenset({"failed", "canceled"})
 REFUND_PENDING_SUBMISSION = "ledger.refund_pending_submission"
@@ -900,6 +901,50 @@ def refund_rest_of_package(
     a full refund of what is left under PAY.4, refund fee charged to the vendor (D-05), due
     within 14 days. Called by `apps.orders.amendments.cancel_rest_of_package` (setting
     `ORDER_CANCEL_REST_REFUND_HOOK`); the package becomes cancelled or refunded."""
+    return _refund_what_is_left(
+        vendor_order,
+        cause=CAUSE_CANCEL_REST,
+        key="cancel-rest",
+        reason="The customer cancelled the rest of the package after an item was unavailable",
+        ctx=ctx,
+        now=now,
+        dry_run=dry_run,
+    )
+
+
+def refund_cancelled_package(
+    vendor_order: VendorOrder,
+    *,
+    reason: str,
+    ctx: AuditContext,
+    now: dt.datetime,
+    dry_run: bool = False,
+) -> "orders_amendments.RefundOutcome":
+    """The shop or platform staff cancel the package with a full refund (ORD.20, spec 07 Roles:
+    "Cancel the package (full refund)"): what is left is refunded under PAY.4, the refund fee is
+    the vendor's (D-05: a staff cancellation keeps it), due within 14 days. Called by
+    `apps.orders.amendments.cancel_package` (setting `ORDER_CANCEL_PACKAGE_REFUND_HOOK`)."""
+    return _refund_what_is_left(
+        vendor_order,
+        cause=CAUSE_CANCEL_PACKAGE,
+        key="cancel-package",
+        reason=reason,
+        ctx=ctx,
+        now=now,
+        dry_run=dry_run,
+    )
+
+
+def _refund_what_is_left(
+    vendor_order: VendorOrder,
+    *,
+    cause: str,
+    key: str,
+    reason: str,
+    ctx: AuditContext,
+    now: dt.datetime,
+    dry_run: bool,
+) -> "orders_amendments.RefundOutcome":
     sub = _lock(vendor_order)
     _check_paid(sub)
     left = round_line(sub.gross_total - _sum(_group(sub, MOVED), "refunded_gross"))
@@ -914,14 +959,14 @@ def refund_rest_of_package(
     plan = _Plan(
         gross=left,
         request={
-            "mode": CAUSE_CANCEL_REST,
+            "mode": cause,
             "amount": str(left),
             "lines": [{"line": line_id, "qty": qty} for line_id, qty in units],
         },
         channel=RefundChannel.THROUGH_PLATFORM,
-        cause=CAUSE_CANCEL_REST,
-        key=f"refund:{sub.public_id}:cancel-rest",
-        reason="The customer cancelled the rest of the package after an item was unavailable",
+        cause=cause,
+        key=f"refund:{sub.public_id}:{key}",
+        reason=reason,
         due_by=now + dt.timedelta(days=REFUND_DUE_DAYS),
     )
     try:

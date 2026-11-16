@@ -46,7 +46,13 @@ from apps.core.audit import VENDOR_FIELD, AuditContext, record
 from apps.core.changeset import Change, ChangeSet
 from apps.core.countries import InvalidCountry
 from apps.core.models import AuditLog
-from apps.core.services import PLATFORM_OWNER_PERMISSION, audit_changes
+from apps.core.services import (
+    PLATFORM_OWNER_PERMISSION,
+    NoPlatformOperator,
+    OverlappingPlatformOperators,
+    audit_changes,
+    current_operator,
+)
 from apps.shipping import engine as shipping_engine
 from apps.shipping.services import quote_shipping
 from apps.tax import engine as tax_engine
@@ -84,6 +90,40 @@ CUSTOMER_REQUEST_KEYS = ("channel", "date", "text")
 
 class _DryRunRollback(Exception):
     pass
+
+
+# --- the operator's settings (D-47, owner 2026-11-16) -------------------------------------------
+
+
+@dataclass(frozen=True)
+class AmendmentSettings:
+    """The three amendment settings of the `PlatformOperator` version in force (ARC.7)."""
+
+    answer_hours: int
+    comparable_delay_days: int
+    cancel_hold_hours: int
+
+
+DEFAULT_SETTINGS = AmendmentSettings(
+    answer_hours=am.DEFAULT_ANSWER_HOURS,
+    comparable_delay_days=am.DEFAULT_COMPARABLE_DELAY_DAYS,
+    cancel_hold_hours=am.DEFAULT_CANCEL_HOLD_HOURS,
+)
+
+
+def amendment_settings(at: dt.datetime | None = None) -> AmendmentSettings:
+    """The amendment settings in force at `at` (default now), read from the same configuration
+    the Manager shows. Before any operator is configured, or when versions overlap, the code
+    defaults apply (72 hours, 2 days, 24 hours)."""
+    try:
+        operator = current_operator(at)
+    except (NoPlatformOperator, OverlappingPlatformOperators):
+        return DEFAULT_SETTINGS
+    return AmendmentSettings(
+        answer_hours=operator.amendment_answer_hours,
+        comparable_delay_days=operator.amendment_comparable_delay_days,
+        cancel_hold_hours=operator.amendment_cancel_hold_hours,
+    )
 
 
 # --- who acts -----------------------------------------------------------------------------------
@@ -326,7 +366,8 @@ def _recompute(
                 destination_postcode=str(address_before.get("postcode") or "") or None,
                 at=at,
             )
-        except tax_engine.BlockingTaxError as error:
+        except (tax_engine.BlockingTaxError, LookupError) as error:
+            # LookupError: no vendor tax profile or rate in force (a configuration gap).
             raise AmendmentRefused(f"VAT cannot be decided for this package ({error}).") from None
     tax_on = at.astimezone(business_tz()).date()
     ctx = am.RecomputeContext(
@@ -420,6 +461,81 @@ def _amendment_snapshot(amendment: OrderAmendment) -> dict[str, Any]:
         "refund_ref": amendment.refund_ref,
         "revision": amendment.revision,
     }
+
+
+# --- reading (for the adapters) -----------------------------------------------------------------
+
+
+def open_amendment(vendor_order: VendorOrder) -> OrderAmendment | None:
+    """The package's open amendment (at most one), with what the pages show."""
+    return (
+        OrderAmendment.objects.select_related("from_version", "actor", "vendor_order__vendor")
+        .filter(vendor_order=vendor_order, state__in=OPEN_AMENDMENT_STATES)
+        .first()
+    )
+
+
+def available_carriers(vendor_order: VendorOrder) -> list[am.ShippingOffer]:
+    """The vendor's shipping methods with an exact price for the package at its current address
+    (the choices of a carrier change); empty when none can be quoted there."""
+    version = versions.current_version(vendor_order)
+    snapshot = am.VersionSnapshot.from_json(version.snapshot)
+    address = versions.delivery_address(vendor_order, version)
+    try:
+        destination = shipping_engine.Destination(
+            str(address.get("country") or snapshot.destination_country),
+            str(address.get("postcode") or ""),
+            str(address.get("state") or ""),
+        )
+        rates = _rates(vendor_order, snapshot, destination, "the delivery address")
+    except (AmendmentRefused, InvalidCountry):
+        return []
+    return [_offer(rate) for rate in rates]
+
+
+@dataclass(frozen=True)
+class AppliedVersion:
+    """One applied version of a package for a timeline: v1 (the placed order, no amendment) or
+    an applied amendment with its changes and the money it refunded."""
+
+    number: int
+    created_at: dt.datetime
+    gross_total: Decimal
+    changes: tuple[am.AmendmentChange, ...]
+    before: am.VersionSnapshot | None
+    refund: Decimal
+    reason: str
+
+
+def applied_versions(vendor_order: VendorOrder) -> list[AppliedVersion]:
+    """The package's versions in order, oldest first. Internal notes (the staff note, the
+    customer's words) are not part of it."""
+    found: list[AppliedVersion] = []
+    rows = (
+        VendorOrderVersion.objects.filter(vendor_order=vendor_order)
+        .select_related("amendment__from_version")
+        .order_by("number")
+    )
+    for version in rows:
+        amendment = version.amendment
+        found.append(
+            AppliedVersion(
+                number=version.number,
+                created_at=version.created_at,
+                gross_total=version.gross_total,
+                changes=tuple(am.change_from_json(c) for c in amendment.changes)
+                if amendment is not None
+                else (),
+                before=am.VersionSnapshot.from_json(amendment.from_version.snapshot)
+                if amendment is not None
+                else None,
+                refund=Decimal(str(amendment.preview.get("refund") or "0"))
+                if amendment is not None
+                else Decimal("0.00"),
+                reason=amendment.reason if amendment is not None else "",
+            )
+        )
+    return found
 
 
 # --- drafting -----------------------------------------------------------------------------------
@@ -535,7 +651,12 @@ def draft_amendment(
             error = am.staff_carrier_error(initiator, preview, resolved)
             if error:
                 raise AmendmentRefused(error)
-            result = am.classify_amendment(preview, resolved, initiator)
+            result = am.classify_amendment(
+                preview,
+                resolved,
+                initiator,
+                comparable_delay_days=amendment_settings(stamp).comparable_delay_days,
+            )
             amendment = OrderAmendment(
                 vendor_order=locked,
                 from_version=version,
@@ -684,34 +805,48 @@ def _spend_passkey(
     ask = amendment_passkey(amendment)
     if ask is None:
         return
+    _spend(
+        ask,
+        actor,
+        passkey_session,
+        ctx,
+        shop=amendment.vendor_order.vendor,
+        about={"amendment": str(amendment.public_id)},
+        refusal="This change "
+        + (
+            "moves the delivery address"
+            if ask.action == am.ACTION_ADDRESS
+            else "refunds money to the customer"
+        )
+        + ", so it needs a fresh passkey confirmation for this amendment (an open passkey "
+        "window does not cover it; a confirmation given before the draft was edited no "
+        "longer counts).",
+    )
+
+
+def _spend(
+    ask: PasskeyAsk,
+    actor: User,
+    passkey_session: str,
+    ctx: AuditContext,
+    *,
+    shop: object,
+    about: Mapping[str, str],
+    refusal: str,
+) -> None:
+    """Spend the single-use grant of `ask` for `actor` in `passkey_session`, audited, or raise
+    `PasskeyRequired` with `refusal`."""
     if not passkey_session or not levels.spend_grant(
         passkey_session, actor, ask.action, ask.digest
     ):
-        raise PasskeyRequired(
-            "This change "
-            + (
-                "moves the delivery address"
-                if ask.action == am.ACTION_ADDRESS
-                else "refunds money to the customer"
-            )
-            + ", so it needs a fresh passkey confirmation for this amendment (an open passkey "
-            "window does not cover it; a confirmation given before the draft was edited no "
-            "longer counts).",
-            action=ask.action,
-            digest=ask.digest,
-        )
+        raise PasskeyRequired(refusal, action=ask.action, digest=ask.digest)
     record(
         ctx,
         levels.SINGLE_USED,
         USER_MODEL,
         str(actor.public_id),
         None,
-        {
-            "kind": "single",
-            "action": ask.action,
-            "shop": levels.shop_key(amendment.vendor_order.vendor),
-            "amendment": str(amendment.public_id),
-        },
+        {"kind": "single", "action": ask.action, "shop": levels.shop_key(shop), **about},
     )
 
 
@@ -803,7 +938,7 @@ def apply_amendment(
     digest (`amendment_passkey`), never the passkey window. A decrease is a PAY.4 refund event
     submitted to the provider in this step (the ledger, through `ORDER_AMENDMENT_REFUND_HOOK`); a
     provider failure rolls everything back and the draft stays a draft. After a partial
-    unavailability the package is held from shipping for `DEFAULT_CANCEL_HOLD_HOURS` and the
+    unavailability the package is held from shipping for `amendment_cancel_hold_hours` and the
     customer may cancel the rest. A dry run needs no passkey, calls no provider and writes
     nothing; it returns the ChangeSet with the refund estimate."""
     sub = _scoped(amendment.vendor_order, actor)
@@ -897,7 +1032,13 @@ def _write_next_version(
     )
     if error:
         raise AmendmentRefused(error)
-    result = am.classify_amendment(preview, resolved, amendment.initiator)
+    rules = amendment_settings(at)
+    result = am.classify_amendment(
+        preview,
+        resolved,
+        amendment.initiator,
+        comparable_delay_days=rules.comparable_delay_days,
+    )
     if result.kind != am.MINOR:
         raise AmendmentRefused(
             "Recomputed today, this is a substantial change ("
@@ -922,7 +1063,7 @@ def _write_next_version(
     if _partly_unavailable(resolved, preview.after):
         VendorOrder.objects.filter(pk=sub.pk).update(
             cancel_rest_offered_at=at,
-            ship_hold_until=at + dt.timedelta(hours=am.DEFAULT_CANCEL_HOLD_HOURS),
+            ship_hold_until=at + dt.timedelta(hours=rules.cancel_hold_hours),
         )
     refund_changes: list[Change] = []
     if preview.refund > 0:
@@ -1048,7 +1189,12 @@ def _revise_locked(
     error = am.staff_carrier_error(initiator, preview, resolved)
     if error:
         raise AmendmentRefused(error)
-    result = am.classify_amendment(preview, resolved, initiator)
+    result = am.classify_amendment(
+        preview,
+        resolved,
+        initiator,
+        comparable_delay_days=amendment_settings(stamp).comparable_delay_days,
+    )
     locked.changes = [am.change_to_json(c) for c in resolved]
     locked.kind = result.kind
     locked.reasons = list(result.reasons)
@@ -1143,6 +1289,112 @@ def discard_idle_drafts(*, now: dt.datetime | None = None) -> int:
             audit_changes(changeset, ctx=SYSTEM_CTX, action="orders.amendment_discarded")
             done += 1
     return done
+
+
+# --- cancelling the whole package (the shop or platform staff) ----------------------------------
+
+
+def cancel_package_passkey(vendor_order: VendorOrder, initiator: str) -> PasskeyAsk:
+    """The passkey a full-refund cancellation asks (spec 07, Roles and the passkey): the PAY.7
+    `vendor_refund` grant for the shop, `order_amend_cancel` for platform staff. The digest binds
+    the package, its shop and its current version, so a grant never cancels another package nor
+    one that changed after the prompt."""
+    action = am.ACTION_STAFF_REFUND if initiator in am.STAFF_INITIATORS else am.ACTION_VENDOR_REFUND
+    version = versions.current_version(vendor_order)
+    material = json.dumps(
+        {
+            "action": action,
+            "cancel_package": str(vendor_order.public_id),
+            "shop": levels.shop_key(vendor_order.vendor),
+            "version": version.number,
+            "version_digest": versions.digest(version.snapshot),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return PasskeyAsk(action, hashlib.sha256(material.encode()).hexdigest())
+
+
+def cancel_package(
+    vendor_order: VendorOrder,
+    *,
+    actor: User,
+    reason: str,
+    ctx: AuditContext,
+    staff_note: str = "",
+    passkey_session: str = "",
+    dry_run: bool = False,
+    now: dt.datetime | None = None,
+) -> ChangeSet:
+    """Cancel a paid package before shipping with a full refund of what is left (spec 07, Roles:
+    the shop's owner or a member with ORDERS, the platform owner or Support with a note). A
+    PAY.4 refund event due within 14 days, the refund fee charged to the vendor (D-05); an open
+    amendment is superseded by the refund. Critical (CORE.25): it spends a fresh passkey grant
+    (`cancel_package_passkey`). A dry run needs no passkey and writes nothing."""
+    sub = _scoped(vendor_order, actor)
+    initiator = initiator_of(actor, sub)
+    reason = reason.strip()
+    if not reason:
+        raise AmendmentRefused("Give the reason for the cancellation; the customer will read it.")
+    if initiator in am.STAFF_INITIATORS and not staff_note.strip():
+        raise AmendmentRefused("Platform staff must add a note to every amendment.")
+    stamp = now or timezone.now()
+    changeset = ChangeSet()
+    refund_changes: list[Change] = []
+    refund_id = ""
+    try:
+        with transaction.atomic():
+            locked = _lock_amendable(sub)
+            _refuse_withdrawn(locked)
+            if not dry_run:
+                _spend(
+                    cancel_package_passkey(locked, initiator),
+                    actor,
+                    passkey_session,
+                    ctx,
+                    shop=locked.vendor,
+                    about={"vendor_order": str(locked.public_id)},
+                    refusal="Cancelling the package refunds the customer in full, so it needs a "
+                    "fresh passkey confirmation (an open passkey window does not cover it).",
+                )
+            before = {**_offer_snapshot(locked), "initiator": initiator}
+            VendorOrder.objects.filter(pk=locked.pk).update(
+                cancel_rest_offered_at=None, ship_hold_until=None
+            )
+            outcome = _hook("ORDER_CANCEL_PACKAGE_REFUND_HOOK")(
+                locked, reason=reason, ctx=ctx, now=stamp, dry_run=dry_run
+            )
+            refund_changes = outcome.changes
+            apply_refund_to_states(locked, fully_refunded=True, ctx=ctx)
+            locked.refresh_from_db()
+            if locked.state not in {"cancelled", "refunded"}:
+                raise AmendmentRefused(
+                    f"The package could not be cancelled (it is {locked.state}); nothing changed."
+                )
+            refund_id = outcome.refund_id
+            changeset.update(
+                "orders.vendororder",
+                str(locked.public_id),
+                before,
+                {
+                    **_offer_snapshot(locked),
+                    "initiator": initiator,
+                    "reason": _redacted(reason),
+                    "staff_note": _redacted(staff_note.strip()),
+                    "refund": outcome.refund_id,
+                    "refunded": outcome.amount,
+                    "cause": "cancel_package",
+                },
+            )
+            if dry_run:
+                raise _DryRunRollback
+            audit_changes(changeset, ctx=ctx, action="orders.amendment_package_cancelled")
+    except _DryRunRollback:
+        refund_id = ""
+    vendor_order.refresh_from_db()
+    if refund_id:
+        _submit(refund_id, ctx)
+    return ChangeSet([*changeset.changes, *refund_changes])
 
 
 # --- the cancel-the-rest offer ------------------------------------------------------------------
