@@ -68,7 +68,9 @@ lane board.
    Follow-ups, Owner questions, and Review notes. Flag tax, payments, ledger, orders and security
    code for human review.
 2. Do a self-review against the task row. When every check is green, add the label `ready-to-merge`.
-3. Do not merge. `main` is protected, and lane-a merges.
+3. Do not merge. `main` is protected, and lane-a merges. A draft PR skips the E2E and image jobs
+   (ARC.34); mark it ready for review before asking for the label, and wait for the "Unit + integration"
+   check (4 shards) and the "Lane review" check.
 
 ## Merging (lane-a)
 

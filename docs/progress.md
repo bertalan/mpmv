@@ -121,7 +121,7 @@ part of the done-when still open) · `not started`.
 | I18N.7 | partial: 1 of n (Manager and account strings in Italian) | #245 | Italian catalog for the Manager and account strings through `tools/i18n_catalog.py` (extract, compile, check; `make check` runs the check) |
 | CAT.19 | done | #154 | Vendor products in the Manager shop space |
 | VEN.24 | done | #141 | Claim an imported vendor (legal email or registered PEC) |
-| SEC.5 | partial: items 9 and 10 of the security wave open; items 6 and 7 (supply chain, secret settings) done when this PR merges (lane-a/sec-5-supply-chain); item 10: WIP on lane-b/sec-5-attacks-accounts-wip, lane-b/sec-5-attacks-abuse-wip, lane-b/sec-5-attacks-business-wip, unreviewed, 6 days behind main | #162, #169, #166, #171 | Security headers by response type, endpoint sweep, hostile-input corpus, rate-limit tests |
+| SEC.5 | partial: item 9 and item 10 parts 2 and 3 (abuse and business scenarios) open; items 6 and 7 done (#489), item 10 part 1 done (#490) | #162, #169, #166, #171 | Security headers by response type, endpoint sweep, hostile-input corpus, rate-limit tests |
 | CAT.9 | done | #167 | Product search: full-text per language, trigram, SKU prefix |
 | CORE.20 | done | #171 | Per-IP limit on refused API keys |
 | CMS.3 | done | #156 | Blog: index and post pages, scheduling, translatable authors with author pages, ProfilePage/Person and BlogPosting JSON-LD, choosers, `import_article` |
@@ -199,6 +199,17 @@ part of the done-when still open) · `not started`.
 | SEO.9 | done | #330 | `ConsentProvider` interface (`seo/providers.py`), `docs/dev/consent-providers.md`, `consent.js` lazy-loaded, unknown provider fails `seo.E001` |
 | SEO.10 | spec only | #420 | Vendor role (producer or reseller) in the product structured data; no code yet |
 | OPS.14 | done | #421 | Staff-only release indicator: `MPMV_VERSION` in the Manager footer and the account menu, nothing for anyone else |
+| CORE.30 | done | #484 | Manager platform map at `/manager/platform/map/` (section `platform.map`, same roles as the dashboard): links of the storefront, account, each vendor's shop space (plain text for staff), platform space and the editors' admin |
+| CORE.24 | partial: part 1 (session index, invalidation, account list, Support end, panic button); part 2, the role-based idle and absolute lifetimes, is open | #491 | `accounts/session_store.py` and `UserSession` (browser family, OS and a /24 or /48 prefix only, never the raw User-Agent or IP), `SessionIndexMiddleware`, an email change ends the other sessions, Support's "End this user's sessions", the owner's "End every session" (critical, audited with the count). Authentication code, needs human review |
+| SEC.5 (items 6 and 7) | done | #489 | Supply chain (`tools/audit_ignores.py`, every pip-audit ignore with reason and an expiry of at most 90 days; `S` rules on `tools/`) and no hard-coded secret fallback on STAGE and LIVE (`env_str` fails closed on a blank, `live.py` refuses an "insecure" secret key). Settings and secrets, needs human review |
+| SEC.5 (item 10, part 1) | partial: accounts, passkey window and request tampering scenarios in `tests/security`; abuse and business scenarios are open | #490 | `test_passkey_window_attacks.py` and the request tampering suite; no production code. The two strict xfails on sessions after an email change or an MFA reset were closed by #491 |
+| CORE.25 (hardening) | done | #497, #510 | #474 follow-ups: `SHOP_OWNER_CHECK` fails closed, shop offers dropped after use, the audit names the shop, system check `accounts.E003`. #510: an unscoped passkey window covers only while the user may elevate (`core.elevate` and a passkey), re-checked per request; group role changes end members' sessions. Security code, needs human review |
+| ARC.34 | done | #496, #507 | `Unit + integration` in 4 crc32 shards (`MPMV_TEST_SHARD`), `tools/check_test_shards.py`, docs-only PRs skip image and E2E, stable required check names, `ready_for_review` trigger. Documented in CONTRIBUTING and `release.md` by check 32 |
+| ARC.20 (lane accounts) | done | #498, #500 | Lane-b works from its own collaborator account (trusted for coordination and reviews only); "Lane review" check (`.github/workflows/lane-review.yml`) required on main after the owner's approval; `parallel-lanes.md` |
+| THM.8 | done: cart, checkout and confirmation (1/2), customer area and sign in (2/2) | #503, #502 | `ride` CSS `40-cart-checkout.css` and `50-account-auth.css`, e2e at 360, 768 and 1280 px. THM.16 moves these pages onto Bootstrap 5.3 |
+| THM.13 to THM.16 | spec only | #512 | Owner decision Q-98 (MQ-45): `ride` on vendored Bootstrap 5.3 (no Sass, no Node), tokens mapped on `--bs-*`, carousels and chrome, parity table (spec 14 §14.9); THM.7, THM.9 and THM.10 revised. No code |
+| VEN.34, CMP.2, CMP.5, CMP.34, ARC.35 | spec only | #508 | D-46 (tax adviser answers, owner decisions of 2026-11-15): platform regime and fee VAT, statement content and wordings, vendor clauses (j) and (k), RF19 thresholds (CMP.34), takeover runbook (ARC.35); VEN.34 moves to P1. No code. Tax and legal wording needs counsel (CMP.24) |
+| VEN.39, CORE.31 | spec only | #505 | Owner decisions of 2026-11-15: audit of every vendor text (Q-36), D-44 API keys of inactive vendors pinned with regression tests (Q-53); I18N.4 moves to P2. No code |
 
 ## Owner decisions 2026-11-07
 
@@ -1003,7 +1014,24 @@ Compliance, security and content:
 | #482 | none | Coherence check 30 |
 | #476 | PAY.4 | Refunds through and outside the platform, duplicate payment refunds |
 | #485 | PAY.7, PAY.4 | Spec: vendor refund action with isolation tests |
-| (this PR) | none | Coherence check 31 |
+| #487 | none | Coherence check 31 |
+| #484 | CORE.30 | Manager platform map |
+| #488 | CAT.21 | Renumber CAT.5b so the backlog lists it |
+| #489 | SEC.5 | Supply chain and secret settings (items 6 and 7) |
+| #490 | SEC.5 | Attack scenarios: accounts and request tampering (item 10, part 1) |
+| #491 | CORE.24 | Sessions part 1: index, invalidation, account list, Support end and panic button |
+| #496 | ARC.34 | CI speed: shard the test job, skip heavy jobs on docs-only PRs |
+| #497 | CORE.25 | Harden shop-scoped passkey confirmations (#474 follow-ups) |
+| #498 | ARC.20 | Lane-b's own GitHub account |
+| #500 | ARC.20 | Lane review required check |
+| #502 | THM.8 | ride theme: customer area and authentication |
+| #503 | THM.8 | ride theme: cart and checkout |
+| #505 | VEN.39, CORE.31, I18N.4 | Spec: owner decisions 2026-11-15 |
+| #507 | ARC.34 | CI on ready_for_review |
+| #508 | VEN.34, CMP.2, CMP.5, CMP.34, ARC.35 | Spec: tax adviser answers 2026-11-15 (D-46) |
+| #510 | CORE.25 | Unscoped passkey window only for elevate |
+| #512 | THM.13 to THM.16, THM.7, THM.9, THM.10 | Spec: ride theme on Bootstrap 5.3 (Q-98) |
+| (this PR) | none | Coherence check 32 |
 
 ## Coherence checks
 
@@ -2080,3 +2108,25 @@ Findings and actions:
 5. Info. The delta touches payments, ledger, orders and tax-adjacent code: PAY.4, `settlement.py`, `orders/services.py`, `vendors/commission.py`. All need human review.
 
 Verdict: GO with follow-ups. No blocker for a STAGE release. Finding 2 still matters before any LIVE payment.
+
+### Coherence check 32 (main at 1ffd8b5e)
+
+Scope: main at 1ffd8b5e, the merges after check 31 (#487): #484 (CORE.30), #488 (CAT.21), #489 and #490 (SEC.5), #491 (CORE.24 part 1), #496 and #507 (ARC.34), #497 and #510 (CORE.25 hardening), #498 and #500 (ARC.20 lane account and Lane review check), #502 and #503 (THM.8), and the spec PRs #505 (owner decisions), #508 (tax adviser answers, D-46, ARC.35, clauses (j) and (k)) and #512 (`ride` on Bootstrap 5.3, THM.13 to THM.16, MQ-45), through the trains #493 to #495, #501, #504, #506, #509, #511 and #513.
+
+| Area | Result |
+|---|---|
+| Code vs spec | #491 matches the CORE.24 part 1 text (index in `session_store.py` with no raw User-Agent or IP, email change ends other sessions, Support end, panic button); part 2 (role-based lifetimes) is not built. #497 and #510 close the #474 hardening items 1 to 5 of check 30 (fail-closed `SHOP_OWNER_CHECK`, offers dropped, shop in the audit, demotion test, an unscoped window covers only while the user may elevate); `tests/security` holds no strict xfail any more. #489 matches SEC.5 items 6 and 7. #502 and #503 ship `ride` CSS for the THM.8 pages; THM.16 is the move to Bootstrap 5.3. #508 and #512 are spec only: no code reads clause (j) or (k), the D-46 regime, CMP.34 or the Bootstrap foundation yet. |
+| Spec and backlog | `make docs` gives no diff (`90-backlog.md` and `backlog.csv` are fresh; 401 tasks, 2,344 h of P1, 3,202 h in all). Spec 04, 11, 13, 92, `01` (ARC.35) and the CMP.5 text agree on clauses (a) to (k): the title of #508 says clause (l), the merged text folded it into (k); no (l) exists anywhere. Spec 14 has no leftover "no Bootstrap" or scroll-snap text outside the supersession note; THM.7, THM.9 and THM.10 dependencies name THM.13 to THM.16, and the hours in `91-estimates.md` now have a note for the 2026-11-15 spec PRs. The 92 register: MQ-45 is the last MQ and is unique (it opens the 2026-11-15 themes table), D-44 to D-46 are present; the register has no D-23 and no D-42 (not reused, nothing refers to them). `progress.md` had no rows for #484, #488 to #491, #496 to #512 (the 2026-11-15 work); added here with the merge list and the SEC.5 row rewritten. |
+| Docs | `CONTRIBUTING.md`, `release.md` and `parallel-lanes.md` did not describe the ARC.34 CI shape (4 shards, shard check, docs-only skip, drafts skip E2E and image, `ready_for_review`); added. `manager.md` had no platform map section (CORE.30); added. The Lane review rule is in `parallel-lanes.md` and `CLAUDE.md`. `audit-trail.md` lists `accounts.sessions.ended` and `accounts.sessions.ended_all` and the shop key on the window events. |
+| Gates | `make check` pass. Unit, integration and e2e suites not run locally; CI on main is the gate. |
+
+Findings and actions:
+
+1. Minor, fixed here: the missing `progress.md` rows, the stale SEC.5 row (it still named WIP branches), the missing CI, platform map and estimates notes (see above).
+2. Major for go-live, open: CORE.24 part 2 (role-based idle and absolute lifetimes on `PlatformOperator`) is not built; until it lands staff and vendor members keep the default session length. Human review needed (authentication).
+3. Major, open: spec only, no code yet, for money and legal: D-46 and VEN.34 (VAT on every fee by regime and category), CMP.2 statement wordings, CMP.34 RF19 thresholds, ARC.35 takeover runbook, clauses (j) and (k) in the CMS and the ORD.17 box 2. Tax and legal wording needs counsel (CMP.24) and the adviser's rates and Natura codes need a human check before code is built on them. The platform still settles only with `commission_vat_mode` `none` until VEN.34.
+4. Minor, open: THM.13 to THM.16. The merged `ride` THM.8 CSS is plain CSS and moves to Bootstrap 5.3 in THM.16; until THM.13 measures the real sizes, the provisional 75 KB CSS and JS budgets are only in the spec.
+5. Minor, open: carried over from check 31 and still open: the #476 review items, PAY.4 parts (chargebacks) and PAY.7 code, VEN.38 per-vendor fixed fee rule in spec 04, the Stripe cached-error limitation, ORD.17 customer terms clauses pending counsel, VEN.36, VEN.33 and CMP.2 pure engines, SEO.7 partial, `PRIVACY_PEPPER` document, TAX.18 and TAX.19, ORD.10 on STAGE.
+6. Info. The delta touches security, authentication, settings and secrets code: CORE.24, CORE.25, SEC.5; plus the CI and review gates. All need human review.
+
+Verdict: GO with follow-ups. No blocker for a STAGE release. Finding 2 and the PAY.4 and PAY.7 items still matter before LIVE.
