@@ -110,7 +110,9 @@ def test_the_burger_menu_opens_and_closes_below_64rem(
     open_home(page, live_server, width, 800)
     toggle = page.locator(".nav-toggle")
     first_link = page.get_by_role("navigation", name="Main").get_by_role("link").first
-    expect(toggle).to_have_attribute("aria-expanded", "false")
+    # THM.15 1/3: the toggler opens a Bootstrap offcanvas (a modal dialog), which has no
+    # aria-expanded contract; the focus trap and the return of focus are in test_ride_navbar.py.
+    expect(toggle).to_have_attribute("aria-controls", "site-offcanvas")
     expect(first_link).to_be_hidden()
     toggle.click()
     expect(first_link).to_be_visible()
