@@ -1,0 +1,11 @@
+{% load i18n %}{% if items %}{% blocktranslate count counter=items asvar items_label %}{{ counter }} item{% plural %}{{ counter }} items{% endblocktranslate %}{% else %}{% translate "Your cart is empty" as items_label %}{% endif %}<div id="cart-mini" data-cart-count="{{ items }}" data-cart-label="{{ items_label }}">
+{% if lines %}
+  <p class="cart-mini__count">{{ items_label }}</p>
+  <ul class="cart-mini__lines">
+    {% for line in lines %}<li class="cart-mini__line"><span class="cart-mini__name">{{ line.name }}</span> <span class="cart-mini__quantity">&times; {{ line.quantity }}</span> <span class="cart-mini__total"><span class="visually-hidden">{% translate "Line total" %}: </span>{{ line.total }}</span></li>{% endfor %}
+  </ul>
+  <p><a href="{{ cart_url }}">{% translate "View cart" %}</a></p>
+{% else %}
+  <p>{% translate "Your cart is empty" %}</p>
+{% endif %}
+</div>

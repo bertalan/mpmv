@@ -8,6 +8,7 @@ app_name = "orders"
 
 urlpatterns = [
     path("cart/", views.cart_page, name="cart"),
+    path("cart/mini/", views.cart_mini, name="cart_mini"),
     path("cart/add/", views.cart_add, name="cart_add"),
     path("checkout/", views.checkout_page, name="checkout"),
     path("checkout/review/", views.review_page, name="review"),
