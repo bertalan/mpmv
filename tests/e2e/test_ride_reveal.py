@@ -119,3 +119,44 @@ def test_the_video_is_a_link_with_no_third_party_request_before_consent(
     assert [url for url in foreign if "video.example" in url] == []
     violations = run_axe(page)
     assert violations == [], format_violations(violations)
+
+
+def test_a_revealed_element_at_the_very_end_of_the_page_becomes_visible(
+    page: Page, live_server: LiveServer, settings: SettingsWrapper
+) -> None:
+    settings.MPMV_THEME_DEFAULT = "ride"
+    page.emulate_media(reduced_motion="no-preference")
+    page.set_viewport_size({"width": 1280, "height": 700})
+    open_styleguide(page, live_server)
+    expect(page.locator("html")).to_have_class(re.compile(r"reveal-ready"))
+    page.evaluate("() => window.scrollTo(0, document.documentElement.scrollHeight)")
+    items = page.locator("[data-reveal]")
+    for index in range(items.count()):  # including whatever sits at the very end
+        expect(items.nth(index)).to_have_css("opacity", "1")
+
+
+def test_with_reveal_js_blocked_nothing_is_hidden(
+    page: Page, live_server: LiveServer, settings: SettingsWrapper
+) -> None:
+    settings.MPMV_THEME_DEFAULT = "ride"
+    page.emulate_media(reduced_motion="no-preference")
+    page.route("**/js/reveal.js", lambda route: route.abort())
+    open_styleguide(page, live_server)
+    items = page.locator(REVEAL)
+    assert items.count() >= 3
+    for index in range(items.count()):
+        expect(items.nth(index)).to_have_css("opacity", "1")
+    expect(page.locator("html")).not_to_have_class(re.compile(r"reveal-ready"))
+
+
+def test_a_counter_already_on_screen_shows_its_final_value_at_once(
+    page: Page, live_server: LiveServer, settings: SettingsWrapper
+) -> None:
+    settings.MPMV_THEME_DEFAULT = "ride"
+    page.emulate_media(reduced_motion="no-preference")
+    page.set_viewport_size({"width": 1280, "height": 5000})
+    open_styleguide(page, live_server)
+    text = page.locator(COUNTER).first.locator("[data-counter-text]")
+    assert text.text_content() == "1,250"
+    page.wait_for_timeout(300)
+    assert text.text_content() == "1,250"

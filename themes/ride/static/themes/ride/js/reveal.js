@@ -1,6 +1,7 @@
 // Ride scroll reveal and counters (THM.14, spec 14 §14.3). The CSS hides a `[data-reveal]`
-// element only with JavaScript on (no `no-js` class) and without `prefers-reduced-motion:
-// reduce`; this module adds `.is-visible` once it enters the viewport. Counters keep their final
+// element only under `html.reveal-ready`, a class this module adds once it is running (so a
+// blocked or failed module hides nothing), and never under `prefers-reduced-motion: reduce` or
+// print; the module adds `.is-visible` once the element enters the viewport or the page end. Counters keep their final
 // number in the HTML and count up once, only when motion is allowed. No library, no inline code.
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const language = document.documentElement.lang || undefined;
@@ -19,23 +20,42 @@ function countUp(box) {
   requestAnimationFrame(step);
 }
 
-const targets = document.querySelectorAll("[data-reveal], [data-counter]");
-const seen = (el) => {
+const targets = [...document.querySelectorAll("[data-reveal], [data-counter]")];
+const show = (el, animate) => {
   el.classList.add("is-visible");
-  if (el.hasAttribute("data-counter")) countUp(el);
+  if (animate && el.hasAttribute("data-counter")) countUp(el);
 };
 if (still || !("IntersectionObserver" in window)) {
-  for (const el of targets) el.classList.add("is-visible");
+  for (const el of targets) show(el, false);
 } else {
+  let first = true;
+  const pending = new Set(targets);
   const observer = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
-        observer.unobserve(entry.target);
-        seen(entry.target);
+        const el = entry.target;
+        observer.unobserve(el);
+        pending.delete(el);
+        // A counter that was already on screen (and not hidden by reveal) shows its final value.
+        show(el, !first || el.hasAttribute("data-reveal"));
       }
+      first = false;
     },
-    { rootMargin: "0px 0px -10% 0px" },
+    { threshold: 0.01 },
   );
+  // Nothing can scroll further: whatever is left (a block at the page end) is shown.
+  const atEnd = () => {
+    const root = document.documentElement;
+    if (window.innerHeight + window.scrollY < root.scrollHeight - 2) return;
+    for (const el of pending) {
+      observer.unobserve(el);
+      show(el, true);
+    }
+    pending.clear();
+  };
   for (const el of targets) observer.observe(el);
+  document.documentElement.classList.add("reveal-ready");
+  addEventListener("scroll", atEnd, { passive: true });
+  atEnd();
 }
