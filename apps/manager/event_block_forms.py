@@ -21,7 +21,7 @@ from apps.events import engine, services
 from apps.events.models import EventPage
 from apps.vendors.models import Vendor
 
-from .event_forms import product_label
+from .event_fields import product_label
 
 
 class _ImageChoice(forms.ModelChoiceField):  # type: ignore[type-arg]

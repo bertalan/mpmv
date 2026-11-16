@@ -48,17 +48,17 @@ shop = (
             name="event_block_add",
         ),
         path(
-            "events/<uuid:public_id>/blocks/<str:block_id>/",
+            "events/<uuid:public_id>/blocks/<uuid:block_id>/",
             event_block_views.EventBlockEditView.as_view(),
             name="event_block_edit",
         ),
         path(
-            "events/<uuid:public_id>/blocks/<str:block_id>/move/",
+            "events/<uuid:public_id>/blocks/<uuid:block_id>/move/",
             event_block_views.EventBlockMoveView.as_view(),
             name="event_block_move",
         ),
         path(
-            "events/<uuid:public_id>/blocks/<str:block_id>/remove/",
+            "events/<uuid:public_id>/blocks/<uuid:block_id>/remove/",
             event_block_views.EventBlockRemoveView.as_view(),
             name="event_block_remove",
         ),

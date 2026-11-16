@@ -460,6 +460,189 @@ def test_the_library_lists_the_shops_own_images_only(
     assert theirs.title not in html
 
 
+def _file_errors(response: Any) -> list[str]:
+    assert response.status_code == 200
+    return list(response.context["form"].errors.get("file", []))
+
+
+def test_the_31st_upload_in_an_hour_is_refused_with_an_error_on_the_file(
+    signed_in: Client, vendor: Vendor
+) -> None:
+    from apps.events.services import EVENT_IMAGE_LIMIT
+
+    assert EVENT_IMAGE_LIMIT == 30
+    for number in range(EVENT_IMAGE_LIMIT):
+        assert _upload(signed_in, title=f"Stand {number}").status_code == 302
+    response = _upload(signed_in, title="One too many")
+    assert any("Too many uploads" in message for message in _file_errors(response))
+    assert not MediaImage.objects.filter(title="One too many").exists()
+    assert MediaImage.objects.filter(title__startswith="Stand ").count() == EVENT_IMAGE_LIMIT
+
+
+def test_an_oversized_file_is_refused(signed_in: Client, vendor: Vendor, settings: Any) -> None:
+    from PIL import Image
+
+    settings.WAGTAILIMAGES_MAX_UPLOAD_SIZE = 2048
+    noise = io.BytesIO()
+    Image.effect_noise((120, 120), 80).convert("RGB").save(noise, format="PNG")
+    assert len(noise.getvalue()) > 2048
+    big = SimpleUploadedFile("big.png", noise.getvalue(), content_type="image/png")
+    assert _file_errors(_upload(signed_in, file=big))
+    assert not MediaImage.objects.filter(title="Our stand").exists()
+
+
+def test_an_svg_is_refused_whatever_its_name_and_type(signed_in: Client, vendor: Vendor) -> None:
+    body = b"<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"
+    for name, kind in (("a.svg", "image/svg+xml"), ("a.png", "image/png"), ("a.jpg", "image/jpeg")):
+        upload = SimpleUploadedFile(name, body, content_type=kind)
+        assert _file_errors(_upload(signed_in, file=upload)), name
+    assert not MediaImage.objects.filter(title="Our stand").exists()
+
+
+def test_a_png_that_holds_html_is_refused(signed_in: Client, vendor: Vendor) -> None:
+    html = b"<!doctype html><html><body><script>alert(document.cookie)</script></body></html>"
+    spoofed = SimpleUploadedFile("photo.png", html, content_type="image/png")
+    assert _file_errors(_upload(signed_in, file=spoofed))
+    assert not MediaImage.objects.filter(title="Our stand").exists()
+
+
+def test_the_library_is_paged(signed_in: Client, vendor: Vendor) -> None:
+    from apps.manager.event_block_views import IMAGES_PER_PAGE
+
+    for _number in range(IMAGES_PER_PAGE + 1):
+        _own_image(vendor)
+    url = reverse("manager:shop:event_images")
+    first = signed_in.get(url)
+    assert len(first.context["images"]) == IMAGES_PER_PAGE
+    assert 'rel="next"' in first.text
+    assert "<img" in first.text  # a thumbnail
+    assert len(signed_in.get(url, {"page": 2}).context["images"]) == 1
+    assert signed_in.get(url, {"page": "nonsense"}).status_code == 200
+
+
+def test_an_upload_without_the_events_permission_is_a_form_error(
+    signed_in: Client, vendor: Vendor, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from django.core.exceptions import PermissionDenied
+
+    from apps.events import services
+
+    def refuse(*args: Any, **kwargs: Any) -> None:
+        raise PermissionDenied("no")
+
+    monkeypatch.setattr(services, "upload_event_image", refuse)
+    response = _upload(signed_in)
+    assert response.status_code == 200
+    assert response.context["form"].non_field_errors()
+
+
+# --- Concurrent edits and the confirmation pages
+
+
+def _base(page: EventPage) -> int:
+    from apps.events import services
+
+    return services.event_revision_id(page)
+
+
+def test_the_panel_and_the_forms_carry_the_revision_they_were_rendered_from(
+    signed_in: Client, vendor: Vendor
+) -> None:
+    page = _event(vendor)
+    block_id = _paragraph(signed_in, page)
+    edit = reverse("manager:shop:event_edit", args=[page.public_id])
+    assert f'name="base_revision" value="{_base(page)}"' in signed_in.get(edit).text
+    form = signed_in.get(_url("event_block_edit", page, block_id=block_id)).text
+    assert f'name="base_revision" value="{_base(page)}"' in form
+
+
+def test_a_stale_edit_is_refused_and_nothing_is_lost(signed_in: Client, vendor: Vendor) -> None:
+    page = _event(vendor)
+    block_id = _paragraph(signed_in, page, "Original")
+    opened = _base(page)  # both editors open on this revision
+    edit_url = _url("event_block_edit", page, block_id=block_id)
+    ok = signed_in.post(
+        edit_url, {"type": "paragraph", "text": "First editor", "base_revision": opened}
+    )
+    assert ok.status_code == 302
+    assert _base(page) != opened
+    stale = signed_in.post(
+        edit_url, {"type": "paragraph", "text": "Second editor", "base_revision": opened}
+    )
+    assert stale.status_code == 200
+    assert "changed by someone else" in stale.text
+    assert "Second editor" in stale.text  # what was typed is shown again, not lost
+    body = _body(page)
+    assert len(body) == 1
+    assert "First editor" in body[0]["value"]
+    assert "Second editor" not in body[0]["value"]
+
+
+def test_a_stale_add_move_and_remove_are_refused(signed_in: Client, vendor: Vendor) -> None:
+    page = _event(vendor)
+    first = _paragraph(signed_in, page, "One")
+    second = _paragraph(signed_in, page, "Two")
+    opened = _base(page)
+    assert _paragraph(signed_in, page, "Three")  # someone else adds a block
+    before = _body(page)
+    stale = {"base_revision": opened}
+    assert _add(signed_in, page, "paragraph", text="Late", **stale).status_code == 200
+    move = signed_in.post(
+        _url("event_block_move", page, block_id=second), {"direction": "up", **stale}
+    )
+    assert move.status_code == 302
+    remove = signed_in.post(_url("event_block_remove", page, block_id=first), stale)
+    assert remove.status_code == 302
+    assert _body(page) == before
+    htmx = signed_in.post(
+        _url("event_block_remove", page, block_id=first), stale, HTTP_HX_REQUEST="true"
+    )
+    assert htmx.status_code == 409
+    assert htmx["HX-Refresh"] == "true"
+    assert _body(page) == before
+    fresh = {"base_revision": _base(page)}
+    assert (
+        signed_in.post(_url("event_block_remove", page, block_id=first), fresh).status_code == 302
+    )
+    assert _body(page)[0]["id"] == second
+
+
+def test_the_change_locks_the_page_row(signed_in: Client, vendor: Vendor) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    page = _event(vendor)
+    with CaptureQueriesContext(connection) as queries:
+        _paragraph(signed_in, page)
+    assert any("FOR UPDATE" in q["sql"] and "events_eventpage" in q["sql"] for q in queries)
+
+
+def test_a_bare_add_link_lists_the_block_types_and_an_unknown_type_is_a_404(
+    signed_in: Client, vendor: Vendor
+) -> None:
+    page = _event(vendor)
+    response = signed_in.get(_url("event_block_add", page))
+    assert response.status_code == 200
+    assert "?type=paragraph" in response.text
+    assert signed_in.get(_url("event_block_add", page) + "?type=nonsense").status_code == 404
+
+
+def test_removing_without_javascript_asks_first(signed_in: Client, vendor: Vendor) -> None:
+    page = _event(vendor)
+    block_id = _paragraph(signed_in, page, "Keep me")
+    url = _url("event_block_remove", page, block_id=block_id)
+    confirm = signed_in.get(url)
+    assert confirm.status_code == 200
+    assert "Remove this block?" in confirm.text
+    assert "Keep me" in confirm.text
+    assert len(_body(page)) == 1  # a GET removes nothing
+    edit = reverse("manager:shop:event_edit", args=[page.public_id])
+    panel = signed_in.get(edit).text
+    assert f'method="get" action="{url}"' in panel  # the panel's button goes to the confirmation
+    assert signed_in.post(url).status_code == 302
+    assert _body(page) == []
+
+
 # --- The map picker and the point
 
 

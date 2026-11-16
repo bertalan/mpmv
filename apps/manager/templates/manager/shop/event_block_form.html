@@ -11,6 +11,7 @@ The choosers offer the shop's own images, products and events only. No inline sc
   <form method="post" class="manager-form" novalidate>
     {% csrf_token %}
     <input type="hidden" name="type" value="{{ kind }}">
+    <input type="hidden" name="base_revision" value="{{ base_revision }}">
     {% for field in form %}{% include "components/field.html" with field=field only %}{% endfor %}
     {% include "components/button.html" with label=_("Save block") type="submit" only %}
   </form>

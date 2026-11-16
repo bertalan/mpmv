@@ -43,4 +43,5 @@ def blocks_context(page: EventPage) -> dict[str, Any]:
         "block_types": block_types(),
         "add_url": reverse("manager:shop:event_block_add", args=[page.public_id]),
         "panel_id": PANEL_ID,
+        "base_revision": services.event_revision_id(page),
     }

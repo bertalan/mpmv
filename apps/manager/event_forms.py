@@ -11,19 +11,18 @@ from typing import Any
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.utils.translation import get_language
 from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Category, Product
 from apps.core.geocoding import AddressQuery, GeocodeResult
 from apps.core.geocoding import engine as geo_engine
-from apps.core.models import ImageLicence
 from apps.events import engine, services
 from apps.events.models import EventPage, default_timezone
 from apps.vendors.models import Vendor
 
+from .event_fields import CoordinateField, WallClockField, category_label, product_label
+
 CUSTOM = "custom"  # a stored rule the presets cannot write: kept as it is
-_TIME_FORMATS = ("%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S")
 _WEEKDAY_LABELS = (
     ("MO", _("Monday")),
     ("TU", _("Tuesday")),
@@ -57,57 +56,6 @@ ADDRESS_QUERY_FIELDS = ("country", "postcode", "city", "street")
 _DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 
 
-def product_label(product: Product) -> str:
-    """The product's title in the active language (else any), with its SKU."""
-    texts = {t.language: t.title for t in product.translations.all() if t.title}
-    title = texts.get(get_language() or "en") or texts.get("en") or next(iter(texts.values()), "")
-    return f"{title} ({product.sku})" if title else str(product.sku)
-
-
-def category_label(category: Category) -> str:
-    names = {t.language: t.name for t in category.translations.all() if t.name}
-    name = names.get(get_language() or "en") or names.get("en") or next(iter(names.values()), "")
-    return str(name or _("Category %(number)d") % {"number": category.pk})
-
-
-class _CoordinateField(forms.CharField):
-    """A latitude or longitude typed by hand or set by the map: six decimal places."""
-
-    def __init__(self, *, limit: int, **kwargs: Any) -> None:
-        super().__init__(required=False, max_length=20, **kwargs)
-        self.limit = limit
-
-    def clean(self, value: Any) -> Any:
-        text = super().clean(value)
-        if not text:
-            return None
-        try:
-            return geo_engine.coordinate(text.strip().replace(",", "."), limit=self.limit)
-        except ValueError:
-            raise ValidationError(
-                _("Give a number from -%(limit)d to %(limit)d, for example 45.464200."),
-                params={"limit": self.limit},
-            ) from None
-
-
-class _WallClockField(forms.DateTimeField):
-    """A date and time kept as typed (naive): the form reads it in the event's own zone."""
-
-    widget = forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M")
-
-    def to_python(self, value: Any) -> dt.datetime | None:
-        if value in self.empty_values:
-            return None
-        if isinstance(value, dt.datetime):
-            return value.replace(tzinfo=None)
-        for fmt in _TIME_FORMATS:
-            try:
-                return dt.datetime.strptime(str(value).strip(), fmt)
-            except ValueError:
-                continue
-        raise ValidationError(self.error_messages["invalid"], code="invalid")
-
-
 class EventForm(forms.Form):
     title = forms.CharField(
         label=_("Title"),
@@ -135,14 +83,14 @@ class EventForm(forms.Form):
         required=False,
         help_text=_("Tick it for an event with no set hours. Then give the first and last day."),
     )
-    starts_at = _WallClockField(
+    starts_at = WallClockField(
         label=_("Starts at"),
         required=False,
         help_text=_(
             "Day and hour the event begins, in the time zone below. Not for all-day events."
         ),
     )
-    ends_at = _WallClockField(
+    ends_at = WallClockField(
         label=_("Ends at"),
         required=False,
         help_text=_("Day and hour the event ends, after the start. Not for all-day events."),
@@ -272,7 +220,7 @@ class EventForm(forms.Form):
         help_text=_("Where to find you at a fair, for example Hall 3, stand B12. Optional."),
     )
 
-    latitude = _CoordinateField(
+    latitude = CoordinateField(
         limit=90,
         label=_("Latitude"),
         help_text=_(
@@ -280,7 +228,7 @@ class EventForm(forms.Form):
             "in. Give both latitude and longitude, or neither."
         ),
     )
-    longitude = _CoordinateField(
+    longitude = CoordinateField(
         limit=180,
         label=_("Longitude"),
         help_text=_(
@@ -517,59 +465,6 @@ class EventForm(forms.Form):
                 geo_at=timezone.now(),
             )
         return point
-
-
-class EventImageForm(forms.Form):
-    """The upload form of the shop's image library: the file and its licence data (CMS.8).
-    Never a collection: the image goes into the shop's own."""
-
-    file = forms.FileField(
-        label=_("File"),
-        widget=forms.ClearableFileInput(
-            attrs={"accept": "image/png,image/jpeg,image/webp,image/gif"}
-        ),
-        help_text=_(
-            "PNG, JPEG, WebP or GIF (SVG is not accepted). The image is checked and saved again "
-            "without its hidden data. Required."
-        ),
-    )
-    title = forms.CharField(
-        label=_("Title"),
-        max_length=255,
-        required=False,
-        help_text=_("A name for the library, for example Our stand 2027. Optional."),
-    )
-    licence = forms.ModelChoiceField(
-        queryset=ImageLicence.objects.order_by("name"),
-        label=_("Licence"),
-        empty_label=_("Choose a licence"),
-        help_text=_(
-            "Under which licence you may use the image. Your own photo is Own work. Required."
-        ),
-    )
-    author = forms.CharField(
-        label=_("Author"),
-        max_length=200,
-        help_text=_("Who made the picture or holds its rights. Required."),
-    )
-    source_url = forms.URLField(
-        label=_("Source address"),
-        required=False,
-        max_length=500,
-        help_text=_("Where the image comes from, starting with https://. Some licences need it."),
-    )
-    credit_text = forms.CharField(
-        label=_("Credit line"),
-        max_length=250,
-        required=False,
-        help_text=_("Optional: replaces the credit shown under the image."),
-    )
-    permission_ref = forms.CharField(
-        label=_("Permission reference"),
-        max_length=200,
-        required=False,
-        help_text=_("For a licence that needs a written permission: where it is kept."),
-    )
 
 
 def initial_from_page(page: EventPage) -> dict[str, Any]:
