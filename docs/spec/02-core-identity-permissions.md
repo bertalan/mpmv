@@ -594,6 +594,7 @@ in the audit log row means the `AuditLog` entries filtered to the sections the r
 | Platform: approve or suspend a vendor (step-up, reason) | — | — | — | E | — | — | E | — | — |
 | Platform: close a vendor definitively | — | — | — | — | — | — | E | — | — |
 | Platform: orders and customers | — | — | — | — | R | R + A | R | — | — |
+| Platform: order amendments (D-47, ORD.22): carrier at the same or a lower price, address on the customer's request, cancel a package with a full refund (passkey per cancellation, mandatory note); never products or prices | — | — | — | — | — | A | A | — | — |
 | Platform: support actions (unlock, resend link) | — | — | — | — | — | A | A | — | — |
 | Platform: account activation and service messages (CORE.19) | — | — | — | — | — | A (up to 20; prepares batches) | E (approves batches) | — | — |
 | Platform: start an impersonation session (CORE.10; defaults, the policy decides) | — | — | — (A if the policy enables it) | — | — | A | — | — | — |
