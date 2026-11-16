@@ -739,3 +739,29 @@ def test_vendor_staff_may_edit_blocks_and_upload(client: Client, vendor: Vendor)
     page = _event(vendor)
     assert _add(client, page, "paragraph", text="By staff").status_code == 302
     assert _upload(client).status_code == 302
+
+
+# --- The ride theme
+
+
+def test_the_new_pages_render_under_the_ride_theme(
+    signed_in: Client, vendor: Vendor, settings: Any
+) -> None:
+    # The site default theme, not apps.themes: the "No app imports themes" contract.
+    settings.MPMV_THEME_DEFAULT = "ride"
+    page = _event(vendor)
+    _paragraph(signed_in, page, "Ride text")
+    block_id = str(_body(page)[0]["id"])
+    urls = [
+        reverse("manager:shop:event_edit", args=[page.public_id]),
+        _url("event_block_add", page) + "?type=figure",
+        _url("event_block_edit", page, block_id=block_id),
+        reverse("manager:shop:event_images"),
+    ]
+    for url in urls:
+        response = signed_in.get(url)
+        assert response.status_code == 200, url
+        assert 'data-theme="ride"' in response.text, url
+    html = signed_in.get(urls[0]).text
+    assert 'id="event-blocks"' in html
+    assert "data-map-picker" in html

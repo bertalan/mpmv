@@ -110,10 +110,18 @@ class EventBlockAddView(_BlockFormView):
     def kind(self) -> str:
         return str(self.request.GET.get("type") or self.request.POST.get("type") or "")
 
+    def _no_type(self, page: EventPage) -> HttpResponse | None:
+        """No type chosen: back to the form, where the type is chosen (an unknown one is a 404)."""
+        if self.kind():
+            return None
+        return HttpResponseRedirect(reverse(EDIT_URL, args=[page.public_id]) + f"#{PANEL_ID}")
+
     def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         page, vendor = self.event(), self.manager.vendor
         if vendor is None:
             raise Http404("No vendor selected.")
+        if (back := self._no_type(page)) is not None:
+            return back
         return self.render_form(self.form_class()(vendor=vendor), page)
 
     def save(self, page: EventPage, form: BlockForm) -> None:
@@ -128,6 +136,8 @@ class EventBlockAddView(_BlockFormView):
 
     @requires_level_method("content_edit")
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        if (back := self._no_type(self.event())) is not None:
+            return back
         return super().post(request, *args, **kwargs)
 
 
