@@ -10,7 +10,7 @@
 FROM ghcr.io/astral-sh/uv:0.13.8@sha256:5cc1805e2426484abca4ad46ea783bab281fdb225fd82d8ce6d66a81254bac85 AS uv
 
 # --- Build stage: resolve dependencies from uv.lock and collect static files.
-FROM docker.io/library/python:3.13.18-slim-trixie@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc AS build
+FROM docker.io/library/python:3.13.18-slim-trixie@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 AS build
 
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
@@ -40,7 +40,7 @@ RUN DJANGO_SECRET_KEY="$(/app/.venv/bin/python -c 'import secrets; print(secrets
     /app/.venv/bin/python manage.py collectstatic --noinput --settings=mpmv.settings.live
 
 # --- Runtime stage: no build tools, code owned by root and read-only for the app user.
-FROM docker.io/library/python:3.13.18-slim-trixie@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc AS runtime
+FROM docker.io/library/python:3.13.18-slim-trixie@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 AS runtime
 
 ARG MPMV_VERSION=dev
 LABEL org.opencontainers.image.title="mpmv-app" \
