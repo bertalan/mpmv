@@ -1,0 +1,11 @@
+{% extends "layouts/account.html" %}
+{% load i18n %}
+{% block title %}{% translate "Recovery codes" %} · MPMV{% endblock %}
+{% block account_content %}
+<h1>{% if enrolled %}{% translate "Two-factor authentication is on" %}{% else %}{% translate "New recovery codes" %}{% endif %}</h1>
+{% if codes %}
+{% include "accounts/mfa/_recovery_codes_list.html" %}
+{% else %}
+<p><a class="btn btn-primary" href="{{ next }}">{% translate "Continue" %}</a></p>
+{% endif %}
+{% endblock %}

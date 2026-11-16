@@ -1,0 +1,37 @@
+{% extends "layouts/account.html" %}
+{% load i18n %}
+{% block title %}{% translate "Security" %} · MPMV{% endblock %}
+{% block account_content %}
+<h1>{% if passkeys or has_totp %}{% translate "Account security" %}{% else %}{% translate "Set up two-factor authentication" %}{% endif %}</h1>
+{% if show_required %}<div class="alert alert-warning" role="status">{% translate "Your role requires a second factor before you can continue." %}</div>{% endif %}
+
+{% if passkeys or has_totp %}
+<section aria-labelledby="security-state">
+  <h2 id="security-state" class="mt-4">{% translate "Your protection" %}</h2>
+  {% if passkeys %}<p>{% translate "Your account is protected with a passkey." %}</p>
+  {% else %}<p>{% translate "Your account is protected with an authenticator app." %}</p>{% endif %}
+  <ul class="list-unstyled d-grid gap-3 p-0">
+    {% for item in passkeys %}
+    <li class="card card-body">{{ item.device.name }} ({% translate "passkey" %}): {% blocktranslate with created=item.device.created_at|date:"SHORT_DATE_FORMAT" %}added {{ created }}{% endblocktranslate %}, {% if item.device.last_used_at %}{% blocktranslate with used=item.device.last_used_at|date:"SHORT_DATE_FORMAT" %}last used {{ used }}{% endblocktranslate %}{% else %}{% translate "never used" %}{% endif %}
+      <form class="mt-2" method="post" action="{{ item.remove_url }}">{% csrf_token %}<button type="submit" class="btn btn-outline-danger">{% translate "Remove" %}</button></form>
+    </li>
+    {% endfor %}
+    <li class="card card-body">{% translate "Authenticator app" %}: {% if has_totp %}{% translate "on" %}{% else %}{% translate "off" %}{% endif %}</li>
+  </ul>
+  <p><a href="{% url 'mfa:overview' %}">{% translate "Manage two-factor settings and recovery codes" %}</a></p>
+</section>
+{% else %}
+<p>{% translate "Choose how you will confirm it is you after your password." %}</p>
+{% endif %}
+
+<h2 class="mt-4">{% translate "Authenticator app" %}</h2>
+<p><a class="btn btn-outline-dark" href="{{ totp_url }}">{% translate "Use an authenticator app" %}</a></p>
+
+<h2 class="mt-4">{% translate "Passkey" %}</h2>
+<p>{% translate "Use this device's screen lock or a security key." %}</p>
+{% include "accounts/mfa/_passkey_register_form.html" with add_another=passkeys %}
+
+<h2 class="mt-4">{% translate "Sessions" %}</h2>
+<p><a href="{% url 'sessions:list' %}">{% translate "See where you are signed in" %}</a></p>
+{% include "accounts/mfa/_passkey_script.html" %}
+{% endblock %}
