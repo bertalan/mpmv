@@ -39,7 +39,7 @@ from apps.core.money import CURRENCY
 from apps.core.services import audit_changes, holds_permission, run_mutation, save_audited
 from apps.core.text import ascii_int
 from apps.vendors import services as vendors_services
-from apps.vendors.models import Vendor
+from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import VendorScopedQuerySet, is_platform_staff
 from apps.vendors.services import ensure_vendor_can_write, vendors_in_suggestions
 
@@ -2078,6 +2078,110 @@ def scope_anchor(scope: ListingScope, language: str) -> ListingAnchor | None:
     return _vendor_anchor(vendor)
 
 
+def listing_page_paths(
+    scopes: Sequence[ListingScope],
+) -> list[tuple[dict[str, str], tuple[str, ...]] | None]:
+    """`(paths, published)` of each one-part scope, like `scope_anchor` but for many scopes in
+    a fixed number of queries (the sitemap lists every listing); None where `scope_anchor`
+    gives none. No name: nothing here translates a title."""
+    nodes: dict[int, tuple[Any, list[Any]]] = {}  # scope index -> (node, chain root first)
+    for index, scope in enumerate(scopes):
+        node = scope.category or scope.term
+        if (
+            node is not None
+            and sum(bool(p) for p in (scope.category, scope.term, scope.brand, scope.vendor)) == 1
+        ):
+            nodes[index] = (node, [])
+    published: dict[str, dict[int, dict[str, str]]] = {}
+    for owner, model, text_model in (
+        ("category", Category, CategoryTranslation),
+        ("term", Term, TermTranslation),
+    ):
+        mine = {i: n for i, (n, _) in nodes.items() if isinstance(n, model)}
+        prefixes = {
+            node.path[:end]
+            for node in mine.values()
+            for end in range(model.steplen, len(node.path) + 1, model.steplen)
+        }
+        by_path = {row.path: row for row in model.objects.filter(path__in=prefixes)}
+        for i, node in mine.items():
+            nodes[i][1].extend(
+                by_path[node.path[:end]]
+                for end in range(model.steplen, len(node.path) + 1, model.steplen)
+                if node.path[:end] in by_path
+            )
+        ids = {row.pk for row in by_path.values()}
+        published[owner] = _published_slugs(
+            text_model.objects.filter(**{f"{owner}__in": ids}), owner
+        )
+    taxonomy_slugs = _published_slugs(_landing_taxonomy_texts(), "taxonomy")
+    brand_slugs = _published_slugs(
+        BrandTranslation.objects.filter(brand__in=[s.brand for s in scopes if s.brand is not None]),
+        "brand",
+    )
+    vendor_texts: dict[int, set[str]] = {}
+    for vendor_id, language in VendorTranslation.objects.filter(
+        vendor__in=[s.vendor for s in scopes if s.vendor is not None],
+        status=translations.PUBLISHED,
+    ).values_list("vendor_id", "language"):
+        vendor_texts.setdefault(vendor_id, set()).add(language)
+    found: list[tuple[dict[str, str], tuple[str, ...]] | None] = []
+    for index, scope in enumerate(scopes):
+        if scope.category is not None and index in nodes:
+            chain = nodes[index][1]
+            slugs_by = published["category"]
+            paths = {
+                lang: slugs.category_path(lang, parts, default_language=settings.LANGUAGE_CODE)
+                for lang, parts in _public_slug_paths(chain, slugs_by).items()
+            }
+            found.append((paths, _published_languages(slugs_by.get(scope.category.pk, {}))))
+        elif scope.term is not None and index in nodes:
+            chain = nodes[index][1]
+            slugs_by = published["term"]
+            tax = taxonomy_slugs.get(scope.term.taxonomy_id, {})
+            paths = {}
+            for lang, parts in _public_slug_paths(chain, slugs_by).items():
+                segment = _public_slug(tax, lang)
+                if segment is not None:
+                    paths[lang] = slugs.term_path(
+                        lang, segment, parts, default_language=settings.LANGUAGE_CODE
+                    )
+            found.append((paths, _published_languages(slugs_by.get(scope.term.pk, {}))))
+        elif (
+            scope.brand is not None
+            and scope.category is None
+            and scope.term is None
+            and scope.vendor is None
+        ):
+            mine_slugs = brand_slugs.get(scope.brand.pk, {})
+            paths = {}
+            for lang in _languages():
+                public = _public_slug(mine_slugs, lang)
+                if public is not None:
+                    paths[lang] = slugs.brand_path(
+                        lang, public, default_language=settings.LANGUAGE_CODE
+                    )
+            found.append((paths, _published_languages(mine_slugs)))
+        elif (
+            scope.vendor is not None
+            and scope.vendor.status == Vendor.Status.ACTIVE
+            and index not in nodes
+            and scope.brand is None
+        ):
+            texts = vendor_texts.get(scope.vendor.pk, set())
+            vendor_published = tuple(lang for lang in _languages() if lang in texts)
+            paths = {
+                lang: slugs.vendor_path(
+                    lang, scope.vendor.slug, default_language=settings.LANGUAGE_CODE
+                )
+                for lang in _languages()
+            }
+            found.append((paths, vendor_published or (translations.source_language(),)))
+        else:
+            found.append(None)
+    return found
+
+
 def _filter_slug_paths(
     rows: "QuerySet[Any]", owner: str, tree_paths: Iterable[str], steplen: int, language: str
 ) -> dict[str, str]:
@@ -2157,6 +2261,11 @@ class ProductCard:
     image_alt: str = ""
     # A Wagtail image: rendered as AVIF/WebP/JPEG renditions (THM.12) instead of `image_url`.
     image: MediaImage | None = None
+    # The product's fiscal category: templates turn the net price into the VAT-inclusive
+    # consumer price with the tax app's `consumer_price` tag (TAX.12).
+    fiscal_category: str = "standard"
+    # The seller: the price shown is what checkout charges for this vendor (its VAT regime).
+    vendor: Vendor | None = None
 
 
 def product_cards(products: Sequence[Product], language: str) -> list[ProductCard]:
@@ -2195,6 +2304,8 @@ def product_cards(products: Sequence[Product], language: str) -> list[ProductCar
                     else None
                 ),
                 image_alt=title,
+                fiscal_category=product.fiscal_category,
+                vendor=product.vendor,
             )
         )
     return cards

@@ -12,7 +12,7 @@
   {% if order %}
     {% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=order.lines total=order.total note=order.note only %}
   {% else %}
-    <p class="form-text">{% translate "Prices are shown without VAT. Shipping and VAT are worked out at checkout, from your delivery address." %}</p>
+    <p class="form-text">{% translate "Indicative price. Final amount at checkout." %} {% translate "Shipping is worked out at checkout, from your delivery address." %}</p>
   {% endif %}
   {% if can_continue %}
     <p><a class="btn btn-primary btn-lg" href="{% url 'orders:checkout' %}">{% translate "Continue to checkout" %}</a></p>

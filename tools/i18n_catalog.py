@@ -69,6 +69,8 @@ SCOPES = (
     "apps/catalog/templates/catalog/product.html",
     "apps/catalog/templates/catalog/includes/stock_status.html",
     "apps/catalog/templates/catalog/includes/product_card.html",
+    # The note under every consumer price (TAX.12, owner wording 2026-11-16), in all languages.
+    "apps/tax/prices.py",
     # Temporary staff "Site links" page (OPS.12); remove before LIVE.
     "apps/seo/site_links.py",
     "apps/seo/templates/seo/site_links.html",
@@ -100,10 +102,12 @@ HELP_TEXT_SCOPES = (
 # The customer order pages (ORD.7) join the Manager and account pages in I18N.7.
 _ORDER_EMAILS = ("apps/orders/templates/email", "apps/orders/templates/documents")
 _EVENT_PAGES = (*EVENT_FILES, "themes/base/templates/components/pagination.html")
+# The consumer price note (TAX.12) is a legal display: every language has it from the start.
+_PRICE_NOTE = ("apps/tax/prices.py",)
 LANGUAGE_SCOPES: dict[str, tuple[str, ...]] = {
-    "de": (*_ORDER_EMAILS, *_EVENT_PAGES),
-    "fr": (*_ORDER_EMAILS, *_EVENT_PAGES),
-    "es": (*_ORDER_EMAILS, *_EVENT_PAGES),
+    "de": (*_ORDER_EMAILS, *_PRICE_NOTE, *_EVENT_PAGES),
+    "fr": (*_ORDER_EMAILS, *_PRICE_NOTE, *_EVENT_PAGES),
+    "es": (*_ORDER_EMAILS, *_PRICE_NOTE, *_EVENT_PAGES),
 }
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (

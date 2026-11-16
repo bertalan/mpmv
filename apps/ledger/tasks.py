@@ -36,7 +36,24 @@ def settle_pending_payments(timestamp: int) -> None:
 @locked()
 @task("ledger.retry_pending_refund_reversals", retry=NO_RETRY)
 def retry_pending_refund_reversals(timestamp: int) -> None:
-    """Every 10 minutes: retry the transfer reversal of each refund the provider already paid
-    out to the buyer (PAY.4), under the same idempotency key. Idempotent."""
+    """Every 10 minutes: submit each amendment refund the provider has not taken yet (ORD.20),
+    then retry the transfer reversal of each refund the provider already paid out to the buyer
+    (PAY.4), both under the same idempotency key. Idempotent."""
+    try:  # each sweep on its own: a failure in one never blocks the other
+        submitted = refunds.submit_pending_refunds()
+        logger.info("ledger.retry_pending_refund_reversals: %s submitted", submitted)
+    except Exception:
+        logger.exception("ledger.retry_pending_refund_reversals: the submission sweep failed")
     cleared = refunds.retry_pending_reversals()
     logger.info("ledger.retry_pending_refund_reversals: %s cleared", cleared)
+
+
+@periodic("0 * * * *")
+@locked()
+@task("ledger.alert_refunds_near_due", retry=NO_RETRY)
+def alert_refunds_near_due(timestamp: int) -> None:
+    """Every hour: alert staff for each amendment refund the provider has not confirmed 4 days
+    before its 14-day `due_by` (ORD.20; art. 61 c. 4 Codice del consumo). The alert email goes
+    once per refund and repeat window."""
+    count = refunds.alert_refunds_near_due()
+    logger.info("ledger.alert_refunds_near_due: %d alerted", count)

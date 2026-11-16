@@ -14,7 +14,10 @@ from xml.etree import ElementTree
 import pytest
 from django.apps import apps
 from django.conf import settings
+from django.core.cache import cache
+from django.db import connection
 from django.test import Client, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from wagtail.models import Locale, Site
 
@@ -47,6 +50,11 @@ def _indexing_on() -> None:
     apps.get_model("seo", "SeoSettings").objects.create(
         site=Site.objects.get(is_default_site=True), allow_indexing=True
     )
+
+
+@pytest.fixture(autouse=True)
+def _fresh_sitemap_cache() -> None:
+    cache.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -167,9 +175,10 @@ def test_a_noindex_term_landing_page_is_not_listed_and_has_no_links(client: Clie
     page = StandardPageFactory.create()
     page.save_revision().publish()
     listed = sitemap_paths(client, PRIMARY)
-    assert page.get_url() in listed
-    assert landing.get_url() not in listed
-    html = client.get(landing.get_url()).content.decode()
+    # get_url() is absolute when more than one Site exists; the sitemap set holds paths.
+    assert urlsplit(page.get_url()).path in listed
+    assert urlsplit(landing.get_url()).path not in listed
+    html = client.get(urlsplit(landing.get_url()).path).content.decode()
     assert "noindex" in html
     assert 'rel="canonical"' not in html
     assert "hreflang" not in html
@@ -378,3 +387,56 @@ def test_every_theme_prints_the_canonical_and_hreflang_links(
     assert canonical == [urlsplit(page.url).path]
     assert hreflang == {PRIMARY}
     assert html.count('rel="canonical"') == 1
+
+
+# --- Cost: the index and a part do not rebuild every language's entries, and listings are bulk
+
+
+def listed_category() -> None:
+    category = CategoryFactory.create()
+    for language in configured_languages():
+        CategoryTranslationFactory.create(category=category, language=language, status=PUBLISHED)
+    product([PRIMARY], category=category)
+
+
+def queries_for(client: Client, name: str, **kwargs: Any) -> int:
+    cache.clear()
+    with CaptureQueriesContext(connection) as captured:
+        assert client.get(reverse(name, kwargs=kwargs or None)).status_code == 200
+    return len(captured)
+
+
+def test_index_and_part_queries_do_not_grow_with_listings(client: Client) -> None:
+    listed_category()
+    part = {"language": PRIMARY}
+    base = (queries_for(client, "sitemap"), queries_for(client, "sitemap_language", **part))
+    for _ in range(6):
+        listed_category()
+    more = (queries_for(client, "sitemap"), queries_for(client, "sitemap_language", **part))
+    assert more == base
+
+
+def test_a_second_request_is_served_from_the_cache(
+    client: Client, django_assert_max_num_queries: Any
+) -> None:
+    product([PRIMARY])
+    client.get(reverse("sitemap"))
+    with django_assert_max_num_queries(14):  # site, indexing switch and the fingerprint, no rebuild
+        assert (
+            client.get(reverse("sitemap_language", kwargs={"language": PRIMARY})).status_code == 200
+        )
+        client.get(reverse("sitemap"))
+
+
+def test_listing_paths_take_a_fixed_number_of_queries(django_assert_max_num_queries: Any) -> None:
+    from apps.catalog import services as catalog
+    from apps.catalog.models import Category
+
+    for _ in range(8):
+        category = CategoryFactory.create()
+        CategoryTranslationFactory.create(category=category, language=PRIMARY, status=PUBLISHED)
+    scopes = [catalog.ListingScope(category=row) for row in Category.objects.all()]
+    with django_assert_max_num_queries(12):
+        found = catalog.listing_page_paths(scopes)
+    assert len(found) == 8
+    assert all(item is not None and PRIMARY in item[0] for item in found)

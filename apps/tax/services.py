@@ -330,6 +330,18 @@ def current_tax_profile(vendor: Vendor, at: dt.datetime | None = None) -> Vendor
         raise NoVendorTaxProfile(str(exc)) from exc
 
 
+def current_tax_profiles(at: dt.datetime) -> dict[int, VendorTaxProfile]:
+    """Every vendor's profile valid at `at`, by vendor id, with its legal notes (TAX.12: a page
+    of products from many vendors reads them in two queries). Overlaps cannot exist (database
+    exclusion constraint); a vendor without a valid profile is absent."""
+    rows = (
+        VendorTaxProfile.objects.filter(valid_from__lte=at)
+        .filter(Q(valid_to__isnull=True) | Q(valid_to__gt=at))
+        .prefetch_related("translations")
+    )
+    return {row.vendor_id: row for row in rows}
+
+
 def legal_note_snapshot(note: VendorTaxProfileTranslation) -> dict[str, Any]:
     values: dict[str, Any] = {
         VENDOR_FIELD: str(note.profile.vendor.public_id),
@@ -1197,6 +1209,39 @@ def rate_table(at: dt.datetime) -> engine.RateTable:
     )
 
 
+def vendor_tax_snapshot(
+    vendor: Vendor,
+    at: dt.datetime,
+    territories: tuple[engine.TerritoryRule, ...],
+    *,
+    profile: VendorTaxProfile | None = None,
+) -> engine.VendorTaxProfileSnapshot:
+    """The vendor's tax profile valid at `at`, as the goods tax decision reads it.
+
+    Raises `NoVendorTaxProfile` without one, and `UnresolvedTerritory` for a vendor established
+    in a territory with rates of its own or outside the VAT area: the context has no vendor
+    territory (Q3), detectable only with a postcode. `profile` is the one valid at `at` when
+    the caller already read it (`current_tax_profiles`).
+    """
+    if profile is None:
+        profile = current_tax_profile(vendor, at)
+    if vendor.registered_postal_code and engine.find_territory(
+        vendor.country, vendor.registered_postal_code, territories
+    ):
+        raise engine.UnresolvedTerritory(
+            "a vendor established in a special territory is not supported by the tax engine"
+        )
+    return engine.VendorTaxProfileSnapshot(
+        regime=profile.regime,
+        exempt_reason=profile.exempt_reason,
+        exempt_country=profile.exempt_country,
+        exemption_nature=profile.exemption_nature,
+        legal_notes=tuple(
+            (n.language, n.legal_note) for n in profile.translations.all() if n.legal_note
+        ),
+    )
+
+
 def build_tax_context(
     vendor: Vendor,
     *,
@@ -1212,17 +1257,9 @@ def build_tax_context(
     absent answers leave a consumer (T2, fail closed). The platform country is the operator's.
     """
     at = at or timezone.now()
-    profile = current_tax_profile(vendor, at)
-    operator = current_operator(at)
     territories = tuple(territory_rules())
-    # A vendor established in a territory with rates of its own or outside the VAT area is not
-    # supported: the context has no vendor territory (Q3). Detectable only with a postcode.
-    if vendor.registered_postal_code and engine.find_territory(
-        vendor.country, vendor.registered_postal_code, territories
-    ):
-        raise engine.UnresolvedTerritory(
-            "a vendor established in a special territory is not supported by the tax engine"
-        )
+    vendor_profile = vendor_tax_snapshot(vendor, at, territories)
+    operator = current_operator(at)
     customer: engine.B2BValidated | None = None
     vat_check: engine.VatCheckSnapshot | None = None
     if customer_vat is not None:
@@ -1242,15 +1279,7 @@ def build_tax_context(
     return engine.TaxContext(
         on=at.date(),
         vendor_country=vendor.country,
-        vendor_profile=engine.VendorTaxProfileSnapshot(
-            regime=profile.regime,
-            exempt_reason=profile.exempt_reason,
-            exempt_country=profile.exempt_country,
-            exemption_nature=profile.exemption_nature,
-            legal_notes=tuple(
-                (n.language, n.legal_note) for n in profile.translations.all() if n.legal_note
-            ),
-        ),
+        vendor_profile=vendor_profile,
         platform=engine.PlatformOperatorSnapshot(country=operator.country),
         destination_country=destination_country,
         destination_postcode=destination_postcode,

@@ -194,7 +194,8 @@ class SummaryLine:
 
 @dataclass(frozen=True)
 class ShippingOption:
-    """A shipping choice offered for a package, net of VAT."""
+    """A shipping choice offered for a package: net, and the VAT it would carry with this
+    package's goods (None before the goods' tax is decided)."""
 
     key: str
     kind: str
@@ -203,6 +204,7 @@ class ShippingOption:
     is_default: bool = False
     min_days: int | None = None
     max_days: int | None = None
+    tax: Decimal | None = None
 
 
 @dataclass(frozen=True)

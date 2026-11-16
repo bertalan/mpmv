@@ -92,6 +92,10 @@ msgstr "Événements"
 msgid "Events in %(month)s"
 msgstr "Événements de %(month)s"
 
+#: apps/tax/prices.py
+msgid "excl. VAT"
+msgstr "HT"
+
 #: apps/events/templates/events/_filters.html
 msgid "Filter events"
 msgstr "Filtrer les événements"
@@ -137,6 +141,10 @@ msgstr "Sur place"
 #: apps/events/models.py
 msgid "In person and online"
 msgstr "Sur place et en ligne"
+
+#: apps/tax/prices.py
+msgid "Indicative price. Final amount at checkout."
+msgstr "Prix indicatif. Montant final lors du paiement."
 
 #: apps/events/templates/events/event_page.html
 msgid "Join online"

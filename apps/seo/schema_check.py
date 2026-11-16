@@ -82,6 +82,9 @@ def rich_result_errors(document: Mapping[str, Any]) -> list[str]:
         kind = node.get("@type")
         if kind in {"Product", "ProductGroup"}:
             errors += _product_errors(node)
+        elif kind == "OfferShippingDetails":
+            if not node.get("shippingRate"):
+                errors.append("OfferShippingDetails: shippingRate is missing")
         elif kind == "BreadcrumbList":
             items = node.get("itemListElement") or []
             if not items:

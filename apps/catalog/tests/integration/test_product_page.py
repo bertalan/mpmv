@@ -77,11 +77,13 @@ def test_a_published_product_answers_200_in_each_language(client: Client, langua
     assert 'rel="canonical"' in html
 
 
-def test_the_page_links_the_vendor_and_shows_the_net_price(client: Client) -> None:
+@pytest.mark.usefixtures("consumer_prices")
+def test_the_page_links_the_vendor_and_shows_the_consumer_price(client: Client) -> None:
     product = live(price_net=Decimal("12.50"))
     html = client.get(path("en", "mug-en")).content.decode()
     assert f'href="/shop/{product.vendor.slug}/"' in html
-    assert "12.50" in html
+    assert "15.25" in html  # 12.50 + 22 % (TAX.12)
+    assert "12.50" not in html
 
 
 @pytest.mark.parametrize("status", [Product.Status.DRAFT])
@@ -143,13 +145,14 @@ def test_the_default_variant_is_selected(client: Client) -> None:
     assert 'value="VAR-B"' in checked
 
 
+@pytest.mark.usefixtures("consumer_prices")
 def test_a_variant_price_override_shows(client: Client) -> None:
     product = live(kind=Product.Kind.VARIABLE, price_net=Decimal("10.00"))
     variant = VariantFactory.create(
         product=product, sku="VAR-X", is_default=True, price_net_override=Decimal("24.00")
     )
     VariantTranslationFactory.create(variant=variant, language="en", label="Big", status=PUBLISHED)
-    assert "24.00" in client.get(path("en", "mug-en")).content.decode()
+    assert "29.28" in client.get(path("en", "mug-en")).content.decode()  # 24.00 + 22 %
 
 
 def test_a_missing_translation_shows_the_source_text_with_a_notice(client: Client) -> None:
@@ -208,6 +211,7 @@ def test_the_robots_rule_follows_the_site_setting(client: Client) -> None:
     assert "noindex" in client.get(path("en", "mug-en")).content.decode()
 
 
+@pytest.mark.usefixtures("consumer_prices")
 def test_the_structured_data_has_a_product_node_with_the_brand_id(client: Client) -> None:
     brand = BrandFactory.create()
     BrandTranslationFactory.create(brand=brand, language="en", slug="acme", status=PUBLISHED)

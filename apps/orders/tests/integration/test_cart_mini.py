@@ -40,6 +40,7 @@ def add(client: Client, quantity: int = 2) -> None:
     )
 
 
+@pytest.mark.usefixtures("consumer_prices")
 def test_the_fragment_lists_the_lines_and_the_count(client: Client) -> None:
     add(client)
     response = client.get(reverse("orders:cart_mini"))
@@ -47,7 +48,7 @@ def test_the_fragment_lists_the_lines_and_the_count(client: Client) -> None:
     assert response.status_code == 200
     assert 'data-cart-count="2"' in html
     assert "Blue vase" in html
-    assert "20.00" in html
+    assert "24.40" in html  # 2 x 10.00 + 22 % (TAX.12)
     assert reverse("orders:cart") in html
     assert "<html" not in html
     assert "Shipping" not in html
