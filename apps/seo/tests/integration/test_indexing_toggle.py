@@ -176,19 +176,13 @@ def test_listings_follow_the_toggle(client: Client) -> None:
 
 
 @override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
-def test_robots_txt_has_no_sitemap_line_while_no_sitemap_route_exists(client: Client) -> None:
-    set_indexing(True)
-    assert "Sitemap:" not in client.get("/robots.txt").content.decode()
-
-
-@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False, ROOT_URLCONF="apps.seo.tests.urls")
 def test_robots_txt_lists_the_sitemap_when_indexing_is_allowed(client: Client) -> None:
     set_indexing(True)
     text = client.get("/robots.txt").content.decode()
-    assert text.endswith("Sitemap: http://testserver/sitemap.xml\n")
+    assert text.endswith(f"Sitemap: http://testserver{reverse('sitemap')}\n")
 
 
-@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False, ROOT_URLCONF="apps.seo.tests.urls")
+@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
 def test_a_noindex_robots_txt_has_no_sitemap_line(client: Client) -> None:
     text = client.get("/robots.txt").content.decode()
     assert "Sitemap:" not in text
