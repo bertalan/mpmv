@@ -99,7 +99,9 @@ class TranslationIn(Schema):
 
     model_config = ConfigDict(extra="forbid")
 
-    language: PlainText = Field(description="The language to add: en, it, de, fr or es.")
+    language: PlainText = Field(
+        "", description="The language to add: en, it, de, fr or es (required)."
+    )
     title: PlainText = Field("", max_length=255)
     slug: PlainText = ""
     summary: PlainText = Field("", max_length=300)
@@ -370,17 +372,23 @@ def cancel_event(
     url_name="event_translations",
 )
 def add_translation(
-    request: HttpRequest, public_id: uuid.UUID, payload: TranslationIn, dry_run: DryRun = False
+    request: HttpRequest,
+    public_id: uuid.UUID,
+    payload: Annotated[TranslationIn | None, Body()] = None,
+    dry_run: DryRun = False,
 ) -> Status[dict[str, Any]]:
     """Add a draft translation of an event in another enabled language: the text fields only;
     dates, place and links are the original's and are copied when the event is published.
     Submit the new page with `/{id}/submit`. 201 with the ChangeSet; 200 on `?dry_run=true`."""
+    event = _event(request, public_id)  # another vendor's event is a 404 before any 422
+    payload = payload or TranslationIn.model_validate({})
     locale = _locale(payload.language)
-    assert locale is not None  # noqa: S101  # `language` is required: never empty
+    if locale is None:
+        raise ValidationError({"language": "This field is required."})
     text = payload.model_dump(exclude_unset=True, exclude={"language"})
     changes = services.add_event_translation(
         api_client_of(request),
-        _event(request, public_id),
+        event,
         locale,
         text,
         ctx=audit_context(request),
