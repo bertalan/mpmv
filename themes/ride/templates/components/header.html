@@ -32,7 +32,7 @@ pages (app `orders`) the icon stays a plain link: their own markup would repeat 
 Context: `site_name`, `links` (label, url, optional children), `languages`, `search_url` and
 `cart_url` (default: the routes named `search` and `orders:cart`; an icon is left out without a
 url, never rendered as a dead link), and the context of the help link.
-{% endcomment %}<header class="site-header">
+{% endcomment %}{% with page_path=request.path|default:"" %}<header class="site-header">
   <div class="site-header__inner navbar">
     {% url 'home' as home_url %}<a class="site-name" href="{% firstof home_url '/' %}">{{ site_name }}</a>
     {% if links %}
@@ -70,7 +70,7 @@ url, never rendered as a dead link), and the context of the help link.
       {% firstof search_url search_default as search_href %}{% firstof cart_url cart_default as cart_href %}
       {% with search_url=search_href|safe_href cart_url=cart_href|safe_href %}
         {% if search_url %}<a class="tool" href="{{ search_url }}" data-bs-toggle="modal" data-bs-target="#search-modal">{% include "components/icon.html" with name="search" only %}<span class="visually-hidden">{% translate "Search" %}</span></a>{% endif %}
-        {% if cart_url %}<a class="tool tool--cart" href="{{ cart_url }}"{% if request.resolver_match.app_name != "orders" %} data-bs-toggle="offcanvas" data-bs-target="#mini-cart-offcanvas" aria-controls="mini-cart-offcanvas"{% endif %}>{% include "components/icon.html" with name="cart" only %}<span class="tool__badge" id="cart-badge" aria-hidden="true" hidden></span><span class="visually-hidden">{% translate "Cart" %}</span><span class="visually-hidden" id="cart-count" aria-live="polite"></span></a>{% endif %}
+        {% if cart_url %}<a class="tool tool--cart" href="{{ cart_url }}"{% if request.resolver_match.app_name != "orders" and request.resolver_match.app_name != "mfa" and request.resolver_match.app_name != "levels" and "login" not in page_path %} data-bs-toggle="offcanvas" data-bs-target="#mini-cart-offcanvas" aria-controls="mini-cart-offcanvas"{% endif %}>{% include "components/icon.html" with name="cart" only %}<span class="tool__badge" id="cart-badge" aria-hidden="true" hidden></span><span class="visually-hidden">{% translate "Cart" %}</span><span class="visually-hidden" id="cart-count" aria-live="polite"></span></a>{% endif %}
       {% endwith %}
       {% include "components/help_link.html" %}
       {% if languages %}{% include "components/language_switcher.html" %}{% endif %}
@@ -94,16 +94,18 @@ url, never rendered as a dead link), and the context of the help link.
           </div>
         </div>
       {% endif %}
-      {% if cart_url and request.resolver_match.app_name != "orders" %}
+      {% comment %}No mini-cart on the cart and checkout pages (their ids would repeat) nor on the sign-in, second-factor and passkey pages: its background request must never race the session write of a login (it once lost a fresh MFA verification on CI). The request carries X-MPMV-Poll, so it is not user activity and writes no session stamp.{% endcomment %}
+      {% if cart_url and request.resolver_match.app_name != "orders" and request.resolver_match.app_name != "mfa" and request.resolver_match.app_name != "levels" and "login" not in page_path %}
         <div class="offcanvas offcanvas-end" tabindex="-1" id="mini-cart-offcanvas" aria-labelledby="mini-cart-title">
           <div class="offcanvas-header">
             <span class="offcanvas-title" id="mini-cart-title">{% translate "Cart" %}</span>
             <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}"></button>
           </div>
           <div class="offcanvas-body">
-            <div id="mini-cart-body" hx-get="{% url 'orders:cart_mini' %}" hx-trigger="load, cart-changed from:body" hx-swap="innerHTML"></div>
+            <div id="mini-cart-body" hx-get="{% url 'orders:cart_mini' %}" hx-trigger="load, cart-changed from:body" hx-swap="innerHTML" hx-headers='{"X-MPMV-Poll": "1"}'></div>
             <p class="mini-cart__all"><a href="{{ cart_url }}">{% translate "View cart" %}</a></p>
           </div>
         </div>
       {% endif %}
     {% endwith %}
+{% endwith %}

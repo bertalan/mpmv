@@ -248,3 +248,16 @@ def test_the_empty_mini_cart_fragment_says_so() -> None:
     html = render("orders/_cart_mini.html", lines=[], items=0, cart_url="/cart/")
     assert 'data-cart-count="0"' in html
     assert "Your cart is empty" in html
+
+
+def test_the_mini_cart_request_is_background_and_skipped_on_sign_in_pages() -> None:
+    """The mini-cart's htmx request is not user activity (X-MPMV-Poll) and never runs on the
+    sign-in, second-factor or passkey pages, where it could race the session write of a login."""
+    from pathlib import Path
+
+    header = (
+        Path(__file__).resolve().parents[4] / "themes/ride/templates/components/header.html"
+    ).read_text(encoding="utf-8")
+    assert 'hx-headers=\'{"X-MPMV-Poll": "1"}\'' in header
+    for guard in ('app_name != "mfa"', 'app_name != "levels"', '"login" not in page_path'):
+        assert header.count(guard) == 2, guard  # the trigger link and the offcanvas agree
