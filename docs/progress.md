@@ -41,7 +41,7 @@ part of the done-when still open) · `not started`.
 | SEC.3 | done | #36 | AES-256-GCM field encryption with versioned keys outside the database for Vendor.iban and Vendor.tax_code; raw SQL dump test finds no cleartext; key checks at migrate, `rotate_field_keys` with dry-run and audit. KYC files and the DAC7 date of birth get it when their models exist |
 | VEN.5 | done | #37 | Application, onboarding and activation flow; versioned contract with per-language texts locked by database triggers once accepted; append-only acceptances tied to the version, language and text hash shown; activation blocked until the contract is accepted |
 | CMS.1 | done | #40 | Wagtail 8.1 with one locale per configured language, home and About pages per language, per-language header and footer menus, editors' admin at /admin/ under MFA and strict CSP, repeatable `seed_cms` |
-| OPS.4 | done | #48, #59 | Weekly Dependabot update PRs for uv, GitHub Actions and Containerfile images (minor and patch grouped, majors and Django/Wagtail alone, cooldown), full CI on update PRs, CycloneDX SBOMs of the Python environment and the image in CI and attached to releases |
+| OPS.4 | done | #48, #59, #524, #525, #526, #527 | Weekly Dependabot update PRs for uv, GitHub Actions and Containerfile images (minor and patch grouped, majors and Django/Wagtail alone, cooldown), full CI on update PRs, CycloneDX SBOMs of the Python environment and the image in CI and attached to releases; Dependabot bumps: actions/cache 6, uv 0.13.8, python image digest, python-minor-patch group |
 | ARC.8 | done | #51 | Feature flag registry with code, environment, staff and per-vendor values; kill switches for checkout, import and payments seeded on; `flag_enabled` helper; audited services with dry-run; admins with step-up on kill switches |
 | CAT.2 | done | #53 | Category and term trees (treebeard), configurable taxonomies with typed term attributes, brands, per-language names, slugs and SEO texts; product links; admin CRUD with translations |
 | SHP.12 | done | #54 | Several shipping methods per vendor and zone (VendorZoneRate renamed in place), vendor zones overriding platform zones, country groups, shared postcode grammar in apps/core/postcodes.py, per-method free-shipping threshold and stored VAT treatment |
@@ -66,6 +66,7 @@ part of the done-when still open) · `not started`.
 | ARC.16 | done | #112 | Transactional email outbox, `EmailSender`, bounce suppression (ARC.19 split off) |
 | VEN.18 | done | #107 | Fiscal regime RF20 (cross-border VAT franchise) |
 | SHP.14 | done | #93 | Special areas and per-method treatments; seed gaps are follow-ups (check 6) |
+| SHP.15 | done | #519 | Special areas completed (shipping 0014): Ionian islands, Sporades and Skyros, Kythira and Antikythira, Saronic islands (Methana stays mainland), Northern Ireland `BT*` as remote |
 | VEN.21 | done | #101 | Staff reopen a closed vendor to onboarding |
 | CMP.13 | done | #91 | Vendor establishment gate on the allowed vendor countries |
 | I18N.3 | done | #89 | wagtail-localize for CMS pages, images per locale |
@@ -200,14 +201,16 @@ part of the done-when still open) · `not started`.
 | SEO.10 | spec only | #420 | Vendor role (producer or reseller) in the product structured data; no code yet |
 | OPS.14 | done | #421 | Staff-only release indicator: `MPMV_VERSION` in the Manager footer and the account menu, nothing for anyone else |
 | CORE.30 | done | #484 | Manager platform map at `/manager/platform/map/` (section `platform.map`, same roles as the dashboard): links of the storefront, account, each vendor's shop space (plain text for staff), platform space and the editors' admin |
-| CORE.24 | partial: part 1 (session index, invalidation, account list, Support end, panic button); part 2, the role-based idle and absolute lifetimes, is open | #491 | `accounts/session_store.py` and `UserSession` (browser family, OS and a /24 or /48 prefix only, never the raw User-Agent or IP), `SessionIndexMiddleware`, an email change ends the other sessions, Support's "End this user's sessions", the owner's "End every session" (critical, audited with the count). Authentication code, needs human review |
+| CORE.24 | done (part 1 #491, part 2 #520) | #491, #520 | Session index, panic button, Support end (part 1); role-based idle and absolute lifetimes on `PlatformOperator.session_policy` (`customer_days` 14, `staff_idle_minutes` 30, `staff_absolute_hours` 12, ceiling 72), `accounts.session.expired` audit. Authentication code, needs human review |
+| ORD.20 to ORD.23 | spec only | #534 | Order amendments (D-47): versions, proposals, staff tools, quote-priced shipping. No code |
 | SEC.5 (items 6 and 7) | done | #489 | Supply chain (`tools/audit_ignores.py`, every pip-audit ignore with reason and an expiry of at most 90 days; `S` rules on `tools/`) and no hard-coded secret fallback on STAGE and LIVE (`env_str` fails closed on a blank, `live.py` refuses an "insecure" secret key). Settings and secrets, needs human review |
 | SEC.5 (item 10, part 1) | partial: accounts, passkey window and request tampering scenarios in `tests/security`; abuse and business scenarios are open | #490 | `test_passkey_window_attacks.py` and the request tampering suite; no production code. The two strict xfails on sessions after an email change or an MFA reset were closed by #491 |
 | CORE.25 (hardening) | done | #497, #510 | #474 follow-ups: `SHOP_OWNER_CHECK` fails closed, shop offers dropped after use, the audit names the shop, system check `accounts.E003`. #510: an unscoped passkey window covers only while the user may elevate (`core.elevate` and a passkey), re-checked per request; group role changes end members' sessions. Security code, needs human review |
 | ARC.34 | done | #496, #507 | `Unit + integration` in 4 crc32 shards (`MPMV_TEST_SHARD`), `tools/check_test_shards.py`, docs-only PRs skip image and E2E, stable required check names, `ready_for_review` trigger. Documented in CONTRIBUTING and `release.md` by check 32 |
 | ARC.20 (lane accounts) | done | #498, #500 | Lane-b works from its own collaborator account (trusted for coordination and reviews only); "Lane review" check (`.github/workflows/lane-review.yml`) required on main after the owner's approval; `parallel-lanes.md` |
 | THM.8 | done: cart, checkout and confirmation (1/2), customer area and sign in (2/2) | #503, #502 | `ride` CSS `40-cart-checkout.css` and `50-account-auth.css`, e2e at 360, 768 and 1280 px. THM.16 moves these pages onto Bootstrap 5.3 |
-| THM.13 to THM.16 | spec only | #512 | Owner decision Q-98 (MQ-45): `ride` on vendored Bootstrap 5.3 (no Sass, no Node), tokens mapped on `--bs-*`, carousels and chrome, parity table (spec 14 §14.9); THM.7, THM.9 and THM.10 revised. No code |
+| THM.13 | done | #514, #515, #516, #522 | Vendored Bootstrap 5.3.9 (`foundation` key, `@layer bootstrap`, hash-checked `vendor/`), token to `--bs-*` map, per-theme budgets (ride CSS 48 KB and JS 70 KB), CSP lint (tooltip, popover, data-bs-html), selector-collision test, components with focus ring and axe; follow-up: helper-class contrast lint |
+| THM.16 | done in two parts (1/2 cart and checkout, 2/2 account and auth) | #528, #530 | THM.8 pages on Bootstrap 5.3 classes; passkey prompt rebuilt from the current base page. Customer sign-up and password-reset pages do not exist yet |
 | VEN.34, CMP.2, CMP.5, CMP.34, ARC.35 | spec only | #508 | D-46 (tax adviser answers, owner decisions of 2026-11-15): platform regime and fee VAT, statement content and wordings, vendor clauses (j) and (k), RF19 thresholds (CMP.34), takeover runbook (ARC.35); VEN.34 moves to P1. No code. Tax and legal wording needs counsel (CMP.24) |
 | VEN.39, CORE.31 | spec only | #505 | Owner decisions of 2026-11-15: audit of every vendor text (Q-36), D-44 API keys of inactive vendors pinned with regression tests (Q-53); I18N.4 moves to P2. No code |
 
@@ -685,7 +688,7 @@ Follow-ups:
 | TAX.5 | `apps/tax/services.py` | `verify_vat_number` logs the full VAT number at warning level; a sole trader's number can be personal data |
 | SHP.14 | `apps/shipping/config_io.py` | Area codes in a method's `area_treatments` are stripped but not lower-cased, unlike special-area and country-group rows |
 | SHP.14 | `tests/integration/test_special_area_territories.py` | The guard checks only the country of a linked territory, not that its postcode list agrees with the area's |
-| SHP.14 | `apps/shipping/migrations/0009_seed_special_areas.py` | The seed covers less than the task row (UK Highlands and Islands, Ionian islands, Mount Athos, Saint-Barthélemy and Saint-Martin) |
+| SHP.14 | `apps/shipping/migrations/0009_seed_special_areas.py` | The seed covers less than the task row (UK Highlands and Islands, Ionian islands, Mount Athos, Saint-Barthélemy and Saint-Martin) (resolved by SHP.15, #519) |
 | SHP.14 | `apps/shipping/migrations/0009_seed_special_areas.py` | Sardinia's list leaves out OG, OT, CI and VS, so an address with no postcode and one of these provinces is not resolved |
 | SHP.14 | `apps/shipping/services.py` | `delete_config(dry_run=True)` on a treated `SpecialArea` previews a success; `ProtectedError` comes only on the real run |
 | CAT.13 | `apps/catalog/migrations/0006_sku_identity.py` | The migration does not reverse once raw SKUs exist (the CAT.1 normalized checks come back) |
@@ -1031,7 +1034,18 @@ Compliance, security and content:
 | #508 | VEN.34, CMP.2, CMP.5, CMP.34, ARC.35 | Spec: tax adviser answers 2026-11-15 (D-46) |
 | #510 | CORE.25 | Unscoped passkey window only for elevate |
 | #512 | THM.13 to THM.16, THM.7, THM.9, THM.10 | Spec: ride theme on Bootstrap 5.3 (Q-98) |
-| (this PR) | none | Coherence check 32 |
+| #514 | THM.13 | Bootstrap foundation (1/3) |
+| #515 | THM.13 | Token map, budgets, CSP lint (2/3) |
+| #516 | THM.13 | Components and a11y (3/3) |
+| #517 | none | Coherence check 32 |
+| #519 | SHP.15 | Special areas |
+| #520 | CORE.24 | Role-based session lifetimes (part 2) |
+| #522 | THM.13 | Follow-up |
+| #524, #525, #526, #527 | OPS.4 | Dependabot bumps |
+| #528 | THM.16 | Cart and checkout on Bootstrap (1/2) |
+| #530 | THM.16 | Account and auth on Bootstrap (2/2) |
+| #534 | ORD.20 to ORD.23 | Spec: order amendments (D-47) |
+| (this PR) | none | Coherence check 33 |
 
 ## Coherence checks
 
@@ -2130,3 +2144,27 @@ Findings and actions:
 6. Info. The delta touches security, authentication, settings and secrets code: CORE.24, CORE.25, SEC.5; plus the CI and review gates. All need human review.
 
 Verdict: GO with follow-ups. No blocker for a STAGE release. Finding 2 and the PAY.4 and PAY.7 items still matter before LIVE.
+
+### Coherence check 33 (main at 40d4fdff)
+
+Scope: main at 40d4fdff, the merges after check 32 (#517): #514, #515, #516 and #522 (THM.13), #519 (SHP.15), #520 (CORE.24 part 2), #524 to #527 (OPS.4 Dependabot), #528 and #530 (THM.16 in two parts) and the spec PR #534 (ORD.20 to ORD.23, D-47).
+
+| Area | Result |
+|---|---|
+| Code vs spec | THM.13 matches spec 14 (Bootstrap 5.3.9 in `@layer bootstrap`, hash-checked vendor files, token map, budgets ride CSS 48 KB and JS 70 KB, CSP lint). THM.16 moves the THM.8 pages to Bootstrap classes; sign-up and password-reset pages do not exist yet. SHP.15 completes the special areas (shipping 0014). CORE.24 part 2 adds role-based lifetimes on `PlatformOperator.session_policy`. #534 is spec only. Migrations core 0027 and shipping 0014 are linear and reversible. Vendored hashes match `VENDORED.toml`. No inline script or style, tooltip, popover or data-bs-html in the delta. |
+| Spec and backlog | `build_docs --check` is fresh. The D-47 refund-fee exemption was missing from the older refund text in 04, 07 and 92 (point 4 also lacked the amendment refund in the critical actions); fixed here. Spec 14 wording on `VENDORED.toml` and the THM.16 row corrected. D-23 and D-42 are referenced in the delta but are not in the 92 table: to check. |
+| Docs | `progress.md` had no rows for the delta; added. `docs/dev/themes.md` gets a Bootstrap foundation section; `docs/dev/admin-access.md` documents the `session_policy` keys. |
+| Gates | Main CI on 40d4fdff green. `make check` pass. Unit, integration and e2e suites not run locally; CI is the gate. No credentials, real names or hostnames, no TODO without an ID. |
+
+Findings and actions:
+
+1. Major, fixed here: no `progress.md` rows for the delta (THM.13, THM.16, SHP.15, CORE.24, ORD.20 to ORD.23, OPS.4 and the PR table).
+2. Major, fixed here: D-47 refund-fee exemption missing from spec 04, 07 and 92 (D-05 row); point (4) of D-47 now names any amendment that refunds money.
+3. Minor, fixed here: spec 14 `VENDORED.toml` wording and the THM.16 row; `themes.md` and `admin-access.md` additions.
+4. Minor, open: THM.16 e2e: review, payment and confirmation pages are checked only at the default width, login not at 768, and the MFA verify, TOTP and recovery codes pages and the levels prompt are not under the e2e gates at three widths (the prompt has a render test).
+5. Minor, open: CORE.24: no test that exactly 72 h is accepted; the `PlatformOperator` write path through `parse_policy` is not verified; the "no enrolment without a fresh second factor" Done-when is covered only by older tests (`test_sessions.py:350`, `test_mfa_totp.py:190`, `test_mfa_passkeys.py:113`).
+6. Info: EVT.7 is blocked by EVT.8 (and EVT.4, EVT.6, I18N.6), none built; CAT.12 is already done. GitHub Actions are pinned by tag, not SHA (existing convention). Human review needed: CORE.24 part 2 (authentication), the THM.16 MFA and passkey templates and the Stripe confirmation template in #528 (markup only).
+
+Check 32 findings 2 (CORE.24 part 2, #520) and 4 (THM.13 final budgets) are closed.
+
+Verdict: GO with follow-ups. No blocker for the 11:45 UTC STAGE release.
