@@ -307,9 +307,11 @@ they follow the same staggered switch as product URLs:
   then MPMV STAGE keeps its current host.
 - **Database host name.** It is private: resolved only on the app server, never in public DNS,
   reached over the private network (spec 12) and outside the HSTS inventory.
-- **HSTS.** At launch a short `max-age`, raised in steps to one year. `includeSubDomains` is added
-  once every browser-reachable subdomain in the inventory answers valid HTTPS. Preload submission is
-  done by hand, only after about a month stable (SEC.3, SEC.12).
+- **HSTS** (owner decision Q-08, 2026-11-15). The LIVE header carries `includeSubDomains` and
+  `preload` from launch, so the subdomain inventory is complete and every browser-reachable
+  subdomain answers valid HTTPS before the switch. `max-age` starts short and is raised in steps
+  to one year. Submission to the browsers' preload list is done by hand, only after about a
+  month stable with the full inventory checked (SEC.3, SEC.12).
 - **CDN or static-files subdomain.** Planned, not at launch.
 
 ## 13.5 Tasks
