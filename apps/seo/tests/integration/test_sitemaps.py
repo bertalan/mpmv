@@ -167,9 +167,10 @@ def test_a_noindex_term_landing_page_is_not_listed_and_has_no_links(client: Clie
     page = StandardPageFactory.create()
     page.save_revision().publish()
     listed = sitemap_paths(client, PRIMARY)
-    assert page.get_url() in listed
-    assert landing.get_url() not in listed
-    html = client.get(landing.get_url()).content.decode()
+    # get_url() is absolute when more than one Site exists; the sitemap set holds paths.
+    assert urlsplit(page.get_url()).path in listed
+    assert urlsplit(landing.get_url()).path not in listed
+    html = client.get(urlsplit(landing.get_url()).path).content.decode()
     assert "noindex" in html
     assert 'rel="canonical"' not in html
     assert "hreflang" not in html
