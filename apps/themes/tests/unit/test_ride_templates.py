@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 from django.template.loader import render_to_string
+from django.urls import reverse
 
 from apps.themes.services import use_theme
 
@@ -148,8 +149,8 @@ def test_the_cart_link_opens_an_offcanvas_with_a_live_region_count_and_an_htmx_b
     assert 'aria-labelledby="mini-cart-title"' in panel.group(0)
     body = re.search(r'<div[^>]*id="mini-cart-body"[^>]*>', html)
     assert body
-    assert 'hx-get="/cart/"' in body.group(0)
-    assert 'hx-select="#cart-body"' in body.group(0)
+    assert f'hx-get="{reverse("orders:cart_mini")}"' in body.group(0)  # language prefix aware
+    assert "hx-select" not in body.group(0)
     assert re.search(r'<span[^>]*id="cart-count"[^>]*aria-live="polite"', html)
     assert re.search(r'<a[^>]*href="/cart/"[^>]*>[^<]*View cart', html)
 
@@ -230,6 +231,24 @@ def test_a_product_tile_is_not_one_giant_link() -> None:
     assert re.search(
         r'class="button button--small[^"]*"[^>]*>View<span class="visually-hidden">', html
     )
+
+
+def test_the_mini_cart_fragment_is_a_bootstrap_list_with_the_count() -> None:
+    line = SimpleNamespace(name="Blue vase", variant="", quantity=2, total="\u20ac 20.00")
+    html = render("orders/_cart_mini.html", lines=[line], items=2, cart_url="/cart/")
+    assert 'data-cart-count="2"' in html
+    assert 'data-cart-label="2 items"' in html
+    assert "list-group" in html
+    assert "Blue vase" in html
+    assert "20.00" in html
+    assert "<form" not in html  # the "View cart" link is the panel's own, in the header
+    assert "Shipping" not in html
+
+
+def test_the_empty_mini_cart_fragment_says_so() -> None:
+    html = render("orders/_cart_mini.html", lines=[], items=0, cart_url="/cart/")
+    assert 'data-cart-count="0"' in html
+    assert "Your cart is empty" in html
 
 
 def test_the_mini_cart_request_is_background_and_skipped_on_sign_in_pages() -> None:

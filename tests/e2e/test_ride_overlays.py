@@ -7,7 +7,6 @@ a listing and a product page at 360, 768 and 1280 px, with and without an overla
 """
 
 import re
-from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -167,8 +166,11 @@ def test_adding_a_product_updates_the_count_and_the_mini_cart_without_a_reload(
         "href", re.compile(r"/cart/$")
     )
     clean(page)
-    quantity = panel.locator(".quantity input")
-    assert Decimal(quantity.input_value()) == Decimal("2")
+    expect(panel.locator("#mini-cart-body")).to_contain_text("2")
+    expect(panel.locator("#mini-cart-body [data-cart-count]")).to_have_attribute(
+        "data-cart-count", "2"
+    )
+    assert panel.locator("form").count() == 0  # the fragment, not the cart page
 
 
 def test_the_count_survives_a_new_page(
