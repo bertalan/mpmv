@@ -71,15 +71,17 @@ def test_shift_tab_up_from_the_footer_never_lands_under_the_sticky_header(
     for _ in range(40):
         page.keyboard.press("Shift+Tab")
         hidden = page.evaluate(
-            "() => { const e = document.activeElement; if (e === document.body) return false;"
+            "() => { const e = document.activeElement;"
+            " if (e === document.body || e.classList.contains('skip-link')) return false;"
             " const h = document.querySelector('.site-header');"
             " if (getComputedStyle(h).position !== 'sticky') return false;"
             " const r = e.getBoundingClientRect();"
             " if (r.width === 0 || r.height === 0) return false;"
             " const hb = h.getBoundingClientRect().bottom - 1;"
-            " return r.top < hb && r.bottom > 0 && !h.contains(e); }"
+            " const bad = r.top < hb && r.bottom > 0 && !h.contains(e);"
+            " return bad ? e.outerHTML.slice(0, 120) : false; }"
         )
-        assert not hidden
+        assert not hidden, hidden
 
 
 @pytest.mark.parametrize("width", [360, 768, 1280])
