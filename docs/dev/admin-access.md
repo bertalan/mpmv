@@ -73,3 +73,9 @@ verify from your computer:
 1. With the tunnel open, `https://<site-name>:8443/django-admin/` shows the admin sign-in page.
 2. Without the tunnel (and without the hosts-file line), `https://<site-name>/django-admin/`
    answers 404, the same page as any unknown address.
+
+## Session lifetimes (CORE.24)
+
+The `session_policy` of the `PlatformOperator` sets them: `customer_days` (default 14, max 365),
+`staff_idle_minutes` (default 30) and `staff_absolute_hours` (default 12, max 72).
+Change them by saving a new PlatformOperator version; no code change is needed.
