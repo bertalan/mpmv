@@ -186,6 +186,9 @@ SESSION_LEVEL_POLL_PATHS: tuple[str, ...] = ()
 LEVEL_DECORATOR = "apps.accounts.decorators.requires_level"  # CORE.25 (D-32)
 # Shop ownership for the passkey levels (D-32 amendment 2026-11-14): accounts never imports vendors.
 SHOP_OWNER_CHECK = "apps.vendors.services.is_vendor_owner"
+# ORD.20: who may confirm a shop's order actions (an amendment refund, an address change) with a
+# passkey: an active member with the ORDERS right, re-checked on each call.
+SHOP_ORDERS_CHECK = "apps.vendors.services.handles_orders"
 # Role-matrix check (CORE.18) for admin pages of lower apps, which cannot import the Manager.
 PLATFORM_SECTION_CHECK = "apps.manager.access.may_access_section"
 # The Manager login (CORE.17): where the Manager gate sends anonymous visitors.
@@ -246,6 +249,7 @@ ORDER_WITHDRAWAL_HOOKS: list[str] = ["apps.compliance.withdrawal.has_withdrawal"
 # the rest, in the transaction of the change (orders cannot import the ledger).
 ORDER_AMENDMENT_REFUND_HOOK = "apps.ledger.refunds.refund_amendment"
 ORDER_CANCEL_REST_REFUND_HOOK = "apps.ledger.refunds.refund_rest_of_package"
+ORDER_CANCEL_PACKAGE_REFUND_HOOK = "apps.ledger.refunds.refund_cancelled_package"
 # ORD.20: the refund of an amendment or a cancel of the rest is recorded with the change and
 # submitted to the provider right after it commits (retried by the ledger's sweep on failure).
 ORDER_REFUND_SUBMIT_HOOK = "apps.ledger.refunds.submit_pending_refund"
