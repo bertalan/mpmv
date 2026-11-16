@@ -37,6 +37,7 @@ from django.db import IntegrityError, transaction
 from django.http import Http404
 from django.utils import timezone
 from django.utils.module_loading import import_string
+from django.utils.translation import gettext
 
 from apps.accounts import levels
 from apps.accounts.models import User
@@ -86,6 +87,8 @@ AmendmentRefused = am.AmendmentRefused
 AmendmentBlocked = am.AmendmentBlocked
 
 CUSTOMER_REQUEST_KEYS = ("channel", "date", "text")
+# The Support role's permission (`apps.manager.roles`, CORE.18): orders never imports the Manager.
+SUPPORT_PERMISSION = "manager.platform_support"
 
 
 class _DryRunRollback(Exception):
@@ -158,7 +161,15 @@ def initiator_of(actor: User, vendor_order: VendorOrder) -> str:
             raise PermissionDenied("Only the shop's owner or a member with orders may amend.")
         return am.VENDOR_OWNER if role == vendors_engine.OWNER else am.VENDOR_MEMBER
     if is_platform_staff(actor):
-        return am.PLATFORM_OWNER if actor.has_perm(PLATFORM_OWNER_PERMISSION) else am.SUPPORT
+        # Spec 07 roles and ORD.22: only the platform owner and Support amend; the Finance,
+        # Catalog and Configuration roles see orders but never change them.
+        if actor.has_perm(PLATFORM_OWNER_PERMISSION):
+            return am.PLATFORM_OWNER
+        if actor.has_perm(SUPPORT_PERMISSION):
+            return am.SUPPORT
+        raise PermissionDenied(
+            "Only the platform owner or Support may change an order from the platform side."
+        )
     raise PermissionDenied("Only the shop or platform staff may amend an order.")
 
 
@@ -594,8 +605,10 @@ def withdrawn(sub: VendorOrder) -> bool:
 def _refuse_withdrawn(sub: VendorOrder) -> None:
     if withdrawn(sub):
         raise AmendmentRefused(
-            "The customer has withdrawn from this package, so it can no longer be changed: the "
-            "withdrawal and its refund run on the current version."
+            gettext(
+                "The customer has withdrawn from this package, so it can no longer be changed: "
+                "the withdrawal and its refund run on the current version."
+            )
         )
 
 
@@ -1291,20 +1304,39 @@ def discard_idle_drafts(*, now: dt.datetime | None = None) -> int:
     return done
 
 
-# --- cancelling the whole package (the shop or platform staff) ----------------------------------
+# --- cancelling the whole package (the shop or platform staff; ORD.22 for staff) ---------------
+
+# Why a package is cancelled in full (owner decision 2026-11-16): it decides who pays the refund
+# fee and whether the units go back to stock. The vendor's fault (goods unavailable, the vendor
+# cannot fulfil) keeps the fee (D-05) and restocks nothing; a customer's request or a platform
+# error drops the fee and restocks the units.
+CANCEL_VENDOR_FAULT = "vendor_fault"
+CANCEL_CUSTOMER_REQUEST = "customer_request"
+CANCEL_PLATFORM_ERROR = "platform_error"
+CANCEL_CAUSES = (CANCEL_VENDOR_FAULT, CANCEL_CUSTOMER_REQUEST, CANCEL_PLATFORM_ERROR)
+SHOP_CANCEL_CAUSES = (CANCEL_VENDOR_FAULT, CANCEL_CUSTOMER_REQUEST)
 
 
-def cancel_package_passkey(vendor_order: VendorOrder, initiator: str) -> PasskeyAsk:
+def cancel_package_passkey(
+    vendor_order: VendorOrder,
+    initiator: str,
+    cause: str = CANCEL_VENDOR_FAULT,
+    *,
+    amount: Decimal,
+) -> PasskeyAsk:
     """The passkey a full-refund cancellation asks (spec 07, Roles and the passkey): the PAY.7
     `vendor_refund` grant for the shop, `order_amend_cancel` for platform staff. The digest binds
-    the package, its shop and its current version, so a grant never cancels another package nor
-    one that changed after the prompt."""
+    the package, its shop, its current version, the cause (it decides the refund fee) and the
+    amount left to refund, so a grant never cancels another package, one that changed after the
+    prompt, or for another cause or amount."""
     action = am.ACTION_STAFF_REFUND if initiator in am.STAFF_INITIATORS else am.ACTION_VENDOR_REFUND
     version = versions.current_version(vendor_order)
     material = json.dumps(
         {
             "action": action,
             "cancel_package": str(vendor_order.public_id),
+            "cause": cause,
+            "amount": str(amount),
             "shop": levels.shop_key(vendor_order.vendor),
             "version": version.number,
             "version_digest": versions.digest(version.snapshot),
@@ -1315,22 +1347,67 @@ def cancel_package_passkey(vendor_order: VendorOrder, initiator: str) -> Passkey
     return PasskeyAsk(action, hashlib.sha256(material.encode()).hexdigest())
 
 
+def _check_cancel_cause(
+    initiator: str, cause: str, customer_request: Mapping[str, Any] | None
+) -> dict[str, str]:
+    """The cause a side may choose, and the customer's request the shop must record for it."""
+    if cause not in CANCEL_CAUSES:
+        raise AmendmentRefused(
+            "Choose why the package is cancelled: the shop's fault, the customer's request or a "
+            "platform error."
+        )
+    if initiator in am.STAFF_INITIATORS:
+        return {}
+    if cause not in SHOP_CANCEL_CAUSES:
+        raise AmendmentRefused(
+            "A shop cancels either for its own fault or because the customer asked; a platform "
+            "error is for platform staff to record."
+        )
+    if cause != CANCEL_CUSTOMER_REQUEST:
+        return {}
+    request = dict(customer_request or {})
+    missing = [key for key in CUSTOMER_REQUEST_KEYS if not str(request.get(key) or "").strip()]
+    if missing:
+        raise AmendmentRefused(
+            "A cancellation the customer asked for needs the request's " + ", ".join(missing) + "."
+        )
+    return {key: str(request[key]) for key in CUSTOMER_REQUEST_KEYS}
+
+
+def _restock_package(sub: VendorOrder, cause: str) -> list[Change]:
+    """Put the current version's units back in stock unless the vendor's fault (goods
+    unavailable) caused the cancellation (lane-a decision on #577)."""
+    if cause == CANCEL_VENDOR_FAULT:
+        return []
+    before = am.VersionSnapshot.from_json(versions.current_version(sub).snapshot)
+    gone = [am.RemoveLine(line.line_key, unavailable=False) for line in before.lines]
+    return _restock(sub, before, replace(before, lines=()), gone)
+
+
 def cancel_package(
     vendor_order: VendorOrder,
     *,
     actor: User,
     reason: str,
     ctx: AuditContext,
+    cause: str = CANCEL_VENDOR_FAULT,
     staff_note: str = "",
+    customer_request: Mapping[str, Any] | None = None,
     passkey_session: str = "",
     dry_run: bool = False,
     now: dt.datetime | None = None,
 ) -> ChangeSet:
     """Cancel a paid package before shipping with a full refund of what is left (spec 07, Roles:
-    the shop's owner or a member with ORDERS, the platform owner or Support with a note). A
-    PAY.4 refund event due within 14 days, the refund fee charged to the vendor (D-05); an open
+    the shop's owner or a member with ORDERS; the platform owner or Support with a note, ORD.22).
+    A PAY.4 refund event due within 14 days (a platform-initiated one for staff); an open
     amendment is superseded by the refund. Critical (CORE.25): it spends a fresh passkey grant
-    (`cancel_package_passkey`). A dry run needs no passkey and writes nothing."""
+    (`cancel_package_passkey`). A dry run needs no passkey and writes nothing.
+
+    `cause` (owner decision 2026-11-16) decides the refund fee and the stock: `vendor_fault`
+    charges the fee to the vendor and restocks nothing; `customer_request` and `platform_error`
+    charge no fee (the ledger records the exclusion) and restock the units. The shop chooses its
+    own fault or the customer's request, which it records (channel, date, words); only staff
+    record a platform error."""
     sub = _scoped(vendor_order, actor)
     initiator = initiator_of(actor, sub)
     reason = reason.strip()
@@ -1338,7 +1415,10 @@ def cancel_package(
         raise AmendmentRefused("Give the reason for the cancellation; the customer will read it.")
     if initiator in am.STAFF_INITIATORS and not staff_note.strip():
         raise AmendmentRefused("Platform staff must add a note to every amendment.")
+    request = _check_cancel_cause(initiator, cause, customer_request)
     stamp = now or timezone.now()
+    hook = _hook("ORDER_CANCEL_PACKAGE_REFUND_HOOK")
+    by_staff = initiator in am.STAFF_INITIATORS
     changeset = ChangeSet()
     refund_changes: list[Change] = []
     refund_id = ""
@@ -1347,8 +1427,18 @@ def cancel_package(
             locked = _lock_amendable(sub)
             _refuse_withdrawn(locked)
             if not dry_run:
+                estimate = hook(
+                    locked,
+                    reason=reason,
+                    cancel_cause=cause,
+                    note=staff_note.strip(),
+                    by_staff=by_staff,
+                    ctx=ctx,
+                    now=stamp,
+                    dry_run=True,
+                )
                 _spend(
-                    cancel_package_passkey(locked, initiator),
+                    cancel_package_passkey(locked, initiator, cause, amount=estimate.amount),
                     actor,
                     passkey_session,
                     ctx,
@@ -1361,8 +1451,16 @@ def cancel_package(
             VendorOrder.objects.filter(pk=locked.pk).update(
                 cancel_rest_offered_at=None, ship_hold_until=None
             )
-            outcome = _hook("ORDER_CANCEL_PACKAGE_REFUND_HOOK")(
-                locked, reason=reason, ctx=ctx, now=stamp, dry_run=dry_run
+            stock_changes = _restock_package(locked, cause)
+            outcome = hook(
+                locked,
+                reason=reason,
+                cancel_cause=cause,
+                note=staff_note.strip(),
+                by_staff=by_staff,
+                ctx=ctx,
+                now=stamp,
+                dry_run=dry_run,
             )
             refund_changes = outcome.changes
             apply_refund_to_states(locked, fully_refunded=True, ctx=ctx)
@@ -1372,6 +1470,7 @@ def cancel_package(
                     f"The package could not be cancelled (it is {locked.state}); nothing changed."
                 )
             refund_id = outcome.refund_id
+            changeset.changes.extend(stock_changes)
             changeset.update(
                 "orders.vendororder",
                 str(locked.public_id),
@@ -1381,9 +1480,18 @@ def cancel_package(
                     "initiator": initiator,
                     "reason": _redacted(reason),
                     "staff_note": _redacted(staff_note.strip()),
+                    "customer_request": {
+                        "channel": request.get("channel", ""),
+                        "date": request.get("date", ""),
+                        "text": _redacted(request.get("text", "")),
+                    },
                     "refund": outcome.refund_id,
                     "refunded": outcome.amount,
                     "cause": "cancel_package",
+                    "cancel_cause": cause,
+                    "refund_fee": outcome.refund_fee,
+                    "fee_exclusion_reason": outcome.fee_exclusion_reason,
+                    "restocked": bool(stock_changes),
                 },
             )
             if dry_run:
@@ -1397,6 +1505,57 @@ def cancel_package(
     return ChangeSet([*changeset.changes, *refund_changes])
 
 
+def cancellation_ask(
+    vendor_order: VendorOrder, actor: User, cause: str, *, ctx: AuditContext
+) -> PasskeyAsk:
+    """The passkey ask of a cancellation as the service would compute it now (for a prompt or a
+    test): the dry-run refund gives the amount left."""
+    sub = _scoped(vendor_order, actor)
+    initiator = initiator_of(actor, sub)
+    estimate = _hook("ORDER_CANCEL_PACKAGE_REFUND_HOOK")(
+        sub,
+        reason="estimate",
+        cancel_cause=cause,
+        note="estimate",
+        by_staff=initiator in am.STAFF_INITIATORS,
+        ctx=ctx,
+        now=timezone.now(),
+        dry_run=True,
+    )
+    return cancel_package_passkey(sub, initiator, cause, amount=estimate.amount)
+
+
+@dataclass(frozen=True)
+class PackageCancellation:
+    """A package cancelled with a refund (by the customer after an unavailable item, or in full by
+    the shop or staff), for the customer's timeline: when, how much, and whether the customer
+    asked."""
+
+    at: dt.datetime
+    refunded: Decimal
+    by_customer: bool
+
+
+def package_cancellations(vendor_order: VendorOrder) -> list[PackageCancellation]:
+    """The package's cancellations, from their audit entries (no internal note in them)."""
+    rows = AuditLog.objects.filter(
+        action="orders.amendment_package_cancelled",
+        target_model="orders.vendororder",
+        target_key=str(vendor_order.public_id),
+    ).order_by("id")
+    found = []
+    for entry in rows:
+        after = entry.after or {}
+        found.append(
+            PackageCancellation(
+                at=entry.created_at,
+                refunded=Decimal(str(after.get("refunded") or "0")),
+                by_customer=after.get("cause") != "cancel_package",
+            )
+        )
+    return found
+
+
 # --- the cancel-the-rest offer ------------------------------------------------------------------
 
 
@@ -1404,7 +1563,9 @@ def _customer_may_answer(order: Order, actor: User | None, verified_guest: bool)
     if verified_guest:
         return  # the adapter checked the order's signed link (a guest order)
     if actor is None or order.customer_id is None or actor.pk != order.customer_id:
-        raise PermissionDenied("Only the customer who placed the order may answer this offer.")
+        raise PermissionDenied(
+            gettext("Only the customer who placed the order may answer this offer.")
+        )
 
 
 def _offer_snapshot(sub: VendorOrder) -> dict[str, Any]:
@@ -1425,10 +1586,13 @@ def _lock_offer(vendor_order: VendorOrder) -> VendorOrder:
         .get(pk=vendor_order.pk)
     )
     if locked.cancel_rest_offered_at is None:
-        raise AmendmentRefused("There is no offer to cancel the rest of this package.")
+        raise AmendmentRefused(gettext("There is no offer to cancel the rest of this package."))
     if locked.state not in am.AMENDABLE_VENDOR_ORDER_STATES:
         raise AmendmentRefused(
-            f"This package is {locked.state}, so the rest of it can no longer be cancelled."
+            gettext(
+                "This package has already shipped or is closed, so the rest of it can no longer "
+                "be cancelled."
+            )
         )
     return locked
 
@@ -1501,16 +1665,16 @@ def keep_rest_of_package(
     verified_guest: bool = False,
     dry_run: bool = False,
 ) -> ChangeSet:
-    """The customer answers the offer by keeping the rest: the shipping hold ends at once."""
+    """The customer keeps the rest: the shipping hold ends at once, so the seller may ship. The
+    offer itself stays open until shipping (the counsel clause: the customer may cancel the rest
+    free of charge before shipping), so a later change of mind still works."""
     _customer_may_answer(vendor_order.order, actor, verified_guest)
     changeset = ChangeSet()
     try:
         with transaction.atomic():
             locked = _lock_offer(vendor_order)
             before = _offer_snapshot(locked)
-            VendorOrder.objects.filter(pk=locked.pk).update(
-                cancel_rest_offered_at=None, ship_hold_until=None
-            )
+            VendorOrder.objects.filter(pk=locked.pk).update(ship_hold_until=None)
             locked.refresh_from_db()
             changeset.update(
                 "orders.vendororder", str(locked.public_id), before, _offer_snapshot(locked)

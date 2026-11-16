@@ -88,6 +88,11 @@ shop = (
             name="amendment_discard",
         ),
         path(
+            "orders/<uuid:public_id>/amend/cancel/",
+            amendment_views.ShopCancelView.as_view(),
+            name="order_cancel",
+        ),
+        path(
             "orders/<uuid:public_id>/<slug:action>/",
             views.VendorOrderActionView.as_view(),
             name="order_action",

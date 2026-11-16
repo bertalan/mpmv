@@ -303,6 +303,10 @@ msgstr ""
 msgid "A picture for the banner. If you leave it empty, the banner has no picture."
 msgstr "Un'immagine per il banner. Se la lasci vuota, il banner non ha immagine."
 
+#: apps/manager/amendment_forms.py
+msgid "A platform error: no refund fee for the shop"
+msgstr "Un errore della piattaforma: nessuna commissione di rimborso per il negozio"
+
 #: apps/manager/templates/email/manager/role_self_assigned/subject.txt
 msgid "A platform owner gave themselves a role"
 msgstr "Un proprietario della piattaforma si è assegnato un ruolo"
@@ -3500,6 +3504,10 @@ msgstr ""
 "Solo su richiesta del cliente, nello stesso paese e nello stesso territorio fiscale. Registra come"
 " e quando lo ha chiesto il cliente e le sue parole."
 
+#: apps/orders/amendments.py
+msgid "Only the customer who placed the order may answer this offer."
+msgstr "Solo il cliente che ha effettuato l'ordine può rispondere a questa offerta."
+
 #: apps/manager/amendment_views.py
 msgid "Only the side that started this draft may discard it."
 msgstr "Solo chi ha iniziato questa bozza può scartarla."
@@ -3677,6 +3685,10 @@ msgstr "Esaurito"
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Owner"
 msgstr "Titolare"
+
+#: apps/orders/customer_views.py
+msgid "Package cancelled"
+msgstr "Pacco annullato"
 
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Packages of order %(number)s"
@@ -4302,6 +4314,10 @@ msgstr "Obbligatoria per lo staff della piattaforma. Il cliente non la vede."
 #: apps/manager/forms.py
 msgid "Required when you give a role to yourself; kept in the audit log."
 msgstr "Obbligatorio quando assegni un ruolo a te stesso; resta nel registro di audit."
+
+#: apps/orders/customer_views.py
+msgid "Rest of the package cancelled at your request"
+msgstr "Resto del pacco annullato su tua richiesta"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Restrict and send the statement of reasons"
@@ -5534,13 +5550,32 @@ msgstr ""
 msgid "The court for any dispute is the one of your own place of residence."
 msgstr "Per qualsiasi controversia il foro competente è quello del tuo luogo di residenza."
 
+#: apps/manager/amendment_forms.py
+msgid "The customer asked to cancel: no refund fee for the shop"
+msgstr "Il cliente ha chiesto di annullare: nessuna commissione di rimborso per il negozio"
+
+#: apps/manager/amendment_forms.py
+msgid "The customer asked to cancel: no refund fee; record the request below"
+msgstr ""
+"Il cliente ha chiesto di annullare: nessuna commissione di rimborso; registra la richiesta qui "
+"sotto"
+
 #: apps/manager/templates/manager/amendment.html
 msgid ""
-"The customer gets back everything paid for this package, within 14 days at the latest. The refund "
-"fee is charged to the shop. It asks for your passkey."
+"The customer gets back everything paid for this package, within 14 days at the latest. The cause "
+"decides who pays the refund fee and whether the units go back to stock. It asks for your passkey."
 msgstr ""
-"Il cliente riceve indietro tutto quanto pagato per questo pacco, entro 14 giorni al massimo. La "
-"commissione di rimborso è a carico del negozio. Serve la tua passkey."
+"Il cliente riceve indietro tutto quanto pagato per questo pacco, entro 14 giorni al massimo. Il "
+"motivo decide chi paga la commissione di rimborso e se le unità tornano in magazzino. Serve la tua"
+" passkey."
+
+#: apps/orders/amendments.py
+msgid ""
+"The customer has withdrawn from this package, so it can no longer be changed: the withdrawal and "
+"its refund run on the current version."
+msgstr ""
+"Il cliente ha esercitato il recesso su questo pacco, quindi non si può più modificare: il recesso "
+"e il suo rimborso valgono sulla versione attuale."
 
 #: apps/manager/amendment_forms.py
 msgid "The customer reads it. Write it in plain words."
@@ -6435,8 +6470,20 @@ msgstr ""
 "Iniziane una nuova."
 
 #: apps/manager/amendment_views.py
-msgid "The package is cancelled and the customer is refunded in full, within 14 days at the latest."
-msgstr "Il pacco è annullato e il cliente è rimborsato per intero, entro 14 giorni al massimo."
+msgid ""
+"The package is cancelled and the customer is refunded in full, within 14 days at the latest. No "
+"refund fee is charged to the shop."
+msgstr ""
+"Il pacco è annullato e il cliente è rimborsato per intero, entro 14 giorni al massimo. Al negozio "
+"non è addebitata alcuna commissione di rimborso."
+
+#: apps/manager/amendment_views.py
+msgid ""
+"The package is cancelled and the customer is refunded in full, within 14 days at the latest. The "
+"refund fee is charged to the shop."
+msgstr ""
+"Il pacco è annullato e il cliente è rimborsato per intero, entro 14 giorni al massimo. La "
+"commissione di rimborso è addebitata al negozio."
 
 #: themes/base/templates/404.html
 msgid "The page you asked for does not exist or has moved."
@@ -6901,6 +6948,14 @@ msgstr ""
 #: apps/events/admin_views.py
 msgid "The shop whose events rule you want to change."
 msgstr "Il negozio di cui vuoi cambiare la regola sugli eventi."
+
+#: apps/manager/amendment_forms.py
+msgid ""
+"The shop's fault, for example the goods are unavailable or the shop cannot fulfil the order: the "
+"refund fee is charged to the shop"
+msgstr ""
+"Responsabilità del negozio, per esempio la merce non è disponibile o il negozio non può evadere "
+"l'ordine: la commissione di rimborso è addebitata al negozio"
 
 #: apps/manager/amendment_views.py
 msgid "the shop's owner"
@@ -7389,6 +7444,10 @@ msgstr "Non c'è nessun account con questa email."
 msgid "There is no help text for this page yet."
 msgstr "Per questa pagina non c’è ancora un testo di aiuto."
 
+#: apps/orders/amendments.py
+msgid "There is no offer to cancel the rest of this package."
+msgstr "Non c'è un'offerta per annullare il resto di questo pacco."
+
 #: apps/manager/templates/manager/shop/termination.html
 msgid "There is no termination notice for your shop."
 msgstr "Per il tuo negozio non c’è nessun preavviso di cessazione."
@@ -7540,6 +7599,10 @@ msgid ""
 msgstr ""
 "Questo pacco ha una modifica in corso: applicala o scartala prima di segnare il pacco come "
 "spedito."
+
+#: apps/orders/amendments.py
+msgid "This package has already shipped or is closed, so the rest of it can no longer be cancelled."
+msgstr "Questo pacco è già stato spedito o è chiuso, quindi il resto non si può più annullare."
 
 #: apps/catalog/templates/catalog/product.html
 msgid "This page is not available in your language yet."
@@ -8110,6 +8173,13 @@ msgid "We cannot calculate the VAT for this vendor's items to your address. Cont
 msgstr ""
 "Non possiamo calcolare l'IVA degli articoli di questo venditore per il tuo indirizzo. Contatta il "
 "venditore."
+
+#: apps/manager/amendment_forms.py
+msgid ""
+"We cannot fulfil it, for example the goods are unavailable: the refund fee is charged to the shop"
+msgstr ""
+"Non possiamo evaderlo, per esempio la merce non è disponibile: la commissione di rimborso è "
+"addebitata al negozio"
 
 #: themes/base/templates/500.html
 msgid "We could not complete your request. Please try again in a few minutes."
@@ -8719,6 +8789,10 @@ msgstr "Perché l'evento è stato nascosto. Il venditore può leggerlo. Lo compi
 #: apps/vendors/models.py
 msgid "Why the field is required, for the record. Up to 200 characters."
 msgstr "Perché il campo è obbligatorio, per memoria. Al massimo 200 caratteri."
+
+#: apps/manager/amendment_forms.py
+msgid "Why the package is cancelled"
+msgstr "Perché il pacco è annullato"
 
 #: apps/catalog/models.py
 msgid ""

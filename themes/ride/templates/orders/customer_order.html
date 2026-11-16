@@ -36,22 +36,22 @@
             {% csrf_token %}
             {% include "components/button.html" with label=_("Cancel the rest of the order and refund everything") type="submit" variant="danger" only %}
           </form>
-          <form class="d-inline-block me-2 mb-2" method="post" action="{{ part.offer.keep_url }}">
+          {% if part.offer.can_keep %}<form class="d-inline-block me-2 mb-2" method="post" action="{{ part.offer.keep_url }}">
             {% csrf_token %}
             {% include "components/button.html" with label=_("Keep the rest") type="submit" variant="secondary" only %}
-          </form>
+          </form>{% endif %}
         </section>
       {% endif %}
       {% if part.versions %}
         <h3 class="h5" id="versions-{{ forloop.counter }}">{% translate "Changes to this package" %}</h3>
         <ol class="order-versions list-unstyled" aria-labelledby="versions-{{ forloop.counter }}" data-versions>
           {% for version in part.versions %}
-            <li data-version="{{ version.number }}">
-              <strong>{% blocktranslate with n=version.number %}Version {{ n }}{% endblocktranslate %}</strong>,
+            <li{% if version.number %} data-version="{{ version.number }}"{% endif %}>
+              {% if version.number %}<strong>{% blocktranslate with n=version.number %}Version {{ n }}{% endblocktranslate %}</strong>,{% endif %}
               <time datetime="{{ version.at|date:'c' }}">{{ version.at|date:"DATE_FORMAT" }}</time>:
               {% for text in version.changes %}{{ text }}{% if not forloop.last %}; {% endif %}{% endfor %}.
               {% if version.refund %}{% blocktranslate with amount=version.refund %}{{ amount }} refunded.{% endblocktranslate %}{% endif %}
-              {% blocktranslate with total=version.total %}New total {{ total }}.{% endblocktranslate %}
+              {% if version.total %}{% blocktranslate with total=version.total %}New total {{ total }}.{% endblocktranslate %}{% endif %}
             </li>
           {% endfor %}
         </ol>

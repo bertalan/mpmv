@@ -127,7 +127,7 @@ answers with the passkey prompt. No inline script or style.
   {% if cancel_form %}
     <section aria-labelledby="cancel-heading">
       <h2 id="cancel-heading">{% translate "Cancel the package with a full refund" %}</h2>
-      <p>{% translate "The customer gets back everything paid for this package, within 14 days at the latest. The refund fee is charged to the shop. It asks for your passkey." %}</p>
+      <p>{% translate "The customer gets back everything paid for this package, within 14 days at the latest. The cause decides who pays the refund fee and whether the units go back to stock. It asks for your passkey." %}</p>
       {% include "components/error_summary.html" with form=cancel_form only %}
       <form method="post" action="{{ cancel_url }}" class="manager-form" novalidate>
         {% csrf_token %}

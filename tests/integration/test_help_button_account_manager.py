@@ -64,6 +64,7 @@ NOT_PAGES = (
     # ORD.20 part 3: POST only, they redirect to the amendment page (or show the passkey prompt).
     "manager:shop:amendment_apply",
     "manager:shop:amendment_discard",
+    "manager:shop:order_cancel",
     "manager:platform:amendment_apply",
     "manager:platform:amendment_discard",
     "manager:platform:order_cancel",

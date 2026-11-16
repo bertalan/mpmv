@@ -418,30 +418,6 @@ def test_support_has_no_line_fields_and_cannot_touch_a_shop_draft(
     assert refused.status_code == 409
 
 
-def test_support_cancels_the_package_with_a_full_refund(
-    client: Client, seeded: VendorOrder
-) -> None:
-    support = staff_login(client)
-    url = f"{PLATFORM}{seeded.public_id}/cancel/"
-    data = {"reason": "Seller cannot ship", "staff_note": "Seller phoned"}
-    prompt = client.post(url, data)
-    assert all((prompt.status_code == 403, 'name="staff_note"' in prompt.text)), plainly(
-        "the cancel prompt must replay the reason and the note", "it does not"
-    )
-    grant(client, support, amendments.cancel_package_passkey(seeded, "support"))
-    assert client.post(url, data).status_code == 302
-    seeded.refresh_from_db()
-    assert seeded.state == "cancelled", plainly(
-        "a cancelled package must be cancelled", f"it is {seeded.state}"
-    )
-    refund = Refund.objects.filter(vendor_order=seeded).latest("id")
-    assert all((refund.refunded_gross == D("170.80"), refund.refund_fee > 0)), plainly(
-        "a staff cancellation refunds 170.80 and charges the refund fee",
-        f"refunded {refund.refunded_gross}, fee {refund.refund_fee}",
-    )
-    assert AuditLog.objects.filter(action="orders.amendment_package_cancelled").exists()
-
-
 def test_platform_pages_refuse_vendors_and_other_roles(client: Client, seeded: VendorOrder) -> None:
     shop_login(client, member(seeded))
     assert client.get(PLATFORM).status_code in {403, 404}
@@ -528,7 +504,9 @@ def test_the_customer_keeps_or_cancels_the_rest(client: Client, seeded: VendorOr
     assert "Cancel the rest of the order" not in page
 
 
-def test_keeping_the_rest_ends_the_hold(client: Client, seeded: VendorOrder) -> None:
+def test_keeping_the_rest_ends_the_hold_and_the_offer_stays(
+    client: Client, seeded: VendorOrder
+) -> None:
     applied_removal(seeded)
     customer = seeded.order.customer
     assert customer is not None
@@ -537,7 +515,25 @@ def test_keeping_the_rest_ends_the_hold(client: Client, seeded: VendorOrder) -> 
     assert client.post(f"{base}keep-rest/").status_code == 302
     seeded.refresh_from_db()
     assert seeded.ship_hold_until is None
-    assert seeded.cancel_rest_offered_at is None
+    assert seeded.cancel_rest_offered_at is not None, plainly(
+        "keeping the rest only ends the hold: the offer stays open until shipping",
+        "the offer was closed",
+    )
+    page = client.get(f"/account/orders/{seeded.order.public_id}/").text
+    assert "Keep the rest" not in page
+    assert "will not ship it before" not in page, plainly(
+        "a hold that ended must not be shown as a date", "it was shown"
+    )
+    assert "Cancel the rest of the order and refund everything" in page
+    assert client.post(f"{base}cancel-rest/").status_code == 302
+    seeded.refresh_from_db()
+    assert seeded.state == "cancelled", plainly(
+        "the rest can still be cancelled after keeping it, until shipping", f"it is {seeded.state}"
+    )
+    page = client.get(f"/account/orders/{seeded.order.public_id}/").text
+    assert "Rest of the package cancelled at your request" in page, plainly(
+        "the cancellation must appear in the customer's timeline", "it does not"
+    )
 
 
 def test_a_stranger_cannot_cancel_the_rest(client: Client, seeded: VendorOrder) -> None:

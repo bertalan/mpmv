@@ -283,7 +283,27 @@ def initial_from(
 
 
 class CancelPackageForm(forms.Form):
-    """Cancel the whole package with a full refund (platform staff: the note is required)."""
+    """Cancel the whole package with a full refund (platform staff: the cause and the note are
+    required; the cause decides who pays the refund fee, owner decision 2026-11-16)."""
+
+    cause = forms.ChoiceField(
+        label=_("Why the package is cancelled"),
+        widget=forms.RadioSelect,
+        choices=[
+            (
+                "vendor_fault",
+                _(
+                    "The shop's fault, for example the goods are unavailable or the shop cannot "
+                    "fulfil the order: the refund fee is charged to the shop"
+                ),
+            ),
+            (
+                "customer_request",
+                _("The customer asked to cancel: no refund fee for the shop"),
+            ),
+            ("platform_error", _("A platform error: no refund fee for the shop")),
+        ],
+    )
 
     reason = forms.CharField(
         label=_("Reason for the cancellation"),
@@ -297,3 +317,70 @@ class CancelPackageForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 3}),
         help_text=_("Required for platform staff. The customer does not see it."),
     )
+
+
+class ShopCancelForm(forms.Form):
+    """The shop cancels the whole package with a full refund: for its own fault (the refund fee is
+    the shop's), or because the customer asked, recorded with how, when and in which words (no
+    refund fee)."""
+
+    cause = forms.ChoiceField(
+        label=_("Why the package is cancelled"),
+        widget=forms.RadioSelect,
+        choices=[
+            (
+                "vendor_fault",
+                _(
+                    "We cannot fulfil it, for example the goods are unavailable: the refund fee "
+                    "is charged to the shop"
+                ),
+            ),
+            (
+                "customer_request",
+                _("The customer asked to cancel: no refund fee; record the request below"),
+            ),
+        ],
+    )
+    request_channel = forms.ChoiceField(
+        label=_("How the customer asked"),
+        required=False,
+        choices=[("", "---------"), *REQUEST_CHANNELS],
+    )
+    request_date = forms.DateField(
+        label=_("When the customer asked"),
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    request_text = forms.CharField(
+        label=_("The customer's words"),
+        required=False,
+        max_length=2000,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+    reason = forms.CharField(
+        label=_("Reason for the cancellation"),
+        max_length=2000,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text=_("The customer reads it. Write it in plain words."),
+    )
+
+    def clean(self) -> dict[str, Any]:
+        data = super().clean() or {}
+        if data.get("cause") == "customer_request":
+            for name in ("request_channel", "request_date", "request_text"):
+                if not data.get(name):
+                    self.add_error(
+                        name, _("Record how, when and in which words the customer asked.")
+                    )
+        return data
+
+    def customer_request(self) -> dict[str, str] | None:
+        data = self.cleaned_data
+        if data.get("cause") != "customer_request":
+            return None
+        when = data.get("request_date")
+        return {
+            "channel": str(data.get("request_channel") or ""),
+            "date": when.isoformat() if isinstance(when, dt.date) else "",
+            "text": str(data.get("request_text") or ""),
+        }

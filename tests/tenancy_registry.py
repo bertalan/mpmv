@@ -625,6 +625,11 @@ ENDPOINTS: dict[str, Access] = {
         methods=("POST",),
         sample={"public_id": NIL_UUID, "amendment": NIL_UUID},
     ),
+    "manager:shop:order_cancel": VendorScoped(
+        make=paid_vendor_order,
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
     "manager:shop:amendment_discard": VendorScoped(
         make=open_draft,
         kwargs=by_amendment,

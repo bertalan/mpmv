@@ -51,7 +51,9 @@ def grant(amendment: OrderAmendment, actor: Any) -> str:
 
 def staff_user() -> Any:
     staff = UserFactory.create(is_staff=True)
-    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    staff.user_permissions.add(
+        *Permission.objects.filter(codename__in=["view_all_vendors", "platform_support"])
+    )
     return staff
 
 

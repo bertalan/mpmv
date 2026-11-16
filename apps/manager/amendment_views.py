@@ -34,9 +34,15 @@ from apps.core.session_policy import GROUP_CRITICAL
 from apps.orders import amendment_engine as am
 from apps.orders import amendments, versions
 from apps.orders.models import AmendmentState, OrderAmendment, VendorOrder
-from apps.orders.services import OrdersFrozen
+from apps.orders.services import PAID_OR_LATER, OrdersFrozen
 
-from .amendment_forms import AmendmentForm, CancelPackageForm, initial_from, lines_of
+from .amendment_forms import (
+    AmendmentForm,
+    CancelPackageForm,
+    ShopCancelForm,
+    initial_from,
+    lines_of,
+)
 from .spaces import Space
 from .views import ManagerView, address_lines
 
@@ -174,6 +180,13 @@ class AmendmentPage(ManagerView):
         """Whether the open draft is this side's: the shop's for the shop, staff's for staff."""
         return (draft.initiator in am.STAFF_INITIATORS) == self.staff
 
+    def cancel_form(self, data: Any = None) -> CancelPackageForm | ShopCancelForm:
+        return (
+            CancelPackageForm(data, prefix="cancel")
+            if self.staff
+            else ShopCancelForm(data, prefix="cancel")
+        )
+
     def build_form(self, sub: VendorOrder, data: Any = None, initial: Any = None) -> AmendmentForm:
         version = versions.current_version(sub)
         return AmendmentForm(
@@ -192,10 +205,12 @@ class AmendmentPage(ManagerView):
         order = sub.order
         version = versions.current_version(sub) if sub.current_version_id else None
         draft = amendments.open_amendment(sub)
+        # The same rule as the service (`_lock_amendable`): a paid order, a package pending or
+        # accepted.
         amendable = (
             version is not None
             and sub.state in am.AMENDABLE_VENDOR_ORDER_STATES
-            and order.state != "awaiting_payment"
+            and order.state in PAID_OR_LATER
         )
         mine = draft is not None and self.draft_side(draft)
         context.update(
@@ -234,10 +249,9 @@ class AmendmentPage(ManagerView):
                 context["form"] = self.build_form(sub, initial=initial)
         else:
             context.pop("form", None)
-        if self.staff and amendable and "cancel_form" not in context:
-            context["cancel_form"] = CancelPackageForm()
-        if self.staff:
-            context["cancel_url"] = self.url("order_cancel", sub)
+        if amendable and "cancel_form" not in context:
+            context["cancel_form"] = self.cancel_form()
+        context["cancel_url"] = self.url("order_cancel", sub)
         return context
 
     def refused(self, message: str, status: int = 409, **extra: Any) -> HttpResponse:
@@ -470,28 +484,30 @@ class PlatformAmendmentDiscardView(AmendmentDiscardView):
         return self.url("order", sub)
 
 
-class PlatformCancelView(AmendmentPage):
-    """POST: platform staff cancel the package with a full refund (note and passkey required)."""
+class CancelView(AmendmentPage):
+    """POST: cancel the package with a full refund. The shop (owner, members with ORDERS) gives
+    its own fault or the customer's request, which it records; platform staff (ORD.22) give the
+    cause and the mandatory note. The passkey is always asked."""
 
-    section = PLATFORM_SECTION
-    namespace = "manager:platform"
     http_method_names = ["post", "options"]
-
-    def page_url(self, sub: VendorOrder) -> str:
-        return self.url("order", sub)
 
     @requires_level_method("orders_in_progress")
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         sub = self.sub_order()
-        form = CancelPackageForm(request.POST)
+        form = self.cancel_form(request.POST)
         if not form.is_valid():
             return self.render_to_response(self.get_context_data(cancel_form=form), status=400)
+        data = form.cleaned_data
         try:
             amendments.cancel_package(
                 sub,
                 actor=_actor(self),
-                reason=form.cleaned_data["reason"],
-                staff_note=form.cleaned_data["staff_note"],
+                reason=data["reason"],
+                cause=data["cause"],
+                staff_note=str(data.get("staff_note") or ""),
+                customer_request=(
+                    form.customer_request() if isinstance(form, ShopCancelForm) else None
+                ),
                 ctx=self.ctx(),
                 passkey_session=request.session.session_key or "",
             )
@@ -501,14 +517,30 @@ class PlatformCancelView(AmendmentPage):
             return self.refused(str(error), cancel_form=form)
         except PermissionDenied:
             raise Http404("No such order.") from None
-        messages.success(
-            request,
-            _(
+        if data["cause"] == amendments.CANCEL_VENDOR_FAULT:
+            text = _(
                 "The package is cancelled and the customer is refunded in full, within 14 days "
-                "at the latest."
-            ),
-        )
+                "at the latest. The refund fee is charged to the shop."
+            )
+        else:
+            text = _(
+                "The package is cancelled and the customer is refunded in full, within 14 days "
+                "at the latest. No refund fee is charged to the shop."
+            )
+        messages.success(request, text)
         return HttpResponseRedirect(self.page_url(sub))
+
+
+class ShopCancelView(CancelView):
+    section = "shop.orders"
+
+
+class PlatformCancelView(CancelView):
+    section = PLATFORM_SECTION
+    namespace = "manager:platform"
+
+    def page_url(self, sub: VendorOrder) -> str:
+        return self.url("order", sub)
 
 
 class AmendmentSettingsView(ManagerView):

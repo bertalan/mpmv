@@ -583,7 +583,9 @@ def test_staff_cannot_change_prices() -> None:
 
     sub = seed()
     staff = UserFactory.create(is_staff=True)
-    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    staff.user_permissions.add(
+        *Permission.objects.filter(codename__in=["view_all_vendors", "platform_support"])
+    )
     with pytest.raises(amendments.AmendmentRefused, match="prices"):
         draft(
             sub,
@@ -637,7 +639,9 @@ def test_staff_cannot_change_the_delivery_time_or_choose_a_dearer_carrier() -> N
     sub = seed()
     method(sub.vendor, "express", "14.00", 6)
     staff = UserFactory.create(is_staff=True)
-    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    staff.user_permissions.add(
+        *Permission.objects.filter(codename__in=["view_all_vendors", "platform_support"])
+    )
     with pytest.raises(amendments.AmendmentRefused) as refused:
         draft(sub, am.ChangeDeliveryTime(9), actor=staff, staff_note="customer called")
     assert "delivery times" in str(refused.value), plainly(
@@ -992,7 +996,9 @@ def test_a_staff_carrier_draft_that_became_dearer_is_refused_at_apply() -> None:
     sub = seed()
     method(sub.vendor, "express", "10.00", 5)
     staff = UserFactory.create(is_staff=True)
-    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    staff.user_permissions.add(
+        *Permission.objects.filter(codename__in=["view_all_vendors", "platform_support"])
+    )
     amendment, _ = draft(
         sub,
         am.ChangeCarrier(am.ShippingOffer("express", "", D("0"))),

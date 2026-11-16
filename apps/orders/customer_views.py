@@ -24,6 +24,7 @@ from django.core.paginator import Paginator
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, resolve_url
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.cache import never_cache
@@ -131,7 +132,8 @@ def _change_text(change: am.AmendmentChange, before: am.VersionSnapshot | None) 
 
 
 def _versions(sub: VendorOrder) -> list[dict[str, Any]]:
-    return [
+    """The versions of a changed package, then its cancellations (an entry without a version)."""
+    found = [
         {
             "number": version.number,
             "at": version.created_at,
@@ -143,14 +145,33 @@ def _versions(sub: VendorOrder) -> list[dict[str, Any]]:
         }
         for version in amendments.applied_versions(sub)
     ]
+    for cancelled in amendments.package_cancellations(sub):
+        found.append(
+            {
+                "number": None,
+                "at": cancelled.at,
+                "changes": [
+                    gettext("Rest of the package cancelled at your request")
+                    if cancelled.by_customer
+                    else gettext("Package cancelled")
+                ],
+                "refund": _money(cancelled.refunded) if cancelled.refunded > 0 else "",
+                "total": "",
+            }
+        )
+    return found
 
 
 def _offer(sub: VendorOrder, order: Order) -> dict[str, Any] | None:
     """The open cancel-the-rest offer of a package, with its actions and the hold's end."""
     if sub.cancel_rest_offered_at is None or sub.state not in am.AMENDABLE_VENDOR_ORDER_STATES:
         return None
+    held = sub.ship_hold_until is not None and sub.ship_hold_until > timezone.now()
     return {
-        "hold_until": sub.ship_hold_until,
+        # Only a future date: once the hold is over the seller may ship, and the offer stays
+        # open until it does (counsel clause).
+        "hold_until": sub.ship_hold_until if held else None,
+        "can_keep": held,
         "cancel_url": reverse("customer_order_cancel_rest", args=[order.public_id, sub.public_id]),
         "keep_url": reverse("customer_order_keep_rest", args=[order.public_id, sub.public_id]),
     }
@@ -179,6 +200,7 @@ def _part(sub: VendorOrder, order: Order, templates: dict[str, str]) -> dict[str
     shown_tracking = bool(sub.tracking_number)
     version = versions.current_version(sub) if sub.current_version_id is not None else None
     amended = version is not None and version.number > 1
+    history = _versions(sub) if sub.current_version_id is not None else []
     if amended:
         assert version is not None  # noqa: S101  # amended implies a version
         snapshot = am.VersionSnapshot.from_json(version.snapshot)
@@ -204,7 +226,7 @@ def _part(sub: VendorOrder, order: Order, templates: dict[str, str]) -> dict[str
         "lines": lines,
         "shipping": shipping,
         "total": total,
-        "versions": _versions(sub) if amended else [],
+        "versions": history if (amended or len(history) > 1) else [],
         "offer": _offer(sub, order),
         "tracking": {
             "carrier": sub.carrier,
