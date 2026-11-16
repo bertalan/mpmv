@@ -161,9 +161,16 @@ class TestScriptsAndStyles:
         self, css: str
     ) -> None:
         assert re.search(
-            r"@media \(prefers-reduced-motion: no-preference\)\s*\{[^@]*?data-reveal", css
-        ), "reveal styles must sit inside no-preference"
-        assert re.search(r"html:not\(\.no-js\)[^{]*\[data-reveal\]", css)
+            r"@media screen and \(prefers-reduced-motion: no-preference\)\s*\{[^@]*?data-reveal",
+            css,
+        ), "reveal styles must sit inside screen + no-preference (print shows everything)"
+
+    def test_the_hide_rule_is_scoped_to_reveal_ready_which_the_script_adds(self, css: str) -> None:
+        assert re.search(r"html\.reveal-ready\s+\[data-reveal\]", css)
+        assert not re.search(r"html:not\(\.no-js\)[^{]*\[data-reveal\]", css)
+        script = (JS / "reveal.js").read_text(encoding="utf-8")
+        assert 'classList.add("reveal-ready")' in script
+        assert "rootMargin" not in script  # no negative margin: the page end must reveal
 
     def test_no_forbidden_library(self) -> None:
         for path in (RIDE / "static").rglob("*"):

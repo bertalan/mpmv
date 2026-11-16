@@ -1,10 +1,11 @@
 /* Ride motion and small components (THM.14 part 2): scroll reveal, counters, progress bar,
    section title, the launch countdown and the video button. Tokens only. Content is visible by
-   default: a revealed element is hidden only with JavaScript on (no `no-js` class on <html>) and
-   only when the visitor has not asked for reduced motion; `js/reveal.js` then adds `.is-visible`. */
+   default: a revealed element is hidden only once `js/reveal.js` is running (it adds `reveal-ready`
+   to <html>; no module, nothing hidden), only when the visitor has not asked for reduced motion,
+   and never in print; the module then adds `.is-visible`. */
 @layer overrides {
-  @media (prefers-reduced-motion: no-preference) {
-    html:not(.no-js) [data-reveal] {
+  @media screen and (prefers-reduced-motion: no-preference) {
+    html.reveal-ready [data-reveal] {
       transform: translateY(var(--space-m));
       opacity: 0;
       transition:
@@ -12,7 +13,7 @@
         transform 0.5s ease-out;
     }
 
-    html:not(.no-js) [data-reveal].is-visible {
+    html.reveal-ready [data-reveal].is-visible {
       transform: none;
       opacity: 1;
     }
