@@ -1,9 +1,11 @@
 # 16 — Trust badges, customer reviews and community
 
-Proposal for decision D-37 (owner idea of 2026-11-10): vendor trust badges, a customer review
-system, and a possible social or blog section. Status: **proposal, under review**. Nothing here is
-decided; the rows in §16.12 are P2 and P3 and none blocks go-live. The design was written
-independently of any other notes, so it also says what it would not build.
+Design for decision D-37 (owner idea of 2026-11-10): vendor trust badges, a customer review
+system, and a possible social or blog section. Status: **approved by the owner on 2026-11-13**,
+with Q-T1 to Q-T13 answered the same day; counsel answered Q-T7 and Q-T8 (legal basis of review
+invitations and of reviews) on 2026-11-13 and the answers are built in below. The rows in §16.12 are
+P2 and P3 and none blocks go-live. The design was written independently of any other notes, so it
+also says what it would not build.
 
 ## 16.1 What exists today
 
@@ -68,11 +70,24 @@ its own revision history, same `state` values).
   checkout, through a single-use signed link in the invitation email. The link follows the
   QuoteLink pattern ([06](06-shipping-and-quotes.md)): only the token hash is stored, a GET shows the
   form and changes nothing, a POST acts once and a second POST is idempotent.
-- **Invitations**: the platform sends them, never the vendor. One email 7 days after delivery and one
-  reminder 14 days later, to every buyer of a delivered order, with neutral wording and a
-  "no, thanks" link. No invitation is skipped because the order had a return, a complaint or a
-  low expected rating ("review gating" is forbidden, §16.8). The email has no promotion and no
-  tracking pixel (CMP.4). Whether it needs a consent basis is a legal question (Q-T7).
+- **Invitations** (counsel's answer to Q-T7, 2026-11-13): the platform sends them, never the vendor.
+  A review invitation is treated like marketing under the Italian rules (art. 130 of the privacy
+  code), so it rests on legitimate interest and the "soft opt-in" of art. 130(4), not on consent,
+  and the opt-out comes first:
+  - **Opt-out at checkout**: the checkout and the order confirmation carry a line with a link or a
+    toggle "do not invite me to review this order", and every invitation email carries a "No,
+    thanks" link that works without login. The same for guests and for business buyers; the signed
+    single-use link for guests is fine.
+  - **Best route, a service message**: the "Delivered" email (a pure service message, GDPR article
+    6(1)(b)) carries two buttons, "Report a problem or return" and "Rate products and shipping".
+    No promotion ever goes into that email or into any invitation.
+  - **One invitation only**, 7 days after delivery (`TrustRules.invite_delay_days`, counsel's range
+    7 to 10), with neutral wording. A reminder 14 days later goes only to registered users who
+    turned review notifications on in their account; nobody else gets a second email.
+  - No invitation is skipped because the order had a return, a complaint or a low expected rating
+    ("review gating" is forbidden, §16.8). The email has no tracking pixel (CMP.4). A buyer who
+    opted out at checkout gets neither the invitation nor the reminder and can still write a review
+    from the account or the delivered email.
 - **No incentive**: no discount, points or gift for a review, and the vendor terms forbid vendors
   from offering one. If that ever changes, the incentive must be shown next to every review it
   produced.
@@ -91,9 +106,10 @@ its own revision history, same `state` values).
   number in the aggregate history table, which holds no text and no link to a person.
 - A **vendor cannot edit, hide or delete a review**. It can reply once, and it can report a
   review through the notice form (CMP.5, notice target `review`).
-- Account erasure (CMP.4): the nickname and the link to the user are removed, the review becomes
-  "Former customer" and stays unless the person also asks for its deletion, which is honoured at
-  once (Q-T8).
+- Account erasure (CMP.4): the nickname and the link to the user are removed (nickname set to NULL),
+  and the review stays under the label "Verified customer" (or "Business purchase", §16.6), never
+  "Former customer" (counsel, Q-T8). The deletion dialog has an optional box "Also delete my
+  reviews", honoured at once.
 
 ### Moderation
 
@@ -125,12 +141,31 @@ notice reports.
   vote (it invites vote manipulation and is a second ranking we would have to explain).
 - The average is the arithmetic mean of all published `mpmv_verified` reviews, with the count next to
   it. Below 3 reviews the page shows the reviews and "not enough reviews for an average".
-- Reviews appear in their original language with a language label. No automatic translation at
-  launch (Q-T9).
+- Reviews appear in their original language with a language label (Q-T9). A machine translation may
+  be shown, labelled "Machine translated from [language] - Show original" (CMP.8), with a link to the
+  original text, which stays the reference; the reader can always switch to it. The translation is
+  made at display time or cached per review language, is replaced when the author edits, is never
+  put in JSON-LD (§16.9), and is dropped with the review. It needs no consent from the author
+  (counsel, Q-T8): the terms give the platform a free non-exclusive licence to publish and translate
+  the review. The translation provider is a GDPR processor of the review text (sub-processor
+  register, CMP.4; spec 11) and its choice follows ING.14 and CMP.8.
 - Vendor plan, commission, advertising or payment never changes the display or the average.
-- The page also says: who may review (buyers of delivered orders), how that is checked (the order
-  record and the signed link), how reviews are checked and removed (the list above), that vendors
-  cannot remove reviews, and that there are no incentives.
+- **Listing cards render no rating or reviews badge** (Q-T1): the average and count appear only on the
+  product page and the vendor page.
+- The "How verified reviews work" page, linked next to every star rating (Q-T8, counsel), says: who
+  may review (buyers of delivered orders), how that is checked (the order record and the signed
+  link), no gating, no incentives, that the average weighs business and consumer purchases equally,
+  the formulas and windows of the badges, how reviews are checked and removed (the list above),
+  that vendors cannot remove reviews, how a vendor reports a review with a specific reason
+  (DSA article 16: a low rating or a criticism is not a reason), that a removal comes with a
+  statement of reasons to the author (article 17) and a chance to correct the text, and that a
+  product review is about the quality of the goods while packaging and delivery belong in the
+  vendor review.
+- **Business purchase label** (Q-T11): when the order's buyer bought as a business (the checkout
+  business-buyer flag of [07](07-cart-orders-payments.md): the buyer chose to buy as a business and
+  gave a VAT number, whatever the VIES result), the review shows "Business purchase" in place of
+  "Verified customer". It is read from the order snapshot when the review is displayed, never from
+  the reviewer's text, and the vendor cannot change it.
 
 ## 16.4 Badges
 
@@ -157,14 +192,15 @@ Notes on the table:
   badge: quote turnaround (QuoteLink, [06](06-shipping-and-quotes.md)) is an internal vendor metric
   in the Manager dashboard and a staff alert, because a public "answers in 2 hours" badge rewards
   automated replies. It can become a badge later with the same engine.
-- **Migrated orders** (MIG.4) can count towards badges 1 and 7 as "including N orders on our previous
+- **Migrated orders** (MIG.4) count towards badges 1 and 7 (answer to Q-T4, §16.10) as "including N orders on our previous
   shop", because the operator is the same and the data is verified at import. Their buyers are not
   invited to review (no basis, §16.9). Q-T4.
 - **No sustainability, quality, "premium" or "top seller" badge** is built. They would be claims we
   cannot verify from data (CMP.10 `GREEN`, UCPD).
 - Badges are not marked up in JSON-LD (§16.9) and do not change search or listing ranking. If the
   owner wants ranking to use them, the ranking parameters page of CMP.5 and the vendor terms must
-  say so first (P2B article 5). Q-T5.
+  say so first (P2B article 5). Q-T5: never at launch; a later change needs a new task after the
+  CMP.5 ranking page and the vendor-terms clause exist.
 - Badges 3 and 4 use buyers' data only in aggregate; a vendor never gets a buyer list from them.
 
 ### Refresh
@@ -213,7 +249,7 @@ honest vendors.
 
 ### Default
 
-A buyer is shown as **"Verified buyer"** with the month of the order. Nothing else. This is the
+A buyer is shown as **"Verified customer"** (or **"Business purchase"** for a business buyer, §16.3) with the month of the order. Nothing else. This is the
 default for every review, for the "latest review" in the badge and for the structured data. The
 label is not derived from the real name: a masked real name such as `M***o` still identifies the
 person to anyone who knows them, so masking a real name is not used.
@@ -222,7 +258,7 @@ person to anyone who knows them, so masking a real name is not used.
 
 | Level | Shown | Chosen by |
 |---|---|---|
-| 0 (default, no row) | "Verified buyer", month | nothing to do |
+| 0 (default, no row) | "Verified customer" or "Business purchase", month | nothing to do |
 | 1 | a nickname chosen by the buyer | a checkbox and a nickname field |
 | 2 | nickname plus country and "customer since <year>" | a second, separate checkbox |
 | per vendor | the nickname in that vendor's "regular customers" (badge 4) | a third checkbox, asked once after the second delivered order from that vendor |
@@ -236,10 +272,13 @@ person to anyone who knows them, so masking a real name is not used.
   `verified`, vendor names, staff names), no email or URL, checked at the form and by the moderators
   for impersonation. A nickname is not an identifier and is not a link: **there is no public buyer
   profile page.**
-- **Legal basis and records**: the pseudonymous display is personal data. Basis: the buyer's
-  consent (GDPR articles 6(1)(a), 7), recorded on the profile row with the text version, the time
-  and, on withdrawal, the time. The consent text is versioned like the CMP.24 legal wording. The
-  review itself is the buyer's act of publication, with a notice at the form (Q-T8).
+- **Legal basis and records** (counsel, Q-T8): the pseudonymous display is personal data and its
+  basis is the buyer's separate consent (GDPR articles 6(1)(a), 7), revocable in one click, recorded
+  on the profile row with the text version, the time and, on withdrawal, the time; the default
+  stays "Verified customer". The consent text is versioned like the CMP.24 legal wording. The
+  review itself does not rest on consent: its basis is legitimate interest and the function of the
+  service (6(1)(b)), plus the legal duty of the Omnibus rules (6(1)(c)) for the link between review
+  and order. The review form carries a notice: write no personal data.
 - **Withdrawal** (article 7(3)): one control in the account and one link in each review email
   switch back to level 0 at once. Reviews reference the profile and do not copy the nickname,
   so every page, the vendor panel and the JSON-LD change with the cache purge done in the same
@@ -337,12 +376,18 @@ extended to it in TRU.1. The tasks are in §16.12.
   minimisation (5(1)(c)), notice at collection (13), erasure (17), no profiling (22). Review text
   is not an order record: it has its own retention (kept while the vendor is active and 24 months
   after, then anonymised in full) and is not covered by the D-29 fiscal exception.
-- **ePrivacy and emails**: whether the review invitation and reminder are service messages or
-  marketing under the Italian rules (and the Garante provision cited in CMP.4) is an open legal
-  point (Q-T7).
+- **ePrivacy and emails** (counsel, Q-T7, 2026-11-13): a review invitation is treated like marketing
+  (art. 130 of the Italian privacy code; the German BGH ruling VI ZR 225/17 points the same way).
+  It is sent without consent only on legitimate interest and the art. 130(4) soft opt-in, with
+  the opt-out at checkout and in every email, one invitation only, and the review links inside the
+  "Delivered" service email (§16.3). TRU.3 and TRU.5 are no longer gated: the open point is
+  answered. The customer terms carry two articles for it (CMP.5, customer kind).
+- **Legal basis of reviews** (counsel, Q-T8): legitimate interest, 6(1)(b) and 6(1)(c) as in §16.6;
+  not consent. Nickname: separate consent.
 - **Business buyers**: a review from a company with a VAT number is not a consumer review in the UCPD
-  sense. They are accepted, and the "How reviews work" page says reviews may come from business
-  buyers (Q-T11).
+  sense. They are accepted, labelled "Business purchase" (§16.3), and the "How verified reviews work"
+  page says reviews may come from business buyers and that they weigh the same in the average
+  (Q-T11).
 
 ### SEO
 
@@ -352,8 +397,10 @@ extended to it in TRU.1. The tasks are in §16.12.
   reviews, none for a vendor reply.
 - **No self-serving markup**: no `AggregateRating` on the operator `Organization`, on `WebSite` or on
   the vendor `Organization` node (search engines ignore or penalise an entity rating itself on its
-  own pages); `VendorReview` data stays in the HTML and the trust panel only (Q-T12).
-- `Review.author` is a `Person` with the name "Verified buyer" or the opted-in nickname, never more.
+  own pages); `VendorReview` data stays in the HTML and the trust panel only (Q-T12; a vendor-level rating in markup is a later experiment, not at launch).
+- `Review` nodes carry only the original text, never a machine translation (Q-T9), and the
+  "Business purchase" label is page text, not markup.
+- `Review.author` is a `Person` with the name "Verified customer" (or "Business purchase") or the opted-in nickname, never more.
 - Reviews have no URL of their own beyond an `#review-<id>` anchor; review list pages 2 and up are
   `noindex, follow`; links in review text are not allowed (sanitiser, CMS.12), and any that remain
   carry `rel="ugc nofollow"`.
@@ -377,30 +424,41 @@ extended to it in TRU.1. The tasks are in §16.12.
   nickname (3.3.7 redundant entry), a character counter as a polite live region, targets of at least
   24 px (2.5.8). The pages are added to the axe audit (CMP.7).
 
-## 16.10 Owner questions (answered 2026-11-13, Q-T7 and Q-T8 with counsel)
+## 16.10 Owner questions (all answered 2026-11-13; Q-T7 and Q-T8 by counsel)
 
 1. **Q-T1**: is the vendor "reviews" badge (average and count) wanted on listing cards, or only on
-   the vendor page and product page? (Cards are visible everywhere, so most exposed to disputes.) **Answered (owner, 2026-11-13): vendor page and product page only, not on listing cards.**
+   the vendor page and product page? (Cards are visible everywhere, so most exposed to disputes.)
+   **Answered (owner, 2026-11-13): vendor page and product page only, not on listing cards.**
 2. **Q-T2**: product review and vendor review as two kinds (this proposal), or one review per
-   order? One is simpler; two keep complaints about shipping off product pages. **Answered (owner, 2026-11-13): two kinds, product review and vendor review.**
-3. **Q-T3**: the review window (90 days after delivery) and the edit window (30 days). **Answered (owner, 2026-11-13): 90 days after delivery to review, 30 days to edit.**
+   order? One is simpler; two keep complaints about shipping off product pages.
+   **Answered (owner, 2026-11-13): two kinds, product review and vendor review.**
+3. **Q-T3**: the review window (90 days after delivery) and the edit window (30 days).
+   **Answered (owner, 2026-11-13): 90 days after delivery to review, 30 days to edit.**
 4. **Q-T4**: do orders from the legacy shop count for the "orders delivered" and "on MPMV since" badges
-   ("including N orders on our previous shop"), and are legacy buyers ever invited? **Answered (owner, 2026-11-13): legacy orders count, with the "including N orders on our previous shop" wording; legacy buyers are never invited.**
+   ("including N orders on our previous shop"), and are legacy buyers ever invited?
+   **Answered (owner, 2026-11-13): legacy orders count, with the "including N orders on our previous shop" wording; legacy buyers are never invited.**
 5. **Q-T5**: may badges ever influence search or listing order? Default: never (it needs the P2B
-   ranking page and the vendor terms first). **Answered (owner, 2026-11-13): yes, later, and only after the P2B ranking page and the vendor-terms clause exist (never at launch).**
-6. **Q-T6**: may a vendor hide an earned badge? Default: no (§16.4). **Answered (owner, 2026-11-13): no.**
+   ranking page and the vendor terms first).
+   **Answered (owner, 2026-11-13): never at launch; a later change needs a new task after the CMP.5 ranking page and the vendor-terms clause exist.**
+6. **Q-T6**: may a vendor hide an earned badge? Default: no (§16.4).
+   **Answered (owner, 2026-11-13): no.**
 7. **Q-T7**: counsel: are the review invitation and reminder emails service messages or marketing
-   under current Italian and EU practice, and do they need consent? **Sent to counsel (2026-11-13).**
+   under current Italian and EU practice, and do they need consent? **Answered (counsel, 2026-11-13): see §16.3 (invitations) and §16.9.**
 8. **Q-T8**: counsel: the legal basis for the review itself and for the nickname (consent as written
    here, or legitimate interest), and the default on erasure (the review stays as "Former customer",
-   or is deleted). **Sent to counsel (2026-11-13).**
+   or is deleted; counsel: the label is "Verified customer", with an optional "also delete my reviews" box). **Answered (counsel, 2026-11-13): see §16.3, §16.6 and §16.9.**
 9. **Q-T9**: show reviews in their original language only (this proposal), or add machine
-   translation (needs the CMP.8 label)? **Answered (owner, 2026-11-13): add machine translation, labelled "machine translated" (CMP.8) with a link to the original text, which stays the reference.**
-10. **Q-T10**: review photos: later, or never? **Answered (owner, 2026-11-13): later, not at launch (image moderation and personal data in photos first).**
-11. **Q-T11**: accept reviews from business buyers, and say so on the page? **Answered (owner, 2026-11-13): yes, labelled "business purchase" on the review.**
+   translation (needs the CMP.8 label)?
+   **Answered (owner, 2026-11-13): add machine translation, labelled "machine translated" (CMP.8) with a link to the original text, which stays the reference.**
+10. **Q-T10**: review photos: later, or never?
+   **Answered (owner, 2026-11-13): later, not at launch (image moderation and personal data in photos first).**
+11. **Q-T11**: accept reviews from business buyers, and say so on the page?
+   **Answered (owner, 2026-11-13): yes, labelled "business purchase" on the review.**
 12. **Q-T12**: a vendor-level rating in the vendor `Organization` markup: a later experiment, or
-    never? **Answered (owner, 2026-11-13): a later, measured experiment, not at launch.**
-13. **Q-T13**: vendor updates and a "Community" page: P3 as written here, or dropped? **Answered (owner, 2026-11-13): kept at P3, after launch.**
+    never?
+   **Answered (owner, 2026-11-13): a later, measured experiment, not at launch.**
+13. **Q-T13**: vendor updates and a "Community" page: P3 as written here, or dropped?
+   **Answered (owner, 2026-11-13): kept at P3, after launch.**
 
 ## 16.11 Regression cases
 
@@ -417,19 +475,25 @@ extended to it in TRU.1. The tasks are in §16.12.
    request, and the cached pages are purged.
 9. A cached public product page shows the same review count and mean as its JSON-LD.
 10. No `AggregateRating` on `Organization` or `WebSite`; none for supplier reviews.
-11. The "How reviews work" page exists in each go-live language before any review is published.
+11. The "How verified reviews work" page exists in each go-live language before any review is published.
+12. Listing cards render no rating or reviews badge; the same vendor and product show them on their own pages.
+13. A review of an order from a business buyer shows "Business purchase"; a consumer order shows "Verified customer"; the vendor and the reviewer cannot change either.
+14. A machine translation of a review shows its "Machine translated" label and a link to the original, and no JSON-LD node carries it.
+15. A buyer who opted out at checkout (or by the email link, with no login) gets no invitation or reminder; a buyer who did not gets exactly one invitation, and a reminder only if registered with review notifications on.
+16. After account erasure the review keeps "Verified customer" with no nickname; with the "also delete my reviews" box ticked it disappears at once.
+17. Orders migrated from the previous shop count in badges 1 and 7 with the "including N orders on our previous shop" wording, and their buyers get no invitation.
 
 ## 16.12 Tasks
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
 | TRU.1 | `trust` app and rules: `TrustRules` (versioned, staff-editable with audit, dry-run preview), `VendorTrustInputs`, pure `compute_vendor_trust` for badges 1 to 7 with tiers and hysteresis, append-only `VendorTrustSnapshot`; import contracts extended | P2 | 10 | ORD.2, VEN.5, ARC.18 | The §16.11 cases 4, 6 and 7 pass on the engine with no database; a new rules version changes a vendor's result and the old snapshot keeps its `rules_version` |
-| TRU.2 | Snapshot service and refresh: inputs built from orders, returns and vendors with the §16.5 exclusions, nightly task for active vendors, dirty marking and 15-minute recompute on order, return, review and suspension events, cache purge, `AuditLog` on gain and loss | P2 | 8 | TRU.1, ORD.6, SEO.6 | A review removal updates the vendor's snapshot within 15 minutes; an excluded order does not move any count; a suspended vendor has no public panel |
-| TRU.3 | Review submission on CMS.6's models: eligibility and window; single-use signed link for guest buyers; platform invitation and one reminder; edit, withdraw, delete; vendor reply; supplier-imported reviews in their own block (ING.11) | P2 | 10 | CMS.6, ARC.16, ORD.6, TRU.1 | §16.11 cases 1 to 3 pass; a vendor invitation or incentive field does not exist; an imported review never counts in a snapshot or in markup |
-| TRU.4 | Review moderation: automatic checks, staff queue in the Manager for Catalog and moderation, `review` as a CMP.5 notice target, closed removal reasons, statement of reasons and appeal route to the author and the vendor, vendor reply moderation | P2 | 8 | TRU.3, CMP.5 | A notice against a review gets a tracked outcome; a removal emails a statement of reasons; a negative review with no listed reason cannot be removed; the Catalog and moderation role sees the queue and Finance does not |
-| TRU.5 | Community profile and consent: `CommunityProfile` with levels 0 to 2, per-vendor regular-customers opt-in asked once after the second delivered order, nickname rules, versioned consent text and withdrawal, erasure per CMP.4 | P2 | 8 | TRU.3, CMP.4, CMP.24 | §16.11 case 8; nothing is pre-ticked and both buttons weigh the same; an erased account's reviews show "Former customer"; a nickname that is a reserved word is refused |
+| TRU.2 | Snapshot service and refresh: inputs built from orders, returns and vendors with the §16.5 exclusions, nightly task for active vendors, dirty marking and 15-minute recompute on order, return, review and suspension events, cache purge, `AuditLog` on gain and loss | P2 | 8 | TRU.1, ORD.6, SEO.6, MIG.4 | A review removal updates the vendor's snapshot within 15 minutes; an excluded order does not move any count; a suspended vendor has no public panel; orders imported by MIG.4 count in badges 1 and 7 with the "including N orders on our previous shop" wording and are never invited to review (Q-T4) |
+| TRU.3 | Review submission on CMS.6's models: eligibility and window; single-use signed link for guest buyers; one platform invitation after delivery with the opt-out at checkout and in every email, review links in the "Delivered" service email, a reminder only for registered users with review notifications on (counsel, Q-T7); edit, withdraw, delete; vendor reply; supplier-imported reviews in their own block (ING.11) | P2 | 10 | CMS.6, ARC.16, ORD.6, TRU.1 | §16.11 cases 1 to 3 pass; a vendor invitation or incentive field does not exist; an imported review never counts in a snapshot or in markup; §16.11 case 15; the order confirmation carries the opt-out line; the form carries the "no personal data" notice; the review stores the order's business-buyer flag for the "Business purchase" label |
+| TRU.4 | Review moderation: automatic checks, staff queue in the Manager for Catalog and moderation, `review` as a CMP.5 notice target, closed removal reasons, statement of reasons (article 17) to the author with a chance to correct the text, and appeal route to the author and the vendor, vendor reports need a specific reason (article 16), vendor reply moderation | P2 | 8 | TRU.3, CMP.5 | A notice against a review gets a tracked outcome; a removal emails a statement of reasons; a negative review with no listed reason cannot be removed; the Catalog and moderation role sees the queue and Finance does not |
+| TRU.5 | Community profile and consent: `CommunityProfile` with levels 0 to 2, per-vendor regular-customers opt-in asked once after the second delivered order, nickname rules, versioned consent text and withdrawal, erasure per CMP.4 with the optional "also delete my reviews" box | P2 | 8 | TRU.3, CMP.4, CMP.24 | §16.11 case 8; nothing is pre-ticked and both buttons weigh the same; §16.11 case 16; an erased account's reviews show "Verified customer", never "Former customer"; a nickname that is a reserved word is refused |
 | TRU.6 | Anti-gaming: nightly `TrustFlag` rules (§16.5 point 4), staff queue, exclude-orders and suspend-badge actions with reasons and audit | P2 | 8 | TRU.2, TRU.4 | Seeded burst, duplicate-text and young-account cases raise a flag and change nothing by themselves; a staff exclusion lowers the count and is audited |
-| TRU.7 | Public display: vendor trust panel, product chip, reviews list with the §16.3 display rules, "How reviews work" page in every go-live language (legal wording approved under CMP.24), badge 8 explanation list; WCAG 2.2 AA per §16.9; pages added to the CMP.7 axe audit | P2 | 10 | TRU.2, TRU.3, THM.3, I18N.9 | §16.11 case 11; zero axe violations on the new pages; the rating is available as text; the panel works without script |
+| TRU.7 | Public display: vendor trust panel, product chip, reviews list with the §16.3 display rules, "How verified reviews work" page in every go-live language and linked next to the stars, "Business purchase" label (Q-T11), machine-translated reviews with their label and link to the original (Q-T9, CMP.8), no rating or reviews badge on listing cards (Q-T1) (legal wording approved under CMP.24), badge 8 explanation list; WCAG 2.2 AA per §16.9; pages added to the CMP.7 axe audit | P2 | 10 | TRU.2, TRU.3, THM.3, I18N.9, CMP.8 | §16.11 case 11; zero axe violations on the new pages; the rating is available as text; the panel works without script; §16.11 cases 12 to 14: a listing card renders no rating or badge, a business-buyer order shows "Business purchase", a machine translation shows its label and original link and is absent from JSON-LD |
 | TRU.8 | Review structured data in `seo.page_graph`: `AggregateRating` and up to five `Review` nodes on `Product` only, per §16.9 | P2 | 4 | SEO.7, TRU.3 | §16.11 cases 9 and 10; the Rich Results Test shows no errors on a product with reviews |
 | TRU.9 | Business-verified badge (badge 8) from CMP.11, VEN.6 and CMP.3 data with a monthly re-check and a public list of what was checked | P2 | 4 | TRU.1, CMP.11 | A vendor failing a VIES re-check loses the badge and the list shows only what was checked |
 | TRU.10 | Vendor updates: vendor-authored `BlogPostPage` through a Manager form, limited blocks, `Author` linked to a vendor, first-3-posts pre-approval then post-moderation | P3 | 10 | CMS.3, CMS.12, TRU.4, CORE.9 | A vendor member writes a post that goes to moderation; raw HTML and embeds are refused; the vendor's storefront lists the approved posts |
