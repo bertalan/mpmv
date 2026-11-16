@@ -442,6 +442,10 @@ ENDPOINTS: dict[str, Access] = {
         "Per-language sitemap (I18N.6): public page URLs only, no tenant data.",
         kwargs={"language": "xx"},
     ),
+    "sitemap_part": NoVendorData(
+        "One part of a large per-language sitemap (I18N.6): public page URLs only, no tenant data.",
+        kwargs={"language": "xx", "part": 0},
+    ),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "payments_webhook": NoVendorData("Signed payment provider events; answers with a status only."),
     "media": NoVendorData(
