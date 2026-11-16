@@ -40,26 +40,51 @@ def test_the_header_is_a_dark_bar_with_the_logo_first_and_a_labelled_nav() -> No
     assert re.search(r'<nav[^>]+aria-label="Main"', html)
 
 
-def test_a_submenu_is_a_button_with_aria_expanded_never_hover_only() -> None:
+def test_the_header_is_a_bootstrap_navbar_that_expands_at_md() -> None:
+    html = render("components/header.html", site_name="Ride", links=LINKS)
+    assert re.search(r'class="[^"]*\bnavbar\b[^"]*\bnavbar-expand-md\b', html)
+    assert 'class="site-name' in html
+
+
+def test_a_submenu_is_a_bootstrap_dropdown_button_with_aria_expanded_never_hover_only() -> None:
     html = render("components/header.html", site_name="Ride", links=LINKS)
     buttons = re.findall(r"<button[^>]*>", html)
-    sub = [b for b in buttons if "aria-controls" in b and "nav-toggle" not in b]
+    sub = [b for b in buttons if 'data-bs-toggle="dropdown"' in b]
     assert len(sub) == 1
     assert 'aria-expanded="false"' in sub[0]
     assert 'type="button"' in sub[0]
+    assert 'aria-controls="subnav-1"' in sub[0]
+    assert 'id="subnav-1"' in html
+    assert 'class="dropdown-menu' in html
     # the parent link stays reachable, and the children are plain links in a list
     assert 'href="/vendors/"' in html
     assert 'href="/sell/"' in html
     assert "onmouseover" not in html
 
 
-def test_the_burger_button_names_the_menu_and_controls_the_nav() -> None:
+def test_the_burger_button_opens_the_offcanvas_menu() -> None:
     html = render("components/header.html", site_name="Ride", links=LINKS)
     toggle = re.search(r'<button[^>]*class="nav-toggle[^>]*>.*?</button>', html, re.S)
     assert toggle is not None
-    assert 'aria-controls="site-nav"' in toggle.group(0)
+    assert 'data-bs-toggle="offcanvas"' in toggle.group(0)
+    assert 'data-bs-target="#site-offcanvas"' in toggle.group(0)
+    assert 'aria-controls="site-offcanvas"' in toggle.group(0)
     assert 'aria-expanded="false"' in toggle.group(0)
     assert "Menu" in toggle.group(0)
+    panel = re.search(r'<div[^>]*id="site-offcanvas"[^>]*>', html)
+    assert panel is not None
+    assert "offcanvas" in panel.group(0)
+    assert 'tabindex="-1"' in panel.group(0)
+    assert 'aria-labelledby="site-offcanvas-title"' in panel.group(0)
+    assert 'id="site-offcanvas-title"' in html
+    close = re.search(r'<button[^>]*data-bs-dismiss="offcanvas"[^>]*>', html)
+    assert close is not None
+    assert "aria-label=" in close.group(0)
+    # the nav lives inside the panel; no Alpine directive, no inline script or style
+    assert html.index('id="site-offcanvas"') < html.index("<nav")
+    assert "x-data" not in html
+    assert "<script" not in html
+    assert " style=" not in html
 
 
 def test_search_and_cart_are_icons_with_text_for_screen_readers() -> None:

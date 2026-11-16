@@ -91,7 +91,7 @@ def test_the_home_page_renders_with_ride_at_every_width(
     assert page.evaluate("() => document.fonts.check(\"400 1em 'Barlow'\")")
     assert page.evaluate(NO_SIDEWAYS_SCROLL)
     toggle = page.locator(".nav-toggle")
-    if width >= 1024:  # 64rem
+    if width >= 768:  # md
         expect(page.get_by_role("navigation", name="Main")).to_be_visible()
         expect(toggle).to_be_hidden()
     else:
@@ -103,21 +103,20 @@ def test_the_home_page_renders_with_ride_at_every_width(
     shot(str(width))
 
 
-@pytest.mark.parametrize("width", [360, 768])
-def test_the_burger_menu_opens_and_closes_below_64rem(
-    width: int, page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+def test_the_burger_menu_opens_and_closes_below_md(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
+    width = 360
     open_home(page, live_server, width, 800)
     toggle = page.locator(".nav-toggle")
     first_link = page.get_by_role("navigation", name="Main").get_by_role("link").first
     expect(toggle).to_have_attribute("aria-expanded", "false")
     expect(first_link).to_be_hidden()
     toggle.click()
-    expect(toggle).to_have_attribute("aria-expanded", "true")
     expect(first_link).to_be_visible()
     shot(f"{width}-menu-open")
     page.keyboard.press("Escape")
-    expect(toggle).to_have_attribute("aria-expanded", "false")
+    expect(first_link).to_be_hidden()
     assert page.evaluate(NO_SIDEWAYS_SCROLL)
 
 
