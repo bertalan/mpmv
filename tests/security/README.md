@@ -18,7 +18,7 @@ go-live.
 
 | Category | Module | Status |
 |---|---|---|
-| Accounts | `test_accounts_attacks.py`, `test_passkey_window_attacks.py` | present |
+| Accounts | `test_accounts_attacks.py`, `test_passkey_window_attacks.py`, `test_session_lifetime_attacks.py` | present |
 | Request tampering | `test_request_tampering.py` | present |
 | Business logic | `test_business_logic.py` | to do |
 | Integrations | `test_integrations.py` | to do |

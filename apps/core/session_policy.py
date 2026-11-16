@@ -1,11 +1,18 @@
-"""The session policy of D-32 (CORE.25): the passkey window timers and the three action lists.
+"""The session policy: the passkey window of D-32 (CORE.25) and the session lifetimes (CORE.24).
 
 Pure functions, no ORM. The policy lives on the `PlatformOperator` configuration as a sparse
-JSON mapping over the D-32 defaults, so a timer or a list is tuned without code (trial, review
+JSON mapping over the defaults, so a timer or a list is tuned without code (trial, review
 after STAGE). Shape of the mapping (every key optional)::
 
     {"idle_minutes": 15, "cap_minutes": 120, "single_seconds": 120,
-     "actions": {"everyday": [...], "sensitive": [...], "critical": [...]}}
+     "actions": {"everyday": [...], "sensitive": [...], "critical": [...]},
+     "customer_days": 14, "staff_idle_minutes": 30, "staff_absolute_hours": 12}
+
+`idle_minutes` and `cap_minutes` time the passkey window. The last three are the role-based
+session lifetimes (CORE.24 part 2, spec 02 §Session lifetimes and control): a customer's session
+is rolling (it ends `customer_days` after its last use); a staff session (staff, platform staff,
+vendor members, editors) ends `staff_idle_minutes` after its last use and `staff_absolute_hours`
+after its sign-in, whatever its activity. This module is the one place these defaults live.
 
 A sensitive action is always sensitive: the passkey window grants no extra power, it only lets one
 fresh passkey cover several sensitive actions for a limited time. Groups: 1 everyday (free),
@@ -34,6 +41,17 @@ DEFAULT_IDLE_MINUTES: Final = 15
 DEFAULT_CAP_MINUTES: Final = 120
 DEFAULT_SINGLE_SECONDS: Final = 120
 MAX_SINGLE_SECONDS: Final = 600
+
+# CORE.24 part 2: the session lifetimes (owner note 2026-11-10).
+DEFAULT_CUSTOMER_DAYS: Final = 14
+DEFAULT_STAFF_IDLE_MINUTES: Final = 30
+DEFAULT_STAFF_ABSOLUTE_HOURS: Final = 12
+MAX_CUSTOMER_DAYS: Final = 365
+MAX_STAFF_ABSOLUTE_HOURS: Final = 72
+CUSTOMER_LIFETIME: Final = "customer"
+STAFF_LIFETIME: Final = "staff"
+# A stamp later than "now" by more than this is not trusted (clock skew between workers).
+STAMP_SKEW_SECONDS: Final = 60
 
 DEFAULT_EVERYDAY_ACTIONS: Final = frozenset(
     {"catalogue_edit", "orders_in_progress", "content_edit"}
@@ -86,7 +104,17 @@ _LEGACY_LIST_KEYS: Final = {
     "operational": "sensitive",
     "passkey": "critical",
 }
-_KEYS = frozenset({"idle_minutes", "cap_minutes", "single_seconds", "actions"})
+_KEYS = frozenset(
+    {
+        "idle_minutes",
+        "cap_minutes",
+        "single_seconds",
+        "actions",
+        "customer_days",
+        "staff_idle_minutes",
+        "staff_absolute_hours",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -99,6 +127,10 @@ class SessionPolicy:
     critical: frozenset[str]
     # An unreadable stored policy fails closed: every action is critical until it is fixed.
     fail_closed: bool = False
+    # CORE.24 part 2: the session lifetimes (an unreadable policy keeps these defaults).
+    customer_days: int = DEFAULT_CUSTOMER_DAYS
+    staff_idle_minutes: int = DEFAULT_STAFF_IDLE_MINUTES
+    staff_absolute_hours: int = DEFAULT_STAFF_ABSOLUTE_HOURS
 
     def group_of(self, action: str) -> int:
         if self.fail_closed or action in FLOOR_CRITICAL_ACTIONS or action in self.critical:
@@ -139,6 +171,13 @@ def parse_policy(raw: object) -> SessionPolicy:
     single = _minutes(raw, "single_seconds", DEFAULT_SINGLE_SECONDS, MAX_SINGLE_SECONDS)
     if idle > cap:
         raise ValueError("idle_minutes cannot exceed cap_minutes")
+    customer_days = _minutes(raw, "customer_days", DEFAULT_CUSTOMER_DAYS, MAX_CUSTOMER_DAYS)
+    staff_idle = _minutes(raw, "staff_idle_minutes", DEFAULT_STAFF_IDLE_MINUTES, 24 * 60)
+    staff_absolute = _minutes(
+        raw, "staff_absolute_hours", DEFAULT_STAFF_ABSOLUTE_HOURS, MAX_STAFF_ABSOLUTE_HOURS
+    )
+    if staff_idle > staff_absolute * 60:
+        raise ValueError("staff_idle_minutes cannot exceed staff_absolute_hours")
     actions = _current_list_keys(raw.get("actions", {}))
     defaults = {
         "everyday": DEFAULT_EVERYDAY_ACTIONS,
@@ -175,6 +214,9 @@ def parse_policy(raw: object) -> SessionPolicy:
         everyday=lists["everyday"],
         sensitive=lists["sensitive"],
         critical=lists["critical"],
+        customer_days=customer_days,
+        staff_idle_minutes=staff_idle,
+        staff_absolute_hours=staff_absolute,
     )
 
 
@@ -201,3 +243,56 @@ def expiry(
     if now - last_activity >= policy.idle_minutes * 60:
         return "idle"
     return None
+
+
+# --- CORE.24 part 2: the session lifetimes
+
+
+@dataclass(frozen=True)
+class Lifetime:
+    """How long a session lives: `idle_seconds` after its last use and, when set,
+    `absolute_seconds` after its sign-in (never moved by activity)."""
+
+    kind: str
+    idle_seconds: int
+    absolute_seconds: int | None
+
+
+def lifetime_of(policy: SessionPolicy, *, strict: bool) -> Lifetime:
+    """The staff lifetime when `strict`, else the customer's rolling one."""
+    if strict:
+        return Lifetime(
+            kind=STAFF_LIFETIME,
+            idle_seconds=policy.staff_idle_minutes * 60,
+            absolute_seconds=policy.staff_absolute_hours * 3600,
+        )
+    return Lifetime(
+        kind=CUSTOMER_LIFETIME, idle_seconds=policy.customer_days * 24 * 3600, absolute_seconds=None
+    )
+
+
+def lifetime_expiry(
+    lifetime: Lifetime, *, signed_in_at: float | None, last_seen: float | None, now: float
+) -> str | None:
+    """Why a session is over at `now`: "absolute", "idle", "invalid"; None if it lives.
+
+    Stamps that are missing, in the future (beyond a small clock skew) or out of order are
+    "invalid": the session fails closed.
+    """
+    if signed_in_at is None or last_seen is None:
+        return "invalid"
+    if max(signed_in_at, last_seen) > now + STAMP_SKEW_SECONDS or last_seen < signed_in_at:
+        return "invalid"
+    if lifetime.absolute_seconds is not None and now - signed_in_at >= lifetime.absolute_seconds:
+        return "absolute"
+    if now - last_seen >= lifetime.idle_seconds:
+        return "idle"
+    return None
+
+
+def lifetime_deadline(lifetime: Lifetime, *, signed_in_at: float, last_seen: float) -> float:
+    """When the session ends if it is not used again: the nearer of idle and absolute."""
+    deadline = last_seen + lifetime.idle_seconds
+    if lifetime.absolute_seconds is not None:
+        deadline = min(deadline, signed_in_at + lifetime.absolute_seconds)
+    return deadline

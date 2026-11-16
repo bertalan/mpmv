@@ -3549,6 +3549,16 @@ msgstr "Impostazioni SEO salvate."
 msgid "SEO title"
 msgstr "Titolo SEO"
 
+#: apps/core/models.py
+msgid ""
+"Session settings that replace the defaults: how long customer and staff sessions last, the passkey"
+" window timers and the lists of actions. Leave it empty to keep the defaults. A value that does "
+"not fit is refused when you save."
+msgstr ""
+"Impostazioni delle sessioni che sostituiscono quelle predefinite: quanto durano le sessioni dei "
+"clienti e del personale, i tempi della finestra passkey e gli elenchi di azioni. Lascialo vuoto "
+"per tenere i valori predefiniti. Un valore che non va bene viene rifiutato al salvataggio."
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Sessions"
 msgstr "Sessioni"
@@ -3840,15 +3850,6 @@ msgid ""
 msgstr ""
 "Solo per lo staff: il numero utente del venditore nel vecchio sistema, conservato per collegare i "
 "dati migrati. Lascialo com'è."
-
-#: apps/core/models.py
-msgid ""
-"Staff session settings that replace the defaults: timers and lists of actions. Leave it empty to "
-"keep the defaults. A value that does not fit is refused when you save."
-msgstr ""
-"Impostazioni delle sessioni del personale che sostituiscono quelle predefinite: tempi ed elenchi "
-"di azioni. Lascialo vuoto per tenere i valori predefiniti. Un valore che non va bene viene "
-"rifiutato al salvataggio."
 
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "Standard clause on applicable law and court"
@@ -7584,6 +7585,18 @@ msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
 #: apps/manager/sales_terms_views.py
 msgid "Your sales terms are published and in force."
 msgstr "Le tue condizioni di vendita sono pubblicate e in vigore."
+
+#: apps/accounts/lifetimes.py
+msgid "Your session ended because it was not used for a while. Please sign in again."
+msgstr "La sessione è terminata perché non è stata usata per un po' di tempo. Accedi di nuovo."
+
+#: apps/accounts/lifetimes.py
+msgid "Your session ended. Please sign in again."
+msgstr "La sessione è terminata. Accedi di nuovo."
+
+#: apps/accounts/lifetimes.py
+msgid "Your session reached its maximum length. Please sign in again."
+msgstr "La sessione ha raggiunto la durata massima. Accedi di nuovo."
 
 #: apps/accounts/templates/accounts/sessions/list.html
 msgid "Your sessions"

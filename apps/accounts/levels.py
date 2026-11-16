@@ -15,9 +15,11 @@ action. The shop is the view's (`requires_level(..., shop=...)`); ownership come
 `settings.SHOP_OWNER_CHECK`, since accounts never imports vendors.
 
 Hooks for later work: CORE.26 (vendor policy) replaces `policy()` with the merge of the platform
-policy and the vendor's tightening for shop-space actions; CORE.24 (session lifetimes) owns the
-12 h staff session and the "log out everywhere" list, and should call `close_window` when it
-invalidates a session.
+policy and the vendor's tightening for shop-space actions.
+
+The window lives inside its session (CORE.24 part 2, `lifetimes`): the session's idle and
+absolute lifetimes end it with the session (closed with reason `expired`), the minutes left never
+exceed the session's own, and the window's activity never moves the session's sign-in time.
 """
 
 import datetime as dt
@@ -241,6 +243,11 @@ def seconds_left(request: HttpRequest) -> int | None:
     pol = policy()
     now = time.time()
     left = min(started + pol.cap_minutes * 60 - now, active + pol.idle_minutes * 60 - now)
+    from . import lifetimes  # lifetimes imports this module
+
+    session_left = lifetimes.seconds_left(request)  # the window ends with its session
+    if session_left is not None:
+        left = min(left, session_left)
     return max(0, int(left))
 
 
@@ -293,7 +300,8 @@ def window_covers(request: HttpRequest, action: str, shop: object | None) -> boo
 
 
 def close_window(request: HttpRequest, reason: str) -> None:
-    """Close the passkey window: `reason` is idle, cap, manual, logout or invalid."""
+    """Close the passkey window: `reason` is idle, cap, manual, logout, invalid or expired (its
+    session's lifetime is over, CORE.24)."""
     session = request.session
     started = session.pop(STARTED_KEY, None)
     session.pop(ACTIVITY_KEY, None)
@@ -322,11 +330,11 @@ def refresh(request: HttpRequest) -> None:
     )
     if why is not None:
         close_window(request, why)
-    elif not _is_background(request):
+    elif not is_background(request):
         session[ACTIVITY_KEY] = now
 
 
-def _is_background(request: HttpRequest) -> bool:
+def is_background(request: HttpRequest) -> bool:
     """Polling and prefetch are not the user working: they do not keep the window open."""
     if request.headers.get("X-MPMV-Poll") == "1" or "prefetch" in request.headers.get(
         "Sec-Purpose", ""
