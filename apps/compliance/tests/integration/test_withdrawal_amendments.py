@@ -12,9 +12,10 @@ from apps.compliance import withdrawal
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.orders import amendment_engine as am
-from apps.orders import amendments
+from apps.orders import amendments, versions
 from apps.orders.models import AmendmentState, OrderAmendment
 from apps.orders.tests.control import plainly
+from apps.orders.tests.factories import OrderAmendmentFactory
 from apps.orders.tests.integration.test_amendments import (  # noqa: F401 (autouse fixture)
     draft,
     key_of,
@@ -58,3 +59,22 @@ def test_a_withdrawal_dry_run_leaves_the_amendment_open() -> None:
     amendment.refresh_from_db()
     assert amendment.state == AmendmentState.DRAFT
     assert not withdrawal.has_withdrawal(sub)
+
+
+def test_the_withdrawal_lists_the_lines_of_the_current_version() -> None:
+    sub = seed()
+    v1 = am.VersionSnapshot.from_json(sub.versions.get(number=1).snapshot)
+    without_b = am.VersionSnapshot(
+        lines=tuple(line for line in v1.lines if line.sku != "SKU-B"),
+        shipping=v1.shipping,
+        commission=v1.commission,
+        destination_country=v1.destination_country,
+    )
+    record = OrderAmendmentFactory.create(vendor_order=sub, from_version=sub.versions.get(number=1))
+    versions.create_next_version(sub, without_b, number=2, amendment=record, shipping_address=None)
+    sub.refresh_from_db()
+    titles = [line["title"] for line in withdrawal._lines(sub)]
+    assert titles == ["A"], plainly(
+        "after B was removed, the withdrawal acknowledgement must list only A",
+        f"it lists {titles}",
+    )

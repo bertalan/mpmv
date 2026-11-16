@@ -21,6 +21,7 @@ from typing import Any
 import pytest
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
+from django.test import TestCase
 from django.utils import timezone
 
 from apps.accounts import levels
@@ -198,9 +199,21 @@ def confirm(amendment: OrderAmendment, actor: Any) -> str:
     return session
 
 
+def apply_now(*args: Any, **kw: Any) -> Any:
+    """Apply, then run what waits for the commit (the refund's submission): the test runs in
+    one transaction that never commits."""
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        return amendments.apply_amendment(*args, **kw)
+
+
+def cancel_now(*args: Any, **kw: Any) -> Any:
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        return amendments.cancel_rest_of_package(*args, **kw)
+
+
 def apply(amendment: OrderAmendment, actor: Any, **kw: Any) -> Any:
     kw.setdefault("passkey_session", confirm(amendment, actor))
-    return amendments.apply_amendment(amendment, actor=actor, ctx=CTX, **kw)
+    return apply_now(amendment, actor=actor, ctx=CTX, **kw)
 
 
 def rows(sub: VendorOrder, after_id: int = 0) -> list[tuple[str, Decimal]]:
@@ -425,7 +438,7 @@ def test_a_refund_asks_a_fresh_passkey_even_with_the_window_open(
     window = secrets.token_hex(16)
     levels.create_grant(window, actor, "export", "anything", ttl=900)
     with pytest.raises(amendments.PasskeyRequired):
-        amendments.apply_amendment(amendment, actor=actor, ctx=CTX, passkey_session=window)
+        apply_now(amendment, actor=actor, ctx=CTX, passkey_session=window)
     assert not Refund.objects.filter(vendor_order=sub).exists()
     assert stripe.calls.count("create_refund") == 0
     amendment.refresh_from_db()
@@ -443,9 +456,9 @@ def test_a_grant_is_void_after_a_draft_edit_and_is_spent_once(stripe: FakeStripe
     amendment.refresh_from_db()
     assert amendment.revision == 2
     with pytest.raises(amendments.PasskeyRequired):
-        amendments.apply_amendment(amendment, actor=actor, ctx=CTX, passkey_session=session)
+        apply_now(amendment, actor=actor, ctx=CTX, passkey_session=session)
     fresh = confirm(amendment, actor)
-    amendments.apply_amendment(amendment, actor=actor, ctx=CTX, passkey_session=fresh)
+    apply_now(amendment, actor=actor, ctx=CTX, passkey_session=fresh)
     assert Refund.objects.get(vendor_order=sub).refunded_gross == D("12.20")
     assert AuditLog.objects.filter(action="orders.amendment_edited").count() == 1
 
@@ -458,14 +471,14 @@ def test_a_grant_for_one_amendment_does_not_apply_another(stripe: FakeStripeClie
     theirs = draft(other, actor, am.RemoveLine(key_of(other, "B")))
     session = confirm(mine, actor)
     with pytest.raises(amendments.PasskeyRequired):
-        amendments.apply_amendment(theirs, actor=actor, ctx=CTX, passkey_session=session)
+        apply_now(theirs, actor=actor, ctx=CTX, passkey_session=session)
 
 
 # --- the 14-day deadline and the staff alert ---------------------------------------------------
 
 
-def test_an_amendment_refund_is_due_within_14_days_and_alerts_staff_4_days_before(
-    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+def test_an_amendment_refund_is_due_within_14_days_and_alerts_once_then_once_overdue(
+    stripe: FakeStripeClient, caplog: pytest.LogCaptureFixture
 ) -> None:
     sub = place_seed(stripe)
     actor = owner_of(sub)
@@ -478,15 +491,31 @@ def test_an_amendment_refund_is_due_within_14_days_and_alerts_staff_4_days_befor
     )
     assert refund.provider_status == "pending"
     assert refund.succeeded_at is None
-    alerts: list[str] = []
-    monkeypatch.setattr(refunds, "raise_alert", lambda alert, **kw: alerts.append(alert.key))
+
+    def alerts() -> list[str]:
+        return [r.getMessage() for r in caplog.records if r.name == "mpmv.alerts"]
+
+    caplog.set_level("ERROR", logger="mpmv.alerts")
     assert refunds.alert_refunds_near_due(now=moment + dt.timedelta(days=9, hours=23)) == 0, (
-        plainly("no alert may fire earlier than 4 days before the deadline", f"alerts: {alerts}")
+        plainly("no alert may fire earlier than 4 days before the deadline", f"{alerts()}")
     )
-    assert refunds.alert_refunds_near_due(now=moment + dt.timedelta(days=10)) == 1, plainly(
-        "a refund not succeeded 4 days before its deadline must alert staff", "none fired"
+    day10 = moment + dt.timedelta(days=10)
+    assert refunds.alert_refunds_near_due(now=day10) == 1
+    assert refunds.alert_refunds_near_due(now=day10 + dt.timedelta(hours=7)) == 0
+    assert refunds.alert_refunds_near_due(now=day10 + dt.timedelta(days=3)) == 0
+    overdue = moment + dt.timedelta(days=14, minutes=1)
+    assert refunds.alert_refunds_near_due(now=overdue) == 1
+    assert refunds.alert_refunds_near_due(now=overdue + dt.timedelta(days=5)) == 0, plainly(
+        "after the overdue alert nothing more may be sent", f"{alerts()}"
     )
-    assert alerts == [f"refund-due:{refund.public_id}"]
+    sent = alerts()
+    assert len(sent) == 2, plainly(
+        "an unconfirmed refund must alert staff exactly twice: 4 days before and when overdue",
+        f"{len(sent)} alerts were raised: {sent}",
+    )
+    assert f"refund-due:{refund.public_id}" in sent[0]
+    assert f"refund-overdue:{refund.public_id}" in sent[1]
+    assert "OVERDUE" in sent[1]
 
 
 def test_a_succeeded_refund_never_alerts(stripe: FakeStripeClient) -> None:
@@ -521,7 +550,7 @@ def test_the_dry_run_moves_nothing(stripe: FakeStripeClient) -> None:
     actor = owner_of(sub)
     amendment = draft(sub, actor, am.RemoveLine(key_of(sub, "B")))
     before = rows(sub)
-    changes = amendments.apply_amendment(amendment, actor=actor, ctx=CTX, dry_run=True)
+    changes = apply_now(amendment, actor=actor, ctx=CTX, dry_run=True)
     estimate = [c for c in changes.changes if c.model == "ledger.refund"]
     assert estimate
     assert estimate[0].after is not None
@@ -665,7 +694,7 @@ def test_a_withdrawal_registered_after_the_draft_blocks_the_apply(
         "apps.orders.tests.integration.test_amendments_apply.always_withdrawn"
     ]
     with pytest.raises(amendments.AmendmentRefused, match="withdrawn"):
-        amendments.apply_amendment(amendment, actor=actor, ctx=CTX, passkey_session=session)
+        apply_now(amendment, actor=actor, ctx=CTX, passkey_session=session)
     assert not Refund.objects.filter(vendor_order=sub).exists()
 
 
@@ -678,7 +707,7 @@ def test_a_withdrawal_blocks_cancelling_the_rest(stripe: FakeStripeClient, setti
         "apps.orders.tests.integration.test_amendments_apply.always_withdrawn"
     ]
     with pytest.raises(amendments.AmendmentRefused, match="withdrawn"):
-        amendments.cancel_rest_of_package(sub, actor=customer, ctx=CTX)
+        cancel_now(sub, actor=customer, ctx=CTX)
     assert Refund.objects.filter(vendor_order=sub).count() == 1
 
 
@@ -755,7 +784,7 @@ def test_an_amendment_cannot_refund_a_line_already_refunded(stripe: FakeStripeCl
         ctx=CTX,
     )
     with pytest.raises(amendments.AmendmentRefused):
-        amendments.apply_amendment(amendment, actor=actor, ctx=CTX, passkey_session=session)
+        apply_now(amendment, actor=actor, ctx=CTX, passkey_session=session)
     # ... and a new draft removing it again cannot refund it twice.
     again = draft(sub, actor, am.RemoveLine(key_of(sub, "B")))
     with pytest.raises(amendments.AmendmentRefused, match="refund the customer twice"):
@@ -811,8 +840,8 @@ def test_the_customer_cancels_the_rest_with_a_full_refund_and_the_vendors_fee(
     moment = timezone.now()
     apply(draft(sub, actor, am.RemoveLine(key_of(sub, "B"))), actor, now=moment)
     with pytest.raises(PermissionDenied):
-        amendments.cancel_rest_of_package(sub, actor=UserFactory.create(), ctx=CTX)
-    amendments.cancel_rest_of_package(sub, actor=customer, ctx=CTX, now=moment)
+        cancel_now(sub, actor=UserFactory.create(), ctx=CTX)
+    cancel_now(sub, actor=customer, ctx=CTX, now=moment)
     rest = Refund.objects.get(vendor_order=sub, cause="cancel_rest")
     assert rest.refunded_gross == D("134.20"), plainly(
         "cancelling the rest must refund what is left: 170.80 - 36.60 = 134.20",
@@ -842,7 +871,7 @@ def test_the_customer_keeps_the_rest_and_the_hold_ends(stripe: FakeStripeClient)
     sub.refresh_from_db()
     assert sub.state == "shipped"
     with pytest.raises(amendments.AmendmentRefused):
-        amendments.cancel_rest_of_package(sub, actor=customer, ctx=CTX)
+        cancel_now(sub, actor=customer, ctx=CTX)
 
 
 # --- owner decisions on #564 -------------------------------------------------------------------
@@ -918,7 +947,7 @@ def test_the_rest_refund_gives_back_all_the_commission_left(stripe: FakeStripeCl
     sub = place_seed(stripe, customer=customer)
     actor = owner_of(sub)
     apply(draft(sub, actor, am.RemoveLine(key_of(sub, "B"))), actor)
-    amendments.cancel_rest_of_package(sub, actor=customer, ctx=CTX)
+    cancel_now(sub, actor=customer, ctx=CTX)
     total = sum((r.commission_reversal for r in Refund.objects.filter(vendor_order=sub)), D("0"))
     assert total == D("13.00"), plainly(
         "once the whole package is refunded, all 13.00 of commission must be back",
@@ -983,3 +1012,163 @@ def test_the_unavailable_flag_survives_the_stored_draft() -> None:
         change = am.RemoveLine("k", unavailable=unavailable)
         assert am.change_from_json(am.change_to_json(change)) == change
     assert am.change_from_json({"kind": "remove_line", "line_key": "k"}) == am.RemoveLine("k")
+
+
+# --- lane-b cross-review of #564 ---------------------------------------------------------------
+
+
+def pending_refund(stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch) -> Refund:
+    """A seed package with B removed while Stripe does not know the payment: the refund stays
+    recorded and pending. Stripe learns the payment back afterwards."""
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    saved = {k: v for k, v in stripe.intents.items() if k == sub.order.payment_intent_ref}
+    for key in saved:
+        del stripe.intents[key]
+    apply(draft(sub, actor, am.RemoveLine(key_of(sub, "B"))), actor)
+    stripe.intents.update(saved)
+    return Refund.objects.get(vendor_order=sub)
+
+
+def test_one_bad_pending_refund_does_not_block_the_others(
+    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(refunds, "raise_alert", lambda alert, **kw: None)
+    bad, good = pending_refund(stripe, monkeypatch), pending_refund(stripe, monkeypatch)
+    real_send = refunds._send
+
+    def send(sub: VendorOrder, refund: Refund, **kw: Any) -> Any:
+        if refund.pk == bad.pk:
+            raise KeyError("a broken row")
+        return real_send(sub, refund, **kw)
+
+    monkeypatch.setattr(refunds, "_send", send)
+    assert refunds.submit_pending_refunds() == 1
+    bad.refresh_from_db()
+    good.refresh_from_db()
+    assert (bad.submission_pending, good.submission_pending) == (True, False), plainly(
+        "an unexpected error on one pending refund must not stop the sweep for the next one",
+        f"bad pending={bad.submission_pending}, good pending={good.submission_pending}",
+    )
+    assert AuditLog.objects.filter(
+        action="ledger.refund_submission_failed", target_key=str(bad.public_id)
+    ).exists()
+
+
+def test_the_sweep_reuses_the_key_and_a_second_submission_is_a_no_op(
+    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(refunds, "raise_alert", lambda alert, **kw: None)
+    refund = pending_refund(stripe, monkeypatch)
+    ctx = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
+    assert refunds.submit_pending_refund(str(refund.public_id), ctx=ctx)
+    calls = stripe.calls.count("create_refund")
+    assert refunds.submit_pending_refund(str(refund.public_id), ctx=ctx)
+    assert refunds.submit_pending_refunds() == 0
+    assert stripe.calls.count("create_refund") == calls, plainly(
+        "a refund already submitted must never reach the provider again",
+        f"{stripe.calls.count('create_refund') - calls} more call(s)",
+    )
+    refund.refresh_from_db()
+    assert f"re:{refund.idempotency_key}" in stripe._replies, plainly(
+        "the provider must have seen the refund's own idempotency key", "it did not"
+    )
+    assert LedgerEntry.objects.filter(vendor_order=refund.vendor_order, kind="refund").count() == 1
+
+
+def test_a_pending_refund_older_than_the_key_window_waits_for_staff(
+    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    alerts: list[str] = []
+    monkeypatch.setattr(refunds, "raise_alert", lambda alert, **kw: alerts.append(alert.key))
+    refund = pending_refund(stripe, monkeypatch)
+    calls = stripe.calls.count("create_refund")
+    later = timezone.now() + dt.timedelta(hours=21)
+    assert refunds.submit_pending_refunds(now=later) == 0
+    assert refunds.submit_pending_refunds(now=later) == 0
+    refund.refresh_from_db()
+    assert (refund.submission_pending, refund.provider_status) == (True, "needs_reconciliation")
+    assert stripe.calls.count("create_refund") == calls, plainly(
+        "a refund older than the provider's idempotency window must not be retried blindly",
+        "it was sent again",
+    )
+    assert alerts.count(f"refund-reconcile:{refund.public_id}") == 1
+
+
+def test_a_failed_provider_refund_posts_nothing(
+    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(refunds, "raise_alert", lambda alert, **kw: None)
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    stripe.refund_status = "failed"
+    before = rows(sub)
+    apply(draft(sub, actor, am.RemoveLine(key_of(sub, "B"))), actor)
+    refund = Refund.objects.get(vendor_order=sub)
+    assert (refund.provider_status, refund.submission_pending) == ("failed", False)
+    assert rows(sub) == before, plainly(
+        "a refund the provider reports failed must post no ledger line", f"{rows(sub)}"
+    )
+    assert_balanced(sub, "after a failed refund", versions=False)
+    sub.refresh_from_db()
+    assert sub.order.state == "paid", plainly(
+        "a failed refund must leave the order states alone", f"the order is {sub.order.state}"
+    )
+    assert AuditLog.objects.filter(action="ledger.refund_failed_at_provider").exists()
+
+
+def test_staff_apply_their_refund_with_the_order_amend_cancel_grant(
+    stripe: FakeStripeClient,
+) -> None:
+    from django.contrib.auth.models import Permission
+
+    sub = place_seed(stripe)
+    economy = ShippingMethodFactory.create(
+        vendor=sub.vendor,
+        zone=ShippingMethod.objects.get(vendor=sub.vendor).zone,
+        key="economy",
+        min_delivery_days=1,
+        max_delivery_days=5,
+    )
+    ShippingMethodTranslationFactory.create(method=economy, name="Economy", status="published")
+    WeightBandFactory.create(method=economy, from_kg=D("0"), to_kg=D("30"), cost_net=D("8.00"))
+    staff = UserFactory.create(is_staff=True)
+    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    amendment = draft(
+        sub,
+        staff,
+        am.ChangeCarrier(am.ShippingOffer("economy", "", D("0"))),
+        staff_note="customer called",
+    )
+    with pytest.raises(amendments.AmendmentRefused, match="platform staff"):
+        apply(amendment, owner_of(sub))
+    apply(amendment, staff)
+    refund = Refund.objects.get(vendor_order=sub)
+    assert refund.refunded_gross == D("2.44"), plainly(
+        "a cheaper carrier chosen by staff must refund 2.00 + 0.44", f"{refund.refunded_gross}"
+    )
+    spent = AuditLog.objects.get(action="accounts.session.single_used")
+    assert (spent.after or {})["action"] == "order_amend_cancel"
+
+
+def test_a_vendor_refund_grant_cannot_apply_a_staff_address_draft(
+    stripe: FakeStripeClient,
+) -> None:
+    from django.contrib.auth.models import Permission
+
+    sub = place_seed(stripe, milan_seller())
+    staff = UserFactory.create(is_staff=True)
+    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    amendment = draft(
+        sub, staff, fix_to_milan(), customer_request=CUSTOMER_ASKED, staff_note="customer called"
+    )
+    vendor = owner_of(sub)
+    ask = amendments.amendment_passkey(amendment)
+    assert ask is not None
+    session = secrets.token_hex(16)
+    levels.create_grant(session, vendor, "vendor_refund", ask.digest, ttl=120)
+    with pytest.raises(amendments.AmendmentRefused, match="platform staff"):
+        apply_now(amendment, actor=vendor, ctx=CTX, passkey_session=session)
+    with pytest.raises(amendments.PasskeyRequired):
+        apply_now(amendment, actor=staff, ctx=CTX, passkey_session=session)
+    assert not Refund.objects.filter(vendor_order=sub).exists()

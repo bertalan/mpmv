@@ -39,6 +39,7 @@ leaves `states_pending`, and the sweep or a replay of the request finishes them.
 """
 
 import datetime as dt
+import logging
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -90,6 +91,8 @@ from . import engine, refund_engine, services, settlement
 from .models import FeeExclusionReason, LedgerEntry, Refund, RefundChannel
 from .refund_engine import InvalidRefundRequest, LineFigures, RefundSelection
 
+logger = logging.getLogger(__name__)
+
 REFUND_MODEL = "ledger.refund"
 REFUND_RECORDED = "ledger.refund_recorded"
 REFUND_MARKED_OUTSIDE = "ledger.refund_marked_outside"
@@ -113,6 +116,11 @@ SUCCEEDED = "succeeded"
 FAILED_STATUSES = frozenset({"failed", "canceled"})
 REFUND_PENDING_SUBMISSION = "ledger.refund_pending_submission"
 REFUND_SUBMISSION_FAILED = "ledger.refund_submission_failed"
+REFUND_FAILED_AT_PROVIDER = "ledger.refund_failed_at_provider"
+# Stripe keeps an idempotency key about 24 hours. A pending refund older than this is not
+# retried automatically: a retry under an expired key could refund twice, so staff reconcile it
+# with the provider first (alerted once).
+RETRY_WINDOW = dt.timedelta(hours=20)
 
 
 class RefundRefused(ValueError):
@@ -198,7 +206,11 @@ def _already(sub: VendorOrder, channels: tuple[str, ...] = MOVED) -> dict[int, i
 
 
 def _group(sub: VendorOrder, channels: tuple[str, ...]) -> "QuerySet[Refund]":
-    return Refund.objects.filter(vendor_order=sub, channel__in=channels)
+    """The package's refunds of these channels, without those the provider reports as failed or
+    canceled: no money moved, so they count for nothing (no caps, no units, no fees)."""
+    return Refund.objects.filter(vendor_order=sub, channel__in=channels).exclude(
+        provider_status__in=FAILED_STATUSES
+    )
 
 
 def _sum(rows: "QuerySet[Any]", field: str) -> Decimal:
@@ -554,6 +566,18 @@ def _send(
         answer, pending = error.result, True  # the buyer IS refunded: record it, retry later
     else:
         pending = False
+    if answer.status in FAILED_STATUSES:
+        # The provider took the request but the money did not move: nothing is posted, the
+        # order states stay, and staff refund the customer another way within the deadline.
+        refund.provider_refund_ref = answer.refund_ref
+        refund.provider_status = answer.status[:24]
+        refund.submission_pending = False
+        refund.save()
+        failed = ChangeSet()
+        failed.create(REFUND_MODEL, str(refund.public_id), _created(refund))
+        audit_changes(failed, ctx=ctx, action=REFUND_FAILED_AT_PROVIDER)
+        _alert_failed(refund)
+        return failed
     final = lines_for(round_line(answer.provider_cost))
     refund.commission_reversal = final.commission_reversal
     refund.payment_fee_reversal = final.payment_fee_reversal
@@ -585,8 +609,6 @@ def _send(
             },
         )
         audit_changes(flagged, ctx=ctx, action=REFUND_FEE_EXCLUDED)
-    if answer.status in FAILED_STATUSES:
-        _alert_failed(refund)
     _apply_states(refund, ctx)
     return changes
 
@@ -616,7 +638,9 @@ def _exclusion_of(refund: Refund) -> FeeExclusion | None:
     return None
 
 
-def submit_pending_refund(refund_id: str, *, ctx: AuditContext) -> bool:
+def submit_pending_refund(
+    refund_id: str, *, ctx: AuditContext, now: dt.datetime | None = None
+) -> bool:
     """Submit a recorded amendment or cancel-the-rest refund to the provider (ORD.20), after the
     change that recorded it committed. Idempotent (the provider key is the refund's). A provider
     failure keeps it `submission_pending`, audited and alerted once; the sweep retries it. True
@@ -637,6 +661,18 @@ def submit_pending_refund(refund_id: str, *, ctx: AuditContext) -> bool:
         )
         if not refund.submission_pending:
             return True
+        if refund.created_at < (now or timezone.now()) - RETRY_WINDOW:
+            if refund.provider_status != "needs_reconciliation":
+                refund.provider_status = "needs_reconciliation"
+                refund.save(update_fields=["provider_status"])
+                _flag_submission(
+                    refund,
+                    ctx,
+                    "older than the provider's idempotency window: check the provider for a "
+                    "refund already made on this payment before submitting it again",
+                    escalated=True,
+                )
+            return False
         rule = _fee_rule(_snapshot_of(sub), sub.order.created_at)
         try:
             with transaction.atomic():
@@ -646,29 +682,53 @@ def submit_pending_refund(refund_id: str, *, ctx: AuditContext) -> bool:
             if not refund.provider_status:
                 refund.provider_status = "not_submitted"
                 refund.save(update_fields=["provider_status"])
-                flagged = ChangeSet()
-                flagged.create(
-                    REFUND_MODEL,
-                    str(refund.public_id),
-                    {VENDOR_FIELD: str(refund.vendor.public_id), "error": str(error)[:200]},
-                )
-                audit_changes(flagged, ctx=ctx, action=REFUND_SUBMISSION_FAILED)
-                raise_alert(
-                    Alert(
-                        f"refund-submission:{refund.public_id}",
-                        "A refund could not be submitted to the payment provider; it is retried",
-                        {"refund": str(refund.public_id), "order": sub.order.number},
-                    )
-                )
+                _flag_submission(refund, ctx, str(error)[:200])
             return False
     return True
 
 
-def submit_pending_refunds() -> int:
-    """The sweep: submit each refund still waiting for the provider; returns how many went."""
+def _flag_submission(
+    refund: Refund, ctx: AuditContext, error: str, *, escalated: bool = False
+) -> None:
+    """Audit and alert (once per refund and kind) a refund that did not reach the provider."""
+    flagged = ChangeSet()
+    flagged.create(
+        REFUND_MODEL,
+        str(refund.public_id),
+        {VENDOR_FIELD: str(refund.vendor.public_id), "error": error, "escalated": escalated},
+    )
+    audit_changes(flagged, ctx=ctx, action=REFUND_SUBMISSION_FAILED)
+    raise_alert(
+        Alert(
+            f"refund-{'reconcile' if escalated else 'submission'}:{refund.public_id}",
+            "A refund needs staff: check the payment provider before it is submitted again"
+            if escalated
+            else "A refund could not be submitted to the payment provider; it is retried",
+            {"refund": str(refund.public_id), "order": refund.vendor_order.order.number},
+        )
+    )
+
+
+def submit_pending_refunds(*, now: dt.datetime | None = None) -> int:
+    """The sweep: submit each refund still waiting for the provider; returns how many went. Each
+    refund is on its own: an unexpected error on one is logged, audited and alerted, and the
+    sweep goes on with the next."""
     ids = list(Refund.objects.filter(submission_pending=True).values_list("public_id", flat=True))
     ctx = AuditContext(actor_label="system:refund-submission", source=AuditLog.Source.SYSTEM)
-    return sum(submit_pending_refund(str(public_id), ctx=ctx) for public_id in ids)
+    done = 0
+    for public_id in ids:
+        try:
+            done += submit_pending_refund(str(public_id), ctx=ctx, now=now)
+        except Exception as error:
+            logger.exception("refund %s could not be submitted", public_id)
+            refund = (
+                Refund.objects.select_related("vendor", "vendor_order__order")
+                .filter(public_id=public_id)
+                .first()
+            )
+            if refund is not None:
+                _flag_submission(refund, ctx, f"{type(error).__name__}: {error}"[:200])
+    return done
 
 
 # --- ORD.20: the refunds of order amendments --------------------------------------------------
@@ -875,33 +935,50 @@ def refund_rest_of_package(
 
 
 def alert_refunds_near_due(*, now: dt.datetime | None = None) -> int:
-    """Alert staff for each refund with a 14-day `due_by` that the provider has not confirmed
-    4 days before it (ORD.20). Returns how many are alerted; `raise_alert` sends the email once
-    per refund and repeat window."""
+    """Alert staff about refunds with a 14-day `due_by` the provider has not confirmed (ORD.20):
+    once 4 days before the deadline, and once more, escalated, when the deadline has passed;
+    never again after that. Returns how many alerts went out."""
     moment = now or timezone.now()
-    late = Refund.objects.filter(
-        due_by__isnull=False,
-        succeeded_at__isnull=True,
-        due_by__lte=moment + dt.timedelta(days=REFUND_ALERT_DAYS_BEFORE),
+    unconfirmed = Refund.objects.filter(
+        due_by__isnull=False, succeeded_at__isnull=True
     ).select_related("vendor_order__order")
     count = 0
-    for refund in late:
-        raise_alert(
-            Alert(
-                f"refund-due:{refund.public_id}",
-                "A refund is not confirmed by the payment provider 4 days before its 14-day "
-                "deadline",
-                {
-                    "refund": str(refund.public_id),
-                    "order": refund.vendor_order.order.number,
-                    "due_by": refund.due_by.isoformat() if refund.due_by else "",
-                    "provider_status": refund.provider_status,
-                },
-            ),
-            now=moment,
+    near = unconfirmed.filter(
+        due_alerted_at__isnull=True,
+        due_by__gt=moment,
+        due_by__lte=moment + dt.timedelta(days=REFUND_ALERT_DAYS_BEFORE),
+    )
+    for refund in near:
+        _alert_due(refund, moment, overdue=False)
+        Refund.objects.filter(pk=refund.pk).update(due_alerted_at=moment)
+        count += 1
+    for refund in unconfirmed.filter(overdue_alerted_at__isnull=True, due_by__lte=moment):
+        _alert_due(refund, moment, overdue=True)
+        Refund.objects.filter(pk=refund.pk).update(
+            due_alerted_at=refund.due_alerted_at or moment, overdue_alerted_at=moment
         )
         count += 1
     return count
+
+
+def _alert_due(refund: Refund, moment: dt.datetime, *, overdue: bool) -> None:
+    raise_alert(
+        Alert(
+            f"refund-{'overdue' if overdue else 'due'}:{refund.public_id}",
+            "OVERDUE: a refund is still not confirmed by the payment provider after its 14-day "
+            "deadline; refund the customer now"
+            if overdue
+            else "A refund is not confirmed by the payment provider 4 days before its 14-day "
+            "deadline",
+            {
+                "refund": str(refund.public_id),
+                "order": refund.vendor_order.order.number,
+                "due_by": refund.due_by.isoformat() if refund.due_by else "",
+                "provider_status": refund.provider_status,
+            },
+        ),
+        now=moment,
+    )
 
 
 def _apply_states(refund: Refund, ctx: AuditContext) -> bool:

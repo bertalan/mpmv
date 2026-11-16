@@ -263,3 +263,16 @@ def test_the_cancel_the_rest_offer_needs_an_offer() -> None:
     sub = seed()
     with pytest.raises(amendments.AmendmentRefused, match="no offer"):
         amendments.cancel_rest_of_package(sub, actor=None, verified_guest=True, ctx=CTX)
+
+
+def test_the_digest_changes_with_the_shop_alone(monkeypatch: pytest.MonkeyPatch) -> None:
+    sub = seed()
+    amendment, _ = draft(sub, am.RemoveLine(key_of(sub, "SKU-B")))
+    assert amendment is not None
+    mine = amendments.amendment_passkey(amendment)
+    monkeypatch.setattr(levels, "shop_key", lambda shop: "vendors.vendor:other")
+    other = amendments.amendment_passkey(amendment)
+    assert getattr(mine, "digest", 1) != getattr(other, "digest", 1), plainly(
+        "the same amendment confirmed for another shop must have another digest",
+        "the digest stayed the same",
+    )

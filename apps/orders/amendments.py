@@ -25,6 +25,7 @@ never import orders.
 import datetime as dt
 import hashlib
 import json
+import logging
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
@@ -74,6 +75,7 @@ from .services import (
 )
 from .tz import business_tz
 
+logger = logging.getLogger(__name__)
 AmendmentRefused = am.AmendmentRefused
 AmendmentBlocked = am.AmendmentBlocked
 
@@ -85,6 +87,18 @@ class _DryRunRollback(Exception):
 
 
 # --- who acts -----------------------------------------------------------------------------------
+
+
+def _same_side(initiator: str, drafted_by: str) -> None:
+    """The platform and the shop never act on each other's drafts (staff limits, passkeys)."""
+    if initiator != drafted_by and (
+        initiator in am.STAFF_INITIATORS or drafted_by in am.STAFF_INITIATORS
+    ):
+        raise AmendmentRefused(
+            "This draft was started by "
+            + ("platform staff" if drafted_by in am.STAFF_INITIATORS else "the shop")
+            + ": only that side may change or apply it."
+        )
 
 
 def _scoped(vendor_order: VendorOrder, actor: User) -> VendorOrder:
@@ -793,7 +807,7 @@ def apply_amendment(
     customer may cancel the rest. A dry run needs no passkey, calls no provider and writes
     nothing; it returns the ChangeSet with the refund estimate."""
     sub = _scoped(amendment.vendor_order, actor)
-    initiator_of(actor, sub)
+    initiator = initiator_of(actor, sub)
     stamp = now or timezone.now()
     changeset = ChangeSet()
     refund_changes: list[Change] = []
@@ -807,6 +821,7 @@ def apply_amendment(
             )
             if locked.state != AmendmentState.DRAFT:
                 raise AmendmentRefused(f"Only a draft can be applied; this one is {locked.state}.")
+            _same_side(initiator, locked.initiator)
             before = _amendment_snapshot(locked)
             if locked_sub.current_version_id != locked.from_version_id:
                 # The version moved under the draft: it is superseded and nothing else moves.
@@ -845,8 +860,19 @@ def apply_amendment(
 
 
 def _submit(refund_id: str, ctx: AuditContext) -> None:
-    submit: Callable[..., bool] = import_string(settings.ORDER_REFUND_SUBMIT_HOOK)
-    submit(refund_id, ctx=ctx)
+    """Submit the recorded refund once the change that recorded it is committed: at once
+    outside a transaction, else on the real commit (`on_commit`). The change is already
+    committed, so a failure here never surfaces to the caller: it is logged, and the ledger's
+    sweep retries the refund (and alerts)."""
+
+    def go() -> None:
+        try:
+            submit: Callable[..., bool] = import_string(settings.ORDER_REFUND_SUBMIT_HOOK)
+            submit(refund_id, ctx=ctx)
+        except Exception:
+            logger.exception("refund %s left for the sweep", refund_id)
+
+    transaction.on_commit(go)
 
 
 def _write_next_version(
@@ -955,14 +981,7 @@ def revise_amendment(
             )
             if locked.state != AmendmentState.DRAFT:
                 raise AmendmentRefused(f"Only a draft can be edited; this one is {locked.state}.")
-            if initiator != locked.initiator and (
-                initiator in am.STAFF_INITIATORS or locked.initiator in am.STAFF_INITIATORS
-            ):
-                raise AmendmentRefused(
-                    "This draft was started by "
-                    + ("platform staff" if locked.initiator in am.STAFF_INITIATORS else "the shop")
-                    + ": discard it and start a new one instead of editing it."
-                )
+            _same_side(initiator, locked.initiator)
             new_reason = (reason if reason is not None else locked.reason).strip()
             new_note = (staff_note if staff_note is not None else locked.staff_note).strip()
             if not new_reason:

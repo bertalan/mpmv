@@ -175,6 +175,10 @@ class Refund(models.Model):
     # ORD.20: recorded with the change, not yet taken by the provider (submitted right after the
     # change commits; the sweep retries until the provider takes it).
     submission_pending = models.BooleanField(default=False)
+    # When staff were alerted that the refund is close to `due_by` (4 days before) and when it
+    # passed it unconfirmed: each alert goes once.
+    due_alerted_at = models.DateTimeField(null=True, blank=True)
+    overdue_alerted_at = models.DateTimeField(null=True, blank=True)
     succeeded_at = models.DateTimeField(null=True, blank=True)
 
     objects: ClassVar[VendorScopedManager["Refund"]] = VendorScopedManager()

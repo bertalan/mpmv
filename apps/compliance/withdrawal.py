@@ -47,8 +47,15 @@ from apps.core.services import (
     run_mutation,
 )
 from apps.core.services import enqueue_email as _enqueue_email
+from apps.orders import amendment_engine as am
 from apps.orders import amendments as order_amendments
-from apps.orders.models import CustomerTaxStatus, Order, PrivacyStatus, VendorOrder
+from apps.orders.models import (
+    CustomerTaxStatus,
+    Order,
+    PrivacyStatus,
+    VendorOrder,
+    VendorOrderVersion,
+)
 from apps.orders.tz import business_tz
 
 from . import engine
@@ -188,6 +195,18 @@ def _vendor_name(sub: VendorOrder) -> str:
 
 
 def _lines(sub: VendorOrder) -> tuple[dict[str, Any], ...]:
+    """The lines as the customer has them now: the current version after an order amendment
+    (ORD.20), else the lines as placed."""
+    version = (
+        VendorOrderVersion.objects.filter(pk=sub.current_version_id).first()
+        if sub.current_version_id
+        else None
+    )
+    if version is not None and version.number > 1:
+        return tuple(
+            {"title": line.title, "variant": line.variant_label, "quantity": line.quantity}
+            for line in am.VersionSnapshot.from_json(version.snapshot).lines
+        )
     return tuple(
         {"title": line.title, "variant": line.variant_label, "quantity": line.quantity}
         for line in sub.lines.order_by("id")

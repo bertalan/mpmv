@@ -596,7 +596,17 @@ the same CMP.24 approval.
   refunds the rest of a package gives back all the commission and collection cost left. A later
   refund by line reads the line of the current version. The refund is recorded with the version
   and submitted to the provider right after it commits; one the provider does not take stays
-  pending, is retried by the sweep and alerts staff.
+  pending, is retried by the sweep and alerts staff. A pending refund older than the provider's
+  idempotency window (20 hours) is not retried automatically: staff check the provider first. A
+  refund the provider reports `failed` or `canceled` posts nothing (no ledger line, no state
+  change, it counts for no cap) and alerts staff at once, who refund the customer another way
+  within the 14 days. Staff are alerted once 4 days before `due_by` and once, escalated, when it
+  has passed unconfirmed.
+- Design notes (ORD.20 part 2): a removal or a lower quantity is `unavailable` unless the vendor
+  says otherwise (part 3's screen asks explicitly); only unavailable units keep their stock, the
+  others restock. Each unavailable amendment opens the cancel-the-rest offer again and re-arms the
+  24-hour hold from its own apply. The offer stays open until shipping (the counsel clause), the
+  hold only blocks shipping for its hours.
 - **Refund-fee exemption (owner, 2026-11-16).** A refund that comes from an amendment **the
   customer asked for** (an amendment whose every change is an address correction marked as asked
   by the customer, with the recorded `customer_request`; the vendor's own record of the request
