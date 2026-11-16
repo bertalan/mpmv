@@ -27,6 +27,11 @@ NEW_CODES = {code for code, *_ in migration.SEED}
         (Destination("GR", "37002"), "gr-sporades"),  # Skiathos
         (Destination("GR", "37003"), "gr-sporades"),  # Skopelos
         (Destination("GR", "18010"), "gr-saronic-islands"),  # Aegina
+        (Destination("GR", "18020"), "gr-saronic-islands"),  # Poros
+        (Destination("GR", "18040"), "gr-saronic-islands"),  # Hydra
+        (Destination("GR", "18050"), "gr-saronic-islands"),  # Spetses
+        (Destination("GR", "34007"), "gr-sporades"),  # Skyros
+        (Destination("GR", "80100"), "gr-ionian-islands"),  # Kythira
         (Destination("GR", "18900"), "gr-saronic-islands"),  # Salamina
         (Destination("GB", "BT1 1AA"), "gb-northern-ireland"),
         (Destination("GB", "bt7 3ab"), "gb-northern-ireland"),
@@ -45,11 +50,12 @@ def test_new_areas_match_their_addresses(dest: Destination, area: str) -> None:
         Destination("GR", "10431"),  # Athens
         Destination("GR", "18510"),  # Piraeus
         Destination("GR", "18648"),  # Piraeus area
+        Destination("GR", "18030"),  # Methana peninsula, mainland (owner answer)
+        Destination("GR", "34100"),  # Chalkida (next to Skyros 34007)
         Destination("GR", "27100"),  # Pyrgos
         Destination("GR", "30100"),  # Agrinio
         Destination("GR", "48100"),  # Preveza
         Destination("GR", "38221"),  # Volos
-        Destination("GR", "34100"),  # Chalkida
         Destination("GB", "SW1A 1AA"),  # London
         Destination("GB", "G1 1AA"),  # Glasgow
         Destination("GB", "B1 1AA"),  # Birmingham, starts with B

@@ -4,13 +4,13 @@ Completes the SHP.14 seed (owner decision Q-97) from the postal code lists of th
 tables in use by vendors, cross-checked with the public Greek and UK postcode structure.
 
 - Greece, Ionian islands: 49* (Corfu and Paxoi), 28* (Kefalonia, Ithaca), 29* (Zakynthos), 31*
-  (Lefkada and Meganisi). Each of these two-digit prefixes is an island-only regional unit, so
+  (Lefkada and Meganisi) and 801* (Kythira and Antikythira). Each of these two-digit prefixes is an island-only regional unit, so
   none of them reaches mainland Greece (Patras 26*, Pyrgos 27*, Agrinio 30*, Preveza 48*).
-- Greece, Sporades: 370* (Skiathos, Skopelos, Alonissos). Skyros (34007) is not seeded: its
-  carrier zone coverage is unconfirmed, so it stays a follow-up.
-- Greece, Saronic islands: 180* (Aegina, Agistri, Poros, Hydra, Spetses) and 189* (Salamina).
-  Piraeus and the Athens basin use 181* to 188*, which stay mainland. The Methana peninsula
-  (18030) sits in 180* and is accepted as a known imprecision, to be reviewed by the owner.
+- Greece, Sporades: 370* (Skiathos, Skopelos, Alonissos) and 34007 (Skyros).
+- Greece, Saronic islands: the exact codes 18010 (Aegina, Agistri), 18020 (Poros), 18040
+  (Hydra), 18050 (Spetses) and 189* (Salamina). 180* is not used as a prefix: the Methana
+  peninsula (18030) is mainland by owner decision, and the pattern grammar has no exclusion.
+  Piraeus and the Athens basin use 181* to 188*, which stay mainland.
 - United Kingdom, Northern Ireland: BT*, a remote area priced "subject to quote" by default.
   It is a shipping area only: the tax territory logic (TAX.7, D-02) is unaffected, so the area
   carries no territory code and is not an extra-VAT kind.
@@ -28,9 +28,9 @@ REMOTE = 'remote'
 
 # (code, name, kind, countries, postcode patterns); frozen copies.
 SEED: list[tuple[str, str, str, list[str], list[str]]] = [
-    ('gr-ionian-islands', 'Ionian islands', ISLAND, ['GR'], ['49*', '28*', '29*', '31*']),
-    ('gr-sporades', 'Sporades (Skiathos, Skopelos, Alonissos)', ISLAND, ['GR'], ['370*']),
-    ('gr-saronic-islands', 'Saronic islands', ISLAND, ['GR'], ['180*', '189*']),
+    ('gr-ionian-islands', 'Ionian islands', ISLAND, ['GR'], ['49*', '28*', '29*', '31*', '801*']),
+    ('gr-sporades', 'Sporades (Skiathos, Skopelos, Alonissos)', ISLAND, ['GR'], ['370*', '34007']),
+    ('gr-saronic-islands', 'Saronic islands', ISLAND, ['GR'], ['18010', '18020', '18040', '18050', '189*']),
     ('gb-northern-ireland', 'Northern Ireland', REMOTE, ['GB'], ['BT*']),
 ]
 
