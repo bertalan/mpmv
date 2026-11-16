@@ -190,3 +190,38 @@ def test_the_deadline_is_the_nearer_of_idle_and_absolute() -> None:
     assert sp.lifetime_deadline(life, signed_in_at=start, last_seen=late) == start + 12 * 3600
     customer = sp.lifetime_of(sp.DEFAULT_POLICY, strict=False)
     assert sp.lifetime_deadline(customer, signed_in_at=start, last_seen=late) == late + 14 * DAY
+
+
+def test_staff_absolute_hours_boundary_is_72() -> None:
+    assert sp.parse_policy({"staff_absolute_hours": 72}).staff_absolute_hours == 72
+    with pytest.raises(ValueError, match="staff_absolute_hours"):
+        sp.parse_policy({"staff_absolute_hours": 73})
+
+
+def test_customer_days_boundary_is_365() -> None:
+    assert sp.parse_policy({"customer_days": 365}).customer_days == 365
+    with pytest.raises(ValueError, match="customer_days"):
+        sp.parse_policy({"customer_days": 366})
+
+
+def test_staff_idle_may_equal_the_absolute_lifetime_but_not_exceed_it() -> None:
+    ok = sp.parse_policy({"staff_absolute_hours": 2, "staff_idle_minutes": 120})
+    assert ok.staff_idle_minutes == 120
+    with pytest.raises(ValueError, match="staff_idle_minutes"):
+        sp.parse_policy({"staff_absolute_hours": 2, "staff_idle_minutes": 121})
+
+
+def test_staff_idle_has_its_own_ceiling_of_a_day_even_with_72_hours_absolute() -> None:
+    assert (
+        sp.parse_policy({"staff_absolute_hours": 72, "staff_idle_minutes": 1440}).staff_idle_minutes
+        == 1440
+    )
+    with pytest.raises(ValueError, match="staff_idle_minutes"):
+        sp.parse_policy({"staff_absolute_hours": 72, "staff_idle_minutes": 1441})
+
+
+@pytest.mark.parametrize("key", ["customer_days", "staff_absolute_hours", "staff_idle_minutes"])
+@pytest.mark.parametrize("value", [0, -1, True, 1.5, "7"])
+def test_lifetime_keys_refuse_non_positive_and_non_integer_values(key: str, value: object) -> None:
+    with pytest.raises(ValueError, match=key):
+        sp.parse_policy({key: value})
