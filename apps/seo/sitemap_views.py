@@ -4,11 +4,17 @@ With indexing off (the environment floor or the site's own switch, SEO.8) there 
 404, and robots.txt carries no `Sitemap:` line.
 """
 
+import hashlib
+
+from django.core.cache import cache
+from django.db.models import Count, Max
 from django.http import Http404, HttpRequest, HttpResponse
 from django.urls import reverse
 from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_safe
+from wagtail.models import Page, Site
 
+from apps.catalog.models import Product
 from apps.core.i18n import configured_languages, primary_language
 from apps.core.indexing import is_noindex
 from apps.core.site_url import absolute_url
@@ -29,8 +35,33 @@ def _require_indexing(request: HttpRequest) -> None:
 _cache = cache_control(private=True, max_age=300)
 
 
+CACHE_SECONDS = 300
+
+
+def _version(site: Site | None) -> str:
+    """A cheap fingerprint of the content a sitemap lists (two aggregate queries): the count and
+    the latest change of the pages and of the products. The short TTL covers the rest (a
+    vendor, brand or category change)."""
+    pages = Page.objects.live().aggregate(n=Count("pk"), last=Max("last_published_at"))
+    products = Product.objects.aggregate(n=Count("pk"), last=Max("updated_at"))
+    return (
+        f"{site.pk if site else 0}:{pages['n']}:{pages['last']}:{products['n']}:{products['last']}"
+    )
+
+
 def _chunks(request: HttpRequest, language: str, kind: str) -> list[list[engine.Entry]]:
-    return engine.chunk_entries(sitemaps.kind_entries(kind, language, request))
+    """The language's entries of one type in files of at most 50,000 URLs, built once per site,
+    language, type and content version for five minutes: the index and every part share them."""
+    version: str | None = getattr(request, "_sitemap_version", None)
+    if version is None:  # once per request: the index asks for every language
+        version = _version(Site.find_for_request(request))
+        request._sitemap_version = version  # type: ignore[attr-defined]
+    key = "sitemap:" + hashlib.sha256(f"{language}:{kind}:{version}".encode()).hexdigest()
+    chunks: list[list[engine.Entry]] | None = cache.get(key)
+    if chunks is None:
+        chunks = engine.chunk_entries(sitemaps.kind_entries(kind, language, request))
+        cache.set(key, chunks, CACHE_SECONDS)
+    return chunks
 
 
 def _file_names(language: str, kind: str, count: int) -> list[str]:

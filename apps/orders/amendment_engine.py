@@ -70,6 +70,17 @@ DEFAULT_COMPARABLE_DELAY_DAYS: Final = 2
 
 # An amendment is possible only before shipping (spec 07: "When").
 AMENDABLE_VENDOR_ORDER_STATES: Final = frozenset({"pending", "accepted"})
+# After a partial unavailability the package cannot be shipped for this many hours, unless the
+# customer answers the cancel-the-rest offer earlier (operator setting
+# `amendment_cancel_hold_hours`, default 24; the Manager setting comes with ORD.20 part 3).
+DEFAULT_CANCEL_HOLD_HOURS: Final = 24
+# A draft nobody touched for this long is discarded (spec 07, Concurrency).
+DRAFT_IDLE_MINUTES: Final = 60
+# CORE.25 critical actions of an amendment (spec 07, Roles and the passkey): one passkey each
+# time, bound to the amendment's digest and shop, even with the passkey window open.
+ACTION_ADDRESS: Final = "order_amend_address"
+ACTION_VENDOR_REFUND: Final = "vendor_refund"  # the PAY.7 grant
+ACTION_STAFF_REFUND: Final = "order_amend_cancel"
 
 
 class AmendmentRefused(ValueError):
@@ -386,15 +397,23 @@ class ShippingOffer:
 
 @dataclass(frozen=True)
 class RemoveLine:
+    """A line taken out of the package. `unavailable` (spec 07, Stock): the goods are not there,
+    so no stock comes back; a line removed for any other reason restocks its units."""
+
     kind: ClassVar[str] = "remove_line"
     line_key: str
+    unavailable: bool = True
 
 
 @dataclass(frozen=True)
 class ChangeQuantity:
+    """A new quantity for a line. A decrease with `unavailable` keeps no stock; otherwise the
+    units taken out come back to stock."""
+
     kind: ClassVar[str] = "quantity"
     line_key: str
     quantity: int
+    unavailable: bool = True
 
 
 @dataclass(frozen=True)
@@ -494,10 +513,10 @@ def change_to_json(change: AmendmentChange, *, with_address: bool = True) -> dic
     audit trail keeps no personal data)."""
     data: dict[str, Any] = {"kind": change.kind}
     match change:
-        case RemoveLine(line_key=key):
-            data["line_key"] = key
-        case ChangeQuantity(line_key=key, quantity=quantity):
-            data.update(line_key=key, quantity=quantity)
+        case RemoveLine(line_key=key, unavailable=unavailable):
+            data.update(line_key=key, unavailable=unavailable)
+        case ChangeQuantity(line_key=key, quantity=quantity, unavailable=unavailable):
+            data.update(line_key=key, quantity=quantity, unavailable=unavailable)
         case ChangePrice(line_key=key, unit_price_net=price):
             data.update(line_key=key, unit_price_net=str(price))
         case AddLine(line=line):
@@ -536,9 +555,11 @@ def scrub_changes(changes: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
 def change_from_json(data: Mapping[str, Any]) -> AmendmentChange:
     kind = data.get("kind")
     if kind == RemoveLine.kind:
-        return RemoveLine(str(data["line_key"]))
+        return RemoveLine(str(data["line_key"]), bool(data.get("unavailable", True)))
     if kind == ChangeQuantity.kind:
-        return ChangeQuantity(str(data["line_key"]), int(data["quantity"]))
+        return ChangeQuantity(
+            str(data["line_key"]), int(data["quantity"]), bool(data.get("unavailable", True))
+        )
     if kind == ChangePrice.kind:
         return ChangePrice(str(data["line_key"]), _dec(data["unit_price_net"]))
     if kind == AddLine.kind:

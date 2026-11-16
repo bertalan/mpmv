@@ -142,7 +142,7 @@ def test_the_cart_groups_lines_by_vendor_package(client: Client) -> None:
     html = client.get(reverse("orders:cart")).content.decode()
     assert html.index("Sold by Alpha Shop") < html.index("Blue vase")
     assert html.index("Blue vase") < html.index("Sold by Beta Shop") < html.index("Red cup")
-    assert f"€{NBSP}30.00" in html  # unit price, excluding VAT
+    assert f"€{NBSP}36.60" in html  # unit price with VAT, estimated IT 22 % (TAX.12)
     assert "worked out at checkout" in html  # no address yet: no totals
 
 

@@ -188,6 +188,7 @@ def test_applied_filter_chips_link_to_the_canonical_url_without_them(
     }
 
 
+@pytest.mark.usefixtures("consumer_prices")
 def test_product_cards_show_title_link_and_public_price(
     client: Client, shop: dict[str, Any]
 ) -> None:
@@ -201,17 +202,17 @@ def test_product_cards_show_title_link_and_public_price(
     assert it_page.find("a", string=re.compile("Steel bag IT"))["href"] == (
         "/it/prodotto/steel-bag-it/"
     )
-    # The machine-readable price is never localised (the IT page shows "12,50").
-    assert it_page.find("data")["value"] == "12.50"
-    assert "12.50" in priced.get_text()
+    # The consumer price with Italian VAT (TAX.12): 12.50 + 22 % = 15.25. The machine-readable
+    # price is never localised (the IT page shows "15,25").
+    assert it_page.find("data")["value"] == "15.25"
+    assert "15.25" in priced.get_text()
     assert "Price on request" in by_title["Custom bag"].get_text()
 
 
-@pytest.mark.xfail(strict=True, reason="TAX.12: consumer prices must be VAT-inclusive")
+@pytest.mark.usefixtures("consumer_prices")
 def test_a_consumer_card_shows_a_vat_inclusive_price(client: Client, shop: dict[str, Any]) -> None:
-    """Go-live marker (TAX.12, Directive 98/6/EC): CAT.8 cards show the net price "excl. VAT"
-    as an interim. When TAX.12 makes consumer cards VAT-inclusive this test passes, strict xfail
-    fails the suite, and the marker must be removed."""
+    """Go-live gate (TAX.12, Directive 98/6/EC): a consumer card shows the gross price with the
+    owner's note, never the net price "excl. VAT"."""
     card = next(
         card
         for card in soup(client, "/compatibility/maker/").find_all("article", class_="product-card")
@@ -219,7 +220,9 @@ def test_a_consumer_card_shows_a_vat_inclusive_price(client: Client, shop: dict[
     )
     text = card.get_text(" ", strip=True)
     assert "excl. VAT" not in text
-    assert "VAT included" in text
+    assert "12.50" not in text
+    assert "15.25" in text
+    assert "Indicative price. Final amount at checkout." in text
 
 
 def test_the_pagination_nav(

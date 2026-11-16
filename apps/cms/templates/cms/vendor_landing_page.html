@@ -11,7 +11,7 @@ a link to its storefront. Its own canonical and `hreflang` come from the base la
     {% if featured.cards %}
       <section class="vendor-landing-products" aria-labelledby="vendor-landing-products-heading">
         <h2 id="vendor-landing-products-heading">{% translate "Featured products" %}</h2>
-        {% include "cms/includes/product_tiles.html" with cards=featured.cards currency=currency heading_level=3 only %}
+        {% include "cms/includes/product_tiles.html" with request=request cards=featured.cards currency=currency heading_level=3 only %}
         {% if featured.see_all_url %}<p class="block-links"><a class="product-grid-all" href="{{ featured.see_all_url }}">{% blocktranslate with name=featured.name %}See all<span class="visually-hidden"> products: {{ name }}</span>{% endblocktranslate %}</a></p>{% endif %}
       </section>
     {% endif %}

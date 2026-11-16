@@ -34,7 +34,7 @@ def llms_txt(language: str, request: HttpRequest) -> str:
     site = Site.find_for_request(request)
     title, summary = _site_summary(site, language)
     sections = [
-        (heading, list(sitemaps.kind_entries(kind, language, request)))
+        (heading, list(sitemaps.kind_entries(kind, language, request, titles=True)))
         for heading, kind in SECTIONS
     ]
     return llms_engine.llms_text(title or "Marketplace", summary, sections)

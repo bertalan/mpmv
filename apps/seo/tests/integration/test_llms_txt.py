@@ -2,6 +2,7 @@
 language, built from the same data as the sitemaps, on the site's root URL, never the Host."""
 
 import re
+from urllib.parse import urlsplit
 
 import pytest
 from django.apps import apps
@@ -79,7 +80,7 @@ def test_llms_txt_is_markdown_text_with_title_and_sections(client: Client) -> No
     assert found["Mugs llms"] == root + slugs.category_path(
         PRIMARY, ["cat-llms"], default_language=PRIMARY
     )
-    assert found["About us llms"] == root + page.get_url()
+    assert found["About us llms"] == root + urlsplit(page.get_url()).path
     assert all(url.startswith(root + "/") for url in found.values())
 
 

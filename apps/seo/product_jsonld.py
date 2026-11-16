@@ -3,9 +3,10 @@ to the pure `product_graph` functions. Reads catalog, vendors and shipping; writ
 
 Rules (spec 10 "Product node"):
 - No `offers` for a product that is not sold online (`page.price is None`: on request, Q-31, or
-  catalogue only, Q-33). The price is the public price of the page, never recomputed here. It is
-  the interim net price until TAX.12 supplies the gross one (`_offer_price`, the one place that
-  switches to the TAX.12 adapter, with `valueAddedTaxIncluded: true`).
+  catalogue only, Q-33). The price is the consumer price with VAT of TAX.12
+  (`apps.tax.prices.consumer_price(...).gross`, `valueAddedTaxIncluded: true`), for the same
+  request as the visible price, so the two always match. When TAX.12 cannot decide it
+  (`PriceUnavailable`) the offer has no price, never a net one.
 - `gtin` and `mpn` come from the product fields, `sku` is the vendor's SKU label.
 - The seller is the vendor's `Organization`, never the operator.
 - `priceValidUntil` only from a sale end date: the page does not price a sale yet, so none.
@@ -22,11 +23,13 @@ Rules (spec 10 "Product node"):
   `brand` reference resolves.
 """
 
+import logging
 from decimal import Decimal
 from typing import Any
 from urllib.parse import quote
 
 from django.conf import settings
+from django.http import HttpRequest
 from django.utils import translation
 
 from apps.catalog import engine as catalog_engine
@@ -37,9 +40,12 @@ from apps.catalog.product_pages import GalleryImage, ProductPage
 from apps.core.money import CURRENCY
 from apps.shipping import engine as shipping_engine
 from apps.shipping import services as shipping
+from apps.tax.prices import PriceUnavailable, consumer_price, estimated_country
 from apps.vendors.models import Vendor
 
 from . import product_graph as pg
+
+logger = logging.getLogger(__name__)
 
 WITHDRAWAL_DAYS = 14
 
@@ -113,8 +119,26 @@ def _home_label(language: str) -> str:
         return str(translation.gettext("Home"))
 
 
+def _shipping_rate(
+    page: ProductPage, net: Decimal, zone: frozenset[str] | set[str], request: HttpRequest | None
+) -> Decimal | None:
+    """The shipping price with VAT (TAX.12; shipping follows the goods, TAX.17) for the visitor's
+    destination; None when that destination is not in the zone or TAX.12 cannot decide it,
+    so the node carries no rate rather than a net one."""
+    country, _estimated = estimated_country(request)
+    if shipping_engine.WORLD not in zone and country not in zone:
+        return None
+    try:
+        return consumer_price(
+            net, page.product.fiscal_category, vendor=page.vendor, request=request
+        ).gross
+    except PriceUnavailable as exc:
+        logger.warning("JSON-LD shipping rate omitted (%s): %s", page.product.fiscal_category, exc)
+        return None
+
+
 def _shipping_nodes(
-    page: ProductPage, url: str, language: str
+    page: ProductPage, url: str, language: str, request: HttpRequest | None = None
 ) -> tuple[list[dict[str, Any]], list[str], set[str]]:
     """Nodes, their ids and the countries of the vendor's zones (empty set: nothing known).
     The countries do not depend on the product's weight; the shipping nodes do."""
@@ -132,11 +156,14 @@ def _shipping_nodes(
         band = None if weight is None else next((b for b in method.bands if b.holds(weight)), None)
         if band is None:
             continue
+        rate = _shipping_rate(page, band.price, zone, request)
+        if rate is None:
+            continue  # shippingRate is required by Google: no gross rate, no node
         nodes.append(
             pg.shipping_node(
                 node_id=f"{url}#shipping-{method.key}",
                 countries=sorted(listed),
-                rate=band.price,
+                rate=rate,
                 currency=CURRENCY,
                 min_days=method.min_delivery_days,
                 max_days=method.max_delivery_days,
@@ -145,13 +172,16 @@ def _shipping_nodes(
     return nodes, [str(node["@id"]) for node in nodes], countries
 
 
-def _offer_price(page_price: Decimal) -> tuple[Decimal, bool]:
-    """The offer's price and whether it includes VAT. Today the page's interim net price.
-
-    TODO(TAX.12): swap in the TAX.12 gross-price adapter (VAT-inclusive at the estimated
-    destination rate, `valueAddedTaxIncluded: true`); this is the only place that changes.
-    """
-    return page_price, False
+def _offer_price(page: ProductPage, net: Decimal, request: HttpRequest | None) -> Decimal | None:
+    """The consumer price with VAT (TAX.12) the page shows for `net`; None when TAX.12 cannot
+    decide it, so the offer carries no price rather than a net one."""
+    try:
+        return consumer_price(
+            net, page.product.fiscal_category, vendor=page.vendor, request=request
+        ).gross
+    except PriceUnavailable as exc:
+        logger.warning("JSON-LD offer without a price (%s): %s", page.product.fiscal_category, exc)
+        return None
 
 
 def _offer(
@@ -162,23 +192,29 @@ def _offer(
     url: str,
     node_id: str,
     refs: dict[str, Any],
+    request: HttpRequest | None,
 ) -> pg.OfferData | None:
     if price is None:
         return None
-    amount, includes_vat = _offer_price(price)
+    gross = _offer_price(page, price, request)
+    if gross is None:
+        return None
     return pg.OfferData(
-        price=amount,
+        price=gross,
         currency=CURRENCY,
         availability="discontinued" if page.retired else status,
         url=url,
-        price_includes_vat=includes_vat,
+        price_includes_vat=True,
         node_id=node_id,
         **refs,
     )
 
 
-def build_graph(page: ProductPage, *, site: str) -> dict[str, Any]:
-    """The product page's graph; `site` is the origin, like `https://shop.example`."""
+def build_graph(
+    page: ProductPage, *, site: str, request: HttpRequest | None = None
+) -> dict[str, Any]:
+    """The product page's graph; `site` is the origin, like `https://shop.example`. `request`
+    gives the price destination, as for the visible price (TAX.12)."""
     language = page.shown
     url = f"{site}{page.canonical_path}"
     vendor: Vendor = page.vendor
@@ -192,7 +228,7 @@ def build_graph(page: ProductPage, *, site: str) -> dict[str, Any]:
     shipping_ids: list[str] = []
     return_policy: dict[str, Any] | None = None
     if sold:
-        shipping_nodes, shipping_ids, countries = _shipping_nodes(page, url, language)
+        shipping_nodes, shipping_ids, countries = _shipping_nodes(page, url, language, request)
         if countries:
             return_policy = pg.return_policy_node(
                 node_id=f"{vendor_url}#return-policy",
@@ -217,6 +253,7 @@ def build_graph(page: ProductPage, *, site: str) -> dict[str, Any]:
                 url=url,
                 node_id=f"{url}#offer-{quote(choice.sku, safe='')}",
                 refs=refs,
+                request=request,
             ),
         )
         for choice in page.variants
@@ -240,20 +277,32 @@ def build_graph(page: ProductPage, *, site: str) -> dict[str, Any]:
         images=tuple(_image(image, site) for image in page.gallery),
         weight_kg=page.product.weight_kg,
         offer=_offer(
-            page, page.price, page.stock_status, url=url, node_id=f"{url}#offer", refs=refs
+            page,
+            page.price,
+            page.stock_status,
+            url=url,
+            node_id=f"{url}#offer",
+            refs=refs,
+            request=request,
         ),
         variants=variants,
         varies_by=_varies_by(page, language) if variants else (),
     )
+    has_offer = data.offer is not None or any(v.offer is not None for v in variants)
+    if not has_offer:
+        # Nothing references the seller, return policy or shipping nodes: no orphans.
+        seller_node, return_policy, shipping_nodes = None, None, []
+    else:
+        seller_node = seller
     return pg.product_graph(
         product=data,
         breadcrumb=pg.breadcrumb_node(page_url=url, items=_crumbs(page, site, url)),
-        seller=seller if sold else None,
+        seller=seller_node if sold else None,
         return_policy=return_policy,
         shipping=shipping_nodes,
         linked=linked,
     )
 
 
-def graph_text(page: ProductPage, *, site: str) -> str:
-    return pg.graph_text(build_graph(page, site=site))
+def graph_text(page: ProductPage, *, site: str, request: HttpRequest | None = None) -> str:
+    return pg.graph_text(build_graph(page, site=site, request=request))
