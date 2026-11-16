@@ -741,3 +741,74 @@ def test_a_closed_amendment_is_frozen() -> None:
     with pytest.raises(PermissionError):
         amendment.delete()
     assert OrderAmendment.objects.get(pk=amendment.pk).reason == "Out of stock at the supplier"
+
+
+# --- owner decision 2026-11-16, choice 4: a lighter package re-quotes its shipping ----------
+
+
+def banded_seller(light: str) -> Vendor:
+    """A vendor without OSS whose standard method costs `light` up to 1 kg and 10.00 above:
+    the seed (1.5 kg) pays 10.00; without B (1.0 kg) the light band applies."""
+    found = VendorFactory.create(status=Vendor.Status.ACTIVE, country="IT", sells_online=True)
+    VendorTaxProfileFactory.create(vendor=found, valid_from=utc(2026, 1, 1))
+    standard = ShippingMethodFactory.create(
+        vendor=found,
+        zone=ShippingZoneFactory.create(countries=["IT"]),
+        key="standard",
+        is_default=True,
+        min_delivery_days=1,
+        max_delivery_days=5,
+    )
+    ShippingMethodTranslationFactory.create(method=standard, name="Standard", status="published")
+    WeightBandFactory.create(method=standard, from_kg=D("0"), to_kg=D("1"), cost_net=D(light))
+    WeightBandFactory.create(method=standard, from_kg=D("1"), to_kg=D("30"), cost_net=D("10.00"))
+    return found
+
+
+def test_a_removal_into_a_cheaper_band_refunds_the_shipping_difference() -> None:
+    sub = seed(banded_seller("6.00"))
+    amendment, _ = draft(sub, am.RemoveLine(key_of(sub, "SKU-B")))
+    assert amendment is not None
+    # 36.60 for B, plus 4.00 shipping net and its 0.88 VAT at the original 22 %.
+    assert amendment.preview["refund"] == "41.48", plainly(
+        "removing B moves the package into the 6.00 band, so the refund must be 36.60 + 4.88 = "
+        "41.48",
+        f"the draft refunds {amendment.preview['refund']}",
+    )
+    shipping = [m for m in amendment.preview["tax_movements"] if m["part"] == "shipping"]
+    v1_day = am.VersionSnapshot.from_json(sub.versions.get().snapshot).shipping.portions[0].tax_on
+    assert [(m["tax"], m["rate"], m["tax_on"]) for m in shipping] == [
+        ("-0.88", "22.000", v1_day.isoformat())
+    ], plainly(
+        "the shipping VAT must be reversed at its original 22 % and date", f"it moved {shipping}"
+    )
+    assert amendment.kind == "minor", plainly(
+        "a removal that also lowers the shipping must stay minor", f"it was {amendment.kind}"
+    )
+
+
+@pytest.mark.parametrize("light", ["12.00", "10.00"])
+def test_a_removal_into_a_dearer_or_equal_band_moves_no_shipping_money(light: str) -> None:
+    sub = seed(banded_seller(light))
+    amendment, _ = draft(sub, am.RemoveLine(key_of(sub, "SKU-B")))
+    assert amendment is not None
+    assert amendment.preview["refund"] == "36.60", plainly(
+        f"with the lighter band at {light} the customer keeps the 10.00 shipping paid, so "
+        "removing B must refund exactly 36.60",
+        f"the draft refunds {amendment.preview['refund']}",
+    )
+    assert amendment.preview["after"]["shipping_net"] == "10.00", plainly(
+        "the shipping price paid must stay 10.00", f"it is {amendment.preview['after']}"
+    )
+    assert amendment.kind == "minor"
+
+
+def test_a_lower_quantity_into_a_cheaper_band_refunds_the_shipping_difference() -> None:
+    sub = seed(banded_seller("6.00"))
+    amendment, _ = draft(sub, am.ChangeQuantity(key_of(sub, "SKU-A"), 1))
+    assert amendment is not None
+    assert amendment.preview["refund"] == "65.88", plainly(
+        "one A fewer (61.00 gross) brings the package to 1.0 kg and the 6.00 band, so the refund "
+        "must be 61.00 + 4.88 = 65.88",
+        f"the draft refunds {amendment.preview['refund']}",
+    )

@@ -588,6 +588,10 @@ class RecomputeContext:
     tax: TaxContext
     address_before: Mapping[str, Any]
     categories: Mapping[str, str] = field(default_factory=dict)
+    # Owner decision 2026-11-16 (choice 4): the package's own method quoted again for the lower
+    # weight after a removal or a lower quantity. None when not re-quoted, or when the re-quote
+    # failed or needs a quote: the customer keeps the shipping price paid.
+    requoted_shipping_net: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -943,6 +947,16 @@ def recompute_vendor_order(
             case ChangeDeliveryTime(max_days=max_days, min_days=min_days):
                 shipping = replace(shipping, max_days=max_days, min_days=min_days)
 
+    if (
+        ctx.requoted_shipping_net is not None
+        and lowers_weight(version, changes)
+        and not any(isinstance(c, ChangeCarrier | ChangeAddress) for c in changes)
+        and ctx.requoted_shipping_net < shipping.net
+    ):
+        # Owner decision 2026-11-16 (choice 4): a cheaper band after a lighter package refunds
+        # the difference; the shipping VAT is reversed at its original rate and date (the split
+        # below keeps the portions' `tax_on`). Same or dearer: the price paid stays.
+        shipping = replace(shipping, net=ctx.requoted_shipping_net)
     territory_changed = territory_after != territory_before
     if territory_changed:  # a change of regime: every line reversed and taxed again
         for key in order:
@@ -986,6 +1000,18 @@ def recompute_vendor_order(
         vendor_absorbs=vendor_absorbs,
         tax_movements=tuple(movements),
     )
+
+
+def lowers_weight(version: VersionSnapshot, changes: Sequence[AmendmentChange]) -> bool:
+    """Whether the changes make the package lighter: a removed line or a lower quantity."""
+    for change in changes:
+        if isinstance(change, RemoveLine):
+            return True
+        if isinstance(change, ChangeQuantity):
+            line = version.line(change.line_key)
+            if line is not None and change.quantity < line.quantity:
+                return True
+    return False
 
 
 def version_keys(version: VersionSnapshot) -> list[str]:

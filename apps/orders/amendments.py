@@ -302,9 +302,41 @@ def _recompute(
     )
     try:
         preview = am.recompute_vendor_order(snapshot, resolved, ctx)
+        requoted = _requote_lighter(sub, snapshot, preview, resolved, address_after)
+        if requoted is not None:
+            ctx = replace(ctx, requoted_shipping_net=requoted)
+            preview = am.recompute_vendor_order(snapshot, resolved, ctx)
     except tax_engine.BlockingTaxError as error:
         raise AmendmentRefused(f"VAT cannot be decided for this change ({error}).") from None
     return preview, resolved, address_after
+
+
+def _requote_lighter(
+    sub: VendorOrder,
+    snapshot: am.VersionSnapshot,
+    preview: am.AmendmentPreview,
+    changes: Sequence[am.AmendmentChange],
+    address: Mapping[str, Any],
+) -> Decimal | None:
+    """Owner decision 2026-11-16 (choice 4): after a removal or a lower quantity, quote the
+    package's same method again for the lighter package (snapshot weights). Returns the new net,
+    or None when nothing is re-quoted: no lighter package, a carrier or address change (they
+    quote on their own), or a re-quote that fails or needs a quote (the price paid stays)."""
+    if not am.lowers_weight(snapshot, changes) or any(
+        isinstance(c, am.ChangeCarrier | am.ChangeAddress) for c in changes
+    ):
+        return None
+    try:
+        destination = shipping_engine.Destination(
+            str(address.get("country") or snapshot.destination_country),
+            str(address.get("postcode") or ""),
+            str(address.get("state") or ""),
+        )
+        rates = _rates(sub, preview.after, destination, "the delivery address")
+    except (AmendmentRefused, InvalidCountry):
+        return None
+    rate = next((r for r in rates if r.key == snapshot.shipping.key), None)
+    return None if rate is None else rate.net
 
 
 # --- snapshots for the audit trail (no address: personal data) ---------------------------------
