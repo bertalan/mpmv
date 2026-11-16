@@ -8,6 +8,7 @@ outside `/manager/`.
 from django.urls import include, path
 
 from . import (
+    amendment_views,
     event_block_views,
     event_views,
     media,
@@ -75,6 +76,28 @@ shop = (
         ),
         path("orders/", views.VendorOrderListView.as_view(), name="orders"),
         path("orders/<uuid:public_id>/", views.VendorOrderDetailView.as_view(), name="order"),
+        # ORD.20 part 3: change a paid order (draft, preview, apply with the passkey, discard).
+        # Before `order_action`, whose slug would also match "amend".
+        path(
+            "orders/<uuid:public_id>/amend/",
+            amendment_views.ShopAmendView.as_view(),
+            name="order_amend",
+        ),
+        path(
+            "orders/<uuid:public_id>/amend/<uuid:amendment>/apply/",
+            amendment_views.ShopAmendmentApplyView.as_view(),
+            name="amendment_apply",
+        ),
+        path(
+            "orders/<uuid:public_id>/amend/<uuid:amendment>/discard/",
+            amendment_views.ShopAmendmentDiscardView.as_view(),
+            name="amendment_discard",
+        ),
+        path(
+            "orders/<uuid:public_id>/amend/cancel/",
+            amendment_views.ShopCancelView.as_view(),
+            name="order_cancel",
+        ),
         path(
             "orders/<uuid:public_id>/<slug:action>/",
             views.VendorOrderActionView.as_view(),
@@ -157,6 +180,34 @@ platform = (
         path("notices/", notice_views.NoticeListView.as_view(), name="notices"),
         path("notices/<uuid:public_id>/", notice_views.NoticeDetailView.as_view(), name="notice"),
         path("terminations/", termination_views.TerminationListView.as_view(), name="terminations"),
+        # ORD.20 part 3: the staff tools on a paid order (Support and the platform owner).
+        path("orders/", amendment_views.PlatformOrdersView.as_view(), name="orders"),
+        path(
+            "orders/<uuid:public_id>/",
+            amendment_views.PlatformAmendView.as_view(),
+            name="order",
+        ),
+        path(
+            "orders/<uuid:public_id>/amendments/<uuid:amendment>/apply/",
+            amendment_views.PlatformAmendmentApplyView.as_view(),
+            name="amendment_apply",
+        ),
+        path(
+            "orders/<uuid:public_id>/amendments/<uuid:amendment>/discard/",
+            amendment_views.PlatformAmendmentDiscardView.as_view(),
+            name="amendment_discard",
+        ),
+        path(
+            "orders/<uuid:public_id>/cancel/",
+            amendment_views.PlatformCancelView.as_view(),
+            name="order_cancel",
+        ),
+        # The three order-amendment settings, read-only (configuration role and the owner).
+        path(
+            "settings/order-changes/",
+            amendment_views.AmendmentSettingsView.as_view(),
+            name="amendment_settings",
+        ),
         path(
             "terminations/<uuid:public_id>/",
             termination_views.TerminationDetailView.as_view(),
