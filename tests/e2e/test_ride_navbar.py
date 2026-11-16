@@ -1,6 +1,6 @@
 """E2E (THM.15 part 1): the `ride` header as a Bootstrap navbar (spec 14 §14.6).
 
-Dropdown sub-menus and the offcanvas mobile menu (below md, 768 px) work with the keyboard alone:
+Dropdown sub-menus and the offcanvas mobile menu (below 64rem) work with the keyboard alone:
 the offcanvas opens from its toggler, traps focus, closes with Escape and returns focus to the
 toggler; a dropdown opens and closes with the keyboard; axe `wcag22aa` is clean and nothing
 raises a `securitypolicyviolation` at 360, 768 and 1280 px.
@@ -92,7 +92,7 @@ def test_the_offcanvas_menu_traps_focus_and_returns_it_on_escape(
 def test_a_dropdown_opens_and_closes_with_the_keyboard(page: Page, live_server: LiveServer) -> None:
     open_home(page, live_server, 1280)
     toggle = page.locator("[data-bs-toggle='dropdown']")
-    menu = page.locator("#subnav-1")
+    menu = page.locator("#subnav-2")
     expect(toggle).to_have_attribute("aria-expanded", "false")
     toggle.focus()
     page.keyboard.press("Enter")

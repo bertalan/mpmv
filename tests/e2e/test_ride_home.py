@@ -91,7 +91,7 @@ def test_the_home_page_renders_with_ride_at_every_width(
     assert page.evaluate("() => document.fonts.check(\"400 1em 'Barlow'\")")
     assert page.evaluate(NO_SIDEWAYS_SCROLL)
     toggle = page.locator(".nav-toggle")
-    if width >= 768:  # md
+    if width >= 1024:  # 64rem
         expect(page.get_by_role("navigation", name="Main")).to_be_visible()
         expect(toggle).to_be_hidden()
     else:
@@ -103,7 +103,7 @@ def test_the_home_page_renders_with_ride_at_every_width(
     shot(str(width))
 
 
-def test_the_burger_menu_opens_and_closes_below_md(
+def test_the_burger_menu_opens_and_closes_below_64rem(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     width = 360

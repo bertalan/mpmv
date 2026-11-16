@@ -40,9 +40,9 @@ def test_the_header_is_a_dark_bar_with_the_logo_first_and_a_labelled_nav() -> No
     assert re.search(r'<nav[^>]+aria-label="Main"', html)
 
 
-def test_the_header_is_a_bootstrap_navbar_that_expands_at_md() -> None:
+def test_the_header_is_a_bootstrap_navbar_that_expands_at_lg() -> None:
     html = render("components/header.html", site_name="Ride", links=LINKS)
-    assert re.search(r'class="[^"]*\bnavbar\b[^"]*\bnavbar-expand-md\b', html)
+    assert re.search(r'class="[^"]*\bnavbar\b[^"]*\bnavbar-expand-lg\b', html)
     assert 'class="site-name' in html
 
 
@@ -53,8 +53,8 @@ def test_a_submenu_is_a_bootstrap_dropdown_button_with_aria_expanded_never_hover
     assert len(sub) == 1
     assert 'aria-expanded="false"' in sub[0]
     assert 'type="button"' in sub[0]
-    assert 'aria-controls="subnav-1"' in sub[0]
-    assert 'id="subnav-1"' in html
+    assert 'aria-controls="subnav-2"' in sub[0]
+    assert 'id="subnav-2"' in html
     assert 'class="dropdown-menu' in html
     # the parent link stays reachable, and the children are plain links in a list
     assert 'href="/vendors/"' in html
