@@ -1,0 +1,12 @@
+{% load i18n %}{% comment %}
+Error summary of `ride` (THM.16): the `base` contract (a region named by its title, every
+error listed, field errors link to their control, `tabindex="-1"` and `data-autofocus` for
+base.js) on a Bootstrap danger alert. Context: `form`, `summary_id`, `title`, `autofocus`.
+{% endcomment %}{% if form.errors %}{% firstof summary_id "error-summary" as box_id %}<div class="error-summary alert alert-danger" id="{{ box_id }}" tabindex="-1" role="region" aria-labelledby="{{ box_id }}-title"{% if autofocus %} data-autofocus{% endif %}>
+  <h2 class="alert-heading h5" id="{{ box_id }}-title">{% firstof title _("There is a problem") %}</h2>
+  <ul class="mb-0">
+    {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+    {% for field in form.hidden_fields %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+    {% for field in form.visible_fields %}{% for error in field.errors %}<li><a class="alert-link" href="#{% if field.use_fieldset %}{{ field.auto_id }}_0{% else %}{{ field.id_for_label }}{% endif %}">{{ field.label }}: {{ error }}</a></li>{% endfor %}{% endfor %}
+  </ul>
+</div>{% endif %}

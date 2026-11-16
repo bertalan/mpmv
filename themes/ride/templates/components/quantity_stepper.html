@@ -1,0 +1,12 @@
+{% load i18n %}{% comment %}
+Quantity stepper of `ride` (THM.16): the `base` contract (a labelled number field with minus and
+plus buttons that base.js reveals and wires through `data-step`) as a Bootstrap input group.
+Context: `id`, `label`, `name`, `value`, `min`, `max`, `disabled`, `hide_label`.
+{% endcomment %}<div class="quantity">
+  <label for="{{ id }}" class="form-label mb-1{% if hide_label %} visually-hidden{% endif %}">{% firstof label _("Quantity") %}</label>
+  <div class="quantity__row input-group flex-nowrap">
+    <button type="button" class="quantity__step btn btn-outline-secondary" data-step="-1" aria-controls="{{ id }}" aria-label="{% translate 'Decrease quantity' %}"{% if disabled %} disabled{% endif %} hidden>{% include "components/icon.html" with name="minus" only %}</button>
+    <input type="number" class="form-control text-center" id="{{ id }}" name="{{ name|default:'quantity' }}" value="{% if value is None %}1{% else %}{{ value }}{% endif %}" min="{% if min is None %}1{% else %}{{ min }}{% endif %}"{% if max is not None %} max="{{ max }}"{% endif %} step="1" inputmode="numeric"{% if disabled %} disabled{% endif %}>
+    <button type="button" class="quantity__step btn btn-outline-secondary" data-step="1" aria-controls="{{ id }}" aria-label="{% translate 'Increase quantity' %}"{% if disabled %} disabled{% endif %} hidden>{% include "components/icon.html" with name="plus" only %}</button>
+  </div>
+</div>

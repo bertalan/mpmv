@@ -1,0 +1,18 @@
+{% extends "layouts/base.html" %}
+{% load i18n captcha %}{% comment %}Review step of `ride` (THM.16): the app template's form and HTMX hooks unchanged.{% endcomment %}
+{% block title %}{% translate "Review and pay" %} · {{ site_name }}{% endblock %}
+{% block head %}{% robots_meta "noindex, nofollow" %}
+{% captcha_script %}{% endblock %}
+{% block content %}
+<article class="checkout mx-auto">
+  <h1 class="mb-3">{% translate "Review and pay" %}</h1>
+  {% include "components/step_indicator.html" with steps=steps current=current_step only %}
+  <form method="post" action="{% url 'orders:review' %}">
+    {% csrf_token %}
+    {% include "orders/_review_body.html" %}
+    {# Outside #review-body: Turnstile renders a widget once, so a swap must never replace it. #}
+    {% captcha_widget %}
+    {% include "orders/_review_actions.html" %}
+  </form>
+</article>
+{% endblock %}

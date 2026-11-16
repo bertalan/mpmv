@@ -1,0 +1,36 @@
+{% extends "layouts/base.html" %}
+{% load i18n captcha %}{% comment %}Checkout details step of `ride` (THM.16): the same fields, names and order as the
+app template, on the Bootstrap grid, form controls and buttons.{% endcomment %}
+{% block title %}{% translate "Checkout" %} · {{ site_name }}{% endblock %}
+{% block head %}{% robots_meta "noindex, nofollow" %}
+{% captcha_script %}{% endblock %}
+{% block content %}
+<article class="checkout mx-auto">
+  <h1 class="mb-3">{% translate "Your details" %}</h1>
+  {% include "components/step_indicator.html" with steps=steps current=current_step only %}
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" action="{% url 'orders:checkout' %}" novalidate>
+    {% csrf_token %}
+    <h2 class="h4">{% translate "Delivery" %}</h2>
+    <div class="row gx-3">
+      <div class="col-12">{% include "components/field.html" with field=form.email only %}</div>
+      <div class="col-12">{% include "components/field.html" with field=form.full_name only %}</div>
+      <div class="col-12">{% include "components/field.html" with field=form.line1 only %}</div>
+      <div class="col-12">{% include "components/field.html" with field=form.line2 only %}</div>
+      <div class="col-md-4">{% include "components/field.html" with field=form.postcode only %}</div>
+      <div class="col-md-8">{% include "components/field.html" with field=form.city only %}</div>
+      <div class="col-md-6">{% include "components/field.html" with field=form.state only %}</div>
+      <div class="col-md-6">{% include "components/field.html" with field=form.country only %}</div>
+    </div>
+    <h2 class="h4 mt-3">{% translate "Business purchase" %}</h2>
+    {% include "components/field.html" with field=form.is_business only %}
+    <div class="checkout-business row gx-3">
+      <div class="col-md-6">{% include "components/field.html" with field=form.company only %}</div>
+      <div class="col-md-6">{% include "components/field.html" with field=form.vat_id only %}</div>
+    </div>
+    {% captcha_widget %}
+    <button type="submit" class="btn btn-primary btn-lg">{% translate "Continue to review" %}</button>
+  </form>
+  <p class="form-text mt-3">{% translate "We use your details only to deliver your order and to issue the invoices of the vendors you buy from." %}</p>
+</article>
+{% endblock %}
