@@ -111,7 +111,7 @@ def test_a_weekly_preset_expands_to_the_chosen_days() -> None:
         ends_at=start.replace(hour=11),
     )
     found = engine.expand(spec, datetime(2027, 3, 1, tzinfo=UTC), datetime(2027, 3, 15, tzinfo=UTC))
-    assert [o.start.day for o in found] == [1, 3, 8, 10]  # type: ignore[union-attr]
+    assert [o.start.day for o in found] == [1, 3, 8, 10]
 
 
 @pytest.mark.parametrize(

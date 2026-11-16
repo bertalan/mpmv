@@ -22,7 +22,7 @@ from apps.events import services
 from apps.events.models import EVENT_MODERATORS, EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.vendors.models import Vendor
-from apps.vendors.tests.factories import VendorMemberFactory
+from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -64,6 +64,12 @@ def _fresh(page: EventPage) -> EventPage:
 def _publish(page: EventPage) -> EventPage:
     page.get_latest_revision().publish()
     return _fresh(page)
+
+
+@pytest.fixture
+def vendor(db: None) -> Vendor:
+    """An active shop: the services refuse writes for a vendor that is not active yet."""
+    return VendorFactory.create(display_name="Shop One", status=Vendor.Status.ACTIVE)
 
 
 @pytest.fixture
@@ -331,13 +337,13 @@ def test_a_member_of_another_shop_sees_no_event_and_changes_none(
     assert _fresh(page).cancelled_at is None
 
 
-def test_a_customer_gets_a_404_on_every_view(
+def test_a_customer_gets_a_403_on_every_view(
     client: Client, customer: User, vendor: Vendor
 ) -> None:
     page = _event(vendor)
     verified_login(client, customer)
     for method, url in _every_view(page):
-        assert getattr(client, method)(url, _post_data()).status_code == 404, (method, url)
+        assert getattr(client, method)(url, _post_data()).status_code == 403, (method, url)
     assert EventPage.objects.filter(vendor=vendor).count() == 1
 
 
@@ -362,3 +368,28 @@ def test_vendor_staff_may_manage_events_too(client: Client, vendor: Vendor) -> N
 def test_the_events_page_is_in_the_shop_menu(signed_in: Client) -> None:
     html = signed_in.get(reverse("manager:shop:dashboard")).text
     assert reverse(LIST) in html
+
+
+def test_a_shop_that_is_not_active_yet_gets_a_message_not_an_error(
+    client: Client, other_vendor: Vendor
+) -> None:
+    applicant = VendorFactory.create(status=Vendor.Status.APPLICANT)
+    member = VendorMemberFactory.create(vendor=applicant, role="owner").user
+    verified_login(client, member)
+    response = client.post(reverse(NEW), _post_data())
+    assert response.status_code == 200
+    assert "not active yet" in response.text
+    assert not EventPage.objects.filter(vendor=applicant).exists()
+
+
+def test_the_pages_render_under_the_ride_theme(signed_in: Client, vendor: Vendor) -> None:
+    from apps.themes.services import use_theme
+
+    page = _publish(_event(vendor, title="Ride fair"))
+    with use_theme("ride"):
+        for url in (reverse(LIST), reverse(NEW), _urls(page)["edit"], _urls(page)["cancel"]):
+            response = signed_in.get(url)
+            assert response.status_code == 200, url
+        html = signed_in.get(_urls(page)["edit"]).text
+    assert 'name="recurrence"' in html
+    assert 'name="title"' in html

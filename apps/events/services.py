@@ -281,6 +281,27 @@ def events_awaiting_review() -> list[tuple[EventPage, WorkflowState]]:
     return [(found[pk], state) for pk, state in by_page.items() if pk in found]
 
 
+def requested_changes_comment(page: EventPage) -> str:
+    """The moderator's comment on `page` while its review awaits the vendor's changes, else ""
+    (the vendor area shows it next to the event; once resubmitted it is not shown again)."""
+    state = (
+        WorkflowState.objects.filter(
+            base_content_type=ContentType.objects.get_for_model(Page), object_id=str(page.pk)
+        )
+        .order_by("-created_at", "-pk")
+        .first()
+    )
+    if state is None or state.status != WorkflowState.STATUS_NEEDS_CHANGES:
+        return ""
+    task_state = (
+        TaskState.objects.filter(workflow_state=state)
+        .exclude(comment="")
+        .order_by("-finished_at", "-pk")
+        .first()
+    )
+    return task_state.comment if task_state is not None else ""
+
+
 def vendor_event_policies() -> list[VendorEventPolicy]:
     """Every vendor's moderation override, by vendor name (staff list)."""
     return list(

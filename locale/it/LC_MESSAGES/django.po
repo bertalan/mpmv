@@ -106,6 +106,10 @@ msgstr "(si apre il sito del corriere)"
 msgid "-- root --"
 msgstr "-- radice --"
 
+#: apps/manager/event_forms.py
+msgid "1 repeats every time, 2 every second time, up to 12. Empty means 1."
+msgstr "1 ripete ogni volta, 2 una volta su due, fino a 12. Vuoto vale 1."
+
 #: apps/orders/templates/orders/_legal_recap.html
 msgid "24 months for consumers."
 msgstr "24 mesi per i consumatori."
@@ -265,6 +269,11 @@ msgid "A private reminder of why the rule exists, up to 200 characters. Visitors
 msgstr ""
 "Un promemoria privato sul perché esiste la regola, fino a 200 caratteri. I visitatori non lo "
 "vedono mai."
+
+#: apps/manager/event_forms.py
+msgid "A promotion (an offer, with no place), a trade fair or meeting, or something else. Required."
+msgstr ""
+"Una promozione (un'offerta, senza luogo), una fiera o un incontro, oppure altro. Obbligatorio."
 
 #: apps/cms/models.py
 msgid ""
@@ -542,6 +551,10 @@ msgstr "Interveni sul contenuto"
 msgid "Action on the selected rows"
 msgstr "Azione sulle righe selezionate"
 
+#: apps/manager/templates/manager/shop/events.html
+msgid "Actions"
+msgstr "Azioni"
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Add a factor"
 msgstr "Aggiungi un fattore"
@@ -594,11 +607,19 @@ msgstr "Indirizzo, seconda riga"
 msgid "After"
 msgstr "Dopo"
 
+#: apps/manager/event_forms.py
+msgid "After a number of times"
+msgstr "Dopo un certo numero di volte"
+
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Tutti"
+
+#: apps/manager/event_forms.py
+msgid "All day"
+msgstr "Tutto il giorno"
 
 #: apps/manager/views.py
 msgid "all languages"
@@ -737,6 +758,10 @@ msgstr ""
 msgid "Ask %(vendor)s about this product: it is not sold online."
 msgstr "Chiedi a %(vendor)s informazioni su questo prodotto: non si vende online."
 
+#: apps/manager/event_forms.py
+msgid "Attendance"
+msgstr "Partecipazione"
+
 #: apps/accounts/templates/accounts/mfa/totp.html apps/accounts/templates/accounts/mfa/verify.html
 msgid "Authentication code"
 msgstr "Codice di autenticazione"
@@ -768,6 +793,10 @@ msgstr "Torna ai miei ordini"
 #: apps/orders/templates/orders/_review_actions.html
 msgid "Back to the cart"
 msgstr "Torna al carrello"
+
+#: apps/manager/templates/manager/shop/event_form.html
+msgid "Back to the events"
+msgstr "Torna agli eventi"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Back to the notices"
@@ -805,6 +834,10 @@ msgstr "Prima e dopo"
 msgid "Being prepared"
 msgstr "In preparazione"
 
+#: apps/manager/event_forms.py
+msgid "Booth or stand"
+msgstr "Stand"
+
 #: apps/catalog/taxonomy.py
 msgid "brand batch"
 msgstr "lotto di marchi"
@@ -824,6 +857,20 @@ msgstr "Acquisto per un'azienda"
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "Cancel"
 msgstr "Annulla"
+
+#: apps/manager/templates/manager/shop/event_cancel.html
+msgid ""
+"Cancel \"%(title)s\"? The event stays online with a message that it is cancelled, in every "
+"language. This cannot be undone."
+msgstr ""
+"Annullare \"%(title)s\"? L'evento resta online con un avviso di annullamento, in ogni lingua. "
+"L'operazione non si può annullare."
+
+#: apps/manager/event_views.py apps/manager/templates/manager/shop/event_cancel.html
+#: apps/manager/templates/manager/shop/event_form.html
+#: apps/manager/templates/manager/shop/events.html
+msgid "Cancel the event"
+msgstr "Annulla l'evento"
 
 #: apps/vendors/services.py
 msgid "Cancellation"
@@ -892,6 +939,14 @@ msgstr ""
 "subito; annullane una indicando un motivo e i titolari ne saranno informati. Una modifica si può "
 "annullare solo finché il testo non è cambiato di nuovo."
 
+#: apps/manager/event_views.py
+msgid "Changes requested: %(comment)s"
+msgstr "Modifiche richieste: %(comment)s"
+
+#: apps/manager/event_forms.py
+msgid "Check the rule."
+msgstr "Controlla la regola."
+
 #: apps/orders/templates/orders/checkout.html
 msgid "Checkout"
 msgstr "Cassa"
@@ -914,11 +969,19 @@ msgstr ""
 "Scegli 'Contenuto illegale' per la maggior parte delle segnalazioni. Una segnalazione di materiale"
 " pedopornografico può essere inviata senza nome e indirizzo email."
 
+#: apps/manager/event_forms.py
+msgid "Choose a day from 1 to 31, or the last day."
+msgstr "Scegli un giorno da 1 a 31, oppure l'ultimo giorno."
+
 #: apps/cms/blocks.py
 msgid "Choose a page of this site to link to. Fill in this or the web address below, not both."
 msgstr ""
 "Scegli una pagina di questo sito a cui rimandare. Compila questo campo oppure l'indirizzo web qui "
 "sotto, non entrambi."
+
+#: apps/manager/event_forms.py
+msgid "Choose a time zone such as Europe/Rome."
+msgstr "Scegli un fuso orario, per esempio Europe/Rome."
 
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/vendor_picker.html
@@ -933,9 +996,21 @@ msgstr "Scegli un venditore attivo o sospeso."
 msgid "Choose a version"
 msgstr "Scegli una versione"
 
+#: apps/manager/event_forms.py
+msgid "Choose at least one weekday."
+msgstr "Scegli almeno un giorno della settimana."
+
 #: apps/seo/templates/seo/consent/banner.html
 msgid "Choose categories"
 msgstr "Scegli le categorie"
+
+#: apps/manager/event_forms.py
+msgid "Choose how the event repeats."
+msgstr "Scegli come si ripete l'evento."
+
+#: apps/manager/event_forms.py
+msgid "Choose how the event repeats. The fields below belong to the choice."
+msgstr "Scegli come si ripete l'evento. I campi qui sotto dipendono dalla scelta."
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
@@ -994,7 +1069,7 @@ msgstr ""
 msgid "Choose where the products come from: one category, tag, brand or shop."
 msgstr "Scegli da dove vengono i prodotti: una categoria, un'etichetta, una marca o un negozio."
 
-#: apps/orders/ui/forms.py
+#: apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "City"
 msgstr "Città"
 
@@ -1161,7 +1236,7 @@ msgstr "Impostazioni dei cookie"
 msgid "Cookies and your privacy"
 msgstr "Cookie e la tua privacy"
 
-#: apps/orders/ui/forms.py
+#: apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "Country"
 msgstr "Paese"
 
@@ -1219,6 +1294,20 @@ msgid ""
 msgstr ""
 "Date e orari di un evento ripetuto che vengono saltati, per esempio un giorno festivo. Se lo lasci"
 " vuoto, non si salta nulla."
+
+#: apps/manager/event_forms.py
+msgid "Day and hour the event begins, in the time zone below. Not for all-day events."
+msgstr ""
+"Giorno e ora di inizio dell'evento, nel fuso orario qui sotto. Non per gli eventi di un giorno "
+"intero."
+
+#: apps/manager/event_forms.py
+msgid "Day and hour the event ends, after the start. Not for all-day events."
+msgstr "Giorno e ora di fine dell'evento, dopo l'inizio. Non per gli eventi di un giorno intero."
+
+#: apps/manager/event_forms.py
+msgid "Day of the month"
+msgstr "Giorno del mese"
 
 #: apps/shipping/models.py
 msgid "Days added to the method's estimated delivery time in this area."
@@ -1348,6 +1437,10 @@ msgstr "Chiudi"
 msgid "Do it once"
 msgstr "Fallo una volta"
 
+#: apps/manager/event_forms.py
+msgid "Does not repeat"
+msgstr "Non si ripete"
+
 #: apps/orders/customer_views.py
 msgid "done"
 msgstr "completato"
@@ -1385,6 +1478,10 @@ msgstr ""
 "Ogni acquisto è un contratto direttamente con il venditore. Il venditore è responsabile di "
 "spedizione, conformità, fatturazione, resi e recessi. Il marketplace offre il servizio e incassa "
 "il pagamento."
+
+#: apps/manager/event_views.py
+msgid "Edit the event"
+msgstr "Modifica l'evento"
 
 #: apps/manager/site_map.py
 msgid "Editors' admin"
@@ -1443,6 +1540,10 @@ msgstr "Termina le sessioni di questo utente"
 msgid "Ending a session does not revoke API keys or links sent by email."
 msgstr "Terminare una sessione non revoca le chiavi API né i link inviati per email."
 
+#: apps/manager/event_forms.py
+msgid "Ends at"
+msgstr "Finisce alle"
+
 #: apps/manager/forms.py
 msgid "Enter a valid carrier name."
 msgstr "Inserisci un nome di corriere valido."
@@ -1475,6 +1576,14 @@ msgstr "Cancella il tuo account (chiede conferma)"
 msgid "Error"
 msgstr "Errore"
 
+#: apps/manager/templates/manager/shop/events.html
+msgid "Event"
+msgstr "Evento"
+
+#: apps/manager/sections.py apps/manager/site_map.py apps/manager/templates/manager/shop/events.html
+msgid "Events"
+msgstr "Eventi"
+
 #: apps/manager/templates/manager/platform/map.html
 msgid ""
 "Every area of the site in one place. Shop space pages are listed as text: staff do not open them "
@@ -1482,6 +1591,14 @@ msgid ""
 msgstr ""
 "Tutte le aree del sito in un unico posto. Le pagine dello spazio negozio sono elencate come testo:"
 " lo staff non le apre direttamente."
+
+#: apps/manager/event_forms.py
+msgid "Every how many"
+msgstr "Ogni quante volte"
+
+#: apps/manager/event_forms.py
+msgid "Every month, on one day"
+msgstr "Ogni mese, in un giorno"
 
 #: apps/manager/session_views.py
 msgid "Every other session has ended. The platform staff were told."
@@ -1498,6 +1615,14 @@ msgid ""
 msgstr ""
 "Ogni utente, staff e venditori compresi, viene disconnesso ovunque. Resta solo questa sessione. Le"
 " chiavi API e i link inviati per email non cambiano: revocali a parte."
+
+#: apps/manager/event_forms.py
+msgid "Every week, on these days"
+msgstr "Ogni settimana, in questi giorni"
+
+#: apps/manager/event_forms.py
+msgid "Every year, on the same dates"
+msgstr "Ogni anno, nelle stesse date"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Exact location"
@@ -1571,9 +1696,29 @@ msgstr "Cerca l'account"
 msgid "Fingerprint %(hash)s."
 msgstr "Impronta %(hash)s."
 
+#: apps/manager/event_forms.py
+msgid "First day"
+msgstr "Primo giorno"
+
 #: themes/base/templates/components/footer.html
 msgid "Footer"
 msgstr "Piè di pagina"
+
+#: apps/manager/event_forms.py
+msgid "For a monthly event: a day from 1 to 31, or -1 for the last day."
+msgstr "Per un evento mensile: un giorno da 1 a 31, oppure -1 per l'ultimo giorno."
+
+#: apps/manager/event_forms.py
+msgid "For a weekly event: the days of the week it takes place."
+msgstr "Per un evento settimanale: i giorni della settimana in cui si svolge."
+
+#: apps/manager/event_forms.py
+msgid "For an event that ends after a number of times."
+msgstr "Per un evento che finisce dopo un certo numero di volte."
+
+#: apps/manager/event_forms.py
+msgid "For an event that ends on a last day."
+msgstr "Per un evento che finisce in un ultimo giorno."
 
 #: apps/orders/templates/orders/_legal_recap.html
 msgid "For disputes with the marketplace operator: %(court)s."
@@ -1586,6 +1731,10 @@ msgstr "Hai dimenticato le credenziali di accesso?"
 #: themes/base/templates/403_csrf.html
 msgid "Form expired"
 msgstr "Modulo scaduto"
+
+#: apps/manager/event_forms.py
+msgid "Friday"
+msgstr "Venerdì"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Frozen orders and payouts"
@@ -1611,6 +1760,10 @@ msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare
 msgid "Give a role"
 msgstr "Assegna un ruolo"
 
+#: apps/manager/event_forms.py
+msgid "Give how many times the event takes place."
+msgstr "Indica quante volte si svolge l'evento."
+
 #: apps/manager/templates/manager/platform/terminations.html
 msgid "Give notice and tell the vendor"
 msgstr "Dai il preavviso e avvisa il venditore"
@@ -1618,6 +1771,10 @@ msgstr "Dai il preavviso e avvisa il venditore"
 #: apps/manager/templates/manager/platform/terminations.html
 msgid "Give notice of termination"
 msgstr "Dai il preavviso di cessazione"
+
+#: apps/manager/event_forms.py
+msgid "Give the last day."
+msgstr "Indica l'ultimo giorno."
 
 #: apps/manager/termination_views.py
 msgid "Give the legal ground or the term of the terms."
@@ -1725,6 +1882,14 @@ msgstr "testo di aiuto"
 #: apps/manager/wagtail_hooks.py
 msgid "Help texts"
 msgstr "Testi di aiuto"
+
+#: apps/manager/event_views.py
+msgid "Hidden by the platform."
+msgstr "Nascosto dalla piattaforma."
+
+#: apps/manager/event_views.py
+msgid "Hidden by the platform: %(reason)s"
+msgstr "Nascosto dalla piattaforma: %(reason)s"
 
 #: apps/manager/site_map.py
 msgid "Home"
@@ -1951,6 +2116,11 @@ msgstr "lotto di importazione"
 msgid "in force"
 msgstr "in vigore"
 
+#: apps/manager/event_forms.py
+msgid "In person, online or both. Required except for a promotion, which has no place."
+msgstr ""
+"Di persona, online o entrambi. Obbligatorio tranne che per una promozione, che non ha un luogo."
+
 #: apps/catalog/templates/catalog/includes/stock_status.html
 msgid "In stock"
 msgstr "Disponibile"
@@ -2001,6 +2171,10 @@ msgstr "Codice non valido. Riprova."
 msgid "It also closes when you sign out or after inactivity."
 msgstr "Si chiude anche quando esci o dopo un periodo di inattività."
 
+#: apps/manager/event_forms.py
+msgid "It ends"
+msgstr "Finisce"
+
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid "It is critical: it asks for a passkey of its own each time, even with a passkey window open."
 msgstr ""
@@ -2048,6 +2222,14 @@ msgstr "Articolo"
 msgid "Items"
 msgstr "Articoli"
 
+#: apps/manager/templates/manager/shop/event_cancel.html
+msgid "Keep the event"
+msgstr "Mantieni l'evento"
+
+#: apps/manager/event_forms.py
+msgid "Keep the rule already saved: %(rule)s"
+msgstr "Mantieni la regola già salvata: %(rule)s"
+
 #: apps/seo/providers.py
 msgid "Keeps the site working: sign-in, cart and security. Always on."
 msgstr "Fa funzionare il sito: accesso, carrello e sicurezza. Sempre attivi."
@@ -2056,6 +2238,7 @@ msgstr "Fa funzionare il sito: accesso, carrello e sicurezza. Sempre attivi."
 msgid "Kept with the notice, not shown to the vendor. Ends the payout freeze."
 msgstr "Conservata con il preavviso, non mostrata al venditore. Termina il blocco dei pagamenti."
 
+#: apps/manager/templates/manager/shop/events.html
 #: themes/base/templates/components/language_switcher.html
 msgid "Language"
 msgstr "Lingua"
@@ -2063,6 +2246,14 @@ msgstr "Lingua"
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Language of the texts"
 msgstr "Lingua dei testi"
+
+#: apps/manager/event_forms.py
+msgid "Last day"
+msgstr "Ultimo giorno"
+
+#: apps/manager/event_forms.py
+msgid "Last day of the repetition"
+msgstr "Ultimo giorno della ripetizione"
 
 #: apps/manager/templates/manager/platform/user_sessions.html
 msgid "Last used"
@@ -2278,6 +2469,14 @@ msgstr "Unisci in"
 msgid "Merge the selected brands into another brand"
 msgstr "Unisci i marchi selezionati in un altro marchio"
 
+#: apps/manager/templates/manager/shop/events.html
+msgid "Moderation"
+msgstr "Moderazione"
+
+#: apps/manager/event_forms.py
+msgid "Monday"
+msgstr "Lunedì"
+
 #: apps/manager/site_map.py apps/orders/templates/orders/customer_orders.html
 msgid "My orders"
 msgstr "I miei ordini"
@@ -2306,9 +2505,17 @@ msgstr "Rete"
 msgid "Network %(network)s"
 msgstr "Rete %(network)s"
 
+#: apps/manager/event_forms.py
+msgid "Never"
+msgstr "Mai"
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "never used"
 msgstr "mai usata"
+
+#: apps/manager/event_views.py apps/manager/templates/manager/shop/events.html
+msgid "New event"
+msgstr "Nuovo evento"
 
 #: apps/catalog/taxonomy_admin.py
 msgid "New logo file"
@@ -2493,6 +2700,10 @@ msgstr "Segnalazioni"
 msgid "Notifier"
 msgstr "Segnalante"
 
+#: apps/manager/event_forms.py
+msgid "Number of times"
+msgstr "Numero di volte"
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "off"
 msgstr "non attiva"
@@ -2542,6 +2753,10 @@ msgstr "URL ufficiale"
 msgid "on"
 msgstr "attiva"
 
+#: apps/manager/event_forms.py
+msgid "On a last day"
+msgstr "In un ultimo giorno"
+
 #: apps/catalog/templates/catalog/includes/stock_status.html
 msgid "On backorder"
 msgstr "Su ordinazione"
@@ -2575,6 +2790,14 @@ msgstr ""
 "Una o due frasi che dicono che cos'è l'evento, fino a 300 caratteri. Si vedono nell'elenco degli "
 "eventi, nei calendari e nei risultati di ricerca. Obbligatorio: senza non si può salvare l'evento."
 
+#: apps/manager/event_forms.py
+msgid ""
+"One or two sentences that tell what the event is, up to 300 characters. They show in the events "
+"list and in search results. Required."
+msgstr ""
+"Una o due frasi che dicono che cos'è l'evento, fino a 300 caratteri. Compaiono nell'elenco degli "
+"eventi e nei risultati di ricerca. Obbligatorio."
+
 #: apps/cms/blocks.py
 msgid ""
 "One or two sentences under the title, up to 400 characters. If you leave it empty, only the title "
@@ -2585,6 +2808,10 @@ msgstr ""
 #: apps/manager/forms.py
 msgid "Onerous clauses"
 msgstr "Clausole onerose"
+
+#: apps/manager/event_forms.py
+msgid "Online link"
+msgstr "Link online"
 
 #: apps/orders/templates/orders/confirmation.html
 msgid "Online payment is not available yet. The items stay held for you for a short time."
@@ -3094,7 +3321,7 @@ msgstr ""
 msgid "Position"
 msgstr "Posizione"
 
-#: apps/orders/ui/forms.py
+#: apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "Postcode"
 msgstr "CAP"
 
@@ -3298,6 +3525,10 @@ msgstr ""
 msgid "Refunded"
 msgstr "Rimborsato"
 
+#: apps/manager/event_forms.py
+msgid "Region"
+msgstr "Regione"
+
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 msgid "Register a passkey"
 msgstr "Registra una passkey"
@@ -3338,6 +3569,14 @@ msgstr "Rimuovi %(name)s"
 #: apps/manager/forms.py
 msgid "Remove the logo"
 msgstr "Rimuovi il logo"
+
+#: apps/manager/event_forms.py
+msgid "Repeats"
+msgstr "Si ripete"
+
+#: apps/manager/event_forms.py
+msgid "Repetition"
+msgstr "Ripetizione"
 
 #: apps/manager/site_map.py
 msgid "Report illegal content"
@@ -3452,9 +3691,17 @@ msgstr "Condizioni di vendita di %(name)s (versione %(number)s)"
 msgid "sameAs links"
 msgstr "Link sameAs"
 
+#: apps/manager/event_forms.py
+msgid "Saturday"
+msgstr "Sabato"
+
 #: apps/manager/templates/manager/shop/profile.html apps/seo/admin_views.py
 msgid "Save"
 msgstr "Salva"
+
+#: apps/manager/templates/manager/shop/event_form.html
+msgid "Save draft"
+msgstr "Salva la bozza"
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Save logo"
@@ -3463,6 +3710,10 @@ msgstr "Salva logo"
 #: apps/seo/templates/seo/consent/banner.html apps/seo/templates/seo/consent/preferences.html
 msgid "Save my choices"
 msgstr "Salva le mie scelte"
+
+#: apps/manager/templates/manager/shop/event_form.html
+msgid "Save your changes first: the latest saved draft is the one that is submitted."
+msgstr "Salva prima le modifiche: viene inviata l'ultima bozza salvata."
 
 #: apps/compliance/forms.py
 msgid "Say whether the content is illegal or only against the platform terms."
@@ -3863,6 +4114,10 @@ msgstr "Avvia la revisione"
 msgid "Start shopping"
 msgstr "Inizia a fare acquisti"
 
+#: apps/manager/event_forms.py
+msgid "Starts at"
+msgstr "Inizia alle"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Statements of reasons"
 msgstr "Motivazioni"
@@ -3875,8 +4130,8 @@ msgstr "Statistiche"
 #: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/platform/terminations.html
-#: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
-#: apps/orders/templates/orders/customer_order.html
+#: apps/manager/templates/manager/shop/events.html apps/manager/templates/manager/shop/order.html
+#: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_order.html
 #: apps/orders/templates/orders/customer_orders.html
 msgid "Status"
 msgstr "Stato"
@@ -3919,6 +4174,10 @@ msgstr "Profilo del negozio"
 msgid "Storefront profile saved."
 msgstr "Profilo del negozio salvato."
 
+#: apps/manager/event_forms.py
+msgid "Street"
+msgstr "Via"
+
 #: apps/orders/ui/forms.py
 msgid "Street and house number. Required: the carrier needs it to deliver."
 msgstr "Via e numero civico. Obbligatorio: il corriere ne ha bisogno per consegnare."
@@ -3927,9 +4186,26 @@ msgstr "Via e numero civico. Obbligatorio: il corriere ne ha bisogno per consegn
 msgid "Styleguide"
 msgstr "Guida di stile"
 
+#: apps/manager/templates/manager/shop/event_form.html
+msgid "Submit"
+msgstr "Invia"
+
+#: apps/manager/templates/manager/shop/event_form.html
+#: apps/manager/templates/manager/shop/events.html
+msgid "Submit for review"
+msgstr "Invia in revisione"
+
 #: themes/base/templates/components/alert.html
 msgid "Success"
 msgstr "Operazione riuscita"
+
+#: apps/manager/event_forms.py
+msgid "Summary"
+msgstr "Riassunto"
+
+#: apps/manager/event_forms.py
+msgid "Sunday"
+msgstr "Domenica"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Suspected criminal offence (DSA article 18)"
@@ -4364,6 +4640,10 @@ msgstr ""
 "I paesi in cui valgono i CAP e le province qui sotto: codici paese di due lettere, per esempio "
 "'IT' o 'DE', separati da virgole."
 
+#: apps/manager/event_forms.py
+msgid "The country of the place, as a two-letter code, for example IT."
+msgstr "Il paese del luogo, come codice di due lettere, per esempio IT."
+
 #: apps/events/models.py
 msgid "The country of the place. It helps find the right spot on the map."
 msgstr "Il paese del luogo. Aiuta a trovare il punto giusto sulla mappa."
@@ -4558,6 +4838,30 @@ msgid ""
 "The email or the password is not correct, or the account is locked for a while. Please try again."
 msgstr "L’email o la password non sono corrette, oppure l’account è bloccato per un po’. Riprova."
 
+#: apps/manager/event_forms.py
+msgid "The event"
+msgstr "L'evento"
+
+#: apps/manager/event_views.py
+msgid "The event is cancelled. Its page shows a cancellation."
+msgstr "L'evento è annullato. La sua pagina mostra l'annullamento."
+
+#: apps/manager/event_views.py
+msgid "The event is saved as a draft. Submit it when it is ready."
+msgstr "L'evento è salvato come bozza. Invialo quando è pronto."
+
+#: apps/manager/event_views.py
+msgid "The event is submitted."
+msgstr "L'evento è stato inviato."
+
+#: apps/manager/templates/manager/shop/events.html
+msgid ""
+"The events of %(vendor)s: promotions, fairs and meetings. A new event is reviewed before it goes "
+"online."
+msgstr ""
+"Gli eventi di %(vendor)s: promozioni, fiere e incontri. Un nuovo evento viene rivisto prima di "
+"andare online."
+
 #: apps/compliance/forms.py
 msgid "The facts and circumstances you relied on to decide. The vendor sees this text."
 msgstr "I fatti e le circostanze su cui ti sei basato per decidere. Il venditore vede questo testo."
@@ -4573,6 +4877,10 @@ msgstr "La funzione da attivare o disattivare per questo venditore."
 #: apps/shipping/models.py
 msgid "The fewest days a delivery takes. It is only an estimate. Not shown to buyers yet."
 msgstr "Il minimo di giorni per la consegna. È solo una stima. Non ancora mostrato ai clienti."
+
+#: apps/manager/event_forms.py
+msgid "The first day of an all-day event."
+msgstr "Il primo giorno di un evento di un giorno intero."
 
 #: apps/events/models.py
 msgid "The first day of an all-day event. Required when 'All day' is ticked."
@@ -4729,6 +5037,10 @@ msgstr ""
 "all'acquirente prima dell'ordine sul costo della restituzione dei beni. Senza di esse non si può "
 "chiedere al consumatore di pagare e paghi tu."
 
+#: apps/manager/event_forms.py
+msgid "The interval is from 1 to 12."
+msgstr "L'intervallo va da 1 a 12."
+
 #: apps/cms/blocks.py
 msgid ""
 "The invitation, for example 'Visit our workshop'. Up to 120 characters. Required: the block cannot"
@@ -4844,6 +5156,11 @@ msgstr ""
 msgid ""
 "The languages the support team answers in, as codes such as 'en' or 'it', separated by commas."
 msgstr "Le lingue in cui risponde l'assistenza, come codici tipo 'en' o 'it', separati da virgole."
+
+#: apps/manager/event_forms.py
+msgid "The last day of an all-day event, included. Same as the first for one day."
+msgstr ""
+"L'ultimo giorno di un evento di un giorno intero, incluso. Uguale al primo per un solo giorno."
 
 #: apps/events/models.py
 msgid ""
@@ -5029,6 +5346,10 @@ msgstr ""
 "Il nome della categoria o etichetta in questa lingua, per esempio 'Estate'. Obbligatorio: senza, "
 "non ha un nome per chi compra."
 
+#: apps/manager/event_forms.py
+msgid "The name of the event, as shoppers see it. Required."
+msgstr "Il nome dell'evento, come lo vedono i clienti. Obbligatorio."
+
 #: apps/core/models.py
 msgid "The name of the feature switch, exactly as it is registered in the code."
 msgstr "Il nome dell'interruttore della funzione, esattamente come è registrato nel codice."
@@ -5063,6 +5384,10 @@ msgid ""
 "shown."
 msgstr ""
 "Il nome del luogo, per esempio 'Fiera di Milano'. Se lo lasci vuoto, si vede solo l'indirizzo."
+
+#: apps/manager/event_forms.py
+msgid "The name of the place, for example Fiera di Milano."
+msgstr "Il nome del luogo, per esempio Fiera di Milano."
 
 #: apps/cms/models.py
 msgid ""
@@ -5411,6 +5736,10 @@ msgstr "Il CAP della tua stabile organizzazione, per esempio 00184."
 msgid "The postal code of your registered office, for example 00184."
 msgstr "Il CAP della tua sede legale, per esempio 00184."
 
+#: apps/manager/event_forms.py
+msgid "The postal code."
+msgstr "Il codice postale."
+
 #: apps/shipping/models.py
 msgid ""
 "The postcodes in the area, separated by commas: a prefix such as '07*', a range such as "
@@ -5562,6 +5891,10 @@ msgstr ""
 #: apps/events/models.py
 msgid "The region or province of the place, for example 'Lombardia'. Optional."
 msgstr "La regione o la provincia del luogo, per esempio 'Lombardia'. Facoltativo."
+
+#: apps/manager/event_forms.py
+msgid "The region or province. Optional."
+msgstr "La regione o la provincia. Facoltativo."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -5751,6 +6084,10 @@ msgid ""
 "The street and number, for example 'Via Roma 12'. It is also used to find the place on the map."
 msgstr ""
 "La via e il numero civico, per esempio 'Via Roma 12'. Serve anche a trovare il luogo sulla mappa."
+
+#: apps/manager/event_forms.py
+msgid "The street and number, for example Via Roma 12."
+msgstr "La via e il numero, per esempio Via Roma 12."
 
 #: apps/vendors/models.py
 msgid "The street number of your permanent establishment, for example 12/B."
@@ -6296,6 +6633,10 @@ msgstr ""
 "Questa finestra copre solo le azioni sensibili di questo negozio che il suo titolare conferma. Non"
 " copre mai un altro negozio."
 
+#: apps/manager/event_forms.py
+msgid "Thursday"
+msgstr "Giovedì"
+
 #: apps/manager/forms.py
 msgid ""
 "Tick it and save to delete the current logo. A new image and the description above are then "
@@ -6311,6 +6652,10 @@ msgid ""
 msgstr ""
 "Spuntalo per un evento senza orari fissi, come un saldo che dura più giorni. Indicherai il primo e"
 " l'ultimo giorno invece degli orari di inizio e fine."
+
+#: apps/manager/event_forms.py
+msgid "Tick it for an event with no set hours. Then give the first and last day."
+msgstr "Spuntalo per un evento senza orari fissi. Poi indica il primo e l'ultimo giorno."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -6438,11 +6783,15 @@ msgstr ""
 "Con la spunta la funzione è attiva per questo venditore. Senza spunta è disattivata, qualunque sia"
 " l'impostazione della piattaforma. Un interruttore di emergenza qui si può solo disattivare."
 
+#: apps/manager/event_forms.py
+msgid "Time zone"
+msgstr "Fuso orario"
+
 #: apps/events/panels.py
 msgid "Times above are read in this time zone, e.g. Europe/Rome."
 msgstr "Gli orari qui sopra sono letti in questo fuso orario, per esempio Europe/Rome."
 
-#: apps/manager/media.py
+#: apps/manager/event_forms.py apps/manager/media.py
 msgid "Title"
 msgstr "Titolo"
 
@@ -6523,6 +6872,10 @@ msgstr "Numero di tracciamento"
 msgid "Tracking number: %(number)s"
 msgstr "Numero di tracciamento: %(number)s"
 
+#: apps/manager/event_forms.py
+msgid "Tuesday"
+msgstr "Martedì"
+
 #: apps/accounts/templates/accounts/mfa/overview.html apps/manager/site_map.py
 #: apps/seo/site_links.py
 msgid "Two-factor authentication"
@@ -6535,6 +6888,10 @@ msgstr "La verifica in due passaggi è attiva"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Two-factor settings"
 msgstr "Impostazioni della verifica in due passaggi"
+
+#: apps/manager/event_forms.py
+msgid "Type"
+msgstr "Tipo"
 
 #: apps/cms/choosers.py
 msgid "Type part of a product name, SKU, brand or vendor name."
@@ -6649,6 +7006,10 @@ msgstr "Venditore chiuso"
 #: themes/base/templates/components/help_entry.html
 msgid "Vendor guide"
 msgstr "Guida per i venditori"
+
+#: apps/manager/event_forms.py
+msgid "Venue"
+msgstr "Sede"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Verify"
@@ -6809,6 +7170,14 @@ msgstr ""
 msgid "Web address"
 msgstr "Indirizzo web"
 
+#: apps/manager/event_forms.py
+msgid "Wednesday"
+msgstr "Mercoledì"
+
+#: apps/manager/event_forms.py
+msgid "Weekdays"
+msgstr "Giorni della settimana"
+
 #: apps/cms/models.py
 msgid ""
 "What a person can do here and what to do first, in short plain sentences. Without text the dialog "
@@ -6951,6 +7320,10 @@ msgstr ""
 "Che cosa limiti: un prodotto viene rimosso dalla pubblicazione, un evento viene nascosto, il "
 "negozio di un venditore viene sospeso."
 
+#: apps/manager/event_forms.py apps/manager/templates/manager/shop/events.html
+msgid "When"
+msgstr "Quando"
+
 #: apps/ingest/models.py
 msgid "When a run last found the item in the feed."
 msgstr "Quando un'esecuzione ha trovato l'articolo nel flusso l'ultima volta."
@@ -7038,6 +7411,10 @@ msgstr ""
 msgid "When the position was found from the address. Filled in for you."
 msgstr "Quando è stata trovata la posizione dall'indirizzo. Compilato per te."
 
+#: apps/manager/event_forms.py
+msgid "When the repetition stops. Fill in the field that belongs to your choice."
+msgstr "Quando finisce la ripetizione. Compila il campo che corrisponde alla tua scelta."
+
 #: apps/ingest/models.py
 msgid "When the run ended, whatever the result."
 msgstr "Quando l'esecuzione è finita, qualunque sia il risultato."
@@ -7075,6 +7452,10 @@ msgid "When you place the order we hold the items for you. Payment follows in th
 msgstr ""
 "Quando confermi l'ordine riserviamo gli articoli per te. Il pagamento segue nel passo successivo."
 
+#: apps/manager/event_forms.py
+msgid "Where"
+msgstr "Dove"
+
 #: apps/catalog/models.py
 msgid ""
 "Where a 301 sends visitors: a path on this site, a product, a category or tag, or a search. "
@@ -7090,6 +7471,10 @@ msgid ""
 msgstr ""
 "Dove arrivano gli avvisi di conformità, per esempio un caso di sicurezza in ritardo. Lascialo "
 "vuoto per mandarli all'indirizzo di assistenza."
+
+#: apps/manager/event_forms.py
+msgid "Where people join an online event, starting with https://."
+msgstr "Dove ci si collega a un evento online, con indirizzo che inizia con https://."
 
 #: apps/events/models.py
 msgid ""
@@ -7110,6 +7495,11 @@ msgstr ""
 #: apps/ingest/models.py
 msgid "Where the draft stands: new, ready, needs review, published or rejected."
 msgstr "A che punto è la bozza: nuova, pronta, da rivedere, pubblicata o rifiutata."
+
+#: apps/manager/event_forms.py
+msgid "Where the event takes place, for example Europe/Rome. The times above are read in it."
+msgstr ""
+"Dove si svolge l'evento, per esempio Europe/Rome. Gli orari qui sopra sono letti in questo fuso."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -7166,6 +7556,10 @@ msgstr ""
 "A che punto è questa versione nella revisione: una bozza automatica va ancora controllata, "
 "'Reviewed' è controllata, 'Published' è mostrata ai visitatori. Si mostrano solo i testi "
 "pubblicati."
+
+#: apps/manager/event_forms.py
+msgid "Where to find you at a fair, for example Hall 3, stand B12. Optional."
+msgstr "Dove trovarti in una fiera, per esempio Padiglione 3, stand B12. Facoltativo."
 
 #: apps/events/models.py
 msgid ""
@@ -7425,6 +7819,10 @@ msgstr ""
 "Hai 14 giorni dalla consegna per recedere, anche con il pulsante di recesso online. Paghi tu il "
 "costo diretto della restituzione dei beni. %(info)s"
 
+#: apps/manager/templates/manager/shop/events.html
+msgid "You have no events yet."
+msgstr "Non hai ancora eventi."
+
 #: apps/orders/templates/orders/customer_orders.html
 msgid "You have no orders yet"
 msgstr "Non hai ancora ordini"
@@ -7601,6 +7999,10 @@ msgstr "La sessione ha raggiunto la durata massima. Accedi di nuovo."
 #: apps/accounts/templates/accounts/sessions/list.html
 msgid "Your sessions"
 msgstr "Le tue sessioni"
+
+#: apps/manager/event_views.py
+msgid "Your shop is not active yet, so events cannot be changed."
+msgstr "Il tuo negozio non è ancora attivo, quindi gli eventi non si possono modificare."
 
 #: apps/manager/forms.py
 msgid ""

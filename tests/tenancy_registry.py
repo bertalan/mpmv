@@ -579,7 +579,10 @@ ENDPOINTS: dict[str, Access] = {
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
         identify=lambda event: str(event.title),  # type: ignore[attr-defined]
     ),
-    "manager:shop:event_new": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:event_new": NoVendorData(
+        "The empty new-event form: it lists nothing; a save writes under the caller's own shop "
+        "(`apps/manager/tests/integration/test_shop_events.py`)."
+    ),
     "manager:shop:event_edit": VendorScoped(
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
         sample={"public_id": NIL_UUID},
