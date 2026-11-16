@@ -1202,7 +1202,7 @@ def resolve_shipping_tax(
 # The country a site language suggests before the buyer gives a delivery address. English names
 # no single country, so an English visitor gets the operator's country (the last fallback).
 LANGUAGE_PRICE_COUNTRIES: Final[Mapping[str, str]] = {
-    "it": "IT",
+    "it": "IT",  # country-literal: the language's country, not the platform's
     "de": "DE",
     "fr": "FR",
     "es": "ES",
