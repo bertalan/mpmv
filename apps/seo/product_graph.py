@@ -241,7 +241,7 @@ def shipping_node(
     *,
     node_id: str,
     countries: Sequence[str],
-    rate: Decimal | None,
+    rate: Decimal,
     currency: str,
     min_days: int | None = None,
     max_days: int | None = None,
@@ -261,11 +261,11 @@ def shipping_node(
         {
             "@type": "OfferShippingDetails",
             "@id": node_id,
-            "shippingRate": (
-                {"@type": "MonetaryAmount", "value": f"{rate:.2f}", "currency": currency}
-                if rate is not None
-                else ""
-            ),
+            "shippingRate": {
+                "@type": "MonetaryAmount",
+                "value": f"{rate:.2f}",
+                "currency": currency,
+            },
             "shippingDestination": (
                 {"@type": "DefinedRegion", "addressCountry": list(countries)} if countries else ""
             ),

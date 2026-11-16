@@ -156,11 +156,14 @@ def _shipping_nodes(
         band = None if weight is None else next((b for b in method.bands if b.holds(weight)), None)
         if band is None:
             continue
+        rate = _shipping_rate(page, band.price, zone, request)
+        if rate is None:
+            continue  # shippingRate is required by Google: no gross rate, no node
         nodes.append(
             pg.shipping_node(
                 node_id=f"{url}#shipping-{method.key}",
                 countries=sorted(listed),
-                rate=_shipping_rate(page, band.price, zone, request),
+                rate=rate,
                 currency=CURRENCY,
                 min_days=method.min_delivery_days,
                 max_days=method.max_delivery_days,

@@ -289,7 +289,9 @@ def test_a_vendor_without_a_tax_profile_gets_no_offer_price(client: Client, them
     assert schema_check.dangling_references(document) == []
 
 
-def test_a_shipping_zone_the_visitor_is_not_in_has_no_net_rate(client: Client, theme: str) -> None:
+def test_a_shipping_zone_the_visitor_is_not_in_has_no_shipping_node(
+    client: Client, theme: str
+) -> None:
     from apps.shipping.tests.factories import (
         ShippingMethodFactory,
         ShippingZoneFactory,
@@ -301,6 +303,8 @@ def test_a_shipping_zone_the_visitor_is_not_in_has_no_net_rate(client: Client, t
     method = ShippingMethodFactory.create(vendor=product.vendor, zone=zone)
     WeightBandFactory.create(method=method, cost_net=Decimal("6.90"))
     _html, document = graph_of(client)
-    [details] = [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"]
-    assert "shippingRate" not in details
+    assert [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"] == []
+    assert "shippingDetails" not in node(document, "Product")["offers"]
     assert "6.90" not in json.dumps(document)
+    assert schema_check.dangling_references(document) == []
+    assert schema_check.rich_result_errors(document) == []
