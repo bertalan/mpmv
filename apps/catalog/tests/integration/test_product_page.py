@@ -215,7 +215,7 @@ def test_the_structured_data_has_a_product_node_with_the_brand_id(client: Client
     html = client.get(path("en", "mug-en")).content.decode()
     assert '"@type": "Product"' in html
     assert "/brand/acme/#brand" in html
-    assert '"offers"' not in html
+    assert '"@type": "Offer"' in html  # SEO.1: a product sold online has its offer
 
 
 def test_the_page_leaks_no_internal_data(client: Client) -> None:
