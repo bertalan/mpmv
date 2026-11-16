@@ -7005,7 +7005,7 @@ msgstr "Ce navigateur ne prend pas en charge les clés d'accès."
 
 #: apps/accounts/views.py
 msgid "This content is not available in this language."
-msgstr "Ce contenu n'est pas disponible dans cette langue."
+msgstr "Ce contenu n’est pas disponible dans cette langue."
 
 #: apps/orders/ui/forms.py
 msgid "This does not look like an EU VAT number. Check the prefix and the digits."
