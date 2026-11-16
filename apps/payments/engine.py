@@ -146,6 +146,9 @@ class RefundResult:
     # The real provider cost of the refund, from the balance transaction (PAY.4, D-05).
     provider_cost: Decimal
     reversal_refs: Sequence[str] = ()
+    # The provider's status of the refund: "succeeded", or "pending" while the card network
+    # has not confirmed it (ORD.20: a refund not succeeded 4 days before its `due_by` alerts staff).
+    status: str = "succeeded"
 
 
 class TransferReversalFailed(ProviderError):

@@ -29,7 +29,7 @@ moderation (EVT.3, spec 15 "Services").
 import datetime as dt
 import logging
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
@@ -40,7 +40,7 @@ from django.contrib.auth.models import AnonymousUser, Group
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q, QuerySet
 from django.http import Http404
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -68,12 +68,16 @@ from apps.core.changeset import ChangeSet, to_jsonable
 from apps.core.geocoding import AddressQuery, GeocodeResult
 from apps.core.geocoding import services as geocoding
 from apps.core.i18n import configured_languages
-from apps.core.models import AuditLog
-from apps.core.services import save_audited
+from apps.core.models import AuditLog, ImageLicence, MediaImage
+from apps.core.services import consume_rate_limit, save_audited
 from apps.vendors.engine import VendorAction
 from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.scoping import is_platform_staff
-from apps.vendors.services import ensure_vendor_can_write, has_vendor_permission
+from apps.vendors.services import (
+    ensure_vendor_can_write,
+    has_vendor_permission,
+    vendor_logo_collection,
+)
 
 from . import engine
 from .models import (
@@ -279,6 +283,27 @@ def events_awaiting_review() -> list[tuple[EventPage, WorkflowState]]:
     pages = EventPage.objects.filter(pk__in=list(by_page)).select_related("vendor", "locale")
     found = {page.pk: page for page in pages}
     return [(found[pk], state) for pk, state in by_page.items() if pk in found]
+
+
+def requested_changes_comment(page: EventPage) -> str:
+    """The moderator's comment on `page` while its review awaits the vendor's changes, else ""
+    (the vendor area shows it next to the event; once resubmitted it is not shown again)."""
+    state = (
+        WorkflowState.objects.filter(
+            base_content_type=ContentType.objects.get_for_model(Page), object_id=str(page.pk)
+        )
+        .order_by("-created_at", "-pk")
+        .first()
+    )
+    if state is None or state.status != WorkflowState.STATUS_NEEDS_CHANGES:
+        return ""
+    task_state = (
+        TaskState.objects.filter(workflow_state=state)
+        .exclude(comment="")
+        .order_by("-finished_at", "-pk")
+        .first()
+    )
+    return task_state.comment if task_state is not None else ""
 
 
 def vendor_event_policies() -> list[VendorEventPolicy]:
@@ -1100,3 +1125,255 @@ def resolve_picked_point(
             }
         )
     return PickedPoint(source, candidate)
+
+
+# --- The vendor's block editor and image library (EVT.4 part 2)
+
+
+def event_body(page: EventPage) -> list[dict[str, Any]]:
+    """The raw body (StreamField JSON, each block with its id) of the latest revision."""
+    fresh = EventPage.objects.get(pk=page.pk)  # not `page`: it may cache an older latest revision
+    latest: EventPage = fresh.get_latest_revision_as_object()
+    return [dict(block) for block in latest.body.get_prep_value()]
+
+
+class StaleBlockEdit(ValidationError):
+    """The body changed since the editor was rendered: the edit would overwrite someone's work."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            _(
+                "This event was changed by someone else since you opened it. "
+                "Reload the page and make your change again."
+            ),
+            code="stale",
+        )
+
+
+def event_revision_id(page: EventPage) -> int:
+    """The id of the latest revision (0 for a page with none): what an editor is rendered from."""
+    fresh = EventPage.objects.get(pk=page.pk)
+    return int(fresh.latest_revision_id or 0)
+
+
+def _change_body(
+    actor: Any,
+    page: EventPage,
+    change: Callable[[list[dict[str, Any]]], list[dict[str, Any]]],
+    *,
+    vendor: Vendor | None,
+    ctx: AuditContext | None,
+    base_revision: int | None = None,
+) -> EventChangeSet:
+    """Save a new revision with the body `change` makes of the latest revision's body: every
+    block edit is one `save_event_draft`, so its checks and the sanitiser run each time.
+
+    The page row is locked for the whole change, so two edits never read the same body. With
+    `base_revision` (the revision the editor was rendered from) an edit made on an older body is
+    refused with `StaleBlockEdit` and nothing is saved; without it the edit is not checked.
+    """
+    with transaction.atomic():
+        locked = EventPage.objects.select_for_update().get(pk=page.pk)
+        if base_revision is not None and int(locked.latest_revision_id or 0) != base_revision:
+            raise StaleBlockEdit
+        return save_event_draft(
+            actor, {"body": change(event_body(page))}, page, vendor=vendor, ctx=ctx
+        )
+
+
+def add_body_block(
+    actor: Any,
+    page: EventPage,
+    kind: str,
+    value: Any,
+    *,
+    vendor: Vendor | None,
+    ctx: AuditContext | None = None,
+    base_revision: int | None = None,
+) -> EventChangeSet:
+    """Append a block (a new id) to the body. Raises `ValidationError` as `save_event_draft`."""
+    block_id = str(uuid.uuid4())
+    return _change_body(
+        actor,
+        page,
+        lambda body: engine.append_block(body, kind, value, block_id),
+        vendor=vendor,
+        ctx=ctx,
+        base_revision=base_revision,
+    )
+
+
+def replace_body_block(
+    actor: Any,
+    page: EventPage,
+    block_id: str,
+    value: Any,
+    *,
+    vendor: Vendor | None,
+    ctx: AuditContext | None = None,
+    base_revision: int | None = None,
+) -> EventChangeSet:
+    """Replace the value of one block. Raises `engine.BlockNotFound` for an unknown id."""
+    return _change_body(
+        actor,
+        page,
+        lambda body: engine.replace_block(body, block_id, value),
+        vendor=vendor,
+        ctx=ctx,
+        base_revision=base_revision,
+    )
+
+
+def move_body_block(
+    actor: Any,
+    page: EventPage,
+    block_id: str,
+    direction: str,
+    *,
+    vendor: Vendor | None,
+    ctx: AuditContext | None = None,
+    base_revision: int | None = None,
+) -> EventChangeSet:
+    """Move one block up or down ("up" or "down"; at the edge it stays)."""
+    return _change_body(
+        actor,
+        page,
+        lambda body: engine.move_block(body, block_id, direction),
+        vendor=vendor,
+        ctx=ctx,
+        base_revision=base_revision,
+    )
+
+
+def remove_body_block(
+    actor: Any,
+    page: EventPage,
+    block_id: str,
+    *,
+    vendor: Vendor | None,
+    ctx: AuditContext | None = None,
+    base_revision: int | None = None,
+) -> EventChangeSet:
+    return _change_body(
+        actor,
+        page,
+        lambda body: engine.remove_block(body, block_id),
+        vendor=vendor,
+        ctx=ctx,
+        base_revision=base_revision,
+    )
+
+
+def vendor_image_library(vendor: Vendor) -> QuerySet[MediaImage]:
+    """The images a vendor may use in its events: its own collection and the ones below it,
+    newest first (the same set `save_event_draft` accepts)."""
+    own = Collection.objects.filter(
+        depth=2, name=engine.vendor_collection_name(str(vendor.public_id))
+    ).first()
+    if own is None:
+        none: QuerySet[MediaImage] = MediaImage.objects.none()
+        return none
+    images: QuerySet[MediaImage] = MediaImage.objects.filter(
+        collection__in=Collection.objects.descendant_of(own, inclusive=True)
+    )
+    return images.order_by("-created_at", "-pk")
+
+
+def vendor_products(vendor: Vendor) -> QuerySet[Product]:
+    """The vendor's own products, for the choosers (any status: the page lists published ones)."""
+    return Product.objects.filter(vendor=vendor).order_by("sku")
+
+
+def vendor_categories(vendor: Vendor, *, keep: Iterable[int] = ()) -> QuerySet[Category]:
+    """The categories of the vendor's own products (main and secondary), plus `keep`."""
+    own = Q(products__vendor=vendor) | Q(secondary_products__vendor=vendor) | Q(pk__in=list(keep))
+    return Category.objects.filter(own).distinct().order_by("pk")
+
+
+def vendor_events(vendor: Vendor) -> QuerySet[EventPage]:
+    """The vendor's own events, for a call to action link."""
+    return EventPage.objects.filter(vendor=vendor).order_by("title", "pk")
+
+
+EVENT_IMAGE_UPLOADED = "events.image_uploaded"
+EVENT_IMAGE_LIMIT = 30  # uploads per member and hour: every attempt costs image decode work
+EVENT_IMAGE_WINDOW = dt.timedelta(hours=1)
+
+
+def upload_event_image(
+    actor: Any,
+    vendor: Vendor,
+    *,
+    upload: Any,
+    title: str,
+    licence: ImageLicence,
+    author: str,
+    source_url: str = "",
+    credit_text: str = "",
+    permission_ref: str = "",
+    ctx: AuditContext | None = None,
+    dry_run: bool = False,
+) -> MediaImage:
+    """A vendor member uploads an image for its events, into the vendor's own collection only.
+
+    The licence and the metadata it needs (author, source, permission) are the member's: CMS.8
+    refuses an image without them, and the SEC.2 checks of `MediaImage` apply (content type,
+    caps, re-encoding without metadata, no SVG). Needs the events permission and a vendor that
+    can write; counted against an hourly limit per member. Raises `ValidationError` keyed by
+    field. With `dry_run` the image is checked and returned unsaved: nothing is written.
+    """
+    if not _may_author(actor, vendor):
+        raise PermissionDenied("no permission to manage this vendor's events")
+    if not dry_run:
+        wait = consume_rate_limit(
+            f"event-media:user:{getattr(actor, 'pk', 0)}",
+            limit=EVENT_IMAGE_LIMIT,
+            window=EVENT_IMAGE_WINDOW,
+        )
+        if wait:
+            minutes = max(1, int(wait.total_seconds() // 60))
+            raise ValidationError(
+                {
+                    "file": _("Too many uploads: try again in %(minutes)d minutes.")
+                    % {"minutes": minutes}
+                }
+            )
+    ctx = _context(actor, ctx)
+    stored: tuple[Any, str] | None = None
+    try:
+        with _mutation(False, actor=actor, vendor=vendor):
+            locked = Vendor.objects.select_for_update().get(pk=vendor.pk)
+            root = Collection.get_first_root_node()
+            image = MediaImage(
+                title=(title.strip() or "Image")[:255],
+                file=upload,
+                collection=root if dry_run else vendor_logo_collection(locked),
+                licence=licence,
+                author=author.strip()[:200],
+                source_url=source_url.strip(),
+                credit_text=credit_text.strip()[:250],
+                permission_ref=permission_ref.strip(),
+                uploaded_by_user=_user(actor),
+            )
+            image.full_clean()
+            if dry_run:
+                return image
+            image.save()
+            stored = (image.file.storage, image.file.name)
+            record(
+                ctx,
+                EVENT_IMAGE_UPLOADED,
+                "core.mediaimage",
+                str(image.pk),
+                None,
+                {
+                    "image": f"image:{image.pk}",
+                    "title": image.title,
+                    "vendor": str(vendor.public_id),
+                },
+            )
+    except BaseException:
+        if stored is not None:  # the row rolls back; the file would stay on disk
+            stored[0].delete(stored[1])
+        raise
+    return image

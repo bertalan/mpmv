@@ -306,6 +306,16 @@ SUPER_REDUCED: Final = "super_reduced"
 ZERO: Final = "zero"
 BOOKS: Final = "books"
 CATEGORIES: Final = (STANDARD, REDUCED, SUPER_REDUCED, ZERO, BOOKS)
+# Fiscal categories the catalog stores under another name (TAX.12). The catalog's
+# `book_art74` is a book: it takes the `books` rate; the art. 74 treatment itself (no VAT) comes
+# from the vendor's exempt profile (`art74_publishing`, spec 05 §5.2), not from the category.
+CATEGORY_ALIASES: Final[Mapping[str, str]] = {"book_art74": BOOKS}
+
+
+def tax_category(category: str) -> str:
+    """The tax engine's category for a product's fiscal category (aliases resolved)."""
+    return CATEGORY_ALIASES.get(category, category)
+
 
 RATE_SOURCE_TEDB: Final = "ec_tedb"  # the Commission's Taxes in Europe Database (TAX.6)
 RATE_SOURCE_MANUAL: Final = "manual"
@@ -939,6 +949,7 @@ def resolve_goods_tax(ctx: TaxContext, category: FiscalCategory) -> TaxDecision:
     Rates come from the context's table; a missing rate raises `MissingTaxRate` (T6). A blank or
     invalid destination country raises `InvalidCountry`: there is no default country (T18).
     """
+    category = tax_category(category)
     if category not in CATEGORIES:
         raise ValueError(f"{category!r} is not a fiscal category")
     profile = ctx.vendor_profile
@@ -1195,3 +1206,70 @@ def resolve_shipping_tax(
         for decision, share in shares.items()
         if share != 0
     ]
+
+
+# --- TAX.12: consumer prices include VAT (Directive 98/6/EC, owner decision MQ-12) -----------
+
+# The country a site language suggests before the buyer gives a delivery address. English names
+# no single country, so an English visitor gets the operator's country (the last fallback).
+LANGUAGE_PRICE_COUNTRIES: Final[Mapping[str, str]] = {
+    "it": "IT",  # country-literal: the language's country, not the platform's
+    "de": "DE",
+    "fr": "FR",
+    "es": "ES",
+}
+
+
+def consumer_context(
+    vendor_country: str,
+    vendor_profile: VendorTaxProfileSnapshot,
+    *,
+    destination_country: str,
+    destination_postcode: str | None,
+    rates: RateTable,
+    on: dt.date,
+    platform_country: str,
+    territories: tuple[TerritoryRule, ...] = (),
+) -> TaxContext:
+    """The context of a consumer's purchase from this vendor: what `resolve_goods_tax` gets at
+    checkout for a buyer without a VIES-valid number (owner decision 2026-11-16, "il prezzo
+    reale": a displayed price is exactly what checkout charges, the vendor's regime included)."""
+    return TaxContext(
+        on=on,
+        vendor_country=vendor_country,
+        vendor_profile=vendor_profile,
+        platform=PlatformOperatorSnapshot(country=platform_country),
+        destination_country=destination_country,
+        destination_postcode=destination_postcode,
+        customer="b2c",
+        rates=rates,
+        territories=territories,
+    )
+
+
+def gross_amount(net: Decimal, rate: Decimal) -> Decimal:
+    """A net amount plus its VAT, the VAT rounded ROUND_HALF_UP to the cent (one line)."""
+    vat = tax_amount(net, rate)  # refuses floats and non-finite values first
+    return net.quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP) + vat
+
+
+def estimate_price_country(
+    *, delivery_country: str, language: str, operator_country: str
+) -> tuple[str, bool]:
+    """The country whose rate a displayed price uses, and whether it is an estimate.
+
+    The delivery country the buyer gave wins (not an estimate). Before that: the active
+    language's default country (`LANGUAGE_PRICE_COUNTRIES`, a region suffix ignored), else the
+    operator's country. The stack has no geolocation header yet; MQ-12 puts it before the
+    language when one exists.
+    """
+    if delivery_country:
+        try:
+            return normalize_country(delivery_country), False
+        except InvalidCountry:
+            pass
+    base = language.split("-")[0].split("_")[0].lower()
+    by_language = LANGUAGE_PRICE_COUNTRIES.get(base)
+    if by_language is not None:
+        return by_language, True
+    return normalize_country(operator_country), True

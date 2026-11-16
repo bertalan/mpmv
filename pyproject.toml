@@ -143,6 +143,7 @@ markers = [
   "keep_seeded_territories: tax integration test that runs against the territories seeded by migration 0006 (TAX.7)",
   "security_slow: slow security cases, run nightly by security-nightly (SEC.5)",
   "security: attack scenarios in tests/security (SEC.5), run with the integration suite",
+  "rate_change: ORD.20 amendment test whose standard rate changes from 22 % to 23 % by a TAX.6 validity period",
 ]
 
 [tool.coverage.run]
@@ -186,6 +187,14 @@ name = "CMS reads catalog and vendors, never tax or shipping (spec 01 graph)"
 type = "forbidden"
 source_modules = ["apps.cms"]
 forbidden_modules = ["apps.tax", "apps.shipping"]
+
+# TAX.12: consumer prices include VAT, but the catalog stays free of tax imports; its templates
+# load the tax app's `consumer_prices` tags. Also implied by the layers above, stated on its own.
+[[tool.importlinter.contracts]]
+name = "The catalog never imports tax (TAX.12)"
+type = "forbidden"
+source_modules = ["apps.catalog"]
+forbidden_modules = ["apps.tax"]
 
 # Spec 17 §17.2.1: the garage reads accounts and the catalog only. An order line keeps the fit
 # answer shown at purchase, never the garage, so the checkout and money apps never import it.
@@ -320,5 +329,13 @@ forbidden_modules = ["apps.events"]
 name = "Engines are pure: no Django, models or services in apps.*.engine (ARC.18)"
 type = "forbidden"
 source_modules = ["apps.*.engine"]
+forbidden_modules = ["django", "apps.*.models", "apps.*.services"]
+ignore_imports = ["apps.core.text -> django"]
+
+# ORD.20: the order amendment engine is a pure module of orders too (same rule as ARC.18).
+[[tool.importlinter.contracts]]
+name = "The order amendment engine is pure: no Django, models or services (ARC.18, ORD.20)"
+type = "forbidden"
+source_modules = ["apps.orders.amendment_engine"]
 forbidden_modules = ["django", "apps.*.models", "apps.*.services"]
 ignore_imports = ["apps.core.text -> django"]

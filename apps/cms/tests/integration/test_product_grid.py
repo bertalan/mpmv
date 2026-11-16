@@ -147,6 +147,7 @@ def editor() -> User:
 # --- The term grid (the "done when")
 
 
+@pytest.mark.usefixtures("consumer_prices")
 def test_a_term_grid_renders_the_cat8_results(seeded: SeedReport, maker: Term) -> None:
     older = listed("Steel bag", price_net=Decimal("12.50"))
     newer = listed("Leather bag")
@@ -164,7 +165,8 @@ def test_a_term_grid_renders_the_cat8_results(seeded: SeedReport, maker: Term) -
     section = _grid_section(html)
     assert section.find("h2").get_text(strip=True) == "Our picks"
     prices = [p.get_text(" ", strip=True) for p in section.find_all(class_="product-tile__price")]
-    assert prices == ["EUR 10.00 excl. VAT", "EUR 12.50 excl. VAT"]
+    note = "Indicative price. Final amount at checkout."  # TAX.12: with VAT, IT 22 %
+    assert prices == [f"EUR 12.20 {note}", f"EUR 15.25 {note}"]
     links = [a["href"] for a in section.find_all("a")]
     assert any(href.endswith("-en/") and "/product/" in href for href in links)
 

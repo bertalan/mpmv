@@ -40,16 +40,19 @@ from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission
 
-from . import engine, notifications
+from . import amendment_engine, engine, notifications, versions
 from .messages import CLOSED_SITE, CLOSED_VENDOR
 from .models import (
+    OPEN_AMENDMENT_STATES,
     Order,
+    OrderAmendment,
     OrderLine,
     OrderNumberSequence,
     OrderState,
     PrivacyStatus,
     StockReservation,
     VendorOrder,
+    VendorOrderVersion,
 )
 from .tz import business_tz
 
@@ -72,6 +75,12 @@ class LineInput:
     vat_nature_code: str = ""
     discount_net: Decimal = Decimal("0.00")
     legal_note_key: str = ""
+    # ORD.20 snapshots for amendments: the product's fiscal category and the unit weight in kg
+    # (the variant's override when it has one), as they were when the order was placed.
+    fiscal_category: str = ""
+    weight_kg: Decimal | None = None
+    # ORD.20 part 2: the variant sold, so an amendment can put its units back in stock.
+    variant: Variant | None = None
 
 
 @dataclass(frozen=True)
@@ -265,6 +274,7 @@ def _build_vendor_order(
             sku=entry.sku,
             title=entry.title,
             variant_label=entry.variant_label,
+            variant=entry.variant,
             vat_nature_code=entry.vat_nature_code,
             unit_price_net=entry.unit_price_net,
             quantity=entry.quantity,
@@ -274,6 +284,8 @@ def _build_vendor_order(
             tax_reason=entry.tax_reason,
             tax_amount=a.tax,
             legal_note_key=entry.legal_note_key,
+            fiscal_category=entry.fiscal_category,
+            weight_kg=entry.weight_kg,
         )
         for entry, a in zip(item.lines, amounts, strict=True)
     ]
@@ -384,6 +396,8 @@ def create_order(
             for line in lines:
                 line.vendor_order = sub
                 line.save()
+            if order.paid_at is not None:  # a legacy paid order; others get v1 when paid
+                versions.create_version_one(sub, lines)
         changeset = changes()
         audit_changes(changeset, ctx=ctx, action="orders.create")
     return order, changeset
@@ -394,6 +408,19 @@ def create_order(
 
 class _DryRunRollback(Exception):
     pass
+
+
+def _write_version_one(order: Order, changeset: ChangeSet) -> None:
+    """ORD.20: when the payment succeeds, each vendor order gets its v1 (the placed order), taxed
+    on the payment date (`versions.tax_date`), in the transition's changeset and audit entry. The
+    database stamped `paid_at` with the save."""
+    order.refresh_from_db(fields=["paid_at"])
+    for sub in order.vendor_orders.filter(current_version__isnull=True).select_related("vendor"):
+        sub.order = order
+        version = versions.create_version_one(sub, list(sub.lines.all()))
+        changeset.create(
+            "orders.vendororderversion", str(version.public_id), versions.audit_snapshot(version)
+        )
 
 
 def transition_order(
@@ -409,6 +436,8 @@ def transition_order(
             locked.state = target
             locked.save(update_fields=["state", "updated_at"])
             changeset.update("orders.order", str(locked.public_id), before, _order_snapshot(locked))
+            if target == "paid":
+                _write_version_one(locked, changeset)
             if dry_run:
                 raise _DryRunRollback
             audit_changes(changeset, ctx=ctx, action="orders.transition")
@@ -432,6 +461,39 @@ def _orders_frozen(vendor: Vendor) -> bool:
     are dotted paths (orders never imports the apps that freeze); a voluntary closure freezes
     nothing."""
     return any(import_string(path)(vendor) for path in settings.ORDER_FREEZE_HOOKS)
+
+
+orders_frozen = _orders_frozen  # public name for `apps.orders.amendments` (ORD.20)
+
+
+class AmendmentOpen(ValueError):
+    """The package has an open amendment (ORD.20): it cannot be shipped until the amendment is
+    applied, declined, withdrawn or discarded."""
+
+
+class ShipmentOnHold(AmendmentOpen):
+    """The package is held after a partial unavailability (ORD.20): the customer may still
+    cancel the rest of it, so it cannot be shipped before the hold ends or the customer answers."""
+
+
+def _refuse_shipping_with_open_amendment(sub: VendorOrder, now: dt.datetime) -> None:
+    if sub.ship_hold_until is not None and now < sub.ship_hold_until:
+        until = sub.ship_hold_until.astimezone(business_tz()).strftime("%d %b %Y %H:%M")
+        raise ShipmentOnHold(
+            f"This package cannot be marked shipped before {until}: an item was unavailable and "
+            "the customer may still cancel the rest of the package until then (or answer "
+            "earlier)."
+        )
+    open_one = (
+        OrderAmendment.objects.filter(vendor_order=sub, state__in=OPEN_AMENDMENT_STATES)
+        .only("public_id", "state")
+        .first()
+    )
+    if open_one is not None:
+        raise AmendmentOpen(
+            f"This package cannot be marked shipped while amendment {open_one.public_id} is open "
+            f"({open_one.state}): apply, withdraw or discard the amendment first."
+        )
 
 
 def transition_vendor_order(
@@ -465,6 +527,7 @@ def transition_vendor_order(
             before = _vendor_order_snapshot(locked)
             engine.check_vendor_order_transition(locked.state, target)
             if target == "shipped":
+                _refuse_shipping_with_open_amendment(locked, stamp)
                 locked.tracking_number = tracking_number or locked.tracking_number
                 if not locked.tracking_number:
                     raise ValueError("a vendor order needs a tracking number to be shipped")
@@ -617,6 +680,38 @@ def _scrub_snapshot(order: Order) -> dict[str, Any]:
     }
 
 
+def _scrub_amendments(order: Order, changeset: ChangeSet) -> None:
+    """ORD.20: an amendment keeps the new delivery address in its changes and the customer's own
+    words in `customer_request`; anonymisation replaces both (a queryset update: the model
+    refuses to save a closed amendment). The country stays: it is a fiscal fact."""
+    rows = OrderAmendment.objects.filter(vendor_order__order=order).select_related(
+        "vendor_order__vendor"
+    )
+    for amendment in rows:
+        changes = amendment_engine.scrub_changes(amendment.changes)
+        request = dict(amendment.customer_request or {})
+        if request.get("text"):
+            request["text"] = engine.ANONYMISED
+        # The vendor's reason and the staff note are free text that may name the customer.
+        texts = {
+            name: engine.ANONYMISED
+            for name in ("reason", "staff_note")
+            if getattr(amendment, name) not in ("", engine.ANONYMISED)
+        }
+        if changes == amendment.changes and request == amendment.customer_request and not texts:
+            continue
+        OrderAmendment.objects.filter(pk=amendment.pk).update(
+            changes=changes, customer_request=request, **texts
+        )
+        flags = {VENDOR_FIELD: str(amendment.vendor_order.vendor.public_id)}
+        changeset.update(
+            "orders.orderamendment",
+            str(amendment.public_id),
+            {**flags, "personal_data": True},
+            {**flags, "personal_data": False},
+        )
+
+
 def _clear_non_fiscal(order: Order, changeset: ChangeSet) -> None:
     for sub in order.vendor_orders.select_for_update().select_related("vendor"):
         if not (sub.carrier_contact_phone or sub.support_notes):
@@ -693,6 +788,11 @@ def _scrub(
             else:
                 values["restricted_at"] = stamp
             Order.objects.filter(pk=locked.pk).update(**values)
+            if target == "anonymized":  # ORD.20: a package's own address from v2 on
+                VendorOrderVersion.objects.filter(
+                    vendor_order__order=locked, shipping_address__isnull=False
+                ).update(shipping_address=engine.ANONYMISED_ORDER_FIELDS["shipping_address"])
+                _scrub_amendments(locked, changeset)
             _set_scrub_mode("")
             locked.refresh_from_db()
             changeset.update("orders.order", str(locked.public_id), before, _scrub_snapshot(locked))
@@ -1288,6 +1388,7 @@ def _line_input(entry: PlaceLine, product: Product, variants: dict[int, Variant]
         sku=variant.sku if variant is not None else product.sku,
         title=entry.title,
         variant_label=entry.variant_label,
+        variant=variant,
         unit_price_net=unit_price,  # the live price, equal to the one the customer saw
         quantity=entry.quantity,
         tax_rate=entry.tax.rate,
@@ -1295,7 +1396,17 @@ def _line_input(entry: PlaceLine, product: Product, variants: dict[int, Variant]
         vat_nature_code=entry.tax.nature_code or "",  # from the decision, never from a caller
         discount_net=entry.discount_net,
         legal_note_key=entry.tax.legal_note_key or "",
+        fiscal_category=product.fiscal_category,
+        weight_kg=unit_weight(product, variant),
     )
+
+
+def unit_weight(product: Product, variant: Variant | None) -> Decimal | None:
+    """The weight of one unit in kg as the shipping engine reads it: the variant's override, else
+    the product's (None when neither is set)."""
+    if variant is not None and variant.weight_kg_override is not None:
+        return variant.weight_kg_override
+    return product.weight_kg
 
 
 def _reason(tax: TaxOutcome | None) -> str:

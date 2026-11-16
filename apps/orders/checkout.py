@@ -98,7 +98,20 @@ def _unit_weight(product: Product, variant: Variant | None) -> Decimal:
     return product.weight_kg if product.weight_kg is not None else Decimal("0")
 
 
-def _options(rates: Sequence[shipping_engine.ShippingRate]) -> tuple[engine.ShippingOption, ...]:
+def _options(
+    rates: Sequence[shipping_engine.ShippingRate],
+    ctx: tax_engine.TaxContext | None = None,
+    goods: Sequence[tuple[Decimal, tax_engine.TaxDecision]] = (),
+) -> tuple[engine.ShippingOption, ...]:
+    """The shipping choices; with the goods' tax decisions, each with the VAT it would carry
+    (shipping follows the goods, TAX.17), so a consumer sees its price with VAT (TAX.12)."""
+
+    def vat(rate: shipping_engine.ShippingRate) -> Decimal | None:
+        if ctx is None or not goods:
+            return None
+        portions = tax_engine.resolve_shipping_tax(ctx, goods, rate)
+        return sum((p.tax for p in portions), start=_ZERO)
+
     return tuple(
         engine.ShippingOption(
             key=r.key,
@@ -108,6 +121,7 @@ def _options(rates: Sequence[shipping_engine.ShippingRate]) -> tuple[engine.Ship
             is_default=r.is_default,
             min_days=r.min_days,
             max_days=r.max_days,
+            tax=vat(r),
         )
         for r in rates
     )
@@ -354,6 +368,11 @@ def _package(
             engine.PackageLineInput(priced.unit_price_net, line.quantity, _ZERO, decision)
         )
 
+    # The goods' net per decision: the VAT each shipping option would carry (TAX.12, TAX.17).
+    goods = [
+        (round_line(i.unit_price_net * i.quantity - i.discount_net), i.decision) for i in inputs
+    ]
+
     # Shipping (SHP.3): one package per vendor, weight from the product or variant.
     ship_package = shipping_engine.VendorPackage(
         vendor_id=vid,
@@ -378,7 +397,9 @@ def _package(
             else "Shipping to this area is priced on request."
         )
         options = _options(
-            outcome.pickups if isinstance(outcome, shipping_engine.NeedsQuote) else ()
+            outcome.pickups if isinstance(outcome, shipping_engine.NeedsQuote) else (),
+            ctx,
+            goods,
         )
         return stop(
             engine.QUOTE,
@@ -390,7 +411,7 @@ def _package(
         return stop(
             engine.BLOCKED,
             _block(engine.SHIPPING_CHOICE_INVALID, "Choose one of the shipping options.", vid),
-            shipping_options=_options(outcome.rates),
+            shipping_options=_options(outcome.rates, ctx, goods),
         )
 
     amounts = engine.price_package(ctx, inputs, rate.net)
@@ -423,7 +444,7 @@ def _package(
             for b, p in zip(bare, amounts.lines, strict=True)
         ),
         blocks=tuple(extra),
-        shipping_options=_options(outcome.rates),
+        shipping_options=_options(outcome.rates, ctx, goods),
         selected_shipping=rate.key,
         shipping_portions=amounts.shipping_portions,
         totals=amounts.totals,

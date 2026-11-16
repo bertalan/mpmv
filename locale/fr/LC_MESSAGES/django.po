@@ -37,6 +37,10 @@ msgstr "%(vendor_name)s : commande %(order_number)s annulée, ne pas expédier"
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Transporteur : %(carrier)s. Numéro de suivi : %(tracking_number)s."
 
+#: apps/tax/prices.py
+msgid "excl. VAT"
+msgstr "HT"
+
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
@@ -70,6 +74,10 @@ msgstr "Bonjour %(customer_name)s,"
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello,"
 msgstr "Bonjour,"
+
+#: apps/tax/prices.py
+msgid "Indicative price. Final amount at checkout."
+msgstr "Prix indicatif. Montant final lors du paiement."
 
 #: apps/orders/templates/email/orders/vendor_new_order/subject.txt
 msgid "New paid order %(order_number)s"
