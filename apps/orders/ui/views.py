@@ -171,7 +171,7 @@ def _cart_context(request: HttpRequest, cart: Cart | None, status: str = "") -> 
         packages=packages,
         cart_messages=cart_messages,
         address_known=not any(b.code == engine.ADDRESS_MISSING for b in preview.blocks),
-        order=present.order_totals(preview),
+        order=present.order_totals(preview, request=request),
         can_continue=not cart_messages
         and not any(
             p.messages or p.quote_url or any(ln.problem for ln in p.lines) for p in packages
@@ -252,11 +252,15 @@ def cart_mini(request: HttpRequest) -> HttpResponse:
     lines: list[present.LineView] = []
     if cart is not None:
         language = get_language() or "en"
-        for line in cart.lines.select_related("product", "variant"):
+        for line in cart.lines.select_related("product__vendor", "variant"):
             net = cart_services.line_unit_price(line)
             unit, total = (
                 present.line_prices(
-                    net, line.quantity, line.product.fiscal_category, request=request
+                    net,
+                    line.quantity,
+                    line.product.fiscal_category,
+                    vendor=line.product.vendor,
+                    request=request,
                 )
                 if net is not None
                 else (None, None)
@@ -461,7 +465,7 @@ def checkout_page(request: HttpRequest) -> HttpResponse:
         shipping={},
     )
     # TAX.12: the shop's prices now use the delivery country's rate, no longer an estimate.
-    tax_prices.remember_delivery_country(request, cleaned["country"])
+    tax_prices.remember_delivery_address(request, cleaned["country"], cleaned["postcode"])
     return _private(HttpResponseRedirect(reverse("orders:review")))
 
 
@@ -502,7 +506,7 @@ def _review_context(
         },
         "packages": packages,
         "cart_messages": present.cart_blocks(preview),
-        "order": present.order_totals(preview),
+        "order": present.order_totals(preview, request=request),
         "placeable": preview.placeable and open_,
         "ordering_closed": preview.placeable and not open_,
         "address": data.get("address") or {},

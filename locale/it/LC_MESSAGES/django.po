@@ -1783,7 +1783,7 @@ msgstr "Ogni anno, nelle stesse date"
 msgid "Exact location"
 msgstr "Posizione esatta"
 
-#: apps/tax/prices.py
+#: apps/orders/ui/present.py apps/tax/prices.py
 msgid "excl. VAT"
 msgstr "IVA esclusa"
 
@@ -1965,6 +1965,10 @@ msgstr "Vai alla home page"
 #: apps/orders/ui/present.py apps/orders/ui/views.py
 msgid "Goods, excluding VAT"
 msgstr "Merce, IVA esclusa"
+
+#: apps/orders/ui/present.py
+msgid "Goods, VAT included"
+msgstr "Merce, IVA inclusa"
 
 #: apps/manager/forms.py
 msgid "Governing law"
@@ -2951,6 +2955,10 @@ msgstr "Numero di prodotti"
 msgid "Number of times"
 msgstr "Numero di volte"
 
+#: apps/orders/ui/present.py
+msgid "Of which VAT"
+msgstr "Di cui IVA"
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "off"
 msgstr "non attiva"
@@ -3629,7 +3637,7 @@ msgid "Price and availability"
 msgstr "Prezzo e disponibilità"
 
 #: apps/catalog/templates/catalog/includes/product_card.html
-#: apps/catalog/templates/catalog/product.html
+#: apps/catalog/templates/catalog/product.html apps/orders/ui/present.py
 msgid "Price at checkout"
 msgstr "Prezzo al checkout"
 
@@ -4209,6 +4217,10 @@ msgstr "Spedizione con IVA"
 #: apps/orders/ui/present.py apps/orders/ui/views.py
 msgid "Shipping, excluding VAT"
 msgstr "Spedizione, IVA esclusa"
+
+#: apps/orders/ui/present.py
+msgid "Shipping, VAT included"
+msgstr "Spedizione, IVA inclusa"
 
 #: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html

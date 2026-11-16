@@ -125,6 +125,7 @@ def line_prices(
     quantity: int,
     fiscal_category: str,
     *,
+    vendor: Vendor | None,
     request: HttpRequest | None,
     line_net: Decimal | None = None,
     tax_rate: Decimal | None = None,
@@ -133,7 +134,8 @@ def line_prices(
     """The unit price and the line total a buyer sees (TAX.12), VAT included.
 
     With the tax engine's decision for the delivery address (`tax_rate`, `line_tax`) the amounts
-    are final; before it, the rate of the estimated country (`apps.tax.prices`). A business buyer
+    are final; before it, the vendor's decision for the estimated destination (`apps.tax.prices`:
+    what checkout will charge, the vendor's regime included). A business buyer
     who opted in sees the net amounts. Each amount is rounded ROUND_HALF_UP on its own line.
     (None, None) when no rate can be decided: no amount is shown, never a net one.
     """
@@ -143,11 +145,43 @@ def line_prices(
     if tax_rate is not None:
         total = net + line_tax if line_tax is not None else tax_engine.gross_amount(net, tax_rate)
         return tax_engine.gross_amount(unit_net, tax_rate), total
+    if vendor is None:
+        return None, None
     try:
-        unit = tax_prices.consumer_price(unit_net, fiscal_category, request=request)
+        unit = tax_prices.consumer_price(unit_net, fiscal_category, vendor=vendor, request=request)
     except tax_prices.PriceUnavailable:
         return None, None
     return unit.gross, tax_engine.gross_amount(net, unit.rate)
+
+
+def option_price(option: engine.ShippingOption, *, net_view: bool) -> str:
+    """A shipping option's price: with its VAT for a consumer (Directive 2011/83 art. 6(1)(e),
+    TAX.12), net for a business buyer who opted in. Never a net price shown as a consumer one."""
+    if net_view:
+        return f"{money(option.net)} {_('excl. VAT')}"
+    if option.tax is not None:
+        return money(option.net + option.tax)
+    return money(option.net) if option.net == 0 else _("Price at checkout")
+
+
+def summary_rows(
+    totals: engine.Totals, lines: Iterable[engine.SummaryLine], *, net_view: bool
+) -> list[dict[str, str]]:
+    """The rows above a total. A consumer sees goods and shipping with VAT and the VAT they
+    contain (TAX.12); a business buyer who opted in sees the net rows and the VAT added."""
+    if net_view:
+        return [
+            {"label": _("Goods, excluding VAT"), "amount": money(totals.goods_net)},
+            {"label": _("Shipping, excluding VAT"), "amount": money(totals.shipping_net)},
+            {"label": _("VAT"), "amount": money(totals.tax_total)},
+        ]
+    goods_tax = sum((line.tax for line in lines if line.tax is not None), start=Decimal("0.00"))
+    goods = totals.goods_net + goods_tax
+    return [
+        {"label": _("Goods, VAT included"), "amount": money(goods)},
+        {"label": _("Shipping, VAT included"), "amount": money(totals.grand_total - goods)},
+        {"label": _("Of which VAT"), "amount": money(totals.tax_total)},
+    ]
 
 
 def package_views(
@@ -201,6 +235,7 @@ def package_views(
                 line.unit_price_net,
                 line.quantity,
                 cart_line.product.fiscal_category if cart_line is not None else "",
+                vendor=vendor,
                 request=request,
                 line_net=net,
                 tax_rate=line.tax_rate,
@@ -216,11 +251,12 @@ def package_views(
                     problem=" ".join(by_product.get(line.product_id, [])),
                 )
             )
+        net_view = tax_prices.business_net_view(request)
         view.options = [
             OptionView(
                 key=option.key,
                 label=option.label,
-                price=money(option.net),
+                price=option_price(option, net_view=net_view),
                 delivery=_delivery(option.min_days, option.max_days),
                 checked=option.key == package.selected_shipping,
             )
@@ -228,11 +264,7 @@ def package_views(
         ]
         totals = package.totals
         if totals is not None:
-            view.summary_lines = [
-                {"label": _("Goods, excluding VAT"), "amount": money(totals.goods_net)},
-                {"label": _("Shipping, excluding VAT"), "amount": money(totals.shipping_net)},
-                {"label": _("VAT"), "amount": money(totals.tax_total)},
-            ]
+            view.summary_lines = summary_rows(totals, package.lines, net_view=net_view)
             view.total = money(totals.grand_total)
             view.note = _("VAT included in the total")
         out.append(view)
@@ -251,16 +283,18 @@ def cart_blocks(preview: CheckoutPreview, *, hide: Iterable[str] = ()) -> list[s
     return seen
 
 
-def order_totals(preview: CheckoutPreview) -> dict[str, Any] | None:
+def order_totals(
+    preview: CheckoutPreview, *, request: HttpRequest | None = None
+) -> dict[str, Any] | None:
     totals = preview.totals
     if totals is None or not preview.placeable:
         return None
     return {
-        "lines": [
-            {"label": _("Goods, excluding VAT"), "amount": money(totals.goods_net)},
-            {"label": _("Shipping, excluding VAT"), "amount": money(totals.shipping_net)},
-            {"label": _("VAT"), "amount": money(totals.tax_total)},
-        ],
+        "lines": summary_rows(
+            totals,
+            [line for package in preview.packages for line in package.lines],
+            net_view=tax_prices.business_net_view(request),
+        ),
         "total": money(totals.grand_total),
         "note": _("VAT included in the total"),
     }

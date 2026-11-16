@@ -8,5 +8,5 @@ buyer who opted in sees the net amount and "excl. VAT". No public price (`on_req
 <article class="product-card">
   {% if card.image %}{% responsive_image card.image "card" alt=card.image_alt %}{% elif card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.image_alt }}" loading="lazy">{% endif %}
   <h3 class="product-card-title">{% if card.url %}<a href="{{ card.url }}">{{ card.title }}</a>{% else %}{{ card.title }}{% endif %}</h3>
-  <p class="product-card-price">{% if card.price is None %}{% translate "Price on request" %}{% else %}{% consumer_price card.price card.fiscal_category as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p>
+  <p class="product-card-price">{% if card.price is None %}{% translate "Price on request" %}{% else %}{% consumer_price card.price card.fiscal_category card.vendor as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p>
 </article>

@@ -276,14 +276,17 @@ def demo_seed(db: None) -> "ChangeSet":
 
 
 @pytest.fixture
-def consumer_prices(db: None) -> None:
-    """TAX.12: an Italian platform operator and the IT 22 %, DE 19 % and FR 20 % standard rates,
-    so shop pages show VAT-inclusive consumer prices (an English visitor gets the operator's
-    country, IT). Through the app registry: the catalog and cms tests use it without importing
-    the tax app (spec 01 graph)."""
+def consumer_prices(db: None) -> "Iterator[None]":
+    """TAX.12: an Italian platform operator, the IT 22 %, DE 19 % and FR 20 % standard rates and
+    an OSS tax profile for every vendor (existing ones and those made during the test), so shop
+    pages show VAT-inclusive consumer prices (an English visitor gets the operator's country,
+    IT). Through the app registry: the catalog and cms tests use it without importing the tax
+    app (spec 01 graph). A test about another regime replaces the vendor's profile."""
+    import datetime as dt
     from decimal import Decimal
 
     from django.apps import apps
+    from django.db.models.signals import post_save
     from django.utils import timezone
 
     since = timezone.now() - timedelta(days=365)
@@ -306,3 +309,26 @@ def consumer_prices(db: None) -> None:
             source="manual",
             valid_from=since,
         )
+    vendor_model = apps.get_model("vendors", "Vendor")
+    profile = apps.get_model("tax", "VendorTaxProfile")
+
+    def give_profile(vendor: Any) -> None:
+        if not profile.objects.filter(vendor=vendor).exists():
+            profile.objects.create(
+                vendor=vendor,
+                regime="oss",
+                oss_registered_since=dt.date(2020, 1, 1),
+                valid_from=since,
+            )
+
+    def on_save(sender: Any, instance: Any, created: bool, **kwargs: Any) -> None:
+        if created:
+            give_profile(instance)
+
+    for vendor in vendor_model.objects.all():
+        give_profile(vendor)
+    post_save.connect(on_save, sender=vendor_model, dispatch_uid="tax12-consumer-prices")
+    try:
+        yield
+    finally:
+        post_save.disconnect(sender=vendor_model, dispatch_uid="tax12-consumer-prices")

@@ -2160,6 +2160,8 @@ class ProductCard:
     # The product's fiscal category: templates turn the net price into the VAT-inclusive
     # consumer price with the tax app's `consumer_price` tag (TAX.12).
     fiscal_category: str = "standard"
+    # The seller: the price shown is what checkout charges for this vendor (its VAT regime).
+    vendor: Vendor | None = None
 
 
 def product_cards(products: Sequence[Product], language: str) -> list[ProductCard]:
@@ -2199,6 +2201,7 @@ def product_cards(products: Sequence[Product], language: str) -> list[ProductCar
                 ),
                 image_alt=title,
                 fiscal_category=product.fiscal_category,
+                vendor=product.vendor,
             )
         )
     return cards

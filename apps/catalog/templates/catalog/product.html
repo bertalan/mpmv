@@ -45,7 +45,7 @@
         <p class="product-on-request">{% blocktranslate with vendor=page_data.vendor.display_name %}Ask {{ vendor }} about this product: it is not sold online.{% endblocktranslate %}</p>
       {% else %}
         {% if not page_data.variants %}
-          <p class="product-price">{% if page_data.price is not None %}{% consumer_price page_data.price page_data.product.fiscal_category as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p>
+          <p class="product-price">{% if page_data.price is not None %}{% consumer_price page_data.price page_data.product.fiscal_category page_data.vendor as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p>
           <p class="product-stock">{% include "catalog/includes/stock_status.html" with status=page_data.stock_status %}</p>
         {% endif %}
         <form class="product-form" method="post" action="{% url 'orders:cart_add' %}" hx-post="{% url 'orders:cart_add' %}" hx-target="#add-to-cart-result" hx-swap="innerHTML">
@@ -59,7 +59,7 @@
                 {% for variant in page_data.variants %}
                   <li>
                     <input type="radio" name="variant" id="variant-{{ forloop.counter }}" value="{{ variant.sku }}"{% if variant.selected %} checked{% endif %}>
-                    <label for="variant-{{ forloop.counter }}">{{ variant.label }}{% if variant.price is not None %}{% consumer_price variant.price page_data.product.fiscal_category as shown %}{% if shown %} <span class="variant-price"><data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note">{{ shown.note }}</small></span>{% endif %}{% endif %} <span class="variant-stock">{% include "catalog/includes/stock_status.html" with status=variant.stock_status %}</span> <span class="variant-sku">({{ variant.sku }})</span></label>
+                    <label for="variant-{{ forloop.counter }}">{{ variant.label }}{% if variant.price is not None %}{% consumer_price variant.price page_data.product.fiscal_category page_data.vendor as shown %}{% if shown %} <span class="variant-price"><data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note">{{ shown.note }}</small></span>{% endif %}{% endif %} <span class="variant-stock">{% include "catalog/includes/stock_status.html" with status=variant.stock_status %}</span> <span class="variant-sku">({{ variant.sku }})</span></label>
                   </li>
                 {% endfor %}
               </ul>

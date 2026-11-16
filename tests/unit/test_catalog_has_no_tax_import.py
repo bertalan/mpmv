@@ -31,4 +31,4 @@ def test_no_catalog_module_imports_the_tax_app() -> None:
 def test_the_catalog_templates_get_the_gross_price_from_the_tax_tag() -> None:
     card = (CATALOG / "templates" / "catalog" / "includes" / "product_card.html").read_text()
     assert "consumer_prices %}" in card
-    assert "{% consumer_price card.price card.fiscal_category as shown %}" in card
+    assert "{% consumer_price card.price card.fiscal_category card.vendor as shown %}" in card
