@@ -163,7 +163,7 @@ def test_shipping_and_returns_follow_the_vendor_zones_and_the_product_weight(
     offer = node(document, "Product")["offers"]
     [details] = [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"]
     assert offer["shippingDetails"] == [{"@id": details["@id"]}]
-    assert details["shippingRate"]["value"] == "6.90"
+    assert details["shippingRate"]["value"] == "8.42"  # 6.90 net + 22 % VAT (TAX.12)
     assert sorted(details["shippingDestination"]["addressCountry"]) == ["DE", "IT"]
     policy = node(document, "MerchantReturnPolicy")
     assert offer["hasMerchantReturnPolicy"] == {"@id": policy["@id"]}
@@ -284,3 +284,27 @@ def test_a_vendor_without_a_tax_profile_gets_no_offer_price(client: Client, them
     html, document = graph_of(client)
     assert "offers" not in node(document, "Product")
     assert "12.50" not in SCRIPT.findall(html)[0]
+    # No seller, return policy or shipping node survives without an offer to reference them.
+    assert [n["@type"] for n in document["@graph"]] == ["Product", "BreadcrumbList"]
+    assert schema_check.dangling_references(document) == []
+
+
+def test_a_shipping_zone_the_visitor_is_not_in_has_no_shipping_node(
+    client: Client, theme: str
+) -> None:
+    from apps.shipping.tests.factories import (
+        ShippingMethodFactory,
+        ShippingZoneFactory,
+        WeightBandFactory,
+    )
+
+    product = live(price_net=Decimal("12.50"), weight_kg=Decimal("0.500"))
+    zone = ShippingZoneFactory.create(countries=["FR"])
+    method = ShippingMethodFactory.create(vendor=product.vendor, zone=zone)
+    WeightBandFactory.create(method=method, cost_net=Decimal("6.90"))
+    _html, document = graph_of(client)
+    assert [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"] == []
+    assert "shippingDetails" not in node(document, "Product")["offers"]
+    assert "6.90" not in json.dumps(document)
+    assert schema_check.dangling_references(document) == []
+    assert schema_check.rich_result_errors(document) == []

@@ -40,7 +40,7 @@ from apps.catalog.product_pages import GalleryImage, ProductPage
 from apps.core.money import CURRENCY
 from apps.shipping import engine as shipping_engine
 from apps.shipping import services as shipping
-from apps.tax.prices import PriceUnavailable, consumer_price
+from apps.tax.prices import PriceUnavailable, consumer_price, estimated_country
 from apps.vendors.models import Vendor
 
 from . import product_graph as pg
@@ -119,8 +119,26 @@ def _home_label(language: str) -> str:
         return str(translation.gettext("Home"))
 
 
+def _shipping_rate(
+    page: ProductPage, net: Decimal, zone: frozenset[str] | set[str], request: HttpRequest | None
+) -> Decimal | None:
+    """The shipping price with VAT (TAX.12; shipping follows the goods, TAX.17) for the visitor's
+    destination; None when that destination is not in the zone or TAX.12 cannot decide it,
+    so the node carries no rate rather than a net one."""
+    country, _estimated = estimated_country(request)
+    if shipping_engine.WORLD not in zone and country not in zone:
+        return None
+    try:
+        return consumer_price(
+            net, page.product.fiscal_category, vendor=page.vendor, request=request
+        ).gross
+    except PriceUnavailable as exc:
+        logger.warning("JSON-LD shipping rate omitted (%s): %s", page.product.fiscal_category, exc)
+        return None
+
+
 def _shipping_nodes(
-    page: ProductPage, url: str, language: str
+    page: ProductPage, url: str, language: str, request: HttpRequest | None = None
 ) -> tuple[list[dict[str, Any]], list[str], set[str]]:
     """Nodes, their ids and the countries of the vendor's zones (empty set: nothing known).
     The countries do not depend on the product's weight; the shipping nodes do."""
@@ -138,11 +156,14 @@ def _shipping_nodes(
         band = None if weight is None else next((b for b in method.bands if b.holds(weight)), None)
         if band is None:
             continue
+        rate = _shipping_rate(page, band.price, zone, request)
+        if rate is None:
+            continue  # shippingRate is required by Google: no gross rate, no node
         nodes.append(
             pg.shipping_node(
                 node_id=f"{url}#shipping-{method.key}",
                 countries=sorted(listed),
-                rate=band.price,
+                rate=rate,
                 currency=CURRENCY,
                 min_days=method.min_delivery_days,
                 max_days=method.max_delivery_days,
@@ -207,7 +228,7 @@ def build_graph(
     shipping_ids: list[str] = []
     return_policy: dict[str, Any] | None = None
     if sold:
-        shipping_nodes, shipping_ids, countries = _shipping_nodes(page, url, language)
+        shipping_nodes, shipping_ids, countries = _shipping_nodes(page, url, language, request)
         if countries:
             return_policy = pg.return_policy_node(
                 node_id=f"{vendor_url}#return-policy",
@@ -267,10 +288,16 @@ def build_graph(
         variants=variants,
         varies_by=_varies_by(page, language) if variants else (),
     )
+    has_offer = data.offer is not None or any(v.offer is not None for v in variants)
+    if not has_offer:
+        # Nothing references the seller, return policy or shipping nodes: no orphans.
+        seller_node, return_policy, shipping_nodes = None, None, []
+    else:
+        seller_node = seller
     return pg.product_graph(
         product=data,
         breadcrumb=pg.breadcrumb_node(page_url=url, items=_crumbs(page, site, url)),
-        seller=seller if sold else None,
+        seller=seller_node if sold else None,
         return_policy=return_policy,
         shipping=shipping_nodes,
         linked=linked,
