@@ -4,6 +4,7 @@ the net rows only for a business buyer who opted in to net prices. The catalog's
 category reaches the tax engine as `books` (it raised an uncaught ValueError before).
 """
 
+import datetime as dt
 import re
 from decimal import Decimal
 
@@ -13,7 +14,9 @@ from django.test import Client
 from django.urls import reverse
 from pytest_django.fixtures import Settings as SettingsWrapper
 
+from apps.cart.tests.factories import CartFactory
 from apps.core.tests.factories import utc
+from apps.orders import checkout
 from apps.orders.tests.integration.test_checkout_views import (
     NBSP,
     add,
@@ -24,7 +27,8 @@ from apps.orders.tests.integration.test_checkout_views import (
 )
 from apps.tax import engine as tax
 from apps.tax import prices
-from apps.tax.tests.factories import TaxRateFactory
+from apps.tax.models import VendorTaxProfile
+from apps.tax.tests.factories import TaxRateFactory, VendorTaxProfileFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -102,3 +106,44 @@ def test_a_book_art74_product_is_priced_at_checkout_with_the_books_rate(client: 
     response = client.get(reverse("orders:review"))
     assert response.status_code == 200
     assert f"€{NBSP}10.40" in text(response.content.decode())  # 10.00 + 4 %
+
+
+# --- The shown price is the checkout price (lane-b's follow-up on #565). Territories are not
+# compared here: shipping to Livigno needs a quote, so the preview prices no line there.
+
+
+@pytest.mark.parametrize(
+    ("regime", "country", "postcode", "category", "net"),
+    [
+        ("domestic_only", "IT", "00100", "standard", "100.00"),
+        ("domestic_only", "DE", "10115", "standard", "100.00"),  # the vendor's 22 %, not 19 %
+        ("oss", "DE", "10115", "standard", "12.50"),  # 19 %, half a cent up
+        ("oss", "IT", "00100", "reduced", "0.05"),
+        ("exempt", "DE", "10115", "standard", "100.00"),  # forfettario: no VAT
+        ("exempt", "IT", "00100", "reduced", "10.00"),
+    ],
+)
+def test_consumer_price_equals_the_checkout_preview(
+    regime: str, country: str, postcode: str, category: str, net: str
+) -> None:
+    owner = vendor()
+    VendorTaxProfile.objects.filter(vendor=owner).delete()
+    VendorTaxProfileFactory.create(
+        vendor=owner,
+        regime=regime,
+        exempt_reason="flat_rate_forfettario" if regime == "exempt" else "",
+        oss_registered_since=dt.date(2026, 1, 1) if regime == "oss" else None,
+        valid_from=utc(2026, 1, 1),
+    )
+    cart = CartFactory.create()
+    add(cart, owner, net, fiscal_category=category)
+    address = {"line1": "1 Test", "city": "Test", "postcode": postcode, "country": country}
+    preview = checkout.build_checkout(cart, address)
+    line = preview.packages[0].lines[0]
+    assert line.tax_rate is not None, preview.packages[0].blocks
+    assert line.tax is not None
+    shown = prices.consumer_price(
+        Decimal(net), category, vendor=owner, country=country, postcode=postcode
+    )
+    assert shown.rate == line.tax_rate
+    assert shown.gross == line.unit_price_net + line.tax  # quantity 1: unit = line
