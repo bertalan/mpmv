@@ -17,10 +17,22 @@ Enter, Space or the arrow keys open it and Escape closes it. The vendored Bootst
 (loaded with `defer` by the ride layout) does all of it, so base's Alpine components are not used
 here. Without JavaScript the sub-menus stay closed and the parent links remain; the sub-menu links are not reachable then.
 
+Search overlay (THM.15 part 2): the search icon is a link to the search page that Bootstrap turns
+into the trigger of a full-screen modal holding base's search form (same action, field and
+labels). Without JavaScript the link just leads to the search page. Focus moves to the field when
+the modal opens (`ride/js/mini-cart.js`); Escape closes it and focus returns to the icon.
+
+Mini-cart (THM.15 part 2): the cart icon is a link to the cart page that opens an offcanvas on the
+end side. Its body is filled by HTMX from the cart page itself (`hx-get` plus `hx-select` of
+`#cart-body`: no second endpoint) on load and after every add to cart. `#cart-count` is the
+polite live region with the item count in words; `#cart-badge` is the visual count; both are set
+by `ride/js/mini-cart.js` from `data-cart-count` of the loaded cart body. On the cart and checkout
+pages (app `orders`) the icon stays a plain link: their own markup would repeat the panel's ids.
+
 Context: `site_name`, `links` (label, url, optional children), `languages`, `search_url` and
-`cart_url` (the icons are left out without them, never rendered as dead links), and the context
-of the help link.
-{% endcomment %}<header class="site-header">
+`cart_url` (default: the routes named `search` and `orders:cart`; an icon is left out without a
+url, never rendered as a dead link), and the context of the help link.
+{% endcomment %}{% with page_path=request.path|default:"" %}<header class="site-header">
   <div class="site-header__inner navbar">
     {% url 'home' as home_url %}<a class="site-name" href="{% firstof home_url '/' %}">{{ site_name }}</a>
     {% if links %}
@@ -54,9 +66,11 @@ of the help link.
       </div>
     {% endif %}
     <div class="site-header__tools">
-      {% with search_url=search_url|safe_href cart_url=cart_url|safe_href %}
-        {% if search_url %}<a class="tool" href="{{ search_url }}">{% include "components/icon.html" with name="search" only %}<span class="visually-hidden">{% translate "Search" %}</span></a>{% endif %}
-        {% if cart_url %}<a class="tool" href="{{ cart_url }}">{% include "components/icon.html" with name="cart" only %}<span class="visually-hidden">{% translate "Cart" %}</span></a>{% endif %}
+      {% url 'search' as search_default %}{% url 'orders:cart' as cart_default %}
+      {% firstof search_url search_default as search_href %}{% firstof cart_url cart_default as cart_href %}
+      {% with search_url=search_href|safe_href cart_url=cart_href|safe_href %}
+        {% if search_url %}<a class="tool" href="{{ search_url }}" data-bs-toggle="modal" data-bs-target="#search-modal">{% include "components/icon.html" with name="search" only %}<span class="visually-hidden">{% translate "Search" %}</span></a>{% endif %}
+        {% if cart_url %}<a class="tool tool--cart" href="{{ cart_url }}"{% if request.resolver_match.app_name != "orders" and request.resolver_match.app_name != "mfa" and request.resolver_match.app_name != "levels" and "login" not in page_path %} data-bs-toggle="offcanvas" data-bs-target="#mini-cart-offcanvas" aria-controls="mini-cart-offcanvas"{% endif %}>{% include "components/icon.html" with name="cart" only %}<span class="tool__badge" id="cart-badge" aria-hidden="true" hidden></span><span class="visually-hidden">{% translate "Cart" %}</span><span class="visually-hidden" id="cart-count" aria-live="polite"></span></a>{% endif %}
       {% endwith %}
       {% include "components/help_link.html" %}
       {% if languages %}{% include "components/language_switcher.html" %}{% endif %}
@@ -64,3 +78,34 @@ of the help link.
     </div>
   </div>
 </header>
+    {% with search_url=search_href|safe_href cart_url=cart_href|safe_href %}
+      {% if search_url %}
+        <div class="modal fade" id="search-modal" tabindex="-1" aria-labelledby="search-modal-title" aria-hidden="true">
+          <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h2 class="modal-title" id="search-modal-title">{% translate "Search" %}</h2>
+                <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+              </div>
+              <div class="modal-body">
+                {% include "components/search_form.html" with id="site-search" action=search_url query=request.GET.q only %}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+      {% comment %}No mini-cart on the cart and checkout pages (their ids would repeat) nor on the sign-in, second-factor and passkey pages: its background request must never race the session write of a login (it once lost a fresh MFA verification on CI). The request carries X-MPMV-Poll, so it is not user activity and writes no session stamp.{% endcomment %}
+      {% if cart_url and request.resolver_match.app_name != "orders" and request.resolver_match.app_name != "mfa" and request.resolver_match.app_name != "levels" and "login" not in page_path %}
+        <div class="offcanvas offcanvas-end" tabindex="-1" id="mini-cart-offcanvas" aria-labelledby="mini-cart-title">
+          <div class="offcanvas-header">
+            <span class="offcanvas-title" id="mini-cart-title">{% translate "Cart" %}</span>
+            <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}"></button>
+          </div>
+          <div class="offcanvas-body">
+            <div id="mini-cart-body" hx-get="{{ cart_url }}" hx-trigger="load, cart-changed from:body" hx-select="#cart-body" hx-swap="innerHTML" hx-headers='{"X-MPMV-Poll": "1"}'></div>
+            <p class="mini-cart__all"><a href="{{ cart_url }}">{% translate "View cart" %}</a></p>
+          </div>
+        </div>
+      {% endif %}
+    {% endwith %}
+{% endwith %}
