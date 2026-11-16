@@ -622,19 +622,19 @@ ENDPOINTS: dict[str, Access] = {
         make=event_with_block,
         kwargs=by_block_id,
         methods=("GET", "POST"),
-        sample={"public_id": NIL_UUID},
+        sample={"public_id": NIL_UUID, "block_id": NIL_UUID},
     ),
     "manager:shop:event_block_move": VendorScoped(
         make=event_with_block,
         kwargs=by_block_id,
         methods=("POST",),
-        sample={"public_id": NIL_UUID},
+        sample={"public_id": NIL_UUID, "block_id": NIL_UUID},
     ),
     "manager:shop:event_block_remove": VendorScoped(
         make=event_with_block,
         kwargs=by_block_id,
-        methods=("POST",),
-        sample={"public_id": NIL_UUID},
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID, "block_id": NIL_UUID},
     ),
     "manager:shop:event_preview": VendorScoped(
         make=lambda vendor: EventPageFactory.create(vendor=vendor),

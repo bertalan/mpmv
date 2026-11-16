@@ -855,6 +855,7 @@ msgid "Back to the cart"
 msgstr "Torna al carrello"
 
 #: apps/manager/templates/manager/shop/event_block_form.html
+#: apps/manager/templates/manager/shop/event_block_types.html
 msgid "Back to the event"
 msgstr "Torna all'evento"
 
@@ -2401,6 +2402,10 @@ msgstr "Articolo"
 msgid "Items"
 msgstr "Articoli"
 
+#: apps/manager/templates/manager/shop/event_block_remove.html
+msgid "Keep it"
+msgstr "Annulla"
+
 #: apps/manager/templates/manager/shop/event_cancel.html
 msgid "Keep the event"
 msgstr "Mantieni l'evento"
@@ -3844,6 +3849,7 @@ msgstr "Ricorda le scelte che fai, come il tuo garage o la disposizione della pa
 #: apps/accounts/templates/accounts/mfa/overview.html
 #: apps/accounts/templates/accounts/mfa/setup.html
 #: apps/manager/templates/manager/shop/_event_blocks.html
+#: apps/manager/templates/manager/shop/event_block_remove.html
 #: themes/base/templates/components/cart_line.html
 msgid "Remove"
 msgstr "Rimuovi"
@@ -3856,7 +3862,7 @@ msgstr "Rimuovi %(name)s"
 msgid "Remove the logo"
 msgstr "Rimuovi il logo"
 
-#: apps/manager/templates/manager/shop/_event_blocks.html
+#: apps/manager/event_block_views.py apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Remove this block?"
 msgstr "Rimuovere questo blocco?"
 
@@ -6909,6 +6915,14 @@ msgstr "Questo contenuto non è disponibile in questa lingua."
 msgid "This does not look like an EU VAT number. Check the prefix and the digits."
 msgstr "Questa non sembra una partita IVA dell'UE. Controlla il prefisso e le cifre."
 
+#: apps/manager/event_block_views.py
+msgid ""
+"This event was changed by someone else since you opened it. Reload the page and make your change "
+"again."
+msgstr ""
+"Questo evento è stato modificato da qualcun altro dopo che lo hai aperto. "
+"Ricarica la pagina e rifai la modifica."
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "This is your order reference, not an invoice. Each seller issues its own invoice."
 msgstr ""
@@ -8190,6 +8204,10 @@ msgstr ""
 "Puoi contestare questa decisione con un reclamo interno (articolo 20 DSA), con la risoluzione "
 "extragiudiziale delle controversie (articolo 21 DSA) o davanti a un giudice. I termini della "
 "piattaforma spiegano come."
+
+#: apps/manager/event_block_views.py
+msgid "You cannot add images for this shop."
+msgstr "Non puoi aggiungere immagini per questo negozio."
 
 #: apps/manager/event_block_views.py
 msgid "You cannot change this event."

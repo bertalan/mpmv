@@ -14,15 +14,14 @@ No inline script or style.
           <div class="manager-confirm">
             <a class="button button--secondary button--small" href="{{ block.edit_url }}">{% translate "Edit" %}<span class="visually-hidden"> {% blocktranslate with number=block.number label=block.label %}block {{ number }}, {{ label }}{% endblocktranslate %}</span></a>
             <form method="post" action="{{ block.move_url }}" hx-post="{{ block.move_url }}" hx-target="#event-blocks" hx-swap="outerHTML">
-              {% csrf_token %}<input type="hidden" name="direction" value="up">
+              {% csrf_token %}<input type="hidden" name="base_revision" value="{{ base_revision }}"><input type="hidden" name="direction" value="up">
               <button type="submit" class="button button--secondary button--small">{% translate "Move up" %}<span class="visually-hidden"> {% blocktranslate with number=block.number label=block.label %}block {{ number }}, {{ label }}{% endblocktranslate %}</span></button>
             </form>
             <form method="post" action="{{ block.move_url }}" hx-post="{{ block.move_url }}" hx-target="#event-blocks" hx-swap="outerHTML">
-              {% csrf_token %}<input type="hidden" name="direction" value="down">
+              {% csrf_token %}<input type="hidden" name="base_revision" value="{{ base_revision }}"><input type="hidden" name="direction" value="down">
               <button type="submit" class="button button--secondary button--small">{% translate "Move down" %}<span class="visually-hidden"> {% blocktranslate with number=block.number label=block.label %}block {{ number }}, {{ label }}{% endblocktranslate %}</span></button>
             </form>
-            <form method="post" action="{{ block.remove_url }}" hx-post="{{ block.remove_url }}" hx-target="#event-blocks" hx-swap="outerHTML" hx-confirm="{% translate 'Remove this block?' %}">
-              {% csrf_token %}
+            <form method="get" action="{{ block.remove_url }}" hx-post="{{ block.remove_url }}" hx-vals='{"csrfmiddlewaretoken": "{{ csrf_token }}", "base_revision": "{{ base_revision }}"}' hx-target="#event-blocks" hx-swap="outerHTML" hx-confirm="{% translate 'Remove this block?' %}">
               <button type="submit" class="button button--danger button--small">{% translate "Remove" %}<span class="visually-hidden"> {% blocktranslate with number=block.number label=block.label %}block {{ number }}, {{ label }}{% endblocktranslate %}</span></button>
             </form>
           </div>

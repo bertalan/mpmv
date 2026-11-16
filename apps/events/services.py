@@ -1137,6 +1137,25 @@ def event_body(page: EventPage) -> list[dict[str, Any]]:
     return [dict(block) for block in latest.body.get_prep_value()]
 
 
+class StaleBlockEdit(ValidationError):
+    """The body changed since the editor was rendered: the edit would overwrite someone's work."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            _(
+                "This event was changed by someone else since you opened it. "
+                "Reload the page and make your change again."
+            ),
+            code="stale",
+        )
+
+
+def event_revision_id(page: EventPage) -> int:
+    """The id of the latest revision (0 for a page with none): what an editor is rendered from."""
+    fresh = EventPage.objects.get(pk=page.pk)
+    return int(fresh.latest_revision_id or 0)
+
+
 def _change_body(
     actor: Any,
     page: EventPage,
@@ -1144,10 +1163,22 @@ def _change_body(
     *,
     vendor: Vendor | None,
     ctx: AuditContext | None,
+    base_revision: int | None = None,
 ) -> EventChangeSet:
     """Save a new revision with the body `change` makes of the latest revision's body: every
-    block edit is one `save_event_draft`, so its checks and the sanitiser run each time."""
-    return save_event_draft(actor, {"body": change(event_body(page))}, page, vendor=vendor, ctx=ctx)
+    block edit is one `save_event_draft`, so its checks and the sanitiser run each time.
+
+    The page row is locked for the whole change, so two edits never read the same body. With
+    `base_revision` (the revision the editor was rendered from) an edit made on an older body is
+    refused with `StaleBlockEdit` and nothing is saved; without it the edit is not checked.
+    """
+    with transaction.atomic():
+        locked = EventPage.objects.select_for_update().get(pk=page.pk)
+        if base_revision is not None and int(locked.latest_revision_id or 0) != base_revision:
+            raise StaleBlockEdit
+        return save_event_draft(
+            actor, {"body": change(event_body(page))}, page, vendor=vendor, ctx=ctx
+        )
 
 
 def add_body_block(
@@ -1158,6 +1189,7 @@ def add_body_block(
     *,
     vendor: Vendor | None,
     ctx: AuditContext | None = None,
+    base_revision: int | None = None,
 ) -> EventChangeSet:
     """Append a block (a new id) to the body. Raises `ValidationError` as `save_event_draft`."""
     block_id = str(uuid.uuid4())
@@ -1167,6 +1199,7 @@ def add_body_block(
         lambda body: engine.append_block(body, kind, value, block_id),
         vendor=vendor,
         ctx=ctx,
+        base_revision=base_revision,
     )
 
 
@@ -1178,6 +1211,7 @@ def replace_body_block(
     *,
     vendor: Vendor | None,
     ctx: AuditContext | None = None,
+    base_revision: int | None = None,
 ) -> EventChangeSet:
     """Replace the value of one block. Raises `engine.BlockNotFound` for an unknown id."""
     return _change_body(
@@ -1186,6 +1220,7 @@ def replace_body_block(
         lambda body: engine.replace_block(body, block_id, value),
         vendor=vendor,
         ctx=ctx,
+        base_revision=base_revision,
     )
 
 
@@ -1197,6 +1232,7 @@ def move_body_block(
     *,
     vendor: Vendor | None,
     ctx: AuditContext | None = None,
+    base_revision: int | None = None,
 ) -> EventChangeSet:
     """Move one block up or down ("up" or "down"; at the edge it stays)."""
     return _change_body(
@@ -1205,6 +1241,7 @@ def move_body_block(
         lambda body: engine.move_block(body, block_id, direction),
         vendor=vendor,
         ctx=ctx,
+        base_revision=base_revision,
     )
 
 
@@ -1215,9 +1252,15 @@ def remove_body_block(
     *,
     vendor: Vendor | None,
     ctx: AuditContext | None = None,
+    base_revision: int | None = None,
 ) -> EventChangeSet:
     return _change_body(
-        actor, page, lambda body: engine.remove_block(body, block_id), vendor=vendor, ctx=ctx
+        actor,
+        page,
+        lambda body: engine.remove_block(body, block_id),
+        vendor=vendor,
+        ctx=ctx,
+        base_revision=base_revision,
     )
 
 

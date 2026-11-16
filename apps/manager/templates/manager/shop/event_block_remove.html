@@ -1,0 +1,17 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Confirmation before a body block of a vendor event is removed (EVT.4 part 2), for browsers
+without JavaScript (with it, the panel asks in the browser). POST removes, the link goes back.
+No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p><strong>{{ block_label }}</strong>{% if summary %}: {{ summary }}{% endif %}</p>
+  <form method="post" class="manager-confirm">
+    {% csrf_token %}
+    <input type="hidden" name="base_revision" value="{{ base_revision }}">
+    {% include "components/button.html" with label=_("Remove") type="submit" only %}
+    <a class="button button--secondary" href="{{ edit_url }}">{% translate "Keep it" %}</a>
+  </form>
+{% endblock %}

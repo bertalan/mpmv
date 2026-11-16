@@ -9,9 +9,11 @@ block panel (htmx) or a redirect to the form (plain post). Every POST is the gro
 """
 
 from typing import Any
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.http import (
     Http404,
     HttpRequest,
@@ -26,15 +28,29 @@ from django.utils.translation import gettext as _
 from django.views.decorators.cache import never_cache
 
 from apps.accounts.decorators import requires_level_method
-from apps.core.models import ImageLicence
+from apps.core.models import ImageLicence, MediaImage
 from apps.events import engine, services
 from apps.events.models import EventPage
 from apps.vendors.engine import VendorCannotWrite
 
 from .event_block_forms import FORMS, BlockForm
-from .event_block_panel import PANEL_ID, blocks_context
-from .event_forms import EventImageForm
+from .event_block_panel import PANEL_ID, block_types, blocks_context
+from .event_image_form import EventImageForm
 from .event_views import EDIT_URL, _EventAction, _not_active
+
+
+def _base_revision(request: HttpRequest) -> int | None:
+    """The revision the editor was rendered from (None: not sent; -1: not a number, so stale)."""
+    raw = request.POST.get("base_revision")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return -1
+
+
+IMAGES_PER_PAGE = 24
 
 
 class _BlockView(_EventAction):
@@ -48,8 +64,23 @@ class _BlockView(_EventAction):
             return HttpResponse(html)
         return HttpResponseRedirect(reverse(EDIT_URL, args=[page.public_id]) + f"#{PANEL_ID}")
 
+    def stale(self, request: HttpRequest, error: Exception) -> HttpResponse:
+        """A move or remove made on an older body: nothing is saved. htmx gets a 409 and reloads
+        the page, which shows the message; a plain post is redirected with the message."""
+        messages.error(request, self.refused(request, error))
+        if request.headers.get("HX-Request"):
+            response = HttpResponse(status=409)
+            response["HX-Refresh"] = "true"
+            return response
+        return self.respond(request, self.event())
+
     def refused(self, request: HttpRequest, error: Exception) -> str:
         """The error of a refused service call, as text for the form or a message."""
+        if isinstance(error, services.StaleBlockEdit):
+            return _(
+                "This event was changed by someone else since you opened it. "
+                "Reload the page and make your change again."
+            )
         if isinstance(error, ValidationError):
             return " ".join(error.messages)
         if isinstance(error, VendorCannotWrite):
@@ -70,6 +101,7 @@ class _BlockFormView(_BlockView):
         return found
 
     def render_form(self, form: BlockForm, page: EventPage, **extra: Any) -> HttpResponse:
+        extra.setdefault("base_revision", services.event_revision_id(page))
         context = self.get_context_data(
             form=form,
             event=page,
@@ -81,7 +113,7 @@ class _BlockFormView(_BlockView):
         )
         return self.render_to_response(context)
 
-    def save(self, page: EventPage, form: BlockForm) -> None:
+    def save(self, page: EventPage, form: BlockForm, base_revision: int | None) -> None:
         raise NotImplementedError
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
@@ -89,42 +121,57 @@ class _BlockFormView(_BlockView):
         if vendor is None:
             raise Http404("No vendor selected.")
         form = self.form_class()(request.POST, vendor=vendor)
+        posted = request.POST.get("base_revision")
+        shown = {"base_revision": posted} if posted is not None else {}
         if not form.is_valid():
-            return self.render_form(form, page)
+            return self.render_form(form, page, **shown)
         try:
-            self.save(page, form)
+            self.save(page, form, _base_revision(request))
         except engine.BlockNotFound:
             raise Http404("No such block.") from None
         except ValidationError as error:
             form.add_error(None, self.refused(request, error))
-            return self.render_form(form, page)
+            return self.render_form(form, page, **shown)
         except (services.EventRefused, VendorCannotWrite, PermissionDenied) as error:
             form.add_error(None, self.refused(request, error))
-            return self.render_form(form, page)
+            return self.render_form(form, page, **shown)
         return self.respond(request, page)
 
 
 class EventBlockAddView(_BlockFormView):
-    """GET `?type=` shows the form of one block type, POST adds it to the end of the body."""
+    """GET `?type=` shows the form of one block type (no type: the list of types), POST adds it
+    to the end of the body."""
+
+    @property
+    def template_name(self) -> str:  # type: ignore[override]
+        if self.request.method == "GET" and not self.kind():
+            return "manager/shop/event_block_types.html"
+        return "manager/shop/event_block_form.html"
 
     def kind(self) -> str:
         return str(self.request.GET.get("type") or self.request.POST.get("type") or "")
-
-    def _no_type(self, page: EventPage) -> HttpResponse | None:
-        """No type chosen: back to the form, where the type is chosen (an unknown one is a 404)."""
-        if self.kind():
-            return None
-        return HttpResponseRedirect(reverse(EDIT_URL, args=[page.public_id]) + f"#{PANEL_ID}")
 
     def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         page, vendor = self.event(), self.manager.vendor
         if vendor is None:
             raise Http404("No vendor selected.")
-        if (back := self._no_type(page)) is not None:
-            return back
+        if (
+            not self.kind()
+        ):  # no type chosen: the page that lists the types (an unknown one is a 404)
+            return self.render_to_response(
+                self.get_context_data(
+                    event=page,
+                    title=_("Add a block"),
+                    edit_url=reverse(EDIT_URL, args=[page.public_id]),
+                    types=[
+                        (f"{self.request.path}?{urlencode({'type': kind})}", label)
+                        for kind, label in block_types()
+                    ],
+                )
+            )
         return self.render_form(self.form_class()(vendor=vendor), page)
 
-    def save(self, page: EventPage, form: BlockForm) -> None:
+    def save(self, page: EventPage, form: BlockForm, base_revision: int | None) -> None:
         services.add_body_block(
             self.actor(),
             page,
@@ -132,12 +179,15 @@ class EventBlockAddView(_BlockFormView):
             form.raw_value(),
             vendor=self.manager.vendor,
             ctx=self.audit(self.request),
+            base_revision=base_revision,
         )
 
     @requires_level_method("content_edit")
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
-        if (back := self._no_type(self.event())) is not None:
-            return back
+        if not self.kind():
+            return HttpResponseRedirect(
+                reverse(EDIT_URL, args=[self.event().public_id]) + f"#{PANEL_ID}"
+            )
         return super().post(request, *args, **kwargs)
 
 
@@ -146,7 +196,7 @@ class EventBlockEditView(_BlockFormView):
 
     def block(self, page: EventPage) -> dict[str, Any]:
         try:
-            return dict(engine.block_by_id(services.event_body(page), self.kwargs["block_id"]))
+            return dict(engine.block_by_id(services.event_body(page), str(self.kwargs["block_id"])))
         except engine.BlockNotFound:
             raise Http404("No such block.") from None
 
@@ -162,14 +212,15 @@ class EventBlockEditView(_BlockFormView):
         form = form_class(initial=form_class.initial_for(block["value"]), vendor=vendor)
         return self.render_form(form, page)
 
-    def save(self, page: EventPage, form: BlockForm) -> None:
+    def save(self, page: EventPage, form: BlockForm, base_revision: int | None) -> None:
         services.replace_body_block(
             self.actor(),
             page,
-            self.kwargs["block_id"],
+            str(self.kwargs["block_id"]),
             form.raw_value(),
             vendor=self.manager.vendor,
             ctx=self.audit(self.request),
+            base_revision=base_revision,
         )
 
     @requires_level_method("content_edit")
@@ -190,13 +241,16 @@ class EventBlockMoveView(_BlockView):
             services.move_body_block(
                 self.actor(),
                 page,
-                self.kwargs["block_id"],
+                str(self.kwargs["block_id"]),
                 direction,
                 vendor=self.manager.vendor,
                 ctx=self.audit(request),
+                base_revision=_base_revision(request),
             )
         except engine.BlockNotFound:
             raise Http404("No such block.") from None
+        except services.StaleBlockEdit as error:
+            return self.stale(request, error)
         except (
             ValidationError,
             services.EventRefused,
@@ -208,7 +262,29 @@ class EventBlockMoveView(_BlockView):
 
 
 class EventBlockRemoveView(_BlockView):
-    http_method_names = ["post", "options"]
+    """GET asks "Remove this block?" (no JavaScript; htmx asks in the browser), POST removes."""
+
+    template_name = "manager/shop/event_block_remove.html"
+    http_method_names = ["get", "head", "post", "options"]
+
+    def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        page = self.event()
+        try:
+            block = engine.block_by_id(services.event_body(page), str(kwargs["block_id"]))
+        except engine.BlockNotFound:
+            raise Http404("No such block.") from None
+        labels = dict(block_types())
+        kind = str(block.get("type"))
+        return self.render_to_response(
+            self.get_context_data(
+                event=page,
+                title=_("Remove this block?"),
+                block_label=str(labels.get(kind, kind)),
+                summary=engine.block_summary(block),
+                edit_url=reverse(EDIT_URL, args=[page.public_id]) + f"#{PANEL_ID}",
+                base_revision=services.event_revision_id(page),
+            )
+        )
 
     @requires_level_method("content_edit")
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
@@ -217,12 +293,15 @@ class EventBlockRemoveView(_BlockView):
             services.remove_body_block(
                 self.actor(),
                 page,
-                self.kwargs["block_id"],
+                str(self.kwargs["block_id"]),
                 vendor=self.manager.vendor,
                 ctx=self.audit(request),
+                base_revision=_base_revision(request),
             )
         except engine.BlockNotFound:
             raise Http404("No such block.") from None
+        except services.StaleBlockEdit as error:
+            return self.stale(request, error)
         except (
             ValidationError,
             services.EventRefused,
@@ -243,7 +322,9 @@ class EventPreviewView(_EventAction):
         page = self.event()
         latest: EventPage = page.get_latest_revision_as_object()
         mode = latest.default_preview_mode
-        response = latest.make_preview_request(request, mode)  # serves the revision as a response
+        response = latest.make_preview_request(
+            request, mode, extra_request_attrs={"resolver_match": request.resolver_match}
+        )  # the route keys the help button
         if hasattr(response, "render"):
             response.render()
         response["X-Robots-Tag"] = "noindex, nofollow"
@@ -259,7 +340,17 @@ class EventImagesView(_EventAction):
         context = super().get_context_data(**kwargs)
         vendor = self.manager.vendor
         context.setdefault("form", EventImageForm())
-        context["images"] = list(services.vendor_image_library(vendor)[:100]) if vendor else []
+        library = services.vendor_image_library(vendor) if vendor else MediaImage.objects.none()
+        paginator = Paginator(library, IMAGES_PER_PAGE)
+        number = self.request.GET.get("page")
+        pager = paginator.get_page(number)
+        context["images"] = list(pager)
+        context["pager"] = pager
+        context["page_count"] = paginator.num_pages
+        context["previous_url"] = (
+            f"?page={pager.previous_page_number()}" if pager.has_previous() else ""
+        )
+        context["next_url"] = f"?page={pager.next_page_number()}" if pager.has_next() else ""
         context["title"] = _("Images")
         context["list_url"] = reverse("manager:shop:events")
         return context
@@ -292,6 +383,9 @@ class EventImagesView(_EventAction):
             return self.render_to_response(self.get_context_data(form=form))
         except VendorCannotWrite:
             form.add_error(None, _not_active())
+            return self.render_to_response(self.get_context_data(form=form))
+        except PermissionDenied:
+            form.add_error(None, _("You cannot add images for this shop."))
             return self.render_to_response(self.get_context_data(form=form))
         messages.success(request, _("The image is saved in your library."))
         return HttpResponseRedirect(reverse("manager:shop:event_images"))

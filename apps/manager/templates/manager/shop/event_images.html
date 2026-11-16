@@ -1,5 +1,5 @@
 {% extends "manager/layout.html" %}
-{% load i18n %}
+{% load i18n wagtailimages_tags %}
 {% comment %}
 The shop's image library for its events (EVT.4 part 2): the shop's own images and the upload form.
 Every image needs its licence and author (CMS.8). No inline script or style.
@@ -10,8 +10,9 @@ Every image needs its licence and author (CMS.8). No inline script or style.
   <h2>{% translate "Your images" %}</h2>
   {% if images %}
     <ul class="manager-choices">
-      {% for image in images %}<li>{{ image.title }}{% if image.author %} ({{ image.author }}){% endif %}{% if image.licence %}, {{ image.licence.name }}{% endif %}</li>{% endfor %}
+      {% for image in images %}<li>{% image image max-80x80 as thumb %}<img src="{{ thumb.url }}" width="{{ thumb.width }}" height="{{ thumb.height }}" alt="" loading="lazy"> {{ image.title }}{% if image.author %} ({{ image.author }}){% endif %}{% if image.licence %}, {{ image.licence.name }}{% endif %}</li>{% endfor %}
     </ul>
+    {% include "components/pagination.html" with page=pager.number page_count=page_count previous_url=previous_url next_url=next_url only %}
   {% else %}
     <p>{% translate "You have no images yet." %}</p>
   {% endif %}
