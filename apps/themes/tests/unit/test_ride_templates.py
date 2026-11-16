@@ -69,7 +69,6 @@ def test_the_burger_button_opens_the_offcanvas_menu() -> None:
     assert 'data-bs-toggle="offcanvas"' in toggle.group(0)
     assert 'data-bs-target="#site-offcanvas"' in toggle.group(0)
     assert 'aria-controls="site-offcanvas"' in toggle.group(0)
-    assert 'aria-expanded="false"' in toggle.group(0)
     assert "Menu" in toggle.group(0)
     panel = re.search(r'<div[^>]*id="site-offcanvas"[^>]*>', html)
     assert panel is not None

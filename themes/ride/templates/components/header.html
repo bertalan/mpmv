@@ -21,7 +21,7 @@ of the help link.
     {% url 'home' as home_url %}<a class="site-name" href="{% firstof home_url '/' %}">{{ site_name }}</a>
     {% if links %}
       <div class="site-nav">
-        <button type="button" class="nav-toggle navbar-toggler" data-bs-toggle="offcanvas" data-bs-target="#site-offcanvas" aria-controls="site-offcanvas" aria-expanded="false">{% include "components/icon.html" with name="menu" only %}{% translate "Menu" %}</button>
+        <button type="button" class="nav-toggle navbar-toggler" data-bs-toggle="offcanvas" data-bs-target="#site-offcanvas" aria-controls="site-offcanvas">{% include "components/icon.html" with name="menu" only %}{% translate "Menu" %}</button>
         <div class="offcanvas offcanvas-end" tabindex="-1" id="site-offcanvas" aria-labelledby="site-offcanvas-title">
           <div class="offcanvas-header">
             <span class="offcanvas-title" id="site-offcanvas-title">{% translate "Menu" %}</span>
