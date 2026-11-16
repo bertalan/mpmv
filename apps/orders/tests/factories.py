@@ -16,7 +16,15 @@ from django.db import connection
 from factory.django import DjangoModelFactory
 
 from apps.catalog.tests.factories import ProductFactory
-from apps.orders.models import Order, OrderLine, OrderNumberSequence, StockReservation, VendorOrder
+from apps.orders.models import (
+    Order,
+    OrderAmendment,
+    OrderLine,
+    OrderNumberSequence,
+    StockReservation,
+    VendorOrder,
+    VendorOrderVersion,
+)
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -114,6 +122,52 @@ def paid_vendor_order(vendor: Vendor | None = None, **fields: object) -> VendorO
     services.transition_order(sub.order, "paid", ctx=ctx)
     sub.refresh_from_db()
     return sub
+
+
+class VendorOrderVersionFactory(DjangoModelFactory[VendorOrderVersion]):
+    """v1 of an empty vendor order with zero totals (ORD.20). Real versions come from
+    `create_order` and `apps.orders.versions`; use `version_one` for one built from the lines."""
+
+    class Meta:
+        model = VendorOrderVersion
+
+    vendor_order = factory.SubFactory(VendorOrderFactory)
+    number = 1
+    snapshot = factory.LazyFunction(
+        lambda: {
+            "lines": [],
+            "shipping": {"net": "0.00", "portions": []},
+            "commission": {},
+            "destination_country": "IT",
+        }
+    )
+    goods_net = Decimal("0.00")
+    shipping_net = Decimal("0.00")
+    tax_total = Decimal("0.00")
+    gross_total = Decimal("0.00")
+
+
+def version_one(vendor: Vendor | None = None, **fields: object) -> VendorOrderVersion:
+    """v1 of a new vendor order (ORD.20), written from its lines (none by default)."""
+    from apps.orders import versions
+
+    sub = VendorOrderFactory.create(**({"vendor": vendor} if vendor else {}), **fields)
+    return versions.create_version_one(sub, list(sub.lines.all()))
+
+
+class OrderAmendmentFactory(DjangoModelFactory[OrderAmendment]):
+    """A minor draft amendment on v1 of a new vendor order (ORD.20). The changes are empty: a
+    record for scoping tests, never applied."""
+
+    class Meta:
+        model = OrderAmendment
+
+    from_version = factory.SubFactory(VendorOrderVersionFactory)
+    vendor_order = factory.SelfAttribute("from_version.vendor_order")
+    changes = factory.LazyFunction(list)
+    kind = "minor"
+    initiator = "vendor_owner"
+    reason = "Out of stock"
 
 
 class StockReservationFactory(DjangoModelFactory[StockReservation]):

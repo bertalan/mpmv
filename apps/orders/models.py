@@ -337,6 +337,14 @@ class VendorOrder(_StateGuarded):
     carrier = models.CharField(max_length=100, blank=True)
     shipped_at = models.DateTimeField(null=True, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
+    current_version = models.OneToOneField(
+        "VendorOrderVersion",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="ORD.20: the last applied version (v1 is the placed order).",
+    )
 
     class Meta:
         ordering = ["order", "id"]
@@ -425,6 +433,18 @@ class OrderLine(BaseModel):
         max_length=16, blank=True, help_text="N-code when no VAT is charged (TAX.3); else blank."
     )
     legal_note_key = models.CharField(max_length=64, blank=True)
+    fiscal_category = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text="ORD.20 snapshot: the product's fiscal category when ordered (blank: legacy).",
+    )
+    weight_kg = models.DecimalField(
+        max_digits=9,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text="ORD.20 snapshot: one unit's weight in kg (variant override included).",
+    )
 
     class Meta:
         ordering = ["vendor_order", "id"]
@@ -518,3 +538,235 @@ class StockReservation(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.quantity} x {self.variant or self.product} until {self.expires_at:%H:%M}"
+
+
+# --- order amendments (ORD.20, owner decision D-47) ------------------------------------------
+
+
+class VendorOrderVersion(BaseModel):
+    """One version of a vendor order (spec 07 §Order amendments). Append-only: a database trigger
+    refuses updates and deletes, as for the order snapshot.
+
+    v1 is the placed order (`amendment` empty); each applied amendment writes the next number.
+    `snapshot` is `amendment_engine.VersionSnapshot.to_json()`: lines with their tax portions,
+    the shipping choice and its portions, the frozen commission rule and the delivery country.
+    The delivery address is kept beside it, in `shipping_address`: empty for v1 (the order's own
+    address), set from v2 on, so an address change of one package never touches the others. It is
+    the one column the anonymisation scrub may overwrite (D-29).
+    """
+
+    vendor_scope: ClassVar[str] = "vendor_order__vendor"
+    objects: ClassVar[VendorScopedManager["VendorOrderVersion"]] = VendorScopedManager()
+
+    vendor_order = models.ForeignKey(VendorOrder, on_delete=models.PROTECT, related_name="versions")
+    number = models.PositiveIntegerField()
+    amendment = models.OneToOneField(
+        "OrderAmendment",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="applied_version",
+        help_text="The amendment that wrote this version; empty for v1, the placed order.",
+    )
+    snapshot = models.JSONField()
+    goods_net = MoneyField()
+    shipping_net = MoneyField()
+    tax_total = MoneyField()
+    gross_total = MoneyField()
+    shipping_address = models.JSONField(
+        null=True, blank=True, help_text="Empty for v1: the order's own delivery address."
+    )
+
+    class Meta:
+        ordering = ["vendor_order", "number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vendor_order", "number"], name="orders_vendororderversion_unique_number"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(number__gte=1), name="orders_vendororderversion_number_positive"
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(number=1, amendment__isnull=True)
+                    | models.Q(number__gt=1, amendment__isnull=False)
+                ),
+                name="orders_vendororderversion_v1_is_the_placed_order",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    gross_total=models.F("goods_net")
+                    + models.F("shipping_net")
+                    + models.F("tax_total")
+                ),
+                name="orders_vendororderversion_gross_adds_up",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    goods_net__gte=0, shipping_net__gte=0, tax_total__gte=0, gross_total__gte=0
+                ),
+                name="orders_vendororderversion_totals_not_negative",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor_order} v{self.number}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise PermissionError("A vendor order version is append-only")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> Any:
+        raise PermissionError("A vendor order version is append-only")
+
+
+class AmendmentState(models.TextChoices):
+    DRAFT = "draft"
+    AWAITING_QUOTE = "awaiting_quote"
+    PROPOSED = "proposed"
+    ACCEPTED = "accepted"
+    AWAITING_PAYMENT = "awaiting_payment"
+    APPLIED = "applied"
+    DECLINED = "declined"
+    EXPIRED = "expired"
+    WITHDRAWN = "withdrawn"
+    SUPERSEDED = "superseded"
+    DISCARDED = "discarded"
+
+
+OPEN_AMENDMENT_STATES: frozenset[str] = frozenset(
+    {"draft", "awaiting_quote", "proposed", "accepted", "awaiting_payment"}
+)
+
+
+class AmendmentKind(models.TextChoices):
+    MINOR = "minor"
+    SUBSTANTIAL = "substantial"
+
+
+class AmendmentInitiator(models.TextChoices):
+    VENDOR_OWNER = "vendor_owner"
+    VENDOR_MEMBER = "vendor_member"
+    PLATFORM_OWNER = "platform_owner"
+    SUPPORT = "support"
+
+
+class AmendmentFallback(models.TextChoices):
+    KEEP = "keep"
+    REMOVE_UNAVAILABLE_LINES = "remove_unavailable_lines"
+    CANCEL_PACKAGE = "cancel_package"
+
+
+class OrderAmendment(BaseModel):
+    """A typed change to one vendor order (spec 07 §Order amendments, ORD.20 to ORD.23).
+
+    `kind` is set by `amendment_engine.classify_amendment`, never by the actor. At most one
+    amendment per vendor order is open (`draft`, `awaiting_quote`, `proposed`, `accepted`,
+    `awaiting_payment`): a partial unique index enforces it. `from_version` is the version the
+    draft was computed on; an apply on a newer current version marks it `superseded`.
+    The quote link of ORD.23 and the `AmendmentLink` of ORD.21 come with those tasks.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor_order__vendor"
+    objects: ClassVar[VendorScopedManager["OrderAmendment"]] = VendorScopedManager()
+
+    vendor_order = models.ForeignKey(
+        VendorOrder, on_delete=models.PROTECT, related_name="amendments"
+    )
+    from_version = models.ForeignKey(
+        VendorOrderVersion, on_delete=models.PROTECT, related_name="amendments_from"
+    )
+    changes = models.JSONField(
+        default=list, blank=True, help_text="Typed changes (amendment_engine)."
+    )
+    kind = models.CharField(max_length=16, choices=AmendmentKind.choices)
+    reasons = models.JSONField(
+        default=list, blank=True, help_text="Why the change is substantial, in plain words."
+    )
+    initiator = models.CharField(max_length=16, choices=AmendmentInitiator.choices)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    reason = models.TextField(help_text="Why the change is made (required).")
+    staff_note = models.TextField(blank=True, help_text="Required for platform staff.")
+    customer_request = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Channel, date and the customer's words, for an address change they asked for.",
+    )
+    state = models.CharField(
+        max_length=16,
+        choices=AmendmentState.choices,
+        default=AmendmentState.DRAFT,
+        db_index=True,
+    )
+    preview = models.JSONField(
+        default=dict, blank=True, help_text="The recompute: before, after and money."
+    )
+    fallback = models.CharField(
+        max_length=32, choices=AmendmentFallback.choices, default=AmendmentFallback.KEEP
+    )
+    expires_at = models.DateTimeField(null=True, blank=True)
+    reminded_at = models.DateTimeField(null=True, blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_channel = models.CharField(max_length=16, blank=True)
+    payment_ref = models.CharField(max_length=255, blank=True)
+    refund_ref = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["vendor_order", "created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vendor_order"],
+                condition=models.Q(state__in=sorted(OPEN_AMENDMENT_STATES)),
+                name="orders_orderamendment_one_open_per_vendor_order",
+                violation_error_message="This package already has an open amendment.",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(state__in=AmendmentState.values),
+                name="orders_orderamendment_state_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(kind__in=AmendmentKind.values),
+                name="orders_orderamendment_kind_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(initiator__in=AmendmentInitiator.values),
+                name="orders_orderamendment_initiator_valid",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(reason=""), name="orders_orderamendment_reason_required"
+            ),
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(initiator__in=["platform_owner", "support"])
+                    | ~models.Q(staff_note="")
+                ),
+                name="orders_orderamendment_staff_note_required",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"amendment {self.public_id} ({self.state})"
+
+    @property
+    def is_open(self) -> bool:
+        return self.state in OPEN_AMENDMENT_STATES
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """A closed amendment (applied, declined, expired, withdrawn, superseded, discarded) is a
+        record of what happened: saving it again is refused. Only the anonymisation scrub rewrites
+        its personal fields, through a queryset update (D-29)."""
+        if not self._state.adding:
+            stored = type(self).objects.filter(pk=self.pk).values_list("state", flat=True).first()
+            if stored is not None and stored not in OPEN_AMENDMENT_STATES:
+                raise PermissionError(f"An amendment that is {stored} cannot be changed")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> Any:
+        raise PermissionError("An amendment is kept as a record; discard a draft instead")
