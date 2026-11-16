@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0027_operator_session_lifetimes"),
+        ("core", "0028_operator_amendment_settings"),
     ]
 
     operations = [
