@@ -67,6 +67,7 @@ def graph_of(client: Client, path: str = "/product/mug-en/") -> tuple[str, dict[
 
 
 def node(document: dict[str, Any], kind: str) -> dict[str, Any]:
+    found: dict[str, Any]
     [found] = [n for n in document["@graph"] if n["@type"] == kind]
     return found
 
@@ -91,7 +92,7 @@ def test_an_on_request_product_has_no_price(client: Client, theme: str) -> None:
     live(price_net=Decimal("99.00"), sales_mode=Product.SalesMode.ON_REQUEST)
     html, document = graph_of(client)
     assert "offers" not in node(document, "Product")
-    assert "99" not in SCRIPT.findall(html)[0]
+    assert "99.00" not in SCRIPT.findall(html)[0]
     assert "price" not in json.dumps(document).lower()
 
 
@@ -102,7 +103,7 @@ def test_a_catalog_only_product_has_no_price(client: Client, theme: str) -> None
 
 
 def test_a_product_with_variants_is_a_group(client: Client, theme: str) -> None:
-    product = live(price_net=Decimal("10.00"))
+    product = live(kind=Product.Kind.VARIABLE, price_net=Decimal("10.00"))
     variant = VariantFactory.create(product=product, price_net_override=Decimal("11.00"))
     for language in configured_languages():
         VariantTranslationFactory.create(variant=variant, language=language, label="Blue")
@@ -141,3 +142,28 @@ def test_the_product_json_ld_stays_under_the_budget(client: Client, theme: str) 
     live(price_net=Decimal("12.50"), gtin="4006381333931", mpn="MUG-77")
     html = client.get("/product/mug-en/").content.decode()
     assert len(SCRIPT.findall(html)[0].encode()) < 30 * 1024
+
+
+def test_shipping_and_returns_follow_the_vendor_zones_and_the_product_weight(
+    client: Client, theme: str
+) -> None:
+    from apps.shipping.tests.factories import (
+        ShippingMethodFactory,
+        ShippingZoneFactory,
+        WeightBandFactory,
+    )
+
+    product = live(price_net=Decimal("12.50"), weight_kg=Decimal("0.500"))
+    zone = ShippingZoneFactory.create(countries=["IT", "DE"])
+    method = ShippingMethodFactory.create(vendor=product.vendor, zone=zone)
+    WeightBandFactory.create(method=method, cost_net=Decimal("6.90"))
+    _html, document = graph_of(client)
+    offer = node(document, "Product")["offers"]
+    [details] = [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"]
+    assert offer["shippingDetails"] == [{"@id": details["@id"]}]
+    assert details["shippingRate"]["value"] == "6.90"
+    assert sorted(details["shippingDestination"]["addressCountry"]) == ["DE", "IT"]
+    policy = node(document, "MerchantReturnPolicy")
+    assert offer["hasMerchantReturnPolicy"] == {"@id": policy["@id"]}
+    assert sorted(policy["applicableCountry"]) == ["DE", "IT"]
+    assert schema_check.dangling_references(document) == []

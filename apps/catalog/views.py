@@ -269,7 +269,6 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
     if request.path_info != location:
         query = request.META.get("QUERY_STRING", "")
         return HttpResponsePermanentRedirect(listings.join_query(location, query))
-    site = request.build_absolute_uri("/").rstrip("/")
     alternates = hreflang_alternates(
         {lang: request.build_absolute_uri(path) for lang, path in page.paths.items()}
     )
@@ -280,7 +279,6 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
         "alternates": alternates,
         "canonical_url": request.build_absolute_uri(page.canonical_path),
         "robots": listings.ROBOTS_INDEX,
-        "jsonld": product_pages.structured_data(page, site=site),
         "vendor_url": slugs.vendor_path(language, page.vendor.slug, default_language=default),
         # CAT.15: related products and the other sellers of this product.
         "related": product_pages.related(page),
