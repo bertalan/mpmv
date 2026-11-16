@@ -35,6 +35,15 @@ Business logic stays in the owning app's `services.py`; the Manager only calls i
 the links of the whole site in groups: storefront, account, each vendor's shop space (plain text for
 staff, as there is no impersonation path), platform space and the editors' admin.
 
+## Vendor events (EVT.4)
+
+`/manager/shop/events/` (section `shop.events`, owner and staff) lists the shop's events with the
+moderator's "changes requested" comment and the hide reason; `new/` and `<id>/` hold the form with
+recurrence presets, the block editor (`event_block_views.py`), the image library with licence
+fields and the map picker. Every change goes through the EVT.3 services (`save_event_draft`,
+`submit_event`, `cancel_event`); POSTs carry the CORE.25 gate `content_edit`. Staff hide, restore
+and the `VendorEventPolicy` page live in the Wagtail admin (EVT.3).
+
 ## The vendor choice
 
 A member of several vendors picks one (`vendor_choice.py`, a vendor public id in the session). It
