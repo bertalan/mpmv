@@ -29,6 +29,8 @@ from apps.catalog.models import (
     PriceHistory,
     Product,
     ProductAttribute,
+    ProductImage,
+    ProductImageTranslation,
     ProductTranslation,
     Redirect,
     SkuAlias,
@@ -41,7 +43,7 @@ from apps.catalog.models import (
     VariantOption,
     VariantTranslation,
 )
-from apps.core.models import MediaImage
+from apps.core.models import MediaImage, TranslationStatus
 from apps.core.tests.factories import MediaImageFactory, SvgCollectionFactory
 from apps.vendors.tests.factories import VendorFactory
 
@@ -395,3 +397,24 @@ def brand_logo_image(**fields: Any) -> MediaImage:
     if collection is None:
         collection = SvgCollectionFactory.create().collection
     return MediaImageFactory.create(collection=collection, **fields)
+
+
+class ProductImageFactory(DjangoModelFactory[ProductImage]):
+    """A neutral image of a new product's gallery (CAT.4): language-neutral, not the cover."""
+
+    class Meta:
+        model = ProductImage
+
+    product = factory.SubFactory(ProductFactory)
+    image = factory.SubFactory(MediaImageFactory)
+    position = factory.Sequence(int)
+
+
+class ProductImageTranslationFactory(DjangoModelFactory[ProductImageTranslation]):
+    class Meta:
+        model = ProductImageTranslation
+
+    product_image = factory.SubFactory(ProductImageFactory)
+    language = "en"
+    status = TranslationStatus.PUBLISHED
+    alt_text = factory.Faker("sentence", nb_words=4)

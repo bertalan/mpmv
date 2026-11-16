@@ -1167,3 +1167,37 @@ def product_node(
     }
     node.update({key: value for key, value in optional.items() if value})
     return node
+
+
+# --- Product images (CAT.4, D-18)
+
+
+class GalleryRow(Protocol):
+    """What the image rule reads of a gallery image: `ProductImage` and test doubles fit."""
+
+    @property
+    def language(self) -> str | None: ...
+
+    @property
+    def is_cover(self) -> bool: ...
+
+    @property
+    def position(self) -> int: ...
+
+
+def gallery_selection[R: GalleryRow](rows: Iterable[R], language: str) -> list[R]:
+    """The images of one gallery shown in `language`, the cover first (D-18, spec 03 §3.2).
+
+    A language with at least one image dedicated to it shows only its dedicated images; every
+    other language shows the neutral ones (an image dedicated to another language is never
+    shown). The cover is the shown image flagged `is_cover`, else the first by position; the
+    others follow by position.
+    """
+    rows = list(rows)
+    dedicated = [row for row in rows if row.language == language]
+    shown = dedicated or [row for row in rows if row.language is None]
+    ordered = sorted(shown, key=lambda row: row.position)
+    cover = next((row for row in ordered if row.is_cover), None)
+    if cover is None:
+        return ordered
+    return [cover, *(row for row in ordered if row is not cover)]
