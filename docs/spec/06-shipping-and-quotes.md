@@ -322,6 +322,11 @@ def open_quote_link(token) -> Order                           # validates: hash,
 def expire_quotes(now) -> int                                 # hourly job
 ```
 
+After payment, a change of carrier or address that needs a quote, and a change to an order whose
+shipping was quoted, go through an order amendment (D-47, ORD.23, [07](07-cart-orders-payments.md)
+§Order amendments): the vendor's quote has `source = "amendment"` and the amendment's deadlines
+replace the `QuoteLink` expiry.
+
 Rules carried over from version 2.4 (all as tests):
 
 - A vendor quotes only its own package; discount ≥ 0 and not above the vendor's goods total; note ≤ 500 characters.
