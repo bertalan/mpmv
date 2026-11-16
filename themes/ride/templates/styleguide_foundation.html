@@ -104,3 +104,20 @@ the bundle reads the data-bs-* attributes (strict CSP, spec 14 §14.5).
       </div>
     </div>
   </section>
+
+  <section id="sg-motion" aria-labelledby="sg-motion-title">
+    <h2 id="sg-motion-title">{% translate "Carousels" %}</h2>
+    <p>{% translate "Bootstrap carousels with labelled buttons. Tab to a control, then Enter or Space; the arrow keys move between slides once the focus is inside. Nothing moves on its own unless the editor enables it; then it pauses on hover and focus and stops under reduced motion." %}</p>
+
+    <h3>{% translate "Hero slider" %}</h3>
+    {% include "components/hero_slider.html" with id="sg-hero-slider" label=_("Highlights") slides=library.hero_slides heading_level=4 only %}
+
+    <h3>{% translate "Strip" %}</h3>
+    {% include "components/strip.html" with id="sg-strip" label=_("Featured products") slides=library.slides per_view=2 heading_level=4 only %}
+
+    <h3>{% translate "Strip with automatic rotation" %}</h3>
+    {% include "components/strip.html" with id="sg-strip-auto" label=_("New arrivals") slides=library.slides per_view=2 heading_level=4 autoplay=True interval=1000 only %}
+
+    <h3>{% translate "Gallery with thumbnails" %}</h3>
+    {% include "components/gallery.html" with id="sg-gallery-carousel" label=_("Images of the touring jacket, with thumbnails") images=library.images only %}
+  </section>

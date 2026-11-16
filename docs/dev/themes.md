@@ -349,3 +349,21 @@ Point `settings.MPMV_THEMES_DIR` at a temporary directory and write the themes a
 sources; `shipped_tokens()` is a token set that meets the contract; `shipped_templates()` gives
 the shipped `base` templates, which a test `base` needs to render real pages); changing a `MPMV_THEME*`
 setting clears the registry cache. `SiteFactory` and `ThemeSettingsFactory` are in `apps.themes.tests.factories`.
+
+## `ride` carousels (THM.14 part 1)
+
+- Components in `themes/ride/templates/components/`: `hero_slider.html` (slides are the hero
+  component; slide titles `<h2>`, the page's one `<h1>` stays outside), `strip.html` (items grouped
+  by the `in_groups` filter, `per_view` 1 to 4, the group wraps on a narrow screen), `gallery.html`
+  (replaces base's list: thumbnail buttons plus base's `<dialog>` zoom) and the shared
+  `carousel_controls.html` (Previous, Pause/Play, Next).
+- They are Bootstrap carousels (`.carousel.slide`) with `aria-roledescription="carousel"`, slides
+  as `role="group"` with `aria-roledescription="slide"` and a "n of m" label, and labelled indicator
+  buttons. Bootstrap does the sliding and the arrow keys; `js/carousel.js` reveals the controls
+  and owns rotation: off unless the context sets `autoplay` (then `data-autoplay` holds the
+  interval), paused while the pointer or the focus is inside, never under
+  `prefers-reduced-motion` (the Pause/Play button is hidden then), and a polite live region
+  while nothing rotates.
+- Without JavaScript (`html.no-js`) every slide is shown in turn and the controls stay `hidden`.
+- Not wired to the CMS yet: the hero block has no `layout` or slides field (needs a `cms`
+  migration), so the components are shown on the styleguide only.

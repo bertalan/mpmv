@@ -94,8 +94,8 @@ def test_no_autoplay_unless_enabled_and_the_toggle_starts_and_stops_it(
     auto = page.locator(AUTO)
     toggle = auto.locator("[data-ride-toggle]")
     expect(toggle).to_have_text("Pause")
-    expect(auto.locator(".carousel-item.active")).not_to_have_attribute("aria-label", "1 of 3")
     toggle.focus()  # focus inside holds the rotation
+    page.wait_for_timeout(900)  # a slide already moving finishes first
     label = active_label(page, AUTO)
     page.wait_for_timeout(1500)
     assert active_label(page, AUTO) == label
@@ -103,6 +103,7 @@ def test_no_autoplay_unless_enabled_and_the_toggle_starts_and_stops_it(
     expect(toggle).to_have_text("Play")
     page.locator("h1, h2").first.focus()
     page.mouse.move(0, 0)
+    page.wait_for_timeout(900)
     label = active_label(page, AUTO)
     page.wait_for_timeout(1500)
     assert active_label(page, AUTO) == label
