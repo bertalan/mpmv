@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from apps.themes.csp_lint import lint_template, public_templates
+from apps.themes.csp_lint import lint_script, lint_template, public_scripts, public_templates
 from apps.themes.tests.builders import SHIPPED_THEMES
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -144,3 +144,70 @@ def test_every_public_template_passes_the_csp_lint() -> None:
 
 def test_the_shipped_themes_are_linted() -> None:
     assert any(path.is_relative_to(SHIPPED_THEMES) for path in public_templates(ROOT))
+
+
+# --- Helper classes with fixed !important text colours (THM.13 follow-up)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        '<span class="badge text-bg-info">x</span>',
+        '<span class="badge text-bg-warning">x</span>',
+        '<span class="badge text-bg-secondary">x</span>',
+        '<div class="p-2 bg-info">x</div>',
+        "<div class='bg-warning p-2'>x</div>",
+        '<div class="bg-secondary">x</div>',
+    ],
+)
+def test_helper_classes_with_failing_contrast_are_found(source: str) -> None:
+    findings = lint_template(source)
+    assert any("helper class" in f for f in findings), findings
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        '<span class="badge text-bg-primary">x</span>',
+        '<span class="badge text-bg-danger">x</span>',
+        '<div class="bg-info-subtle">x</div>',
+        '<div class="bg-secondary-subtle">x</div>',
+        '<span class="badge badge--secondary">x</span>',
+        '<div class="my-bg-info">x</div>',
+    ],
+)
+def test_other_classes_pass_the_helper_class_lint(source: str) -> None:
+    assert lint_template(source) == []
+
+
+# --- Bootstrap JS components that build markup from a string
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "new bootstrap.Tooltip(el);",
+        "new bootstrap.Popover(el, {});",
+        "bootstrap.Tooltip.getOrCreateInstance(el);",
+        "bootstrap.Popover.getOrCreateInstance(el);",
+        "new  bootstrap . Tooltip(el)",
+    ],
+)
+def test_script_lint_finds_tooltip_and_popover_construction(source: str) -> None:
+    assert lint_script(source), source
+
+
+def test_script_lint_passes_other_code_and_carries_line_numbers() -> None:
+    assert lint_script("new bootstrap.Modal(el);\nbootstrap.Dropdown.getInstance(el);") == []
+    assert lint_script("a();\nnew bootstrap.Tooltip(el);") == ["line 2: Bootstrap Tooltip"]
+
+
+def test_the_theme_scripts_are_listed_and_pass() -> None:
+    paths = public_scripts(ROOT)
+    assert any(path.name == "base.js" for path in paths)
+    assert not any("vendor" in path.parts for path in paths)
+    findings = {
+        path.relative_to(ROOT).as_posix(): lint_script(path.read_text(encoding="utf-8"))
+        for path in paths
+    }
+    assert {name: found for name, found in findings.items() if found} == {}
