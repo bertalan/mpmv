@@ -17,7 +17,7 @@ without a countdown. The consent banner (SEO.5, SEO.9) closes the body: the same
 page, hidden until consent.js finds no valid choice, so a cached page never holds one visitor's
 state; fixed to the bottom of the viewport, last in reading order like in the tab order.
 {% endcomment %}
-<html lang="{{ LANGUAGE_CODE }}" data-theme="{{ theme.slug }}">
+<html lang="{{ LANGUAGE_CODE }}" data-theme="{{ theme.slug }}"{% block html_attrs %}{% endblock %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
