@@ -222,7 +222,7 @@ msgstr ""
 "motori di ricerca li usano per riconoscere l'azienda. Esempio: "
 "[\"https://www.wikidata.org/wiki/Q7\"]."
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid "A name for the library, for example Our stand 2027. Optional."
 msgstr "Un nome per la libreria, per esempio Il nostro stand 2027. Facoltativo."
 
@@ -836,7 +836,7 @@ msgstr "app di autenticazione"
 msgid "Authenticator app"
 msgstr "App di autenticazione"
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid "Author"
 msgstr "Autore"
 
@@ -1022,7 +1022,7 @@ msgstr "Catalogo: prodotti"
 msgid "Categories"
 msgstr "Categorie"
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_fields.py
 msgid "Category %(number)d"
 msgstr "Categoria %(number)d"
 
@@ -1074,7 +1074,7 @@ msgstr ""
 msgid "Choose a day from 1 to 31, or the last day."
 msgstr "Scegli un giorno da 1 a 31, oppure l'ultimo giorno."
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid "Choose a licence"
 msgstr "Scegli una licenza"
 
@@ -1394,7 +1394,7 @@ msgstr "Foro per gli acquirenti professionali"
 msgid "Court of %(court)s"
 msgstr "Foro di %(court)s"
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid "Credit line"
 msgstr "Riga di credito"
 
@@ -1815,7 +1815,7 @@ msgstr "Campo"
 msgid "Fields on this page"
 msgstr "Campi di questa pagina"
 
-#: apps/manager/event_forms.py apps/manager/media.py
+#: apps/manager/event_image_form.py apps/manager/media.py
 msgid "File"
 msgstr "File"
 
@@ -1859,7 +1859,7 @@ msgstr "Primo giorno"
 msgid "Footer"
 msgstr "Piè di pagina"
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid "For a licence that needs a written permission: where it is kept."
 msgstr "Per una licenza che richiede un permesso scritto: dove è conservato."
 
@@ -1919,7 +1919,7 @@ msgstr "Genera nuovi codici"
 msgid "Generating new codes makes every previous code stop working."
 msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_fields.py
 msgid "Give a number from -%(limit)d to %(limit)d, for example 45.464200."
 msgstr "Indica un numero da -%(limit)d a %(limit)d, per esempio 45.464200."
 
@@ -2530,13 +2530,12 @@ msgstr "Ci permette di misurare le nostre pubblicità e di mostrarti offerte su 
 msgid "Letters, digits, spaces and . / _ - only."
 msgstr "Solo lettere, cifre, spazi e . / _ -"
 
-#: apps/orders/templates/orders/_cart_mini.html apps/orders/templates/orders/_package.html
-#: themes/base/templates/components/cart_line.html
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid "Licence"
 msgstr "Licenza"
 
-#: apps/orders/templates/orders/_package.html themes/base/templates/components/cart_line.html
+#: apps/orders/templates/orders/_cart_mini.html apps/orders/templates/orders/_package.html
+#: themes/base/templates/components/cart_line.html
 msgid "Line total"
 msgstr "Totale riga"
 
@@ -3220,7 +3219,7 @@ msgstr ""
 "Facoltativo. Il nome del corriere, per esempio quello scritto sul pacco. Il cliente lo riceve "
 "nell’email di spedizione insieme al numero di tracking."
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid "Optional: replaces the credit shown under the image."
 msgstr "Facoltativo: sostituisce il credito mostrato sotto l'immagine."
 
@@ -3440,7 +3439,7 @@ msgstr "PDF o immagine, al massimo 5 MB."
 msgid "Pending review"
 msgstr "In attesa di revisione"
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid "Permission reference"
 msgstr "Riferimento del permesso"
 
@@ -3582,7 +3581,7 @@ msgstr ""
 "PNG, JPEG, WebP o GIF (gli SVG non sono accettati). L’immagine viene controllata e salvata di "
 "nuovo senza i suoi dati nascosti. Finisce solo tra le tue immagini."
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid ""
 "PNG, JPEG, WebP or GIF (SVG is not accepted). The image is checked and saved again without its "
 "hidden data. Required."
@@ -4411,7 +4410,7 @@ msgstr "Qualcosa è andato storto"
 msgid "source"
 msgstr "origine"
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid "Source address"
 msgstr "Indirizzo della fonte"
 
@@ -6941,8 +6940,8 @@ msgid ""
 "This event was changed by someone else since you opened it. Reload the page and make your change "
 "again."
 msgstr ""
-"Questo evento è stato modificato da qualcun altro dopo che lo hai aperto. "
-"Ricarica la pagina e rifai la modifica."
+"Questo evento è stato modificato da qualcun altro dopo che lo hai aperto. Ricarica la pagina e "
+"rifai la modifica."
 
 #: apps/orders/templates/orders/customer_order.html
 msgid "This is your order reference, not an invoice. Each seller issues its own invoice."
@@ -7192,7 +7191,7 @@ msgstr "Fuso orario"
 msgid "Times above are read in this time zone, e.g. Europe/Rome."
 msgstr "Gli orari qui sopra sono letti in questo fuso orario, per esempio Europe/Rome."
 
-#: apps/manager/event_forms.py apps/manager/media.py
+#: apps/manager/event_forms.py apps/manager/event_image_form.py apps/manager/media.py
 msgid "Title"
 msgstr "Titolo"
 
@@ -7306,7 +7305,7 @@ msgstr "Scrivi le parole esattamente come indicato."
 msgid "Type the words shown above, in capitals, to end every session."
 msgstr "Scrivi in maiuscolo le parole indicate sopra per terminare ogni sessione."
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid "Under which licence you may use the image. Your own photo is Own work. Required."
 msgstr "Con quale licenza puoi usare l'immagine. Una tua foto è Opera propria. Obbligatorio."
 
@@ -7914,7 +7913,7 @@ msgid "Where the event takes place, for example Europe/Rome. The times above are
 msgstr ""
 "Dove si svolge l'evento, per esempio Europe/Rome. Gli orari qui sopra sono letti in questo fuso."
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid "Where the image comes from, starting with https://. Some licences need it."
 msgstr "Da dove viene l'immagine, a partire da https://. Alcune licenze lo richiedono."
 
@@ -8034,7 +8033,7 @@ msgstr ""
 msgid "Who did it: a person, a firm or a tool."
 msgstr "Chi l'ha fatto: una persona, uno studio o uno strumento."
 
-#: apps/manager/event_forms.py
+#: apps/manager/event_image_form.py
 msgid "Who made the picture or holds its rights. Required."
 msgstr "Chi ha fatto l'immagine o ne detiene i diritti. Obbligatorio."
 
