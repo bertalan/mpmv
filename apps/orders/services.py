@@ -79,6 +79,8 @@ class LineInput:
     # (the variant's override when it has one), as they were when the order was placed.
     fiscal_category: str = ""
     weight_kg: Decimal | None = None
+    # ORD.20 part 2: the variant sold, so an amendment can put its units back in stock.
+    variant: Variant | None = None
 
 
 @dataclass(frozen=True)
@@ -272,6 +274,7 @@ def _build_vendor_order(
             sku=entry.sku,
             title=entry.title,
             variant_label=entry.variant_label,
+            variant=entry.variant,
             vat_nature_code=entry.vat_nature_code,
             unit_price_net=entry.unit_price_net,
             quantity=entry.quantity,
@@ -468,7 +471,19 @@ class AmendmentOpen(ValueError):
     applied, declined, withdrawn or discarded."""
 
 
-def _refuse_shipping_with_open_amendment(sub: VendorOrder) -> None:
+class ShipmentOnHold(AmendmentOpen):
+    """The package is held after a partial unavailability (ORD.20): the customer may still
+    cancel the rest of it, so it cannot be shipped before the hold ends or the customer answers."""
+
+
+def _refuse_shipping_with_open_amendment(sub: VendorOrder, now: dt.datetime) -> None:
+    if sub.ship_hold_until is not None and now < sub.ship_hold_until:
+        until = sub.ship_hold_until.astimezone(business_tz()).strftime("%d %b %Y %H:%M")
+        raise ShipmentOnHold(
+            f"This package cannot be marked shipped before {until}: an item was unavailable and "
+            "the customer may still cancel the rest of the package until then (or answer "
+            "earlier)."
+        )
     open_one = (
         OrderAmendment.objects.filter(vendor_order=sub, state__in=OPEN_AMENDMENT_STATES)
         .only("public_id", "state")
@@ -512,7 +527,7 @@ def transition_vendor_order(
             before = _vendor_order_snapshot(locked)
             engine.check_vendor_order_transition(locked.state, target)
             if target == "shipped":
-                _refuse_shipping_with_open_amendment(locked)
+                _refuse_shipping_with_open_amendment(locked, stamp)
                 locked.tracking_number = tracking_number or locked.tracking_number
                 if not locked.tracking_number:
                     raise ValueError("a vendor order needs a tracking number to be shipped")
@@ -1373,6 +1388,7 @@ def _line_input(entry: PlaceLine, product: Product, variants: dict[int, Variant]
         sku=variant.sku if variant is not None else product.sku,
         title=entry.title,
         variant_label=entry.variant_label,
+        variant=variant,
         unit_price_net=unit_price,  # the live price, equal to the one the customer saw
         quantity=entry.quantity,
         tax_rate=entry.tax.rate,

@@ -108,6 +108,7 @@ class StripeRefund:
     amount_minor: int
     currency: str
     fee_minor: int = 0  # fee on the refund's balance transaction (PAY.4 provider cost)
+    status: str = "succeeded"  # Stripe's refund status: succeeded, pending, requires_action...
 
 
 @dataclass(frozen=True)
@@ -394,6 +395,7 @@ class HttpStripeClient:
             amount_minor=int(data["amount"]),
             currency=str(data["currency"]).upper(),
             fee_minor=fee,
+            status=str(data.get("status") or "pending"),
         )
 
     def create_transfer_reversal(

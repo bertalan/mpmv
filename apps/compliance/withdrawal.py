@@ -47,7 +47,15 @@ from apps.core.services import (
     run_mutation,
 )
 from apps.core.services import enqueue_email as _enqueue_email
-from apps.orders.models import CustomerTaxStatus, Order, PrivacyStatus, VendorOrder
+from apps.orders import amendment_engine as am
+from apps.orders import amendments as order_amendments
+from apps.orders.models import (
+    CustomerTaxStatus,
+    Order,
+    PrivacyStatus,
+    VendorOrder,
+    VendorOrderVersion,
+)
 from apps.orders.tz import business_tz
 
 from . import engine
@@ -187,6 +195,18 @@ def _vendor_name(sub: VendorOrder) -> str:
 
 
 def _lines(sub: VendorOrder) -> tuple[dict[str, Any], ...]:
+    """The lines as the customer has them now: the current version after an order amendment
+    (ORD.20), else the lines as placed."""
+    version = (
+        VendorOrderVersion.objects.filter(pk=sub.current_version_id).first()
+        if sub.current_version_id
+        else None
+    )
+    if version is not None and version.number > 1:
+        return tuple(
+            {"title": line.title, "variant": line.variant_label, "quantity": line.quantity}
+            for line in am.VersionSnapshot.from_json(version.snapshot).lines
+        )
     return tuple(
         {"title": line.title, "variant": line.variant_label, "quantity": line.quantity}
         for line in sub.lines.order_by("id")
@@ -232,6 +252,12 @@ def _enqueue(**kwargs: Any) -> bool:
         )
         return False
     return True
+
+
+def has_withdrawal(vendor_order: VendorOrder) -> bool:
+    """Whether a withdrawal statement is registered on the vendor order. The ORD.20 hook
+    (`settings.ORDER_WITHDRAWAL_HOOKS`): such a package can no longer be amended."""
+    return WithdrawalStatement.objects.filter(vendor_order_id=vendor_order.pk).exists()
 
 
 def submit_withdrawal(
@@ -284,6 +310,14 @@ def submit_withdrawal(
         )
 
     def apply() -> None:
+        # The lock order of refunds and amendments (Order, then each VendorOrder): an amendment
+        # applied at the same time either sees this withdrawal or is closed by it.
+        Order.objects.select_for_update().filter(pk=order.pk).first()
+        list(
+            VendorOrder.objects.select_for_update(of=("self",))
+            .filter(pk__in=[o.vendor_order.pk for o in chosen])
+            .order_by("pk")
+        )
         stamp = display_time(now)
         created = []
         for option in chosen:
@@ -297,6 +331,9 @@ def submit_withdrawal(
                     language=order.language,
                 )
             )
+            # ORD.20: an amendment still open on the package closes as `withdrawn`; the
+            # withdrawal runs on the last applied version.
+            order_amendments.withdraw_open_amendment(option.vendor_order, ctx=ctx)
         queued = _enqueue(
             recipient=order.email,
             template_key=ACK_TEMPLATE,

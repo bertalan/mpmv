@@ -226,6 +226,7 @@ class StripePaymentProvider:
             refund_ref=refund.id,
             amount=stripe_engine.from_minor(refund.amount_minor, request.currency),
             provider_cost=stripe_engine.from_minor(refund.fee_minor, request.currency),
+            status=refund.status,
         )
         try:
             if request.reversals is not None:
