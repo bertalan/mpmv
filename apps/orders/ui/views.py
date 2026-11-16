@@ -30,7 +30,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 from django.views.decorators.csp import csp_override
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.accounts.captcha import captcha_passes
 from apps.accounts.models import User
@@ -38,8 +38,10 @@ from apps.cart import services as cart_services
 from apps.cart.models import Cart
 from apps.cart.session import current_cart
 from apps.catalog.models import Product
+from apps.core import translations
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
+from apps.core.money import round_line
 from apps.core.privacy import keyed_hash
 from apps.core.public_forms import Protection, public_form
 from apps.core.services import consume_rate_limit
@@ -232,6 +234,43 @@ def cart_page(request: HttpRequest) -> HttpResponse:
         context = {**_cart_context(request, cart, status), "partial": True}
         return _page(request, "orders/_cart_body.html", context)
     return _page(request, "orders/cart.html", _cart_context(request, cart))
+
+
+def _product_title(product: Product, language: str) -> str:
+    shown = translations.resolve(product.translations.all(), language).translation
+    return shown.title if shown is not None else product.sku
+
+
+@require_GET
+def cart_mini(request: HttpRequest) -> HttpResponse:
+    """The cart as a small fragment for the ride mini-cart (THM.15): the count and the lines.
+
+    No shipping or tax quote, no layout, no flash messages (the messages storage is never
+    touched, so a message queued for the next page stays queued); it creates no cart or session.
+    """
+    cart = current_cart(request)
+    lines: list[present.LineView] = []
+    if cart is not None:
+        language = get_language() or "en"
+        for line in cart.lines.select_related("product", "variant"):
+            unit = cart_services.line_unit_price(line)
+            total = round_line(unit * line.quantity) if unit is not None else None
+            lines.append(
+                present.LineView(
+                    id=str(line.public_id),
+                    name=_product_title(line.product, language),
+                    unit_price=present.money(unit),
+                    quantity=line.quantity,
+                    total=present.money(total),
+                    variant=line.variant.sku if line.variant is not None else "",
+                )
+            )
+    context = {
+        "lines": lines,
+        "items": sum(line.quantity for line in lines),
+        "cart_url": reverse("orders:cart"),
+    }
+    return _page(request, "orders/_cart_mini.html", context)
 
 
 @public_form(

@@ -1,0 +1,45 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Vendor events (EVT.4): the selected shop's own events with status, dates, language and the
+moderation state (the moderator's comment, the hide reason). Rows link to the form; submit and
+cancel are plain forms. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Events" %}</h1>
+  <p class="manager-lead">{% blocktranslate with vendor=manager.vendor.display_name %}The events of {{ vendor }}: promotions, fairs and meetings. A new event is reviewed before it goes online.{% endblocktranslate %}</p>
+  <p>{% include "components/button.html" with label=_("New event") url=new_url variant="primary" only %}</p>
+  <div class="table-scroll" role="region" aria-labelledby="manager-events-caption" tabindex="0">
+    <table class="table">
+      <caption id="manager-events-caption">{% translate "Events" %}</caption>
+      <thead><tr>
+        <th scope="col">{% translate "Event" %}</th>
+        <th scope="col">{% translate "When" %}</th>
+        <th scope="col">{% translate "Status" %}</th>
+        <th scope="col">{% translate "Language" %}</th>
+        <th scope="col">{% translate "Moderation" %}</th>
+        <th scope="col">{% translate "Actions" %}</th>
+      </tr></thead>
+      <tbody>
+        {% for event in events %}<tr>
+          <th scope="row"><a href="{{ event.edit_url }}">{{ event.title }}</a></th>
+          <td>{{ event.when }}</td>
+          <td>{{ event.status }}</td>
+          <td>{{ event.language }}</td>
+          <td>{{ event.moderation }}</td>
+          <td>
+            {% if event.submit_url %}
+              <form method="post" action="{{ event.submit_url }}" class="manager-inline-form">
+                {% csrf_token %}
+                {% include "components/button.html" with label=_("Submit for review") type="submit" variant="secondary" size="small" only %}
+              </form>
+            {% endif %}
+            {% if event.cancel_url %}<a href="{{ event.cancel_url }}">{% translate "Cancel the event" %}</a>{% endif %}
+          </td>
+        </tr>
+        {% empty %}<tr><td colspan="6">{% translate "You have no events yet." %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "components/pagination.html" with page=page_obj.number page_count=page_obj.paginator.num_pages previous_url=previous_url next_url=next_url only %}
+{% endblock %}

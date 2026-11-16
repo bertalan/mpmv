@@ -1,0 +1,26 @@
+{% extends "manager/layout.html" %}
+{% load i18n wagtailimages_tags %}
+{% comment %}
+The shop's image library for its events (EVT.4 part 2): the shop's own images and the upload form.
+Every image needs its licence and author (CMS.8). No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p><a href="{{ list_url }}">{% translate "Back to the events" %}</a></p>
+  <h2>{% translate "Your images" %}</h2>
+  {% if images %}
+    <ul class="manager-choices">
+      {% for image in images %}<li>{% image image max-80x80 as thumb %}<img src="{{ thumb.url }}" width="{{ thumb.width }}" height="{{ thumb.height }}" alt="" loading="lazy"> {{ image.title }}{% if image.author %} ({{ image.author }}){% endif %}{% if image.licence %}, {{ image.licence.name }}{% endif %}</li>{% endfor %}
+    </ul>
+    {% include "components/pagination.html" with page=pager.number page_count=page_count previous_url=previous_url next_url=next_url only %}
+  {% else %}
+    <p>{% translate "You have no images yet." %}</p>
+  {% endif %}
+  <h2>{% translate "Upload an image" %}</h2>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" enctype="multipart/form-data" class="manager-form" novalidate>
+    {% csrf_token %}
+    {% for field in form %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% include "components/button.html" with label=_("Upload") type="submit" only %}
+  </form>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+The block types a vendor can add to an event (EVT.4 part 2): the page a bare "add a block" link
+opens, one link per type. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p><a href="{{ edit_url }}">{% translate "Back to the event" %}</a></p>
+  <ul class="manager-choices">
+    {% for url, label in types %}<li><a href="{{ url }}">{{ label }}</a></li>{% endfor %}
+  </ul>
+{% endblock %}

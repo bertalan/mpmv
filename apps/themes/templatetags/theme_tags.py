@@ -27,6 +27,18 @@ def safe_href(value: object) -> str:
 
 
 @register.filter
+def cart_item_count(packages: object) -> int:
+    """The number of items in the cart's packages (the sum of the line quantities), 0 if none."""
+    if not isinstance(packages, list | tuple):
+        return 0
+    return sum(
+        int(getattr(line, "quantity", 0) or 0)
+        for package in packages
+        for line in getattr(package, "lines", [])
+    )
+
+
+@register.filter
 def heading_level(value: object, default: int = 3) -> int:
     return engine.heading_level(value, default)
 

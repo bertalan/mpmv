@@ -418,6 +418,21 @@ def vendor_display_name(vendor: models.Model) -> str:
 NIL_UUID = "00000000-0000-0000-0000-000000000000"
 
 
+def event_with_block(vendor: Vendor) -> EventPage:
+    """An event with one body block in its latest revision (the block editor addresses it by id)."""
+    page: EventPage = EventPageFactory.create(vendor=vendor)
+    page.save_revision()
+    return page
+
+
+def by_block_id(event: models.Model) -> dict[str, str]:
+    """The event's public id and the id of its first block: a real block, so the caller's own
+    object does not answer 404 and the cross-tenant 404 proves the scoping."""
+    assert isinstance(event, EventPage)
+    latest: EventPage = EventPage.objects.get(pk=event.pk).get_latest_revision_as_object()
+    return {**by_public_id(event), "block_id": str(latest.body[0].id)}
+
+
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "readyz": NoVendorData("Readiness probe: a status only, no data."),
@@ -585,6 +600,62 @@ ENDPOINTS: dict[str, Access] = {
         methods=("POST",),
         sample={"public_id": NIL_UUID},
     ),
+    # EVT.4: the vendor's own events; another vendor's id is a 404 on every view that takes one.
+    "manager:shop:events": VendorScopedList(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        identify=lambda event: str(event.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:event_new": NoVendorData(
+        "The empty new-event form: it lists nothing; a save writes under the caller's own shop "
+        "(`apps/manager/tests/integration/test_shop_events.py`)."
+    ),
+    "manager:shop:event_edit": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_submit": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_cancel": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
+    # EVT.4 part 2: the block editor, the preview and the image library.
+    "manager:shop:event_block_add": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_block_edit": VendorScoped(
+        make=event_with_block,
+        kwargs=by_block_id,
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID, "block_id": NIL_UUID},
+    ),
+    "manager:shop:event_block_move": VendorScoped(
+        make=event_with_block,
+        kwargs=by_block_id,
+        methods=("POST",),
+        sample={"public_id": NIL_UUID, "block_id": NIL_UUID},
+    ),
+    "manager:shop:event_block_remove": VendorScoped(
+        make=event_with_block,
+        kwargs=by_block_id,
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID, "block_id": NIL_UUID},
+    ),
+    "manager:shop:event_preview": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_images": NoVendorData(
+        "The shop's own image library and upload: the images are read from and written to the "
+        "caller's own vendor collection only "
+        "(`apps/manager/tests/integration/test_shop_event_blocks.py`)."
+    ),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
@@ -700,6 +771,10 @@ ENDPOINTS: dict[str, Access] = {
     "orders:cart": NoVendorData(
         "Cart page (ORD.5): shows the caller's own cart, found from their session or account, "
         "never a cart or a vendor's data chosen by an identifier."
+    ),
+    "orders:cart_mini": NoVendorData(
+        "Mini-cart fragment (THM.15): the caller's own cart lines, found from their session or "
+        "account; no vendor data is shown."
     ),
     "orders:cart_add": NoVendorData(
         "Add to cart (ORD.19): adds a public product to the caller's own cart, found from their "

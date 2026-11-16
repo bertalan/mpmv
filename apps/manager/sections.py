@@ -11,6 +11,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.vendors.services import can_review_profiles
 
+from .event_views import SECTION as EVENTS_SECTION
 from .navigation import Registry, Section, anyone, platform_role, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
@@ -52,6 +53,15 @@ BUILT_IN = (
         "manager:shop:sales_terms",
         order=22,
         allowed=vendor_action("profile"),
+    ),
+    # The vendor's own events (EVT.4): owners and staff, by the `events` action of the matrix.
+    Section(
+        EVENTS_SECTION,
+        Space.SHOP,
+        _("Events"),
+        "manager:shop:events",
+        order=35,
+        allowed=vendor_action("events"),
     ),
     # The payout account (VEN.6): owners only, like the other financial settings.
     Section(
