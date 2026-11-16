@@ -5,6 +5,7 @@ The only writer of the block: the graph is JSON escaped like Django's `json_scri
 """
 
 from django import template
+from django.http import HttpRequest
 from django.template.context import Context
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
@@ -21,9 +22,9 @@ def product_jsonld(context: Context, page: ProductPage) -> SafeString:
     site = request.build_absolute_uri("/").rstrip("/")
     return format_html(
         '<script type="application/ld+json">{}</script>',
-        SafeString(product_jsonld_text(page, site)),
+        SafeString(product_jsonld_text(page, site, request)),
     )
 
 
-def product_jsonld_text(page: ProductPage, site: str) -> str:
-    return jsonld.graph_text(page, site=site)
+def product_jsonld_text(page: ProductPage, site: str, request: HttpRequest | None = None) -> str:
+    return jsonld.graph_text(page, site=site, request=request)

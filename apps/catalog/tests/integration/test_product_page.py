@@ -211,6 +211,7 @@ def test_the_robots_rule_follows_the_site_setting(client: Client) -> None:
     assert "noindex" in client.get(path("en", "mug-en")).content.decode()
 
 
+@pytest.mark.usefixtures("consumer_prices")
 def test_the_structured_data_has_a_product_node_with_the_brand_id(client: Client) -> None:
     brand = BrandFactory.create()
     BrandTranslationFactory.create(brand=brand, language="en", slug="acme", status=PUBLISHED)

@@ -3,9 +3,10 @@ to the pure `product_graph` functions. Reads catalog, vendors and shipping; writ
 
 Rules (spec 10 "Product node"):
 - No `offers` for a product that is not sold online (`page.price is None`: on request, Q-31, or
-  catalogue only, Q-33). The price is the public price of the page, never recomputed here. It is
-  the interim net price until TAX.12 supplies the gross one (`_offer_price`, the one place that
-  switches to the TAX.12 adapter, with `valueAddedTaxIncluded: true`).
+  catalogue only, Q-33). The price is the consumer price with VAT of TAX.12
+  (`apps.tax.prices.consumer_price(...).gross`, `valueAddedTaxIncluded: true`), for the same
+  request as the visible price, so the two always match. When TAX.12 cannot decide it
+  (`PriceUnavailable`) the offer has no price, never a net one.
 - `gtin` and `mpn` come from the product fields, `sku` is the vendor's SKU label.
 - The seller is the vendor's `Organization`, never the operator.
 - `priceValidUntil` only from a sale end date: the page does not price a sale yet, so none.
@@ -22,11 +23,13 @@ Rules (spec 10 "Product node"):
   `brand` reference resolves.
 """
 
+import logging
 from decimal import Decimal
 from typing import Any
 from urllib.parse import quote
 
 from django.conf import settings
+from django.http import HttpRequest
 from django.utils import translation
 
 from apps.catalog import engine as catalog_engine
@@ -37,9 +40,12 @@ from apps.catalog.product_pages import GalleryImage, ProductPage
 from apps.core.money import CURRENCY
 from apps.shipping import engine as shipping_engine
 from apps.shipping import services as shipping
+from apps.tax.prices import PriceUnavailable, consumer_price
 from apps.vendors.models import Vendor
 
 from . import product_graph as pg
+
+logger = logging.getLogger(__name__)
 
 WITHDRAWAL_DAYS = 14
 
@@ -145,13 +151,16 @@ def _shipping_nodes(
     return nodes, [str(node["@id"]) for node in nodes], countries
 
 
-def _offer_price(page_price: Decimal) -> tuple[Decimal, bool]:
-    """The offer's price and whether it includes VAT. Today the page's interim net price.
-
-    TODO(TAX.12): swap in the TAX.12 gross-price adapter (VAT-inclusive at the estimated
-    destination rate, `valueAddedTaxIncluded: true`); this is the only place that changes.
-    """
-    return page_price, False
+def _offer_price(page: ProductPage, net: Decimal, request: HttpRequest | None) -> Decimal | None:
+    """The consumer price with VAT (TAX.12) the page shows for `net`; None when TAX.12 cannot
+    decide it, so the offer carries no price rather than a net one."""
+    try:
+        return consumer_price(
+            net, page.product.fiscal_category, vendor=page.vendor, request=request
+        ).gross
+    except PriceUnavailable as exc:
+        logger.warning("JSON-LD offer without a price (%s): %s", page.product.fiscal_category, exc)
+        return None
 
 
 def _offer(
@@ -162,23 +171,29 @@ def _offer(
     url: str,
     node_id: str,
     refs: dict[str, Any],
+    request: HttpRequest | None,
 ) -> pg.OfferData | None:
     if price is None:
         return None
-    amount, includes_vat = _offer_price(price)
+    gross = _offer_price(page, price, request)
+    if gross is None:
+        return None
     return pg.OfferData(
-        price=amount,
+        price=gross,
         currency=CURRENCY,
         availability="discontinued" if page.retired else status,
         url=url,
-        price_includes_vat=includes_vat,
+        price_includes_vat=True,
         node_id=node_id,
         **refs,
     )
 
 
-def build_graph(page: ProductPage, *, site: str) -> dict[str, Any]:
-    """The product page's graph; `site` is the origin, like `https://shop.example`."""
+def build_graph(
+    page: ProductPage, *, site: str, request: HttpRequest | None = None
+) -> dict[str, Any]:
+    """The product page's graph; `site` is the origin, like `https://shop.example`. `request`
+    gives the price destination, as for the visible price (TAX.12)."""
     language = page.shown
     url = f"{site}{page.canonical_path}"
     vendor: Vendor = page.vendor
@@ -217,6 +232,7 @@ def build_graph(page: ProductPage, *, site: str) -> dict[str, Any]:
                 url=url,
                 node_id=f"{url}#offer-{quote(choice.sku, safe='')}",
                 refs=refs,
+                request=request,
             ),
         )
         for choice in page.variants
@@ -240,7 +256,13 @@ def build_graph(page: ProductPage, *, site: str) -> dict[str, Any]:
         images=tuple(_image(image, site) for image in page.gallery),
         weight_kg=page.product.weight_kg,
         offer=_offer(
-            page, page.price, page.stock_status, url=url, node_id=f"{url}#offer", refs=refs
+            page,
+            page.price,
+            page.stock_status,
+            url=url,
+            node_id=f"{url}#offer",
+            refs=refs,
+            request=request,
         ),
         variants=variants,
         varies_by=_varies_by(page, language) if variants else (),
@@ -255,5 +277,5 @@ def build_graph(page: ProductPage, *, site: str) -> dict[str, Any]:
     )
 
 
-def graph_text(page: ProductPage, *, site: str) -> str:
-    return pg.graph_text(build_graph(page, site=site))
+def graph_text(page: ProductPage, *, site: str, request: HttpRequest | None = None) -> str:
+    return pg.graph_text(build_graph(page, site=site, request=request))

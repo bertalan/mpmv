@@ -20,10 +20,11 @@ from apps.catalog.tests.factories import (
 from apps.core.i18n import configured_languages
 from apps.core.models import TranslationStatus
 from apps.seo import schema_check
+from apps.tax import prices
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
 SCRIPT = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
 
@@ -80,7 +81,8 @@ def test_a_sold_product_page_has_the_google_product_properties(client: Client, t
     assert item["sku"] == str(product.sku)
     assert item["gtin13"] == "4006381333931"
     assert item["mpn"] == "MUG-77"
-    assert item["offers"]["price"] == "12.50"
+    # TAX.12: the consumer price with VAT (an English visitor gets the operator's IT 22 %).
+    assert item["offers"]["price"] == "15.25"
     assert item["offers"]["priceCurrency"]
     assert item["offers"]["availability"] == "https://schema.org/InStock"
     assert item["offers"]["seller"]["@id"] == node(document, "Organization")["@id"]
@@ -110,7 +112,7 @@ def test_a_product_with_variants_is_a_group(client: Client, theme: str) -> None:
     _html, document = graph_of(client)
     group = node(document, "ProductGroup")
     assert [v["sku"] for v in group["hasVariant"]] == [str(variant.sku)]
-    assert group["hasVariant"][0]["offers"]["price"] == "11.00"
+    assert group["hasVariant"][0]["offers"]["price"] == "13.42"
 
 
 def test_the_breadcrumb_ends_at_the_product(client: Client, theme: str) -> None:
@@ -254,3 +256,31 @@ def test_an_image_carries_the_licence_fields_of_the_real_model() -> None:
     assert data.url.startswith("https://shop.example")
     own = MediaImageFactory.create(author="")
     assert _image(GalleryImage(image=own, alt=""), "https://shop.example").copyright_notice == ""
+
+
+def test_the_offer_price_is_the_visible_consumer_price_with_vat(client: Client, theme: str) -> None:
+    live(price_net=Decimal("12.50"))
+    html, document = graph_of(client)
+    offer = node(document, "Product")["offers"]
+    shown = re.search(r'class="product-price"><data value="([0-9.]+)"', html)
+    assert shown is not None
+    assert offer["price"] == shown.group(1) == "15.25"
+    assert offer["priceSpecification"]["valueAddedTaxIncluded"] is True
+
+
+def test_the_offer_follows_the_remembered_delivery_country(client: Client, theme: str) -> None:
+    live(price_net=Decimal("10.00"))
+    session = client.session
+    session[prices.DELIVERY_COUNTRY_KEY] = "DE"  # what checkout remembers (TAX.12)
+    session[prices.DELIVERY_POSTCODE_KEY] = "10115"
+    session.save()
+    _html, document = graph_of(client)
+    assert node(document, "Product")["offers"]["price"] == "11.90"
+
+
+def test_a_vendor_without_a_tax_profile_gets_no_offer_price(client: Client, theme: str) -> None:
+    product = live(price_net=Decimal("12.50"))
+    apps.get_model("tax", "VendorTaxProfile").objects.filter(vendor=product.vendor).delete()
+    html, document = graph_of(client)
+    assert "offers" not in node(document, "Product")
+    assert "12.50" not in SCRIPT.findall(html)[0]
