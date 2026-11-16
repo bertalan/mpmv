@@ -38,7 +38,8 @@ class TestCounter:
     def test_the_final_number_is_in_the_html_and_screen_readers_get_it_only(self) -> None:
         assert 'data-counter="1250"' in self.html
         assert 'aria-hidden="true"' in self.html  # the animated digits
-        assert re.search(r'visually-hidden">1,?250\+', self.html)  # the final value for readers
+        # The final value for readers, with the active language's thousands separator.
+        assert re.search(r'visually-hidden">1[,.\u00a0\u202f\u2019 ]?250\+', self.html)
         assert "Orders shipped" in self.html
 
     def test_has_no_inline_style(self) -> None:
