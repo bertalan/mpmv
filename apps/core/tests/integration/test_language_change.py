@@ -18,13 +18,14 @@ from apps.core.language_services import (
     sync_language_state,
 )
 from apps.core.models import AuditLog, LanguageRedirect, SiteLanguages
+from apps.core.tests.factories import LanguageRedirectFactory, SiteLanguagesFactory
 
 pytestmark = pytest.mark.django_db
 
 
 def _record(codes: list[str]) -> None:
     SiteLanguages.objects.all().delete()
-    SiteLanguages.objects.create(codes=codes)
+    SiteLanguagesFactory.create(codes=codes)
 
 
 def test_migrate_records_the_configured_languages() -> None:
@@ -103,7 +104,7 @@ def test_an_unknown_language_is_refused() -> None:
 
 
 def test_a_removed_language_url_redirects_to_the_new_one() -> None:
-    LanguageRedirect.objects.create(old_prefix="/pt/", new_prefix="/")
+    LanguageRedirectFactory.create(old_prefix="/pt/", new_prefix="/")
     response = Client().get("/pt/no-such-page/?q=1")
     assert response.status_code == 301
     assert response["Location"] == "/no-such-page/?q=1"

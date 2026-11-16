@@ -18,11 +18,13 @@ from apps.core.models import (
     GeocoderState,
     Heartbeat,
     ImageLicence,
+    LanguageRedirect,
     MediaImage,
     MediaImageRendition,
     OutboxEmail,
     OutboxEmailEvent,
     PlatformOperator,
+    SiteLanguages,
     SvgCollection,
     Throttle,
 )
@@ -290,3 +292,18 @@ class EmailSuppressionFactory(DjangoModelFactory[EmailSuppression]):
     address = factory.Sequence(lambda n: f"bounced{n}@example.com")
     reason = EmailSuppression.Reason.HARD_BOUNCE
     detail = ""
+
+
+class LanguageRedirectFactory(DjangoModelFactory[LanguageRedirect]):
+    class Meta:
+        model = LanguageRedirect
+
+    old_prefix = factory.Sequence(lambda n: f"/x{n}/")
+    new_prefix = "/"
+
+
+class SiteLanguagesFactory(DjangoModelFactory[SiteLanguages]):
+    class Meta:
+        model = SiteLanguages
+
+    codes = factory.LazyFunction(lambda: ["it"])
