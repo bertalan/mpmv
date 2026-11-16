@@ -586,16 +586,25 @@ the same CMP.24 approval.
 **Money: ledger and commission.**
 
 - A decrease is a PAY.4 refund event: the same arithmetic as a refund by line, quantity or amount
-  (VAT reversed at the original rate of each portion, fees given back pro rata with cumulative
-  rounding, one refund fee per refund event, D-05), with `refund_ref` and the amendment in the
-  memo. An amendment that removes a line and a refund of the same line through PAY.7 give the same
-  ledger rows.
+  (VAT reversed at the original rate of each portion, the collection cost given back pro rata
+  with cumulative rounding, one refund fee per refund event, D-05), with `refund_ref` and the
+  amendment in the memo, except the commission (owner decision on #564, 2026-11-16): an
+  amendment gives back the commission of its recompute, the previous version's commission minus
+  the new one under the frozen rule (3.00 for B in the seed), whatever the operator's
+  `reverse_fees_on_vendor_refund`; a PAY.7 refund keeps the pro rata (2.79 for the same B under a
+  goods-only rule; the rows are identical under a rule on goods and shipping). The event that
+  refunds the rest of a package gives back all the commission and collection cost left. A later
+  refund by line reads the line of the current version. The refund is recorded with the version
+  and submitted to the provider right after it commits; one the provider does not take stays
+  pending, is retried by the sweep and alerts staff.
 - **Refund-fee exemption (owner, 2026-11-16).** A refund that comes from an amendment **the
-  customer asked for** (an amendment with a recorded `customer_request`, for example an address
-  correction whose new shipping costs less) charges **no** D-05 refund fee (VEN.33): the refund
+  customer asked for** (an amendment whose every change is an address correction marked as asked
+  by the customer, with the recorded `customer_request`; the vendor's own record of the request
+  is enough, owner 2026-11-16, and is audited for staff review) charges **no** D-05 refund fee (VEN.33): the refund
   event carries the exclusion reason `customer_requested_amendment`, set by the service from the
   amendment and never by hand, and is audited like the L-10 flag; the commission and the
-  collection cost still go back pro rata. Every other refund keeps the refund fee: a vendor's
+  collection cost still go back. An address fix combined with a removal or a price change keeps
+  the fee. Every other refund keeps the refund fee: a vendor's
   change (a line removed, a lower price, a cheaper carrier chosen by the vendor), a cancel of the
   rest, a decline fallback, a staff cancellation and every refund outside amendments.
 - An increase writes `sale`, `shipping`, `commission` and `payment_fee` rows for the supplement,
