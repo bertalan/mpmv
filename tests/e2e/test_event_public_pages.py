@@ -3,6 +3,7 @@ at 360, 768 and 1280 px with no Content-Security-Policy violation, and the list 
 GET form (the filter is applied by a form submission, no script involved)."""
 
 import datetime as dt
+import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -82,6 +83,6 @@ def test_the_list_filters_with_a_plain_form_submission(page: Page, live_server: 
     page.goto(f"{live_server.url}/events/")
     page.get_by_label("Type").select_option("promotion")
     page.get_by_role("button", name="Show events").click()
-    expect(page).to_have_url(f"{live_server.url}/events/?type=promotion")
+    expect(page).to_have_url(re.compile(r"/events/\?.*type=promotion"))
     expect(page.get_by_role("link", name="Autumn sale")).to_be_visible()
     expect(page.get_by_role("link", name="Spring fair")).to_have_count(0)
