@@ -21,6 +21,12 @@ _JSON_LD_TYPE_RE = re.compile(
     r"\stype\s*=\s*(?:\"application/ld\+json\"|'application/ld\+json'|application/ld\+json(?=[\s/]|$))",
     re.IGNORECASE,
 )
+
+
+def _bs_toggle(component: str) -> re.Pattern[str]:
+    return re.compile(rf"\sdata-bs-toggle\s*=\s*[\"']?\s*{component}\b", re.IGNORECASE)
+
+
 _RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"<style\b", re.IGNORECASE), "<style> block"),
     (re.compile(r"\sstyle\s*=", re.IGNORECASE), "style attribute"),
@@ -28,6 +34,11 @@ _RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"javascript:", re.IGNORECASE), "javascript: URL"),
     (re.compile(r"\shx-on\b", re.IGNORECASE), "hx-on attribute"),
     (re.compile(r"\shx-[\w-]+\s*=\s*[\"']\s*js:", re.IGNORECASE), "js: value"),
+    # Bootstrap components that build markup from a template string (spec 14 §14.5).
+    (_bs_toggle("tooltip"), "Bootstrap tooltip"),
+    (_bs_toggle("popover"), "Bootstrap popover"),
+    (re.compile(r"\sdata-bs-html\b", re.IGNORECASE), "data-bs-html attribute"),
+    (re.compile(r"\sdata-bs-template\b", re.IGNORECASE), "data-bs-template attribute"),
 )
 # x-data="menu", @click='toggle', x-on:keydown.escape=close, :aria-expanded="expanded",
 # x-bind:hidden="toggleHidden": the attribute and its value, double-quoted, single-quoted or

@@ -24,6 +24,7 @@ import tomllib
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+from .bootstrap_map import bootstrap_map_css
 from .contract import TOKEN_CONTRACT
 from .engine import (
     MANIFEST_FILE,
@@ -167,7 +168,11 @@ def render_themes(themes_root: Path, contract: TokenContract = TOKEN_CONTRACT) -
             for path, svg in externalise_svgs(foundation_css)[1].items():
                 outputs[f"{OUTPUT_PREFIX}/{slug}/{path}"] = svg
         outputs[f"{OUTPUT_PREFIX}/{slug}/theme.css"] = build_theme_css(
-            chain, tokens_css=tokens_css, sources=sources, foundation_css=foundation_css
+            chain,
+            tokens_css=tokens_css,
+            sources=sources,
+            foundation_css=foundation_css,
+            bootstrap_map=bootstrap_map_css(tokens) if foundation_css is not None else None,
         )
         for relative, module in read_js_modules(themes_root / slug, slug).items():
             outputs[f"{OUTPUT_PREFIX}/{slug}/js/{relative}"] = module
