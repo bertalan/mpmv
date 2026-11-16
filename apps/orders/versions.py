@@ -7,7 +7,9 @@ version an amendment starts from.
 """
 
 import datetime as dt
-from collections.abc import Sequence
+import hashlib
+import json
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -200,11 +202,19 @@ def current_version(sub: VendorOrder) -> VendorOrderVersion:
     return VendorOrderVersion.objects.get(pk=sub.current_version_id)
 
 
+def digest(snapshot: Mapping[str, Any]) -> str:
+    """The SHA-256 of a version snapshot in canonical JSON: names a version in the audit trail
+    (spec 07 §Audit: the before and after version digests)."""
+    canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
 def audit_snapshot(version: VendorOrderVersion) -> dict[str, Any]:
     """What the audit trail keeps of a version (no address: personal data)."""
     return {
         VENDOR_FIELD: str(version.vendor_order.vendor.public_id),
         "number": version.number,
+        "digest": digest(version.snapshot),
         "goods_net": version.goods_net,
         "shipping_net": version.shipping_net,
         "tax_total": version.tax_total,

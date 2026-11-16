@@ -460,6 +460,9 @@ def _orders_frozen(vendor: Vendor) -> bool:
     return any(import_string(path)(vendor) for path in settings.ORDER_FREEZE_HOOKS)
 
 
+orders_frozen = _orders_frozen  # public name for `apps.orders.amendments` (ORD.20)
+
+
 class AmendmentOpen(ValueError):
     """The package has an open amendment (ORD.20): it cannot be shipped until the amendment is
     applied, declined, withdrawn or discarded."""
@@ -674,10 +677,16 @@ def _scrub_amendments(order: Order, changeset: ChangeSet) -> None:
         request = dict(amendment.customer_request or {})
         if request.get("text"):
             request["text"] = engine.ANONYMISED
-        if changes == amendment.changes and request == amendment.customer_request:
+        # The vendor's reason and the staff note are free text that may name the customer.
+        texts = {
+            name: engine.ANONYMISED
+            for name in ("reason", "staff_note")
+            if getattr(amendment, name) not in ("", engine.ANONYMISED)
+        }
+        if changes == amendment.changes and request == amendment.customer_request and not texts:
             continue
         OrderAmendment.objects.filter(pk=amendment.pk).update(
-            changes=changes, customer_request=request
+            changes=changes, customer_request=request, **texts
         )
         flags = {VENDOR_FIELD: str(amendment.vendor_order.vendor.public_id)}
         changeset.update(

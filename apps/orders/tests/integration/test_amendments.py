@@ -6,13 +6,14 @@ and what happened (owner, 2026-11-16: control tests with intelligible answers).
 """
 
 import datetime as dt
+import threading
 import uuid
 import zoneinfo
 from decimal import Decimal
 from typing import Any
 
 import pytest
-from django.db import IntegrityError, connection, transaction
+from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.http import Http404
 from django.utils import timezone
 
@@ -22,7 +23,7 @@ from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.orders import amendment_engine as am
-from apps.orders import amendments, engine, services
+from apps.orders import amendments, engine, services, versions
 from apps.orders.models import (
     AmendmentState,
     Order,
@@ -136,7 +137,11 @@ def product(owner: Vendor, price: str) -> Product:
 
 
 def seed(
-    owner: Vendor | None = None, *, pay: bool = True, address: dict[str, str] | None = None
+    owner: Vendor | None = None,
+    *,
+    pay: bool = True,
+    address: dict[str, str] | None = None,
+    customer_tax_status: str = "b2c",
 ) -> VendorOrder:
     """The ORD.20 seed order, paid (or only placed, awaiting payment), delivered to `address`
     (Rome by default). Lines carry the fiscal-category and weight snapshots of `place_order`."""
@@ -168,6 +173,8 @@ def seed(
             )
         ],
         ctx=CTX,
+        customer_tax_status=customer_tax_status,
+        customer_vat_number="IT00000000000" if customer_tax_status == "b2b" else "",
     )
     assert order is not None
     services.transition_order(order, "awaiting_payment", ctx=CTX)
@@ -282,7 +289,7 @@ def test_removing_b_drafts_a_minor_change_refunding_36_60() -> None:
     assert amendment.preview["commission_delta"] == "-3.00"
     assert amendment.state == AmendmentState.DRAFT
     assert amendment.from_version_id == sub.current_version_id
-    assert AuditLog.objects.filter(action="orders.amendment.draft").count() == 1
+    assert AuditLog.objects.filter(action="orders.amendment_drafted").count() == 1
     assert not changes.is_empty
 
 
@@ -447,7 +454,7 @@ def test_an_address_fix_asked_by_the_customer_needs_the_request() -> None:
 def test_the_audit_trail_keeps_no_address() -> None:
     sub = seed()
     draft(sub, move_to("IT", "00100"), customer_request=CUSTOMER_ASKED)
-    entry = AuditLog.objects.get(action="orders.amendment.draft")
+    entry = AuditLog.objects.get(action="orders.amendment_drafted")
     assert "2 Via Nuova" not in str(entry.after)
 
 
@@ -811,4 +818,235 @@ def test_a_lower_quantity_into_a_cheaper_band_refunds_the_shipping_difference() 
         "one A fewer (61.00 gross) brings the package to 1.0 kg and the 6.00 band, so the refund "
         "must be 61.00 + 4.88 = 65.88",
         f"the draft refunds {amendment.preview['refund']}",
+    )
+
+
+# --- lane-b cross-review of #551 ----------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_package_lock_takes_the_order_first_and_never_the_vendor_row() -> None:
+    """Same order as `transition_vendor_order` and `ledger.refunds._lock`: the Order row, then the
+    VendorOrder row only (`of=("self",)`), so the Vendor row stays free for other writes."""
+    sub = seed()
+    held, release = threading.Event(), threading.Event()
+    errors: list[BaseException] = []
+
+    def holder() -> None:
+        try:
+            with transaction.atomic():
+                amendments._lock_amendable(sub)
+                held.set()
+                release.wait(timeout=20)
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=holder)
+    thread.start()
+    try:
+        assert held.wait(timeout=20), "the lock holder never took the lock"
+        with transaction.atomic():
+            Vendor.objects.select_for_update(nowait=True).get(pk=sub.vendor_id)
+        with pytest.raises(DatabaseError), transaction.atomic():
+            Order.objects.select_for_update(nowait=True).get(pk=sub.order_id)
+        with pytest.raises(DatabaseError), transaction.atomic():
+            VendorOrder.objects.select_for_update(nowait=True).get(pk=sub.pk)
+    finally:
+        release.set()
+        thread.join(timeout=30)
+    assert not errors, errors
+
+
+@pytest.mark.django_db(transaction=True)
+def test_an_apply_and_a_fulfilment_step_at_the_same_time_never_deadlock() -> None:
+    sub = seed()
+    method(sub.vendor, "express", "14.00", 7)
+    actor = owner_of(sub)
+    amendment, _ = draft(
+        sub, am.ChangeCarrier(am.ShippingOffer("express", "", D("0"))), actor=actor
+    )
+    assert amendment is not None
+    barrier = threading.Barrier(2)
+    errors: list[BaseException] = []
+
+    def run(step: Any) -> None:
+        try:
+            barrier.wait(timeout=20)
+            step()
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            connection.close()
+
+    def apply() -> None:
+        amendments.apply_amendment(amendment, actor=actor, ctx=CTX, now=NOW)
+
+    def accept() -> None:
+        services.fulfil_vendor_order(sub, "accept", actor=actor, ctx=CTX)
+
+    threads = [threading.Thread(target=run, args=(step,)) for step in (apply, accept)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    assert not errors, plainly("both steps must finish without a deadlock", f"they raised {errors}")
+    sub.refresh_from_db()
+    assert sub.state == "accepted"
+    assert sub.versions.count() == 2
+
+
+def test_the_apply_dry_run_moves_nothing() -> None:
+    sub = seed()
+    method(sub.vendor, "express", "14.00", 7)
+    actor = owner_of(sub)
+    amendment, _ = draft(
+        sub, am.ChangeCarrier(am.ShippingOffer("express", "", D("0"))), actor=actor
+    )
+    assert amendment is not None
+    changes = amendments.apply_amendment(amendment, actor=actor, ctx=CTX, now=NOW, dry_run=True)
+    assert not changes.is_empty, "the apply dry run must still show what would change"
+    assert amendment.state == AmendmentState.DRAFT, plainly(
+        "an apply dry run must leave the amendment a draft", f"it is {amendment.state}"
+    )
+    assert sub.versions.count() == 1, "an apply dry run must write no version"
+    assert not AuditLog.objects.filter(action="orders.amendment_applied").exists()
+
+
+def test_the_discard_dry_run_moves_nothing() -> None:
+    sub = seed()
+    actor = owner_of(sub)
+    amendment, _ = draft(sub, am.RemoveLine(key_of(sub, "SKU-B")), actor=actor)
+    assert amendment is not None
+    changes = amendments.discard_amendment(amendment, actor=actor, ctx=CTX, dry_run=True)
+    assert not changes.is_empty
+    assert amendment.state == AmendmentState.DRAFT, plainly(
+        "a discard dry run must leave the amendment a draft", f"it is {amendment.state}"
+    )
+    assert not AuditLog.objects.filter(action="orders.amendment_discarded").exists()
+
+
+def test_a_business_order_may_fix_its_address_in_the_same_territory() -> None:
+    sub = seed(customer_tax_status="b2b")
+    amendment, _ = draft(sub, move_to("IT", "00100"), customer_request=CUSTOMER_ASKED)
+    assert amendment is not None, "a business order's fix inside Italy must be drafted"
+    assert amendment.kind == "minor", plainly(
+        "a business order's house-number fix in the same territory must be minor",
+        f"it was {amendment.kind}: {amendment.reasons}",
+    )
+
+
+def test_a_business_order_cannot_move_to_another_territory_until_vies() -> None:
+    sub = seed(ni_seller(), customer_tax_status="b2b")
+    with pytest.raises(amendments.AmendmentBlocked) as refused:
+        draft(sub, move_to("GB", "BT1 1AA"), customer_request=CUSTOMER_ASKED)
+    assert "business order" in str(refused.value), plainly(
+        "a business order moving to Northern Ireland must be refused until the VIES check of "
+        "the new destination exists (choice 9)",
+        f"the message was {refused.value}",
+    )
+    assert not OrderAmendment.objects.exists()
+    consumer = seed(ni_seller())
+    amendment, _ = draft(consumer, move_to("GB", "BT1 1AA"), customer_request=CUSTOMER_ASKED)
+    assert amendment is not None, "the same move for a consumer must be drafted"
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda sub: am.ChangeQuantity(key_of(sub, "SKU-A"), 2),
+        lambda sub: am.ChangePrice(key_of(sub, "SKU-A"), D("50.00")),
+        lambda sub: am.ChangeCarrier(am.ShippingOffer("standard", "", D("0"))),
+    ],
+    ids=["same quantity", "same price", "same carrier"],
+)
+def test_an_amendment_that_changes_nothing_is_refused(build: Any) -> None:
+    sub = seed()
+    with pytest.raises(amendments.AmendmentRefused) as refused:
+        draft(sub, build(sub))
+    assert "changes nothing" in str(refused.value), plainly(
+        "an amendment that leaves everything as it is must be refused",
+        f"the message was {refused.value}",
+    )
+
+
+def test_a_carrier_and_an_address_change_together_are_refused() -> None:
+    sub = seed()
+    method(sub.vendor, "express", "10.00", 5)
+    with pytest.raises(amendments.AmendmentRefused, match="separate amendments"):
+        draft(
+            sub,
+            move_to("IT", "00100"),
+            am.ChangeCarrier(am.ShippingOffer("express", "", D("0"))),
+            customer_request=CUSTOMER_ASKED,
+        )
+
+
+def test_a_staff_carrier_draft_that_became_dearer_is_refused_at_apply() -> None:
+    from django.contrib.auth.models import Permission
+
+    from apps.accounts.tests.factories import UserFactory
+    from apps.shipping.models import WeightBand
+
+    sub = seed()
+    method(sub.vendor, "express", "10.00", 5)
+    staff = UserFactory.create(is_staff=True)
+    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    amendment, _ = draft(
+        sub,
+        am.ChangeCarrier(am.ShippingOffer("express", "", D("0"))),
+        actor=staff,
+        staff_note="customer called",
+    )
+    assert amendment is not None
+    WeightBand.objects.filter(method__key="express", method__vendor=sub.vendor).update(
+        cost_net=D("14.00")
+    )
+    with pytest.raises(amendments.AmendmentRefused) as refused:
+        amendments.apply_amendment(amendment, actor=staff, ctx=CTX, now=NOW)
+    assert "same or a lower price" in str(refused.value), plainly(
+        "a staff carrier change that became dearer before the apply must be refused",
+        f"the message was {refused.value}",
+    )
+
+
+def test_frozen_orders_cannot_be_amended(settings: Any) -> None:
+    settings.ORDER_FREEZE_HOOKS = ["apps.orders.tests.integration.test_amendments.always_frozen"]
+    sub = seed()
+    with pytest.raises(services.OrdersFrozen):
+        draft(sub, am.RemoveLine(key_of(sub, "SKU-B")))
+
+
+def always_frozen(vendor: Vendor) -> bool:
+    return True
+
+
+def test_the_audit_entry_keeps_digests_not_free_text() -> None:
+    sub = seed()
+    draft(
+        sub,
+        move_to("IT", "00100"),
+        customer_request=CUSTOMER_ASKED,
+        reason="Mario Rossi asked by phone",
+    )
+    entry = AuditLog.objects.get(action="orders.amendment_drafted")
+    text = str(entry.after)
+    assert "Mario Rossi" not in text, plainly("the audit must not keep the reason's text", text)
+    assert "Please fix my address" not in text
+    assert entry.after is not None
+    assert entry.after["customer_request"]["channel"] == "email"
+    assert entry.after["from_digest"] == versions.digest(sub.versions.get().snapshot)
+    assert entry.after["to_digest"], "the digest of the version the draft would write is kept"
+
+
+def test_anonymisation_also_scrubs_the_reason_and_the_staff_note() -> None:
+    sub = seed()
+    amendment, _ = draft(sub, am.RemoveLine(key_of(sub, "SKU-B")), reason="Mario Rossi called")
+    assert amendment is not None
+    backdate(sub.order, timezone.now() - dt.timedelta(days=365 * 12))
+    services.anonymise_order(sub.order, ctx=CTX)
+    amendment.refresh_from_db()
+    assert amendment.reason == engine.ANONYMISED, plainly(
+        "anonymisation must replace the free-text reason", f"it is {amendment.reason!r}"
     )

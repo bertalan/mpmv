@@ -18,6 +18,7 @@ never import orders.
 """
 
 import datetime as dt
+import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from decimal import Decimal
@@ -47,11 +48,12 @@ from . import engine, versions
 from .models import (
     OPEN_AMENDMENT_STATES,
     AmendmentState,
+    Order,
     OrderAmendment,
     VendorOrder,
     VendorOrderVersion,
 )
-from .services import PAID_OR_LATER
+from .services import PAID_OR_LATER, OrdersFrozen, orders_frozen
 from .tz import business_tz
 
 AmendmentRefused = am.AmendmentRefused
@@ -294,9 +296,10 @@ def _recompute(
             )
         except tax_engine.BlockingTaxError as error:
             raise AmendmentRefused(f"VAT cannot be decided for this package ({error}).") from None
+    tax_on = at.astimezone(business_tz()).date()
     ctx = am.RecomputeContext(
-        tax_on=at.astimezone(business_tz()).date(),
-        tax=tax,
+        tax_on=tax_on,
+        tax=replace(tax, on=tax_on),  # the business-zone date, never the UTC one
         address_before=address_before,
         categories=categories,
     )
@@ -342,6 +345,14 @@ def _requote_lighter(
 # --- snapshots for the audit trail (no address: personal data) ---------------------------------
 
 
+def _redacted(text: str) -> dict[str, Any]:
+    """A free text as the audit trail keeps it: its length and a SHA-256 digest, never the text."""
+    return {
+        "length": len(text),
+        "sha256": hashlib.sha256(text.encode()).hexdigest() if text else "",
+    }
+
+
 def _amendment_snapshot(amendment: OrderAmendment) -> dict[str, Any]:
     sub = amendment.vendor_order
     return {
@@ -351,8 +362,23 @@ def _amendment_snapshot(amendment: OrderAmendment) -> dict[str, Any]:
         "kind": amendment.kind,
         "reasons": list(amendment.reasons),
         "initiator": amendment.initiator,
-        "reason": amendment.reason,
+        # Free text may hold personal data and the audit table is append-only (D-29): the entry
+        # keeps a digest of each text; the text itself stays on the amendment, scrubbed with the
+        # order. Channel and date of the customer's request are not personal data.
+        "reason": _redacted(amendment.reason),
+        "staff_note": _redacted(amendment.staff_note),
+        "customer_request": {
+            "channel": (amendment.customer_request or {}).get("channel", ""),
+            "date": (amendment.customer_request or {}).get("date", ""),
+            "text": _redacted(str((amendment.customer_request or {}).get("text") or "")),
+        },
         "from_version": amendment.from_version.number,
+        "from_digest": versions.digest(amendment.from_version.snapshot),
+        "to_digest": (
+            versions.digest(amendment.preview["after_snapshot"])
+            if "after_snapshot" in amendment.preview
+            else ""
+        ),
         "changes": [
             am.change_to_json(am.change_from_json(c), with_address=False) for c in amendment.changes
         ],
@@ -382,9 +408,20 @@ def _check_customer_request(
 
 
 def _lock_amendable(sub: VendorOrder) -> VendorOrder:
+    """Lock the Order, then the VendorOrder (only its own row, `of=("self",)`): the order of
+    `transition_vendor_order` and `ledger.refunds._lock`, so an amendment, a refund and a
+    fulfilment step never deadlock, and the Vendor row is never locked. CMP.5: a vendor whose open
+    orders are frozen (termination under staff review) cannot amend them."""
+    Order.objects.select_for_update().filter(pk=sub.order_id).first()
     locked = (
-        VendorOrder.objects.select_for_update().select_related("order", "vendor").get(pk=sub.pk)
+        VendorOrder.objects.select_for_update(of=("self",))
+        .select_related("order", "vendor")
+        .get(pk=sub.pk)
     )
+    if orders_frozen(locked.vendor):
+        raise OrdersFrozen(
+            "The shop's open orders are frozen pending staff review, so they cannot be amended."
+        )
     if locked.order.state not in PAID_OR_LATER:
         raise AmendmentRefused(
             "This order is not paid yet: change it through the checkout or the quote instead."
@@ -475,7 +512,7 @@ def draft_amendment(
             )
             if dry_run:
                 raise _DryRunRollback
-            audit_changes(changeset, ctx=ctx, action="orders.amendment.draft")
+            audit_changes(changeset, ctx=ctx, action="orders.amendment_drafted")
     except _DryRunRollback:
         return None, changeset
     return amendment, changeset
@@ -503,7 +540,7 @@ def discard_amendment(
             )
             if dry_run:
                 raise _DryRunRollback
-            audit_changes(changeset, ctx=ctx, action="orders.amendment.discard")
+            audit_changes(changeset, ctx=ctx, action="orders.amendment_discarded")
     except _DryRunRollback:
         pass
     amendment.refresh_from_db()
@@ -552,7 +589,7 @@ def apply_amendment(
                 # The version moved under the draft: it is superseded and nothing else moves.
                 locked.state = AmendmentState.SUPERSEDED
                 locked.save(update_fields=["state", "updated_at"])
-                action = "orders.amendment.superseded"
+                action = "orders.amendment_superseded"
             else:
                 version = _write_next_version(locked_sub, locked, at=stamp)
                 changeset.create(
@@ -560,7 +597,7 @@ def apply_amendment(
                     str(version.public_id),
                     versions.audit_snapshot(version),
                 )
-                action = "orders.amendment.apply"
+                action = "orders.amendment_applied"
             changeset.update(
                 "orders.orderamendment", str(locked.public_id), before, _amendment_snapshot(locked)
             )
@@ -583,6 +620,12 @@ def _write_next_version(
         )
     changes = [am.change_from_json(c) for c in amendment.changes]
     preview, resolved, address = _recompute(sub, amendment.from_version, changes, at=at)
+    # The price is quoted again at apply: a staff draft must still meet the staff limits.
+    error = am.staff_change_error(amendment.initiator, resolved) or am.staff_carrier_error(
+        amendment.initiator, preview, resolved
+    )
+    if error:
+        raise AmendmentRefused(error)
     result = am.classify_amendment(preview, resolved, amendment.initiator)
     if result.kind != am.MINOR:
         raise AmendmentRefused(

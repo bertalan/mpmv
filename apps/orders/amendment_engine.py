@@ -399,6 +399,10 @@ class ChangeQuantity:
 
 @dataclass(frozen=True)
 class ChangePrice:
+    """A new unit price for a line. The line keeps its snapshotted discount, capped at the new
+    line amount (unit price x quantity) so the net never goes below zero; a lower discount is
+    the only effect of the cap, and the recompute shows it."""
+
     kind: ClassVar[str] = "price"
     line_key: str
     unit_price_net: Decimal
@@ -670,6 +674,7 @@ class AmendmentPreview:
             "vendor_absorbs": str(self.vendor_absorbs),
             "tax_movements": [m.to_json() for m in self.tax_movements],
             "lines": _line_diff(self.before, self.after),
+            "after_snapshot": self.after.to_json(),
         }
 
 
@@ -855,6 +860,7 @@ def recompute_vendor_order(
     """
     if not changes:
         raise AmendmentRefused("An amendment needs at least one change.")
+    _refuse_combinations(changes)
     lines: dict[str, VersionLine] = {line.line_key: line for line in version.lines}
     order: list[str] = list(lines)
     shipping = version.shipping
@@ -967,6 +973,7 @@ def recompute_vendor_order(
             )
     if not order:
         raise AmendmentRefused("An amendment cannot remove every line: cancel the package instead.")
+    _refuse_no_op(version, lines, order, shipping, changes, ctx)
     new_lines = tuple(lines[key] for key in order)
     shipping = replace(
         shipping,
@@ -1000,6 +1007,52 @@ def recompute_vendor_order(
         vendor_absorbs=vendor_absorbs,
         tax_movements=tuple(movements),
     )
+
+
+def _refuse_combinations(changes: Sequence[AmendmentChange]) -> None:
+    """Combinations part 1 does not resolve: two carrier or two address changes in one
+    amendment, or a carrier change together with an address change (the address re-quotes the
+    package's current method). Make them as separate amendments."""
+    carriers = sum(isinstance(c, ChangeCarrier) for c in changes)
+    addresses = sum(isinstance(c, ChangeAddress) for c in changes)
+    if carriers > 1 or addresses > 1:
+        raise AmendmentRefused(
+            "An amendment can change the carrier once and the address once: put each change in "
+            "its own amendment."
+        )
+    if carriers and addresses:
+        raise AmendmentRefused(
+            "Change the address and the carrier in two separate amendments: the address first, "
+            "then the carrier quoted for the new address."
+        )
+
+
+def _refuse_no_op(
+    version: VersionSnapshot,
+    lines: Mapping[str, VersionLine],
+    order: Sequence[str],
+    shipping: VersionShipping,
+    changes: Sequence[AmendmentChange],
+    ctx: RecomputeContext,
+) -> None:
+    """An amendment that changes nothing (the same quantity, the same price, the same carrier,
+    the same address) is refused: it would write an identical version."""
+    same_lines = tuple(lines[key] for key in order) == version.lines
+    # The method, its price and its maximum delivery time (what a customer is promised).
+    same_shipping = (shipping.key, shipping.net, shipping.max_days) == (
+        version.shipping.key,
+        version.shipping.net,
+        version.shipping.max_days,
+    )
+    moved = any(
+        isinstance(c, ChangeAddress) and dict(c.address) != dict(ctx.address_before)
+        for c in changes
+    )
+    if same_lines and same_shipping and not moved:
+        raise AmendmentRefused(
+            "This amendment changes nothing: the lines, the shipping and the address would stay "
+            "as they are."
+        )
 
 
 def lowers_weight(version: VersionSnapshot, changes: Sequence[AmendmentChange]) -> bool:
