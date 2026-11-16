@@ -39,6 +39,7 @@ from django.utils.module_loading import import_string
 
 from apps.accounts import levels
 from apps.accounts.models import User
+from apps.catalog.models import Product, Variant
 from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import Change, ChangeSet
 from apps.core.countries import InvalidCountry
@@ -60,6 +61,7 @@ from .models import (
     AmendmentState,
     Order,
     OrderAmendment,
+    OrderLine,
     VendorOrder,
     VendorOrderVersion,
 )
@@ -688,11 +690,64 @@ def _hook(name: str) -> Callable[..., RefundOutcome]:
 
 
 def _partly_unavailable(changes: Sequence[am.AmendmentChange], after: am.VersionSnapshot) -> bool:
-    """A line removed or reduced, with something left in the package (spec 07, minor change 2:
-    the customer is then offered to cancel the rest)."""
+    """A line removed or reduced as unavailable, with something left in the package (spec 07,
+    minor change 2: the customer is then offered to cancel the rest)."""
     return bool(after.lines) and any(
-        isinstance(c, am.RemoveLine | am.ChangeQuantity) for c in changes
+        isinstance(c, am.RemoveLine | am.ChangeQuantity) and c.unavailable for c in changes
     )
+
+
+def _restock(
+    sub: VendorOrder,
+    before: am.VersionSnapshot,
+    after: am.VersionSnapshot,
+    changes: Sequence[am.AmendmentChange],
+) -> list[Change]:
+    """Put back in stock the units of a line removed or reduced for a reason other than
+    unavailability (spec 07, Stock); an unavailable line restores nothing. Only lines of the
+    placed order (v1) carry the product or variant whose stock moved at payment."""
+    keys = {
+        c.line_key
+        for c in changes
+        if isinstance(c, am.RemoveLine | am.ChangeQuantity) and not c.unavailable
+    }
+    left = {line.line_key: line.quantity for line in after.lines}
+    changes_out: list[Change] = []
+    for line in before.lines:
+        units = line.quantity - left.get(line.line_key, 0)
+        if line.line_key not in keys or units <= 0:
+            continue
+        order_line = OrderLine.objects.filter(vendor_order=sub, public_id=line.line_key).first()
+        if order_line is None:
+            continue
+        if order_line.product_id is None:
+            continue
+        # The order line keeps the variant's SKU (it has no variant key): the stock that moved
+        # at payment is that variant's, or the product's for a simple product.
+        variant = (
+            Variant.objects.select_for_update()
+            .filter(product_id=order_line.product_id, sku=order_line.sku)
+            .first()
+        )
+        row: Product | Variant
+        if variant is not None:
+            row = variant
+            model = "catalog.variant"
+        else:
+            row = Product.objects.select_for_update(of=("self",)).get(pk=order_line.product_id)
+            model = "catalog.product"
+        stock_before = row.stock_qty
+        row.stock_qty = stock_before + units
+        row.save(update_fields=["stock_qty", "updated_at"])
+        change = Change(
+            "update",
+            model,
+            str(row.public_id),
+            {"stock_qty": stock_before},
+            {"stock_qty": row.stock_qty, "restocked_from": str(sub.public_id)},
+        )
+        changes_out.append(change)
+    return changes_out
 
 
 def apply_amendment(
@@ -741,9 +796,10 @@ def apply_amendment(
             else:
                 if not dry_run:
                     _spend_passkey(locked, actor, passkey_session)
-                version, refund_changes = _write_next_version(
+                version, refund_changes, stock_changes = _write_next_version(
                     locked_sub, locked, at=stamp, ctx=ctx, dry_run=dry_run
                 )
+                changeset.changes.extend(stock_changes)
                 changeset.create(
                     "orders.vendororderversion",
                     str(version.public_id),
@@ -769,7 +825,7 @@ def _write_next_version(
     at: dt.datetime,
     ctx: AuditContext,
     dry_run: bool,
-) -> tuple[VendorOrderVersion, list[Change]]:
+) -> tuple[VendorOrderVersion, list[Change], list[Change]]:
     """Recompute the minor draft on the apply date, write the next version, refund the decrease
     and open the cancel-the-rest offer after a partial unavailability."""
     if amendment.kind != am.MINOR:
@@ -808,10 +864,20 @@ def _write_next_version(
     refund_changes: list[Change] = []
     if preview.refund > 0:
         outcome = _hook("ORDER_AMENDMENT_REFUND_HOOK")(
-            amendment, amount=preview.refund, ctx=ctx, now=at, dry_run=dry_run
+            amendment,
+            amount=preview.refund,
+            # Owner decision on #564: an amendment gives back the commission of the recompute
+            # (previous version minus the new one under the frozen rule), not the PAY.4 pro rata.
+            commission_back=max(
+                Decimal("0.00"), preview.commission_before - preview.commission_after
+            ),
+            ctx=ctx,
+            now=at,
+            dry_run=dry_run,
         )
         amendment.refund_ref = outcome.refund_id
         refund_changes = outcome.changes
+    stock_changes = _restock(sub, preview.before, preview.after, resolved)
     if _partly_unavailable(resolved, preview.after):
         VendorOrder.objects.filter(pk=sub.pk).update(
             cancel_rest_offered_at=at,
@@ -821,7 +887,7 @@ def _write_next_version(
     amendment.preview = preview.to_json()
     amendment.changes = [am.change_to_json(c) for c in resolved]
     amendment.save(update_fields=["state", "preview", "changes", "refund_ref", "updated_at"])
-    return version, refund_changes
+    return version, refund_changes, stock_changes
 
 
 # --- editing a draft ----------------------------------------------------------------------------

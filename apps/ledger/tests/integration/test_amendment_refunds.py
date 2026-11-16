@@ -1,11 +1,12 @@
 """ORD.20 (2/3): amendments that move money, on real PostgreSQL with the Stripe double.
 
 Seed vendor order (spec 07, ORD.20): A 2 x 50.00 and B 1 x 30.00 net at 22 %, shipping 10.00 net,
-gross 170.80, 10 % commission rule. The rule here is on goods and shipping (14.00), so the PAY.4
-pro-rata reversal and the version delta agree (3.00 for B, 1.00 for A's lower price); see the PR
-for the goods-only rule, where they differ. Stripe is doubled only behind our own `StripeClient`.
-Every assertion of an outcome says in plain words what was expected and what happened (owner,
-2026-11-16: control tests with intelligible answers).
+gross 170.80, 10 % commission rule on the goods (13.00). Owner decision on #564: an amendment
+gives back the commission of its recompute (3.00 for B, 1.00 for A's lower price), while an
+ordinary PAY.4 refund keeps the pro rata of the refunded gross (2.79 for B under this rule; the
+two agree under a rule on goods and shipping, `RULE_WITH_SHIPPING`). Stripe is doubled only
+behind our own `StripeClient`. Every assertion of an outcome says in plain words what was
+expected and what happened (owner, 2026-11-16: control tests with intelligible answers).
 """
 
 import datetime as dt
@@ -30,7 +31,7 @@ from apps.core.services import FLAG_CACHE
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.ledger import refunds, settlement
 from apps.ledger.models import LedgerEntry, Refund
-from apps.ledger.refund_engine import RefundSelection
+from apps.ledger.refund_engine import InvalidRefundRequest, RefundSelection
 from apps.ledger.tests.integration.test_refunds import SECRET, webhook
 from apps.orders import amendment_engine as am
 from apps.orders import amendments, services
@@ -63,12 +64,13 @@ RULE = {
     "rule_id": "ord20",
     "version": 1,
     "percent": "10.00",
-    "base": "net_goods_and_shipping",
+    "base": "net_goods",
     "fee_percent": "0.00",
     "fee_fixed": "0.00",
     "fee_base": "gross_paid",
     "promo_label": "",
 }
+RULE_WITH_SHIPPING = {**RULE, "rule_id": "ord20-shipping", "base": "net_goods_and_shipping"}
 DOMESTIC = FakeTax(rate=D("22"), reason=tax.REASON_DOMESTIC_VENDOR_COUNTRY)
 CUSTOMER_ASKED = {"channel": "email", "date": "2026-11-16", "text": "Please fix my house number"}
 
@@ -120,7 +122,14 @@ def seller() -> Vendor:
     return found
 
 
-def place_seed(stripe: FakeStripeClient, owner: Vendor | None = None, **kw: Any) -> VendorOrder:
+def place_seed(
+    stripe: FakeStripeClient,
+    owner: Vendor | None = None,
+    *,
+    rule: dict[str, Any] | None = None,
+    stock: int = 10,
+    **kw: Any,
+) -> VendorOrder:
     """The ORD.20 seed, placed, paid through the Stripe double and transferred."""
     owner = owner or seller()
     from apps.catalog.models import Product
@@ -130,7 +139,7 @@ def place_seed(stripe: FakeStripeClient, owner: Vendor | None = None, **kw: Any)
         return ProductFactory.create(
             vendor=owner,
             status=Product.Status.PUBLISHED,
-            stock_qty=10,
+            stock_qty=stock,
             price_net=D(price),
             weight_kg=D("0.500"),
             fiscal_category=tax.STANDARD,
@@ -146,7 +155,7 @@ def place_seed(stripe: FakeStripeClient, owner: Vendor | None = None, **kw: Any)
                 shipping_net=D("10.00"),
                 shipping_tax=DOMESTIC,
                 shipping_choice={"key": "standard", "label": "Standard", "max_days": 5},
-                commission_snapshot=RULE,
+                commission_snapshot=rule or RULE,
             ),
             shipping_address=ROME,
             billing_address=ROME,
@@ -206,7 +215,7 @@ def last_id(sub: VendorOrder) -> int:
     return entry.pk if entry else 0
 
 
-def assert_balanced(sub: VendorOrder, when: str) -> None:
+def assert_balanced(sub: VendorOrder, when: str, *, versions: bool = True) -> None:
     """The ledger of the package sums to zero after each version: the customer's money (sale and
     refunds) equals what the platform kept and what the vendor got (commission, collection cost,
     transfer and its reversals). The refund fee is the one line outside: a debit the vendor owes
@@ -215,6 +224,8 @@ def assert_balanced(sub: VendorOrder, when: str) -> None:
     entries = LedgerEntry.objects.filter(vendor_order=sub)
     total = sum((e.amount for e in entries.exclude(kind="refund_fee")), D("0"))
     assert total == 0, plainly(f"the package's ledger must sum to zero {when}", f"it sums {total}")
+    if not versions:  # an ordinary refund moves money without writing a version
+        return
     sub.refresh_from_db()
     assert sub.current_version is not None
     charged = sum((e.amount for e in entries.filter(kind__in=["sale", "shipping"])), D("0"))
@@ -267,8 +278,8 @@ def test_removing_b_applies_v2_refunds_36_60_and_reverses_3_00_with_one_refund_f
 def test_the_removal_writes_the_same_ledger_rows_as_a_pay7_refund_of_line_b(
     stripe: FakeStripeClient,
 ) -> None:
-    amended = place_seed(stripe)
-    refunded = place_seed(stripe)
+    amended = place_seed(stripe, rule=RULE_WITH_SHIPPING)
+    refunded = place_seed(stripe, rule=RULE_WITH_SHIPPING)
     actor = owner_of(amended)
     start_a, start_b = last_id(amended), last_id(refunded)
     apply(draft(amended, actor, am.RemoveLine(key_of(amended, "B"))), actor)
@@ -702,3 +713,143 @@ def test_the_customer_keeps_the_rest_and_the_hold_ends(stripe: FakeStripeClient)
     assert sub.state == "shipped"
     with pytest.raises(amendments.AmendmentRefused):
         amendments.cancel_rest_of_package(sub, actor=customer, ctx=CTX)
+
+
+# --- owner decisions on #564 -------------------------------------------------------------------
+
+
+def test_with_a_goods_only_rule_the_amendment_gives_back_the_recompute_delta(
+    stripe: FakeStripeClient,
+) -> None:
+    amended, refunded = place_seed(stripe), place_seed(stripe)
+    actor = owner_of(amended)
+    apply(draft(amended, actor, am.RemoveLine(key_of(amended, "B"))), actor)
+    by_amendment = Refund.objects.get(vendor_order=amended)
+    assert by_amendment.commission_reversal == D("3.00"), plainly(
+        "an amendment removing B under a 10 % goods rule must give back 13.00 - 10.00 = 3.00",
+        f"it gave back {by_amendment.commission_reversal}",
+    )
+    refunds.refund_through_platform(
+        refunded,
+        RefundSelection("line", ((refunded.lines.get(title="B").pk, 1),)),
+        request_id=secrets.token_urlsafe(12),
+        actor=owner_of(refunded),
+        ctx=CTX,
+    )
+    by_refund = Refund.objects.get(vendor_order=refunded)
+    assert by_refund.commission_reversal == D("2.79"), plainly(
+        "an ordinary PAY.7 refund of B keeps the PAY.4 pro rata, 13.00 x 36.60 / 170.80 = 2.79",
+        f"it gave back {by_refund.commission_reversal}",
+    )
+    assert_balanced(amended, "after the removal")
+
+
+def test_a_line_refund_after_a_lower_price_reads_the_amended_line(
+    stripe: FakeStripeClient,
+) -> None:
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    apply(draft(sub, actor, am.ChangePrice(key_of(sub, "A"), D("45.00"))), actor)
+    sub.refresh_from_db()
+    later = refunds.refund_through_platform(
+        sub,
+        RefundSelection("line", ((sub.lines.get(title="A").pk, 2),)),
+        request_id=secrets.token_urlsafe(12),
+        actor=actor,
+        ctx=CTX,
+    )
+    assert later.refund is not None
+    assert later.refund.refunded_gross == D("109.80"), plainly(
+        "after A was lowered to 45.00, a full refund of A must give back 2 x 45.00 gross = "
+        "109.80, never the 122.00 of the line as placed",
+        f"it gave back {later.refund.refunded_gross}",
+    )
+    assert_balanced(sub, "after the later refund", versions=False)
+
+
+def test_a_removed_line_cannot_be_refunded_again(stripe: FakeStripeClient) -> None:
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    apply(draft(sub, actor, am.RemoveLine(key_of(sub, "B"))), actor)
+    sub.refresh_from_db()
+    with pytest.raises(InvalidRefundRequest):
+        refunds.refund_through_platform(
+            sub,
+            RefundSelection("line", ((sub.lines.get(title="B").pk, 1),)),
+            request_id=secrets.token_urlsafe(12),
+            actor=actor,
+            ctx=CTX,
+        )
+    assert Refund.objects.filter(vendor_order=sub).count() == 1
+
+
+def test_the_rest_refund_gives_back_all_the_commission_left(stripe: FakeStripeClient) -> None:
+    customer = UserFactory.create()
+    sub = place_seed(stripe, customer=customer)
+    actor = owner_of(sub)
+    apply(draft(sub, actor, am.RemoveLine(key_of(sub, "B"))), actor)
+    amendments.cancel_rest_of_package(sub, actor=customer, ctx=CTX)
+    total = sum((r.commission_reversal for r in Refund.objects.filter(vendor_order=sub)), D("0"))
+    assert total == D("13.00"), plainly(
+        "once the whole package is refunded, all 13.00 of commission must be back",
+        f"{total} came back",
+    )
+
+
+def stock_of(sub: VendorOrder, title: str) -> int:
+    line = sub.lines.get(title=title)
+    assert line.product is not None
+    line.product.refresh_from_db()
+    return line.product.stock_qty
+
+
+def test_a_line_removed_as_unavailable_keeps_no_stock_and_offers_the_rest(
+    stripe: FakeStripeClient,
+) -> None:
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    before = stock_of(sub, "B")
+    apply(draft(sub, actor, am.RemoveLine(key_of(sub, "B"), unavailable=True)), actor)
+    sub.refresh_from_db()
+    assert stock_of(sub, "B") == before, plainly(
+        "a line removed as unavailable must not come back to stock",
+        f"the stock went from {before} to {stock_of(sub, 'B')}",
+    )
+    assert sub.cancel_rest_offered_at is not None
+
+
+def test_a_line_removed_for_another_reason_restocks_and_makes_no_offer(
+    stripe: FakeStripeClient,
+) -> None:
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    before_a, before_b = stock_of(sub, "A"), stock_of(sub, "B")
+    amendment = draft(sub, actor, am.RemoveLine(key_of(sub, "B"), unavailable=False))
+    apply(amendment, actor)
+    sub.refresh_from_db()
+    assert stock_of(sub, "B") == before_b + 1, plainly(
+        "a line removed for a reason other than unavailability must restock its unit",
+        f"the stock went from {before_b} to {stock_of(sub, 'B')}",
+    )
+    assert stock_of(sub, "A") == before_a
+    assert sub.cancel_rest_offered_at is None
+    assert sub.ship_hold_until is None
+    restocked = AuditLog.objects.get(
+        action="orders.amendment_applied", target_model="catalog.product"
+    )
+    assert (restocked.after or {})["restocked_from"] == str(sub.public_id)
+
+
+def test_a_lower_quantity_not_unavailable_restocks_the_units(stripe: FakeStripeClient) -> None:
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    before = stock_of(sub, "A")
+    apply(draft(sub, actor, am.ChangeQuantity(key_of(sub, "A"), 1, unavailable=False)), actor)
+    assert stock_of(sub, "A") == before + 1
+
+
+def test_the_unavailable_flag_survives_the_stored_draft() -> None:
+    for unavailable in (True, False):
+        change = am.RemoveLine("k", unavailable=unavailable)
+        assert am.change_from_json(am.change_to_json(change)) == change
+    assert am.change_from_json({"kind": "remove_line", "line_key": "k"}) == am.RemoveLine("k")

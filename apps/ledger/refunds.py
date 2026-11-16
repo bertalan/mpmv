@@ -60,7 +60,13 @@ from apps.core.services import audit_changes, current_operator
 from apps.orders import amendment_engine as am
 from apps.orders import amendments as orders_amendments
 from apps.orders import services as orders_services
-from apps.orders.models import Order, OrderAmendment, OrderLine, VendorOrder
+from apps.orders.models import (
+    Order,
+    OrderAmendment,
+    OrderLine,
+    VendorOrder,
+    VendorOrderVersion,
+)
 from apps.payments import registry
 from apps.payments import settlement as payments_settlement
 from apps.payments.engine import (
@@ -149,10 +155,43 @@ def _check_paid(sub: VendorOrder) -> None:
 
 
 def _line_figures(sub: VendorOrder) -> dict[int, LineFigures]:
-    return {
-        line.pk: LineFigures(line.pk, line.quantity, round_line(line.net_total + line.tax_amount))
-        for line in OrderLine.objects.filter(vendor_order=sub)
-    }
+    """Each order line as the customer has it now: its quantity and gross in the package's
+    current version (ORD.20). After an amendment lowered a price or a quantity, a refund by line
+    reads the amended line, never the line as placed; a line an amendment removed has nothing
+    left (quantity 0). Without amendments that is the placed line (v1)."""
+    lines = list(OrderLine.objects.filter(vendor_order=sub))
+    version = (
+        VendorOrderVersion.objects.filter(pk=sub.current_version_id).first()
+        if sub.current_version_id
+        else None
+    )
+    if version is None or version.number == 1:
+        return {
+            line.pk: LineFigures(
+                line.pk, line.quantity, round_line(line.net_total + line.tax_amount)
+            )
+            for line in lines
+        }
+    current = {line.line_key: line for line in am.VersionSnapshot.from_json(version.snapshot).lines}
+    figures: dict[int, LineFigures] = {}
+    for line in lines:
+        found = current.get(str(line.public_id))
+        figures[line.pk] = (
+            LineFigures(line.pk, found.quantity, round_line(found.net + found.tax))
+            if found is not None
+            else LineFigures(line.pk, 0, ZERO)
+        )
+    return figures
+
+
+def _already(sub: VendorOrder, channels: tuple[str, ...] = MOVED) -> dict[int, int]:
+    """Units already refunded per line, by the refunds other than amendments: the units an
+    amendment took out are already out of the current version's quantity."""
+    return refund_engine.refunded_quantities(
+        request
+        for request in _group(sub, channels).values_list("request", flat=True)
+        if request.get("mode") != CAUSE_AMENDMENT
+    )
 
 
 def _group(sub: VendorOrder, channels: tuple[str, ...]) -> "QuerySet[Refund]":
@@ -164,17 +203,13 @@ def _sum(rows: "QuerySet[Any]", field: str) -> Decimal:
 
 
 def _gross_of(sub: VendorOrder, selection: RefundSelection, channels: tuple[str, ...]) -> Decimal:
-    rows = _group(sub, channels)
-    already = refund_engine.refunded_quantities(rows.values_list("request", flat=True))
-    return refund_engine.refunded_gross_of(selection, _line_figures(sub), already)
+    return refund_engine.refunded_gross_of(selection, _line_figures(sub), _already(sub, channels))
 
 
 def _stored(
     sub: VendorOrder, selection: RefundSelection, channels: tuple[str, ...]
 ) -> RefundSelection:
-    rows = _group(sub, channels)
-    already = refund_engine.refunded_quantities(rows.values_list("request", flat=True))
-    return refund_engine.normalised_lines(selection, _line_figures(sub), already)
+    return refund_engine.normalised_lines(selection, _line_figures(sub), _already(sub, channels))
 
 
 def _fee_rule(snapshot: dict[str, object], placed_at: dt.datetime) -> RefundFeeRule:
@@ -337,6 +372,9 @@ class _Plan:
     exclusion: FeeExclusion | None = None
     amendment: OrderAmendment | None = None
     due_by: dt.datetime | None = None
+    # ORD.20 (owner decision on #564): an amendment gives back the commission of its recompute,
+    # not the pro rata of the refunded gross.
+    commission_back: Decimal | None = None
 
 
 def _refund_money(
@@ -406,7 +444,7 @@ def _carry_out(
     exclusion = plan.exclusion
 
     def lines_for(cost: Decimal) -> _Figures:
-        return _figures(sub, snapshot, gross, cost, rule, exclusion, reverse)
+        return _figures(sub, snapshot, gross, cost, rule, exclusion, reverse, plan.commission_back)
 
     planned = lines_for(ZERO)
     transfer = _transfer_of(sub)
@@ -530,17 +568,34 @@ def _removed_units(amendment: OrderAmendment) -> dict[str, int]:
     return removed
 
 
-def _check_units_left(sub: VendorOrder, lines: Sequence[tuple[int, int]]) -> None:
-    """Refuse an amendment that takes out units a refund already gave back."""
-    already = refund_engine.refunded_quantities(
-        _group(sub, MOVED).values_list("request", flat=True)
-    )
-    figures = _line_figures(sub)
-    for line_id, qty in lines:
-        if qty > figures[line_id].quantity - already.get(line_id, 0):
+def _touched_keys(amendment: OrderAmendment) -> set[str]:
+    """The lines whose quantity, price or discount the amendment changes, or which it removes."""
+    before = am.VersionSnapshot.from_json(amendment.from_version.snapshot)
+    after = {
+        line.line_key: line
+        for line in am.VersionSnapshot.from_json(amendment.preview["after_snapshot"]).lines
+    }
+    touched: set[str] = set()
+    for line in before.lines:
+        new = after.get(line.line_key)
+        if new is None or (new.quantity, new.unit_price_net, new.discount_net) != (
+            line.quantity,
+            line.unit_price_net,
+            line.discount_net,
+        ):
+            touched.add(str(line.line_key))
+    return touched
+
+
+def _check_not_refunded(sub: VendorOrder, amendment: OrderAmendment) -> None:
+    """Refuse an amendment that changes a line a refund already gave back in part or in full:
+    the version would not know of that refund, so the customer could be refunded twice."""
+    already = _already(sub)
+    for line_id, _ in _units_by_line(sub, dict.fromkeys(_touched_keys(amendment), 1)):
+        if already.get(line_id, 0) > 0:
             raise orders_amendments.AmendmentRefused(
-                "Part of this change was already refunded (a refund of the same line), so it "
-                "would refund the customer twice: discard the draft and check the refunds."
+                "This change touches a line that was already refunded, so it could refund the "
+                "customer twice: discard the draft and refund the rest of that line instead."
             )
 
 
@@ -581,6 +636,7 @@ def refund_amendment(
     amendment: OrderAmendment,
     *,
     amount: Decimal,
+    commission_back: Decimal,
     ctx: AuditContext,
     now: dt.datetime,
     dry_run: bool = False,
@@ -589,17 +645,18 @@ def refund_amendment(
 
     Called by `apps.orders.amendments.apply_amendment` (setting `ORDER_AMENDMENT_REFUND_HOOK`) in
     the transaction that writes the new version, so the version and the refund are written
-    together or not at all. Same arithmetic as a PAY.4 refund of the same amount (the commission
-    and collection cost pro rata, cumulatively; one refund fee per event; the vendor's share
-    taken back from its transfer), submitted to the provider in this step, `due_by` = the event
-    plus 14 days. An amendment with a recorded customer request refunds without the refund fee
+    together or not at all. Same event as a PAY.4 refund of the same amount (the collection
+    cost pro rata, cumulatively; one refund fee per event; the vendor's share taken back from its
+    transfer), except the commission: it is `commission_back`, the recompute's delta under the
+    frozen rule (owner decision on #564). Submitted to the provider in this step, `due_by` = the
+    event plus 14 days. An amendment the customer asked for refunds without the refund fee
     (exclusion `customer_requested_amendment`, set here from the amendment, never by hand,
     audited). The units the amendment takes out are stored with the request, so a later refund
     of the same line cannot give them back twice."""
     sub = _lock(amendment.vendor_order)
     _check_paid(sub)
     lines = _units_by_line(sub, _removed_units(amendment))
-    _check_units_left(sub, lines)
+    _check_not_refunded(sub, amendment)
     asked = _customer_asked(amendment)
     plan = _Plan(
         gross=round_line(amount),
@@ -622,6 +679,7 @@ def refund_amendment(
         ),
         amendment=amendment,
         due_by=now + dt.timedelta(days=REFUND_DUE_DAYS),
+        commission_back=round_line(commission_back),
     )
     try:
         return _outcome(_carry_out(sub, plan, ctx=ctx, dry_run=dry_run, now=now))
@@ -649,9 +707,7 @@ def refund_rest_of_package(
     left = round_line(sub.gross_total - _sum(_group(sub, MOVED), "refunded_gross"))
     if left <= 0:
         raise orders_amendments.AmendmentRefused("Nothing is left to refund on this package.")
-    already = refund_engine.refunded_quantities(
-        _group(sub, MOVED).values_list("request", flat=True)
-    )
+    already = _already(sub)
     units = [
         (line_id, figures.quantity - already.get(line_id, 0))
         for line_id, figures in sorted(_line_figures(sub).items())
@@ -868,9 +924,12 @@ def _figures(
     rule: RefundFeeRule,
     exclusion: FeeExclusion | None,
     reverse: bool,
+    commission_back: Decimal | None = None,
 ) -> _Figures:
     """`refund_lines` for this event, the reversals capped so that all the events of the package
-    together never give back more than the commission and collection cost it paid."""
+    together never give back more than the commission and collection cost it paid. An amendment
+    passes `commission_back` (its recompute's commission delta) in place of the pro rata. The
+    event that refunds the rest of the package gives back all that is left of both."""
     str_snapshot = {k: str(v) for k, v in snapshot.items()}
     moved = _group(sub, MOVED)
     lines = refund_lines(
@@ -892,8 +951,11 @@ def _figures(
     )
     commission_left = max(ZERO, paid.commission - _sum(moved, "commission_reversal"))
     fee_left = max(ZERO, paid.payment_fee - _sum(moved, "payment_fee_reversal"))
+    if round_line(_sum(moved, "refunded_gross") + gross) >= sub.gross_total:
+        return _Figures(commission_left, fee_left, lines.refund_fee)
+    commission = lines.commission_reversal if commission_back is None else commission_back
     return _Figures(
-        min(lines.commission_reversal, commission_left),
+        min(commission, commission_left),
         min(lines.payment_fee_reversal, fee_left),
         lines.refund_fee,
     )
