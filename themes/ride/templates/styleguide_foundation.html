@@ -121,3 +121,34 @@ the bundle reads the data-bs-* attributes (strict CSP, spec 14 §14.5).
     <h3>{% translate "Gallery with thumbnails" %}</h3>
     {% include "components/gallery.html" with id="sg-gallery-carousel" label=_("Images of the touring jacket, with thumbnails") images=library.images only %}
   </section>
+
+  <section id="sg-reveal" aria-labelledby="sg-reveal-title">
+    {% include "components/section_title.html" with overline=_("Scroll reveal") title=_("Reveal on scroll") heading_level=2 id="sg-reveal-title" only %}
+    <p>{% translate "Blocks marked data-reveal fade in once, when they scroll into view. With JavaScript off, or with reduced motion, they are simply there." %}</p>
+    <div class="row g-3">
+      <div class="col-md-4" data-reveal><div class="card card-body">{% translate "First revealed block" %}</div></div>
+      <div class="col-md-4" data-reveal><div class="card card-body">{% translate "Second revealed block" %}</div></div>
+      <div class="col-md-4" data-reveal><div class="card card-body">{% translate "Third revealed block" %}</div></div>
+    </div>
+  </section>
+
+  <section id="sg-counters" aria-labelledby="sg-counters-title">
+    <h2 id="sg-counters-title">{% translate "Counters" %}</h2>
+    <div class="row g-3">
+      <div class="col-6 col-md-4">{% include "components/counter.html" with value=1250 label=_("Orders shipped") only %}</div>
+      <div class="col-6 col-md-4">{% include "components/counter.html" with value=48 label=_("Small workshops") suffix="+" only %}</div>
+      <div class="col-6 col-md-4">{% include "components/counter.html" with value=99 label=_("Satisfied riders") suffix="%" only %}</div>
+    </div>
+  </section>
+
+  <section id="sg-progress" aria-labelledby="sg-progress-title">
+    <h2 id="sg-progress-title">{% translate "Progress" %}</h2>
+    {% include "components/progress.html" with id="sg-progress-packed" label=_("Order packed") value=60 only %}
+    {% include "components/progress.html" with id="sg-progress-shipped" label=_("Parcels delivered") value=3 max=8 only %}
+  </section>
+
+  <section id="sg-video" aria-labelledby="sg-video-title">
+    <h2 id="sg-video-title">{% translate "Video" %}</h2>
+    <p>{% translate "A link to the video. Once you accept marketing cookies, it plays in a dialog; before that, no request goes to the video site." %}</p>
+    {% include "components/video_modal.html" with id="sg-video-tour" title=_("Workshop tour") url=library.video.url embed_url=library.video.embed_url only %}
+  </section>

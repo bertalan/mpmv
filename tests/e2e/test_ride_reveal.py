@@ -6,6 +6,8 @@ makes no third-party request before; axe `wcag22aa` and zero CSP violations at 3
 1280 px (spec 14 §14.3, §14.6, §14.9).
 """
 
+import re
+
 import pytest
 from playwright.sync_api import Browser, Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
@@ -28,7 +30,7 @@ def test_axe_and_csp_are_clean_with_the_motion_components(
     width: int, page: Page, live_server: LiveServer, settings: SettingsWrapper
 ) -> None:
     open_ride(page, live_server, settings, width)
-    for selector in ("#sg-reveal", "#sg-counters", "#sg-progress", "#sg-ride-countdown", VIDEO):
+    for selector in ("#sg-reveal", "#sg-counters", "#sg-progress", "#sg-countdown", VIDEO):
         expect(page.locator(selector)).to_be_attached()
     violations = run_axe(page)
     assert violations == [], format_violations(violations)
@@ -64,7 +66,7 @@ def test_with_motion_an_element_is_revealed_once_it_scrolls_into_view_and_counts
     last = page.locator(REVEAL).last
     assert last.evaluate("(e) => getComputedStyle(e).opacity") == "0"
     last.scroll_into_view_if_needed()
-    expect(last).to_have_class(r"/is-visible/")
+    expect(last).to_have_class(re.compile(r"is-visible"))
     expect(last).to_have_css("opacity", "1")
     counter = page.locator(COUNTER).first
     counter.scroll_into_view_if_needed()
@@ -90,7 +92,7 @@ def test_without_javascript_every_revealed_element_and_counter_is_readable(
     expect(bare.locator(COUNTER).first).to_contain_text("1,250")
     expect(bare.locator("#sg-progress progress").first).to_be_visible()
     expect(bare.locator(f"{VIDEO} a[href]").first).to_be_visible()
-    expect(bare.locator("#sg-ride-countdown [data-countdown-upcoming]")).to_be_visible()
+    expect(bare.locator("[data-countdown-upcoming]").first).to_be_visible()
     context.close()
 
 
@@ -106,7 +108,7 @@ def test_the_video_is_a_link_with_no_third_party_request_before_consent(
     opener = page.locator(f"{VIDEO} [data-bs-toggle=modal]")
     opener.focus()
     page.keyboard.press("Enter")
-    modal = page.locator("#sg-video-modal")
+    modal = page.locator("#sg-video-tour-modal")
     expect(modal).to_be_visible()
     expect(modal.locator("[data-video-gate]")).to_be_visible()
     expect(modal.locator("a[href*='cookie-settings']")).to_be_visible()

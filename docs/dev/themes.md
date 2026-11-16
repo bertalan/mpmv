@@ -367,3 +367,20 @@ setting clears the registry cache. `SiteFactory` and `ThemeSettingsFactory` are 
 - Without JavaScript (`html.no-js`) every slide is shown in turn and the controls stay `hidden`.
 - Not wired to the CMS yet: the hero block has no `layout` or slides field (needs a `cms`
   migration), so the components are shown on the styleguide only.
+
+## `ride` reveal, counters and video (THM.14 part 2)
+
+- `js/reveal.js` adds `.is-visible` to `[data-reveal]` elements and counts `[data-counter]` up
+  once. The CSS hides a revealed element only with JavaScript on (`html:not(.no-js)`) and inside
+  `prefers-reduced-motion: no-preference`; otherwise everything is visible at once and nothing
+  animates. The counter's final number is in the HTML (an `aria-hidden` animated copy, a visually
+  hidden final value for screen readers).
+- Components: `counter.html`, `progress.html` (native `<progress>`, label and value as text),
+  `section_title.html` (overline and heading), `launch_countdown.html` (a copy of base's with the
+  same hooks and text, Bootstrap buttons and `ride-countdown`), `video_modal.html`.
+- `video_modal.html` is a plain link to the video first. With JavaScript it opens a Bootstrap
+  modal; `js/video.js` creates the `<iframe>` only when `window.mpmvConsent.allows("marketing")`,
+  else the modal shows a placeholder with a link to the cookie settings. No request goes to the
+  video site before consent. The provider's origin must be added to the CSP `frame-src` by a
+  reviewed setting (none is added here); until then the browser blocks the frame.
+- Not wired to the CMS yet (no block fields); the cta block carries `data-reveal` as the first use.

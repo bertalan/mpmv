@@ -291,6 +291,10 @@ def sample_library() -> dict[str, Any]:
                 "image_url": image,
             },
         ],
+        "video": {
+            "url": "https://video.example/watch/workshop-tour",
+            "embed_url": "https://video.example/embed/workshop-tour",
+        },
         "images": [
             {"url": image, "alt": _("The jacket from the front")},
             {"url": image, "alt": _("The jacket from the side")},
