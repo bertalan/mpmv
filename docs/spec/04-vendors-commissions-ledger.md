@@ -207,6 +207,10 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
    Commissions, collection costs, amounts refunded to customers and refund fees are set off
    against transfers by contract (D-08, art. 1252 of the Italian civil code; CMP.5 clause (e)),
    with SEPA debit under the vendor's mandate for a negative balance.
+   An **order amendment** (D-47, ORD.20, ORD.21) posts a decrease as a PAY.4 refund event and an
+   increase as `sale`, `shipping`, `commission` and `payment_fee` rows tied to the supplement
+   charge, with the commission added cumulatively on the frozen rule; balances and DAC7 follow the
+   final version.
 5. **Nightly reconciliation**: ledger ↔ Stripe transfers and balance; discrepancies → alert and report.
 
 ### Vendor statuses (owner decision Q-17)
