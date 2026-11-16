@@ -345,6 +345,15 @@ class VendorOrder(_StateGuarded):
         related_name="+",
         help_text="ORD.20: the last applied version (v1 is the placed order).",
     )
+    # ORD.20 (spec 07, minor change 2): after a partial unavailability the customer may cancel
+    # the rest of the package free of charge before shipping, and the package cannot be shipped
+    # until the hold ends, unless the customer answered earlier.
+    cancel_rest_offered_at = models.DateTimeField(
+        null=True, blank=True, help_text="When the cancel-the-rest offer was made."
+    )
+    ship_hold_until = models.DateTimeField(
+        null=True, blank=True, help_text="Shipping is refused until then (cancel-the-rest hold)."
+    )
 
     class Meta:
         ordering = ["order", "id"]
@@ -717,6 +726,9 @@ class OrderAmendment(BaseModel):
     decision_channel = models.CharField(max_length=16, blank=True)
     payment_ref = models.CharField(max_length=255, blank=True)
     refund_ref = models.CharField(max_length=255, blank=True)
+    # Each edit of a draft bumps it: a passkey grant is bound to the revision it was asked for,
+    # so an edit voids it (CORE.25).
+    revision = models.PositiveIntegerField(default=1)
 
     class Meta:
         ordering = ["vendor_order", "created_at", "id"]

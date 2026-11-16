@@ -7,7 +7,7 @@ from django.db import models
 
 from apps.core.fields import MoneyField
 from apps.core.models import PlatformOperator
-from apps.orders.models import VendorOrder
+from apps.orders.models import OrderAmendment, VendorOrder
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
 
@@ -102,6 +102,17 @@ class RefundChannel(models.TextChoices):
     PLATFORM_INITIATED = "platform_initiated", "Platform-initiated refund"
 
 
+class FeeExclusionReason(models.TextChoices):
+    """Why a refund event carries no refund fee besides a platform error (L-10, its own flag).
+    Set by the amendment refund service only, never from a form or an API field."""
+
+    NONE = "", "None"
+    CUSTOMER_REQUESTED_AMENDMENT = (
+        "customer_requested_amendment",
+        "Amendment the customer asked for (no refund fee)",
+    )
+
+
 class Refund(models.Model):
     """One refund event of a vendor order (PAY.4, D-05, D-41): the record the ledger lines and
     the provider refund of that event hang from.
@@ -145,6 +156,23 @@ class Refund(models.Model):
     declared_method = models.CharField(max_length=64, blank=True)
     reason = models.TextField(blank=True)
     created_by = models.CharField(max_length=128, blank=True)  # the audit actor label
+    # ORD.20: the amendment whose decrease this refund is (null for every other refund).
+    amendment = models.ForeignKey(
+        OrderAmendment,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="refunds",
+    )
+    # ORD.20, owner 2026-11-16: no refund fee for an amendment the customer asked for.
+    fee_exclusion_reason = models.CharField(
+        max_length=32, blank=True, choices=FeeExclusionReason.choices
+    )
+    # Art. 61 c. 4 Codice del consumo (joint opinion 2026-11-16): an amendment or cancel-the-rest
+    # refund is due within 14 days of the event; never 30. Staff are alerted 4 days before.
+    due_by = models.DateTimeField(null=True, blank=True)
+    provider_status = models.CharField(max_length=24, blank=True)
+    succeeded_at = models.DateTimeField(null=True, blank=True)
 
     objects: ClassVar[VendorScopedManager["Refund"]] = VendorScopedManager()
 
@@ -171,6 +199,14 @@ class Refund(models.Model):
                 condition=~models.Q(channel="outside_platform")
                 | (models.Q(declared_date__isnull=False) & ~models.Q(declared_method="")),
                 name="ledger_refund_outside_needs_date_and_method",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fee_exclusion_reason__in=FeeExclusionReason.values),
+                name="ledger_refund_fee_exclusion_reason_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fee_exclusion_reason="") | models.Q(amendment__isnull=False),
+                name="ledger_refund_fee_exclusion_needs_amendment",
             ),
         ]
         indexes = [models.Index(fields=["vendor_order", "id"], name="ledger_refund_order_idx")]

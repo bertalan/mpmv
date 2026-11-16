@@ -70,6 +70,17 @@ DEFAULT_COMPARABLE_DELAY_DAYS: Final = 2
 
 # An amendment is possible only before shipping (spec 07: "When").
 AMENDABLE_VENDOR_ORDER_STATES: Final = frozenset({"pending", "accepted"})
+# After a partial unavailability the package cannot be shipped for this many hours, unless the
+# customer answers the cancel-the-rest offer earlier (operator setting
+# `amendment_cancel_hold_hours`, default 24; the Manager setting comes with ORD.20 part 3).
+DEFAULT_CANCEL_HOLD_HOURS: Final = 24
+# A draft nobody touched for this long is discarded (spec 07, Concurrency).
+DRAFT_IDLE_MINUTES: Final = 60
+# CORE.25 critical actions of an amendment (spec 07, Roles and the passkey): one passkey each
+# time, bound to the amendment's digest and shop, even with the passkey window open.
+ACTION_ADDRESS: Final = "order_amend_address"
+ACTION_VENDOR_REFUND: Final = "vendor_refund"  # the PAY.7 grant
+ACTION_STAFF_REFUND: Final = "order_amend_cancel"
 
 
 class AmendmentRefused(ValueError):

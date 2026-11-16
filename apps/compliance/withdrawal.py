@@ -47,6 +47,7 @@ from apps.core.services import (
     run_mutation,
 )
 from apps.core.services import enqueue_email as _enqueue_email
+from apps.orders import amendments as order_amendments
 from apps.orders.models import CustomerTaxStatus, Order, PrivacyStatus, VendorOrder
 from apps.orders.tz import business_tz
 
@@ -234,6 +235,12 @@ def _enqueue(**kwargs: Any) -> bool:
     return True
 
 
+def has_withdrawal(vendor_order: VendorOrder) -> bool:
+    """Whether a withdrawal statement is registered on the vendor order. The ORD.20 hook
+    (`settings.ORDER_WITHDRAWAL_HOOKS`): such a package can no longer be amended."""
+    return WithdrawalStatement.objects.filter(vendor_order_id=vendor_order.pk).exists()
+
+
 def submit_withdrawal(
     order: Order,
     vendor_order_ids: Sequence[uuid.UUID | str],
@@ -297,6 +304,9 @@ def submit_withdrawal(
                     language=order.language,
                 )
             )
+            # ORD.20: an amendment still open on the package closes as `withdrawn`; the
+            # withdrawal runs on the last applied version.
+            order_amendments.withdraw_open_amendment(option.vendor_order, ctx=ctx)
         queued = _enqueue(
             recipient=order.email,
             template_key=ACK_TEMPLATE,

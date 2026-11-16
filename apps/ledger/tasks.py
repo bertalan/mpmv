@@ -40,3 +40,14 @@ def retry_pending_refund_reversals(timestamp: int) -> None:
     out to the buyer (PAY.4), under the same idempotency key. Idempotent."""
     cleared = refunds.retry_pending_reversals()
     logger.info("ledger.retry_pending_refund_reversals: %s cleared", cleared)
+
+
+@periodic("0 * * * *")
+@locked()
+@task("ledger.alert_refunds_near_due", retry=NO_RETRY)
+def alert_refunds_near_due(timestamp: int) -> None:
+    """Every hour: alert staff for each amendment refund the provider has not confirmed 4 days
+    before its 14-day `due_by` (ORD.20; art. 61 c. 4 Codice del consumo). The alert email goes
+    once per refund and repeat window."""
+    count = refunds.alert_refunds_near_due()
+    logger.info("ledger.alert_refunds_near_due: %d alerted", count)

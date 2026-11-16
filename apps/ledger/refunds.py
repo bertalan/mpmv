@@ -40,7 +40,7 @@ leaves `states_pending`, and the sweep or a replay of the request finishes them.
 
 import datetime as dt
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
@@ -57,8 +57,10 @@ from apps.core.models import PLATFORM_ERROR, PLATFORM_REFUND_CASES, AuditLog
 from apps.core.money import round_line
 from apps.core.opschecks import Alert
 from apps.core.services import audit_changes, current_operator
+from apps.orders import amendment_engine as am
+from apps.orders import amendments as orders_amendments
 from apps.orders import services as orders_services
-from apps.orders.models import Order, OrderLine, VendorOrder
+from apps.orders.models import Order, OrderAmendment, OrderLine, VendorOrder
 from apps.payments import registry
 from apps.payments import settlement as payments_settlement
 from apps.payments.engine import (
@@ -70,11 +72,16 @@ from apps.payments.engine import (
 from apps.payments.models import Payment
 from apps.vendors import engine as vendor_engine
 from apps.vendors.commission import RefundEvent, compute_commission, refund_lines
-from apps.vendors.refund_fee import PlatformErrorExclusion, RefundFeeRule
+from apps.vendors.refund_fee import (
+    CustomerRequestedAmendment,
+    FeeExclusion,
+    PlatformErrorExclusion,
+    RefundFeeRule,
+)
 from apps.vendors.services import has_vendor_permission
 
 from . import engine, refund_engine, services, settlement
-from .models import LedgerEntry, Refund, RefundChannel
+from .models import FeeExclusionReason, LedgerEntry, Refund, RefundChannel
 from .refund_engine import InvalidRefundRequest, LineFigures, RefundSelection
 
 REFUND_MODEL = "ledger.refund"
@@ -90,6 +97,13 @@ _REQUEST_ID = re.compile(r"[A-Za-z0-9_.-]{8,64}")
 METHOD_MAX = 64
 REASON_MAX = 2000
 SNAPSHOT_SURCHARGE_KEY = "refund_fee_surcharge"
+# ORD.20 (joint opinion 2026-11-16; art. 61 c. 4 Codice del consumo): an amendment refund is due
+# within 14 days of the event, never later, and staff are alerted 4 days before that.
+REFUND_DUE_DAYS = 14
+REFUND_ALERT_DAYS_BEFORE = 4
+CAUSE_AMENDMENT = "amendment"
+CAUSE_CANCEL_REST = "cancel_rest"
+SUCCEEDED = "succeeded"
 
 
 class RefundRefused(ValueError):
@@ -216,6 +230,10 @@ def _created(refund: Refund, extra: dict[str, object] | None = None) -> dict[str
         "declared_date": refund.declared_date,
         "declared_method": refund.declared_method,
         "reason": refund.reason,
+        "amendment": str(refund.amendment.public_id) if refund.amendment else "",
+        "fee_exclusion_reason": refund.fee_exclusion_reason,
+        "due_by": refund.due_by,
+        "provider_status": refund.provider_status,
         **(extra or {}),
     }
 
@@ -304,6 +322,23 @@ def refund_by_platform(
     )
 
 
+@dataclass(frozen=True)
+class _Plan:
+    """One refund event to carry out on a locked vendor order: what it refunds and how it is
+    recorded. `exclusion` drops the refund fee (a platform error, or an amendment the customer
+    asked for); `due_by` is set for the refunds of an amendment and of a cancel of the rest."""
+
+    gross: Decimal
+    request: dict[str, object]
+    channel: str
+    cause: str
+    key: str
+    reason: str
+    exclusion: FeeExclusion | None = None
+    amendment: OrderAmendment | None = None
+    due_by: dt.datetime | None = None
+
+
 def _refund_money(
     vendor_order: VendorOrder,
     selection: RefundSelection,
@@ -320,114 +355,359 @@ def _refund_money(
     if len(reason) > REASON_MAX:
         raise RefundRefused("the reason is too long")
     key = f"refund:{vendor_order.public_id}:{request_id}"
-    result = RefundChangeSet()
     with transaction.atomic():
         sub = _lock(vendor_order)
         _check_paid(sub)
         if _replay(sub, key, channel, selection):
             _finish_pending(key)
-            return result
+            return RefundChangeSet()
         if sub.state in {"cancelled", "refunded"}:
             raise RefundRefused(f"the vendor order is {sub.state}: nothing is left to refund")
-        operator = current_operator()
-        gross = _gross_of(sub, selection, MOVED)
-        refunded_before = _sum(_group(sub, MOVED), "refunded_gross")
-        if gross > round_line(sub.gross_total - refunded_before):
-            raise RefundRefused("the refund exceeds what is left of the vendor order")
-        payment = _payment_of(sub.order)
-        snapshot = _snapshot_of(sub)
-        rule = _fee_rule(snapshot, sub.order.created_at)
-        reverse = (
-            channel == RefundChannel.PLATFORM_INITIATED or operator.reverse_fees_on_vendor_refund
-        )
-        exclusion = (
-            PlatformErrorExclusion(reason=exclusion_reason, set_by=ctx.actor_label)
-            if exclusion_reason
-            else None
-        )
-
-        def lines_for(cost: Decimal) -> _Figures:
-            return _figures(sub, snapshot, gross, cost, rule, exclusion, reverse)
-
-        planned = lines_for(ZERO)
-        transfer = _transfer_of(sub)
-        reversal_amount = _reversal_amount(planned, gross, transfer)
-        refund = Refund(
-            vendor=sub.vendor,
-            vendor_order=sub,
+        plan = _Plan(
+            gross=_gross_of(sub, selection, MOVED),
+            request=_stored(sub, selection, MOVED).snapshot(),
             channel=channel,
             cause=cause,
-            idempotency_key=key,
-            request=_stored(sub, selection, MOVED).snapshot(),
-            refunded_gross=gross,
-            platform_error=exclusion is not None,
-            platform_error_reason=exclusion_reason,
+            key=key,
             reason=reason,
-            created_by=ctx.actor_label[:128],
+            exclusion=(
+                PlatformErrorExclusion(reason=exclusion_reason, set_by=ctx.actor_label)
+                if exclusion_reason
+                else None
+            ),
         )
-        refund.commission_reversal = planned.commission_reversal
-        refund.payment_fee_reversal = planned.payment_fee_reversal
-        refund.refund_fee = planned.refund_fee
-        refund.transfer_reversed = reversal_amount
-        result.create(
+        return _carry_out(sub, plan, ctx=ctx, dry_run=dry_run)
+
+
+def _carry_out(
+    sub: VendorOrder,
+    plan: _Plan,
+    *,
+    ctx: AuditContext,
+    dry_run: bool,
+    now: dt.datetime | None = None,
+) -> RefundChangeSet:
+    """Refund `plan` on the locked vendor order `sub`: the provider refund and the reverse
+    transfer in one call, then the `Refund` row, its ledger lines, the audit entries and the
+    order states. A dry run returns the estimate and writes nothing. Every refund other than an
+    amendment's own supersedes the package's open amendment (spec 07, Concurrency)."""
+    result = RefundChangeSet()
+    operator = current_operator()
+    gross = plan.gross
+    refunded_before = _sum(_group(sub, MOVED), "refunded_gross")
+    if gross > round_line(sub.gross_total - refunded_before):
+        raise RefundRefused("the refund exceeds what is left of the vendor order")
+    payment = _payment_of(sub.order)
+    snapshot = _snapshot_of(sub)
+    rule = _fee_rule(snapshot, sub.order.created_at)
+    reverse = (
+        plan.channel == RefundChannel.PLATFORM_INITIATED or operator.reverse_fees_on_vendor_refund
+    )
+    exclusion = plan.exclusion
+
+    def lines_for(cost: Decimal) -> _Figures:
+        return _figures(sub, snapshot, gross, cost, rule, exclusion, reverse)
+
+    planned = lines_for(ZERO)
+    transfer = _transfer_of(sub)
+    reversal_amount = _reversal_amount(planned, gross, transfer)
+    platform_error = isinstance(exclusion, PlatformErrorExclusion)
+    refund = Refund(
+        vendor=sub.vendor,
+        vendor_order=sub,
+        channel=plan.channel,
+        cause=plan.cause,
+        idempotency_key=plan.key,
+        request=plan.request,
+        refunded_gross=gross,
+        platform_error=platform_error,
+        platform_error_reason=exclusion.reason if platform_error and exclusion else "",
+        reason=plan.reason,
+        created_by=ctx.actor_label[:128],
+        amendment=plan.amendment,
+        fee_exclusion_reason=(
+            FeeExclusionReason.CUSTOMER_REQUESTED_AMENDMENT
+            if isinstance(exclusion, CustomerRequestedAmendment)
+            else FeeExclusionReason.NONE
+        ),
+        due_by=plan.due_by,
+    )
+    refund.commission_reversal = planned.commission_reversal
+    refund.payment_fee_reversal = planned.payment_fee_reversal
+    refund.refund_fee = planned.refund_fee
+    refund.transfer_reversed = reversal_amount
+    result.create(
+        REFUND_MODEL,
+        str(refund.public_id),
+        _created(refund, {"estimate": True} if dry_run else None),
+    )
+    if dry_run:
+        return result
+    if plan.amendment is None:
+        orders_amendments.supersede_open_amendment(sub, cause="refund", ctx=ctx)
+    try:
+        answer = registry.get_provider(payment.provider).refund(
+            RefundRequest(
+                provider_ref=payment.provider_ref,
+                amount=gross,
+                currency=payment.currency,
+                idempotency_key=plan.key,
+                reverse_vendor_shares=False,
+                reversals=(
+                    (TransferReversal(transfer.ref, reversal_amount),)
+                    if transfer is not None and reversal_amount > 0
+                    else ()
+                ),
+            )
+        )
+    except TransferReversalFailed as error:
+        answer, pending = error.result, True  # the buyer IS refunded: record it, retry later
+    except (ProviderError, registry.UnknownProvider) as error:
+        raise RefundFailed(str(error)) from error
+    else:
+        pending = False
+    final = lines_for(round_line(answer.provider_cost))
+    refund.commission_reversal = final.commission_reversal
+    refund.payment_fee_reversal = final.payment_fee_reversal
+    refund.refund_fee = final.refund_fee
+    refund.provider_cost = round_line(answer.provider_cost)
+    refund.provider_refund_ref = answer.refund_ref
+    refund.transfer_reversed = reversal_amount
+    refund.reversal_pending = pending
+    refund.provider_status = answer.status[:24]
+    refund.succeeded_at = (now or timezone.now()) if answer.status == SUCCEEDED else None
+    refund.save()
+    _write_lines(sub, refund, answer.refund_ref, answer.reversal_refs, transfer, ctx)
+    changes = ChangeSet()
+    changes.create(REFUND_MODEL, str(refund.public_id), _created(refund))
+    audit_changes(changes, ctx=ctx, action=REFUND_RECORDED)
+    if pending:
+        _flag_pending_reversal(refund, ctx)
+    if exclusion is not None:
+        flagged = ChangeSet()
+        flagged.create(
             REFUND_MODEL,
             str(refund.public_id),
-            _created(refund, {"estimate": True} if dry_run else None),
+            {
+                VENDOR_FIELD: str(sub.vendor.public_id),
+                "reason": exclusion.reason,
+                "set_by": exclusion.set_by,
+                "amendment": str(plan.amendment.public_id) if plan.amendment else "",
+            },
         )
-        if dry_run:
-            return result
-        try:
-            answer = registry.get_provider(payment.provider).refund(
-                RefundRequest(
-                    provider_ref=payment.provider_ref,
-                    amount=gross,
-                    currency=payment.currency,
-                    idempotency_key=key,
-                    reverse_vendor_shares=False,
-                    reversals=(
-                        (TransferReversal(transfer.ref, reversal_amount),)
-                        if transfer is not None and reversal_amount > 0
-                        else ()
-                    ),
-                )
-            )
-        except TransferReversalFailed as error:
-            answer, pending = error.result, True  # the buyer IS refunded: record it, retry later
-        except (ProviderError, registry.UnknownProvider) as error:
-            raise RefundFailed(str(error)) from error
-        else:
-            pending = False
-        final = lines_for(round_line(answer.provider_cost))
-        refund.commission_reversal = final.commission_reversal
-        refund.payment_fee_reversal = final.payment_fee_reversal
-        refund.refund_fee = final.refund_fee
-        refund.provider_cost = round_line(answer.provider_cost)
-        refund.provider_refund_ref = answer.refund_ref
-        refund.transfer_reversed = reversal_amount
-        refund.reversal_pending = pending
-        refund.save()
-        _write_lines(sub, refund, answer.refund_ref, answer.reversal_refs, transfer, ctx)
-        changes = ChangeSet()
-        changes.create(REFUND_MODEL, str(refund.public_id), _created(refund))
-        audit_changes(changes, ctx=ctx, action=REFUND_RECORDED)
-        if pending:
-            _flag_pending_reversal(refund, ctx)
-        if exclusion is not None:
-            flagged = ChangeSet()
-            flagged.create(
-                REFUND_MODEL,
-                str(refund.public_id),
-                {
-                    VENDOR_FIELD: str(sub.vendor.public_id),
-                    "reason": exclusion.reason,
-                    "set_by": exclusion.set_by,
-                },
-            )
-            audit_changes(flagged, ctx=ctx, action=REFUND_FEE_EXCLUDED)
-        _apply_states(refund, ctx)
-        result.changes = changes.changes
-        result.refund = refund
+        audit_changes(flagged, ctx=ctx, action=REFUND_FEE_EXCLUDED)
+    _apply_states(refund, ctx)
+    result.changes = changes.changes
+    result.refund = refund
     return result
+
+
+# --- ORD.20: the refunds of order amendments --------------------------------------------------
+
+
+def _units_by_line(sub: VendorOrder, units: dict[str, int]) -> list[tuple[int, int]]:
+    """`units` keyed by version line key (the v1 `OrderLine.public_id`) as (line pk, units);
+    lines added by a later version have no order line and are left out."""
+    ids = {
+        str(public_id): pk
+        for public_id, pk in OrderLine.objects.filter(
+            vendor_order=sub, public_id__in=list(units)
+        ).values_list("public_id", "pk")
+    }
+    return sorted((ids[key], qty) for key, qty in units.items() if key in ids)
+
+
+def _removed_units(amendment: OrderAmendment) -> dict[str, int]:
+    """The units the amendment takes out of each line (a removed line, a lower quantity)."""
+    before = am.VersionSnapshot.from_json(amendment.from_version.snapshot)
+    after = am.VersionSnapshot.from_json(amendment.preview["after_snapshot"])
+    left = {line.line_key: line.quantity for line in after.lines}
+    removed: dict[str, int] = {}
+    for line in before.lines:
+        gone = line.quantity - left.get(line.line_key, 0)
+        if gone > 0:
+            removed[str(line.line_key)] = gone
+    return removed
+
+
+def _check_units_left(sub: VendorOrder, lines: Sequence[tuple[int, int]]) -> None:
+    """Refuse an amendment that takes out units a refund already gave back."""
+    already = refund_engine.refunded_quantities(
+        _group(sub, MOVED).values_list("request", flat=True)
+    )
+    figures = _line_figures(sub)
+    for line_id, qty in lines:
+        if qty > figures[line_id].quantity - already.get(line_id, 0):
+            raise orders_amendments.AmendmentRefused(
+                "Part of this change was already refunded (a refund of the same line), so it "
+                "would refund the customer twice: discard the draft and check the refunds."
+            )
+
+
+def _outcome(result: RefundChangeSet) -> "orders_amendments.RefundOutcome":
+    created: Mapping[str, Any] = (result.changes[0].after or {}) if result.changes else {}
+    refund = result.refund
+    return orders_amendments.RefundOutcome(
+        refund_id=str(refund.public_id) if refund else str(result.changes[0].key),
+        provider_ref=refund.provider_refund_ref if refund else "",
+        amount=Decimal(str(created.get("refunded_gross", ZERO))),
+        refund_fee=Decimal(str(created.get("refund_fee", ZERO))),
+        fee_exclusion_reason=str(created.get("fee_exclusion_reason", "")),
+        due_by=created.get("due_by"),
+        changes=list(result.changes),
+    )
+
+
+def _provider_failed(error: RefundFailed) -> "orders_amendments.AmendmentRefused":
+    return orders_amendments.AmendmentRefused(
+        "The refund could not be submitted to the payment provider, so nothing was changed: "
+        f"try again in a few minutes ({error})."
+    )
+
+
+def _customer_asked(amendment: OrderAmendment) -> bool:
+    """Whether the amendment is one the customer asked for: a recorded customer request (channel,
+    date, the customer's words) on an address change marked as asked by the customer. Read from
+    the amendment only; a request attached to any other change does not exempt the fee."""
+    words = str((amendment.customer_request or {}).get("text") or "").strip()
+    return bool(words) and any(
+        str(change.get("kind")) == am.ChangeAddress.kind
+        and bool(change.get("requested_by_customer"))
+        for change in amendment.changes
+    )
+
+
+def refund_amendment(
+    amendment: OrderAmendment,
+    *,
+    amount: Decimal,
+    ctx: AuditContext,
+    now: dt.datetime,
+    dry_run: bool = False,
+) -> "orders_amendments.RefundOutcome":
+    """The PAY.4 refund event of an applied amendment's decrease (ORD.20, spec 07 §Money).
+
+    Called by `apps.orders.amendments.apply_amendment` (setting `ORDER_AMENDMENT_REFUND_HOOK`) in
+    the transaction that writes the new version, so the version and the refund are written
+    together or not at all. Same arithmetic as a PAY.4 refund of the same amount (the commission
+    and collection cost pro rata, cumulatively; one refund fee per event; the vendor's share
+    taken back from its transfer), submitted to the provider in this step, `due_by` = the event
+    plus 14 days. An amendment with a recorded customer request refunds without the refund fee
+    (exclusion `customer_requested_amendment`, set here from the amendment, never by hand,
+    audited). The units the amendment takes out are stored with the request, so a later refund
+    of the same line cannot give them back twice."""
+    sub = _lock(amendment.vendor_order)
+    _check_paid(sub)
+    lines = _units_by_line(sub, _removed_units(amendment))
+    _check_units_left(sub, lines)
+    asked = _customer_asked(amendment)
+    plan = _Plan(
+        gross=round_line(amount),
+        request={
+            "mode": CAUSE_AMENDMENT,
+            "amendment": str(amendment.public_id),
+            "amount": str(round_line(amount)),
+            "lines": [{"line": line_id, "qty": qty} for line_id, qty in lines],
+        },
+        channel=RefundChannel.THROUGH_PLATFORM,
+        cause=CAUSE_AMENDMENT,
+        key=f"refund:{sub.public_id}:amendment:{amendment.public_id}",
+        reason=f"Order amendment {amendment.public_id}",
+        exclusion=(
+            CustomerRequestedAmendment(
+                amendment=str(amendment.public_id), set_by="service:orders.amendments"
+            )
+            if asked
+            else None
+        ),
+        amendment=amendment,
+        due_by=now + dt.timedelta(days=REFUND_DUE_DAYS),
+    )
+    try:
+        return _outcome(_carry_out(sub, plan, ctx=ctx, dry_run=dry_run, now=now))
+    except RefundFailed as error:
+        raise _provider_failed(error) from error
+    except RefundRefused as error:
+        raise orders_amendments.AmendmentRefused(
+            f"The refund of this change cannot be made: {error}."
+        ) from error
+
+
+def refund_rest_of_package(
+    vendor_order: VendorOrder,
+    *,
+    ctx: AuditContext,
+    now: dt.datetime,
+    dry_run: bool = False,
+) -> "orders_amendments.RefundOutcome":
+    """The customer cancels the rest of the package after a partial unavailability (ORD.20):
+    a full refund of what is left under PAY.4, refund fee charged to the vendor (D-05), due
+    within 14 days. Called by `apps.orders.amendments.cancel_rest_of_package` (setting
+    `ORDER_CANCEL_REST_REFUND_HOOK`); the package becomes cancelled or refunded."""
+    sub = _lock(vendor_order)
+    _check_paid(sub)
+    left = round_line(sub.gross_total - _sum(_group(sub, MOVED), "refunded_gross"))
+    if left <= 0:
+        raise orders_amendments.AmendmentRefused("Nothing is left to refund on this package.")
+    already = refund_engine.refunded_quantities(
+        _group(sub, MOVED).values_list("request", flat=True)
+    )
+    units = [
+        (line_id, figures.quantity - already.get(line_id, 0))
+        for line_id, figures in sorted(_line_figures(sub).items())
+        if figures.quantity - already.get(line_id, 0) > 0
+    ]
+    plan = _Plan(
+        gross=left,
+        request={
+            "mode": CAUSE_CANCEL_REST,
+            "amount": str(left),
+            "lines": [{"line": line_id, "qty": qty} for line_id, qty in units],
+        },
+        channel=RefundChannel.THROUGH_PLATFORM,
+        cause=CAUSE_CANCEL_REST,
+        key=f"refund:{sub.public_id}:cancel-rest",
+        reason="The customer cancelled the rest of the package after an item was unavailable",
+        due_by=now + dt.timedelta(days=REFUND_DUE_DAYS),
+    )
+    try:
+        return _outcome(_carry_out(sub, plan, ctx=ctx, dry_run=dry_run, now=now))
+    except RefundFailed as error:
+        raise _provider_failed(error) from error
+    except RefundRefused as error:
+        raise orders_amendments.AmendmentRefused(
+            f"The rest of the package cannot be refunded: {error}."
+        ) from error
+
+
+def alert_refunds_near_due(*, now: dt.datetime | None = None) -> int:
+    """Alert staff for each refund with a 14-day `due_by` that the provider has not confirmed
+    4 days before it (ORD.20). Returns how many are alerted; `raise_alert` sends the email once
+    per refund and repeat window."""
+    moment = now or timezone.now()
+    late = Refund.objects.filter(
+        due_by__isnull=False,
+        succeeded_at__isnull=True,
+        due_by__lte=moment + dt.timedelta(days=REFUND_ALERT_DAYS_BEFORE),
+    ).select_related("vendor_order__order")
+    count = 0
+    for refund in late:
+        raise_alert(
+            Alert(
+                f"refund-due:{refund.public_id}",
+                "A refund is not confirmed by the payment provider 4 days before its 14-day "
+                "deadline",
+                {
+                    "refund": str(refund.public_id),
+                    "order": refund.vendor_order.order.number,
+                    "due_by": refund.due_by.isoformat() if refund.due_by else "",
+                    "provider_status": refund.provider_status,
+                },
+            ),
+            now=moment,
+        )
+        count += 1
+    return count
 
 
 def _apply_states(refund: Refund, ctx: AuditContext) -> bool:
@@ -586,7 +866,7 @@ def _figures(
     gross: Decimal,
     provider_cost: Decimal,
     rule: RefundFeeRule,
-    exclusion: PlatformErrorExclusion | None,
+    exclusion: FeeExclusion | None,
     reverse: bool,
 ) -> _Figures:
     """`refund_lines` for this event, the reversals capped so that all the events of the package
@@ -764,6 +1044,7 @@ def mark_refunded_outside(
         if dry_run:
             return result
         refund.save()
+        orders_amendments.supersede_open_amendment(sub, cause="refund", ctx=ctx)
         audit_changes(result, ctx=ctx, action=REFUND_MARKED_OUTSIDE)
         result.refund = refund
     return result
@@ -776,8 +1057,11 @@ __all__ = [
     "RefundRefused",
     "RefundSelection",
     "StaffRequired",
+    "alert_refunds_near_due",
     "mark_refunded_outside",
+    "refund_amendment",
     "refund_by_platform",
+    "refund_rest_of_package",
     "refund_through_platform",
     "retry_pending_reversals",
 ]
