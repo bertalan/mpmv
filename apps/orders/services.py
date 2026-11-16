@@ -387,7 +387,8 @@ def create_order(
             for line in lines:
                 line.vendor_order = sub
                 line.save()
-            versions.create_version_one(sub, lines)  # ORD.20: the placed order is v1
+            if order.paid_at is not None:  # a legacy paid order; others get v1 when paid
+                versions.create_version_one(sub, lines)
         changeset = changes()
         audit_changes(changeset, ctx=ctx, action="orders.create")
     return order, changeset
@@ -398,6 +399,15 @@ def create_order(
 
 class _DryRunRollback(Exception):
     pass
+
+
+def _write_version_one(order: Order) -> None:
+    """ORD.20: when the payment succeeds, each vendor order gets its v1 (the placed order), taxed
+    on the payment date (`versions.tax_date`). The database stamped `paid_at` with the save."""
+    order.refresh_from_db(fields=["paid_at"])
+    for sub in order.vendor_orders.filter(current_version__isnull=True).select_related("vendor"):
+        sub.order = order
+        versions.create_version_one(sub, list(sub.lines.all()))
 
 
 def transition_order(
@@ -412,6 +422,8 @@ def transition_order(
             engine.check_order_transition(locked.state, target)
             locked.state = target
             locked.save(update_fields=["state", "updated_at"])
+            if target == "paid":
+                _write_version_one(locked)
             changeset.update("orders.order", str(locked.public_id), before, _order_snapshot(locked))
             if dry_run:
                 raise _DryRunRollback

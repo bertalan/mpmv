@@ -1,8 +1,8 @@
 """Versions of a vendor order (ORD.20, spec 07 §Order amendments): v1 from the placed order.
 
 The `OrderLine` rows and the `VendorOrder` snapshot fields stay as they were placed; they are
-version 1. `create_version_one` writes that version when an order is created, and the migration
-that introduced versions wrote it for the orders placed before. `current_version` reads the
+version 1. `create_version_one` writes that version when the payment succeeds, and the migration
+that introduced versions wrote it for the orders paid before. `current_version` reads the
 version an amendment starts from.
 """
 
@@ -30,8 +30,16 @@ def _country_of_taxation(rate: Decimal, reason: str, sub: VendorOrder) -> str | 
 
 
 def tax_date(sub: VendorOrder) -> dt.date:
-    """The date the placed order was taxed on: the day it was created, in the business zone."""
-    return sub.order.created_at.astimezone(business_tz()).date()
+    """The `tax_on` of v1: the day the order's payment succeeded, in the business time zone.
+
+    Joint tax and legal opinion 2026-11-16: the paid part keeps the rate and rules of the original
+    payment (art. 6 c. 4 DPR 633/72: a payment before delivery fixes the taxable event). The
+    payment's success is `Order.paid_at`, stamped by the database when the payment webhook moves
+    the order to `paid` (orders does not read the payments app). Only the date is set here: the
+    rates stay the ones the checkout snapshotted, never re-rated. The creation day is a fallback
+    for rows without a recorded payment (legacy orders in the backfill)."""
+    paid_or_created = sub.order.paid_at or sub.order.created_at
+    return paid_or_created.astimezone(business_tz()).date()
 
 
 def version_one_snapshot(sub: VendorOrder, lines: Sequence[OrderLine]) -> am.VersionSnapshot:

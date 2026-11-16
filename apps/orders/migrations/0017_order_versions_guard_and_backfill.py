@@ -1,4 +1,4 @@
-"""ORD.20: vendor order versions are append-only, and every existing vendor order gets its v1.
+"""ORD.20: vendor order versions are append-only, and every paid vendor order gets its v1.
 
 The trigger refuses any DELETE and any UPDATE of a version, except the anonymisation scrub
 (D-29, `mpmv.order_scrub` = `anonymise`) replacing a package's own address with the placeholder.
@@ -37,6 +37,8 @@ CREATE TRIGGER orders_vendororderversion_append_only
     FOR EACH ROW EXECUTE FUNCTION orders_vendororderversion_guard();
 """
 
+UNPAID_STATES = ("checkout", "quote_flow", "awaiting_payment", "cancelled")
+
 BACKWARD = """
 DROP TRIGGER IF EXISTS orders_vendororderversion_append_only ON orders_vendororderversion;
 DROP FUNCTION IF EXISTS orders_vendororderversion_guard();
@@ -69,11 +71,16 @@ def backfill(apps: Any, schema_editor: Any) -> None:
     version_model = apps.get_model("orders", "VendorOrderVersion")
     line_model = apps.get_model("orders", "OrderLine")
     tz = zoneinfo.ZoneInfo(settings.BUSINESS_TIME_ZONE)
-    subs = vendor_order_model.objects.filter(current_version__isnull=True).select_related(
-        "order", "vendor"
+    # v1 exists from the payment on: an order still unpaid gets it when its payment succeeds.
+    subs = (
+        vendor_order_model.objects.filter(current_version__isnull=True)
+        .exclude(order__paid_at__isnull=True, order__state__in=UNPAID_STATES)
+        .select_related("order", "vendor")
     )
     for sub in subs.iterator():
-        on = sub.order.created_at.astimezone(tz).date().isoformat()
+        # `tax_on` is the payment date (joint opinion 2026-11-16, art. 6 c. 4 DPR 633/72); a
+        # legacy row with no recorded payment falls back to its creation day.
+        on = (sub.order.paid_at or sub.order.created_at).astimezone(tz).date().isoformat()
         lines = []
         for line in line_model.objects.filter(vendor_order=sub).order_by("id"):
             lines.append(

@@ -7,12 +7,14 @@ and what happened (owner, 2026-11-16: control tests with intelligible answers).
 
 import datetime as dt
 import uuid
+import zoneinfo
 from decimal import Decimal
 from typing import Any
 
 import pytest
 from django.db import IntegrityError, connection, transaction
 from django.http import Http404
+from django.utils import timezone
 
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory
@@ -20,15 +22,20 @@ from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.orders import amendment_engine as am
-from apps.orders import amendments, services
+from apps.orders import amendments, engine, services
 from apps.orders.models import (
     AmendmentState,
+    Order,
     OrderAmendment,
     VendorOrder,
     VendorOrderVersion,
 )
 from apps.orders.services import LineInput, VendorOrderInput
-from apps.orders.tests.factories import OrderAmendmentFactory, VendorOrderVersionFactory
+from apps.orders.tests.factories import (
+    OrderAmendmentFactory,
+    VendorOrderVersionFactory,
+    unchecked,
+)
 from apps.shipping.models import ShippingMethod
 from apps.shipping.tests.factories import (
     ShippingMethodFactory,
@@ -102,8 +109,8 @@ def product(owner: Vendor, price: str) -> Product:
     )
 
 
-def seed(owner: Vendor | None = None) -> VendorOrder:
-    """The ORD.20 seed order, paid."""
+def seed(owner: Vendor | None = None, *, pay: bool = True) -> VendorOrder:
+    """The ORD.20 seed order, paid (or only placed, awaiting payment)."""
     owner = owner or seller()
     a, b = product(owner, "50.00"), product(owner, "30.00")
     lines = [
@@ -132,8 +139,17 @@ def seed(owner: Vendor | None = None) -> VendorOrder:
     )
     assert order is not None
     services.transition_order(order, "awaiting_payment", ctx=CTX)
-    services.transition_order(order, "paid", ctx=CTX)
+    if pay:
+        services.transition_order(order, "paid", ctx=CTX)
     return order.vendor_orders.get()
+
+
+def backdate(order: Order, created: dt.datetime) -> None:
+    """Set created_at (and its retention date) without the triggers (test set-up)."""
+    until = engine.tax_retention_until(created, zoneinfo.ZoneInfo("Europe/Rome"))
+    with unchecked():
+        Order.objects.filter(pk=order.pk).update(created_at=created, tax_retention_until=until)
+    order.refresh_from_db()
 
 
 def owner_of(sub: VendorOrder) -> Any:
@@ -161,6 +177,30 @@ CUSTOMER_ASKED = {"channel": "email", "date": "2027-03-04", "text": "Please fix 
 
 
 # --- versions ---------------------------------------------------------------------------------
+
+
+def test_v1_is_written_when_the_payment_succeeds_dated_on_the_payment_day() -> None:
+    sub = seed(pay=False)
+    assert not sub.versions.exists(), "an unpaid order must have no version yet"
+    order = sub.order
+    created = timezone.now() - dt.timedelta(days=1)
+    backdate(order, created)  # placed on day D at the snapshot rate of 22 %
+    services.transition_order(order, "paid", ctx=CTX)  # paid on D+1
+    order.refresh_from_db()
+    assert order.paid_at is not None
+    version = sub.versions.get()
+    paid_day = order.paid_at.astimezone(zoneinfo.ZoneInfo("Europe/Rome")).date()
+    created_day = created.astimezone(zoneinfo.ZoneInfo("Europe/Rome")).date()
+    snapshot = am.VersionSnapshot.from_json(version.snapshot)
+    portions = [p for line in snapshot.lines for p in line.portions]
+    portions += list(snapshot.shipping.portions)
+    assert {p.tax_on for p in portions} == {paid_day}, (
+        f"v1 must be taxed on the payment day {paid_day}, not the creation day {created_day}, "
+        f"but its portions carry {sorted({p.tax_on for p in portions})}"
+    )
+    assert {p.rate for p in portions} == {D("22.000")}, (
+        "v1 keeps the rates the checkout snapshotted, never re-rated on the payment day"
+    )
 
 
 def test_placing_an_order_writes_v1_with_the_seed_totals() -> None:
@@ -406,6 +446,41 @@ def test_a_dearer_carrier_is_applied_as_v2_and_moves_no_money() -> None:
     assert v2.shipping_address is not None
     assert v2.shipping_address["postcode"] == "00100"
     assert amendment.state == AmendmentState.APPLIED
+
+
+def test_anonymisation_replaces_a_v2_address_and_nothing_else_may_touch_it() -> None:
+    sub = seed()
+    method(sub.vendor, "express", "14.00", 7)
+    actor = owner_of(sub)
+    amendment, _ = draft(
+        sub, am.ChangeCarrier(am.ShippingOffer("express", "", D("0"))), actor=actor
+    )
+    assert amendment is not None
+    amendments.apply_amendment(amendment, actor=actor, ctx=CTX, now=NOW)
+    v2 = sub.versions.get(number=2)
+    placeholder = engine.ANONYMISED_ORDER_FIELDS["shipping_address"]
+    # Outside the scrub, even the placeholder is refused: the version is append-only.
+    with pytest.raises(IntegrityError), transaction.atomic():
+        VendorOrderVersion.objects.filter(pk=v2.pk).update(shipping_address=placeholder)
+    before = VendorOrderVersion.objects.filter(pk=v2.pk).values(
+        "snapshot", "gross_total", "number", "amendment_id"
+    )[0]
+    order = sub.order
+    backdate(order, timezone.now() - dt.timedelta(days=365 * 12))  # retention over
+    services.anonymise_order(order, ctx=CTX)
+    v2 = VendorOrderVersion.objects.get(pk=v2.pk)
+    assert v2.shipping_address == placeholder, (
+        "anonymisation must replace the package's own v2 address with the placeholder, "
+        f"but it is {v2.shipping_address}"
+    )
+    after = VendorOrderVersion.objects.filter(pk=v2.pk).values(
+        "snapshot", "gross_total", "number", "amendment_id"
+    )[0]
+    assert after == before, "anonymisation must change nothing but the address of a version"
+    assert sub.versions.get(number=1).shipping_address is None
+    assert "2 Via Nuova" not in str(
+        AuditLog.objects.filter(action="orders.anonymise").values_list("after", flat=True)
+    )
 
 
 def test_a_carrier_three_days_slower_is_substantial() -> None:
