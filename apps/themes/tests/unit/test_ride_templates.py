@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 from django.template.loader import render_to_string
+from django.urls import reverse
 
 from apps.themes.services import use_theme
 
@@ -148,7 +149,7 @@ def test_the_cart_link_opens_an_offcanvas_with_a_live_region_count_and_an_htmx_b
     assert 'aria-labelledby="mini-cart-title"' in panel.group(0)
     body = re.search(r'<div[^>]*id="mini-cart-body"[^>]*>', html)
     assert body
-    assert 'hx-get="/cart/mini/"' in body.group(0)
+    assert f'hx-get="{reverse("orders:cart_mini")}"' in body.group(0)  # language prefix aware
     assert "hx-select" not in body.group(0)
     assert re.search(r'<span[^>]*id="cart-count"[^>]*aria-live="polite"', html)
     assert re.search(r'<a[^>]*href="/cart/"[^>]*>[^<]*View cart', html)
