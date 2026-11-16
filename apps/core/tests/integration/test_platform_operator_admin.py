@@ -168,3 +168,45 @@ def test_add_form_refuses_bad_profile_lists(staff_client: Client, profiles: str)
     assert response.status_code == 200
     assert "official_profiles" in response.context["adminform"].form.errors
     assert PlatformOperator.objects.count() == 0
+
+
+_BOUNDARY = {"customer_days": 365, "staff_absolute_hours": 72}
+
+
+@pytest.mark.parametrize("policy", [{"customer_days": 366}, {"staff_absolute_hours": 73}])
+def test_full_clean_refuses_an_out_of_range_lifetime(policy: dict[str, int]) -> None:
+    from django.core.exceptions import ValidationError
+
+    operator = PlatformOperatorFactory.build(session_policy=policy)
+    with pytest.raises(ValidationError) as caught:
+        operator.full_clean(exclude=["logo"], validate_constraints=False)
+    assert "session_policy" in caught.value.message_dict
+
+
+def test_full_clean_accepts_the_lifetime_boundary() -> None:
+    operator = PlatformOperatorFactory.build(session_policy=_BOUNDARY)
+    operator.full_clean(exclude=["logo"], validate_constraints=False)
+
+
+@pytest.mark.parametrize("policy", [{"customer_days": 366}, {"staff_absolute_hours": 73}])
+def test_add_form_refuses_an_out_of_range_lifetime(
+    staff_client: Client, policy: dict[str, int]
+) -> None:
+    import json
+
+    response = staff_client.post(
+        reverse("admin:core_platformoperator_add"), _form(session_policy=json.dumps(policy))
+    )
+    assert response.status_code == 200
+    assert "session_policy" in response.context["adminform"].form.errors
+    assert PlatformOperator.objects.count() == 0
+
+
+def test_add_form_accepts_the_lifetime_boundary(staff_client: Client) -> None:
+    import json
+
+    response = staff_client.post(
+        reverse("admin:core_platformoperator_add"), _form(session_policy=json.dumps(_BOUNDARY))
+    )
+    assert response.status_code == 302, response.content
+    assert PlatformOperator.objects.get().session_policy == _BOUNDARY
