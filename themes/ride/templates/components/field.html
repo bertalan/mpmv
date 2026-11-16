@@ -4,7 +4,7 @@ Form field of `ride` (THM.16): the `base` contract (visible label tied to the co
 group, the box first for a single checkbox) on Bootstrap form classes. The widget gets
 `form-control`, `form-select` or `form-check-input` from `bs_widget`; errors show in
 `.invalid-feedback` with the word "Error", never colour alone. Context: `field`.
-{% endcomment %}{% with widget=field.widget_type %}<div class="mb-3{% if field.field.disabled %} field--disabled{% endif %}">
+{% endcomment %}{% with widget=field.widget_type %}<div class="field mb-3{% if widget == 'checkbox' %} field--check{% elif field.use_fieldset %} field--group{% endif %}{% if field.field.disabled %} field--disabled{% endif %}{% if field.errors %} field--invalid{% endif %}">
   {% if widget == "checkbox" %}
   <div class="form-check">
     {{ field|bs_widget }}
@@ -13,7 +13,7 @@ group, the box first for a single checkbox) on Bootstrap form classes. The widge
   </div>
   {% if field.help_text %}<div class="form-text" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
   {% elif field.use_fieldset %}
-  <fieldset class="field-choices"{% if field.aria_describedby %} aria-describedby="{{ field.aria_describedby }}"{% endif %}>
+  <fieldset{% if field.aria_describedby %} aria-describedby="{{ field.aria_describedby }}"{% endif %}>
     <legend class="form-label fs-6">{{ field.label }}{% if field.field.required %} <span class="field__required">({% translate "required" %})</span>{% endif %}</legend>
     {% if field.help_text %}<div class="form-text" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
     {% if field.errors %}<div class="invalid-feedback d-block" id="{{ field.auto_id }}_error"><span class="visually-hidden">{% translate "Error" %}: </span>{% for error in field.errors %}{{ error }}{% if not forloop.last %} {% endif %}{% endfor %}</div>{% endif %}

@@ -60,20 +60,6 @@
     margin-inline-start: -2.25rem;
   }
 
-  /* A group of choices that Django renders as divs of labels: one row each, 24 px apart. */
-
-  .field-choices label {
-    display: flex;
-    align-items: center;
-    gap: var(--space-s);
-    min-block-size: 2.5rem;
-  }
-
-  .field-choices .form-check-input {
-    margin: 0;
-    flex: none;
-  }
-
   /* Review: the pay button takes the full width on a phone. */
 
   @media (max-width: 40rem) {

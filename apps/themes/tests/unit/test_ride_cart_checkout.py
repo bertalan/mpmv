@@ -240,3 +240,72 @@ def test_the_base_templates_are_not_overridden_by_this_task() -> None:
         assert "list-group" not in text
         assert "card-body" not in text
     assert isinstance(base, Path)
+
+
+class ChoiceForm(forms.Form):
+    kind = forms.ChoiceField(
+        label="Kind", choices=[("a", "Alpha"), ("b", "Beta")], widget=forms.RadioSelect
+    )
+    extras = forms.MultipleChoiceField(
+        label="Extras",
+        choices=[("x", "Ex"), ("y", "Why")],
+        widget=forms.CheckboxSelectMultiple,
+    )
+    agree = forms.BooleanField(label="Agree")
+    doc = forms.FileField(label="Document")
+    photo = forms.ImageField(label="Photo", widget=forms.ClearableFileInput)
+
+
+@pytest.mark.parametrize("name", ["kind", "extras"])
+def test_a_choice_group_puts_the_check_class_on_each_input_not_on_the_wrapper(name: str) -> None:
+    form = ChoiceForm({})
+    html = render("ride", "components/field.html", field=form[name])
+    wrapper = re.search(rf'<div id="id_{name}"([^>]*)>', html)
+    assert wrapper is not None
+    assert "class" not in wrapper.group(1)
+    inputs = re.findall(r"<input[^>]*>", html)
+    assert len(inputs) == 2
+    assert all('class="form-check-input is-invalid"' in tag for tag in inputs)
+    assert html.count('class="form-check"') == 2
+    assert f'id="id_{name}_0"' in html
+    assert f'for="id_{name}_0"' in html
+
+
+def test_a_valid_choice_group_has_no_invalid_class() -> None:
+    form = ChoiceForm({"kind": "a", "extras": ["x"], "agree": "on"})
+    html = render("ride", "components/field.html", field=form["kind"])
+    assert "is-invalid" not in html
+    assert 'class="form-check-input"' in html
+
+
+def test_a_single_checkbox_with_errors_is_invalid() -> None:
+    form = ChoiceForm({})
+    html = render("ride", "components/field.html", field=form["agree"])
+    assert 'class="form-check-input is-invalid"' in html
+
+
+@pytest.mark.parametrize("name", ["doc", "photo"])
+def test_file_inputs_get_the_form_control_class(name: str) -> None:
+    form = ChoiceForm({})
+    html = render("ride", "components/field.html", field=form[name])
+    assert re.search(r'<input type="file"[^>]*class="form-control is-invalid"', html)
+
+
+def test_the_field_keeps_the_base_wrapper_classes_beside_bootstrap_ones() -> None:
+    form = ChoiceForm({})
+    group = render("ride", "components/field.html", field=form["kind"])
+    assert re.match(
+        r'<div class="[^"]*\bfield\b[^"]*\bfield--group\b[^"]*\bfield--invalid\b', group
+    )
+    box = render("ride", "components/field.html", field=form["agree"])
+    assert re.match(r'<div class="[^"]*\bfield\b[^"]*\bfield--check\b[^"]*\bfield--invalid\b', box)
+    ok = render("ride", "components/field.html", field=DetailsForm()["email"])
+    assert "field--invalid" not in ok
+    assert 'class="field ' in ok
+
+
+def test_an_error_level_alert_gets_the_danger_title() -> None:
+    html = render("ride", "components/alert.html", level="error", message="Broken")
+    assert "alert-danger" in html
+    assert "alert--error" in html
+    assert ">Error<" in html

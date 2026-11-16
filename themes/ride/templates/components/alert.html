@@ -6,7 +6,7 @@ level accent, and Bootstrap's `alert-<level>` maps the same colours on tokens.
 Context as in `base`: `level`, `message`, `title`, `id`, `live`, `dismissible`.
 {% endcomment %}<div class="alert alert-{% if level == 'error' %}danger{% else %}{{ level|default:'info' }}{% endif %} alert--{{ level|default:'info' }}{% if dismissible %} alert--dismissible{% endif %}{% if live %} alert--live{% endif %}"{% if id %} id="{{ id }}"{% endif %}{% if live == "assertive" %} role="alert"{% elif live %} role="status"{% endif %}>
   <div class="alert__content">
-    <p class="alert__title alert-heading fw-bold mb-1">{% if title %}{{ title }}{% elif level == "success" %}{% translate "Success" %}{% elif level == "warning" %}{% translate "Warning" %}{% elif level == "danger" %}{% translate "Error" %}{% else %}{% translate "Information" %}{% endif %}</p>
+    <p class="alert__title alert-heading fw-bold mb-1">{% if title %}{{ title }}{% elif level == "success" %}{% translate "Success" %}{% elif level == "warning" %}{% translate "Warning" %}{% elif level == "danger" or level == "error" %}{% translate "Error" %}{% else %}{% translate "Information" %}{% endif %}</p>
     {% if message %}<p class="mb-0">{{ message }}</p>{% endif %}
   </div>
   {% if dismissible %}<button type="button" class="button button--ghost button--small button--icon alert__dismiss" aria-label="{% translate 'Dismiss' %}" data-dismiss hidden>{% include "components/icon.html" with name="close" only %}</button>{% endif %}
