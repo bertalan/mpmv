@@ -2,8 +2,8 @@
 Page layout of the `ride` theme (THM.6): base's layout plus one font preload (Barlow 400, the
 body face; spec 14 §14.7 allows one) and, from THM.13, the Bootstrap bundle as a classic deferred
 script that runs before the theme modules (spec 14 §14.5). A page that overrides `head` without `{{ block.super }}`
-loses the preload only. <html> is served with class `no-js`; the external module `ride.js` removes it. The plain nav list below 64rem shows only under `.no-js` (the inverse pattern: before the script runs the menu is hidden, never the full list).
+loses the preload only. <html> is served with class `no-js`; the external classic script `ride.js` (blocking, in <head>, never inline) removes it before the body is painted. The plain nav list below 64rem shows only under `.no-js`, so it appears only with JavaScript off and never flashes with JavaScript on.
 {% endcomment %}
-{% block foundation_scripts %}<script src="{% static 'themes/ride/vendor/bootstrap.bundle.min.js' %}" defer></script><script type="module" src="{% static 'themes/ride/js/ride.js' %}"></script>{% endblock %}
+{% block foundation_scripts %}<script src="{% static 'themes/ride/vendor/bootstrap.bundle.min.js' %}" defer></script><script src="{% static 'themes/ride/js/ride.js' %}"></script>{% endblock %}
 {% block html_attrs %} class="no-js"{% endblock %}
 {% block head %}<link rel="preload" href="{% static 'themes/ride/fonts/barlow-400.woff2' %}" as="font" type="font/woff2" crossorigin>{{ block.super }}{% endblock %}
