@@ -84,7 +84,7 @@ permalinks and redirects.
 | Coupons | a couple of coupon posts, none used on orders | not migrated (D-17, D-39) | MIG.19 |
 | Product reviews | a few hundred approved review comments on products | migrated visible, labelled "not verified" (Omnibus); only a review tied to a real order counts as verified | MIG.18 |
 | Store reviews, enquiries | marketplace tables (few rows) | exported to each vendor, not migrated | MIG.21 |
-| MIG.22 | Domains, mail and TLS at cutover (owner decision 2026-11-16, §13.4): DNS inventory exported from the registrar into private storage, mail moved off the legacy web server when it is hosted there, SPF, DKIM and DMARC for the transactional provider (ARC.16), TTL 300 s from T−7, production certificates issued before the switch (ACME DNS-01), legacy site on an internal hostname behind basic auth and `noindex`, Stripe webhook URLs and domain verification updated, staged HSTS | P1 | 6 | MIG.9 | Runbook checklist: the inventory file is in private storage; a mail test send and receive passes after the move; the TTL check shows 300 s on the switched records; certificates are valid before the switch; the legacy host answers 401 without credentials and carries `noindex`; rollback by DNS was rehearsed in a dress rehearsal |
+| MIG.22 | Domains, mail and TLS at cutover (owner decision 2026-11-16, §13.4): DNS inventory exported from the registrar into private storage, a dedicated mail host record and the MX moved to it before the switch when mail is self-managed on the legacy server (a dedicated mail service is a recommended follow-up, and a precondition for shutting the legacy server down), SPF, DKIM and DMARC for the transactional provider (ARC.16), TTL 300 s from T−7, production certificates issued before the switch (ACME DNS-01), legacy site on an internal hostname behind basic auth and `noindex`, Stripe webhook URLs and domain verification updated, staged HSTS | P1 | 6 | MIG.9 | Runbook checklist: the inventory file is in private storage; a mail test send and receive passes after the MX change, before the switch; the TTL check shows 300 s on the switched records; certificates are valid before the switch; the legacy host answers 401 without credentials and carries `noindex`; rollback by DNS was rehearsed in a dress rehearsal |
 | Pages and blog | pages (a few built with a page builder), posts as classic HTML linked EN to IT; blog post URLs include the category, and both forms get a one-hop redirect, whether or not the legacy site still serves the old form (MIG.6) | `StandardPage`, `BlogPostPage`, `LegalPage` (legal pages rebuilt) | MIG.7 |
 | Redirects | per-product old slugs: the custom `_legacy_old_slugs` meta (at most 10 per product and language) and the core old-slug meta, both on most products; code maps for retired SKUs, merged model tags (EN and IT), old model categories and an old brand base | `SlugHistory`, `Redirect`, frozen legacy paths | MIG.6, MIG.11 |
 | Ledger | marketplace ledger and withdrawals; payouts almost all by split payment at charge time | one `adjustment` opening balance per vendor, verified against the payment provider at T0 | MIG.8 |
@@ -281,7 +281,7 @@ they follow the same staggered switch as product URLs:
 6. Rollback: DNS back to WordPress (left intact) if a no-go criterion occurs within the first 24 h;
    orders collected on the new system in the meantime are handled manually.
 7. T+14/28: Merchant Center and Search Console verified (indexing, redirect and 404 errors,
-   ranking review against the pre-cutover baseline), WordPress shut down. The legacy database,
+   ranking review against the pre-cutover baseline), WordPress shut down, but only once mail no longer depends on the legacy server (MIG.22). The legacy database,
    read-only since T0, survives only as an encrypted backup kept 30 to 60 days, then wiped, with a
    written record (L-11). The updated privacy notice is live from launch, and migrated customers get
    one informative service email, with no link and no promotional content (CORE.19).
@@ -293,9 +293,13 @@ they follow the same staggered switch as product URLs:
 ### Domains, mail and TLS (owner decision 2026-11-16, MIG.22)
 
 - **Before go-live.** A full DNS inventory is exported from the registrar and kept in private
-  storage. If mail is hosted on the legacy web server, it moves to a dedicated mail service before
-  cutover, because shutting WordPress down would otherwise stop mail. SPF, DKIM and DMARC are set
-  for the transactional email provider (ARC.16).
+  storage. If mail is self-managed on the legacy web server's hosting panel and the MX points at the apex
+  itself, then **before the DNS switch** a dedicated mail host record (for example `mail.`) is
+  created pointing to the server that hosts mail, and the MX moves to it; otherwise moving the apex
+  A record would stop inbound mail at the switch. A send and receive test follows the MX change,
+  before the switch. Mail may stay on the legacy server after cutover, but then that server cannot
+  be shut down until mail moves to a dedicated mail service; that move is a recommended follow-up,
+  not a pre-cutover blocker. SPF, DKIM and DMARC are set for the transactional email provider (ARC.16).
 - **T−7.** TTL 300 s on the records that will be switched.
 - **Certificates.** TLS certificates for the production names are issued before the switch (ACME
   DNS-01), so HTTPS works from the first request.
