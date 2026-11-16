@@ -1,0 +1,13 @@
+{% load i18n %}{% comment %}
+Progress bar of the `ride` theme (THM.14) on the native `<progress>` element, styled like
+Bootstrap's bar. The label and the value are text, so nothing depends on colour or on the bar.
+
+  {% include "components/progress.html" with id="packed" label=_("Order packed") value=60 only %}
+
+Context: `id` and `label` (required), `value` (required), `max` (default 100). The value shows as
+a percentage of `max`.
+{% endcomment %}{% firstof max 100 as top %}<div class="ride-progress">
+  <label class="ride-progress__label" for="{{ id }}">{{ label }}</label>
+  <progress class="ride-progress__bar" id="{{ id }}" value="{{ value }}" max="{{ top }}">{{ value }}%</progress>
+  <span class="ride-progress__value">{% if top == 100 %}{{ value }}%{% else %}{{ value }} / {{ top }}{% endif %}</span>
+</div>
