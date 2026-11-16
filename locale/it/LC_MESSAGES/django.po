@@ -24,6 +24,12 @@ msgstr "%(actor_name)s si è assegnato un ruolo di piattaforma. La modifica è n
 msgid "%(browser)s on %(system)s"
 msgstr "%(browser)s su %(system)s"
 
+#: apps/orders/templates/orders/_cart_mini.html
+msgid "%(counter)s item"
+msgid_plural "%(counter)s items"
+msgstr[0] "%(counter)s articolo"
+msgstr[1] "%(counter)s articoli"
+
 #: apps/manager/templates/manager/platform/sessions_panic.html
 msgid "%(counter)s session is open now."
 msgid_plural "%(counter)s sessions are open now."
@@ -2137,7 +2143,8 @@ msgstr "Ci permette di misurare le nostre pubblicità e di mostrarti offerte su 
 msgid "Letters, digits, spaces and . / _ - only."
 msgstr "Solo lettere, cifre, spazi e . / _ -"
 
-#: apps/orders/templates/orders/_package.html themes/base/templates/components/cart_line.html
+#: apps/orders/templates/orders/_cart_mini.html apps/orders/templates/orders/_package.html
+#: themes/base/templates/components/cart_line.html
 msgid "Line total"
 msgstr "Totale riga"
 
@@ -6700,7 +6707,7 @@ msgstr "Versioni"
 msgid "VIES says this VAT number is not valid. VAT is charged on your order."
 msgstr "VIES dice che questa partita IVA non è valida. Sul tuo ordine viene applicata l'IVA."
 
-#: themes/ride/templates/components/header.html
+#: apps/orders/templates/orders/_cart_mini.html themes/ride/templates/components/header.html
 msgid "View cart"
 msgstr "Vai al carrello"
 
@@ -7478,7 +7485,7 @@ msgstr ""
 "Il tuo carrello è cambiato dopo la verifica della tua partita IVA, quindi sul tuo ordine viene "
 "applicata l'IVA. Conferma di nuovo i tuoi dati per verificarla per ogni venditore."
 
-#: apps/orders/templates/orders/_cart_body.html
+#: apps/orders/templates/orders/_cart_body.html apps/orders/templates/orders/_cart_mini.html
 msgid "Your cart is empty"
 msgstr "Il tuo carrello è vuoto"
 
