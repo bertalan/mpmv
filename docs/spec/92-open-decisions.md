@@ -67,7 +67,7 @@ Smaller questions raised overnight by the lanes (the "MQ" register) and answered
 | MQ-9 | Catalog, promotions | A price is never 0.00, neither on a product nor on a variant. Gifts are a P2 promotion: the product at full price plus a 100% discount line, with discount funding, stock and a per-customer limit tracked; the accountant confirms the VAT treatment of gifts | [07](07-cart-orders-payments.md) (ORD.12) |
 | MQ-10 | Operations | A stuck worker is restarted automatically and staff are alerted, based on the ARC.9 heartbeat | [01](01-stack-and-architecture.md) (ARC.13) |
 | MQ-11 | Infrastructure | The app connects to PostgreSQL with `sslmode=verify-full`. The database is not public, so a free internal certificate authority (openssl or step-ca) signs the server certificate and the app container mounts its root certificate; verified on STAGE | [01](01-stack-and-architecture.md) (ARC.13), [12](12-security-infra-operations.md) |
-| MQ-12 | Tax | Consumer prices use the delivery country's rate, an estimated country until the buyer picks one, and net prices only for business buyers who opt in and have a verified VAT number (owner decision 2026-11-16; TAX.12, TAX.12b, ORD.25; the opt-in itself was confirmed on 2026-11-08) | [05](05-tax.md) (TAX.12) |
+| MQ-12 | Tax | Consumer prices use the delivery country's rate, an estimated country until the buyer picks one, and net prices only for business buyers who opt in and have a verified VAT number (owner decision 2026-11-16; TAX.12, TAX.22, ORD.25; the opt-in itself was confirmed on 2026-11-08) | [05](05-tax.md) (TAX.12) |
 
 ## Owner decisions of 2026-11-09 (MQ register)
 
