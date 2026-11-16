@@ -53,6 +53,9 @@ MODAL_FRAGMENTS = (
 NOT_PAGES = (
     "manager:shop:order_action",
     "manager:shop:event_submit",  # EVT.4: POST only, redirects to the events list
+    "manager:shop:event_block_edit",  # EVT.4 part 2: needs a block id
+    "manager:shop:event_block_move",  # EVT.4 part 2: POST only
+    "manager:shop:event_block_remove",  # EVT.4 part 2: POST only
     "manager:platform:profile_revert",  # POST only, redirects to the changes page
     "manager:platform:profile_confirm",  # POST only, redirects to the changes page
     "manager:shop:termination_data",  # a JSON file download, not a page
@@ -163,6 +166,9 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:event_new": "shop",
         "manager:shop:event_edit": "shop",
         "manager:shop:event_cancel": "shop",  # the confirmation page
+        "manager:shop:event_block_add": "shop",  # EVT.4 part 2
+        "manager:shop:event_preview": "shop",
+        "manager:shop:event_images": "shop",
     }
 
 
@@ -172,7 +178,12 @@ def _open(name: str) -> tuple[Client, str]:
         kwargs = {}
         if name == "manager:shop:order":
             kwargs = {"public_id": paid_vendor_order(vendor).public_id}  # type: ignore[arg-type]
-        if name in ("manager:shop:event_edit", "manager:shop:event_cancel"):
+        if name in (
+            "manager:shop:event_edit",
+            "manager:shop:event_cancel",
+            "manager:shop:event_block_add",
+            "manager:shop:event_preview",
+        ):
             primary_index()
             event = EventPageFactory.create(vendor=vendor)
             event.save_revision().publish()  # a published event can be cancelled

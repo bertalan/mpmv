@@ -597,6 +597,39 @@ ENDPOINTS: dict[str, Access] = {
         methods=("POST",),
         sample={"public_id": NIL_UUID},
     ),
+    # EVT.4 part 2: the block editor, the preview and the image library.
+    "manager:shop:event_block_add": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_block_edit": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        kwargs=lambda event: {**by_public_id(event), "block_id": "0"},
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_block_move": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        kwargs=lambda event: {**by_public_id(event), "block_id": "0"},
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_block_remove": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        kwargs=lambda event: {**by_public_id(event), "block_id": "0"},
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_preview": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_images": NoVendorData(
+        "The shop's own image library and upload: the images are read from and written to the "
+        "caller's own vendor collection only "
+        "(`apps/manager/tests/integration/test_shop_event_blocks.py`)."
+    ),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
