@@ -1,11 +1,11 @@
 {% extends "layouts/base.html" %}
-{% load i18n l10n static responsive_images wagtailcore_tags %}
+{% load i18n l10n static responsive_images wagtailcore_tags consumer_prices %}
 {% comment %}
   Product page (CAT.7). Semantic and unstyled beyond catalog/product.css; THM.7 restyles it. No
   inline script or style (the CSP has no 'unsafe-inline'). Shows published data only: the
-  `ProductPage` built by `product_pages.find`. The price is the listings' interim net price
-  (TODO(TAX.12): the gross amount at the delivery country's rate replaces it, see
-  includes/product_card.html). The variant choice and the buy button are a POST form (ORD.19)
+  `ProductPage` built by `product_pages.find`. Prices, variant prices included, are consumer
+  prices (TAX.12): the gross amount from the tax app's `consumer_price` tag with the owner's
+  note, as on includes/product_card.html. The variant choice and the buy button are a POST form (ORD.19)
   shown only when the product sells online; htmx swaps the answer into #add-to-cart-result. `related` (CAT.15) holds the related products and other sellers.
 {% endcomment %}
 {% block title %}{{ page_data.title }}{% if site_name %} · {{ site_name }}{% endif %}{% endblock %}
@@ -45,7 +45,7 @@
         <p class="product-on-request">{% blocktranslate with vendor=page_data.vendor.display_name %}Ask {{ vendor }} about this product: it is not sold online.{% endblocktranslate %}</p>
       {% else %}
         {% if not page_data.variants %}
-          <p class="product-price">{% if page_data.price is not None %}<data value="{{ page_data.price|unlocalize }}">{{ currency }} {{ page_data.price }}</data> <small>{% translate "excl. VAT" %}</small>{% endif %}</p>
+          <p class="product-price">{% if page_data.price is not None %}{% consumer_price page_data.price page_data.product.fiscal_category page_data.vendor as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p>
           <p class="product-stock">{% include "catalog/includes/stock_status.html" with status=page_data.stock_status %}</p>
         {% endif %}
         <form class="product-form" method="post" action="{% url 'orders:cart_add' %}" hx-post="{% url 'orders:cart_add' %}" hx-target="#add-to-cart-result" hx-swap="innerHTML">
@@ -59,7 +59,7 @@
                 {% for variant in page_data.variants %}
                   <li>
                     <input type="radio" name="variant" id="variant-{{ forloop.counter }}" value="{{ variant.sku }}"{% if variant.selected %} checked{% endif %}>
-                    <label for="variant-{{ forloop.counter }}">{{ variant.label }}{% if variant.price is not None %} <span class="variant-price"><data value="{{ variant.price|unlocalize }}">{{ currency }} {{ variant.price }}</data> <small>{% translate "excl. VAT" %}</small></span>{% endif %} <span class="variant-stock">{% include "catalog/includes/stock_status.html" with status=variant.stock_status %}</span> <span class="variant-sku">({{ variant.sku }})</span></label>
+                    <label for="variant-{{ forloop.counter }}">{{ variant.label }}{% if variant.price is not None %}{% consumer_price variant.price page_data.product.fiscal_category page_data.vendor as shown %}{% if shown %} <span class="variant-price"><data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note">{{ shown.note }}</small></span>{% endif %}{% endif %} <span class="variant-stock">{% include "catalog/includes/stock_status.html" with status=variant.stock_status %}</span> <span class="variant-sku">({{ variant.sku }})</span></label>
                   </li>
                 {% endfor %}
               </ul>

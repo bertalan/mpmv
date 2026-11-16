@@ -1149,9 +1149,9 @@ def product_node(
     gtin: str = "",
 ) -> dict[str, Any]:
     """The schema.org `Product` node of a product page. The brand is a reference to the brand
-    page's node (CAT.20), never a copy. No `offers`: the page shows an interim net price (TAX.12
-    replaces it with the gross one) and an on-request product has none; an empty value is left
-    out."""
+    page's node (CAT.20), never a copy. No `offers` here: the gross consumer price comes from
+    `apps.tax.prices.consumer_price` (TAX.12), which SEO.1 adds, and an on-request product has
+    none; an empty value is left out."""
     optional: dict[str, Any] = {
         "description": description,
         "brand": {"@id": brand_id} if brand_id else "",

@@ -188,6 +188,14 @@ type = "forbidden"
 source_modules = ["apps.cms"]
 forbidden_modules = ["apps.tax", "apps.shipping"]
 
+# TAX.12: consumer prices include VAT, but the catalog stays free of tax imports; its templates
+# load the tax app's `consumer_prices` tags. Also implied by the layers above, stated on its own.
+[[tool.importlinter.contracts]]
+name = "The catalog never imports tax (TAX.12)"
+type = "forbidden"
+source_modules = ["apps.catalog"]
+forbidden_modules = ["apps.tax"]
+
 # Spec 17 §17.2.1: the garage reads accounts and the catalog only. An order line keeps the fit
 # answer shown at purchase, never the garage, so the checkout and money apps never import it.
 [[tool.importlinter.contracts]]
