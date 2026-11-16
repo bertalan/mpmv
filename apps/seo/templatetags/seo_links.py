@@ -45,16 +45,20 @@ def _page_links(context: Context) -> tuple[str, Iterable[tuple[str, str]]]:
 @register.simple_tag(takes_context=True)
 def seo_links(context: Context) -> SafeString:
     robots = str(context.get("robots") or "")
-    page = context.get("page")
     if (
         is_noindex(context.get("request"))  # the environment floor or the site's switch
         or robots.startswith("noindex")
-        or (page is not None and page_is_noindex(page))
     ):
         return SafeString("")  # no canonical or hreflang on a page that asks not to be indexed
     canonical = context.get("canonical_url")
     alternates = context.get("alternates")
     if canonical is None and alternates is None:
+        # A view that supplies no links renders a CMS page itself: its own robots rule applies.
+        # (A view that supplies them, like the term listing that shows its landing page, owns
+        # the rule through `robots`.)
+        page = context.get("page")
+        if page is not None and page_is_noindex(page):
+            return SafeString("")
         canonical, alternates = _page_links(context)
     parts = []
     if canonical:

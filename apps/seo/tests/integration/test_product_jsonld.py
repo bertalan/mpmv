@@ -135,7 +135,7 @@ def test_the_canonical_and_robots_are_one_each(client: Client, theme: str) -> No
     html = client.get("/product/mug-en/").content.decode()
     assert html.count('rel="canonical"') == 1
     assert html.count('name="robots"') <= 1
-    assert 'href="http://testserver/product/mug-en/"' in html
+    assert 'href="http://localhost/product/mug-en/"' in html
 
 
 def test_the_product_json_ld_stays_under_the_budget(client: Client, theme: str) -> None:

@@ -411,6 +411,11 @@ ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "readyz": NoVendorData("Readiness probe: a status only, no data."),
     "robots_txt": NoVendorData("robots.txt (SEO.8): constant text for crawlers; no vendor data."),
+    "sitemap": NoVendorData("Sitemap index (SEO.2): public page URLs only, no tenant data."),
+    "sitemap_language": NoVendorData(
+        "Per-language sitemap (I18N.6): public page URLs only, no tenant data.",
+        kwargs={"language": "xx"},
+    ),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "payments_webhook": NoVendorData("Signed payment provider events; answers with a status only."),
     "media": NoVendorData(

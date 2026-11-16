@@ -201,7 +201,7 @@ def test_a_language_over_the_limit_is_split_into_parts(
     for _ in range(5):
         product([PRIMARY])
     monkeypatch.setattr(sitemap_engine, "MAX_URLS", 2)
-    index = ElementTree.fromstring(client.get(reverse("sitemap")).content)  # noqa: S314
+    index = ElementTree.fromstring(client.get(reverse("sitemap")).content)  # noqa: S314 (parses our own generated XML)
     found = [urlsplit(loc.text or "").path for loc in index.findall("s:sitemap/s:loc", NS)]
     parts = [reverse("sitemap_part", kwargs={"language": PRIMARY, "part": n}) for n in range(1, 4)]
     assert set(parts) <= set(found)
@@ -210,7 +210,7 @@ def test_a_language_over_the_limit_is_split_into_parts(
     for part in parts:
         response = client.get(part)
         assert response.status_code == 200
-        count = len(ElementTree.fromstring(response.content).findall("s:url", NS))  # noqa: S314
+        count = len(ElementTree.fromstring(response.content).findall("s:url", NS))  # noqa: S314 (parses our own generated XML)
         assert count <= 2
         total += count
     assert total >= 5
