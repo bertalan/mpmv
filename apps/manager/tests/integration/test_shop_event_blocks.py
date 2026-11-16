@@ -19,7 +19,11 @@ from wagtail.models import Collection
 
 from apps.accounts.models import User
 from apps.accounts.tests.mfa import verified_login
-from apps.catalog.tests.factories import CategoryFactory, ProductFactory
+from apps.catalog.tests.factories import (
+    CategoryFactory,
+    ProductFactory,
+    ProductTranslationFactory,
+)
 from apps.core.geocoding import AddressQuery
 from apps.core.geocoding import engine as geo_engine
 from apps.core.models import AuditLog, ImageLicence, MediaImage
@@ -70,7 +74,16 @@ def signed_in(client: Client, owner: User) -> Client:
     return client
 
 
+def _product(vendor: Vendor, title: str = "", **fields: Any) -> Any:
+    """A product of `vendor`; `title` is its English text (a product has no name column)."""
+    product = ProductFactory.create(vendor=vendor, **fields)
+    if title:
+        ProductTranslationFactory.create(product=product, language="en", title=title)
+    return product
+
+
 def _event(vendor: Vendor, **fields: Any) -> EventPage:
+    fields.setdefault("body", [])  # the factory's own paragraph would hide what the tests add
     page: EventPage = EventPageFactory.create(vendor=vendor, **fields)
     page.save_revision()
     return page
@@ -98,7 +111,7 @@ def _url(name: str, page: EventPage, **kwargs: Any) -> str:
     return reverse(f"manager:shop:{name}", kwargs={"public_id": page.public_id, **kwargs})
 
 
-def _add(client: Client, page: EventPage, kind: str, **fields: Any) -> Any:
+def _add(client: Client, page: EventPage, kind: str, /, **fields: Any) -> Any:
     return client.post(_url("event_block_add", page), {"type": kind, **fields})
 
 
@@ -241,8 +254,8 @@ def test_product_cards_offer_and_accept_the_shops_own_products_only(
     signed_in: Client, vendor: Vendor, other_vendor: Vendor
 ) -> None:
     page = _event(vendor)
-    mine = ProductFactory.create(vendor=vendor, name="Own mug")
-    theirs = ProductFactory.create(vendor=other_vendor, name="Their mug")
+    mine = _product(vendor, "Own mug")
+    theirs = _product(other_vendor, "Their mug")
     form = signed_in.get(_url("event_block_add", page) + "?type=product_cards").text
     assert "Own mug" in form
     assert "Their mug" not in form
@@ -307,9 +320,11 @@ def test_blocks_move_up_and_down_and_are_removed(signed_in: Client, vendor: Vend
     page = _event(vendor)
     first = _paragraph(signed_in, page, "One")
     second = _paragraph(signed_in, page, "Two")
-    move = lambda block_id, direction: signed_in.post(  # noqa: E731
-        _url("event_block_move", page, block_id=block_id), {"direction": direction}
-    )
+
+    def move(block_id: str, direction: str) -> Any:
+        url = _url("event_block_move", page, block_id=block_id)
+        return signed_in.post(url, {"direction": direction})
+
     assert move(second, "up").status_code == 302
     assert [b["id"] for b in _body(page)] == [second, first]
     assert move(second, "up").status_code == 302  # already first: nothing changes, no error
@@ -597,8 +612,8 @@ def test_the_choosers_offer_the_shops_own_products_and_their_categories_only(
 ) -> None:
     page = _event(vendor)
     own_category, foreign_category = CategoryFactory.create(), CategoryFactory.create()
-    ProductFactory.create(vendor=vendor, name="Own mug", category=own_category)
-    ProductFactory.create(vendor=other_vendor, name="Their mug", category=foreign_category)
+    _product(vendor, "Own mug", category=own_category)
+    _product(other_vendor, "Their mug", category=foreign_category)
     html = signed_in.get(reverse("manager:shop:event_edit", args=[page.public_id])).text
     assert "Own mug" in html
     assert "Their mug" not in html
