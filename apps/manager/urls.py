@@ -7,7 +7,15 @@ outside `/manager/`.
 
 from django.urls import include, path
 
-from . import media, notice_views, sales_terms_views, session_views, termination_views, views
+from . import (
+    event_views,
+    media,
+    notice_views,
+    sales_terms_views,
+    session_views,
+    termination_views,
+    views,
+)
 
 app_name = "manager"
 
@@ -17,6 +25,20 @@ shop = (
         path("profile/", views.StorefrontProfileView.as_view(), name="profile"),
         path("payments/", views.PaymentsView.as_view(), name="payments"),
         path("sales-terms/", sales_terms_views.SalesTermsView.as_view(), name="sales_terms"),
+        # EVT.4: the vendor's own events (list, form, submit, cancel).
+        path("events/", event_views.EventsView.as_view(), name="events"),
+        path("events/new/", event_views.EventFormView.as_view(), name="event_new"),
+        path("events/<uuid:public_id>/", event_views.EventFormView.as_view(), name="event_edit"),
+        path(
+            "events/<uuid:public_id>/submit/",
+            event_views.EventSubmitView.as_view(),
+            name="event_submit",
+        ),
+        path(
+            "events/<uuid:public_id>/cancel/",
+            event_views.EventCancelView.as_view(),
+            name="event_cancel",
+        ),
         path("orders/", views.VendorOrderListView.as_view(), name="orders"),
         path("orders/<uuid:public_id>/", views.VendorOrderDetailView.as_view(), name="order"),
         path(

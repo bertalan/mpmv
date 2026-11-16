@@ -273,6 +273,129 @@ def validate_rrule(text: str, all_day: bool) -> RRuleSubset:
     return RRuleSubset(freq, interval, count, until, byday, bymonthday, bymonth, wkst)
 
 
+# --- Recurrence presets of the vendor form (spec 15 "Recurrence", EVT.4) ---------------------
+
+PRESET_NONE = "none"  # the event happens once
+PRESET_YEARLY = "yearly"  # every year on the event's own dates
+PRESET_WEEKLY = "weekly"  # every week on the chosen weekdays
+PRESET_MONTHLY = "monthly"  # every month on one day (-1 is the last day)
+PRESETS = (PRESET_NONE, PRESET_YEARLY, PRESET_WEEKLY, PRESET_MONTHLY)
+ENDS_NEVER = "never"
+ENDS_COUNT = "count"
+ENDS_UNTIL = "until"
+_PRESET_FREQ = {PRESET_YEARLY: "YEARLY", PRESET_WEEKLY: "WEEKLY", PRESET_MONTHLY: "MONTHLY"}
+
+
+@dataclass(frozen=True)
+class PresetChoice:
+    """A recurrence preset with its inputs: what the vendor form shows for a stored rule."""
+
+    preset: str
+    weekdays: tuple[str, ...] = ()
+    month_day: int | None = None
+    interval: int = 1
+    ends: str = ENDS_NEVER
+    count: int | None = None
+    until: date | None = None  # the last day, in the event's zone
+
+
+def _until_part(day: date, *, all_day: bool, timezone: str) -> str:
+    if all_day:
+        return day.strftime("%Y%m%d")
+    local = datetime.combine(day, time(23, 59, 59), tzinfo=ZoneInfo(timezone))
+    return local.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def build_rrule(
+    preset: str,
+    *,
+    weekdays: Sequence[str] = (),
+    month_day: int | None = None,
+    interval: int = 1,
+    ends: str = ENDS_NEVER,
+    count: int | None = None,
+    until: date | None = None,
+    all_day: bool = False,
+    timezone: str = "UTC",
+) -> str:
+    """The RRULE a preset writes, checked by `validate_rrule`; `RecurrenceError` names what is
+    missing or out of range. A timed event's last day ends at 23:59:59 in its zone, in UTC."""
+    if preset == PRESET_NONE:
+        return ""
+    errors: list[RuleError] = []
+    if preset not in _PRESET_FREQ:
+        raise RecurrenceError([RuleError("FREQ", "choose how the event repeats.")])
+    parts = [f"FREQ={_PRESET_FREQ[preset]}"]
+    if interval != 1:
+        parts.append(f"INTERVAL={interval}")
+    if preset == PRESET_WEEKLY:
+        chosen = [day for day in WEEKDAYS if day in set(weekdays)]
+        if not chosen or len(chosen) != len(set(weekdays)):
+            errors.append(RuleError("BYDAY", "choose at least one weekday."))
+        parts.append("BYDAY=" + ",".join(chosen))
+    elif preset == PRESET_MONTHLY:
+        if month_day is None or not (1 <= month_day <= 31 or month_day == -1):
+            errors.append(RuleError("BYMONTHDAY", "choose a day from 1 to 31, or the last day."))
+        parts.append(f"BYMONTHDAY={month_day}")
+    if ends == ENDS_COUNT:
+        if count is None:
+            errors.append(RuleError("COUNT", "give the number of times."))
+        else:
+            parts.append(f"COUNT={count}")
+    elif ends == ENDS_UNTIL:
+        if until is None:
+            errors.append(RuleError("UNTIL", "give the last day."))
+        else:
+            parts.append(f"UNTIL={_until_part(until, all_day=all_day, timezone=timezone)}")
+    if errors:
+        raise RecurrenceError(errors)
+    rule = ";".join(parts)
+    validate_rrule(rule, all_day)
+    return rule
+
+
+def preset_from_rrule(
+    rrule: str, *, all_day: bool = False, timezone: str = "UTC"
+) -> PresetChoice | None:
+    """The preset that writes `rrule`, or None for a rule the presets cannot write (it is kept
+    as it is, "custom")."""
+    if not rrule.strip():
+        return PresetChoice(PRESET_NONE)
+    try:
+        rule = validate_rrule(rrule, all_day)
+    except RecurrenceError:
+        return None
+    if rule.wkst != 0 or rule.bymonth or rule.freq == "DAILY":
+        return None
+    weekdays: tuple[str, ...] = ()
+    month_day: int | None = None
+    if rule.freq == "YEARLY":
+        preset = PRESET_YEARLY
+        if rule.byday or rule.bymonthday:
+            return None
+    elif rule.freq == "WEEKLY":
+        preset = PRESET_WEEKLY
+        if rule.bymonthday or not rule.byday or any(ordinal for ordinal, _day in rule.byday):
+            return None
+        weekdays = tuple(WEEKDAYS[day] for _ordinal, day in rule.byday)
+    else:
+        preset = PRESET_MONTHLY
+        if rule.byday or len(rule.bymonthday) != 1:
+            return None
+        month_day = rule.bymonthday[0]
+    ends, last = ENDS_NEVER, None
+    if rule.count is not None:
+        ends = ENDS_COUNT
+    elif rule.until is not None:
+        ends = ENDS_UNTIL
+        last = (
+            rule.until.astimezone(ZoneInfo(timezone)).date()
+            if isinstance(rule.until, datetime)
+            else rule.until
+        )
+    return PresetChoice(preset, weekdays, month_day, rule.interval, ends, rule.count, last)
+
+
 # --- Candidate days --------------------------------------------------------------------------
 
 

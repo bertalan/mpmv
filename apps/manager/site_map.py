@@ -59,6 +59,7 @@ SHOP_PAGES: Final[Pages] = (
     (gettext_noop("Payments"), "manager:shop:payments"),
     (gettext_noop("Sales terms"), "manager:shop:sales_terms"),
     (gettext_noop("Orders"), "manager:shop:orders"),
+    (gettext_noop("Events"), "manager:shop:events"),
     (gettext_noop("Choose a vendor"), "manager:shop:vendor"),
     (gettext_noop("Termination notice"), "manager:shop:termination"),
 )
@@ -81,6 +82,10 @@ NOT_LISTED: Final = frozenset(
     {
         "manager:shop:order",
         "manager:shop:order_action",
+        "manager:shop:event_new",
+        "manager:shop:event_edit",
+        "manager:shop:event_submit",
+        "manager:shop:event_cancel",
         "manager:shop:termination_data",
         "manager:shop:image_choose",
         "manager:shop:image_results",
