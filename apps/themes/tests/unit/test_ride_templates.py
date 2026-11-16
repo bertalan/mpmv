@@ -232,7 +232,7 @@ def test_a_product_tile_is_not_one_giant_link() -> None:
     )
 
 
-def test_the_mini_cart_fragment_is_a_bootstrap_list_with_the_count_and_a_cart_link() -> None:
+def test_the_mini_cart_fragment_is_a_bootstrap_list_with_the_count() -> None:
     line = SimpleNamespace(name="Blue vase", variant="", quantity=2, total="\u20ac 20.00")
     html = render("orders/_cart_mini.html", lines=[line], items=2, cart_url="/cart/")
     assert 'data-cart-count="2"' in html
@@ -240,8 +240,7 @@ def test_the_mini_cart_fragment_is_a_bootstrap_list_with_the_count_and_a_cart_li
     assert "list-group" in html
     assert "Blue vase" in html
     assert "20.00" in html
-    assert re.search(r'<a[^>]*href="/cart/"', html)
-    assert "<form" not in html
+    assert "<form" not in html  # the "View cart" link is the panel's own, in the header
     assert "Shipping" not in html
 
 

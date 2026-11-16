@@ -159,6 +159,11 @@ def _unit_price(product: Product, variant: Variant | None) -> Decimal | None:
     )
 
 
+def line_unit_price(line: CartLine) -> Decimal | None:
+    """The unit net price shown for a cart line now (None when the product has no online price)."""
+    return _unit_price(line.product, line.variant)
+
+
 def _check_quantity(quantity: int, limit: int) -> None:
     error = engine.quantity_error(quantity, limit=limit)
     if error is not None:

@@ -23,10 +23,10 @@ labels). Without JavaScript the link just leads to the search page. Focus moves 
 the modal opens (`ride/js/mini-cart.js`); Escape closes it and focus returns to the icon.
 
 Mini-cart (THM.15 part 2): the cart icon is a link to the cart page that opens an offcanvas on the
-end side. Its body is filled by HTMX from the cart page itself (`hx-get` plus `hx-select` of
-`#cart-body`: no second endpoint) on load and after every add to cart. `#cart-count` is the
+end side. Its body is filled by HTMX from the small fragment `orders:cart_mini` (count and lines; no
+pricing quote, no flash messages) on load and after every add to cart. `#cart-count` is the
 polite live region with the item count in words; `#cart-badge` is the visual count; both are set
-by `ride/js/mini-cart.js` from `data-cart-count` of the loaded cart body. On the cart and checkout
+by `ride/js/mini-cart.js` from `data-cart-count` of the loaded fragment. On the cart and checkout
 pages (app `orders`) the icon stays a plain link: their own markup would repeat the panel's ids.
 
 Context: `site_name`, `links` (label, url, optional children), `languages`, `search_url` and
@@ -101,7 +101,7 @@ url, never rendered as a dead link), and the context of the help link.
             <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}"></button>
           </div>
           <div class="offcanvas-body">
-            <div id="mini-cart-body" hx-get="{{ cart_url }}" hx-trigger="load, cart-changed from:body" hx-select="#cart-body" hx-swap="innerHTML"></div>
+            <div id="mini-cart-body" hx-get="{% url 'orders:cart_mini' %}" hx-trigger="load, cart-changed from:body" hx-swap="innerHTML"></div>
             <p class="mini-cart__all"><a href="{{ cart_url }}">{% translate "View cart" %}</a></p>
           </div>
         </div>

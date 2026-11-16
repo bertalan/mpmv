@@ -1,6 +1,6 @@
 // Ride header overlays (THM.15 part 2, spec 14 §14.6): the glue Bootstrap and htmx leave open.
 //
-// - The cart count: the mini-cart body (loaded by htmx from the cart page) carries the number of
+// - The cart count: the mini-cart body (the `orders:cart_mini` fragment, loaded by htmx) carries the number of
 //   items and the same number in words (`data-cart-count`, `data-cart-label`, set by the server in
 //   the visitor's language). The visual badge shows the number; the polite live region
 //   (#cart-count) says it in words. The first value, written when a page loads, is not announced.
