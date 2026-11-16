@@ -382,11 +382,10 @@ class CountryWarningLanguages(Model):   # platform data: country -> accepted war
   version (counsel 2026-11-16): a new or changed unfair-terms clause, such as clause (l), needs a
   new double signature, completed as today with the FEA/FEQ or the paper original, plus the 15
   days' notice on a durable medium (P2B article 3(2)); silence after the notice is not enough for
-  a clause under art. 1341 comma 2. The acceptance screen and the document carry the optional
-  waiver sentence "Sottoscrivendo la presente versione aggiornata, il Venditore accetta che le
-  modifiche abbiano efficacia immediata rinunciando al termine di preavviso di cui all'art. 3,
-  par. 2, del Regolamento (UE) 2019/1150"; signing it makes the version effective at once
-  (VEN.16).
+  a clause under art. 1341 comma 2. Counsel also offered a waiver sentence that would make the
+  version effective at once (P2B article 3(2)); the owner chose not to use it (2026-11-16), so a
+  vendor on an older version, the trial vendors included, re-signs both acts and the new
+  version takes effect only after the 15 days' notice (VEN.16).
 - Completing the specific approval. The specific approval counts as completed only when the
   vendor signs with a qualified or advanced electronic signature (VEN.17) or sends the paper
   original signed by hand, checked and approved by staff on receipt (VEN.16). Until then a
