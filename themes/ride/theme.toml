@@ -7,3 +7,8 @@ version = "0.1.0"
 parent = "base"
 description = "Bold vertical theme: dark header, condensed display type, blue accent."
 direction = "ltr"
+foundation = "bootstrap-5.3"
+# Compressed ceilings of spec 14 §14.7, measured at THM.13 part 2: theme.css 38.3 KB, a page's
+# JavaScript 63.2 KB. Raising one needs a reviewed change here.
+css_budget_kb = 48
+js_budget_kb = 70

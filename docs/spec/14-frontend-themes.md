@@ -327,8 +327,8 @@ the anonymous page cache on.
 
 | Budget | Limit | Checked by |
 |---|---|---|
-| CSS per theme (`theme.css`, compressed) | ≤ 45 KB (`base`); ≤ 75 KB for a theme with `foundation = "bootstrap-5.3"` (provisional, THM.13 sets the final value) | unit test on the build output (THM.5, THM.13) |
-| JavaScript total, including htmx and Alpine (compressed) | ≤ 40 KB (`base`); ≤ 75 KB for a Bootstrap theme (provisional) | unit test (THM.5, THM.13) |
+| CSS per theme (`theme.css`, compressed) | ≤ 45 KB (`base`); ≤ 48 KB for `ride` (`css_budget_kb` in its manifest; measured 38.3 KB at THM.13) | unit test on the build output (THM.5, THM.13) |
+| JavaScript total, including htmx and Alpine (compressed) | ≤ 40 KB (`base`); ≤ 70 KB for `ride` (`js_budget_kb`; measured 63.2 KB at THM.13) | unit test (THM.5, THM.13) |
 | Web fonts | ≤ 2 families, ≤ 4 woff2 files, Latin + Latin Extended-A subsets, `font-display: swap`, one preload | `LICENSES.toml` and build check (THM.5) |
 | LCP (mobile, 4G profile) | < 2.5 s | SEO.6 on STAGE |
 | CLS | < 0.1 (images and embeds always have width and height or `aspect-ratio`) | SEO.6 |
@@ -343,11 +343,11 @@ Brotli too.
 **Budgets for a Bootstrap theme (owner decision Q-98).** The vendored Bootstrap 5.3 files are
 about 30 KB (CSS) and 23 KB (bundle JS) compressed, before any `ride` rule, so the single budgets
 above cannot hold for `ride`. The limit becomes **per theme**, declared in the manifest
-(`css_budget_kb`, `js_budget_kb`), with `base` keeping 45 and 40. The provisional figures are an
-upper estimate (Bootstrap about 30 KB plus `base` and `ride` CSS about 25 KB plus headroom;
-Bootstrap bundle, htmx, Alpine and theme modules about 60 KB). THM.13 measures the real sizes and
-writes the final limits into the manifest and into this table; they are a ceiling that THM.5
-enforces, never a target, and raising one needs a reviewed manifest change. The anonymous page
+(`css_budget_kb`, `js_budget_kb`), with `base` keeping 45 and 40. THM.13 part 2 measured the real sizes
+(`theme.css` 38.3 KB, page JavaScript 63.2 KB: Bootstrap bundle 23.2 KB, htmx 16.0 KB, Alpine
+16.0 KB, theme modules the rest) and wrote the final limits (48 KB and 70 KB) into the `ride`
+manifest and into this table, with room for the later `ride` components (THM.14, THM.15); they
+are a ceiling that THM.5 enforces, never a target, and raising one needs a reviewed manifest change. The anonymous page
 cache, hashed long-lived static files and compression make the extra transfer a first-visit cost.
 If the measured LCP on STAGE (SEO.6) regresses, the first remedy is splitting the CSS in the build
 (Bootstrap components a page does not use, loaded per template), not dropping features.

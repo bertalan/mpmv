@@ -66,3 +66,15 @@ Option 2.
 - Revisit if a needed feature has no Baseline support, if CSS grows past the budgets of spec 14
   §14.7 without a build step that only a Node tool provides, or if a frontend component needs a
   framework that only ships through npm.
+
+## Addendum (THM.13, owner decision Q-98, 2026-11-15): Bootstrap 5.3 for `ride`
+
+The "no utility-CSS framework" consequence above stays true for `base`, which remains framework
+free. The `ride` theme builds on **Bootstrap 5.3**, taken as the official dist files
+(`bootstrap.min.css`, `bootstrap.bundle.min.js`), vendored unchanged and hash-checked, never
+compiled from Sass: that would need Dart Sass and break the "no Node, no npm" decision. A theme
+opts in with `foundation = "bootstrap-5.3"` in `theme.toml`. The build wraps the framework CSS in
+`@layer bootstrap`, ordered between `reset` and `tokens`, drops `base`'s reset for that chain and
+replaces the framework's `data:` image URIs with same-origin SVG files, so the CSP stays
+unchanged. Details: spec 14 §14.5 "Bootstrap in `ride`". Revisit when Bootstrap 6 is stable or
+if the per-theme budgets of §14.7 cannot hold.

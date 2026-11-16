@@ -6,6 +6,7 @@
 - themes.E003 (database): a site's `ThemeSettings` names a theme that is not registered (for
   example one removed since it was chosen). Run by `migrate` and `check --database default`.
 - themes.E004: the `base` theme is missing or invalid.
+- themes.E005: a theme's `foundation` files are missing or differ from their `VENDORED.toml`.
 """
 
 from collections.abc import Iterable, Sequence
@@ -17,6 +18,7 @@ from django.db import DatabaseError, connections, transaction
 from django.db.migrations.executor import MigrationExecutor
 
 from .engine import MISSING_BASE
+from .foundation import foundation_problems
 from .services import default_theme, get_registry, themes_dir
 
 
@@ -40,6 +42,17 @@ def check_themes(
                     f"Invalid theme {error}",
                     hint="Fix theme.toml (spec 14 §14.2) or remove the directory.",
                     id="themes.E001",
+                )
+            )
+    for slug, manifest in registry.manifests.items():
+        if manifest.foundation is None:
+            continue
+        for problem in foundation_problems(themes_dir() / slug, slug, manifest.foundation):
+            messages.append(
+                checks.Error(
+                    f"Theme {slug!r}: {problem}",
+                    hint="Restore the vendored framework files (spec 14 §14.5).",
+                    id="themes.E005",
                 )
             )
     default = default_theme()
