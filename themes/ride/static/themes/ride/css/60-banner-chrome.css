@@ -1,0 +1,117 @@
+/* Ride: page banner, footer widgets, social links, back-to-top (THM.15 part 3). Colours only
+   through tokens. Smooth scrolling only when the visitor has no reduced-motion preference. */
+@layer overrides {
+  /* --- Page banner: dark field (or an image under a scrim), title, lead, breadcrumb. */
+
+  .page-banner {
+    position: relative;
+    isolation: isolate;
+    padding-block: var(--space-xl);
+    margin-block: 0 var(--space-l);
+    background: var(--color-surface-inverse);
+    color: var(--color-text-inverse);
+  }
+
+  .page-banner__image {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    inline-size: 100%;
+    block-size: 100%;
+    border-radius: 0;
+    object-fit: cover;
+  }
+
+  .page-banner__scrim {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: color-mix(in srgb, var(--color-overlay) 70%, transparent);
+  }
+
+  .page-banner__title {
+    margin: 0;
+    color: var(--color-text-inverse);
+    font-family: var(--font-display);
+    font-size: var(--step-4);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .page-banner__text {
+    max-inline-size: 60ch;
+    margin: var(--space-s) 0 0;
+    color: var(--color-text-inverse);
+  }
+
+  .page-banner .breadcrumb ol {
+    margin-block-end: var(--space-s);
+  }
+
+  .page-banner .breadcrumb a,
+  .page-banner .breadcrumb [aria-current="page"],
+  .page-banner .breadcrumb li + li::before {
+    color: var(--color-text-inverse);
+  }
+
+  /* --- Footer: widget columns, social links, back-to-top bar. */
+
+  .site-footer__heading {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--step-1);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  @media (width >= 40rem) {
+    .site-footer__inner {
+      grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    }
+  }
+
+  .site-footer__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-s) var(--space-l);
+    padding-block: var(--space-m) var(--space-l);
+    border-block-start: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  }
+
+  .site-footer__social {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-m);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .site-footer__social a,
+  .back-to-top {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+  }
+
+  .back-to-top {
+    margin-inline-start: auto;
+    font-weight: 700;
+  }
+
+  .back-to-top .icon {
+    transform: rotate(180deg);
+  }
+
+  /* --- Smooth scroll for in-page links (back-to-top, skip link) unless motion is reduced. */
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+}

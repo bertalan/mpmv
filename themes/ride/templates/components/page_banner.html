@@ -1,0 +1,21 @@
+{% load theme_tags %}{% comment %}
+Page banner of the `ride` theme (THM.15, spec 14 §14.6): the band at the top of a listing, a
+content or an account page: a dark colour field or an image under a scrim, the page title, an
+optional lead and the breadcrumb trail. The trail is base's components/breadcrumb.html (a `<nav>`
+with `aria-label`, the current page `aria-current="page"`); the BreadcrumbList JSON-LD is built
+from the same `items` by `seo` (spec 10), not here.
+
+  {% include "components/page_banner.html" with title=page.title items=trail only %}
+
+Context: `title` (required), `heading_level` (1 by default; 2 where the page title sits
+elsewhere), `text` (the lead), `items` (label and url, the current page last), `image_url`
+(decorative: the alt text is empty; the title says what the page is).
+{% endcomment %}<div class="page-banner{% if image_url %} page-banner--image{% endif %} full-bleed">
+  {% if image_url %}<img class="page-banner__image" src="{{ image_url }}" alt="" width="1600" height="400">
+  <div class="page-banner__scrim" aria-hidden="true"></div>{% endif %}
+  <div class="page-banner__content">
+    {% include "components/breadcrumb.html" with items=items only %}
+    <h{{ heading_level|default:1 }} class="page-banner__title">{{ title }}</h{{ heading_level|default:1 }}>
+    {% if text %}<p class="page-banner__text">{{ text }}</p>{% endif %}
+  </div>
+</div>

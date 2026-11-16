@@ -44,6 +44,7 @@ SCOPES = (
     "apps/vendors/templates/vendors/terms",  # the public sales terms page (VEN.35)
     "themes/base/templates/layouts",
     "themes/ride/templates/components/header.html",  # the Bootstrap navbar and offcanvas (THM.15)
+    "themes/ride/templates/components/footer.html",  # social nav label, back to top (THM.15)
     # Brand review models (CAT.20): the rest of the catalog app joins with the storefront I18N.
     "apps/catalog/taxonomy.py",
     "apps/catalog/taxonomy_admin.py",
