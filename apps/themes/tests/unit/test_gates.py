@@ -269,6 +269,7 @@ def test_each_asset_kind_has_its_own_spec_licences() -> None:
         "font": frozenset({"OFL-1.1", "Apache-2.0"}),
         "icons": frozenset({"MIT", "ISC"}),
         "image": frozenset({"CC0-1.0"}),
+        "framework": frozenset({"MIT"}),
     } == ALLOWED_LICENCES_BY_KIND
 
 

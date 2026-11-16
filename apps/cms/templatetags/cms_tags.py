@@ -180,7 +180,7 @@ def faq_jsonld(page: Any) -> SafeString:
         return mark_safe("")
     # JSON with <, > and & escaped: it cannot leave its script element (`jsonld_text`).
     data = jsonld_text(faq_page_jsonld(questions))
-    return mark_safe(f'<script type="application/ld+json">{data}</script>')  # noqa: S308
+    return mark_safe(f'<script type="application/ld+json">{data}</script>')  # noqa: S308 (escaped by jsonld_text)
 
 
 @register.simple_tag
@@ -189,7 +189,7 @@ def jsonld_script(data: Mapping[str, Any] | None) -> SafeString:
     "" for none. Escaped by `jsonld_text`, so it cannot leave its script element."""
     if not data:
         return mark_safe("")
-    return mark_safe(f'<script type="application/ld+json">{jsonld_text(data)}</script>')  # noqa: S308
+    return mark_safe(f'<script type="application/ld+json">{jsonld_text(data)}</script>')  # noqa: S308 (escaped by jsonld_text)
 
 
 @register.simple_tag(takes_context=True)

@@ -1,0 +1,8 @@
+{% load i18n %}<div id="live-region" hx-swap-oob="innerHTML">{{ message }}</div>
+{% if ok %}
+  {% url "orders:cart" as cart_url %}
+  {% include "components/alert.html" with level="success" message=message only %}
+  <p><a class="mini-cart" id="mini-cart" href="{{ cart_url }}">{% blocktranslate count counter=count %}View your cart: {{ counter }} item{% plural %}View your cart: {{ counter }} items{% endblocktranslate %}</a></p>
+{% else %}
+  {% for problem in problems %}{% include "components/alert.html" with level="danger" live="assertive" message=problem only %}{% endfor %}
+{% endif %}

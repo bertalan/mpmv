@@ -110,11 +110,24 @@ def step_up_required[**P](max_age: int | None = None) -> Callable[[View[P]], Vie
     return decorator
 
 
-def _prompt(request: HttpRequest, action: str, group: int, digest: str) -> HttpResponse:
-    """The refusal of a sensitive action when no passkey window is open (D-32), with the way on."""
+type ShopOf = Callable[[HttpRequest], object | None]
+
+
+def _prompt(
+    request: HttpRequest, action: str, group: int, digest: str, shop: object | None
+) -> HttpResponse:
+    """The refusal of a sensitive action when no passkey window covers it (D-32), with the way
+    on. A vendor owner is offered both ways for their own shop's owner actions only; the offer is
+    kept in the session, and the passkey endpoints accept a vendor owner only for it."""
     outcome = "window_required"
-    levels.record_prompt(request, action, group, outcome)
-    can_elevate = levels.may_elevate(request.user)
+    scope = levels.shop_key(shop) if shop is not None else ""
+    levels.record_prompt(request, action, group, outcome, shop=scope)
+    staff = levels.may_elevate(request.user)
+    can_elevate = levels.may_confirm(request.user, action, shop)
+    shop_window = can_elevate and not staff
+    if shop_window:
+        assert shop is not None  # noqa: S101  # may_confirm needs it for a non-elevator
+        levels.offer_shop_confirmation(request, action, digest, shop)
     if wants_json(request):
         return JsonResponse(
             {"error": "passkey_window_required", "action": action, "digest": digest}, status=403
@@ -134,6 +147,7 @@ def _prompt(request: HttpRequest, action: str, group: int, digest: str) -> HttpR
             "digest": digest,
             "can_elevate": can_elevate,
             "can_do_once": can_elevate,
+            "shop_window": shop_window,
             "has_passkey": levels.has_passkey(request.user),
             "replay_method": request.method,
             "replay_url": request.get_full_path(),
@@ -143,7 +157,7 @@ def _prompt(request: HttpRequest, action: str, group: int, digest: str) -> HttpR
     )
 
 
-def requires_level[**P](action: str) -> Callable[[View[P]], View[P]]:
+def requires_level[**P](action: str, *, shop: ShopOf | None = None) -> Callable[[View[P]], View[P]]:
     """Gate a view by the session level its `action` needs (D-32, CORE.25).
 
     The group of `action` comes from the `PlatformOperator` configuration, per request:
@@ -156,6 +170,10 @@ def requires_level[**P](action: str) -> Callable[[View[P]], View[P]]:
        does not count), even with the window open. With no window it can also be done once, each
        time with a fresh passkey assertion with user verification made for that grant (never one
        from an earlier login or an earlier window).
+
+    `shop` returns the shop the request acts on (shop-space views): it binds a "Do it once" to
+    that shop and lets its owner confirm an action of `levels.SHOP_OWNER_ACTIONS` there, once or
+    with a window scoped to that shop (D-32 amendment 2026-11-14), ownership re-checked each time.
 
     Stack it with `step_up_required` where the view must also confirm a recent second factor.
     """
@@ -171,13 +189,19 @@ def requires_level[**P](action: str) -> Callable[[View[P]], View[P]]:
             group = levels.policy().group_of(action)
             if group == session_policy.GROUP_EVERYDAY:
                 return view(request, *args, **kwargs)
-            digest = levels.params_digest(request)
-            if levels.current_level(request) != levels.PASSKEY_WINDOW:
-                if levels.consume_single(request, action, digest):
+            target = shop(request) if shop is not None else None
+            digest = levels.params_digest(request, shop=target)
+            scope = levels.shop_key(target) if target is not None else ""
+            if not levels.window_covers(request, action, target):
+                # A grant is spent only while the user may still confirm it: `elevate` (with a
+                # passkey) for a platform action, ownership of the shop (or `elevate`) for a shop
+                # action; its digest names the shop, so it never fits another one.
+                rechecked = levels.may_confirm(request.user, action, target)
+                if rechecked and levels.consume_single(request, action, digest, shop=scope):
                     return view(request, *args, **kwargs)
-                return _prompt(request, action, group, digest)
+                return _prompt(request, action, group, digest, target)
             if group == session_policy.GROUP_CRITICAL and not is_recently_passkey_verified(request):
-                levels.record_prompt(request, action, group, "passkey_required")
+                levels.record_prompt(request, action, group, "passkey_required", shop=scope)
                 if wants_json(request):
                     return JsonResponse({"error": "passkey_required", "action": action}, status=403)
                 query = urlencode({"next": request.get_full_path(), "factor": "passkey"})
@@ -190,15 +214,21 @@ def requires_level[**P](action: str) -> Callable[[View[P]], View[P]]:
     return decorator
 
 
-def requires_level_method(action: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+def requires_level_method(
+    action: str, *, shop: Callable[[Any, HttpRequest], object | None] | None = None
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """`requires_level` for a view method (`post(self, request, ...)`): the method itself carries
-    `session_action`, so a subclass that overrides it without the gate fails the sweep."""
+    `session_action`, so a subclass that overrides it without the gate fails the sweep. `shop`
+    takes the view and the request."""
 
     def decorator(method: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(method)
         def wrapped(self: Any, request: HttpRequest, /, *args: Any, **kwargs: Any) -> Any:
             bound = functools.partial(method, self)
-            return requires_level(action)(bound)(request, *args, **kwargs)
+            shop_of: ShopOf | None = None
+            if shop is not None:
+                shop_of = functools.partial(shop, self)
+            return requires_level(action, shop=shop_of)(bound)(request, *args, **kwargs)
 
         wrapped.session_action = action  # type: ignore[attr-defined]
         return wrapped

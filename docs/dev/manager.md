@@ -29,6 +29,12 @@ per-request `ManagerContext`.
 
 Business logic stays in the owning app's `services.py`; the Manager only calls it.
 
+## The platform map (CORE.30)
+
+`/manager/platform/map/` (section `platform.map`, open to every role that opens the dashboard) lists
+the links of the whole site in groups: storefront, account, each vendor's shop space (plain text for
+staff, as there is no impersonation path), platform space and the editors' admin.
+
 ## The vendor choice
 
 A member of several vendors picks one (`vendor_choice.py`, a vendor public id in the session). It

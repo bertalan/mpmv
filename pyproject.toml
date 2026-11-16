@@ -52,7 +52,7 @@ dev = [
   # only on the same Hypothesis version, and Hypothesis releases several times a week. A bump
   # comes as its own Dependabot PR, so a new failing example points at the bump, not at a change
   # in our code (docs/dev/dependency-updates.md).
-  "hypothesis==6.170.10",
+  "hypothesis==6.170.15",
   # tools/build_docs.py renders the HTML spec; tests/unit/test_build_docs_eof.py checks it.
   "markdown>=3.5",
   "pytest-xdist>=3.6",
@@ -76,7 +76,7 @@ ignore = ["RUF012"]
 "**/tests/**" = ["S101", "S105", "S106"]
 "tests/**" = ["S101", "S105", "S106"]
 "conftest.py" = ["S101"]
-"tools/**" = ["S", "E501", "RUF005"]
+"tools/**" = ["E501", "RUF005"]
 
 [tool.mypy]
 python_version = "3.13"
@@ -142,6 +142,7 @@ markers = [
   "consent_banner: e2e test that meets the consent banner (others start with a choice made)",
   "keep_seeded_territories: tax integration test that runs against the territories seeded by migration 0006 (TAX.7)",
   "security_slow: slow security cases, run nightly by security-nightly (SEC.5)",
+  "security: attack scenarios in tests/security (SEC.5), run with the integration suite",
 ]
 
 [tool.coverage.run]

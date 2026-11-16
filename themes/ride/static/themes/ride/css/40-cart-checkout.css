@@ -1,0 +1,70 @@
+/* Ride: cart, checkout steps, review with the legal step, payment and confirmation (THM.8,
+   moved onto Bootstrap 5.3 classes by THM.16). The templates use the Bootstrap grid, forms,
+   buttons, alerts, cards, list-group and badges, mapped on tokens in 40-bootstrap-components.css;
+   only what Bootstrap has no class for stays here. Colours only through tokens. */
+@layer overrides {
+  .checkout {
+    max-inline-size: 60rem;
+  }
+
+  .checkout h1,
+  .checkout h2,
+  .checkout h3 {
+    font-family: var(--font-display);
+  }
+
+  /* Step indicator: the number is a round badge, at least 24 px (WCAG 2.5.8). */
+
+  .steps__number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: 1.75rem;
+    min-block-size: 1.75rem;
+  }
+
+  .steps__step {
+    font-family: var(--font-display);
+    font-size: var(--step-1);
+    letter-spacing: 0.03em;
+  }
+
+  /* Totals in condensed type. */
+
+  .cart-line__total,
+  .order-summary__line--total {
+    font-family: var(--font-display);
+    color: var(--color-heading);
+  }
+
+  /* Quantity stepper: a field wide enough for three digits. */
+
+  .quantity {
+    max-inline-size: 11rem;
+  }
+
+  /* Check boxes and radios keep a 24 px target (WCAG 2.5.8); Bootstrap draws 1 em. */
+
+  .form-check {
+    min-block-size: 1.5rem;
+    padding-inline-start: 2.25rem;
+  }
+
+  .form-check-input {
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+  }
+
+  .form-check .form-check-input {
+    margin-block-start: 0;
+    margin-inline-start: -2.25rem;
+  }
+
+  /* Review: the pay button takes the full width on a phone. */
+
+  @media (max-width: 40rem) {
+    #review-actions .btn {
+      inline-size: 100%;
+    }
+  }
+}

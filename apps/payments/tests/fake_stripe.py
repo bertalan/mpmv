@@ -1,7 +1,9 @@
 """In-memory `StripeClient` for tests: the only double of Stripe, behind our own interface.
 
-It behaves like Stripe where the provider relies on it: idempotency keys replay the first answer,
-a refund above the charge is refused, a transfer needs a charge. No network, no key.
+It behaves like Stripe where the provider relies on it: idempotency keys replay the first answer
+(an error answer of a transfer included), a reused transfer key with other parameters gets
+Stripe's `idempotency_error`, a refund above the charge is refused, a transfer needs a charge and
+a destination in `refused_destinations` is refused. No network, no key.
 """
 
 import secrets
@@ -10,6 +12,7 @@ from datetime import UTC, datetime
 
 from apps.payments.stripe_client import (
     StripeAccount,
+    StripeCharge,
     StripeError,
     StripeIntent,
     StripeRefund,
@@ -26,10 +29,14 @@ class FakeStripeClient:
         self.reversals: list[tuple[str, int]] = []
         self.transfer_calls: list[dict[str, object]] = []
         self.calls: list[str] = []
+        self.fail_reversals = 0  # the next N transfer reversals fail (a Stripe outage)
+        # the next N transfer reversals are recorded at Stripe, then the answer is lost
+        self.lose_reversal_answers = 0
         self.accounts: dict[str, StripeAccount] = {}
         self.account_calls: list[dict[str, object]] = []
         self.links: list[str] = []
         self._replies: dict[str, object] = {}
+        self.refused_destinations: set[str] = set()  # Stripe answers 400 for these accounts
         self._refunded: dict[str, int] = {}
 
     def _replay(self, key: str) -> object | None:
@@ -68,6 +75,23 @@ class FakeStripeClient:
             raise StripeError("No such payment_intent")
         return self.intents[intent_id]
 
+    def get_charge(self, charge_id: str) -> StripeCharge:
+        self.calls.append("get_charge")
+        for intent in self.intents.values():
+            if intent.charge_id == charge_id:
+                return StripeCharge(
+                    charge_id,
+                    intent.amount_minor,
+                    intent.currency,
+                    self._refunded.get(intent.id, 0),
+                )
+        raise StripeError("No such charge")
+
+    def refund_in_dashboard(self, intent_id: str, amount_minor: int) -> None:
+        """A refund made in the Stripe dashboard: the app never saw it, only the charge shows it."""
+        already = self._refunded.get(intent_id, 0)
+        self._refunded[intent_id] = already + amount_minor
+
     def create_transfer(
         self,
         *,
@@ -83,11 +107,24 @@ class FakeStripeClient:
         self.transfer_calls.append(
             {"source_transaction": source_transaction, "destination": destination}
         )
+        params = (amount_minor, currency.upper(), destination, transfer_group, source_transaction)
         if (cached := self._replay(f"tr:{idempotency_key}")) is not None:
-            assert isinstance(cached, StripeTransfer)
-            return cached
+            assert isinstance(cached, tuple)
+            sent, answer = cached
+            if sent != params:  # Stripe: the key is bound to the first request's parameters
+                raise StripeError(status=400, error_type="idempotency_error")
+            if isinstance(answer, StripeError):  # Stripe stores an error answer for 24 hours
+                raise answer
+            assert isinstance(answer, StripeTransfer)
+            return answer
         if not any(i.charge_id == source_transaction for i in self.intents.values()):
             raise StripeError("No such charge")
+        if destination in self.refused_destinations:
+            error = StripeError(
+                status=400, error_type="invalid_request_error", code="account_invalid"
+            )
+            self._replies[f"tr:{idempotency_key}"] = (params, error)
+            raise error
         transfer = StripeTransfer(
             id=f"tr_{secrets.token_hex(6)}",
             destination=destination,
@@ -96,9 +133,10 @@ class FakeStripeClient:
             created=datetime.now(UTC),
             payment_ref=metadata.get("payment_ref", ""),
             transfer_group=transfer_group,
+            vendor_order=metadata.get("vendor_order", ""),
         )
         self.transfers[transfer.id] = transfer
-        self._replies[f"tr:{idempotency_key}"] = transfer
+        self._replies[f"tr:{idempotency_key}"] = (params, transfer)
         return transfer
 
     def list_transfers(
@@ -133,14 +171,24 @@ class FakeStripeClient:
         self, *, transfer_id: str, amount_minor: int, idempotency_key: str
     ) -> str:
         self.calls.append("create_transfer_reversal")
+        if self.fail_reversals > 0:
+            self.fail_reversals -= 1
+            raise StripeError("Stripe is unavailable")
         if (cached := self._replay(f"rv:{idempotency_key}")) is not None:
             assert isinstance(cached, str)
             return cached
         if transfer_id not in self.transfers:
             raise StripeError("No such transfer")
+        held = self.transfers[transfer_id].amount_minor
+        taken = sum(minor for tid, minor in self.reversals if tid == transfer_id)
+        if amount_minor <= 0 or taken + amount_minor > held:  # Stripe: never more than the transfer
+            raise StripeError("Reversal amount is greater than the transfer's remaining amount")
         self.reversals.append((transfer_id, amount_minor))
         reversal = f"trr_{secrets.token_hex(6)}"
         self._replies[f"rv:{idempotency_key}"] = reversal
+        if self.lose_reversal_answers > 0:  # Stripe reversed it, the answer never came back
+            self.lose_reversal_answers -= 1
+            raise StripeError("Connection reset while reading the answer")
         return reversal
 
     # -- Connect onboarding (VEN.6)

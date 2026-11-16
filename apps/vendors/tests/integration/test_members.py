@@ -94,7 +94,7 @@ def test_first_member_added_as_owner_is_saved_and_audited() -> None:
     member = VendorMember.objects.get()
     assert (member.vendor, member.user, member.role) == (vendor, user, OWNER)
     assert changes.summary() == {"create": 1, "update": 0, "delete": 0}
-    entry = AuditLog.objects.get()
+    entry = AuditLog.objects.exclude(action="accounts.sessions.ended").get()  # CORE.24
     assert entry.action == MEMBER_ADDED == "vendor.member_added"
     assert entry.target_model == MEMBER_MODEL == "vendors.vendormember"
     assert entry.target_key == str(member.public_id)
@@ -165,7 +165,7 @@ def test_promoting_staff_to_owner_is_saved_and_audited() -> None:
     assert changes.summary() == {"create": 0, "update": 1, "delete": 0}
     member.refresh_from_db()
     assert member.role == OWNER
-    entry = AuditLog.objects.get()
+    entry = AuditLog.objects.exclude(action="accounts.sessions.ended").get()  # CORE.24
     assert entry.action == MEMBER_ROLE_CHANGED == "vendor.member_role_changed"
     assert entry.target_key == str(member.public_id)
     assert entry.before == {
@@ -247,7 +247,7 @@ def test_removing_a_staff_member_is_saved_and_audited() -> None:
 
     assert changes.summary() == {"create": 0, "update": 0, "delete": 1}
     assert list(VendorMember.objects.all()) == [owner]
-    entry = AuditLog.objects.get()
+    entry = AuditLog.objects.exclude(action="accounts.sessions.ended").get()  # CORE.24
     assert entry.action == MEMBER_REMOVED == "vendor.member_removed"
     assert entry.target_key == key
     assert entry.before == {

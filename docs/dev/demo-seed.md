@@ -32,7 +32,7 @@ every app in the import contracts.
 
 | Area | Content |
 | --- | --- |
-| Platform | A demo `PlatformOperator` if none is configured; a demo vendor contract (EN, IT) if none is in force; VAT rates for AT, DE, ES, FR and IT where a country has none |
+| Platform | A demo `PlatformOperator` if none is configured; a demo vendor contract (EN, IT) if none is in force; the platform default commission rule of spec 04 (20% on net goods, payment fee 4% + 2.00 on the gross paid) if no default rule is open, so the demo checkout can place orders; VAT rates for AT, DE, ES, FR and IT where a country has none |
 | Vendors | Five active vendors, one per regime (E's "other" exemption names France, the country of its law, TAX.13): A (IT, S.r.l., RF01, domestic-only VAT), B (IT, sole proprietor, RF19 forfettario, exempt), C (IT, S.r.l., RF01, publishing art. 74 exempt), D (DE, GmbH, RF18, OSS), E (FR, RF20 cross-border franchise with an `EX` number, exempt). Each has a complete DAC7 dataset (VEN.23) and went through application, contract acceptance, activation and an approved tax profile; storefront texts in EN and IT |
 | Catalog | 15 categories (2 levels; the 5 top-level ones have `demo-` slugs in every language) and a "Material" taxonomy with term pages, named in EN, IT, DE, FR and ES; two variant attributes (size, colour); five brands; 50 published products (10 per vendor) with EN and IT texts, Decimal net prices, some sale prices, 32 variants, two "on request" products |
 | Shipping | Two carriers; per vendor a domestic and an EU zone, three methods with weight bands and special-area treatments (island surcharges for Sicily, Sardinia, Corsica; quotes for the minor islands and the Venice lagoon; no delivery to the extra-VAT areas) |
@@ -76,7 +76,8 @@ retracts them instead:
 - a legal page is **unpublished**: each publish recorded an append-only version;
 - the audit log keeps every entry, including the reset's own.
 
-The demo operator, the demo contract and the vendors' tax profiles stay. The next `seed`
+The demo operator, the demo contract, the default commission rule (rules are never
+deleted, VEN.2) and the vendors' tax profiles stay. The next `seed`
 reopens the closed vendors (a new onboarding round, VEN.21), accepts the contract again,
 activates them and republishes the legal pages.
 

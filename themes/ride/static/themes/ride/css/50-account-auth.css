@@ -1,0 +1,52 @@
+/* Ride: the customer area and the sign-in pages (THM.8 2/2, moved onto Bootstrap by THM.16 2/2).
+   The panel, forms, buttons, tables, alerts, grid and spacing are Bootstrap's (the markup in
+   themes/ride/templates). What stays is what Bootstrap has no class for: the panel's accent bar
+   and width, the order timeline, the session level note and the recovery-code ticket.
+   Rules sit in `overrides`; colours only through tokens. */
+@layer overrides {
+  .account-page,
+  .privacy-account,
+  .privacy-erased {
+    inline-size: min(100% - 2 * var(--space-m), 56rem);
+    max-inline-size: 56rem;
+    background: var(--color-surface-raised);
+    border-block-start: 4px solid var(--color-accent);
+  }
+
+  .account-page > .card-body > h1:first-child,
+  .privacy-account > .card-body > h1:first-child,
+  .privacy-erased > .card-body > h1:first-child {
+    margin-block-start: 0;
+  }
+
+  .session-level {
+    padding: var(--space-s) var(--space-m);
+    border-inline-start: 4px solid var(--color-accent);
+    background: var(--color-surface);
+  }
+
+  .timeline {
+    padding-inline-start: var(--space-m);
+    border-inline-start: 2px solid var(--color-border-strong);
+    font-family: var(--font-display);
+    font-weight: 600;
+  }
+
+  .timeline__step--current {
+    color: var(--color-heading);
+  }
+
+  /* MFA: recovery codes read like a ticket, in the monospace face. */
+  .recovery-codes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: var(--space-s);
+    margin: var(--space-m) 0;
+    padding: var(--space-m);
+    list-style: none;
+    font-family: var(--font-mono);
+    background: var(--color-surface);
+    border: 2px dashed var(--color-border-control);
+    border-radius: var(--radius-card);
+  }
+}

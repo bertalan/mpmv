@@ -428,6 +428,7 @@ def record_legal_version(page: LegalPage, *, ctx: AuditContext, dry_run: bool = 
             title=page.title,
             effective_date=page.effective_date,
             body=page.body.get_prep_value(),
+            onerous_clauses=list(page.onerous_clauses or []),
             published_at=timezone.now(),
             published_by=ctx.actor_label,
         )
@@ -668,6 +669,69 @@ def legal_page_plain_text(kind: str, language: str) -> str | None:
     if page is None:
         return None
     return unescape(strip_tags(str(page.body)))
+
+
+# --- The customer terms in force at checkout (ORD.17, D-40)
+
+
+@dataclass(frozen=True)
+class TermsInForce:
+    """One legal text version as the checkout snapshots it on the order."""
+
+    version_id: int
+    number: int
+    title: str
+    language: str
+    effective_date: dt.date
+    sha256: str
+    clauses: tuple[tuple[str, str], ...]
+    text: str
+
+
+def _terms_in_force(version: LegalPageVersion) -> TermsInForce:
+    text = unescape(strip_tags(str(version.body)))
+    return TermsInForce(
+        version_id=version.pk,
+        number=version.number,
+        title=version.title,
+        language=version.language_code,
+        effective_date=version.effective_date,
+        sha256=hashlib.sha256(text.encode()).hexdigest(),
+        clauses=tuple(
+            (str(row.get("article", "")).strip(), str(row.get("title", "")).strip())
+            for row in version.onerous_clauses or []
+            if isinstance(row, dict)
+        ),
+        text=text,
+    )
+
+
+def customer_terms_in_force(language: str, *, today: dt.date | None = None) -> TermsInForce | None:
+    """The customer terms version in force in `language`, else in the site's default language
+    (a checkout must not stop for a missing translation; the language is recorded). None when no
+    live terms page has a version in force."""
+    day = today or timezone.localdate()
+    for code in dict.fromkeys((language, settings.LANGUAGE_CODE)):
+        page = (
+            LegalPage.objects.live()
+            .filter(kind=LegalPage.Kind.TERMS, alias_of__isnull=True, locale__language_code=code)
+            .first()
+        )
+        if page is None:
+            continue
+        versions = list(page.versions.order_by("-number"))
+        stamp = engine.version_in_force(
+            [engine.VersionStamp(v.number, v.effective_date) for v in versions], day
+        )
+        if stamp is not None:
+            return _terms_in_force(next(v for v in versions if v.number == stamp.number))
+    return None
+
+
+def legal_version_terms(version_id: int) -> TermsInForce | None:
+    """A recorded version by id (an order's snapshot points here), in force or not."""
+    version = LegalPageVersion.objects.filter(pk=version_id).first()
+    return None if version is None else _terms_in_force(version)
 
 
 def _seed_legal_placeholders(home: HomePage, report: SeedReport) -> None:
@@ -1124,3 +1188,17 @@ def sanitise_rich_text_fields(instance: Any, only: Collection[str] | None = None
                 setattr(instance, model_field.attname, stream_block.to_python(clean_stored))
                 changed.append(model_field.name)
     return changed
+
+
+def legal_page_url(kind: str, language: str) -> str:
+    """The path of the live legal page `kind` in `language`, else in the site's default language;
+    empty when there is none (a link is then left out, never invented)."""
+    for code in dict.fromkeys((language, settings.LANGUAGE_CODE)):
+        page = (
+            LegalPage.objects.live()
+            .filter(kind=kind, alias_of__isnull=True, locale__language_code=code)
+            .first()
+        )
+        if page is not None:
+            return str(page.get_url() or "")
+    return ""

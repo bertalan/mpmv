@@ -44,12 +44,20 @@ class Payment(BaseModel):
     amount = MoneyField()
     currency = models.CharField(max_length=3)
     succeeded_at = models.DateTimeField()
+    # PAY.4 (#438 review): a payment that succeeded on an order already paid with another
+    # payment. The platform refunds it in full: no transfer, no vendor share, no refund fee.
+    duplicate = models.BooleanField(default=False)
+    duplicate_refund_ref = models.CharField(max_length=255, blank=True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=["provider", "provider_ref"], name="payments_payment_once"
-            )
+            ),
+            models.CheckConstraint(
+                condition=models.Q(duplicate=True) | models.Q(duplicate_refund_ref=""),
+                name="payments_payment_refund_only_duplicate",
+            ),
         ]
 
     def __str__(self) -> str:

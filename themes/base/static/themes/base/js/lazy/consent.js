@@ -78,9 +78,33 @@ if (banner) {
     }
     const before = state;
     state = { decided: true, granted: new Set(result.granted) };
+    const page = document.querySelector("[data-consent-preferences]");
     if ([...before.granted].some((c) => !state.granted.has(c))) {
-      location.reload(); // a script that already runs cannot be taken back
+      // a script that already runs cannot be taken back; the settings page shows its notice after the reload
+      if (page) {
+        const url = new URL(location.href);
+        url.searchParams.set("saved", "1");
+        location.assign(url);
+      } else {
+        location.reload();
+      }
       return;
+    }
+    if (page) {
+      const labels = [];
+      for (const box of page.querySelectorAll('input[name="categories"]:not(:disabled)')) {
+        box.checked = state.granted.has(box.value);
+        if (box.checked) {
+          labels.push(box.labels[0]?.textContent.trim());
+        }
+      }
+      const notice = page.querySelector("[data-consent-notice]");
+      const head = document.createElement("p");
+      head.append(Object.assign(document.createElement("strong"), { textContent: page.dataset.saved }));
+      const note = document.createElement("p");
+      note.textContent = labels.length ? `${page.dataset.some} ${labels.join(", ")}.` : page.dataset.none;
+      notice.replaceChildren(head, note);
+      notice.hidden = false;
     }
     publish(state);
     const inBanner = banner.contains(document.activeElement);

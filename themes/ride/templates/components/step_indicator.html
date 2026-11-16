@@ -1,0 +1,10 @@
+{% load i18n theme_tags %}{% comment %}
+Step indicator of `ride` (THM.16): the `base` component's contract (labelled nav, ordered list,
+`aria-current="step"`, done steps are links that say "completed", state by number, mark and
+text) on Bootstrap utilities and badges. Context: `steps` (`label`, `url`), `current` (1-based),
+`label`.
+{% endcomment %}<nav class="steps mb-4" aria-label="{% firstof label _('Checkout steps') %}">
+  <ol class="steps__list list-unstyled d-flex flex-wrap gap-2 gap-md-4 mb-0 pb-2 border-bottom border-2">
+    {% for step in steps %}{% if forloop.counter < current %}<li class="steps__step steps__step--done d-flex align-items-center gap-2 fw-semibold text-uppercase">{% with href=step.url|safe_href %}{% if href %}<a class="d-flex align-items-center gap-2" href="{{ href }}">{% else %}<span class="d-flex align-items-center gap-2">{% endif %}<span class="steps__number badge rounded-pill text-bg-dark" aria-hidden="true">{% include "components/icon.html" with name="check" only %}</span>{{ step.label }}<span class="visually-hidden"> ({% translate "completed" %})</span>{% if href %}</a>{% else %}</span>{% endif %}{% endwith %}</li>{% elif forloop.counter == current %}<li class="steps__step steps__step--current d-flex align-items-center gap-2 fw-bold text-uppercase" aria-current="step"><span class="steps__number badge rounded-pill text-bg-primary" aria-hidden="true">{{ forloop.counter }}</span>{{ step.label }}</li>{% else %}<li class="steps__step d-flex align-items-center gap-2 fw-semibold text-uppercase"><span class="steps__number badge rounded-pill border text-body" aria-hidden="true">{{ forloop.counter }}</span>{{ step.label }}</li>{% endif %}{% endfor %}
+  </ol>
+</nav>

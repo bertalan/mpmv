@@ -17,7 +17,7 @@ without a countdown. The consent banner (SEO.5, SEO.9) closes the body: the same
 page, hidden until consent.js finds no valid choice, so a cached page never holds one visitor's
 state; fixed to the bottom of the viewport, last in reading order like in the tab order.
 {% endcomment %}
-<html lang="{{ LANGUAGE_CODE }}" data-theme="{{ theme.slug }}">
+<html lang="{{ LANGUAGE_CODE }}" data-theme="{{ theme.slug }}"{% block html_attrs %}{% endblock %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -25,6 +25,7 @@ state; fixed to the bottom of the viewport, last in reading order like in the ta
   {% block description %}{% if page.search_description %}<meta name="description" content="{{ page.search_description }}">{% endif %}{% endblock %}
   <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true}'>
   {% with "themes/"|add:theme.slug|add:"/theme.css" as theme_css %}<link rel="stylesheet" href="{% static theme_css %}">{% endwith %}
+  {% block foundation_scripts %}{% endblock %}
   <script type="module" src="{% static 'themes/base/js/base.js' %}"></script>
   <script type="module" src="{% static 'themes/base/js/countdown.js' %}"></script>
   {% help_context as help_chrome %}{% if help_chrome %}<script type="module" src="{% static 'themes/base/js/help.js' %}"></script>{% endif %}

@@ -86,7 +86,9 @@ from apps.tax import services as tax_services
 from apps.tax.models import TaxRate, VendorTaxProfile
 from apps.vendors import engine as vendors_engine
 from apps.vendors import services as vendors_services
+from apps.vendors import terms_services
 from apps.vendors.models import (
+    CommissionRule,
     ContractAcceptance,
     Vendor,
     VendorContract,
@@ -168,12 +170,14 @@ def seed(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     run = _Run(ctx=ctx)
     with _rolled_back_if(dry_run, run), _operator_session(run):
         _platform(run)
+        _commission_rule(run)
         contract = _contract(run)
         _tax_rates(run)
         catalog = _catalog_structure(run)
         vendors = [_vendor(run, index, spec, contract) for index, spec in enumerate(data.VENDORS)]
         _carriers(run)
         for vendor, spec in zip(vendors, data.VENDORS, strict=True):
+            _sales_terms(run, vendor, spec)
             _products(run, vendor, spec, catalog)
             _shipping(run, vendor, spec)
         images = _images(run)
@@ -312,6 +316,51 @@ def _platform(run: _Run) -> None:
             valid_from=data.SEED_EPOCH,
         )
         run.add(configure_platform_operator(operator, ctx=run.ctx))
+
+
+def _commission_rule(run: _Run) -> None:
+    """The platform default commission rule (spec 04's example) when no default rule is open.
+
+    It starts now, or where a closed default rule ends if that is later: rules never start in the
+    past (VEN.2). A default rule that closed in the past can only be followed by a backdated
+    import, so the seed leaves that to staff. Rules are never deleted: `reset` keeps it.
+    """
+    latest = (
+        CommissionRule.objects.filter(vendor__isnull=True, plan__isnull=True)
+        .order_by("-version")
+        .first()
+    )
+    if latest is not None and latest.valid_to is None:
+        return
+    now = timezone.now()
+    start = now if latest is None or latest.valid_to is None else latest.valid_to
+    if start < now:
+        return
+    rule = CommissionRule(
+        percent=data.DEFAULT_COMMISSION_PERCENT,
+        base=data.DEFAULT_COMMISSION_BASE,
+        fee_percent=data.DEFAULT_FEE_PERCENT,
+        fee_fixed=data.DEFAULT_FEE_FIXED,
+        fee_base=data.DEFAULT_FEE_BASE,
+        valid_from=start,
+    )
+    run.add(vendors_services.add_commission_rule(rule, ctx=run.ctx))
+
+
+def _sales_terms(run: _Run, vendor: Vendor, spec: data.VendorSeed) -> None:
+    """Publish the vendor's sales terms (VEN.35) unless a version is in force.
+
+    Goes through the publish service as the vendor's owner. Versions are immutable records, so
+    `reset` keeps them (like commission rules) and a re-seed finds one in force.
+    """
+    if terms_services.version_in_force(vendor) is not None:
+        return
+    owner = User.objects.get(email__iexact=spec.owner_email)
+    run.add(
+        terms_services.publish_sales_terms(
+            vendor, data.SALES_TERMS[spec.letter].values(), actor=owner, ctx=run.ctx
+        )
+    )
 
 
 def _contract(run: _Run) -> VendorContract:
@@ -1144,12 +1193,16 @@ def _legal_page(
             effective_date=data.LEGAL_EFFECTIVE,
             body=[("paragraph", spec.body["en"])],
         )
+        _set_clauses(page, kind, "en")
         home.add_child(instance=page)
         page = _publish(page)
         run.created("cms.legalpage", page.url_path)
-    elif not page.live:
+    elif _set_clauses(page, kind, "en") or not page.live:
+        was_live = page.live
         _publish(page)
-        run.changes.update("cms.legalpage", page.url_path, {"live": False}, {"live": True})
+        run.changes.update(
+            "cms.legalpage", page.url_path, {"live": was_live}, {"live": True, "version": "new"}
+        )
     for language in ("it",):
         locale = locales.get(language)
         if locale is None:
@@ -1157,7 +1210,12 @@ def _legal_page(
         existing = page.get_translation_or_none(locale)
         if existing is not None:
             existing = existing.specific
-            if not existing.live:
+            if _set_clauses(existing, kind, language):
+                _publish(existing)
+                run.changes.update(
+                    "cms.legalpage", existing.url_path, {"onerous_clauses": []}, {"version": "new"}
+                )
+            elif not existing.live:
                 _publish(existing)
                 run.changes.update(
                     "cms.legalpage", existing.url_path, {"live": False}, {"live": True}
@@ -1167,8 +1225,27 @@ def _legal_page(
         copy.title = copy.draft_title = spec.title[language]
         copy.slug = spec.slug[language]
         copy.body = [("paragraph", spec.body[language])]
+        _set_clauses(copy, kind, language)
         copy = _publish(copy)
         run.created("cms.legalpage", copy.url_path)
+
+
+def _set_clauses(page: LegalPage, kind: str, language: str) -> bool:
+    """Give the customer Terms of sale page its onerous clauses when it has none (ORD.17).
+
+    True when the page changed: the caller publishes it, which records a new LegalPageVersion.
+    A page whose clauses a person already wrote is left alone.
+    """
+    if kind != "terms":
+        return False
+    # A translation starts as a copy of the source page, so it holds the English list.
+    untouched = [[], data.PLATFORM_TERMS_CLAUSES["en"]] if language != "en" else [[]]
+    if (page.onerous_clauses or []) not in untouched:
+        return False
+    if page.onerous_clauses == data.PLATFORM_TERMS_CLAUSES[language]:
+        return False
+    page.onerous_clauses = list(data.PLATFORM_TERMS_CLAUSES[language])
+    return True
 
 
 def _seed_pages(model: Any, slugs: Iterable[str]) -> list[Any]:

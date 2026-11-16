@@ -1,0 +1,14 @@
+{% load i18n %}
+{% comment %}No method: passkey.js runs the ceremony. A native submit (before the script is
+ready, or without JavaScript) is a harmless GET of this page, never a POST. Bootstrap classes
+(THM.16 2/2); the data-* hooks are the ones base uses.{% endcomment %}
+<form data-passkey="register" data-csrf-token="{{ csrf_token }}" data-options-url="{{ register_options_url }}" data-finish-url="{{ register_url }}" data-text-request-failed="{% translate "The request failed." %}" data-text-unsupported="{% translate "This browser does not support passkeys." %}" data-text-failed="{% translate "The passkey did not work." %}">
+  <div class="mb-3 col-md-8 col-lg-6">
+    <label class="form-label" for="id_passkey_name">{% translate "Passkey name" %}</label>
+    <input class="form-control" id="id_passkey_name" name="name" value="{% translate "Passkey" %}" maxlength="64">
+  </div>
+  <button type="button" class="btn btn-primary" data-passkey-start>{% if add_another %}{% translate "Add another passkey" %}{% else %}{% translate "Register a passkey" %}{% endif %}</button>
+  <noscript><p class="mt-2">{% translate "Passkeys need JavaScript." %}</p></noscript>
+  <div class="alert alert-danger mt-3" data-passkey-error role="alert" hidden></div>
+</form>
+{% include "accounts/mfa/_recovery_codes_list.html" with codes=None %}

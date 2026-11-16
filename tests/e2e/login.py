@@ -33,12 +33,18 @@ def open_passkey_window(page: Page) -> None:
     import time
 
     from django.conf import settings
+    from django.contrib.auth import SESSION_KEY
     from django.contrib.sessions.backends.db import SessionStore
 
     from apps.accounts import levels
+    from apps.accounts.models import User
+    from apps.accounts.tests.mfa import grant_elevate
 
     cookies = {cookie["name"]: cookie["value"] for cookie in page.context.cookies()}
     store = SessionStore(session_key=cookies[settings.SESSION_COOKIE_NAME])
+    # A full (unscoped) window covers only who may elevate (CORE.25): give the signed-in user
+    # what production asks before the window opens, `core.elevate` and a passkey.
+    grant_elevate(User.objects.get(pk=store[SESSION_KEY]))
     store[levels.STARTED_KEY] = store[levels.ACTIVITY_KEY] = time.time()
     store.save()
 

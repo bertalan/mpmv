@@ -16,7 +16,8 @@ from apps.core.audit import AuditContext
 from apps.core.models import PlatformOperator
 from apps.core.tests.factories import PlatformOperatorFactory
 from apps.ledger import services
-from apps.ledger.models import LedgerEntry
+from apps.ledger.models import LedgerEntry, Refund, RefundChannel
+from apps.orders.tests.factories import VendorOrderFactory
 from apps.vendors.tests.factories import VendorFactory
 
 
@@ -60,3 +61,21 @@ class LedgerEntryFactory(DjangoModelFactory[LedgerEntry]):
             vendor_order=kwargs.get("vendor_order"),
         )
         return LedgerEntry.objects.get(idempotency_key=kwargs["idempotency_key"])
+
+
+class RefundFactory(DjangoModelFactory[Refund]):
+    """An outside-the-platform mark (D-41): moves no money, so it needs no provider or ledger
+    line. The vendor order belongs to `vendor`."""
+
+    class Meta:
+        model = Refund
+        skip_postgeneration_save = True
+
+    vendor = factory.SubFactory(VendorFactory)
+    vendor_order = factory.SubFactory(VendorOrderFactory, vendor=factory.SelfAttribute("..vendor"))
+    channel = RefundChannel.OUTSIDE_PLATFORM
+    idempotency_key = factory.Sequence(lambda n: f"test-refund-{n}")
+    request = factory.LazyFunction(lambda: {"mode": "amount", "lines": [], "amount": "5.00"})
+    refunded_gross = Decimal("5.00")
+    declared_date = factory.LazyFunction(dt.date.today)
+    declared_method = "bank transfer"

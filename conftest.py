@@ -1,10 +1,13 @@
 """Root pytest configuration: every test belongs to exactly one suite (ADR-0006).
 
 The suite comes from the directory: .../tests/unit/, .../tests/integration/ or tests/e2e/.
+The attack scenarios in tests/security/ (SEC.5) run in the integration suite, on every PR, and
+also carry the `security` marker (`pytest -m security`).
 Test data comes from factory_boy factories, reseeded before every test (ARC.12).
 """
 
 import os
+import zlib
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -54,6 +57,8 @@ def english_interface(default_languages: None) -> "Iterator[None]":
 FACTORY_SEED = int(os.environ.get("MPMV_TEST_SEED", "20271"))
 
 SUITES = ("unit", "integration", "e2e")
+# Directories whose tests join a suite under another name: attack scenarios need the full stack.
+SUITE_ALIASES = {"security": "integration"}
 
 # Hypothesis profiles for every `@given` test (SEC.5). `ci` is the default: a fixed example
 # sequence, no example database and no per-example deadline, because one slow example on a
@@ -92,19 +97,50 @@ def suite_for(path: Path) -> str | None:
     for part in reversed(path.parts[:-1]):
         if part in SUITES:
             return part
+        if part in SUITE_ALIASES:
+            return SUITE_ALIASES[part]
     return None
 
 
+def _shard_selector() -> tuple[int, int] | None:
+    """ARC.34: `MPMV_TEST_SHARD=i/N` (1-based) keeps only the tests whose hash falls in shard i.
+
+    The split is by test id (crc32): deterministic, no timing data, evenly sized, and every test
+    runs in exactly one shard.
+    """
+    raw = os.environ.get("MPMV_TEST_SHARD", "").strip()
+    if not raw:
+        return None
+    index, _, total = raw.partition("/")
+    if not (index.isdigit() and total.isdigit() and 1 <= int(index) <= int(total)):
+        raise pytest.UsageError(f"MPMV_TEST_SHARD must look like 2/4, got {raw!r}")
+    return int(index), int(total)
+
+
+def _in_shard(item: pytest.Item, index: int, total: int) -> bool:
+    return zlib.crc32(item.nodeid.encode()) % total == index - 1
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    shard = _shard_selector()
+    if shard is not None:
+        kept = [item for item in items if _in_shard(item, *shard)]
+        dropped = [item for item in items if not _in_shard(item, *shard)]
+        if dropped:
+            config.hook.pytest_deselected(items=dropped)
+        items[:] = kept
     for item in items:
         suite = suite_for(Path(str(item.path)))
         if suite is None:
             raise pytest.UsageError(
-                f"{item.nodeid}: tests must live under tests/unit, tests/integration or tests/e2e"
+                f"{item.nodeid}: tests must live under tests/unit, tests/integration, tests/e2e "
+                "or tests/security"
             )
         if suite == "unit" and item.get_closest_marker("django_db") is not None:
             raise pytest.UsageError(f"{item.nodeid}: unit tests must not use the database")
         item.add_marker(getattr(pytest.mark, suite))
+        if "security" in Path(str(item.path)).parts[:-1]:
+            item.add_marker(pytest.mark.security)
         if _flushes_database(item):
             # Under xdist (--dist loadgroup) a transactional test flushes the rows its worker's
             # database got from data migrations. pytest-django runs those tests last; the group
@@ -143,6 +179,26 @@ def _reproducible_factories(factory_seed: int) -> None:
     factory.random.reseed_random(factory_seed)
     for factory_class in app_factories():
         factory_class.reset_sequence()
+
+
+@pytest.fixture(autouse=True)
+def _migration_tests_start_from_flushed_tables(request: pytest.FixtureRequest) -> None:
+    """A test that rolls migrations back starts from empty tables, whatever ran before it.
+
+    Reversing past `events.0002` deletes the event pages through historical models; with rows
+    left by `post_migrate` (the Events index page) that delete cascades into tables of models the
+    same rollback has already dropped (`cms_blogindexpage`, ...). The old single-job run only
+    passed because an earlier transactional test had flushed its worker's database (ARC.34: a
+    shard may start with the migration test). The test would flush the database afterwards
+    anyway, and these tests run last (see `xdist_group` above).
+    """
+    module = request.module
+    if "MigrationExecutor" not in vars(module) or not _flushes_database(request.node):
+        return
+    request.getfixturevalue("transactional_db")
+    from django.core.management import call_command
+
+    call_command("flush", interactive=False, inhibit_post_migrate=True, verbosity=0)
 
 
 @pytest.fixture(autouse=True)

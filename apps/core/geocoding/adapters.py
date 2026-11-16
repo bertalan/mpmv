@@ -53,9 +53,9 @@ def http_get_json(
     carry a key); the original exception is dropped from the chain for the same reason.
     """
     full_url = f"{url}?{urllib.parse.urlencode(params)}" if params else url
-    request = urllib.request.Request(full_url, headers=dict(headers), method="GET")  # noqa: S310
+    request = urllib.request.Request(full_url, headers=dict(headers), method="GET")  # noqa: S310 (adapter's fixed https base URL)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 (adapter's fixed https base URL)
             body = response.read()
     except urllib.error.HTTPError as exc:
         if exc.code in _RATE_LIMIT_STATUSES:

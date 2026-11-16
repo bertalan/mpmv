@@ -3,9 +3,13 @@
 {% block title %}{% translate "Cookie settings" %} · {{ site_name }}{% endblock %}
 {% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 {% block page_content %}
-  <article class="consent-preferences" data-consent-preferences>
+  <article class="consent-preferences" data-consent-preferences data-saved="{% translate 'Your cookie choice was saved.' %}" data-none="{% translate 'Only necessary cookies are on.' %}" data-some="{% translate 'Optional cookies on:' %}">
     <h1>{% translate "Cookie settings" %}</h1>
     <p>{% translate "We always use the cookies the site needs to work. We only use the others if you say yes. You can change your mind here at any time." %}</p>
+    <div class="consent-notice" role="status" data-consent-notice{% if not saved %} hidden{% endif %}>{% if saved %}
+      <p><strong>{% translate "Your cookie choice was saved." %}</strong></p>
+      <p>{% if optional_on %}{% translate "Optional cookies on:" %} {{ optional_on|join:", " }}.{% else %}{% translate "Only necessary cookies are on." %}{% endif %}</p>
+    {% endif %}</div>
     {% if decided %}<p>{% translate "Your choice is saved on this device for six months." %}</p>{% endif %}
     <form method="post" action="{{ action_url }}" data-consent-form>
       <input type="hidden" name="next" value="{{ preferences_url }}">

@@ -10,17 +10,21 @@ verification; JSON clients get 403.
 from collections.abc import Callable
 from typing import Any
 
+from django.contrib.auth.models import AnonymousUser
 from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from django.utils import translation
 
+from apps.core.http import client_ip
 from apps.core.i18n import configured_languages, translate_path
 
-from . import levels
+from . import levels, lifetimes, services
 from .decorators import MFA_EXEMPT_ATTR, mfa_redirect
 from .mfa_session import is_verified
+from .models import User
 from .services import has_second_factor, mfa_required
 from .session_language import SESSION_LANGUAGE_KEY
+from .session_store import generation_matches, touch_session
 
 # Signing out is always possible: the staff admin's and the editors' (Wagtail, CMS.1).
 EXEMPT_VIEW_NAMES = frozenset({"admin:logout", "wagtailadmin_logout"})
@@ -108,3 +112,43 @@ class PreferredLanguageMiddleware:
         return translate_path(path, language) != path or (
             translation.get_language_from_path(path) is not None
         )
+
+
+class SessionIndexMiddleware:
+    """CORE.24: keep the session index fresh and name the request's session to the services.
+
+    A session whose copy of the user's session generation is old was ended (also when the
+    index never saw it): it is flushed and the request is anonymous. A session whose role-based
+    lifetime is over (`lifetimes.enforce`, CORE.24 part 2) is ended, audited and sent to the
+    login. Otherwise the request
+    refreshes its `UserSession` row at most every `SESSION_TOUCH_SECONDS` (at once when the row
+    is missing), never the session data, so the session's expiry does not move. The request's
+    session is bound for `services.end_sessions_after_change`, so a change a user makes to their
+    own account keeps the session they made it from.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        session = getattr(request, "session", None)
+        user = getattr(request, "user", None)
+        if session is not None and isinstance(user, User) and user.is_authenticated:
+            if not generation_matches(user, session):
+                # This user's sessions were ended after this one signed in (CORE.24).
+                session.flush()
+                request.user = AnonymousUser()
+            elif (ended := lifetimes.enforce(request)) is not None:
+                return ended  # the idle or absolute lifetime is over (CORE.24 part 2)
+            else:
+                touch_session(
+                    user,
+                    session,
+                    user_agent=request.headers.get("user-agent"),
+                    ip=client_ip(request),
+                )
+        token = services.bind_current_session(session)
+        try:
+            return self.get_response(request)
+        finally:
+            services.unbind_current_session(token)

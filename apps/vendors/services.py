@@ -38,6 +38,7 @@ from apps.accounts.services import (
     Enrolment,
     action_link_path,
     email_bound_link,
+    end_sessions_after_change,
     enrol_totp_key,
     has_second_factor,
     issue_action_token,
@@ -489,7 +490,7 @@ def ensure_vendor_can_write(vendor: Vendor) -> str:
         raise RuntimeError("ensure_vendor_can_write must run inside the write transaction")
     with connection.cursor() as cursor:
         cursor.execute(
-            f"SELECT status FROM {connection.ops.quote_name(Vendor._meta.db_table)} "  # noqa: S608
+            f"SELECT status FROM {connection.ops.quote_name(Vendor._meta.db_table)} "  # noqa: S608 (quoted model name, bound id)
             "WHERE id = %s FOR SHARE",
             [vendor.pk],
         )
@@ -548,7 +549,13 @@ def add_member(
         member = VendorMember(vendor=locked, user=user, role=role)
         changes = ChangeSet()
         changes.create(MEMBER_MODEL, str(member.public_id), member_snapshot(member))
-        run_mutation(changes, member.save, ctx=ctx, action=MEMBER_ADDED, dry_run=dry_run)
+
+        def apply_add() -> None:
+            member.save()
+            # CORE.24: a membership change ends the user's other sessions.
+            end_sessions_after_change(user, reason="membership", ctx=ctx)
+
+        run_mutation(changes, apply_add, ctx=ctx, action=MEMBER_ADDED, dry_run=dry_run)
     return changes
 
 
@@ -573,6 +580,7 @@ def change_member_role(
         def apply() -> None:
             current.role = role
             current.save(update_fields=["role", "updated_at"])
+            end_sessions_after_change(current.user, reason="membership", ctx=ctx)  # CORE.24
 
         run_mutation(changes, apply, ctx=ctx, action=MEMBER_ROLE_CHANGED, dry_run=dry_run)
 
@@ -596,6 +604,7 @@ def remove_member(member: VendorMember, *, ctx: AuditContext, dry_run: bool = Fa
 
         def apply() -> None:
             current.delete()
+            end_sessions_after_change(current.user, reason="membership", ctx=ctx)  # CORE.24
 
         run_mutation(changes, apply, ctx=ctx, action=MEMBER_REMOVED, dry_run=dry_run)
     return changes
@@ -609,6 +618,14 @@ def member_role(user: User, vendor: Vendor) -> str | None:
     return (
         VendorMember.objects.filter(user=user, vendor=vendor).values_list("role", flat=True).first()
     )
+
+
+def is_vendor_owner(user: AbstractBaseUser | AnonymousUser, vendor: object) -> bool:
+    """Whether `user` is an active OWNER member of `vendor` now (`settings.SHOP_OWNER_CHECK`: the
+    passkey levels let a shop owner confirm its own shop's owner actions, D-32 amendment)."""
+    if not (isinstance(vendor, Vendor) and isinstance(user, User) and user.is_active):
+        return False
+    return member_role(user, vendor) == engine.OWNER
 
 
 def has_vendor_permission(user: User, vendor: Vendor, action: str) -> bool:

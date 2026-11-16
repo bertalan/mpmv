@@ -57,7 +57,9 @@ PAIRS = (
     ContrastPair("color.on-secondary", "color.secondary-hover", TEXT),
     ContrastPair("color.secondary-text", "color.surface", TEXT),
     ContrastPair("color.text-inverse", "color.surface-inverse", TEXT),
+    # Level colours used as text (`.text-danger`, `.text-success`) on the plain surface.
     ContrastPair("color.danger", "color.surface", TEXT),
+    ContrastPair("color.success", "color.surface", TEXT),
     # The raised surface (alerts, footer) carries body text and links (THM.4).
     ContrastPair("color.text", "color.surface-raised", TEXT),
     ContrastPair("color.text-muted", "color.surface-raised", TEXT),
@@ -75,7 +77,6 @@ PAIRS = (
     ContrastPair("color.danger", "color.surface-raised", UI),
     # The library's indicator bars on the plain surface: a cart line's problem, a toast (THM.4).
     ContrastPair("color.warning", "color.surface", UI),
-    ContrastPair("color.success", "color.surface", UI),
 )
 
 TOKEN_CONTRACT = TokenContract(required=(*COLOURS, *OTHER), pairs=PAIRS)

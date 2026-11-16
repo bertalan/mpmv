@@ -22,7 +22,7 @@ from django.db.models import QuerySet
 from django.utils import timezone
 from django_otp import devices_for_user
 
-from apps.accounts.models import ElevationGrant, User
+from apps.accounts.models import ElevationGrant, User, UserSession
 from apps.cart.models import Cart
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
@@ -252,6 +252,7 @@ def _purge_sessions(user: User) -> None:
     for session in Session.objects.filter(expire_date__gt=timezone.now()):
         if session.get_decoded().get("_auth_user_id") == key:
             session.delete()
+    UserSession.objects.filter(user=user).delete()  # CORE.24: the session index goes too
 
 
 def _erase_outbox(address: str, tombstone: str) -> None:

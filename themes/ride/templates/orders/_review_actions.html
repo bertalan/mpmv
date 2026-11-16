@@ -1,0 +1,14 @@
+{% load i18n %}{% comment %}
+The "Place order" button, or what to do instead (THM.16: Bootstrap buttons). It sits outside
+#review-body, next to the captcha widget; a shipping change sends this block out of band
+(`oob`), so the Turnstile widget is never replaced and keeps its token.
+{% endcomment %}<div id="review-actions"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {% if placeable %}
+    <p class="form-text">{% translate "When you place the order we hold the items for you. Payment follows in the next step." %}</p>
+    {% include "orders/_legal_boxes.html" %}
+    <button type="submit" class="btn btn-primary btn-lg">{{ pay_label }}</button>
+  {% else %}
+    <p class="form-text">{% translate "Solve the points above to place the order." %}</p>
+    <p><a class="btn btn-outline-secondary btn-lg" href="{% url 'orders:cart' %}">{% translate "Back to the cart" %}</a></p>
+  {% endif %}
+</div>

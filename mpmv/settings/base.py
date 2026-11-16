@@ -138,6 +138,8 @@ MIDDLEWARE = [
     # SEC.14: rate limit and captcha for Wagtail's page view restriction forms (after CSRF).
     "apps.cms.middleware.PageRestrictionProtectionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # CORE.24: the per-user session index (last use) and the session a self-service change keeps.
+    "apps.accounts.middleware.SessionIndexMiddleware",
     # I18N.12: the stored language of a signed-in user on unprefixed areas (Manager, account).
     "apps.accounts.middleware.PreferredLanguageMiddleware",
     # SEC.5: pages for a signed-in user are never stored by a shared cache.
@@ -181,6 +183,8 @@ STEP_UP_DECORATOR = "apps.accounts.decorators.step_up_required"
 # Path prefixes whose requests (polling) do not count as activity for the passkey window (CORE.25).
 SESSION_LEVEL_POLL_PATHS: tuple[str, ...] = ()
 LEVEL_DECORATOR = "apps.accounts.decorators.requires_level"  # CORE.25 (D-32)
+# Shop ownership for the passkey levels (D-32 amendment 2026-11-14): accounts never imports vendors.
+SHOP_OWNER_CHECK = "apps.vendors.services.is_vendor_owner"
 # Role-matrix check (CORE.18) for admin pages of lower apps, which cannot import the Manager.
 PLATFORM_SECTION_CHECK = "apps.manager.access.may_access_section"
 # The Manager login (CORE.17): where the Manager gate sends anonymous visitors.
@@ -239,9 +243,10 @@ ORDER_PAYMENT_STARTER = "apps.payments.checkout.start_payment"
 # PAY.1: the callable that fetches the browser-side secret of an order's payment from the provider
 # (`(provider_ref, order_ref) -> str`); the secret is never kept in the session.
 ORDER_PAYMENT_BROWSER_HOOK = "apps.payments.checkout.client_secret_for"
-# PAY.3 sets this True once the per-vendor transfers exist. Until then a payment would stay whole on
-# the platform account (against D-08), so `manage.py check` refuses LIVE_DATA (payments.E004).
-PAYMENTS_TRANSFERS_WIRED = False
+# PAY.3: True because a paid order now posts the vendor ledger lines and queues one transfer per
+# vendor package (apps.ledger.settlement). Were it False, a payment would stay whole on the
+# platform account (against D-08) and `manage.py check` would refuse LIVE_DATA (payments.E004).
+PAYMENTS_TRANSFERS_WIRED = True
 
 # Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
 # that lists the active vendors established outside a new allowed set.
@@ -603,6 +608,9 @@ STRIPE_SECRET_KEY = env_str("MPMV_STRIPE_SECRET_KEY", "")
 # Public by design: Stripe.js in the browser needs it. Never the secret key.
 STRIPE_PUBLISHABLE_KEY = env_str("MPMV_STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = env_str("MPMV_STRIPE_WEBHOOK_SECRET", "")
+# Optional second signing secret: the Stripe "Connected accounts" endpoint (account.updated) has
+# its own. Empty: ignored. The same URL accepts events signed with either secret.
+STRIPE_CONNECT_WEBHOOK_SECRET = env_str("MPMV_STRIPE_CONNECT_WEBHOOK_SECRET", "")
 STRIPE_API_VERSION = env_str("MPMV_STRIPE_API_VERSION", "")  # empty: the account's default
 STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300  # Stripe's recommended replay window
 
@@ -635,6 +643,15 @@ SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 # Everything is same-origin: no other site embeds our resources (apps.core.middleware).
 CROSS_ORIGIN_RESOURCE_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
+# CORE.24: Django's database backend, which also keeps the per-user session index in step.
+SESSION_ENGINE = "apps.accounts.session_store"
+SESSION_TOUCH_SECONDS = 300  # how often a request refreshes its session's "last used" time
+# CORE.24 part 2: the role-based lifetimes (values on the PlatformOperator, `core.session_policy`).
+SESSION_ACTIVITY_SECONDS = 60  # how often a request counts as use for the idle timeout
+SESSION_EXPIRY_GRACE_SECONDS = 3600  # the stored session outlives its deadline by this, to explain
+# Extra `check(user) -> bool` paths for the staff lifetime, beyond staff, superusers and every role
+# in MFA_REQUIRED_POLICIES. Platform staff need not hold `is_staff` (spec 02 Q-34).
+SESSION_STAFF_CHECKS: list[str] = ["apps.manager.access.is_platform_staff"]
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = True

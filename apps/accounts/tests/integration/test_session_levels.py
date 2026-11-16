@@ -617,6 +617,8 @@ WIRED = {
     "notice_decision",
     "sales_terms_publish",
     "bulk_edit",
+    "sessions_end_user",  # CORE.24
+    "sessions_end_all",  # CORE.24
 }
 # Actions whose web view does not exist yet: nothing to decorate (follow-ups in the PR).
 NOT_BUILT = {"tax_in_clear", "export", "backup", "impersonation"}
@@ -672,6 +674,9 @@ MANAGER_UNGATED: dict[str, str] = {
         "answers with the format form and the embed of an own image already chosen: stores nothing"
     ),
     "apps.manager.views.LoginView": "the sign-in form itself, before any session level exists",
+    "apps.manager.session_views.UserLookupView": (
+        "finds an account by email (CORE.24): a read sent as POST so the email stays out of URLs"
+    ),
     "apps.manager.views.logout": "sign-out: ends the session, nothing to protect",
 }
 MUTATING = ("post", "put", "patch", "delete")
@@ -1222,3 +1227,85 @@ def test_an_expired_unspent_grant_does_not_block_a_new_one() -> None:
     levels.create_grant("s", user, "export", "d", ttl=-5)
     levels.create_grant("s", user, "export", "d", ttl=120)
     assert levels.spend_grant("s", user, "export", "d")
+
+
+# --- D-32 amendment (owner 2026-11-14): shop owners confirm their own shop's owner actions
+
+
+def test_staff_with_elevate_keep_the_full_prompt_with_no_shop_note(client: Client) -> None:
+    user, _ = _staff_with_passkey()
+    _no_window_session(client, user)
+    refused = client.get(reverse("test-export"))
+    assert refused.context["can_do_once"]
+    assert refused.context["can_elevate"]
+    assert not refused.context["shop_window"]
+    assert "never covers another shop" not in refused.content.decode()
+    assert not client.session.get(levels.SHOP_OFFERS_KEY)
+
+
+def test_a_user_without_elevate_and_without_a_shop_is_never_offered_a_confirmation(
+    client: Client,
+) -> None:
+    user, _ = _staff_with_passkey(elevate=False)
+    _no_window_session(client, user)
+    refused = client.get(reverse("test-export"))
+    assert not refused.context["can_do_once"]
+    assert "Your role may not open a passkey window" in refused.content.decode()
+    for action in sorted(levels.SHOP_OWNER_ACTIONS):
+        assert not levels.may_confirm(user, action, None)
+
+
+# --- Losing `elevate` with the session kept (CORE.25, #510 review: checked live on every use)
+
+
+def _lose_elevate(user: User, how: str) -> None:
+    """Take away what `may_elevate` needs straight in the database, so no session ends."""
+    from django.contrib.auth.models import Group
+
+    from apps.accounts.models import PasskeyDevice
+
+    if how == "permission":
+        user.user_permissions.remove(Permission.objects.get(codename=levels.ELEVATE_CODENAME))
+    elif how == "group":
+        for group in Group.objects.filter(user=user):
+            group.permissions.clear()
+    else:
+        PasskeyDevice.objects.filter(user=user).delete()
+
+
+def _staff_with_passkey_via(how: str) -> tuple[User, FakeAuthenticator]:
+    """Staff who may elevate, holding `elevate` through a group when `how` is "group"."""
+    if how != "group":
+        return _staff_with_passkey()
+    from django.contrib.auth.models import Group
+
+    user, authenticator = _staff_with_passkey(elevate=False)
+    group = Group.objects.create(name=f"elevators-{secrets.token_hex(4)}")
+    group.permissions.add(Permission.objects.get(codename=levels.ELEVATE_CODENAME))
+    user.groups.add(group)
+    return user, authenticator
+
+
+@pytest.mark.parametrize("how", ["permission", "group", "passkey"])
+def test_an_open_window_stops_covering_once_elevate_is_lost_with_the_session_kept(
+    client: Client, how: str
+) -> None:
+    user, authenticator = _staff_with_passkey_via(how)
+    _no_window_session(client, user)
+    assert _elevate(client, authenticator).status_code == 200
+    assert client.get(reverse("test-export")).status_code == 200
+    _lose_elevate(user, how)
+    assert client.session.get(levels.STARTED_KEY) is not None  # the session and window stay
+    assert client.get(reverse("test-export")).status_code == 403
+
+
+@pytest.mark.parametrize("how", ["permission", "group", "passkey"])
+def test_a_pending_do_it_once_grant_is_refused_once_elevate_is_lost(
+    client: Client, how: str
+) -> None:
+    user, authenticator = _staff_with_passkey_via(how)
+    _no_window_session(client, user)
+    refused = client.get(reverse("test-export"))
+    assert _do_it_once(client, authenticator, refused).status_code == 200
+    _lose_elevate(user, how)
+    assert client.get(reverse("test-export")).status_code == 403

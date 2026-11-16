@@ -12,7 +12,8 @@ inside the form of orders/review.html; the captcha widget and the actions stay o
     {% if business and vat_note %}{% include "components/alert.html" with level=vat_ok|yesno:"success,info" message=vat_note only %}{% endif %}
   </section>
   {% for package in packages %}{% include "orders/_package.html" with package=package mode="review" %}{% endfor %}
-  <noscript><p><button type="submit" class="button button--secondary" formaction="{% url 'orders:shipping' %}">{% translate "Update shipping" %}</button></p></noscript>
+  {% include "orders/_legal_recap.html" %}
+  <noscript><p><button type="submit" class="button button--secondary" formaction="{% url 'orders:shipping' %}" formnovalidate>{% translate "Update shipping" %}</button></p></noscript>
   {% if order %}{% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=order.lines total=order.total note=order.note only %}{% endif %}
   {% if ordering_closed %}{% include "components/alert.html" with level="info" message=_("Ordering is not open yet. Your cart is kept.") only %}{% endif %}
 </div>

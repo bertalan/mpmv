@@ -1,8 +1,13 @@
 # CI pipeline (ARC.4, ADR-0006). All jobs are required before merging into main.
+# ARC.34 (CI speed): the test job runs as parallel shards behind the stable "Unit + integration"
+# aggregate; a docs-only PR skips the image and E2E jobs, whose gate jobs ("Container image",
+# "E2E (Playwright)") still report success. Branch protection requires the gate names only.
 name: CI
 
 on:
   pull_request:
+    # ready_for_review: a draft skips E2E and the image build; marking it ready must run them.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
@@ -22,6 +27,38 @@ env:
   DATABASE_URL: postgres://mpmv@localhost:5432/mpmv
 
 jobs:
+  changes:
+    # ARC.34: decides whether the heavy jobs (image, E2E) run. A pull request that touches only
+    # docs, Markdown, spec files or locale catalogs skips them; push events and everything else
+    # run them. Static checks, secret scan and the tests always run.
+    name: Changed files
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      heavy: ${{ steps.scope.outputs.heavy }}
+    steps:
+      - name: Heavy jobs needed?
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          heavy=true
+          if [ "$EVENT" = pull_request ]; then
+            if files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename') && [ -n "$files" ]; then
+              echo "$files"
+              if ! echo "$files" | grep -Evq '^docs/|\.md$|^locale/[^/]+/LC_MESSAGES/django\.(po|mo)$'; then
+                heavy=false
+              fi
+            else
+              echo "::warning::could not list the changed files; running every job"
+            fi
+          fi
+          echo "heavy=$heavy" | tee -a "$GITHUB_OUTPUT"
+
   static:
     name: Static checks
     runs-on: ubuntu-24.04
@@ -30,6 +67,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
+          cache-dependency-glob: uv.lock
       - run: uv sync
       - name: Ruff (lint + format)
         run: |
@@ -85,7 +123,72 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   tests:
-    name: Unit + integration
+    # ARC.34: N parallel shards (MPMV_TEST_SHARD=i/N, conftest.py), each on its own runner and its
+    # own PostgreSQL service. The required "Unit + integration" check is the aggregate below.
+    name: Unit + integration (shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mpmv
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mpmv
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mpmv -d mpmv"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync
+      # Throwaway service database: durability is worthless here, and the migration and flush
+      # tests write a lot. All three settings reload without a restart.
+      - name: PostgreSQL without fsync
+        run: |
+          psql "$DATABASE_URL" -c "ALTER SYSTEM SET fsync = off" \
+            -c "ALTER SYSTEM SET synchronous_commit = off" \
+            -c "ALTER SYSTEM SET full_page_writes = off" -c "SELECT pg_reload_conf()"
+      # No coverage here: branch tracing roughly doubles the run time, and no CI gate has a
+      # coverage threshold (the nightly job and `make test` report it), so there is nothing to
+      # combine across shards.
+      - name: Pytest (unit + integration, shard ${{ matrix.shard }}/4)
+        env:
+          MPMV_TEST_SHARD: ${{ matrix.shard }}/4
+        run: >-
+          uv run pytest -n auto --dist loadgroup --durations=40 -m "unit or integration"
+          --junitxml=build/reports/junit-${{ matrix.shard }}.xml
+      - name: Store reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-shard-${{ matrix.shard }}
+          path: build/reports/
+
+  shard-check:
+    # ARC.34: the shards together collect exactly the full "unit or integration" suite, each test
+    # once (tools/check_test_shards.py). Collection only: no database.
+    name: Test shards cover the suite
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync
+      - run: uv run python tools/check_test_shards.py 4
+
+  tests-extra:
+    # Checks that used to follow the pytest step of the single test job; they run beside the shards.
+    name: Language and upgrade checks
     runs-on: ubuntu-24.04
     services:
       postgres:
@@ -103,19 +206,13 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
+          cache-dependency-glob: uv.lock
       - run: uv sync
-      # Throwaway service database: durability is worthless here, and the migration and flush
-      # tests write a lot. All three settings reload without a restart.
       - name: PostgreSQL without fsync
         run: |
           psql "$DATABASE_URL" -c "ALTER SYSTEM SET fsync = off" \
             -c "ALTER SYSTEM SET synchronous_commit = off" \
             -c "ALTER SYSTEM SET full_page_writes = off" -c "SELECT pg_reload_conf()"
-      # No coverage here: branch tracing roughly doubles the run time. `make test` still reports it.
-      - name: Pytest (unit + integration)
-        run: >-
-          uv run pytest -n auto --dist loadgroup --durations=40 -m "unit or integration"
-          --junitxml=build/reports/junit.xml
       # I18N.15: the unit suite again with English absent from the site languages (primary Italian,
       # then German): no test may assume `en`. Unit tests need no database; about one minute.
       - name: Pytest (unit, MPMV_LANGUAGES=it,de)
@@ -136,12 +233,21 @@ jobs:
           uv run python manage.py migrate manager 0001
           uv run python manage.py shell -c "from django.contrib.auth.models import Group; Group.objects.all().delete()"
           uv run python manage.py migrate
-      - name: Store reports
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-reports
-          path: build/reports/
+
+  tests-gate:
+    # Branch protection requires this exact name. It passes only when every shard, the shard
+    # coverage check and the extra checks passed (runs even when one failed or was cancelled).
+    name: Unit + integration
+    needs: [tests, shard-check, tests-extra]
+    if: always()
+    runs-on: ubuntu-24.04
+    env:
+      RESULTS: ${{ needs.tests.result }} ${{ needs.shard-check.result }} ${{ needs.tests-extra.result }}
+    steps:
+      - name: Every shard and check passed
+        run: |
+          echo "results: $RESULTS"
+          for r in $RESULTS; do test "$r" = success || exit 1; done
 
   image-build:
     # ARC.5: the Containerfile builds on a standard OCI builder (ADR-0002) and the image migrates,
@@ -153,7 +259,8 @@ jobs:
     name: Container image (${{ matrix.arch }})
     # Draft PRs run the light jobs only (runner time, owner 2026-11-11); ready PRs, merge trains and
     # main run everything, so nothing reaches main without this job.
-    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    needs: changes
+    if: ${{ needs.changes.outputs.heavy == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
     strategy:
       fail-fast: false
       matrix:
@@ -224,21 +331,28 @@ jobs:
     # Branch protection requires this check. It passes only when both architectures passed; it
     # runs even when a build fails, because a skipped required check would count as passing.
     name: Container image
-    needs: image-build
+    # ARC.34: also a pass when the build was skipped on purpose (draft PR, docs-only PR).
+    needs: [changes, image-build]
     if: always()
     runs-on: ubuntu-24.04
     env:
       BUILD_RESULT: ${{ needs.image-build.result }}
+      CHANGES_RESULT: ${{ needs.changes.result }}
+      HEAVY: ${{ needs.changes.outputs.heavy }}
       IS_DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
     steps:
-      - name: Both architectures built and passed (skipped only on a draft PR)
-        run: test "$BUILD_RESULT" = success || { test "$IS_DRAFT" = true && test "$BUILD_RESULT" = skipped; }
+      - name: Both architectures built and passed (skipped only on a draft or docs-only PR)
+        run: |
+          test "$CHANGES_RESULT" = success || exit 1
+          test "$BUILD_RESULT" = success && exit 0
+          test "$BUILD_RESULT" = skipped && { test "$IS_DRAFT" = true || test "$HEAVY" = false; }
 
   e2e:
-    name: E2E (Playwright)
+    name: E2E (Playwright) run
     # Draft PRs run the light jobs only (runner time, owner 2026-11-11); ready PRs, merge trains and
     # main run everything, so nothing reaches main without this job.
-    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    needs: changes
+    if: ${{ needs.changes.outputs.heavy == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     services:
       postgres:
@@ -256,9 +370,10 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
+          cache-dependency-glob: uv.lock
       - run: uv sync
       - name: Cache Playwright browsers
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('uv.lock') }}
@@ -319,3 +434,22 @@ jobs:
         with:
           name: e2e-reports
           path: build/reports/
+
+  e2e-gate:
+    # Branch protection requires this exact name; the run job above is named differently so a
+    # skipped run (draft or docs-only PR) still leaves a passing "E2E (Playwright)" check.
+    name: E2E (Playwright)
+    needs: [changes, e2e]
+    if: always()
+    runs-on: ubuntu-24.04
+    env:
+      E2E_RESULT: ${{ needs.e2e.result }}
+      CHANGES_RESULT: ${{ needs.changes.result }}
+      HEAVY: ${{ needs.changes.outputs.heavy }}
+      IS_DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
+    steps:
+      - name: E2E passed (skipped only on a draft or docs-only PR)
+        run: |
+          test "$CHANGES_RESULT" = success || exit 1
+          test "$E2E_RESULT" = success && exit 0
+          test "$E2E_RESULT" = skipped && { test "$IS_DRAFT" = true || test "$HEAVY" = false; }

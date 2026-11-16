@@ -76,7 +76,7 @@ def has_active_account(vendor: Vendor) -> bool:
     ).exists()
 
 
-DEMO_ACCOUNT_PREFIX = "acct_demo_"
+DEMO_ACCOUNT_PREFIX = stripe_engine.DEMO_ACCOUNT_PREFIX
 
 
 def record_demo_account(

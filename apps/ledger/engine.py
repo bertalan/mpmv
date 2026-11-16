@@ -18,6 +18,8 @@ COMMISSION = "commission"
 PAYMENT_FEE = "payment_fee"
 REFUND = "refund"
 COMMISSION_REVERSAL = "commission_reversal"
+PAYMENT_FEE_REVERSAL = "payment_fee_reversal"
+TRANSFER_REVERSAL = "transfer_reversal"
 REFUND_FEE = "refund_fee"
 ADJUSTMENT = "adjustment"
 PAYOUT = "payout"
@@ -26,9 +28,20 @@ PLAN_FEE = "plan_fee"
 BUNDLE_DISCOUNT_VENDOR_FUNDED = "bundle_discount_vendor_funded"
 BUNDLE_DISCOUNT_PLATFORM_FUNDED = "bundle_discount_platform_funded"
 
-# Money the vendor is owed: the sale and shipping it collected, the commission given back on a
-# refund, and a discount the platform funds.
-CREDIT_KINDS = frozenset({SALE, SHIPPING, COMMISSION_REVERSAL, BUNDLE_DISCOUNT_PLATFORM_FUNDED})
+# Money the vendor is owed: the sale and shipping it collected, the commission and the collection
+# cost given back on a refund (PAY.4), a transfer taken back from its account by a refund (the
+# balance the platform owes it rises again by what the provider took back), and a discount the
+# platform funds.
+CREDIT_KINDS = frozenset(
+    {
+        SALE,
+        SHIPPING,
+        COMMISSION_REVERSAL,
+        PAYMENT_FEE_REVERSAL,
+        TRANSFER_REVERSAL,
+        BUNDLE_DISCOUNT_PLATFORM_FUNDED,
+    }
+)
 # Money the vendor owes or was paid: fees, refunds, discounts it funds, and what was sent to it.
 DEBIT_KINDS = frozenset(
     {

@@ -26,7 +26,7 @@ Keys are the namespaced URL name, or the route when the pattern has no name (as 
 
 from collections.abc import Callable
 
-from apps.accounts.tests.factories import TOTPDeviceFactory
+from apps.accounts.tests.factories import TOTPDeviceFactory, UserSessionFactory
 from apps.compliance.tests.factories import NoticeFactory
 from tests.tenancy import CrossTenant
 
@@ -61,6 +61,10 @@ PUBLIC: dict[str, str] = {
     "orders:cart": (
         "Cart page (ORD.5): shows the visitor's own cart, found from their session; a POST "
         "changes only that cart, is CSRF-checked and has a per-IP budget."
+    ),
+    "orders:cart_add": (
+        "Add to cart from the product page (ORD.19): a POST that adds only to the visitor's own "
+        "cart, is CSRF-checked, has a per-IP budget and checks the sales mode on the server."
     ),
     "orders:checkout": (
         "Checkout details form (ORD.5): public by design for guests; the page redirects to the "
@@ -184,7 +188,9 @@ CSRF_EXEMPT: dict[str, str] = {
 API_CSRF_REASON = "API v1: bearer API key only, the session cookie never authenticates."
 
 # Tables any request may write: the session store (sign-in state, language, messages).
-GET_WRITES_ALLOWED: frozenset[str] = frozenset({"django_session"})
+# The per-user session index (CORE.24) is part of the session store: a signed-in request
+# refreshes its own row's "last used" time, at most every few minutes.
+GET_WRITES_ALLOWED: frozenset[str] = frozenset({"django_session", "accounts_usersession"})
 
 # IDOR review: a web endpoint or API operation whose URL carries an identifier (a public id, a
 # slug, a token, a page id) must be `VendorScoped` or `StaffOnly` in `tests.tenancy_registry`,
@@ -199,6 +205,10 @@ IDOR_REVIEWED: dict[str, str] = {
     "mfa:remove_device": (
         "The factor is looked up among the signed-in user's own (CORE.4); another user's factor "
         "answers 404 (`test_a_user_cannot_remove_another_users_second_factor`)."
+    ),
+    "sessions:end_one": (
+        "The session is looked up among the signed-in user's own (CORE.24); another user's "
+        "session answers 404 and stays (`test_a_user_cannot_end_another_users_session`)."
     ),
     "action_link:open": (
         "The signed token is bound to one user and one object (CORE.15); a token of another "
@@ -256,6 +266,9 @@ OBJECT_PATHS: dict[str, ObjectKwargs] = {
     "mfa:remove_device": lambda tenants: {
         "kind": "totp",
         "public_id": str(TOTPDeviceFactory.create(user=tenants.b.owner).pk),
+    },
+    "sessions:end_one": lambda tenants: {
+        "public_id": str(UserSessionFactory.create(user=tenants.b.owner).public_id),
     },
     "vendor_claim:claim": lambda tenants: {"vendor_key": str(tenants.b.vendor.public_id)},
     "manager:platform:notice": lambda tenants: {"public_id": str(NoticeFactory.create().public_id)},

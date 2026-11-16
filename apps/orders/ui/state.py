@@ -2,15 +2,21 @@
 and the shipping choices, in the visitor's session. Nothing is saved to the database before
 `place_order`; the session is the only store, and it is cleared when the order is placed.
 
-`commission_snapshots` is the one seam to the vendor commission rule (VEN.2, decision D-04 is
-open): until a rule exists it returns nothing, and the review step says that ordering is not
-open yet instead of placing an order with an invented commission.
+`commission_snapshots` is the one seam to the vendor commission rule (VEN.2): it asks
+`apps.vendors.services.commission_rule_for` for the rule in force now. A vendor with no rule is
+left out, and the review step says that ordering is not open yet instead of placing an order with
+an invented commission (never a silent 0%, case REGOLA-ZERO).
 """
 
 from collections.abc import Iterable
 from typing import Any
 
 from django.http import HttpRequest
+from django.utils import timezone
+
+from apps.vendors import engine as vendors_engine
+from apps.vendors import services as vendors_services
+from apps.vendors.models import Vendor
 
 SESSION_KEY = "checkout_state"
 CONFIRMATION_KEY = "checkout_confirmation"
@@ -59,5 +65,18 @@ def vat_validation_for(data: dict[str, Any], vendor_ids: Iterable[int]) -> int |
 
 
 def commission_snapshots(vendor_ids: Iterable[int]) -> dict[int, dict[str, Any]]:
-    """The commission rule snapshot of each vendor, by vendor id (VEN.2 supplies it)."""
-    return {}
+    """The snapshot of the commission rule in force now for each vendor, by vendor id (VEN.2).
+
+    The vendor's own rule, else the platform default (`commission_rule_for`). No plan is passed:
+    a vendor's plan assignment belongs to VEN.19 and is not stored yet, so a plan-scoped rule
+    cannot apply. A vendor with no rule in force is left out, which keeps ordering closed.
+    """
+    now = timezone.now()
+    snapshots: dict[int, dict[str, Any]] = {}
+    for found in Vendor.objects.filter(pk__in=set(vendor_ids)).order_by("pk"):
+        try:
+            rule = vendors_services.commission_rule_for(found, at=now)
+        except vendors_engine.NoCommissionRule:
+            continue
+        snapshots[found.pk] = rule.snapshot()
+    return snapshots

@@ -408,6 +408,7 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
         "accounts.passkeydevice": "exported by name, deleted",
         "accounts.recoverycodedevice": "exported by name, deleted",
         "accounts.elevationgrant": "short-lived step-up grant (hashes only), deleted on erasure",
+        "accounts.usersession": "session index (device family, network prefix), deleted on erasure",
         "accounts.actionlinkuse": "digests and keys only; the user row stays as the tombstone",
         "accounts.actionlinkissue": "digests and keys only; the user row stays as the tombstone",
         "compliance.erasurerequest": "the request itself, no personal data",

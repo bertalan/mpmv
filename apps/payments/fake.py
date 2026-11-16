@@ -24,6 +24,10 @@ from .engine import (
     ProviderError,
     RefundRequest,
     RefundResult,
+    TransferConflict,
+    TransferRequest,
+    TransferResult,
+    TransferReversal,
     WebhookEvent,
     validate_payment_request,
 )
@@ -42,6 +46,9 @@ class FakePaymentProvider:
         self._refunds: dict[str, RefundResult] = {}
         self._refunded: dict[str, Decimal] = {}
         self._payouts: list[PayoutRecord] = []
+        self._transfers: dict[str, TransferResult] = {}
+        # (payment, vendor order) -> (destination, transfer): one transfer per vendor order
+        self._by_reference: dict[tuple[str, str], tuple[str, TransferResult]] = {}
         self.reversed_transfers: list[str] = []
 
     def supported_methods(self) -> Sequence[str]:
@@ -80,6 +87,41 @@ class FakePaymentProvider:
             )
         return result
 
+    def transfer(self, request: TransferRequest) -> TransferResult:
+        if request.idempotency_key in self._transfers:
+            return self._transfers[request.idempotency_key]
+        if request.provider_ref not in self._payments:
+            raise ProviderError("unknown payment")
+        if request.amount <= 0:
+            raise ProviderError("transfer amount must be positive")
+        made = self._by_reference.get((request.provider_ref, request.reference))
+        if request.reference and made is not None and made[0] != request.vendor_account_ref:
+            raise TransferConflict(
+                "a transfer of this vendor order to another account exists",
+                transfer_ref=made[1].transfer_ref,
+            )
+        result = TransferResult(f"fake_tr_x{len(self._transfers) + 1}", request.amount)
+        self._transfers[request.idempotency_key] = result
+        if request.reference:
+            self._by_reference[(request.provider_ref, request.reference)] = (
+                request.vendor_account_ref,
+                result,
+            )
+        self._payouts.append(
+            PayoutRecord(
+                result.transfer_ref,
+                request.vendor_account_ref,
+                request.amount,
+                request.currency,
+                datetime.now().astimezone(),
+                request.provider_ref,
+            )
+        )
+        return result
+
+    def refunded_amount(self, *, provider_ref: str, charge_ref: str, currency: str) -> Decimal:
+        return self._refunded.get(provider_ref, Decimal("0"))
+
     def payment_client_secret(self, provider_ref: str, order_ref: str) -> str:
         if (
             provider_ref not in self._payments
@@ -99,11 +141,23 @@ class FakePaymentProvider:
         if request.amount <= 0 or already + request.amount > paid.amount:
             raise ProviderError("refund exceeds the payment")
         self._refunded[request.provider_ref] = already + request.amount
-        if request.reverse_vendor_shares:
+        reversal_refs: tuple[str, ...] = ()
+        if request.reversals is not None:
+            self.reversed_transfers.extend(r.transfer_ref for r in request.reversals)
+            reversal_refs = tuple(f"fake_trr_{r.transfer_ref}" for r in request.reversals)
+        elif request.reverse_vendor_shares:
             self.reversed_transfers.extend(result.transfer_refs)
-        refund = RefundResult(f"fake_re_{len(self._refunds) + 1}", request.amount, self.refund_cost)
+        refund = RefundResult(
+            f"fake_re_{len(self._refunds) + 1}", request.amount, self.refund_cost, reversal_refs
+        )
         self._refunds[key] = refund
         return refund
+
+    def reverse_transfers(
+        self, *, idempotency_key: str, currency: str, reversals: Sequence[TransferReversal]
+    ) -> Sequence[str]:
+        self.reversed_transfers.extend(r.transfer_ref for r in reversals)
+        return tuple(f"fake_trr_{r.transfer_ref}" for r in reversals)
 
     def list_payouts(self, since: datetime) -> Sequence[PayoutRecord]:
         return [payout for payout in self._payouts if payout.paid_at >= since]

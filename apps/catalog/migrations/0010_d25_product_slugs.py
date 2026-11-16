@@ -1,4 +1,4 @@
-"""D-25 (CAT.5b): reslug existing products to `{title}`, without the language suffix.
+"""D-25 (CAT.21): reslug existing products to `{title}`, without the language suffix.
 
 Runs on the historical models only, with a frozen private copy of the pure slug functions, so a
 later migration that adds a column cannot break a fresh `migrate`. The replaced `{title}-{lang}`

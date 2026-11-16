@@ -54,6 +54,7 @@ part of the done-when still open) · `not started`.
 | CAT.14 | done | #80, #94, #116 | Catalogue integrity rules |
 | CAT.3 | done | #84, #96, #116 | Typed attributes, translated values and variant axes |
 | CAT.5 | done | #81, #116, #221 | SKU-free product slugs, SlugHistory and 301 redirects. #221 (D-25): the slug is the title without the `-{lang}` suffix, `catalog/0010` reslugs existing products on the historical models with audit, old slugs answer one 301 |
+| CAT.21 | done | #221 | Formerly CAT.5b: `catalog/0010` reslugs existing products to the D-25 slug through the slug service (dry run, audit, history rows, one 301 per old slug) |
 | CAT.6 | done | #174 | Redirect model, admin, `import_redirects`, resolved in the middleware |
 | THM.1 | done | #88 | Theme registry, loader and per-site theme |
 | ARC.18 | done | #106 | Engine purity contract and dry-run exception guard |
@@ -85,7 +86,7 @@ part of the done-when still open) · `not started`.
 | TAX.13 | done | #138 | Exemption reasons tied to their law's country. Tax code, flagged for careful human review |
 | VEN.23 | done | #137 | DAC7 seller dataset |
 | ARC.20 | done | #132 | Trusted input for AI agents |
-| ARC.10 | done | #150 | Synthetic data seed (`make seed`) |
+| ARC.10 | done | #150, #480 | Synthetic data seed (`make seed`); #480 publishes one sales terms version per demo vendor and onerous clauses on the demo Terms of sale pages |
 | CMS.10 | done | #126, #275 | Product grid block. #275 adds the SEO.7 `ItemList` through `graph_nodes` and places the grid in the blog, term landing, vendor landing and event bodies |
 | CMS.11 | done | #275 | `product_cards` block (grid or row of hand-picked products, listed and page-language only, no price for on-request items) and the product chooser with search (name in any language, SKU, brand, vendor) and vendor, brand and category filters, scoped to the member's own vendors; vendor event bodies allow cards of own products and grids sourced from the vendor itself. Migrations cms 0015, events 0004. Security-relevant scoping, needs human review |
 | CORE.15 | done | #140, #163 | Secure action links, review follow-ups |
@@ -100,7 +101,7 @@ part of the done-when still open) · `not started`.
 | CMP.7 | partial: automated audit in CI; manual review and statement open | #217 | axe (wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa) on the key public pages in the e2e suite (`tests/e2e/test_axe_audit.py`), any violation fails, report uploaded as the `e2e-axe` artifact. Cart, checkout and product detail are not yet in `KEY_PAGES` |
 | VEN.29 | done | #238 | Storefront description and the three policies are Wagtail rich text (D-34): sanitised on save and on render, embeds of another vendor's media refused and hidden, legacy plain text rendered as paragraphs, idempotent data migration (`vendors/0026`), editors scoped to the Manager form, e2e screenshot. Security (rich text), needs human review |
 | TAX.3 | done | #218 | `resolve_goods_tax` pure function in `apps/tax/engine.py` with the T1 to T15 goods case table (`apps/tax/tests/unit/test_goods_tax.py`; T4 and T10 to T13 wait for TAX.4, T16 to T18 belong to their own rows), exemption-nature codes (D-26, D-28), T15 through `is_outside_vat_territory`; migration `tax/0007`. Tax code, needs human review |
-| CMP.5 | partial: 3 of 4 (contacts, terms and ranking pages; notice and action; statement of reasons) plus the versioned terms clauses (a) to (h) (#343); 30-day termination notice open (#291, not merged) | #222, #230, #233, #343 | #343: `compliance/terms_clauses.py` (pure, EN and IT, draft wording that needs counsel approval, CMP.24), `publish_terms_clauses` command and a `compliance.review_notices` permission with `manager/0006`. Compliance code, needs human review. 1/4 DSA points of contact, platform terms and ranking pages (migration `core/0019`). 2/4 notice and action (art. 16): `Notice` with a tracked outcome and a reviewer workflow, good-faith statement, captcha, declared in the public forms register (migration `compliance/0003`). Compliance code, needs human review. 3/4 DSA art. 17 statement of reasons (`StatementOfReasons`, acting on content through the owning app services), art. 18 notification, art. 24(5) transparency submission stored pending (migration `compliance/0004`). Compliance code, needs human review |
+| CMP.5 | done: 4 of 4 (contacts, terms and ranking pages; notice and action; statement of reasons; 30-day termination notice) plus the versioned terms clauses (a) to (h), reworded after the owner's legal review of 2026-11-13 | #222, #230, #233, #343, #291, #426 | #426: clause (f) states the refund fee as the provider's actual cost plus the plan surcharge, rounded up to the euro, and has no sentence letting the vendor pass it on to consumers (Codice del consumo artt. 56-57); the spec rows now require the separate specific approval of the onerous clauses (art. 1341 comma 2 c.c.) at vendor onboarding (spec only, VEN.13 and VEN.14 build it). #291: the 30-day termination notice for business users (`compliance/0010`), orders of a terminated vendor frozen. Draft wording that still needs counsel (CMP.24). Earlier: `compliance/terms_clauses.py` (#343), 1/4 migration `core/0019`, 2/4 `compliance/0003`, 3/4 `compliance/0004`. Compliance code, needs human review |
 | CORE.25 | done | #234 | Two session levels (D-32): `restricted` default, a passkey window (then called operational mode; renamed by #393, see the CORE.25 wording row) from a fresh passkey, per-action "do it once" grants stored in the database and spent once (`accounts/0006`, `0007`), group 3 actions need their own fresh user-verified passkey, timers and action lists in `SessionPolicy` (`core/0020`), start, end and prompts audited, per-user per-day report. Security code, needs human review |
 | SEC.14 | done | #251 | Rate limit (per IP and per restriction) and captcha on Wagtail page view restriction forms; the interim block is lifted. Declared in the public forms register. Security code, needs human review |
 | OPS.2 | done | #250 | JSON logs, error tracker interface (`MPMV_ERROR_TRACKER`: none or log), `/healthz` and `/readyz`, alert hooks (disk space, WAL archiving, backup age). New `MPMV_OPS_*` variables in the server env example |
@@ -120,7 +121,7 @@ part of the done-when still open) · `not started`.
 | I18N.7 | partial: 1 of n (Manager and account strings in Italian) | #245 | Italian catalog for the Manager and account strings through `tools/i18n_catalog.py` (extract, compile, check; `make check` runs the check) |
 | CAT.19 | done | #154 | Vendor products in the Manager shop space |
 | VEN.24 | done | #141 | Claim an imported vendor (legal email or registered PEC) |
-| SEC.5 | partial: items 6, 7, 9 and 10 of the security wave open | #162, #169, #166, #171 | Security headers by response type, endpoint sweep, hostile-input corpus, rate-limit tests |
+| SEC.5 | partial: item 9 and item 10 parts 2 and 3 (abuse and business scenarios) open; items 6 and 7 done (#489), item 10 part 1 done (#490) | #162, #169, #166, #171 | Security headers by response type, endpoint sweep, hostile-input corpus, rate-limit tests |
 | CAT.9 | done | #167 | Product search: full-text per language, trigram, SKU prefix |
 | CORE.20 | done | #171 | Per-IP limit on refused API keys |
 | CMS.3 | done | #156 | Blog: index and post pages, scheduling, translatable authors with author pages, ProfilePage/Person and BlogPosting JSON-LD, choosers, `import_article` |
@@ -163,14 +164,23 @@ part of the done-when still open) · `not started`.
 | FIT.1 | partial: 1 of 2 (data model and services); the Manager platform pages are open | #286 | New app `apps/fitment` (migration `fitment/0001`): `FitmentScheme`, `FitmentLevel`, `FitmentNode` tree with aliases, merge history and notes, pure `engine.py`, audited services with `dry_run`, a reference registry for FIT.2 and FIT.5; `FitmentCategory` rows replace a `Category` field so the catalog never depends on fitment (deviation from spec 17, stated in the PR); import contract that tax, shipping, cart, orders and themes never import it |
 | VEN.4 | done | #350 | New app `apps/ledger` (migrations `ledger/0001`, `0002`): append-only `LedgerEntry` with database triggers against UPDATE and DELETE, signed `Decimal` amounts, an idempotency key, `record_entry` (audit `ledger.entry_recorded`, dry run) and the balance and the statement as the sum of entries. Ledger code, needs human review |
 | VEN.33 | partial: the pure refund fee engine and the surcharge on the plan rule; the vendor terms clause is in CMP.5 | #318, #343 | `vendors/refund_fee.py`: provider cost plus surcharge, `ROUND_CEILING` to the whole euro (the one explicit exception to `ROUND_HALF_UP`), the owner's regression cases. Nothing charges the fee yet (PAY.4). Money code, needs human review |
+| VEN.35 | done (part 1; the PDF is VEN.36) | #448 | Versioned seller sales terms and pre-contractual data (`vendors/0033`, `0034` append-only `SalesTermsVersion`), the `require_sales_terms` operator rollout setting (`core/0025`). Landed before check 28 and missing from this file until check 29 |
 | PAY.5 | done | #326 | `PaymentProvider` interface, registry that refuses a provider missing a capability, system checks `payments.E001` to `E003`, fake provider, contract tests and `docs/dev/payment-providers.md` |
-| PAY.1 | partial: the Stripe provider; checkout does not call it yet | #351 | `payments/stripe_provider.py` and `stripe_client.py`: separate charges and transfers, per-vendor transfer shares in minor units (`ROUND_HALF_UP` per transfer), the platform fee kept apart from the vendor payout. Payments code, needs human review |
-| PAY.2 | partial: webhook, idempotency and the audit row; no receiver of `on_payment_succeeded` yet | #351 | Signed, idempotent webhook (`payments/0001`, `Payment`), audit `payments.payment.succeeded`, signal `on_payment_succeeded`. Payments code, needs human review |
-| PAY.4 | partial: the pure refund fee engine only (VEN.33); refunds are not built | #318 | See VEN.33 |
+| PAY.1 | partial: the Stripe provider; checkout creates one PaymentIntent per order with the real per-vendor split; the transfers are PAY.3 | #351, #429, #452 | #351: `payments/stripe_provider.py`. #429: one PaymentIntent per order. #452: the intent is built from `payments.settlement` |
+| PAY.2 | done | #351, #429, #452, #465 | Signed, idempotent webhook (`payments.processedevent`), the audit row, the order marked paid, and the paid order posts the ledger and queues the transfers (#452). #465: the Connect webhook accepts its own signing secret (`MPMV_STRIPE_CONNECT_WEBHOOK_SECRET`), the platform secret stays for customer payments |
+| PAY.3 | done (D-08, D-41) | #452 | `apps/ledger/settlement.py`: a paid order posts one ledger line set per vendor and queues one transfer per vendor package as a transactional outbox job (a rollback leaves no job); `payments/settlement.py` computes each vendor net; a refunded or partially refunded package is never transferred (`ledger.transfer_skipped_refunded`); a platform with `commission_vat_mode` not `none` refuses to settle (`ledger.settlement_blocked_vat_mode`, until VEN.34); a vendor with no ready account stays a receivable. `PAYMENTS_TRANSFERS_WIRED` is True, so `payments.E004` no longer stops LIVE. Needs human review |
+| PAY.4 | partial: refunds through and outside the platform, duplicate payment refunds; open: fixes 4 to 6, chargebacks, the vendor refund action (PAY.7) | #318, #476 | `ledger/refund_engine.py` (pure) and `ledger/refunds.py` (service: `dry_run`, `AuditLog`, replay by key, reverse transfer from the vendor's share, refund fee with the L-10 exclusion flag, outside mark with declared date and method); `payments/duplicates.py` refunds a second payment in full with no fee; `PlatformOperator` refund settings (core 0026); ledger 0003 to 0005, payments 0003. Ledger and payments code, needs human review |
+| PAY.7 | spec only | #485 | Vendor refund action through the platform (PAY.4 part b): `vendor_refund` critical action, the owner's isolation tests (404 not 403, grant bound to action, digest and shop). No code |
 | SHP.4 | done | #354 | Shipping cost per vendor package through `quote_shipping` and the tax engine |
 | ORD.3 | done | #354 | `build_checkout`: per-vendor packages, tax, shipping, blocking messages, preview; mixed-rate shipping VAT regression test. Money and tax code, needs human review |
+| ORD.17 | done (customer terms clause lists pending counsel) | #463 | Checkout legal step (D-40, variant A): seller recap, box 1 and box 2, order terms snapshot in `terms_acceptance`, terms in the confirmation email, confirming poll after the provider redirect. Box 2 lists only seller clauses until counsel enters `onerous_clauses` in the CMS |
+| ORD.17b | done | #473 | ORD.17 follow-ups: version stamps on the terms snapshot, kept ticks, `orders/0015` makes `terms_acceptance` not editable, confirmation email text. Orders code, needs human review |
+| CORE.25, VEN.6 (shop owner passkey) | done: follow-ups open | #474 | D-32 amendment (2026-11-14): on a shop they own, a vendor owner with a passkey may "Do it once" and open a passkey window scoped to that shop for `payout_details` and `sales_terms_publish`; the owner check is `settings.SHOP_OWNER_CHECK`, re-read on each call. Found on STAGE: no vendor owner could connect a payout account. Security code, needs human review |
+| PAY.3 (transfer key) | done | #477 | The transfer key names destination, amount and currency; a transfer of the same payment to another account is blocked and audited once (`ledger.transfer_blocked`); demo payout accounts (`acct_demo_`) are skipped before any provider call; `StripeError` keeps Stripe's error type and code. Closes the STAGE incident of 2026-11-14. Payments code, needs human review |
+| VEN.38 | spec only | #479 | D-43: vendor configuration form with Collection costs and Commissions tabs, fixed fees once per vendor order; VEN.19 charges per billing period; VEN.33 order-handling fee defined. No code |
+| ORD.19 | done | #469 | `cart_add` on the product page: POST with CSRF, cart rate budget, HTMX fragment and no-JS redirect; the sales mode is checked again by `add_to_cart` (`effective_sales_mode`) |
 | ORD.10 | partial: the switch and the alert; nothing yet reports STAGE | #353 | `ensure_checkout_open` in `place_order` (the `checkout` and `payments` switches, platform and every vendor), `manage.py check_payments` alert on a payment without transfer; the done-when "verified on STAGE" is open |
-| ORD.5 | partial: the cart and checkout UI, B2B fields, VIES, place order; no payment step yet | #360 | `orders/ui` (HTMX): cart, review and checkout, conditional B2B fields, VIES, captcha, the confirmation page. `place_order` creates the order but no provider call follows (PAY.1 wiring open). Orders code, needs human review |
+| ORD.5 | partial: the cart and checkout UI, B2B fields, VIES, place order, the payment page | #360, #429 | `orders/ui` (HTMX): cart, review and checkout, conditional B2B fields, VIES, captcha, the confirmation page. #429: `place_order` starts the payment after the transaction commits and the payment page (`orders/static/orders/payment.js`) confirms it with the browser-side secret. Orders code, needs human review |
 | TAX.17 | done | #323 | Shipping VAT always follows the goods (`shipping/0012`, `0013` data and schema); #323 was closed and its content merged through #325 |
 | TAX.18 | partial: Northern Ireland goods rules; XI VAT numbers in `VatValidation` are TAX.19 | #325 | `BT` postcodes resolve to `XI`, UK rate for OSS vendors on NI goods, the vendor's country VAT for a business with the vendor's own number, `XI` kept out of `VIES_COUNTRIES`. Tax code, needs human review |
 | CMP.2 | partial: the pure commission statement lines and the carry-over credit; no statement, export or ledger wiring | #334 | `compliance/commission_statement.py` (T-1, T-5, T-8): `ROUND_HALF_UP` per line, the refund fee as its own line. Money code, needs human review |
@@ -178,6 +188,28 @@ part of the done-when still open) · `not started`.
 | SEO.7 | partial: the Organization JSON-LD schema check and the operator provenance tests; the search results page and the full page-type coverage are open | #345 | Tests only (`seo/tests`): the operator `Organization` node |
 | ORD.16 | partial: order emails in DE, FR and ES with the informal register, the vendor mail language (`vendors/0031`); the field-help sweep checks the Italian catalog only | #299 | The five languages for the ORD.9 emails; the DE and FR register is informal (owner decision) |
 | ARC.15 | partial: design only (ADR-0009 accepted); SEC.15 and OPS.13 are the build rows | #297 | `docs/adr/0009-private-vendor-documents.md`, rows SEC.15 and OPS.13 (the scanner row was renumbered from OPS.12) |
+| VEN.3 | partial: the pure `compute_commission` (paid-time commission, collection cost, vendor net) and `refund_lines` (one refund event: commission and collection cost reversed pro rata, the refund fee charged to the vendor only, never passed on to the customer, no fee for a platform error); nothing posts them to the ledger yet | #409 | `vendors/commission.py`, spec 04 section 4.4 cases and the pseudonymous real-case suite. Money code, needs human review |
+| VEN.6 | partial: Stripe Express onboarding, the `account.updated` webhook, the effective sales mode derived at read time (D-19), the vendor Payments page, a test payout account in the demo seed | #356 | `payments/connect.py`, `payments/0002`, `vendors/0032`, `manager/shop/payments.html`; checkout uses the effective sales mode. Payments code, needs human review |
+| FIT.6 | partial: the anonymous garage cookie; the merge into the account at sign-in is open | #331 | Anonymous garage cookie (`fitment/garage.py`, `fitment/views.py`): up to 3 vehicles of make, model and year, extra keys make the cookie invalid, `read_garage` re-validates every vehicle against the catalogue, an invalid cookie is cleared on the next garage action, storage `off` deletes the cookie |
+| FIT.17 | partial: the order vehicle snapshot (`orders/0013`) from the active garage vehicle; the fit-answer annotation on the order line is open | #331 | `orders/engine.py` snapshot, shown on the confirmation and the two order emails. Orders code, needs human review |
+| MIG.1 | partial: part 1, the read-only legacy source connector (SELECT only, authorizer, `mode=ro`) and the fixture schema | #336 | `ingest/legacy_source.py`, `legacy_engine.py`; reads no real data, tests use a synthetic schema |
+| MIG.3 | partial: part 1, the catalog loader (vendors, catalog, taxonomies) from the intermediate format; a rejected record leaves no trace in the report, ChangeSet or audit trail | #341 | `ingest/catalog_loader.py`, audit `ingest.catalog_load.run`; images and IT-text twins are open |
+| MIG.6 | partial: part 1, the pure redirect map engine (one hop, chains collapsed, loops refused, open redirects refused) | #333 | `ingest/redirect_map.py`; the sitemap check and the Django wiring are open |
+| SEO.5 | partial: our own consent banner with a consent log, Consent Mode v2 signals and the consent state kept off cacheable pages; e-commerce events are open | #330 | `seo/0002` (`ConsentLog`, append-only, no IP), `seo/views.py` `consent_save` is `csrf_exempt` with a same-site Origin or Referer check |
+| SEO.9 | done | #330 | `ConsentProvider` interface (`seo/providers.py`), `docs/dev/consent-providers.md`, `consent.js` lazy-loaded, unknown provider fails `seo.E001` |
+| SEO.10 | spec only | #420 | Vendor role (producer or reseller) in the product structured data; no code yet |
+| OPS.14 | done | #421 | Staff-only release indicator: `MPMV_VERSION` in the Manager footer and the account menu, nothing for anyone else |
+| CORE.30 | done | #484 | Manager platform map at `/manager/platform/map/` (section `platform.map`, same roles as the dashboard): links of the storefront, account, each vendor's shop space (plain text for staff), platform space and the editors' admin |
+| CORE.24 | partial: part 1 (session index, invalidation, account list, Support end, panic button); part 2, the role-based idle and absolute lifetimes, is open | #491 | `accounts/session_store.py` and `UserSession` (browser family, OS and a /24 or /48 prefix only, never the raw User-Agent or IP), `SessionIndexMiddleware`, an email change ends the other sessions, Support's "End this user's sessions", the owner's "End every session" (critical, audited with the count). Authentication code, needs human review |
+| SEC.5 (items 6 and 7) | done | #489 | Supply chain (`tools/audit_ignores.py`, every pip-audit ignore with reason and an expiry of at most 90 days; `S` rules on `tools/`) and no hard-coded secret fallback on STAGE and LIVE (`env_str` fails closed on a blank, `live.py` refuses an "insecure" secret key). Settings and secrets, needs human review |
+| SEC.5 (item 10, part 1) | partial: accounts, passkey window and request tampering scenarios in `tests/security`; abuse and business scenarios are open | #490 | `test_passkey_window_attacks.py` and the request tampering suite; no production code. The two strict xfails on sessions after an email change or an MFA reset were closed by #491 |
+| CORE.25 (hardening) | done | #497, #510 | #474 follow-ups: `SHOP_OWNER_CHECK` fails closed, shop offers dropped after use, the audit names the shop, system check `accounts.E003`. #510: an unscoped passkey window covers only while the user may elevate (`core.elevate` and a passkey), re-checked per request; group role changes end members' sessions. Security code, needs human review |
+| ARC.34 | done | #496, #507 | `Unit + integration` in 4 crc32 shards (`MPMV_TEST_SHARD`), `tools/check_test_shards.py`, docs-only PRs skip image and E2E, stable required check names, `ready_for_review` trigger. Documented in CONTRIBUTING and `release.md` by check 32 |
+| ARC.20 (lane accounts) | done | #498, #500 | Lane-b works from its own collaborator account (trusted for coordination and reviews only); "Lane review" check (`.github/workflows/lane-review.yml`) required on main after the owner's approval; `parallel-lanes.md` |
+| THM.8 | done: cart, checkout and confirmation (1/2), customer area and sign in (2/2) | #503, #502 | `ride` CSS `40-cart-checkout.css` and `50-account-auth.css`, e2e at 360, 768 and 1280 px. THM.16 moves these pages onto Bootstrap 5.3 |
+| THM.13 to THM.16 | spec only | #512 | Owner decision Q-98 (MQ-45): `ride` on vendored Bootstrap 5.3 (no Sass, no Node), tokens mapped on `--bs-*`, carousels and chrome, parity table (spec 14 §14.9); THM.7, THM.9 and THM.10 revised. No code |
+| VEN.34, CMP.2, CMP.5, CMP.34, ARC.35 | spec only | #508 | D-46 (tax adviser answers, owner decisions of 2026-11-15): platform regime and fee VAT, statement content and wordings, vendor clauses (j) and (k), RF19 thresholds (CMP.34), takeover runbook (ARC.35); VEN.34 moves to P1. No code. Tax and legal wording needs counsel (CMP.24) |
+| VEN.39, CORE.31 | spec only | #505 | Owner decisions of 2026-11-15: audit of every vendor text (Q-36), D-44 API keys of inactive vendors pinned with regression tests (Q-53); I18N.4 moves to P2. No code |
 
 ## Owner decisions 2026-11-07
 
@@ -947,7 +979,59 @@ Compliance, security and content:
 | #326 | PAY.5 | `PaymentProvider` interface, registry, dev page |
 | #402 | THM.12 | Linear-time SVG sanitiser test |
 | #299 | ORD.16 | Order emails in DE, FR and ES, vendor mail language |
-| (this PR) | none | Coherence check 27 |
+| #419 | none | Coherence check 27 |
+| #291 | CMP.5 | 30-day termination notice (4/4) |
+| #356 | VEN.6 | Stripe Express onboarding and the effective sales mode |
+| #421 | OPS.14 | Staff-only release indicator |
+| #420 | SEO.10 | Spec: vendor role in product structured data |
+| #426 | CMP.5 | Clauses (a) to (h) after the owner's legal review |
+| #336 | MIG.1 | Read-only legacy source connector (1) |
+| #333 | MIG.6 | Legacy redirect map engine (1) |
+| #430 | CMP.4 | De-flake the suppression audit test |
+| #409 | VEN.3 | `compute_commission` and `refund_lines` |
+| #429 | ORD.4, PAY.1, PAY.2, ORD.5 | Checkout creates the PaymentIntent, the webhook marks the order paid, `payments.E004` |
+| #331 | FIT.6, FIT.17 | Garage cookie validation and the order vehicle snapshot |
+| #341 | MIG.3 | Catalog loader (1) |
+| #330 | SEO.5, SEO.9 | Consent banner and `ConsentProvider` |
+| #437 | none | Coherence check 28 |
+| #448 | VEN.35 | Seller versioned sales terms |
+| #449 | VEN.35, VEN.36 | Spec: VEN.35 in two parts, `require_sales_terms` |
+| #452 | PAY.3 | Ledger lines from the paid order and per-vendor transfers (D-08) |
+| #454 | TAX, CORE, VEN | Spec: adviser rules for RF20 and XI, register decisions MQ-38 to MQ-44 |
+| #458 | SEC.2 | SVG linear-time test retry |
+| #460 | SEO.9 | Cookie settings: saved notice and checkbox sync |
+| #462 | none | Coherence check 28 follow-ups |
+| #463 | ORD.17 | Checkout legal step (D-40) |
+| #465 | PAY.2 | Connect webhook signing secret |
+| #467 | ORD.5, VEN.2 | Checkout takes the commission rule in force |
+| #469 | ORD.19 | Add to cart from the product page |
+| #472 | none | Coherence check 29 |
+| #473 | ORD.17 | Checkout legal step follow-ups (ORD.17b) |
+| #474 | CORE.25, VEN.6 | A shop owner confirms its own shop's owner actions (D-32 amendment) |
+| #477 | PAY.3 | Transfer key names destination and amount |
+| #479 | VEN.38, VEN.19, VEN.33 | Spec: vendor economic configuration (D-43) |
+| #480 | ARC.10, VEN.35, ORD.17 | Demo seed publishes sales terms and onerous clauses |
+| #482 | none | Coherence check 30 |
+| #476 | PAY.4 | Refunds through and outside the platform, duplicate payment refunds |
+| #485 | PAY.7, PAY.4 | Spec: vendor refund action with isolation tests |
+| #487 | none | Coherence check 31 |
+| #484 | CORE.30 | Manager platform map |
+| #488 | CAT.21 | Renumber CAT.5b so the backlog lists it |
+| #489 | SEC.5 | Supply chain and secret settings (items 6 and 7) |
+| #490 | SEC.5 | Attack scenarios: accounts and request tampering (item 10, part 1) |
+| #491 | CORE.24 | Sessions part 1: index, invalidation, account list, Support end and panic button |
+| #496 | ARC.34 | CI speed: shard the test job, skip heavy jobs on docs-only PRs |
+| #497 | CORE.25 | Harden shop-scoped passkey confirmations (#474 follow-ups) |
+| #498 | ARC.20 | Lane-b's own GitHub account |
+| #500 | ARC.20 | Lane review required check |
+| #502 | THM.8 | ride theme: customer area and authentication |
+| #503 | THM.8 | ride theme: cart and checkout |
+| #505 | VEN.39, CORE.31, I18N.4 | Spec: owner decisions 2026-11-15 |
+| #507 | ARC.34 | CI on ready_for_review |
+| #508 | VEN.34, CMP.2, CMP.5, CMP.34, ARC.35 | Spec: tax adviser answers 2026-11-15 (D-46) |
+| #510 | CORE.25 | Unscoped passkey window only for elevate |
+| #512 | THM.13 to THM.16, THM.7, THM.9, THM.10 | Spec: ride theme on Bootstrap 5.3 (Q-98) |
+| (this PR) | none | Coherence check 32 |
 
 ## Coherence checks
 
@@ -1934,3 +2018,115 @@ Findings and actions:
 9. Info. The delta touches money, tax, payments, ledger, privacy and permissions code: VEN.4, VEN.33, PAY.1, PAY.2, ORD.3, ORD.5, ORD.10, TAX.17, TAX.18, CMP.2, CMP.33, CMP.4 (#337), CMP.5 (#343) and CORE.18 (#265). All need human review, and the legal wording needs counsel (CMP.24).
 
 Verdict: GO with follow-ups. No blocker for the merged code; finding 1 is a gap to close before any payment test on STAGE. The ledger, payments, tax, roles and legal code need human review.
+
+
+### Coherence check 28 (main at b7f9136a)
+
+Scope: main at b7f9136a (merge of train #435), the merges after check 27 (#419, train #424): six trains, #427 (#426, #336), #428 (#333), #431 (#430, #409), #432 (#331), #434 (#341) and #435 (#330, #429), 25 non-merge commits. Also covered, because check 27 listed them as open and did not review them: #291 (CMP.5 4/4, train #417), #356 (VEN.6, train #423), #421 (OPS.14, train #422) and #420 (SEO.10 spec, train #424).
+
+| Area | Result |
+|---|---|
+| Code vs spec | #429: one PaymentIntent per order (`payments/checkout.py`, `transfer_group` = the order number, reached through `ORDER_PAYMENT_STARTER` so `orders` never imports `payments`); the webhook transaction runs `order_hook.order_paid_on_payment`, which calls `mark_order_paid`; the session keeps only the payment id and the client secret is asked from the provider on each payment page (no model field, no audit payload holds it); `payments.E004` refuses LIVE while `PAYMENTS_TRANSFERS_WIRED` is False, and it is False in `base.py` (no override) with a test for LIVE, STAGE and the wired case. #409: `refund_lines` is per refund event, the fee is charged to the vendor and never passed on (docstring, spec 04, PAY.4 row). #426: clause (f) says Stripe's actual cost plus the plan surcharge rounded up, with no pass-on sentence; the CMP.5, VEN.33, PAY.4, D-05 and L-10 rows agree; art. 1341 comma 2 is a spec requirement only (VEN.13 and VEN.14 build the approval; `terms_clauses.py` does not mark clauses as onerous). #331: the parser rejects extra keys, `validated_garage` re-checks every vehicle against the catalogue and keeps the catalogue labels, one miss makes an empty garage, the views clear the cookie, `off` deletes it. #330: `consent_save` is `csrf_exempt`, refuses a request whose Origin, else Referer, is not this host (403) before the rate limit, and has a cross-site test with a foreign Origin and a foreign Referer. #341 and #336: the legacy reader opens SQLite with `mode=ro`, an authorizer that denies every write and a SELECT-only gate (`ReadOnlyViolation`); the fixtures are synthetic; no vendor name, hostname, legacy order number or credential-like literal in the delta. |
+| Spec and docs | `progress.md` had no rows for VEN.3, VEN.6, FIT.6, FIT.17, MIG.1, MIG.3, MIG.6, SEO.5, SEO.9, SEO.10 and OPS.14, and stale rows for CMP.5, PAY.1, PAY.2 and ORD.5; all added or updated here, with the merge list (#291, #356, #421, #420, #426, #336, #333, #430, #409, #429, #331, #341, #330). `backlog.csv` has 374 tasks (2 new since check 27: SEO.10, OPS.14; none removed) and `make docs` freshness passes. D-05, D-08, D-19 and L-10 agree with their rows; there is no D-40 anywhere in the repository (the last decision row is D-39). `audit-trail.md` has the order payment, payments, ingest and connected account rows and says why `seo.consentlog` is not audited. `payment-providers.md` now names `payments.E004` and says the order state change is wired (it said it was still to connect). |
+| Hygiene | Single migration leaf per app, no duplicate numbers: accounts 0009, api 0007, cart 0002, catalog 0015, cms 0017, compliance 0010, core 0024, events 0005, fitment 0001, ingest 0002, ledger 0002, manager 0006, orders 0013, payments 0002, seo 0002, shipping 0013, tax 0010, themes 0002, vendors 0032 (mcp has none). `makemigrations --check`: no changes. The Italian catalog check passes. |
+| Gates | `make check` pass (exit 0). Unit, integration and e2e suites not run locally; CI on main is the gate. |
+
+Findings and actions:
+
+1. Major for go-live, not for the merge. Check 27 finding 1 is half closed: the checkout creates the payment and the webhook marks the order paid (#429). Still open: no vendor transfer (PAY.3, `shares=()` and the whole amount stays on the platform), no ledger entry from an order, no refund. `payments.E004` keeps LIVE from starting until PAY.3 sets `PAYMENTS_TRANSFERS_WIRED`; STAGE is not affected. Action: lane-a plans PAY.3 next.
+2. Minor, new. `PlatformOperator.commission_vat_mode` is read nowhere (only the admin, the field list and a docstring in `vendors/commission.py` mention it) and the demo seed sets it to `STANDARD`. The commission VAT is therefore not applied from the operator setting. Action: wire it in the statement or ledger code (CMP.2, VEN.4 posting) or drop the claim in the docstring.
+3. Minor, new. `apps/orders/tests/integration/test_migrations.py` hard-codes `LATEST = "0013_vehicle_snapshot"`; the next orders migration breaks it. Action: derive it from the migration loader's leaf.
+4. Minor, new. The consent cross-site test has an Origin case and a Referer case but no `Sec-Fetch-Site` case, and `_same_site` ignores that header. Action: add a case, or document that Origin and Referer are the only signals.
+5. Minor, new. #341's `"blue"` assertions in `test_catalog_loader.py` (`not in changed`, `not in logged`) never run against a value the loader would otherwise have kept, so they prove nothing. Action: make the rejected record carry the value in a way the loader would have written.
+6. Minor, new. The art. 1341 comma 2 approval of the onerous clauses (#426) is in the CMP.5 spec row but no code marks a clause as onerous. Action: none until VEN.13 and VEN.14 are built; keep the row as the owner.
+7. Minor, carried over from check 27 and still open: finding 2 (VEN.33, CMP.2 and PAY.4 are pure engines, nothing posts them to the ledger); 3 (SEO.7 is partial: results page, page-type sweep and CI schema check); 4 (`PRIVACY_PEPPER` has no document under `docs/dev` or `docs/spec`); 5 (TAX.18 and TAX.19, XI VAT numbers); 6 (ORD.10 on STAGE); and all the check 26 follow-ups listed in finding 7 of check 27.
+8. Closed here: check 27 finding 1 as far as the order marked paid; the missing `progress.md` rows and the stale `payment-providers.md` text (this PR); the `#291` and `#356` rows that check 27 left out.
+9. Info. The delta touches money, payments, orders and compliance code: VEN.3, VEN.6, PAY.1, PAY.2, ORD.4, ORD.5, FIT.17, CMP.5 (#291, #426) and SEO.5 (consent log). All need human review, and the legal wording needs counsel (CMP.24).
+
+Verdict: GO with follow-ups. No blocker for the merged code; findings 1 and 2 matter before any LIVE payment. The payments, orders, ledger and legal code need human review.
+
+### Coherence check 29 (main at c45180ee)
+
+Scope: main at c45180ee, the merges after check 28 (#437): the trains #461, #464, #466, #468 and #470, #459, and #463. They carry #452 (PAY.3), #454 (spec: adviser rules for RF20 and XI, MQ-38 to MQ-44), #458, #460 (SEO.9), #462 (check 28 follow-ups), #465 (PAY.2 Connect secret), #467 (ORD.5, VEN.2), #469 (ORD.19) and #463 (ORD.17); 26 non-merge commits. #448 and #449 (VEN.35) landed before check 28 and had no row; covered here.
+
+| Area | Result |
+|---|---|
+| Code vs spec | PAY.3: `PAYMENTS_TRANSFERS_WIRED = True` in `base.py` with the reason in the comment, `payments.E004` only fires when it is False (`test_transfers_wired_check.py`), so LIVE no longer stops on it; the ledger settlement posts the lines and queues one outbox transfer per vendor package, skips a refunded or partially refunded package and refuses to settle when `commission_vat_mode` is not `none` (`ledger.settlement_blocked_vat_mode`, spec 04 4.4 case 3). That also closes check 28 finding 2: the mode is now read. ORD.19: `cart_add` is `require_POST` with no `csrf_exempt`, has the cart rate budget, and the server re-checks the sales mode through `add_to_cart` and `effective_sales_mode`. PAY.2 (#465): `STRIPE_CONNECT_WEBHOOK_SECRET` is a separate setting (`MPMV_STRIPE_CONNECT_WEBHOOK_SECRET`) passed to the provider as `connect_webhook_secret`; the platform secret is untouched. ORD.5 (#467): `commission_snapshots` in `orders/ui/state.py` calls `commission_rule_for`; the stub is gone on main. ORD.17 (#463) is merged: the terms snapshot goes in `terms_acceptance` (`orders/0014`). D-08, D-40 and D-41 are in the register with their rows (PAY.3, ORD.17, VEN.35, PAY.4) and agree with the code. |
+| Spec and docs | `progress.md` had no rows for PAY.3, ORD.17, ORD.19 and VEN.35 and stale PAY.1 and PAY.2 rows; added or updated here, with the merge list (#448, #449, #452, #454, #458, #460, #462, #463, #465, #467, #469). `make docs` freshness passes. `audit-trail.md` has the PAY.3 settlement actions (`ledger.posting_blocked`, `transfer_failed`, `transfer_without_account`, `transfer_blocked`, `transfer_skipped_refunded`, `settlement_blocked_vat_mode`). `payment-providers.md` has the Stripe idempotency keys and cached errors section. |
+| Hygiene | Single migration leaf per app: accounts 0009, api 0007, cart 0002, catalog 0015, cms 0018, compliance 0010, core 0025, events 0005, fitment 0001, ingest 0002, ledger 0002, manager 0006, orders 0014, payments 0002, seo 0002, shipping 0013, tax 0010, themes 0002, vendors 0034 (mcp has none). `makemigrations --check`: no changes. |
+| Gates | `make check` pass. Unit, integration and e2e suites not run locally; CI on main is the gate. |
+
+Findings and actions:
+
+1. Closed here: check 28 finding 1 (PAY.3 landed, LIVE is no longer stopped by `payments.E004`); finding 2 (`commission_vat_mode` is read by the settlement); finding 3 (the orders migration test derives the leaf), finding 4 (consent Sec-Fetch-Site and cross-site cases) and finding 5 (the catalog loader test) all by #462; the missing `progress.md` rows.
+2. Major for go-live, still open: PAY.4 (refunds) is not built. The PAY.3 guard stops a transfer to a refunded package, but no code refunds the customer or reverses a transfer; staff decide by hand until PAY.4.
+3. Minor, open: the platform settles only with `commission_vat_mode` `none`; any other mode blocks every paid order until VEN.34. The demo seed sets `STANDARD`, so a seeded platform shows `ledger.settlement_blocked_vat_mode`. Action: VEN.34, or have the seed use `none`.
+4. Minor, open: the Stripe idempotency cached-error limitation (`payment-providers.md`): a repeated key replays Stripe's first error for 24 hours, so a retry of a failed vendor transfer under the same key does not make a fresh attempt. Documented in `payment-providers.md`, no code change planned.
+5. Minor, open: ORD.17 follow-ups: box 2 lists only seller clauses until counsel enters the customer terms clauses (`onerous_clauses`) in the CMS; the owner has to confirm that "marketplace terms" are the CMS page of kind `terms`, and that a seller with no published terms shows a notice and stores null; the PDF of a terms version is VEN.36.
+6. Minor, carried over from checks 27 and 28 and still open: VEN.33, CMP.2 and PAY.4 are pure engines (finding 2 of check 27, now partly covered by PAY.3 posting); SEO.7 partial; `PRIVACY_PEPPER` has no document; TAX.18 and TAX.19 (XI VAT numbers, the adviser rules of #454 are spec only); ORD.10 on STAGE; art. 1341 comma 2 marking in code waits for VEN.13 and VEN.14; the check 26 follow-ups.
+7. Info. The delta touches money, payments, ledger, orders and compliance code: PAY.1 to PAY.3, ORD.5, ORD.17, ORD.19, VEN.35. All need human review; the legal wording needs counsel (CMP.24).
+
+Verdict: GO with follow-ups. No blocker for the merged code. Finding 2 (no refunds) matters before any LIVE payment. The payments, ledger, orders and legal code need human review.
+
+### Coherence check 30 (main at 6cb3033d)
+
+Scope: main at 6cb3033d, the merges after check 29 (#472): #473 (ORD.17b), #474 (CORE.25, VEN.6 shop owner passkey), #477 (PAY.3 transfer key), #479 (D-43 spec: VEN.38, VEN.19, VEN.33) and #480 (demo seed sales terms), through the trains #475, #478 and #481.
+
+| Area | Result |
+|---|---|
+| Code vs spec | #474 matches the D-32 amendment: `levels.may_confirm` lets a vendor owner confirm only `SHOP_OWNER_ACTIONS` on a shop `is_shop_owner` says they own, re-checked on each call through `settings.SHOP_OWNER_CHECK` (`apps.vendors.services.is_vendor_owner`); spec 02 and D-32 carry the amendment. #477 matches PAY.3 and `payment-providers.md` (transfer key with destination and amount, blocked and demo-account cases). #473 and #480 match ORD.17 and VEN.35 (no change of status). #479 is spec only: no code reads `fee_fixed` per vendor order or the billing period yet. |
+| Spec and backlog | VEN.38 is a new row (P-table total 3128), VEN.19 and VEN.33 reworded, D-43 in the register; `90-backlog.md` and `backlog.csv` were regenerated by `make docs` in #479 (not edited by hand), freshness passes. `progress.md` had no rows for ORD.17b, the #474 amendment, the PAY.3 transfer key and VEN.38; added here with the merge list. |
+| Docs | Relative links in the touched docs resolve; `payment-providers.md` was updated by #477. |
+| Gates | `make check` pass. Unit, integration and e2e suites not run locally; CI on main is the gate. |
+
+Findings and actions:
+
+1. Minor, open: #474 hardening. (a) The window path in `levels.py` has a window that is not scoped to the shop on every code path; (b) `SHOP_OWNER_CHECK` should fail closed (a wrong dotted path or an exception must deny, not raise); (c) offers should be popped after use, including in `close_window`; (d) the shop should be in `SINGLE_USED` and `record_prompt` so the audit and the friction report name it; (e) a test for a vendor owner demoted during an open window is missing. Security code: needs human review before more vendor owner actions join `SHOP_OWNER_ACTIONS`.
+2. Minor, open: the spec has no rule for a per-vendor fixed fee yet in the fee engine; D-43 and VEN.38 define the fixed amount once per vendor order, and the settlement still reads the plan rule. Action: VEN.38 and a spec line in spec 04 for the per-vendor fixed fee rule before the form is built.
+3. Minor, open: carried over from check 29 and still open: PAY.4 (no refunds; matters before any LIVE payment), the platform settles only with `commission_vat_mode` `none` (VEN.34), the Stripe cached-error limitation (now narrowed by the new transfer key), ORD.17 customer terms clauses pending counsel, VEN.36, VEN.33 and CMP.2 pure engines, SEO.7 partial, `PRIVACY_PEPPER` document, TAX.18 and TAX.19, ORD.10 on STAGE.
+4. Info. The delta touches security, payments, ledger and orders code: CORE.25, VEN.6, PAY.3, ORD.17b. All need human review; the legal wording needs counsel (CMP.24).
+
+Verdict: GO with follow-ups. No blocker for the merged code. The #474 hardening items should land before more shop owner actions are added. PAY.4 still matters before any LIVE payment.
+
+### Coherence check 31 (main at 5fa7c54f)
+
+Scope: main at 5fa7c54f, the merges after check 30 (#482): #476 (PAY.4 refunds through and outside the platform, with the duplicate payment refund; ledger 0003 to 0005, core 0026, payments 0003) and #485 (spec PAY.7, the vendor refund action), through the trains #483 and #486.
+
+| Area | Result |
+|---|---|
+| Code vs spec | #476 matches the PAY.4 row: pure `refund_engine`, service in `ledger/refunds.py` with `dry_run` and `AuditLog`, pro rata reversal of commission and collection cost, refund fee from the provider cost plus surcharge frozen on the refund, L-10 exclusion flag, outside refunds with a declared date and method, duplicate payment refunded in full with no fee and no vendor share reversed (`payments/duplicates.py`), operator refund settings from D-41. Chargebacks and the vendor-facing refund action are not in the code. #485 is spec only: no `vendor_refund` action exists yet in `levels.py`. |
+| Spec and backlog | PAY.7 is a new row; `90-backlog.md` and `backlog.csv` were regenerated by `make docs` in #485, freshness passes. The `progress.md` PAY.4 row still said "refunds are not built"; corrected here, PAY.7 and the merge list added. |
+| Docs | `audit-trail.md` lists every new action: `ledger.refund_recorded`, `ledger.refund_fee_excluded`, `ledger.refund_marked_outside`, `ledger.refund_reversal_pending`, `ledger.refund_reversal_done`, `ledger.refund_states_pending`, `payments.payment.duplicate_flagged`, `.duplicate_refunded` and `.duplicate_refund_failed`. `payment-providers.md` now says the refund reversal key is `<refund key>:reverse:<transfer>`, amount-free on purpose, so a retry with another amount fails closed. |
+| Gates | `make check` pass. Unit, integration and e2e suites not run locally; CI on main is the gate. |
+
+Findings and actions:
+
+1. Minor, open: #476 non-blocking review items. (a) a test for the savepoint around the state update; (b) the reversal sweep stops on the first exception instead of going on with the next refund; (c) `_apply_states` catches a broad `Exception`; (d) a pending reversal is audited again on each retry; (e) the cleared count the sweep returns is not exact; (f) optional: squash the ledger migrations 0003 to 0005 before LIVE.
+2. Major for go-live, open: PAY.4 is partial. Fixes 4 to 6 of the PAY.4 review and chargebacks (dispute cost as provider cost) are not built. No vendor can start a refund yet: staff refund by hand through the service.
+3. Major for the vendor channel, open: PAY.7 code not started (the `vendor_refund` critical action, the per-action rule in `levels.may_confirm`, the shop-scoped lookup, the owner's four isolation tests). Human review required when built.
+4. Minor, open: carried over from check 30 and still open: the #474 hardening items (finding 1), the per-vendor fixed fee rule (finding 2), the `commission_vat_mode` `none` limit (VEN.34), the Stripe cached-error limitation, ORD.17 customer terms clauses pending counsel, VEN.36, VEN.33 and CMP.2 pure engines, SEO.7 partial, `PRIVACY_PEPPER` document, TAX.18 and TAX.19, ORD.10 on STAGE.
+5. Info. The delta touches payments, ledger, orders and tax-adjacent code: PAY.4, `settlement.py`, `orders/services.py`, `vendors/commission.py`. All need human review.
+
+Verdict: GO with follow-ups. No blocker for a STAGE release. Finding 2 still matters before any LIVE payment.
+
+### Coherence check 32 (main at 1ffd8b5e)
+
+Scope: main at 1ffd8b5e, the merges after check 31 (#487): #484 (CORE.30), #488 (CAT.21), #489 and #490 (SEC.5), #491 (CORE.24 part 1), #496 and #507 (ARC.34), #497 and #510 (CORE.25 hardening), #498 and #500 (ARC.20 lane account and Lane review check), #502 and #503 (THM.8), and the spec PRs #505 (owner decisions), #508 (tax adviser answers, D-46, ARC.35, clauses (j) and (k)) and #512 (`ride` on Bootstrap 5.3, THM.13 to THM.16, MQ-45), through the trains #493 to #495, #501, #504, #506, #509, #511 and #513.
+
+| Area | Result |
+|---|---|
+| Code vs spec | #491 matches the CORE.24 part 1 text (index in `session_store.py` with no raw User-Agent or IP, email change ends other sessions, Support end, panic button); part 2 (role-based lifetimes) is not built. #497 and #510 close the #474 hardening items 1 to 5 of check 30 (fail-closed `SHOP_OWNER_CHECK`, offers dropped, shop in the audit, demotion test, an unscoped window covers only while the user may elevate); `tests/security` holds no strict xfail any more. #489 matches SEC.5 items 6 and 7. #502 and #503 ship `ride` CSS for the THM.8 pages; THM.16 is the move to Bootstrap 5.3. #508 and #512 are spec only: no code reads clause (j) or (k), the D-46 regime, CMP.34 or the Bootstrap foundation yet. |
+| Spec and backlog | `make docs` gives no diff (`90-backlog.md` and `backlog.csv` are fresh; 401 tasks, 2,344 h of P1, 3,202 h in all). Spec 04, 11, 13, 92, `01` (ARC.35) and the CMP.5 text agree on clauses (a) to (k): the title of #508 says clause (l), the merged text folded it into (k); no (l) exists anywhere. Spec 14 has no leftover "no Bootstrap" or scroll-snap text outside the supersession note; THM.7, THM.9 and THM.10 dependencies name THM.13 to THM.16, and the hours in `91-estimates.md` now have a note for the 2026-11-15 spec PRs. The 92 register: MQ-45 is the last MQ and is unique (it opens the 2026-11-15 themes table), D-44 to D-46 are present; the register has no D-23 and no D-42 (not reused, nothing refers to them). `progress.md` had no rows for #484, #488 to #491, #496 to #512 (the 2026-11-15 work); added here with the merge list and the SEC.5 row rewritten. |
+| Docs | `CONTRIBUTING.md`, `release.md` and `parallel-lanes.md` did not describe the ARC.34 CI shape (4 shards, shard check, docs-only skip, drafts skip E2E and image, `ready_for_review`); added. `manager.md` had no platform map section (CORE.30); added. The Lane review rule is in `parallel-lanes.md` and `CLAUDE.md`. `audit-trail.md` lists `accounts.sessions.ended` and `accounts.sessions.ended_all` and the shop key on the window events. |
+| Gates | `make check` pass. Unit, integration and e2e suites not run locally; CI on main is the gate. |
+
+Findings and actions:
+
+1. Minor, fixed here: the missing `progress.md` rows, the stale SEC.5 row (it still named WIP branches), the missing CI, platform map and estimates notes (see above).
+2. Major for go-live, open: CORE.24 part 2 (role-based idle and absolute lifetimes on `PlatformOperator`) is not built; until it lands staff and vendor members keep the default session length. Human review needed (authentication).
+3. Major, open: spec only, no code yet, for money and legal: D-46 and VEN.34 (VAT on every fee by regime and category), CMP.2 statement wordings, CMP.34 RF19 thresholds, ARC.35 takeover runbook, clauses (j) and (k) in the CMS and the ORD.17 box 2. Tax and legal wording needs counsel (CMP.24) and the adviser's rates and Natura codes need a human check before code is built on them. The platform still settles only with `commission_vat_mode` `none` until VEN.34.
+4. Minor, open: THM.13 to THM.16. The merged `ride` THM.8 CSS is plain CSS and moves to Bootstrap 5.3 in THM.16; until THM.13 measures the real sizes, the provisional 75 KB CSS and JS budgets are only in the spec.
+5. Minor, open: carried over from check 31 and still open: the #476 review items, PAY.4 parts (chargebacks) and PAY.7 code, VEN.38 per-vendor fixed fee rule in spec 04, the Stripe cached-error limitation, ORD.17 customer terms clauses pending counsel, VEN.36, VEN.33 and CMP.2 pure engines, SEO.7 partial, `PRIVACY_PEPPER` document, TAX.18 and TAX.19, ORD.10 on STAGE.
+6. Info. The delta touches security, authentication, settings and secrets code: CORE.24, CORE.25, SEC.5; plus the CI and review gates. All need human review.
+
+Verdict: GO with follow-ups. No blocker for a STAGE release. Finding 2 and the PAY.4 and PAY.7 items still matter before LIVE.
