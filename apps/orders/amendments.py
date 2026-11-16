@@ -39,8 +39,9 @@ from django.utils.module_loading import import_string
 
 from apps.accounts import levels
 from apps.accounts.models import User
+from apps.accounts.services import USER_MODEL
 from apps.catalog.models import Product, Variant
-from apps.core.audit import VENDOR_FIELD, AuditContext
+from apps.core.audit import VENDOR_FIELD, AuditContext, record
 from apps.core.changeset import Change, ChangeSet
 from apps.core.countries import InvalidCountry
 from apps.core.models import AuditLog
@@ -68,6 +69,7 @@ from .models import (
 from .services import (
     PAID_OR_LATER,
     OrdersFrozen,
+    apply_refund_to_states,
     orders_frozen,
 )
 from .tz import business_tz
@@ -660,7 +662,9 @@ def amendment_passkey(amendment: OrderAmendment) -> PasskeyAsk | None:
     return PasskeyAsk(action, hashlib.sha256(material.encode()).hexdigest())
 
 
-def _spend_passkey(amendment: OrderAmendment, actor: User, passkey_session: str) -> None:
+def _spend_passkey(
+    amendment: OrderAmendment, actor: User, passkey_session: str, ctx: AuditContext
+) -> None:
     """Spend the fresh passkey grant of a critical amendment, or refuse. Never the passkey
     window: a critical action asks a passkey each time (CORE.25)."""
     ask = amendment_passkey(amendment)
@@ -682,6 +686,19 @@ def _spend_passkey(amendment: OrderAmendment, actor: User, passkey_session: str)
             action=ask.action,
             digest=ask.digest,
         )
+    record(
+        ctx,
+        levels.SINGLE_USED,
+        USER_MODEL,
+        str(actor.public_id),
+        None,
+        {
+            "kind": "single",
+            "action": ask.action,
+            "shop": levels.shop_key(amendment.vendor_order.vendor),
+            "amendment": str(amendment.public_id),
+        },
+    )
 
 
 def _hook(name: str) -> Callable[..., RefundOutcome]:
@@ -722,13 +739,16 @@ def _restock(
             continue
         if order_line.product_id is None:
             continue
-        # The order line keeps the variant's SKU (it has no variant key): the stock that moved
-        # at payment is that variant's, or the product's for a simple product.
+        # The variant the line was sold as (its id, kept on the line since ORD.20 part 2); a
+        # line placed earlier falls back to the variant with the line's SKU.
+        found = Variant.objects.select_for_update()
         variant = (
-            Variant.objects.select_for_update()
-            .filter(product_id=order_line.product_id, sku=order_line.sku)
-            .first()
+            found.filter(pk=order_line.variant_id).first()
+            if order_line.variant_id is not None
+            else found.filter(product_id=order_line.product_id, sku=order_line.sku).first()
         )
+        if order_line.variant_id is not None and variant is None:
+            continue  # the variant was deleted: there is no stock to put back
         row: Product | Variant
         if variant is not None:
             row = variant
@@ -794,8 +814,9 @@ def apply_amendment(
                 locked.save(update_fields=["state", "updated_at"])
                 action = "orders.amendment_superseded"
             else:
+                _refuse_withdrawn(locked_sub)
                 if not dry_run:
-                    _spend_passkey(locked, actor, passkey_session)
+                    _spend_passkey(locked, actor, passkey_session, ctx)
                 version, refund_changes, stock_changes = _write_next_version(
                     locked_sub, locked, at=stamp, ctx=ctx, dry_run=dry_run
                 )
@@ -815,7 +836,17 @@ def apply_amendment(
     except _DryRunRollback:
         pass
     amendment.refresh_from_db()
+    if not dry_run and amendment.refund_ref:
+        # The version and the pending refund are committed: submit it to the provider now. A
+        # provider failure leaves the refund pending (retried by the sweep, alerted), never a
+        # version without its refund or a refund without its version.
+        _submit(amendment.refund_ref, ctx)
     return ChangeSet([*changeset.changes, *refund_changes])
+
+
+def _submit(refund_id: str, ctx: AuditContext) -> None:
+    submit: Callable[..., bool] = import_string(settings.ORDER_REFUND_SUBMIT_HOOK)
+    submit(refund_id, ctx=ctx)
 
 
 def _write_next_version(
@@ -861,6 +892,12 @@ def _write_next_version(
         amendment=amendment,
         shipping_address=address,
     )
+    stock_changes = _restock(sub, preview.before, preview.after, resolved)
+    if _partly_unavailable(resolved, preview.after):
+        VendorOrder.objects.filter(pk=sub.pk).update(
+            cancel_rest_offered_at=at,
+            ship_hold_until=at + dt.timedelta(hours=am.DEFAULT_CANCEL_HOLD_HOURS),
+        )
     refund_changes: list[Change] = []
     if preview.refund > 0:
         outcome = _hook("ORDER_AMENDMENT_REFUND_HOOK")(
@@ -877,12 +914,6 @@ def _write_next_version(
         )
         amendment.refund_ref = outcome.refund_id
         refund_changes = outcome.changes
-    stock_changes = _restock(sub, preview.before, preview.after, resolved)
-    if _partly_unavailable(resolved, preview.after):
-        VendorOrder.objects.filter(pk=sub.pk).update(
-            cancel_rest_offered_at=at,
-            ship_hold_until=at + dt.timedelta(hours=am.DEFAULT_CANCEL_HOLD_HOURS),
-        )
     amendment.state = AmendmentState.APPLIED
     amendment.preview = preview.to_json()
     amendment.changes = [am.change_to_json(c) for c in resolved]
@@ -1148,18 +1179,28 @@ def cancel_rest_of_package(
     stamp = now or timezone.now()
     changeset = ChangeSet()
     refund_changes: list[Change] = []
+    refund_id = ""
     try:
         with transaction.atomic():
             locked = _lock_offer(vendor_order)
+            _refuse_withdrawn(locked)
             before = _offer_snapshot(locked)
+            VendorOrder.objects.filter(pk=locked.pk).update(
+                cancel_rest_offered_at=None, ship_hold_until=None
+            )
             outcome = _hook("ORDER_CANCEL_REST_REFUND_HOOK")(
                 locked, ctx=ctx, now=stamp, dry_run=dry_run
             )
             refund_changes = outcome.changes
-            VendorOrder.objects.filter(pk=locked.pk).update(
-                cancel_rest_offered_at=None, ship_hold_until=None
-            )
+            # The package is cancelled with the refund recorded, before the provider is called:
+            # it can never be shipped while its refund is on the way.
+            apply_refund_to_states(locked, fully_refunded=True, ctx=ctx)
             locked.refresh_from_db()
+            if locked.state not in {"cancelled", "refunded"}:
+                raise AmendmentRefused(
+                    f"The package could not be cancelled (it is {locked.state}); nothing changed."
+                )
+            refund_id = outcome.refund_id
             changeset.update(
                 "orders.vendororder",
                 str(locked.public_id),
@@ -1174,8 +1215,10 @@ def cancel_rest_of_package(
                 raise _DryRunRollback
             audit_changes(changeset, ctx=ctx, action="orders.amendment_package_cancelled")
     except _DryRunRollback:
-        pass
+        refund_id = ""
     vendor_order.refresh_from_db()
+    if refund_id:
+        _submit(refund_id, ctx)
     return ChangeSet([*changeset.changes, *refund_changes])
 
 

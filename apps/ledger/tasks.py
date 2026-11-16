@@ -36,8 +36,11 @@ def settle_pending_payments(timestamp: int) -> None:
 @locked()
 @task("ledger.retry_pending_refund_reversals", retry=NO_RETRY)
 def retry_pending_refund_reversals(timestamp: int) -> None:
-    """Every 10 minutes: retry the transfer reversal of each refund the provider already paid
-    out to the buyer (PAY.4), under the same idempotency key. Idempotent."""
+    """Every 10 minutes: submit each amendment refund the provider has not taken yet (ORD.20),
+    then retry the transfer reversal of each refund the provider already paid out to the buyer
+    (PAY.4), both under the same idempotency key. Idempotent."""
+    submitted = refunds.submit_pending_refunds()
+    logger.info("ledger.retry_pending_refund_reversals: %s submitted", submitted)
     cleared = refunds.retry_pending_reversals()
     logger.info("ledger.retry_pending_refund_reversals: %s cleared", cleared)
 

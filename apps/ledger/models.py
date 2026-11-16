@@ -172,6 +172,9 @@ class Refund(models.Model):
     # refund is due within 14 days of the event; never 30. Staff are alerted 4 days before.
     due_by = models.DateTimeField(null=True, blank=True)
     provider_status = models.CharField(max_length=24, blank=True)
+    # ORD.20: recorded with the change, not yet taken by the provider (submitted right after the
+    # change commits; the sweep retries until the provider takes it).
+    submission_pending = models.BooleanField(default=False)
     succeeded_at = models.DateTimeField(null=True, blank=True)
 
     objects: ClassVar[VendorScopedManager["Refund"]] = VendorScopedManager()
@@ -207,6 +210,14 @@ class Refund(models.Model):
             models.CheckConstraint(
                 condition=models.Q(fee_exclusion_reason="") | models.Q(amendment__isnull=False),
                 name="ledger_refund_fee_exclusion_needs_amendment",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fee_exclusion_reason="") | models.Q(refund_fee=0),
+                name="ledger_refund_fee_exclusion_means_no_fee",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fee_exclusion_reason="") | models.Q(platform_error=False),
+                name="ledger_refund_one_fee_exclusion",
             ),
         ]
         indexes = [models.Index(fields=["vendor_order", "id"], name="ledger_refund_order_idx")]

@@ -291,6 +291,14 @@ def submit_withdrawal(
         )
 
     def apply() -> None:
+        # The lock order of refunds and amendments (Order, then each VendorOrder): an amendment
+        # applied at the same time either sees this withdrawal or is closed by it.
+        Order.objects.select_for_update().filter(pk=order.pk).first()
+        list(
+            VendorOrder.objects.select_for_update(of=("self",))
+            .filter(pk__in=[o.vendor_order.pk for o in chosen])
+            .order_by("pk")
+        )
         stamp = display_time(now)
         created = []
         for option in chosen:

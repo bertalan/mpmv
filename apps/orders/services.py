@@ -79,6 +79,8 @@ class LineInput:
     # (the variant's override when it has one), as they were when the order was placed.
     fiscal_category: str = ""
     weight_kg: Decimal | None = None
+    # ORD.20 part 2: the variant sold, so an amendment can put its units back in stock.
+    variant: Variant | None = None
 
 
 @dataclass(frozen=True)
@@ -272,6 +274,7 @@ def _build_vendor_order(
             sku=entry.sku,
             title=entry.title,
             variant_label=entry.variant_label,
+            variant=entry.variant,
             vat_nature_code=entry.vat_nature_code,
             unit_price_net=entry.unit_price_net,
             quantity=entry.quantity,
@@ -1385,6 +1388,7 @@ def _line_input(entry: PlaceLine, product: Product, variants: dict[int, Variant]
         sku=variant.sku if variant is not None else product.sku,
         title=entry.title,
         variant_label=entry.variant_label,
+        variant=variant,
         unit_price_net=unit_price,  # the live price, equal to the one the customer saw
         quantity=entry.quantity,
         tax_rate=entry.tax.rate,

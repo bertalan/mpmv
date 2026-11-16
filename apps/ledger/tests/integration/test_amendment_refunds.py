@@ -32,7 +32,7 @@ from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.ledger import refunds, settlement
 from apps.ledger.models import LedgerEntry, Refund
 from apps.ledger.refund_engine import InvalidRefundRequest, RefundSelection
-from apps.ledger.tests.integration.test_refunds import SECRET, webhook
+from apps.ledger.tests.integration.test_refunds import SECRET, set_operator, webhook
 from apps.orders import amendment_engine as am
 from apps.orders import amendments, services
 from apps.orders.models import AmendmentState, OrderAmendment, VendorOrder
@@ -570,22 +570,152 @@ def test_every_step_is_audited_with_before_after_role_and_money(
     assert (recorded.after or {})["refunded_gross"] == "36.60"
 
 
-def test_a_provider_failure_rolls_everything_back(stripe: FakeStripeClient) -> None:
+def test_a_provider_failure_keeps_the_change_and_a_pending_refund_the_sweep_submits(
+    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     sub = place_seed(stripe)
     actor = owner_of(sub)
     amendment = draft(sub, actor, am.RemoveLine(key_of(sub, "B")))
+    alerts: list[str] = []
+    monkeypatch.setattr(refunds, "raise_alert", lambda alert, **kw: alerts.append(alert.key))
+    saved = dict(stripe.intents)
     stripe.intents.clear()  # Stripe no longer knows the payment: the refund call fails
-    with pytest.raises(amendments.AmendmentRefused, match="payment provider"):
-        apply(amendment, actor)
+    apply(amendment, actor)
     amendment.refresh_from_db()
-    sub.refresh_from_db()
-    assert amendment.state == AmendmentState.DRAFT, plainly(
-        "a refund the provider refused must leave the draft as it was",
-        f"the amendment is {amendment.state}",
+    refund = Refund.objects.get(vendor_order=sub)
+    assert (amendment.state, refund.submission_pending) == ("applied", True), plainly(
+        "a refund the provider did not take must stay recorded and pending with its version, "
+        "never be lost",
+        f"the amendment is {amendment.state} and the refund pending={refund.submission_pending}",
     )
-    assert sub.current_version is not None
-    assert sub.current_version.number == 1
+    assert not LedgerEntry.objects.filter(vendor_order=sub, kind="refund").exists()
+    assert alerts == [f"refund-submission:{refund.public_id}"]
+    stripe.intents.update(saved)
+    assert refunds.submit_pending_refunds() == 1
+    refund.refresh_from_db()
+    assert refund.submission_pending is False
+    assert refund.provider_refund_ref
+    assert refund.commission_reversal == D("3.00")
+    assert_balanced(sub, "after the sweep submitted the refund")
+
+
+def test_a_refund_the_provider_reports_failed_alerts_at_once(
+    stripe: FakeStripeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    alerts: list[str] = []
+    monkeypatch.setattr(refunds, "raise_alert", lambda alert, **kw: alerts.append(alert.key))
+    stripe.refund_status = "failed"
+    apply(draft(sub, actor, am.RemoveLine(key_of(sub, "B"))), actor)
+    refund = Refund.objects.get(vendor_order=sub)
+    assert alerts == [f"refund-failed:{refund.public_id}"], plainly(
+        "a refund the provider reports failed must alert staff at once", f"alerts: {alerts}"
+    )
+
+
+# --- second review of #564 ---------------------------------------------------------------------
+
+
+def test_an_address_fix_mixed_with_a_removal_keeps_the_refund_fee(
+    stripe: FakeStripeClient,
+) -> None:
+    sub = place_seed(stripe, milan_seller())
+    actor = owner_of(sub)
+    amendment = draft(
+        sub,
+        actor,
+        fix_to_milan(),
+        am.RemoveLine(key_of(sub, "B")),
+        customer_request=CUSTOMER_ASKED,
+    )
+    apply(amendment, actor)
+    refund = Refund.objects.get(vendor_order=sub)
+    assert (refund.fee_exclusion_reason, refund.refund_fee > 0) == ("", True), plainly(
+        "an address fix the customer asked for, mixed with a line the vendor removes, must keep "
+        "the refund fee",
+        f"the exclusion is {refund.fee_exclusion_reason!r} and the fee {refund.refund_fee}",
+    )
+
+
+def test_the_commission_delta_goes_back_even_when_fees_stay_on_refunds(
+    stripe: FakeStripeClient,
+) -> None:
+    set_operator(reverse_fees_on_vendor_refund=False)
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    apply(draft(sub, actor, am.RemoveLine(key_of(sub, "B"))), actor)
+    refund = Refund.objects.get(vendor_order=sub)
+    assert refund.commission_reversal == D("3.00"), plainly(
+        "an amendment's commission delta is a price correction and must go back even when the "
+        "operator keeps the fees on refunds",
+        f"{refund.commission_reversal} went back",
+    )
+    assert_balanced(sub, "after the removal")
+
+
+def test_a_withdrawal_registered_after_the_draft_blocks_the_apply(
+    stripe: FakeStripeClient, settings: Any
+) -> None:
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    amendment = draft(sub, actor, am.RemoveLine(key_of(sub, "B")))
+    session = confirm(amendment, actor)
+    settings.ORDER_WITHDRAWAL_HOOKS = [
+        "apps.orders.tests.integration.test_amendments_apply.always_withdrawn"
+    ]
+    with pytest.raises(amendments.AmendmentRefused, match="withdrawn"):
+        amendments.apply_amendment(amendment, actor=actor, ctx=CTX, passkey_session=session)
     assert not Refund.objects.filter(vendor_order=sub).exists()
+
+
+def test_a_withdrawal_blocks_cancelling_the_rest(stripe: FakeStripeClient, settings: Any) -> None:
+    customer = UserFactory.create()
+    sub = place_seed(stripe, customer=customer)
+    actor = owner_of(sub)
+    apply(draft(sub, actor, am.RemoveLine(key_of(sub, "B"))), actor)
+    settings.ORDER_WITHDRAWAL_HOOKS = [
+        "apps.orders.tests.integration.test_amendments_apply.always_withdrawn"
+    ]
+    with pytest.raises(amendments.AmendmentRefused, match="withdrawn"):
+        amendments.cancel_rest_of_package(sub, actor=customer, ctx=CTX)
+    assert Refund.objects.filter(vendor_order=sub).count() == 1
+
+
+def test_the_ledger_memo_names_the_amendment(stripe: FakeStripeClient) -> None:
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    amendment = draft(sub, actor, am.RemoveLine(key_of(sub, "B")))
+    apply(amendment, actor)
+    entry = LedgerEntry.objects.get(vendor_order=sub, kind="refund")
+    assert str(amendment.public_id) in entry.memo
+
+
+def test_the_grant_spend_is_audited(stripe: FakeStripeClient) -> None:
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    amendment = draft(sub, actor, am.RemoveLine(key_of(sub, "B")))
+    apply(amendment, actor)
+    spent = AuditLog.objects.get(action="accounts.session.single_used")
+    assert (spent.after or {})["action"] == "vendor_refund"
+    assert (spent.after or {})["amendment"] == str(amendment.public_id)
+
+
+def test_an_exclusion_with_a_fee_is_refused_by_the_database(stripe: FakeStripeClient) -> None:
+    sub = place_seed(stripe)
+    actor = owner_of(sub)
+    amendment = draft(sub, actor, am.RemoveLine(key_of(sub, "B")))
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Refund.objects.create(
+            vendor=sub.vendor,
+            vendor_order=sub,
+            channel="through_platform",
+            idempotency_key=secrets.token_hex(8),
+            refunded_gross=D("1.00"),
+            refund_fee=D("3.00"),
+            amendment=amendment,
+            fee_exclusion_reason="customer_requested_amendment",
+        )
 
 
 # --- an open amendment and other refunds -------------------------------------------------------

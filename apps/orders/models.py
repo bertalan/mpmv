@@ -431,6 +431,17 @@ class OrderLine(BaseModel):
     )
     title = models.CharField(max_length=300)
     variant_label = models.CharField(max_length=300, blank=True)
+    # ORD.20 part 2: the variant sold, read when an amendment restocks the line. No database
+    # constraint and no cascade: the line is an immutable snapshot (a deleted variant leaves
+    # the id, and nothing is restocked for it).
+    variant = models.ForeignKey(
+        "catalog.Variant",
+        on_delete=models.DO_NOTHING,
+        db_constraint=False,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
     unit_price_net = MoneyField()
     quantity = models.PositiveIntegerField()
     discount_net = MoneyField(default=0)

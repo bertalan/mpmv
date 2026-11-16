@@ -245,6 +245,9 @@ ORDER_WITHDRAWAL_HOOKS: list[str] = ["apps.compliance.withdrawal.has_withdrawal"
 # the rest, in the transaction of the change (orders cannot import the ledger).
 ORDER_AMENDMENT_REFUND_HOOK = "apps.ledger.refunds.refund_amendment"
 ORDER_CANCEL_REST_REFUND_HOOK = "apps.ledger.refunds.refund_rest_of_package"
+# ORD.20: the refund of an amendment or a cancel of the rest is recorded with the change and
+# submitted to the provider right after it commits (retried by the ledger's sweep on failure).
+ORDER_REFUND_SUBMIT_HOOK = "apps.ledger.refunds.submit_pending_refund"
 # PAY.1: the callable `place_order` uses to start the payment (orders cannot import payments).
 ORDER_PAYMENT_STARTER = "apps.payments.checkout.start_payment"
 # PAY.1: the callable that fetches the browser-side secret of an order's payment from the provider
