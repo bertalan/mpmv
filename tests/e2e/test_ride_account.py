@@ -16,8 +16,8 @@ from playwright.sync_api import Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
-from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
-from apps.accounts.tests.mfa import totp_token
+from apps.accounts.tests.factories import PasskeyDeviceFactory, TOTPDeviceFactory, UserFactory
+from apps.accounts.tests.mfa import password_login, totp_token, verified_login
 from apps.orders.tests.integration.test_retention import place
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
@@ -125,6 +125,55 @@ def test_a_customer_signs_in_with_the_keyboard_only(
     )
     assert focus[0] != "none"
     assert focus[1] >= 2
+
+
+def _session_cookie(page: Page, live_server: LiveServer, client: Client) -> None:
+    page.context.add_cookies(
+        [{"name": "sessionid", "value": client.cookies["sessionid"].value, "url": live_server.url}]
+    )
+    page.add_init_script(RECORD_CSP_VIOLATIONS)
+
+
+@pytest.mark.parametrize("width", [360, 768, 1280])
+def test_the_sign_in_and_second_factor_pages_pass_the_gates_at_every_width(
+    width: int, page: Page, live_server: LiveServer
+) -> None:
+    """THM.16 follow-up: login, MFA verify and the passkey-level prompt at 360, 768 and 1280."""
+    user = UserFactory.create(password=secrets.token_urlsafe(16))
+    TOTPDeviceFactory.create(user=user)
+    PasskeyDeviceFactory.create(user=user)
+    client = Client()
+    password_login(client, user)
+    page.add_init_script(RECORD_CSP_VIOLATIONS)
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(f"{live_server.url}/account/login/")  # anonymous: the sign-in form
+    _check(page, width)
+    _session_cookie(page, live_server, client)
+    for path in ("/account/mfa/verify/", "/account/mfa/verify/?factor=passkey"):
+        page.goto(f"{live_server.url}{path}")
+        _check(page, width)
+
+
+@pytest.mark.parametrize("width", [360, 768, 1280])
+def test_totp_enrolment_and_recovery_codes_pass_the_gates_at_every_width(
+    width: int, page: Page, live_server: LiveServer
+) -> None:
+    enrolling = UserFactory.create(password=secrets.token_urlsafe(16))
+    client = Client()
+    client.force_login(enrolling)
+    _session_cookie(page, live_server, client)
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(f"{live_server.url}/account/mfa/totp/")
+    _check(page, width)
+    page.context.clear_cookies()
+    member = UserFactory.create(password=secrets.token_urlsafe(16))
+    verified = Client()
+    verified_login(verified, member)
+    _session_cookie(page, live_server, verified)
+    page.goto(f"{live_server.url}/account/mfa/recovery-codes/")
+    _check(page, width)
+    page.get_by_role("button").last.click()  # regenerate: the page that shows the new codes
+    _check(page, width)
 
 
 BOOTSTRAP_PAGES = {
