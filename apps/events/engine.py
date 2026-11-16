@@ -11,6 +11,7 @@ import unicodedata
 from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from html import escape, unescape
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -271,6 +272,129 @@ def validate_rrule(text: str, all_day: bool) -> RRuleSubset:
     if errors:
         raise RecurrenceError(errors)
     return RRuleSubset(freq, interval, count, until, byday, bymonthday, bymonth, wkst)
+
+
+# --- Recurrence presets of the vendor form (spec 15 "Recurrence", EVT.4) ---------------------
+
+PRESET_NONE = "none"  # the event happens once
+PRESET_YEARLY = "yearly"  # every year on the event's own dates
+PRESET_WEEKLY = "weekly"  # every week on the chosen weekdays
+PRESET_MONTHLY = "monthly"  # every month on one day (-1 is the last day)
+PRESETS = (PRESET_NONE, PRESET_YEARLY, PRESET_WEEKLY, PRESET_MONTHLY)
+ENDS_NEVER = "never"
+ENDS_COUNT = "count"
+ENDS_UNTIL = "until"
+_PRESET_FREQ = {PRESET_YEARLY: "YEARLY", PRESET_WEEKLY: "WEEKLY", PRESET_MONTHLY: "MONTHLY"}
+
+
+@dataclass(frozen=True)
+class PresetChoice:
+    """A recurrence preset with its inputs: what the vendor form shows for a stored rule."""
+
+    preset: str
+    weekdays: tuple[str, ...] = ()
+    month_day: int | None = None
+    interval: int = 1
+    ends: str = ENDS_NEVER
+    count: int | None = None
+    until: date | None = None  # the last day, in the event's zone
+
+
+def _until_part(day: date, *, all_day: bool, timezone: str) -> str:
+    if all_day:
+        return day.strftime("%Y%m%d")
+    local = datetime.combine(day, time(23, 59, 59), tzinfo=ZoneInfo(timezone))
+    return local.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def build_rrule(
+    preset: str,
+    *,
+    weekdays: Sequence[str] = (),
+    month_day: int | None = None,
+    interval: int = 1,
+    ends: str = ENDS_NEVER,
+    count: int | None = None,
+    until: date | None = None,
+    all_day: bool = False,
+    timezone: str = "UTC",
+) -> str:
+    """The RRULE a preset writes, checked by `validate_rrule`; `RecurrenceError` names what is
+    missing or out of range. A timed event's last day ends at 23:59:59 in its zone, in UTC."""
+    if preset == PRESET_NONE:
+        return ""
+    errors: list[RuleError] = []
+    if preset not in _PRESET_FREQ:
+        raise RecurrenceError([RuleError("FREQ", "choose how the event repeats.")])
+    parts = [f"FREQ={_PRESET_FREQ[preset]}"]
+    if interval != 1:
+        parts.append(f"INTERVAL={interval}")
+    if preset == PRESET_WEEKLY:
+        chosen = [day for day in WEEKDAYS if day in set(weekdays)]
+        if not chosen or len(chosen) != len(set(weekdays)):
+            errors.append(RuleError("BYDAY", "choose at least one weekday."))
+        parts.append("BYDAY=" + ",".join(chosen))
+    elif preset == PRESET_MONTHLY:
+        if month_day is None or not (1 <= month_day <= 31 or month_day == -1):
+            errors.append(RuleError("BYMONTHDAY", "choose a day from 1 to 31, or the last day."))
+        parts.append(f"BYMONTHDAY={month_day}")
+    if ends == ENDS_COUNT:
+        if count is None:
+            errors.append(RuleError("COUNT", "give the number of times."))
+        else:
+            parts.append(f"COUNT={count}")
+    elif ends == ENDS_UNTIL:
+        if until is None:
+            errors.append(RuleError("UNTIL", "give the last day."))
+        else:
+            parts.append(f"UNTIL={_until_part(until, all_day=all_day, timezone=timezone)}")
+    if errors:
+        raise RecurrenceError(errors)
+    rule = ";".join(parts)
+    validate_rrule(rule, all_day)
+    return rule
+
+
+def preset_from_rrule(
+    rrule: str, *, all_day: bool = False, timezone: str = "UTC"
+) -> PresetChoice | None:
+    """The preset that writes `rrule`, or None for a rule the presets cannot write (it is kept
+    as it is, "custom")."""
+    if not rrule.strip():
+        return PresetChoice(PRESET_NONE)
+    try:
+        rule = validate_rrule(rrule, all_day)
+    except RecurrenceError:
+        return None
+    if rule.wkst != 0 or rule.bymonth or rule.freq == "DAILY":
+        return None
+    weekdays: tuple[str, ...] = ()
+    month_day: int | None = None
+    if rule.freq == "YEARLY":
+        preset = PRESET_YEARLY
+        if rule.byday or rule.bymonthday:
+            return None
+    elif rule.freq == "WEEKLY":
+        preset = PRESET_WEEKLY
+        if rule.bymonthday or not rule.byday or any(ordinal for ordinal, _day in rule.byday):
+            return None
+        weekdays = tuple(WEEKDAYS[day] for _ordinal, day in rule.byday)
+    else:
+        preset = PRESET_MONTHLY
+        if rule.byday or len(rule.bymonthday) != 1:
+            return None
+        month_day = rule.bymonthday[0]
+    ends, last = ENDS_NEVER, None
+    if rule.count is not None:
+        ends = ENDS_COUNT
+    elif rule.until is not None:
+        ends = ENDS_UNTIL
+        last = (
+            rule.until.astimezone(ZoneInfo(timezone)).date()
+            if isinstance(rule.until, datetime)
+            else rule.until
+        )
+    return PresetChoice(preset, weekdays, month_day, rule.interval, ends, rule.count, last)
 
 
 # --- Candidate days --------------------------------------------------------------------------
@@ -760,3 +884,113 @@ def event_slug(title: str, *, taken: Set[str]) -> str:
     while f"{base}-{number}" in taken:
         number += 1
     return f"{base}-{number}"
+
+
+# --- The vendor's block editor (EVT.4 part 2): pure edits of a raw body --------------------------
+
+
+class BlockNotFound(LookupError):
+    """No block of the body has this id."""
+
+
+GALLERY_SLOTS = 6  # image slots of the gallery form
+FAQ_SLOTS = 8  # question slots of the FAQ form
+_TAG = re.compile(r"<\s*/?\s*[a-zA-Z][^>]*>")
+_SIMPLE_PARAGRAPHS = re.compile(r"^(?:<p(?:\s[^>]*)?>.*?</p>)+$", re.DOTALL)
+
+
+def paragraph_html(text: str) -> str:
+    """The rich-text value of what a vendor typed: text with tags is kept as HTML (the sanitiser
+    and the link checks run on it later), plain text becomes paragraphs (a blank line starts a
+    new one, a single line break stays one)."""
+    text = text.strip()
+    if _TAG.search(text):
+        return text
+    paragraphs = [part.strip() for part in re.split(r"\n\s*\n", text.replace("\r\n", "\n"))]
+    return "".join(
+        "<p>" + "<br>".join(escape(line.strip()) for line in part.split("\n")) + "</p>"
+        for part in paragraphs
+        if part
+    )
+
+
+def paragraph_text(html: str) -> str:
+    """The text to edit for a stored rich-text value: plain paragraphs show as plain text, any
+    other markup is shown as it is."""
+    if not _SIMPLE_PARAGRAPHS.match(html.strip()):
+        return html
+    inner = re.sub(r"<br\s*/?>", "\n", html)
+    inner = re.sub(r"</p>\s*<p(?:\s[^>]*)?>", "\n\n", inner)
+    inner = re.sub(r"</?p(?:\s[^>]*)?>", "", inner)
+    return html if _TAG.search(inner) else unescape(inner)
+
+
+def _find(body: Sequence[Mapping[str, Any]], block_id: str) -> int:
+    for index, block in enumerate(body):
+        if str(block.get("id", "")) == block_id:
+            return index
+    raise BlockNotFound(block_id)
+
+
+def block_by_id(body: Sequence[Mapping[str, Any]], block_id: str) -> Mapping[str, Any]:
+    return body[_find(body, block_id)]
+
+
+def append_block(
+    body: Sequence[Mapping[str, Any]], kind: str, value: Any, block_id: str
+) -> list[dict[str, Any]]:
+    return [*(dict(block) for block in body), {"type": kind, "value": value, "id": block_id}]
+
+
+def replace_block(
+    body: Sequence[Mapping[str, Any]], block_id: str, value: Any
+) -> list[dict[str, Any]]:
+    index = _find(body, block_id)
+    result = [dict(block) for block in body]
+    result[index]["value"] = value
+    return result
+
+
+def move_block(
+    body: Sequence[Mapping[str, Any]], block_id: str, direction: str
+) -> list[dict[str, Any]]:
+    """The body with one block one place up or down; at the edge nothing changes."""
+    index = _find(body, block_id)
+    result = [dict(block) for block in body]
+    target = index - 1 if direction == "up" else index + 1
+    if 0 <= target < len(result):
+        result[index], result[target] = result[target], result[index]
+    return result
+
+
+def remove_block(body: Sequence[Mapping[str, Any]], block_id: str) -> list[dict[str, Any]]:
+    index = _find(body, block_id)
+    return [dict(block) for i, block in enumerate(body) if i != index]
+
+
+def _words(value: str, limit: int = 80) -> str:
+    text = " ".join(unescape(_TAG.sub(" ", value)).split())
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def block_summary(block: Mapping[str, Any]) -> str:
+    """A short plain-text line that tells which block this is in the editor's list."""
+    kind, value = block.get("type"), block.get("value")
+    if isinstance(value, str):
+        return _words(value)
+    if not isinstance(value, Mapping):
+        return ""
+    if kind == "figure":
+        return _words(str(value.get("alt_text") or ""))
+    if kind == "gallery":
+        return _words(
+            ", ".join(
+                str((item.get("value", item) if isinstance(item, Mapping) else {}).get("alt_text"))
+                for item in value.get("images") or []
+            )
+        )
+    if kind == "faq":
+        first = next(iter(value.get("items") or []), None)
+        item = first.get("value", first) if isinstance(first, Mapping) else {}
+        return _words(str(value.get("heading") or item.get("question") or ""))
+    return _words(str(value.get("heading") or ""))

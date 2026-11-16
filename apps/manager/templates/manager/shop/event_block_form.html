@@ -1,0 +1,18 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+One body block of a vendor event (EVT.4 part 2): the form of the block type, to add it or edit it.
+The choosers offer the shop's own images, products and events only. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}: {{ block_label }}</h1>
+  <p><a href="{{ edit_url }}">{% translate "Back to the event" %}</a></p>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" class="manager-form" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="type" value="{{ kind }}">
+    <input type="hidden" name="base_revision" value="{{ base_revision }}">
+    {% for field in form %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% include "components/button.html" with label=_("Save block") type="submit" only %}
+  </form>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% load i18n %}{% comment %}
+The body blocks of a vendor event (EVT.4 part 2): the list with Edit, Move up, Move down and Remove
+for each block, and the form that adds one. The actions are plain forms that also work without
+JavaScript; htmx swaps this panel in place (`#event-blocks`). The block is in each button's name.
+No inline script or style.
+{% endcomment %}<section id="event-blocks" aria-labelledby="event-blocks-title">
+  <h2 id="event-blocks-title">{% translate "Content" %}</h2>
+  <p class="manager-lead">{% translate "The text, pictures and other blocks of the event page, in this order. Each change is saved as a draft." %}</p>
+  {% if blocks %}
+    <ol class="manager-choices">
+      {% for block in blocks %}
+        <li>
+          <p><strong>{{ block.label }}</strong>{% if block.summary %}: {{ block.summary }}{% endif %}</p>
+          <div class="manager-confirm">
+            <a class="button button--secondary button--small" href="{{ block.edit_url }}">{% translate "Edit" %}<span class="visually-hidden"> {% blocktranslate with number=block.number label=block.label %}block {{ number }}, {{ label }}{% endblocktranslate %}</span></a>
+            <form method="post" action="{{ block.move_url }}" hx-post="{{ block.move_url }}" hx-target="#event-blocks" hx-swap="outerHTML">
+              {% csrf_token %}<input type="hidden" name="base_revision" value="{{ base_revision }}"><input type="hidden" name="direction" value="up">
+              <button type="submit" class="button button--secondary button--small">{% translate "Move up" %}<span class="visually-hidden"> {% blocktranslate with number=block.number label=block.label %}block {{ number }}, {{ label }}{% endblocktranslate %}</span></button>
+            </form>
+            <form method="post" action="{{ block.move_url }}" hx-post="{{ block.move_url }}" hx-target="#event-blocks" hx-swap="outerHTML">
+              {% csrf_token %}<input type="hidden" name="base_revision" value="{{ base_revision }}"><input type="hidden" name="direction" value="down">
+              <button type="submit" class="button button--secondary button--small">{% translate "Move down" %}<span class="visually-hidden"> {% blocktranslate with number=block.number label=block.label %}block {{ number }}, {{ label }}{% endblocktranslate %}</span></button>
+            </form>
+            <form method="get" action="{{ block.remove_url }}" hx-post="{{ block.remove_url }}" hx-vals='{"csrfmiddlewaretoken": "{{ csrf_token }}", "base_revision": "{{ base_revision }}"}' hx-target="#event-blocks" hx-swap="outerHTML" hx-confirm="{% translate 'Remove this block?' %}">
+              <button type="submit" class="button button--danger button--small">{% translate "Remove" %}<span class="visually-hidden"> {% blocktranslate with number=block.number label=block.label %}block {{ number }}, {{ label }}{% endblocktranslate %}</span></button>
+            </form>
+          </div>
+        </li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <p>{% translate "The event page has no content yet." %}</p>
+  {% endif %}
+  <form method="get" action="{{ add_url }}" class="manager-confirm">
+    <label for="event-block-type">{% translate "Add a block" %}</label>
+    <select id="event-block-type" name="type">
+      {% for kind, label in block_types %}<option value="{{ kind }}">{{ label }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="button button--secondary">{% translate "Add" %}</button>
+  </form>
+</section>

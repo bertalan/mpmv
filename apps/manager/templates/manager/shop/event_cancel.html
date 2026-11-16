@@ -1,0 +1,15 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Cancel an event (EVT.4): a confirmation before the POST. The page stays online with a
+cancellation message, in every language. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p>{% blocktranslate with title=event.title %}Cancel "{{ title }}"? The event stays online with a message that it is cancelled, in every language. This cannot be undone.{% endblocktranslate %}</p>
+  <form method="post">
+    {% csrf_token %}
+    {% include "components/button.html" with label=_("Cancel the event") type="submit" variant="danger" only %}
+  </form>
+  <p><a href="{{ list_url }}">{% translate "Keep the event" %}</a></p>
+{% endblock %}

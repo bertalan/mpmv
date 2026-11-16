@@ -1,0 +1,49 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Vendor event form (EVT.4): the structured fields with the recurrence presets, the map picker
+and the product and category choosers (part 2); the body blocks are their own panel below the
+form, once the event exists. Works without JavaScript. No inline script or style.
+{% endcomment %}
+{% block head %}{{ block.super }}{{ map_media }}{% endblock %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p><a href="{{ list_url }}">{% translate "Back to the events" %}</a></p>
+  {% if moderation %}{% include "components/alert.html" with level="warning" message=moderation live="polite" only %}{% endif %}
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" class="manager-form" novalidate>
+    {% csrf_token %}
+    {% for heading, fields in form.sections %}
+      <fieldset class="manager-form__group">
+        <legend>{{ heading }}</legend>
+        {% for field in fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+      </fieldset>
+    {% endfor %}
+    <fieldset class="manager-form__group">
+      <legend>{% translate "Point on the map" %}</legend>
+      {% include "events/admin/map_picker_panel.html" with inputs=map_picker.inputs picked_inputs=map_picker.picked_inputs source_input=map_picker.source_input find_url=map_picker.find_url language=map_picker.language help_id=map_picker.help_id tile_url=map_picker.tile_url attribution=map_picker.attribution attribution_url=map_picker.attribution_url default_latitude=map_picker.default_latitude default_longitude=map_picker.default_longitude default_zoom=map_picker.default_zoom only %}
+      {% for field in form.point_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+    </fieldset>
+    {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+    {% include "components/button.html" with label=_("Save draft") type="submit" only %}
+  </form>
+  {% if event %}
+    <p><a href="{{ preview_url }}" target="_blank" rel="noopener">{% translate "Preview the saved draft" %}</a></p>
+    {% include "manager/shop/_event_blocks.html" %}
+    <p>{% translate "Pictures for the event page come from" %} <a href="{{ images_url }}">{% translate "your image library" %}</a>.</p>
+    {% if can_submit %}
+      <h2>{% translate "Submit" %}</h2>
+      <p>{% translate "Save your changes first: the latest saved draft is the one that is submitted." %}</p>
+      <form method="post" action="{{ submit_url }}">
+        {% csrf_token %}
+        {% include "components/button.html" with label=_("Submit for review") type="submit" variant="secondary" only %}
+      </form>
+    {% endif %}
+    {% if can_cancel %}<p><a href="{{ cancel_url }}">{% translate "Cancel the event" %}</a></p>{% endif %}
+  {% else %}
+    <section id="event-content-later">
+      <h2>{% translate "Content" %}</h2>
+      <p>{% translate "Save the event first: then you can add text, pictures and other blocks to its page." %}</p>
+    </section>
+  {% endif %}
+{% endblock %}
