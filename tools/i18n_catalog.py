@@ -78,17 +78,9 @@ HELP_TEXT_SCOPES = (
     "apps/themes",
     "apps/vendors",
 )
-# German, French and Spanish start with the order emails (ORD.16); the Manager and account pages
-# join them with their own I18N.7 slices. Italian covers every scope.
-# The customer order pages (ORD.7) join the Manager and account pages in I18N.7.
-_ORDER_EMAILS = ("apps/orders/templates/email", "apps/orders/templates/documents")
-# The consumer price note (TAX.12) is a legal display: every language has it from the start.
-_PRICE_NOTE = ("apps/tax/prices.py",)
-LANGUAGE_SCOPES: dict[str, tuple[str, ...]] = {
-    "de": (*_ORDER_EMAILS, *_PRICE_NOTE),
-    "fr": (*_ORDER_EMAILS, *_PRICE_NOTE),
-    "es": (*_ORDER_EMAILS, *_PRICE_NOTE),
-}
+# Every language scans the same scope (I18N.7 slice 2): a language listed here would scan only
+# the given paths, so the dict stays empty and `SCOPES` applies to all of them.
+LANGUAGE_SCOPES: dict[str, tuple[str, ...]] = {}
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
     "400.html",
