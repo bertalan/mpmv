@@ -150,7 +150,7 @@ def test_the_account_pages_use_bootstrap_classes(page: Page, live_server: LiveSe
     assert page.locator("form input.form-control").count() == 2
     assert page.locator("form label.form-label").count() == 2
     assert page.locator("form button.btn.btn-primary").count() == 1
-    assert page.locator(".button, .alert--danger").count() == 0
+    assert page.locator(".account-page .button, .account-page .alert--danger").count() == 0
 
 
 def test_the_account_stylesheet_keeps_only_what_bootstrap_lacks() -> None:

@@ -1,0 +1,13 @@
+{% extends "layouts/account.html" %}
+{% load i18n %}
+{% block title %}{% translate "Recovery codes" %} · MPMV{% endblock %}
+{% block account_content %}
+<h1>{% translate "Recovery codes" %}</h1>
+<p>{% blocktranslate count counter=unused_codes %}You have {{ counter }} unused recovery code.{% plural %}You have {{ counter }} unused recovery codes.{% endblocktranslate %}</p>
+<form method="post">
+  {% csrf_token %}
+  <p>{% translate "Generating new codes makes every previous code stop working." %}</p>
+  <button type="submit" class="btn btn-primary">{% translate "Generate new codes" %}</button>
+</form>
+<p class="mt-3"><a href="{% url 'mfa:overview' %}">{% translate "Back to two-factor settings" %}</a></p>
+{% endblock %}
