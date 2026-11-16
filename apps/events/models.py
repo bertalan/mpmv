@@ -271,6 +271,16 @@ ROW_FIELDS = (
     "dsa_notice_ref",
 )
 
+# The structured fields a translation takes from the original on every publish (EVT.8): the
+# synchronised fields less the page-level state the cancel, hide and restore services write on
+# every translation themselves, and less the language itself. The links are copied too.
+TRANSLATION_COPIED_FIELDS = (
+    *(name for name in SYNCHRONISED_FIELDS if name not in ROW_FIELDS and name != "original_locale"),
+    "sequence",
+    "content_changed_at",
+)
+LINK_ATTRIBUTES = ("products", "categories")
+
 ADDRESS_FIELDS = ("street", "postcode", "city", "region", "country")
 LATITUDE_RANGE = (Decimal(-90), Decimal(90))
 LONGITUDE_RANGE = (Decimal(-180), Decimal(180))
@@ -830,7 +840,50 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
             setattr(page, attname, getattr(self, attname))
         if self.cancelled_at is not None:
             page.cancelled_at = self.cancelled_at
+        original = self.original_page()
+        if original is not None:
+            # A translation never carries structured fields of its own (EVT.8): whatever its
+            # revision says, the original's published values apply.
+            for name in TRANSLATION_COPIED_FIELDS:
+                attname = self._meta.get_field(name).attname
+                setattr(page, attname, getattr(original, attname))
         return page
+
+    def original_page(self) -> "EventPage | None":
+        """The page in the event's original language when this page is another translation of
+        it, else None (this is the original, or the original page does not exist)."""
+        if not self.pk or self.locale_id == self.original_locale_id:
+            return None
+        found: EventPage | None = EventPage.objects.filter(
+            translation_key=self.translation_key, locale_id=self.original_locale_id
+        ).first()
+        return found
+
+    def sync_translations(self) -> None:
+        """Copy the structured fields and the product and category links of this original page
+        to every other translation (spec 15 "Languages": "copies the structured fields from the
+        original page to every translation on each publish"). A translation's own text is
+        never touched."""
+        if self.locale_id != self.original_locale_id:
+            return
+        others = EventPage.objects.filter(translation_key=self.translation_key).exclude(pk=self.pk)
+        if not others.exists():
+            return
+        source = EventPage.objects.get(pk=self.pk)
+        values = {
+            self._meta.get_field(name).attname: getattr(source, self._meta.get_field(name).attname)
+            for name in TRANSLATION_COPIED_FIELDS
+        }
+        others.update(**values)
+        for other in others:
+            self._copy_links(source, other)
+
+    @staticmethod
+    def _copy_links(source: "EventPage", target: "EventPage") -> None:
+        for link in LINK_ATTRIBUTES:
+            manager = getattr(target, link)
+            manager.set(list(getattr(source, link).all()))
+            manager.commit()  # a parental relation is deferred until it is committed
 
     def publish(
         self,
@@ -851,7 +904,7 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
         if EventPage.objects.filter(pk=self.pk, hidden_at__isnull=False).exists():
             raise HiddenEventPublishRefused("a hidden event is restored by platform staff only")
         self._bump_sequence(revision)
-        return super().publish(
+        result = super().publish(
             revision,
             user=user,
             changed=changed,
@@ -859,6 +912,12 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
             previous_revision=previous_revision,
             skip_permission_checks=skip_permission_checks,
         )
+        original = self.original_page()
+        if original is None:
+            self.sync_translations()
+        else:  # a translation's revision carries old links: the original's apply
+            self._copy_links(original, self)
+        return result
 
     def _bump_sequence(self, revision: Any) -> None:
         stored: EventPage | None = EventPage.objects.filter(pk=self.pk).first()

@@ -191,6 +191,10 @@ msgstr "Keine vergangenen Veranstaltungen."
 msgid "Online"
 msgstr "Online"
 
+#: apps/events/templates/events/_filters.html
+msgid "Only events in %(language)s"
+msgstr "Nur Veranstaltungen auf %(language)s"
+
 #: apps/orders/templates/email/orders/order_cancelled/subject.txt
 msgid "Order %(order_number)s was cancelled"
 msgstr "Bestellung %(order_number)s wurde storniert"

@@ -96,10 +96,14 @@ def _translate_url(page: EventPage) -> str:
 
 
 def test_the_new_form_offers_every_enabled_language(signed_in: Client) -> None:
-    html = signed_in.get(reverse(NEW)).text
-    assert 'name="language"' in html
-    for code in ("en", "it", "de", "fr", "es"):
-        assert f'value="{code}"' in html
+    form = signed_in.get(reverse(NEW)).context["form"]
+    assert [code for code, _name in form.fields["language"].choices] == [
+        "en",
+        "it",
+        "de",
+        "fr",
+        "es",
+    ]
 
 
 def test_a_new_event_is_written_in_the_chosen_language(signed_in: Client) -> None:
@@ -122,9 +126,9 @@ def test_the_edit_form_shows_the_original_language_and_cannot_change_it(
 ) -> None:
     page = _german_event(owner, vendor)
     edit = reverse("manager:shop:event_edit", args=[page.public_id])
-    html = signed_in.get(edit).text
-    assert 'name="language"' not in html
-    assert "Deutsch" in html or "German" in html
+    response = signed_in.get(edit)
+    assert "language" not in response.context["form"].fields
+    assert "Deutsch" in response.text
     assert signed_in.post(edit, _post(title="Herbstmesse 2", language="it")).status_code == 302
     assert EventPage.objects.get(pk=page.pk).locale.language_code == "de"
 
@@ -152,8 +156,8 @@ def test_add_translation_creates_the_draft_and_opens_its_text_form(
     page = _german_event(owner, vendor)
     form = signed_in.get(_translate_url(page))
     assert form.status_code == 200
-    assert 'name="language"' in form.text
-    assert 'value="de"' not in form.text  # the original language is not a choice
+    choices = [code for code, _name in form.context["form"].fields["language"].choices]
+    assert choices == ["en", "it", "fr", "es"]  # the original language is not a choice
     response = signed_in.post(
         _translate_url(page),
         {"language": "it", "title": "Fiera d'autunno", "summary": "Incontra gli artigiani."},

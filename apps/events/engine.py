@@ -1214,3 +1214,39 @@ def event_ics(event: IcsEvent) -> str:
         lines.append(f"CATEGORIES:{ics_escape(event.category)}")
     lines += ["END:VEVENT", "END:VCALENDAR"]
     return "".join(ics_fold(line) for line in lines)
+
+
+# --- Languages: original-language fallback and hreflang (EVT.8, spec 15 "Languages") ----------
+
+
+def pick_language(
+    available: Sequence[str], wanted: str, original: str, order: Sequence[str]
+) -> str | None:
+    """The language an event shows in on a page of language `wanted`.
+
+    `available` are the languages the event has a public page in. The translation in `wanted`
+    when there is one, else the event's original language, else (the original is not public) the
+    first available language in `order`. None when nothing is public.
+    """
+    if wanted in available:
+        return wanted
+    if original in available:
+        return original
+    return next((code for code in order if code in available), None)
+
+
+def event_hreflang(
+    urls: Mapping[str, str], original: str, order: Sequence[str]
+) -> list[tuple[str, str]]:
+    """The `hreflang` alternates of an event page from `{language: URL}` of its public
+    translations, in `order`, then `x-default`: the EN translation when there is one, else the
+    original, else the first language present. Only existing translations are listed."""
+    alternates = [(code, urls[code]) for code in order if code in urls]
+    if not alternates:
+        return []
+    default = next(
+        (code for code in ("en", original) if code in urls),
+        alternates[0][0],
+    )
+    alternates.append(("x-default", urls[default]))
+    return alternates

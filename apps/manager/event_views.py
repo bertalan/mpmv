@@ -17,7 +17,7 @@ from django.core.paginator import Paginator
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
-from django.utils import formats
+from django.utils import formats, translation
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 from wagtail.models import Locale
@@ -25,6 +25,7 @@ from wagtail.models import Locale
 from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
 from apps.core.audit import audit_context
+from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
 from apps.events import engine, services
 from apps.events.models import EventPage
@@ -32,7 +33,7 @@ from apps.events.panels import map_assets, map_settings
 from apps.vendors.engine import VendorCannotWrite
 
 from .event_block_panel import blocks_context
-from .event_forms import EventForm, initial_from_page
+from .event_forms import EventForm, EventTranslationForm, initial_from_page, language_choices
 from .views import ManagerView
 
 SECTION = "shop.events"
@@ -90,11 +91,41 @@ def _moderation(page: EventPage) -> str:
 
 
 def _active_locale() -> Locale | None:
-    """The Wagtail locale of the interface language, for a new event (EVT.8 adds the choice).
-
-    None when no locale exists for that language: the caller then falls back to the default
-    locale silently, until EVT.8 adds the language field."""
+    """The Wagtail locale of the interface language: where a new event is written when the form
+    names no language. None when no locale exists for it: the default locale applies then."""
     return Locale.objects.filter(language_code=(get_language() or "").split("-")[0]).first()
+
+
+def _locale(code: str) -> Locale | None:
+    return Locale.objects.filter(language_code=code).first() if code else None
+
+
+def _language_name(code: str) -> str:
+    return str(translation.get_language_info(code)["name_local"])
+
+
+def _is_translation(page: EventPage | None) -> bool:
+    return page is not None and page.locale_id != page.original_locale_id
+
+
+def _free_languages(page: EventPage) -> list[tuple[str, str]]:
+    """The enabled languages the event has no page in yet."""
+    taken = set(
+        EventPage.objects.filter(translation_key=page.translation_key).values_list(
+            "locale__language_code", flat=True
+        )
+    )
+    return language_choices(exclude=taken)
+
+
+def _languages_of(keys: list[Any]) -> dict[Any, set[str]]:
+    """The languages each event (by `translation_key`) has a page in."""
+    found: dict[Any, set[str]] = {key: set() for key in keys}
+    for key, code in EventPage.objects.filter(translation_key__in=keys).values_list(
+        "translation_key", "locale__language_code"
+    ):
+        found[key].add(code)
+    return found
 
 
 class EventsView(ManagerView):
@@ -106,8 +137,14 @@ class EventsView(ManagerView):
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        rows = self.scoped(EventPage).select_related("locale").order_by("-id")
+        rows = self.scoped(EventPage).select_related("locale", "original_locale").order_by("-id")
         page = Paginator(rows, self.paginate_by).get_page(self.request.GET.get("page"))
+        languages = {
+            key: sorted(codes)
+            for key, codes in _languages_of(
+                [event.translation_key for event in page.object_list]
+            ).items()
+        }
         context.update(
             page_obj=page,
             events=[
@@ -115,7 +152,16 @@ class EventsView(ManagerView):
                     "title": event.title,
                     "status": event.get_status_display(),
                     "when": _when(event),
-                    "language": event.locale.language_code,
+                    "language": _language_name(event.locale.language_code),
+                    "original": not _is_translation(event),
+                    "original_language": _language_name(event.original_locale.language_code),
+                    "languages": [
+                        _language_name(code) for code in languages[event.translation_key]
+                    ],
+                    "translate_url": reverse("manager:shop:event_translate", args=[event.public_id])
+                    if not _is_translation(event)
+                    and len(languages[event.translation_key]) < len(configured_languages())
+                    else "",
                     "moderation": _moderation(event),
                     "edit_url": reverse(EDIT_URL, args=[event.public_id]),
                     "submit_url": reverse("manager:shop:event_submit", args=[event.public_id])
@@ -167,6 +213,16 @@ class EventFormView(_EventAction):
             vendor = self.manager.vendor
             if page is None:
                 context["form"] = EventForm(vendor=vendor)
+                context["form"].fields["language"].initial = _initial_language()
+            elif _is_translation(page):
+                latest = page.get_latest_revision_as_object()
+                context["form"] = EventTranslationForm(
+                    initial={
+                        "title": latest.title,
+                        "summary": latest.summary,
+                        "venue_name": latest.venue_name,
+                    }
+                )
             else:
                 latest: EventPage = page.get_latest_revision_as_object()
                 context["form"] = EventForm(
@@ -178,6 +234,10 @@ class EventFormView(_EventAction):
         context["event"] = page
         context["title"] = _("Edit the event") if page else _("New event")
         if page is not None:
+            context["language_name"] = _language_name(page.locale.language_code)
+            context["original_language_name"] = _language_name(page.original_locale.language_code)
+            context["is_translation"] = _is_translation(page)
+        if page is not None:
             context["can_submit"] = _can_submit(page)
             context["submit_url"] = reverse("manager:shop:event_submit", args=[page.public_id])
             context["cancel_url"] = reverse("manager:shop:event_cancel", args=[page.public_id])
@@ -186,14 +246,15 @@ class EventFormView(_EventAction):
             context["preview_url"] = reverse("manager:shop:event_preview", args=[page.public_id])
             context.update(blocks_context(page))
         form = context["form"]
-        context["map_media"] = map_assets()
-        context["map_picker"] = {
-            **form.picker_context(),
-            **map_settings(),
-            "find_url": reverse("geocoding_find"),
-            "language": get_language() or "",
-            "help_id": "event-map-help",
-        }
+        if isinstance(form, EventForm):  # a translation has no structured fields, so no map
+            context["map_media"] = map_assets()
+            context["map_picker"] = {
+                **form.picker_context(),
+                **map_settings(),
+                "find_url": reverse("geocoding_find"),
+                "language": get_language() or "",
+                "help_id": "event-map-help",
+            }
         context["images_url"] = reverse("manager:shop:event_images")
         context["list_url"] = reverse(LIST_URL)
         return context
@@ -205,7 +266,11 @@ class EventFormView(_EventAction):
             raise Http404("No vendor selected.")
         latest = page.get_latest_revision_as_object() if page is not None else None
         kept = _kept(latest) if latest is not None else ""
-        form = EventForm(request.POST, kept_rule=kept, vendor=vendor, page=latest)
+        form: EventForm | EventTranslationForm
+        if _is_translation(page):
+            form = EventTranslationForm(request.POST)
+        else:
+            form = EventForm(request.POST, kept_rule=kept, vendor=vendor, page=latest)
         if not form.is_valid():
             return self.render_to_response(self.get_context_data(form=form))
         try:
@@ -214,7 +279,9 @@ class EventFormView(_EventAction):
                 form.event_data(),
                 page,
                 vendor=vendor,
-                locale=None if page is not None else _active_locale(),
+                locale=None
+                if page is not None
+                else (_locale(form.chosen_language()) or _active_locale()),
                 ctx=self.audit(request),
             )
         except ValidationError as error:
@@ -231,6 +298,62 @@ class EventFormView(_EventAction):
         return HttpResponseRedirect(reverse(EDIT_URL, args=[saved.public_id]))
 
 
+def _initial_language() -> str:
+    """The language a new event starts with: the interface language when it is enabled."""
+    code = (get_language() or "").split("-")[0]
+    return code if code in configured_languages() else configured_languages()[0]
+
+
+class EventTranslateView(_EventAction):
+    """ "Add translation": choose a free language and write the title, summary and venue name;
+    the page is a draft with the original's structured fields (`add_event_translation`)."""
+
+    template_name = "manager/shop/event_translate.html"
+
+    def original(self) -> EventPage:
+        page = self.event()
+        if _is_translation(page):
+            raise Http404("Translate the original page.")
+        return page
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        page = self.original()
+        if "form" not in context:
+            context["form"] = EventTranslationForm(languages=_free_languages(page))
+        context["event"] = page
+        context["title"] = _("Add a translation")
+        context["list_url"] = reverse(LIST_URL)
+        return context
+
+    @requires_level_method("content_edit")
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        page = self.original()
+        form = EventTranslationForm(request.POST, languages=_free_languages(page))
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form))
+        locale = _locale(form.chosen_language())
+        assert locale is not None  # noqa: S101  # the choices are the enabled languages
+        try:
+            changes = services.add_event_translation(
+                self.actor(), page, locale, form.event_data(), ctx=self.audit(request)
+            )
+        except ValidationError as error:
+            _add_errors(form, error)  # type: ignore[arg-type]
+            return self.render_to_response(self.get_context_data(form=form))
+        except services.EventRefused:
+            return self.render_to_response(self.get_context_data(form=form), status=403)
+        except VendorCannotWrite:
+            form.add_error(None, _not_active())
+            return self.render_to_response(self.get_context_data(form=form))
+        created = changes.page
+        assert created is not None  # noqa: S101  # a real call always has its page
+        messages.success(
+            request, _("The translation is saved as a draft. Submit it when it is ready.")
+        )
+        return HttpResponseRedirect(reverse(EDIT_URL, args=[created.public_id]))
+
+
 def _kept(page: EventPage) -> str:
     """The saved rule that the presets cannot write ("" when it is a preset or empty)."""
     rule = page.rrule
@@ -242,7 +365,7 @@ def _kept(page: EventPage) -> str:
     return rule if rule and known is None else ""
 
 
-def _add_errors(form: EventForm, error: ValidationError) -> None:
+def _add_errors(form: EventForm | EventTranslationForm, error: ValidationError) -> None:
     if hasattr(error, "error_dict"):
         for name, errors in error.message_dict.items():
             target = {"rrule": "recurrence"}.get(name, name)

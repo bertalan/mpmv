@@ -253,7 +253,7 @@ def test_after_an_italian_translation_the_list_shows_it_without_a_lang_override(
     assert not re.search(r"<article[^>]*\blang=", article)
     assert f'href="{italian.url}"' in article
     assert "Herbstmesse" not in html
-    assert "Deutsch" not in html
+    assert "event-language" not in html
     # Each event once: no duplicate row for the original.
     assert html.count("event-summary") == 1
 
@@ -433,12 +433,14 @@ def test_a_translations_own_edit_never_diverges_the_structured_fields() -> None:
     fixture = Fixture()
     page = fixture.create("de")
     italian = fixture.translate(page, "it")
+    later = page.starts_at + dt.timedelta(days=9)
     services.save_event_draft(
         fixture.user,
         {
             "title": "Fiera nuova",
             "city": "Roma",
-            "starts_at": page.starts_at + dt.timedelta(days=9),
+            "starts_at": later,
+            "ends_at": later + dt.timedelta(hours=1),
         },
         italian,
     )
