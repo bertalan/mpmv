@@ -1133,7 +1133,9 @@ def test_staff_apply_their_refund_with_the_order_amend_cancel_grant(
     ShippingMethodTranslationFactory.create(method=economy, name="Economy", status="published")
     WeightBandFactory.create(method=economy, from_kg=D("0"), to_kg=D("30"), cost_net=D("8.00"))
     staff = UserFactory.create(is_staff=True)
-    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    staff.user_permissions.add(
+        *Permission.objects.filter(codename__in=["view_all_vendors", "platform_support"])
+    )
     amendment = draft(
         sub,
         staff,
@@ -1158,7 +1160,9 @@ def test_a_vendor_refund_grant_cannot_apply_a_staff_address_draft(
 
     sub = place_seed(stripe, milan_seller())
     staff = UserFactory.create(is_staff=True)
-    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    staff.user_permissions.add(
+        *Permission.objects.filter(codename__in=["view_all_vendors", "platform_support"])
+    )
     amendment = draft(
         sub, staff, fix_to_milan(), customer_request=CUSTOMER_ASKED, staff_note="customer called"
     )

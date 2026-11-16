@@ -68,4 +68,15 @@ def check_shop_owner_check(app_configs: Any, **kwargs: Any) -> list[CheckMessage
                 id="accounts.E003",
             )
         ]
+    try:
+        import_string(settings.SHOP_ORDERS_CHECK)
+    except (ImportError, AttributeError):
+        return [
+            Error(
+                "SHOP_ORDERS_CHECK cannot be imported.",
+                hint="Set it to the dotted path of the function (user, shop) -> bool that "
+                "says whether the user handles the shop's orders.",
+                id="accounts.E004",
+            )
+        ]
     return []
