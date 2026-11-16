@@ -296,7 +296,7 @@ each seller's sales terms in the version of the order (art. 51(7)): this is the 
 the information before the button. The ready-made texts of box 1, box 2 and the court clauses are in counsel's opinion
 (kept private); the legal pages and the translations use them.
 
-### Order amendments (ORD.20 to ORD.23, owner decision D-47)
+### Order amendments (ORD.20 to ORD.24, owner decision D-47)
 
 Owner decision D-47 (2026-11-16, Q-99). After payment a vendor sometimes cannot ship exactly what
 was sold: a line is out of stock, the price was wrong, the carrier changed, or the customer asks to
@@ -304,7 +304,10 @@ fix the address. Today the only tools are a refund (PAY.4, PAY.7) or a cancellat
 **amendment** is a typed change to one `VendorOrder`, recomputed with the checkout engines, that is
 either applied at once (minor) or proposed to the customer (substantial). Every rule below is a
 service rule tested in the service, never only in a view. The PRs touch orders, payments, ledger,
-tax and consumer law and carry the human-review flag.
+tax and consumer law and carry the human-review flag. The joint tax and legal opinion of
+2026-11-16 (kept private) confirmed the model and set the VAT timing, the territory checks, the
+14-day refund deadline, the durable-medium and proposal-content duties and the contract clauses
+below.
 
 **When.** Only on a paid vendor order in `pending` or `accepted`, never once it is `shipped`,
 `delivered`, `completed`, `cancelled` or `refunded`. Before payment the quote flow (SHP.9 revisions)
@@ -315,7 +318,8 @@ withdraw its own proposal first.
 **Versions, never edits.** The `OrderLine` rows and the `VendorOrder` snapshot fields of the
 placed order stay immutable. They are **version 1**. Each applied amendment writes a new
 `VendorOrderVersion` (v2, v3…) holding the full snapshot of that version: lines (product, sku,
-title, variant, unit price, quantity, discount, tax rate, reason, nature code, tax amount), shipping
+title, variant, unit price, quantity, discount, and its tax portions, each with rate, reason, nature
+code, tax amount and `tax_on`, see VAT timing below), shipping
 choice (carrier, method, zone, special area, rate or quote with its revision), shipping address,
 tax profile snapshot, totals and the commission snapshot. `VendorOrder.current_version` points to
 the last applied one; a version is append-only (a database trigger refuses updates, as for the
@@ -358,14 +362,46 @@ it) and `discarded` (a draft never sent). The open states are `draft`, `awaiting
 pure function that replays the checkout: `resolve_goods_tax` per line, `quote_shipping` for the
 package, `resolve_shipping_tax` (shipping follows the goods, TAX.17, so removing a line can move the
 shipping VAT split), `compute_commission` with the frozen rule, and the money delta (gross to pay
-or to refund). The tax date `TaxContext.on` stays the order's date for every version, so one vendor
-order never mixes two rate tables (⚖️ (T) to confirm with the tax adviser, see D-47). The customer's
-tax status (B2C or B2B and the VIES snapshot) is never amended; a destination change re-runs the
-reverse-charge and OSS decisions and the ORD.13 proofs follow the final destination. A destination
-that the engines answer with `Blocked`, a CMP.14 lead-only UK consignment or a TAX.21 block makes
-the change impossible: the draft is refused with the engine's reason and never proposed.
+or to refund). The customer's tax status (B2C or B2B and the VIES snapshot) is never amended.
 `engine.classify_amendment(before, after, changes, initiator) -> "minor" | "substantial"` is pure
 and decides the kind; the actor never picks it.
+
+**VAT timing (joint opinion 2026-11-16, point 1.a; replaces "the order date for every version").**
+Every version recomputes the VAT line by line, and every tax portion of a version line (goods and
+its share of shipping) carries its own `tax_on` date and the rate and rules it was taxed with:
+
+- the amount **already paid** keeps the rate and rules of the original payment (art. 6 c. 4 DPR
+  633/72): an unchanged line, or the unchanged part of a changed line, copies its portion from the
+  previous version and is never re-rated, even if a rate changed by law in the meantime;
+- a **reduction** or a **removed line** is reversed at the rate of the portion it reduces, that is
+  the original rate (art. 26 c. 2), exactly as a PAY.4 refund by line;
+- a **substitute** or an **added line** is taxed with its own fiscal category (its own rate, which
+  may differ from the line it replaces), and an **increase** of an existing line (higher price or
+  quantity) adds a new portion for the increment; both use the rates and rules in force on the
+  amendment's tax date: the date of the second payment when money is collected, otherwise the date
+  the version is applied (TAX.6 validity periods, at midnight of the rate's country);
+- the customer pays the **gross difference** between the versions; the original payment and the
+  second payment stay recorded separately (two charges, two sets of ledger rows, each with its
+  tax date), and the order summary (ORD.9) shows both.
+
+**Territory change (joint opinion, point 1.b).** A change of destination country or tax territory
+is not a recompute only: `recompute_vendor_order` runs the **full eligibility and blocking checks
+of a new checkout** (ORD.3) on the new destination at the amendment's tax date: the EUR 10,000
+distance-sales threshold and OSS and the RF20 rules (TAX.20), the vendor's shipping zones and the
+special-area treatments of the excluded territories (SHP.14: the Canary Islands, Livigno, Campione
+d'Italia and the other extra-VAT territories), a non-EU destination when the vendor does not ship
+there, Northern Ireland (`XI`) blocked for a vendor above the threshold without OSS (TAX.21), the
+CMP.14 UK lead-only consignment, and for a B2B buyer the VIES check (TAX.5): an intra-EU zero-rated
+supply only with a valid VAT number of another member state and the ORD.13 transport proofs, which
+follow the final destination. Every line of the previous version is reversed at its original rate
+and taxed again for the new destination on the amendment's tax date (a change of regime, art. 26
+c. 2). A destination the checks do not support **blocks** the amendment: the draft is refused with a
+plain message naming the reason ("the seller cannot deliver to the Canary Islands, so the address
+cannot be changed to it") and is never proposed. A territory change is always substantial (the
+customer-terms article below); on acceptance a lower gross total is refunded automatically and a
+higher one is collected by the second payment. The commission is computed on the net goods with
+the frozen rule, so it does not change with the destination's VAT rate (only the percentage part of
+the collection cost moves by a few cents with the gross).
 
 **Minor changes** (applied at once, the customer is told by email and in the order history):
 
@@ -397,9 +433,10 @@ meets is kept (the customer never pays more because of a vendor's change).
 - a higher price, a higher quantity or an added line; the difference is paid through a new
   PaymentIntent, because a captured Stripe payment cannot be increased;
 - an address change made on the vendor's or staff's own initiative (fraud risk), or any address
-  change to another country or tax territory, whoever asks; tax and shipping are recomputed; an
-  other-country change is substantial even when the new total is lower (the customer then gets the
-  difference back when accepting);
+  change to another country or tax territory, whoever asks; the full checkout checks run again
+  (territory change, above) and an unsupported destination blocks the draft; an other-country
+  change is substantial even when the new total is lower (the customer then gets the difference
+  back automatically when accepting);
 - a much slower delivery: the new maximum delivery days exceed the old by more than
   `amendment_comparable_delay_days`;
 - any minor change whose recompute raises the gross (above).
@@ -428,16 +465,128 @@ to the amendment and the from-version, and dies with it.
   `remove_unavailable_lines` removes the unavailable lines with a refund (a minor change, the
   customer may cancel the rest), and `cancel_package` cancels the package with a full refund. A
   substitute is never shipped without the customer's consent, and unavailable goods are refunded,
-  never replaced by default (⚖️ (L): the owner's rule is a refund within 30 days at the latest; the
-  platform starts the refund at once). A declined higher price does not let the vendor cancel for
+  never replaced by default. A declined higher price does not let the vendor cancel for
   convenience: `cancel_package` after a declined price increase needs the vendor's declared reason
   "cannot be fulfilled as ordered", is audited, and such cancellations are counted per vendor on
   the staff dashboard.
+- **After a decline or expiry, if the vendor ships the original order**, the 72 hours have moved
+  the delivery: the vendor confirms a new estimated delivery date before it can mark the package
+  shipped, and the customer is told that date (email and customer area).
+
+**Refund deadline (joint opinion, point 2; art. 61 c. 4 Codice del consumo).** Every refund that
+an amendment causes (a decrease, a removed line, a cancel of the rest, a decline or expiry
+fallback, a package cancelled by the vendor or staff, a lower total after a territory change) is
+made **without undue delay and in any case within 14 days**, on the same means of payment, never
+30 days (that term is repealed). The service submits the PAY.4 refund to the provider in the same
+step as the event that causes it; each refund event stores `due_by` (the event time plus 14 days),
+and a refund not succeeded with the provider 4 days before `due_by` raises a staff alert. Customer
+messages say: "credited within 5 to 10 business days depending on the card issuer, and in any case
+within 14 days".
+
+**Unsolicited supply (art. 66-quinquies Codice del consumo).** A substitute shipped without the
+customer's express consent is an unsolicited supply: the consumer neither pays nor returns it. So
+a substitute enters a version only through an `accepted` amendment with a recorded decision (POST,
+channel and time); no other path (a minor change, a staff tool, the API, a dry run applied later)
+can add it, and the ship action ships only the current version.
+
+**Durable medium (art. 51 c. 7 Codice del consumo).** The unavailability notice (a line removed or
+reduced), the proposal and the confirmation of the accepted version are each sent by email with
+the full content in the body or an attached PDF (never only a link) **and** recorded in the
+customer area (for a guest, the order page reached from the order email) as an `OrderEvent` that
+keeps the exact text sent, in the customer's language, with its CMP.24 wording version.
+
+**Mandatory content of a proposal (joint opinion, operating point 1).** Before the Accept button,
+the proposal page and email show, and `propose_amendment` refuses a proposal (`ProposalIncomplete`,
+naming each missing field in plain words) that lacks any of:
+
+- for a **substitute**: the original item with its price; the substitute's description, brand and
+  SKU; its compatibility with the vehicle the customer selected in the Garage, when the original
+  line carries a vehicle snapshot (spec 17 §17.4.6, FIT.17: the fit answer for that vehicle with
+  "Compatibility declared by the seller", obtained through the order-line annotation hook so that
+  `orders` still does not import `fitment`);
+- for a **price or quantity increase**: the vendor's reason, quoted;
+- in every case: the unit and total price including VAT; the change in shipping; the exact
+  difference to pay or to be refunded; the new estimated delivery date; the answer deadline; what
+  a decline or no answer means (the `fallback`); that nothing is charged without the customer's
+  express consent; and a reminder of the 14-day right of withdrawal from delivery (who pays the
+  return as in the seller's terms, the seller when the goods are not in conformity) and of the
+  legal guarantee of conformity, both unchanged by the amendment.
+
+**The second-payment button ("button solution", art. 8(2) Directive 2011/83/EU; § 312j(3) BGB).**
+The final button of the second payment names the obligation to pay and the amount including VAT,
+exactly per language: IT "Conferma modifica e paga EUR [x]", EN "Confirm change and pay EUR [x]",
+DE "Änderung zahlungspflichtig bestätigen (EUR [x])", FR "Confirmer la modification et payer EUR
+[x]", ES "Confirmar modificación y pagar EUR [x]", where [x] is the gross difference. Never
+"Accept", "Continue" or "Send" alone on that button.
+
+**Confirmation of the accepted version.** Once the accepted version is applied (after the webhook
+when money was collected), the customer and the vendor each receive a confirmation on a durable
+medium with the final version: lines, shipping, VAT per rate, and the total as first payment plus
+second payment (or minus the refund), with both collections listed separately. The vendor's copy
+is for its invoicing and carries the invoice notice below.
+
+**Vendor invoice already issued (joint opinion, point 1.c).** The vendor corrects its own fiscal
+documents: a TD04 credit note when the amount goes down or the regime changes (art. 26 c. 2); a
+TD01 or TD05 when it goes up (art. 26 c. 1), or a full TD04 and a new invoice. The platform does not
+issue them. It **warns** the vendor in every applied-change notice to the vendor (email and the
+vendor order page) and, prominently, on the amendment screen when `invoice_issued_at` is set; the
+amendment is never blocked. The message requirement (CMP.24 wording, IT reference text of the
+opinion): EN "Order changed after payment: if you already issued an invoice or receipt for the
+previous version, remember to issue a credit or debit note to bring the document in line with the
+new amounts."; IT "Ordine modificato dopo il pagamento: se hai già emesso fattura o scontrino per la
+versione precedente, ricorda di emettere nota di variazione/rettifica per allineare il documento ai
+nuovi importi". From the vendor order the vendor downloads (PDF and CSV) the **final snapshot** and
+the **difference statement** between the previous and the new version: per line before and after,
+per tax portion the rate, `tax_on`, net and VAT, the shipping, the totals and the gross difference,
+the payment and refund references, and whether the change lowered, raised or changed the regime.
+
+**Message templates (ORD.24).** The counsel-approved texts are kept in private/ (CMP.24) in five
+languages: Italian in the opinion, English, German, French and Spanish in the owner's PDF to be
+filed under private/consulenti/. The spec fixes each template's required fields and structure;
+ORD.24 loads the approved wording into the gettext catalogues with the `(L)` context. Every
+template says what changed, what it costs, what to do and by when (owner, 2026-11-16).
+
+| Template | Subject must say | Body must contain | Actions |
+|---|---|---|---|
+| A1, item unavailable, whole package cancelled | order reference, item unavailable, full refund | the item, the seller, that the order to that seller is cancelled, the full refund amount on the same means of payment started at once, the credit-time wording (5 to 10 business days, in any case 14 days), an apology | none |
+| A2, partial unavailability | order reference, partial refund for an unavailable item | the refund amount (VAT and the shipping share included), that the order goes on at the new total, the right to cancel the rest free of charge before shipping and the deadline (date and time) | "Cancel the rest of the order and refund everything" |
+| 2b, substitute proposal (72 hours) | "action required within 72 hours", order reference, substitute proposal | every mandatory proposal field above; the difference case (none, refunded automatically with the credit-time wording, or to pay on acceptance); the deadline; "the substitution happens only with your explicit consent"; if accepted, withdrawal and guarantee unchanged; if declined or unanswered, the `fallback` with the full refund within 14 days | "I accept the substitute" and "I decline" |
+| Price increase, email | "action required within 72 hours", order reference, price update proposal | the vendor's reason quoted; "you are under no obligation to accept, and nothing more is charged without your explicit consent"; the summary (items, total already paid, new total with goods, shipping and VAT, difference, estimated delivery); the deadline; if accepted, withdrawal and guarantee unchanged; if declined or unanswered, no cost and the original order at the original price or a full refund within 14 days; signed by the platform team | "Accept and pay the difference (EUR …)" and "Decline the change" |
+| Price increase, banner in the order area | (none) | the seller, old and new price and the difference including VAT, the reason, the deadline (date and time), that silence declines it without any charge and the order stays at the original price or is cancelled with a full refund within 14 days | "Accept and pay EUR …" and "Decline" |
+
+The confirmation of the accepted version, the reminder, the new delivery date after a decline and
+the outcome messages follow the same rule (what changed, what it costs, what to do, by when) and
+the same CMP.24 approval.
+
+**Contract clauses (joint opinion; CMP.5).**
+
+- **Customer terms**, a new article "Order changes after payment and before shipping" in the
+  platform terms, with three paragraphs stated as requirements: (1) **minor changes** that do not
+  worsen the customer's position (a carrier at the same or a lower cost with an equivalent delivery
+  time, an address correction requested by the customer within the same country, a lower price or
+  an unavailable item removed with the difference refunded at once) may be made before the goods
+  go to the carrier, and after a partial unavailability the customer may cancel the rest free of
+  charge before shipping with a full refund; (2) **substantial changes** (a substitute, a higher
+  price, a significantly longer delivery time, a change of the destination country or tax
+  territory) are a proposal that needs the customer's express acceptance within 72 hours of the
+  notice on a durable medium, and silence is always a refusal; (3) on **refusal or no answer** the
+  proposal lapses at no cost and the original order stands; if the seller cannot fulfil it as
+  ordered, the order is cancelled and the whole amount paid is refunded without undue delay and in
+  any case within 14 days, on the same means of payment. The counsel-approved Italian wording is
+  in CMP.5 (spec 11).
+- **Vendor terms**, clause **(l) "Changes to paid orders"** (CMP.5): a substantial change before
+  shipping is only a proposal, effective only on the customer's express acceptance within 72
+  hours, silence is a refusal; on refusal the vendor ships the original order or cancels it with a
+  full refund and the refund fee; **anti-abuse rule**: the vendor must not systematically propose
+  price increases after payment to get around its catalogue prices ("bait pricing"), a breach that
+  may lead to restriction or suspension under the P2B rules (statement of reasons, CMP.5); the
+  correction of invoices already issued is the vendor's alone. Staff see, per vendor, the count of
+  price-increase proposals and their acceptance rate (ORD.22) to apply it.
 
 **Money: ledger and commission.**
 
 - A decrease is a PAY.4 refund event: the same arithmetic as a refund by line, quantity or amount
-  (VAT reversed with the version's snapshot rates, fees given back pro rata with cumulative
+  (VAT reversed at the original rate of each portion, fees given back pro rata with cumulative
   rounding, one refund fee per refund event, D-05), with `refund_ref` and the amendment in the
   memo. An amendment that removes a line and a refund of the same line through PAY.7 give the same
   ledger rows.
@@ -450,7 +599,8 @@ to the amendment and the from-version, and dies with it.
   change (a line removed, a lower price, a cheaper carrier chosen by the vendor), a cancel of the
   rest, a decline fallback, a staff cancellation and every refund outside amendments.
 - An increase writes `sale`, `shipping`, `commission` and `payment_fee` rows for the supplement,
-  tied to the supplement charge, and a transfer of the vendor's share with `source_transaction`
+  tied to the supplement charge and taxed on the amendment's tax date (VAT timing, above), and a
+  transfer of the vendor's share with `source_transaction`
   equal to that charge (PAY.3, D-08). Commission rounds **cumulatively**: the commission added is
   `round(base_new × pct) − round(base_old × pct)` on the version bases, so several small increases
   add up to the commission of the final base and never drift by a cent per step. The supplement's
@@ -463,10 +613,10 @@ to the amendment and the from-version, and dies with it.
   transaction however many versions it has.
 - **Invoicing.** The vendor invoices (spec 00); the platform sends only the non-fiscal order summary
   (ORD.9), regenerated for each version and labelled "version n, replaces version n−1". The vendor
-  may record `invoice_issued_at` on the vendor order. If it is set, the amendment screen warns that
-  the vendor must issue a credit note or a new invoice for the change: that is the vendor's job and
-  the amendment is not blocked. The periodic statement (CMP.2) follows the versions through the
-  ledger.
+  may record `invoice_issued_at` on the vendor order. The vendor is warned to issue a credit or debit
+  note, and downloads the final snapshot and the difference statement ("Vendor invoice already
+  issued", above): that is the vendor's job and the amendment is not blocked. The periodic
+  statement (CMP.2) follows the versions through the ledger.
 
 **Stock.** Proposing a substitute reserves its stock with a `StockReservation` linked to the
 amendment and expiring at the amendment's deadline. Accepting confirms it and decrements stock
@@ -517,12 +667,14 @@ customer sees an `OrderEvent` timeline of versions in the customer area ("versio
 removed as unavailable, EUR 36.60 refunded"), without internal notes. Personal data in these
 entries follow the order retention rules (D-29, D-30, ORD.14 masking).
 
-**Emails (ORD.9, five languages).** Customer: minor change applied (with the cancel-the-rest action
-when a line was removed or reduced), proposal, reminder, outcome (accepted, declined, expired,
-payment received), package cancelled. Vendor (its mail language, ORD.16): proposal accepted,
-declined, expired, payment received, staff changed your package, quote needed (ORD.23). Staff: an
-amendment waiting for a vendor quote for 48 hours, a package cancelled after a declined price
-increase.
+**Emails (ORD.9, five languages; wording from ORD.24).** Customer: minor change applied (with the
+cancel-the-rest action when a line was removed or reduced), proposal, reminder, outcome (accepted,
+declined, expired, payment received), confirmation of the accepted version, new estimated delivery
+date after a decline, package cancelled. Vendor (its mail language, ORD.16): proposal accepted
+(with the confirmation of the final version and the invoice notice), declined, expired, payment
+received, staff changed your package, quote needed (ORD.23). Staff: an amendment waiting for a
+vendor quote for 48 hours, a package cancelled after a declined price increase, a refund close to
+its 14-day `due_by`.
 
 **Settings, control tests and clear messages (owner, 2026-11-16).** The defaults are confirmed:
 `amendment_answer_hours` 72, `amendment_comparable_delay_days` 2, `amendment_cancel_hold_hours`
@@ -607,7 +759,8 @@ tests with intelligible answers":
 | ORD.17 | Checkout legal step (owner decision D-40 and counsel opinion of 2026-11-13, §Checkout legal step): per-seller recap block (identity, professional status, address, VAT number, contact, split of obligations, delivery time, withdrawal and who pays the return, maximum return-cost estimate for goods not returnable by post, legal guarantee, garage item, link to the seller's terms version with PDF); total with each seller's share right above the button; box 1 for every buyer (platform terms plus each named seller's terms, privacy notice read); box 2 only between businesses with an Italian operator and/or a seller established in Italy or choosing Italian law, built from the Italian operator's and those sellers' declared onerous clauses by article number and title (VEN.35); button "Confirm order and pay now – EUR <total>"; accepted versions (platform terms, one per seller, box 2 text) and the time stored on the order; terms on a durable medium in the confirmation email; "payment received, confirming" state after a provider redirect (only the webhook marks paid); ⚖️ (L) counsel answered L-1 to L-6; phase note: this F2 task waits for the F3 rows VEN.35 and CMP.5, so the checkout legal step ships after them | P1 | 14 | ORD.5, ORD.9, PAY.2, CMP.5, CMP.6, VEN.35 | The order cannot be placed without box 1, nor without box 2 for a business buyer when the operator is Italian or a seller in the cart is established in Italy or chooses Italian law (server-side too); a consumer never sees box 2, also when buying from an Italian seller on an Italian operator; a business with an unverified VAT number still sees it; the operator condition reads `current_operator()` and a test with a non-Italian operator and a foreign seller shows no box 2; a business buying only from a foreign seller on a foreign operator sees no box 2; box 2 names every article by number and title for the Italian operator and each seller in the cart that is established in Italy or whose terms choose Italian law, and no other seller; each seller block shows identity, delivery time, return cost and, for a bulky item, the return-cost estimate, and links a downloadable PDF of the terms version in force; the order stores the platform version, one version per seller, the box 2 text and the time; the button label contains the total; the confirmation email attaches the terms; a redirect before the webhook shows the confirming state and the order stays unpaid until the webhook |
 | ORD.18 | Single-page accordion checkout, the **first paid module** (owner decision D-40): one page with a compact order summary on top; billing, delivery ("same as billing" ticked by default), shipping per vendor package, courier notes and payment as steps; a finished step closes into an editable summary row; totals recalculate after billing (country, VIES); the Stripe Payment Element opens inline before the payment exists and the order and PaymentIntent are created on "Pay now"; progress (addresses, choices, notes, step) saved server-side with the cart and expiring with it, across devices when signed in; keyboard and phone first; Turnstile survives the steps; ORD.17's legal step is reused, not copied; UI only over the core services, which re-check everything; lives in a private module package (ARC.33); its activation option picks the mixed-cart policy (whole marketplace by default, every vendor entitled, or at least one) | P2 | 24 | ARC.33, ORD.17, PAY.3, PAY.4 | With the module on, a mixed 3-vendor cart pays on one page and a reload resumes at the same step; with it off, the core checkout runs; a tampered step (skipped terms, changed price) is refused by the core services |
 | ORD.19 | Add to cart from the product page | P1 | 6 | CAT.7, ORD.5, VEN.6 | A POST form on the product page (variants, quantity) calls `apps.cart.services.add_to_cart`; HTMX updates the cart count and the message without a reload, with a no-JS fallback (a plain POST plus redirect); `add_to_cart` errors are shown to the user; the cart rate-limit budget is applied; the button shows only when `sells_online(product)`; CSRF on; an e2e from the product page to the payment page with the fake provider |
-| ORD.20 | Order amendments 1/4, model, engine and minor changes (owner decision D-47, Q-99; §Order amendments): `VendorOrderVersion` (v1 = the placed order, append-only, trigger-guarded; per-package shipping address from v2; stable `line_key`), `OrderAmendment` with its states and one open amendment per vendor order (partial unique index, `select_for_update`, from-version check, `superseded`), the pure `recompute_vendor_order` (goods tax, shipping, shipping tax, frozen commission rule, money delta; tax date = the order date) and `classify_amendment`; minor changes applied at once by the vendor owner and members with ORDERS (carrier at the same or a lower price with a comparable delivery time, the vendor absorbing a dearer one; lower price, lower quantity, line removed as unavailable, with the PAY.4 refund and the cancel-the-rest offer and hold; a customer-requested address correction in the same country and tax territory); amendments only in `pending` or `accepted`, shipping refused while one is open; decreases are PAY.4 refund events; critical actions per CORE.25 (address change, any refund through the PAY.7 `vendor_refund` grant) with one passkey bound to the amendment digest and shop; `AuditLog` entries and the customer's version timeline; minor-change emails in five languages; `invoice_issued_at` warning; `dry_run=True` returns the `ChangeSet`; the PR is flagged for human review (orders, payments, ledger, tax) | P1 | 24 | ORD.6, ORD.9, PAY.4, PAY.7, SHP.4, CORE.25 | Regression cases on a seed vendor order (A 2 × 50.00 and B 1 × 30.00 net at 22 %, shipping 10.00 net, gross 170.80, 10 % commission rule): removing B as unavailable applies v2 at once, refunds 36.60 (VAT 6.60 reversed at the snapshot rate), reverses 3.00 commission and writes one refund fee, the same ledger rows as a PAY.7 refund of line B; lowering A to 45.00 refunds 12.20 and reverses 1.00; with A at 100.00 net 22 % and B at 50.00 net 10 % and shipping 10.00, removing B refunds 54.60 because the shipping VAT re-split goes from 1.80 to 2.20; a removal whose recompute would raise the gross is classified substantial; a carrier at the same price with max delivery +2 days is minor and +3 days is substantial; a dearer carrier keeps the customer's shipping and moves no money; a lower one refunds the difference; a customer-requested house-number fix applies at once, and a postcode that moves the address to another tax territory (IT to Livigno, GB to `BT*`) is not minor; v1 rows cannot be updated (trigger test); a second draft on the same vendor order is refused; an apply whose from-version is stale becomes `superseded` and moves nothing; a shipped vendor order cannot be amended and an open amendment blocks shipping; a member of shop A amending shop B gets 404; an address change and a refund each ask a fresh passkey even with the window open, one prompt per amendment, and a grant is void after a draft edit; a coupon threshold no longer met keeps the discount; every step writes its `AuditLog` entry with before, after, role and money; the customer sees the new version in the timeline; the dry run moves nothing; the ledger sums to zero after each version; refund-fee exemption (owner, 2026-11-16): a customer-requested address correction whose recompute refunds shipping writes the refund with the exclusion reason `customer_requested_amendment` and no refund-fee line, while the B removal above writes one, and the reason cannot be set by hand; control tests (owner, 2026-11-16): each default (72 h, 2 days, 24 h hold) and each classification and refusal has a test whose failure message says in plain words what was expected and what happened (for example "a carrier change that costs the customer more must be a substantial change, but it was classified minor"); the Manager shows the three amendment settings from the live configuration, each with a one-line plain explanation; every minor-change message to the customer and the vendor states what changed, the amount refunded or that nothing is due, what to do (including the cancel-the-rest action and its deadline) and by when, in the five languages (snapshot tests), and every refusal names its reason in plain words |
-| ORD.21 | Order amendments 2/4, proposals with the customer's acceptance (owner decision D-47; §Order amendments): substantial changes (substitute product, higher price or quantity or an added line, address changed on the vendor's or staff's initiative or to another country or tax territory, a much slower delivery, a minor change that would raise the gross) are proposed with a 72-hour deadline (`amendment_answer_hours`), a reminder 24 hours before, Accept and Decline from a one-time `AmendmentLink` (POST only, the GET decides nothing) and from the customer area; the declared `fallback` on decline or expiry (keep, remove the unavailable lines with a refund, or cancel the package with a full refund; a substitute never ships without consent); a higher price is paid through a new PaymentIntent in the same `transfer_group`, applied only by the PAY.2 webhook, with its own transfer tied by `source_transaction`, commission added cumulatively and the collection cost's percentage part only; the substitute's stock reserved until the deadline; a withdrawal (ORD.8) closes an open proposal as `withdrawn`; `order_amend_price_up` is a critical action; the vendor's "cannot be fulfilled as ordered" cancellations counted for staff; proposal, reminder and outcome emails in five languages; the PR is flagged for human review (orders, payments, ledger, tax, consumer law) | P1 | 24 | ORD.20, PAY.2, PAY.3, ORD.8 | On the ORD.20 seed: raising A to 55.00 sends a proposal, applies nothing, and after Accept and a test payment of 12.20 the webhook applies v2 with commission +1.00 and a collection-cost line of 0.18 (1.5 % rule, no second fixed part) and a transfer whose `source_transaction` is the supplement charge; a duplicated webhook applies nothing twice; three successive increases of 0.05 net on a 100.00 base at 10 % post commission 0.01, 0.00 and 0.01 (total 0.02, never 0.03); Decline and no answer at 72 hours both leave the current version unchanged; a decline with `cancel_package` refunds the package in full and with `remove_unavailable_lines` refunds only those lines; a prefetching GET of the link decides nothing and a used or expired link is refused; Accept with no payment by the deadline expires as a decline; a supplement paid after the amendment closed is refunded in full as a duplicate payment; a substitute reserves its stock, Accept decrements it and decline, expiry or withdrawal release it; a withdrawal during an open proposal closes it as `withdrawn` and the refund runs on the last applied version; a move from IT to DE with a lower total still asks acceptance and refunds the difference on Accept; an address change that the engines answer `Blocked`, CMP.14 or TAX.21 refuses is never proposed; each email renders in the five languages (snapshot tests); the supplement charge writes no second fixed collection cost (the platform pays the provider's fixed cost); control tests with plain failure messages cover every state exit (applied, declined, expired, withdrawn, superseded, payment received, package cancelled) and the 72-hour and 24-hour-payment deadlines; the proposal, reminder and outcome messages to the customer and the vendor state what changes, what it costs (to pay or refunded), what to do (accept, decline, pay, nothing) and the deadline with date and time, in the five languages |
-| ORD.22 | Order amendments 3/4, platform staff tools (owner decision D-47; §Order amendments, roles table): in the platform space the platform owner and the Support role may change the carrier (only methods of the same vendor at the same or a lower price), change the address on the customer's request (with the request recorded) and cancel a package with a full refund, each with a mandatory note; never products, prices, quantities or delivery time; not through impersonation; the vendor is told of every staff change; staff cancellation (Support included, owner 2026-11-16) spends the critical `order_amend_cancel` grant with a mandatory note; the CORE.18 matrix gains the amendment actions (A for Support and the platform owner on "orders and customers"); a staff list of open amendments, those waiting for a vendor quote and the per-vendor count of cancellations after a declined price increase; the PR is flagged for human review (orders, payments, access) | P1 | 8 | ORD.21, CORE.18 | Support changes the carrier to a cheaper method of the same vendor and the address on a recorded customer request, each with a note; a change without a note is refused; Support cannot change a price, a quantity, a product or the delivery time, nor pick a dearer method (service tests, not only the view); a Catalog or Finance role member cannot amend; a staff cancellation asks a fresh passkey, refunds in full and writes its `AuditLog` entry with role and note; the vendor receives the staff-change email; the matrix sweep test covers the new actions; a Support member cancels a package with a full refund only with a fresh passkey (even with the window open) and a note, the refund charges the vendor the refund fee, and a cancellation without a passkey or without a note is refused with a plain message |
+| ORD.20 | Order amendments 1/4, model, engine and minor changes (owner decision D-47, Q-99; §Order amendments): `VendorOrderVersion` (v1 = the placed order, append-only, trigger-guarded; per-package shipping address from v2; stable `line_key`), `OrderAmendment` with its states and one open amendment per vendor order (partial unique index, `select_for_update`, from-version check, `superseded`), the pure `recompute_vendor_order` (goods tax, shipping, shipping tax, frozen commission rule, money delta; VAT timing of the joint tax and legal opinion of 2026-11-16: each tax portion carries `tax_on`, the paid part keeps the original rate and rules, reductions and removed lines are reversed at it, increments and new lines use the amendment's tax date; a territory change runs the full checkout eligibility and blocking checks and an unsupported destination blocks the draft) and `classify_amendment`; minor changes applied at once by the vendor owner and members with ORDERS (carrier at the same or a lower price with a comparable delivery time, the vendor absorbing a dearer one; lower price, lower quantity, line removed as unavailable, with the PAY.4 refund and the cancel-the-rest offer and hold; a customer-requested address correction in the same country and tax territory); amendments only in `pending` or `accepted`, shipping refused while one is open; decreases are PAY.4 refund events; critical actions per CORE.25 (address change, any refund through the PAY.7 `vendor_refund` grant) with one passkey bound to the amendment digest and shop; `AuditLog` entries and the customer's version timeline; minor-change emails in five languages, the unavailability notice on a durable medium (full content in the email and an `OrderEvent` with the exact text); every amendment refund without undue delay and within 14 days (`due_by`, staff alert; never 30 days); the vendor invoice notice (CMP.24 wording) on every applied change, prominent when `invoice_issued_at` is set, and downloads of the final snapshot and the difference statement; `dry_run=True` returns the `ChangeSet`; the PR is flagged for human review (orders, payments, ledger, tax) | P1 | 28 | ORD.6, ORD.9, PAY.4, PAY.7, SHP.4, CORE.25 | Regression cases on a seed vendor order (A 2 × 50.00 and B 1 × 30.00 net at 22 %, shipping 10.00 net, gross 170.80, 10 % commission rule): removing B as unavailable applies v2 at once, refunds 36.60 (VAT 6.60 reversed at the snapshot rate), reverses 3.00 commission and writes one refund fee, the same ledger rows as a PAY.7 refund of line B; lowering A to 45.00 refunds 12.20 and reverses 1.00; with A at 100.00 net 22 % and B at 50.00 net 10 % and shipping 10.00, removing B refunds 54.60 because the shipping VAT re-split goes from 1.80 to 2.20; a removal whose recompute would raise the gross is classified substantial; a carrier at the same price with max delivery +2 days is minor and +3 days is substantial; a dearer carrier keeps the customer's shipping and moves no money; a lower one refunds the difference; a customer-requested house-number fix applies at once, and a postcode that moves the address to another tax territory (IT to Livigno, GB to `BT*`) is not minor; v1 rows cannot be updated (trigger test); a second draft on the same vendor order is refused; an apply whose from-version is stale becomes `superseded` and moves nothing; a shipped vendor order cannot be amended and an open amendment blocks shipping; a member of shop A amending shop B gets 404; an address change and a refund each ask a fresh passkey even with the window open, one prompt per amendment, and a grant is void after a draft edit; a coupon threshold no longer met keeps the discount; every step writes its `AuditLog` entry with before, after, role and money; the customer sees the new version in the timeline; the dry run moves nothing; the ledger sums to zero after each version; refund-fee exemption (owner, 2026-11-16): a customer-requested address correction whose recompute refunds shipping writes the refund with the exclusion reason `customer_requested_amendment` and no refund-fee line, while the B removal above writes one, and the reason cannot be set by hand; control tests (owner, 2026-11-16): each default (72 h, 2 days, 24 h hold) and each classification and refusal has a test whose failure message says in plain words what was expected and what happened (for example "a carrier change that costs the customer more must be a substantial change, but it was classified minor"); the Manager shows the three amendment settings from the live configuration, each with a one-line plain explanation; every minor-change message to the customer and the vendor states what changed, the amount refunded or that nothing is due, what to do (including the cancel-the-rest action and its deadline) and by when, in the five languages (snapshot tests), and every refusal names its reason in plain words; VAT timing (joint opinion 2026-11-16): with the standard rate changed by law from 22 % to 23 % the day after the order (a TAX.6 validity period), removing B later still reverses 6.60 at 22 % and v2 keeps the unchanged A portion at 22 % (VAT 22.00), so no paid portion is ever re-rated; territory checks: a draft moving the address to the Canary Islands, Livigno, Campione d'Italia, a non-EU country the vendor does not ship to, or `BT1 1AA` for a vendor above the EUR 10,000 threshold without OSS is refused with a plain message naming the reason and never proposed; refunds: every refund event an amendment creates is submitted to the provider in the same step and stores `due_by` = event time + 14 days, a refund not succeeded 4 days before `due_by` alerts staff, and no setting, message or template states a 30-day term; the customer message says "credited within 5 to 10 business days depending on the card issuer, and in any case within 14 days"; the unavailability notice is an email with the full content (never only a link) plus an `OrderEvent` keeping the exact text and its CMP.24 version; every applied change sends the vendor the invoice notice (snapshot test in IT and EN), shown prominently when `invoice_issued_at` is set, and never blocks; the vendor downloads the final snapshot and the difference statement (PDF and CSV) whose per-portion rates, `tax_on`, totals and gross difference match the ledger |
+| ORD.21 | Order amendments 2/4, proposals with the customer's acceptance (owner decision D-47; §Order amendments): substantial changes (substitute product, higher price or quantity or an added line, address changed on the vendor's or staff's initiative or to another country or tax territory, a much slower delivery, a minor change that would raise the gross) are proposed with a 72-hour deadline (`amendment_answer_hours`), a reminder 24 hours before, Accept and Decline from a one-time `AmendmentLink` (POST only, the GET decides nothing) and from the customer area; the declared `fallback` on decline or expiry (keep, remove the unavailable lines with a refund, or cancel the package with a full refund; a substitute never ships without consent); a higher price is paid through a new PaymentIntent in the same `transfer_group`, applied only by the PAY.2 webhook, with its own transfer tied by `source_transaction`, commission added cumulatively and the collection cost's percentage part only; the substitute's stock reserved until the deadline; a withdrawal (ORD.8) closes an open proposal as `withdrawn`; `order_amend_price_up` is a critical action; the vendor's "cannot be fulfilled as ordered" cancellations counted for staff; the joint opinion of 2026-11-16: the mandatory proposal content before Accept (`ProposalIncomplete` otherwise), the second-payment button labels per language (button solution), the second payment taxed on the amendment's tax date and recorded separately from the first, a territory change re-taxing every line for the new destination (VIES for B2B, commission unchanged), no substitute in a version without an accepted decision (unsolicited supply), the proposal and the confirmation of the accepted version on a durable medium, the confirmation of the final version (first plus second payment) to the customer and the vendor, and the new estimated delivery date after a decline; proposal, reminder and outcome emails in five languages; the PR is flagged for human review (orders, payments, ledger, tax, consumer law) | P1 | 30 | ORD.20, PAY.2, PAY.3, ORD.8 | On the ORD.20 seed: raising A to 55.00 sends a proposal, applies nothing, and after Accept and a test payment of 12.20 the webhook applies v2 with commission +1.00 and a collection-cost line of 0.18 (1.5 % rule, no second fixed part) and a transfer whose `source_transaction` is the supplement charge; a duplicated webhook applies nothing twice; three successive increases of 0.05 net on a 100.00 base at 10 % post commission 0.01, 0.00 and 0.01 (total 0.02, never 0.03); Decline and no answer at 72 hours both leave the current version unchanged; a decline with `cancel_package` refunds the package in full and with `remove_unavailable_lines` refunds only those lines; a prefetching GET of the link decides nothing and a used or expired link is refused; Accept with no payment by the deadline expires as a decline; a supplement paid after the amendment closed is refunded in full as a duplicate payment; a substitute reserves its stock, Accept decrements it and decline, expiry or withdrawal release it; a withdrawal during an open proposal closes it as `withdrawn` and the refund runs on the last applied version; a move from IT to DE with a lower total still asks acceptance and refunds the difference on Accept; an address change that the engines answer `Blocked`, CMP.14 or TAX.21 refuses is never proposed; each email renders in the five languages (snapshot tests); the supplement charge writes no second fixed collection cost (the platform pays the provider's fixed cost); control tests with plain failure messages cover every state exit (applied, declined, expired, withdrawn, superseded, payment received, package cancelled) and the 72-hour and 24-hour-payment deadlines; the proposal, reminder and outcome messages to the customer and the vendor state what changes, what it costs (to pay or refunded), what to do (accept, decline, pay, nothing) and the deadline with date and time, in the five languages; VAT timing: with the standard rate changed by law from 22 % to 23 % between the order and the second payment, raising A to 55.00 asks 12.30 (the 10.00 net increment at 23 %) while the paid 100.00 stays at 22 %, and the two charges are recorded separately with their tax dates; a substitute for B in another fiscal category is taxed at its own rate on the amendment's tax date while B is reversed at 22 %; territory: a move from IT to DE for a vendor in OSS reverses every line at 22 % and re-taxes it at the German rate on the amendment's tax date, with the commission unchanged (13.00 on 130.00 net); a B2B move to FR is zero-rated only with a VIES-valid FR number and asks the ORD.13 proofs for the new destination, otherwise it is taxed; mandatory content: a parametrised test removes each required field in turn (description, brand, SKU, the Garage compatibility when the line has a vehicle snapshot, unit and total price incl. VAT, shipping change, exact difference, new delivery estimate, withdrawal and guarantee reminder, the vendor's reason for a price increase) and each proposal is refused with `ProposalIncomplete` naming the field; button solution: the second-payment button reads exactly "Conferma modifica e paga EUR 12,20", "Confirm change and pay EUR 12.20", "Änderung zahlungspflichtig bestätigen (EUR 12,20)", "Confirmer la modification et payer EUR 12,20" and "Confirmar modificación y pagar EUR 12,20" (snapshot test per language, amount in the locale's format); unsolicited supply: a substitute cannot enter a version without an `accepted` decision (a direct service call, a staff tool, an API key and a minor classification are each refused), and a package with an open, declined or expired substitute proposal ships only its current version; durable medium: the proposal and the confirmation are emails with the full content plus `OrderEvent` records with the exact text; after Accept and payment the customer and the vendor each receive the confirmation of the final version with total 170.80 + 12.20 = 183.00 and both charges listed; after a decline the vendor cannot mark the package shipped before confirming a new estimated delivery date, and the customer receives that date |
+| ORD.22 | Order amendments 3/4, platform staff tools (owner decision D-47; §Order amendments, roles table): in the platform space the platform owner and the Support role may change the carrier (only methods of the same vendor at the same or a lower price), change the address on the customer's request (with the request recorded) and cancel a package with a full refund, each with a mandatory note; never products, prices, quantities or delivery time; not through impersonation; the vendor is told of every staff change; staff cancellation (Support included, owner 2026-11-16) spends the critical `order_amend_cancel` grant with a mandatory note; the CORE.18 matrix gains the amendment actions (A for Support and the platform owner on "orders and customers"); a staff list of open amendments, those waiting for a vendor quote, the per-vendor count of cancellations after a declined price increase and the anti-abuse metric of vendor clause (l) (per-vendor count of price-increase proposals and their acceptance rate); the PR is flagged for human review (orders, payments, access) | P1 | 9 | ORD.21, CORE.18 | Support changes the carrier to a cheaper method of the same vendor and the address on a recorded customer request, each with a note; a change without a note is refused; Support cannot change a price, a quantity, a product or the delivery time, nor pick a dearer method (service tests, not only the view); a Catalog or Finance role member cannot amend; a staff cancellation asks a fresh passkey, refunds in full and writes its `AuditLog` entry with role and note; the vendor receives the staff-change email; the matrix sweep test covers the new actions; a Support member cancels a package with a full refund only with a fresh passkey (even with the window open) and a note, the refund charges the vendor the refund fee, and a cancellation without a passkey or without a note is refused with a plain message; anti-abuse metric (clause (l), joint opinion 2026-11-16): the staff list shows per vendor the count of price-increase proposals over a chosen period (default 90 days) and the share accepted, read from the amendments, visible to platform staff with orders access and never to vendors |
 | ORD.23 | Order amendments 4/4, quote-priced shipping in amendments (owner decision D-47, the owner's point; §Order amendments): a carrier or address change answered `NeedsQuote` or `IndicativeRates` (SHP.14 and SHP.15 special areas, remote zones such as `BT*`, over-band `quote` policy, indicative carriers) waits for a vendor quote (`ShippingQuote` with `source = "amendment"`, SHP.9 validators, VAT by the tax engine); a quote above the shipping paid makes the change substantial, an equal or lower one minor with the difference refunded; a support or customer-requested change goes to `awaiting_quote` with 72 hours for the vendor, a 48-hour reminder and staff alert, and expires leaving the order as it was; an order whose shipping was a quote keeps it for changes that do not touch destination, carrier or weight and needs a new quote or an explicit "the quote stays" otherwise; a quote is bound to the amendment's fingerprint; the PR is flagged for human review (orders, payments, tax) | P1 | 10 | ORD.21, ORD.22, SHP.9, SHP.14, SHP.15 | Shipping paid 10.00 net at 22 %, customer-requested correction to a Sardinia postcode: the draft waits for a quote; a quote of 25.00 net makes it substantial with 18.30 to pay; a quote of 8.00 makes it minor with 2.44 refunded; a vendor-initiated address change with an 8.00 quote stays substantial; a support change to `BT1 1AA` goes to `awaiting_quote`, reminds at 48 hours, alerts staff and after 72 hours without a quote expires with the original address kept and the customer told; a quoted-shipping order amended by a lower line price keeps its quote, and a line removal asks for a new quote or the explicit confirmation; editing the draft after quoting voids the quote; the SHP.9 168-hour link expiry has no effect on an amendment; the 2.44 refund of the customer-requested Sardinia correction writes no refund fee (owner, 2026-11-16); control tests with plain failure messages cover each quote outcome (higher, equal, lower, none within 72 hours, voided by an edit); the "quote to be entered" message tells the vendor what changed, by when to quote and what happens without a quote, and the customer's outcome message says whether the change was made, what it costs and what to do, in the five languages |
+| ORD.24 | Order amendment message templates from the counsel-approved wording, ORD.9 style (owner decision D-47; joint tax and legal opinion 2026-11-16; §Order amendments, message templates): A1 (item unavailable, package cancelled), A2 (partial unavailability), 2b (substitute proposal), the price-increase email and order-area banner, the reminder, the confirmation of the accepted version, the new delivery date after a decline, the vendor invoice notice and the second-payment button labels, in IT, EN, DE, FR and ES, loaded from the counsel-approved texts kept in private/ (CMP.24) into the gettext catalogues with the `(L)` context; the EN, DE, FR and ES texts wait for the owner's PDF in private/consulenti/; the PR is flagged for human review (consumer law) | P1 | 6 | ORD.20, ORD.21, ORD.16, CMP.24 | Each template renders in the five languages with every required field of the spec's template table, and a test fails naming the missing field; the button labels match the spec exactly; each text has a CMP.24 approval record whose hash matches, so a changed text fails the release check; no template states a 30-day refund term and every refund mention reads "credited within 5 to 10 business days depending on the card issuer, and in any case within 14 days" in the recipient's language; snapshot tests per language |
