@@ -1,4 +1,4 @@
-"""CSP lint of the public templates (THM.3, spec 14 §14.5).
+"""CSP lint of the public templates and theme scripts (THM.3, spec 14 §14.5).
 
 The public pages run under the strict Content-Security-Policy of SEC.1 (no `'unsafe-inline'`,
 no `'unsafe-eval'`), so their templates must not contain what that policy blocks, and Alpine
@@ -39,6 +39,14 @@ _RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (_bs_toggle("popover"), "Bootstrap popover"),
     (re.compile(r"\sdata-bs-html\b", re.IGNORECASE), "data-bs-html attribute"),
     (re.compile(r"\sdata-bs-template\b", re.IGNORECASE), "data-bs-template attribute"),
+    # Bootstrap's helper classes set a fixed text colour with !important, and with the theme's
+    # tokens these fail contrast (info 1.74:1, warning 4.18:1, secondary 1.94:1 on ride). Use the
+    # theme's badge and alert variants instead (spec 14 §14.9). `-subtle` and `-emphasis`
+    # variants are other classes and stay allowed.
+    (
+        re.compile(r"(?<![\w-])(?:text-bg|bg)-(?:info|warning|secondary)(?![\w-])"),
+        "Bootstrap helper class with a fixed text colour",
+    ),
 )
 # x-data="menu", @click='toggle', x-on:keydown.escape=close, :aria-expanded="expanded",
 # x-bind:hidden="toggleHidden": the attribute and its value, double-quoted, single-quoted or
@@ -65,6 +73,30 @@ def lint_template(source: str) -> list[str]:
             findings.append((match.start(), f"Alpine expression in {match.group(1)}"))
     return [
         f"line {source.count(chr(10), 0, offset) + 1}: {what}" for offset, what in sorted(findings)
+    ]
+
+
+# Bootstrap JS components that build markup from a template string (blocked by the CSP and
+# the sanitizer settings): never constructed by a theme module.
+_SCRIPT_RE = re.compile(
+    r"\bbootstrap\s*\.\s*(Tooltip|Popover)\b(?=\s*(?:\(|\.\s*getOrCreateInstance\b))"
+)
+
+
+def lint_script(source: str) -> list[str]:
+    """`line <n>: Bootstrap <Component>` for every tooltip or popover a script constructs."""
+    return [
+        f"line {source.count(chr(10), 0, match.start()) + 1}: Bootstrap {match.group(1)}"
+        for match in _SCRIPT_RE.finditer(source)
+    ]
+
+
+def public_scripts(project_dir: Path) -> list[Path]:
+    """Every theme JavaScript module, vendored libraries excluded."""
+    return [
+        path
+        for path in sorted(project_dir.glob("themes/*/static/**/js/**/*.js"))
+        if "vendor" not in path.parts
     ]
 
 
