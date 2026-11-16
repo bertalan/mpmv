@@ -16,7 +16,7 @@ from typing import Final
 
 from apps.core.money import round_line
 from apps.vendors import engine
-from apps.vendors.refund_fee import PlatformErrorExclusion, RefundFeeRule, refund_fee
+from apps.vendors.refund_fee import FeeExclusion, RefundFeeRule, refund_fee
 
 HUNDRED: Final = Decimal("100")
 ZERO: Final = Decimal("0.00")
@@ -39,11 +39,12 @@ class CommissionResult:
 
 @dataclasses.dataclass(frozen=True)
 class RefundEvent:
-    """One refund or chargeback; the platform-error exclusion is set per event (L-10)."""
+    """One refund or chargeback; the refund-fee exclusion (a platform error, L-10, or an
+    amendment the customer asked for, ORD.20) is set per event."""
 
     refunded_gross: Decimal
     provider_cost: Decimal
-    platform_error: PlatformErrorExclusion | None = None
+    platform_error: FeeExclusion | None = None
 
 
 @dataclasses.dataclass(frozen=True)

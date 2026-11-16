@@ -24,6 +24,7 @@ class FakeStripeClient:
     def __init__(self, *, confirm: bool = True, refund_fee_minor: int = 0) -> None:
         self.confirm = confirm  # True: the customer pays at once (status succeeded)
         self.refund_fee_minor = refund_fee_minor
+        self.refund_status = "succeeded"  # "pending": the card network has not confirmed yet
         self.intents: dict[str, StripeIntent] = {}
         self.transfers: dict[str, StripeTransfer] = {}
         self.reversals: list[tuple[str, int]] = []
@@ -162,7 +163,11 @@ class FakeStripeClient:
             raise StripeError("Refund amount is greater than the charge")
         self._refunded[payment_intent] = already + amount_minor
         refund = StripeRefund(
-            f"re_{secrets.token_hex(6)}", amount_minor, intent.currency, self.refund_fee_minor
+            f"re_{secrets.token_hex(6)}",
+            amount_minor,
+            intent.currency,
+            self.refund_fee_minor,
+            self.refund_status,
         )
         self._replies[f"re:{idempotency_key}"] = refund
         return refund

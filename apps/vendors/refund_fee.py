@@ -4,7 +4,9 @@ The refund fee is the real provider cost of the refund or chargeback plus the pl
 (default EUR 2.00), charged on every refund event, rounded UP to the whole euro. The ceil is the
 one explicit exception to `ROUND_HALF_UP`. It is always charged to the vendor, whatever the cause,
 except a refund caused by a platform malfunction or error (L-10): staff set an exclusion with a
-required reason (the service audits it). The surcharge is versioned with an effective date and a
+required reason (the service audits it), and a refund from an order amendment the customer asked
+for (owner, 2026-11-16, ORD.20) is exempt too: the amendment service sets that exclusion from the
+amendment, never a person. The surcharge is versioned with an effective date and a
 change needs 15 days' notice.
 """
 
@@ -12,7 +14,7 @@ import dataclasses
 import datetime as dt
 from collections.abc import Iterable, Mapping
 from decimal import ROUND_CEILING, Decimal
-from typing import Final
+from typing import ClassVar, Final
 
 from apps.core.money import round_line
 
@@ -20,6 +22,7 @@ EURO: Final = Decimal("1")
 DEFAULT_SURCHARGE: Final = Decimal("2.00")
 NOTICE_DAYS: Final = 15
 SNAPSHOT_KEY: Final = "refund_fee_surcharge"
+CUSTOMER_REQUESTED_AMENDMENT: Final = "customer_requested_amendment"
 
 
 class ReasonRequired(ValueError):
@@ -64,13 +67,33 @@ class PlatformErrorExclusion:
             raise ReasonRequired("A platform-error exclusion needs a reason.")
 
 
+@dataclasses.dataclass(frozen=True)
+class CustomerRequestedAmendment:
+    """The refund comes from an order amendment the customer asked for (ORD.20, owner
+    2026-11-16): no refund fee. Built by the amendment refund service from the amendment's recorded
+    customer request, never from a person's input; the service audits it."""
+
+    amendment: str  # the amendment's public id
+    set_by: str
+
+    reason: ClassVar[str] = CUSTOMER_REQUESTED_AMENDMENT
+
+    def __post_init__(self) -> None:
+        if not self.amendment.strip():
+            raise ReasonRequired("A customer-requested amendment exclusion names the amendment.")
+
+
+type FeeExclusion = PlatformErrorExclusion | CustomerRequestedAmendment
+
+
 def refund_fee(
     provider_cost: Decimal,
     rule: RefundFeeRule,
     *,
-    platform_error: PlatformErrorExclusion | None = None,
+    platform_error: FeeExclusion | None = None,
 ) -> Decimal:
-    """Provider cost plus surcharge, rounded up to the whole euro; 0.00 on a platform error."""
+    """Provider cost plus surcharge, rounded up to the whole euro; 0.00 on a platform error or
+    for a refund from an amendment the customer asked for."""
     if provider_cost < 0:
         raise ValueError("The provider cost cannot be negative.")
     if platform_error is not None:
