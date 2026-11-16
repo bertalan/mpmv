@@ -119,9 +119,9 @@ def test_a_listed_file_is_valid_sitemap_xml(client: Client) -> None:
     rows = urlset.findall("s:url", NS)
     assert rows
     for row in rows:
-        loc = row.find("s:loc", NS)
-        assert loc is not None
-        assert (loc.text or "").startswith(root + "/")
+        url = row.find("s:loc", NS)
+        assert url is not None
+        assert (url.text or "").startswith(root + "/")
         lastmod = row.find("s:lastmod", NS)
         assert lastmod is not None
         assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", lastmod.text or "")

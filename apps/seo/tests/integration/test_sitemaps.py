@@ -202,7 +202,7 @@ def test_the_404_of_a_sitemap_has_no_cache_header_and_the_200_is_private(client:
     assert "public" not in cache
 
 
-def test_a_language_over_the_limit_is_split_into_parts(
+def test_a_type_over_the_limit_is_split_into_parts(
     client: Client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from apps.seo import sitemap_engine

@@ -11,6 +11,10 @@ from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from xml.sax.saxutils import escape
 
+# The types of page a language's sitemap is split into; each has its own file (SEO.2).
+KINDS = ("pages", "events", "products", "listings", "vendors")
+KIND_PATTERN = "|".join(KINDS)
+
 MAX_URLS = 50_000  # the sitemaps.org limits of one file
 MAX_BYTES = 50 * 1024 * 1024
 NAMESPACE = "http://www.sitemaps.org/schemas/sitemap/0.9"
@@ -21,6 +25,7 @@ _HEAD = '<?xml version="1.0" encoding="UTF-8"?>\n'
 class Entry:
     loc: str  # absolute URL
     lastmod: dt.date | None = None
+    title: str = ""  # the page's name, for `llms.txt` (a sitemap does not print it)
 
 
 def sitemap_path(paths: Mapping[str, str], published: Collection[str], language: str) -> str | None:

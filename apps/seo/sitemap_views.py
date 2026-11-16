@@ -1,4 +1,4 @@
-"""The sitemap index and one sitemap per language (I18N.6). Thin adapters over `sitemaps`.
+"""The sitemap index, the sitemaps per language and type, `llms.txt` (I18N.6, SEO.2).
 
 With indexing off (the environment floor or the site's own switch, SEO.8) there is no sitemap:
 404, and robots.txt carries no `Sitemap:` line.
@@ -9,12 +9,12 @@ from django.urls import reverse
 from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_safe
 
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.indexing import is_noindex
 from apps.core.site_url import absolute_url
 
+from . import llms, sitemaps
 from . import sitemap_engine as engine
-from . import sitemaps
 
 XML = "application/xml"
 
@@ -29,37 +29,53 @@ def _require_indexing(request: HttpRequest) -> None:
 _cache = cache_control(private=True, max_age=300)
 
 
-def _chunks(request: HttpRequest, language: str) -> list[list[engine.Entry]]:
-    return engine.chunk_entries(sitemaps.language_entries(language, request))
+def _chunks(request: HttpRequest, language: str, kind: str) -> list[list[engine.Entry]]:
+    return engine.chunk_entries(sitemaps.kind_entries(kind, language, request))
+
+
+def _file_names(language: str, kind: str, count: int) -> list[str]:
+    if count == 1:
+        return [reverse("sitemap_section", kwargs={"language": language, "kind": kind})]
+    return [
+        reverse("sitemap_part", kwargs={"language": language, "kind": kind, "part": str(n)})
+        for n in range(1, count + 1)
+    ]
 
 
 @require_safe
 @_cache
 def sitemap_index(request: HttpRequest) -> HttpResponse:
-    """Every language's file; a language with more than 50,000 URLs (or 50 MB) lists its
-    numbered parts `sitemap-<language>-<n>.xml` instead of one file."""
+    """Every language's files, one per type that has URLs (a language with no URL at all lists
+    its empty pages file); a type with more than 50,000 URLs (or 50 MB) lists its numbered
+    parts `sitemap-<language>-<type>-<n>.xml` instead of one file."""
     _require_indexing(request)
     locations: list[str] = []
     for code in configured_languages():
-        count = len(_chunks(request, code))
-        if count == 1:
-            names = [reverse("sitemap_language", kwargs={"language": code})]
-        else:
-            names = [
-                reverse("sitemap_part", kwargs={"language": code, "part": n})
-                for n in range(1, count + 1)
+        found = False
+        for kind in engine.KINDS:
+            chunks = _chunks(request, code, kind)
+            if not chunks[0]:
+                continue
+            found = True
+            locations += [
+                absolute_url(request, name) for name in _file_names(code, kind, len(chunks))
             ]
-        locations += [absolute_url(request, name) for name in names]
+        if not found:
+            locations.append(absolute_url(request, _file_names(code, "pages", 1)[0]))
     return HttpResponse(engine.index_xml(locations), content_type=XML)
+
+
+def _checked(language: str, kind: str) -> None:
+    if language not in configured_languages() or kind not in engine.KINDS:
+        raise Http404("No such sitemap.")
 
 
 @require_safe
 @_cache
-def sitemap_language(request: HttpRequest, language: str) -> HttpResponse:
+def sitemap_section(request: HttpRequest, language: str, kind: str) -> HttpResponse:
     _require_indexing(request)
-    if language not in configured_languages():
-        raise Http404("No such language.")
-    chunks = _chunks(request, language)
+    _checked(language, kind)
+    chunks = _chunks(request, language, kind)
     if len(chunks) > 1:  # too big for one file: the index lists the parts
         raise Http404("Split into parts.")
     return HttpResponse(engine.urlset_xml(chunks[0]), content_type=XML)
@@ -67,11 +83,21 @@ def sitemap_language(request: HttpRequest, language: str) -> HttpResponse:
 
 @require_safe
 @_cache
-def sitemap_part(request: HttpRequest, language: str, part: int) -> HttpResponse:
+def sitemap_part(request: HttpRequest, language: str, kind: str, part: str) -> HttpResponse:
     _require_indexing(request)
+    _checked(language, kind)
+    chunks = _chunks(request, language, kind)
+    if len(chunks) == 1 or not 1 <= int(part) <= len(chunks):
+        raise Http404("No such part.")
+    return HttpResponse(engine.urlset_xml(chunks[int(part) - 1]), content_type=XML)
+
+
+@require_safe
+@_cache
+def llms_txt(request: HttpRequest, language: str | None = None) -> HttpResponse:
+    """`/llms.txt` (the primary language) and `/llms-<language>.txt`."""
+    _require_indexing(request)
+    language = language or primary_language()
     if language not in configured_languages():
         raise Http404("No such language.")
-    chunks = _chunks(request, language)
-    if len(chunks) == 1 or not 1 <= part <= len(chunks):
-        raise Http404("No such part.")
-    return HttpResponse(engine.urlset_xml(chunks[part - 1]), content_type=XML)
+    return HttpResponse(llms.llms_txt(language, request), content_type="text/plain; charset=utf-8")

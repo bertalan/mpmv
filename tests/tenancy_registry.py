@@ -438,13 +438,19 @@ ENDPOINTS: dict[str, Access] = {
     "readyz": NoVendorData("Readiness probe: a status only, no data."),
     "robots_txt": NoVendorData("robots.txt (SEO.8): constant text for crawlers; no vendor data."),
     "sitemap": NoVendorData("Sitemap index (SEO.2): public page URLs only, no tenant data."),
-    "sitemap_language": NoVendorData(
-        "Per-language sitemap (I18N.6): public page URLs only, no tenant data.",
-        kwargs={"language": "xx"},
+    "sitemap_section": NoVendorData(
+        "Per-language, per-type sitemap (SEO.2): public page URLs only, no tenant data.",
+        kwargs={"language": "xx", "kind": "pages"},
     ),
     "sitemap_part": NoVendorData(
-        "One part of a large per-language sitemap (I18N.6): public page URLs only, no tenant data.",
-        kwargs={"language": "xx", "part": "0"},
+        "One part of a large per-language, per-type sitemap (SEO.2): public page URLs only, "
+        "no tenant data.",
+        kwargs={"language": "xx", "kind": "pages", "part": "0"},
+    ),
+    "llms_txt": NoVendorData("llms.txt (SEO.2): public page titles and URLs only, no tenant data."),
+    "llms_language": NoVendorData(
+        "llms.txt of one language (SEO.2): public page titles and URLs only, no tenant data.",
+        kwargs={"language": "xx"},
     ),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "payments_webhook": NoVendorData("Signed payment provider events; answers with a status only."),

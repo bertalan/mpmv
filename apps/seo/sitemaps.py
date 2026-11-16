@@ -27,6 +27,7 @@ from apps.cms.models import TermLandingPage
 from apps.core import translations
 from apps.core.i18n import primary_language
 from apps.core.site_url import absolute_url
+from apps.events.models import EventPage
 from apps.vendors.models import Vendor
 
 from .sitemap_engine import Entry, sitemap_path
@@ -47,7 +48,7 @@ def page_is_noindex(page: Page) -> bool:
     return isinstance(page, TermLandingPage)
 
 
-def cms_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
+def _cms_entries(language: str, request: HttpRequest, *, events: bool) -> Iterator[Entry]:
     site = Site.find_for_request(request)
     pages = Page.objects.live().public().filter(locale__language_code=language, depth__gte=2)
     if site is not None:  # this site's tree only: another site's pages are not ours to list
@@ -57,14 +58,23 @@ def cms_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
             trees |= Q(path__startswith=root.path, depth__gte=root.depth)
         pages = pages.filter(trees)
     for page in pages.order_by("path").specific().iterator(chunk_size=500):
-        if page_is_noindex(page):
+        if isinstance(page, EventPage) != events or page_is_noindex(page):
             continue
         visible = getattr(page, "is_publicly_visible", None)
         if visible is not None and not visible():  # a hidden event
             continue
         url = _absolute(request, page.get_url(request))
         if url:
-            yield Entry(url, _date(page.last_published_at))
+            yield Entry(url, _date(page.last_published_at), page.title)
+
+
+def cms_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
+    """The CMS pages other than events."""
+    return _cms_entries(language, request, events=False)
+
+
+def event_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
+    return _cms_entries(language, request, events=True)
 
 
 def product_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
@@ -75,9 +85,10 @@ def product_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
         product__status=ProductStatus.PUBLISHED,
         product__vendor__status=Vendor.Status.ACTIVE,
     ).order_by("product_id")
-    for slug, updated in rows.values_list("slug", "product__updated_at").iterator(chunk_size=1000):
+    values = rows.values_list("slug", "product__updated_at", "title")
+    for slug, updated, title in values.iterator(chunk_size=1000):
         path = slugs.product_path(language, slug, default_language=primary_language())
-        yield Entry(absolute_url(request, path), _date(updated))
+        yield Entry(absolute_url(request, path), _date(updated), title)
 
 
 def _listed_ids() -> tuple[set[int], set[int], set[str], set[str]]:
@@ -120,11 +131,12 @@ def _listing_entries(
             continue
         path = sitemap_path(anchor.paths, anchor.published, language)
         if path:
-            yield Entry(absolute_url(request, path))
+            yield Entry(absolute_url(request, path), title=anchor.name)
 
 
 def listing_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
-    vendor_ids, brand_ids, category_paths, term_paths = _listed_ids()
+    """Category, taxonomy term and brand listings."""
+    _vendor_ids, brand_ids, category_paths, term_paths = _listed_ids()
     scopes: list[catalog.ListingScope] = [
         catalog.ListingScope(category=row)
         for row in Category.objects.order_by("path")
@@ -140,7 +152,13 @@ def listing_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
         catalog.ListingScope(brand=row)
         for row in Brand.objects.filter(status=Brand.Status.APPROVED, pk__in=brand_ids)
     ]
-    scopes += [
+    yield from _listing_entries(scopes, language, request)
+
+
+def vendor_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
+    """The storefronts of the active vendors that have listed products."""
+    vendor_ids = _listed_ids()[0]
+    scopes = [
         catalog.ListingScope(vendor=row)
         for row in Vendor.objects.filter(status=Vendor.Status.ACTIVE, pk__in=vendor_ids).order_by(
             "id"
@@ -149,7 +167,15 @@ def listing_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
     yield from _listing_entries(scopes, language, request)
 
 
-def language_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
-    yield from cms_entries(language, request)
-    yield from listing_entries(language, request)
-    yield from product_entries(language, request)
+_BUILDERS = {
+    "pages": cms_entries,
+    "events": event_entries,
+    "products": product_entries,
+    "listings": listing_entries,
+    "vendors": vendor_entries,
+}
+
+
+def kind_entries(kind: str, language: str, request: HttpRequest) -> Iterator[Entry]:
+    """The URLs of one type in one language (an unknown `kind` is a programming error)."""
+    return _BUILDERS[kind](language, request)
