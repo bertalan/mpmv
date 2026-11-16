@@ -40,9 +40,12 @@ def test_the_header_is_a_dark_bar_with_the_logo_first_and_a_labelled_nav() -> No
     assert re.search(r'<nav[^>]+aria-label="Main"', html)
 
 
-def test_the_header_is_a_bootstrap_navbar_that_expands_at_lg() -> None:
+def test_the_header_is_a_bootstrap_navbar_with_one_switch_point_in_ride_css() -> None:
     html = render("components/header.html", site_name="Ride", links=LINKS)
-    assert re.search(r'class="[^"]*\bnavbar\b[^"]*\bnavbar-expand-lg\b', html)
+    assert re.search(r'class="[^"]*\bnavbar\b', html)
+    assert "navbar-expand" not in html  # Bootstrap's lg would switch at 62rem, not 64rem
+    assert 'data-bs-theme="dark"' in html
+    assert "btn-close-white" not in html
     assert 'class="site-name' in html
 
 
