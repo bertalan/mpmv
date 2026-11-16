@@ -41,6 +41,13 @@ def _offer_errors(label: str, offer: Mapping[str, Any]) -> list[str]:
         for key in ("price", "priceCurrency", "availability")
         if not offer.get(key)
     ]
+    spec = offer.get("priceSpecification")
+    if not isinstance(spec, Mapping) or spec.get("price") != offer.get("price"):
+        errors.append(f"{label}: offers.priceSpecification is missing or has another price")
+    elif spec.get("priceCurrency") != offer.get("priceCurrency"):
+        errors.append(f"{label}: offers.priceSpecification has another currency")
+    if not offer.get("seller"):
+        errors.append(f"{label}: offers.seller is missing")
     return errors
 
 
@@ -52,6 +59,10 @@ def _product_errors(node: Mapping[str, Any]) -> list[str]:
         errors += _offer_errors(label, offers)
     for variant in node.get("hasVariant", []):
         errors += _product_errors(variant)
+        if not variant.get("@id"):
+            errors.append(f"{variant.get('sku') or 'variant'}: @id is missing")
+    if node.get("hasVariant") and not node.get("variesBy"):
+        errors.append(f"{label}: variesBy is missing")
     return errors
 
 
@@ -76,8 +87,8 @@ def rich_result_errors(document: Mapping[str, Any]) -> list[str]:
             if not items:
                 errors.append("BreadcrumbList: itemListElement is missing")
             errors += [
-                f"BreadcrumbList: item {i} has no position or name"
+                f"BreadcrumbList: item {i} has no position, name or item URL"
                 for i, item in enumerate(items, start=1)
-                if not (item.get("position") and item.get("name"))
+                if not (item.get("position") and item.get("name") and item.get("item"))
             ]
     return errors

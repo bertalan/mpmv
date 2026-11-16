@@ -167,3 +167,90 @@ def test_shipping_and_returns_follow_the_vendor_zones_and_the_product_weight(
     assert offer["hasMerchantReturnPolicy"] == {"@id": policy["@id"]}
     assert sorted(policy["applicableCountry"]) == ["DE", "IT"]
     assert schema_check.dangling_references(document) == []
+
+
+def test_a_page_with_a_brand_and_variants_has_a_whole_graph(client: Client, theme: str) -> None:
+    from apps.catalog.tests.factories import (
+        AttributeFactory,
+        AttributeTranslationFactory,
+        AttributeValueFactory,
+        BrandFactory,
+        BrandTranslationFactory,
+        ManufacturerFactory,
+        VariantOptionFactory,
+    )
+
+    maker = ManufacturerFactory.create()
+    brand = BrandFactory.create(name="Acme", manufacturer=maker)
+    for language in configured_languages():
+        BrandTranslationFactory.create(
+            brand=brand,
+            language=language,
+            slug=f"acme-{language}",
+            status=TranslationStatus.PUBLISHED,
+        )
+    product = live(kind=Product.Kind.VARIABLE, price_net=Decimal("10.00"), brand=brand)
+    colour = AttributeFactory.create(code="color")
+    taste = AttributeFactory.create(code="taste")
+    for language in configured_languages():
+        AttributeTranslationFactory.create(
+            attribute=taste, language=language, name="Taste", status=TranslationStatus.PUBLISHED
+        )
+    for sku_label in ("Red", "Blue"):
+        variant = VariantFactory.create(product=product)
+        for language in configured_languages():
+            VariantTranslationFactory.create(variant=variant, language=language, label=sku_label)
+        VariantOptionFactory.create(
+            variant=variant, value=AttributeValueFactory.create(attribute=colour)
+        )
+        VariantOptionFactory.create(
+            variant=variant, value=AttributeValueFactory.create(attribute=taste)
+        )
+    _html, document = graph_of(client)
+    group = node(document, "ProductGroup")
+    brand_node = node(document, "Brand")
+    assert group["brand"] == {"@id": brand_node["@id"]}
+    assert brand_node["name"] == "Acme"
+    assert sorted(group["variesBy"]) == ["Taste", "https://schema.org/color"]
+    ids = [variant["@id"] for variant in group["hasVariant"]]
+    assert len(set(ids)) == 2
+    assert all("url" not in variant for variant in group["hasVariant"])
+    assert schema_check.dangling_references(document) == []
+    assert schema_check.rich_result_errors(document) == []
+
+
+def test_a_product_without_weight_still_has_the_return_policy(client: Client, theme: str) -> None:
+    from apps.shipping.tests.factories import ShippingMethodFactory, ShippingZoneFactory
+
+    product = live(price_net=Decimal("12.50"), weight_kg=None)
+    ShippingMethodFactory.create(
+        vendor=product.vendor, zone=ShippingZoneFactory.create(countries=["IT"])
+    )
+    _html, document = graph_of(client)
+    policy = node(document, "MerchantReturnPolicy")
+    assert policy["applicableCountry"] == ["IT"]
+    assert policy["returnFees"] == "https://schema.org/ReturnShippingFees"
+    assert policy["merchantReturnDays"] == 14
+    assert not [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"]
+    assert schema_check.dangling_references(document) == []
+
+
+def test_an_image_carries_the_licence_fields_of_the_real_model() -> None:
+    from apps.catalog.product_pages import GalleryImage
+    from apps.core.models import ImageLicence
+    from apps.core.tests.factories import MediaImageFactory
+    from apps.seo.product_jsonld import _image
+
+    licence = ImageLicence.objects.get(code="CC-BY-4.0")
+    image = MediaImageFactory.create(
+        licence=licence, author="Ada Lovelace", source_url="https://source.example/a"
+    )
+    data = _image(GalleryImage(image=image, alt="A mug"), "https://shop.example")
+    assert data.license == licence.url
+    assert data.creator == "Ada Lovelace"
+    assert data.credit_text == "Ada Lovelace"
+    assert data.copyright_notice == "\u00a9 Ada Lovelace"
+    assert data.acquire_license_page == "https://source.example/a"
+    assert data.url.startswith("https://shop.example")
+    own = MediaImageFactory.create(author="")
+    assert _image(GalleryImage(image=own, alt=""), "https://shop.example").copyright_notice == ""

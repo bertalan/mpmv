@@ -4,19 +4,27 @@ to the pure `product_graph` functions. Reads catalog, vendors and shipping; writ
 Rules (spec 10 "Product node"):
 - No `offers` for a product that is not sold online (`page.price is None`: on request, Q-31, or
   catalogue only, Q-33). The price is the public price of the page, never recomputed here. It is
-  the interim net price until TAX.12 supplies the gross one, so the specification says
-  `valueAddedTaxIncluded: false` (TODO(TAX.12): switch the flag with the gross amount).
+  the interim net price until TAX.12 supplies the gross one (`_offer_price`, the one place that
+  switches to the TAX.12 adapter, with `valueAddedTaxIncluded: true`).
 - `gtin` and `mpn` come from the product fields, `sku` is the vendor's SKU label.
 - The seller is the vendor's `Organization`, never the operator.
 - `priceValidUntil` only from a sale end date: the page does not price a sale yet, so none.
 - Shipping: one node per method of the vendor with a rate for the product's weight, its countries
   in one region; a method without band for that weight, or a product without weight, has none.
-- Returns: one policy per vendor for the countries it ships to, with the 14-day withdrawal
-  window of Directive 2011/83/EU as the floor (the vendor's own window is not modelled yet).
+- Returns: one consumer policy per vendor for the countries it ships to (whatever the product's
+  weight), with the 14-day withdrawal window of Directive 2011/83/EU as the floor (the vendor's
+  own window is not modelled yet), the customer paying the return shipping and a lack of
+  conformity free.
+- Variants: `variesBy` from the attributes the variants take a value on, a `@id` per variant;
+  no variant URL (the page picks a variant in a form, no URL selects one), and no per-variant
+  gtin, mpn or image (the variant model has none yet).
+- Brand: the CAT.20 brand graph (Brand and manufacturer nodes) joins the page graph, so the
+  `brand` reference resolves.
 """
 
 from decimal import Decimal
 from typing import Any
+from urllib.parse import quote
 
 from django.conf import settings
 from django.utils import translation
@@ -24,6 +32,7 @@ from django.utils import translation
 from apps.catalog import engine as catalog_engine
 from apps.catalog import services as catalog
 from apps.catalog import slugs
+from apps.catalog.models import VariantOption
 from apps.catalog.product_pages import GalleryImage, ProductPage
 from apps.core.money import CURRENCY
 from apps.shipping import engine as shipping_engine
@@ -35,6 +44,29 @@ from . import product_graph as pg
 WITHDRAWAL_DAYS = 14
 
 
+VARIES_BY_PROPERTIES = frozenset({"color", "size", "material", "pattern"})
+
+
+def _varies_by(page: ProductPage, language: str) -> tuple[str, ...]:
+    """What the variants differ in: the schema.org property for the usual codes, else the
+    attribute's name in the page language."""
+    attributes = {
+        option.attribute_id: option.attribute
+        for option in VariantOption.objects.filter(variant__product=page.product)
+        .select_related("attribute")
+        .order_by("attribute__code")
+    }
+    names: list[str] = []
+    for attribute in attributes.values():
+        code = str(attribute.code)
+        if code in VARIES_BY_PROPERTIES:
+            names.append(f"{pg.SCHEMA}/{code}")
+        else:
+            resolved = attribute.translation(language).translation
+            names.append(str(resolved.name) if resolved is not None else code)
+    return tuple(names)
+
+
 def _vendor_url(page: ProductPage, site: str) -> str:
     path = slugs.vendor_path(page.shown, page.vendor.slug, default_language=settings.LANGUAGE_CODE)
     return f"{site}{path}"
@@ -42,16 +74,19 @@ def _vendor_url(page: ProductPage, site: str) -> str:
 
 def _image(gallery_image: GalleryImage, site: str) -> pg.ImageData:
     image = gallery_image.image
-    licence = getattr(image, "licence", None)
     url = str(image.file.url)
+    credit = image.credit
+    author = str(image.author or "").strip()
     return pg.ImageData(
         url=url if url.startswith("http") else f"{site}{url}",
         width=image.width or None,
         height=image.height or None,
         caption=gallery_image.alt,
-        license=str(getattr(licence, "url", "") or ""),
-        credit_text=str(image.credit_text or ""),
-        creator=str(image.author or ""),
+        license=str(image.licence.url) if image.licence is not None else "",
+        acquire_license_page=str(image.source_url or ""),
+        credit_text=credit.text if credit is not None else str(image.credit_text or ""),
+        creator=author,
+        copyright_notice=f"\u00a9 {author}" if author else "",
     )
 
 
@@ -81,21 +116,22 @@ def _home_label(language: str) -> str:
 def _shipping_nodes(
     page: ProductPage, url: str, language: str
 ) -> tuple[list[dict[str, Any]], list[str], set[str]]:
-    """Nodes, their ids and the countries of the vendor's zones (empty set: nothing known)."""
+    """Nodes, their ids and the countries of the vendor's zones (empty set: nothing known).
+    The countries do not depend on the product's weight; the shipping nodes do."""
     weight = page.product.weight_kg
-    if weight is None:
-        return [], [], set()
     nodes: list[dict[str, Any]] = []
     countries: set[str] = set()
     config = shipping.shipping_config_snap(page.vendor, language=language)
     for method in config.methods:
-        band = next((b for b in method.bands if b.holds(weight)), None)
-        if band is None or not method.carrier_active:
+        if not method.carrier_active:
             continue
         zone = method.zone.countries | method.zone.group_countries
         world = shipping_engine.WORLD in zone
         listed = set() if world else set(zone)
         countries |= listed
+        band = None if weight is None else next((b for b in method.bands if b.holds(weight)), None)
+        if band is None:
+            continue
         nodes.append(
             pg.shipping_node(
                 node_id=f"{url}#shipping-{method.key}",
@@ -109,6 +145,15 @@ def _shipping_nodes(
     return nodes, [str(node["@id"]) for node in nodes], countries
 
 
+def _offer_price(page_price: Decimal) -> tuple[Decimal, bool]:
+    """The offer's price and whether it includes VAT. Today the page's interim net price.
+
+    TODO(TAX.12): swap in the TAX.12 gross-price adapter (VAT-inclusive at the estimated
+    destination rate, `valueAddedTaxIncluded: true`); this is the only place that changes.
+    """
+    return page_price, False
+
+
 def _offer(
     page: ProductPage,
     price: Decimal | None,
@@ -120,12 +165,13 @@ def _offer(
 ) -> pg.OfferData | None:
     if price is None:
         return None
+    amount, includes_vat = _offer_price(price)
     return pg.OfferData(
-        price=price,
+        price=amount,
         currency=CURRENCY,
         availability="discontinued" if page.retired else status,
         url=url,
-        price_includes_vat=False,
+        price_includes_vat=includes_vat,
         node_id=node_id,
         **refs,
     )
@@ -164,13 +210,12 @@ def build_graph(page: ProductPage, *, site: str) -> dict[str, Any]:
         pg.VariantData(
             sku=choice.sku,
             name=f"{page.title} {choice.label}".strip(),
-            url=url,
             offer=_offer(
                 page,
                 choice.price,
                 choice.stock_status,
                 url=url,
-                node_id=f"{url}#offer-{choice.sku}",
+                node_id=f"{url}#offer-{quote(choice.sku, safe='')}",
                 refs=refs,
             ),
         )
@@ -178,14 +223,16 @@ def build_graph(page: ProductPage, *, site: str) -> dict[str, Any]:
     )
     brand = page.product.brand
     brand_id = ""
+    linked: list[dict[str, Any]] = []
     if brand is not None and brand.status == brand.Status.APPROVED:
         brand_id = catalog.brand_node_id(brand, site=site)
+        if brand_id:
+            linked = catalog.brand_graph(brand, language, site=site)["@graph"]
     data = pg.ProductData(
         url=url,
         name=page.title,
         sku=str(page.product.sku),
         product_id=str(page.product.public_id),
-        language=language,
         description=catalog_engine.plain_description(page.description or page.short_description),
         gtin=str(page.product.gtin or ""),
         mpn=str(page.product.mpn or ""),
@@ -196,6 +243,7 @@ def build_graph(page: ProductPage, *, site: str) -> dict[str, Any]:
             page, page.price, page.stock_status, url=url, node_id=f"{url}#offer", refs=refs
         ),
         variants=variants,
+        varies_by=_varies_by(page, language) if variants else (),
     )
     return pg.product_graph(
         product=data,
@@ -203,6 +251,7 @@ def build_graph(page: ProductPage, *, site: str) -> dict[str, Any]:
         seller=seller if sold else None,
         return_policy=return_policy,
         shipping=shipping_nodes,
+        linked=linked,
     )
 
 

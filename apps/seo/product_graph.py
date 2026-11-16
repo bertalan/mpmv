@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from typing import Any, Final
+from urllib.parse import quote
 
 from apps.catalog.engine import jsonld_text
 
@@ -26,6 +27,9 @@ _AVAILABILITY: Final = {
 }
 _GTIN_KEYS: Final = {8: "gtin8", 12: "gtin12", 13: "gtin13", 14: "gtin14"}
 FINITE_WINDOW: Final = f"{SCHEMA}/MerchantReturnFiniteReturnWindow"
+# The customer pays the return shipping (a withdrawal); a lack of conformity is free by law.
+CUSTOMER_PAYS_RETURN: Final = f"{SCHEMA}/ReturnShippingFees"
+FREE_RETURN: Final = f"{SCHEMA}/FreeReturn"
 
 
 @dataclass(frozen=True)
@@ -61,7 +65,7 @@ class OfferData:
 class VariantData:
     sku: str
     name: str
-    url: str
+    url: str = ""  # only when the page can show this variant by URL; else left out
     offer: OfferData | None = None
     gtin: str = ""
     mpn: str = ""
@@ -74,7 +78,6 @@ class ProductData:
     name: str
     sku: str
     product_id: str
-    language: str
     description: str = ""
     gtin: str = ""
     mpn: str = ""
@@ -84,6 +87,9 @@ class ProductData:
     weight_kg: Decimal | None = None
     offer: OfferData | None = None
     variants: tuple[VariantData, ...] = ()
+    varies_by: tuple[
+        str, ...
+    ] = ()  # what the variants differ in: schema.org property URLs or names
 
 
 @dataclass(frozen=True)
@@ -148,10 +154,12 @@ def offer_node(offer: OfferData) -> dict[str, Any]:
     )
 
 
-def _variant_node(variant: VariantData) -> dict[str, Any]:
+def _variant_node(variant: VariantData, *, product_url: str) -> dict[str, Any]:
     return _clean(
         {
             "@type": "Product",
+            "@id": f"{product_url}#variant-{quote(variant.sku, safe='')}",
+            "url": variant.url,
             "name": variant.name,
             "sku": variant.sku,
             "image": [image_node(image) for image in variant.images],
@@ -173,12 +181,11 @@ def product_node(data: ProductData) -> dict[str, Any]:
         "sku": data.sku,
         "productID": data.product_id,
         "description": data.description,
-        "inLanguage": data.language,
         "brand": {"@id": data.brand_id} if data.brand_id else "",
         "manufacturer": {"@id": data.manufacturer_id} if data.manufacturer_id else "",
         "image": [image_node(image) for image in data.images],
         "weight": (
-            {"@type": "QuantitativeValue", "value": f"{data.weight_kg}", "unitCode": "KGM"}
+            {"@type": "QuantitativeValue", "value": float(data.weight_kg), "unitCode": "KGM"}
             if data.weight_kg is not None
             else ""
         ),
@@ -186,7 +193,8 @@ def product_node(data: ProductData) -> dict[str, Any]:
     node.update(_identifiers(data.gtin, data.mpn))
     if grouped:
         node["productGroupID"] = data.sku
-        node["hasVariant"] = [_variant_node(variant) for variant in data.variants]
+        node["variesBy"] = list(data.varies_by)
+        node["hasVariant"] = [_variant_node(v, product_url=data.url) for v in data.variants]
     elif data.offer is not None:
         node["offers"] = offer_node(data.offer)
     return _clean(node)
@@ -211,6 +219,9 @@ def organization_node(*, node_id: str, name: str, url: str) -> dict[str, Any]:
 def return_policy_node(
     *, node_id: str, countries: Sequence[str], return_country: str, days: int, link: str = ""
 ) -> dict[str, Any]:
+    """A consumer return policy: `days` is the 14-day withdrawal floor, the customer pays the
+    return shipping, and a lack of conformity (`itemDefectReturnFees`) is free. Nothing is
+    promised to business buyers beyond the terms."""
     return _clean(
         {
             "@type": "MerchantReturnPolicy",
@@ -219,6 +230,8 @@ def return_policy_node(
             "returnPolicyCountry": return_country,
             "returnPolicyCategory": FINITE_WINDOW,
             "merchantReturnDays": days,
+            "returnFees": CUSTOMER_PAYS_RETURN,
+            "itemDefectReturnFees": FREE_RETURN,
             "merchantReturnLink": link,
         }
     )
@@ -270,10 +283,12 @@ def product_graph(
     seller: Mapping[str, Any] | None,
     return_policy: Mapping[str, Any] | None,
     shipping: Sequence[Mapping[str, Any]],
+    linked: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    """`linked` are the nodes the product refers to that other apps own (brand, manufacturer)."""
     nodes: list[Mapping[str, Any]] = [product_node(product), breadcrumb]
     nodes += [node for node in (seller, return_policy) if node is not None]
-    nodes += list(shipping)
+    nodes += [*shipping, *linked]
     return {"@context": SCHEMA, "@graph": [dict(node) for node in nodes]}
 
 

@@ -37,7 +37,6 @@ def product(**kwargs: object) -> pg.ProductData:
         "name": "Mug",
         "sku": "ACME-1",
         "product_id": "6f1c",
-        "language": "en",
         "images": (pg.ImageData(url=f"{SITE}/media/mug.jpg", width=800, height=600),),
         "offer": offer(),
     }
@@ -56,7 +55,7 @@ def test_the_product_node_has_stable_id_identifiers_and_the_vendor_sku() -> None
     assert node["mpn"] == "MUG-77"
     assert node["productID"] == "6f1c"
     assert node["brand"] == {"@id": f"{SITE}/brand/x/#brand"}
-    assert node["inLanguage"] == "en"
+    assert "inLanguage" not in node
 
 
 @pytest.mark.parametrize(
@@ -159,6 +158,23 @@ def test_variants_make_a_product_group_with_one_offer_each() -> None:
     assert "offers" not in node  # the offers live on the variants
 
 
+def test_a_variant_has_its_own_id_and_the_group_says_what_varies() -> None:
+    variants = (
+        pg.VariantData(sku="V 1", name="Mug red", gtin="4006381333931", mpn="M-R"),
+        pg.VariantData(sku="V2", name="Mug blue", url=f"{URL}?v=V2"),
+    )
+    node = pg.product_node(
+        product(variants=variants, offer=None, varies_by=("https://schema.org/color",))
+    )
+    assert node["variesBy"] == ["https://schema.org/color"]
+    first, second = node["hasVariant"]
+    assert first["@id"] == f"{URL}#variant-V%201"
+    assert second["@id"] == f"{URL}#variant-V2"
+    assert first["mpn"] == "M-R"
+    assert "url" not in first  # the page cannot select a variant by URL
+    assert second["url"] == f"{URL}?v=V2"
+
+
 def test_images_carry_size_caption_and_licence_fields() -> None:
     image = pg.ImageData(
         url=f"{SITE}/media/a.jpg",
@@ -191,7 +207,8 @@ def test_a_plain_image_has_only_what_it_knows() -> None:
 
 def test_the_weight_is_a_quantitative_value_in_kilograms() -> None:
     weight = pg.product_node(product(weight_kg=Decimal("0.350")))["weight"]
-    assert weight == {"@type": "QuantitativeValue", "value": "0.350", "unitCode": "KGM"}
+    assert weight == {"@type": "QuantitativeValue", "value": 0.35, "unitCode": "KGM"}
+    assert isinstance(weight["value"], float)
 
 
 def test_the_breadcrumb_list_has_absolute_positions() -> None:
@@ -236,6 +253,14 @@ def test_the_return_policy_names_its_countries_and_window() -> None:
     assert node["returnPolicyCategory"] == "https://schema.org/MerchantReturnFiniteReturnWindow"
     assert node["merchantReturnDays"] == 14
     assert node["merchantReturnLink"] == f"{SITE}/shop/acme/"
+
+
+def test_the_customer_pays_the_return_shipping_and_a_defect_is_free() -> None:
+    node = pg.return_policy_node(node_id=RETURNS, countries=("IT",), return_country="IT", days=14)
+    assert node["returnFees"] == "https://schema.org/ReturnShippingFees"
+    assert node["itemDefectReturnFees"] == "https://schema.org/FreeReturn"
+    assert node["merchantReturnDays"] == 14
+    assert "returnShippingFeesAmount" not in node
 
 
 def test_shipping_details_group_the_countries_in_one_region_per_rate() -> None:
@@ -291,6 +316,22 @@ def test_the_graph_is_one_document_with_every_reference_resolving() -> None:
     assert document["@context"] == "https://schema.org"
     assert schema_check.dangling_references(document) == []
     assert schema_check.rich_result_errors(document) == []
+
+
+def test_the_schema_check_covers_specification_seller_breadcrumb_and_variants() -> None:
+    variants = (pg.VariantData(sku="V1", name="Mug red", offer=offer()),)
+    document = graph(product=product(variants=variants, offer=None, varies_by=("size",)))
+    assert schema_check.rich_result_errors(document) == []
+    item = document["@graph"][0]  # type: ignore[index]
+    variant = item["hasVariant"][0]
+    variant["offers"]["priceSpecification"]["price"] = "1.00"
+    del variant["offers"]["seller"]
+    del variant["@id"]
+    del item["variesBy"]
+    del document["@graph"][1]["itemListElement"][0]["item"]  # type: ignore[index]
+    errors = " ".join(schema_check.rich_result_errors(document))
+    for expected in ("priceSpecification", "seller", "@id", "variesBy", "item URL"):
+        assert expected in errors
 
 
 def test_the_schema_check_finds_a_missing_price_and_a_dangling_reference() -> None:
