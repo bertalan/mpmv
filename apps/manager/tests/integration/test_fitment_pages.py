@@ -208,6 +208,8 @@ def test_a_level_is_renamed_in_a_language(client: Client) -> None:
         {
             "action": "rename_level",
             "level": "make",
+            "label_en": "Make",
+            "plural_en": "Makes",
             "label_it": "Marca",
             "plural_it": "Marche",
             "placeholder_it": "Scegli la marca",
@@ -319,7 +321,7 @@ def test_the_list_is_filtered_by_status_and_level(client: Client, levels_three: 
     assert "Make One" not in only_retired
     only_models = client.get(f"{NODES}?level=2").content.decode()
     assert "Model A" in only_models
-    assert "Make One" not in only_models
+    assert ">Make One</a>" not in only_models  # the row of the make itself, not the Under cell
 
 
 def test_a_node_is_renamed_and_its_aliases_and_names_are_kept(
