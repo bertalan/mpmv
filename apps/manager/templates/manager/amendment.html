@@ -1,0 +1,139 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Change a paid order (ORD.20 part 3), in the shop space (owner, members with orders) and the
+platform space (Support, platform owner: carrier, address on the customer's request, cancel).
+The open draft shows its recomputed preview in plain words: what changes, the money refunded or
+to pay, minor or substantial and why. Apply and discard are POSTs with CSRF; a critical change
+answers with the passkey prompt. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% blocktranslate %}Change order {{ number }}{% endblocktranslate %}</h1>
+  <p><a href="{{ order_url }}">{% if staff %}{% translate "Back to the order lookup" %}{% else %}{% translate "Back to the order" %}{% endif %}</a></p>
+  {% if action_error %}{% include "components/alert.html" with level="danger" message=action_error live="assertive" only %}{% endif %}
+  <dl class="manager-facts">
+    <dt>{% translate "Status" %}</dt><dd data-order-state>{{ sub.get_state_display }}</dd>
+    {% if staff %}<dt>{% translate "Shop" %}</dt><dd>{{ sub.vendor.display_name }}</dd>{% endif %}
+    {% if version_number %}<dt>{% translate "Current version" %}</dt><dd data-version>{{ version_number }}</dd>{% endif %}
+    {% if total %}<dt>{% translate "Total with VAT" %}</dt><dd>{{ total }}</dd>{% endif %}
+    {% if show_address %}
+      <dt>{% translate "Ship to" %}</dt>
+      <dd>{% for line in address %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</dd>
+    {% endif %}
+    {% if hold_until %}<dt>{% translate "Shipping held until" %}</dt><dd>{{ hold_until|date:"SHORT_DATETIME_FORMAT" }}</dd>{% endif %}
+  </dl>
+  {% if lines %}
+  <div class="table-scroll" role="region" aria-labelledby="amend-lines-caption" tabindex="0">
+    <table class="table">
+      <caption id="amend-lines-caption">{% translate "Items in the current version" %}</caption>
+      <thead><tr>
+        <th scope="col">{% translate "Product" %}</th>
+        <th scope="col" class="numeric">{% translate "Quantity" %}</th>
+        <th scope="col" class="numeric">{% translate "Unit price net" %}</th>
+        <th scope="col" class="numeric">{% translate "Price with VAT" %}</th>
+      </tr></thead>
+      <tbody>
+        {% for line in lines %}<tr>
+          <th scope="row">{{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %}</th>
+          <td class="numeric">{{ line.quantity }}</td>
+          <td class="numeric">{{ line.unit }}</td>
+          <td class="numeric">{{ line.gross }}</td>
+        </tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if not amendable %}
+    <p>{% translate "This order can no longer be changed: only a paid order that is waiting for the seller or accepted, and not shipped yet, can be changed." %}</p>
+  {% endif %}
+
+  {% if draft %}
+    <section aria-labelledby="draft-heading" data-amendment-preview>
+      <h2 id="draft-heading">{% translate "The change being prepared" %}</h2>
+      {% if not draft_mine %}
+        <p>{% blocktranslate with who=draft_by since=draft.updated_at|date:"SHORT_DATETIME_FORMAT" %}This order has a change in progress, started by {{ who }} (last edited {{ since }}). Only that side may change, apply or discard it.{% endblocktranslate %}</p>
+      {% endif %}
+      <p data-amendment-kind><strong>{{ preview.kind_label }}</strong></p>
+      {% if preview.reasons %}
+        <p>{% translate "Why:" %}</p>
+        <ul>{% for reason in preview.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if preview.lines %}
+      <div class="table-scroll" role="region" aria-labelledby="preview-caption" tabindex="0">
+        <table class="table">
+          <caption id="preview-caption">{% translate "What changes" %}</caption>
+          <thead><tr>
+            <th scope="col">{% translate "Product" %}</th>
+            <th scope="col">{% translate "Before" %}</th>
+            <th scope="col">{% translate "After" %}</th>
+          </tr></thead>
+          <tbody>
+            {% for line in preview.lines %}<tr>
+              <th scope="row">{{ line.title }}</th><td>{{ line.before }}</td><td>{{ line.after }}</td>
+            </tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+      <dl class="manager-facts">
+        {% if preview.shipping %}<dt>{% translate "Shipping method" %}</dt><dd>{{ preview.shipping.before }} &rarr; {{ preview.shipping.after }}</dd>{% endif %}
+        {% if preview.address_changed %}<dt>{% translate "Delivery address" %}</dt><dd>{% translate "Corrected as the customer asked" %}</dd>{% endif %}
+        <dt>{% translate "Total before" %}</dt><dd>{{ preview.gross_before }}</dd>
+        <dt>{% translate "Total after" %}</dt><dd>{{ preview.gross_after }}</dd>
+        <dt>{% translate "Money" %}</dt>
+        <dd data-amendment-money>{% if preview.refund %}{% blocktranslate with amount=preview.refund %}{{ amount }} refunded to the customer{% endblocktranslate %}{% elif preview.to_pay %}{% blocktranslate with amount=preview.to_pay %}{{ amount }} for the customer to pay{% endblocktranslate %}{% else %}{% translate "No money moves" %}{% endif %}</dd>
+        {% if preview.vendor_absorbs %}<dt>{% translate "Shipping cost the shop absorbs" %}</dt><dd>{{ preview.vendor_absorbs }}</dd>{% endif %}
+        {% if not staff %}<dt>{% translate "Commission change" %}</dt><dd>{{ preview.commission_delta }}</dd>{% endif %}
+      </dl>
+      {% if draft_mine and draft.state == "draft" %}
+        {% if preview.passkey %}<p>{% translate "Applying it asks for your passkey: it moves money or the delivery address." %}</p>{% endif %}
+        <div class="manager-actions">
+          {% if preview.kind == "minor" %}
+          <form method="post" action="{{ apply_url }}" class="manager-form">
+            {% csrf_token %}
+            {% include "components/button.html" with label=_("Apply the change") type="submit" only %}
+          </form>
+          {% endif %}
+          <form method="post" action="{{ discard_url }}" class="manager-form">
+            {% csrf_token %}
+            {% include "components/button.html" with label=_("Discard the draft") type="submit" variant="secondary" only %}
+          </form>
+        </div>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {% if form %}
+    <section aria-labelledby="form-heading">
+      <h2 id="form-heading">{% if draft %}{% translate "Edit the change" %}{% else %}{% translate "Prepare a change" %}{% endif %}</h2>
+      {% if staff %}<p>{% translate "Platform staff may change the carrier to one at the same or a lower price, or correct the address when the customer asks. Products, quantities and prices are the shop's." %}</p>{% endif %}
+      {% include "components/error_summary.html" with form=form autofocus=True only %}
+      <form method="post" action="{{ form_url }}" class="manager-form" novalidate>
+        {% csrf_token %}
+        {% for group in form.line_fields %}
+          <fieldset class="manager-fieldset">
+            <legend>{{ group.line.title }}</legend>
+            {% for field in group.fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+          </fieldset>
+        {% endfor %}
+        {% for field in form.other_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+        {% for field in form.closing_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+        {% include "components/button.html" with label=_("Compute the change") type="submit" only %}
+      </form>
+    </section>
+  {% endif %}
+
+  {% if cancel_form %}
+    <section aria-labelledby="cancel-heading">
+      <h2 id="cancel-heading">{% translate "Cancel the package with a full refund" %}</h2>
+      <p>{% translate "The customer gets back everything paid for this package, within 14 days at the latest. The cause decides who pays the refund fee and whether the units go back to stock. It asks for your passkey." %}</p>
+      {% include "components/error_summary.html" with form=cancel_form only %}
+      <form method="post" action="{{ cancel_url }}" class="manager-form" novalidate>
+        {% csrf_token %}
+        {% for field in cancel_form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+        {% include "components/button.html" with label=_("Cancel the package") type="submit" variant="danger" only %}
+      </form>
+    </section>
+  {% endif %}
+{% endblock %}

@@ -75,7 +75,7 @@ def _window_scope(request: HttpRequest) -> str | None:
     prompt the server showed this vendor owner (a window scoped to it). Refused otherwise."""
     if levels.may_elevate(request.user):
         return None
-    shop = levels.shop_offer(request)
+    shop = levels.shop_offer(request, window=True)
     if not shop:
         raise PermissionDenied
     return shop
