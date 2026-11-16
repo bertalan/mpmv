@@ -1,4 +1,4 @@
-{% load i18n %}<div id="cart-body">
+{% load i18n theme_tags %}{% with items=packages|cart_item_count %}{% if items %}{% blocktranslate count counter=items asvar items_label %}{{ counter }} item{% plural %}{{ counter }} items{% endblocktranslate %}{% else %}{% translate "Your cart is empty" as items_label %}{% endif %}<div id="cart-body" data-cart-count="{{ items }}" data-cart-label="{{ items_label }}">
 {% if partial %}<div id="live-region" hx-swap-oob="innerHTML">{{ status }}</div>{% endif %}
 {% if empty %}
   {% url "home" as home_url %}{% include "components/empty_state.html" with title=_("Your cart is empty") text=_("Find something you like.") url=home_url action=_("Start shopping") only %}
@@ -20,4 +20,4 @@
     <p class="form-text">{% translate "Solve the points above to go on." %}</p>
   {% endif %}
 {% endif %}
-</div>
+</div>{% endwith %}

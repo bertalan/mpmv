@@ -4,5 +4,5 @@ body face; spec 14 §14.7 allows one) and, from THM.13, the Bootstrap bundle as 
 script that runs before the theme modules (spec 14 §14.5). A page that overrides `head` without `{{ block.super }}`
 loses the preload only.
 {% endcomment %}
-{% block foundation_scripts %}<script src="{% static 'themes/ride/vendor/bootstrap.bundle.min.js' %}" defer></script>{% endblock %}
+{% block foundation_scripts %}<script src="{% static 'themes/ride/vendor/bootstrap.bundle.min.js' %}" defer></script><script type="module" src="{% static 'themes/ride/js/mini-cart.js' %}"></script>{% endblock %}
 {% block head %}<link rel="preload" href="{% static 'themes/ride/fonts/barlow-400.woff2' %}" as="font" type="font/woff2" crossorigin>{{ block.super }}{% endblock %}

@@ -189,6 +189,69 @@
     }
   }
 
+  /* --- Search modal and mini-cart offcanvas (Bootstrap; THM.15 part 2). The icons are links that
+     JavaScript turns into triggers. */
+
+  .tool--cart {
+    position: relative;
+  }
+
+  .tool__badge {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    min-inline-size: 1.25rem;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    font-size: var(--step--1);
+    font-weight: 700;
+    line-height: 1.25rem;
+    text-align: center;
+  }
+
+  .site-header .modal,
+  .site-header .offcanvas {
+    --bs-modal-bg: var(--color-surface-inverse);
+    --bs-modal-color: var(--color-text-inverse);
+    --bs-modal-border-width: 0;
+    --bs-modal-header-border-width: 0;
+  }
+
+  .site-header .modal-title {
+    color: var(--color-text-inverse);
+    font-family: var(--font-display);
+    font-size: var(--step-1);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .site-header .modal-body {
+    max-inline-size: 40rem;
+    margin-inline: auto;
+    inline-size: 100%;
+  }
+
+  .site-header .modal .search-form label {
+    color: var(--color-text-inverse);
+  }
+
+  #mini-cart-offcanvas {
+    --bs-offcanvas-width: min(32rem, 100vw);
+    --bs-offcanvas-bg: var(--color-surface);
+    --bs-offcanvas-color: var(--color-text);
+  }
+
+  #mini-cart-offcanvas .offcanvas-header {
+    background: var(--color-surface-inverse);
+    color: var(--color-text-inverse);
+  }
+
+  .mini-cart__all {
+    margin-block: var(--space-m) 0;
+  }
+
   /* --- Footer: dark surface, three columns from 40rem. */
 
   .site-footer {
