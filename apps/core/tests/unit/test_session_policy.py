@@ -79,3 +79,114 @@ def test_expiry_decisions() -> None:
         sp.expiry(policy, started_at=start, last_activity=start + 7199, now=start + 7201) == "cap"
     )
     assert sp.expiry(policy, started_at=None, last_activity=None, now=start) == "invalid"
+
+
+# --- CORE.24 part 2: the role-based session lifetimes
+
+DAY = 24 * 3600
+
+
+def test_the_lifetime_defaults() -> None:
+    policy = sp.parse_policy({})
+    assert (policy.customer_days, policy.staff_idle_minutes, policy.staff_absolute_hours) == (
+        14,
+        30,
+        12,
+    )
+    assert sp.lifetime_of(policy, strict=False) == sp.Lifetime(
+        kind=sp.CUSTOMER_LIFETIME, idle_seconds=14 * DAY, absolute_seconds=None
+    )
+    assert sp.lifetime_of(policy, strict=True) == sp.Lifetime(
+        kind=sp.STAFF_LIFETIME, idle_seconds=30 * 60, absolute_seconds=12 * 3600
+    )
+
+
+def test_the_fail_closed_policy_keeps_the_default_lifetimes() -> None:
+    policy = sp.FAIL_CLOSED_POLICY
+    assert sp.lifetime_of(policy, strict=True) == sp.lifetime_of(sp.DEFAULT_POLICY, strict=True)
+
+
+def test_sparse_lifetime_overrides_keep_the_other_values() -> None:
+    policy = sp.parse_policy({"staff_idle_minutes": 10})
+    assert (policy.customer_days, policy.staff_idle_minutes, policy.staff_absolute_hours) == (
+        14,
+        10,
+        12,
+    )
+    assert policy.idle_minutes == 15  # the passkey window timers are separate
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        {"customer_days": 0},
+        {"customer_days": 366},
+        {"customer_days": "14"},
+        {"customer_days": True},
+        {"staff_idle_minutes": 0},
+        {"staff_absolute_hours": 0},
+        {"staff_absolute_hours": 73},
+        {"staff_absolute_hours": 1.5},
+        {"staff_idle_minutes": 61, "staff_absolute_hours": 1},  # idle longer than the lifetime
+    ],
+)
+def test_a_bad_lifetime_is_refused(raw: object) -> None:
+    with pytest.raises(ValueError, match=r"."):
+        sp.parse_policy(raw)
+
+
+def test_a_customer_lifetime_is_rolling_with_no_absolute_limit() -> None:
+    life = sp.lifetime_of(sp.DEFAULT_POLICY, strict=False)
+    start = 1_000_000.0
+    seen = start + 100 * DAY  # active for 100 days: still fine
+    assert sp.lifetime_expiry(life, signed_in_at=start, last_seen=seen, now=seen + 13 * DAY) is None
+    assert (
+        sp.lifetime_expiry(life, signed_in_at=start, last_seen=seen, now=seen + 14 * DAY) == "idle"
+    )
+
+
+def test_a_staff_lifetime_ends_on_idle_and_on_the_absolute_limit() -> None:
+    life = sp.lifetime_of(sp.DEFAULT_POLICY, strict=True)
+    start = 1_000_000.0
+    soon = start + 29 * 60
+    assert sp.lifetime_expiry(life, signed_in_at=start, last_seen=start, now=soon) is None
+    assert (
+        sp.lifetime_expiry(life, signed_in_at=start, last_seen=start, now=start + 31 * 60) == "idle"
+    )
+    late = start + 12 * 3600
+    assert sp.lifetime_expiry(life, signed_in_at=start, last_seen=late - 1, now=late) == "absolute"
+    assert sp.lifetime_expiry(life, signed_in_at=start, last_seen=late - 60, now=late - 1) is None
+
+
+@pytest.mark.parametrize(
+    ("signed_in_at", "last_seen"),
+    [
+        (None, 1000.0),
+        (1000.0, None),
+        (1000.0 + 3600, 1000.0 + 3600),  # signed in an hour in the future
+        (1000.0, 1000.0 + 3600),  # seen an hour in the future
+        (float("nan"), 1000.0),  # not a number: every comparison is false
+        (1000.0, float("nan")),
+        (float("-inf"), 1000.0),
+        (1000.0, float("inf")),
+        (1000.0, 900.0),  # seen before the sign-in
+    ],
+)
+def test_an_unreadable_lifetime_stamp_is_invalid(
+    signed_in_at: float | None, last_seen: float | None
+) -> None:
+    life = sp.lifetime_of(sp.DEFAULT_POLICY, strict=False)
+    assert (
+        sp.lifetime_expiry(life, signed_in_at=signed_in_at, last_seen=last_seen, now=1000.0)
+        == "invalid"
+    )
+
+
+def test_the_deadline_is_the_nearer_of_idle_and_absolute() -> None:
+    life = sp.lifetime_of(sp.DEFAULT_POLICY, strict=True)
+    start = 1_000_000.0
+    assert sp.lifetime_deadline(life, signed_in_at=start, last_seen=start) == start + 30 * 60
+    late = start + 12 * 3600 - 60
+    assert sp.lifetime_deadline(life, signed_in_at=start, last_seen=late) == start + 12 * 3600
+    customer = sp.lifetime_of(sp.DEFAULT_POLICY, strict=False)
+    assert sp.lifetime_deadline(customer, signed_in_at=start, last_seen=late) == late + 14 * DAY

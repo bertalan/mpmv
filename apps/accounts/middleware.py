@@ -18,7 +18,7 @@ from django.utils import translation
 from apps.core.http import client_ip
 from apps.core.i18n import configured_languages, translate_path
 
-from . import levels, services
+from . import levels, lifetimes, services
 from .decorators import MFA_EXEMPT_ATTR, mfa_redirect
 from .mfa_session import is_verified
 from .models import User
@@ -118,7 +118,9 @@ class SessionIndexMiddleware:
     """CORE.24: keep the session index fresh and name the request's session to the services.
 
     A session whose copy of the user's session generation is old was ended (also when the
-    index never saw it): it is flushed and the request is anonymous. Otherwise the request
+    index never saw it): it is flushed and the request is anonymous. A session whose role-based
+    lifetime is over (`lifetimes.enforce`, CORE.24 part 2) is ended, audited and sent to the
+    login. Otherwise the request
     refreshes its `UserSession` row at most every `SESSION_TOUCH_SECONDS` (at once when the row
     is missing), never the session data, so the session's expiry does not move. The request's
     session is bound for `services.end_sessions_after_change`, so a change a user makes to their
@@ -136,6 +138,8 @@ class SessionIndexMiddleware:
                 # This user's sessions were ended after this one signed in (CORE.24).
                 session.flush()
                 request.user = AnonymousUser()
+            elif (ended := lifetimes.enforce(request)) is not None:
+                return ended  # the idle or absolute lifetime is over (CORE.24 part 2)
             else:
                 touch_session(
                     user,

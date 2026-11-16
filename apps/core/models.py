@@ -594,13 +594,15 @@ class PlatformOperator(Versioned):
     # `apps.core.services.set_allowed_vendor_countries`; other new versions carry it over.
     # D-32 (CORE.25): the passkey window timers and the three action lists, sparse over the D-32
     # defaults (`core.session_policy`); `{}` is the defaults. Tunable without code (trial).
+    # CORE.24 part 2: also the session lifetimes (customer_days, staff_idle_minutes,
+    # staff_absolute_hours).
     session_policy = models.JSONField(
         default=dict,
         blank=True,
         help_text=_(
-            "Staff session settings that replace the defaults: timers and lists of actions."
-            " Leave it empty to keep the defaults. A value that does not fit is refused "
-            "when you save."
+            "Session settings that replace the defaults: how long customer and staff sessions"
+            " last, the passkey window timers and the lists of actions. Leave it empty to keep"
+            " the defaults. A value that does not fit is refused when you save."
         ),
     )
     allowed_vendor_countries = ArrayField(

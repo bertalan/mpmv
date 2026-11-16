@@ -646,6 +646,12 @@ X_FRAME_OPTIONS = "DENY"
 # CORE.24: Django's database backend, which also keeps the per-user session index in step.
 SESSION_ENGINE = "apps.accounts.session_store"
 SESSION_TOUCH_SECONDS = 300  # how often a request refreshes its session's "last used" time
+# CORE.24 part 2: the role-based lifetimes (values on the PlatformOperator, `core.session_policy`).
+SESSION_ACTIVITY_SECONDS = 60  # how often a request counts as use for the idle timeout
+SESSION_EXPIRY_GRACE_SECONDS = 3600  # the stored session outlives its deadline by this, to explain
+# Extra `check(user) -> bool` paths for the staff lifetime, beyond staff, superusers and every role
+# in MFA_REQUIRED_POLICIES. Platform staff need not hold `is_staff` (spec 02 Q-34).
+SESSION_STAFF_CHECKS: list[str] = ["apps.manager.access.is_platform_staff"]
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = True
