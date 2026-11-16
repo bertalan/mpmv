@@ -168,3 +168,47 @@ def test_the_cart_and_the_details_step_pass_the_gates_at_every_width(
         page.goto(f"{live_server.url}{path}")
         check_page(page)
         assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
+
+
+def _gates(page: Page, width: int) -> None:
+    check_page(page)
+    assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"), (
+        f"sideways scroll at {width}px"
+    )
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_review_payment_and_confirming_pass_the_gates_at_every_width(
+    page: Page,
+    live_server: LiveServer,
+    shop: Cart,  # noqa: F811
+    stripe: FakeStripeClient,  # noqa: F811
+    width: int,
+) -> None:
+    """THM.16 follow-up: one checkout per width, each later step under the same gates."""
+    fake_stripe_routes(page, stripe)
+    page.set_viewport_size({"width": width, "height": 900})
+    open_with_cart(page, live_server, shop)
+    page.goto(f"{live_server.url}/checkout/")
+    for field, value in (
+        ("#id_email", "buyer@example.com"),
+        ("#id_full_name", "Mario Rossi"),
+        ("#id_line1", "1 Via Test"),
+        ("#id_postcode", "00100"),
+        ("#id_city", "Roma"),
+    ):
+        page.locator(field).fill(value)
+    page.locator("#id_country").select_option("IT")
+    page.locator("#id_city").press("Enter")
+
+    expect(page.get_by_role("heading", level=1)).to_have_text("Review and pay")
+    _gates(page, width)
+    page.get_by_label(re.compile("I have read and accept")).check()
+    page.get_by_role("button", name=re.compile("Confirm order and pay now")).click()
+
+    expect(page.get_by_role("heading", level=1)).to_have_text("Order received")
+    expect(page.locator("#fake-card")).to_be_visible()
+    _gates(page, width)
+    page.get_by_role("button", name="Pay now").click()
+    expect(page.get_by_text("Payment received, confirming")).to_be_visible()
+    _gates(page, width)
