@@ -116,3 +116,64 @@ def test_a_focused_footer_link_is_not_covered_by_the_sticky_header(
         " return e.top < h.bottom; }"
     )
     assert not covered
+
+
+@pytest.mark.parametrize(("width", "burger"), [(1000, True), (1023, True), (1024, False)])
+def test_there_is_one_switch_point_at_64rem(
+    width: int, burger: bool, page: Page, live_server: LiveServer
+) -> None:
+    """Between 992 and 1023 px Bootstrap's own `lg` would expand; ride switches only at 1024."""
+    open_home(page, live_server, width)
+    toggle = page.locator(".nav-toggle")
+    inline_menu = page.get_by_role("navigation", name="Main").get_by_role("link").first
+    if burger:
+        expect(toggle).to_be_visible()
+        expect(inline_menu).to_be_hidden()
+    else:
+        expect(toggle).to_be_hidden()
+        expect(inline_menu).to_be_visible()
+    visible = [toggle.is_visible(), inline_menu.is_visible()]
+    assert visible.count(True) == 1, visible
+
+
+def test_without_javascript_the_main_nav_is_a_reachable_link_list(
+    browser: Any, live_server: LiveServer
+) -> None:
+    context = browser.new_context(java_script_enabled=False, viewport={"width": 360, "height": 800})
+    try:
+        page = context.new_page()
+        assert page.goto(f"{live_server.url}/") is not None
+        nav = page.get_by_role("navigation", name="Main")
+        expect(page.locator(".nav-toggle")).to_be_hidden()
+        for link in nav.get_by_role("link").all():
+            if link.get_attribute("class") != "dropdown-item":
+                expect(link).to_be_visible()
+        page.keyboard.press("Tab")  # skip link, then the header, then the main nav
+        reached: list[str] = []
+        for _ in range(12):
+            page.keyboard.press("Tab")
+            href = page.evaluate("() => document.activeElement.getAttribute('href')")
+            reached.append(href)
+        assert "/shop/" in reached, reached
+        assert "/about/" in reached, reached
+    finally:
+        context.close()
+
+
+def test_escape_closes_an_open_dropdown_before_the_offcanvas(
+    page: Page, live_server: LiveServer
+) -> None:
+    open_home(page, live_server, 360)
+    page.locator(".nav-toggle").click()
+    panel = page.locator("#site-offcanvas")
+    expect(panel).to_be_visible()
+    sub_toggle = page.locator("[data-bs-toggle='dropdown']")
+    sub_toggle.focus()
+    page.keyboard.press("Enter")
+    expect(sub_toggle).to_have_attribute("aria-expanded", "true")
+    page.keyboard.press("Escape")
+    expect(sub_toggle).to_have_attribute("aria-expanded", "false")
+    expect(panel).to_be_visible()  # the first Escape only closed the dropdown
+    page.keyboard.press("Escape")
+    expect(panel).to_be_hidden()
+    assert csp_violations(page) == [], "\n".join(csp_violations(page))

@@ -3,15 +3,19 @@ Site header of the `ride` theme (THM.6, THM.15 part 1, spec 14 §14.6): a dark B
 with the logo on the left, the main navigation, search and cart icons with text for screen
 readers, the help link and the language switcher.
 
-Navbar: `navbar-expand-lg`. From 64rem (1024 px) the navigation sits in the bar. Below it a menu button
-opens the Bootstrap offcanvas panel (`data-bs-*` only: focus is trapped inside, Escape closes it
-and returns focus to the button; no inline script or style).
+Navbar: a Bootstrap `navbar` WITHOUT `navbar-expand-lg`, which would switch at 62rem (992 px); the
+one switch point is 64rem (1024 px), set in 20-header-footer.css. From 64rem the navigation sits in
+the bar. Below it a menu button opens the Bootstrap offcanvas panel (`data-bs-*` only: focus is
+trapped inside, Escape closes it and returns focus to the button; no inline script or style).
+Without JavaScript (`no-js` class on <html>, which ride.js removes) the burger is hidden and the
+panel is shown as a plain list of links below 64rem. Escape inside an open dropdown closes the
+dropdown first; a second Escape closes the panel (Bootstrap's behaviour).
 
 Sub-menus: a link with `children` (label and url each) gets a Bootstrap dropdown button next to
 it. The button carries `aria-expanded` and `aria-controls`; nothing opens on hover alone;
 Enter, Space or the arrow keys open it and Escape closes it. The vendored Bootstrap bundle
 (loaded with `defer` by the ride layout) does all of it, so base's Alpine components are not used
-here. Without JavaScript the panel and the sub-menus stay closed and the parent links remain.
+here. Without JavaScript the sub-menus stay closed and the parent links remain; the sub-menu links are not reachable then.
 
 Search overlay (THM.15 part 2): the search icon is a link to the search page that Bootstrap turns
 into the trigger of a full-screen modal holding base's search form (same action, field and
@@ -29,7 +33,7 @@ Context: `site_name`, `links` (label, url, optional children), `languages`, `sea
 `cart_url` (default: the routes named `search` and `orders:cart`; an icon is left out without a
 url, never rendered as a dead link), and the context of the help link.
 {% endcomment %}<header class="site-header">
-  <div class="site-header__inner navbar navbar-expand-lg">
+  <div class="site-header__inner navbar">
     {% url 'home' as home_url %}<a class="site-name" href="{% firstof home_url '/' %}">{{ site_name }}</a>
     {% if links %}
       <div class="site-nav">
@@ -37,7 +41,7 @@ url, never rendered as a dead link), and the context of the help link.
         <div class="offcanvas offcanvas-end" tabindex="-1" id="site-offcanvas" aria-labelledby="site-offcanvas-title">
           <div class="offcanvas-header">
             <span class="offcanvas-title" id="site-offcanvas-title">{% translate "Menu" %}</span>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#site-offcanvas" aria-label="{% translate 'Close' %}"></button>
+            <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}"></button>
           </div>
           <div class="offcanvas-body">
             <nav id="site-nav" aria-label="{% translate 'Main' %}">
@@ -80,7 +84,7 @@ url, never rendered as a dead link), and the context of the help link.
             <div class="modal-content">
               <div class="modal-header">
                 <h2 class="modal-title" id="search-modal-title">{% translate "Search" %}</h2>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
               </div>
               <div class="modal-body">
                 {% include "components/search_form.html" with id="site-search" action=search_url query=request.GET.q only %}
@@ -93,7 +97,7 @@ url, never rendered as a dead link), and the context of the help link.
         <div class="offcanvas offcanvas-end" tabindex="-1" id="mini-cart-offcanvas" aria-labelledby="mini-cart-title">
           <div class="offcanvas-header">
             <span class="offcanvas-title" id="mini-cart-title">{% translate "Cart" %}</span>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#mini-cart-offcanvas" aria-label="{% translate 'Close' %}"></button>
+            <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}"></button>
           </div>
           <div class="offcanvas-body">
             <div id="mini-cart-body" hx-get="{{ cart_url }}" hx-trigger="load, cart-changed from:body" hx-select="#cart-body" hx-swap="innerHTML"></div>
