@@ -23,6 +23,7 @@ DEFAULT_SURCHARGE: Final = Decimal("2.00")
 NOTICE_DAYS: Final = 15
 SNAPSHOT_KEY: Final = "refund_fee_surcharge"
 CUSTOMER_REQUESTED_AMENDMENT: Final = "customer_requested_amendment"
+CUSTOMER_REQUESTED_CANCELLATION: Final = "customer_requested_cancellation"
 
 
 class ReasonRequired(ValueError):
@@ -83,7 +84,25 @@ class CustomerRequestedAmendment:
             raise ReasonRequired("A customer-requested amendment exclusion names the amendment.")
 
 
-type FeeExclusion = PlatformErrorExclusion | CustomerRequestedAmendment
+@dataclasses.dataclass(frozen=True)
+class CustomerRequestedCancellation:
+    """Platform staff cancelled the whole package because the customer asked (ORD.20, owner
+    2026-11-16): no refund fee for the vendor. Built by the package-cancellation service from the
+    cause staff chose, never from a free field; the service audits it."""
+
+    vendor_order: str  # the vendor order's public id
+    set_by: str
+
+    reason: ClassVar[str] = CUSTOMER_REQUESTED_CANCELLATION
+
+    def __post_init__(self) -> None:
+        if not self.vendor_order.strip():
+            raise ReasonRequired("A customer-requested cancellation names the vendor order.")
+
+
+type FeeExclusion = (
+    PlatformErrorExclusion | CustomerRequestedAmendment | CustomerRequestedCancellation
+)
 
 
 def refund_fee(

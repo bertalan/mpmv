@@ -40,6 +40,9 @@ data are not shown. Every action is a POST with a CSRF token. No inline script o
       </tbody>
     </table>
   </div>
+  {% if can_amend %}
+    <p><a href="{{ amend_url }}">{% translate "Change this order" %}</a>{% if version_number and version_number > 1 %} <span data-version>{% blocktranslate with n=version_number %}(version {{ n }}){% endblocktranslate %}</span>{% endif %}</p>
+  {% endif %}
   {% if can_accept %}
     <form method="post" action="{{ accept_url }}" class="manager-form">
       {% csrf_token %}

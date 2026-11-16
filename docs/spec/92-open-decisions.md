@@ -175,3 +175,10 @@ TAX.20 and TAX.21. The owner answered the open questions of the register sweep t
 | ID | Area | Decision | Recorded in |
 |---|---|---|---|
 | MQ-45 | Themes | The `ride` theme is improved, not cut down (Q-98): it rebuilds the look of the owner's reference template faithfully on Bootstrap 5.3 (MIT, vendored dist files, tokens mapped on `--bs-*` custom properties, no Sass, no Node), with our own markup and styles; hero slider and carousels (pause control, no autoplay without it), scroll reveal, header search overlay, mini-cart offcanvas, page banners with breadcrumb, counters and progress bars come back; no template file is committed and the template, author and marketplace are never named; `base` stays framework-free; the per-theme CSS and JavaScript budgets are revisited in THM.13 | [14](14-frontend-themes.md) (§14.1, §14.5, §14.7, §14.9, THM.7, THM.9, THM.10, THM.13 to THM.16) |
+
+## Owner decisions of 2026-11-16 (analytics, domains)
+
+| ID | Area | Decision | Recorded in |
+|---|---|---|---|
+| MQ-46 | Analytics | Analytics is provider-neutral (an `AnalyticsProvider` interface like `ConsentProvider`; none, one or several providers enabled per environment; built-in Matomo and Google Analytics 4). Matomo is the default for today's operator, replacing Google Analytics: the operator's own instance on a separate domain, cookieless, IP anonymised, first-party proxy by default, strict CSP. D-10 stands for the consent banner. ⚖️ Open legal point: counsel confirms whether such analytics may run without consent under the Garante cookie guidelines (2021); until then it runs only after analytics consent. Consent Mode v2 applies to GA4 and any remaining Google advertising or Merchant tags | SEO.5, SEO.9 |
+| MQ-47 | Cutover | Domains, mail and TLS at cutover: DNS inventory, mail moved off the legacy web server, SPF, DKIM and DMARC, TTL 300 s at T-7, certificates before the switch, legacy site kept on an internal hostname behind basic auth and `noindex`, staged HSTS | MIG.22, spec 13 §13.4 |
