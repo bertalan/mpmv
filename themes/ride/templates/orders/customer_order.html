@@ -1,0 +1,66 @@
+{% extends "layouts/account.html" %}
+{% load i18n %}
+{% block title %}{% blocktranslate %}Order {{ number }}{% endblocktranslate %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block account_content %}
+  {% comment %}THM.16 2/2: Bootstrap grid, card and table; the timeline keeps its own rules.{% endcomment %}
+  <p><a href="{% url 'customer_orders' %}">{% translate "Back to my orders" %}</a></p>
+  <h1>{% blocktranslate %}Order {{ number }}{% endblocktranslate %}</h1>
+  <dl class="row">
+    <dt class="col-sm-3">{% translate "Placed on" %}</dt>
+    <dd class="col-sm-9"><time datetime="{{ placed|date:'c' }}">{{ placed|date:"DATE_FORMAT" }}</time></dd>
+    <dt class="col-sm-3">{% translate "Status" %}</dt>
+    <dd class="col-sm-9">{{ status }}</dd>
+    <dt class="col-sm-3">{% translate "Total" %}</dt>
+    <dd class="col-sm-9">{{ total }}</dd>
+  </dl>
+  <p>{% translate "This is your order reference, not an invoice. Each seller issues its own invoice." %}</p>
+  {% for part in parts %}
+    <section class="order-part card card-body my-4" aria-labelledby="part-{{ forloop.counter }}">
+      <h2 id="part-{{ forloop.counter }}" class="h4">{% blocktranslate with name=part.vendor_name %}Sold by {{ name }}{% endblocktranslate %}</h2>
+      <p><strong>{% translate "Status" %}:</strong> {{ part.status }}</p>
+      <ol class="timeline" aria-label="{% translate 'Status history' %}">
+        {% for step in part.steps %}
+          <li class="timeline__step timeline__step--{{ step.status }}"{% if step.status == "current" %} aria-current="step"{% endif %}>
+            <span class="timeline__label">{{ step.label }}</span>
+            <span class="visually-hidden">({{ step.status_label }})</span>
+            {% if step.at %}<time datetime="{{ step.at|date:'c' }}">{{ step.at|date:"SHORT_DATETIME_FORMAT" }}</time>{% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+      {% if part.tracking %}
+        <h3 class="h5">{% translate "Tracking" %}</h3>
+        <p>
+          {% if part.tracking.carrier %}{% blocktranslate with carrier=part.tracking.carrier %}Carrier: {{ carrier }}{% endblocktranslate %}<br>{% endif %}
+          {% blocktranslate with number=part.tracking.number %}Tracking number: {{ number }}{% endblocktranslate %}
+          {% if part.tracking.url %}<br><a href="{{ part.tracking.url }}" rel="noopener noreferrer">{% translate "Track the parcel" %}<span class="visually-hidden"> {% translate "(opens the carrier's site)" %}</span></a>{% endif %}
+        </p>
+      {% endif %}
+      <div class="table-responsive" role="region" aria-labelledby="lines-{{ forloop.counter }}" tabindex="0">
+        <table class="table align-middle">
+          <caption id="lines-{{ forloop.counter }}" class="fw-bold">{% blocktranslate with name=part.vendor_name %}What you bought from {{ name }}{% endblocktranslate %}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{% translate "Item" %}</th>
+              <th scope="col" class="text-end">{% translate "Quantity" %}</th>
+              <th scope="col" class="text-end">{% translate "Price with VAT" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for line in part.lines %}
+              <tr>
+                <th scope="row">{{ line.title }}{% if line.variant %} <span class="text-body-secondary">({{ line.variant }})</span>{% endif %}</th>
+                <td class="text-end">{{ line.quantity }}</td>
+                <td class="text-end">{{ line.total }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr><th scope="row" colspan="2">{% translate "Shipping with VAT" %}</th><td class="text-end">{{ part.shipping }}</td></tr>
+            <tr><th scope="row" colspan="2">{% translate "Total" %}</th><td class="text-end">{{ part.total }}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  {% endfor %}
+{% endblock %}

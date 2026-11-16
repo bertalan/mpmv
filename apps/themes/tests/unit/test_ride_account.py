@@ -16,13 +16,11 @@ CSS = STATIC / "css" / "50-account-auth.css"
 
 HOOKS = [
     ".account-page",
-    ".session-list",
-    ".manager-login",
-    ".messages",
     ".timeline",
     ".recovery-codes",
     ".privacy-account",
-    ".order-part",
+    ".privacy-erased",
+    ".session-level",
 ]
 
 

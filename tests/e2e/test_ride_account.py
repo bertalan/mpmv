@@ -125,3 +125,45 @@ def test_a_customer_signs_in_with_the_keyboard_only(
     )
     assert focus[0] != "none"
     assert focus[1] >= 2
+
+
+BOOTSTRAP_PAGES = {
+    "/account/orders/": [
+        ".account-page.card",
+        ".table-responsive .table",
+    ],
+    "/account/sessions/": [".account-page.card", ".session-list .card", "form .btn"],
+    "/account/privacy/": [".privacy-account.card", "input.form-control", ".btn-primary"],
+    "/account/mfa/setup/": [".account-page.card", ".btn-primary"],
+}
+
+
+def test_the_account_pages_use_bootstrap_classes(page: Page, live_server: LiveServer) -> None:
+    """THM.16 2/2: the panel, tables, forms, buttons and messages are Bootstrap's, not THM.8's."""
+    _signed_in_page(page, live_server)
+    for path, selectors in BOOTSTRAP_PAGES.items():
+        page.goto(f"{live_server.url}{path}")
+        for selector in selectors:
+            assert page.locator(selector).count() > 0, f"{path}: nothing matches {selector}"
+        assert page.locator(".table-scroll, .manager-login, .field").count() == 0, path
+    page.goto(f"{live_server.url}/account/login/")
+    assert page.locator("form input.form-control").count() == 2
+    assert page.locator("form label.form-label").count() == 2
+    assert page.locator("form button.btn.btn-primary").count() == 1
+    assert page.locator(".account-page .button, .account-page .alert--danger").count() == 0
+
+
+def test_the_account_stylesheet_keeps_only_what_bootstrap_lacks() -> None:
+    css = (
+        Path(__file__).resolve().parents[2]
+        / "themes/ride/static/themes/ride/css/50-account-auth.css"
+    ).read_text()
+    for gone in (
+        ".manager-login",
+        ".messages",
+        ".errornote",
+        ".table-scroll",
+        ".order-part",
+        ".session-list",
+    ):
+        assert gone not in css, f"{gone} is Bootstrap's job now"

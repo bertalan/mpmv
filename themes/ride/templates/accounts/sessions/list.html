@@ -1,0 +1,33 @@
+{% extends "layouts/account.html" %}
+{% load i18n %}
+{# This page shows its messages in place; the base layout must not repeat them. #}
+{% block messages %}{% endblock %}
+{% block title %}{% translate "Your sessions" %} · MPMV{% endblock %}
+{% block account_content %}
+<h1>{% translate "Your sessions" %}</h1>
+{% if messages %}<div class="alert alert-info" role="status"><ul class="list-unstyled mb-0">{% for message in messages %}<li>{{ message }}</li>{% endfor %}</ul></div>{% endif %}
+<p>{% translate "These are the browsers and devices signed in to your account. If you do not recognise one, end it and change your password." %}</p>
+<ul class="session-list list-unstyled d-grid gap-3 my-4 p-0">
+  {% for row in rows %}
+  <li class="card card-body">
+    <strong>{% if row.session.browser and row.session.system %}{% blocktranslate with browser=row.session.browser system=row.session.system %}{{ browser }} on {{ system }}{% endblocktranslate %}{% elif row.session.browser or row.session.system %}{{ row.session.browser }}{{ row.session.system }}{% else %}{% translate "Unknown device" %}{% endif %}</strong>
+    {% if row.current %}<span class="badge text-bg-primary align-self-start my-1">{% translate "this session" %}</span>{% endif %}
+    <span>{% blocktranslate with used=row.session.last_seen|date:"DATETIME_FORMAT" %}Last used {{ used }}{% endblocktranslate %}{% if row.session.network %} · {% blocktranslate with network=row.session.network %}Network {{ network }}{% endblocktranslate %}{% endif %}</span>
+    <form class="mt-2" method="post" action="{% url 'sessions:end_one' public_id=row.session.public_id %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-dark">{% if row.current %}{% translate "Sign out of this session" %}{% else %}{% translate "End this session" %}{% endif %}</button>
+    </form>
+  </li>
+  {% empty %}
+  <li class="card card-body">{% translate "No session is recorded yet." %}</li>
+  {% endfor %}
+</ul>
+{% if others %}
+<form method="post" action="{% url 'sessions:end_others' %}">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-danger">{% translate "Log out everywhere else" %}</button>
+</form>
+{% endif %}
+<p class="mt-3">{% translate "Ending a session does not revoke API keys or links sent by email." %}</p>
+<p><a href="{% url 'mfa:setup' %}?from=security">{% translate "Back to account security" %}</a></p>
+{% endblock %}

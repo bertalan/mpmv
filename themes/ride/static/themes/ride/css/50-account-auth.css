@@ -1,112 +1,28 @@
-/* Ride: the customer area and the sign-in pages (THM.8 2/2). These pages extend base's
-   `layouts/account.html`, so one panel and a few list rules cover them all: My orders, the order
-   timeline, privacy, sessions, sign-in, MFA, and the passkey prompt. Rules sit in `overrides`;
-   colours only through tokens; touch targets stay at 44 px. */
+/* Ride: the customer area and the sign-in pages (THM.8 2/2, moved onto Bootstrap by THM.16 2/2).
+   The panel, forms, buttons, tables, alerts, grid and spacing are Bootstrap's (the markup in
+   themes/ride/templates). What stays is what Bootstrap has no class for: the panel's accent bar
+   and width, the order timeline, the session level note and the recovery-code ticket.
+   Rules sit in `overrides`; colours only through tokens. */
 @layer overrides {
   .account-page,
   .privacy-account,
   .privacy-erased {
     inline-size: min(100% - 2 * var(--space-m), 56rem);
     max-inline-size: 56rem;
-    margin: var(--space-xl) auto var(--space-2xl);
-    padding: var(--space-l) var(--space-m);
     background: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
     border-block-start: 4px solid var(--color-accent);
-    border-radius: var(--radius-card);
   }
 
-  @media (min-width: 40rem) {
-    .account-page,
-    .privacy-account,
-    .privacy-erased {
-      padding: var(--space-xl);
-    }
-  }
-
-  .account-page > h1,
-  .privacy-account > h1 {
+  .account-page > .card-body > h1:first-child,
+  .privacy-account > .card-body > h1:first-child,
+  .privacy-erased > .card-body > h1:first-child {
     margin-block-start: 0;
-  }
-
-  .account-page h2,
-  .privacy-account h2 {
-    margin-block-start: var(--space-xl);
-  }
-
-  .account-page__manager {
-    margin-block: 0 var(--space-m);
-    font-weight: 600;
-  }
-
-  /* Sign-in: a narrow column inside the panel. */
-  .manager-login {
-    display: grid;
-    gap: var(--space-m);
-    max-inline-size: 28rem;
-  }
-
-  /* Messages and form errors shown in place. */
-  .messages,
-  .errornote {
-    margin-block: var(--space-m);
-    padding: var(--space-s) var(--space-m);
-    list-style: none;
-    background: var(--color-accent-tint);
-    border-inline-start: 4px solid var(--color-accent);
-    border-radius: var(--radius-control);
-  }
-
-  /* Sessions: one row card per device, the end buttons at full touch size. */
-  .session-list {
-    display: grid;
-    gap: var(--space-m);
-    margin: var(--space-l) 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .session-list > li {
-    display: grid;
-    gap: var(--space-s);
-    padding: var(--space-m);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-card);
-  }
-
-  .session-list form {
-    margin-block-start: var(--space-s);
-  }
-
-  .session-list button,
-  .account-page form > button,
-  .account-page form button[type="submit"] {
-    min-block-size: 2.75rem;
   }
 
   .session-level {
     padding: var(--space-s) var(--space-m);
     border-inline-start: 4px solid var(--color-accent);
     background: var(--color-surface);
-  }
-
-  /* My orders and one order. */
-  .account-page .table-scroll {
-    background: var(--color-surface);
-    border-radius: var(--radius-card);
-  }
-
-  .order-part {
-    margin-block: var(--space-l);
-    padding: var(--space-m);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-card);
-  }
-
-  .order-part > h2:first-child {
-    margin-block-start: 0;
   }
 
   .timeline {
