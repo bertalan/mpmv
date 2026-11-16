@@ -1,0 +1,31 @@
+# Bootstrap 5.3.9, the official dist files vendored unchanged (THM.13, spec 14 §14.5).
+# css/bootstrap.min.css and js/bootstrap.bundle.min.js come from bootstrap-5.3.9-dist.zip of the
+# twbs release (zip sha256 13f7bb777406d87cfd4f34cf285aa586db085db526e1669594d0954c4b119259).
+# The dist zip has no LICENSE file: LICENSE is copied verbatim from the bootstrap@5.3.9 npm
+# package (registry tarball package/LICENSE), whose dist files carry the same sha256 as below.
+# Same rules as apps/themes/static/vendor/VENDORED.toml; checked by apps.themes.foundation.
+# To update: replace the two files from a newer 5.3.x release archive and update the entries.
+
+[[file]]
+path = "bootstrap.min.css"
+name = "bootstrap"
+version = "5.3.9"
+source = "https://github.com/twbs/bootstrap/releases/download/v5.3.9/bootstrap-5.3.9-dist.zip"
+sha256 = "9caac977a0af0c2229abd397eee3345899c4020da2a1a0b711c1cc543fe3719d"
+license = "MIT"
+
+[[file]]
+path = "bootstrap.bundle.min.js"
+name = "bootstrap"
+version = "5.3.9"
+source = "https://github.com/twbs/bootstrap/releases/download/v5.3.9/bootstrap-5.3.9-dist.zip"
+sha256 = "4ad2ad30a7df1fa0a615c4cfeb1aeffbe92019a8dff0262c99464acbd56dca5c"
+license = "MIT"
+
+[[file]]
+path = "LICENSE"
+name = "bootstrap"
+version = "5.3.9"
+source = "https://registry.npmjs.org/bootstrap/-/bootstrap-5.3.9.tgz (package/LICENSE)"
+sha256 = "bc0cd18d94c028f1c0b62ec9fdaddcb9921c1e07c29cf52dc7df8cca9daf2488"
+license = "MIT"
