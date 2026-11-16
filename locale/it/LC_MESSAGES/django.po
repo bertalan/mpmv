@@ -1783,8 +1783,7 @@ msgstr "Ogni anno, nelle stesse date"
 msgid "Exact location"
 msgstr "Posizione esatta"
 
-#: apps/catalog/templates/catalog/includes/product_card.html
-#: apps/catalog/templates/catalog/product.html
+#: apps/tax/prices.py
 msgid "excl. VAT"
 msgstr "IVA esclusa"
 
@@ -2335,6 +2334,10 @@ msgid ""
 msgstr ""
 "Il server impone la non indicizzazione (MPMV_FORCE_NOINDEX o modalità demo). Ogni pagina è noindex"
 " e qui non puoi attivare questo interruttore."
+
+#: apps/orders/templates/orders/_cart_body.html apps/tax/prices.py
+msgid "Indicative price. Final amount at checkout."
+msgstr "Prezzo indicativo. Importo finale al checkout."
 
 #: themes/base/templates/components/alert.html
 msgid "Information"
@@ -3627,20 +3630,17 @@ msgstr "Prezzo e disponibilità"
 
 #: apps/catalog/templates/catalog/includes/product_card.html
 #: apps/catalog/templates/catalog/product.html
+msgid "Price at checkout"
+msgstr "Prezzo al checkout"
+
+#: apps/catalog/templates/catalog/includes/product_card.html
+#: apps/catalog/templates/catalog/product.html
 msgid "Price on request"
 msgstr "Prezzo su richiesta"
 
 #: apps/orders/templates/orders/customer_order.html
 msgid "Price with VAT"
 msgstr "Prezzo con IVA"
-
-#: apps/orders/templates/orders/_cart_body.html
-msgid ""
-"Prices are shown without VAT. Shipping and VAT are worked out at checkout, from your delivery "
-"address."
-msgstr ""
-"I prezzi sono senza IVA. Spedizione e IVA vengono calcolate alla cassa, in base al tuo indirizzo "
-"di consegna."
 
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Print"
@@ -4175,6 +4175,10 @@ msgstr "Spedito"
 #: apps/orders/templates/orders/_package.html apps/vendors/services.py
 msgid "Shipping"
 msgstr "Spedizione"
+
+#: apps/orders/templates/orders/_cart_body.html
+msgid "Shipping is worked out at checkout, from your delivery address."
+msgstr "La spedizione viene calcolata al checkout, in base al tuo indirizzo di consegna."
 
 #: apps/orders/ui/present.py
 msgid ""

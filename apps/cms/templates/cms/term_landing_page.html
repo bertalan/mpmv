@@ -13,7 +13,7 @@ around the listing. The preview shows them with the term's newest products.
     {% if cards %}
       <section class="listing-results" aria-labelledby="term-landing-products-heading">
         <h2 id="term-landing-products-heading">{% translate "Products" %}</h2>
-        {% include "cms/includes/product_tiles.html" with cards=cards currency=currency heading_level=3 only %}
+        {% include "cms/includes/product_tiles.html" with request=request cards=cards currency=currency heading_level=3 only %}
       </section>
     {% endif %}
     {% include "cms/includes/term_landing_after.html" %}

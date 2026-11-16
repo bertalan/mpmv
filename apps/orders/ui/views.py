@@ -41,7 +41,6 @@ from apps.catalog.models import Product
 from apps.core import translations
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
-from apps.core.money import round_line
 from apps.core.privacy import keyed_hash
 from apps.core.public_forms import Protection, public_form
 from apps.core.services import consume_rate_limit
@@ -61,6 +60,7 @@ from apps.orders.services import (
     start_payment,
 )
 from apps.tax import engine as tax_engine
+from apps.tax import prices as tax_prices
 from apps.tax import services as tax_services
 from apps.tax.models import VatValidation
 from apps.vendors.models import Vendor
@@ -164,7 +164,7 @@ def _cart_context(request: HttpRequest, cart: Cart | None, status: str = "") -> 
     if cart is None or not cart.lines.exists():
         return context
     preview = _preview(request, cart, state.load(request))
-    packages = present.package_views(preview, cart, _vendors(cart))
+    packages = present.package_views(preview, cart, _vendors(cart), request=request)
     cart_messages = present.cart_blocks(preview, hide=(engine.ADDRESS_MISSING,))
     context.update(
         empty=False,
@@ -253,8 +253,14 @@ def cart_mini(request: HttpRequest) -> HttpResponse:
     if cart is not None:
         language = get_language() or "en"
         for line in cart.lines.select_related("product", "variant"):
-            unit = cart_services.line_unit_price(line)
-            total = round_line(unit * line.quantity) if unit is not None else None
+            net = cart_services.line_unit_price(line)
+            unit, total = (
+                present.line_prices(
+                    net, line.quantity, line.product.fiscal_category, request=request
+                )
+                if net is not None
+                else (None, None)
+            )
             lines.append(
                 present.LineView(
                     id=str(line.public_id),
@@ -454,6 +460,8 @@ def checkout_page(request: HttpRequest) -> HttpResponse:
         vat_ok=validation is not None,
         shipping={},
     )
+    # TAX.12: the shop's prices now use the delivery country's rate, no longer an estimate.
+    tax_prices.remember_delivery_country(request, cleaned["country"])
     return _private(HttpResponseRedirect(reverse("orders:review")))
 
 
@@ -468,7 +476,7 @@ def _review_context(
 ) -> dict[str, Any]:
     preview = _preview(request, cart, data)
     vendors = _vendors(cart)
-    packages = present.package_views(preview, cart, vendors)
+    packages = present.package_views(preview, cart, vendors, request=request)
     open_ = _ordering_open(preview)
     vat_ok = bool(data.get("vat_ok"))
     vat_note = data.get("vat_note", "")

@@ -1195,3 +1195,75 @@ def resolve_shipping_tax(
         for decision, share in shares.items()
         if share != 0
     ]
+
+
+# --- TAX.12: consumer prices include VAT (Directive 98/6/EC, owner decision MQ-12) -----------
+
+# The country a site language suggests before the buyer gives a delivery address. English names
+# no single country, so an English visitor gets the operator's country (the last fallback).
+LANGUAGE_PRICE_COUNTRIES: Final[Mapping[str, str]] = {
+    "it": "IT",
+    "de": "DE",
+    "fr": "FR",
+    "es": "ES",
+}
+
+
+def consumer_tax_decision(
+    country: str,
+    category: FiscalCategory,
+    *,
+    rates: RateTable,
+    on: dt.date,
+    platform_country: str,
+    postcode: str | None = None,
+    territories: tuple[TerritoryRule, ...] = (),
+) -> TaxDecision:
+    """The VAT a consumer sees in a displayed price, decided by `resolve_goods_tax`.
+
+    Owner decision MQ-12: the displayed rate is the destination country's, for a consumer,
+    whoever the vendor is. The decision tree runs for a consumer of an OSS seller established
+    in the platform's country, which yields the destination rate inside the EU, 0% for an
+    export or a territory outside the VAT area, and the `XI` rules for Northern Ireland. The
+    vendor's own regime (exempt, domestic-only) applies at checkout, where the amount is final.
+    """
+    ctx = TaxContext(
+        on=on,
+        vendor_country=platform_country,
+        vendor_profile=VendorTaxProfileSnapshot(regime=OSS),
+        platform=PlatformOperatorSnapshot(country=platform_country),
+        destination_country=country,
+        destination_postcode=postcode,
+        customer="b2c",
+        rates=rates,
+        territories=territories,
+    )
+    return resolve_goods_tax(ctx, category)
+
+
+def gross_amount(net: Decimal, rate: Decimal) -> Decimal:
+    """A net amount plus its VAT, the VAT rounded ROUND_HALF_UP to the cent (one line)."""
+    vat = tax_amount(net, rate)  # refuses floats and non-finite values first
+    return net.quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP) + vat
+
+
+def estimate_price_country(
+    *, delivery_country: str, language: str, operator_country: str
+) -> tuple[str, bool]:
+    """The country whose rate a displayed price uses, and whether it is an estimate.
+
+    The delivery country the buyer gave wins (not an estimate). Before that: the active
+    language's default country (`LANGUAGE_PRICE_COUNTRIES`, a region suffix ignored), else the
+    operator's country. The stack has no geolocation header yet; MQ-12 puts it before the
+    language when one exists.
+    """
+    if delivery_country:
+        try:
+            return normalize_country(delivery_country), False
+        except InvalidCountry:
+            pass
+    base = language.split("-")[0].split("_")[0].lower()
+    by_language = LANGUAGE_PRICE_COUNTRIES.get(base)
+    if by_language is not None:
+        return by_language, True
+    return normalize_country(operator_country), True
