@@ -1198,7 +1198,7 @@ def _showcase_body(language: str, images: dict[str, MediaImage]) -> list[Any]:
     text = data.SHOWCASE_TEXT
     t = {key: _text(value, language) for key, value in text.items()}
     pictures = [images["home-hero"], images["how-it-works"], images["event-fair"]]
-    slide = {"links": [], "image": None, "alt_text": "", "text": ""}
+    slide: dict[str, Any] = {"links": [], "image": None, "alt_text": "", "text": ""}
     return [
         ("paragraph", t["intro"] + _text(data.DEMO_NOTICE, language)),
         (

@@ -240,6 +240,14 @@ msgstr ""
 "Poche parole mostrate in cima all'elenco degli eventi. Se lo lasci vuoto, "
 "l'elenco parte subito sotto il titolo."
 
+#: apps/cms/blocks.py
+msgid ""
+"A few words shown small above the title, for example 'Our range'. Up to 80 "
+"characters. If you leave it empty, nothing is shown above."
+msgstr ""
+"Poche parole in piccolo sopra il titolo, per esempio 'La nostra gamma'. Al "
+"massimo 80 caratteri. Se lo lasci vuoto, sopra non appare nulla."
+
 #: apps/vendors/models.py
 msgid ""
 "A fingerprint (SHA-256) of the exact text that was accepted, to prove later "
@@ -335,6 +343,14 @@ msgid ""
 "A picture for the slide. If you leave it empty, the slide has no picture."
 msgstr ""
 "Un'immagine per la slide. Se la lasci vuota, la slide non ha immagine."
+
+#: apps/cms/blocks.py
+msgid ""
+"A picture shown before anyone plays the video. If you leave it empty, only "
+"the play button is shown."
+msgstr ""
+"Un'immagine mostrata prima che qualcuno avvii il video. Se la lasci vuota, "
+"appare solo il pulsante di avvio."
 
 #: apps/manager/amendment_forms.py
 msgid "A platform error: no refund fee for the shop"
@@ -579,6 +595,14 @@ msgid ""
 msgstr ""
 "Un breve motivo mostrato allo staff quando la commissione è zero, per "
 "esempio «Promo di lancio». Lascialo vuoto per una regola normale."
+
+#: apps/cms/blocks.py
+msgid ""
+"A short sign after the number, for example '+' or '%'. If you leave it "
+"empty, the number stands alone."
+msgstr ""
+"Un breve segno dopo il numero, per esempio '+' o '%'. Se lo lasci vuoto, il "
+"numero appare da solo."
 
 #: apps/catalog/models.py
 msgid ""
@@ -1868,6 +1892,14 @@ msgstr "Tempo di consegna in giorni"
 msgid "Delivery, returns and law"
 msgstr "Consegna, resi e legge"
 
+#: apps/cms/blocks.py
+msgid ""
+"Describe the cover picture in a few words, for people who cannot see it. "
+"Required when you pick a cover picture."
+msgstr ""
+"Descrivi l'immagine di copertina in poche parole, per chi non può vederla. "
+"Obbligatorio se scegli un'immagine di copertina."
+
 #: apps/manager/termination_views.py
 msgid "Describe the facts relied on."
 msgstr "Descrivi i fatti su cui si basa la decisione."
@@ -2536,6 +2568,10 @@ msgid ""
 msgstr ""
 "Quanto è precisa la posizione trovata dall'indirizzo, per esempio una via o "
 "una città. Compilato per te."
+
+#: apps/cms/blocks.py
+msgid "How far along it is. It cannot be more than the maximum below."
+msgstr "A che punto è. Non può superare il massimo qui sotto."
 
 #: apps/shipping/models.py
 msgid ""
@@ -3673,6 +3709,14 @@ msgid ""
 msgstr ""
 "Una o due frasi che dicono che cos'è l'evento, fino a 300 caratteri. "
 "Compaiono nell'elenco degli eventi e nei risultati di ricerca. Obbligatorio."
+
+#: apps/cms/blocks.py
+msgid ""
+"One or two sentences under the title, up to 250 characters. If you leave it "
+"empty, nothing is shown below."
+msgstr ""
+"Una o due frasi sotto il titolo, al massimo 250 caratteri. Se lo lasci "
+"vuoto, sotto non appare nulla."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -5558,6 +5602,14 @@ msgstr ""
 "fuori dall'Italia. Il codice te lo può dire il tuo commercialista o il tuo "
 "programma di fatturazione."
 
+#: apps/cms/blocks.py
+msgid ""
+"The address of a YouTube or Vimeo video, starting with https://. Other sites"
+" are not accepted."
+msgstr ""
+"L'indirizzo di un video di YouTube o Vimeo, che inizia con https://. Gli "
+"altri siti non sono accettati."
+
 #: apps/ingest/models.py
 msgid ""
 "The address of the item in the supplier's feed. It identifies the item in "
@@ -6451,6 +6503,10 @@ msgstr ""
 msgid "The general text has no screen or page type."
 msgstr "Il testo generale non ha una schermata né un tipo di pagina."
 
+#: apps/cms/blocks.py
+msgid "The heading of the section, up to 120 characters. Required."
+msgstr "Il titolo della sezione, al massimo 120 caratteri. Obbligatorio."
+
 #: apps/shipping/models.py
 msgid ""
 "The heaviest parcel of the band, in kg, included. Leave it empty for no "
@@ -6947,6 +7003,13 @@ msgstr ""
 msgid "The name of the territory, for example 'Canary Islands'."
 msgstr "Il nome del territorio, per esempio 'Isole Canarie'."
 
+#: apps/cms/blocks.py
+msgid ""
+"The name of the video, shown in the popup. Up to 120 characters. Required."
+msgstr ""
+"Il nome del video, mostrato nella finestra. Al massimo 120 caratteri. "
+"Obbligatorio."
+
 #: apps/shipping/models.py
 msgid "The name of the zone, for example 'Italy, mainland'."
 msgstr "Il nome della zona, per esempio 'Italia, terraferma'."
@@ -7057,6 +7120,10 @@ msgstr ""
 "Il numero che questo prodotto aveva nelle pagine in italiano del vecchio "
 "sito. Serve solo per spostare i dati vecchi; lascialo vuoto per i prodotti "
 "nuovi."
+
+#: apps/cms/blocks.py
+msgid "The number to show, a whole number. Example: 1250."
+msgstr "Il numero da mostrare, un numero intero. Esempio: 1250."
 
 #: apps/catalog/models.py
 msgid ""
@@ -7982,6 +8049,14 @@ msgid ""
 msgstr ""
 "L'unità di un attributo numerico, per esempio cm, kg o ml. Lasciala vuota "
 "per gli attributi a scelta e di testo."
+
+#: apps/cms/blocks.py
+msgid ""
+"The value that means 'done'. Leave 100 to show the value as a percentage; "
+"any other number shows 'value / maximum'."
+msgstr ""
+"Il valore che significa 'completato'. Lascia 100 per mostrare il valore in "
+"percentuale; con un altro numero appare 'valore / massimo'."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -9262,6 +9337,13 @@ msgstr ""
 "Che cosa chiede l'autorità o che cosa segnala l'avviso, in poche frasi. "
 "Obbligatorio."
 
+#: apps/cms/blocks.py
+msgid ""
+"What the bar measures, for example 'Order packed'. Up to 80 characters."
+msgstr ""
+"Che cosa misura la barra, per esempio 'Ordine imballato'. Al massimo 80 "
+"caratteri."
+
 #: apps/manager/forms.py
 msgid ""
 "What the buyer is told before the order about the cost of returning goods, "
@@ -9290,6 +9372,13 @@ msgid ""
 msgstr ""
 "A cosa serve il campo: una richiesta di pagamento o l'attivazione del "
 "venditore."
+
+#: apps/cms/blocks.py
+msgid ""
+"What the number counts, for example 'Orders shipped'. Up to 80 characters."
+msgstr ""
+"Che cosa conta il numero, per esempio 'Ordini spediti'. Al massimo 80 "
+"caratteri."
 
 #: apps/cms/blocks.py
 msgid "What the person said, up to 400 characters. Required."
