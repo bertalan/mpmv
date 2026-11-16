@@ -156,6 +156,16 @@ def test_creating_an_event_saves_a_draft_of_the_shop(signed_in: Client, vendor: 
     assert AuditLog.objects.filter(action="events.event_created").count() == 1
 
 
+def test_a_new_event_is_written_in_the_active_language(signed_in: Client) -> None:
+    services.ensure_event_indexes()
+    User.objects.update(preferred_language="it")  # I18N.12: decides the Manager's language
+    response = signed_in.post(reverse(NEW), _post_data())
+    assert response.status_code == 302
+    page = EventPage.objects.get(title="Autumn fair")
+    assert page.locale.language_code == "it"
+    assert page.original_locale.language_code == "it"
+
+
 def test_the_weekly_preset_writes_the_rrule_and_the_form_shows_it_again(
     signed_in: Client,
 ) -> None:

@@ -21,6 +21,8 @@ from django.utils import formats
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 
+from wagtail.models import Locale
+
 from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
 from apps.core.audit import audit_context
@@ -86,6 +88,11 @@ def _moderation(page: EventPage) -> str:
     if comment:
         return _("Changes requested: %(comment)s") % {"comment": comment}
     return ""
+
+
+def _active_locale() -> Locale | None:
+    """The Wagtail locale of the interface language, for a new event (EVT.8 adds the choice)."""
+    return Locale.objects.filter(language_code=(get_language() or "").split("-")[0]).first()
 
 
 class EventsView(ManagerView):
@@ -201,7 +208,12 @@ class EventFormView(_EventAction):
             return self.render_to_response(self.get_context_data(form=form))
         try:
             changes = services.save_event_draft(
-                actor, form.event_data(), page, vendor=vendor, ctx=self.audit(request)
+                actor,
+                form.event_data(),
+                page,
+                vendor=vendor,
+                locale=None if page is not None else _active_locale(),
+                ctx=self.audit(request),
             )
         except ValidationError as error:
             _add_errors(form, error)
