@@ -8,6 +8,12 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#: apps/events/templates/events/_results.html
+msgid "%(counter)s event"
+msgid_plural "%(counter)s events"
+msgstr[0] "%(counter)s événement"
+msgstr[1] "%(counter)s événements"
+
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "%(vendor_name)s shipped its part of order %(order_number)s."
@@ -16,26 +22,79 @@ msgstr "%(vendor_name)s a expédié sa partie de la commande %(order_number)s."
 #: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
 msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
-msgstr "La partie de la commande %(order_number)s de %(vendor_name)s a été annulée."
+msgstr ""
+"La partie de la commande %(order_number)s de %(vendor_name)s a été annulée."
 
 #: apps/orders/templates/email/orders/vendor_order_delivered/body.html
 #: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
-msgstr "La partie de la commande %(order_number)s de %(vendor_name)s a été livrée."
+msgstr ""
+"La partie de la commande %(order_number)s de %(vendor_name)s a été livrée."
 
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
-msgstr "%(vendor_name)s : nouvelle commande payée %(order_number)s à expédier :"
+msgstr ""
+"%(vendor_name)s : nouvelle commande payée %(order_number)s à expédier :"
 
 #: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
 msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
 msgstr "%(vendor_name)s : commande %(order_number)s annulée, ne pas expédier"
 
+#: apps/events/templates/events/event_page.html
+msgid "Add to calendar"
+msgstr "Ajouter au calendrier"
+
+#: apps/events/templates/events/_filters.html
+msgid "All types"
+msgstr "Tous les types"
+
+#: apps/events/templates/events/_filters.html
+msgid "All vendors"
+msgstr "Tous les vendeurs"
+
+#: apps/events/templates/events/_filters.html
+msgid "Any month"
+msgstr "Tous les mois"
+
+#: apps/events/templates/events/event_page.html
+msgid "Attendance"
+msgstr "Participation"
+
+#: apps/events/templates/events/event_page.html
+msgid "Booth %(booth)s"
+msgstr "Stand %(booth)s"
+
+#: apps/events/templates/events/_summary.html
+#: apps/events/templates/events/event_calendar.html
+#: apps/events/templates/events/event_page.html
+msgid "Cancelled"
+msgstr "Annulé"
+
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Transporteur : %(carrier)s. Numéro de suivi : %(tracking_number)s."
+
+#: apps/events/templates/events/_filters.html
+msgid "Clear filters"
+msgstr "Effacer les filtres"
+
+#: apps/events/templates/events/_links.html
+msgid "Event views"
+msgstr "Affichages des événements"
+
+#: apps/events/listing.py apps/events/templates/events/_results.html
+msgid "Events"
+msgstr "Événements"
+
+#: apps/events/templates/events/event_calendar.html
+msgid "Events in %(month)s"
+msgstr "Événements de %(month)s"
+
+#: apps/events/templates/events/_filters.html
+msgid "Filter events"
+msgstr "Filtrer les événements"
 
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
@@ -71,9 +130,53 @@ msgstr "Bonjour %(customer_name)s,"
 msgid "Hello,"
 msgstr "Bonjour,"
 
+#: apps/events/models.py
+msgid "In person"
+msgstr "Sur place"
+
+#: apps/events/models.py
+msgid "In person and online"
+msgstr "Sur place et en ligne"
+
+#: apps/events/templates/events/event_page.html
+msgid "Join online"
+msgstr "Participer en ligne"
+
+#: apps/events/templates/events/_filters.html
+msgid "Month"
+msgstr "Mois"
+
+#: apps/events/templates/events/_links.html
+msgid "Month calendar"
+msgstr "Calendrier du mois"
+
 #: apps/orders/templates/email/orders/vendor_new_order/subject.txt
 msgid "New paid order %(order_number)s"
 msgstr "Nouvelle commande payée %(order_number)s"
+
+#: themes/base/templates/components/pagination.html
+msgid "Next"
+msgstr "Suivant"
+
+#: apps/events/templates/events/event_calendar.html
+msgid "Next month"
+msgstr "Mois suivant"
+
+#: apps/events/templates/events/event_index_page.html
+msgid "No events are planned at the moment."
+msgstr "Aucun événement n'est prévu pour le moment."
+
+#: apps/events/templates/events/event_calendar.html
+msgid "No events this month."
+msgstr "Aucun événement ce mois-ci."
+
+#: apps/events/templates/events/event_past.html
+msgid "No past events."
+msgstr "Aucun événement passé."
+
+#: apps/events/models.py apps/events/templates/events/event_page.html
+msgid "Online"
+msgstr "En ligne"
 
 #: apps/orders/templates/email/orders/order_cancelled/subject.txt
 msgid "Order %(order_number)s was cancelled"
@@ -81,13 +184,17 @@ msgstr "La commande %(order_number)s a été annulée"
 
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
-msgid "Order %(order_number)s was cancelled before payment. Nothing was charged."
-msgstr "La commande %(order_number)s a été annulée avant le paiement. Aucun montant n’a été débité."
+msgid ""
+"Order %(order_number)s was cancelled before payment. Nothing was charged."
+msgstr ""
+"La commande %(order_number)s a été annulée avant le paiement. Aucun montant "
+"n’a été débité."
 
 #: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
 #: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
 msgid "Order %(order_number)s was cancelled. Do not ship these items:"
-msgstr "La commande %(order_number)s a été annulée. N’expédie pas ces articles :"
+msgstr ""
+"La commande %(order_number)s a été annulée. N’expédie pas ces articles :"
 
 #: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
@@ -111,9 +218,42 @@ msgstr "Commande %(order_number)s : confirmation de %(vendor_name)s"
 msgid "Order %(order_number)s: part of your order was cancelled"
 msgstr "Commande %(order_number)s : une partie de ta commande a été annulée"
 
+#: apps/events/models.py
+msgid "Other"
+msgstr "Autre"
+
+#: themes/base/templates/components/pagination.html
+msgid "Page %(number)s"
+msgstr "Page %(number)s"
+
+#: themes/base/templates/components/pagination.html
+msgid "Page %(page)s of %(count)s"
+msgstr "Page %(page)s sur %(count)s"
+
+#: themes/base/templates/components/pagination.html
+msgid "Pagination"
+msgstr "Pagination"
+
+#: apps/events/templates/events/_links.html
+#: apps/events/templates/events/event_past.html
+msgid "Past events"
+msgstr "Événements passés"
+
 #: apps/orders/templates/email/orders/payment_confirmed/subject.txt
 msgid "Payment received for order %(order_number)s"
 msgstr "Paiement reçu pour la commande %(order_number)s"
+
+#: themes/base/templates/components/pagination.html
+msgid "Previous"
+msgstr "Précédent"
+
+#: apps/events/templates/events/event_calendar.html
+msgid "Previous month"
+msgstr "Mois précédent"
+
+#: apps/events/models.py
+msgid "Promotion"
+msgstr "Promotion"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 msgid "Read this version online"
@@ -122,6 +262,10 @@ msgstr "Lire cette version en ligne"
 #: apps/orders/templates/email/orders/order_received/body.txt
 msgid "Read this version online:"
 msgstr "Lire cette version en ligne :"
+
+#: apps/events/templates/events/event_page.html
+msgid "Report this event"
+msgstr "Signaler cet événement"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
@@ -139,6 +283,10 @@ msgstr "Expédier à :"
 msgid "Shipping: %(shipping)s EUR"
 msgstr "Livraison : %(shipping)s EUR"
 
+#: apps/events/templates/events/_filters.html
+msgid "Show events"
+msgstr "Afficher les événements"
+
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 msgid "The terms you accepted, kept here for your records."
@@ -149,6 +297,24 @@ msgstr "Les conditions que tu as acceptées, conservées ici pour tes archives."
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Total: %(total)s EUR"
 msgstr "Total : %(total)s EUR"
+
+#: apps/events/models.py
+msgid "Trade fair or meeting"
+msgstr "Salon ou rencontre"
+
+#: apps/events/templates/events/_filters.html
+#: apps/events/templates/events/event_page.html
+msgid "Type"
+msgstr "Type"
+
+#: apps/events/templates/events/_links.html
+msgid "Upcoming events"
+msgstr "Événements à venir"
+
+#: apps/events/templates/events/_filters.html
+#: apps/events/templates/events/event_page.html
+msgid "Vendor"
+msgstr "Vendeur"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
@@ -162,17 +328,26 @@ msgstr "Nous avons bien reçu ta commande %(order_number)s"
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 msgid ""
-"We received your order %(order_number)s (total %(total)s EUR). We will confirm it when the payment"
-" is complete."
+"We received your order %(order_number)s (total %(total)s EUR). We will "
+"confirm it when the payment is complete."
 msgstr ""
-"Nous avons bien reçu ta commande %(order_number)s (total : %(total)s EUR). Nous te la confirmerons"
-" dès que le paiement sera terminé."
+"Nous avons bien reçu ta commande %(order_number)s (total : %(total)s EUR). "
+"Nous te la confirmerons dès que le paiement sera terminé."
 
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
 msgid ""
-"We received your payment of %(total)s EUR for order %(order_number)s. Each seller will prepare its"
-" part and you will get a message when it ships."
+"We received your payment of %(total)s EUR for order %(order_number)s. Each "
+"seller will prepare its part and you will get a message when it ships."
 msgstr ""
-"Nous avons bien reçu ton paiement de %(total)s EUR pour la commande %(order_number)s. Chaque "
-"vendeur prépare sa part de la commande et tu recevras un message dès qu’elle sera expédiée."
+"Nous avons bien reçu ton paiement de %(total)s EUR pour la commande "
+"%(order_number)s. Chaque vendeur prépare sa part de la commande et tu "
+"recevras un message dès qu’elle sera expédiée."
+
+#: apps/events/templates/events/event_page.html
+msgid "When"
+msgstr "Quand"
+
+#: apps/events/templates/events/event_page.html
+msgid "Where"
+msgstr "Où"

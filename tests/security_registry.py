@@ -162,6 +162,7 @@ PUBLIC: dict[str, str] = {
     "api-v1:api-root": "API root: links only.",
     "api-v1:openapi-json": "API description, the same for every caller.",
     "api-v1:openapi-view": "Interactive API documentation page.",
+    "events_resource": "Public event ICS download (EVT.6): a published event's calendar file.",
     "wagtail_serve": PUBLIC_CMS,
     "wagtailcore_login": "Sign-in for password-protected CMS pages.",
     "wagtailcore_authenticate_with_password": "Password form of a private CMS page.",
@@ -209,6 +210,11 @@ SITEMAP = (
 )
 
 IDOR_REVIEWED: dict[str, str] = {
+    "events_resource": (
+        "Public by design (EVT.6): the path names a published event's calendar file, the same "
+        "for every visitor; a hidden event and an unknown path are a 404 "
+        "(`test_pending_draft_and_hidden_events_are_404_to_visitors`)."
+    ),
     "media": MEDIA,
     "sitemap_language": SITEMAP,
     "sitemap_part": SITEMAP,

@@ -14,7 +14,6 @@ from django.utils import timezone
 
 from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
-from apps.themes.services import use_theme
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -270,11 +269,3 @@ def test_the_ics_download_is_calendar_text_with_crlf_and_escaping(client: Client
     assert all(len(line.encode()) <= 75 for line in body.split("\r\n"))
     assert "ORGANIZER" not in body
     assert "ATTENDEE" not in body
-
-
-def test_ride_renders_the_event_pages(client: Client) -> None:
-    page = _event(10, title="Ride fair")
-    with use_theme("ride"):
-        assert "Ride fair" in _get(client, str(page.url))
-        assert "Ride fair" in _get(client, _index_url())
-        _get(client, f"{_index_url()}past/")

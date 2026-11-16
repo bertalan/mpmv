@@ -29,6 +29,24 @@ import polib
 ROOT = Path(__file__).resolve().parent.parent
 LOCALE = ROOT / "locale"
 LANGUAGES = ("it", "de", "fr", "es")  # grows with I18N.7 slices
+# The public event pages (EVT.6): their templates, the listing module and the type labels.
+EVENT_FILES = (
+    "apps/events/listing.py",
+    "apps/events/models.py",
+    *(
+        f"apps/events/templates/events/{name}.html"
+        for name in (
+            "event_calendar",
+            "event_index_page",
+            "event_page",
+            "event_past",
+            "_filters",
+            "_links",
+            "_results",
+            "_summary",
+        )
+    ),
+)
 SCOPES = (
     "apps/manager",
     "apps/accounts",
@@ -54,6 +72,7 @@ SCOPES = (
     # Temporary staff "Site links" page (OPS.12); remove before LIVE.
     "apps/seo/site_links.py",
     "apps/seo/templates/seo/site_links.html",
+    *EVENT_FILES,  # the public event pages (EVT.6)
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (
@@ -80,10 +99,11 @@ HELP_TEXT_SCOPES = (
 # join them with their own I18N.7 slices. Italian covers every scope.
 # The customer order pages (ORD.7) join the Manager and account pages in I18N.7.
 _ORDER_EMAILS = ("apps/orders/templates/email", "apps/orders/templates/documents")
+_EVENT_PAGES = (*EVENT_FILES, "themes/base/templates/components/pagination.html")
 LANGUAGE_SCOPES: dict[str, tuple[str, ...]] = {
-    "de": _ORDER_EMAILS,
-    "fr": _ORDER_EMAILS,
-    "es": _ORDER_EMAILS,
+    "de": (*_ORDER_EMAILS, *_EVENT_PAGES),
+    "fr": (*_ORDER_EMAILS, *_EVENT_PAGES),
+    "es": (*_ORDER_EMAILS, *_EVENT_PAGES),
 }
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
@@ -120,6 +140,7 @@ THEME_FILES = (
 ONLY_CLASSES = {
     "apps/compliance/forms.py": ("WithdrawalLookupForm",),
     "apps/cms/models.py": ("HelpEntry",),
+    "apps/events/models.py": ("EventType", "Attendance"),  # the labels the pages show
 }
 SKIP_PARTS = {"tests", "migrations", "static", "node_modules"}
 

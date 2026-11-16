@@ -994,3 +994,223 @@ def block_summary(block: Mapping[str, Any]) -> str:
         item = first.get("value", first) if isinstance(first, Mapping) else {}
         return _words(str(value.get("heading") or item.get("question") or ""))
     return _words(str(value.get("heading") or ""))
+
+
+# --- Public pages: occurrences in time, the month grid, robots (EVT.6) --------------------------
+
+NOINDEX_AFTER_DAYS = 30  # spec 15 "Public pages": a past event is noindex 30 days after its end
+PAGE_SIZE = 12  # events per page of the list and of the archive
+
+
+@dataclass(frozen=True)
+class Span:
+    """One occurrence as aware datetimes in the event's zone, `end` exclusive.
+
+    An all-day occurrence runs from midnight of its first day to midnight after its last day.
+    """
+
+    start: datetime
+    end: datetime
+    all_day: bool
+
+    def days(self) -> list[date]:
+        """The local days the span touches, first to last."""
+        last = (self.end - timedelta(microseconds=1)).date()
+        first = self.start.date()
+        return [first + timedelta(days=n) for n in range((last - first).days + 1)]
+
+    def overlaps(self, start: datetime, end: datetime) -> bool:
+        return self.start < end and self.end > start
+
+
+def _midnight(day: date, zone: ZoneInfo) -> datetime:
+    return datetime.combine(day, time.min, tzinfo=zone)
+
+
+def _span(occurrence: Occurrence, zone: ZoneInfo, *, all_day: bool) -> Span:
+    if all_day:
+        if not (isinstance(occurrence.start, date) and isinstance(occurrence.end, date)):
+            raise TypeError("an all-day occurrence has dates")
+        return Span(
+            _midnight(occurrence.start, zone),
+            _midnight(occurrence.end + timedelta(days=1), zone),
+            True,
+        )
+    if not (isinstance(occurrence.start, datetime) and isinstance(occurrence.end, datetime)):
+        raise TypeError("a timed occurrence has datetimes")
+    return Span(occurrence.start.astimezone(zone), occurrence.end.astimezone(zone), False)
+
+
+def first_span(spec: RecurrenceSpec) -> Span:
+    """The event's own (first) occurrence."""
+    zone = ZoneInfo(spec.timezone)
+    if spec.all_day:
+        if spec.start_date is None or spec.end_date is None:
+            raise ValueError("an all-day event needs start_date and end_date")
+        return _span(Occurrence(spec.start_date, spec.end_date), zone, all_day=True)
+    if spec.starts_at is None or spec.ends_at is None:
+        raise ValueError("a timed event needs starts_at and ends_at")
+    return _span(Occurrence(spec.starts_at, spec.ends_at), zone, all_day=False)
+
+
+def event_spans(spec: RecurrenceSpec, window_start: datetime, window_end: datetime) -> list[Span]:
+    """The occurrences of an event that overlap [window_start, window_end), in start order.
+
+    A one-off event is its own span, however old (the archive); a recurring one is expanded
+    (never beyond the horizon of `expand`).
+    """
+    if not spec.rrule.strip():
+        span = first_span(spec)
+        return [span] if span.overlaps(window_start, window_end) else []
+    zone = ZoneInfo(spec.timezone)
+    return [
+        _span(occurrence, zone, all_day=spec.all_day)
+        for occurrence in expand(spec, window_start, window_end)
+    ]
+
+
+def month_bounds(year: int, month: int, zone: ZoneInfo) -> tuple[datetime, datetime]:
+    """Midnight of the month's first day and of the next month's, in `zone`."""
+    next_year, next_month = _add_months(year, month, 1)
+    return _midnight(date(year, month, 1), zone), _midnight(date(next_year, next_month, 1), zone)
+
+
+def parse_month(text: str) -> tuple[int, int] | None:
+    """`YYYY-MM` as (year, month), or None when it is not a real month."""
+    match = re.fullmatch(r"(\d{4})-(\d{2})", text.strip())
+    if match is None:
+        return None
+    year, month = int(match.group(1)), int(match.group(2))
+    return (year, month) if 1900 <= year <= 2200 and 1 <= month <= 12 else None
+
+
+def month_grid(year: int, month: int) -> list[list[date]]:
+    """The weeks of the month, Monday first, padded with the days of the neighbouring months."""
+    return [list(week) for week in calendar.Calendar(0).monthdatescalendar(year, month)]
+
+
+def neighbour_month(year: int, month: int, step: int) -> tuple[int, int]:
+    return _add_months(year, month, step)
+
+
+def is_noindex(spec: RecurrenceSpec, *, cancelled: bool, now: datetime) -> bool:
+    """A cancelled event, and one that ended more than 30 days ago, is noindex."""
+    if cancelled:
+        return True
+    return not event_spans(spec, now - timedelta(days=NOINDEX_AFTER_DAYS), horizon_end(now))
+
+
+# --- Single-event ICS (RFC 5545), the pure serializer (EVT.6; EVT.9 adds the feeds) ------------
+
+ICS_LINE_OCTETS = 75
+ICS_PATH = "calendar.ics"  # one event's ICS, after the event's own URL
+
+
+@dataclass(frozen=True)
+class IcsEvent:
+    """What the ICS of one event shows (the allow list: never the body or any personal data)."""
+
+    uid: str
+    stamp: datetime  # DTSTAMP and LAST-MODIFIED, aware
+    created: datetime | None
+    sequence: int
+    summary: str
+    description: str
+    location: str
+    url: str
+    category: str
+    span: Span
+    cancelled: bool
+    calendar_name: str
+    rrule: str = ""
+    exdates: tuple[datetime, ...] = ()
+    exdate_days: tuple[date, ...] = ()
+    latitude: str = ""
+    longitude: str = ""
+
+
+def ics_escape(text: str) -> str:
+    """TEXT values: backslash, semicolon and comma escaped, line breaks as `\\n` (§3.3.11)."""
+    flat = text.replace("\r\n", "\n").replace("\r", "\n")
+    return flat.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+
+
+def ics_fold(line: str) -> str:
+    """Fold a content line at 75 octets, never inside a UTF-8 sequence (§3.1); CRLF-terminated."""
+    out: list[str] = []
+    current = ""
+    size = 0
+    limit = ICS_LINE_OCTETS
+    for char in line:
+        width = len(char.encode("utf-8"))
+        if size + width > limit:
+            out.append(current)
+            current, size, limit = " ", 1, ICS_LINE_OCTETS  # a fold's leading space counts
+        current += char
+        size += width
+    out.append(current)
+    return "\r\n".join(out) + "\r\n"
+
+
+def _ics_utc(moment: datetime) -> str:
+    return moment.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _ics_instants(event: IcsEvent) -> list[str]:
+    span = event.span
+    if span.all_day:
+        return [
+            f"DTSTART;VALUE=DATE:{span.start:%Y%m%d}",
+            f"DTEND;VALUE=DATE:{span.end:%Y%m%d}",  # exclusive, as RFC 5545 wants
+        ]
+    if event.rrule:
+        # A recurring event keeps its wall-clock time across daylight saving: local time with
+        # TZID (EVT.9 adds the VTIMEZONE component with the feeds).
+        zone = span.start.tzinfo
+        name = getattr(zone, "key", "UTC")
+        return [
+            f"DTSTART;TZID={name}:{span.start:%Y%m%dT%H%M%S}",
+            f"DTEND;TZID={name}:{span.end:%Y%m%dT%H%M%S}",
+        ]
+    return [f"DTSTART:{_ics_utc(span.start)}", f"DTEND:{_ics_utc(span.end)}"]
+
+
+def event_ics(event: IcsEvent) -> str:
+    """The `text/calendar` body of one event: CRLF lines folded at 75 octets."""
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//MPMV//Events//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"NAME:{ics_escape(event.calendar_name)}",
+        f"X-WR-CALNAME:{ics_escape(event.calendar_name)}",
+        "BEGIN:VEVENT",
+        f"UID:{event.uid}",
+        f"DTSTAMP:{_ics_utc(event.stamp)}",
+        f"LAST-MODIFIED:{_ics_utc(event.stamp)}",
+    ]
+    if event.created is not None:
+        lines.append(f"CREATED:{_ics_utc(event.created)}")
+    lines.append(f"SEQUENCE:{event.sequence}")
+    lines.extend(_ics_instants(event))
+    if event.rrule:
+        lines.append(f"RRULE:{event.rrule}")
+    for moment in event.exdates:
+        lines.append(f"EXDATE:{_ics_utc(moment)}")
+    if event.exdate_days:
+        lines.append("EXDATE;VALUE=DATE:" + ",".join(f"{day:%Y%m%d}" for day in event.exdate_days))
+    lines.append("STATUS:CANCELLED" if event.cancelled else "STATUS:CONFIRMED")
+    lines.append("TRANSP:TRANSPARENT")  # an event never blocks the subscriber's free time
+    lines.append(f"SUMMARY:{ics_escape(event.summary)}")
+    if event.description:
+        lines.append(f"DESCRIPTION:{ics_escape(event.description)}")
+    if event.location:
+        lines.append(f"LOCATION:{ics_escape(event.location)}")
+    if event.latitude and event.longitude:
+        lines.append(f"GEO:{event.latitude};{event.longitude}")  # the one unescaped `;` (§3.8.1.6)
+    lines.append(f"URL:{event.url}")
+    if event.category:
+        lines.append(f"CATEGORIES:{ics_escape(event.category)}")
+    lines += ["END:VEVENT", "END:VCALENDAR"]
+    return "".join(ics_fold(line) for line in lines)

@@ -829,6 +829,11 @@ ENDPOINTS: dict[str, Access] = {
         "DSA points of contact (CMP.5): the platform operator's own contact data, the same for "
         "every visitor; no vendor data."
     ),
+    "events_resource": NoVendorData(
+        "File-like routes of public event pages (EVT.6): the single-event ICS of a published "
+        "event, the same for every visitor; hidden events are a 404.",
+        kwargs={"path": "events/no-such-event/calendar.ics"},
+    ),
     "wagtail_serve": NoVendorData(
         "Public CMS pages (home, static pages); no vendor data until the CMS.4 landing pages.",
         path="/no-such-page/",
