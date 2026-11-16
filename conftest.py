@@ -273,3 +273,36 @@ def demo_seed(db: None) -> "ChangeSet":
     from apps.seed.services import TEST_CONTEXT, seed
 
     return seed(ctx=TEST_CONTEXT)
+
+
+@pytest.fixture
+def consumer_prices(db: None) -> None:
+    """TAX.12: an Italian platform operator and the IT 22 %, DE 19 % and FR 20 % standard rates,
+    so shop pages show VAT-inclusive consumer prices (an English visitor gets the operator's
+    country, IT). Through the app registry: the catalog and cms tests use it without importing
+    the tax app (spec 01 graph)."""
+    from decimal import Decimal
+
+    from django.apps import apps
+    from django.utils import timezone
+
+    since = timezone.now() - timedelta(days=365)
+    operator = apps.get_model("core", "PlatformOperator")
+    operator.objects.create(
+        legal_name="Operator",
+        country="IT",
+        vat_number="IT00000000000",
+        tax_regime=operator.TaxRegime.SMALL_BUSINESS,
+        commission_vat_mode=operator.CommissionVatMode.NONE,
+        dac7_authority_country="IT",
+        valid_from=since,
+    )
+    rate = apps.get_model("tax", "TaxRate")
+    for country, value in (("IT", "22"), ("DE", "19"), ("FR", "20")):
+        rate.objects.create(
+            country=country,
+            category="standard",
+            rate=Decimal(value),
+            source="manual",
+            valid_from=since,
+        )
