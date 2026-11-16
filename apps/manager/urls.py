@@ -8,6 +8,7 @@ outside `/manager/`.
 from django.urls import include, path
 
 from . import (
+    event_block_views,
     event_views,
     media,
     notice_views,
@@ -38,6 +39,33 @@ shop = (
             "events/<uuid:public_id>/cancel/",
             event_views.EventCancelView.as_view(),
             name="event_cancel",
+        ),
+        # EVT.4 part 2: the body blocks, the image library and the preview.
+        path("events/images/", event_block_views.EventImagesView.as_view(), name="event_images"),
+        path(
+            "events/<uuid:public_id>/blocks/add/",
+            event_block_views.EventBlockAddView.as_view(),
+            name="event_block_add",
+        ),
+        path(
+            "events/<uuid:public_id>/blocks/<uuid:block_id>/",
+            event_block_views.EventBlockEditView.as_view(),
+            name="event_block_edit",
+        ),
+        path(
+            "events/<uuid:public_id>/blocks/<uuid:block_id>/move/",
+            event_block_views.EventBlockMoveView.as_view(),
+            name="event_block_move",
+        ),
+        path(
+            "events/<uuid:public_id>/blocks/<uuid:block_id>/remove/",
+            event_block_views.EventBlockRemoveView.as_view(),
+            name="event_block_remove",
+        ),
+        path(
+            "events/<uuid:public_id>/preview/",
+            event_block_views.EventPreviewView.as_view(),
+            name="event_preview",
         ),
         path("orders/", views.VendorOrderListView.as_view(), name="orders"),
         path("orders/<uuid:public_id>/", views.VendorOrderDetailView.as_view(), name="order"),

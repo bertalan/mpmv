@@ -11,6 +11,7 @@ import unicodedata
 from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from html import escape, unescape
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -883,3 +884,113 @@ def event_slug(title: str, *, taken: Set[str]) -> str:
     while f"{base}-{number}" in taken:
         number += 1
     return f"{base}-{number}"
+
+
+# --- The vendor's block editor (EVT.4 part 2): pure edits of a raw body --------------------------
+
+
+class BlockNotFound(LookupError):
+    """No block of the body has this id."""
+
+
+GALLERY_SLOTS = 6  # image slots of the gallery form
+FAQ_SLOTS = 8  # question slots of the FAQ form
+_TAG = re.compile(r"<\s*/?\s*[a-zA-Z][^>]*>")
+_SIMPLE_PARAGRAPHS = re.compile(r"^(?:<p(?:\s[^>]*)?>.*?</p>)+$", re.DOTALL)
+
+
+def paragraph_html(text: str) -> str:
+    """The rich-text value of what a vendor typed: text with tags is kept as HTML (the sanitiser
+    and the link checks run on it later), plain text becomes paragraphs (a blank line starts a
+    new one, a single line break stays one)."""
+    text = text.strip()
+    if _TAG.search(text):
+        return text
+    paragraphs = [part.strip() for part in re.split(r"\n\s*\n", text.replace("\r\n", "\n"))]
+    return "".join(
+        "<p>" + "<br>".join(escape(line.strip()) for line in part.split("\n")) + "</p>"
+        for part in paragraphs
+        if part
+    )
+
+
+def paragraph_text(html: str) -> str:
+    """The text to edit for a stored rich-text value: plain paragraphs show as plain text, any
+    other markup is shown as it is."""
+    if not _SIMPLE_PARAGRAPHS.match(html.strip()):
+        return html
+    inner = re.sub(r"<br\s*/?>", "\n", html)
+    inner = re.sub(r"</p>\s*<p(?:\s[^>]*)?>", "\n\n", inner)
+    inner = re.sub(r"</?p(?:\s[^>]*)?>", "", inner)
+    return html if _TAG.search(inner) else unescape(inner)
+
+
+def _find(body: Sequence[Mapping[str, Any]], block_id: str) -> int:
+    for index, block in enumerate(body):
+        if str(block.get("id", "")) == block_id:
+            return index
+    raise BlockNotFound(block_id)
+
+
+def block_by_id(body: Sequence[Mapping[str, Any]], block_id: str) -> Mapping[str, Any]:
+    return body[_find(body, block_id)]
+
+
+def append_block(
+    body: Sequence[Mapping[str, Any]], kind: str, value: Any, block_id: str
+) -> list[dict[str, Any]]:
+    return [*(dict(block) for block in body), {"type": kind, "value": value, "id": block_id}]
+
+
+def replace_block(
+    body: Sequence[Mapping[str, Any]], block_id: str, value: Any
+) -> list[dict[str, Any]]:
+    index = _find(body, block_id)
+    result = [dict(block) for block in body]
+    result[index]["value"] = value
+    return result
+
+
+def move_block(
+    body: Sequence[Mapping[str, Any]], block_id: str, direction: str
+) -> list[dict[str, Any]]:
+    """The body with one block one place up or down; at the edge nothing changes."""
+    index = _find(body, block_id)
+    result = [dict(block) for block in body]
+    target = index - 1 if direction == "up" else index + 1
+    if 0 <= target < len(result):
+        result[index], result[target] = result[target], result[index]
+    return result
+
+
+def remove_block(body: Sequence[Mapping[str, Any]], block_id: str) -> list[dict[str, Any]]:
+    index = _find(body, block_id)
+    return [dict(block) for i, block in enumerate(body) if i != index]
+
+
+def _words(value: str, limit: int = 80) -> str:
+    text = " ".join(unescape(_TAG.sub(" ", value)).split())
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def block_summary(block: Mapping[str, Any]) -> str:
+    """A short plain-text line that tells which block this is in the editor's list."""
+    kind, value = block.get("type"), block.get("value")
+    if isinstance(value, str):
+        return _words(value)
+    if not isinstance(value, Mapping):
+        return ""
+    if kind == "figure":
+        return _words(str(value.get("alt_text") or ""))
+    if kind == "gallery":
+        return _words(
+            ", ".join(
+                str((item.get("value", item) if isinstance(item, Mapping) else {}).get("alt_text"))
+                for item in value.get("images") or []
+            )
+        )
+    if kind == "faq":
+        first = next(iter(value.get("items") or []), None)
+        item = first.get("value", first) if isinstance(first, Mapping) else {}
+        return _words(str(value.get("heading") or item.get("question") or ""))
+    return _words(str(value.get("heading") or ""))

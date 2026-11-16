@@ -10,13 +10,19 @@ from typing import Any
 
 from django import forms
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from apps.events import engine
+from apps.catalog.models import Category, Product
+from apps.core.geocoding import AddressQuery, GeocodeResult
+from apps.core.geocoding import engine as geo_engine
+from apps.events import engine, services
 from apps.events.models import EventPage, default_timezone
+from apps.vendors.models import Vendor
+
+from .event_fields import CoordinateField, WallClockField, category_label, product_label
 
 CUSTOM = "custom"  # a stored rule the presets cannot write: kept as it is
-_TIME_FORMATS = ("%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S")
 _WEEKDAY_LABELS = (
     ("MO", _("Monday")),
     ("TU", _("Tuesday")),
@@ -46,25 +52,8 @@ PLACE_FIELDS = (
     "country",
     "booth",
 )
+ADDRESS_QUERY_FIELDS = ("country", "postcode", "city", "street")
 _DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
-
-
-class _WallClockField(forms.DateTimeField):
-    """A date and time kept as typed (naive): the form reads it in the event's own zone."""
-
-    widget = forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M")
-
-    def to_python(self, value: Any) -> dt.datetime | None:
-        if value in self.empty_values:
-            return None
-        if isinstance(value, dt.datetime):
-            return value.replace(tzinfo=None)
-        for fmt in _TIME_FORMATS:
-            try:
-                return dt.datetime.strptime(str(value).strip(), fmt)
-            except ValueError:
-                continue
-        raise ValidationError(self.error_messages["invalid"], code="invalid")
 
 
 class EventForm(forms.Form):
@@ -94,14 +83,14 @@ class EventForm(forms.Form):
         required=False,
         help_text=_("Tick it for an event with no set hours. Then give the first and last day."),
     )
-    starts_at = _WallClockField(
+    starts_at = WallClockField(
         label=_("Starts at"),
         required=False,
         help_text=_(
             "Day and hour the event begins, in the time zone below. Not for all-day events."
         ),
     )
-    ends_at = _WallClockField(
+    ends_at = WallClockField(
         label=_("Ends at"),
         required=False,
         help_text=_("Day and hour the event ends, after the start. Not for all-day events."),
@@ -231,6 +220,45 @@ class EventForm(forms.Form):
         help_text=_("Where to find you at a fair, for example Hall 3, stand B12. Optional."),
     )
 
+    latitude = CoordinateField(
+        limit=90,
+        label=_("Latitude"),
+        help_text=_(
+            "The north-south position, from -90 to 90, for example 45.464200. The map fills it "
+            "in. Give both latitude and longitude, or neither."
+        ),
+    )
+    longitude = CoordinateField(
+        limit=180,
+        label=_("Longitude"),
+        help_text=_(
+            "The east-west position, from -180 to 180, for example 9.190000. The map fills it "
+            "in. Give both latitude and longitude, or neither."
+        ),
+    )
+    # Set by the map picker (hidden): how the point was found, and the "Find coordinates"
+    # candidate the author chose before moving the marker. Checked against the cached lookup.
+    geo_source = forms.CharField(required=False, widget=forms.HiddenInput)
+    picked_latitude = forms.CharField(required=False, widget=forms.HiddenInput)
+    picked_longitude = forms.CharField(required=False, widget=forms.HiddenInput)
+    products = forms.ModelMultipleChoiceField(
+        queryset=Product.objects.none(),
+        required=False,
+        label=_("Products"),
+        widget=forms.CheckboxSelectMultiple,
+        help_text=_("The products you bring or put on offer. Only your own products. Optional."),
+    )
+    categories: forms.ModelMultipleChoiceField[Category] = forms.ModelMultipleChoiceField(
+        queryset=Category.objects.none(),
+        required=False,
+        label=_("Categories"),
+        widget=forms.CheckboxSelectMultiple,
+        help_text=_(
+            "The categories of your products that the event is about, so visitors find it from "
+            "them. Optional."
+        ),
+    )
+
     SECTIONS = (
         (_("The event"), ("title", "summary", "event_type")),
         (
@@ -250,10 +278,33 @@ class EventForm(forms.Form):
             ),
         ),
         (_("Where"), PLACE_FIELDS),
+        (_("Products and categories"), ("products", "categories")),
     )
+    POINT_FIELDS = ("latitude", "longitude")
+    PICKER_INPUTS = ("latitude", "longitude", "street", "postcode", "city", "country")
+    PICKED_INPUTS = ("picked_latitude", "picked_longitude")
 
-    def __init__(self, *args: Any, kept_rule: str = "", **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *args: Any,
+        kept_rule: str = "",
+        vendor: Vendor | None = None,
+        page: EventPage | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*args, **kwargs)
+        self.page = page if page is not None else EventPage()
+        self.picked: services.PickedPoint | None = None
+        if vendor is not None:
+            linked = [c.pk for c in page.categories.all()] if page is not None and page.pk else []
+            products = services.vendor_products(vendor).prefetch_related("translations")
+            categories = services.vendor_categories(vendor, keep=linked).prefetch_related(
+                "translations"
+            )
+            self.fields["products"].queryset = products  # type: ignore[attr-defined]
+            self.fields["products"].label_from_instance = product_label  # type: ignore[attr-defined]
+            self.fields["categories"].queryset = categories  # type: ignore[attr-defined]
+            self.fields["categories"].label_from_instance = category_label  # type: ignore[attr-defined]
         self.kept_rule = kept_rule  # a rule the presets cannot write, kept by "custom"
         if kept_rule:
             self.fields["recurrence"].choices = [  # type: ignore[attr-defined]
@@ -264,6 +315,19 @@ class EventForm(forms.Form):
 
     def sections(self) -> list[tuple[Any, list[forms.BoundField]]]:
         return [(title, [self[name] for name in names]) for title, names in self.SECTIONS]
+
+    def point_fields(self) -> list[forms.BoundField]:
+        return [self[name] for name in self.POINT_FIELDS]
+
+    def picker_context(self) -> dict[str, Any]:
+        """What `events/admin/map_picker_panel.html` reads (the ids of the form's inputs)."""
+        inputs = {name: self[name].auto_id for name in self.PICKER_INPUTS}
+        picked = {name.replace("_", "-"): self[name].auto_id for name in self.PICKED_INPUTS}
+        return {
+            "inputs": inputs,
+            "picked_inputs": picked,
+            "source_input": self["geo_source"].auto_id,
+        }
 
     # --- Validation
 
@@ -276,7 +340,45 @@ class EventForm(forms.Form):
                 if data.get(name) is not None:
                     data[name] = data[name].replace(tzinfo=zone)
         data["rrule"] = self._rrule(data, all_day, zone)
+        self._clean_point(data)
         return data
+
+    def _chosen_point(self, data: dict[str, Any]) -> tuple[Any, Any] | None:
+        try:
+            return (
+                geo_engine.coordinate(str(data.get("picked_latitude") or "").strip()),
+                geo_engine.coordinate(str(data.get("picked_longitude") or "").strip(), limit=180),
+            )
+        except ValueError:
+            return None
+
+    def _clean_point(self, data: dict[str, Any]) -> None:
+        """The point, as the map picker sends it (EVT.13): a promotion has none; a "Find
+        coordinates" candidate is checked against the cached lookup of the address, so the
+        request never sets a provider, a precision or a confidence."""
+        if self.errors.keys() & {"latitude", "longitude"}:
+            return
+        if data.get("event_type") == EventPage.EventType.PROMOTION:
+            data["latitude"] = data["longitude"] = None
+        latitude, longitude = data.get("latitude"), data.get("longitude")
+        if (latitude is None) != (longitude is None):
+            self.add_error(
+                "longitude" if latitude is not None else "latitude",
+                _("Give both coordinates, or neither."),
+            )
+            return
+        address = AddressQuery(**{name: str(data.get(name) or "") for name in ADDRESS_QUERY_FIELDS})
+        try:
+            self.picked = services.resolve_picked_point(
+                self.page,
+                latitude=latitude,
+                longitude=longitude,
+                source=str(data.get("geo_source") or ""),
+                address=address,
+                chosen=self._chosen_point(data),
+            )
+        except ValidationError as error:
+            self.add_error(None, error)
 
     def _zone(self, data: dict[str, Any]) -> zoneinfo.ZoneInfo | None:
         name = data.get("timezone")
@@ -327,7 +429,42 @@ class EventForm(forms.Form):
         promotion = data["event_type"] == EventPage.EventType.PROMOTION
         for name in PLACE_FIELDS:
             event[name] = "" if promotion else data[name]
+        event.update(self._point_data())
+        event["products"] = [product.pk for product in data["products"]]
+        event["categories"] = [category.pk for category in data["categories"]]
         return event
+
+    def _point_data(self) -> dict[str, Any]:
+        """The point fields to save: none clears the point and its metadata; a confirmed
+        candidate brings its own metadata; otherwise the earlier metadata stays."""
+        picked = self.picked
+        data = self.cleaned_data
+        if picked is None or not picked.source:
+            return {
+                "latitude": None,
+                "longitude": None,
+                "geo_source": "",
+                "geo_provider": "",
+                "geo_precision": "",
+                "geo_confidence": None,
+                "geo_at": None,
+            }
+        point: dict[str, Any] = {
+            "latitude": data["latitude"],
+            "longitude": data["longitude"],
+            "geo_source": picked.source,
+        }
+        candidate: GeocodeResult | None = picked.candidate
+        if candidate is not None:
+            if picked.source == EventPage.GeoSource.GEOCODED:
+                point["latitude"], point["longitude"] = candidate.latitude, candidate.longitude
+            point.update(
+                geo_provider=candidate.provider,
+                geo_precision=candidate.precision,
+                geo_confidence=candidate.confidence,
+                geo_at=timezone.now(),
+            )
+        return point
 
 
 def initial_from_page(page: EventPage) -> dict[str, Any]:
@@ -354,6 +491,11 @@ def initial_from_page(page: EventPage) -> dict[str, Any]:
         )
     }
     initial["country"] = str(page.country) if page.country else ""
+    initial["latitude"] = page.latitude
+    initial["longitude"] = page.longitude
+    initial["geo_source"] = page.geo_source
+    initial["products"] = [product.pk for product in page.products.all()]
+    initial["categories"] = [category.pk for category in page.categories.all()]
     initial["starts_at"] = wall(page.starts_at)
     initial["ends_at"] = wall(page.ends_at)
     choice = engine.preset_from_rrule(page.rrule, all_day=page.all_day, timezone=str(zone))

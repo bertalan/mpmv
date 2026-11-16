@@ -53,6 +53,10 @@ MODAL_FRAGMENTS = (
 NOT_PAGES = (
     "manager:shop:order_action",
     "manager:shop:event_submit",  # EVT.4: POST only, redirects to the events list
+    "manager:shop:event_block_edit",  # EVT.4 part 2: needs a block id
+    "manager:shop:event_block_move",  # EVT.4 part 2: POST only
+    "manager:shop:event_block_remove",  # EVT.4 part 2: needs a block id (confirm page)
+    "manager:shop:event_preview",  # EVT.4 part 2: the storefront layout, see its own test below
     "manager:platform:profile_revert",  # POST only, redirects to the changes page
     "manager:platform:profile_confirm",  # POST only, redirects to the changes page
     "manager:shop:termination_data",  # a JSON file download, not a page
@@ -163,6 +167,8 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:event_new": "shop",
         "manager:shop:event_edit": "shop",
         "manager:shop:event_cancel": "shop",  # the confirmation page
+        "manager:shop:event_block_add": "shop",  # EVT.4 part 2
+        "manager:shop:event_images": "shop",
     }
 
 
@@ -172,7 +178,11 @@ def _open(name: str) -> tuple[Client, str]:
         kwargs = {}
         if name == "manager:shop:order":
             kwargs = {"public_id": paid_vendor_order(vendor).public_id}  # type: ignore[arg-type]
-        if name in ("manager:shop:event_edit", "manager:shop:event_cancel"):
+        if name in (
+            "manager:shop:event_edit",
+            "manager:shop:event_cancel",
+            "manager:shop:event_block_add",
+        ):
             primary_index()
             event = EventPageFactory.create(vendor=vendor)
             event.save_revision().publish()  # a published event can be cancelled
@@ -231,6 +241,22 @@ def test_the_sweep_opens_every_manager_page_route() -> None:
     uncovered = _manager_route_names() - set(_manager_pages()) - {"manager:shop:vendor"}
     uncovered -= set(NOT_PAGES)
     assert not uncovered, f"Manager routes the help sweep does not open: {sorted(uncovered)}"
+
+
+def test_the_event_preview_has_the_help_button_keyed_by_its_manager_route() -> None:
+    """The preview is the storefront page as visitors see it (not the Manager layout), but the
+    help button asks for the Manager route's entry."""
+    user, vendor = _shop_owner()
+    primary_index()
+    event = EventPageFactory.create(vendor=vendor)
+    event.save_revision()
+    client = Client()
+    verified_login(client, user)  # type: ignore[arg-type]
+    response = client.get(reverse("manager:shop:event_preview", args=[event.public_id]))
+    assert response.status_code == 200
+    tools = _soup(response.content).select_one("header .user-tools")
+    assert tools is not None
+    assert tools["data-help-route"] == "manager:shop:event_preview"
 
 
 def test_the_vendor_picker_has_the_help_button_for_a_member_of_two_vendors() -> None:

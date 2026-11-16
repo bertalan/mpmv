@@ -18,6 +18,7 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils import formats
+from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 
 from apps.accounts.decorators import requires_level_method
@@ -26,8 +27,10 @@ from apps.core.audit import audit_context
 from apps.core.models import AuditLog
 from apps.events import engine, services
 from apps.events.models import EventPage
+from apps.events.panels import map_assets, map_settings
 from apps.vendors.engine import VendorCannotWrite
 
+from .event_block_panel import blocks_context
 from .event_forms import EventForm, initial_from_page
 from .views import ManagerView
 
@@ -152,12 +155,16 @@ class EventFormView(_EventAction):
         context = super().get_context_data(**kwargs)
         page = self.page()
         if "form" not in context:
+            vendor = self.manager.vendor
             if page is None:
-                context["form"] = EventForm()
+                context["form"] = EventForm(vendor=vendor)
             else:
                 latest: EventPage = page.get_latest_revision_as_object()
                 context["form"] = EventForm(
-                    initial=initial_from_page(latest), kept_rule=_kept(latest)
+                    initial=initial_from_page(latest),
+                    kept_rule=_kept(latest),
+                    vendor=vendor,
+                    page=latest,
                 )
         context["event"] = page
         context["title"] = _("Edit the event") if page else _("New event")
@@ -167,6 +174,18 @@ class EventFormView(_EventAction):
             context["cancel_url"] = reverse("manager:shop:event_cancel", args=[page.public_id])
             context["can_cancel"] = _can_cancel(page)
             context["moderation"] = _moderation(page)
+            context["preview_url"] = reverse("manager:shop:event_preview", args=[page.public_id])
+            context.update(blocks_context(page))
+        form = context["form"]
+        context["map_media"] = map_assets()
+        context["map_picker"] = {
+            **form.picker_context(),
+            **map_settings(),
+            "find_url": reverse("geocoding_find"),
+            "language": get_language() or "",
+            "help_id": "event-map-help",
+        }
+        context["images_url"] = reverse("manager:shop:event_images")
         context["list_url"] = reverse(LIST_URL)
         return context
 
@@ -175,8 +194,9 @@ class EventFormView(_EventAction):
         page, vendor, actor = self.page(), self.manager.vendor, self.actor()
         if vendor is None:
             raise Http404("No vendor selected.")
-        kept = _kept(page.get_latest_revision_as_object()) if page is not None else ""
-        form = EventForm(request.POST, kept_rule=kept)
+        latest = page.get_latest_revision_as_object() if page is not None else None
+        kept = _kept(latest) if latest is not None else ""
+        form = EventForm(request.POST, kept_rule=kept, vendor=vendor, page=latest)
         if not form.is_valid():
             return self.render_to_response(self.get_context_data(form=form))
         try:

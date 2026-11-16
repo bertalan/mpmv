@@ -407,6 +407,21 @@ def vendor_display_name(vendor: models.Model) -> str:
 NIL_UUID = "00000000-0000-0000-0000-000000000000"
 
 
+def event_with_block(vendor: Vendor) -> EventPage:
+    """An event with one body block in its latest revision (the block editor addresses it by id)."""
+    page: EventPage = EventPageFactory.create(vendor=vendor)
+    page.save_revision()
+    return page
+
+
+def by_block_id(event: models.Model) -> dict[str, str]:
+    """The event's public id and the id of its first block: a real block, so the caller's own
+    object does not answer 404 and the cross-tenant 404 proves the scoping."""
+    assert isinstance(event, EventPage)
+    latest: EventPage = EventPage.objects.get(pk=event.pk).get_latest_revision_as_object()
+    return {**by_public_id(event), "block_id": str(latest.body[0].id)}
+
+
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "readyz": NoVendorData("Readiness probe: a status only, no data."),
@@ -596,6 +611,39 @@ ENDPOINTS: dict[str, Access] = {
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
         methods=("POST",),
         sample={"public_id": NIL_UUID},
+    ),
+    # EVT.4 part 2: the block editor, the preview and the image library.
+    "manager:shop:event_block_add": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_block_edit": VendorScoped(
+        make=event_with_block,
+        kwargs=by_block_id,
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID, "block_id": NIL_UUID},
+    ),
+    "manager:shop:event_block_move": VendorScoped(
+        make=event_with_block,
+        kwargs=by_block_id,
+        methods=("POST",),
+        sample={"public_id": NIL_UUID, "block_id": NIL_UUID},
+    ),
+    "manager:shop:event_block_remove": VendorScoped(
+        make=event_with_block,
+        kwargs=by_block_id,
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID, "block_id": NIL_UUID},
+    ),
+    "manager:shop:event_preview": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:event_images": NoVendorData(
+        "The shop's own image library and upload: the images are read from and written to the "
+        "caller's own vendor collection only "
+        "(`apps/manager/tests/integration/test_shop_event_blocks.py`)."
     ),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
