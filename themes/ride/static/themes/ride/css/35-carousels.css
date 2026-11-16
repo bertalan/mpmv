@@ -116,6 +116,29 @@
     list-style: none;
   }
 
+  /* Under 40rem one item is in view: the group is a row the visitor scrolls sideways (swipe,
+     arrow keys once focused, no script), and Previous and Next still move between groups. */
+  @media (max-width: 39.999rem) {
+    .ride-strip__group {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 100%;
+      grid-template-columns: none;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x mandatory;
+    }
+
+    .ride-strip__item {
+      scroll-snap-align: start;
+    }
+
+    .ride-strip__group:focus-visible {
+      outline: var(--focus-width) solid var(--color-focus);
+      outline-offset: var(--focus-offset);
+    }
+  }
+
   .ride-strip__item {
     padding: var(--card-padding);
     border: 1px solid var(--color-border);

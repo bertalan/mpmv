@@ -80,6 +80,7 @@ from .blocks import (
     PageCardBlock,
     ProductCardsBlock,
     ProductGridBlock,
+    StripBlock,
     countdown_targets,
     paragraph_block,
 )
@@ -113,6 +114,7 @@ def body_field(
             ("cta", CallToActionBlock()),
             ("faq", FaqBlock()),
             ("featured", FeaturedLinksBlock()),
+            ("strip", StripBlock()),
             *grid,
             *extra,
             *sections,
@@ -1192,6 +1194,7 @@ class BlogPostPage(Page):  # type: ignore[misc]
             ("cta", CallToActionBlock()),
             ("faq", FaqBlock()),
             ("featured", ArticleLinksBlock()),
+            ("strip", StripBlock()),
             ("product_grid", ProductGridBlock()),
             ("product_cards", ProductCardsBlock()),
         ],

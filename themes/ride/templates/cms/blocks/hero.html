@@ -1,7 +1,11 @@
 {% comment %}
-Hero block of the `ride` theme (THM.6): the CMS.2 block as the theme's hero component. Its first
-two links become the primary and the secondary button. `heading_level` is 1 when the home page
-puts the hero first (themes/ride/templates/cms/home_page.html), else 2.
-{% endcomment %}<section class="block block-hero">
-  {% include "components/hero.html" with title=value.heading text=value.text image=value.image image_alt=value.alt_text url=value.links.0.href action=value.links.0.label secondary_url=value.links.1.href secondary_action=value.links.1.label heading_level=heading_level only %}
-</section>
+Hero block of the `ride` theme (THM.6, THM.14): the CMS.2 block as the theme's hero component.
+Layout `single` or `split` is one hero (its first two links become the primary and the secondary
+button); `slider` with at least one more slide is the hero slider (the banner is the first slide),
+its titles `<h2>` so the page keeps one `<h1>` outside it. `heading_level` is 1 when the home page
+puts a non-slider hero first (themes/ride/templates/cms/home_page.html), else 2.
+{% endcomment %}{% if slider %}<section class="block block-hero block-hero--slider">
+  {% include "components/hero_slider.html" with id=carousel_id label=value.heading slides=slides autoplay=autoplay interval=interval heading_level=2 only %}
+</section>{% else %}<section class="block block-hero">
+  {% include "components/hero.html" with title=value.heading text=value.text image=value.image image_alt=value.alt_text url=value.links.0.href action=value.links.0.label secondary_url=value.links.1.href secondary_action=value.links.1.label heading_level=heading_level layout=value.layout only %}
+</section>{% endif %}

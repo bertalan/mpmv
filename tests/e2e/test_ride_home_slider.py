@@ -20,8 +20,20 @@ QUOTES = [
     for n in range(1, 6)
 ]
 
-SLIDE_A = {"image": None, "alt_text": "", "heading": "Spring sale", "text": "", "links": []}
-SLIDE_B = {"image": None, "alt_text": "", "heading": "New vendors", "text": "", "links": []}
+SLIDE_A: dict[str, object] = {
+    "image": None,
+    "alt_text": "",
+    "heading": "Spring sale",
+    "text": "",
+    "links": [],
+}
+SLIDE_B: dict[str, object] = {
+    "image": None,
+    "alt_text": "",
+    "heading": "New vendors",
+    "text": "",
+    "links": [],
+}
 
 
 @pytest.fixture(autouse=True)

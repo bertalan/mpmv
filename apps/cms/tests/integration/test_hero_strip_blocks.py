@@ -119,14 +119,14 @@ def test_ride_slider_autoplay_is_off_unless_the_editor_enables_it() -> None:
 
 
 def test_two_sliders_on_one_page_get_distinct_ids() -> None:
-    value = hero(layout="slider", slides=SLIDES)
+    value, other = hero(layout="slider", slides=SLIDES), hero(layout="slider", slides=SLIDES)
     with use_theme("ride"):
         from django.template import engines
 
         template = engines["django"].from_string(
             "{% load wagtailcore_tags %}{% include_block a %}{% include_block b %}"
         )
-        html = template.render({"a": value, "b": value}, None)
+        html = template.render({"a": value, "b": other}, None)
     ids = re.findall(r'<section class="carousel[^"]*" id="([^"]+)"', html)
     assert len(ids) == 2
     assert len(set(ids)) == 2
