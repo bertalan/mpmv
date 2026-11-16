@@ -113,6 +113,7 @@ def test_only_products_published_in_the_page_language_are_shown(seeded: SeedRepo
     assert _titles(BeautifulSoup(response.content, "html.parser")) == ["Blue bowl IT"]
 
 
+@pytest.mark.usefixtures("consumer_prices")
 def test_an_on_request_product_shows_no_price(seeded: SeedReport) -> None:
     for_sale = listed("Blue bowl", price_net=Decimal("10.00"))
     on_request = listed("Red jug", sales_mode=Product.SalesMode.ON_REQUEST, price_net=None)
@@ -120,7 +121,7 @@ def test_an_on_request_product_shows_no_price(seeded: SeedReport) -> None:
     html = _publish(_home(), [_cards(for_sale, on_request, catalog_only)])
     tiles = _section(html).find_all("li")
     assert len(tiles) == 3
-    assert "10.00" in tiles[0].get_text()
+    assert "12.20" in tiles[0].get_text()  # 10.00 + 22 % (TAX.12)
     assert "EUR" not in tiles[1].get_text()
     assert "EUR" not in tiles[2].get_text()
 

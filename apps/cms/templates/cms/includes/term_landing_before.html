@@ -12,7 +12,7 @@ it already). No inline script or style.
       {% for section in sections %}
         <section class="term-landing-category" aria-labelledby="term-landing-category-{{ forloop.counter }}">
           <h3 id="term-landing-category-{{ forloop.counter }}">{{ section.name }}</h3>
-          {% include "cms/includes/product_tiles.html" with cards=section.cards currency=currency heading_level=4 only %}
+          {% include "cms/includes/product_tiles.html" with request=request cards=section.cards currency=currency heading_level=4 only %}
           <p class="block-links"><a class="term-landing-see-all" href="{{ section.see_all_url }}">{% blocktranslate with name=section.name %}See all<span class="visually-hidden"> products: {{ name }}</span>{% endblocktranslate %}</a></p>
         </section>
       {% endfor %}

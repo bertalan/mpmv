@@ -28,6 +28,7 @@ from apps.core.models import PlatformOperator, TranslationStatus
 from apps.core.tests.factories import PlatformOperatorFactory
 from apps.payments import stripe_engine
 from apps.payments.tests.factories import ConnectedAccountFactory
+from apps.tax.prices import consumer_price
 from apps.vendors import services as vendors
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import SalesTermsVersionFactory, VendorFactory
@@ -108,6 +109,7 @@ def test_a_vendor_without_an_account_row_is_on_request_everywhere(client: Client
     assert card.price is None
 
 
+@pytest.mark.usefixtures("consumer_prices")
 def test_the_same_vendor_with_a_ready_account_sells_online(client: Client) -> None:
     vendor = active_vendor()
     ready(vendor)
@@ -116,7 +118,11 @@ def test_the_same_vendor_with_a_ready_account_sells_online(client: Client) -> No
     shown = page(product)
     assert (shown.on_request, shown.purchasable, shown.price) == (False, True, PRICE)
     text = html(client)
-    assert "12.34" in text
+    # The page shows the consumer price with VAT (TAX.12): what checkout charges this vendor's
+    # buyer in the operator's country (an English visitor's estimate).
+    gross = consumer_price(PRICE, product.fiscal_category, vendor=vendor, country="IT").gross
+    assert gross != PRICE
+    assert f'value="{gross}"' in text
     assert "Price on request" not in text
     assert product.pk in priced()
     cart.add_to_cart(CartFactory.create(), product)
