@@ -40,16 +40,19 @@ from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission
 
-from . import engine, notifications
+from . import engine, notifications, versions
 from .messages import CLOSED_SITE, CLOSED_VENDOR
 from .models import (
+    OPEN_AMENDMENT_STATES,
     Order,
+    OrderAmendment,
     OrderLine,
     OrderNumberSequence,
     OrderState,
     PrivacyStatus,
     StockReservation,
     VendorOrder,
+    VendorOrderVersion,
 )
 from .tz import business_tz
 
@@ -384,6 +387,7 @@ def create_order(
             for line in lines:
                 line.vendor_order = sub
                 line.save()
+            versions.create_version_one(sub, lines)  # ORD.20: the placed order is v1
         changeset = changes()
         audit_changes(changeset, ctx=ctx, action="orders.create")
     return order, changeset
@@ -434,6 +438,24 @@ def _orders_frozen(vendor: Vendor) -> bool:
     return any(import_string(path)(vendor) for path in settings.ORDER_FREEZE_HOOKS)
 
 
+class AmendmentOpen(ValueError):
+    """The package has an open amendment (ORD.20): it cannot be shipped until the amendment is
+    applied, declined, withdrawn or discarded."""
+
+
+def _refuse_shipping_with_open_amendment(sub: VendorOrder) -> None:
+    open_one = (
+        OrderAmendment.objects.filter(vendor_order=sub, state__in=OPEN_AMENDMENT_STATES)
+        .only("public_id", "state")
+        .first()
+    )
+    if open_one is not None:
+        raise AmendmentOpen(
+            f"This package cannot be marked shipped while amendment {open_one.public_id} is open "
+            f"({open_one.state}): apply, withdraw or discard the amendment first."
+        )
+
+
 def transition_vendor_order(
     sub: VendorOrder,
     target: str,
@@ -465,6 +487,7 @@ def transition_vendor_order(
             before = _vendor_order_snapshot(locked)
             engine.check_vendor_order_transition(locked.state, target)
             if target == "shipped":
+                _refuse_shipping_with_open_amendment(locked)
                 locked.tracking_number = tracking_number or locked.tracking_number
                 if not locked.tracking_number:
                     raise ValueError("a vendor order needs a tracking number to be shipped")
@@ -693,6 +716,10 @@ def _scrub(
             else:
                 values["restricted_at"] = stamp
             Order.objects.filter(pk=locked.pk).update(**values)
+            if target == "anonymized":  # ORD.20: a package's own address from v2 on
+                VendorOrderVersion.objects.filter(
+                    vendor_order__order=locked, shipping_address__isnull=False
+                ).update(shipping_address=engine.ANONYMISED_ORDER_FIELDS["shipping_address"])
             _set_scrub_mode("")
             locked.refresh_from_db()
             changeset.update("orders.order", str(locked.public_id), before, _scrub_snapshot(locked))
