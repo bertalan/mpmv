@@ -323,6 +323,13 @@ public spec and a brief: no file derives from a reference template (spec 14 §14
   image), `components/product_tile.html` (title link plus a small button, not one giant link),
   `components/icon.html`, `cms/blocks/hero.html`, `cms/blocks/cta.html` and `cms/home_page.html`
   (the first hero block carries the page's one `<h1>`).
+- **Header and overlays (THM.15)**: the header is a Bootstrap `navbar` with dropdown sub-menus and
+  an offcanvas menu below 64rem (one switch point, in `20-header-footer.css`; no `navbar-expand-lg`).
+  The server renders `<html class="no-js">` (the empty `html_attrs` block of the base layout) and
+  the external `ride.js` removes it; below 64rem the plain list shows only under `html.no-js`.
+  Search is a link to the `search` route that Bootstrap opens as a modal; the mini-cart is a link
+  to the cart that opens an offcanvas filled by HTMX from `orders:cart_mini`. `#cart-count` is a
+  polite live region, updated by `mini-cart.js`. Page banner and footer chrome are THM.15 part 3.
 - **Not yet**: catalog, cart, checkout, account and content pages are THM.7 to THM.9. Pages that
   override the `head` block without `{{ block.super }}` lose the font preload only.
 

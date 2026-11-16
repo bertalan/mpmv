@@ -14,7 +14,7 @@ from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import ArrayField, DateTimeRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.core.validators import MinValueValidator, URLValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -389,6 +389,13 @@ def official_profile_errors(urls: Any) -> list[str]:
 
 
 DEFAULT_REFUND_FEE_SURCHARGE = Decimal("2.00")
+# ORD.20 (D-47, owner 2026-11-16): the order-amendment defaults and their bounds.
+DEFAULT_AMENDMENT_ANSWER_HOURS = 72
+DEFAULT_AMENDMENT_COMPARABLE_DELAY_DAYS = 2
+DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS = 24
+MAX_AMENDMENT_ANSWER_HOURS = 336
+MAX_AMENDMENT_COMPARABLE_DELAY_DAYS = 30
+MAX_AMENDMENT_CANCEL_HOLD_HOURS = 168
 PLATFORM_ERROR = "platform_error"
 VENDOR_DEFAULT = "vendor_default"
 PLATFORM_REFUND_CASES = (PLATFORM_ERROR, VENDOR_DEFAULT)
@@ -603,6 +610,32 @@ class PlatformOperator(Versioned):
             "Session settings that replace the defaults: how long customer and staff sessions"
             " last, the passkey window timers and the lists of actions. Leave it empty to keep"
             " the defaults. A value that does not fit is refused when you save."
+        ),
+    )
+    # ORD.20 (D-47, owner 2026-11-16): the three order-amendment settings. The services read
+    # them from the version in force (`apps.orders.amendments.amendment_settings`).
+    amendment_answer_hours = models.PositiveSmallIntegerField(
+        default=DEFAULT_AMENDMENT_ANSWER_HOURS,
+        validators=[MinValueValidator(1), MaxValueValidator(MAX_AMENDMENT_ANSWER_HOURS)],
+        help_text=_(
+            "How many hours the customer has to accept or decline a proposed change to a paid "
+            "order. After that the order stays as it was."
+        ),
+    )
+    amendment_comparable_delay_days = models.PositiveSmallIntegerField(
+        default=DEFAULT_AMENDMENT_COMPARABLE_DELAY_DAYS,
+        validators=[MaxValueValidator(MAX_AMENDMENT_COMPARABLE_DELAY_DAYS)],
+        help_text=_(
+            "How many days later a new carrier may deliver for the change to count as minor "
+            "and apply at once. A slower one needs the customer's acceptance."
+        ),
+    )
+    amendment_cancel_hold_hours = models.PositiveSmallIntegerField(
+        default=DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS,
+        validators=[MinValueValidator(1), MaxValueValidator(MAX_AMENDMENT_CANCEL_HOLD_HOURS)],
+        help_text=_(
+            "After an item is removed as unavailable, how many hours the seller must wait "
+            "before shipping, so the customer can cancel the rest of the package."
         ),
     )
     allowed_vendor_countries = ArrayField(

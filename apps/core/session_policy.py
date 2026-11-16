@@ -85,6 +85,11 @@ DEFAULT_CRITICAL_ACTIONS: Final = frozenset(
         "bootstrap_platform_owner",
         "sessions_end_user",
         "sessions_end_all",
+        # ORD.20 (spec 07, Roles and the passkey): an amendment's address change, an amendment
+        # refund by the shop (the PAY.7 grant) and a staff refund or package cancellation.
+        "order_amend_address",
+        "vendor_refund",
+        "order_amend_cancel",
     }
 )
 FLOOR_CRITICAL_ACTIONS: Final = frozenset(
@@ -95,6 +100,11 @@ FLOOR_CRITICAL_ACTIONS: Final = frozenset(
         "bootstrap_platform_owner",
         "sessions_end_user",
         "sessions_end_all",
+        # ORD.20 (spec 07, Roles and the passkey): an amendment's address change, an amendment
+        # refund by the shop (the PAY.7 grant) and a staff refund or package cancellation.
+        "order_amend_address",
+        "vendor_refund",
+        "order_amend_cancel",
     }
 )
 
