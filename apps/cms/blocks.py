@@ -87,6 +87,7 @@ from .engine import (
     gallery_for_language,
     grid_limit,
     link_language,
+    parse_video_url,
     storefront_path,
     term_path,
 )
@@ -154,6 +155,21 @@ class GalleryImageBlock(FigureBlock):
     )
 
 
+def _gallery_slide(item: Mapping[str, Any]) -> dict[str, Any]:
+    """A gallery image as the context of the theme's gallery carousel."""
+    image = item["image"]
+    shown = image.get_rendition("width-800")
+    large = image.get_rendition("width-1600")
+    return {
+        "url": shown.url,
+        "large_url": large.url,
+        "alt": item.get("alt_text") or "",
+        "caption": item.get("caption") or "",
+        "width": shown.width,
+        "height": shown.height,
+    }
+
+
 class GalleryBlock(blocks.StructBlock):  # type: ignore[misc]
     """Images shown by the D-18 rule: a language's dedicated images, otherwise the neutral."""
 
@@ -166,7 +182,10 @@ class GalleryBlock(blocks.StructBlock):  # type: ignore[misc]
 
     def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
         context = super().get_context(value, parent_context=parent_context)
-        context["images"] = gallery_for_language(value["images"], _page_language(parent_context))
+        images = gallery_for_language(value["images"], _page_language(parent_context))
+        context["images"] = images
+        context["slides"] = [_gallery_slide(image) for image in images]
+        context["carousel_id"] = _unique_id(parent_context, "gallery", value)
         return context
 
 
@@ -1016,6 +1035,178 @@ class StripBlock(blocks.StructBlock):  # type: ignore[misc]
         context["autoplay"] = bool(value.get("autoplay"))
         context["interval"] = value.get("interval") or 6000
         context["carousel_id"] = _unique_id(parent_context, "strip", value)
+        return context
+
+
+class SectionTitleBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A heading with a small line above it and an optional lead (THM.14): the `ride` theme styles
+    it with the accent rule, `base` shows a plain heading."""
+
+    eyebrow = blocks.CharBlock(
+        required=False,
+        max_length=80,
+        label=_("Line above the title"),
+        help_text=_(
+            "A few words shown small above the title, for example 'Our range'. "
+            "Up to 80 characters. If you leave it empty, nothing is shown above."
+        ),
+    )
+    title = blocks.CharBlock(
+        max_length=120,
+        help_text=_("The heading of the section, up to 120 characters. Required."),
+    )
+    lead = blocks.CharBlock(
+        required=False,
+        max_length=250,
+        label=_("Short text below"),
+        help_text=_(
+            "One or two sentences under the title, up to 250 characters. "
+            "If you leave it empty, nothing is shown below."
+        ),
+    )
+
+    class Meta:
+        icon = "title"
+        label = _("Section title")
+        template = "cms/blocks/section_title.html"
+
+
+class CounterBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A number with a label (THM.14): the `ride` theme counts up to it once, when it scrolls into
+    view and the visitor accepts motion; the final value is always in the page."""
+
+    label = blocks.CharBlock(
+        max_length=80,
+        help_text=_("What the number counts, for example 'Orders shipped'. Up to 80 characters."),
+    )
+    value = blocks.IntegerBlock(
+        min_value=0,
+        max_value=999_999_999,
+        help_text=_("The number to show, a whole number. Example: 1250."),
+    )
+    suffix = blocks.CharBlock(
+        required=False,
+        max_length=8,
+        help_text=_(
+            "A short sign after the number, for example '+' or '%'. "
+            "If you leave it empty, the number stands alone."
+        ),
+    )
+
+    class Meta:
+        icon = "order"
+        label = _("Counter")
+        template = "cms/blocks/counter.html"
+
+
+class ProgressBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A labelled progress bar (THM.14); the value is also written as text."""
+
+    label = blocks.CharBlock(
+        max_length=80,
+        help_text=_("What the bar measures, for example 'Order packed'. Up to 80 characters."),
+    )
+    value = blocks.IntegerBlock(
+        min_value=0,
+        help_text=_("How far along it is. It cannot be more than the maximum below."),
+    )
+    max = blocks.IntegerBlock(
+        min_value=1,
+        default=100,
+        label=_("Maximum"),
+        help_text=_(
+            "The value that means 'done'. Leave 100 to show the value as a percentage; "
+            "any other number shows 'value / maximum'."
+        ),
+    )
+
+    class Meta:
+        icon = "order"
+        label = _("Progress bar")
+        template = "cms/blocks/progress.html"
+
+    def clean(self, value: Any) -> Any:
+        cleaned = super().clean(value)
+        if cleaned["value"] > cleaned["max"]:
+            raise StructBlockValidationError(
+                block_errors={
+                    "value": ValidationError(_("The value cannot be more than the maximum."))
+                }
+            )
+        return cleaned
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        context["progress_id"] = _unique_id(parent_context, "progress", value)
+        return context
+
+
+def validate_video_url(url: str) -> None:
+    """Only YouTube and Vimeo addresses (https), so the embed is a known no-tracking origin."""
+    if parse_video_url(url) is None:
+        raise ValidationError(
+            _(
+                "Use the address of a YouTube or Vimeo video, starting with https://. "
+                "Example: https://www.youtube.com/watch?v=abcdefghijk or https://vimeo.com/123456789."
+            )
+        )
+
+
+class VideoModalBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A poster with a play button that opens the video in a popup (THM.14). The video loads
+    only after the visitor accepts marketing cookies (consent gate); until then, and without
+    JavaScript, the button is a link to the video. The provider's origin must also be allowed
+    by the CSP `frame-src` (an operations setting, docs/dev/themes.md) for the frame to show."""
+
+    title = blocks.CharBlock(
+        max_length=120,
+        help_text=_("The name of the video, shown in the popup. Up to 120 characters. Required."),
+    )
+    poster = ImageChooserBlock(
+        required=False,
+        label=_("Cover picture"),
+        help_text=_(
+            "A picture shown before anyone plays the video. If you leave it empty, "
+            "only the play button is shown."
+        ),
+    )
+    alt_text = blocks.CharBlock(
+        required=False,
+        max_length=250,
+        help_text=_(
+            "Describe the cover picture in a few words, for people who cannot see it. "
+            "Required when you pick a cover picture."
+        ),
+    )
+    url = blocks.URLBlock(
+        validators=[validate_video_url],
+        label=_("Video address"),
+        help_text=_(
+            "The address of a YouTube or Vimeo video, starting with https://. "
+            "Other sites are not accepted."
+        ),
+    )
+
+    class Meta:
+        icon = "media"
+        label = _("Video")
+        template = "cms/blocks/video_modal.html"
+
+    def clean(self, value: Any) -> Any:
+        cleaned = super().clean(value)
+        if cleaned.get("poster") and not (cleaned.get("alt_text") or "").strip():
+            raise StructBlockValidationError(
+                block_errors={
+                    "alt_text": ValidationError(_("Describe the cover picture: this is required."))
+                }
+            )
+        return cleaned
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        links = parse_video_url(value["url"])
+        context["video"] = links
+        context["video_id"] = _unique_id(parent_context, "video", value)
         return context
 
 

@@ -229,6 +229,8 @@ STOREFRONT = (
     ("/it/shop/vendor-e-studio/", "Lampada da tavolo in ceramica"),
     ("/demo-how-it-works/", "How it works (demo)"),
     ("/it/demo-come-funziona/", "Come funziona (demo)"),
+    ("/demo-showcase/", "Showcase (demo)"),
+    ("/it/demo-vetrina/", "Vetrina (demo)"),
     ("/demo-terms-of-sale/", "DEMO PLACEHOLDER"),
     ("/it/demo-condizioni-di-vendita/", "SEGNAPOSTO"),
     ("/events/", "Makers fair (demo)"),
@@ -241,6 +243,24 @@ def test_the_storefront_pages_show_the_seed(demo_seed: ChangeSet, client: Client
         response = client.get(path)
         assert response.status_code == 200, path
         assert text in response.content.decode(), path
+
+
+def test_the_showcase_page_places_every_motion_block(demo_seed: ChangeSet, client: Client) -> None:
+    """THM.14: STAGE shows one of each block an editor can place."""
+    from django.test.utils import override_settings
+
+    with override_settings(MPMV_THEME_DEFAULT="ride"):
+        html = client.get("/demo-showcase/").content.decode()
+    assert html.count('aria-roledescription="carousel"') == 3  # hero slider, strip, gallery
+    for marker in (
+        "ride-section-title",
+        "data-counter=",
+        "<progress",
+        'data-consent="marketing"',
+        "ride-gallery__thumbs",
+    ):
+        assert marker in html, marker
+    assert html.count("<h1") == 1
 
 
 def test_real_rows_with_generic_keys_survive_a_seed_and_a_reset() -> None:

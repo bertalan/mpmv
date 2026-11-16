@@ -1,0 +1,7 @@
+{% load i18n responsive_images %}{% comment %}
+The video (THM.14). `base` has no popup: the cover picture and a plain link to the video; nothing
+from the video site is requested before the visitor follows the link.
+{% endcomment %}{% if video %}<figure class="block block-video">
+  {% if value.poster %}{% responsive_image value.poster "card" alt=value.alt_text %}{% endif %}
+  <figcaption><a href="{{ video.watch_url }}">{% translate "Watch the video" %}: {{ value.title }}</a></figcaption>
+</figure>{% endif %}

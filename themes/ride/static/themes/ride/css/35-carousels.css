@@ -118,7 +118,7 @@
 
   /* Under 40rem one item is in view: the group is a row the visitor scrolls sideways (swipe,
      arrow keys once focused, no script), and Previous and Next still move between groups. */
-  @media (max-width: 39.999rem) {
+  @media (width < 40rem) {
     .ride-strip__group {
       display: grid;
       grid-auto-flow: column;
@@ -237,6 +237,21 @@
     position: absolute;
     inset: auto var(--space-s) var(--space-s) auto;
     background: var(--color-surface);
+  }
+
+  .ride-gallery__caption {
+    margin: var(--space-xs) 0 0;
+    color: var(--color-text-muted);
+  }
+
+  .ride-video__poster {
+    margin: 0 0 var(--space-s);
+  }
+
+  .ride-video__poster img {
+    inline-size: 100%;
+    block-size: auto;
+    border-radius: var(--radius-card);
   }
 
   .ride-gallery__zoom[hidden] {

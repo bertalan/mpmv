@@ -9,11 +9,12 @@ Same context as base's components/gallery.html, plus `autoplay` and `interval`:
   {% include "components/gallery.html" with id="product-images" label=_("Product images") images=images only %}
 
 - `id` (required): a prefix for the ids, unique on the page; `label` (required): the name.
-- `images`: a list of `url`, `alt` (what the image shows), optional `large_url`, `width`, `height`.
+- `images`: a list of `url`, `alt` (what the image shows), optional `caption`, `large_url`, `width`, `height`.
 {% endcomment %}{% if images %}{% with total=images|length %}<section class="gallery carousel slide ride-carousel ride-gallery" id="{{ id }}" aria-roledescription="carousel" aria-label="{{ label }}" data-ride-carousel{% if autoplay %} data-autoplay="{{ interval|default:6000 }}"{% endif %}>
   <div class="carousel-inner" id="{{ id }}-slides" aria-live="{% if autoplay %}off{% else %}polite{% endif %}">
     {% for image in images %}{% blocktranslate asvar fallback with count=forloop.counter total=total %}{{ label }}, image {{ count }} of {{ total }}{% endblocktranslate %}{% blocktranslate asvar slide_label with count=forloop.counter total=total %}{{ count }} of {{ total }}{% endblocktranslate %}{% firstof image.alt fallback as name %}<div class="carousel-item{% if forloop.first %} active{% endif %}" role="group" aria-roledescription="slide" aria-label="{{ slide_label }}">
       <img class="ride-gallery__image" src="{{ image.url }}" alt="{{ image.alt }}" width="{{ image.width|default:800 }}" height="{{ image.height|default:800 }}"{% if not forloop.first %} loading="lazy"{% endif %}>
+      {% if image.caption %}<p class="ride-gallery__caption">{{ image.caption }}</p>{% endif %}
       <button type="button" class="btn btn-outline-dark ride-gallery__zoom" data-dialog="{{ id }}-{{ forloop.counter }}" aria-haspopup="dialog" hidden>{% include "components/icon.html" with name="zoom" only %}{% translate "Enlarge" %}<span class="visually-hidden">: {{ name }}</span></button>
       <dialog class="dialog dialog--image" id="{{ id }}-{{ forloop.counter }}" aria-label="{{ name }}">
         <form method="dialog" class="dialog__header"><button type="submit" class="button button--ghost button--icon dialog__close" aria-label="{% translate 'Close' %}">{% include "components/icon.html" with name="close" only %}</button></form>
