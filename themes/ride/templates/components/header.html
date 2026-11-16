@@ -77,6 +77,7 @@ url, never rendered as a dead link), and the context of the help link.
       {% help_context as help %}{% include "components/user_tools.html" %}
     </div>
   </div>
+</header>
     {% with search_url=search_href|safe_href cart_url=cart_href|safe_href %}
       {% if search_url %}
         <div class="modal fade" id="search-modal" tabindex="-1" aria-labelledby="search-modal-title" aria-hidden="true">
@@ -106,4 +107,3 @@ url, never rendered as a dead link), and the context of the help link.
         </div>
       {% endif %}
     {% endwith %}
-</header>
