@@ -291,32 +291,52 @@ def meta_catalog_feed(lang) -> Response          # Meta Commerce feed
 
 ### Analytics and consent
 
-- **Provider: Matomo** (owner decision 2026-11-16, replacing Google Analytics). The operator's own
-  Matomo instance runs on a separate domain; its URL and site id are `PlatformOperator` or settings
-  values per environment, and STAGE has none by default (no tracker, no request).
-- **Tracker delivery.** Recommended default: the tracker script and its collection endpoint are
-  proxied first-party under the site's own path, so no third-party host appears in the page. The
-  alternative is loading the tracker from the Matomo host: that host is then allowed in CSP
-  `script-src` and `connect-src`, with a `preconnect` hint. The proxy forwards only the tracker script and the collection endpoint to the one configured host (no open proxy; the SEC.9 rule against private addresses applies). It forwards no cookies, no authorisation headers and no full client IP: the IP is anonymised (2 bytes) or omitted, with Matomo's own anonymisation as a second layer. The CSP stays strict either way
-  (no `unsafe-inline`, SEC.3); the allowed host is a per-environment setting, never a wildcard.
-- **Events.** The standard e-commerce events map to Matomo e-commerce tracking: product view
-  (`setEcommerceView`), cart update (`addEcommerceItem` and `trackEcommerceCartUpdate`) and order
-  (`trackEcommerceOrder`). The purchase event is also sent server-side through the Matomo HTTP
-  tracking API, so it survives blockers and a closed tab, but only when the order's session
-  recorded analytics consent (or, once counsel confirms consent-free operation and the operator
-  enables it, always). The API `token_auth` is a per-environment secret taken from the environment:
-  never in the repository, the logs, the `AuditLog` or the `PlatformOperator` admin in clear text. A minimal internal dashboard (conversion,
-  sales per vendor) stays.
-- **Privacy configuration.** Matomo is configured cookieless (`disableCookies`), with IP
-  anonymisation (2 bytes) and no cross-site data. Events carry no personal data and, per the
-  garage rules of [17](17-garage-fitment.md), no make, model or year.
-- ⚖️ **Consent.** Under the Italian Garante cookie guidelines (2021), analytics of this kind
-  (cookieless, anonymised, first-party data only) may run without consent. This is **pending
-  counsel's confirmation** (open legal point). Until confirmed, tracking runs only after analytics
-  consent, through the existing `ConsentProvider` (D-10). Once confirmed, a setting lets the
-  operator run Matomo without the consent gate.
-- **Consent Mode v2** stays only for any Google advertising or Merchant tags that remain. The
-  Merchant Center feeds are not removed.
+- **Provider-neutral** (owner decision 2026-11-16): the platform is generic, so analytics sits
+  behind an `AnalyticsProvider` interface, the same pattern as `ConsentProvider`. A provider
+  declares: its client snippet and config; the CSP sources it needs (`script-src`, `connect-src`,
+  `preconnect`); the e-commerce event mapping (product view, cart update, checkout start,
+  purchase); optional server-side purchase sending; whether it is consent-free-capable; and its
+  consent category. Providers are selected per environment in operator settings. None, one or
+  several can be enabled at once, for example during a switch from one to another. STAGE has none
+  by default (no tracker, no request).
+- **Built-in providers.**
+  - **Matomo**, the default for this operator (replacing Google Analytics). It is the operator's
+    own instance on a separate domain; its URL and site id are `PlatformOperator` or settings
+    values per environment. It is cookieless (`disableCookies`), uses IP anonymisation (2 bytes),
+    shares no cross-site data and can be proxied first-party. It is consent-free-capable: it runs
+    without consent only after counsel confirms and the operator enables it. Events map to Matomo
+    e-commerce tracking (`setEcommerceView`, `addEcommerceItem` with
+    `trackEcommerceCartUpdate`, `trackEcommerceOrder`); the server-side purchase uses the HTTP
+    tracking API with a `token_auth`.
+  - **Google Analytics 4**, for operators who prefer it. It always needs consent and uses
+    Consent Mode v2. Its measurement id and the API secret for server-side purchases (Measurement
+    Protocol) come from settings and the environment, never from the repository. Its CSP sources
+    are added only while it is enabled.
+- **Tracker delivery.** Where the provider allows it, the recommended default is a first-party
+  proxy under the site's own path, so no third-party host appears in the page; the alternative is
+  loading from the provider's host, allowed in CSP `script-src` and `connect-src` with a
+  `preconnect` hint. The proxy forwards only the tracker script and the collection endpoint to the
+  one configured host (no open proxy; the SEC.9 rule against private addresses applies). It
+  forwards no cookies, no authorisation headers and no full client IP: the IP is anonymised
+  (2 bytes) or omitted, with the provider's own anonymisation as a second layer. The CSP stays
+  strict either way (no `unsafe-inline`, SEC.3); every allowed host is a per-environment setting,
+  never a wildcard. A disabled provider adds no CSP source and no script.
+- **Server-side purchase.** Sent through the provider's API, so it survives blockers and a closed
+  tab, but only when the order's session recorded analytics consent (or, for a consent-free-capable
+  provider, once counsel confirms and the operator enables it, always). Every provider secret
+  (Matomo `token_auth`, GA4 API secret) is a per-environment secret taken from the environment:
+  never in the repository, the logs, the `AuditLog` or the `PlatformOperator` admin in clear text.
+  A minimal internal dashboard (conversion, sales per vendor) stays.
+- **Rules for every provider.** The consent gate, the no-personal-data rule and, per the garage
+  rules of [17](17-garage-fitment.md), no make, model or year in events, and the secret rules
+  apply to each enabled provider.
+- ⚖️ **Consent.** Under the Italian Garante cookie guidelines (2021), analytics of the Matomo
+  kind (cookieless, anonymised, first-party data only) may run without consent. This is **pending
+  counsel's confirmation** (open legal point). Until confirmed, every provider, Matomo included,
+  runs only after analytics consent, through the existing `ConsentProvider` (D-10). Once
+  confirmed, a setting lets the operator run a consent-free-capable provider without the gate.
+- **Consent Mode v2** applies to GA4 and to any Google advertising or Merchant tags that remain.
+  The Merchant Center feeds are not removed.
 
 ### Reviews
 
@@ -376,7 +396,7 @@ with design tokens, template overrides, CSP-safe components and WCAG 2.2 AA rule
 | SEO.2 | Per-language and per-type sitemaps, generated `llms.txt` | P1 | 4 | I18N.6 | Valid sitemaps |
 | SEO.3 | Google feed (EN for every product, IT for products with a published IT translation, including the Italian texts migrated at go-live, D-18 bis and Q-71) with legacy IDs, prices from the tax engine, shipping from tables; GTIN, brand and MPN from the product fields; on-request and catalogue-only products left out (Q-31, Q-33) | P1 | 8 | TAX.3, SHP.11 | Feed validated in STAGE Merchant Center; no item carries the vendor SKU as MPN; no on-request product is in the feed |
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
-| SEO.5 | Cookie consent + Matomo analytics (owner decision 2026-11-16, replaces Google Analytics: the operator's own instance on a separate domain, URL and site id per environment, first-party proxy by default, cookieless, IP anonymised to 2 bytes, e-commerce events plus a server-side purchase event through the HTTP tracking API, strict CSP; ⚖️ consent-free operation pending counsel, until then only after analytics consent) + Consent Mode v2 for any remaining Google advertising or Merchant tags + e-commerce events; owner decision D-10 (2026-11-11): our own minimal self-hosted consent banner first (technical cookies always, consent-gated categories, a consent log kept as proof), behind the `ConsentProvider` interface of SEO.9; the default is ours | P1 | 8 | ORD.5 | No tags fire before consent; the banner offers accept and reject with equal weight and categories; a choice is stored and logged (time, categories, banner version, no more personal data than needed) and can be changed later; Consent Mode v2 signals follow the choice; STAGE sends nothing to Matomo without a configured instance; the tracker host is in CSP only when not proxied; events carry no personal data and no make, model or year (spec 17); an order placed without analytics consent sends no server-side Matomo request while the consent gate is on (tested); the rendered tracker config has `disableCookies` and no `_pk_*` cookie is set (tested); with the gate on and no consent, the page makes no request to the tracker path (tested); the `token_auth` never appears in the repository, logs or `AuditLog` (tested) |
+| SEO.5 | Cookie consent + provider-neutral analytics (owner decision 2026-11-16): an `AnalyticsProvider` interface like `ConsentProvider` (client config, CSP sources, e-commerce event mapping, optional server-side purchase, consent-free capability, consent category), selected per environment, none, one or several enabled at once; built-in providers Matomo (this operator's default: own instance on a separate domain, first-party proxy by default, cookieless, IP anonymised to 2 bytes; ⚖️ consent-free operation only after counsel confirms and the operator enables it) and Google Analytics 4 (always consent-gated, Consent Mode v2, measurement id and API secret from settings and environment); strict CSP + Consent Mode v2 for GA4 and any remaining Google advertising or Merchant tags + e-commerce events; owner decision D-10 (2026-11-11): our own minimal self-hosted consent banner first (technical cookies always, consent-gated categories, a consent log kept as proof), behind the `ConsentProvider` interface of SEO.9; the default is ours | P1 | 8 | ORD.5 | No tags fire before consent; the banner offers accept and reject with equal weight and categories; a choice is stored and logged (time, categories, banner version, no more personal data than needed) and can be changed later; Consent Mode v2 signals follow the choice; STAGE sends nothing without an enabled provider. For each enabled provider: an order placed without analytics consent sends no server-side request while the consent gate is on (tested); with the gate on and no consent, the page makes no request to the provider's tracker path or host (tested); events carry no personal data and no make, model or year (spec 17) (tested); the CSP carries exactly the provider's declared sources, and the tracker host only when not proxied (tested); its secrets never appear in the repository, logs or `AuditLog` (tested). A disabled provider adds no CSP source and no script (tested). Matomo: the rendered config has `disableCookies` and no `_pk_*` cookie is set (tested). GA4: Consent Mode v2 defaults are denied until consent (tested) |
 | SEO.9 | `ConsentProvider` interface and docs (owner decision D-10, 2026-11-11): the consent banner is one provider behind an interface (state of each category, gating of tags and e-commerce events, consent log, change of choice); the self-hosted one of SEO.5 is the default and an operator who prefers an external certified CMP plugs it in through a setting, not a fork; `docs/dev/consent-providers.md` "how to add a consent provider" lists what a provider must do (block before consent, signal state, keep proof, CSP and script allow-list per the §14 rule) | P2 | 4 | SEO.5 | The doc exists; the setting selects the provider and an unknown value fails a system check; a test provider replaces the default without changing the tag-gating code; no tag fires before consent with either provider |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget; cacheability rules taken from wagtail-cache (owner decision D-36; the list below is the minimum and the spike checks it against the package): only anonymous `GET` and `HEAD` with a 200 answer are cached, nothing with a session, cart, consent or CSRF cookie or a `Vary: Cookie`, nothing in the Manager or admin, the key includes the locale and the host, a publish or unpublish purges the page and the pages that list it; **a cached page never carries a per-request CSP nonce** (replaying one nonce to every visitor defeats it), so a page that needs a nonce is not cacheable; package or mirror decided at a short spike inside this row | P2 | 6 | THM.3 | LCP < 2.5 s on product page; tests: a cacheable public response has no `nonce` attribute and its CSP has no nonce source, a page that needs a nonce is served uncached; a cart, consent, Manager or logged-in request is never cached; a locale change and a publish purge the right entries |
 | SEO.7 | Site-wide schema.org `@graph` (owner question 2026-11-09): one JSON-LD block per page from `seo.page_graph`, stable `@id` nodes for the operator `Organization`, `WebSite` + `SearchAction`, `WebPage` subtypes, `BreadcrumbList`, vendor `Organization` as `seller`, shared return and shipping nodes, `Product`/`Offer`/`AggregateOffer`, `CollectionPage` + `ItemList`, `BlogPosting` + `Person`/`ProfilePage`, `Event`; `inLanguage` and no cross-language fallback; SEO.1 and EVT.10 return nodes into it | P1 | 8 | SEO.1, CMS.3, CMS.10, CMS.11 | Each page type in the SEO.7 coverage table has a snapshot test of its graph, and a sweep over the registered page types fails on a public page without one; the search results page is a `SearchResultsPage` with an `ItemList` of mixed result types and `noindex, follow`; every `@id` reference resolves to a node in the same graph or a canonical URL; a schema check (types, required and recommended properties of the Google rich results for Product, Breadcrumb, Article, Event, ProfilePage) runs in CI; a page has exactly one JSON-LD script; a product name containing `</script><img src=x onerror=alert(1)>` is inert inside the JSON-LD and adds no element to the page; a page with a product grid and a product cards block has two named `ItemList`s whose items reference product `@id`s without repeating offers, and a retired product disappears from both; the product node checklist of §"Structured data graph" is covered (vendor as seller, gtin/mpn/productID, variants as ProductGroup, compact shipping, licence fields on images) and a product page's JSON-LD stays under 30 KB |

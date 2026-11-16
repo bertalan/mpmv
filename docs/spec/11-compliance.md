@@ -196,7 +196,7 @@ class CountryWarningLanguages(Model):   # platform data: country -> accepted war
   compliance from about 2026-10-29): transactional and service emails (ARC.16, CMP.10 reminders)
   carry no open-tracking pixel; marketing emails carry one only with consent, revocable on its own.
 - Non-production environments only with synthetic or anonymized data (today LIVE is cloned to STAGE).
-- Cookie consent through the `ConsentProvider`; analytics is Matomo, cookieless and anonymised, and Consent Mode applies only to remaining Google advertising or Merchant tags (see [10](10-content-seo-ai.md)). ⚖️ Whether Matomo may run without consent (Garante cookie guidelines 2021) awaits counsel.
+- Cookie consent through the `ConsentProvider`; analytics is provider-neutral (Matomo by default for this operator, Google Analytics 4 optional), and Consent Mode applies to GA4 and any remaining Google advertising or Merchant tags (see [10](10-content-seo-ai.md)). ⚖️ Whether Matomo may run without consent (Garante cookie guidelines 2021) awaits counsel.
 
 ### Order data retention and archive (owner decision D-29)
 - Legal basis: GDPR article 6(1)(c) and 17(3)(b); VAT directive 2006/112/EC article 242a;
