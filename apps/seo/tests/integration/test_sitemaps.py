@@ -63,7 +63,7 @@ def other_language() -> str:
 def sitemap_paths(client: Client, language: str) -> set[str]:
     response = client.get(reverse("sitemap_language", kwargs={"language": language}))
     assert response.status_code == 200
-    root = ElementTree.fromstring(response.content)  # noqa: S314
+    root = ElementTree.fromstring(response.content)  # noqa: S314 (parses our own generated XML)
     return {urlsplit(loc.text or "").path for loc in root.findall("s:url/s:loc", NS)}
 
 
@@ -111,7 +111,7 @@ def event(title: str) -> EventPage:
 def test_the_index_lists_one_sitemap_per_language(client: Client) -> None:
     response = client.get(reverse("sitemap"))
     assert response.status_code == 200
-    root = ElementTree.fromstring(response.content)  # noqa: S314
+    root = ElementTree.fromstring(response.content)  # noqa: S314 (parses our own generated XML)
     found = [urlsplit(loc.text or "").path for loc in root.findall("s:sitemap/s:loc", NS)]
     assert found == [
         reverse("sitemap_language", kwargs={"language": code}) for code in configured_languages()
@@ -172,7 +172,7 @@ def test_a_translated_product_is_in_both_sitemaps_with_both_alternates(client: C
 
 def test_drafts_and_inactive_vendors_are_not_listed(client: Client) -> None:
     draft = product([PRIMARY], status=Product.Status.DRAFT)
-    inactive = product([PRIMARY], vendor=VendorFactory.create(status=Vendor.Status.PENDING))
+    inactive = product([PRIMARY], vendor=VendorFactory.create(status=Vendor.Status.SUSPENDED))
     listed = sitemap_paths(client, PRIMARY)
     assert product_path(PRIMARY, draft) not in listed
     assert product_path(PRIMARY, inactive) not in listed
@@ -269,3 +269,19 @@ def test_a_hidden_event_is_not_listed(client: Client) -> None:
     page = event("Secret fair")
     EventPage.objects.filter(pk=page.pk).update(hidden_at=dt.datetime.now(dt.UTC))
     assert all("secret-fair" not in path for path in sitemap_paths(client, PRIMARY))
+
+
+@pytest.mark.parametrize("theme", ["base", "ride"])
+def test_every_theme_prints_the_canonical_and_hreflang_links(
+    client: Client, settings: Any, theme: str
+) -> None:
+    settings.MPMV_THEME_DEFAULT = theme
+    home = Site.objects.get(is_default_site=True).root_page
+    page = StandardPageFactory.create(title="Themed", parent=home)
+    page.save_revision().publish()
+    html = client.get(page.url).content.decode()
+    assert f'data-theme="{theme}"' in html
+    canonical, hreflang = head_links(html)
+    assert canonical == [urlsplit(page.url).path]
+    assert hreflang == {PRIMARY}
+    assert html.count('rel="canonical"') == 1

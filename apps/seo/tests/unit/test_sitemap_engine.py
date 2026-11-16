@@ -34,7 +34,7 @@ def test_the_urlset_lists_locations_and_dates_escaped() -> None:
         engine.Entry("https://shop.test/a/?x=1&y=2", dt.date(2027, 1, 5)),
         engine.Entry("https://shop.test/b/", None),
     ]
-    root = ElementTree.fromstring(engine.urlset_xml(entries))  # noqa: S314
+    root = ElementTree.fromstring(engine.urlset_xml(entries))  # noqa: S314 (parses our own generated XML)
     urls = root.findall("s:url", NS)
     assert [u.findtext("s:loc", namespaces=NS) for u in urls] == [e.loc for e in entries]
     assert urls[0].findtext("s:lastmod", namespaces=NS) == "2027-01-05"
@@ -42,13 +42,13 @@ def test_the_urlset_lists_locations_and_dates_escaped() -> None:
 
 
 def test_an_empty_urlset_is_valid_xml() -> None:
-    root = ElementTree.fromstring(engine.urlset_xml([]))  # noqa: S314
+    root = ElementTree.fromstring(engine.urlset_xml([]))  # noqa: S314 (parses our own generated XML)
     assert root.findall("s:url", NS) == []
 
 
 def test_the_index_lists_one_sitemap_per_location() -> None:
     xml = engine.index_xml(["https://shop.test/s-en.xml", "https://shop.test/s-it.xml"])
-    root = ElementTree.fromstring(xml)  # noqa: S314
+    root = ElementTree.fromstring(xml)  # noqa: S314 (parses our own generated XML)
     assert [e.findtext("s:loc", namespaces=NS) for e in root.findall("s:sitemap", NS)] == [
         "https://shop.test/s-en.xml",
         "https://shop.test/s-it.xml",

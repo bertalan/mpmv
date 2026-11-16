@@ -117,7 +117,11 @@ def test_one_font_is_preloaded_from_the_same_origin(client: Client, home: HomePa
 
 def test_no_external_request_and_no_inline_code(client: Client, home: HomePage) -> None:
     html = client.get("/").content.decode()
-    external = re.findall(r'<(?:link|script|img)[^>]+(?:src|href)="(https?://[^"]+)"', html)
+    # canonical and hreflang links (I18N.6) name the page's own URLs; the browser never fetches them
+    html_requests = re.sub(r'<link rel="(?:canonical|alternate)"[^>]*>', "", html)
+    external = re.findall(
+        r'<(?:link|script|img)[^>]+(?:src|href)="(https?://[^"]+)"', html_requests
+    )
     assert external == []
     assert "style=" not in html
     assert not re.search(r"<style[\s>]", html)
