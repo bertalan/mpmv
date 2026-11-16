@@ -543,3 +543,11 @@ def test_the_library_colour_pairs_are_in_the_token_contract() -> None:
     for level in ("color.warning", "color.success"):
         assert pairs[(level, "color.surface")] >= UI
         assert pairs[(level, "color.surface-raised")] >= UI
+
+
+def test_danger_and_success_text_on_the_surface_are_in_the_token_contract() -> None:
+    # Bootstrap's `.text-success` and `.text-danger` draw the level colours as text on the plain
+    # surface (THM.13 follow-up): a palette change that breaks 4.5:1 must fail the contract.
+    pairs = {(pair.foreground, pair.background): pair.minimum for pair in PAIRS}
+    assert pairs[("color.danger", "color.surface")] >= TEXT
+    assert pairs[("color.success", "color.surface")] >= TEXT

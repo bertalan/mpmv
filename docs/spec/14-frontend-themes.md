@@ -327,7 +327,7 @@ the anonymous page cache on.
 
 | Budget | Limit | Checked by |
 |---|---|---|
-| CSS per theme (`theme.css`, compressed) | ≤ 45 KB (`base`); ≤ 48 KB for `ride` (`css_budget_kb` in its manifest; measured 38.3 KB at THM.13) | unit test on the build output (THM.5, THM.13) |
+| CSS per theme (`theme.css`, compressed) | ≤ 45 KB (`base`); ≤ 48 KB for `ride` (`css_budget_kb` in its manifest; measured 40.5 KB at THM.13 part 3) | unit test on the build output (THM.5, THM.13) |
 | JavaScript total, including htmx and Alpine (compressed) | ≤ 40 KB (`base`); ≤ 70 KB for `ride` (`js_budget_kb`; measured 63.2 KB at THM.13) | unit test (THM.5, THM.13) |
 | Web fonts | ≤ 2 families, ≤ 4 woff2 files, Latin + Latin Extended-A subsets, `font-display: swap`, one preload | `LICENSES.toml` and build check (THM.5) |
 | LCP (mobile, 4G profile) | < 2.5 s | SEO.6 on STAGE |
@@ -344,7 +344,7 @@ Brotli too.
 about 30 KB (CSS) and 23 KB (bundle JS) compressed, before any `ride` rule, so the single budgets
 above cannot hold for `ride`. The limit becomes **per theme**, declared in the manifest
 (`css_budget_kb`, `js_budget_kb`), with `base` keeping 45 and 40. THM.13 part 2 measured the real sizes
-(`theme.css` 38.3 KB, page JavaScript 63.2 KB: Bootstrap bundle 23.2 KB, htmx 16.0 KB, Alpine
+(`theme.css` 38.3 KB at part 2 and 40.5 KB in the final part 3, page JavaScript 63.2 KB: Bootstrap bundle 23.2 KB, htmx 16.0 KB, Alpine
 16.0 KB, theme modules the rest) and wrote the final limits (48 KB and 70 KB) into the `ride`
 manifest and into this table, with room for the later `ride` components (THM.14, THM.15); they
 are a ceiling that THM.5 enforces, never a target, and raising one needs a reviewed manifest change. The anonymous page
@@ -448,6 +448,7 @@ and THM.9 (catalog, content and system pages).
 | Forms: underline inputs, validation states with icons, nice-select | Bootstrap form controls with visible labels, `.is-invalid` plus text and icon, native `<select>` | THM.13, THM.16 |
 | Modals and popovers | Bootstrap modal and offcanvas for dialogs; popovers are not used | THM.15 |
 | Alert, cookie notice | Bootstrap alert; consent banner (SEO.5) restyled, never covering focus | THM.9 |
+| Badge and alert colour variants | The theme's badge and alert variants (`.badge--secondary`, `.alert-*`, `.text-bg-primary`, `-danger`, `-success`, `-dark`); the helper classes `.text-bg-info`, `.text-bg-warning`, `.text-bg-secondary`, `.bg-info`, `.bg-warning` and `.bg-secondary` set a fixed text colour with `!important` that fails contrast on the tokens (1.74:1, 4.18:1, 1.94:1), so the CSP lint refuses them in every public template | THM.13 |
 | Video play button and popup | Link or consent-gated embed (SEO.5) opened in a Bootstrap modal after consent | THM.14 |
 | Preloader spinner | Dropped: it hides content and hurts LCP; loading states use the HTMX indicator | - |
 | Home variants (three) | One home template; the hero block has a `layout` choice (slider, single image, split), so editors get the variants without three templates | THM.14 |
