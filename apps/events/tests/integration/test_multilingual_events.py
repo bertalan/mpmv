@@ -223,7 +223,7 @@ def test_a_translation_of_a_hidden_event_is_refused_to_its_vendor() -> None:
 def _article(html: str, title: str) -> str:
     for block in re.findall(r"<article[^>]*event-summary[^>]*>.*?</article>", html, re.S):
         if title in block:
-            return block
+            return str(block)
     raise AssertionError(f"no article for {title!r}")
 
 
@@ -361,10 +361,9 @@ def test_hreflang_lists_existing_translations_with_x_default_on_the_english_one(
     assert default.endswith(f"/de/events/{page.slug}/")
     fixture.translate(page, "en", title="Autumn fair")
     html = _get(client, page.url)
-    alternates = dict(re.findall(r'<link rel="alternate" hreflang="([^"]+)" href="([^"]+)"', html))
-    assert set(alternates) == {"de", "it", "en", "x-default"}
-    assert alternates["x-default"] == alternates["en"]
-    assert "fr" not in alternates
+    by_code = dict(re.findall(r'<link rel="alternate" hreflang="([^"]+)" href="([^"]+)"', html))
+    assert set(by_code) == {"de", "it", "en", "x-default"}
+    assert by_code["x-default"] == by_code["en"]
 
 
 def test_a_draft_translation_is_not_in_hreflang_and_has_no_url_to_visitors(
@@ -414,6 +413,7 @@ def test_changing_the_dates_on_the_original_changes_every_translation() -> None:
     page = fixture.create("de")
     italian = fixture.translate(page, "it")
     french = fixture.translate(page, "fr")
+    assert page.starts_at is not None
     new_start = page.starts_at + dt.timedelta(days=3)
     services.save_event_draft(
         fixture.user,
@@ -433,6 +433,7 @@ def test_a_translations_own_edit_never_diverges_the_structured_fields() -> None:
     fixture = Fixture()
     page = fixture.create("de")
     italian = fixture.translate(page, "it")
+    assert page.starts_at is not None
     later = page.starts_at + dt.timedelta(days=9)
     services.save_event_draft(
         fixture.user,

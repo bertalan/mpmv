@@ -845,9 +845,14 @@ class LocalisedEvent:
 class LocaleFilters(Protocol):
     """What `events_for_locale` reads of the list filters (`listing.Filters`)."""
 
-    vendor: str
-    type: str
-    translated_only: bool
+    @property
+    def vendor(self) -> str: ...
+
+    @property
+    def type(self) -> str: ...
+
+    @property
+    def translated_only(self) -> bool: ...
 
 
 def events_for_locale(

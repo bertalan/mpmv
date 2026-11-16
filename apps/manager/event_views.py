@@ -215,12 +215,12 @@ class EventFormView(_EventAction):
                 context["form"] = EventForm(vendor=vendor)
                 context["form"].fields["language"].initial = _initial_language()
             elif _is_translation(page):
-                latest = page.get_latest_revision_as_object()
+                draft: EventPage = page.get_latest_revision_as_object()
                 context["form"] = EventTranslationForm(
                     initial={
-                        "title": latest.title,
-                        "summary": latest.summary,
-                        "venue_name": latest.venue_name,
+                        "title": draft.title,
+                        "summary": draft.summary,
+                        "venue_name": draft.venue_name,
                     }
                 )
             else:
@@ -339,7 +339,7 @@ class EventTranslateView(_EventAction):
                 self.actor(), page, locale, form.event_data(), ctx=self.audit(request)
             )
         except ValidationError as error:
-            _add_errors(form, error)  # type: ignore[arg-type]
+            _add_errors(form, error)
             return self.render_to_response(self.get_context_data(form=form))
         except services.EventRefused:
             return self.render_to_response(self.get_context_data(form=form), status=403)
