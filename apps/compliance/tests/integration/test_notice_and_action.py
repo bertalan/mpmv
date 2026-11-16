@@ -361,4 +361,6 @@ def test_counter_keys_hold_no_address_or_ip_in_the_clear(client: Client) -> None
     client.post(url(), form_data(), REMOTE_ADDR=IP)
     keys = " ".join(Throttle.objects.values_list("key", flat=True))
     assert IP not in keys
-    assert "ada" not in keys
+    # Keys are hex digests, so look for the address itself: a bare "ada" can occur in a hash.
+    assert "ada@example.org" not in keys.lower()
+    assert "example.org" not in keys.lower()
