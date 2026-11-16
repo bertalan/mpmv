@@ -62,6 +62,11 @@ PUBLIC: dict[str, str] = {
         "Cart page (ORD.5): shows the visitor's own cart, found from their session; a POST "
         "changes only that cart, is CSRF-checked and has a per-IP budget."
     ),
+    "orders:cart_mini": (
+        "Mini-cart fragment (THM.15): a GET that shows only the item count and the lines of the "
+        "visitor's own cart, found from their session; it creates no cart or session and no "
+        "flash message is read."
+    ),
     "orders:cart_add": (
         "Add to cart from the product page (ORD.19): a POST that adds only to the visitor's own "
         "cart, is CSRF-checked, has a per-IP budget and checks the sales mode on the server."
