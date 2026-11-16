@@ -6,5 +6,10 @@ from . import sitemap_views
 
 urlpatterns = [
     path("sitemap.xml", sitemap_views.sitemap_index, name="sitemap"),
+    path(
+        "sitemap-<slug:language>-<int:part>.xml",
+        sitemap_views.sitemap_part,
+        name="sitemap_part",
+    ),
     path("sitemap-<slug:language>.xml", sitemap_views.sitemap_language, name="sitemap_language"),
 ]

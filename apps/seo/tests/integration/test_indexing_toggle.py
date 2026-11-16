@@ -175,11 +175,13 @@ def test_listings_follow_the_toggle(client: Client) -> None:
 # --- Sitemap line in robots.txt
 
 
-@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
+@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False, ALLOWED_HOSTS=["*"])
 def test_robots_txt_lists_the_sitemap_when_indexing_is_allowed(client: Client) -> None:
     set_indexing(True)
-    text = client.get("/robots.txt").content.decode()
-    assert text.endswith(f"Sitemap: http://testserver{reverse('sitemap')}\n")
+    root = Site.objects.get(is_default_site=True).root_url
+    text = client.get("/robots.txt", HTTP_HOST="evil.example").content.decode()
+    assert text.endswith(f"Sitemap: {root}{reverse('sitemap')}\n")  # never the Host header
+    assert "evil.example" not in text
 
 
 @override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)

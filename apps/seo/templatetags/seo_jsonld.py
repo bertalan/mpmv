@@ -10,6 +10,7 @@ from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
 from apps.catalog.product_pages import ProductPage
+from apps.core.site_url import site_root_url
 from apps.seo import product_jsonld as jsonld
 
 register = template.Library()
@@ -18,7 +19,7 @@ register = template.Library()
 @register.simple_tag(takes_context=True)
 def product_jsonld(context: Context, page: ProductPage) -> SafeString:
     request = context["request"]
-    site = request.build_absolute_uri("/").rstrip("/")
+    site = site_root_url(request)
     return format_html(
         '<script type="application/ld+json">{}</script>',
         SafeString(product_jsonld_text(page, site)),

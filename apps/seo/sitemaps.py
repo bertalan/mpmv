@@ -7,13 +7,14 @@ categories, taxonomy terms, brands and vendor storefronts. A fallback copy is le
 """
 
 import datetime as dt
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 
+from django.db.models import Q
 from django.http import HttpRequest
-from wagtail.models import Page
+from wagtail.models import Page, Site
 
+from apps.catalog import listings, slugs
 from apps.catalog import services as catalog
-from apps.catalog import slugs
 from apps.catalog.models import (
     Brand,
     Category,
@@ -25,23 +26,38 @@ from apps.catalog.models import (
 from apps.cms.models import TermLandingPage
 from apps.core import translations
 from apps.core.i18n import primary_language
+from apps.core.site_url import absolute_url
 from apps.vendors.models import Vendor
 
 from .sitemap_engine import Entry, sitemap_path
 
 
 def _absolute(request: HttpRequest, path: str | None) -> str | None:
-    return request.build_absolute_uri(path) if path else None
+    return absolute_url(request, path) if path else None
 
 
 def _date(value: dt.datetime | None) -> dt.date | None:
     return value.date() if value is not None else None
 
 
+def page_is_noindex(page: Page) -> bool:
+    """The page's own robots rule, the one its template prints: a term landing page is noindex
+    (its term page is the indexed one). The environment floor and the site's switch are checked
+    once for the whole sitemap (the views answer 404 when indexing is off)."""
+    return isinstance(page, TermLandingPage)
+
+
 def cms_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
+    site = Site.find_for_request(request)
     pages = Page.objects.live().public().filter(locale__language_code=language, depth__gte=2)
-    for page in pages.order_by("path").specific():
-        if isinstance(page, TermLandingPage):  # noindex: its term page is the indexed one
+    if site is not None:  # this site's tree only: another site's pages are not ours to list
+        # The root page and its translations: each language has its own tree.
+        trees = Q()
+        for root in site.root_page.get_translations(inclusive=True):
+            trees |= Q(path__startswith=root.path, depth__gte=root.depth)
+        pages = pages.filter(trees)
+    for page in pages.order_by("path").specific().iterator(chunk_size=500):
+        if page_is_noindex(page):
             continue
         visible = getattr(page, "is_publicly_visible", None)
         if visible is not None and not visible():  # a hidden event
@@ -59,44 +75,81 @@ def product_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
         product__status=ProductStatus.PUBLISHED,
         product__vendor__status=Vendor.Status.ACTIVE,
     ).order_by("product_id")
-    for slug in rows.values_list("slug", flat=True):
+    for slug, updated in rows.values_list("slug", "product__updated_at").iterator(chunk_size=1000):
         path = slugs.product_path(language, slug, default_language=primary_language())
-        yield Entry(request.build_absolute_uri(path))
+        yield Entry(absolute_url(request, path), _date(updated))
+
+
+def _listed_ids() -> tuple[set[int], set[int], set[str], set[str]]:
+    """With ONE aggregate pass over the listed products: the vendor and brand ids that have
+    some, and the tree paths of the categories and terms they sit in (a listing includes its
+    subtree, so a node has products when some path starts with its own)."""
+    listed = catalog.listed_products().order_by()
+    vendor_ids = set(listed.values_list("vendor_id", flat=True).distinct())
+    brand_ids = {
+        pk for pk in listed.values_list("brand_id", flat=True).distinct() if pk is not None
+    }
+    category_paths = set(listed.values_list("category__path", flat=True).distinct()) | set(
+        listed.values_list("secondary_categories__path", flat=True).distinct()
+    )
+    term_paths = set(listed.values_list("terms__path", flat=True).distinct())
+    return (
+        vendor_ids,
+        brand_ids,
+        {p for p in category_paths if p},
+        {p for p in term_paths if p},
+    )
+
+
+def _has_path(paths: set[str], node_path: str) -> bool:
+    return any(path.startswith(node_path) for path in paths)
+
+
+def _listing_robots_allows(scope: catalog.ListingScope) -> bool:
+    """The canonical first page of a listing is indexable (the rule of the listing layout)."""
+    robots = listings.listing_robots(listings.ListingParams(), total=1)
+    return not robots.startswith("noindex")
 
 
 def _listing_entries(
-    scopes: list[catalog.ListingScope], language: str, request: HttpRequest
+    scopes: Iterable[catalog.ListingScope], language: str, request: HttpRequest
 ) -> Iterator[Entry]:
     for scope in scopes:
         anchor = catalog.scope_anchor(scope, language)
-        if anchor is None:
+        if anchor is None or not _listing_robots_allows(scope):
             continue
         path = sitemap_path(anchor.paths, anchor.published, language)
-        if path and catalog.listing_products(scope).exists():
-            yield Entry(request.build_absolute_uri(path))
+        if path:
+            yield Entry(absolute_url(request, path))
 
 
 def listing_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
-    scopes = [catalog.ListingScope(category=row) for row in Category.objects.order_by("path")]
+    vendor_ids, brand_ids, category_paths, term_paths = _listed_ids()
+    scopes: list[catalog.ListingScope] = [
+        catalog.ListingScope(category=row)
+        for row in Category.objects.order_by("path")
+        if _has_path(category_paths, row.path)
+    ]
     for taxonomy in Taxonomy.objects.filter(has_landing=True).order_by("code"):
         scopes += [
             catalog.ListingScope(term=row)
             for row in Term.objects.filter(taxonomy=taxonomy).order_by("path")
+            if _has_path(term_paths, row.path)
         ]
     scopes += [
         catalog.ListingScope(brand=row)
-        for row in Brand.objects.filter(status=Brand.Status.APPROVED)
+        for row in Brand.objects.filter(status=Brand.Status.APPROVED, pk__in=brand_ids)
     ]
     scopes += [
         catalog.ListingScope(vendor=row)
-        for row in Vendor.objects.filter(status=Vendor.Status.ACTIVE).order_by("id")
+        for row in Vendor.objects.filter(status=Vendor.Status.ACTIVE, pk__in=vendor_ids).order_by(
+            "id"
+        )
     ]
     yield from _listing_entries(scopes, language, request)
 
 
-def language_entries(language: str, request: HttpRequest) -> list[Entry]:
-    return [
-        *cms_entries(language, request),
-        *listing_entries(language, request),
-        *product_entries(language, request),
-    ]
+def language_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
+    yield from cms_entries(language, request)
+    yield from listing_entries(language, request)
+    yield from product_entries(language, request)

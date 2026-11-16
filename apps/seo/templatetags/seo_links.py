@@ -18,6 +18,8 @@ from wagtail.models import Page
 
 from apps.cms import services
 from apps.core.i18n import hreflang_alternates
+from apps.core.indexing import is_noindex
+from apps.seo.sitemaps import page_is_noindex
 
 register = template.Library()
 
@@ -42,6 +44,14 @@ def _page_links(context: Context) -> tuple[str, Iterable[tuple[str, str]]]:
 
 @register.simple_tag(takes_context=True)
 def seo_links(context: Context) -> SafeString:
+    robots = str(context.get("robots") or "")
+    page = context.get("page")
+    if (
+        is_noindex(context.get("request"))  # the environment floor or the site's switch
+        or robots.startswith("noindex")
+        or (page is not None and page_is_noindex(page))
+    ):
+        return SafeString("")  # no canonical or hreflang on a page that asks not to be indexed
     canonical = context.get("canonical_url")
     alternates = context.get("alternates")
     if canonical is None and alternates is None:

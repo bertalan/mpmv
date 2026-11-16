@@ -27,7 +27,7 @@ from apps.catalog.tests.factories import (
     ProductTranslationFactory,
 )
 from apps.cms.services import translate_page
-from apps.cms.tests.factories import StandardPageFactory
+from apps.cms.tests.factories import StandardPageFactory, TermLandingPageFactory
 from apps.core.i18n import configured_languages
 from apps.core.models import TranslationStatus
 from apps.events.models import EventIndexPage, EventPage
@@ -118,10 +118,103 @@ def test_the_index_lists_one_sitemap_per_language(client: Client) -> None:
     ]
 
 
-@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
+HOSTILE = "evil.example"
+
+
+@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False, ALLOWED_HOSTS=["*"])
 def test_robots_txt_lists_the_sitemap_index(client: Client) -> None:
-    text = client.get("/robots.txt").content.decode()
-    assert text.endswith(f"Sitemap: http://testserver{reverse('sitemap')}\n")
+    root = Site.objects.get(is_default_site=True).root_url
+    text = client.get("/robots.txt", HTTP_HOST=HOSTILE).content.decode()
+    assert text.endswith(f"Sitemap: {root}{reverse('sitemap')}\n")
+    assert HOSTILE not in text
+
+
+@override_settings(ALLOWED_HOSTS=["*"])
+def test_no_url_takes_the_host_header(client: Client) -> None:
+    """Index, sitemaps, canonical and hreflang are on the site's root URL, whatever the Host."""
+    item = product([PRIMARY, other_language()])
+    page = StandardPageFactory.create()
+    page.save_revision().publish()
+    root = Site.objects.get(is_default_site=True).root_url
+    index = client.get(reverse("sitemap"), HTTP_HOST=HOSTILE).content.decode()
+    sitemap = client.get(
+        reverse("sitemap_language", kwargs={"language": PRIMARY}), HTTP_HOST=HOSTILE
+    ).content.decode()
+    product_html = client.get(product_path(PRIMARY, item), HTTP_HOST=HOSTILE).content.decode()
+    category = CategoryFactory.create()
+    CategoryTranslationFactory.create(category=category, language=PRIMARY, status=PUBLISHED)
+    ProductFactory.create(
+        category=category,
+        vendor=VendorFactory.create(status=Vendor.Status.ACTIVE),
+        status=Product.Status.PUBLISHED,
+    )
+    listing = client.get(
+        slugs.category_path(
+            PRIMARY, category.translations.get(language=PRIMARY).slug, default_language=PRIMARY
+        ),
+        HTTP_HOST=HOSTILE,
+    ).content.decode()
+    for body in (index, sitemap, product_html, listing):
+        assert HOSTILE not in body
+    assert root in index
+    assert root in sitemap
+    assert f'rel="canonical" href="{root}' in product_html
+
+
+def test_a_noindex_term_landing_page_is_not_listed_and_has_no_links(client: Client) -> None:
+    landing = TermLandingPageFactory.create()
+    landing.save_revision().publish()
+    page = StandardPageFactory.create()
+    page.save_revision().publish()
+    listed = sitemap_paths(client, PRIMARY)
+    assert page.get_url() in listed
+    assert landing.get_url() not in listed
+    html = client.get(landing.get_url()).content.decode()
+    assert "noindex" in html
+    assert 'rel="canonical"' not in html
+    assert "hreflang" not in html
+
+
+@override_settings(FORCE_NOINDEX=True)
+def test_a_forced_noindex_page_has_no_canonical_or_hreflang(client: Client) -> None:
+    page = StandardPageFactory.create()
+    page.save_revision().publish()
+    html = client.get(page.get_url()).content.decode()
+    assert 'rel="canonical"' not in html
+    assert "hreflang" not in html
+
+
+def test_the_404_of_a_sitemap_has_no_cache_header_and_the_200_is_private(client: Client) -> None:
+    assert "max-age" not in client.get(reverse("sitemap_language", kwargs={"language": "xx"})).get(
+        "Cache-Control", ""
+    )
+    cache = client.get(reverse("sitemap")).get("Cache-Control", "")
+    assert "private" in cache
+    assert "public" not in cache
+
+
+def test_a_language_over_the_limit_is_split_into_parts(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from apps.seo import sitemap_engine
+
+    for _ in range(5):
+        product([PRIMARY])
+    monkeypatch.setattr(sitemap_engine, "MAX_URLS", 2)
+    index = ElementTree.fromstring(client.get(reverse("sitemap")).content)  # noqa: S314
+    found = [urlsplit(loc.text or "").path for loc in index.findall("s:sitemap/s:loc", NS)]
+    parts = [reverse("sitemap_part", kwargs={"language": PRIMARY, "part": n}) for n in range(1, 4)]
+    assert set(parts) <= set(found)
+    assert reverse("sitemap_language", kwargs={"language": PRIMARY}) not in found
+    total = 0
+    for part in parts:
+        response = client.get(part)
+        assert response.status_code == 200
+        count = len(ElementTree.fromstring(response.content).findall("s:url", NS))  # noqa: S314
+        assert count <= 2
+        total += count
+    assert total >= 5
+    assert client.get(reverse("sitemap_language", kwargs={"language": PRIMARY})).status_code == 404
 
 
 def test_an_unknown_language_has_no_sitemap(client: Client) -> None:
