@@ -42,7 +42,7 @@ from django.utils.module_loading import import_string
 from apps.core import session_policy
 from apps.core.audit import audit_context, record, user_context
 from apps.core.models import ELEVATE_CODENAME
-from apps.core.services import NoPlatformOperator, current_operator
+from apps.core.services import NoPlatformOperator, OverlappingPlatformOperators, current_operator
 
 from . import services
 from .models import ElevationGrant, PasskeyDevice, User
@@ -81,16 +81,38 @@ PROMPT: Final = "accounts.session.prompt"
 REGISTERED_ACTIONS: set[str] = set()
 
 
-def policy() -> session_policy.SessionPolicy:
+POLICY_ATTR: Final = "_mpmv_session_policy"  # the policy read once per request
+
+
+def policy(request: HttpRequest | None = None) -> session_policy.SessionPolicy:
     """The policy of the current `PlatformOperator`; the D-32 defaults before one exists.
 
-    A stored mapping that no longer parses (the model validates it, so this is old or hand-made
-    data) fails CLOSED: every action is critical until it is fixed, and the error is logged.
+    With `request`, it is read once per request and kept on it. A stored mapping that no longer
+    parses (the model validates it, so this is old or hand-made data), or operator versions that
+    overlap, fail CLOSED: every action is critical and the session lifetimes keep their
+    defaults until it is fixed, and the error is logged. Never a server error on every request.
     """
+    if request is not None:
+        cached = getattr(request, POLICY_ATTR, None)
+        if isinstance(cached, session_policy.SessionPolicy):
+            return cached
+    found = _read_policy()
+    if request is not None:
+        setattr(request, POLICY_ATTR, found)
+    return found
+
+
+def _read_policy() -> session_policy.SessionPolicy:
     try:
         raw = current_operator().session_policy
     except NoPlatformOperator:
         return session_policy.DEFAULT_POLICY
+    except OverlappingPlatformOperators:
+        logger.error(
+            "Several PlatformOperator versions apply now: the session policy fails closed "
+            "(all critical, default lifetimes)."
+        )
+        return session_policy.FAIL_CLOSED_POLICY
     try:
         return session_policy.parse_policy(raw)
     except ValueError:
@@ -104,7 +126,7 @@ def stored_policy_error() -> str:
         session_policy.parse_policy(current_operator().session_policy)
     except NoPlatformOperator:
         return ""
-    except ValueError as exc:
+    except (ValueError, OverlappingPlatformOperators) as exc:
         return str(exc)
     return ""
 
@@ -240,7 +262,7 @@ def seconds_left(request: HttpRequest) -> int | None:
     started, active = request.session.get(STARTED_KEY), request.session.get(ACTIVITY_KEY)
     if started is None or active is None:
         return None
-    pol = policy()
+    pol = policy(request)
     now = time.time()
     left = min(started + pol.cap_minutes * 60 - now, active + pol.idle_minutes * 60 - now)
     from . import lifetimes  # lifetimes imports this module
@@ -269,7 +291,7 @@ def open_window(request: HttpRequest, *, shop: str | None = None) -> None:
     else:
         session[WINDOW_SHOP_KEY] = shop
     session[ACTIVITY_KEY] = now
-    pol = policy()
+    pol = policy(request)
     after: dict[str, Any] = {
         "kind": "session",
         "idle_minutes": pol.idle_minutes,
@@ -323,7 +345,7 @@ def refresh(request: HttpRequest) -> None:
         return
     now = time.time()
     why = session_policy.expiry(
-        policy(),
+        policy(request),
         started_at=_number(session.get(STARTED_KEY)),
         last_activity=_number(session.get(ACTIVITY_KEY)),
         now=now,

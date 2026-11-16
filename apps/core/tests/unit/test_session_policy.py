@@ -165,6 +165,10 @@ def test_a_staff_lifetime_ends_on_idle_and_on_the_absolute_limit() -> None:
         (1000.0, None),
         (1000.0 + 3600, 1000.0 + 3600),  # signed in an hour in the future
         (1000.0, 1000.0 + 3600),  # seen an hour in the future
+        (float("nan"), 1000.0),  # not a number: every comparison is false
+        (1000.0, float("nan")),
+        (float("-inf"), 1000.0),
+        (1000.0, float("inf")),
         (1000.0, 900.0),  # seen before the sign-in
     ],
 )

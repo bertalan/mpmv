@@ -26,6 +26,7 @@ Policies stored before the wording change use the list keys `restricted`, `opera
 `passkey`; `parse_policy` reads them as `everyday`, `sensitive` and `critical`.
 """
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final
@@ -276,11 +277,13 @@ def lifetime_expiry(
 ) -> str | None:
     """Why a session is over at `now`: "absolute", "idle", "invalid"; None if it lives.
 
-    Stamps that are missing, in the future (beyond a small clock skew) or out of order are
-    "invalid": the session fails closed.
+    Stamps that are missing, not finite (NaN, infinity), in the future (beyond a small clock
+    skew) or out of order are "invalid": the session fails closed.
     """
     if signed_in_at is None or last_seen is None:
         return "invalid"
+    if not (math.isfinite(signed_in_at) and math.isfinite(last_seen)):
+        return "invalid"  # NaN compares false to everything: it would never expire
     if max(signed_in_at, last_seen) > now + STAMP_SKEW_SECONDS or last_seen < signed_in_at:
         return "invalid"
     if lifetime.absolute_seconds is not None and now - signed_in_at >= lifetime.absolute_seconds:

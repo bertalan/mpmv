@@ -16,7 +16,9 @@ import pytest
 from django.contrib.auth import SESSION_KEY
 from django.contrib.auth.models import Permission
 from django.contrib.sessions.models import Session
+from django.db import connection
 from django.test import Client, RequestFactory
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -394,3 +396,39 @@ def test_a_session_from_before_the_lifetimes_with_no_index_row_starts_now() -> N
     UserSession.objects.all().delete()
     assert client.get(LIST).status_code == 200
     assert client.session[lifetimes.SIGNED_IN_KEY] == pytest.approx(time.time(), abs=30)
+
+
+# --- Cost: the lifetime is decided once per request
+
+
+def _request_of(client: Client, user: User) -> Any:
+    request = RequestFactory().get(LIST)
+    request.session = client.session
+    request.user = user
+    return request
+
+
+@pytest.mark.parametrize("make", [customer_client, staff_client])
+def test_the_lifetime_is_decided_once_per_request(make: Any) -> None:
+    user, client = make()
+    session = client.session
+    session[levels.STARTED_KEY] = session[levels.ACTIVITY_KEY] = time.time()  # the banner asks
+    session.save()
+    request = _request_of(client, user)
+    with CaptureQueriesContext(connection) as first:
+        assert lifetimes.enforce(request) is None
+    assert len(first) <= 7
+    with CaptureQueriesContext(connection) as again:
+        lifetimes.lifetime_for_request(request)
+        lifetimes.seconds_left(request)
+        levels.seconds_left(request)  # the passkey window banner
+        levels.policy(request)
+    assert len(again) == 0
+
+
+def test_the_per_request_lifetime_follows_a_change_of_user() -> None:
+    customer, client = customer_client()
+    request = _request_of(client, customer)
+    assert lifetimes.lifetime_for_request(request).kind == "customer"
+    request.user = UserFactory.create(staff=True)
+    assert lifetimes.lifetime_for_request(request).kind == "staff"

@@ -13,14 +13,16 @@ from typing import Any
 import pytest
 from django.contrib.auth import SESSION_KEY
 from django.contrib.sessions.models import Session
-from django.test import Client
+from django.test import Client, RequestFactory
 from django.urls import reverse
 
 from apps.accounts import levels, lifetimes
 from apps.accounts.models import User, UserSession
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import password_login, totp_token, verified_login
+from apps.core import session_policy
 from apps.core.models import AuditLog, PlatformOperator
+from apps.core.services import OverlappingPlatformOperators
 from apps.core.tests.factories import PlatformOperatorFactory
 
 pytestmark = pytest.mark.django_db
@@ -124,6 +126,10 @@ def test_a_post_on_an_expired_session_does_nothing() -> None:
         {lifetimes.SEEN_KEY: None},
         {lifetimes.SIGNED_IN_KEY: datetime.now(UTC).timestamp() + 3600},
         {lifetimes.SEEN_KEY: datetime.now(UTC).timestamp() + 3600},
+        {lifetimes.SIGNED_IN_KEY: float("nan")},  # would never expire if trusted
+        {lifetimes.SEEN_KEY: float("nan")},
+        {lifetimes.SIGNED_IN_KEY: float("-inf")},
+        {lifetimes.SEEN_KEY: float("inf")},
     ],
 )
 def test_a_session_with_a_broken_stamp_fails_closed(stamps: dict[str, Any]) -> None:
@@ -165,3 +171,36 @@ def test_the_storage_expiry_never_outlives_the_staff_lifetime_by_more_than_the_g
     _, client = _staff_session()
     stored = Session.objects.get(session_key=client.cookies["sessionid"].value).expire_date
     assert stored <= datetime.now(UTC) + dt.timedelta(minutes=30) + lifetimes.grace()
+
+
+def test_overlapping_operator_versions_fail_closed_to_the_default_lifetimes(
+    caplog: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two operator versions covering now: no 500 on every request, the default (strict)
+    lifetimes apply and the configuration error is logged.
+
+    The database's exclusion constraint already refuses overlapping rows, so the lookup is made
+    to report them (data restored by hand, a constraint dropped by a bad migration)."""
+
+    def overlapping(at: object = None) -> PlatformOperator:
+        raise OverlappingPlatformOperators("two PlatformOperator rows apply")
+
+    PlatformOperatorFactory.create(open_ended=True, valid_from=datetime(2020, 1, 1, tzinfo=UTC))
+    monkeypatch.setattr(levels, "current_operator", overlapping)
+    assert levels.policy() == session_policy.FAIL_CLOSED_POLICY
+    assert "platformoperator" in caplog.text.lower()
+    assert levels.stored_policy_error()  # the admin warning names it too
+    _, client = _staff_session()
+    _age(client, 29 * 60)
+    request = RequestFactory().get(LIST)
+    request.session = client.session
+    request.user = _user_of(client)
+    assert lifetimes.enforce(request) is None  # 29 min idle: alive, no error
+    _age(client, 2 * 60)
+    response = client.get(LIST)
+    assert response.status_code == 302
+    assert _last_reason() == "idle"
+
+
+def _user_of(client: Client) -> User:
+    return User.objects.get(pk=client.session[SESSION_KEY])

@@ -28,6 +28,7 @@ reason. The user is then sent to the login page with a message (JSON clients get
 
 import datetime as dt
 import logging
+import math
 import time
 from typing import Any, Final
 
@@ -57,6 +58,8 @@ logger = logging.getLogger(__name__)
 
 SIGNED_IN_KEY: Final = "session_signed_in_at"  # epoch seconds of the sign-in; never moved
 SEEN_KEY: Final = "session_last_seen"  # epoch seconds of the last use (within the cadence)
+
+LIFETIME_ATTR: Final = "_mpmv_session_lifetime"  # (user pk, Lifetime) for this request
 
 SESSION_EXPIRED: Final = "accounts.session.expired"
 # The system ends the session, not the user: no actor, no IP, no personal data in the entry.
@@ -96,17 +99,35 @@ def is_strict(user: AbstractBaseUser | AnonymousUser) -> bool:
         return True
 
 
-def lifetime_for(user: AbstractBaseUser | AnonymousUser) -> session_policy.Lifetime:
-    return session_policy.lifetime_of(levels.policy(), strict=is_strict(user))
+def lifetime_for(
+    user: AbstractBaseUser | AnonymousUser, request: HttpRequest | None = None
+) -> session_policy.Lifetime:
+    return session_policy.lifetime_of(levels.policy(request), strict=is_strict(user))
+
+
+def lifetime_for_request(request: HttpRequest) -> session_policy.Lifetime:
+    """The lifetime of this request's user, decided once per request (the staff checks and the
+    policy cost a few queries) and kept on the request for that user only."""
+    user = request.user
+    cached = getattr(request, LIFETIME_ATTR, None)
+    if isinstance(cached, tuple) and cached[0] == user.pk:
+        lifetime: session_policy.Lifetime = cached[1]
+        return lifetime
+    lifetime = lifetime_for(user, request)
+    setattr(request, LIFETIME_ATTR, (user.pk, lifetime))
+    return lifetime
 
 
 # --- The stamps
 
 
 def _stamp(value: object) -> float | None:
+    """A stored stamp as a finite number, else None (refused as `invalid`): NaN compares false
+    to everything, so a NaN stamp would never expire."""
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
-    return float(value)
+    number = float(value)
+    return number if math.isfinite(number) else None
 
 
 def _store_expiry(
@@ -146,7 +167,7 @@ def seconds_left(request: HttpRequest) -> int | None:
     signed_in, seen = stamps(request.session)
     if signed_in is None or seen is None:
         return None
-    lifetime = lifetime_for(request.user)
+    lifetime = lifetime_for_request(request)
     deadline = session_policy.lifetime_deadline(lifetime, signed_in_at=signed_in, last_seen=seen)
     return max(0, int(deadline - time.time()))
 
@@ -165,7 +186,7 @@ def enforce(request: HttpRequest) -> HttpResponse | None:
     if not isinstance(user, User):
         return None
     now = time.time()
-    lifetime = lifetime_for(user)
+    lifetime = lifetime_for_request(request)
     unstamped = SIGNED_IN_KEY not in session and SEEN_KEY not in session
     if unstamped:
         signed_in: float | None = _sign_in_of_unstamped(session, now)

@@ -143,12 +143,15 @@ def test_the_confirming_state_polls_until_the_webhook_marks_the_order_paid(
     page = client.get(reverse("orders:confirmation")).content.decode()
     assert 'hx-get="' + reverse("orders:confirmation") + '"' in page
     assert 'hx-trigger="every 3s"' in page
+    # CORE.24/CORE.25: the poll is not use, so it keeps neither the session nor a window alive.
+    assert """hx-headers='{"X-MPMV-Poll": "1"}'""" in page
     assert "<script>" not in page
     assert "onclick" not in page
     # A poll before the webhook: still confirming, still polling, the order still unpaid.
     poll = client.get(reverse("orders:confirmation"), HTTP_HX_REQUEST="true").content.decode()
     assert "<html" not in poll
     assert "hx-trigger" in poll
+    assert '"X-MPMV-Poll": "1"' in poll
     assert "confirming" in poll
     order.refresh_from_db()
     assert order.state == "awaiting_payment"
