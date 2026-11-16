@@ -275,6 +275,20 @@ To add or update baselines after a reviewed, intentional change:
 
 The first baselines for `base` and `ride` are committed by THM.10.
 
+## Bootstrap foundation (THM.13)
+
+- A theme opts in with `foundation = "bootstrap-5.3"` in `theme.toml`.
+- The vendored files live under `static/themes/<slug>/vendor/bootstrap/` and are never edited: they
+  are hash-checked against the `VENDORED.toml` beside them, marked `-text` in `.gitattributes` and
+  excluded from the pre-commit end-of-file and whitespace hooks.
+- To update, replace the files from an official 5.3.x release, update the SHA-256 values in
+  `VENDORED.toml` and copy the upstream `LICENSE` verbatim.
+- Bootstrap loads inside `@layer bootstrap`; the design tokens map onto the `--bs-*` variables.
+  Base's layout has a `foundation_scripts` block for the bundle. The build drops the
+  `sourceMappingURL` comment from the built copies.
+- Per-theme budgets: `css_budget_kb` and `js_budget_kb` in `theme.toml` (ride: 48 and 70).
+- A ride override must start from the current base template and get a render test under ride.
+
 ## The `ride` theme (THM.6)
 
 `themes/ride/` is the first vertical theme (`parent = "base"`). It was written clean-room from the
