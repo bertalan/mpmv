@@ -1,0 +1,34 @@
+{% load i18n theme_tags %}{% comment %}
+Multi-item strip of the `ride` theme (THM.14): products, vendors, testimonials or blog posts in a
+Bootstrap carousel. The items are grouped by the `in_groups` filter, one group per slide, so a
+slide shows up to `per_view` items side by side (fewer columns on a narrow screen: the group
+wraps). Previous, Pause/Play and Next are buttons, the indicators are labelled buttons, the
+arrow keys work once the focus is inside. Nothing moves unless `autoplay` is set; then it
+pauses on hover and focus and never runs under `prefers-reduced-motion`. Without JavaScript all
+items are listed one after the other.
+
+  {% include "components/strip.html" with id="featured" label=_("Featured products") slides=products per_view=4 only %}
+
+Context:
+- `id` (required): unique on the page; `label` (required): the carousel's accessible name.
+- `slides`: a list of `title`, optional `text`, `meta`, `url`, `image_url` and `image_alt`
+  (a testimonial: `text` is the quote, `title` the author).
+- `per_view`: items per slide, 1 to 4 (default 4); `heading_level`: of the item titles (default 3).
+- `autoplay` (default off) and `interval` in ms (default 6000).
+{% endcomment %}{% firstof per_view 4 as size %}{% with groups=slides|in_groups:size %}{% with total=groups|length %}<section class="carousel slide ride-carousel ride-strip ride-strip--per-{{ size }}" id="{{ id }}" aria-roledescription="carousel" aria-label="{{ label }}" data-ride-carousel{% if autoplay %} data-autoplay="{{ interval|default:6000 }}"{% endif %}>
+  {% if total > 1 %}{% include "components/carousel_controls.html" with id=id autoplay=autoplay only %}{% endif %}
+  <div class="carousel-inner" id="{{ id }}-slides" aria-live="{% if autoplay %}off{% else %}polite{% endif %}">
+    {% for group in groups %}{% blocktranslate asvar slide_label with count=forloop.counter total=total %}{{ count }} of {{ total }}{% endblocktranslate %}<div class="carousel-item{% if forloop.first %} active{% endif %}" role="group" aria-roledescription="slide" aria-label="{{ slide_label }}">
+      <ul class="ride-strip__group" role="list">
+        {% for slide in group %}<li class="ride-strip__item">
+          {% if slide.image_url %}<img src="{{ slide.image_url }}" alt="{{ slide.image_alt|default:'' }}" width="400" height="400" loading="lazy">{% endif %}
+          <h{{ heading_level|default:3 }} class="ride-strip__title">{% with href=slide.url|safe_href %}{% if href %}<a href="{{ href }}">{{ slide.title }}</a>{% else %}{{ slide.title }}{% endif %}{% endwith %}</h{{ heading_level|default:3 }}>
+          {% if slide.meta %}<p class="ride-strip__meta">{{ slide.meta }}</p>{% endif %}{% if slide.text %}<p>{{ slide.text }}</p>{% endif %}
+        </li>{% endfor %}
+      </ul>
+    </div>{% endfor %}
+  </div>
+  {% if total > 1 %}<div class="carousel-indicators ride-carousel__indicators">
+    {% for group in groups %}{% blocktranslate asvar indicator_label with count=forloop.counter total=total %}Go to slide {{ count }} of {{ total }}{% endblocktranslate %}<button type="button" data-bs-target="#{{ id }}" data-bs-slide-to="{{ forloop.counter0 }}"{% if forloop.first %} class="active" aria-current="true"{% endif %} aria-label="{{ indicator_label }}" hidden></button>{% endfor %}
+  </div>{% endif %}
+</section>{% endwith %}{% endwith %}

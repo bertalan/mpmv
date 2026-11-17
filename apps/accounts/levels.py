@@ -65,6 +65,10 @@ MAX_SHOP_OFFERS: Final = 8
 
 # Shop-space actions a vendor owner may confirm for their own shop (D-32 amendment 2026-11-14).
 SHOP_OWNER_ACTIONS: Final = frozenset({"payout_details", "sales_terms_publish"})
+# Order actions a shop member with the ORDERS right (the owner included) may confirm "once" for
+# that shop (ORD.20 part 3, spec 07 Roles and the passkey): the refund of an order amendment
+# (the PAY.7 grant) and an address change. Never with a passkey window: each is critical.
+SHOP_ORDERS_ACTIONS: Final = frozenset({"vendor_refund", "order_amend_address"})
 
 SESSION_STARTED: Final = "accounts.session.window_started"
 SESSION_ENDED: Final = "accounts.session.window_ended"
@@ -180,22 +184,34 @@ def is_shop_owner(user: AbstractBaseUser | AnonymousUser, shop: object) -> bool:
         return False
 
 
+def handles_shop_orders(user: AbstractBaseUser | AnonymousUser, shop: object) -> bool:
+    """Whether `user` is a member of `shop` with the ORDERS right now, through
+    `settings.SHOP_ORDERS_CHECK` (read on each call). Fails closed like `is_shop_owner`."""
+    try:
+        check = import_string(settings.SHOP_ORDERS_CHECK)
+        return bool(check(user, shop))
+    except Exception:
+        logger.exception("SHOP_ORDERS_CHECK failed: treated as not handling orders")
+        return False
+
+
 def may_confirm(user: AbstractBaseUser | AnonymousUser, action: str, shop: object | None) -> bool:
     """Whether `user` may confirm `action` with a passkey here, once or with a window.
 
     Staff with `core.elevate` may, as before. A vendor owner may only for an action of
-    `SHOP_OWNER_ACTIONS` on `shop`, a shop they own (re-checked on each call), with a passkey.
+    `SHOP_OWNER_ACTIONS` on `shop`, a shop they own (re-checked on each call), with a passkey. A
+    member with the ORDERS right (owners included) may for an action of `SHOP_ORDERS_ACTIONS` on
+    that shop (ORD.20), re-checked the same way.
     """
     if may_elevate(user):
         return True
-    return (
-        shop is not None
-        and action in SHOP_OWNER_ACTIONS
-        and isinstance(user, User)
-        and user.is_active
-        and has_passkey(user)
-        and is_shop_owner(user, shop)
-    )
+    if not (shop is not None and isinstance(user, User) and user.is_active and has_passkey(user)):
+        return False
+    if action in SHOP_OWNER_ACTIONS:
+        return is_shop_owner(user, shop)
+    if action in SHOP_ORDERS_ACTIONS:
+        return handles_shop_orders(user, shop)
+    return False
 
 
 def offer_shop_confirmation(request: HttpRequest, action: str, digest: str, shop: object) -> None:
@@ -210,14 +226,22 @@ def offer_shop_confirmation(request: HttpRequest, action: str, digest: str, shop
     request.session[SHOP_OFFERS_KEY] = offers[-MAX_SHOP_OFFERS:]
 
 
-def shop_offer(request: HttpRequest, action: str | None = None, digest: str | None = None) -> str:
-    """The shop of the newest offer to this vendor owner matching `action` and `digest` (any
-    offer when both are None), or "". Never for a deactivated user or one without a passkey."""
+def shop_offer(
+    request: HttpRequest,
+    action: str | None = None,
+    digest: str | None = None,
+    *,
+    window: bool = False,
+) -> str:
+    """The shop of the newest offer to this vendor member matching `action` and `digest` (any
+    offer when both are None), or "". `window=True` considers only the owner actions, the only
+    ones a passkey window may cover. Never for a deactivated user or one without a passkey."""
     user = request.user
     if not (isinstance(user, User) and user.is_active and has_passkey(user)):
         return ""
+    offered = SHOP_OWNER_ACTIONS if window else SHOP_OWNER_ACTIONS | SHOP_ORDERS_ACTIONS
     for offer in reversed(request.session.get(SHOP_OFFERS_KEY, [])):
-        if not isinstance(offer, Mapping) or offer.get("action") not in SHOP_OWNER_ACTIONS:
+        if not isinstance(offer, Mapping) or offer.get("action") not in offered:
             continue
         if action is None or (offer.get("action") == action and offer.get("digest") == digest):
             shop = offer.get("shop")

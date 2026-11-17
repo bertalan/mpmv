@@ -322,7 +322,7 @@ treats **user-interface customisation** cookies as exempt when they are set beca
 setting (a language, a layout) and are limited to that purpose. A garage that the user created by
 pressing a button, that holds no identifier and is used for nothing else, is argued to fit.
 The condition list that keeps it inside the exemption: set only on the explicit action, only the
-selection inside, no identifier, never read by analytics, advertising or the Consent Mode tags
+selection inside, no identifier, never read by analytics (Matomo), advertising or the Consent Mode tags
 (SEO.5), duration tied to the purpose, plain-language information next to the button
 ("This stays on this device so the shop remembers your choice. It is not used for anything else.").
 **Decided (owner, 2026-11-11, Q-G1, adviser opinion 2026-11-11):** the cookie is technical and needs no consent, on

@@ -592,3 +592,16 @@ def test_rest_of_the_world_zone_takes_no_patterns_or_provinces() -> None:
             ShippingZoneFactory.build(world=True, **fields).full_clean()
         with refused(), transaction.atomic():
             ShippingZoneFactory.create(world=True, **fields)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_country_group_seed_with_italian_primary_language(settings: Any) -> None:
+    """I18N.15: the seed must not create the same language twice when the primary is 'it'."""
+    CountryGroup.objects.all().delete()
+    settings.LANGUAGE_CODE = "it"
+    importlib.import_module("apps.shipping.migrations.0005_seed_country_groups").seed(apps, None)
+    group = CountryGroup.objects.get(code="africa")
+    rows = list(group.translations.values_list("language", "name"))
+    assert rows == [("it", "Africa")]
+    europe_like = CountryGroup.objects.get(code="americas")
+    assert list(europe_like.translations.values_list("name", flat=True)) == ["Americhe"]
