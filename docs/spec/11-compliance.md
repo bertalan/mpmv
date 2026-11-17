@@ -767,9 +767,9 @@ which plans include the module is a plan setting the platform owner configures; 
 single function. The read API (CMP.36), the return path (CMP.38) and the webhooks (CMP.37) all go
 through it: a vendor whose plan lacks the module gets 403 on every accounting route and no webhook
 delivery is made. Data already exported stays the vendor's, and losing the entitlement keeps the
-vendor's endpoints and references (VEN.19). The module's terms (CMP.24 wording) state that the sync of the
-vendor's document references serves administrative reconciliation only and does not replace the
-vendor's own legal duty to keep its invoices (tax adviser opinion 2026-11-17).
+vendor's endpoints and references (VEN.19). The module's terms (CMP.24 wording) state that the
+sync of the vendor's document references serves administrative reconciliation only and does not
+replace the vendor's own legal duty to keep its invoices (tax adviser opinion 2026-11-17).
 
 ### CMP.24 — Approval of legal wording `[P1]`
 - Owner answer to Q-70 (2026-11-07): the team and the agents draft the legal wording, and legal
