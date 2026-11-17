@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **442** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3498 h** (P1 2610 h · P2 800 h · P3 88 h)
+- Micro-tasks: **443** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3501 h** (P1 2610 h · P2 800 h · P3 91 h)
 - P1 critical path (schedule lower bound with full parallelism): **197 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → PAY.7 → ORD.20 → ORD.21 → ORD.22 → ORD.23
 
 ## By macro area
@@ -16,7 +16,7 @@
 |---|---|---:|---:|---:|---:|---:|
 | ARC | Architecture and foundations | 35 | 232 | 52 | 0 | 284 |
 | CORE | Identity, permissions, API, backoffice | 32 | 224 | 4 | 6 | 234 |
-| CAT | Product catalog | 27 | 162 | 81 | 0 | 243 |
+| CAT | Product catalog | 28 | 162 | 81 | 3 | 246 |
 | VEN | Vendors, commissions, ledger | 40 | 298 | 35 | 0 | 333 |
 | TAX | Tax engine | 22 | 98 | 37 | 0 | 135 |
 | SHP | Shipping and quotes | 15 | 96 | 30 | 0 | 126 |
@@ -36,7 +36,7 @@
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 14 | 25 | 37 | 8 | 70 |
 | MIG | Migration and cutover | 22 | 141 | 29 | 0 | 170 |
-| **Total** | | **442** | **2610** | **800** | **88** | **3498** |
+| **Total** | | **443** | **2610** | **800** | **91** | **3501** |
 
 ## By phase
 
@@ -507,11 +507,12 @@
 | MIG.19 | Coupons are not migrated (D-17; coupons as a feature belong to D-39, issue #243 and the promotions spec 18, still under review): the extractor reports the coupon posts that exist, and the historical coupon lines of migrated orders are kept as read-only order lines | P2 | 1 | MIG.4 | A migrated order with a coupon line shows it unchanged and read-only; the run report lists the unmigrated coupons; no coupon is created in the new system by the migration (the listing of still-valid coupons for the pre-cutover expiry announcement is a MIG.9 step) |
 | MIG.21 | Store reviews and product enquiries export (owner decision 2026-11-11, relayed by lane-a, #86): store reviews and enquiries (marketplace tables) are not migrated into MPMV; the extractor exports each vendor's own to a file for that vendor | P2 | 2 | MIG.1, MIG.16 | Each vendor gets a file with only its own store reviews and enquiries; none is created in the new system; another vendor's data never appears in a file |
 
-### F7 — Later evolution (P3) (10 tasks, 88 h)
+### F7 — Later evolution (P3) (11 tasks, 91 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
 | CORE.22 | Optional four-eyes rule for publishers (follow-up of CORE.18; the owner decides whether it is wanted, so no work starts before that decision is recorded in spec 92): a setting under which a page or product publication by one publisher needs approval from a second person with the publisher role, with an `AuditLog` entry for both | P3 | 6 | CORE.18, SEC.4 | With the rule on, a single publisher cannot publish alone and both people appear in the audit log; with the rule off, behaviour is unchanged |
+| CAT.28 | Database-side filter in `events.services.search_events` (follow-up of the CAT.27 review, 2026-11-17): the search results page loads every public event and filters in Python; filter title, summary, venue and city in the database, keeping the EVT.8 language fallback, and bound the rows read | P3 | 3 | CAT.27, EVT.8 | A search on a catalogue of 500 public events reads a bounded number of rows; the results and their order are the same as before; hidden, draft and suspended-vendor events still never appear |
 | PAY.6 | Non-split payment methods (proposed by lane-b on the owner's request for ideas, D-09, 2026-11-11; spec only, no code now, waits for the owner to schedule it; D-08 decided, adviser opinion 2026-11-11): allowed **only when the customer pays the vendor directly**, never with customer money collected on the operator's bank account; for such a method the platform fee becomes the platform's own receivable on the vendor, netted from the vendor's next Stripe payout; when the balance does not cover it, a vendor SEPA direct-debit mandate (signed in the Manager, audited, revocable) is the fallback; unpaid receivables are listed for staff and block nothing at checkout until the owner sets a ceiling; refunds of such orders reverse the receivable | P3 | 16 | PAY.5, PAY.4, VEN.4 | Owner schedules the build (counsel's D-08 answer is in); then: a non-split order is possible only with the vendor as the payee of the customer's payment (a test refuses a configuration where the operator receives it); it creates a receivable equal to the platform fee; the next payout is reduced by it; with too little balance a debit is requested under the mandate; a refund reverses the receivable; the ledger stays append-only and sums to the order |
 | PRM.14 | Measurement: stable holdout, dispatch log, report with recovery rate, incremental, cannibalised, cost per incremental order and incremental margin; vendor aggregate view with a minimum cell size | P3 | 10 | PRM.12 | RCV-HOLDOUT green; a vendor never sees a cell under 10 users or any individual |
 | TRU.10 | Vendor updates: vendor-authored `BlogPostPage` through a Manager form, limited blocks, `Author` linked to a vendor, first-3-posts pre-approval then post-moderation | P3 | 10 | CMS.3, CMS.12, TRU.4, CORE.9 | A vendor member writes a post that goes to moderation; raw HTML and embeds are refused; the vendor's storefront lists the approved posts |
