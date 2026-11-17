@@ -101,3 +101,30 @@ def test_a_placeholder_renders_the_operators_current_value() -> None:
     assert content is not None
     assert "help@operator.example" in content.html
     assert "{{" not in content.html
+
+
+def test_the_modal_of_a_covered_route_shows_that_files_text_in_the_users_language(
+    tmp_path: Path,
+) -> None:
+    """The help lookup the modal uses: the route's own file wins over the general text, in the
+    user's language, then the primary language, then the general entry."""
+    cache.clear()
+    write(tmp_path, "en", "route", "manager__shop__orders", "Orders help", "English orders body.")
+    write(tmp_path, "it", "route", "manager__shop__orders", "Aiuto ordini", "Corpo ordini.")
+    write(tmp_path, "en", "general", "general", "General help", "General body.")
+    help_sync.sync_help(root=tmp_path)
+    italian = help_lookup.help_for("manager:shop:orders", "", "it")
+    assert italian is not None
+    assert (italian.title, italian.source) == ("Aiuto ordini", "route")
+    assert "Corpo ordini." in italian.html
+    english = help_lookup.help_for("manager:shop:orders", "", "en")
+    assert english is not None
+    assert english.title == "Orders help"
+    # No German file: the primary language answers, never another language.
+    fallback = help_lookup.help_for("manager:shop:orders", "", "de")
+    assert fallback is not None
+    assert fallback.title == "Orders help"
+    # A route with no file of its own falls back to the general entry.
+    other = help_lookup.help_for("manager:shop:other", "", "it")
+    assert other is not None
+    assert (other.title, other.source) == ("General help", "general")

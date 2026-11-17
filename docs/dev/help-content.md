@@ -40,6 +40,8 @@ Plain Markdown. Short sentences for a non-technical reader.
   features (headings become h4, bold, italic, lists, links). Anything else is dropped.
 - Tone follows I18N.13: DE, FR and ES are formal for vendor and staff screens and informal for
   customer screens. DE, FR and ES are AI drafts until the translator's review (I18N.19).
+  The general entry is the exception: every role sees it, vendors and staff included, so it is
+  written in the formal register in all of DE (Sie), FR (vous), ES (usted) and IT (Lei).
 
 ## Placeholders
 
@@ -55,10 +57,18 @@ settings when the dialog is shown (never cached), HTML-escaped. An unknown place
 `manage.py sync_help [--dry-run]` creates or updates one `HelpEntry` per file, in the languages
 that exist as Locales. It is idempotent and the files win: a staff row with the same language,
 kind and key is replaced and marked `source="file"`. Rows made by file are read-only in the
-Wagtail snippet admin; rows staff made for other keys stay editable. A row whose file was removed
+Wagtail snippet admin for everyone, the superuser included (the permission policy refuses
+change and delete on them, and the edit, delete and copy views answer 403); rows staff made for other keys stay editable. A row whose file was removed
 is reported (`orphan`) and kept. `seed` calls it (a dry run stays a dry run), and the migrate
 step of the container (`deploy/container/entrypoint.sh`, used by `mpmv-migrate`) runs it after
-`migrate`; a failure there is logged and does not block a release.
+`migrate`; a failure there does not block a release (a bad file is caught by the test suite
+first; stale help is cosmetic, not a safety risk) but logs one greppable line to stderr:
+`ERROR sync_help failed: ...`. See the deploy runbook (`deploy/README.md`, "Help texts after a
+deploy") when help looks stale after a release.
+
+Decision (ARC.36): `sync_help` writes no `AuditLog`. The content comes from versioned files, so
+git history is the audit trail (who, when, why, reviewed in a PR); the command prints its
+`ChangeSet`. Staff edits of rows they made are not audited either.
 
 ## The coverage sweep and the baseline
 
@@ -78,6 +88,25 @@ Other checks: a file naming a route or page type that no longer exists fails; ea
 files in all five languages with the same placeholders; the general entry exists. The test also
 prints a warning (never a failure) when the route's view module or a template named in its view
 changed in git after the file's `last-checked` date: re-read the screen, then update the date.
+
+### Why most admin routes are not in the universe yet
+
+`SPACE_NAMES` in the sweep lists nine Wagtail and Django admin screens. The rest (page chooser
+variants, snippets of other models, users, groups, reports, workflows, the django-admin models)
+is deferred to ARC.37 part 4: they are the frameworks' own screens, the admin help button is one
+generic entry per screen family rather than per route name, and each needs a decision on what a
+role may see there. ARC.37 part 4 owns them and widens `SPACE_NAMES`; until then the debt is
+recorded here and in the sweep module's docstring.
+
+### Enabled languages and the baseline gate
+
+The sweep requires files in every enabled language, read from `settings.LANGUAGES` (the effective
+set after the I18N.19 gate, via `MPMV_LANGUAGES`): when the gate lifts DE, FR and ES, the sweep
+follows without an edit. The test suite runs with all five.
+
+The baseline never grows: adding a key to `tests/help_coverage_baseline.txt` is not allowed and
+reviewers reject it. The sweep fails on a line that has files or names a route that is gone,
+and warns when a key is not on `origin/main`'s baseline (where git and that ref exist).
 
 ## Rule for every PR
 

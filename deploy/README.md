@@ -197,6 +197,11 @@ before the other style binds them, so the first deploy with the socket and a rol
 from before it switch by themselves. If the migration fails, the live units and tag come back and
 nothing restarts.
 
+Help texts after a deploy: the migrate step also runs `sync_help` (ARC.36). If it fails, the
+release goes on and the step logs one line, `ERROR sync_help failed: ...`; find it with
+`journalctl --user -u mpmv-migrate | grep 'ERROR sync_help'` (or the deploy output). Fix the
+named help file and run it again with the `manage sync_help` process type, or redeploy.
+
 The check then polls, for at most `MPMV_CHECK_BUDGET` seconds (40), the app's health check and,
 through Caddy on this host (`curl --resolve <site>:443:127.0.0.1`, the site name read from
 `caddy.env`), `/healthz`, the home page and one `.webp` file of the media volume. If the app
