@@ -20,6 +20,7 @@ class CatalogConfig(AppConfig):
         "brand",
         "brandbatch",
         "manufacturer",
+        "productimage",
     )
     unaudited_models = {
         "pricehistory": "append-only record of price settings; every one is written by the audited "
@@ -42,6 +43,9 @@ class CatalogConfig(AppConfig):
         "attributetranslation": "storefront texts under the translation workflow",
         "attributevalue": "values of a choice attribute and their order; no money or access",
         "attributevaluetranslation": "storefront texts under the translation workflow",
+        # CAT.4: the gallery is audited by `catalog.media`; texts follow the translation workflow.
+        "productimagetranslation": "alt text and captions under the translation workflow; "
+        "changes through media.set_text are audited",
         "productattribute": "catalog content describing a product; creation with variants is "
         "audited by services.create_product",
         "variantoption": "which value a variant takes on an axis; created and audited by "
