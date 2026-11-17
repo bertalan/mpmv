@@ -1,4 +1,4 @@
-# Sus datos
+# Tus datos
 last-checked: 2026-11-17
 
 ## Para qué sirve esta página

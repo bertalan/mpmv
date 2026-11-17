@@ -1,4 +1,4 @@
-# Ihre Daten
+# Deine Daten
 last-checked: 2026-11-17
 
 ## Wofür diese Seite da ist

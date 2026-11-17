@@ -1,4 +1,4 @@
-# Verifica tu identidad
+# Verifique su identidad
 last-checked: 2026-11-17
 
 ## Para qué sirve esta página
