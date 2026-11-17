@@ -44,6 +44,11 @@ fields and the map picker. Every change goes through the EVT.3 services (`save_e
 `submit_event`, `cancel_event`); POSTs carry the CORE.25 gate `content_edit`. Staff hide, restore
 and the `VendorEventPolicy` page live in the Wagtail admin (EVT.3).
 
+EVT.8: `events/<id>/translate/` adds one language to an event (`add_event_translation`); an
+event has an `original_locale`, a reader in a language the event lacks gets the original-language
+event (`events.engine.pick_language`), the listing has an "Only events in <language>" filter, and the
+event page lists `hreflang` alternates only for the languages that exist.
+
 ### Event emails (EVT.11)
 
 `apps/events/notifications.py` queues them through the ARC.16 outbox, in the recipient's language

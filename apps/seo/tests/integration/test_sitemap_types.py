@@ -110,7 +110,7 @@ def test_the_index_lists_only_types_that_have_urls(client: Client) -> None:
 
 def test_a_listed_file_is_valid_sitemap_xml(client: Client) -> None:
     published_product()
-    root = Site.objects.get(is_default_site=True).root_url
+    root = settings.WAGTAILADMIN_BASE_URL.rstrip("/")
     index = parse(client, reverse("sitemap"))
     for loc in index.findall("s:sitemap/s:loc", NS):
         assert (loc.text or "").startswith(root + "/sitemap-")

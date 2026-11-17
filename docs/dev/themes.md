@@ -329,7 +329,11 @@ public spec and a brief: no file derives from a reference template (spec 14 §14
   the external `ride.js` removes it; below 64rem the plain list shows only under `html.no-js`.
   Search is a link to the `search` route that Bootstrap opens as a modal; the mini-cart is a link
   to the cart that opens an offcanvas filled by HTMX from `orders:cart_mini`. `#cart-count` is a
-  polite live region, updated by `mini-cart.js`. Page banner and footer chrome are THM.15 part 3.
+  polite live region, updated by `mini-cart.js`. The page banner (`components/page_banner.html`: title, lead, breadcrumb, optional image under a
+  scrim) is built but no page includes it until THM.7 and THM.9 adopt it. The footer takes optional
+  `widgets` (up to four columns) and `social_links`, and ends with a back-to-top link: a plain
+  `#top` link, always visible without JavaScript, shown after 400 px of scroll with `ride.js`
+  (`html.is-scrolled`). No CMS setting feeds the widgets or social links yet (CMS.17).
 - **Not yet**: catalog, cart, checkout, account and content pages are THM.7 to THM.9. Pages that
   override the `head` block without `{{ block.super }}` lose the font preload only.
 

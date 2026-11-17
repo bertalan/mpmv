@@ -4,11 +4,10 @@
 Author page (CMS.3), `author/<slug>/` under a language's blog: the author's name, photo (with its
 CMS.8 credit), job title and bio in this language (hidden while untranslated, never another
 language's), profile links, then their live articles here, newest first, twelve per page.
-`page` is the blog index; the head carries the ProfilePage of the author's Person.
+`page` is the blog index; the page graph (SEO.7) holds the ProfilePage of the author's Person.
 {% endcomment %}
 {% block title %}{{ author.name }} · {{ page.title }} · {{ site_name }}{% endblock %}
 {% block description %}{% endblock %}
-{% block head %}{% jsonld_script jsonld %}{% endblock %}
 {% block page_content %}
   <section class="author-profile">
     <h1>{{ author.name }}</h1>
