@@ -1,0 +1,13 @@
+{% load i18n l10n responsive_images consumer_prices %}{# A product card (CAT.8) of `ride` (THM.7): a Bootstrap card. Needs `card` and `currency`. #}{% comment %}
+Copied from the app's includes/product_card.html: the same price rules (TAX.12, the consumer price
+tag, the owner's note; "Price on request" or "Price at checkout" when no amount may be shown) and
+the same hooks (`.product-card`, `.product-card-title`, `.product-card-price`). The image is
+decorative next to the title link, so the card has one link.
+{% endcomment %}
+<article class="product-card card h-100">
+  {% if card.image %}{% responsive_image card.image "card" alt=card.image_alt class="card-img-top" %}{% elif card.image_url %}<img class="card-img-top" src="{{ card.image_url }}" alt="{{ card.image_alt }}" loading="lazy">{% endif %}
+  <div class="card-body">
+    <h3 class="product-card-title card-title h5">{% if card.url %}<a class="stretched-link" href="{{ card.url }}">{{ card.title }}</a>{% else %}{{ card.title }}{% endif %}</h3>
+    <p class="product-card-price card-text mb-0">{% if card.price is None %}{% translate "Price on request" %}{% else %}{% consumer_price card.price card.fiscal_category card.vendor as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note text-body-secondary">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p>
+  </div>
+</article>
