@@ -5417,6 +5417,10 @@ msgstr "Denunciar este evento"
 msgid "Reported"
 msgstr "Denunciado"
 
+#: apps/cms/models.py
+msgid "Repository file"
+msgstr "Archivo del repositorio"
+
 #: apps/orders/templates/orders/_package.html
 msgid "Request a quote"
 msgstr "Solicitar un presupuesto"
@@ -6038,7 +6042,7 @@ msgstr "Resuelve los puntos anteriores para confirmar el pedido."
 msgid "Something went wrong"
 msgstr "Algo ha salido mal"
 
-#: apps/catalog/taxonomy.py
+#: apps/catalog/taxonomy.py apps/cms/models.py
 msgid "source"
 msgstr "origen"
 
@@ -10457,6 +10461,12 @@ msgstr ""
 " del fabricante: un producto que deje los cuatro vacíos usa los valores predeterminados de su "
 "vendedor."
 
+#: apps/cms/models.py
+msgid ""
+"Who owns the text. A text that comes from a repository file is read-only here: change the file and"
+" the next deploy updates it."
+msgstr "Quién gestiona el texto. Un texto que viene de un archivo del repositorio es de solo lectura aquí: cambia el archivo y la próxima versión lo actualiza."
+
 #: apps/vendors/models.py
 msgid ""
 "Who pays the direct cost of sending goods back after a withdrawal. Empty means you pay. The "
@@ -10613,6 +10623,10 @@ msgid ""
 msgstr ""
 "Escriba aquí su texto. Use la barra de herramientas para títulos, negrita, listas y enlaces. Un "
 "título hace que la página sea más fácil de leer."
+
+#: apps/cms/models.py
+msgid "Written in the admin"
+msgstr "Escrito en la administración"
 
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Yes"
