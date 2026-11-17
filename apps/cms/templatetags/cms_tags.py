@@ -11,7 +11,6 @@ from django.conf import settings
 from django.http import HttpRequest
 from django.urls import NoReverseMatch, reverse
 from django.utils import translation
-from django.utils.html import format_html_join
 from django.utils.safestring import SafeString, mark_safe
 from django.utils.translation import gettext
 from wagtail.models import Locale, Page, Site
@@ -19,7 +18,6 @@ from wagtail.models import Locale, Page, Site
 from apps.core.i18n import (
     LanguageLink,
     configured_languages,
-    hreflang_alternates,
     switch_goes_home,
     switcher_links,
     translate_path,
@@ -139,23 +137,6 @@ def switch_next_url(context: dict[str, Any]) -> str:
     if request is None or switch_goes_home(request):
         return "/"
     return request.get_full_path()
-
-
-@register.simple_tag(takes_context=True)
-def page_hreflang(context: dict[str, Any]) -> SafeString:
-    """The `<link rel="alternate" hreflang>` set of the page in the context, from the same
-    translations map as its language switcher (`services.page_language_urls`)."""
-    request: HttpRequest | None = context.get("request")
-    page: Page | None = context.get("page")
-    if request is None or page is None:
-        return mark_safe("")
-    urls = {
-        code: request.build_absolute_uri(url)
-        for code, url in services.page_language_urls(page, request).items()
-    }
-    return format_html_join(
-        "\n  ", '<link rel="alternate" hreflang="{}" href="{}">', hreflang_alternates(urls)
-    )
 
 
 @register.simple_tag

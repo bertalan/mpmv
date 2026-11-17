@@ -288,7 +288,11 @@ TEMPLATES = [
                 "apps.themes.context_processors.theme",
                 "apps.themes.context_processors.release",
             ],
-            "builtins": ["apps.seo.templatetags.seo_robots", "apps.seo.templatetags.consent"],
+            "builtins": [
+                "apps.seo.templatetags.seo_robots",
+                "apps.seo.templatetags.seo_links",
+                "apps.seo.templatetags.consent",
+            ],
             "loaders": [
                 "apps.themes.loaders.ThemeLoader",
                 (

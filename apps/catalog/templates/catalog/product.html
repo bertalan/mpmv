@@ -12,9 +12,6 @@
 {% block description %}{% if page_data.short_description %}<meta name="description" content="{{ page_data.short_description }}">{% endif %}{% endblock %}
 {% block head %}
   {% robots_meta robots %}
-  <link rel="canonical" href="{{ canonical_url }}">
-  {% for lang, url in alternates %}<link rel="alternate" hreflang="{{ lang }}" href="{{ url }}">
-  {% endfor %}
   <link rel="stylesheet" href="{% static 'catalog/product.css' %}">
   {% product_jsonld page_data %}
 {% endblock %}

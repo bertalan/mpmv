@@ -29,6 +29,7 @@ from wagtail.views import serve
 from apps.core import translations
 from apps.core.i18n import hreflang_alternates
 from apps.core.money import CURRENCY
+from apps.core.site_url import absolute_url, site_root_url
 from apps.vendors import services as vendors_services
 
 from . import engine, listings, product_pages, services, slugs
@@ -145,7 +146,7 @@ def _listing(
     window = page.window
 
     def absolute(lang: str, lang_params: listings.ListingParams) -> str:
-        return request.build_absolute_uri(listings.listing_url(anchor.paths[lang], lang_params))
+        return absolute_url(request, listings.listing_url(anchor.paths[lang], lang_params))
 
     def in_language(lang: str) -> listings.ListingParams | None:
         return services.listing_params_in(params, language, lang)
@@ -158,7 +159,7 @@ def _listing(
         if lang in anchor.paths and lang_params is not None:
             language_urls[lang] = listings.listing_url(anchor.paths[lang], lang_params)
     alternates = hreflang_alternates(
-        {lang: request.build_absolute_uri(url) for lang, url in language_urls.items()}
+        {lang: absolute_url(request, url) for lang, url in language_urls.items()}
     )
     source = translations.source_language()
 
@@ -177,7 +178,7 @@ def _listing(
     }
     labels.update({(listings.VENDOR, option.value): option.label for option in vendors})
     brand = anchor.scope.brand
-    site = request.build_absolute_uri("/").rstrip("/")
+    site = site_root_url(request)
 
     context: dict[str, Any] = {
         "editorial": (
@@ -270,14 +271,14 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
         query = request.META.get("QUERY_STRING", "")
         return HttpResponsePermanentRedirect(listings.join_query(location, query))
     alternates = hreflang_alternates(
-        {lang: request.build_absolute_uri(path) for lang, path in page.paths.items()}
+        {lang: absolute_url(request, path) for lang, path in page.paths.items()}
     )
     context: dict[str, Any] = {
         "page_data": page,
         "currency": CURRENCY,
         "language_urls": dict(page.paths),
         "alternates": alternates,
-        "canonical_url": request.build_absolute_uri(page.canonical_path),
+        "canonical_url": absolute_url(request, page.canonical_path),
         "robots": listings.ROBOTS_INDEX,
         "vendor_url": slugs.vendor_path(language, page.vendor.slug, default_language=default),
         # CAT.15: related products and the other sellers of this product.

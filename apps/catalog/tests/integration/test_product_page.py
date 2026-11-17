@@ -167,7 +167,7 @@ def test_a_missing_translation_shows_the_source_text_with_a_notice(client: Clien
     assert response.status_code == 200
     html = response.content.decode()
     assert "Only English" in html
-    assert 'rel="canonical" href="http://testserver/product/only-english/"' in html
+    assert 'rel="canonical" href="http://localhost/product/only-english/"' in html
 
 
 def test_the_required_companion_is_shown_when_published(client: Client) -> None:
