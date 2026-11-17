@@ -9,6 +9,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from django.utils import translation
+from django.utils.translation import gettext
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
@@ -34,6 +36,12 @@ def test_the_switch_stays_on_the_same_term_page(
 
     switcher.locator('button[value="de"]').click()
     expect(page).to_have_url(f"{live_server.url}/de/")
-    expect(page.locator(".site-messages")).to_contain_text("not available in this language")
+    expect(page.locator(".site-messages")).to_contain_text(switch_notice("de"))
     shot("switch-de-notice")
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
+
+
+def switch_notice(language: str) -> str:
+    """The switch notice as the page shows it in `language` (the catalogs translate it)."""
+    with translation.override(language):
+        return gettext("This content is not available in this language.")
