@@ -114,7 +114,9 @@ def test_the_home_page_renders_its_blocks_in_order(client: Client, home: HomePag
     assert "<details" in html
     assert "style=" not in html
     ld = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
-    assert [json.loads(data)["@type"] for data in ld] == ["FAQPage"]
+    assert len(ld) == 1  # one @graph per page (SEO.7)
+    nodes = json.loads(ld[0])["@graph"]
+    assert "FAQPage" in [node["@type"] for node in nodes]
 
 
 def test_a_hero_image_needs_alt_text(banner: MediaImage) -> None:

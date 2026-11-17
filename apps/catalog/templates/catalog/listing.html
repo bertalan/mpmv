@@ -14,7 +14,6 @@
   {% if previous_url %}<link rel="prev" href="{{ previous_url }}">{% endif %}
   {% if next_url %}<link rel="next" href="{{ next_url }}">{% endif %}
   <link rel="stylesheet" href="{% static 'catalog/listing.css' %}">
-  {% if jsonld %}<script type="application/ld+json">{{ jsonld|safe }}</script>{% endif %}
 {% endblock %}
 {% block content %}
   <div class="listing">

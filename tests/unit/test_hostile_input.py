@@ -14,7 +14,6 @@ import re
 import secrets
 import unicodedata
 from decimal import Decimal
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -22,10 +21,11 @@ from hypothesis import example, given
 from hypothesis import strategies as st
 
 from apps.cms.engine import faq_page_jsonld, jsonld_text
-from apps.cms.templatetags.cms_tags import faq_jsonld
 from apps.core import mail
 from apps.core.geocoding import engine as geo
 from apps.core.postcodes import InvalidPostcodePattern, normalize_postcode, parse_postcode_pattern
+from apps.seo.graph_engine import faq_node
+from apps.seo.page_graph import graph_text
 from apps.shipping import config_format as fmt
 from apps.vendors import engine as vendors
 from tests import hostile_input as hi
@@ -81,16 +81,38 @@ def test_json_ld_text_cannot_leave_its_script_element(question: str, answer: str
 
 
 @pytest.mark.parametrize("value", hi.values("html", "template", "bidi", "lone_surrogates"))
-def test_the_faq_tag_renders_one_inert_script_element(value: str) -> None:
-    item = {"question": value, "answer": value}
-    page = SimpleNamespace(body=[SimpleNamespace(block_type="faq", value={"items": [item]})])
+def test_the_page_graph_text_is_inert_inside_its_script_element(value: str) -> None:
+    graph = {
+        "@context": "https://schema.org",
+        "@graph": [
+            faq_node(url="https://example.org/faq", language="en", questions=[(value, value)])
+        ],
+    }
 
-    html = str(faq_jsonld(page))
+    text = graph_text(graph)
 
-    assert html.count("<script") == 1
-    assert html.count("</script>") == 1
-    inner = html.removeprefix('<script type="application/ld+json">').removesuffix("</script>")
-    assert json.loads(inner)["mainEntity"][0]["name"] == value
+    assert not re.search(r"[<>&\u2028\u2029]", text)
+    assert json.loads(text)["@graph"][0]["mainEntity"][0]["name"] == value
+
+
+def test_an_faq_answer_cannot_close_the_script_element() -> None:
+    node = faq_node(
+        url="https://example.org/faq",
+        language="en",
+        questions=[("Q?", "<p>Fine</p></script><script>alert(1)</script> a & b\u2028c\u2029")],
+    )
+
+    text = graph_text({"@graph": [node]})
+
+    assert "</script" not in text
+    assert "&" not in text
+    assert "\u2028" not in text
+    assert "\u2029" not in text
+    assert "\\u0026" in text
+    assert "\\u2028" in text
+    assert json.loads(text)["@graph"][0]["mainEntity"][0]["acceptedAnswer"]["text"].endswith(
+        "a & b\u2028c\u2029"
+    )
 
 
 # --- Email (ARC.16) -------------------------------------------------------------------------
