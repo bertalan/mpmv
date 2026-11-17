@@ -7,15 +7,22 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from django.contrib.auth.models import Group
+from django.apps import apps
+from django.contrib.auth.models import Group, Permission
+from django.contrib.contenttypes.models import ContentType
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.catalog.tests.factories import CategoryFactory
-from apps.fitment.tests.factories import FitmentLevelFactory, FitmentNodeFactory
+from apps.fitment.tests.factories import (
+    FitmentLevelFactory,
+    FitmentNodeFactory,
+    FitmentSchemeFactory,
+)
 from apps.manager import roles
+from apps.manager.role_groups import sync_role_groups
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
@@ -28,6 +35,10 @@ SIZES = (360, 1280)
 def test_the_fitment_pages_open_and_are_accessible(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
+    # A transactional e2e database is flushed between tests, which drops the data the migrations
+    # seeded: the role groups and the one fitment scheme row. Recreate both.
+    sync_role_groups(Group, Permission, ContentType, apps.get_model)
+    FitmentSchemeFactory.create()
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
     user = UserFactory.create(email="staff@example.com", password=password, platform_role="config")
     user.groups.add(Group.objects.get(name=roles.role("catalog").group))
