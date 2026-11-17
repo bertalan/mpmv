@@ -1,0 +1,19 @@
+{% load i18n %}{% if invoice_issued %}{% translate "Important:" %} {% include "email/orders/_invoice_notice.txt" %}
+
+{% endif %}{% if by_staff %}{% blocktranslate %}Platform support changed your order {{ order_number }}. It is now version {{ version }}.{% endblocktranslate %}{% else %}{% blocktranslate %}Your order {{ order_number }} was changed. It is now version {{ version }}.{% endblocktranslate %}{% endif %}
+
+{% for change in changes %}- {{ change }}
+{% endfor %}
+{% blocktranslate %}Reason: “{{ reason }}”{% endblocktranslate %}
+
+{% if ship_to %}{% translate "Ship to this address:" %}
+{% for part in ship_to %}{{ part }}
+{% endfor %}
+{% endif %}{% translate "Items to ship:" %}
+{% for line in lines %}- {{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}
+{% endfor %}
+{% if refunded %}{% blocktranslate %}The customer was refunded {{ refund }} EUR.{% endblocktranslate %}{% else %}{% translate "No money was refunded." %}{% endif %}
+{% blocktranslate %}New total of the order: {{ total }} EUR.{% endblocktranslate %}
+{% if not invoice_issued %}
+{% include "email/orders/_invoice_notice.txt" %}
+{% endif %}

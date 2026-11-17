@@ -61,6 +61,10 @@ msgid_plural "%(counter)s unused."
 msgstr[0] "%(counter)s sin usar."
 msgstr[1] "%(counter)s sin usar."
 
+#: apps/orders/amendments.py
+msgid "%(country)r is not a country the address can be in."
+msgstr "%(country)r no es un país en el que pueda estar la dirección."
+
 #: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/present.py
 msgid "%(days)s working days"
 msgstr "%(days)s días laborables"
@@ -69,7 +73,7 @@ msgstr "%(days)s días laborables"
 msgid "%(low)s to %(high)s working days"
 msgstr "de %(low)s a %(high)s días laborables"
 
-#: apps/manager/amendment_views.py
+#: apps/manager/amendment_views.py apps/orders/amendment_engine.py
 msgid "%(n)s days"
 msgstr "%(n)s días"
 
@@ -89,25 +93,30 @@ msgstr "%(qty)s x %(unit)s"
 msgid "%(quantity)s × %(unit_price)s"
 msgstr "%(quantity)s × %(unit_price)s"
 
-#: apps/orders/customer_views.py
+#: apps/orders/amendment_notices.py
 msgid "%(title)s removed"
 msgstr "%(title)s eliminado"
 
-#: apps/orders/customer_views.py
+#: apps/orders/amendment_notices.py
 msgid "%(title)s removed as unavailable"
 msgstr "%(title)s eliminado por no estar disponible"
 
-#: apps/orders/customer_views.py
+#: apps/orders/amendment_notices.py
 msgid "%(title)s: lower price"
 msgstr "%(title)s: precio más bajo"
 
-#: apps/orders/customer_views.py
+#: apps/orders/amendment_notices.py
 msgid "%(title)s: quantity changed to %(quantity)s"
 msgstr "%(title)s: cantidad cambiada a %(quantity)s"
 
 #: themes/base/templates/components/cart_line.html
 msgid "%(unit_price)s each"
 msgstr "%(unit_price)s cada uno"
+
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+msgid "%(vendor_name)s changed your order %(order_number)s before shipping it:"
+msgstr "%(vendor_name)s ha modificado tu pedido %(order_number)s antes de enviarlo:"
 
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
@@ -130,8 +139,17 @@ msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
 msgstr "%(vendor_name)s: nuevo pedido pagado %(order_number)s para enviar:"
 
 #: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
+#: apps/orders/templates/email/orders/vendor_package_cancelled/subject.txt
 msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
 msgstr "%(vendor_name)s: pedido %(order_number)s cancelado, no enviar"
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/subject.txt
+msgid "%(vendor_name)s: order %(order_number)s changed (version %(version)s)"
+msgstr "%(vendor_name)s: pedido %(order_number)s modificado (versión %(version)s)"
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/subject.txt
+msgid "%(vendor_name)s: platform support changed order %(order_number)s"
+msgstr "%(vendor_name)s: el soporte de la plataforma ha modificado el pedido %(order_number)s"
 
 #: apps/core/models.py
 msgid ""
@@ -178,6 +196,12 @@ msgstr "24 meses para los consumidores."
 #: apps/ingest/models.py
 msgid "A blocking case stops its run from ending as succeeded until it is decided."
 msgstr "Un caso bloqueante impide que su ejecución termine como correcta hasta que se resuelva."
+
+#: apps/orders/amendments.py
+msgid "A cancellation the customer asked for needs the request's %(fields)s."
+msgstr ""
+"Una cancelación solicitada por el cliente necesita los siguientes datos de la solicitud: "
+"%(fields)s."
 
 #: apps/cms/models.py
 msgid "A category or tag that has its own pages."
@@ -270,6 +294,18 @@ msgid "A hand-picked cover that imports and automatic updates never replace."
 msgstr ""
 "Una portada elegida a mano que las importaciones y las actualizaciones automáticas nunca "
 "sustituyen."
+
+#: apps/orders/amendment_engine.py
+msgid "a higher price needs the customer's acceptance"
+msgstr "un precio más alto requiere la aceptación del cliente"
+
+#: apps/orders/amendment_engine.py
+msgid "a higher quantity needs the customer's acceptance"
+msgstr "una cantidad mayor requiere la aceptación del cliente"
+
+#: apps/orders/amendment_engine.py
+msgid "A line needs at least one unit; remove the line instead."
+msgstr "Una línea necesita al menos una unidad; elimine la línea en su lugar."
 
 #: apps/core/models.py
 msgid "A link to the text of the licence. Optional."
@@ -417,6 +453,14 @@ msgstr ""
 #: apps/manager/event_block_forms.py
 msgid "A sentence or two that says why to click. Leave it empty for none."
 msgstr "Una o dos frases que expliquen por qué hacer clic. Déjelo vacío si no es necesario."
+
+#: apps/orders/amendments.py
+msgid ""
+"A shop cancels either for its own fault or because the customer asked; a platform error is for "
+"platform staff to record."
+msgstr ""
+"Una tienda cancela por culpa propia o porque lo ha pedido el cliente; un error de la plataforma lo"
+" registra el personal de la plataforma."
 
 #: apps/manager/amendment_views.py
 msgid "a shop member"
@@ -593,6 +637,10 @@ msgid ""
 msgstr ""
 "Un texto breve que se muestra encima de los productos de esta categoría o etiqueta. Si no añade "
 "ninguno, la página empieza directamente con los productos."
+
+#: apps/orders/amendment_engine.py
+msgid "a substitute product needs the customer's consent"
+msgstr "un producto sustituto requiere el consentimiento del cliente"
 
 #: apps/seo/templates/seo/site_links.html
 msgid ""
@@ -838,6 +886,15 @@ msgstr ""
 "Después de eliminar un artículo por no estar disponible, el vendedor espera este tiempo antes de "
 "enviar, para que el cliente pueda cancelar el resto del paquete."
 
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid ""
+"After an item was unavailable, the customer cancelled the rest of order %(order_number)s, as the "
+"terms allow, and was refunded in full."
+msgstr ""
+"Tras la falta de disponibilidad de un artículo, el cliente ha cancelado el resto del pedido "
+"%(order_number)s, como permiten las condiciones, y ha recibido el reembolso íntegro."
+
 #: apps/manager/fitment_forms.py
 msgid "Alias"
 msgstr "Alias"
@@ -888,9 +945,42 @@ msgstr "Texto alternativo"
 msgid "Alt text %(number)d"
 msgstr "Texto alternativo %(number)d"
 
+#: apps/orders/amendment_engine.py
+msgid "an added line needs the customer's acceptance"
+msgstr "una línea añadida requiere la aceptación del cliente"
+
+#: apps/orders/amendments.py
+msgid "An address change asked by the customer needs the request's %(fields)s."
+msgstr ""
+"Un cambio de dirección solicitado por el cliente necesita los siguientes datos de la solicitud: "
+"%(fields)s."
+
+#: apps/orders/amendment_engine.py
+msgid ""
+"an address change made on the vendor's or staff's own initiative needs the customer's acceptance"
+msgstr ""
+"un cambio de dirección por iniciativa del vendedor o del personal de la plataforma requiere la "
+"aceptación del cliente"
+
 #: apps/manager/event_block_forms.py
 msgid "An address starting with https://. Fill in this or one of your events."
 msgstr "Una dirección que empiece por https://. Rellene este campo o elija uno de sus eventos."
+
+#: apps/orders/amendment_engine.py
+msgid ""
+"An amendment can change the carrier once and the address once: put each change in its own "
+"amendment."
+msgstr ""
+"Una modificación puede cambiar el transportista una vez y la dirección una vez: ponga cada cambio "
+"en su propia modificación."
+
+#: apps/orders/amendment_engine.py
+msgid "An amendment cannot remove every line: cancel the package instead."
+msgstr "Una modificación no puede eliminar todas las líneas: cancele el paquete en su lugar."
+
+#: apps/orders/amendment_engine.py
+msgid "An amendment needs at least one change."
+msgstr "Una modificación necesita al menos un cambio."
 
 #: apps/compliance/models.py
 msgid ""
@@ -933,7 +1023,7 @@ msgstr ""
 "Una introducción que se muestra en la página de esta categoría o etiqueta. Se permite un formato "
 "sencillo. Opcional."
 
-#: apps/orders/customer_views.py
+#: apps/orders/amendment_notices.py
 msgid "an item"
 msgstr "un artículo"
 
@@ -971,6 +1061,10 @@ msgid "An optional web form for users, next to the support email. It must start 
 msgstr ""
 "Un formulario web opcional para los usuarios, junto al correo electrónico de asistencia. Debe "
 "empezar por https://."
+
+#: apps/orders/amendments.py
+msgid "An order that is not paid has no invoice yet."
+msgstr "Un pedido no pagado todavía no tiene factura."
 
 #: apps/seo/templates/seo/site_links.html
 msgid "And %(counter)s more."
@@ -1051,9 +1145,31 @@ msgid "Articles or pages to suggest under the products. If you add none, nothing
 msgstr ""
 "Artículos o páginas que se sugieren bajo los productos. Si no añade ninguno, no se sugiere nada."
 
+#: apps/orders/templates/email/orders/rest_cancelled/body.html
+#: apps/orders/templates/email/orders/rest_cancelled/body.txt
+msgid ""
+"As you asked, the rest of your order %(order_number)s with %(vendor_name)s has been cancelled free"
+" of charge, and we have refunded %(refund)s EUR to the payment method you used for the purchase."
+msgstr ""
+"Como pediste, el resto de tu pedido %(order_number)s con %(vendor_name)s se ha cancelado sin coste"
+" y te hemos reembolsado %(refund)s EUR en el medio de pago que usaste para la compra."
+
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+msgid ""
+"As you asked, your order %(order_number)s with %(vendor_name)s has been cancelled, and we have "
+"refunded the full %(refund)s EUR to the payment method you used for the purchase."
+msgstr ""
+"Como pediste, tu pedido %(order_number)s con %(vendor_name)s se ha cancelado y te hemos "
+"reembolsado íntegramente %(refund)s EUR en el medio de pago que usaste para la compra."
+
 #: apps/catalog/templates/catalog/product.html
 msgid "Ask %(vendor)s about this product: it is not sold online."
 msgstr "Pregunta a %(vendor)s por este producto: no se vende en línea."
+
+#: apps/orders/amendment_engine.py
+msgid "at the new address %(why)s"
+msgstr "en la nueva dirección %(why)s"
 
 #: apps/manager/templates/manager/platform/fitment_node_form.html
 msgid "At the top level of the scheme."
@@ -1243,13 +1359,28 @@ msgstr "Cancelar el paquete"
 msgid "Cancel the package with a full refund"
 msgstr "Cancelar el paquete con reembolso total"
 
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+msgctxt "(L)"
+msgid "Cancel the rest of the order and refund everything"
+msgstr "Cancelar el resto del pedido y reembolsar todo"
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "Cancel the rest of the order and refund everything"
 msgstr "Cancelar el resto del pedido y reembolsar todo"
 
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgctxt "(L)"
+msgid "Cancel the rest of the order and refund everything: %(cancel_url)s"
+msgstr "Cancelar el resto del pedido y reembolsar todo: %(cancel_url)s"
+
 #: apps/vendors/services.py
 msgid "Cancellation"
 msgstr "Cancelación"
+
+#: apps/orders/templates/email/orders/package_cancelled/subject.txt
+msgctxt "(L)"
+msgid "Cancellation of order %(order_number)s due to a technical error and full refund"
+msgstr "Cancelación de tu pedido n.º %(order_number)s por un error técnico y reembolso íntegro"
 
 #: apps/manager/forms.py
 msgid "Cancellation policy"
@@ -1259,6 +1390,21 @@ msgstr "Condiciones de cancelación"
 #: apps/events/templates/events/event_page.html apps/orders/customer_views.py
 msgid "Cancelled"
 msgstr "Cancelado"
+
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+#: apps/orders/templates/email/orders/rest_cancelled/body.html
+#: apps/orders/templates/email/orders/rest_cancelled/body.txt
+msgid "Cancelled items:"
+msgstr "Artículos cancelados:"
+
+#: apps/orders/amendments.py
+msgid ""
+"Cancelling the package refunds the customer in full, so it needs a fresh passkey confirmation (an "
+"open passkey window does not cover it)."
+msgstr ""
+"La cancelación del paquete reembolsa al cliente el importe íntegro y por ello necesita una nueva "
+"confirmación con passkey (una ventana de passkey abierta no la cubre)."
 
 #: apps/manager/fitment_forms.py
 msgid "Cannot change once the level has nodes."
@@ -1330,6 +1476,21 @@ msgstr "Categoría"
 msgid "Category %(number)d"
 msgstr "Categoría %(number)d"
 
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Cause: an error of the platform."
+msgstr "Causa: un error de la plataforma."
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Cause: the customer asked to cancel."
+msgstr "Causa: el cliente pidió cancelar."
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Cause: the shop cannot fulfil the order."
+msgstr "Causa: la tienda no puede cumplir el pedido."
+
 #: apps/manager/templates/manager/platform/fitment_node.html
 msgid "Change"
 msgstr "Cambiar"
@@ -1341,6 +1502,14 @@ msgstr "Modificar los datos"
 #: apps/manager/templates/manager/amendment.html
 msgid "Change order %(number)s"
 msgstr "Modificar el pedido %(number)s"
+
+#: apps/orders/amendment_engine.py
+msgid ""
+"Change the address and the carrier in two separate amendments: the address first, then the carrier"
+" quoted for the new address."
+msgstr ""
+"Cambie la dirección y el transportista en dos modificaciones separadas: primero la dirección y "
+"después el transportista ofrecido para la nueva dirección."
 
 #: apps/manager/amendment_views.py
 msgid "Change the order"
@@ -1371,6 +1540,10 @@ msgstr "Cambios en este paquete"
 #: apps/manager/amendment_forms.py
 msgid "Chat or message"
 msgstr "Chat o mensaje"
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid "check"
+msgstr "revisar"
 
 #: apps/manager/event_forms.py
 msgid "Check the rule."
@@ -1533,6 +1706,13 @@ msgstr ""
 #: apps/cms/blocks.py
 msgid "Choose where the products come from: one category, tag, brand or shop."
 msgstr "Elija de dónde proceden los productos: una categoría, una etiqueta, una marca o una tienda."
+
+#: apps/orders/amendments.py
+msgid ""
+"Choose why the package is cancelled: the shop's fault, the customer's request or a platform error."
+msgstr ""
+"Elija por qué se cancela el paquete: culpa de la tienda, petición del cliente o error de la "
+"plataforma."
 
 #: apps/manager/amendment_forms.py apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "City"
@@ -1795,6 +1975,10 @@ msgstr "Cliente"
 msgid "Customer account"
 msgstr "Cuenta de cliente"
 
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Customer: rest cancelled"
+msgstr "Cliente: resto cancelado"
+
 #: apps/manager/forms.py
 msgid "Customers see this text. A change is live at once and the moderators are told."
 msgstr ""
@@ -1875,9 +2059,13 @@ msgstr "Entrega"
 msgid "Delivery address"
 msgstr "Dirección de entrega"
 
-#: apps/orders/customer_views.py
+#: apps/orders/amendment_notices.py
 msgid "Delivery address corrected as you asked"
 msgstr "Dirección de entrega corregida como pediste"
+
+#: apps/orders/amendment_notices.py
+msgid "Delivery address corrected at the customer's request"
+msgstr "Dirección de entrega corregida a petición del cliente"
 
 #: apps/orders/templates/orders/_review_body.html
 msgid "Delivery details"
@@ -2013,6 +2201,11 @@ msgstr "Hacerlo una vez"
 msgid "Do not expect fitment"
 msgstr "No exigir compatibilidad"
 
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Do not ship these items:"
+msgstr "No envíe estos artículos:"
+
 #: apps/manager/event_forms.py
 msgid "Does not repeat"
 msgstr "No se repite"
@@ -2037,6 +2230,22 @@ msgstr "Borradores"
 #: apps/manager/site_map.py apps/seo/site_links.py
 msgid "DSA points of contact"
 msgstr "Puntos de contacto DSA"
+
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+msgctxt "(L)"
+msgid ""
+"Due to a technical issue on our platform, your order %(order_number)s with seller %(vendor_name)s "
+"cannot be processed. The order has been cancelled at no cost to you, and we have immediately "
+"issued a full refund of EUR %(refund)s to your original payment method (credited within 5–10 "
+"business days, and in any event within the statutory 14-day limit). We apologize for the "
+"inconvenience."
+msgstr ""
+"Te informamos de que, debido a un error técnico de la plataforma, no es posible tramitar tu pedido"
+" n.º %(order_number)s con el vendedor %(vendor_name)s. El pedido ha sido cancelado sin coste "
+"alguno para ti y hemos ordenado de inmediato el reembolso íntegro de EUR %(refund)s en el mismo "
+"medio de pago utilizado (abono en 5 a 10 días laborables y, en todo caso, en un máximo de 14 "
+"días). Te pedimos disculpas por las molestias."
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid ""
@@ -2190,8 +2399,8 @@ msgstr "Evento"
 msgid "Event views"
 msgstr "Vistas de los eventos"
 
-#: apps/events/listing.py apps/events/templates/events/_results.html apps/manager/sections.py
-#: apps/manager/site_map.py apps/manager/templates/manager/shop/events.html
+#: apps/events/templates/events/_results.html apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/shop/events.html
 msgid "Events"
 msgstr "Eventos"
 
@@ -2206,6 +2415,11 @@ msgid ""
 msgstr ""
 "Todas las áreas del sitio en un solo lugar. Las páginas del espacio de tienda se muestran como "
 "texto: el personal no las abre directamente."
+
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+#: apps/orders/templates/email/orders/rest_cancelled/body.txt
+msgid "Every change is listed on your order page: %(order_url)s"
+msgstr "Todos los cambios aparecen en la página de tu pedido: %(order_url)s"
 
 #: apps/manager/event_forms.py
 msgid "Every how many"
@@ -2468,6 +2682,14 @@ msgstr "Indique el último día."
 msgid "Give the legal ground or the term of the terms."
 msgstr "Indique el fundamento jurídico o la cláusula de las condiciones."
 
+#: apps/orders/amendments.py
+msgid "Give the reason for the cancellation; the customer will read it."
+msgstr "Indique el motivo de la cancelación; el cliente lo leerá."
+
+#: apps/orders/amendments.py
+msgid "Give the reason for the change; the customer will read it."
+msgstr "Indique el motivo del cambio; el cliente lo leerá."
+
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Give the role"
 msgstr "Asignar el rol"
@@ -2542,14 +2764,22 @@ msgstr "Título"
 msgid "Hello %(customer_name)s,"
 msgstr "Hola %(customer_name)s,"
 
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/rest_cancelled/body.html
+#: apps/orders/templates/email/orders/rest_cancelled/body.txt
 #: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
 #: apps/orders/templates/email/orders/vendor_order_delivered/body.html
@@ -2835,6 +3065,10 @@ msgstr ""
 msgid "I am buying for a business"
 msgstr "Compro para una empresa"
 
+#: apps/manager/templates/manager/shop/order.html
+msgid "I have issued the invoice or receipt"
+msgstr "He emitido la factura o el comprobante"
+
 #: apps/orders/templates/orders/_legal_boxes.html
 msgid "I have read and accept the marketplace terms and the sales terms of each seller named above."
 msgstr ""
@@ -2844,6 +3078,18 @@ msgstr ""
 #: apps/orders/templates/orders/_legal_boxes.html
 msgid "I specifically approve the onerous clauses listed above, one by one."
 msgstr "Apruebo específicamente, una por una, las cláusulas onerosas enumeradas arriba."
+
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgctxt "(L)"
+msgid ""
+"If the unavailable item was essential to your purchase, you can cancel the rest of the order free "
+"of charge and get back everything you paid for it, until the package is handed to the carrier. The"
+" seller will not ship it before %(hold_until)s."
+msgstr ""
+"Si el artículo no disponible era esencial para tu compra, puedes cancelar gratuitamente el resto "
+"del pedido y obtener el reembolso íntegro del importe restante, hasta la entrega del paquete al "
+"transportista. El vendedor no lo enviará antes del %(hold_until)s."
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
@@ -2868,6 +3114,13 @@ msgstr "Imágenes"
 #: apps/catalog/taxonomy.py
 msgid "import batch"
 msgstr "lote de importación"
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Important:"
+msgstr "Importante:"
 
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "in force"
@@ -2935,6 +3188,10 @@ msgstr "Código no válido. Comprueba la hora de tu dispositivo e inténtalo de 
 msgid "Invalid code. Try again."
 msgstr "Código no válido. Inténtalo de nuevo."
 
+#: apps/manager/templates/manager/shop/order.html
+msgid "Invoice"
+msgstr "Factura"
+
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "It also closes when you sign out or after inactivity."
 msgstr "También se cierra cuando cierra la sesión o tras un periodo de inactividad."
@@ -2942,6 +3199,15 @@ msgstr "También se cierra cuando cierra la sesión o tras un periodo de inactiv
 #: apps/manager/event_forms.py
 msgid "It ends"
 msgstr "Termina"
+
+#: apps/orders/templates/email/orders/_credit_time.txt
+msgctxt "(L)"
+msgid ""
+"It is credited within 5 to 10 business days depending on the card issuer, and in any case within "
+"14 days."
+msgstr ""
+"El abono se reflejará en un plazo de 5 a 10 días laborables según tu entidad bancaria y, en todo "
+"caso, dentro del plazo legal de 14 días."
 
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid "It is critical: it asks for a passkey of its own each time, even with a passkey window open."
@@ -2998,6 +3264,11 @@ msgstr "Artículos de la versión actual"
 #: apps/manager/fitment_forms.py
 msgid "Items reveal sensitive information"
 msgstr "Los artículos revelan información sensible"
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "Items to ship:"
+msgstr "Artículos que enviar:"
 
 #: apps/manager/templates/manager/platform/fitment_merge.html
 msgid ""
@@ -3356,6 +3627,10 @@ msgstr "Fusionar con otro nodo"
 msgid "Merge the selected brands into another brand"
 msgstr "Fusionar las marcas seleccionadas en otra marca"
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Messages we sent you about this package"
+msgstr "Mensajes que te hemos enviado sobre este paquete"
+
 #: apps/manager/amendment_views.py
 msgid "Minor change: it applies at once"
 msgstr "Cambio menor: se aplica de inmediato"
@@ -3469,6 +3744,16 @@ msgstr "Nuevos códigos de recuperación"
 msgid "New total %(total)s."
 msgstr "Nuevo total %(total)s."
 
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "New total of the order: %(total)s EUR."
+msgstr "Nuevo total del pedido: %(total)s EUR."
+
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+msgid "New total of this part of your order: %(total)s EUR."
+msgstr "Nuevo total de esta parte de tu pedido: %(total)s EUR."
+
 #: apps/manager/amendment_forms.py
 msgid "New unit price of %(title)s, EUR net of VAT (now %(price)s)"
 msgstr "Nuevo precio unitario de %(title)s, EUR sin IVA (ahora %(price)s)"
@@ -3521,9 +3806,18 @@ msgstr "Todavía no hay logotipo."
 msgid "No money moves"
 msgstr "No se mueve dinero"
 
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "No money was refunded."
+msgstr "No se ha reembolsado ningún importe."
+
 #: apps/manager/templates/manager/platform/orders.html
 msgid "No order has this number."
 msgstr "Ningún pedido tiene este número."
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid "No package was cancelled in this period."
+msgstr "En este período no se canceló ningún paquete."
 
 #: apps/accounts/mfa_views.py
 msgid "no passkey registered"
@@ -3540,6 +3834,11 @@ msgstr "ninguna autenticación con clave de acceso (passkey) en curso"
 #: apps/accounts/mfa_views.py
 msgid "no pending passkey registration"
 msgstr "ningún registro de clave de acceso (passkey) en curso"
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "No refund fee is charged to your shop."
+msgstr "No se cobra a su tienda ninguna tarifa de reembolso."
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "No second factor yet."
@@ -3875,6 +4174,18 @@ msgstr ""
 msgid "Online sale"
 msgstr "Venta en línea"
 
+#: apps/orders/amendments.py
+msgid "Only a draft can be applied; this one is %(state)s."
+msgstr "Solo se puede aplicar un borrador; este está %(state)s."
+
+#: apps/orders/amendments.py
+msgid "Only a draft can be discarded; this one is %(state)s."
+msgstr "Solo se puede descartar un borrador; este está %(state)s."
+
+#: apps/orders/amendments.py
+msgid "Only a draft can be edited; this one is %(state)s."
+msgstr "Solo se puede editar un borrador; este está %(state)s."
+
 #: apps/manager/termination_views.py
 msgid "Only a pending notice can be withdrawn."
 msgstr "Solo se puede retirar un preaviso en curso."
@@ -4002,6 +4313,25 @@ msgstr ""
 msgid "Only the customer who placed the order may answer this offer."
 msgstr "Solo el cliente que realizó el pedido puede responder a esta oferta."
 
+#: apps/orders/amendments.py
+msgid "Only the platform owner or Support may change an order from the platform side."
+msgstr ""
+"Solo el propietario de la plataforma o el soporte puede modificar un pedido desde el lado de la "
+"plataforma."
+
+#: apps/orders/amendments.py
+msgid "Only the shop or platform staff may amend an order."
+msgstr "Solo la tienda o el personal de la plataforma puede modificar un pedido."
+
+#: apps/orders/amendments.py
+msgid "Only the shop records its own invoice."
+msgstr "Solo la tienda registra su propia factura."
+
+#: apps/orders/amendments.py
+msgid "Only the shop's owner or a member with orders may amend."
+msgstr ""
+"Solo el propietario de la tienda o un miembro con acceso a los pedidos puede hacer modificaciones."
+
 #: apps/manager/amendment_views.py
 msgid "Only the side that started this draft may discard it."
 msgstr "Solo la parte que inició este borrador puede descartarlo."
@@ -4060,6 +4390,18 @@ msgstr "Pedido %(number)s"
 msgid "Order %(order_number)s was cancelled"
 msgstr "El pedido %(order_number)s se ha cancelado"
 
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgctxt "(L)"
+msgid ""
+"Order %(order_number)s was cancelled because of a technical error attributable to the platform. "
+"The customer was refunded in full; under the vendor terms, the commission and the collection cost "
+"were reversed in full and no refund fee is charged to you."
+msgstr ""
+"El pedido %(order_number)s se ha cancelado por un error técnico imputable a la plataforma. Se ha "
+"reembolsado íntegramente al cliente; conforme al contrato de vendedores, la comisión y el coste de"
+" cobro se han anulado por completo y no se le cobra ninguna tarifa de reembolso."
+
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
 msgid "Order %(order_number)s was cancelled before payment. Nothing was charged."
@@ -4068,7 +4410,7 @@ msgstr "El pedido %(order_number)s se ha cancelado antes del pago. No se ha cobr
 #: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
 #: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
 msgid "Order %(order_number)s was cancelled. Do not ship these items:"
-msgstr "El pedido %(order_number)s se ha cancelado. No envíes estos artículos:"
+msgstr "El pedido %(order_number)s se ha cancelado. No envíe estos artículos:"
 
 #: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
@@ -4084,6 +4426,10 @@ msgstr "Pedido %(order_number)s: un envío está en camino"
 msgid "Order %(order_number)s: a shipment was delivered"
 msgstr "Pedido %(order_number)s: un envío ha sido entregado"
 
+#: apps/orders/templates/email/orders/package_cancelled/subject.txt
+msgid "Order %(order_number)s: cancelled as you asked, full refund"
+msgstr "Pedido %(order_number)s: cancelado como pediste, reembolso íntegro"
+
 #: apps/orders/templates/email/orders/order_confirmation/subject.txt
 msgid "Order %(order_number)s: confirmation from %(vendor_name)s"
 msgstr "Pedido %(order_number)s: confirmación de %(vendor_name)s"
@@ -4092,14 +4438,33 @@ msgstr "Pedido %(order_number)s: confirmación de %(vendor_name)s"
 msgid "Order %(order_number)s: part of your order was cancelled"
 msgstr "Pedido %(order_number)s: una parte de tu pedido se ha cancelado"
 
+#: apps/orders/templates/email/orders/rest_cancelled/subject.txt
+msgid "Order %(order_number)s: the rest of your order was cancelled, full refund"
+msgstr "Pedido %(order_number)s: se ha cancelado el resto de tu pedido, reembolso íntegro"
+
+#: apps/orders/templates/email/orders/amendment_applied/subject.txt
+msgid "Order %(order_number)s: your order from %(vendor_name)s was changed"
+msgstr "Pedido %(order_number)s: tu pedido con %(vendor_name)s ha sido modificado"
+
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/platform/amendment_settings.html
 msgid "Order change settings"
 msgstr "Ajustes de los cambios de pedidos"
 
-#: apps/orders/customer_views.py
+#: apps/orders/amendment_notices.py
 msgid "Order changed"
 msgstr "Pedido modificado"
+
+#: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/shop/order.html
+#: apps/orders/templates/email/orders/_invoice_notice.txt
+msgctxt "(L)"
+msgid ""
+"Order changed after payment: if you already issued an invoice or receipt for the previous version,"
+" remember to issue a credit or debit note to bring the document in line with the new amounts."
+msgstr ""
+"Pedido modificado tras el pago: si ya ha emitido una factura o comprobante de venta para la "
+"versión anterior de este pedido, recuerde emitir la correspondiente factura rectificativa o nota "
+"de abono para ajustar el documento a los importes definitivos."
 
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/platform/orders.html
@@ -4130,6 +4495,16 @@ msgstr "Resumen del pedido"
 #: apps/orders/templates/orders/confirmation.html
 msgid "Order total"
 msgstr "Total del pedido"
+
+#: apps/orders/templates/email/orders/package_cancelled/subject.txt
+msgctxt "(L)"
+msgid "Order update %(order_number)s: order cancelled and full refund"
+msgstr "Actualización del pedido %(order_number)s — Pedido cancelado y reembolso íntegro"
+
+#: apps/orders/templates/email/orders/item_unavailable/subject.txt
+msgctxt "(L)"
+msgid "Order update %(order_number)s: partial refund for an unavailable item"
+msgstr "Actualización del pedido %(order_number)s — Reembolso parcial por artículo no disponible"
 
 #: apps/orders/ui/present.py
 msgid "Ordering is not available right now. Please try again later."
@@ -4171,6 +4546,14 @@ msgstr ""
 msgid "Other ways the supplier writes the same term, as a JSON list."
 msgstr "Otras formas en que el proveedor escribe el mismo término, como lista JSON."
 
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+msgid ""
+"Our support team changed your order %(order_number)s from %(vendor_name)s before it was shipped:"
+msgstr ""
+"Nuestro equipo de soporte ha modificado tu pedido %(order_number)s con %(vendor_name)s antes del "
+"envío:"
+
 #: apps/catalog/templates/catalog/includes/stock_status.html
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Out of stock"
@@ -4179,6 +4562,14 @@ msgstr "Agotado"
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Owner"
 msgstr "Titular"
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Package cancellations by shop"
+msgstr "Cancelaciones de paquetes por tienda"
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Package cancellations by shop and cause"
+msgstr "Cancelaciones de paquetes por tienda y causa"
 
 #: apps/orders/customer_views.py
 msgid "Package cancelled"
@@ -4405,6 +4796,7 @@ msgstr "Espacio de plataforma: denuncias de contenidos"
 msgid "Platform space: dashboard"
 msgstr "Espacio de plataforma: panel de control"
 
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Platform staff"
 msgstr "Personal de la plataforma"
@@ -4418,6 +4810,16 @@ msgstr ""
 " un rol de plataforma. Los cambios requieren el modo operativo y se registran en el registro de "
 "auditoría."
 
+#: apps/orders/amendment_engine.py
+msgid ""
+"Platform staff may change the carrier only to one at the same or a lower price: %(method)s costs "
+"%(cost)s EUR net, more than the %(paid)s EUR the customer paid for shipping. The vendor can make "
+"this change itself."
+msgstr ""
+"El personal de la plataforma solo puede cambiar el transportista por uno del mismo precio o más "
+"barato: %(method)s cuesta %(cost)s EUR netos, más que los %(paid)s EUR que el cliente pagó por el "
+"envío. El vendedor puede hacer este cambio por sí mismo."
+
 #: apps/manager/templates/manager/amendment.html
 msgid ""
 "Platform staff may change the carrier to one at the same or a lower price, or correct the address "
@@ -4426,6 +4828,19 @@ msgstr ""
 "El personal de la plataforma puede cambiar el transportista por uno del mismo precio o más barato,"
 " o corregir la dirección cuando el cliente lo pide. Los productos, cantidades y precios "
 "corresponden a la tienda."
+
+#: apps/orders/amendment_engine.py
+msgid ""
+"Platform staff may only change the carrier, or the address when the customer asks; products, "
+"quantities, prices and delivery times are changed by the vendor, who is the seller."
+msgstr ""
+"El personal de la plataforma solo puede cambiar el transportista, o la dirección cuando lo pide el"
+" cliente; los productos, las cantidades, los precios y los plazos de entrega los cambia el "
+"vendedor, que es quien vende."
+
+#: apps/orders/amendments.py
+msgid "Platform staff must add a note to every amendment."
+msgstr "El personal de la plataforma debe añadir una nota a cada modificación."
 
 #: apps/vendors/templates/email/vendors/profile_reverted/body.html
 #: apps/vendors/templates/email/vendors/profile_reverted/body.txt
@@ -4448,6 +4863,20 @@ msgstr ""
 #: apps/manager/amendment_views.py
 msgid "platform support"
 msgstr "el soporte de la plataforma"
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Platform support cancelled your order %(order_number)s and refunded the customer in full."
+msgstr ""
+"El soporte de la plataforma ha cancelado su pedido %(order_number)s y ha reembolsado íntegramente "
+"al cliente."
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "Platform support changed your order %(order_number)s. It is now version %(version)s."
+msgstr ""
+"El soporte de la plataforma ha modificado su pedido %(order_number)s. Ahora es la versión "
+"%(version)s."
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Please correct the error below."
@@ -4736,10 +5165,39 @@ msgstr "Motivo de la cancelación"
 msgid "Reason for the change"
 msgstr "Motivo del cambio"
 
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Reason: “%(reason)s”"
+msgstr "Motivo: «%(reason)s»"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
 msgid "Received"
 msgstr "Recibido"
+
+#: apps/orders/amendments.py
+msgid ""
+"Recomputed today, this change moves %(now)s instead of the %(drafted)s shown in the draft: edit "
+"the draft so it shows today's amounts, then confirm it again."
+msgstr ""
+"Recalculado hoy, este cambio mueve %(now)s en lugar de los %(drafted)s que muestra el borrador: "
+"edite el borrador para que muestre los importes de hoy y vuelva a confirmarlo."
+
+#: apps/orders/amendments.py
+msgid ""
+"Recomputed today, this is a substantial change (%(reasons)s): it needs the customer's acceptance "
+"first."
+msgstr ""
+"Recalculado hoy, este es un cambio sustancial (%(reasons)s): necesita antes la aceptación del "
+"cliente."
 
 #: apps/manager/amendment_forms.py
 msgid "Record how, when and in which words the customer asked."
@@ -4782,6 +5240,11 @@ msgstr ""
 #: apps/orders/customer_views.py
 msgid "Refunded"
 msgstr "Reembolsado"
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Refunded to the customer: %(refund)s EUR."
+msgstr "Reembolsado al cliente: %(refund)s EUR."
 
 #: apps/manager/templates/manager/platform/fitment_node.html
 msgid "Refuse and remove the proposal"
@@ -5075,6 +5538,11 @@ msgstr "Seguridad"
 msgid "See where you are signed in"
 msgstr "Ver dónde ha iniciado sesión"
 
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/rest_cancelled/body.html
+msgid "See your order page"
+msgstr "Ver la página de tu pedido"
+
 #: apps/manager/templates/manager/list.html
 msgid "Select"
 msgstr "Seleccionar"
@@ -5175,6 +5643,11 @@ msgstr "Enviar el pedido"
 msgid "Ship to"
 msgstr "Enviar a"
 
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "Ship to this address:"
+msgstr "Envíe a esta dirección:"
+
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "Ship to:"
@@ -5208,7 +5681,7 @@ msgstr "El envío se calcula al finalizar la compra, según tu dirección de ent
 msgid "Shipping method"
 msgstr "Método de envío"
 
-#: apps/orders/customer_views.py
+#: apps/orders/amendment_notices.py
 msgid "Shipping method changed to %(method)s"
 msgstr "Método de envío cambiado a %(method)s"
 
@@ -5271,6 +5744,14 @@ msgstr "Espacio de tienda: pedidos"
 #: apps/seo/site_links.py
 msgid "Shop space: storefront profile"
 msgstr "Espacio de tienda: perfil de escaparate"
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Shop: cannot fulfil"
+msgstr "Tienda: no puede entregar"
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Shop: the customer asked (no fee)"
+msgstr "Tienda: lo pidió el cliente (sin comisión)"
 
 #: apps/seo/site_links.py
 msgid "Shops"
@@ -6215,9 +6696,24 @@ msgstr ""
 "El cliente ha ejercido el desistimiento de este paquete, por lo que ya no se puede modificar: el "
 "desistimiento y su reembolso se aplican sobre la versión actual."
 
+#: apps/orders/amendments.py
+msgid ""
+"The customer must have at least %(hours)s hours to read the notice and cancel the rest before the "
+"seller may ship, but the shipping hold is set to %(set)s hours: raise the hold in the amendment "
+"settings."
+msgstr ""
+"El cliente debe tener al menos %(hours)s horas para leer el aviso y cancelar el resto antes de que"
+" el vendedor pueda enviar, pero el bloqueo de envío está fijado en %(set)s horas: aumente el "
+"bloqueo en los ajustes de modificaciones."
+
 #: apps/manager/amendment_forms.py
 msgid "The customer reads it. Write it in plain words."
 msgstr "El cliente lo lee. Escríbalo con palabras sencillas."
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "The customer was refunded %(refund)s EUR."
+msgstr "Se han reembolsado %(refund)s EUR al cliente."
 
 #: apps/manager/amendment_forms.py
 msgid "The customer's words"
@@ -6392,6 +6888,14 @@ msgstr "El primer día de un evento de todo el día."
 msgid "The first day of an all-day event. Required when 'All day' is ticked."
 msgstr "El primer día de un evento de todo el día. Obligatorio cuando «Todo el día» está marcado."
 
+#: apps/orders/amendment_engine.py
+msgid ""
+"The fiscal category of this line was not recorded when it was sold, so its tax cannot be decided "
+"again; the line can only be reduced or removed."
+msgstr ""
+"La categoría fiscal de esta línea no se registró cuando se vendió, por lo que su impuesto no puede"
+" volver a determinarse; la línea solo puede reducirse o eliminarse."
+
 #: apps/core/models.py
 msgid ""
 "The fixed part of the refund fee in EUR, added to the payment provider's real cost and rounded up "
@@ -6557,6 +7061,14 @@ msgstr ""
 msgid "The invitation, for example Visit our workshop. Required."
 msgstr "La invitación, por ejemplo Visite nuestro taller. Obligatorio."
 
+#: apps/manager/views.py
+msgid "The invoice is recorded as issued."
+msgstr "La factura queda registrada como emitida."
+
+#: apps/orders/amendments.py
+msgid "The invoice of this order is already recorded as issued."
+msgstr "La factura de este pedido ya está registrada como emitida."
+
 #: apps/vendors/models.py
 msgid "The IP address the acceptance came from, kept as evidence. Empty if it was not known."
 msgstr ""
@@ -6680,6 +7192,14 @@ msgid ""
 msgstr ""
 "Los idiomas en los que responde el servicio de asistencia, como códigos del tipo «en» o «it», "
 "separados por comas."
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid ""
+"The last %(days)s days. When a shop says the customer asked to cancel, the shop pays no refund fee"
+" on its word alone: check the shops with many of them."
+msgstr ""
+"Los últimos %(days)s días. Cuando una tienda dice que el cliente pidió cancelar, la tienda no paga"
+" comisión de reembolso solo por su palabra: revise las tiendas que tienen muchas."
 
 #: apps/manager/event_forms.py
 msgid "The last day of an all-day event, included. Same as the first for one day."
@@ -6987,6 +7507,22 @@ msgstr ""
 msgid "The name shown in image credits, for example 'CC BY 4.0'."
 msgstr "El nombre que se muestra en los créditos de las imágenes, por ejemplo «CC BY 4.0»."
 
+#: apps/orders/amendment_engine.py
+msgid "the new address changes the tax"
+msgstr "la nueva dirección cambia el impuesto"
+
+#: apps/orders/amendment_engine.py
+msgid "the new address costs more to ship"
+msgstr "la nueva dirección cuesta más de enviar"
+
+#: apps/orders/amendment_engine.py
+msgid "the new address is in another country or tax territory, which is never a minor change"
+msgstr "la nueva dirección está en otro país o territorio fiscal, lo que nunca es un cambio menor"
+
+#: apps/orders/amendments.py
+msgid "The new address is incomplete: %(fields)s is missing."
+msgstr "La nueva dirección está incompleta: falta %(fields)s."
+
 #: apps/catalog/models.py
 msgid ""
 "The new address on this site, for example /it/. Never another website. Fill it only when the "
@@ -6994,6 +7530,20 @@ msgid ""
 msgstr ""
 "La nueva dirección en este sitio, por ejemplo /it/. Nunca otro sitio web. Rellénelo solo cuando el"
 " destino sea una ruta."
+
+#: apps/orders/amendment_engine.py
+msgid "the new delivery time is not known, so it cannot be shown to be comparable to the old one"
+msgstr ""
+"el nuevo plazo de entrega no se conoce, por lo que no se puede demostrar que sea comparable al "
+"anterior"
+
+#: apps/orders/amendment_engine.py
+msgid ""
+"the new maximum delivery time (%(after)s) is %(extra)s days longer than the old one (%(before)s), "
+"more than the %(allowed)s days a minor change allows"
+msgstr ""
+"el nuevo plazo máximo de entrega (%(after)s) es %(extra)s días más largo que el anterior "
+"(%(before)s), más de los %(allowed)s días que permite un cambio menor"
 
 #: apps/manager/fitment_views.py
 msgid "The node is added."
@@ -7110,9 +7660,17 @@ msgstr ""
 "La apertura de la página, construida con bloques: explique por qué un vendedor debería unirse a "
 "ustedes. Si no añade ninguno, la página empieza con los planes."
 
+#: apps/orders/amendment_engine.py
+msgid "The order already has a line %(key)r."
+msgstr "El pedido ya tiene una línea %(key)r."
+
 #: apps/orders/ui/views.py
 msgid "The order could not be placed."
 msgstr "No se ha podido realizar el pedido."
+
+#: apps/orders/amendment_engine.py
+msgid "The order has no line %(key)r in its current version."
+msgstr "El pedido no tiene una línea %(key)r en su versión actual."
 
 #: apps/catalog/attributes.py
 msgid ""
@@ -7146,11 +7704,22 @@ msgstr ""
 msgid "The order was updated."
 msgstr "El pedido se ha actualizado."
 
+#: apps/orders/amendments.py
+msgid ""
+"The package changed since this draft was made, so the draft was closed as superseded: start a new "
+"one."
+msgstr ""
+"El paquete cambió desde este borrador, por lo que se cerró como superado: empiece uno nuevo."
+
 #: apps/manager/amendment_views.py
 msgid "The package changed since this draft was made, so the draft was closed. Start a new one."
 msgstr ""
 "El paquete ha cambiado desde que se creó este borrador, por lo que el borrador se ha cerrado. "
 "Inicie uno nuevo."
+
+#: apps/orders/amendments.py
+msgid "The package could not be cancelled (it is %(state)s); nothing changed."
+msgstr "No se pudo cancelar el paquete (está %(state)s); no se cambió nada."
 
 #: apps/manager/amendment_views.py
 msgid ""
@@ -7167,6 +7736,14 @@ msgid ""
 msgstr ""
 "El paquete se ha cancelado y el cliente recibe el reembolso íntegro, dentro de 14 días como "
 "máximo. La comisión de reembolso se cobra a la tienda."
+
+#: apps/orders/amendments.py
+msgid ""
+"The package's shipping method (%(method)s) does not deliver to %(place)s, so the address cannot be"
+" changed to it."
+msgstr ""
+"El método de envío del paquete (%(method)s) no entrega en %(place)s, por lo que la dirección no "
+"puede cambiarse a ese destino."
 
 #: themes/base/templates/404.html
 msgid "The page you asked for does not exist or has moved."
@@ -7275,6 +7852,14 @@ msgid ""
 msgstr ""
 "Los planes entre los que puede elegir un nuevo vendedor, uno junto a otro. Si no añade ninguno, la"
 " página no muestra planes."
+
+#: apps/manager/templates/manager/shop/order.html
+msgid ""
+"The platform does not issue your invoice. Record here when you have issued it, so every later "
+"change reminds you to correct it."
+msgstr ""
+"La plataforma no emite su factura. Registre aquí cuándo la ha emitido, para que cada cambio "
+"posterior le recuerde corregirla."
 
 #: apps/manager/amendment_views.py
 msgid "the platform owner"
@@ -7464,6 +8049,12 @@ msgstr ""
 "Las preguntas que más hacen los nuevos vendedores, con sus respuestas. Si no añade ninguna, la "
 "página no muestra preguntas."
 
+#: apps/orders/amendment_engine.py
+msgid "the recompute raises what the customer pays by %(amount)s EUR, and a minor change never does"
+msgstr ""
+"el nuevo cálculo aumenta en %(amount)s EUR lo que paga el cliente, algo que un cambio menor nunca "
+"hace"
+
 #: apps/compliance/forms.py
 msgid ""
 "The reference from your order confirmation email, for example 2027-000123. Required: without it we"
@@ -7485,6 +8076,11 @@ msgid ""
 "in."
 msgstr ""
 "La referencia de la denuncia que llevó a ocultar el evento, si la hubo. La rellena la plataforma."
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "The refund fee is charged to your shop."
+msgstr "La tarifa de reembolso se cobra a su tienda."
 
 #: apps/events/models.py
 msgid "The region or province of the place, for example 'Lombardia'. Optional."
@@ -7570,9 +8166,34 @@ msgstr ""
 "El esquema indica lo que eligen los clientes: por ejemplo una marca y un modelo, o una marca y una"
 " máquina. No se escribe nada hasta que confirme en la página de vista previa."
 
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgctxt "(L)"
+msgid ""
+"The seller %(vendor_name)s no longer has %(items)s in stock, while the other items in your order "
+"%(order_number)s are ready for dispatch."
+msgstr ""
+"Te informamos de que el vendedor %(vendor_name)s ya no dispone de existencias de %(items)s, "
+"mientras que el resto de artículos de tu pedido %(order_number)s están listos para su envío."
+
 #: apps/manager/forms.py
 msgid "The seller (default)"
 msgstr "El vendedor (predeterminado)"
+
+#: apps/orders/amendments.py
+msgid "The seller cannot deliver to %(place)s, so the address cannot be changed to it (%(why)s)"
+msgstr ""
+"El vendedor no puede entregar en %(place)s, por lo que la dirección no puede cambiarse a ese "
+"destino (%(why)s)"
+
+#: apps/orders/amendments.py
+msgid ""
+"The seller has no fixed shipping price for %(place)s, so the address cannot be changed to it: such"
+" a change would need a shipping quote, which amendments do not support yet."
+msgstr ""
+"El vendedor no tiene un precio de envío fijo para %(place)s, por lo que la dirección no puede "
+"cambiarse a ese destino: un cambio así necesitaría un presupuesto de envío, que las modificaciones"
+" todavía no admiten."
 
 #: apps/vendors/models.py
 msgid "The seller these terms belong to."
@@ -7607,6 +8228,10 @@ msgid ""
 msgstr ""
 "El grupo de categorías o etiquetas al que pertenece esta, por ejemplo «temporada». Obligatorio. No"
 " se puede cambiar después."
+
+#: apps/orders/amendments.py
+msgid "The shipping method %(method)r is not offered for this package."
+msgstr "El método de envío %(method)r no se ofrece para este paquete."
 
 #: apps/shipping/models.py
 msgid "The shipping price for this band, without VAT."
@@ -7655,6 +8280,16 @@ msgid ""
 msgstr ""
 "Responsabilidad de la tienda, por ejemplo la mercancía no está disponible o la tienda no puede "
 "cumplir el pedido: la comisión de reembolso se cobra a la tienda"
+
+#: apps/manager/templates/manager/amendment.html
+msgid "The shop's invoice is already issued"
+msgstr "La factura de la tienda ya está emitida"
+
+#: apps/orders/amendments.py
+msgid "The shop's open orders are frozen pending staff review, so they cannot be amended."
+msgstr ""
+"Los pedidos abiertos de la tienda están congelados a la espera de la revisión del personal de la "
+"plataforma, por lo que no pueden modificarse."
 
 #: apps/manager/amendment_views.py
 msgid "the shop's owner"
@@ -7782,6 +8417,10 @@ msgstr ""
 #: apps/shipping/models.py
 msgid "The surcharge: an amount without VAT for a fixed or per-kg surcharge, or a percentage."
 msgstr "El suplemento: un importe sin IVA para un suplemento fijo o por kg, o un porcentaje."
+
+#: apps/orders/amendment_engine.py
+msgid "The tax of the increase of line %(sku)s is not known."
+msgstr "No se conoce el impuesto del aumento de la línea %(sku)s."
 
 #: apps/vendors/models.py
 msgid ""
@@ -7916,6 +8555,10 @@ msgid ""
 msgstr ""
 "La unidad de un atributo numérico, por ejemplo cm, kg o ml. Déjela vacía para los atributos de "
 "elección y de texto."
+
+#: apps/orders/amendment_engine.py
+msgid "The unit price must be an amount above zero, in cents."
+msgstr "El precio unitario debe ser un importe superior a cero, en céntimos."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -8232,10 +8875,25 @@ msgstr ""
 msgid "This action changes nothing."
 msgstr "Esta acción no modifica nada."
 
+#: apps/orders/amendment_engine.py
+msgid ""
+"This amendment changes nothing: the lines, the shipping and the address would stay as they are."
+msgstr "Este cambio no modifica nada: las líneas, el envío y la dirección quedarían como están."
+
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "This browser does not support passkeys."
 msgstr "Este navegador no admite claves de acceso (passkeys)."
+
+#: apps/orders/amendments.py
+msgid ""
+"This change moves the delivery address, so it needs a fresh passkey confirmation for this "
+"amendment (an open passkey window does not cover it; a confirmation given before the draft was "
+"edited no longer counts)."
+msgstr ""
+"Este cambio traslada la dirección de entrega y por ello necesita una nueva confirmación con "
+"passkey para esta modificación (una ventana de passkey abierta no la cubre; una confirmación dada "
+"antes de editar el borrador ya no cuenta)."
 
 #: apps/manager/templates/manager/amendment_passkey.html
 msgid ""
@@ -8245,6 +8903,16 @@ msgstr ""
 "Este cambio del pedido %(number)s es %(what)s: confírmelo con su passkey. La confirmación vale "
 "solo para este cambio, una vez."
 
+#: apps/orders/amendments.py
+msgid ""
+"This change refunds money to the customer, so it needs a fresh passkey confirmation for this "
+"amendment (an open passkey window does not cover it; a confirmation given before the draft was "
+"edited no longer counts)."
+msgstr ""
+"Este cambio reembolsa dinero al cliente y por ello necesita una nueva confirmación con passkey "
+"para esta modificación (una ventana de passkey abierta no la cubre; una confirmación dada antes de"
+" editar el borrador ya no cuenta)."
+
 #: apps/accounts/views.py
 msgid "This content is not available in this language."
 msgstr "Este contenido no está disponible en este idioma."
@@ -8253,6 +8921,15 @@ msgstr "Este contenido no está disponible en este idioma."
 msgid "This does not look like an EU VAT number. Check the prefix and the digits."
 msgstr "Esto no parece un número de IVA de la UE. Comprueba el prefijo y los dígitos."
 
+#: apps/orders/amendments.py
+msgid "This draft was started by platform staff: only that side may change or apply it."
+msgstr ""
+"Este borrador lo inició el personal de la plataforma: solo ese lado puede modificarlo o aplicarlo."
+
+#: apps/orders/amendments.py
+msgid "This draft was started by the shop: only that side may change or apply it."
+msgstr "Este borrador lo inició la tienda: solo ese lado puede modificarlo o aplicarlo."
+
 #: apps/manager/event_block_views.py
 msgid ""
 "This event was changed by someone else since you opened it. Reload the page and make your change "
@@ -8260,6 +8937,18 @@ msgid ""
 msgstr ""
 "Este evento ha sido modificado por otra persona desde que lo abrió. Vuelva a cargar la página y "
 "repita el cambio."
+
+#: apps/orders/amendments.py
+msgid ""
+"This is a business order, so the address cannot be moved to %(place)s without a new VAT number "
+"check for that destination, which amendments do not support yet."
+msgstr ""
+"Este es un pedido de empresa, por lo que la dirección no puede trasladarse a %(place)s sin una "
+"nueva comprobación del número de IVA para ese destino, que las modificaciones todavía no admiten."
+
+#: apps/orders/amendments.py
+msgid "This is a substantial change: it needs the customer's acceptance first."
+msgstr "Este es un cambio sustancial: necesita antes la aceptación del cliente."
 
 #: apps/manager/templates/manager/shop/event_form.html
 msgid ""
@@ -8327,6 +9016,27 @@ msgstr "Este pedido ya no está abierto al pago."
 msgid "This order is not paid yet, so it cannot be changed here."
 msgstr "Este pedido aún no está pagado, por lo que no se puede modificar aquí."
 
+#: apps/orders/amendments.py
+msgid "This order is not paid yet: change it through the checkout or the quote instead."
+msgstr ""
+"Este pedido todavía no está pagado: modifíquelo en su lugar mediante el checkout o el presupuesto."
+
+#: apps/orders/amendments.py
+msgid ""
+"This package already has an open amendment (%(ref)s, %(state)s): finish, withdraw or discard it "
+"before drafting another."
+msgstr ""
+"Este paquete ya tiene una modificación abierta (%(ref)s, %(state)s): termínela, retírela o "
+"descártela antes de redactar otra."
+
+#: apps/orders/amendments.py
+msgid ""
+"This package already has an open amendment: finish, withdraw or discard it before drafting "
+"another."
+msgstr ""
+"Este paquete ya tiene una modificación abierta: termínela, retírela o descártela antes de redactar"
+" otra."
+
 #: apps/manager/views.py
 msgid ""
 "This package cannot be shipped before %(when)s: an item was removed as unavailable and the "
@@ -8345,6 +9055,14 @@ msgstr ""
 #: apps/orders/amendments.py
 msgid "This package has already shipped or is closed, so the rest of it can no longer be cancelled."
 msgstr "Este paquete ya se ha enviado o está cerrado, por lo que ya no se puede cancelar el resto."
+
+#: apps/orders/amendments.py
+msgid ""
+"This package is %(state)s: an order can be amended only before shipping, while the package is "
+"pending or accepted."
+msgstr ""
+"Este paquete está %(state)s: un pedido solo puede modificarse antes del envío, mientras el paquete"
+" esté pendiente o aceptado."
 
 #: apps/catalog/templates/catalog/product.html
 msgid "This page is not available in your language yet."
@@ -8600,6 +9318,13 @@ msgstr ""
 " cerrado tras una revisión; después el vendedor repite el proceso de alta (onboarding), incluida "
 "la aceptación del contrato en vigor."
 
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgid "To cancel the rest, contact our customer support with the order number %(order_number)s."
+msgstr ""
+"Para cancelar el resto, contacta con nuestro servicio de atención al cliente indicando el número "
+"de pedido %(order_number)s."
+
 #: apps/manager/templates/manager/platform/sessions_panic.html
 msgid "To confirm, type <strong>%(word)s</strong>."
 msgstr "Para confirmar, escriba <strong>%(word)s</strong>."
@@ -8632,6 +9357,7 @@ msgstr "Demasiadas descargas. Inténtelo de nuevo más tarde."
 msgid "Too many requests from this address. Try again later."
 msgstr "Demasiadas solicitudes desde esta dirección. Inténtalo de nuevo más tarde."
 
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_order.html
 #: apps/orders/templates/orders/customer_orders.html
 #: themes/base/templates/components/order_summary.html
@@ -8762,6 +9488,10 @@ msgstr "Con qué licencia puede usar la imagen. Una foto suya es Obra propia. Ob
 msgid "Unit price net"
 msgstr "Precio unitario neto"
 
+#: apps/orders/amendment_engine.py
+msgid "unknown"
+msgstr "desconocido"
+
 #: apps/accounts/templates/accounts/sessions/list.html
 #: apps/manager/templates/manager/platform/user_sessions.html
 msgid "Unknown device"
@@ -8866,6 +9596,22 @@ msgstr "Usa un año"
 #: apps/orders/ui/present.py apps/orders/ui/views.py
 msgid "VAT"
 msgstr "IVA"
+
+#: apps/orders/amendments.py
+msgid ""
+"VAT cannot be decided for a delivery to %(place)s, so the address cannot be changed to it "
+"(%(why)s)."
+msgstr ""
+"No se puede determinar el IVA para una entrega en %(place)s, por lo que la dirección no puede "
+"cambiarse a ese destino (%(why)s)."
+
+#: apps/orders/amendments.py
+msgid "VAT cannot be decided for this change (%(why)s)."
+msgstr "No se puede determinar el IVA para este cambio (%(why)s)."
+
+#: apps/orders/amendments.py
+msgid "VAT cannot be decided for this package (%(why)s)."
+msgstr "No se puede determinar el IVA para este paquete (%(why)s)."
 
 #: apps/orders/ui/present.py
 msgid "VAT included in the total"
@@ -8992,11 +9738,29 @@ msgstr ""
 "Utilizamos siempre las cookies que el sitio necesita para funcionar. Utilizamos las demás solo si "
 "usted acepta. Aquí puede cambiar de opinión en cualquier momento."
 
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+msgctxt "(L)"
+msgid "We apologize for the inconvenience."
+msgstr "Sentimos las molestias ocasionadas."
+
 #: apps/orders/messages.py
 msgid "We are not taking new orders right now. Nothing was charged. Please try again later."
 msgstr ""
 "En este momento no aceptamos nuevos pedidos. No se te ha cobrado nada. Inténtalo de nuevo más "
 "tarde."
+
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+msgctxt "(L)"
+msgid ""
+"We are sorry to tell you that the seller %(vendor_name)s cannot fulfil your order "
+"%(order_number)s. Your order with %(vendor_name)s has been cancelled and we have immediately "
+"refunded the full %(refund)s EUR to the payment method you used for the purchase."
+msgstr ""
+"Lamentamos informarte de que el vendedor %(vendor_name)s no puede suministrar tu pedido "
+"%(order_number)s. El pedido con %(vendor_name)s ha sido cancelado y hemos ordenado de inmediato el"
+" reembolso íntegro de EUR %(refund)s en el mismo medio de pago utilizado para la compra."
 
 #: apps/orders/ui/present.py
 msgid "We cannot calculate the VAT for this vendor's items to your address. Contact the vendor."
@@ -9026,6 +9790,21 @@ msgstr "No hemos encontrado este producto."
 #: apps/orders/ui/views.py
 msgid "We could not open your cart."
 msgstr "No hemos podido abrir tu carrito."
+
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgctxt "(L)"
+msgid ""
+"We have already refunded %(refund)s EUR (VAT and any shipping share included) to the payment "
+"method you used."
+msgstr ""
+"Ya hemos tramitado el reembolso automático de EUR %(refund)s (IVA y parte proporcional de los "
+"gastos de envío incluidos) en tu medio de pago original."
+
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+msgid "We have refunded %(refund)s EUR to the payment method you used."
+msgstr "Te hemos reembolsado %(refund)s EUR en el medio de pago que usaste."
 
 #: apps/orders/templates/email/orders/order_received/subject.txt
 msgid "We received your order %(order_number)s"
@@ -9104,6 +9883,11 @@ msgid ""
 msgstr ""
 "Lo que ven los compradores: disponible, agotado o bajo pedido al proveedor. El pedido al proveedor"
 " solo funciona con la gestión de existencias siempre abierta."
+
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgid "What changed:"
+msgstr "Qué ha cambiado:"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "What changes"
@@ -9821,6 +10605,19 @@ msgstr "Todavía no tienes pedidos"
 msgid "You may also like"
 msgstr "También te puede gustar"
 
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+msgid "You pay nothing more, and there is nothing you need to do."
+msgstr "No pagas nada más y no tienes que hacer nada."
+
+#: apps/manager/templates/manager/shop/order.html
+msgid ""
+"You recorded on %(when)s that your invoice or receipt for this order is issued. Every later change"
+" shows the reminder to correct it."
+msgstr ""
+"Registró el %(when)s que su factura o comprobante de este pedido está emitido. Cada cambio "
+"posterior muestra el recordatorio de corregirlo."
+
 #: apps/accounts/templates/accounts/levels/prompt.html
 #: apps/manager/templates/manager/amendment_passkey.html
 msgid ""
@@ -9919,13 +10716,45 @@ msgstr "su biblioteca de imágenes"
 msgid "Your images"
 msgstr "Sus imágenes"
 
+#: apps/manager/templates/manager/shop/order.html
+msgid "Your invoice is already issued"
+msgstr "Su factura ya está emitida"
+
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."
 msgstr "Su nombre. Obligatorio, salvo para una denuncia de material de abuso sexual infantil."
 
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "Your order %(order_number)s was changed. It is now version %(version)s."
+msgstr "Su pedido %(order_number)s ha sido modificado. Ahora es la versión %(version)s."
+
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgctxt "(L)"
+msgid "Your order goes on for the remaining items at the new total of %(total)s EUR."
+msgstr "El pedido continuará para los artículos restantes por el nuevo total de EUR %(total)s."
+
 #: apps/orders/templates/orders/confirmation.html
 msgid "Your order number is %(number)s. We sent a confirmation to %(email)s."
 msgstr "El número de tu pedido es %(number)s. Hemos enviado una confirmación a %(email)s."
+
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgctxt "(L)"
+msgid ""
+"Your order will proceed for the remaining items at the new total of EUR %(total)s. However, if the"
+" unavailable item was essential to your purchase, you can cancel the rest of the order free of "
+"charge until the parcel is handed over to the carrier (the seller will not ship it before "
+"%(hold_until)s): since you checked out as a guest, simply contact support at %(support_email)s "
+"quoting order number %(order_number)s to receive a full refund of the remaining balance."
+msgstr ""
+"El pedido continuará para los artículos restantes por el nuevo total de EUR %(total)s. No "
+"obstante, si el artículo no disponible era esencial para tu compra, puedes cancelar gratuitamente "
+"el resto del pedido mientras el paquete no haya sido entregado al transportista (el vendedor no lo"
+" enviará antes del %(hold_until)s): al haber comprado sin crear una cuenta, te basta con escribir "
+"a asistencia en %(support_email)s indicando el número de pedido %(order_number)s para recibir el "
+"reembolso íntegro del importe restante."
 
 #: apps/orders/templates/orders/customer_orders.html
 msgid "Your orders, newest first"
@@ -10008,6 +10837,12 @@ msgstr "Tu sesión ha alcanzado la duración máxima. Inicia sesión de nuevo."
 #: apps/accounts/templates/accounts/sessions/list.html
 msgid "Your sessions"
 msgstr "Tus sesiones"
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Your shop cancelled order %(order_number)s and the customer was refunded in full."
+msgstr ""
+"Su tienda ha cancelado el pedido %(order_number)s y se ha reembolsado íntegramente al cliente."
 
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."
