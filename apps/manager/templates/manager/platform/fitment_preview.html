@@ -1,0 +1,27 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Dry-run preview of a fitment change (FIT.1 part 2): the ChangeSet the service returned with
+`dry_run=True`, nothing written yet. Confirming posts the same fields again with `confirm`.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p class="manager-lead">{% translate "Nothing has changed yet. Check the changes below, then confirm." %}</p>
+  {% if changes %}
+    <ul class="manager-changes">
+      {% for change in changes %}
+        <li><strong>{{ change.op }}</strong> {{ change.model }} <code>{{ change.key }}</code>
+          {% if change.fields %}<ul>{% for name, values in change.fields.items %}<li>{{ name }}: {{ values.0|default_if_none:"—" }} → {{ values.1|default_if_none:"—" }}</li>{% endfor %}</ul>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {% include "components/alert.html" with level="info" message=_("This action changes nothing.") only %}
+  {% endif %}
+  <form method="post" class="manager-confirm">
+    {% csrf_token %}
+    {% for name, value in echo %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+    {% include "components/button.html" with label=_("Confirm") type="submit" name="confirm" value="1" only %}
+    {% include "components/button.html" with label=_("Cancel") url=cancel_url variant="ghost" only %}
+  </form>
+{% endblock %}
