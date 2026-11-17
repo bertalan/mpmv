@@ -16,6 +16,7 @@ from PIL import Image
 from playwright.sync_api import Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
+from wagtail.models import Collection
 
 from apps.catalog import media
 from apps.catalog.models import Product
@@ -120,6 +121,8 @@ def test_the_gallery_and_related_products_pass_axe_and_csp(
 ) -> None:
     settings.MPMV_THEME_DEFAULT = theme
     product = Product.objects.get(translations__slug="hand-made-mug")
+    if Collection.get_first_root_node() is None:  # a transactional test starts without one
+        Collection.add_root(name="Root")
     licence = ImageLicenceFactory.create(code="own-work", name="Own work", source_required=False)
     for color in ("teal", "orange"):
         buffer = io.BytesIO()
