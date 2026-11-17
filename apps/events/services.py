@@ -1000,14 +1000,29 @@ def record_review_decision(
     return changes
 
 
-def send_review_digest(*, today: dt.date | None = None, dry_run: bool = False) -> ChangeSet:
+def send_review_digest(
+    *, today: dt.date | None = None, ctx: AuditContext | None = None, dry_run: bool = False
+) -> ChangeSet:
     """Email the "Event moderators" the events awaiting review, once a day each (EVT.11).
 
-    Nothing is queued for an empty queue. The email lists titles and vendors only; the link
-    opens the review list.
+    Nothing is queued, and nothing audited, for an empty queue. The email lists titles and
+    vendors only; the link opens the review list.
     """
     pages = [page for page, _state in events_awaiting_review()]
-    return notifications.send_digest(pages, day=today or timezone.localdate(), dry_run=dry_run)
+    with transaction.atomic():
+        changes = notifications.send_digest(
+            pages, day=today or timezone.localdate(), dry_run=dry_run
+        )
+        if changes.changes and not dry_run:
+            record(
+                ctx or SYSTEM,
+                "events.review_digest_queued",
+                EVENT,
+                "digest",
+                None,
+                {"emails": len(changes.changes), "events": len(pages)},
+            )
+    return changes
 
 
 # --- Moderation policy and settings (staff, audited)
