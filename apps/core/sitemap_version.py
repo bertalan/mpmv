@@ -25,5 +25,8 @@ def bump_sitemap_version() -> None:
 
 
 def _bump() -> None:
+    from .language_services import configured_codes  # imports this module at load time
+
     if not SiteLanguages.objects.update(sitemap_version=F("sitemap_version") + 1):
-        SiteLanguages.objects.create(sitemap_version=1)
+        # No row yet: record the configured languages with it, never an empty list.
+        SiteLanguages.objects.create(codes=configured_codes(), sitemap_version=1)

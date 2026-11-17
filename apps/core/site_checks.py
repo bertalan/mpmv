@@ -1,13 +1,14 @@
-"""System check of the default Wagtail Site (I18N.18).
+"""System checks of the public root URL (I18N.18).
 
-- core.E921: where live data is held (LIVE and STAGE), the default Site has no real hostname
-  (empty, the installer placeholder `localhost`, a scheme or a path in it, or no default Site).
-  Canonical, `hreflang` and sitemap URLs are built on it, so they would be wrong or relative.
-- core.W921: the same finding elsewhere (development, tests): a warning.
+- core.E921: where live data is held (LIVE and STAGE, not DEBUG), `MPMV_BASE_URL` is not set to a
+  real https host. Absolute URLs (sitemaps, `llms.txt`) are built on it.
+- core.W921: the default Wagtail Site's hostname or port disagrees with the base URL (the `seed`
+  syncs it), or the base URL is not real outside live data (development, tests).
 """
 
 from collections.abc import Iterable
 from typing import Any
+from urllib.parse import urlsplit
 
 from django.apps import AppConfig
 from django.conf import settings
@@ -34,18 +35,41 @@ def site_is_strict() -> bool:
     return bool(getattr(settings, "LIVE_DATA", False) or getattr(settings, "STAGE", False))
 
 
+def base_url_problem() -> str | None:
+    """Why `WAGTAILADMIN_BASE_URL` (from `MPMV_BASE_URL`) is not a real https root; else None."""
+    url = str(getattr(settings, "WAGTAILADMIN_BASE_URL", "") or "")
+    parts = urlsplit(url)
+    if not parts.hostname or hostname_problem(parts.hostname) is not None:
+        return f"MPMV_BASE_URL is not set to a real host ({url!r})"
+    if parts.scheme != "https":
+        return f"MPMV_BASE_URL is not https ({url!r})"
+    return None
+
+
 def check_site_hostname(
     app_configs: Iterable[AppConfig] | None, **kwargs: Any
 ) -> list[checks.CheckMessage]:
+    out: list[checks.CheckMessage] = []
+    problem = base_url_problem()
+    hint = "Set MPMV_BASE_URL to the public https root, e.g. https://shop.example."
+    if problem is not None:
+        if site_is_strict() and not settings.DEBUG:
+            return [checks.Error(problem + ".", hint=hint, id="core.E921")]
+        out.append(checks.Warning(problem + ".", hint=hint, id="core.W921"))
     if Site._meta.db_table not in connection.introspection.table_names():
-        return []  # `migrate` runs the database checks before it creates the table
+        return out  # `migrate` runs the database checks before it creates the table
+    from .site_root import base_url_parts
+
+    root = base_url_parts()
     site = Site.objects.filter(is_default_site=True).first()
-    problem = "There is no default Site" if site is None else hostname_problem(site.hostname)
-    if site is not None and problem is not None:
-        problem = f"The default Site hostname {site.hostname!r} {problem}"
-    if problem is None:
-        return []
-    hint = "Set the default Site's hostname (and port 443) in the Wagtail admin: Settings, Sites."
-    if site_is_strict() and not settings.DEBUG:
-        return [checks.Error(problem + ".", hint=hint, id="core.E921")]
-    return [checks.Warning(problem + ".", hint=hint, id="core.W921")]
+    if root is not None and (site is None or (site.hostname, site.port) != root[1:]):
+        found = "no default Site" if site is None else f"{site.hostname}:{site.port}"
+        out.append(
+            checks.Warning(
+                f"The default Wagtail Site ({found}) differs from MPMV_BASE_URL "
+                f"({root[1]}:{root[2]}): canonical links use the Site.",
+                hint="Run `manage.py seed` (it syncs the Site) or edit Settings, Sites.",
+                id="core.W921",
+            )
+        )
+    return out
