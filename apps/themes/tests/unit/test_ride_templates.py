@@ -285,6 +285,8 @@ def test_the_default_search_action_is_the_active_language_home() -> None:
     other = next(code for code, _name in settings.LANGUAGES if code != settings.LANGUAGE_CODE)
     with translation.override(other):
         html = render("components/header.html", site_name="Ride", links=LINKS)
+        home = reverse("wagtail_serve", args=[""])
     form = re.search(r'<form[^>]*role="search"[^>]*>', html)
     assert form
-    assert f'action="/{other}/"' in form.group(0)
+    # The router decides the prefix (none for the primary language), so compare with it.
+    assert f'action="{home}"' in form.group(0)
