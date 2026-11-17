@@ -1156,6 +1156,10 @@ msgstr "Torna al sito"
 msgid "Back to the terminations"
 msgstr "Torna alle cessazioni"
 
+#: themes/ride/templates/components/footer.html
+msgid "Back to top"
+msgstr "Torna su"
+
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Back to two-factor settings"
 msgstr "Torna alle impostazioni della verifica in due passaggi"
@@ -2350,7 +2354,7 @@ msgstr "Nodi di compatibilità"
 msgid "Fitment scheme"
 msgstr "Schema di compatibilità"
 
-#: themes/base/templates/components/footer.html
+#: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Footer"
 msgstr "Piè di pagina"
 
@@ -3138,7 +3142,7 @@ msgstr "Lascia la prima scelta, salvo che valga una di queste: consente un preav
 msgid "Leave the slot empty to skip it."
 msgstr "Lascia vuota la casella per saltarla."
 
-#: themes/base/templates/components/footer.html
+#: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Legal"
 msgstr "Note legali"
 
@@ -5407,6 +5411,10 @@ msgid ""
 msgstr ""
 "Solo slider con cambio automatico: quanto resta una slide, in millisecondi, tra 3000 e 20000. "
 "Esempio: 6000 sono sei secondi."
+
+#: themes/ride/templates/components/footer.html
+msgid "Social"
+msgstr "Social network"
 
 #: apps/catalog/templates/catalog/product.html
 msgid "Sold by"
