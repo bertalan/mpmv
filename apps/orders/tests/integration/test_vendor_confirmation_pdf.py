@@ -9,12 +9,14 @@ from pypdf import PdfReader
 
 from apps.core import mail
 from apps.core import services as core_services
+from apps.core.i18n import primary_language
 from apps.core.models import OutboxEmail, OutboxEmailEvent
 from apps.orders import documents, notifications, pdf_render, services
 from apps.orders.models import Order, PrivacyStatus, VendorOrder
 from apps.orders.tests.integration.test_notifications import BANNED, LANGS, two_vendor_order
 from apps.orders.tests.integration.test_services import CTX, line_input, pay, place, vendor_input
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -95,7 +97,7 @@ def test_the_pdf_is_built_from_snapshots_not_live_rows() -> None:
 
 
 def test_an_unknown_order_language_renders_in_english() -> None:
-    order = place(language="en")
+    order = place(language=primary_language())
     Order.objects.filter(pk=order.pk).update(language="xx")
     sub = sub_orders(Order.objects.get(pk=order.pk))[0]
     assert LABELS["en"] in text_of(documents.render_vendor_confirmation_pdf(sub))
@@ -139,7 +141,7 @@ def test_hostile_names_are_inert_and_shown_as_text(monkeypatch: pytest.MonkeyPat
 
 
 def test_the_pdf_is_tagged_with_language_and_title() -> None:
-    order = two_vendor_order(language="de")
+    order = two_vendor_order(language=third_language())
     pdf = documents.render_vendor_confirmation_pdf(sub_orders(order)[0])
     rd = reader(pdf)
     root: Any = rd.trailer["/Root"]
@@ -267,7 +269,7 @@ def test_an_unregistered_attachment_kind_is_left_out(sender: mail.MemoryEmailSen
     core_services.enqueue_email(
         recipient="someone@example.com",
         template_key="orders.order_confirmation",
-        language="en",
+        language=primary_language(),
         context={
             "order_number": "X",
             "vendor_name": "V",
@@ -291,7 +293,7 @@ def test_a_forged_reference_does_not_attach_another_buyers_document(
     core_services.enqueue_email(
         recipient="someone.else@example.com",
         template_key="orders.order_confirmation",
-        language="en",
+        language=primary_language(),
         context={
             "order_number": "X",
             "vendor_name": "V",

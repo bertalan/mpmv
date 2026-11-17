@@ -34,6 +34,8 @@ from apps.catalog.tests.factories import (
     TermFactory,
     TermTranslationFactory,
 )
+from apps.core.i18n import primary_language
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -103,7 +105,7 @@ def test_add_a_root_category_with_translations_and_seo_texts(staff_client: Clien
                     seo_title="Hand-made bags",
                     seo_description="Bags made by hand.",
                 ),
-                texts("it", "Borse", "borse", status="machine"),
+                texts(other_language(), "Borse", "borse", status="machine"),
             ]
         )
     )
@@ -111,9 +113,9 @@ def test_add_a_root_category_with_translations_and_seo_texts(staff_client: Clien
     assert response.status_code == 302, errors_of(response)
     category = Category.objects.get()
     assert category.is_root()
-    english = category.translations.get(language="en")
+    english = category.translations.get(language=primary_language())
     assert (english.name, english.slug, english.seo_title) == ("Bags", "bags", "Hand-made bags")
-    assert category.translations.get(language="it").status == "machine"
+    assert category.translations.get(language=other_language()).status == "machine"
 
 
 def test_add_a_subcategory_first_under_its_parent(staff_client: Client) -> None:
@@ -196,7 +198,7 @@ def test_moving_a_category_next_to_a_same_slug_sibling_is_refused(staff_client: 
 
 
 def test_delete_a_leaf_category_with_its_translations(staff_client: Client) -> None:
-    category = CategoryFactory.create(languages=["en", "it"])
+    category = CategoryFactory.create(languages=["en", other_language()])
     response = staff_client.post(
         reverse("admin:catalog_category_delete", args=[category.pk]), {"post": "yes"}
     )
@@ -247,7 +249,12 @@ def test_add_a_taxonomy_with_translated_names_and_slugs(staff_client: Client) ->
         translation_rows(
             [
                 {"language": "en", "status": "published", "name": "Occasion", "slug": "occasion"},
-                {"language": "it", "status": "machine", "name": "Occasione", "slug": "occasione"},
+                {
+                    "language": other_language(),
+                    "status": "machine",
+                    "name": "Occasione",
+                    "slug": "occasione",
+                },
             ]
         )
     )
@@ -259,7 +266,7 @@ def test_add_a_taxonomy_with_translated_names_and_slugs(staff_client: Client) ->
         True,
         True,
     )
-    assert taxonomy.translations.get(language="it").slug == "occasione"
+    assert taxonomy.translations.get(language=other_language()).slug == "occasione"
 
 
 def test_a_taxonomy_with_a_malformed_term_schema_is_refused(staff_client: Client) -> None:
@@ -543,23 +550,26 @@ def test_add_change_and_delete_a_brand_with_translations(staff_client: Client) -
         translation_rows(
             [
                 brand_texts("en", "maker-a", seo_title="Maker A products"),
-                brand_texts("it", "maker-a", status="machine"),
+                brand_texts(other_language(), "maker-a", status="machine"),
             ]
         )
     )
     response = staff_client.post(reverse("admin:catalog_brand_add"), data)
     assert response.status_code == 302, errors_of(response)
     brand = Brand.objects.get()
-    assert brand.translations.get(language="en").seo_title == "Maker A products"
+    assert brand.translations.get(language=primary_language()).seo_title == "Maker A products"
 
-    english = brand.translations.get(language="en")
-    italian = brand.translations.get(language="it")
+    english = brand.translations.get(language=primary_language())
+    italian = brand.translations.get(language=other_language())
     data = {"name": "Maker A Works"}
     data.update(
         translation_rows(
             [
                 {**brand_texts("en", "maker-a-works"), "id": str(english.pk)},
-                {**brand_texts("it", "maker-a", status="machine"), "id": str(italian.pk)},
+                {
+                    **brand_texts(other_language(), "maker-a", status="machine"),
+                    "id": str(italian.pk),
+                },
             ],
             initial=2,
         )
@@ -568,7 +578,7 @@ def test_add_change_and_delete_a_brand_with_translations(staff_client: Client) -
     assert response.status_code == 302, errors_of(response)
     brand.refresh_from_db()
     assert brand.name == "Maker A Works"
-    assert brand.translations.get(language="en").slug == "maker-a-works"
+    assert brand.translations.get(language=primary_language()).slug == "maker-a-works"
 
     response = staff_client.post(
         reverse("admin:catalog_brand_delete", args=[brand.pk]), {"post": "yes"}

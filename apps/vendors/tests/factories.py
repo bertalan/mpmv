@@ -19,6 +19,7 @@ from django.utils.text import slugify
 from factory.django import DjangoModelFactory
 
 from apps.accounts.tests.factories import UserFactory
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import FeatureFlagFactory
 from apps.core.translations import source_hash
 from apps.vendors import engine
@@ -238,7 +239,7 @@ class VendorTranslationFactory(DjangoModelFactory[VendorTranslation]):
         model = VendorTranslation
 
     vendor = factory.SubFactory(VendorFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     tagline = factory.Faker("catch_phrase")
     description = factory.Faker("paragraph")
     shipping_policy = factory.Faker("sentence")
@@ -308,7 +309,7 @@ class VendorContractFactory(DjangoModelFactory[VendorContract]):
         obj: VendorContract, create: bool, extracted: Iterable[str] | None, **kwargs: Any
     ) -> None:
         if create:
-            for language in ("en",) if extracted is None else extracted:
+            for language in (primary_language(),) if extracted is None else extracted:
                 VendorContractTranslationFactory.create(contract=obj, language=language)
 
 
@@ -317,7 +318,7 @@ class VendorContractTranslationFactory(DjangoModelFactory[VendorContractTranslat
         model = VendorContractTranslation
 
     contract = factory.SubFactory(VendorContractFactory, languages=[])
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     status = VendorContractTranslation.Status.PUBLISHED
     title = factory.LazyAttribute(lambda o: f"Vendor agreement [{o.language}]")
     body = factory.Faker("paragraph")
@@ -337,7 +338,7 @@ class ContractAcceptanceFactory(DjangoModelFactory[ContractAcceptance]):
     vendor = factory.SubFactory(VendorFactory, status=Vendor.Status.ONBOARDING)
     contract = factory.SubFactory(VendorContractFactory)
     user = factory.SubFactory(UserFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     text_hash = ""
     accepted_at = factory.LazyFunction(timezone.now)
     ip = "198.51.100.1"
@@ -374,7 +375,7 @@ class SelfCertificationFactory(DjangoModelFactory[SelfCertification]):
     vendor = factory.SubFactory(VendorFactory, status=Vendor.Status.ONBOARDING)
     user = factory.SubFactory(UserFactory)
     version = engine.SELF_CERTIFICATION_VERSION
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     text_hash = factory.LazyAttribute(lambda o: engine.self_certification_hash(o.language))
     accepted_at = factory.LazyFunction(timezone.now)
     onboarding_round = factory.SelfAttribute("vendor.onboarding_round")

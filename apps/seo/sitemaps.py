@@ -27,6 +27,7 @@ from apps.cms.models import TermLandingPage
 from apps.core import translations
 from apps.core.i18n import primary_language
 from apps.core.site_url import absolute_url
+from apps.events.models import EventPage
 from apps.vendors.models import Vendor
 
 from .sitemap_engine import Entry, sitemap_path
@@ -42,12 +43,13 @@ def _date(value: dt.datetime | None) -> dt.date | None:
 
 def page_is_noindex(page: Page) -> bool:
     """The page's own robots rule, the one its template prints: a term landing page is noindex
-    (its term page is the indexed one). The environment floor and the site's switch are checked
-    once for the whole sitemap (the views answer 404 when indexing is off)."""
-    return isinstance(page, TermLandingPage)
+    (its term page is the indexed one), and so is a page whose own `noindex` field is set (THM.14
+    showcase and any page type that adds the field). The environment floor and the site's switch
+    are checked once for the whole sitemap (the views answer 404 when indexing is off)."""
+    return isinstance(page, TermLandingPage) or bool(getattr(page, "noindex", False))
 
 
-def cms_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
+def _cms_entries(language: str, request: HttpRequest, *, events: bool) -> Iterator[Entry]:
     site = Site.find_for_request(request)
     pages = Page.objects.live().public().filter(locale__language_code=language, depth__gte=2)
     if site is not None:  # this site's tree only: another site's pages are not ours to list
@@ -57,14 +59,23 @@ def cms_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
             trees |= Q(path__startswith=root.path, depth__gte=root.depth)
         pages = pages.filter(trees)
     for page in pages.order_by("path").specific().iterator(chunk_size=500):
-        if page_is_noindex(page):
+        if isinstance(page, EventPage) != events or page_is_noindex(page):
             continue
         visible = getattr(page, "is_publicly_visible", None)
         if visible is not None and not visible():  # a hidden event
             continue
         url = _absolute(request, page.get_url(request))
         if url:
-            yield Entry(url, _date(page.last_published_at))
+            yield Entry(url, _date(page.last_published_at), page.title)
+
+
+def cms_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
+    """The CMS pages other than events."""
+    return _cms_entries(language, request, events=False)
+
+
+def event_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
+    return _cms_entries(language, request, events=True)
 
 
 def product_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
@@ -75,9 +86,10 @@ def product_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
         product__status=ProductStatus.PUBLISHED,
         product__vendor__status=Vendor.Status.ACTIVE,
     ).order_by("product_id")
-    for slug, updated in rows.values_list("slug", "product__updated_at").iterator(chunk_size=1000):
+    values = rows.values_list("slug", "product__updated_at", "title")
+    for slug, updated, title in values.iterator(chunk_size=1000):
         path = slugs.product_path(language, slug, default_language=primary_language())
-        yield Entry(absolute_url(request, path), _date(updated))
+        yield Entry(absolute_url(request, path), _date(updated), title)
 
 
 def _listed_ids() -> tuple[set[int], set[int], set[str], set[str]]:
@@ -113,21 +125,27 @@ def _listing_robots_allows() -> bool:
 
 
 def _listing_entries(
-    scopes: Sequence[catalog.ListingScope], language: str, request: HttpRequest
+    scopes: Sequence[catalog.ListingScope], language: str, request: HttpRequest, *, titles: bool
 ) -> Iterator[Entry]:
+    """`titles` adds each listing's name (a query per listing: only `llms.txt` asks for it)."""
     if not _listing_robots_allows():
         return
-    for found in catalog.listing_page_paths(scopes):
+    for scope, found in zip(scopes, catalog.listing_page_paths(scopes), strict=True):
         if found is None:
             continue
         paths, published = found
         path = sitemap_path(paths, published, language)
-        if path:
-            yield Entry(absolute_url(request, path))
+        if not path:
+            continue
+        anchor = catalog.scope_anchor(scope, language) if titles else None
+        yield Entry(absolute_url(request, path), title=anchor.name if anchor else "")
 
 
-def listing_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
-    vendor_ids, brand_ids, category_paths, term_paths = _listed_ids()
+def listing_entries(
+    language: str, request: HttpRequest, *, titles: bool = False
+) -> Iterator[Entry]:
+    """Category, taxonomy term and brand listings."""
+    _vendor_ids, brand_ids, category_paths, term_paths = _listed_ids()
     scopes: list[catalog.ListingScope] = [
         catalog.ListingScope(category=row)
         for row in Category.objects.order_by("path")
@@ -143,16 +161,28 @@ def listing_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
         catalog.ListingScope(brand=row)
         for row in Brand.objects.filter(status=Brand.Status.APPROVED, pk__in=brand_ids)
     ]
-    scopes += [
+    yield from _listing_entries(scopes, language, request, titles=titles)
+
+
+def vendor_entries(language: str, request: HttpRequest, *, titles: bool = False) -> Iterator[Entry]:
+    """The storefronts of the active vendors that have listed products."""
+    vendor_ids = _listed_ids()[0]
+    scopes = [
         catalog.ListingScope(vendor=row)
         for row in Vendor.objects.filter(status=Vendor.Status.ACTIVE, pk__in=vendor_ids).order_by(
             "id"
         )
     ]
-    yield from _listing_entries(scopes, language, request)
+    yield from _listing_entries(scopes, language, request, titles=titles)
 
 
-def language_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
-    yield from cms_entries(language, request)
-    yield from listing_entries(language, request)
-    yield from product_entries(language, request)
+def kind_entries(
+    kind: str, language: str, request: HttpRequest, *, titles: bool = False
+) -> Iterator[Entry]:
+    """The URLs of one type in one language (an unknown `kind` is a programming error)."""
+    if kind == "listings":
+        return listing_entries(language, request, titles=titles)
+    if kind == "vendors":
+        return vendor_entries(language, request, titles=titles)
+    builders = {"pages": cms_entries, "events": event_entries, "products": product_entries}
+    return builders[kind](language, request)

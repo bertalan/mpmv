@@ -36,6 +36,7 @@ from apps.accounts.tests.mfa import verified_login
 from apps.cms import roles
 from apps.cms.models import StandardPage
 from apps.cms.services import seed_site
+from apps.core.i18n import primary_language
 
 pytestmark = pytest.mark.django_db
 
@@ -177,7 +178,7 @@ def test_every_staff_admin_screen_has_the_help_button_left_of_the_user_tools() -
 
 def test_the_page_type_of_the_page_being_edited_keys_the_wagtail_help() -> None:
     seed_site()
-    home = Page.objects.get(depth=2, locale__language_code="en")
+    home = Page.objects.get(depth=2, locale__language_code=primary_language())
     client = _superuser_client()
     page = home.add_child(
         instance=StandardPage(title="About", slug="about-help", locale=home.locale)

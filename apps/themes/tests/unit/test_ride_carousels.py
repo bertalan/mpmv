@@ -189,4 +189,6 @@ def test_the_carousel_script_is_a_small_module_without_a_library() -> None:
     assert "mouseenter" in script
     assert "eval(" not in script
     layout = (RIDE / "templates/layouts/base.html").read_text(encoding="utf-8")
-    assert "themes/ride/js/carousel.js" in layout
+    assert "themes/ride/js/carousel.js" not in layout  # loaded by the carousel controls only
+    controls = (RIDE / "templates/components/carousel_controls.html").read_text(encoding="utf-8")
+    assert "themes/ride/js/carousel.js" in controls

@@ -7,6 +7,7 @@ import factory
 from factory.django import DjangoModelFactory
 from wagtail.models import Site
 
+from apps.core.i18n import primary_language
 from apps.seo import engine
 from apps.seo.models import ConsentLog, SeoSettings
 
@@ -43,4 +44,4 @@ class ConsentLogFactory(DjangoModelFactory[ConsentLog]):
     granted: list[str] = []
     banner_version = engine.BANNER_VERSION
     provider = "self-hosted"
-    language = "en"
+    language = factory.LazyFunction(primary_language)

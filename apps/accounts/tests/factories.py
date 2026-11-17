@@ -23,6 +23,7 @@ from apps.accounts.models import (
     User,
     UserSession,
 )
+from apps.core.i18n import primary_language
 
 
 class UserFactory(DjangoModelFactory[User]):
@@ -43,7 +44,7 @@ class UserFactory(DjangoModelFactory[User]):
 
     email = factory.Sequence(lambda n: f"user{n}@example.com")
     full_name = factory.Faker("name")
-    preferred_language = "en"
+    preferred_language = factory.LazyFunction(primary_language)
 
     @factory.post_generation
     def password(obj: User, create: bool, extracted: str | None, **kwargs: Any) -> None:

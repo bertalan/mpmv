@@ -1,0 +1,21 @@
+{% comment %}
+The strip (THM.14): cards to pages, vendors and products and customer quotes. `base` shows them as
+a plain list (the `ride` theme makes a carousel of the same items); left out when no card is
+public.
+{% endcomment %}{% if items %}
+<section class="block block-strip">
+  {% if value.heading %}<h2>{{ value.heading }}</h2>{% endif %}
+  <ul class="cards">
+    {% for item in items %}
+      <li class="card">
+        {% if item.quote %}
+          <blockquote><p>{{ item.text|linebreaksbr }}</p><footer>{{ item.title }}{% if item.meta %}, {{ item.meta }}{% endif %}</footer></blockquote>
+        {% else %}
+          <a href="{{ item.url }}">{{ item.title }}</a>
+          {% if item.text %}<p>{{ item.text|linebreaksbr }}</p>{% endif %}
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

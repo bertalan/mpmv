@@ -1,0 +1,7 @@
+{% load i18n %}{% comment %}
+Strip block of the `ride` theme (THM.14): the CMS cards as the multi-item carousel component
+(components/strip.html), one to four items per slide. Left out when no card is public.
+{% endcomment %}{% if items %}<section class="block block-strip">
+  {% if value.heading %}<h2>{{ value.heading }}</h2>{% endif %}
+  {% include "components/strip.html" with id=carousel_id label=value.heading|default:_("Highlights") slides=items per_view=per_view autoplay=autoplay interval=interval heading_level=3 only %}
+</section>{% endif %}

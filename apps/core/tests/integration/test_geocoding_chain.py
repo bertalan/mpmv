@@ -18,8 +18,10 @@ from apps.core.geocoding import (
 from apps.core.geocoding import services as geo
 from apps.core.geocoding.adapters import LocationIQGeocoder, OpenCageGeocoder
 from apps.core.geocoding.fakes import FakeGeocoder, fake_result
+from apps.core.i18n import primary_language
 from apps.core.models import GeocodeCacheEntry, GeocoderState
 from apps.core.tests.factories import GeocodeCacheEntryFactory, GeocoderStateFactory, utc
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -56,7 +58,7 @@ def address(n: int) -> AddressQuery:
 
 def lookup(query: AddressQuery, chain: list[Any], clock: FakeClock) -> GeocodeOutcome:
     return geo.geocode_address(
-        query, language="it", geocoders=chain, clock=clock, sleep=clock.sleep
+        query, language=other_language(), geocoders=chain, clock=clock, sleep=clock.sleep
     )
 
 
@@ -93,7 +95,9 @@ def test_a_second_lookup_of_the_same_address_is_served_from_the_cache(clock: Fak
 def test_the_cache_is_per_language(clock: FakeClock) -> None:
     nominatim = FakeGeocoder("nominatim", results=[fake_result("nominatim")])
     lookup(MILAN, [nominatim], clock)
-    geo.geocode_address(MILAN, language="de", geocoders=[nominatim], clock=clock, sleep=clock.sleep)
+    geo.geocode_address(
+        MILAN, language=third_language(), geocoders=[nominatim], clock=clock, sleep=clock.sleep
+    )
     assert len(nominatim.calls) == 2
 
 
@@ -213,7 +217,9 @@ def test_an_expired_cache_entry_is_not_used(clock: FakeClock) -> None:
     from apps.core.geocoding import engine
 
     GeocodeCacheEntryFactory.create(
-        key=engine.cache_key(MILAN), language="it", expires_at=T0 - dt.timedelta(seconds=1)
+        key=engine.cache_key(MILAN),
+        language=other_language(),
+        expires_at=T0 - dt.timedelta(seconds=1),
     )
     nominatim = FakeGeocoder("nominatim", results=[fake_result("nominatim")])
     outcome = lookup(MILAN, [nominatim], clock)
@@ -242,7 +248,7 @@ def test_the_package_level_geocode_uses_the_configured_chain(
 
     photon = FakeGeocoder("photon", results=[fake_result("photon")])
     monkeypatch.setattr(geo, "configured_geocoders", lambda: [photon])
-    assert geocode(MILAN, language="en").provider == "photon"
+    assert geocode(MILAN, language=primary_language()).provider == "photon"
 
 
 # --- Secrets

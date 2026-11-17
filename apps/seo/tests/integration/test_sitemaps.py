@@ -68,11 +68,24 @@ def other_language() -> str:
     return next(code for code in configured_languages() if code != PRIMARY)
 
 
-def sitemap_paths(client: Client, language: str) -> set[str]:
-    response = client.get(reverse("sitemap_language", kwargs={"language": language}))
+def index_paths(client: Client) -> list[str]:
+    response = client.get(reverse("sitemap"))
     assert response.status_code == 200
     root = ElementTree.fromstring(response.content)  # noqa: S314 (parses our own generated XML)
-    return {urlsplit(loc.text or "").path for loc in root.findall("s:url/s:loc", NS)}
+    return [urlsplit(loc.text or "").path for loc in root.findall("s:sitemap/s:loc", NS)]
+
+
+def sitemap_paths(client: Client, language: str) -> set[str]:
+    """Every page path the index lists for `language`, over all of its type files."""
+    found: set[str] = set()
+    for path in index_paths(client):
+        if not path.startswith(f"/sitemap-{language}-"):
+            continue
+        response = client.get(path)
+        assert response.status_code == 200
+        root = ElementTree.fromstring(response.content)  # noqa: S314 (parses our own generated XML)
+        found |= {urlsplit(loc.text or "").path for loc in root.findall("s:url/s:loc", NS)}
+    return found
 
 
 def head_links(html: str) -> tuple[list[str], set[str]]:
@@ -116,14 +129,10 @@ def event(title: str) -> EventPage:
 # --- The index and robots.txt
 
 
-def test_the_index_lists_one_sitemap_per_language(client: Client) -> None:
-    response = client.get(reverse("sitemap"))
-    assert response.status_code == 200
-    root = ElementTree.fromstring(response.content)  # noqa: S314 (parses our own generated XML)
-    found = [urlsplit(loc.text or "").path for loc in root.findall("s:sitemap/s:loc", NS)]
-    assert found == [
-        reverse("sitemap_language", kwargs={"language": code}) for code in configured_languages()
-    ]
+def test_the_index_lists_a_sitemap_for_every_language(client: Client) -> None:
+    found = index_paths(client)
+    for code in configured_languages():
+        assert any(path.startswith(f"/sitemap-{code}-") for path in found)
 
 
 HOSTILE = "evil.example"
@@ -146,7 +155,8 @@ def test_no_url_takes_the_host_header(client: Client) -> None:
     root = Site.objects.get(is_default_site=True).root_url
     index = client.get(reverse("sitemap"), HTTP_HOST=HOSTILE).content.decode()
     sitemap = client.get(
-        reverse("sitemap_language", kwargs={"language": PRIMARY}), HTTP_HOST=HOSTILE
+        reverse("sitemap_section", kwargs={"language": PRIMARY, "kind": "products"}),
+        HTTP_HOST=HOSTILE,
     ).content.decode()
     product_html = client.get(product_path(PRIMARY, item), HTTP_HOST=HOSTILE).content.decode()
     category = CategoryFactory.create()
@@ -194,15 +204,14 @@ def test_a_forced_noindex_page_has_no_canonical_or_hreflang(client: Client) -> N
 
 
 def test_the_404_of_a_sitemap_has_no_cache_header_and_the_200_is_private(client: Client) -> None:
-    assert "max-age" not in client.get(reverse("sitemap_language", kwargs={"language": "xx"})).get(
-        "Cache-Control", ""
-    )
+    missing = client.get(reverse("sitemap_section", kwargs={"language": "xx", "kind": "pages"}))
+    assert "max-age" not in missing.get("Cache-Control", "")
     cache = client.get(reverse("sitemap")).get("Cache-Control", "")
     assert "private" in cache
     assert "public" not in cache
 
 
-def test_a_language_over_the_limit_is_split_into_parts(
+def test_a_type_over_the_limit_is_split_into_parts(
     client: Client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from apps.seo import sitemap_engine
@@ -212,9 +221,13 @@ def test_a_language_over_the_limit_is_split_into_parts(
     monkeypatch.setattr(sitemap_engine, "MAX_URLS", 2)
     index = ElementTree.fromstring(client.get(reverse("sitemap")).content)  # noqa: S314 (parses our own generated XML)
     found = [urlsplit(loc.text or "").path for loc in index.findall("s:sitemap/s:loc", NS)]
-    parts = [reverse("sitemap_part", kwargs={"language": PRIMARY, "part": n}) for n in range(1, 4)]
+    parts = [
+        reverse("sitemap_part", kwargs={"language": PRIMARY, "kind": "products", "part": str(n)})
+        for n in range(1, 4)
+    ]
+    whole = reverse("sitemap_section", kwargs={"language": PRIMARY, "kind": "products"})
     assert set(parts) <= set(found)
-    assert reverse("sitemap_language", kwargs={"language": PRIMARY}) not in found
+    assert whole not in found
     total = 0
     for part in parts:
         response = client.get(part)
@@ -223,18 +236,21 @@ def test_a_language_over_the_limit_is_split_into_parts(
         assert count <= 2
         total += count
     assert total >= 5
-    assert client.get(reverse("sitemap_language", kwargs={"language": PRIMARY})).status_code == 404
+    assert client.get(whole).status_code == 404
 
 
-def test_an_unknown_language_has_no_sitemap(client: Client) -> None:
-    assert client.get(reverse("sitemap_language", kwargs={"language": "xx"})).status_code == 404
+def test_an_unknown_language_or_type_has_no_sitemap(client: Client) -> None:
+    unknown_language = reverse("sitemap_section", kwargs={"language": "xx", "kind": "pages"})
+    assert client.get(unknown_language).status_code == 404
+    assert client.get(f"/sitemap-{PRIMARY}-nothing.xml").status_code == 404
 
 
 @override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
 def test_with_indexing_off_there_is_no_sitemap(client: Client) -> None:
     apps.get_model("seo", "SeoSettings").objects.update(allow_indexing=False)
     assert client.get(reverse("sitemap")).status_code == 404
-    assert client.get(reverse("sitemap_language", kwargs={"language": PRIMARY})).status_code == 404
+    section = reverse("sitemap_section", kwargs={"language": PRIMARY, "kind": "pages"})
+    assert client.get(section).status_code == 404
 
 
 @override_settings(FORCE_NOINDEX=True)
@@ -408,11 +424,11 @@ def queries_for(client: Client, name: str, **kwargs: Any) -> int:
 
 def test_index_and_part_queries_do_not_grow_with_listings(client: Client) -> None:
     listed_category()
-    part = {"language": PRIMARY}
-    base = (queries_for(client, "sitemap"), queries_for(client, "sitemap_language", **part))
+    part = {"language": PRIMARY, "kind": "listings"}
+    base = (queries_for(client, "sitemap"), queries_for(client, "sitemap_section", **part))
     for _ in range(6):
         listed_category()
-    more = (queries_for(client, "sitemap"), queries_for(client, "sitemap_language", **part))
+    more = (queries_for(client, "sitemap"), queries_for(client, "sitemap_section", **part))
     assert more == base
 
 
@@ -422,9 +438,8 @@ def test_a_second_request_is_served_from_the_cache(
     product([PRIMARY])
     client.get(reverse("sitemap"))
     with django_assert_max_num_queries(14):  # site, indexing switch and the fingerprint, no rebuild
-        assert (
-            client.get(reverse("sitemap_language", kwargs={"language": PRIMARY})).status_code == 200
-        )
+        section = reverse("sitemap_section", kwargs={"language": PRIMARY, "kind": "products"})
+        assert client.get(section).status_code == 200
         client.get(reverse("sitemap"))
 
 
