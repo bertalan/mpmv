@@ -23,6 +23,7 @@ No internal note (the staff note, the customer's own words) enters a notice.
 import datetime as dt
 import functools
 import hashlib
+import logging
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
@@ -34,9 +35,15 @@ from django.utils.translation import gettext
 
 from apps.cms import services as cms_services
 from apps.core import services as core_services
+from apps.core.models import OutboxEmail
+from apps.core.services import (
+    NoPlatformOperator,
+    OverlappingPlatformOperators,
+    current_operator,
+)
 
 from . import amendment_engine as am
-from . import notifications, versions
+from . import versions
 from .models import (
     Order,
     OrderAmendment,
@@ -47,6 +54,8 @@ from .models import (
     VendorOrderVersion,
 )
 from .tz import business_tz
+
+logger = logging.getLogger(__name__)
 
 AMENDMENT_APPLIED = "orders.amendment_applied"
 ITEM_UNAVAILABLE = "orders.item_unavailable"
@@ -84,12 +93,24 @@ _PLACEHOLDERS: dict[str, Any] = {
     "hold_until": "[date and time]",
     "cancel_url": "[link]",
     "order_url": "[link]",
+    "support_email": "[support address]",
+}
+
+#: CMP.24 provenance of the (L) wording of these notices: counsel approved the IT and EN texts and
+#: their DE, FR and ES versions on 2026-11-17 (A1 with the general "cannot fulfil" formula, A2,
+#: the guest A2, the platform-error cancellation, the vendor invoice notice). The DE, FR and ES
+#: texts still wait for the professional translator's review (owner decision, I18N.14).
+WORDING_APPROVAL: dict[str, Any] = {
+    "approved_by": "counsel",
+    "approved_on": "2026-11-17",
+    "translator_review_pending": ["de", "fr", "es"],
 }
 
 #: A variant flag that is false empties these placeholders (the branch without them).
 _BLANKED_UNLESS: dict[str, tuple[str, ...]] = {
     "linked": ("cancel_url", "order_url"),
     "address_changed": ("ship_to",),
+    "support": ("support_email",),
 }
 
 
@@ -136,12 +157,31 @@ def _record(
     variant: Mapping[str, Any],
     event_key: str,
     payload: Mapping[str, Any],
-) -> OrderEvent:
-    """Render the notice, keep its exact text as an `OrderEvent`, and queue the same email."""
+) -> OrderEvent | None:
+    """Queue the notice and keep its exact text as an `OrderEvent`, only when the email was
+    accepted into the outbox for sending: no recipient, a suppressed address, a refused recipient
+    (SEC.5) or an email already queued under the same key keep no copy, so the customer area
+    never lists a message that did not go out. Returns the event, or None."""
+    if not recipient:
+        return None
     language = core_services.email_language(language)
     values = {**context, **variant}
+    try:
+        queued = core_services.enqueue_email(
+            recipient=recipient,
+            template_key=template_key,
+            language=language,
+            idempotency_key=f"{event_key}:{audience}",
+            context=values,
+        )
+    except ValueError as exc:
+        logger.warning("notice %s not queued: %s", template_key, exc.__class__.__name__)
+        return None
+    created = [c for c in queued.changes if c.op == "create" and c.after]
+    if not created or (created[0].after or {}).get("status") != OutboxEmail.Status.QUEUED:
+        return None
     rendered = core_services.render_email(template_key, language, values)
-    event = OrderEvent.objects.create(
+    return OrderEvent.objects.create(
         order=sub.order,
         vendor_order=sub,
         kind=template_key,
@@ -151,17 +191,8 @@ def _record(
         text=rendered.text_body,
         wording_version=wording_version(template_key, language, tuple(sorted(variant.items()))),
         terms=_terms(language) if audience == OrderEventAudience.CUSTOMER else {},
-        payload=dict(payload),
+        payload={**payload, "wording_approval": WORDING_APPROVAL},
     )
-    if recipient:
-        notifications.enqueue_email(
-            recipient=recipient,
-            template_key=template_key,
-            language=language,
-            idempotency_key=f"{event_key}:{audience}",
-            context=values,
-        )
-    return event
 
 
 def _active(order: Order) -> bool:
@@ -182,6 +213,14 @@ def _when(value: dt.datetime | None, language: str) -> str:
         return ""
     with translation.override(language):
         return formats.date_format(timezone.localtime(value, business_tz()), "DATETIME_FORMAT")
+
+
+def _support_email() -> str:
+    """The platform's support address (the operator in force), empty when none is configured."""
+    try:
+        return str(current_operator().support_email or "").strip()
+    except (NoPlatformOperator, OverlappingPlatformOperators):
+        return ""
 
 
 def _absolute(path: str) -> str:
@@ -304,6 +343,9 @@ def amendment_applied(amendment: OrderAmendment, version: VendorOrderVersion) ->
         )
         template = ITEM_UNAVAILABLE
         variant: dict[str, Any] = {"refunded": refund > 0}
+        if not customer["order_url"]:  # a guest: counsel's guest A2 names the support address
+            customer["support_email"] = _support_email()
+            variant["support"] = bool(customer["support_email"])
     else:
         template = AMENDMENT_APPLIED
         variant = {"refunded": refund > 0, "by_staff": by_staff}

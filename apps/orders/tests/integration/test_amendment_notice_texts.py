@@ -43,7 +43,11 @@ VARIANTS: dict[str, list[dict[str, Any]]] = {
     notices.AMENDMENT_APPLIED: [
         {"refunded": r, "by_staff": s} for r, s in itertools.product((True, False), repeat=2)
     ],
-    notices.ITEM_UNAVAILABLE: [{"refunded": True}, {"refunded": True, "cancel_url": ""}],
+    notices.ITEM_UNAVAILABLE: [
+        {"refunded": True},
+        {"refunded": True, "cancel_url": "", "order_url": "", "support_email": "help@example.test"},
+        {"refunded": True, "cancel_url": "", "order_url": ""},
+    ],
     notices.PACKAGE_CANCELLED: [
         {"cause": c} for c in ("vendor_fault", "customer_request", "platform_error")
     ],
@@ -57,7 +61,8 @@ VARIANTS: dict[str, list[dict[str, Any]]] = {
         for b, c, i in itertools.product(
             ("shop", "staff", "customer"), ("vendor_fault", "customer_request"), (True, False)
         )
-    ],
+    ]
+    + [{"by": "staff", "cause": "platform_error", "refund_fee": False, "invoice_issued": False}],
 }
 CASES = [(kind, i) for kind, variants in VARIANTS.items() for i in range(len(variants))]
 
@@ -173,3 +178,83 @@ def test_a_kept_notice_refuses_edits_and_deletes() -> None:
         event.save()
     with pytest.raises(PermissionError):
         event.delete()
+
+
+INFORMAL = {
+    "de": re.compile(r"\b(du|dein|deine|deinem|deinen|dir|dich|versende)\b", re.IGNORECASE),
+    "fr": re.compile(r"\b(tu|ta|ton|tes|toi|expédie)\b", re.IGNORECASE),
+    "es": re.compile(r"\b(tu|tú|tus|envía|envíes)\b", re.IGNORECASE),
+}
+VENDOR_KINDS = (
+    notices.VENDOR_AMENDMENT_APPLIED,
+    notices.VENDOR_PACKAGE_CANCELLED,
+    "orders.vendor_new_order",
+    "orders.vendor_order_cancelled_notice",
+)
+
+
+@pytest.mark.parametrize("lang", FOREIGN)
+@pytest.mark.parametrize("kind", VENDOR_KINDS)
+def test_vendor_emails_use_the_formal_register(kind: str, lang: str) -> None:
+    """Vendor-facing texts are formal (Sie, vous, usted); only customer emails are informal."""
+    variants = VARIANTS.get(kind) or [{}]
+    for variant in variants:
+        rendered = core_services.render_email(kind, lang, {**BASE, **variant})
+        found = INFORMAL[lang].findall(rendered.subject + "\n" + rendered.text_body)
+        assert found == [], plainly(f"the {lang} {kind} email must be formal", str(found))
+
+
+# --- counsel's reference texts (2026-11-17) ------------------------------------------------------
+
+
+def test_the_guest_a2_names_the_support_address_and_no_reply() -> None:
+    text = render(
+        notices.ITEM_UNAVAILABLE,
+        refunded=True,
+        cancel_url="",
+        order_url="",
+        support_email="help@example.test",
+    )
+    assert "since you checked out as a guest, simply contact support at help@example.test" in text
+    assert "will not ship it before 18/11/2026 11:00" in text
+    assert "reply" not in text.lower(), plainly(
+        "the outbox sets no reply-to, so the guest text must not ask for a reply", text
+    )
+
+
+def test_the_platform_error_texts_are_counsel_s() -> None:
+    subject = core_services.render_email(
+        notices.PACKAGE_CANCELLED, "en", {**BASE, "cause": "platform_error"}
+    ).subject
+    assert subject == "Cancellation of order MP-1001 due to a technical error and full refund"
+    text = render(notices.PACKAGE_CANCELLED, cause="platform_error")
+    assert "Due to a technical issue on our platform" in text
+    assert "statutory 14-day limit" in text
+    vendor = render(
+        notices.VENDOR_PACKAGE_CANCELLED,
+        by="staff",
+        cause="platform_error",
+        refund_fee=False,
+        invoice_issued=False,
+    )
+    assert "no refund fee is charged to you" in vendor
+
+
+@pytest.mark.parametrize(
+    ("lang", "start"),
+    [
+        ("de", "Bestellung nach Zahlungseingang geändert: Falls Sie"),
+        ("fr", "Commande modifiée après le paiement : si vous avez déjà émis"),
+        ("es", "Pedido modificado tras el pago: si ya ha emitido"),
+    ],
+)
+def test_the_invoice_notice_is_counsel_s_formal_text(lang: str, start: str) -> None:
+    text = render(
+        notices.VENDOR_AMENDMENT_APPLIED, lang, by_staff=False, refunded=False, invoice_issued=True
+    )
+    assert start in text, plainly(f"the {lang} invoice notice must be counsel's", text)
+
+
+def test_the_wording_provenance_is_recorded() -> None:
+    assert notices.WORDING_APPROVAL["approved_on"] == "2026-11-17"
+    assert notices.WORDING_APPROVAL["translator_review_pending"] == ["de", "fr", "es"]

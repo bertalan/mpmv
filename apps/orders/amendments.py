@@ -97,6 +97,12 @@ class _DryRunRollback(Exception):
     pass
 
 
+# Counsel (2026-11-17, A2): the date until which the seller may not ship ("the seller will not
+# ship it before {date}") is never less than this after the A2 notice is sent, so the customer
+# has real time to read it and cancel the rest. The notice goes out when the change applies.
+A2_MIN_WINDOW_HOURS = 24
+
+
 # --- the operator's settings (D-47, owner 2026-11-16) -------------------------------------------
 
 
@@ -793,6 +799,14 @@ class RefundOutcome:
     fee_exclusion_reason: str
     due_by: dt.datetime | None
     changes: list[Change] = field(default_factory=list)
+    platform_error: bool = False
+
+    @property
+    def fee_charged(self) -> bool:
+        """Whether the vendor pays the D-05 refund fee for this event, as the ledger decided it:
+        no exclusion reason and no platform-error flag (L-10). The notices read it here, never
+        from the cause, so the email and the ledger cannot diverge."""
+        return not self.fee_exclusion_reason and not self.platform_error
 
 
 class PasskeyRequired(PermissionDenied):
@@ -1126,6 +1140,18 @@ def _write_next_version(
                 "the draft: edit the draft so it shows today's amounts, then confirm it again."
             )
             % {"now": preview.money_delta, "drafted": drafted}
+        )
+    if (
+        _partly_unavailable(resolved, preview.after)
+        and rules.cancel_hold_hours < A2_MIN_WINDOW_HOURS
+    ):
+        raise AmendmentRefused(
+            gettext(
+                "The customer must have at least %(hours)s hours to read the notice and cancel the "
+                "rest before the seller may ship, but the shipping hold is set to %(set)s hours: "
+                "raise the hold in the amendment settings."
+            )
+            % {"hours": A2_MIN_WINDOW_HOURS, "set": rules.cancel_hold_hours}
         )
     version = versions.create_next_version(
         sub,
@@ -1593,7 +1619,7 @@ def cancel_package(
                 cause=cause,
                 reason=reason,
                 refunded=outcome.amount,
-                refund_fee=cause == CANCEL_VENDOR_FAULT,
+                refund_fee=outcome.fee_charged,
                 refund_ref=outcome.refund_id,
                 lines=lines,
             )
@@ -1767,14 +1793,13 @@ def cancel_rest_of_package(
             if dry_run:
                 raise _DryRunRollback
             audit_changes(changeset, ctx=ctx, action="orders.amendment_package_cancelled")
-            # The refund fee of a cancel of the rest is the vendor's (D-05).
             amendment_notices.package_cancelled(
                 locked,
                 by=amendment_notices.BY_CUSTOMER,
                 cause=CANCEL_CUSTOMER_REQUEST,
                 reason="",
                 refunded=outcome.amount,
-                refund_fee=True,
+                refund_fee=outcome.fee_charged,
                 refund_ref=outcome.refund_id,
                 lines=lines,
             )

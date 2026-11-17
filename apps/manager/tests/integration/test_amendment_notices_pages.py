@@ -16,6 +16,7 @@ from django.utils import timezone
 from apps.accounts.tests.factories import UserFactory
 from apps.core import services as core_services
 from apps.core.models import AuditLog, OutboxEmail
+from apps.ledger.models import Refund
 from apps.ledger.tests.integration.test_amendment_refunds import (  # noqa: F401 (fixtures)
     _setup,
     place_seed,
@@ -79,7 +80,11 @@ def staff_cancel(sub: VendorOrder, cause: str) -> None:
     [
         ("vendor_fault", "cannot fulfil your order", "Cause: the shop cannot fulfil the order."),
         ("customer_request", "As you asked", "Cause: the customer asked to cancel."),
-        ("platform_error", "Because of an error on our side", "Cause: an error of the platform."),
+        (
+            "platform_error",
+            "Due to a technical issue on our platform",
+            "technical error attributable to the platform",
+        ),
     ],
 )
 def test_a_staff_cancellation_notifies_the_customer_by_cause_and_the_vendor(
@@ -91,14 +96,23 @@ def test_a_staff_cancellation_notifies_the_customer_by_cause_and_the_vendor(
     assert customer_says in body, plainly(
         f"the customer must read the {cause} wording and the full refund", body
     )
-    assert "in any case within 14 days" in body
+    assert "within 14 days" in body or "14-day limit" in body
     _, vendor = text_of(notices.VENDOR_PACKAGE_CANCELLED)
     assert "Platform support cancelled your order" in vendor, vendor
     assert vendor_says in vendor, vendor
     fee = "The refund fee is charged to your shop."
-    assert (fee in vendor) is (cause == "vendor_fault"), plainly(
-        "the vendor must be told whether it pays the refund fee", vendor
+    refund = Refund.objects.get(vendor_order=seeded, cause="cancel_package")
+    charged = (
+        refund.refund_fee > 0 and not refund.fee_exclusion_reason and not refund.platform_error
     )
+    assert (fee in vendor) is charged, plainly(
+        "the vendor's fee line must match the ledger's refund (fee and exclusion)",
+        f"fee {refund.refund_fee}, exclusion {refund.fee_exclusion_reason!r}, "
+        f"platform error {refund.platform_error}: {vendor}",
+    )
+    assert charged is (cause == "vendor_fault")
+    vendor_copy = OrderEvent.objects.get(vendor_order=seeded, audience="vendor")
+    assert vendor_copy.payload["refund_fee"] is charged
     assert "Do not ship these items:" in vendor
     assert "A x 2" in vendor
     kept = OrderEvent.objects.filter(vendor_order=seeded).values_list("audience", flat=True)

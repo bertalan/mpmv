@@ -809,6 +809,7 @@ def _outcome(result: RefundChangeSet) -> "orders_amendments.RefundOutcome":
         amount=Decimal(str(created.get("refunded_gross", ZERO))),
         refund_fee=Decimal(str(created.get("refund_fee", ZERO))),
         fee_exclusion_reason=str(created.get("fee_exclusion_reason", "")),
+        platform_error=bool(created.get("platform_error", False)),
         due_by=created.get("due_by"),
         changes=list(result.changes),
     )

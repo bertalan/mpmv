@@ -1268,18 +1268,6 @@ msgstr "Torna alle impostazioni della verifica in due passaggi"
 msgid "Bad request"
 msgstr "Richiesta non valida"
 
-#: apps/orders/templates/email/orders/package_cancelled/body.html
-#: apps/orders/templates/email/orders/package_cancelled/body.txt
-msgctxt "(L)"
-msgid ""
-"Because of an error on our side, your order %(order_number)s with %(vendor_name)s has been "
-"cancelled, and we have immediately refunded the full %(refund)s EUR to the payment method you used"
-" for the purchase."
-msgstr ""
-"A causa di un errore da parte nostra, il tuo ordine %(order_number)s presso %(vendor_name)s è "
-"stato annullato e abbiamo disposto immediatamente il rimborso integrale di EUR %(refund)s sullo "
-"stesso metodo di pagamento utilizzato per l’acquisto."
-
 #: apps/manager/templates/manager/amendment.html
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Before"
@@ -1373,6 +1361,11 @@ msgstr "Annulla il resto dell’ordine e rimborsa tutto: %(cancel_url)s"
 #: apps/vendors/services.py
 msgid "Cancellation"
 msgstr "Annullamento"
+
+#: apps/orders/templates/email/orders/package_cancelled/subject.txt
+msgctxt "(L)"
+msgid "Cancellation of order %(order_number)s due to a technical error and full refund"
+msgstr "Annullamento ordine %(order_number)s per anomalia tecnica e rimborso integrale"
 
 #: apps/manager/forms.py
 msgid "Cancellation policy"
@@ -2217,6 +2210,22 @@ msgstr "Bozze"
 #: apps/manager/site_map.py apps/seo/site_links.py
 msgid "DSA points of contact"
 msgstr "Punti di contatto DSA"
+
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+msgctxt "(L)"
+msgid ""
+"Due to a technical issue on our platform, your order %(order_number)s with seller %(vendor_name)s "
+"cannot be processed. The order has been cancelled at no cost to you, and we have immediately "
+"issued a full refund of EUR %(refund)s to your original payment method (credited within 5–10 "
+"business days, and in any event within the statutory 14-day limit). We apologize for the "
+"inconvenience."
+msgstr ""
+"Ti informiamo che a causa di un’anomalia tecnica della piattaforma non è possibile dare seguito al"
+" tuo ordine %(order_number)s presso il venditore %(vendor_name)s. L’ordine è stato annullato senza"
+" alcun costo a tuo carico e abbiamo disposto immediatamente il rimborso integrale di EUR "
+"%(refund)s sullo stesso metodo di pagamento utilizzato (accredito visibile entro 5–10 giorni "
+"lavorativi e comunque entro il termine massimo di legge di 14 giorni). Ci scusiamo per il disagio."
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid ""
@@ -4345,6 +4354,19 @@ msgstr "Ordine %(number)s"
 #: apps/orders/templates/email/orders/order_cancelled/subject.txt
 msgid "Order %(order_number)s was cancelled"
 msgstr "L’ordine %(order_number)s è stato annullato"
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgctxt "(L)"
+msgid ""
+"Order %(order_number)s was cancelled because of a technical error attributable to the platform. "
+"The customer was refunded in full; under the vendor terms, the commission and the collection cost "
+"were reversed in full and no refund fee is charged to you."
+msgstr ""
+"L’ordine %(order_number)s è stato annullato per un’anomalia tecnica imputabile alla piattaforma. "
+"Il cliente è stato rimborsato integralmente; ai sensi del contratto venditori, la commissione e il"
+" costo d’incasso sono stati interamente stornati e non ti viene addebitato alcun costo di "
+"rimborso."
 
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
@@ -6645,6 +6667,16 @@ msgid ""
 msgstr ""
 "Il cliente ha esercitato il recesso su questo pacco, quindi non si può più modificare: il recesso "
 "e il suo rimborso valgono sulla versione attuale."
+
+#: apps/orders/amendments.py
+msgid ""
+"The customer must have at least %(hours)s hours to read the notice and cancel the rest before the "
+"seller may ship, but the shipping hold is set to %(set)s hours: raise the hold in the amendment "
+"settings."
+msgstr ""
+"Il cliente deve avere almeno %(hours)s ore per leggere l’avviso e annullare il resto prima che il "
+"venditore possa spedire, ma il blocco della spedizione è impostato a %(set)s ore: aumenta il "
+"blocco nelle impostazioni delle modifiche."
 
 #: apps/manager/amendment_forms.py
 msgid "The customer reads it. Write it in plain words."
@@ -9616,7 +9648,7 @@ msgstr ""
 #: apps/orders/templates/email/orders/package_cancelled/body.html
 #: apps/orders/templates/email/orders/package_cancelled/body.txt
 msgctxt "(L)"
-msgid "We apologise for the inconvenience."
+msgid "We apologize for the inconvenience."
 msgstr "Ci scusiamo per l’inconveniente."
 
 #: apps/orders/messages.py
@@ -10613,6 +10645,23 @@ msgstr "L’ordine proseguirà per i restanti articoli al nuovo totale di EUR %(
 #: apps/orders/templates/orders/confirmation.html
 msgid "Your order number is %(number)s. We sent a confirmation to %(email)s."
 msgstr "Il numero del tuo ordine è %(number)s. Abbiamo inviato una conferma a %(email)s."
+
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgctxt "(L)"
+msgid ""
+"Your order will proceed for the remaining items at the new total of EUR %(total)s. However, if the"
+" unavailable item was essential to your purchase, you can cancel the rest of the order free of "
+"charge until the parcel is handed over to the carrier (the seller will not ship it before "
+"%(hold_until)s): since you checked out as a guest, simply contact support at %(support_email)s "
+"quoting order number %(order_number)s to receive a full refund of the remaining balance."
+msgstr ""
+"L’ordine proseguirà per gli articoli rimanenti al nuovo totale di EUR %(total)s. Se però "
+"l’articolo mancante era essenziale per il tuo acquisto, puoi annullare gratuitamente il resto "
+"dell’ordine finché il pacco non è consegnato al corriere (il venditore non lo spedirà prima del "
+"%(hold_until)s): avendo acquistato senza creare un account, ti basta contattare l’assistenza a "
+"%(support_email)s indicando il numero d’ordine %(order_number)s per ricevere il rimborso completo "
+"della somma residua."
 
 #: apps/orders/templates/orders/customer_orders.html
 msgid "Your orders, newest first"

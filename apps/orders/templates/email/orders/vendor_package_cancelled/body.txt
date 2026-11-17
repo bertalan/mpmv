@@ -1,7 +1,7 @@
 {% load i18n %}{% if invoice_issued %}{% translate "Important:" %} {% include "email/orders/_invoice_notice.txt" %}
 
 {% endif %}{% if by == "staff" %}{% blocktranslate %}Platform support cancelled your order {{ order_number }} and refunded the customer in full.{% endblocktranslate %}{% elif by == "customer" %}{% blocktranslate %}After an item was unavailable, the customer cancelled the rest of order {{ order_number }}, as the terms allow, and was refunded in full.{% endblocktranslate %}{% else %}{% blocktranslate %}Your shop cancelled order {{ order_number }} and the customer was refunded in full.{% endblocktranslate %}{% endif %}
-{% if by != "customer" %}{% if cause == "vendor_fault" %}{% translate "Cause: the shop cannot fulfil the order." %}{% elif cause == "customer_request" %}{% translate "Cause: the customer asked to cancel." %}{% else %}{% translate "Cause: an error of the platform." %}{% endif %}
+{% if by != "customer" %}{% if cause == "vendor_fault" %}{% translate "Cause: the shop cannot fulfil the order." %}{% elif cause == "customer_request" %}{% translate "Cause: the customer asked to cancel." %}{% elif refund_fee %}{% translate "Cause: an error of the platform." %}{% else %}{% blocktranslate context "(L)" %}Order {{ order_number }} was cancelled because of a technical error attributable to the platform. The customer was refunded in full; under the vendor terms, the commission and the collection cost were reversed in full and no refund fee is charged to you.{% endblocktranslate %}{% endif %}
 {% blocktranslate %}Reason: “{{ reason }}”{% endblocktranslate %}
 {% endif %}
 {% translate "Do not ship these items:" %}
