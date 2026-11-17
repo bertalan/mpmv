@@ -5,7 +5,11 @@ site name with the help link (WCAG 3.2.6: the same place on every page), the foo
 it is empty, the column stays so the grid keeps its shape.
 
 Context: `site_name`, `links`, `legal_links` (label and url each), and the context of the
-help link.
+help link. THM.15: optional `widgets` (up to four columns of the CMS: `title`, `links`, `text`),
+`social_links` (label and url: the label is the accessible name; an unsafe url is left out) and
+a back-to-top link at the end (a plain link to #top: no JavaScript, visible and focusable).
+No CMS setting holds widget columns or social profiles yet: until one does, nothing is passed
+and the three columns above are all that shows.
 {% endcomment %}<footer class="site-footer">
   <div class="site-footer__inner">
     <div class="site-footer__col">
@@ -32,5 +36,16 @@ help link.
       <p>&copy; {% now "Y" %} {{ site_name }}</p>
       {% consent_settings_link as consent_link %}{% if consent_link %}<p>{{ consent_link }}</p>{% endif %}
     </div>
+    {% for widget in widgets|slice:":4" %}
+      <div class="site-footer__col site-footer__widget">
+        {% if widget.title %}<h2 class="site-footer__heading">{{ widget.title }}</h2>{% endif %}
+        {% if widget.text %}<p>{{ widget.text }}</p>{% endif %}
+        {% if widget.links %}<ul>{% for link in widget.links %}<li>{% with href=link.url|safe_href %}{% if href %}<a href="{{ href }}">{{ link.label }}</a>{% else %}{{ link.label }}{% endif %}{% endwith %}</li>{% endfor %}</ul>{% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  <div class="site-footer__bar">
+    {% if social_links %}<nav aria-label="{% translate 'Social' %}"><ul class="site-footer__social">{% for link in social_links %}{% with href=link.url|safe_href %}{% if href %}<li><a href="{{ href }}" rel="noopener noreferrer me">{{ link.label }}</a></li>{% endif %}{% endwith %}{% endfor %}</ul></nav>{% endif %}
+    <a class="back-to-top" href="#top">{% include "components/icon.html" with name="chevron-down" %}{% translate "Back to top" %}</a>
   </div>
 </footer>
