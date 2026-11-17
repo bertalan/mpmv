@@ -418,6 +418,21 @@ def vendor_display_name(vendor: models.Model) -> str:
 NIL_UUID = "00000000-0000-0000-0000-000000000000"
 
 
+def open_draft(vendor: Vendor) -> OrderAmendment:
+    """A draft amendment on the current version of one of the vendor's paid orders (ORD.20)."""
+    sub = paid_vendor_order(vendor)
+    assert sub.current_version is not None
+    return OrderAmendmentFactory.create(from_version=sub.current_version, vendor_order=sub)
+
+
+def by_amendment(obj: models.Model) -> dict[str, str]:
+    amendment: OrderAmendment = obj  # type: ignore[assignment]
+    return {
+        "public_id": str(amendment.vendor_order.public_id),
+        "amendment": str(amendment.public_id),
+    }
+
+
 def event_with_block(vendor: Vendor) -> EventPage:
     """An event with one body block in its latest revision (the block editor addresses it by id)."""
     page: EventPage = EventPageFactory.create(vendor=vendor)
@@ -437,6 +452,21 @@ ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "readyz": NoVendorData("Readiness probe: a status only, no data."),
     "robots_txt": NoVendorData("robots.txt (SEO.8): constant text for crawlers; no vendor data."),
+    "sitemap": NoVendorData("Sitemap index (SEO.2): public page URLs only, no tenant data."),
+    "sitemap_section": NoVendorData(
+        "Per-language, per-type sitemap (SEO.2): public page URLs only, no tenant data.",
+        kwargs={"language": "xx", "kind": "pages"},
+    ),
+    "sitemap_part": NoVendorData(
+        "One part of a large per-language, per-type sitemap (SEO.2): public page URLs only, "
+        "no tenant data.",
+        kwargs={"language": "xx", "kind": "pages", "part": "0"},
+    ),
+    "llms_txt": NoVendorData("llms.txt (SEO.2): public page titles and URLs only, no tenant data."),
+    "llms_language": NoVendorData(
+        "llms.txt of one language (SEO.2): public page titles and URLs only, no tenant data.",
+        kwargs={"language": "xx"},
+    ),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "payments_webhook": NoVendorData("Signed payment provider events; answers with a status only."),
     "media": NoVendorData(
@@ -600,6 +630,27 @@ ENDPOINTS: dict[str, Access] = {
         methods=("POST",),
         sample={"public_id": NIL_UUID},
     ),
+    # ORD.20 part 3: change a paid order; another vendor's package or draft is a 404.
+    "manager:shop:order_amend": VendorScoped(
+        make=paid_vendor_order, methods=("GET", "POST"), sample={"public_id": NIL_UUID}
+    ),
+    "manager:shop:amendment_apply": VendorScoped(
+        make=open_draft,
+        kwargs=by_amendment,
+        methods=("POST",),
+        sample={"public_id": NIL_UUID, "amendment": NIL_UUID},
+    ),
+    "manager:shop:order_cancel": VendorScoped(
+        make=paid_vendor_order,
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:amendment_discard": VendorScoped(
+        make=open_draft,
+        kwargs=by_amendment,
+        methods=("POST",),
+        sample={"public_id": NIL_UUID, "amendment": NIL_UUID},
+    ),
     # EVT.4: the vendor's own events; another vendor's id is a 404 on every view that takes one.
     "manager:shop:events": VendorScopedList(
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
@@ -715,6 +766,32 @@ ENDPOINTS: dict[str, Access] = {
         "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
         "and the vehicle scheme; no vendor data."
     ),
+    "manager:platform:orders": StaffOnly(
+        "Order changes (ORD.20 part 3): Support and the platform owner find an order by number; "
+        "a vendor member gets the platform gate's refusal (test_amendment_views)."
+    ),
+    "manager:platform:order": StaffOnly(
+        "One package's staff tools (ORD.20 part 3): Support and the platform owner only; a "
+        "vendor member gets the platform gate's refusal (test_amendment_views).",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "manager:platform:amendment_apply": StaffOnly(
+        "Apply a staff draft (ORD.20 part 3): Support and the platform owner only, POST only.",
+        kwargs={"public_id": NIL_UUID, "amendment": NIL_UUID},
+    ),
+    "manager:platform:amendment_discard": StaffOnly(
+        "Discard a staff draft (ORD.20 part 3): Support and the platform owner only, POST only.",
+        kwargs={"public_id": NIL_UUID, "amendment": NIL_UUID},
+    ),
+    "manager:platform:order_cancel": StaffOnly(
+        "Cancel a package with a full refund (ORD.20 part 3): Support and the platform owner "
+        "only, POST only, with a note and a fresh passkey.",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "manager:platform:amendment_settings": StaffOnly(
+        "The amendment settings in force (ORD.20 part 3): platform configuration, no vendor "
+        "data; the configuration role and the platform owner only."
+    ),
     "manager:platform:terminations": StaffOnly(
         "Notices of termination (CMP.5 part 4): platform data; needs the "
         "compliance.review_notices permission, so a vendor member gets 404."
@@ -751,6 +828,17 @@ ENDPOINTS: dict[str, Access] = {
         "and an unknown id all answer 404 "
         "(`test_a_stranger_s_order_is_a_404_like_an_unknown_one`).",
         kwargs={"public_id": NIL_UUID},
+    ),
+    "customer_order_cancel_rest": NoVendorData(
+        "The signed-in customer cancels the rest of one of their own packages (ORD.20): the "
+        "order is looked up among the caller's own and the package within it; anything else is "
+        "a 404 (`test_a_stranger_cannot_cancel_the_rest`).",
+        kwargs={"public_id": NIL_UUID, "package": NIL_UUID},
+    ),
+    "customer_order_keep_rest": NoVendorData(
+        "The signed-in customer keeps the rest of one of their own packages (ORD.20): looked up "
+        "like the cancel; anything else is a 404 (`test_a_stranger_cannot_cancel_the_rest`).",
+        kwargs={"public_id": NIL_UUID, "package": NIL_UUID},
     ),
     "privacy_requests": StaffOnly(
         "Erasure requests (CMP.4): platform data listed by public id; needs "

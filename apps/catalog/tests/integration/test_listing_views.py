@@ -34,10 +34,11 @@ from apps.catalog.tests.factories import (
     TermFactory,
     TermTranslationFactory,
 )
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -71,17 +72,25 @@ def compat() -> dict[str, Any]:
     published in EN and IT, and one product on the child term."""
     taxonomy = TaxonomyFactory.create(code="compat", has_landing=True)
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="en", slug="compatibility", status=PUBLISHED
+        taxonomy=taxonomy, language=primary_language(), slug="compatibility", status=PUBLISHED
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="it", slug="compatibilita", status=PUBLISHED
+        taxonomy=taxonomy, language=other_language(), slug="compatibilita", status=PUBLISHED
     )
     maker = TermFactory.create(taxonomy=taxonomy)
-    TermTranslationFactory.create(term=maker, language="en", slug="maker", status=PUBLISHED)
-    TermTranslationFactory.create(term=maker, language="it", slug="marca", status=PUBLISHED)
+    TermTranslationFactory.create(
+        term=maker, language=primary_language(), slug="maker", status=PUBLISHED
+    )
+    TermTranslationFactory.create(
+        term=maker, language=other_language(), slug="marca", status=PUBLISHED
+    )
     model = TermFactory.create(parent=maker)
-    TermTranslationFactory.create(term=model, language="en", slug="model", status=PUBLISHED)
-    TermTranslationFactory.create(term=model, language="it", slug="modello", status=PUBLISHED)
+    TermTranslationFactory.create(
+        term=model, language=primary_language(), slug="model", status=PUBLISHED
+    )
+    TermTranslationFactory.create(
+        term=model, language=other_language(), slug="modello", status=PUBLISHED
+    )
     product = listed()
     product.terms.add(model)
     return {"taxonomy": taxonomy, "maker": maker, "model": model, "product": product}
@@ -123,7 +132,9 @@ def test_a_term_page_answers_200_in_every_configured_language(
 
 def test_a_child_term_page_lists_its_subtree_only(client: Client, compat: dict[str, Any]) -> None:
     sibling = TermFactory.create(parent=compat["maker"])
-    TermTranslationFactory.create(term=sibling, language="en", slug="other", status=PUBLISHED)
+    TermTranslationFactory.create(
+        term=sibling, language=primary_language(), slug="other", status=PUBLISHED
+    )
     listed().terms.add(sibling)
     response = client.get("/compatibility/maker/model/")
     assert response.status_code == 200
@@ -151,7 +162,7 @@ def test_a_language_without_a_published_text_uses_the_en_slugs(
     response = client.get("/de/compatibility/maker/")
     assert response.status_code == 200
     assert response.context["is_fallback"] is True
-    assert response.context["canonical_url"] == "http://testserver/compatibility/maker/"
+    assert response.context["canonical_url"] == "http://localhost/compatibility/maker/"
     assert_redirect(client.get("/de/compatibilita/marca/"), "/de/compatibility/maker/")
 
 
@@ -159,11 +170,11 @@ def test_hreflang_lists_only_published_languages(client: Client, compat: dict[st
     response = client.get("/compatibility/maker/")
     alternates = dict(response.context["alternates"])
     assert alternates == {
-        "en": "http://testserver/compatibility/maker/",
-        "it": "http://testserver/it/compatibilita/marca/",
-        "x-default": "http://testserver/compatibility/maker/",
+        "en": "http://localhost/compatibility/maker/",
+        "it": "http://localhost/it/compatibilita/marca/",
+        "x-default": "http://localhost/compatibility/maker/",
     }
-    assert response.context["canonical_url"] == "http://testserver/compatibility/maker/"
+    assert response.context["canonical_url"] == "http://localhost/compatibility/maker/"
     assert response.context["is_fallback"] is False
 
 
@@ -222,7 +233,7 @@ def test_tracking_parameters_stay_without_a_redirect_and_leave_the_canonical(
     response = client.get("/compatibility/maker/?price_min=5&utm_source=x")
     assert response.status_code == 200
     assert response.context["canonical_url"] == (
-        "http://testserver/compatibility/maker/?price_min=5"
+        "http://localhost/compatibility/maker/?price_min=5"
     )
 
 
@@ -248,7 +259,7 @@ def test_paginated_urls_build_on_the_term_url(
     assert first.context["previous_url"] is None
     second = client.get("/it/compatibilita/marca/?page=2")
     assert second.status_code == 200
-    assert second.context["canonical_url"] == "http://testserver/it/compatibilita/marca/?page=2"
+    assert second.context["canonical_url"] == "http://localhost/it/compatibilita/marca/?page=2"
     assert second.context["previous_url"] == "/it/compatibilita/marca/"
     assert second.context["next_url"] is None
     assert client.get("/it/compatibilita/marca/?page=3").status_code == 404
@@ -267,7 +278,7 @@ def test_a_filtered_listing_is_indexable_on_its_canonical_url(
     assert response.status_code == 200
     assert response.context["robots"] == INDEX
     assert response.context["canonical_url"] == (
-        f"http://testserver/compatibility/maker/?vendor={vendor.slug}"
+        f"http://localhost/compatibility/maker/?vendor={vendor.slug}"
     )
 
 
@@ -277,12 +288,12 @@ def test_a_filtered_fallback_page_has_the_en_listing_as_canonical(
     response = client.get("/de/compatibility/maker/?compatibility=maker/model&price_min=1")
     assert response.status_code == 200
     assert response.context["canonical_url"] == (
-        "http://testserver/compatibility/maker/?compatibility=maker/model&price_min=1"
+        "http://localhost/compatibility/maker/?compatibility=maker/model&price_min=1"
     )
     # The IT page re-expresses the filter in IT slugs for its alternate.
     response = client.get("/compatibility/maker/?compatibility=maker/model")
     assert dict(response.context["alternates"])["it"] == (
-        "http://testserver/it/compatibilita/marca/?compatibilita=marca/modello"
+        "http://localhost/it/compatibilita/marca/?compatibilita=marca/modello"
     )
 
 
@@ -312,10 +323,10 @@ def test_the_page_renders_canonical_robots_and_hreflang_tags(
     client: Client, compat: dict[str, Any]
 ) -> None:
     html = client.get("/compatibility/maker/").content.decode()
-    assert '<link rel="canonical" href="http://testserver/compatibility/maker/">' in html
+    assert '<link rel="canonical" href="http://localhost/compatibility/maker/">' in html
     assert '<meta name="robots" content="index, follow">' in html
     assert (
-        '<link rel="alternate" hreflang="it" href="http://testserver/it/compatibilita/marca/">'
+        '<link rel="alternate" hreflang="it" href="http://localhost/it/compatibilita/marca/">'
         in html
     )
 
@@ -328,7 +339,7 @@ def category() -> dict[str, Any]:
     parent = CategoryFactory.create()
     CategoryTranslationFactory.create(category=parent, slug="bags", status=PUBLISHED)
     CategoryTranslationFactory.create(
-        category=parent, language="it", slug="borse", status=PUBLISHED
+        category=parent, language=other_language(), slug="borse", status=PUBLISHED
     )
     child = CategoryFactory.create(parent=parent)
     CategoryTranslationFactory.create(category=child, slug="backpacks", status=PUBLISHED)
@@ -358,7 +369,9 @@ def test_category_pages_per_language(client: Client, category: dict[str, Any]) -
 def test_brand_pages_per_language(client: Client) -> None:
     brand = BrandFactory.create()
     BrandTranslationFactory.create(brand=brand, slug="acme", status=PUBLISHED)
-    BrandTranslationFactory.create(brand=brand, language="it", slug="acme-it", status=PUBLISHED)
+    BrandTranslationFactory.create(
+        brand=brand, language=other_language(), slug="acme-it", status=PUBLISHED
+    )
     product = listed(brand=brand)
     listed()
     response = client.get("/brand/acme/")
@@ -449,7 +462,7 @@ def test_a_draft_slug_in_another_language_never_shadows_a_cms_page(client: Clien
     cms_page(guida, "intro")
     taxonomy = TaxonomyFactory.create(has_landing=True)
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="it", slug="guida", status=TranslationStatus.MACHINE
+        taxonomy=taxonomy, language=other_language(), slug="guida", status=TranslationStatus.MACHINE
     )
     assert client.get("/guida/intro/").status_code == 200
 
@@ -488,10 +501,10 @@ def _filter_values(compat: dict[str, Any], first: int, count: int) -> str:
     for number in range(first, first + count):
         term = TermFactory.create(taxonomy=compat["taxonomy"])
         TermTranslationFactory.create(
-            term=term, language="en", slug=f"value-{number}", status=PUBLISHED
+            term=term, language=primary_language(), slug=f"value-{number}", status=PUBLISHED
         )
         TermTranslationFactory.create(
-            term=term, language="it", slug=f"valore-{number}", status=PUBLISHED
+            term=term, language=other_language(), slug=f"valore-{number}", status=PUBLISHED
         )
         values.append(f"value-{number}")
     return ",".join(sorted(values))

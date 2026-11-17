@@ -201,11 +201,31 @@ GET_WRITES_ALLOWED: frozenset[str] = frozenset({"django_session", "accounts_user
 # slug, a token, a page id) must be `VendorScoped` or `StaffOnly` in `tests.tenancy_registry`,
 # where the cross-tenant tests reach it with another vendor's object, or be listed here with what
 # keeps one user from reaching another's object through it.
+SITEMAP = (
+    "A per-language, per-type sitemap (I18N.6, SEO.2), one of its parts or the llms.txt of a "
+    "language is public by design and takes a language code (and a type and part number), not "
+    "an object: it "
+    "lists only published, indexable pages, and an unknown language or indexing off answers 404 "
+    "whoever asks."
+)
+
 IDOR_REVIEWED: dict[str, str] = {
     "media": MEDIA,
+    "sitemap_section": SITEMAP,
+    "llms_language": SITEMAP,
+    "sitemap_part": SITEMAP,
     "customer_order": (
         "The order is looked up among the signed-in customer's own (ORD.7); a stranger's order "
         "and a guest order answer 404 (`test_a_stranger_s_order_is_a_404_like_an_unknown_one`)."
+    ),
+    "customer_order_cancel_rest": (
+        "The order is looked up among the signed-in customer's own (ORD.20) and the package "
+        "within it; a stranger's order or package answers 404 "
+        "(`test_a_stranger_cannot_cancel_the_rest`)."
+    ),
+    "customer_order_keep_rest": (
+        "Looked up like the cancel of the rest (ORD.20): a stranger's order or package answers "
+        "404 (`test_a_stranger_cannot_cancel_the_rest`)."
     ),
     "mfa:remove_device": (
         "The factor is looked up among the signed-in user's own (CORE.4); another user's factor "
@@ -284,6 +304,9 @@ OBJECT_PATHS: dict[str, ObjectKwargs] = {
 # Routes with an identifier, called with placeholder parameters, that may answer 404 to a caller
 # who is not signed in or not allowed, with why that 404 hides nothing.
 PLACEHOLDER_404: dict[str, str] = {
+    "sitemap_section": SITEMAP,
+    "llms_language": SITEMAP,
+    "sitemap_part": SITEMAP,
     "vendor_terms:read": (
         "Public by design (VEN.35): the signed token is the credential; a tampered, expired or "
         "superseded token is a 404 for everyone, and the route shows only the terms in force."

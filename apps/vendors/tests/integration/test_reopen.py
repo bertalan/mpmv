@@ -16,6 +16,7 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors import engine
 from apps.vendors.models import ContractAcceptance, Vendor, VendorMember
@@ -211,7 +212,7 @@ def test_a_reopened_vendor_must_accept_the_contract_in_force_again() -> None:
     certify_platform_duties(
         vendor,
         owner,
-        language="en",
+        language=primary_language(),
         ctx=AuditContext(actor_id=owner.pk, actor_label="user:owner", source="vendor"),
     )
     assert ContractAcceptance.objects.filter(vendor=vendor, contract=contract).count() == 2
@@ -247,7 +248,7 @@ def test_a_newer_contract_version_is_the_one_a_reopened_vendor_accepts() -> None
     certify_platform_duties(
         acceptance.vendor,
         acceptance.user,
-        language="en",
+        language=primary_language(),
         ctx=AuditContext(actor_id=acceptance.user.pk, actor_label="user:owner", source="vendor"),
     )
     latest = ContractAcceptance.objects.filter(vendor=acceptance.vendor).first()  # newest first

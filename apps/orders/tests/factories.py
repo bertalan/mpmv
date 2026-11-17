@@ -16,6 +16,7 @@ from django.db import connection
 from factory.django import DjangoModelFactory
 
 from apps.catalog.tests.factories import ProductFactory
+from apps.core.i18n import primary_language
 from apps.orders.models import (
     Order,
     OrderAmendment,
@@ -52,7 +53,7 @@ class OrderFactory(DjangoModelFactory[Order]):
 
     number = factory.LazyFunction(lambda: f"2999-{next(_numbers):06d}")
     email = factory.Sequence(lambda n: f"buyer{n}@example.com")
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     billing_address = factory.LazyFunction(lambda: {"line1": "1 Test Street", "city": "Rome"})
     billing_country = "IT"
     shipping_address = factory.LazyFunction(lambda: {"line1": "1 Test Street", "city": "Rome"})

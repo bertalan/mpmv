@@ -78,3 +78,14 @@ def test_a_hidden_translation_is_not_offered(client: Client) -> None:
     EventPage.objects.filter(pk=english.pk).update(hidden_at=dt.datetime.now(dt.UTC))
     found = targets(client.get(page.url).content.decode())
     assert found["en"][1] is True
+
+
+@pytest.fixture(autouse=True)
+def _site_allows_indexing(db: None) -> None:
+    """The canonical and hreflang links are for indexable pages: the site's switch is on."""
+    from django.apps import apps
+    from wagtail.models import Site
+
+    apps.get_model("seo", "SeoSettings").objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )

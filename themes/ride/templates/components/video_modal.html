@@ -1,0 +1,37 @@
+{% load i18n theme_tags %}{% comment %}
+Video play button and popup of the `ride` theme (THM.14, spec 14 §14.3). It is a plain link to the
+video first: without JavaScript, or when the embed is not allowed, the visitor follows it and no
+request is made before the click. With JavaScript the link opens a Bootstrap modal. `js/video.js`
+puts the `<iframe>` in the modal only when the visitor has consented to the `marketing` category
+(SEO.5, SEO.9: `window.mpmvConsent`); before that the modal shows a placeholder with a link to the
+cookie settings and the link to the video. Closing the modal removes the frame, which stops the
+video. `data-consent` makes the page load the consent module even when a choice was saved.
+
+The embed's origin must be in the CSP `frame-src` (a reviewed setting; docs/dev/themes.md): until
+it is, the browser blocks the frame and the placeholder link still works.
+
+  {% include "components/video_modal.html" with id="tour" title=_("Workshop tour") url=video.watch_url embed_url=video.embed_url only %}
+
+Context: `id` and `title` (required), `url` (the video's page), `embed_url` (https only), `label`
+(the button text; default "Play video"). Place the include outside any `data-reveal` element: the
+modal is `position: fixed`.
+{% endcomment %}{% with url=url|safe_href embed_url=embed_url|safe_href %}<div class="ride-video" id="{{ id }}" data-video data-consent="marketing" data-title="{{ title }}"{% if embed_url %} data-embed="{{ embed_url }}"{% endif %}>
+  <a class="btn btn-primary ride-video__open" href="{{ url }}" data-bs-toggle="modal" data-bs-target="#{{ id }}-modal"><span>{% firstof label _("Play video") %}<span class="visually-hidden">: {{ title }}</span></span></a>
+  <div class="modal fade" id="{{ id }}-modal" tabindex="-1" aria-labelledby="{{ id }}-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title fs-4" id="{{ id }}-modal-title">{{ title }}</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+        </div>
+        <div class="modal-body">
+          <div class="ride-video__gate" data-video-gate>
+            <p>{% translate "This video is hosted by another site. It loads only if you accept marketing cookies." %}</p>
+            <p class="ride-video__actions"><a class="btn btn-primary" href="{% url 'consent_preferences' %}">{% translate "Cookie settings" %}</a> <a class="btn btn-outline-dark" href="{{ url }}">{% translate "Watch on the video site" %}</a></p>
+          </div>
+          <div class="ratio ratio-16x9" data-video-frame hidden></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>{% endwith %}

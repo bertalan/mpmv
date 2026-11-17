@@ -1119,6 +1119,14 @@ def _cms(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> Non
     home = HomePage.objects.get(locale=Locale.get_default(), depth=2)
 
     how = _standard_page(run, home, locales, images["how-it-works"])
+    _standard_page(
+        run,
+        home,
+        locales,
+        images["home-hero"],
+        data.SHOWCASE,
+        lambda language: _showcase_body(language, images),
+    )
     for kind, spec in data.LEGAL_PAGES.items():
         _legal_page(run, home, locales, kind, spec)
 
@@ -1141,18 +1149,23 @@ def _cms(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> Non
 
 
 def _standard_page(
-    run: _Run, home: HomePage, locales: dict[str, Locale], image: MediaImage
+    run: _Run,
+    home: HomePage,
+    locales: dict[str, Locale],
+    image: MediaImage,
+    spec: data.PageSeed = data.HOW_IT_WORKS,
+    body: Callable[[str], list[Any]] | None = None,
 ) -> StandardPage:
-    spec = data.HOW_IT_WORKS
     page = StandardPage.objects.child_of(home).filter(slug=spec.slug["en"]).first()
 
-    def body(language: str) -> list[Any]:
+    def default_body(language: str) -> list[Any]:
         faq = data.HOW_IT_WORKS_FAQ.get(language) or data.HOW_IT_WORKS_FAQ["en"]
         return [
             ("paragraph", spec.body[language] + _text(data.DEMO_NOTICE, language)),
             ("faq", {"heading": "", "items": [{"question": q, "answer": a} for q, a in faq]}),
         ]
 
+    make_body = body or default_body
     if page is None:
         page = StandardPage(
             locale=home.locale,
@@ -1160,7 +1173,8 @@ def _standard_page(
             slug=spec.slug["en"],
             image=image,
             image_alt_text=_text(data.HOME_HERO_ALT, "en"),
-            body=body("en"),
+            noindex=spec.noindex,
+            body=make_body("en"),
         )
         home.add_child(instance=page)
         page = _publish(page)
@@ -1173,11 +1187,85 @@ def _standard_page(
         copy.title = copy.draft_title = spec.title[language]
         copy.slug = spec.slug[language]
         copy.image_alt_text = _text(data.HOME_HERO_ALT, language)
-        copy.body = body(language)
+        copy.noindex = spec.noindex
+        copy.body = make_body(language)
         copy = _publish(copy)
         run.created("cms.standardpage", copy.url_path)
     found: StandardPage = page
     return found
+
+
+def _showcase_body(language: str, images: dict[str, MediaImage]) -> list[Any]:
+    """One of every motion block the editor can place (THM.14), with invented content."""
+    text = data.SHOWCASE_TEXT
+    t = {key: _text(value, language) for key, value in text.items()}
+    pictures = [images["home-hero"], images["how-it-works"], images["event-fair"]]
+    slide: dict[str, Any] = {"links": [], "image": None, "alt_text": "", "text": ""}
+    return [
+        ("paragraph", t["intro"] + _text(data.DEMO_NOTICE, language)),
+        (
+            "hero",
+            {
+                "heading": t["hero"],
+                "text": t["hero_text"],
+                "image": images["home-hero"],
+                "alt_text": _text(data.HOME_HERO_ALT, language),
+                "layout": "slider",
+                "slides": [
+                    {
+                        **slide,
+                        "image": images["how-it-works"],
+                        "alt_text": t["alt_two"],
+                        "heading": t["slide_two"],
+                    },
+                    {
+                        **slide,
+                        "image": images["event-fair"],
+                        "alt_text": t["alt_three"],
+                        "heading": t["slide_three"],
+                    },
+                ],
+                "links": [],
+            },
+        ),
+        ("section_title", {"eyebrow": t["eyebrow"], "title": t["title"], "lead": t["lead"]}),
+        (
+            "strip",
+            {
+                "heading": t["strip"],
+                "cards": [
+                    ("testimonial", {"quote": quote, "author": author, "role": ""})
+                    for quote, author in data.SHOWCASE_QUOTES
+                ],
+                "per_view": "2",
+            },
+        ),
+        (
+            "gallery",
+            {
+                "images": [
+                    {
+                        "image": picture,
+                        "alt_text": t[f"alt_{n}"],
+                        "caption": t[f"caption_{n}"],
+                        "language": "",
+                    }
+                    for n, picture in zip(("one", "two", "three"), pictures, strict=True)
+                ]
+            },
+        ),
+        ("counter", {"label": t["counter"], "value": 1250, "suffix": "+"}),
+        ("progress", {"label": t["progress"], "value": 60, "max": 100}),
+        (
+            "video_modal",
+            {
+                "title": t["video"],
+                "poster": images["event-workshop"],
+                "alt_text": t["alt_video"],
+                "url": data.SHOWCASE_VIDEO_URL,
+            },
+        ),
+    ]
 
 
 def _legal_page(
@@ -1256,7 +1344,7 @@ def _seed_pages(model: Any, slugs: Iterable[str]) -> list[Any]:
 
 
 def _reset_cms(run: _Run) -> None:
-    for page in _seed_pages(StandardPage, [data.HOW_IT_WORKS.slug["en"]]):
+    for page in _seed_pages(StandardPage, [data.HOW_IT_WORKS.slug["en"], data.SHOWCASE.slug["en"]]):
         run.changes.delete("cms.standardpage", page.url_path, {})
         page.delete()
     for page in _seed_pages(LegalPage, [spec.slug["en"] for spec in data.LEGAL_PAGES.values()]):

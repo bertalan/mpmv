@@ -1,0 +1,12 @@
+{% load i18n static %}{% comment %}
+Controls of a `ride` carousel (THM.14): Previous, Pause or Play and Next, all native buttons,
+hidden until `js/carousel.js` runs (this file loads it, once per page: a module with the same URL runs once, so pages without a carousel never fetch it) (without JavaScript every slide is simply shown). Bootstrap
+reads `data-bs-slide`; the script owns the Pause/Play button and its labels.
+
+Context: `id` (the carousel's id), `autoplay` (the editor enabled rotation: the button starts as
+Pause). Included with `only`.
+{% endcomment %}<div class="ride-carousel__controls">
+  <button type="button" class="btn btn-outline-dark ride-carousel__button" data-bs-target="#{{ id }}" data-bs-slide="prev" aria-controls="{{ id }}-slides" hidden>{% include "components/icon.html" with name="chevron-left" only %}<span class="visually-hidden">{% translate "Previous slide" %}</span></button>
+  <button type="button" class="btn btn-outline-dark ride-carousel__button ride-carousel__toggle" data-ride-toggle data-label-pause="{% translate 'Pause' %}" data-label-play="{% translate 'Play' %}" aria-controls="{{ id }}-slides" hidden>{% if autoplay %}{% translate "Pause" %}{% else %}{% translate "Play" %}{% endif %}</button>
+  <button type="button" class="btn btn-outline-dark ride-carousel__button" data-bs-target="#{{ id }}" data-bs-slide="next" aria-controls="{{ id }}-slides" hidden>{% include "components/icon.html" with name="chevron-right" only %}<span class="visually-hidden">{% translate "Next slide" %}</span></button>
+</div><script type="module" src="{% static 'themes/ride/js/carousel.js' %}"></script>
