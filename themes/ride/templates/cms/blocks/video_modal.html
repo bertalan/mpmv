@@ -1,0 +1,9 @@
+{% load i18n responsive_images %}{% comment %}
+Video block of the `ride` theme (THM.14): the cover picture and the consent-gated popup
+(components/video_modal.html). The popup stays outside any `data-reveal` element (it is fixed).
+Without JavaScript the button is a link to the video. A CSP `frame-src` for the provider is an
+operations setting (docs/dev/themes.md).
+{% endcomment %}{% if video %}<section class="block block-video">
+  {% if value.poster %}<figure class="ride-video__poster">{% responsive_image value.poster "card" alt=value.alt_text %}</figure>{% endif %}
+  {% include "components/video_modal.html" with id=video_id title=value.title url=video.watch_url embed_url=video.embed_url only %}
+</section>{% endif %}

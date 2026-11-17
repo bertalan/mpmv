@@ -137,3 +137,14 @@ def test_a_listing_never_carries_its_query_to_a_home_page(
 ) -> None:
     targets = switch_targets(client.get("/compatibility/maker/?utm_source=x").content.decode())
     assert targets["de"] == ("/de/", True)
+
+
+@pytest.fixture(autouse=True)
+def _site_allows_indexing(db: None) -> None:
+    """The canonical and hreflang links are for indexable pages: the site's switch is on."""
+    from django.apps import apps
+    from wagtail.models import Site
+
+    apps.get_model("seo", "SeoSettings").objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )

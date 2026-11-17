@@ -42,9 +42,11 @@ from apps.catalog.tests.factories import (
 from apps.cms.blocks import ProductGridBlock
 from apps.cms.models import HomePage, LegalPage, StandardPage
 from apps.cms.services import SeedReport
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -59,12 +61,12 @@ def _commit_hooks_run_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def _home(code: str = "en") -> HomePage:
+def _home(code: str = primary_language()) -> HomePage:
     home: HomePage = HomePage.objects.get(locale__language_code=code)
     return home
 
 
-def _about(code: str = "en") -> StandardPage:
+def _about(code: str = primary_language()) -> StandardPage:
     about: StandardPage = StandardPage.objects.get(
         locale__language_code=code, depth=_home(code).depth + 1
     )
@@ -113,7 +115,11 @@ def listed(title: str, **kwargs: Any) -> Product:
         product=product, title=title, slug=f"{slug}-en", status=PUBLISHED
     )
     ProductTranslationFactory.create(
-        product=product, language="it", title=f"{title} IT", slug=f"{slug}-it", status=PUBLISHED
+        product=product,
+        language=other_language(),
+        title=f"{title} IT",
+        slug=f"{slug}-it",
+        status=PUBLISHED,
     )
     return product
 
@@ -127,13 +133,13 @@ def maker() -> Term:
         taxonomy=compat, name="Compatibility", slug="compatibility", status=PUBLISHED
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=compat, language="it", name="Compatibilità", slug="compatibilita",
+        taxonomy=compat, language=other_language(), name="Compatibilità", slug="compatibilita",
         status=PUBLISHED,
     )  # fmt: skip
     term: Term = TermFactory.create(taxonomy=compat)
     TermTranslationFactory.create(term=term, name="Maker", slug="maker", status=PUBLISHED)
     TermTranslationFactory.create(
-        term=term, language="it", name="Marca", slug="marca", status=PUBLISHED
+        term=term, language=other_language(), name="Marca", slug="marca", status=PUBLISHED
     )
     return term
 
@@ -191,7 +197,7 @@ def test_a_term_grid_includes_the_term_subtree(seeded: SeedReport, maker: Term) 
 
 def test_the_grid_follows_the_page_language(seeded: SeedReport, maker: Term) -> None:
     listed("Steel bag").terms.add(maker)
-    html = _publish(_home("it"), [_grid("term", maker, heading="Scelti per te")])
+    html = _publish(_home(other_language()), [_grid("term", maker, heading="Scelti per te")])
     assert _titles(html) == ["Steel bag IT"]
     see_all = _grid_section(html).find("a", class_="product-grid-all")
     assert see_all["href"] == "/it/compatibilita/marca/"
@@ -219,7 +225,7 @@ def test_see_all_links_to_the_canonical_listing(seeded: SeedReport, maker: Term)
 
 def test_see_all_names_its_listing_in_the_page_language(seeded: SeedReport, maker: Term) -> None:
     listed("Steel bag").terms.add(maker)
-    html = _publish(_home("it"), [_grid("term", maker, heading="Scelti per te")])
+    html = _publish(_home(other_language()), [_grid("term", maker, heading="Scelti per te")])
     see_all = _grid_section(html).find("a", class_="product-grid-all")
     assert see_all.find(class_="visually-hidden").get_text(strip=True) == "products: Marca"
 
@@ -232,7 +238,7 @@ def test_an_empty_heading_falls_back_to_the_listing_name(
     listed("Steel bag").terms.add(maker)
     html = _publish(_home(), [_grid("term", maker, heading="", see_all=see_all)])
     assert _grid_section(html).find("h2").get_text(strip=True) == "Maker"
-    html = _publish(_home("it"), [_grid("term", maker, heading="", see_all=see_all)])
+    html = _publish(_home(other_language()), [_grid("term", maker, heading="", see_all=see_all)])
     assert _grid_section(html).find("h2").get_text(strip=True) == "Marca"
 
 

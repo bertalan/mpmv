@@ -1,0 +1,11 @@
+{% extends "manager/list.html" %}
+{% load i18n %}
+{% comment %}The base list of the Manager with links between the fitment node pages (FIT.1 part 2).{% endcomment %}
+{% block manager_content %}
+  {% if links %}
+    <nav aria-label="{% translate 'Fitment nodes' %}">
+      <ul class="manager-links">{% for label, url in links %}<li><a href="{{ url }}">{{ label }}</a></li>{% endfor %}</ul>
+    </nav>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

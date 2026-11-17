@@ -126,7 +126,7 @@ def test_the_head_has_title_canonical_robots_and_hreflang(
     page = soup(client, "/compatibility/maker/")
     assert "Maker" in page.title.get_text()
     assert (
-        page.head.find("link", rel="canonical")["href"] == "http://testserver/compatibility/maker/"
+        page.head.find("link", rel="canonical")["href"] == "http://localhost/compatibility/maker/"
     )
     assert page.head.find("meta", attrs={"name": "robots"})["content"] == "index, follow"
     hreflangs = {link["hreflang"] for link in page.head.find_all("link", hreflang=True)}

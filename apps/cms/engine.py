@@ -708,3 +708,85 @@ def help_guide_url_valid(url: object) -> bool:
 def help_guide_url(url: object) -> str:
     """The vendor guide address to link, or "" when there is none or it is not valid."""
     return url if isinstance(url, str) and url.strip() and help_guide_url_valid(url) else ""
+
+
+# --- Video modal (THM.14): only YouTube and Vimeo, always the no-tracking embed
+
+_VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{6,20}$")
+_YOUTUBE_HOSTS = frozenset(
+    {
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com",
+        "youtube-nocookie.com",
+        "www.youtube-nocookie.com",
+    }
+)
+_VIMEO_HOSTS = frozenset({"vimeo.com", "www.vimeo.com", "player.vimeo.com"})
+
+
+# The only origins a video block ever frames (never a wildcard); the CSP `frame-src` gets them on
+# the responses that render such a block (apps.cms.middleware.VideoEmbedCspMiddleware).
+VIDEO_EMBED_ORIGINS = ("https://www.youtube-nocookie.com", "https://player.vimeo.com")
+_VIMEO_HASH = re.compile(r"^[0-9a-f]{6,20}$")
+
+
+@dataclass(frozen=True)
+class VideoLinks:
+    """The page of a video and the no-tracking address of its embed."""
+
+    watch_url: str
+    embed_url: str
+
+
+def parse_video_url(url: str) -> VideoLinks | None:
+    """`VideoLinks` for a YouTube or Vimeo address (https only), else None. The embed is the
+    `youtube-nocookie.com` or `player.vimeo.com` (`dnt=1`) address, built from the video id."""
+    parts = urlsplit((url or "").strip())
+    if parts.scheme != "https" or parts.username or parts.port not in (None, 443):
+        return None
+    host = (parts.hostname or "").lower()
+    segments = [s for s in parts.path.split("/") if s]
+    video_id = ""
+    unlisted_hash = ""
+    if host in _YOUTUBE_HOSTS:
+        if segments[:1] == ["watch"]:
+            ids = [
+                v
+                for k, v in (q.split("=", 1) for q in parts.query.split("&") if "=" in q)
+                if k == "v"
+            ]
+            video_id = ids[0] if ids else ""
+        elif len(segments) == 2 and segments[0] in {"embed", "shorts"}:
+            video_id = segments[1]
+        if _VIDEO_ID.match(video_id):
+            return VideoLinks(
+                f"https://www.youtube.com/watch?v={video_id}",
+                f"https://www.youtube-nocookie.com/embed/{video_id}",
+            )
+    elif host == "youtu.be" and len(segments) == 1:
+        video_id = segments[0]
+        if _VIDEO_ID.match(video_id):
+            return VideoLinks(
+                f"https://www.youtube.com/watch?v={video_id}",
+                f"https://www.youtube-nocookie.com/embed/{video_id}",
+            )
+    elif host in _VIMEO_HOSTS:
+        if host == "player.vimeo.com" and len(segments) == 2 and segments[0] == "video":
+            video_id = segments[1]
+        elif host != "player.vimeo.com" and len(segments) in (1, 2):
+            video_id = segments[0]
+            if len(segments) == 2:  # an unlisted video: vimeo.com/<id>/<hash>
+                unlisted_hash = segments[1]
+        if player_unlisted := dict(  # player.vimeo.com/video/<id>?h=<hash>
+            q.split("=", 1) for q in parts.query.split("&") if "=" in q
+        ).get("h"):
+            unlisted_hash = unlisted_hash or player_unlisted
+        if unlisted_hash and not _VIMEO_HASH.match(unlisted_hash):
+            return None
+        if video_id.isdigit():
+            watch = f"https://vimeo.com/{video_id}" + (f"/{unlisted_hash}" if unlisted_hash else "")
+            embed = f"https://player.vimeo.com/video/{video_id}?"
+            embed += f"h={unlisted_hash}&dnt=1" if unlisted_hash else "dnt=1"
+            return VideoLinks(watch, embed)
+    return None

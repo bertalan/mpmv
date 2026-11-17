@@ -14,6 +14,7 @@ from django.http import HttpRequest, HttpResponseBadRequest
 from django.http.response import HttpResponse, HttpResponseBase
 from django.middleware.csp import get_nonce
 from django.urls import NoReverseMatch, reverse
+from django.utils.csp import CSP
 from django.utils.translation import gettext
 from wagtail.models import PageViewRestriction
 
@@ -24,6 +25,7 @@ from apps.core.services import consume_rate_limit, rate_limit_wait
 from apps.core.throttling import ip_bucket
 
 from .csp import nonce_picker_scripts
+from .engine import VIDEO_EMBED_ORIGINS
 from .help_admin import strip_assets
 
 
@@ -146,3 +148,27 @@ class PageRestrictionProtectionMiddleware:
             return HttpResponseBadRequest(gettext(VERIFICATION_FAILED), content_type="text/plain")
         request._page_restriction_key = key  # type: ignore[attr-defined]
         return None
+
+
+class VideoEmbedCspMiddleware:
+    """Allow the video embed origins in `frame-src`, only on a response that rendered a video.
+
+    The video block marks the request (`request.mpmv_video_embed`). The two no-tracking origins
+    of `VIDEO_EMBED_ORIGINS` (never a wildcard) are added to the policy of that response alone;
+    every other page keeps the site policy. Listed after Django's ContentSecurityPolicyMiddleware,
+    so it runs first on the way out and the policy it leaves is the one written. The frame itself
+    still appears only after consent to `marketing` (js/video.js).
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        response = self.get_response(request)
+        if getattr(request, "mpmv_video_embed", False) and not hasattr(response, "_csp_config"):
+            policy = dict(settings.SECURE_CSP)
+            current = policy.get("frame-src")
+            sources = list(current) if isinstance(current, list) else [CSP.SELF]
+            policy["frame-src"] = [*sources, *(o for o in VIDEO_EMBED_ORIGINS if o not in sources)]
+            response._csp_config = policy  # type: ignore[attr-defined]
+        return response

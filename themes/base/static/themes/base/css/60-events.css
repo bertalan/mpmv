@@ -1,0 +1,111 @@
+/* Public event pages (EVT.6, spec 15): the filter form, the month heading groups, the month
+   calendar table and the event page's facts. Colours only through tokens. Below 48rem the month
+   view shows the list layout instead of the table (spec 15 "Public pages"). */
+@layer components {
+  .event-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
+    align-items: end;
+    margin-block: var(--space-m);
+  }
+
+  .event-filters .field {
+    display: grid;
+    gap: var(--space-xs);
+  }
+
+  .event-month {
+    margin-block-start: var(--space-l);
+    font-size: var(--step-1);
+  }
+
+  .event-summary {
+    padding-block: var(--space-s);
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  .event-summary h4 {
+    margin: 0;
+    font-size: var(--step-0);
+  }
+
+  .event-meta {
+    margin: 0;
+    color: var(--color-text-muted);
+  }
+
+  .event-status {
+    font-weight: 700;
+  }
+
+  .event-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-m);
+    margin-block: var(--space-m);
+  }
+
+  .event-facts {
+    display: grid;
+    gap: var(--space-xs) var(--space-m);
+    grid-template-columns: max-content 1fr;
+  }
+
+  .event-facts dd {
+    margin: 0;
+  }
+
+  .event-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-m);
+    margin-block: var(--space-m);
+  }
+
+  .calendar-table {
+    inline-size: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  .calendar-table caption {
+    font-weight: 700;
+    text-align: start;
+    padding-block-end: var(--space-xs);
+  }
+
+  .calendar-table th,
+  .calendar-table td {
+    border: 1px solid var(--color-border);
+    padding: var(--space-xs);
+    vertical-align: top;
+    text-align: start;
+  }
+
+  .calendar-day--outside {
+    color: var(--color-text-muted);
+  }
+
+  .calendar-day ul {
+    margin: 0;
+    padding-inline-start: var(--space-s);
+  }
+
+  .calendar-day__number {
+    display: block;
+    font-weight: 700;
+  }
+
+  @media (width < 48rem) {
+    .calendar-table {
+      display: none;
+    }
+  }
+
+  @media (width >= 48rem) {
+    .calendar-list {
+      display: none;
+    }
+  }
+}

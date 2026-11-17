@@ -14,6 +14,7 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.cms.models import HomePage
 from apps.cms.services import seed_site
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import MediaImageFactory
 
 pytestmark = pytest.mark.django_db
@@ -27,7 +28,7 @@ def _ride(settings: SettingsWrapper) -> None:
 @pytest.fixture
 def home(db: None) -> HomePage:
     seed_site()
-    page: HomePage = HomePage.objects.get(locale__language_code="en")
+    page: HomePage = HomePage.objects.get(locale__language_code=primary_language())
     banner = MediaImageFactory.create(title="Banner", file__filename="banner.png")
     page.body = [
         (
@@ -61,7 +62,9 @@ def test_the_home_page_uses_the_ride_theme_and_its_stylesheet(
     client: Client, home: HomePage
 ) -> None:
     html = client.get("/").content.decode()
-    assert '<html lang="en" data-theme="ride"' in html  # ride adds class="no-js" (THM.15 1/3)
+    assert (
+        f'<html lang="{primary_language()}" data-theme="ride"' in html
+    )  # ride adds class="no-js" (THM.15 1/3)
     assert re.search(r'<link rel="stylesheet" href="[^"]*themes/ride/theme[^"]*\.css">', html)
     assert "themes/base/theme" not in html
 
@@ -94,7 +97,7 @@ def test_the_hero_offers_a_primary_and_a_secondary_action_and_no_carousel(
     assert "Sell with us" in hero
     assert 'class="button' in hero
     assert "button--secondary" in hero
-    # THM.14 loads carousel.js on every ride page; the home hero itself is not a carousel.
+    # The home hero itself is not a carousel; carousel.js loads only with one.
     assert "carousel" not in hero.lower()
     assert 'aria-roledescription="carousel"' not in html
     assert "data-autoplay" not in html
@@ -119,7 +122,11 @@ def test_one_font_is_preloaded_from_the_same_origin(client: Client, home: HomePa
 
 def test_no_external_request_and_no_inline_code(client: Client, home: HomePage) -> None:
     html = client.get("/").content.decode()
-    external = re.findall(r'<(?:link|script|img)[^>]+(?:src|href)="(https?://[^"]+)"', html)
+    # canonical and hreflang links (I18N.6) name the page's own URLs; the browser never fetches them
+    html_requests = re.sub(r'<link rel="(?:canonical|alternate)"[^>]*>', "", html)
+    external = re.findall(
+        r'<(?:link|script|img)[^>]+(?:src|href)="(https?://[^"]+)"', html_requests
+    )
     assert external == []
     assert "style=" not in html
     assert not re.search(r"<style[\s>]", html)

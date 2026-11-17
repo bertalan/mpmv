@@ -10,6 +10,7 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.manager import roles
 from apps.vendors.models import Vendor, VendorTranslation
@@ -36,7 +37,9 @@ def reviewer(db: None) -> User:
 
 @pytest.fixture
 def changed(vendor: Vendor, owner: User) -> AuditLog:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old tagline")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=primary_language(), tagline="Old tagline"
+    )
     save_storefront_profile(vendor, "en", {"tagline": "New tagline"}, actor=owner, ctx=CTX)
     return AuditLog.objects.get(action="vendor.profile_changed")
 
@@ -90,7 +93,10 @@ def test_the_revert_needs_a_reason(
     verified_login(client, reviewer)
     response = client.post(revert_url(changed), {"reason": " "}, follow=True)
     assert response.status_code == 200
-    assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "New tagline"
+    assert (
+        VendorTranslation.objects.get(vendor=vendor, language=primary_language()).tagline
+        == "New tagline"
+    )
     assert not AuditLog.objects.filter(action="vendor.profile_reverted").exists()
 
 
@@ -100,7 +106,10 @@ def test_the_reviewer_reverts_with_a_reason(
     verified_login(client, reviewer)
     response = client.post(revert_url(changed), {"reason": "Misleading policy"})
     assert response.status_code == 302
-    assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "Old tagline"
+    assert (
+        VendorTranslation.objects.get(vendor=vendor, language=primary_language()).tagline
+        == "Old tagline"
+    )
     log = AuditLog.objects.get(action="vendor.profile_reverted")
     assert log.actor_id == reviewer.pk
     assert log.source == AuditLog.Source.ADMIN
@@ -119,7 +128,10 @@ def test_the_revert_asks_for_a_recent_second_factor(
     response = client.post(revert_url(changed), {"reason": "Misleading policy"})
     assert response.status_code == 302
     assert "/mfa/" in response["Location"]
-    assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "New tagline"
+    assert (
+        VendorTranslation.objects.get(vendor=vendor, language=primary_language()).tagline
+        == "New tagline"
+    )
     assert not AuditLog.objects.filter(action="vendor.profile_reverted").exists()
 
 
@@ -178,7 +190,10 @@ def test_the_catalog_and_owner_roles_review_and_revert(
     verified_login(client, member)
     assert client.get(PAGE).status_code == 200
     client.post(revert_url(changed), {"reason": "Not acceptable."}, follow=True)
-    assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "Old tagline"
+    assert (
+        VendorTranslation.objects.get(vendor=vendor, language=primary_language()).tagline
+        == "Old tagline"
+    )
 
 
 @pytest.mark.parametrize("key", [roles.CONFIG, roles.FINANCE, roles.SUPPORT])
@@ -211,7 +226,10 @@ def test_a_restricted_session_cannot_revert_a_text_change(
     verified_login(client, reviewer, level=levels.NO_WINDOW)
     response = client.post(revert_url(changed), {"reason": "Not acceptable."})
     assert response.status_code == 403
-    assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "New tagline"
+    assert (
+        VendorTranslation.objects.get(vendor=vendor, language=primary_language()).tagline
+        == "New tagline"
+    )
     assert not AuditLog.objects.filter(action="vendor.profile_reverted").exists()
 
 

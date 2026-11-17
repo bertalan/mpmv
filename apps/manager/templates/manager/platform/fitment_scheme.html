@@ -1,0 +1,91 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+The fitment scheme (FIT.1 part 2, D-38): wording, year range and limits, and the levels of the
+tree (at most four). Every change shows its dry-run preview first and is written on
+confirmation, behind the passkey window. A level with nodes cannot be reordered, removed or
+changed in how it names things. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p class="manager-lead">{% translate "The scheme says what customers pick: for example a make and a model, or a brand and a machine. Nothing is written until you confirm on the preview page." %}</p>
+  {% if not can_write %}{% include "components/alert.html" with level="info" message=_("You can read the scheme but not change it.") only %}{% endif %}
+
+  <h2>{% translate "Settings" %}</h2>
+  {% include "components/error_summary.html" with form=scheme_form only %}
+  <form method="post" class="manager-form" novalidate>
+    {% csrf_token %}<input type="hidden" name="action" value="save">
+    {% for field in scheme_form %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% if can_write %}{% include "components/button.html" with label=_("Preview the change") type="submit" only %}{% endif %}
+  </form>
+
+  <h2>{% translate "Levels" %}</h2>
+  <div class="table-scroll" role="region" aria-labelledby="levels-caption" tabindex="0">
+    <table class="table">
+      <caption id="levels-caption">{% translate "Levels of the scheme" %}</caption>
+      <thead><tr>
+        <th scope="col">{% translate "Position" %}</th>
+        <th scope="col">{% translate "Label" %}</th>
+        <th scope="col">{% translate "Code" %}</th>
+        <th scope="col" class="numeric">{% translate "Nodes" %}</th>
+        <th scope="col">{% translate "Names differ by language" %}</th>
+      </tr></thead>
+      <tbody>
+        {% for row in levels %}<tr>
+          <th scope="row">{{ row.level.position }}</th>
+          <td>{{ row.label }}</td>
+          <td><code>{{ row.level.code }}</code></td>
+          <td class="numeric">{{ row.level.node_count }}</td>
+          <td>{% if row.level.translate_names %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td>
+        </tr>{% empty %}<tr><td colspan="5">{% translate "No level yet." %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if can_write %}
+    {% for row in levels %}
+      <details{% if row.form.errors %} open{% endif %}>
+        <summary>{% blocktranslate with label=row.label %}Edit {{ label }}{% endblocktranslate %}</summary>
+        {% include "components/error_summary.html" with form=row.form only %}
+        <form method="post" class="manager-form" novalidate>
+          {% csrf_token %}<input type="hidden" name="action" value="rename_level"><input type="hidden" name="level" value="{{ row.level.code }}">
+          {% for field in row.form %}{% include "components/field.html" with field=field only %}{% endfor %}
+          {% include "components/button.html" with label=_("Preview the labels") type="submit" only %}
+        </form>
+        <form method="post" class="manager-inline">
+          {% csrf_token %}<input type="hidden" name="action" value="translate_names"><input type="hidden" name="level" value="{{ row.level.code }}">
+          <input type="hidden" name="value" value="{% if row.level.translate_names %}0{% else %}1{% endif %}">
+          {% include "components/button.html" with label=_("Switch names by language") type="submit" variant="secondary" only %}
+        </form>
+        <form method="post" class="manager-inline">
+          {% csrf_token %}<input type="hidden" name="action" value="remove_level"><input type="hidden" name="level" value="{{ row.level.code }}">
+          {% include "components/button.html" with label=_("Remove this level") type="submit" variant="danger" only %}
+        </form>
+      </details>
+    {% endfor %}
+
+    {% if levels|length > 1 %}
+      <h2>{% translate "Order" %}</h2>
+      <p>{% translate "Give each level a position number. A level that has nodes cannot move." %}</p>
+      <form method="post" class="manager-form" novalidate>
+        {% csrf_token %}<input type="hidden" name="action" value="reorder">
+        {% for row in levels %}
+          <div class="field"><label for="position-{{ row.level.code }}">{{ row.label }}</label>
+            <input id="position-{{ row.level.code }}" name="position-{{ row.level.code }}" type="number" min="1" max="{{ max_levels }}" value="{{ row.level.position }}" required></div>
+        {% endfor %}
+        {% include "components/button.html" with label=_("Preview the order") type="submit" only %}
+      </form>
+    {% endif %}
+
+    {% if add_form %}
+      <h2>{% translate "Add a level" %}</h2>
+      <p>{% blocktranslate with max=max_levels %}A scheme has at most {{ max }} levels. The new level goes last.{% endblocktranslate %}</p>
+      {% include "components/error_summary.html" with form=add_form only %}
+      <form method="post" class="manager-form" novalidate>
+        {% csrf_token %}<input type="hidden" name="action" value="add_level">
+        {% for field in add_form %}{% include "components/field.html" with field=field only %}{% endfor %}
+        {% include "components/button.html" with label=_("Preview the level") type="submit" only %}
+      </form>
+    {% endif %}
+  {% endif %}
+{% endblock %}

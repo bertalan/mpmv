@@ -1,0 +1,19 @@
+{% load i18n tz wagtailcore_tags %}{% comment %}
+One event in a list (EVT.6): a heading link, the dates as `<time datetime>`, the type as text and
+the vendor, never colour alone. Context: `item` (an `events.listing.Item`).
+{% endcomment %}
+{% with event=item.page span=item.span %}
+<article class="event-summary">
+  <h4><a href="{% pageurl event %}">{{ event.title }}</a></h4>
+  <p class="event-meta">
+    {% if event.all_day %}
+      <time datetime="{{ span.start|date:'Y-m-d' }}">{{ span.start|date:"DATE_FORMAT" }}</time>{% if span.days|length > 1 %} – {% with last=span.days|last %}<time datetime="{{ last|date:'Y-m-d' }}">{{ last|date:"DATE_FORMAT" }}</time>{% endwith %}{% endif %}
+    {% else %}
+      <time datetime="{{ span.start|date:'c' }}">{{ span.start|date:"DATETIME_FORMAT" }}</time>
+    {% endif %}
+    · {{ event.get_event_type_display }}{% if event.vendor %} · {{ event.vendor.display_name }}{% endif %}
+    {% if event.cancelled_at %} · <span class="event-status">{% translate "Cancelled" %}</span>{% endif %}
+  </p>
+  {% if event.summary %}<p>{{ event.summary }}</p>{% endif %}
+</article>
+{% endwith %}

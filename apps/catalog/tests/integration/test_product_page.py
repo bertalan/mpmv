@@ -23,7 +23,7 @@ from apps.catalog.tests.factories import (
     VariantFactory,
     VariantTranslationFactory,
 )
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
@@ -94,7 +94,9 @@ def test_a_draft_is_a_404(client: Client, status: str) -> None:
 
 def test_a_hidden_translation_is_a_404(client: Client) -> None:
     product = live()
-    product.translations.filter(language="en").update(status=TranslationStatus.MACHINE)
+    product.translations.filter(language=primary_language()).update(
+        status=TranslationStatus.MACHINE
+    )
     assert client.get(path("en", "mug-en")).status_code == 404
 
 
@@ -108,7 +110,7 @@ def test_a_product_of_a_vendor_that_is_not_live_is_a_404(client: Client, status:
 
 def test_an_old_slug_answers_a_301_to_the_current_one(client: Client) -> None:
     product = live()
-    SlugHistoryFactory.create(product=product, language="en", slug="old-mug")
+    SlugHistoryFactory.create(product=product, language=primary_language(), slug="old-mug")
     response = client.get(path("en", "old-mug"))
     assert response.status_code == 301
     assert response["Location"] == path("en", "mug-en")
@@ -134,7 +136,7 @@ def test_the_default_variant_is_selected(client: Client) -> None:
     for sku, default in (("VAR-A", False), ("VAR-B", True)):
         variant = VariantFactory.create(product=product, sku=sku, is_default=default)
         VariantTranslationFactory.create(
-            variant=variant, language="en", label=f"Size {sku}", status=PUBLISHED
+            variant=variant, language=primary_language(), label=f"Size {sku}", status=PUBLISHED
         )
     html = client.get(path("en", "mug-en")).content.decode()
     assert "Size VAR-A" in html
@@ -151,7 +153,9 @@ def test_a_variant_price_override_shows(client: Client) -> None:
     variant = VariantFactory.create(
         product=product, sku="VAR-X", is_default=True, price_net_override=Decimal("24.00")
     )
-    VariantTranslationFactory.create(variant=variant, language="en", label="Big", status=PUBLISHED)
+    VariantTranslationFactory.create(
+        variant=variant, language=primary_language(), label="Big", status=PUBLISHED
+    )
     assert "29.28" in client.get(path("en", "mug-en")).content.decode()  # 24.00 + 22 %
 
 
@@ -161,13 +165,17 @@ def test_a_missing_translation_shows_the_source_text_with_a_notice(client: Clien
         status=Product.Status.PUBLISHED,
     )
     ProductTranslationFactory.create(
-        product=product, language="en", title="Only English", slug="only-english", status=PUBLISHED
+        product=product,
+        language=primary_language(),
+        title="Only English",
+        slug="only-english",
+        status=PUBLISHED,
     )
     response = client.get(path("it", "only-english"))
     assert response.status_code == 200
     html = response.content.decode()
     assert "Only English" in html
-    assert 'rel="canonical" href="http://testserver/product/only-english/"' in html
+    assert 'rel="canonical" href="http://localhost/product/only-english/"' in html
 
 
 def test_the_required_companion_is_shown_when_published(client: Client) -> None:
@@ -178,7 +186,7 @@ def test_the_required_companion_is_shown_when_published(client: Client) -> None:
         vendor=vendor, status=Product.Status.PUBLISHED, required_companion=companion
     )
     ProductTranslationFactory.create(
-        product=product, language="en", title="Toy", slug="toy", status=PUBLISHED
+        product=product, language=primary_language(), title="Toy", slug="toy", status=PUBLISHED
     )
     html = client.get(path("en", "toy")).content.decode()
     assert "Battery pack" in html
@@ -192,7 +200,7 @@ def test_a_draft_companion_is_not_exposed(client: Client) -> None:
         vendor=vendor, status=Product.Status.PUBLISHED, required_companion=companion
     )
     ProductTranslationFactory.create(
-        product=product, language="en", title="Toy", slug="toy", status=PUBLISHED
+        product=product, language=primary_language(), title="Toy", slug="toy", status=PUBLISHED
     )
     assert "Secret draft" not in client.get(path("en", "toy")).content.decode()
 
@@ -211,14 +219,17 @@ def test_the_robots_rule_follows_the_site_setting(client: Client) -> None:
     assert "noindex" in client.get(path("en", "mug-en")).content.decode()
 
 
+@pytest.mark.usefixtures("consumer_prices")
 def test_the_structured_data_has_a_product_node_with_the_brand_id(client: Client) -> None:
     brand = BrandFactory.create()
-    BrandTranslationFactory.create(brand=brand, language="en", slug="acme", status=PUBLISHED)
+    BrandTranslationFactory.create(
+        brand=brand, language=primary_language(), slug="acme", status=PUBLISHED
+    )
     live(brand=brand)
     html = client.get(path("en", "mug-en")).content.decode()
     assert '"@type": "Product"' in html
     assert "/brand/acme/#brand" in html
-    assert '"offers"' not in html
+    assert '"@type": "Offer"' in html  # SEO.1: a product sold online has its offer
 
 
 def test_the_page_leaks_no_internal_data(client: Client) -> None:

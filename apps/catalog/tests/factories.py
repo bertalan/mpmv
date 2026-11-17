@@ -43,6 +43,7 @@ from apps.catalog.models import (
     VariantOption,
     VariantTranslation,
 )
+from apps.core.i18n import primary_language
 from apps.core.models import MediaImage, TranslationStatus
 from apps.core.tests.factories import MediaImageFactory, SvgCollectionFactory
 from apps.vendors.tests.factories import VendorFactory
@@ -78,7 +79,7 @@ class ProductTranslationFactory(DjangoModelFactory[ProductTranslation]):
         model = ProductTranslation
 
     product = factory.SubFactory(ProductFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     title = factory.Faker("sentence", nb_words=3)
     short_description = factory.Faker("sentence")
     description = factory.Faker("paragraph")
@@ -91,7 +92,7 @@ class SlugHistoryFactory(DjangoModelFactory[SlugHistory]):
         model = SlugHistory
 
     product = factory.SubFactory(ProductFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     slug = factory.Sequence(lambda n: f"old-product-{n}-en")
 
 
@@ -146,7 +147,7 @@ class VariantTranslationFactory(DjangoModelFactory[VariantTranslation]):
         model = VariantTranslation
 
     variant = factory.SubFactory(VariantFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     label = factory.Faker("word")
 
 
@@ -188,7 +189,7 @@ class CategoryTranslationFactory(DjangoModelFactory[CategoryTranslation]):
         model = CategoryTranslation
 
     category = factory.SubFactory(CategoryFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     name = factory.Faker("word")
     slug = factory.Sequence(lambda n: f"category-{n}")
 
@@ -209,7 +210,7 @@ class TaxonomyTranslationFactory(DjangoModelFactory[TaxonomyTranslation]):
         model = TaxonomyTranslation
 
     taxonomy = factory.SubFactory(TaxonomyFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     name = factory.Faker("word")
     slug = factory.Sequence(lambda n: f"taxonomy-{n}")
 
@@ -233,7 +234,7 @@ class TermTranslationFactory(DjangoModelFactory[TermTranslation]):
         model = TermTranslation
 
     term = factory.SubFactory(TermFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     name = factory.Faker("word")
     slug = factory.Sequence(lambda n: f"term-{n}")
 
@@ -267,7 +268,7 @@ class BrandTranslationFactory(DjangoModelFactory[BrandTranslation]):
         model = BrandTranslation
 
     brand = factory.SubFactory(BrandFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     slug = factory.Sequence(lambda n: f"brand-{n}")
     description = factory.Faker("sentence")
 
@@ -287,7 +288,7 @@ class AttributeTranslationFactory(DjangoModelFactory[AttributeTranslation]):
         model = AttributeTranslation
 
     attribute = factory.SubFactory(AttributeFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     name = factory.Faker("word")
 
 
@@ -307,7 +308,7 @@ class AttributeValueTranslationFactory(DjangoModelFactory[AttributeValueTranslat
         model = AttributeValueTranslation
 
     value = factory.SubFactory(AttributeValueFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     label = factory.Faker("word")
 
 

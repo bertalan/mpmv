@@ -229,6 +229,8 @@ STOREFRONT = (
     ("/it/shop/vendor-e-studio/", "Lampada da tavolo in ceramica"),
     ("/demo-how-it-works/", "How it works (demo)"),
     ("/it/demo-come-funziona/", "Come funziona (demo)"),
+    ("/demo-showcase/", "Showcase (demo)"),
+    ("/it/demo-vetrina/", "Vetrina (demo)"),
     ("/demo-terms-of-sale/", "DEMO PLACEHOLDER"),
     ("/it/demo-condizioni-di-vendita/", "SEGNAPOSTO"),
     ("/events/", "Makers fair (demo)"),
@@ -241,6 +243,24 @@ def test_the_storefront_pages_show_the_seed(demo_seed: ChangeSet, client: Client
         response = client.get(path)
         assert response.status_code == 200, path
         assert text in response.content.decode(), path
+
+
+def test_the_showcase_page_places_every_motion_block(demo_seed: ChangeSet, client: Client) -> None:
+    """THM.14: STAGE shows one of each block an editor can place."""
+    from django.test.utils import override_settings
+
+    with override_settings(MPMV_THEME_DEFAULT="ride"):
+        html = client.get("/demo-showcase/").content.decode()
+    assert html.count('aria-roledescription="carousel"') == 3  # hero slider, strip, gallery
+    for marker in (
+        "ride-section-title",
+        "data-counter=",
+        "<progress",
+        'data-consent="marketing"',
+        "ride-gallery__thumbs",
+    ):
+        assert marker in html, marker
+    assert html.count("<h1") == 1
 
 
 def test_real_rows_with_generic_keys_survive_a_seed_and_a_reset() -> None:
@@ -322,3 +342,46 @@ def test_the_seed_keeps_an_open_default_rule_staff_configured() -> None:
     )
     seed(ctx=TEST_CONTEXT)
     assert list(CommissionRule.objects.all()) == [own]
+
+
+def test_the_showcase_page_is_noindex_by_itself_and_frames_only_the_video_origins(
+    demo_seed: ChangeSet, client: Client
+) -> None:
+    """THM.14: the demo page asks search engines to skip it whatever the environment floor says
+    (the sitemaps and llms.txt skip a page with its own noindex), and its response allows the two
+    no-tracking video origins in `frame-src`, which no other page does."""
+    from django.test.utils import override_settings
+    from wagtail.models import Site
+
+    from apps.cms.models import StandardPage
+    from apps.seo.models import SeoSettings
+
+    pages = StandardPage.objects.filter(slug__in=["demo-showcase", "demo-vetrina"])
+    assert pages.count() == 2
+    assert all(page.noindex for page in pages)
+    assert not StandardPage.objects.filter(noindex=True).exclude(pk__in=pages).exists()
+    SeoSettings.objects.create(site=Site.objects.get(is_default_site=True), allow_indexing=True)
+    with override_settings(FORCE_NOINDEX=False, DEMO_MODE=False):
+        for path in ("/demo-showcase/", "/it/demo-vetrina/"):
+            response = client.get(path)
+            assert 'name="robots" content="noindex"' in response.content.decode(), path
+            assert "https://www.youtube-nocookie.com" in response["Content-Security-Policy"]
+        other = client.get("/demo-how-it-works/")
+        assert 'name="robots"' not in other.content.decode()
+        assert "youtube-nocookie" not in other["Content-Security-Policy"]
+
+
+def test_a_standard_page_can_ask_search_engines_to_skip_it(client: Client) -> None:
+    from wagtail.models import Site
+
+    from apps.cms.services import seed_site
+    from apps.cms.tests.factories import StandardPageFactory
+    from apps.seo.models import SeoSettings
+
+    seed_site()
+    StandardPageFactory.create(title="Hidden demo", slug="hidden-demo", noindex=True)
+    StandardPageFactory.create(title="Shown page", slug="shown-page")
+    SeoSettings.objects.create(site=Site.objects.get(is_default_site=True), allow_indexing=True)
+    with override_settings(FORCE_NOINDEX=False, DEMO_MODE=False):
+        assert 'name="robots" content="noindex"' in client.get("/hidden-demo/").content.decode()
+        assert 'name="robots"' not in client.get("/shown-page/").content.decode()

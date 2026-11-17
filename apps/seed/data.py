@@ -1260,6 +1260,7 @@ class PageSeed:
     slug: Texts
     title: Texts
     body: Texts  # rich text HTML
+    noindex: bool = False  # the page asks search engines to skip it (its own robots rule)
 
 
 DEMO_NOTICE: Final[Texts] = {
@@ -1329,6 +1330,50 @@ HOW_IT_WORKS: Final = PageSeed(
         "ordini. I prezzi sono mostrati senza IVA finché il checkout non sa dove ti trovi.</p>",
     },
 )
+SHOWCASE: Final = PageSeed(
+    slug={"en": "demo-showcase", "it": "demo-vetrina"},
+    title={"en": "Showcase (demo)", "it": "Vetrina (demo)"},
+    body={"en": "", "it": ""},
+    noindex=True,  # a demo page: never in the sitemaps or llms.txt, whatever the site's switch
+)
+# "Big Buck Bunny" (c) Blender Foundation, https://peach.blender.org, licensed CC BY 3.0, which
+# allows sharing and embedding with credit; the official channel's upload, embedded without cookies.
+SHOWCASE_VIDEO_URL: Final = "https://www.youtube.com/watch?v=YE7VzlLtp-4"
+SHOWCASE_QUOTES: Final = (
+    ("Fast delivery and a kind note in the box.", "Demo customer A"),
+    ("The jacket fits as described.", "Demo customer B"),
+    ("Good prices from small workshops.", "Demo customer C"),
+)
+SHOWCASE_TEXT: Final[dict[str, Texts]] = {
+    "intro": {
+        "en": "<p>One of every block an editor can place on a page.</p>",
+        "it": "<p>Un esempio di ogni blocco che un redattore può inserire in una pagina.</p>",
+    },
+    "hero": {"en": "Showcase slider", "it": "Slider vetrina"},
+    "hero_text": {
+        "en": "Three slides, nothing moves by itself.",
+        "it": "Tre slide, nulla si muove da solo.",
+    },
+    "slide_two": {"en": "Second slide", "it": "Seconda slide"},
+    "slide_three": {"en": "Third slide", "it": "Terza slide"},
+    "eyebrow": {"en": "Our range", "it": "La nostra gamma"},
+    "title": {"en": "Gear for every ride", "it": "Attrezzatura per ogni uscita"},
+    "lead": {
+        "en": "Invented products from invented workshops.",
+        "it": "Prodotti inventati da laboratori inventati.",
+    },
+    "strip": {"en": "Voices", "it": "Voci"},
+    "counter": {"en": "Orders shipped", "it": "Ordini spediti"},
+    "progress": {"en": "Order packed", "it": "Ordine imballato"},
+    "video": {"en": "Workshop tour (placeholder)", "it": "Visita al laboratorio (segnaposto)"},
+    "alt_video": {"en": "Abstract placeholder shapes", "it": "Forme astratte segnaposto"},
+    "alt_one": {"en": "Warm abstract shapes", "it": "Forme astratte calde"},
+    "alt_two": {"en": "Blue abstract shapes", "it": "Forme astratte blu"},
+    "alt_three": {"en": "Green abstract shapes", "it": "Forme astratte verdi"},
+    "caption_one": {"en": "Warm shapes", "it": "Forme calde"},
+    "caption_two": {"en": "Blue shapes", "it": "Forme blu"},
+    "caption_three": {"en": "Green shapes", "it": "Forme verdi"},
+}
 HOW_IT_WORKS_FAQ: Final[dict[str, list[tuple[str, str]]]] = {
     "en": [
         ("Is this a real shop?", "<p>No. It is a demo with invented data.</p>"),

@@ -2,13 +2,8 @@
 {% load i18n wagtailcore_tags %}
 {% comment %}
 A vendor's story (CMS.4, spec 10 §10.2): the story blocks, then the vendor's newest products with
-a link to its storefront. Its own canonical, and `hreflang` for its live translations.
+a link to its storefront. Its own canonical and `hreflang` come from the base layout (`seo_links`).
 {% endcomment %}
-{% block head %}
-  {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
-  {% for lang, url in alternates %}<link rel="alternate" hreflang="{{ lang }}" href="{{ url }}">
-  {% endfor %}
-{% endblock %}
 {% block page_content %}
   <article class="vendor-landing">
     <h1>{{ page.title }}</h1>
