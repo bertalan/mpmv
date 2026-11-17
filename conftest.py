@@ -38,9 +38,9 @@ def default_languages(settings: Any) -> None:
     """I18N.15: pins the default language set (English primary, then it, de, fr, es) for tests
     whose subject is exactly that set. The suite also runs with another `MPMV_LANGUAGES` (CI job
     `it,de`), so a test must not read the default from the environment it runs in."""
-    from mpmv.settings.languages import DEFAULT_LANGUAGE_CODES, language_settings
+    from mpmv.settings.languages import ALL_LANGUAGE_CODES, language_settings
 
-    settings.LANGUAGE_CODE, settings.LANGUAGES = language_settings(DEFAULT_LANGUAGE_CODES)
+    settings.LANGUAGE_CODE, settings.LANGUAGES = language_settings(ALL_LANGUAGE_CODES)
     settings.WAGTAIL_CONTENT_LANGUAGES = settings.LANGUAGES
 
 

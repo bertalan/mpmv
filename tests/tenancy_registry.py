@@ -110,6 +110,7 @@ from apps.ledger.models import LedgerEntry, Refund
 from apps.ledger.tests.factories import LedgerEntryFactory, RefundFactory
 from apps.orders.models import (
     OrderAmendment,
+    OrderEvent,
     OrderLine,
     StockReservation,
     VendorOrder,
@@ -117,6 +118,7 @@ from apps.orders.models import (
 )
 from apps.orders.tests.factories import (
     OrderAmendmentFactory,
+    OrderEventFactory,
     OrderLineFactory,
     StockReservationFactory,
     VendorOrderFactory,
@@ -317,6 +319,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     # ORD.20: v1 of one of the vendor's orders, and a draft amendment on such an order.
     VendorOrderVersion: lambda vendor: version_one(vendor),
     OrderAmendment: lambda vendor: OrderAmendmentFactory.create(from_version=version_one(vendor)),
+    OrderEvent: lambda vendor: OrderEventFactory.create(vendor_order=paid_vendor_order(vendor)),
     StockReservation: lambda vendor: StockReservationFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
@@ -667,6 +670,12 @@ ENDPOINTS: dict[str, Access] = {
         methods=("POST",),
         sample={"public_id": NIL_UUID},
     ),
+    # ORD.20 part 3b: the shop records its own invoice; another vendor's package is a 404.
+    "manager:shop:order_invoice_issued": VendorScoped(
+        make=paid_vendor_order,
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
     "manager:shop:amendment_discard": VendorScoped(
         make=open_draft,
         kwargs=by_amendment,
@@ -965,8 +974,9 @@ ENDPOINTS: dict[str, Access] = {
         "every visitor; no vendor data."
     ),
     "events_resource": NoVendorData(
-        "File-like routes of public event pages (EVT.6): the single-event ICS of a published "
-        "event, the same for every visitor; hidden events are a 404.",
+        "File-like routes of public event pages (EVT.6, EVT.9): the single-event ICS and the RSS "
+        "and ICS feeds (platform, vendor, type), the same for every visitor; hidden events are a "
+        "404 and in no feed.",
         kwargs={"path": "events/no-such-event/calendar.ics"},
     ),
     "wagtail_serve": NoVendorData(

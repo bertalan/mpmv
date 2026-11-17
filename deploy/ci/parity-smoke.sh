@@ -123,6 +123,8 @@ declare -A fill=(
   [DATABASE_URL]="$database_url"
   [MPMV_SITE_ADDRESS]="$site"
   [MPMV_NOINDEX]=true
+  # STAGE shape: the five languages of the staff preview (the example file holds the LIVE value en,it).
+  [MPMV_LANGUAGES]="en,it,de,fr,es"
 )
 for name in mpmv database caddy; do
   while IFS= read -r line; do

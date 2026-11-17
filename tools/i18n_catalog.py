@@ -6,6 +6,8 @@ nor the app image carry. This script does the same job with Django's own templat
 
     python tools/i18n_catalog.py extract   # rewrite locale/<lang>/LC_MESSAGES/django.po
     python tools/i18n_catalog.py compile   # write the django.mo next to each django.po
+    python tools/i18n_catalog.py review-export <lang> [--all] [--pending] [--out FILE]
+                                           # CSV of the sensitive entries for a translator
     python tools/i18n_catalog.py check     # exit 1 when a catalog is stale, has an untranslated
                                            # entry or its .mo does not match its .po
 
@@ -17,7 +19,9 @@ so the application needs no build step to translate; `check` guards that they st
 
 from __future__ import annotations
 
+import argparse
 import ast
+import csv
 import os
 import re
 import sys
@@ -44,6 +48,7 @@ EVENT_FILES = (
             "_links",
             "_results",
             "_summary",
+            "_subscribe",
         )
     ),
 )
@@ -84,7 +89,12 @@ EXTRA_FILES = (
     "apps/cms/templatetags/cms_tags.py",  # the header's "Site links" item (OPS.12)
 )
 # Single Python modules scanned in full: customer-facing messages of apps that are not in SCOPES.
-FILES = ("apps/orders/messages.py", "apps/orders/amendments.py")
+FILES = (
+    "apps/orders/messages.py",
+    "apps/orders/amendments.py",
+    "apps/orders/amendment_engine.py",  # the classification reasons and refusals (ORD.20)
+    "apps/orders/amendment_notices.py",
+)
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
 HELP_TEXT_SCOPES = (
@@ -99,18 +109,9 @@ HELP_TEXT_SCOPES = (
     "apps/themes",
     "apps/vendors",
 )
-# German, French and Spanish start with the order emails (ORD.16); the Manager and account pages
-# join them with their own I18N.7 slices. Italian covers every scope.
-# The customer order pages (ORD.7) join the Manager and account pages in I18N.7.
-_ORDER_EMAILS = ("apps/orders/templates/email", "apps/orders/templates/documents")
-_EVENT_PAGES = (*EVENT_FILES, "themes/base/templates/components/pagination.html")
-# The consumer price note (TAX.12) is a legal display: every language has it from the start.
-_PRICE_NOTE = ("apps/tax/prices.py",)
-LANGUAGE_SCOPES: dict[str, tuple[str, ...]] = {
-    "de": (*_ORDER_EMAILS, *_PRICE_NOTE, *_EVENT_PAGES),
-    "fr": (*_ORDER_EMAILS, *_PRICE_NOTE, *_EVENT_PAGES),
-    "es": (*_ORDER_EMAILS, *_PRICE_NOTE, *_EVENT_PAGES),
-}
+# Every language scans the same scope (I18N.7 slice 2): a language listed here would scan only
+# the given paths, so the dict stays empty and `SCOPES` applies to all of them.
+LANGUAGE_SCOPES: dict[str, tuple[str, ...]] = {}
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
     "400.html",
@@ -319,6 +320,7 @@ def extract() -> None:
                 msgctxt=ctx,
                 msgid_plural=plural or "",
                 occurrences=[(p, "") for p in sorted(places)],
+                tcomment=prev.tcomment if prev else "",
             )
             if plural:
                 strs = dict(prev.msgstr_plural) if prev and prev.msgstr_plural else {}
@@ -329,6 +331,96 @@ def extract() -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         po.save(str(path))
         print(f"{path.relative_to(ROOT)}: {len(po)} entries")
+
+
+# Entries a human (professional translator, and counsel for legal and tax wording) must review
+# before a language is offered to customers (owner decision 2026-11-16). An entry is sensitive
+# when any of its `#:` source references starts with one of these prefixes; the first matching
+# group names it. Marking an entry reviewed: a translator comment line `# reviewed` in the .po.
+SENSITIVE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "order emails and documents",
+        ("apps/orders/templates/email/", "apps/orders/templates/documents/"),
+    ),
+    ("compliance forms", ("apps/compliance/",)),
+    (
+        "sales terms",
+        (
+            "apps/vendors/templates/vendors/terms/",
+            "apps/manager/templates/manager/shop/sales_terms.html",
+            "apps/manager/sales_terms_views.py",
+        ),
+    ),
+    ("price notes and tax", ("apps/tax/",)),
+    (
+        "cart and order summary components",
+        (
+            "themes/base/templates/components/cart_line.html",
+            "themes/base/templates/components/order_summary.html",
+            "themes/base/templates/components/step_indicator.html",
+            "themes/base/templates/components/quantity_stepper.html",
+        ),
+    ),
+    ("orders, checkout and order changes (ORD.20)", ("apps/orders/",)),
+)
+REVIEWED_MARK = "reviewed"
+REVIEW_COLUMNS = ("msgid", "msgctxt", "msgid_plural", "sources", "msgstr", "group")
+
+
+def sensitive_group(entry: polib.POEntry) -> str | None:
+    paths = [p for p, _line in entry.occurrences]
+    for group, prefixes in SENSITIVE_GROUPS:
+        if any(p.startswith(prefixes) for p in paths):
+            return group
+    return None
+
+
+def is_reviewed(entry: polib.POEntry) -> bool:
+    return any(line.strip() == REVIEWED_MARK for line in entry.tcomment.splitlines())
+
+
+def review_rows(lang: str, *, everything: bool = False, pending: bool = False) -> list[list[str]]:
+    rows = []
+    for e in polib.pofile(str(_po_path(lang))):
+        group = sensitive_group(e)
+        if (group is None and not everything) or (pending and is_reviewed(e)):
+            continue
+        forms = (
+            " | ".join(f"[{i}] {v}" for i, v in sorted(e.msgstr_plural.items()))
+            if e.msgid_plural
+            else e.msgstr
+        )
+        rows.append(
+            [
+                e.msgid,
+                e.msgctxt or "",
+                e.msgid_plural,
+                " ".join(p for p, _line in e.occurrences),
+                forms,
+                group or "other",
+            ]
+        )
+    return rows
+
+
+def _safe_cell(value: str) -> str:
+    """Spreadsheet formula injection: a cell starting with = + - @ tab or CR gets a leading apostrophe."""
+    return "'" + value if value[:1] in ("=", "+", "-", "@", "\t", "\r") else value
+
+
+def review_export(
+    lang: str, out: Path | None = None, *, everything: bool = False, pending: bool = False
+) -> int:
+    rows = review_rows(lang, everything=everything, pending=pending)
+    handle = out.open("w", encoding="utf-8", newline="") if out else sys.stdout
+    try:
+        writer = csv.writer(handle, lineterminator="\r\n")
+        writer.writerow(REVIEW_COLUMNS)
+        writer.writerows([_safe_cell(cell) for cell in row] for row in rows)
+    finally:
+        if out:
+            handle.close()
+    return len(rows)
 
 
 def _missing(po: polib.POFile) -> list[str]:
@@ -373,6 +465,16 @@ def check() -> int:
 
 if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else ""
+    if command == "review-export":
+        ap = argparse.ArgumentParser(prog="i18n_catalog.py review-export")
+        ap.add_argument("lang", choices=LANGUAGES)
+        ap.add_argument("--out", type=Path)
+        ap.add_argument("--all", action="store_true", dest="everything")
+        ap.add_argument("--pending", action="store_true")
+        ns = ap.parse_args(sys.argv[2:])
+        n = review_export(ns.lang, ns.out, everything=ns.everything, pending=ns.pending)
+        print(f"{n} entries", file=sys.stderr)
+        raise SystemExit(0)
     if command == "extract":
         extract()
     elif command == "compile":
