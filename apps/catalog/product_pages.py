@@ -94,13 +94,17 @@ def gallery(product: Product, language: str) -> list[GalleryImage]:
         .select_related("image")
         .prefetch_related("translations")
     )
+    # An image with no alt text of its own is described by the product title (D-18 fallback to
+    # the source language comes first, in `resolve`): a content image never has an empty alt.
+    named = translations.resolve(product.translations.all(), language).translation
+    fallback = named.title if named is not None and named.title else str(product.sku)
     shown = []
     for row in engine.gallery_selection(rows, language):
         text = translations.resolve(row.translations.all(), language).translation
         shown.append(
             GalleryImage(
                 image=row.image,
-                alt=text.alt_text if text is not None else "",
+                alt=(text.alt_text if text is not None else "") or fallback,
                 caption=text.caption if text is not None else "",
                 is_cover=row.is_cover,
             )

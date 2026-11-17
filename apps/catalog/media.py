@@ -16,20 +16,24 @@ import hashlib
 from collections.abc import Sequence
 from typing import Any
 
-from django.core.exceptions import ValidationError
+from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from wagtail.models import Collection
 
 from apps.core import images as core_images
+from apps.core import tasks as core_tasks
 from apps.core import translations
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.fields import image_limits, read_upload
 from apps.core.i18n import configured_languages
-from apps.core.models import ImageLicence, MediaImage, TranslationStatus
+from apps.core.models import AuditLog, ImageLicence, MediaImage, TranslationStatus
 from apps.core.services import audit_changes
 from apps.vendors.engine import vendor_collection_name
 from apps.vendors.models import Vendor
+from apps.vendors.scoping import is_platform_staff
+from apps.vendors.services import has_vendor_permission
 
 from .models import Product, ProductImage, ProductImageTranslation, Variant
 
@@ -89,9 +93,32 @@ def _check_language(language: str | None) -> None:
         raise ValidationError({"language": f"{language!r} is not an enabled language."})
 
 
-def _prerender(image: MediaImage) -> None:
-    """Make the AVIF, WebP and JPEG renditions of the presets used for products now."""
-    if image.is_svg():
+# Sources that act without a person (imports, migrations, jobs): no membership to check.
+PIPELINE_SOURCES = (AuditLog.Source.SYSTEM, AuditLog.Source.TASK, AuditLog.Source.COMMAND)
+
+
+def _authorise(vendor: Vendor, ctx: AuditContext) -> None:
+    """The actor of `ctx` must be a member of `vendor` allowed to manage products, or platform
+    staff; a pipeline (`PIPELINE_SOURCES`, no actor) is trusted. Adapters (the Manager, the
+    API, the admin) build `ctx` from the signed-in user and so pass; they still do their own
+    request-level checks. Raises PermissionDenied."""
+    if ctx.actor_id is None:
+        if ctx.source in PIPELINE_SOURCES:
+            return
+        raise PermissionDenied("Product images are changed by a signed-in member of the vendor.")
+    user = get_user_model().objects.filter(pk=ctx.actor_id).first()
+    if user is not None and (
+        is_platform_staff(user) or has_vendor_permission(user, vendor, "products")
+    ):
+        return
+    raise PermissionDenied("You cannot change this vendor's product images.")
+
+
+def render_renditions(image_id: int) -> None:
+    """Make the AVIF, WebP and JPEG renditions of the presets used for products. Idempotent:
+    existing renditions are reused; a missing or SVG image is skipped."""
+    image = MediaImage.objects.filter(pk=image_id).first()
+    if image is None or image.is_svg():
         return
     formats = core_images.picture_formats()
     specs = [
@@ -126,6 +153,7 @@ def upload_image(
     in one gallery and language is refused. `alt_text` and `caption` are in the source language.
     Returns the `ChangeSet`; the new row is `ProductImage.objects.filter(product=...)`'s latest.
     """
+    _authorise(product.vendor, ctx)
     _check_language(language)
     if variant is not None and variant.product_id != product.pk:
         raise ValidationError({"variant": "The variant belongs to another product."})
@@ -141,21 +169,29 @@ def upload_image(
         collection=_own_collection(vendor, create=False),
     )
     candidate.full_clean()
+    if hasattr(file, "seek"):
+        file.seek(0)  # validation may have read it
     source_hash = hashlib.sha256(read_upload(file, image_limits().max_bytes)).hexdigest()
+    if hasattr(file, "seek"):
+        file.seek(0)
     changes = ChangeSet()
     with transaction.atomic():
         _lock_product(product)
+        if _gallery(product, variant).filter(source_hash=source_hash, language=language).exists():
+            raise ValidationError({"file": "This image is already in the gallery."})
+        # The file is reused only with the same licence and author: the second upload's own
+        # data is never dropped, so it gets its own library entry instead.
         known = (
-            ProductImage.objects.filter(product__vendor=vendor, source_hash=source_hash)
+            ProductImage.objects.filter(
+                product__vendor=vendor,
+                source_hash=source_hash,
+                image__licence=licence,
+                image__author=author,
+            )
             .select_related("image")
             .first()
         )
         image = known.image if known is not None else candidate
-        if (
-            image.pk is not None
-            and _gallery(product, variant).filter(image=image, language=language).exists()
-        ):
-            raise ValidationError({"file": "This image is already in the gallery."})
         last = _gallery(product, variant).order_by("-position").values_list("position", flat=True)
         row = ProductImage(
             product=product,
@@ -172,7 +208,12 @@ def upload_image(
             image.collection = _own_collection(vendor, create=True)
             image.save()
         row.save()
-        _prerender(row.image)
+        if known is None and not image.is_svg():
+            # A job row in this transaction: it exists only if the upload commits, and the
+            # encoders run in the worker, not under the product lock.
+            from .tasks import render_product_image  # tasks imports this module
+
+            core_tasks.enqueue(render_product_image, image_id=image.pk)
         if alt_text:
             _write_text(
                 row,
@@ -205,6 +246,7 @@ def set_cover(
     A person's choice locks the cover (`cover_locked`). With `automatic=True` (pipelines,
     imports) a locked cover is never replaced: nothing changes. An automatic cover is not locked.
     """
+    _authorise(row.product.vendor, ctx)
     changes = ChangeSet()
     with transaction.atomic():
         _lock_product(row.product)
@@ -235,6 +277,7 @@ def lock_cover(
     row: ProductImage, *, locked: bool, ctx: AuditContext, dry_run: bool = False
 ) -> ChangeSet:
     """Lock or unlock the cover so pipelines may not (or may) replace it."""
+    _authorise(row.product.vendor, ctx)
     changes = ChangeSet()
     with transaction.atomic():
         _lock_product(row.product)
@@ -258,6 +301,7 @@ def set_language(
     A cover moved into a set that already has one stops being a cover (and loses its lock).
     """
     _check_language(language)
+    _authorise(row.product.vendor, ctx)
     changes = ChangeSet()
     with transaction.atomic():
         _lock_product(row.product)
@@ -300,6 +344,7 @@ def reorder(
 ) -> ChangeSet:
     """Set the order of a whole gallery (the product's, or `variant`'s own): every image of it,
     once, in the new order."""
+    _authorise(product.vendor, ctx)
     changes = ChangeSet()
     with transaction.atomic():
         _lock_product(product)
@@ -323,15 +368,35 @@ def reorder(
 
 def delete_image(row: ProductImage, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Remove the image from the gallery with its texts. The `MediaImage` stays in the library
-    (other products of the vendor may share it; orphans are for the staff review list)."""
+    (other products of the vendor may share it; orphans are for the staff review list, CAT.25).
+    An unlocked cover passes to the next image of the gallery and language."""
+    _authorise(row.product.vendor, ctx)
     changes = ChangeSet()
     with transaction.atomic():
         _lock_product(row.product)
         stored = ProductImage.objects.select_related("product", "variant").get(pk=row.pk)
         changes.delete(IMAGE_MODEL, _key(stored), image_snapshot(stored))
+        # An unlocked cover hands over to the next image; a locked one (a person's choice) goes
+        # with its image and the gallery falls back to the first by position.
+        heir = None
+        if stored.is_cover and not stored.cover_locked:
+            heir = (
+                ProductImage.objects.filter(
+                    product=stored.product, variant=stored.variant, language=stored.language
+                )
+                .exclude(pk=stored.pk)
+                .select_related("product", "variant")
+                .order_by("position", "pk")
+                .first()
+            )
+            if heir is not None:
+                before = image_snapshot(heir)
+                changes.update(IMAGE_MODEL, _key(heir), before, {**before, "is_cover": True})
         if dry_run:
             return changes
         stored.delete()
+        if heir is not None:
+            ProductImage.objects.filter(pk=heir.pk).update(is_cover=True, cover_locked=False)
         audit_changes(changes, ctx=ctx, action=IMAGE_DELETED)
     return changes
 
@@ -377,6 +442,7 @@ def set_text(
     """Set the alt text and caption of the image in `language`. Visitors see another language's
     text only once it is published; until then the source language's text is shown."""
     _check_language(language)
+    _authorise(row.product.vendor, ctx)
     changes = ChangeSet()
     with transaction.atomic():
         _lock_product(row.product)
