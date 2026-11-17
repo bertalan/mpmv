@@ -10,14 +10,19 @@ from typing import Any
 import pytest
 from defusedxml.ElementTree import fromstring
 from django.apps import apps
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from icalendar import Calendar
 from wagtail.models import Site
 
 from apps.accounts.models import User
+from apps.accounts.tests.factories import UserFactory
 from apps.cms.services import seed_site
+from apps.core.models import Throttle
 from apps.events.models import EventPage
+from apps.events.services import hide_event
 from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.events.tests.integration.test_multilingual_events import Fixture
 from apps.vendors.models import Vendor
@@ -250,8 +255,9 @@ def test_a_repeated_request_with_the_etag_gets_304_and_a_hide_changes_the_etag(n
     again = client.get(path, headers={"If-None-Match": etag})
     assert again.status_code == 304
     assert again.content == b""
+    # Last-Modified is informational: only the strong ETag decides a 304
     later = client.get(path, headers={"If-Modified-Since": first["Last-Modified"]})
-    assert later.status_code == 304
+    assert later.status_code == 200
     EventPage.objects.filter(pk=page.pk).update(hidden_at=timezone.now())
     changed = client.get(path, headers={"If-None-Match": etag})
     assert changed.status_code == 200
@@ -377,3 +383,138 @@ def test_a_304_answer_counts_towards_the_limit() -> None:
             == 304
         )
     assert client.get(path, REMOTE_ADDR="203.0.113.9").status_code == 429
+
+
+# --- Rate limit: validated first, bounded key, no address, spoofed header
+
+
+def test_a_404_scope_writes_no_throttle_row_and_a_400_char_path_is_not_a_500() -> None:
+    client = Client()
+    base = _index_path()
+    long_slug = "x" * 400
+    for path in (
+        f"{base}vendor/{long_slug}/feed.rss",
+        f"{base}vendor/{long_slug}/calendar.ics",
+        f"{base}type/{long_slug}/feed.rss",
+        f"{base}vendor/nobody/feed.rss",
+    ):
+        assert client.get(path, REMOTE_ADDR="203.0.113.20").status_code == 404, path
+    assert not Throttle.objects.filter(key__startswith="events.feed:").exists()
+
+
+def test_a_valid_feed_key_is_bounded_whatever_the_path() -> None:
+    client = Client()
+    page = _event(10)
+    assert client.get(_index_path() + "feed.rss", REMOTE_ADDR="2001:db8::1").status_code == 200
+    assert client.get(f"{page.url}calendar.ics", REMOTE_ADDR="2001:db8::1").status_code == 200
+    rows = Throttle.objects.filter(key__startswith="events.feed:")
+    keys = list(rows.values_list("key", flat=True))
+    assert len(keys) == 2
+    assert all(len(key) <= 320 for key in keys)
+
+
+def test_a_request_without_a_client_address_is_not_throttled(caplog: Any) -> None:
+    client = Client()
+    path = _index_path() + "feed.rss"
+    with caplog.at_level("WARNING", logger="apps.events.feeds"):
+        for _ in range(35):
+            assert client.get(path, REMOTE_ADDR="").status_code == 200
+    assert not Throttle.objects.filter(key__startswith="events.feed:").exists()
+    assert "without a client address" in caplog.text
+
+
+def test_a_spoofed_forwarded_header_does_not_change_the_bucket(settings: Any) -> None:
+    settings.TRUSTED_PROXY_HEADER = "X-Forwarded-For"
+    settings.TRUSTED_PROXIES = ["198.51.100.1"]
+    client = Client()
+    path = _index_path() + "feed.rss"
+    for number in range(30):  # REMOTE_ADDR is not a trusted proxy: the header is ignored
+        response = client.get(
+            path, REMOTE_ADDR="203.0.113.30", headers={"X-Forwarded-For": f"192.0.2.{number}"}
+        )
+        assert response.status_code == 200
+    blocked = client.get(
+        path, REMOTE_ADDR="203.0.113.30", headers={"X-Forwarded-For": "192.0.2.200"}
+    )
+    assert blocked.status_code == 429
+
+
+# --- Query counts: flat in the number of events
+
+
+def _queries(client: Client, path: str) -> int:
+    with CaptureQueriesContext(connection) as captured:
+        assert client.get(path, REMOTE_ADDR="203.0.113.40").status_code == 200
+    return len(captured)
+
+
+@pytest.mark.parametrize("name", ["feed.rss", "calendar.ics"])
+def test_the_query_count_does_not_grow_with_the_number_of_events(name: str) -> None:
+    client = Client()
+    vendor = VendorFactory.create()
+    for number in range(3):
+        _event(10 + number, vendor=vendor, located=True)
+    path = _index_path() + name
+    client.get(path, REMOTE_ADDR="203.0.113.40")  # warm caches and the throttle row
+    few = _queries(client, path)
+    for number in range(27):
+        _event(20 + number, vendor=VendorFactory.create(), located=True)
+    assert _queries(client, path) == few
+
+
+# --- Hostile content, hide service, suspended vendor, LOCATION language
+
+
+HOSTILE = "Fair <b> & ]]> , ; \\ line\r\nEND:VEVENT caf\u00e9 \u00e8 \u4e2d"
+
+
+def test_hostile_text_stays_well_formed_in_rss_and_cannot_inject_ics_lines() -> None:
+    client = Client()
+    _event(
+        10,
+        title=HOSTILE,
+        summary=HOSTILE,
+        venue_name=HOSTILE,
+        located=True,
+    )
+    channel = _rss(client, _index_path() + "feed.rss")
+    item = channel.find("item")
+    assert "&" in item.findtext("title")
+    assert "]]>" in item.findtext("title")
+    assert "caf\u00e9" in item.findtext("description")
+    response = client.get(_index_path() + "calendar.ics")
+    calendar = Calendar.from_ical(response.content)
+    assert len(calendar.walk("VEVENT")) == 1
+    assert "caf\u00e9" in str(calendar.walk("VEVENT")[0]["SUMMARY"])
+    assert b"\r\nEND:VEVENT\r\nEND:VEVENT" not in response.content
+
+
+def test_case_12_a_hide_through_the_service_removes_the_event_from_every_feed() -> None:
+    client = Client()
+    page = _event(10, title="Reported")
+    staff = UserFactory.create(superuser=True)
+    assert all(titles == ["Reported"] for titles in _all_titles(client, page.vendor).values())
+    hide_event(staff, page, "Misleading")
+    assert all(titles == [] for titles in _all_titles(client, page.vendor).values())
+    assert client.get(f"{page.url}calendar.ics").status_code == 404
+
+
+def test_the_single_event_ics_of_a_suspended_vendor_is_a_404() -> None:
+    client = Client()
+    page = _event(10, title="Soon suspended")
+    assert client.get(f"{page.url}calendar.ics").status_code == 200
+    vendor = page.vendor
+    assert vendor is not None
+    Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.SUSPENDED)
+    assert client.get(f"{page.url}calendar.ics").status_code == 404
+
+
+def test_the_rss_self_link_is_built_from_the_site_not_the_host_header(settings: Any) -> None:
+    client = Client()
+    _event(10)
+    path = _index_path() + "feed.rss"
+    settings.ALLOWED_HOSTS = ["*"]
+    response = client.get(path, headers={"Host": "evil.example"})
+    link = assert_valid_rss(response.content).find(f"{ATOM}link").get("href")
+    assert "evil.example" not in link
+    assert link.endswith(path)

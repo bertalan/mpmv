@@ -114,4 +114,29 @@ def test_rrule_and_exdate_pass_through_in_one_vevent() -> None:
     events = Calendar.from_ical(body).walk("VEVENT")
     assert len(events) == 1
     assert "FREQ=WEEKLY;COUNT=10" in str(events[0]["RRULE"].to_ical())
-    assert "EXDATE:20270317T080000Z\r\n" in body
+    assert "EXDATE;TZID=Europe/Rome:20270317T090000\r\n" in body  # same TZID form as DTSTART
+
+
+def test_location_carries_the_language_of_a_fallback_item() -> None:
+    body = engine.calendar_ics([_event(language="de")], "Events")
+    assert Calendar.from_ical(body).walk("VEVENT")[0]["LOCATION"].params["LANGUAGE"] == "de"
+    assert "LOCATION;LANGUAGE" not in engine.calendar_ics([_event()], "Events")
+
+
+def test_an_unbounded_rule_ends_its_timezone_with_yearly_rules() -> None:
+    unbounded = engine.calendar_ics([_event(rrule="FREQ=WEEKLY")], "Events")
+    assert "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU\r\n" in unbounded
+    assert "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU\r\n" in unbounded
+    Calendar.from_ical(unbounded)
+    bounded = engine.calendar_ics([_event(rrule="FREQ=WEEKLY;COUNT=4")], "Events")
+    assert "FREQ=YEARLY" not in bounded
+
+
+def test_hostile_text_is_escaped_and_cannot_inject_a_line() -> None:
+    nasty = "A, B; C \\ D\r\nEND:VEVENT\nBEGIN:X ]]> < & caf\u00e9 \u00e8"
+    body = engine.calendar_ics([_event(summary=nasty, description=nasty, location=nasty)], "Events")
+    calendar = Calendar.from_ical(body)
+    assert len(calendar.walk("VEVENT")) == 1
+    assert not calendar.walk("X")
+    assert "caf\u00e9" in str(calendar.walk("VEVENT")[0]["SUMMARY"])
+    assert "\r\nEND:VEVENT\r\nEND:VEVENT" not in body
