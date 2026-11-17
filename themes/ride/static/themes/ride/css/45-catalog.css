@@ -1,0 +1,60 @@
+/* Ride: catalog listings (THM.7 part 1): filter column, product cards, numbered pagination.
+   Bootstrap classes do the layout; this file maps them on the ride tokens. Colours only through
+   tokens. Transitions only when the visitor has no reduced-motion preference. */
+@layer overrides {
+  .listing-filters fieldset {
+    border: 0;
+    padding: 0;
+    margin-inline: 0;
+  }
+
+  .listing-filters legend {
+    font-family: var(--font-display);
+    float: none;
+  }
+
+  .product-card .card-title a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .product-card .card-title a:hover,
+  .product-card .card-title a:focus-visible {
+    color: var(--color-accent);
+    text-decoration: underline;
+  }
+
+  .product-card .card-img-top {
+    inline-size: 100%;
+    block-size: auto;
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+
+  .product-card:has(a:focus-visible) {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-offset);
+  }
+
+  /* WCAG 2.5.8: a page link is at least 44 px (24 px is the floor). */
+  .pagination .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: 2.75rem;
+    min-block-size: 2.75rem;
+    font-family: var(--font-display);
+  }
+
+  .filter-chips .btn {
+    min-block-size: 2rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .product-card,
+    .page-link,
+    .btn {
+      transition: none;
+    }
+  }
+}
