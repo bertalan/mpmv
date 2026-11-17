@@ -1400,6 +1400,9 @@ msgstr ""
 #: apps/manager/forms.py
 msgid "Cancellation policy"
 msgstr "Conditions d'annulation"
+#: apps/events/templates/events/_subscribe.html
+msgid "Calendar address to copy"
+msgstr "Adresse du calendrier à copier"
 
 #: apps/events/templates/events/_summary.html apps/events/templates/events/event_calendar.html
 #: apps/events/templates/events/event_page.html apps/orders/customer_views.py
@@ -2417,6 +2420,9 @@ msgstr "Erreur"
 #: apps/manager/templates/manager/shop/events.html
 msgid "Event"
 msgstr "Événement"
+#: apps/events/templates/events/_subscribe.html
+msgid "Download the calendar (ICS)"
+msgstr "Télécharger le calendrier (ICS)"
 
 #: apps/events/templates/events/_links.html
 msgid "Event views"
@@ -2424,6 +2430,7 @@ msgstr "Affichages des événements"
 
 #: apps/events/templates/events/_results.html apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/events.html
+#: apps/events/templates/events/_results.html
 msgid "Events"
 msgstr "Événements"
 
@@ -5497,6 +5504,9 @@ msgstr "Conditions de vente de %(name)s"
 #: apps/orders/templates/orders/_legal_recap.html
 msgid "Sales terms of %(name)s (version %(number)s of %(date)s), print or download"
 msgstr "Conditions de vente de %(name)s (version %(number)s du %(date)s), imprimer ou télécharger"
+#: apps/events/templates/events/_subscribe.html
+msgid "RSS feed"
+msgstr "Flux RSS"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
@@ -8521,6 +8531,13 @@ msgid ""
 msgstr ""
 "Les conditions ont changé pendant que tu passais commande. Lis les nouvelles versions et coche à "
 "nouveau les cases pour passer la commande."
+#: apps/events/templates/events/_subscribe.html
+msgid "Subscribe"
+msgstr "S'abonner"
+
+#: apps/events/templates/events/_subscribe.html
+msgid "Subscribe in your calendar app"
+msgstr "S'abonner dans votre application de calendrier"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
