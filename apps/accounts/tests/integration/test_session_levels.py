@@ -625,6 +625,10 @@ NOT_BUILT = {"tax_in_clear", "export", "backup", "impersonation"}
 # Actions that are not web views: `manage.py bootstrap_platform_owner` runs with shell access on
 # the server, outside any browser session, so session levels cannot apply to it.
 NO_SESSION = {"bootstrap_platform_owner"}
+# Actions whose grant the service itself spends, bound to the object's digest, not the request's
+# (ORD.20: an amendment's address change or refund, a staff refund or package cancellation; the
+# Manager's prompt mints the grant, `apps.orders.amendments` spends it).
+SERVICE_BOUND = {"order_amend_address", "vendor_refund", "order_amend_cancel"}
 
 
 def _source_files() -> list[Path]:
@@ -647,7 +651,8 @@ def test_every_configured_action_is_wired_not_built_or_outside_sessions() -> Non
 
     policy = parse_policy({})
     configured = policy.sensitive | policy.critical
-    assert configured == WIRED | NOT_BUILT | NO_SESSION, "classify every configured action"
+    classified = WIRED | NOT_BUILT | NO_SESSION | SERVICE_BOUND
+    assert configured == classified, "classify every configured action"
     missing = WIRED - _gated_actions()
     assert not missing, f"existing views without their requires_level: {sorted(missing)}"
 

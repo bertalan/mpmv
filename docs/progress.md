@@ -202,7 +202,14 @@ part of the done-when still open) · `not started`.
 | OPS.14 | done | #421 | Staff-only release indicator: `MPMV_VERSION` in the Manager footer and the account menu, nothing for anyone else |
 | CORE.30 | done | #484 | Manager platform map at `/manager/platform/map/` (section `platform.map`, same roles as the dashboard): links of the storefront, account, each vendor's shop space (plain text for staff), platform space and the editors' admin |
 | CORE.24 | done (part 1 #491, part 2 #520) | #491, #520 | Session index, panic button, Support end (part 1); role-based idle and absolute lifetimes on `PlatformOperator.session_policy` (`customer_days` 14, `staff_idle_minutes` 30, `staff_absolute_hours` 12, ceiling 72), `accounts.session.expired` audit. Authentication code, needs human review |
-| ORD.20 to ORD.23 | spec only | #534 | Order amendments (D-47): versions, proposals, staff tools, quote-priced shipping. No code |
+| ORD.21, ORD.23 | spec only | #534 | Order amendments (D-47): proposals with the customer's acceptance, quote-priced shipping. No code (ORD.20 and ORD.22 have their own rows) |
+| ORD.24, ORD.25 | spec only | #538, #570 | Amendment message templates from the counsel-approved wording; business details after the order (VAT number and invoicing details until invoiced or shipped, VIES re-check, audit, vendor notice). No code |
+| TAX.22 | spec only | #570 | Net-price view only for buyers with a verified VAT number; the opt-in is a switch in the account Preferences (ORD.11). Code change on top of TAX.12, not started |
+| CMP.34 | spec only | #570 | RF19 thresholds: first warning at EUR 75,000, then 85,000 and 100,000 (owner decision 2026-11-16). No code |
+| ORD.11, TRU.3, PAY.5 | spec only (scope changes) | #570 | Preferences section at launch (MQ-43); review invitation 7 days after delivery (`TrustRules.invite_delay_days`); payments layer provider-neutral, Stripe only at launch. No code |
+| VEN.13, VEN.16, CMP.5 | spec only | #580 | Clause (l) "Modifiche agli ordini pagati" approved by counsel with the second signature; re-acceptance of older versions by double signature plus 15 days' notice or the optional P2B art. 3(2) waiver. The suspension clause letter "[x]" is still to be set |
+| SEO.5, MIG.22 | spec only | #585 | Matomo (operator's own instance, first-party proxy, cookieless) replaces Google Analytics (MQ-46); domains, mail and TLS at cutover (MQ-47). The consent-free operation is an open legal point. No code |
+| CAT.22, CAT.23, VEN.40, SEO.13 to SEO.15, I18N.16 to I18N.18, CMS.17 | spec only | #589 | Follow-up rows from the SEO.1, I18N.6 and THM.15 reviews: product attributes, variant identifiers, vendor return policy, seller name rule, sitemap invalidation, x-default tracking, empty `site_root_url` check, footer columns and social profiles. No code |
 | SEC.5 (items 6 and 7) | done | #489 | Supply chain (`tools/audit_ignores.py`, every pip-audit ignore with reason and an expiry of at most 90 days; `S` rules on `tools/`) and no hard-coded secret fallback on STAGE and LIVE (`env_str` fails closed on a blank, `live.py` refuses an "insecure" secret key). Settings and secrets, needs human review |
 | SEC.5 (item 10, part 1) | partial: accounts, passkey window and request tampering scenarios in `tests/security`; abuse and business scenarios are open | #490 | `test_passkey_window_attacks.py` and the request tampering suite; no production code. The two strict xfails on sessions after an email change or an MFA reset were closed by #491 |
 | CORE.25 (hardening) | done | #497, #510 | #474 follow-ups: `SHOP_OWNER_CHECK` fails closed, shop offers dropped after use, the audit names the shop, system check `accounts.E003`. #510: an unscoped passkey window covers only while the user may elevate (`core.elevate` and a passkey), re-checked per request; group role changes end members' sessions. Security code, needs human review |
@@ -210,7 +217,14 @@ part of the done-when still open) · `not started`.
 | ARC.20 (lane accounts) | done | #498, #500 | Lane-b works from its own collaborator account (trusted for coordination and reviews only); "Lane review" check (`.github/workflows/lane-review.yml`) required on main after the owner's approval; `parallel-lanes.md` |
 | THM.8 | done: cart, checkout and confirmation (1/2), customer area and sign in (2/2) | #503, #502 | `ride` CSS `40-cart-checkout.css` and `50-account-auth.css`, e2e at 360, 768 and 1280 px. THM.16 moves these pages onto Bootstrap 5.3 |
 | THM.13 | done | #514, #515, #516, #522 | Vendored Bootstrap 5.3.9 (`foundation` key, `@layer bootstrap`, hash-checked `vendor/`), token to `--bs-*` map, per-theme budgets (ride CSS 48 KB and JS 70 KB), CSP lint (tooltip, popover, data-bs-html), selector-collision test, components with focus ring and axe; follow-up: helper-class contrast lint |
-| THM.16 | done in two parts (1/2 cart and checkout, 2/2 account and auth) | #528, #530 | THM.8 pages on Bootstrap 5.3 classes; passkey prompt rebuilt from the current base page. Customer sign-up and password-reset pages do not exist yet |
+| THM.16 | done in two parts (1/2 cart and checkout, 2/2 account and auth) | #528, #530 | THM.8 pages on Bootstrap 5.3 classes; passkey prompt rebuilt from the current base page. #558: every moved page (review, payment, confirmation, login, MFA verify, TOTP, recovery codes, levels prompt) is under the e2e gates at 360, 768 and 1280 px. Customer sign-up and password-reset pages do not exist yet (CORE.32, CORE.33) |
+| THM.15 | partial: 1/3 navbar and offcanvas menu, 2/3 search overlay and mini-cart; 3/3 (page banner, footer, back-to-top) open | #532, #536, #541 | `ride` header on a Bootstrap navbar with dropdown sub-menus and an offcanvas menu below 64rem (one switch point), `<html class="no-js">` removed by the external `ride.js` (empty `html_attrs` block in the base layout), search modal and mini-cart offcanvas fed by HTMX from the `orders:cart_mini` fragment (`#cart-count` live region), e2e at 360, 768 and 1280 px |
+| EVT.4 | done | #543, #549, #555 | Vendor area `/manager/shop/events/`: list, form with recurrence presets (`events.engine.build_rrule`), submit and cancel (1/3); block editor with a stale-edit guard, image library with licence fields, map picker, product and category choosers, read-only preview (2/3); staff hide and restore, `VendorEventPolicy` and the Done-when e2e (3/3). Event code, needs human review |
+| ORD.20 | partial: 1/3 model and engine (#551), 2/3 money-moving changes, refunds and passkey (#564); 3a/3 Manager, customer UI, passkey prompt and settings (#577); 3b/3 (emails, notices, downloads) open | #551, #564, #577 | `VendorOrderVersion` (trigger-guarded, v1 written at payment), `OrderAmendment`, `recompute_vendor_order`, `classify_amendment` (orders 0016 to 0019); apply a lower price, a lower quantity, a removed line or an address correction with the refund in one transaction through `ORDER_AMENDMENT_REFUND_HOOK` (`ledger.refunds.refund_amendment`, ledger 0006), `due_by` = event + 14 days with the hourly alert, refund-fee exemption `customer_requested_amendment`, single-use passkey bound to the amendment digest, cancel-the-rest hold, withdrawal and idle-draft handling. Orders, payments, ledger and tax code, needs human review. CMP.14 UK lead check still deferred (no CMP.14 code). 3a (#577): the shop's amendment page (draft, preview, revise, discard, apply with the passkey prompt bound to the amendment), the shop's full cancellation with its cause, the three amendment settings on `PlatformOperator` (read-only Manager page), the customer's version timeline and cancel-the-rest answer |
+| ORD.22 | partial: staff tools (#577) | #577 | Platform space "Order changes" for Support and the platform owner only (service check, other roles refused): carrier at the same or a lower price, address on the customer's request, cancelling a package with a full refund whose cause (vendor fault, customer request, platform error) decides the refund fee (`customer_requested_cancellation` or the L-10 flag) and the restock; mandatory note and `order_amend_cancel` passkey. The staff dashboard counts and the vendor notice of staff changes are open |
+| TAX.12 | partial: cards, tiles, product page, variants, cart, checkout and shipping options; JSON-LD `offers` (SEO.1), a business opt-in toggle and a geolocation header are open | #565 | Consumer prices include VAT: `apps/tax/prices.py` (`consumer_price`, `gross_amount`), the vendor's real rate at the delivery or estimated country (OSS vendor: destination; domestic-only: own country; exempt: none), the owner's note under every consumer price, `consumer_prices` tag so the catalog never imports tax (new import contract), checkout summaries "VAT included", `book_art74` alias fix. Tax code, needs human review |
+| CORE.32, CORE.33 | spec only | #556 | Customer sign-up and password reset pages (CORE.32 names the privacy notice, the customer terms and a separate marketing consent). No code |
+| TRU.1 to TRU.13 | spec only | #457 | Owner and counsel answers to Q-T1 to Q-T13 recorded in spec 16 and D-37 (no rating badge on cards, "Business purchase" label, labelled machine translation). No code |
 | VEN.34, CMP.2, CMP.5, CMP.34, ARC.35 | spec only | #508 | D-46 (tax adviser answers, owner decisions of 2026-11-15): platform regime and fee VAT, statement content and wordings, vendor clauses (j) and (k), RF19 thresholds (CMP.34), takeover runbook (ARC.35); VEN.34 moves to P1. No code. Tax and legal wording needs counsel (CMP.24) |
 | VEN.39, CORE.31 | spec only | #505 | Owner decisions of 2026-11-15: audit of every vendor text (Q-36), D-44 API keys of inactive vendors pinned with regression tests (Q-53); I18N.4 moves to P2. No code |
 
@@ -1045,7 +1059,25 @@ Compliance, security and content:
 | #528 | THM.16 | Cart and checkout on Bootstrap (1/2) |
 | #530 | THM.16 | Account and auth on Bootstrap (2/2) |
 | #534 | ORD.20 to ORD.23 | Spec: order amendments (D-47) |
-| (this PR) | none | Coherence check 33 |
+| #538 | ORD.20 to ORD.23 | Spec: joint tax and legal opinion (VAT timing, territory checks, 14-day refunds, clause (l)) |
+| #540 | none | Coherence check 33 |
+| #457 | TRU | Spec: owner answers to Q-T1 to Q-T13 |
+| #532, #536, #541 | THM.15 | ride navbar (1/3), search overlay and mini-cart (2/3), `orders:cart_mini` fragment |
+| #553 | CMP.5 | Flaky counter-key test fix |
+| #543, #549, #555 | EVT.4 | Vendor events: list and form, blocks, images, map picker, staff side |
+| #551 | ORD.20 | Order amendments 1/3: versions, engine, classification |
+| #556 | CORE.32, CORE.33 | Spec: customer sign-up and password reset |
+| #558 | THM.16 | e2e at three widths for every moved page |
+| #559 | CORE.24 | Session lifetime boundary tests |
+| #564 | ORD.20 | Order amendments 2/3: money-moving changes, refunds, passkey |
+| #577 | ORD.20, ORD.22 | Order amendments 3a/3: Manager, staff and customer UI, passkey prompt |
+| #565 | TAX.12 | Consumer prices include VAT |
+| #569 | none | Coherence check 34 |
+| #570 | CMP.34, TAX.22, ORD.11, ORD.25, TRU.3, PAY.5 | Spec: owner answers of 16 November |
+| #580 | VEN.13, VEN.16, CMP.5 | Spec: clause (l) counsel answer |
+| #585 | SEO.5, MIG.22 | Spec: Matomo replaces Google Analytics; domains, mail and TLS at cutover |
+| #589 | CAT.22, CAT.23, VEN.40, SEO.13 to SEO.15, I18N.16 to I18N.18, CMS.17 | Spec: follow-up rows from the SEO.1, I18N.6 and THM.15 reviews |
+| (this PR) | none | Coherence check 35 |
 
 ## Coherence checks
 
@@ -2152,7 +2184,7 @@ Scope: main at 40d4fdff, the merges after check 32 (#517): #514, #515, #516 and 
 | Area | Result |
 |---|---|
 | Code vs spec | THM.13 matches spec 14 (Bootstrap 5.3.9 in `@layer bootstrap`, hash-checked vendor files, token map, budgets ride CSS 48 KB and JS 70 KB, CSP lint). THM.16 moves the THM.8 pages to Bootstrap classes; sign-up and password-reset pages do not exist yet. SHP.15 completes the special areas (shipping 0014). CORE.24 part 2 adds role-based lifetimes on `PlatformOperator.session_policy`. #534 is spec only. Migrations core 0027 and shipping 0014 are linear and reversible. Vendored hashes match `VENDORED.toml`. No inline script or style, tooltip, popover or data-bs-html in the delta. |
-| Spec and backlog | `build_docs --check` is fresh. The D-47 refund-fee exemption was missing from the older refund text in 04, 07 and 92 (point 4 also lacked the amendment refund in the critical actions); fixed here. Spec 14 wording on `VENDORED.toml` and the THM.16 row corrected. D-23 and D-42 are referenced in the delta but are not in the 92 table: to check. |
+| Spec and backlog | `build_docs --check` is fresh. The D-47 refund-fee exemption was missing from the older refund text in 04, 07 and 92 (point 4 also lacked the amendment refund in the critical actions); fixed here. Spec 14 wording on `VENDORED.toml` and the THM.16 row corrected. D-23 and D-42 are not in the 92 table and nothing refers to them (corrected in check 34). |
 | Docs | `progress.md` had no rows for the delta; added. `docs/dev/themes.md` gets a Bootstrap foundation section; `docs/dev/admin-access.md` documents the `session_policy` keys. |
 | Gates | Main CI on 40d4fdff green. `make check` pass. Unit, integration and e2e suites not run locally; CI is the gate. No credentials, real names or hostnames, no TODO without an ID. |
 
@@ -2168,3 +2200,53 @@ Findings and actions:
 Check 32 findings 2 (CORE.24 part 2, #520) and 4 (THM.13 final budgets) are closed.
 
 Verdict: GO with follow-ups. No blocker for the 11:45 UTC STAGE release.
+
+### Coherence check 34 (main at f8cc3896)
+
+Scope: the merges after check 33 (main at 40d4fdff): #457 (trust answers), #532, #536 and #541 (THM.15), #538 (ORD.20 opinion spec), #540 (check 33), #543, #549 and #555 (EVT.4), #551 and #564 (ORD.20 parts 1 and 2), #553 (flaky test), #556 (CORE.32 and CORE.33 spec), #558 (THM.16 e2e), #559 (CORE.24 tests) and #565 (TAX.12).
+
+| Area | Result |
+|---|---|
+| Code vs spec | THM.15 1/3 and 2/3 match spec 14 (navbar, offcanvas, search modal, HTMX mini-cart, no-JS fallback); 3/3 is open. EVT.4 meets its Done-when (e2e `test_manager_events_moderation`); spec 15 now says `VendorEventPolicy` is a custom admin view (#555). ORD.20 parts 1 and 2: trigger-guarded versions, one open amendment, orders never imports the ledger (setting hook), refunds share the PAY.4 code path, `due_by` of 14 days, no 30-day term, fee exemption not settable by hand; the row says 1/4 for the whole of ORD.20 while the PRs split it 1/3 to 3/3 (emails, durable-medium notices, downloads and Manager settings are part 3). TAX.12: gross price equals what checkout charges, the catalog has no tax import (new contract). Migrations orders 0016 to 0019 and ledger 0006 are linear. No vendored file changed. No inline script or style in the delta (the JSON-LD data block is the existing one). |
+| Spec and backlog | `build_docs --check` is fresh. Every D-xx and Q-xx in the delta exists in 92. D-23 and D-42: nothing refers to them; check 33 was wrong to say they are referenced (check 32 had it right): the gaps stay unused. |
+| Docs | `progress.md` had no rows for the delta; added (THM.15, EVT.4, ORD.20, TAX.12, CORE.32 and CORE.33, TRU) and the PR table. `docs/dev/themes.md` gets the ride navbar and overlays; `docs/dev/manager.md` the shop events section. |
+| Gates | Main CI green on 33f50cab and earlier; the run on f8cc3896 was still in progress. `make check` pass. Unit, integration and e2e suites not run locally; CI is the gate. No credentials, real names or hostnames, no TODO without an ID (the two existing ones name CORE.18 and CMP.4). |
+
+Findings and actions:
+
+1. Major, fixed here: no `progress.md` rows for the delta.
+2. Minor, fixed here: `themes.md` and `manager.md` additions; check 33's D-23 and D-42 note corrected.
+3. Minor, open: the ORD.20 spec row is titled 1/4 but the work ships as parts 1/3 to 3/3; call the remaining part by the same names (suggest: lane-a renames the row text on the next spec PR).
+4. Minor, open: TAX.12 has no geolocation step and no business opt-in toggle (spec says "when one exists"), and the JSON-LD `offers` wait for SEO.1; the row stays partial until the feeds exist. CMP.14 UK lead-only check is deferred for ORD.20 (no CMP.14 code yet).
+5. Info: CI on the merge commit was still running at the time of the check; the previous heads are green.
+6. Info: EVT.4's `VendorEventPolicy` is not a Wagtail ViewSet; spec 15 was changed to match.
+
+Check 33 findings 4 (THM.16 e2e widths, closed by #558: review, payment, confirmation, login, MFA verify, TOTP, recovery codes and the levels prompt at 360, 768 and 1280) and 5 (CORE.24, closed by #559: 72 h and 365 day boundaries, idle ceiling, operator write path; the fresh-second-factor enrolment case stays covered by the older tests) are closed.
+
+Human review needed: ORD.20 parts 1 and 2 (orders, payments, ledger: refunds, fee exemption, passkey digest), TAX.12 (tax: the rate shown to consumers, rounding, estimated country, the owner's note), EVT.4 (moderation flow and uploads).
+
+Verdict: GO with follow-ups. No blocker.
+
+### Coherence check 35 (main at 08800668)
+
+Scope: the merges after check 34 (main at f8cc3896): #569 (check 34), #570 (owner answers of 16 November), #577 (ORD.20 part 3a), #580 (clause (l) counsel answer), #585 (Matomo, domains and mail at cutover, MIG.22), #589 (follow-up rows) and #590 (merge train). #573 (D-48 accounting connector) is still open and not in scope.
+
+| Area | Result |
+|---|---|
+| Code vs spec | #577 meets its Done-when for part 3a: Manager draft, preview, revise, discard and apply; the passkey prompt for a critical change (`order_amend_address`, `vendor_refund`, `order_amend_cancel`) is in the CORE.25 critical lists in `session_policy.py` and the shop grants in `accounts/levels.py`; staff tools and customer pages exist; the cancel cause (`vendor_fault`, `customer_request`, `platform_error`) decides the refund fee and the restock; Manager settings live on `PlatformOperator`. Migrations are linear: core 0028 after 0027, ledger 0007 after 0006 (and orders 0019, vendors 0034). `makemigrations --check` finds no change. No inline script or style, no `<script>` or `style=` in the template delta; the `ride` customer order page was updated with the base. The import contracts pass (`make check`). #570, #580, #585 and #589 are spec only. |
+| Spec and backlog | `make docs` gives no diff; `build_docs --check` is fresh. The 14 new rows (CAT.22, CAT.23, VEN.40, TAX.22, ORD.25, I18N.16 to I18N.18, CMS.17, SEO.13 to SEO.15, CMP.34 text, MIG.22) have a Done-when and every dependency exists. IDs are plain numeric: no `X.12b`-style ID is left in `docs/spec` (CAT.5b and SEC.5b only appear as "formerly" and "proposed as" notes). MQ-43, MQ-46 and MQ-47 and D-46 to D-48 exist in 92; Q-08 and Q-91 are owner-decision labels cited in spec 13 only (older register, not in 92). The "1/4" to "4/4" in ORD.20 to ORD.23 is the numbering of four rows, not parts of ORD.20; check 34 finding 3 was a misreading and is closed. |
+| Docs | `progress.md` had rows for #577 (ORD.20 3a, ORD.22) but none for #570, #580, #585 and #589; added with the PR table. The ORD.20 to ORD.23 "spec only" row was stale (ORD.20 and ORD.22 are partly built); split. `audit-trail.md` lists the #577 actions (`orders.amendment_package_cancelled` with the cancel cause, `accounts.session.prompt`, `ledger.refund_fee_excluded` with `customer_requested_cancellation`). `manager.md` and `themes.md` describe the amendment pages. `platform-roles.md` is regenerated and unchanged. |
+| Gates | `make check` pass. CI on main: the run on 08800668 was queued at the time of the check; the previous heads (1776801e and 5fcfc4b1) are green. Unit, integration and e2e suites not run locally; CI is the gate. No credentials, real names or hostnames in the delta; no TODO without an ID. |
+
+Findings and actions:
+
+1. Minor, fixed here: no `progress.md` rows for #570, #580, #585 and #589; the stale ORD.20 to ORD.23 row.
+2. Minor, closed: the "1/4" row label of ORD.20 (it numbers four rows).
+3. Minor, open: TAX.12 stays partial (no geolocation header, no business opt-in toggle until TAX.22, JSON-LD `offers` wait for SEO.1); TAX.22 is the code change that the owner answer asks for.
+4. Minor, open: clause (l) cites the suspension clause as "[x]"; set it to the real letter when the suspension clause gets one (CMP.5, VEN.13).
+5. Minor, open: ORD.20 part 3b (emails, durable-medium notices, downloads) is not built; ORD.21, ORD.23 to ORD.25 are spec only.
+6. Info: the analytics change (Matomo, cookieless, consent-free) depends on counsel's answer (MQ-46); the banner and consent log of SEO.5 stay until then.
+
+Human review needed: ORD.20 3a and ORD.22 (money: the cancel-cause refund-fee rule, restock, the ledger 0007 fee exclusion for a customer's request or a platform error, the passkey for refunds); CMP.34 thresholds (tax); clause (l) and the P2B waiver wording (legal, counsel); Matomo without consent (legal, privacy).
+
+Verdict: GO with follow-ups. No blocker.

@@ -105,3 +105,19 @@ def bs_widget(field: BoundField) -> SafeString:
         widget.attrs.get("class", ""), css, *(["is-invalid"] if field.errors else [])
     )
     return SafeString(field.as_widget(attrs={"class": classes}))
+
+
+@register.filter
+def in_groups(value: object, size: object) -> list[list[object]]:
+    """`value` as consecutive lists of `size` items (the last may be shorter), for a carousel.
+
+    A missing, unreadable or non-positive size means one item per group, so a template with a
+    bad `per_view` still renders every item.
+    """
+    items = list(value) if isinstance(value, list | tuple) else []
+    try:
+        step = int(str(size))
+    except ValueError:
+        step = 1
+    step = step if step > 0 else 1
+    return [items[start : start + step] for start in range(0, len(items), step)]

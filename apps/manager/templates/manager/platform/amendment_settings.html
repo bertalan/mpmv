@@ -1,0 +1,17 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+The order-amendment settings in force (ORD.20 part 3, spec 07 Settings): read from the
+PlatformOperator version the services use, each with a one-line plain explanation. Read-only:
+a change is a new configuration version.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Order change settings" %}</h1>
+  <p class="manager-lead">{% translate "These rules apply to every change of a paid order. They are part of the platform configuration: a change takes effect as a new configuration version." %}</p>
+  <dl class="manager-facts" data-amendment-settings>
+    {% for row in settings_rows %}
+      <dt>{{ row.label }}</dt>
+      <dd><strong>{{ row.value }}</strong>: {{ row.explanation }}</dd>
+    {% endfor %}
+  </dl>
+{% endblock %}

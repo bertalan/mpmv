@@ -628,6 +628,15 @@ def is_vendor_owner(user: AbstractBaseUser | AnonymousUser, vendor: object) -> b
     return member_role(user, vendor) == engine.OWNER
 
 
+def handles_orders(user: AbstractBaseUser | AnonymousUser, vendor: object) -> bool:
+    """Whether `user` is an active member of `vendor` with the ORDERS right now
+    (`settings.SHOP_ORDERS_CHECK`: such a member confirms the shop's amendment refunds and
+    address changes with a passkey, ORD.20)."""
+    if not (isinstance(vendor, Vendor) and isinstance(user, User) and user.is_active):
+        return False
+    return has_vendor_permission(user, vendor, "orders")
+
+
 def has_vendor_permission(user: User, vendor: Vendor, action: str) -> bool:
     """Whether `user` may perform `action` on `vendor` as one of its members.
 

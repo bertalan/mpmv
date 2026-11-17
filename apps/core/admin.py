@@ -31,6 +31,9 @@ from . import flags
 from .audit import audit_context
 from .changeset import diff
 from .models import (
+    DEFAULT_AMENDMENT_ANSWER_HOURS,
+    DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS,
+    DEFAULT_AMENDMENT_COMPARABLE_DELAY_DAYS,
     DEFAULT_REFUND_FEE_SURCHARGE,
     PLATFORM_REFUND_CASE_CHOICES,
     AuditLog,
@@ -50,6 +53,13 @@ from .services import (
     save_image_licence,
 )
 from .session_policy import parse_policy
+
+# ORD.20: an amendment setting left empty in the form takes its default.
+AMENDMENT_DEFAULTS: dict[str, int] = {
+    "amendment_answer_hours": DEFAULT_AMENDMENT_ANSWER_HOURS,
+    "amendment_comparable_delay_days": DEFAULT_AMENDMENT_COMPARABLE_DELAY_DAYS,
+    "amendment_cancel_hold_hours": DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS,
+}
 
 
 class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
@@ -101,6 +111,9 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             "user_contact_languages",
             "logo",
             "official_profiles",
+            "amendment_answer_hours",
+            "amendment_comparable_delay_days",
+            "amendment_cancel_hold_hours",
             "valid_from",
         )
 
@@ -109,6 +122,10 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
         # D-41: an empty surcharge means the default, so a form from before PAY.4 still saves.
         if "refund_fee_surcharge" in self.fields:
             self.fields["refund_fee_surcharge"].required = False
+        # ORD.20: an empty amendment setting means its default, so an older form still saves.
+        for name in AMENDMENT_DEFAULTS:
+            if name in self.fields:
+                self.fields[name].required = False
         # Only the platform logos collection (or one below it), never a vendor's or page image.
         if "logo" not in self.fields:  # a stored row is shown read-only
             return
@@ -118,6 +135,19 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             condition |= Q(collection__path__startswith=path)
         field: Any = self.fields["logo"]
         field.queryset = MediaImage.objects.filter(condition)
+
+    def _amendment_setting(self, name: str) -> int:
+        value: int | None = self.cleaned_data.get(name)
+        return AMENDMENT_DEFAULTS[name] if value is None else value
+
+    def clean_amendment_answer_hours(self) -> int:
+        return self._amendment_setting("amendment_answer_hours")
+
+    def clean_amendment_comparable_delay_days(self) -> int:
+        return self._amendment_setting("amendment_comparable_delay_days")
+
+    def clean_amendment_cancel_hold_hours(self) -> int:
+        return self._amendment_setting("amendment_cancel_hold_hours")
 
     def clean_refund_fee_surcharge(self) -> Decimal:
         value: Decimal | None = self.cleaned_data.get("refund_fee_surcharge")

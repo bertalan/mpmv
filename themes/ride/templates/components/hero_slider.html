@@ -1,0 +1,28 @@
+{% load i18n %}{% comment %}
+Hero slider of the `ride` theme (THM.14): the hero component's slides in a full-bleed Bootstrap
+carousel (slide or `fade`). One `<h1>` per page stays outside the slider: slide titles are
+`<h2>` (or `heading_level`) and the lead a `<p>`. Previous, Pause/Play, Next and the indicators
+are buttons; nothing moves unless `autoplay` is set (then paused on hover and focus, off under
+`prefers-reduced-motion`). The first slide's image is the LCP image, the others load lazily.
+Without JavaScript the slides follow one another.
+
+  {% include "components/hero_slider.html" with id="home-hero" label=_("Highlights") slides=slides only %}
+
+Context:
+- `id`, `label` (required);
+- `slides`: a list of `title`, `text`, `url`, `action`, `secondary_url`, `secondary_action`,
+  `image` or `image_url`, `image_alt`, `image_width`, `image_height` (as components/hero.html);
+- `fade` (cross-fade instead of sliding), `autoplay`, `interval` (ms, default 6000), `heading_level`.
+{% endcomment %}{% with total=slides|length %}<section class="carousel slide ride-carousel ride-hero-slider full-bleed{% if fade %} carousel-fade{% endif %}" id="{{ id }}" aria-roledescription="carousel" aria-label="{{ label }}" data-ride-carousel{% if autoplay %} data-autoplay="{{ interval|default:6000 }}"{% endif %}>
+  <div class="carousel-inner" id="{{ id }}-slides" aria-live="{% if autoplay %}off{% else %}polite{% endif %}">
+    {% for slide in slides %}{% blocktranslate asvar slide_label with count=forloop.counter total=total %}{{ count }} of {{ total }}{% endblocktranslate %}<div class="carousel-item{% if forloop.first %} active{% endif %}" role="group" aria-roledescription="slide" aria-label="{{ slide_label }}">
+      {% include "components/hero.html" with title=slide.title text=slide.text image=slide.image image_url=slide.image_url image_alt=slide.image_alt image_width=slide.image_width image_height=slide.image_height url=slide.url action=slide.action secondary_url=slide.secondary_url secondary_action=slide.secondary_action heading_level=heading_level|default:2 contained=True lazy=forloop.counter0 only %}
+    </div>{% endfor %}
+  </div>
+  {% if total > 1 %}<div class="ride-hero-slider__bar">
+    {% include "components/carousel_controls.html" with id=id autoplay=autoplay only %}
+    <div class="carousel-indicators ride-carousel__indicators">
+      {% for slide in slides %}{% blocktranslate asvar indicator_label with count=forloop.counter total=total %}Go to slide {{ count }} of {{ total }}{% endblocktranslate %}<button type="button" data-bs-target="#{{ id }}" data-bs-slide-to="{{ forloop.counter0 }}"{% if forloop.first %} class="active" aria-current="true"{% endif %} aria-label="{{ indicator_label }}" hidden></button>{% endfor %}
+    </div>
+  </div>{% endif %}
+</section>{% endwith %}
