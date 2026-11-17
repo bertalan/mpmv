@@ -348,7 +348,8 @@ def meta_catalog_feed(lang) -> Response          # Meta Commerce feed
     - the technical setup;
     - the legal basis (art. 122 Codice privacy and art. 5(3) ePrivacy for the device access; art.
       6(1)(f) GDPR for the processing);
-    - the controller, and the hosting provider as processor (art. 28);
+    - the controller, and the hosting provider as processor (art. 28) when a third party hosts
+      the analytics server (this operator hosts it itself, so there is none);
     - 13 months' retention of raw visit data, after which only irreversible aggregates remain.
 
   The rules of the visitor's country apply (DE § 25 TDDDG, FR CNIL, ES LSSI art. 22.2). The
