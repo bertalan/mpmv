@@ -20,6 +20,7 @@ from apps.core.i18n import primary_language
 from apps.orders.models import (
     Order,
     OrderAmendment,
+    OrderEvent,
     OrderLine,
     OrderNumberSequence,
     StockReservation,
@@ -169,6 +170,22 @@ class OrderAmendmentFactory(DjangoModelFactory[OrderAmendment]):
     kind = "minor"
     initiator = "vendor_owner"
     reason = "Out of stock"
+
+
+class OrderEventFactory(DjangoModelFactory[OrderEvent]):
+    """A notice kept on a durable medium (ORD.20 part 3b) about a new vendor order."""
+
+    class Meta:
+        model = OrderEvent
+
+    vendor_order = factory.SubFactory(VendorOrderFactory)
+    order = factory.SelfAttribute("vendor_order.order")
+    kind = "orders.amendment_applied"
+    audience = "customer"
+    language = "en"
+    subject = "Order changed"
+    text = "Hello,"
+    wording_version = "sha256:" + "0" * 64
 
 
 class StockReservationFactory(DjangoModelFactory[StockReservation]):

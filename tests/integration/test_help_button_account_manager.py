@@ -69,6 +69,8 @@ NOT_PAGES = (
     "manager:platform:amendment_apply",
     "manager:platform:amendment_discard",
     "manager:platform:order_cancel",
+    # ORD.20 part 3b-1: POST only, records invoice_issued_at and redirects to the order page.
+    "manager:shop:order_invoice_issued",
     *MODAL_FRAGMENTS,
 )
 

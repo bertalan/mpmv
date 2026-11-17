@@ -1,0 +1,1 @@
+{% load i18n %}{% translate "It is credited within 5 to 10 business days depending on the card issuer, and in any case within 14 days." context "(L)" %}
