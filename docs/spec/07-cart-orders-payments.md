@@ -412,7 +412,7 @@ above and settled how the shipping VAT and a supplement are taxed:
   of the goods.
 
 Regression cases, with exact amounts. **Seed M:** P22 1 × 50.00 net, standard category at 22 %;
-P4 1 × 50.00 net, super-reduced category at 4 %; shipping 10.00 net split 5.00 at 22 % (VAT
+P4 1 × 50.00 net, a 4 % category (books in Italy); shipping 10.00 net split 5.00 at 22 % (VAT
 1.10) and 5.00 at 4 % (VAT 0.20); gross 124.30; commission 10 % of the net goods (10.00). **Seed
 S:** P22 1 × 50.00 net at 22 % and shipping 10.00 net at 22 % (VAT 2.20); gross 73.20. D1 is
 the first payment, D2 the second payment (or the apply date of a minor change).
