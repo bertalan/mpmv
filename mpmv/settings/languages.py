@@ -2,8 +2,11 @@
 
 An ordered list of language codes: the first is the primary (source) language, served without a
 URL prefix; the others get `/<code>/`. The list feeds `LANGUAGES`, `LANGUAGE_CODE` and
-`WAGTAIL_CONTENT_LANGUAGES`. The default is English first, then Italian, German, French and
-Spanish. This module is imported by `base.py` and imports nothing from Django or the apps.
+`WAGTAIL_CONTENT_LANGUAGES`. The default is English first, then Italian: the customer languages.
+German, French and Spanish are AI drafts until the professional review (I18N.19, owner decision
+2026-11-16), so they are not served by default; an operator adds them with `MPMV_LANGUAGES`
+(for example `en,it,de,fr,es` on STAGE for the staff preview).
+This module is imported by `base.py` and imports nothing from Django or the apps.
 
 Unknown codes are not rejected here: a settings module that raises hides the reason behind a
 traceback, so the code is kept (named by itself) and the `core.E911` system check refuses it.
@@ -35,7 +38,10 @@ KNOWN_LANGUAGES: dict[str, str] = {
     "bg": "Български",
 }
 
-DEFAULT_LANGUAGE_CODES: tuple[str, ...] = ("en", "it", "de", "fr", "es")
+# Served to customers when `MPMV_LANGUAGES` is empty (I18N.19 interim guard).
+DEFAULT_LANGUAGE_CODES: tuple[str, ...] = ("en", "it")
+# Every language that has a catalog; the test suite runs on this set (mpmv/settings/test.py).
+ALL_LANGUAGE_CODES: tuple[str, ...] = ("en", "it", "de", "fr", "es")
 
 
 def language_settings(codes: Sequence[str]) -> tuple[str, list[tuple[str, str]]]:

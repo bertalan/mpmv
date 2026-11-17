@@ -16,6 +16,7 @@ from .changeset import ChangeSet
 from .language_engine import LanguagePlan, plan_language_change, settings_conflict
 from .models import LanguageRedirect, SiteLanguages
 from .services import run_mutation
+from .sitemap_version import bump_sitemap_version
 
 CHANGE_ACTION = "language.change"
 STATE_KEY = "site"
@@ -73,6 +74,7 @@ def change_languages(target: Sequence[str], *, ctx: AuditContext, dry_run: bool)
         row.removed = [c for c in dict.fromkeys([*row.removed, *gone]) if c not in plan.new]
         row.codes = list(plan.new)
         row.save()
+        bump_sitemap_version()
         LanguageRedirect.objects.filter(
             old_prefix__in=[_prefix(code, plan) for code in plan.new]
         ).delete()

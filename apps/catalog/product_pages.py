@@ -11,9 +11,10 @@ the other sellers of the same product are CAT.15 (`related`).
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 from django.conf import settings
-from django.db.models import prefetch_related_objects
+from django.db.models import Count, Q, prefetch_related_objects
 
 from apps.core import translations
 from apps.core.models import MediaImage
@@ -202,6 +203,44 @@ def _build(product: Product, language: str) -> ProductPage | None:
     )
 
 
-def related(page: ProductPage) -> Sequence["services.ProductCard"]:
-    """Related products and other sellers: CAT.15 fills this."""
-    return ()
+RELATED_LIMIT = 4
+
+
+def related(page: ProductPage, language: str | None = None) -> Sequence["services.ProductCard"]:
+    """Up to four products sharing the most terms with the page's product (spec 03 §3.1), then
+    in random order. Never the product itself, its upsells, its companion, a product that is
+    not published or of a vendor that is not active. The other sellers of the same product
+    are CAT.15 (not here)."""
+    product = page.product
+    term_ids = list(product.terms.values_list("pk", flat=True))
+    if not term_ids:
+        return ()
+    excluded = [
+        product.pk,
+        *product.upsells.values_list("pk", flat=True),
+        *([product.required_companion_id] if product.required_companion_id else []),
+    ]
+    chosen = list(
+        services.listed_products()
+        .exclude(pk__in=excluded)
+        .filter(terms__pk__in=term_ids)
+        .annotate(shared=Count("terms", filter=Q(terms__pk__in=term_ids)))
+        .order_by("-shared", "?")[:RELATED_LIMIT]
+    )
+    cards = services.product_cards(chosen, language or page.requested)
+    return [card for card in cards if card.url]
+
+
+def gallery_items(page: ProductPage) -> list[dict[str, Any]]:
+    """The gallery as the `components/gallery.html` context: the `image` renders as a
+    `<picture>` (AVIF, WebP, JPEG). No rendition is looked up or created here."""
+    items: list[dict[str, Any]] = []
+    for item in page.gallery:
+        items.append(
+            {
+                "image": item.image,
+                "alt": item.alt,
+                "caption": item.caption,
+            }
+        )
+    return items
