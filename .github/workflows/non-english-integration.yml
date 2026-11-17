@@ -1,0 +1,68 @@
+# I18N.15 (4): informational nightly run of the unit + integration suites with English absent from
+# the site languages (primary Italian, then German). Not a required check and not run per PR: the
+# failure list is triaged by hand. Dispatch is possible only once this file exists on main.
+name: Non-English integration (informational)
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UV_FROZEN: "1"
+  DJANGO_SETTINGS_MODULE: mpmv.settings.test
+  # Throwaway service database with trust auth: no credentials in the repository.
+  DATABASE_URL: postgres://mpmv@localhost:5432/mpmv
+  MPMV_LANGUAGES: it,de
+
+jobs:
+  integration-it-de:
+    name: Integration (MPMV_LANGUAGES=it,de)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mpmv
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mpmv
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mpmv -d mpmv"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync
+      - name: PostgreSQL without fsync
+        run: |
+          psql "$DATABASE_URL" -c "ALTER SYSTEM SET fsync = off" \
+            -c "ALTER SYSTEM SET synchronous_commit = off" \
+            -c "ALTER SYSTEM SET full_page_writes = off" -c "SELECT pg_reload_conf()"
+      - name: Pytest (integration, MPMV_LANGUAGES=it,de)
+        continue-on-error: true
+        run: >-
+          uv run pytest -n auto --dist loadgroup -m integration
+          -p no:cacheprovider -rf --tb=line --junitxml=itde-junit.xml
+          2>&1 | tee itde.log
+      - name: Failure list
+        if: always()
+        run: |
+          grep -E '^(FAILED|ERROR) ' itde.log > itde-failures.txt || true
+          wc -l itde-failures.txt
+      - name: Store reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: itde-integration-report
+          path: |
+            itde-junit.xml
+            itde-failures.txt
+          if-no-files-found: warn

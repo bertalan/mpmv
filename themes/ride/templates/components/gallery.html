@@ -1,0 +1,30 @@
+{% load i18n %}{% comment %}
+Gallery of the `ride` theme (THM.14, replaces base's list): a Bootstrap carousel of the product
+images with a row of thumbnail buttons, Previous, Pause/Play and Next (spec 14 §14.3). Each image
+keeps base's "Enlarge" button and `<dialog>` zoom (opened by base.js). Nothing moves unless
+`autoplay` is set. Without JavaScript all images follow one another and the thumbnails stay
+hidden. Without images a neutral placeholder, hidden from assistive technology, keeps the layout.
+Same context as base's components/gallery.html, plus `autoplay` and `interval`:
+
+  {% include "components/gallery.html" with id="product-images" label=_("Product images") images=images only %}
+
+- `id` (required): a prefix for the ids, unique on the page; `label` (required): the name.
+- `images`: a list of `url`, `alt` (what the image shows), optional `large_url`, `width`, `height`.
+{% endcomment %}{% if images %}{% with total=images|length %}<section class="gallery carousel slide ride-carousel ride-gallery" id="{{ id }}" aria-roledescription="carousel" aria-label="{{ label }}" data-ride-carousel{% if autoplay %} data-autoplay="{{ interval|default:6000 }}"{% endif %}>
+  <div class="carousel-inner" id="{{ id }}-slides" aria-live="{% if autoplay %}off{% else %}polite{% endif %}">
+    {% for image in images %}{% blocktranslate asvar fallback with count=forloop.counter total=total %}{{ label }}, image {{ count }} of {{ total }}{% endblocktranslate %}{% blocktranslate asvar slide_label with count=forloop.counter total=total %}{{ count }} of {{ total }}{% endblocktranslate %}{% firstof image.alt fallback as name %}<div class="carousel-item{% if forloop.first %} active{% endif %}" role="group" aria-roledescription="slide" aria-label="{{ slide_label }}">
+      <img class="ride-gallery__image" src="{{ image.url }}" alt="{{ image.alt }}" width="{{ image.width|default:800 }}" height="{{ image.height|default:800 }}"{% if not forloop.first %} loading="lazy"{% endif %}>
+      <button type="button" class="btn btn-outline-dark ride-gallery__zoom" data-dialog="{{ id }}-{{ forloop.counter }}" aria-haspopup="dialog" hidden>{% include "components/icon.html" with name="zoom" only %}{% translate "Enlarge" %}<span class="visually-hidden">: {{ name }}</span></button>
+      <dialog class="dialog dialog--image" id="{{ id }}-{{ forloop.counter }}" aria-label="{{ name }}">
+        <form method="dialog" class="dialog__header"><button type="submit" class="button button--ghost button--icon dialog__close" aria-label="{% translate 'Close' %}">{% include "components/icon.html" with name="close" only %}</button></form>
+        <img src="{% firstof image.large_url image.url %}" alt="{{ image.alt }}" width="{{ image.width|default:800 }}" height="{{ image.height|default:800 }}" loading="lazy">
+      </dialog>
+    </div>{% endfor %}
+  </div>
+  {% if total > 1 %}<div class="ride-gallery__bar">
+    {% include "components/carousel_controls.html" with id=id autoplay=autoplay only %}
+    <div class="carousel-indicators ride-carousel__indicators ride-gallery__thumbs">
+      {% for image in images %}{% blocktranslate asvar indicator_label with count=forloop.counter total=total %}Show image {{ count }} of {{ total }}{% endblocktranslate %}<button type="button" data-bs-target="#{{ id }}" data-bs-slide-to="{{ forloop.counter0 }}"{% if forloop.first %} class="active" aria-current="true"{% endif %} aria-label="{{ indicator_label }}" hidden><img src="{{ image.url }}" alt="{{ image.alt }}" width="80" height="80" loading="lazy"></button>{% endfor %}
+    </div>
+  </div>{% endif %}
+</section>{% endwith %}{% else %}<section class="gallery" aria-label="{{ label }}"><div class="gallery__placeholder" aria-hidden="true"></div></section>{% endif %}
