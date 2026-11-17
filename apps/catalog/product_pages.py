@@ -4,7 +4,7 @@ Only published data leaves this module: a product that is published (or retired:
 online, spec 03 Rules) of an active vendor, its published texts, its public price (never the
 stored price of an on-request product) and its published companion. The view is a thin adapter.
 
-The gallery has no source yet (`gallery`: CAT.4 adds the product images); related products and
+The gallery is the product's `ProductImage` rows (CAT.4, `gallery`); related products and
 the other sellers of the same product are CAT.15 (`related`).
 """
 
@@ -37,6 +37,8 @@ class VariantChoice:
 class GalleryImage:
     image: MediaImage
     alt: str
+    caption: str = ""
+    is_cover: bool = False
 
 
 @dataclass(frozen=True)
@@ -84,8 +86,30 @@ def _paths(product: Product) -> dict[str, str]:
 
 
 def gallery(product: Product, language: str) -> list[GalleryImage]:
-    """The product's images with their alt text; empty until CAT.4 adds the image model."""
-    return []
+    """The product's images shown in `language` (D-18: a language with dedicated images shows
+    only those, the others the neutral ones), the cover first, with alt text and caption in
+    `language`, or in the source language when it has no published text."""
+    rows = list(
+        product.images.filter(variant__isnull=True)
+        .select_related("image")
+        .prefetch_related("translations")
+    )
+    # An image with no alt text of its own is described by the product title (D-18 fallback to
+    # the source language comes first, in `resolve`): a content image never has an empty alt.
+    named = translations.resolve(product.translations.all(), language).translation
+    fallback = named.title if named is not None and named.title else str(product.sku)
+    shown = []
+    for row in engine.gallery_selection(rows, language):
+        text = translations.resolve(row.translations.all(), language).translation
+        shown.append(
+            GalleryImage(
+                image=row.image,
+                alt=(text.alt_text if text is not None else "") or fallback,
+                caption=text.caption if text is not None else "",
+                is_cover=row.is_cover,
+            )
+        )
+    return shown
 
 
 def _variants(product: Product, language: str, *, on_request: bool) -> list[VariantChoice]:
