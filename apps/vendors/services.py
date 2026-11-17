@@ -69,6 +69,7 @@ from apps.core.services import (
     run_mutation,
     save_audited,
 )
+from apps.core.sitemap_version import bump_sitemap_version
 from apps.core.throttling import ip_bucket
 from apps.core.uploads import UploadRefused, check_document
 from apps.core.validity import next_start_error
@@ -363,6 +364,8 @@ def change_status(
             current.save(update_fields=["status", "updated_at"])
 
         run_mutation(changes, apply, ctx=ctx, action=STATUS_CHANGED, dry_run=dry_run)
+        if not dry_run:
+            bump_sitemap_version()  # I18N.16: the vendor's products enter or leave the sitemaps
         if target == engine.CLOSED:
             _run_closure_hooks(current, changes, ctx=ctx, dry_run=dry_run)
 
@@ -1519,6 +1522,8 @@ def reopen_vendor(
             current.save(update_fields=["status", "onboarding_round", "updated_at"])
 
         run_mutation(changes, apply, ctx=ctx, action=REOPENED, dry_run=dry_run)
+        if not dry_run:
+            bump_sitemap_version()  # I18N.16
         _run_closure_hooks(current, changes, ctx=ctx, dry_run=dry_run)
 
     if not dry_run:
