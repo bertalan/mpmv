@@ -1341,6 +1341,10 @@ msgstr "Achat pour une entreprise"
 msgid "Button text"
 msgstr "Texte du bouton"
 
+#: apps/events/templates/events/_subscribe.html
+msgid "Calendar address to copy"
+msgstr "Adresse du calendrier à copier"
+
 #: apps/manager/event_block_forms.py
 msgid "Call to action"
 msgstr "Appel à l'action"
@@ -1400,9 +1404,6 @@ msgstr ""
 #: apps/manager/forms.py
 msgid "Cancellation policy"
 msgstr "Conditions d'annulation"
-#: apps/events/templates/events/_subscribe.html
-msgid "Calendar address to copy"
-msgstr "Adresse du calendrier à copier"
 
 #: apps/events/templates/events/_summary.html apps/events/templates/events/event_calendar.html
 #: apps/events/templates/events/event_page.html apps/orders/customer_views.py
@@ -2243,6 +2244,10 @@ msgstr "terminé"
 msgid "Download my data"
 msgstr "Télécharger mes données"
 
+#: apps/events/templates/events/_subscribe.html
+msgid "Download the calendar (ICS)"
+msgstr "Télécharger le calendrier (ICS)"
+
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download your shop profile, products and order amounts as a JSON file."
 msgstr ""
@@ -2420,9 +2425,6 @@ msgstr "Erreur"
 #: apps/manager/templates/manager/shop/events.html
 msgid "Event"
 msgstr "Événement"
-#: apps/events/templates/events/_subscribe.html
-msgid "Download the calendar (ICS)"
-msgstr "Télécharger le calendrier (ICS)"
 
 #: apps/events/templates/events/_links.html
 msgid "Event views"
@@ -2430,7 +2432,6 @@ msgstr "Affichages des événements"
 
 #: apps/events/templates/events/_results.html apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/events.html
-#: apps/events/templates/events/_results.html
 msgid "Events"
 msgstr "Événements"
 
@@ -5491,6 +5492,10 @@ msgstr "Rôles"
 msgid "Row"
 msgstr "Ligne"
 
+#: apps/events/templates/events/_subscribe.html
+msgid "RSS feed"
+msgstr "Flux RSS"
+
 #: apps/manager/forms.py apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
@@ -5504,9 +5509,6 @@ msgstr "Conditions de vente de %(name)s"
 #: apps/orders/templates/orders/_legal_recap.html
 msgid "Sales terms of %(name)s (version %(number)s of %(date)s), print or download"
 msgstr "Conditions de vente de %(name)s (version %(number)s du %(date)s), imprimer ou télécharger"
-#: apps/events/templates/events/_subscribe.html
-msgid "RSS feed"
-msgstr "Flux RSS"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
@@ -6147,6 +6149,14 @@ msgstr "Envoyer"
 #: apps/manager/templates/manager/shop/events.html
 msgid "Submit for review"
 msgstr "Soumettre pour vérification"
+
+#: apps/events/templates/events/_subscribe.html
+msgid "Subscribe"
+msgstr "S'abonner"
+
+#: apps/events/templates/events/_subscribe.html
+msgid "Subscribe in your calendar app"
+msgstr "S'abonner dans votre application de calendrier"
 
 #: apps/manager/amendment_views.py
 msgid "Substantial change: it needs the customer's acceptance, which is not available yet"
@@ -8531,13 +8541,6 @@ msgid ""
 msgstr ""
 "Les conditions ont changé pendant que tu passais commande. Lis les nouvelles versions et coche à "
 "nouveau les cases pour passer la commande."
-#: apps/events/templates/events/_subscribe.html
-msgid "Subscribe"
-msgstr "S'abonner"
-
-#: apps/events/templates/events/_subscribe.html
-msgid "Subscribe in your calendar app"
-msgstr "S'abonner dans votre application de calendrier"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
