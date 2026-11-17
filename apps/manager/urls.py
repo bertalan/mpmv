@@ -11,6 +11,7 @@ from . import (
     amendment_views,
     event_block_views,
     event_views,
+    fitment_views,
     media,
     notice_views,
     sales_terms_views,
@@ -206,6 +207,30 @@ platform = (
             "terminations/<uuid:public_id>/",
             termination_views.TerminationDetailView.as_view(),
             name="termination",
+        ),
+        # FIT.1 part 2: the fitment scheme, its categories and its nodes.
+        path("fitment/scheme/", fitment_views.SchemeView.as_view(), name="fitment_scheme"),
+        path(
+            "fitment/categories/",
+            fitment_views.CategoryList.as_view(),
+            name="fitment_categories",
+        ),
+        path("fitment/nodes/", fitment_views.NodeList.as_view(), name="fitment_nodes"),
+        path(
+            "fitment/nodes/proposals/",
+            fitment_views.ProposalList.as_view(),
+            name="fitment_proposals",
+        ),
+        path("fitment/nodes/new/", fitment_views.NodeCreateView.as_view(), name="fitment_node_new"),
+        path(
+            "fitment/nodes/<uuid:public_id>/",
+            fitment_views.NodeDetailView.as_view(),
+            name="fitment_node",
+        ),
+        path(
+            "fitment/nodes/<uuid:public_id>/merge/",
+            fitment_views.NodeMergeView.as_view(),
+            name="fitment_node_merge",
         ),
     ],
     "platform",

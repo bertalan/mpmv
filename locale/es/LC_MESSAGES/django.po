@@ -8,6 +8,12 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#: apps/events/templates/events/_results.html
+msgid "%(counter)s event"
+msgid_plural "%(counter)s events"
+msgstr[0] "%(counter)s evento"
+msgstr[1] "%(counter)s eventos"
+
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "%(vendor_name)s shipped its part of order %(order_number)s."
@@ -32,14 +38,63 @@ msgstr "%(vendor_name)s: nuevo pedido pagado %(order_number)s para enviar:"
 msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
 msgstr "%(vendor_name)s: pedido %(order_number)s cancelado, no enviar"
 
+#: apps/events/templates/events/event_page.html
+msgid "Add to calendar"
+msgstr "Añadir al calendario"
+
+#: apps/events/templates/events/_filters.html
+msgid "All types"
+msgstr "Todos los tipos"
+
+#: apps/events/templates/events/_filters.html
+msgid "All vendors"
+msgstr "Todos los vendedores"
+
+#: apps/events/templates/events/_filters.html
+msgid "Any month"
+msgstr "Cualquier mes"
+
+#: apps/events/templates/events/event_page.html
+msgid "Attendance"
+msgstr "Asistencia"
+
+#: apps/events/templates/events/event_page.html
+msgid "Booth %(booth)s"
+msgstr "Stand %(booth)s"
+
+#: apps/events/templates/events/_summary.html apps/events/templates/events/event_calendar.html
+#: apps/events/templates/events/event_page.html
+msgid "Cancelled"
+msgstr "Cancelado"
+
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Transportista: %(carrier)s. Número de seguimiento: %(tracking_number)s."
 
+#: apps/events/templates/events/_filters.html
+msgid "Clear filters"
+msgstr "Quitar los filtros"
+
+#: apps/events/templates/events/_links.html
+msgid "Event views"
+msgstr "Vistas de los eventos"
+
+#: apps/events/listing.py apps/events/templates/events/_results.html
+msgid "Events"
+msgstr "Eventos"
+
+#: apps/events/templates/events/event_calendar.html
+msgid "Events in %(month)s"
+msgstr "Eventos de %(month)s"
+
 #: apps/tax/prices.py
 msgid "excl. VAT"
 msgstr "IVA no incluido"
+
+#: apps/events/templates/events/_filters.html
+msgid "Filter events"
+msgstr "Filtrar los eventos"
 
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
@@ -75,13 +130,57 @@ msgstr "Hola %(customer_name)s,"
 msgid "Hello,"
 msgstr "Hola,"
 
+#: apps/events/models.py
+msgid "In person"
+msgstr "Presencial"
+
+#: apps/events/models.py
+msgid "In person and online"
+msgstr "Presencial y en línea"
+
 #: apps/tax/prices.py
 msgid "Indicative price. Final amount at checkout."
 msgstr "Precio orientativo. Importe final al finalizar la compra."
 
+#: apps/events/templates/events/event_page.html
+msgid "Join online"
+msgstr "Participar en línea"
+
+#: apps/events/templates/events/_filters.html
+msgid "Month"
+msgstr "Mes"
+
+#: apps/events/templates/events/_links.html
+msgid "Month calendar"
+msgstr "Calendario del mes"
+
 #: apps/orders/templates/email/orders/vendor_new_order/subject.txt
 msgid "New paid order %(order_number)s"
 msgstr "Nuevo pedido pagado %(order_number)s"
+
+#: themes/base/templates/components/pagination.html
+msgid "Next"
+msgstr "Siguiente"
+
+#: apps/events/templates/events/event_calendar.html
+msgid "Next month"
+msgstr "Mes siguiente"
+
+#: apps/events/templates/events/event_index_page.html
+msgid "No events are planned at the moment."
+msgstr "Por ahora no hay eventos previstos."
+
+#: apps/events/templates/events/event_calendar.html
+msgid "No events this month."
+msgstr "Ningún evento este mes."
+
+#: apps/events/templates/events/event_past.html
+msgid "No past events."
+msgstr "Ningún evento pasado."
+
+#: apps/events/models.py apps/events/templates/events/event_page.html
+msgid "Online"
+msgstr "En línea"
 
 #: apps/orders/templates/email/orders/order_cancelled/subject.txt
 msgid "Order %(order_number)s was cancelled"
@@ -119,9 +218,41 @@ msgstr "Pedido %(order_number)s: confirmación de %(vendor_name)s"
 msgid "Order %(order_number)s: part of your order was cancelled"
 msgstr "Pedido %(order_number)s: una parte de tu pedido se ha cancelado"
 
+#: apps/events/models.py
+msgid "Other"
+msgstr "Otro"
+
+#: themes/base/templates/components/pagination.html
+msgid "Page %(number)s"
+msgstr "Página %(number)s"
+
+#: themes/base/templates/components/pagination.html
+msgid "Page %(page)s of %(count)s"
+msgstr "Página %(page)s de %(count)s"
+
+#: themes/base/templates/components/pagination.html
+msgid "Pagination"
+msgstr "Paginación"
+
+#: apps/events/templates/events/_links.html apps/events/templates/events/event_past.html
+msgid "Past events"
+msgstr "Eventos pasados"
+
 #: apps/orders/templates/email/orders/payment_confirmed/subject.txt
 msgid "Payment received for order %(order_number)s"
 msgstr "Pago recibido por el pedido %(order_number)s"
+
+#: themes/base/templates/components/pagination.html
+msgid "Previous"
+msgstr "Anterior"
+
+#: apps/events/templates/events/event_calendar.html
+msgid "Previous month"
+msgstr "Mes anterior"
+
+#: apps/events/models.py
+msgid "Promotion"
+msgstr "Promoción"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 msgid "Read this version online"
@@ -130,6 +261,10 @@ msgstr "Leer esta versión en línea"
 #: apps/orders/templates/email/orders/order_received/body.txt
 msgid "Read this version online:"
 msgstr "Leer esta versión en línea:"
+
+#: apps/events/templates/events/event_page.html
+msgid "Report this event"
+msgstr "Denunciar este evento"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
@@ -147,6 +282,10 @@ msgstr "Enviar a:"
 msgid "Shipping: %(shipping)s EUR"
 msgstr "Envío: %(shipping)s EUR"
 
+#: apps/events/templates/events/_filters.html
+msgid "Show events"
+msgstr "Mostrar los eventos"
+
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 msgid "The terms you accepted, kept here for your records."
@@ -157,6 +296,22 @@ msgstr "Las condiciones que aceptaste, guardadas aquí para tus archivos."
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Total: %(total)s EUR"
 msgstr "Total: %(total)s EUR"
+
+#: apps/events/models.py
+msgid "Trade fair or meeting"
+msgstr "Feria o encuentro"
+
+#: apps/events/templates/events/_filters.html apps/events/templates/events/event_page.html
+msgid "Type"
+msgstr "Tipo"
+
+#: apps/events/templates/events/_links.html
+msgid "Upcoming events"
+msgstr "Próximos eventos"
+
+#: apps/events/templates/events/_filters.html apps/events/templates/events/event_page.html
+msgid "Vendor"
+msgstr "Vendedor"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
@@ -184,3 +339,11 @@ msgid ""
 msgstr ""
 "Hemos recibido tu pago de %(total)s EUR por el pedido %(order_number)s. Cada vendedor preparará su"
 " parte y recibirás un mensaje cuando se envíe."
+
+#: apps/events/templates/events/event_page.html
+msgid "When"
+msgstr "Cuándo"
+
+#: apps/events/templates/events/event_page.html
+msgid "Where"
+msgstr "Dónde"

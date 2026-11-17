@@ -801,6 +801,36 @@ ENDPOINTS: dict[str, Access] = {
         "permission, so a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
+    "manager:platform:fitment_scheme": StaffOnly(
+        "Fitment scheme (FIT.1): platform data, one scheme per installation, no vendor data; "
+        "Configuration and tax writes, the owner reads, every other role and a vendor member get "
+        "404 (apps/manager/tests/integration/test_fitment_pages.py)."
+    ),
+    "manager:platform:fitment_categories": StaffOnly(
+        "Categories expected to declare fitment (FIT.1): platform data, no vendor data; "
+        "Configuration and tax writes, Catalog and the owner read, a vendor member gets 404."
+    ),
+    "manager:platform:fitment_nodes": StaffOnly(
+        "Fitment nodes (FIT.1): the shared vocabulary, not vendor-owned; Catalog and moderation "
+        "writes, Support and the owner read, a vendor member gets 404."
+    ),
+    "manager:platform:fitment_proposals": StaffOnly(
+        "Proposed fitment nodes (FIT.1): the review queue of the Catalog and moderation role; a "
+        "vendor member gets 404."
+    ),
+    "manager:platform:fitment_node_new": StaffOnly(
+        "Add a fitment node (FIT.1): Catalog and moderation only; a vendor member gets 404."
+    ),
+    "manager:platform:fitment_node": StaffOnly(
+        "One fitment node (FIT.1): the shared vocabulary, not vendor-owned; Catalog and "
+        "moderation writes, a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "manager:platform:fitment_node_merge": StaffOnly(
+        "Merge of one fitment node (FIT.1): Catalog and moderation only, shown as a dry run "
+        "first; a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
     "subprocessors": NoVendorData(
         "Sub-processor register (CMP.4): static reviewed data, the same for every visitor."
     ),
@@ -907,6 +937,11 @@ ENDPOINTS: dict[str, Access] = {
     "dsa_contact_points": NoVendorData(
         "DSA points of contact (CMP.5): the platform operator's own contact data, the same for "
         "every visitor; no vendor data."
+    ),
+    "events_resource": NoVendorData(
+        "File-like routes of public event pages (EVT.6): the single-event ICS of a published "
+        "event, the same for every visitor; hidden events are a 404.",
+        kwargs={"path": "events/no-such-event/calendar.ics"},
     ),
     "wagtail_serve": NoVendorData(
         "Public CMS pages (home, static pages); no vendor data until the CMS.4 landing pages.",
