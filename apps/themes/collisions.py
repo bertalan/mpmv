@@ -51,7 +51,8 @@ ALLOWED_COLLISIONS: Mapping[str, str] = {
     "breadcrumb": _MAPPED,
     "card": _MAPPED,
     "carousel": (
-        "ride ships no carousel markup and maps nothing for it; the base rule wins if one is added"
+        "ride's Bootstrap carousels (hero slider, strip, gallery) carry `.carousel` too, so base's "
+        "scroll-snap grid is reset for them in themes/ride/static/themes/ride/css/35-carousels.css"
     ),
     "pagination": _MAPPED,
     "table": _MAPPED,

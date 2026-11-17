@@ -51,7 +51,9 @@ def grant(amendment: OrderAmendment, actor: Any) -> str:
 
 def staff_user() -> Any:
     staff = UserFactory.create(is_staff=True)
-    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    staff.user_permissions.add(
+        *Permission.objects.filter(codename__in=["view_all_vendors", "platform_support"])
+    )
     return staff
 
 
@@ -276,3 +278,59 @@ def test_the_digest_changes_with_the_shop_alone(monkeypatch: pytest.MonkeyPatch)
         "the same amendment confirmed for another shop must have another digest",
         "the digest stayed the same",
     )
+
+
+# --- the operator's settings (ORD.20 part 3) ----------------------------------------------------
+
+
+def _configure(**values: Any) -> None:
+    from apps.core.models import PlatformOperator
+    from apps.core.services import configure_platform_operator, current_operator
+
+    latest = current_operator(NOW)
+    skip = {"id", "public_id", "created_at", "updated_at", "valid_to", "logo"}
+    new = PlatformOperator(
+        **{
+            f.name: getattr(latest, f.name)
+            for f in PlatformOperator._meta.concrete_fields
+            if f.name not in skip
+        }
+    )
+    new.valid_from = NOW - dt.timedelta(days=1)
+    for name, value in values.items():
+        setattr(new, name, value)
+    configure_platform_operator(new, ctx=CTX)
+
+
+def test_the_code_defaults_are_the_configuration_defaults() -> None:
+    from apps.core import models as core
+
+    assert core.DEFAULT_AMENDMENT_ANSWER_HOURS == am.DEFAULT_ANSWER_HOURS == 72, plainly(
+        "the answer time must default to 72 hours in the code and the configuration",
+        "they differ",
+    )
+    assert core.DEFAULT_AMENDMENT_COMPARABLE_DELAY_DAYS == am.DEFAULT_COMPARABLE_DELAY_DAYS == 2
+    assert core.DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS == am.DEFAULT_CANCEL_HOLD_HOURS == 24
+    rules = amendments.amendment_settings(NOW)
+    found = (rules.answer_hours, rules.comparable_delay_days, rules.cancel_hold_hours)
+    assert found == (72, 2, 24), plainly(
+        "a fresh configuration must give 72 h, 2 days and 24 h", f"it gives {rules}"
+    )
+
+
+def test_the_comparable_delay_is_read_from_the_configuration() -> None:
+    sub = seed()
+    method(sub.vendor, "slower", "10.00", 7)  # 2 days slower than the 5 of the seed
+    _configure(amendment_comparable_delay_days=1)
+    amendment, _ = draft(sub, am.ChangeCarrier(am.ShippingOffer("slower", "", D("0"))))
+    assert amendment is not None
+    assert amendment.kind == "substantial", plainly(
+        "with a comparable delay of 1 day, a carrier 2 days slower must be substantial",
+        f"it was classified {amendment.kind}",
+    )
+
+
+def test_the_shipping_hold_is_read_from_the_configuration() -> None:
+    _configure(amendment_cancel_hold_hours=6)
+    rules = amendments.amendment_settings(NOW)
+    assert rules.cancel_hold_hours == 6, plainly("the hold must be 6 hours", f"it is {rules}")

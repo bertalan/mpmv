@@ -1,0 +1,33 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Order changes (ORD.20 part 3, Support and the platform owner): find a paid order by its number,
+then open one of its packages to change the carrier, correct the address on the customer's
+request or cancel the package with a full refund. A GET search writes nothing.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Order changes" %}</h1>
+  <p class="manager-lead">{% translate "Find an order by its number. Each seller's package of the order is changed on its own page, with a note and your passkey." %}</p>
+  <form method="get" action="{% url 'manager:platform:orders' %}" class="manager-form" role="search">
+    <div class="field">
+      <label for="order-number">{% translate "Order number" %}</label>
+      <input type="text" id="order-number" name="number" value="{{ number }}" maxlength="40">
+    </div>
+    {% include "components/button.html" with label=_("Find the order") type="submit" variant="secondary" only %}
+  </form>
+  {% if searched %}
+    {% if rows %}
+      <div class="table-scroll" role="region" aria-labelledby="packages-caption" tabindex="0">
+        <table class="table">
+          <caption id="packages-caption">{% blocktranslate %}Packages of order {{ number }}{% endblocktranslate %}</caption>
+          <thead><tr><th scope="col">{% translate "Shop" %}</th><th scope="col">{% translate "Status" %}</th></tr></thead>
+          <tbody>
+            {% for row in rows %}<tr><th scope="row"><a href="{{ row.url }}">{{ row.vendor }}</a></th><td>{{ row.state }}</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p>{% translate "No order has this number." %}</p>
+    {% endif %}
+  {% endif %}
+{% endblock %}

@@ -104,12 +104,17 @@ class RefundChannel(models.TextChoices):
 
 class FeeExclusionReason(models.TextChoices):
     """Why a refund event carries no refund fee besides a platform error (L-10, its own flag).
-    Set by the amendment refund service only, never from a form or an API field."""
+    Set by the amendment refund and package-cancellation services only, never from a form field
+    or an API field."""
 
     NONE = "", "None"
     CUSTOMER_REQUESTED_AMENDMENT = (
         "customer_requested_amendment",
         "Amendment the customer asked for (no refund fee)",
+    )
+    CUSTOMER_REQUESTED_CANCELLATION = (
+        "customer_requested_cancellation",
+        "Package cancelled by staff because the customer asked (no refund fee)",
     )
 
 
@@ -211,9 +216,19 @@ class Refund(models.Model):
                 condition=models.Q(fee_exclusion_reason__in=FeeExclusionReason.values),
                 name="ledger_refund_fee_exclusion_reason_valid",
             ),
+            # Each exclusion only on the refund it belongs to: an amendment the customer asked
+            # for, or a whole package cancelled by staff because the customer asked (ORD.20).
             models.CheckConstraint(
-                condition=models.Q(fee_exclusion_reason="") | models.Q(amendment__isnull=False),
-                name="ledger_refund_fee_exclusion_needs_amendment",
+                condition=models.Q(fee_exclusion_reason="")
+                | models.Q(
+                    fee_exclusion_reason="customer_requested_amendment", amendment__isnull=False
+                )
+                | models.Q(
+                    fee_exclusion_reason="customer_requested_cancellation",
+                    cause="cancel_package",
+                    amendment__isnull=True,
+                ),
+                name="ledger_refund_fee_exclusion_bound_to_its_refund",
             ),
             models.CheckConstraint(
                 condition=models.Q(fee_exclusion_reason="") | models.Q(refund_fee=0),
