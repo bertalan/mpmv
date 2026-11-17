@@ -67,6 +67,7 @@ For parallel work (worktrees, agents), set `MPMV_TEST_DB_NAME=test_mpmv_<branch>
 - Human line-by-line review for anything touching tax, payments, ledger, orders or security.
 - No secrets in code, fixtures or docs. Config comes from environment variables only.
 - Spec and ADRs are updated if behaviour or decisions changed.
+- A PR that adds a signed-in screen or a page type adds its help files in the five languages (`help/<lang>/...`, [help-content](docs/dev/help-content.md)); the coverage sweep fails otherwise.
 
 ## Parallel tests
 

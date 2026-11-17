@@ -28,7 +28,11 @@ case "$role" in
     exec python manage.py procrastinate worker "$@"
     ;;
   migrate)
-    exec python manage.py migrate --noinput "$@"
+    python manage.py migrate --noinput "$@" || exit $?
+    # ARC.36: the help files into the help entries (idempotent). A bad help file is reported but
+    # never blocks a release: the test suite is what keeps the files valid.
+    python manage.py sync_help || echo "sync_help failed; help entries not updated" >&2
+    exit 0
     ;;
   manage)
     exec python manage.py "$@"

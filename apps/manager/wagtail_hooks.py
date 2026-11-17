@@ -12,6 +12,7 @@ from collections.abc import Collection
 from typing import Any
 
 from django.utils.translation import gettext_lazy as _
+from wagtail.admin.forms import WagtailAdminModelForm
 from wagtail.permission_policies.base import BasePermissionPolicy
 from wagtail.permissions import register_permission_policy
 from wagtail.snippets.models import register_snippet
@@ -47,12 +48,24 @@ class HelpEntryPermissionPolicy(BasePermissionPolicy):  # type: ignore[misc]  # 
 register_permission_policy(HelpEntry, HelpEntryPermissionPolicy(HelpEntry))
 
 
+class HelpEntryForm(WagtailAdminModelForm):  # type: ignore[misc]  # Wagtail is untyped
+    """A help row that comes from a repository file (ARC.36) is read-only: the file wins and the
+    next sync would overwrite an edit. Rows staff made stay editable."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.source == "file":
+            for field in self.fields.values():
+                field.disabled = True
+
+
 class HelpEntryViewSet(SnippetViewSet):  # type: ignore[misc]  # Wagtail is untyped
     model = HelpEntry
+    base_form_class = HelpEntryForm
     icon = "help"
     menu_label = _("Help texts")
     add_to_admin_menu = True
-    list_display = ("title", "kind", "key", "locale")
+    list_display = ("title", "kind", "key", "locale", "source")
     list_filter = ("kind", "locale")
     search_fields = ("title", "key")
 
