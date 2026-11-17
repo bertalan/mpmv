@@ -1131,39 +1131,3 @@ def manufacturer_node(
 def brand_graph(nodes: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     """The `@graph` document of a brand page."""
     return {"@context": SCHEMA_ORG, "@graph": [dict(node) for node in nodes]}
-
-
-# --- Product structured data (CAT.7, spec 10 SEO.7)
-
-PRODUCT_FRAGMENT = "#product"
-
-
-def product_node(
-    *,
-    url: str,
-    name: str,
-    sku: str,
-    description: str = "",
-    brand_id: str = "",
-    mpn: str = "",
-    gtin: str = "",
-) -> dict[str, Any]:
-    """The schema.org `Product` node of a product page. The brand is a reference to the brand
-    page's node (CAT.20), never a copy. No `offers` here: the gross consumer price comes from
-    `apps.tax.prices.consumer_price` (TAX.12), which SEO.1 adds, and an on-request product has
-    none; an empty value is left out."""
-    optional: dict[str, Any] = {
-        "description": description,
-        "brand": {"@id": brand_id} if brand_id else "",
-        "mpn": mpn,
-        "gtin": gtin,
-    }
-    node: dict[str, Any] = {
-        "@type": "Product",
-        "@id": f"{url}{PRODUCT_FRAGMENT}",
-        "url": url,
-        "name": name,
-        "sku": sku,
-    }
-    node.update({key: value for key, value in optional.items() if value})
-    return node
