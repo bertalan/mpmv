@@ -2813,7 +2813,7 @@ msgstr "Nascosto dalla piattaforma."
 msgid "Hidden by the platform: %(reason)s"
 msgstr "Nascosto dalla piattaforma: %(reason)s"
 
-#: apps/manager/site_map.py apps/seo/product_jsonld.py
+#: apps/manager/site_map.py apps/seo/page_builders.py apps/seo/product_jsonld.py
 msgid "Home"
 msgstr "Home"
 

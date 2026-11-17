@@ -7,6 +7,7 @@ words what was expected and what happened (owner, 2026-11-16).
 """
 
 import datetime as dt
+import re
 from decimal import Decimal
 from typing import Any
 
@@ -14,6 +15,7 @@ import pytest
 from django.db import IntegrityError, connection, transaction
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.translation import gettext
 
 from apps.accounts.tests.factories import UserFactory
 from apps.core import services as core_services
@@ -291,7 +293,14 @@ def test_a_hold_shorter_than_the_a2_minimum_is_refused(
     """Counsel (2026-11-17): the A2 date is never less than the minimum window after the notice."""
     sub = place_seed(stripe)
     PlatformOperator.objects.update(amendment_cancel_hold_hours=amendments.A2_MIN_WINDOW_HOURS - 1)
-    with pytest.raises(amendments.AmendmentRefused, match="at least 24 hours"):
+    # The refusal follows the active language (I18N.15): compare with the translated text.
+    refusal = gettext(
+        "The customer must have at least %(hours)s hours to read the notice and cancel the "
+        "rest before the seller may ship, but the shipping hold is set to %(set)s hours: "
+        "raise the hold in the amendment settings."
+    ) % {"hours": 24, "set": amendments.A2_MIN_WINDOW_HOURS - 1}
+    assert amendments.A2_MIN_WINDOW_HOURS == 24, "counsel's A2 minimum is 24 hours"
+    with pytest.raises(amendments.AmendmentRefused, match=re.escape(refusal)):
         remove_b(sub)
     sub.refresh_from_db()
     assert getattr(sub.current_version, "number", None) == 1, plainly(

@@ -2,10 +2,9 @@
 {% load wagtailcore_tags wagtailimages_tags image_credits cms_tags %}
 {% comment %}
 Blog article (CMS.3): title, date and author, the main image and the body. The featured links
-of the body also show product cards. The head carries the BlogPosting, its author pointing at
-the Person of the author page.
+of the body also show product cards. The layout head carries the BlogPosting in the page graph
+(SEO.7), its author pointing at the Person of the author page.
 {% endcomment %}
-{% block head %}{% jsonld_script jsonld %}{% endblock %}
 {% block page_content %}
   <article>
     <h1>{{ page.title }}</h1>

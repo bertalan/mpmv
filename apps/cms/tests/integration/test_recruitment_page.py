@@ -71,7 +71,8 @@ def test_the_page_has_no_inline_scripts_or_styles(client: Client, seeded: SeedRe
     VendorRecruitmentPageFactory.create(title="Sell with us")
     html = client.get("/sell-with-us/").content.decode()
     # The base layout loads same-origin script files (THM.3); none is inline.
-    assert not re.search(r"<script\b(?![^>]*\ssrc=)", html)
+    # (a JSON-LD data block never executes; the CSP lint allows exactly this type).
+    assert not re.search(r'<script\b(?![^>]*\ssrc=)(?!\s+type="application/ld\+json">)', html)
     assert "<style" not in html
     assert "style=" not in html
 

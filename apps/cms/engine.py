@@ -82,6 +82,17 @@ def faq_page_jsonld(questions: Iterable[tuple[str, str]]) -> dict[str, Any]:
     }
 
 
+def faq_questions(page: Any) -> list[tuple[str, str]]:
+    """The (question, answer HTML) pairs of every FAQ block of `page`, in order (spec 10: one
+    FAQPage per page)."""
+    return [
+        (item["question"], str(item["answer"]))
+        for block in getattr(page, "body", None) or []
+        if block.block_type == "faq"
+        for item in block.value["items"]
+    ]
+
+
 def profile_links(urls: Iterable[str]) -> list[str]:
     """The https profile links without a user name or password, each once (same link up to host
     case, IDN form and a trailing slash), Wikidata first."""
@@ -93,38 +104,6 @@ def profile_links(urls: Iterable[str]) -> list[str]:
         seen,
         key=lambda u: urlsplit(u).hostname not in {"wikidata.org", "www.wikidata.org"},
     )
-
-
-def organization_jsonld(
-    name: str,
-    url: str,
-    support_email: str = "",
-    logo_url: str = "",
-    profiles: Iterable[str] = (),
-) -> dict[str, Any]:
-    """A minimal schema.org Organization for the platform operator (SEO.8 follow-up).
-
-    SEO.7 replaces it with the shared `@graph` node. `sameAs` lists the operator's verified https
-    profiles and `logo` its logo, each only when set; the contact point is the public support
-    address.
-    """
-    node: dict[str, Any] = {
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        "name": name,
-        "url": url,
-    }
-    if logo_url:
-        node["logo"] = logo_url
-    if links := profile_links(profiles):
-        node["sameAs"] = links
-    if support_email:
-        node["contactPoint"] = {
-            "@type": "ContactPoint",
-            "contactType": "customer support",
-            "email": support_email,
-        }
-    return node
 
 
 def jsonld_text(data: Mapping[str, Any]) -> str:

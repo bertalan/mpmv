@@ -6,6 +6,7 @@ says in plain words what was expected and what happened (owner, 2026-11-16: cont
 """
 
 import datetime as dt
+import re
 from decimal import Decimal
 
 import pytest
@@ -246,12 +247,16 @@ def test_a_removal_that_would_raise_the_gross_is_substantial() -> None:
 
 
 def test_removing_every_line_is_refused_with_a_plain_reason() -> None:
-    with pytest.raises(am.AmendmentRefused, match="cancel the package"):
+    # The engine's refusals follow the active language (I18N.15): compare with the message as
+    # the engine renders it, not with English text.
+    reason = am.gettext("An amendment cannot remove every line: cancel the package instead.")
+    with pytest.raises(am.AmendmentRefused, match=re.escape(reason)):
         am.recompute_vendor_order(seed(), [am.RemoveLine("A"), am.RemoveLine("B")], ctx())
 
 
 def test_an_unknown_line_is_refused() -> None:
-    with pytest.raises(am.AmendmentRefused, match="no line"):
+    reason = am.gettext("The order has no line %(key)r in its current version.") % {"key": "Z"}
+    with pytest.raises(am.AmendmentRefused, match=re.escape(reason)):
         am.recompute_vendor_order(seed(), [am.RemoveLine("Z")], ctx())
 
 
@@ -358,10 +363,25 @@ def test_a_territory_change_re_taxes_every_line_on_the_amendment_date() -> None:
 # --- roles and serialisation -------------------------------------------------------------------
 
 
+# The English source of the staff refusal; the tests compare with it in the active language.
+STAFF_SCOPE_REFUSAL = (
+    "Platform staff may only change the carrier, or the address when the customer asks; "
+    "products, quantities, prices and delivery times are changed by the vendor, who is "
+    "the seller."
+)
+
+
+def test_the_staff_refusal_names_prices_and_delivery_times() -> None:
+    assert "prices" in STAFF_SCOPE_REFUSAL
+    assert "delivery times" in STAFF_SCOPE_REFUSAL
+
+
 def test_staff_may_not_change_prices() -> None:
     error = am.staff_change_error(am.SUPPORT, [am.ChangePrice("A", D("1.00"))])
     assert error is not None, plainly("Support changing a price must be refused", "it was allowed")
-    assert "prices" in error, plainly("the refusal must name prices", f"it said {error!r}")
+    assert error == am.gettext(STAFF_SCOPE_REFUSAL), plainly(
+        "the refusal must say that prices are the vendor's (spec 07 roles)", f"it said {error!r}"
+    )
     assert am.staff_change_error(am.SUPPORT, [address("IT", "00100")]) is None, plainly(
         "Support may fix an address the customer asked for", "it was refused"
     )
@@ -374,7 +394,9 @@ def test_staff_may_not_change_the_delivery_time() -> None:
         "the platform owner changing the delivery time must be refused (spec 07 roles)",
         "it was allowed",
     )
-    assert "delivery times" in error, plainly("the refusal must name delivery times", error)
+    assert error == am.gettext(STAFF_SCOPE_REFUSAL), plainly(
+        "the refusal must say that delivery times are the vendor's", error
+    )
 
 
 def test_staff_may_change_the_carrier_only_at_the_same_or_a_lower_price() -> None:

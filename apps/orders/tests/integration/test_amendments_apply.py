@@ -8,6 +8,7 @@ happened (owner, 2026-11-16).
 """
 
 import datetime as dt
+import re
 import secrets
 from decimal import Decimal
 from typing import Any
@@ -15,6 +16,7 @@ from typing import Any
 import pytest
 from django.contrib.auth.models import Permission
 from django.utils import timezone
+from django.utils.translation import gettext
 
 from apps.accounts import levels
 from apps.accounts.tests.factories import UserFactory
@@ -69,7 +71,13 @@ def test_an_address_change_asks_a_passkey_even_when_no_money_moves() -> None:
     assert getattr(ask, "action", None) == "order_amend_address", plainly(
         "an address change must be the critical action order_amend_address", f"it asks {ask}"
     )
-    with pytest.raises(amendments.PasskeyRequired, match="delivery address"):
+    # The refusals follow the active language (I18N.15): compare with the translated text.
+    refusal = gettext(
+        "This change moves the delivery address, so it needs a fresh passkey "
+        "confirmation for this amendment (an open passkey window does not cover it; a "
+        "confirmation given before the draft was edited no longer counts)."
+    )
+    with pytest.raises(amendments.PasskeyRequired, match=re.escape(refusal)):
         amendments.apply_amendment(amendment, actor=actor, ctx=CTX, now=NOW)
     session = grant(amendment, actor)
     amendments.apply_amendment(amendment, actor=actor, ctx=CTX, now=NOW, passkey_session=session)
@@ -176,7 +184,8 @@ def test_staff_cannot_edit_a_shop_draft() -> None:
     sub = seed()
     amendment, _ = draft(sub, am.RemoveLine(key_of(sub, "SKU-B")))
     assert amendment is not None
-    with pytest.raises(amendments.AmendmentRefused, match="started by the shop"):
+    refusal = gettext("This draft was started by the shop: only that side may change or apply it.")
+    with pytest.raises(amendments.AmendmentRefused, match=re.escape(refusal)):
         amendments.revise_amendment(
             amendment,
             [am.ChangeCarrier(am.ShippingOffer("standard", "", D("0")))],
@@ -225,7 +234,11 @@ def test_a_withdrawn_package_cannot_be_amended(settings: Any) -> None:
         "apps.orders.tests.integration.test_amendments_apply.always_withdrawn"
     ]
     sub = seed()
-    with pytest.raises(amendments.AmendmentRefused, match="withdrawn") as refused:
+    refusal = gettext(
+        "The customer has withdrawn from this package, so it can no longer be changed: "
+        "the withdrawal and its refund run on the current version."
+    )
+    with pytest.raises(amendments.AmendmentRefused, match=re.escape(refusal)) as refused:
         draft(sub, am.RemoveLine(key_of(sub, "SKU-B")))
     assert not OrderAmendment.objects.filter(vendor_order=sub).exists(), plainly(
         "no draft may be written on a package with a registered withdrawal",
@@ -263,7 +276,8 @@ def test_a_refund_closes_the_open_amendment_as_superseded() -> None:
 
 def test_the_cancel_the_rest_offer_needs_an_offer() -> None:
     sub = seed()
-    with pytest.raises(amendments.AmendmentRefused, match="no offer"):
+    refusal = gettext("There is no offer to cancel the rest of this package.")
+    with pytest.raises(amendments.AmendmentRefused, match=re.escape(refusal)):
         amendments.cancel_rest_of_package(sub, actor=None, verified_guest=True, ctx=CTX)
 
 
