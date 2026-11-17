@@ -207,7 +207,8 @@ class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is u
         """The legacy search URL `/?s=<query>` answers here with the results page (CAT.27)."""
         from apps.catalog import search_page
 
-        if request.method in ("GET", "HEAD") and search_page.SEARCH_PARAMETER in request.GET:
+        safe = request.method == "GET" or request.method == "HEAD"  # reads only; no form here
+        if safe and search_page.SEARCH_PARAMETER in request.GET:
             return search_page.search_view(request)
         return super().serve(request, *args, **kwargs)
 
