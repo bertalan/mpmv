@@ -1,4 +1,4 @@
-# Vérifier et payer
+# Récapitulatif et paiement
 last-checked: 2026-11-17
 
 ## À quoi sert cette page

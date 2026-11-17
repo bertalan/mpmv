@@ -1,4 +1,4 @@
-# Configurer l'authentification à deux facteurs
+# Configurer la vérification en deux étapes
 last-checked: 2026-11-17
 
 ## À quoi sert cette page

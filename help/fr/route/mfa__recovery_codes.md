@@ -14,4 +14,4 @@ Les codes de récupération vous permettent de vous connecter si vous perdez vot
 
 - De nouveaux codes rendent tous les précédents inutilisables.
 - Les codes ne sont affichés qu'une fois, au moment où ils sont générés.
-- Utilisez Retour aux réglages à deux facteurs pour revenir.
+- Utilisez Retour aux paramètres de la vérification en deux étapes pour revenir.

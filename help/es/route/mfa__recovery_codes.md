@@ -14,4 +14,4 @@ Los c처digos de recuperaci처n le permiten iniciar sesi처n si pierde su aplicaci�
 
 - Los c처digos nuevos hacen que todos los anteriores dejen de funcionar.
 - Los c처digos se muestran una sola vez, al generarse.
-- Use Volver a los ajustes de dos pasos para regresar.
+- Use Volver a los ajustes de la verificaci처n en dos pasos para regresar.

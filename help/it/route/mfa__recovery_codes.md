@@ -14,4 +14,4 @@ I codici di recupero permettono di accedere se perde l'app di autenticazione o l
 
 - I nuovi codici fanno smettere di funzionare tutti i precedenti.
 - I codici vengono mostrati una sola volta, quando sono generati.
-- Usi Torna alle impostazioni a due fattori per tornare indietro.
+- Usi Torna alle impostazioni della verifica in due passaggi per tornare indietro.

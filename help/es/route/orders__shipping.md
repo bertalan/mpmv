@@ -8,7 +8,7 @@ Esta dirección no la abres tú. Guarda el envío que eliges en la página de re
 ## Qué puedes hacer
 
 - Elige un envío para cada vendedor en la página de revisión; la elección se guarda al instante.
-- Sin JavaScript, pulsa Actualizar envío.
+- Sin JavaScript, pulsa Actualizar el envío.
 
 ## Conviene saber
 

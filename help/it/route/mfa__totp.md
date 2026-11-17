@@ -1,4 +1,4 @@
-# Configura un'app di autenticazione
+# Configura un’app di autenticazione
 last-checked: 2026-11-17
 
 ## A cosa serve questa pagina

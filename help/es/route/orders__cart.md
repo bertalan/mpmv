@@ -7,9 +7,9 @@ Este es tu carrito. Los artículos están agrupados por vendedor, porque cada ve
 
 ## Qué puedes hacer
 
-- Cambia una cantidad: el carrito se actualiza solo, o pulsa Actualizar carrito.
-- Quita un artículo con Quitar junto al artículo.
-- Cuando todo esté bien, pulsa Continuar con el pago.
+- Cambia una cantidad: el carrito se actualiza solo, o pulsa Actualizar el carrito.
+- Quita un artículo con Eliminar junto al artículo.
+- Cuando todo esté bien, pulsa Ir a finalizar la compra.
 
 ## Conviene saber
 

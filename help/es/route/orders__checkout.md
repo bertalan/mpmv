@@ -9,7 +9,7 @@ Aquí indicas la dirección de entrega y tu correo electrónico. Es el primer pa
 
 - Rellena correo, nombre, dirección y país.
 - Marca Compro para una empresa solo si compras como empresa, y añade el nombre de la empresa y el NIF-IVA.
-- Pulsa Continuar a la revisión.
+- Pulsa Ir al resumen.
 
 ## Conviene saber
 

@@ -8,7 +8,7 @@ Tu n'ouvres pas cette adresse toi-même. Elle enregistre le mode de livraison ch
 ## Ce que tu peux faire
 
 - Choisis un mode de livraison pour chaque vendeur sur la page de vérification ; le choix est enregistré tout de suite.
-- Sans JavaScript, appuie sur Mettre à jour la livraison.
+- Sans JavaScript, appuie sur Mettre à jour l'expédition.
 
 ## Bon à savoir
 

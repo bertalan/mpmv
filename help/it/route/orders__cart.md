@@ -7,9 +7,9 @@ Questo è il tuo carrello. Gli articoli sono raggruppati per venditore, perché 
 
 ## Cosa puoi fare
 
-- Cambia una quantità: il carrello si aggiorna da solo, oppure premi Aggiorna carrello.
+- Cambia una quantità: il carrello si aggiorna da solo, oppure premi Aggiorna il carrello.
 - Togli un articolo con Rimuovi accanto all'articolo.
-- Quando è tutto a posto, premi Continua al checkout.
+- Quando è tutto a posto, premi Vai alla cassa.
 
 ## Da sapere
 

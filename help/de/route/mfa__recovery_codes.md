@@ -7,7 +7,7 @@ Mit Wiederherstellungscodes können Sie sich anmelden, wenn Sie Ihre Authenticat
 
 ## Was Sie tun können
 
-- Drücken Sie Neue Codes erzeugen, um einen neuen Satz zu erhalten.
+- Drücken Sie Neue Codes generieren, um einen neuen Satz zu erhalten.
 - Bewahren Sie die neuen Codes sofort sicher auf.
 
 ## Gut zu wissen

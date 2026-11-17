@@ -9,7 +9,7 @@ Voici ton panier. Les articles sont groupés par vendeur, car chaque vendeur est
 
 - Change une quantité : le panier se met à jour tout seul, ou appuie sur Mettre à jour le panier.
 - Retire un article avec Retirer à côté de l'article.
-- Quand tout est bon, appuie sur Continuer vers la caisse.
+- Quand tout est bon, appuie sur Passer au paiement.
 
 ## Bon à savoir
 

@@ -8,7 +8,7 @@ Questa pagina mostra un ordine: data, stato, totale e, per ogni venditore, gli a
 ## Cosa puoi fare
 
 - Segui i passaggi di stato del pacco di ogni venditore.
-- Usa Traccia il pacco quando c'è un link di tracking.
+- Usa Segui il pacco quando c'è un link di tracking.
 - Se un articolo non era disponibile, ti può essere offerto di annullare il resto con rimborso, o di tenerlo.
 
 ## Da sapere

@@ -8,8 +8,8 @@ Hier gibst du die Lieferadresse und deine E-Mail-Adresse an. Es ist der erste Sc
 ## Was du tun kannst
 
 - Fülle E-Mail, Name, Adresse und Land aus.
-- Hake Ich kaufe für ein Unternehmen nur an, wenn du als Firma kaufst, und gib dann Firmenname und USt-IdNr. an.
-- Drücke Weiter zur Prüfung.
+- Hake Ich kaufe für ein Unternehmen ein nur an, wenn du als Firma kaufst, und gib dann Firmenname und USt-IdNr. an.
+- Drücke Weiter zur Übersicht.
 
 ## Gut zu wissen
 

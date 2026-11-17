@@ -1,4 +1,4 @@
-# Bestätigen Sie, dass Sie es sind
+# Identität bestätigen
 last-checked: 2026-11-17
 
 ## Wofür diese Seite da ist

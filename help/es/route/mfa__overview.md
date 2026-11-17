@@ -1,4 +1,4 @@
-# Autenticación en dos pasos
+# Verificación en dos pasos
 last-checked: 2026-11-17
 
 ## Para qué sirve esta página
@@ -9,7 +9,7 @@ Esta página lista las formas con las que confirma que es usted tras la contrase
 
 - Añada una aplicación de autenticación o una clave de acceso.
 - Quite un factor que ya no usa.
-- Abra Gestionar códigos de recuperación para ver cuántos quedan.
+- Abra Gestionar los códigos de recuperación para ver cuántos quedan.
 
 ## Conviene saber
 

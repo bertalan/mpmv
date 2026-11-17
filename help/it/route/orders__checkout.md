@@ -9,7 +9,7 @@ Qui indichi l'indirizzo di consegna e la tua email. È il primo passo dopo il ca
 
 - Compila email, nome, indirizzo e paese.
 - Spunta Acquisto per un'azienda solo se compri come azienda, poi aggiungi ragione sociale e partita IVA.
-- Premi Continua alla revisione.
+- Premi Vai al riepilogo.
 
 ## Da sapere
 

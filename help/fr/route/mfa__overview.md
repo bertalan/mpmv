@@ -1,4 +1,4 @@
-# Authentification à deux facteurs
+# Vérification en deux étapes
 last-checked: 2026-11-17
 
 ## À quoi sert cette page

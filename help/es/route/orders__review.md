@@ -1,4 +1,4 @@
-# Revisar y pagar
+# Resumen y pago
 last-checked: 2026-11-17
 
 ## Para qué sirve esta página
@@ -8,7 +8,7 @@ Es la última comprobación antes de hacer el pedido. Ves los datos de entrega, 
 ## Qué puedes hacer
 
 - Elige un envío para cada vendedor; el total se actualiza.
-- Usa Cambiar datos si la dirección es incorrecta.
+- Usa Modificar los datos si la dirección es incorrecta.
 - Marca la casilla de las condiciones y pulsa el botón para hacer el pedido.
 
 ## Conviene saber

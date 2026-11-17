@@ -9,7 +9,7 @@ Ici tu indiques l'adresse de livraison et ton adresse e-mail. C'est la première
 
 - Remplis l'e-mail, le nom, l'adresse et le pays.
 - Coche J'achète pour une entreprise seulement si tu achètes en tant que société, puis ajoute le nom de l'entreprise et le numéro de TVA.
-- Appuie sur Continuer vers la vérification.
+- Appuie sur Passer au récapitulatif.
 
 ## Bon à savoir
 

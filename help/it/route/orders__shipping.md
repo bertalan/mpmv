@@ -8,7 +8,7 @@ Non apri questo indirizzo da solo. Salva la spedizione che scegli nella pagina d
 ## Cosa puoi fare
 
 - Scegli una spedizione per ogni venditore nella pagina di revisione: la scelta viene salvata subito.
-- Senza JavaScript, premi Aggiorna spedizione.
+- Senza JavaScript, premi Aggiorna la spedizione.
 
 ## Da sapere
 

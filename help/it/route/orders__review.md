@@ -1,4 +1,4 @@
-# Rivedi e paga
+# Riepilogo e pagamento
 last-checked: 2026-11-17
 
 ## A cosa serve questa pagina
