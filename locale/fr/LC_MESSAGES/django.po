@@ -5462,6 +5462,10 @@ msgstr "Signaler cet événement"
 msgid "Reported"
 msgstr "Signalé"
 
+#: apps/cms/models.py
+msgid "Repository file"
+msgstr "Fichier du dépôt"
+
 #: apps/orders/templates/orders/_package.html
 msgid "Request a quote"
 msgstr "Demander un devis"
@@ -6088,7 +6092,7 @@ msgstr "Résolvez les points ci-dessus pour passer la commande."
 msgid "Something went wrong"
 msgstr "Une erreur s'est produite"
 
-#: apps/catalog/taxonomy.py
+#: apps/catalog/taxonomy.py apps/cms/models.py
 msgid "source"
 msgstr "source"
 
@@ -10561,6 +10565,12 @@ msgstr ""
 "champs du fabricant : un produit qui les laisse tous vides utilise les valeurs par défaut de son "
 "vendeur."
 
+#: apps/cms/models.py
+msgid ""
+"Who owns the text. A text that comes from a repository file is read-only here: change the file and"
+" the next deploy updates it."
+msgstr "Qui gère le texte. Un texte issu d'un fichier du dépôt est en lecture seule ici : modifiez le fichier, la prochaine mise en ligne le met à jour."
+
 #: apps/vendors/models.py
 msgid ""
 "Who pays the direct cost of sending goods back after a withdrawal. Empty means you pay. The "
@@ -10718,6 +10728,10 @@ msgid ""
 msgstr ""
 "Écrivez votre texte ici. Utilisez la barre d'outils pour les titres, le gras, les listes et les "
 "liens. Un titre rend la page plus facile à parcourir."
+
+#: apps/cms/models.py
+msgid "Written in the admin"
+msgstr "Écrit dans l'administration"
 
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Yes"

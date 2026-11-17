@@ -433,6 +433,17 @@ class HelpEntry(TranslatableMixin, models.Model):  # type: ignore[misc]
             "Without text the dialog shows only the title."
         ),
     )
+    source = models.CharField(
+        _("source"),
+        max_length=8,
+        choices=[("staff", _("Written in the admin")), ("file", _("Repository file"))],
+        default="staff",
+        editable=False,
+        help_text=_(
+            "Who owns the text. A text that comes from a repository file is read-only here: "
+            "change the file and the next deploy updates it."
+        ),
+    )
     show_vendor_guide = models.BooleanField(
         _("link the vendor guide"),
         default=False,
