@@ -10,6 +10,7 @@ and `Cache-Control` (304 on a match), and every request counts towards a per-IP,
 
 import datetime as dt
 import hashlib
+import logging
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -31,6 +32,8 @@ from apps.vendors.models import Vendor
 
 if TYPE_CHECKING:
     from apps.events.models import EventIndexPage, EventPage
+
+logger = logging.getLogger(__name__)
 
 MAX_ITEMS = 500
 RATE_LIMIT = 30  # requests per window, per IP and feed path (CORE.5 limiter)
@@ -122,10 +125,19 @@ def _too_many(wait: dt.timedelta) -> HttpResponse:
 
 
 def throttled(request: HttpRequest) -> HttpResponse | None:
-    """A 429 with `Retry-After` when this IP asked for this feed path too often (304s count)."""
-    wait = consume_rate_limit(
-        f"events.feed:{client_ip(request)}:{request.path}", limit=RATE_LIMIT, window=RATE_WINDOW
-    )
+    """A 429 with `Retry-After` when this IP asked for this feed path too often (304s count).
+
+    Call it only after the scope and the vendor are validated, so a 404 never writes a row. The
+    key holds a hash of the path, so a long path cannot overflow `Throttle.key`. Without a client
+    address (no `REMOTE_ADDR`: not a real HTTP request) it does not throttle and logs a warning:
+    one shared bucket would let a single client lock everybody out of the feeds.
+    """
+    ip = client_ip(request)
+    if ip is None:
+        logger.warning("Feed request without a client address: not rate limited")
+        return None
+    digest = hashlib.sha256(request.path.encode()).hexdigest()[:32]
+    wait = consume_rate_limit(f"events.feed:{ip}:{digest}", limit=RATE_LIMIT, window=RATE_WINDOW)
     return _too_many(wait) if wait else None
 
 
@@ -137,7 +149,7 @@ def respond(
     *,
     filename: str = "",
 ) -> HttpResponse:
-    """The body with a strong ETag, `Last-Modified` and `Cache-Control`, or a 304."""
+    """The body with a strong ETag, `Last-Modified` and `Cache-Control`, or a 304 on the ETag."""
     response = HttpResponse(body, content_type=content_type)
     etag = quote_etag(hashlib.sha256(body.encode()).hexdigest()[:32])
     response["ETag"] = etag
@@ -146,12 +158,10 @@ def respond(
         response["Last-Modified"] = http_date(modified.timestamp())
     if filename:
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
-    conditional = get_conditional_response(
-        request,
-        etag=etag,
-        last_modified=int(modified.timestamp()) if modified is not None else None,
-        response=response,
-    )
+    # `Last-Modified` is informational: it can go backwards (an un-hide clears `hidden_at`) or
+    # stay stale (events age out of the window), so `If-Modified-Since` is not honoured and the
+    # strong ETag, a hash of the body, decides.
+    conditional = get_conditional_response(request, etag=etag, response=response)
     return conditional if conditional is not None else response
 
 
@@ -232,12 +242,12 @@ def _type_labels() -> list[tuple[str, str]]:
 
 
 def index_ics_response(index: "EventIndexPage", request: HttpRequest, scope: Scope) -> HttpResponse:
+    _check_scope(scope)
+    vendor = _vendor_for(scope)
     blocked = throttled(request)
     if blocked is not None:
         return blocked
-    _check_scope(scope)
     with translation.override(index.locale.language_code):
-        vendor = _vendor_for(scope)
         name = _calendar_name(vendor, scope)
         events = [
             ics_event(
@@ -353,20 +363,20 @@ def rss_items(
 
 
 def index_rss_response(index: "EventIndexPage", request: HttpRequest, scope: Scope) -> HttpResponse:
+    _check_scope(scope)
+    vendor = _vendor_for(scope)
     blocked = throttled(request)
     if blocked is not None:
         return blocked
-    _check_scope(scope)
     now = timezone.now()
     with translation.override(index.locale.language_code):
-        vendor = _vendor_for(scope)
         title = _feed_title(vendor, scope)
         feed = EventRssFeed(
             title=title,
             link=absolute_url(request, index.url or ""),
             description=title,
             language=index.locale.language_code,
-            feed_url=request.build_absolute_uri(request.path),
+            feed_url=absolute_url(request, request.path),
         )
         for item in rss_items(request, feed_events(index, scope, now), now):
             feed.add_item(**item)

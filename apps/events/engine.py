@@ -6,6 +6,7 @@ SEQUENCE rule, the vendor-safe body rules and the slugs.
 """
 
 import calendar
+import functools
 import re
 import unicodedata
 from collections.abc import Mapping, Sequence, Set
@@ -1197,8 +1198,10 @@ def _ics_offset(delta: timedelta) -> str:
     return f"{sign}{abs(minutes) // 60:02d}{abs(minutes) % 60:02d}"
 
 
-def _transitions(zone: ZoneInfo, first: int, last: int) -> list[datetime]:
-    """The UTC instants (to the hour) where the zone's offset changes, from the tz database."""
+@functools.lru_cache(maxsize=256)
+def _transitions(zone: ZoneInfo, first: int, last: int) -> tuple[datetime, ...]:
+    """The UTC instants (to the hour) where the zone's offset changes, from the tz database
+    (memoised: the scan walks every day of the years)."""
     found: list[datetime] = []
     day = datetime(first, 1, 1, tzinfo=UTC)
     end = datetime(last + 1, 1, 1, tzinfo=UTC)
@@ -1210,12 +1213,21 @@ def _transitions(zone: ZoneInfo, first: int, last: int) -> list[datetime]:
                 hour += timedelta(hours=1)
             found.append(hour)
         day = following
-    return found
+    return tuple(found)
 
 
-def _vtimezone(name: str, first: int, last: int) -> list[str]:
+def _yearly_rule(local: datetime) -> str:
+    """The yearly RRULE of a transition on this local date: the nth or last weekday of a month."""
+    days = calendar.monthrange(local.year, local.month)[1]
+    nth = "-1" if local.day + 7 > days else str((local.day - 1) // 7 + 1)
+    weekday = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")[local.weekday()]
+    return f"RRULE:FREQ=YEARLY;BYMONTH={local.month};BYDAY={nth}{weekday}"
+
+
+def _vtimezone(name: str, first: int, last: int, *, unbounded: bool = False) -> list[str]:
     """A VTIMEZONE of explicit transitions (no RRULE) for the years of the events, from the tz
-    database; deterministic, so the body stays stable."""
+    database; deterministic, so the body stays stable. For an unbounded recurrence the transitions
+    of the last year also carry a yearly RRULE, so the zone stays right after the explicit ones."""
     zone = ZoneInfo(name)
     start = datetime(first, 1, 1, tzinfo=UTC)
     lines = ["BEGIN:VTIMEZONE", f"TZID:{name}"]
@@ -1232,6 +1244,7 @@ def _vtimezone(name: str, first: int, last: int) -> list[str]:
             f"TZNAME:{moment.astimezone(zone).tzname()}",
             f"TZOFFSETFROM:{_ics_offset(before)}",
             f"TZOFFSETTO:{_ics_offset(after)}",
+            *([_yearly_rule(local)] if unbounded and moment.year == last else []),
             f"END:{kind}",
         ]
         before = after
@@ -1243,14 +1256,18 @@ def _vtimezones(events: Sequence[IcsEvent]) -> list[str]:
     """One VTIMEZONE per zone used by a timed event, covering the years of the events (and five
     years more for a recurring one)."""
     years: dict[str, list[int]] = {}
+    unbounded: set[str] = set()
     for event in events:
         if event.span.all_day:
             continue
         span = years.setdefault(_zone_name(event.span), [])
+        if event.rrule and "UNTIL=" not in event.rrule and "COUNT=" not in event.rrule:
+            unbounded.add(_zone_name(event.span))
         span += [event.span.start.year, event.span.end.year + (5 if event.rrule else 1)]
     lines: list[str] = []
     for name in sorted(years):
-        lines += _vtimezone(name, min(years[name]) - 1, max(years[name]))
+        first, last = min(years[name]) - 1, max(years[name])
+        lines += _vtimezone(name, first, last, unbounded=name in unbounded)
     return lines
 
 
@@ -1268,7 +1285,13 @@ def _vevent(event: IcsEvent) -> list[str]:
     if event.rrule:
         lines.append(f"RRULE:{event.rrule}")
     for moment in event.exdates:
-        lines.append(f"EXDATE:{_ics_utc(moment)}")
+        if event.span.all_day:
+            lines.append(f"EXDATE:{_ics_utc(moment)}")
+        else:  # the same TZID form as DTSTART
+            zone = event.span.start.tzinfo
+            lines.append(
+                f"EXDATE;TZID={_zone_name(event.span)}:{moment.astimezone(zone):%Y%m%dT%H%M%S}"
+            )
     if event.exdate_days:
         lines.append("EXDATE;VALUE=DATE:" + ",".join(f"{day:%Y%m%d}" for day in event.exdate_days))
     lines.append("STATUS:CANCELLED" if event.cancelled else "STATUS:CONFIRMED")
@@ -1277,7 +1300,7 @@ def _vevent(event: IcsEvent) -> list[str]:
     if event.description:
         lines.append(_ics_text("DESCRIPTION", event.description, event.language))
     if event.location:
-        lines.append(f"LOCATION:{ics_escape(event.location)}")
+        lines.append(_ics_text("LOCATION", event.location, event.language))
     if event.latitude and event.longitude:
         lines.append(f"GEO:{event.latitude};{event.longitude}")  # the one unescaped `;` (§3.8.1.6)
     lines.append(f"URL:{event.url}")

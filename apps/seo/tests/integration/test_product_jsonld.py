@@ -86,7 +86,9 @@ def test_a_sold_product_page_has_the_google_product_properties(client: Client, t
     assert item["offers"]["price"] == "15.25"
     assert item["offers"]["priceCurrency"]
     assert item["offers"]["availability"] == "https://schema.org/InStock"
-    assert item["offers"]["seller"]["@id"] == node(document, "Organization")["@id"]
+    seller = [n for n in document["@graph"] if n["@id"] == item["offers"]["seller"]["@id"]]
+    assert [n["@type"] for n in seller] == ["Organization"]
+    assert seller[0]["@id"] != "http://localhost/#organization"  # the vendor, never the operator
     assert schema_check.dangling_references(document) == []
     assert schema_check.rich_result_errors(document) == []
 
@@ -287,7 +289,13 @@ def test_a_vendor_without_a_tax_profile_gets_no_offer_price(client: Client, them
     assert "offers" not in node(document, "Product")
     assert "12.50" not in SCRIPT.findall(html)[0]
     # No seller, return policy or shipping node survives without an offer to reference them.
-    assert [n["@type"] for n in document["@graph"]] == ["Product", "BreadcrumbList"]
+    assert [n["@type"] for n in document["@graph"]] == [
+        "Organization",
+        "WebSite",
+        "ItemPage",
+        "Product",
+        "BreadcrumbList",
+    ]
     assert schema_check.dangling_references(document) == []
 
 
