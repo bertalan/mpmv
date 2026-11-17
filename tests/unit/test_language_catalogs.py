@@ -56,3 +56,21 @@ def test_the_language_switch_notice_is_translated() -> None:
         if notice in entries:
             assert entries[notice]
             assert entries[notice] != notice
+
+
+# I18N.13: customer emails address the customer informally (du / tu / tu); staff and vendor
+# strings stay formal. The formal forms below must not appear in the order email entries.
+FORMAL = {
+    "de": re.compile(r"\b(Sie|Ihr\w*|Ihnen)\b"),
+    "fr": re.compile(r"\b(vous|votre|vos|Vous|Votre|Vos)\b"),
+    "es": re.compile(r"\b([Uu]sted(es)?)\b"),
+}
+
+
+@pytest.mark.parametrize("lang", ["de", "fr", "es"])
+def test_customer_order_emails_use_the_informal_register(lang: str) -> None:
+    for entry in _po(lang):
+        if not any(p.startswith("apps/orders/templates/email/") for p, _l in entry.occurrences):
+            continue
+        text = " ".join([entry.msgstr, *entry.msgstr_plural.values()])
+        assert not FORMAL[lang].search(text), entry.msgid
