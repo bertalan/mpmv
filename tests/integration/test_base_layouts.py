@@ -147,7 +147,9 @@ def test_htmx_is_configured_for_the_strict_csp(rendered_page: tuple[str, list[st
 def test_only_same_origin_script_files_are_loaded(rendered_page: tuple[str, list[str]]) -> None:
     html, _ = rendered_page
     scripts = re.findall(r"<script\b([^>]*)>", html)
-    sources = [re.search(r'src="([^"]+)"', attrs) for attrs in scripts]
+    # The one JSON-LD data block (SEO.7) is not executable; every other script loads a file.
+    executable = [attrs for attrs in scripts if 'type="application/ld+json"' not in attrs]
+    sources = [re.search(r'src="([^"]+)"', attrs) for attrs in executable]
     assert all(source is not None for source in sources), "inline <script> found"
     urls = [source.group(1) for source in sources if source is not None]
     assert all(url.startswith("/static/") for url in urls), urls
