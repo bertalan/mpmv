@@ -68,6 +68,7 @@ from apps.core.services import (
     current_operator,
     save_image,
 )
+from apps.core.site_root import sync_default_site
 from apps.core.text import slugify
 from apps.events.models import EventIndexPage, EventPage
 from apps.events.services import ensure_event_indexes
@@ -1115,6 +1116,8 @@ def _locales() -> dict[str, Locale]:
 def _cms(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> None:
     for line in seed_site().created:
         run.created("cms.page", line)
+    for line in sync_default_site():
+        run.created("cms.site", line)
     locales = _locales()
     home = HomePage.objects.get(locale=Locale.get_default(), depth=2)
 

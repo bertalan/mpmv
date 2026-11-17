@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 from django.apps import apps
+from django.conf import settings
 from django.test import Client
 from wagtail.models import Site
 
@@ -137,7 +138,8 @@ def test_the_canonical_and_robots_are_one_each(client: Client, theme: str) -> No
     html = client.get("/product/mug-en/").content.decode()
     assert html.count('rel="canonical"') == 1
     assert html.count('name="robots"') <= 1
-    assert 'href="http://localhost/product/mug-en/"' in html
+    root = settings.WAGTAILADMIN_BASE_URL.rstrip("/")  # the base URL, not the Site row
+    assert f'href="{root}/product/mug-en/"' in html
 
 
 def test_the_product_json_ld_stays_under_the_budget(client: Client, theme: str) -> None:

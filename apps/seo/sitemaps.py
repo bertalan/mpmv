@@ -127,18 +127,17 @@ def _listing_robots_allows() -> bool:
 def _listing_entries(
     scopes: Sequence[catalog.ListingScope], language: str, request: HttpRequest, *, titles: bool
 ) -> Iterator[Entry]:
-    """`titles` adds each listing's name (a query per listing: only `llms.txt` asks for it)."""
+    """`titles` adds each listing's name (two queries in all: only `llms.txt` asks for it)."""
     if not _listing_robots_allows():
         return
-    for scope, found in zip(scopes, catalog.listing_page_paths(scopes), strict=True):
+    names = catalog.listing_names(scopes, language) if titles else [""] * len(scopes)
+    for found, name in zip(catalog.listing_page_paths(scopes), names, strict=True):
         if found is None:
             continue
         paths, published = found
         path = sitemap_path(paths, published, language)
-        if not path:
-            continue
-        anchor = catalog.scope_anchor(scope, language) if titles else None
-        yield Entry(absolute_url(request, path), title=anchor.name if anchor else "")
+        if path:
+            yield Entry(absolute_url(request, path), title=name)
 
 
 def listing_entries(
