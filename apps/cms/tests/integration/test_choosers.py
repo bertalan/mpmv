@@ -316,8 +316,10 @@ def test_several_faq_blocks_give_one_faq_page(seeded: SeedReport) -> None:
         json.loads(data)
         for data in re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
     ]
-    assert [data["@type"] for data in ld] == ["FAQPage"]
-    assert [question["name"] for question in ld[0]["mainEntity"]] == [
+    assert len(ld) == 1  # one @graph per page (SEO.7)
+    faq = [node for node in ld[0]["@graph"] if node["@type"] == "FAQPage"]
+    assert len(faq) == 1
+    assert [question["name"] for question in faq[0]["mainEntity"]] == [
         "Do you ship abroad?",
         "Can I return an item?",
     ]
