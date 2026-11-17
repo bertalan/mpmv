@@ -7,6 +7,7 @@ The suite runs with the default languages and also with another `MPMV_LANGUAGES`
 import pytest
 from django.conf import settings
 
+from apps.catalog import slugs
 from apps.core.i18n import configured_languages, primary_language
 
 
@@ -30,3 +31,43 @@ def third_language() -> str:
 def language_prefix(code: str) -> str:
     """The URL prefix of a language: empty for the primary one, `/<code>` for the others."""
     return "" if code == settings.LANGUAGE_CODE else f"/{code}"
+
+
+def product_url(lang: str, slug: str) -> str:
+    """The path of a product page in `lang`, whatever the primary language is."""
+    return slugs.product_path(lang, slug, default_language=settings.LANGUAGE_CODE)
+
+
+def category_url(lang: str, *parts: str) -> str:
+    """The path of a category page in `lang`."""
+    return slugs.category_path(lang, parts, default_language=settings.LANGUAGE_CODE)
+
+
+def brand_url(lang: str, slug: str) -> str:
+    """The path of a brand page in `lang`."""
+    return slugs.brand_path(lang, slug, default_language=settings.LANGUAGE_CODE)
+
+
+def vendor_url(lang: str, slug: str) -> str:
+    """The path of a vendor storefront in `lang`."""
+    return slugs.vendor_path(lang, slug, default_language=settings.LANGUAGE_CODE)
+
+
+def localized(path: str, lang: str | None = None) -> str:
+    """A catalog page path written with its English segment, in `lang` (default: the primary).
+
+    `/brand/acme/` becomes `/marchio/acme/` when the language is Italian, and gets the language
+    prefix when `lang` is not the primary one. Other paths only get the prefix.
+    """
+    lang = lang or primary_language()
+    first, _, rest = path.lstrip("/").partition("/")
+    for segments in (
+        slugs.PRODUCT_SEGMENTS,
+        slugs.CATEGORY_SEGMENTS,
+        slugs.BRAND_SEGMENTS,
+        slugs.SHOP_SEGMENTS,
+    ):
+        if first == segments["en"]:
+            first = slugs.segment_for(segments, lang)
+            break
+    return f"{language_prefix(lang)}/{first}/{rest}"

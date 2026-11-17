@@ -16,6 +16,7 @@ from apps.seo.models import ConsentLog
 from apps.seo.providers import SelfHostedConsentProvider, get_provider
 from apps.seo.tests.factories import ConsentLogFactory
 from apps.seo.tests.fakes import FakeConsentProvider
+from tests.i18n import language_prefix, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -197,7 +198,7 @@ def test_the_settings_page_shows_the_current_choice_and_is_not_cached(client: Cl
 
 
 def test_the_settings_page_works_in_italian(client: Client) -> None:
-    html = client.get("/it/cookie-settings/").content.decode()
+    html = client.get(f"{language_prefix(other_language())}/cookie-settings/").content.decode()
     assert "Impostazioni dei cookie" in html
 
 
@@ -262,7 +263,9 @@ def test_no_notice_without_the_marker_or_without_a_decision(client: Client) -> N
 
 def test_the_settings_notice_is_translated(client: Client) -> None:
     client.post("/consent/", {"action": "reject_all"}, headers=SAME_SITE)
-    html = client.get("/it/cookie-settings/?saved=1").content.decode()
+    html = client.get(
+        f"{language_prefix(other_language())}/cookie-settings/?saved=1"
+    ).content.decode()
     assert "La tua scelta sui cookie è stata salvata." in html
     assert "Solo i cookie necessari sono attivi." in html
 

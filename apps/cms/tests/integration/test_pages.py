@@ -6,6 +6,7 @@ the same page in the other language even when its slug is translated.
 """
 
 import re
+from collections.abc import Callable
 
 import pytest
 from django.conf import settings
@@ -17,6 +18,7 @@ from apps.cms.seed import seed_text
 from apps.cms.services import SeedReport
 from apps.cms.tests.factories import StandardPageFactory
 from apps.core.i18n import configured_languages
+from tests.i18n import language_prefix, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -43,8 +45,12 @@ HOME_IN_EACH_LANGUAGE = {code: _prefix(code) for code in configured_languages()}
 
 
 def test_the_go_live_languages_are_all_requested() -> None:
-    assert ("/it/chi-siamo/", "it", "Chi siamo") in PAGES
-    assert ("/de/ueber-uns/", "de", "Über uns") in PAGES
+    assert (
+        f"{language_prefix(other_language())}/chi-siamo/",
+        other_language(),
+        "Chi siamo",
+    ) in PAGES
+    assert (f"{language_prefix(third_language())}/ueber-uns/", "de", "Über uns") in PAGES
     assert ("/fr/qui-sommes-nous/", "fr", "Qui sommes-nous") in PAGES
     assert ("/es/quienes-somos/", "es", "Quiénes somos") in PAGES
 
@@ -62,15 +68,24 @@ def test_each_language_serves_its_home_and_static_page(
 
 
 def test_the_italian_home_shows_italian_content(client: Client, seeded: SeedReport) -> None:
-    html = client.get("/it/").content.decode()
+    html = client.get(f"{language_prefix(other_language())}/").content.decode()
     assert "Prodotti di artigiani indipendenti" in html
     assert "Products from independent makers" not in html
 
 
-@pytest.mark.parametrize("path", ["/it/about/", "/de/chi-siamo/", "/chi-siamo/", "/missing/"])
+@pytest.mark.parametrize(
+    "path_of",
+    [
+        lambda: f"{language_prefix(other_language())}/about/",
+        lambda: f"{language_prefix(third_language())}/chi-siamo/",
+        lambda: "/chi-siamo/",
+        lambda: "/missing/",
+    ],
+)
 def test_a_page_is_found_only_in_its_own_language_tree(
-    client: Client, seeded: SeedReport, path: str
+    client: Client, seeded: SeedReport, path_of: Callable[[], str]
 ) -> None:
+    path = path_of()
     assert client.get(path).status_code == 404
 
 
@@ -126,9 +141,11 @@ def test_switching_language_on_a_static_page_follows_the_translated_slug(
     client: Client, seeded: SeedReport
 ) -> None:
     response = client.post(
-        reverse("switch_language"), {"language": "it", "next": "/it/chi-siamo/"}, follow=True
+        reverse("switch_language"),
+        {"language": other_language(), "next": f"{language_prefix(other_language())}/chi-siamo/"},
+        follow=True,
     )
-    assert response.redirect_chain[-1][0] == "/it/chi-siamo/"
+    assert response.redirect_chain[-1][0] == f"{language_prefix(other_language())}/chi-siamo/"
     assert "<h1>Chi siamo</h1>" in response.content.decode()
 
 
@@ -138,5 +155,5 @@ def test_a_page_without_translation_switches_to_the_other_languages_home(
     home = Site.objects.get(is_default_site=True).root_page
     StandardPageFactory.create(title="Only in English", parent=home)
     html = client.get("/only-in-english/?page=2").content.decode()
-    assert 'name="next" value="/it/?page=2"' in html
+    assert f'name="next" value="{language_prefix(other_language())}/?page=2"' in html
     assert 'name="next" value="/only-in-english/?page=2"' in html

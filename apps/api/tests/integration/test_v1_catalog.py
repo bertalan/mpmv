@@ -14,6 +14,7 @@ from django.test import Client
 from apps.api.tests.factories import ApiClientFactory
 from apps.catalog.models import Attribute, Product, Variant
 from apps.catalog.tests.factories import ProductFactory, clothing_attributes
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
@@ -45,7 +46,7 @@ def t_shirt(**overrides: Any) -> dict[str, Any]:
         "kind": "variable",
         "price_net": "19.90",
         "weight_kg": "0.200",
-        "translations": [{"language": "en", "title": "Plain tee"}],
+        "translations": [{"language": primary_language(), "title": "Plain tee"}],
         "attributes": [
             {"attribute": "size", "values": ["s", "m"], "variant_axis": True},
             {"attribute": "color", "values": ["red", "blue"], "variant_axis": True},

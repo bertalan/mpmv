@@ -44,7 +44,7 @@ from apps.cms.tests.factories import LegalPageFactory, LegalPageReviewFactory
 from apps.core.audit import AuditContext
 from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import AuditLog
-from tests.i18n import other_language, third_language
+from tests.i18n import language_prefix, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -89,7 +89,7 @@ def _every_page_in_every_language(*, reviewed: bool = True) -> dict[tuple[str, s
     pages: dict[tuple[str, str], LegalPage] = {}
     for kind in GO_LIVE_LEGAL_KINDS:
         english = _publish(LegalPageFactory.create(title=f"Page {kind}", kind=kind, live=False))
-        pages[kind, "en"] = english
+        pages[kind, primary_language()] = english
         for code in configured_languages()[1:]:
             copy: LegalPage = english.copy_for_translation(
                 Locale.objects.get(language_code=code)
@@ -213,7 +213,7 @@ def test_a_placeholder_says_it_is_not_a_legal_text(client: Client, seeded: SeedR
 
 def test_a_review_is_recorded_on_one_language_version_and_audited(seeded: SeedReport) -> None:
     pages = _every_page_in_every_language(reviewed=False)
-    version = pages["privacy", "it"].versions.get()
+    version = pages["privacy", other_language()].versions.get()
 
     record_legal_review(
         version,
@@ -234,12 +234,12 @@ def test_a_review_is_recorded_on_one_language_version_and_audited(seeded: SeedRe
     assert review.recorded_by == "command:test"
     entry = AuditLog.objects.get(action=REVIEW_ACTION)
     after = entry.after or {}
-    assert after["language_code"] == "it"
+    assert after["language_code"] == other_language()
     assert after["stage"] == "counsel_check"
     assert after["reviewer"] == "Studio Legale Esempio"
     assert after["version"] == 1
     # The other languages of the same page are not covered by it.
-    assert not pages["privacy", "en"].versions.get().reviews.exists()
+    assert not pages["privacy", primary_language()].versions.get().reviews.exists()
 
 
 def test_a_review_dry_run_writes_nothing(seeded: SeedReport) -> None:
@@ -345,7 +345,7 @@ def test_a_translator_sets_the_translations_own_date_while_sync_stays_on(
     entry = AuditLog.objects.get(action=DATE_ACTION)
     assert (entry.before or {})["effective_date"] == "2027-01-01"
     assert (entry.after or {})["effective_date"] == "2027-03-01"
-    assert (entry.after or {})["language_code"] == "it"
+    assert (entry.after or {})["language_code"] == other_language()
 
     # A correction of the English text (same date) reaches Italian; Italian keeps its date.
     english.body = [("paragraph", "<p>Corrected terms.</p>")]
@@ -447,7 +447,7 @@ def test_staff_set_a_translations_date_from_the_command_line(
 def test_a_legal_page_has_no_english_fallback(client: Client, seeded: SeedReport) -> None:
     _publish(LegalPageFactory.create(title="Terms of sale", live=False))
 
-    response = client.get("/de/terms-of-sale/")
+    response = client.get(f"{language_prefix(third_language())}/terms-of-sale/")
 
     assert response.status_code == 404
     assert "Sample terms." not in response.content.decode()

@@ -30,9 +30,9 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture(autouse=True)
 def _english() -> Iterator[None]:
     """Rendering an email activates its language for the thread: start and end in English."""
-    translation.activate("en")
+    translation.activate(primary_language())
     yield
-    translation.activate("en")
+    translation.activate(primary_language())
 
 
 ROME = zoneinfo.ZoneInfo("Europe/Rome")
@@ -242,7 +242,7 @@ def test_the_acknowledgement_is_in_the_order_language() -> None:
     order = paid_order(language=other_language())
     withdrawal.submit_withdrawal(order, [sub_of(order).public_id], ctx=BUYER)
     mail = OutboxEmail.objects.get(template_key=withdrawal.ACK_TEMPLATE)
-    assert mail.language == "it"
+    assert mail.language == other_language()
     rendered = core_services.render_email(mail.template_key, mail.language, mail.context_data)
     assert "recesso" in rendered.text_body.lower()
 

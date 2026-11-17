@@ -292,7 +292,10 @@ def test_staff_duplicate_a_product_to_another_vendor_as_a_draft() -> None:
     assert copy.legacy_wp_id_en is None
     assert copy.required_companion is None
     assert not copy.upsells.exists()
-    assert set(copy.translations.values_list("language", flat=True)) == {"en", other_language()}
+    assert set(copy.translations.values_list("language", flat=True)) == {
+        primary_language(),
+        other_language(),
+    }
     copied_slugs = ProductTranslation.objects.filter(product=copy).values_list("slug", flat=True)
     assert all(copied_slugs)
     copied_variant = Variant.objects.get(product=copy)
