@@ -74,17 +74,26 @@ def plan_language_change(current: Sequence[str], target: Sequence[str]) -> Langu
     )
 
 
-def settings_conflict(recorded: Sequence[str], configured: Sequence[str]) -> str | None:
+def settings_conflict(
+    recorded: Sequence[str], configured: Sequence[str], removed: Sequence[str] = ()
+) -> str | None:
     """Why `configured` (the settings) may not replace `recorded` (applied by the command).
 
-    Only additions are a settings matter; a removed language or a new primary is not.
+    Only additions are a settings matter; a removed language or a new primary is not, and a
+    language the command removed (`removed`) stays out until the command brings it back.
     """
     if not recorded or not configured:
         return None
     message = None
-    removed = [code for code in recorded if code not in configured]
-    if removed:
-        message = f"MPMV_LANGUAGES drops {', '.join(removed)}, which the site still serves."
+    dropped = [code for code in recorded if code not in configured]
+    revived = [code for code in configured if code in removed and code not in recorded]
+    if dropped:
+        message = f"MPMV_LANGUAGES drops {', '.join(dropped)}, which the site still serves."
+    elif revived:
+        message = (
+            f"MPMV_LANGUAGES lists {', '.join(revived)}, which change_languages removed: "
+            "drop it from the setting, or bring it back with the command."
+        )
     elif configured[0] != recorded[0]:
         message = (
             f"MPMV_LANGUAGES changes the primary language from {recorded[0]!r} to "

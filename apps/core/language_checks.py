@@ -103,13 +103,13 @@ def check_language_state(
     from django.db.utils import DatabaseError
 
     from .language_engine import settings_conflict
-    from .language_services import configured_codes, recorded_codes
+    from .language_services import configured_codes, recorded_codes, removed_codes
 
     try:
         recorded = recorded_codes()
     except DatabaseError:
         return []
-    problem = settings_conflict(recorded, configured_codes())
+    problem = settings_conflict(recorded, configured_codes(), removed_codes())
     if problem is None:
         return []
     return [

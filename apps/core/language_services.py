@@ -9,6 +9,7 @@ from collections.abc import Sequence
 
 from django.conf import settings
 from django.db import DEFAULT_DB_ALIAS, transaction
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from .audit import AuditContext
 from .changeset import ChangeSet
@@ -30,6 +31,12 @@ def recorded_codes(using: str = DEFAULT_DB_ALIAS) -> list[str]:
     return [str(code) for code in row.codes] if row else []
 
 
+def removed_codes(using: str = DEFAULT_DB_ALIAS) -> list[str]:
+    """Languages `change_languages` removed and settings must not list again."""
+    row = SiteLanguages.objects.using(using).first()
+    return [str(code) for code in row.removed] if row else []
+
+
 def current_language_codes() -> list[str]:
     """The applied languages, or the configured ones before the first record."""
     return recorded_codes() or configured_codes()
@@ -49,7 +56,7 @@ def sync_language_state(using: str = DEFAULT_DB_ALIAS, **kwargs: object) -> None
     row = SiteLanguages.objects.using(using).first()
     if row is None:
         SiteLanguages.objects.using(using).create(codes=configured)
-    elif row.codes != configured and settings_conflict(row.codes, configured) is None:
+    elif row.codes != configured and settings_conflict(row.codes, configured, row.removed) is None:
         row.codes = configured
         row.save(using=using)
 
@@ -62,6 +69,8 @@ def change_languages(target: Sequence[str], *, ctx: AuditContext, dry_run: bool)
 
     def apply() -> None:
         row, _created = SiteLanguages.objects.get_or_create(defaults={"codes": list(plan.new)})
+        gone = [code for code in plan.old if code not in plan.new]
+        row.removed = [c for c in dict.fromkeys([*row.removed, *gone]) if c not in plan.new]
         row.codes = list(plan.new)
         row.save()
         LanguageRedirect.objects.filter(
@@ -117,7 +126,21 @@ def redirect_target(path: str) -> str | None:
     rows = sorted(LanguageRedirect.objects.all(), key=lambda r: len(r.old_prefix), reverse=True)
     for row in rows:
         if path.startswith(row.old_prefix):
-            return row.new_prefix + path[len(row.old_prefix) :]
-        if path == row.old_prefix.rstrip("/"):
-            return row.new_prefix
+            remainder = path[len(row.old_prefix) :].lstrip("/\\")
+            target = row.new_prefix + remainder
+        elif path == row.old_prefix.rstrip("/"):
+            target = row.new_prefix
+        else:
+            continue
+        return target if _is_local(target) else None
     return None
+
+
+def _is_local(target: str) -> bool:
+    """A same-site path: one leading slash, no backslash, no scheme or host (open redirects)."""
+    return (
+        target.startswith("/")
+        and not target.startswith("//")
+        and "\\" not in target
+        and url_has_allowed_host_and_scheme(target, allowed_hosts=None)
+    )

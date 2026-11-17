@@ -1,5 +1,6 @@
 """HTTP middleware owned by the platform (thin adapters over apps.core.security)."""
 
+import contextlib
 import re
 import uuid
 from collections.abc import Callable
@@ -133,6 +134,14 @@ class AdminNetworkAllowlistMiddleware:
         return path == bare or path.startswith(bare + "/")
 
 
+def _skips_language_redirect(path: str) -> bool:
+    """Manager, API and admin paths are never redirected: their 404 stays a 404."""
+    prefixes = ["/manager/", "/api/", "/account/", "/admin/"]
+    with contextlib.suppress(NoReverseMatch):  # a URLconf without the Django admin (some tests)
+        prefixes.append(reverse("admin:index"))
+    return any(path == p.rstrip("/") or path.startswith(p) for p in prefixes)
+
+
 class LanguageRedirectMiddleware:
     """Send a retired language prefix to its replacement (I18N.15).
 
@@ -147,6 +156,8 @@ class LanguageRedirectMiddleware:
     def __call__(self, request: HttpRequest) -> HttpResponseBase:
         response = self.get_response(request)
         if response.status_code != 404 or request.method not in {"GET", "HEAD"}:
+            return response
+        if _skips_language_redirect(request.path):
             return response
         from .language_services import redirect_target
 

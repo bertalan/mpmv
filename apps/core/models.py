@@ -212,6 +212,9 @@ class SiteLanguages(models.Model):
     """
 
     codes = models.JSONField(default=list)
+    # Languages `change_languages` removed: settings must not list them again until the command
+    # brings them back (a `migrate` would otherwise re-add them silently).
+    removed = models.JSONField(default=list, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:

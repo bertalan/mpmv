@@ -33,6 +33,7 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("codes", models.JSONField(default=list)),
+                ("removed", models.JSONField(blank=True, default=list)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
             ],
         ),

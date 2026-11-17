@@ -129,3 +129,78 @@ def test_service_accepts_a_context_and_dry_run() -> None:
     changes = change_languages(["en", "de"], ctx=ctx, dry_run=True)
     assert not changes.is_empty
     assert current_language_codes() == ["en", "it", "de"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/de//evil.example/",
+        "/de///evil.example/",
+        "/de/\\evil.example",
+        "/de/\\\\evil.example/x",
+        "/de//\\evil.example",
+        "/de/https://evil.example",
+        "/de/%2F%2Fevil.example/",
+        "/de/%5Cevil.example",
+    ],
+)
+def test_a_redirect_never_leaves_the_site(path: str) -> None:
+    LanguageRedirectFactory.create(old_prefix="/de/", new_prefix="/")
+    response = Client().get(path)
+    location = response.get("Location", "")
+    if response.status_code == 301:
+        assert location.startswith("/")
+        assert not location.startswith("//")
+        assert "\\" not in location
+    else:
+        assert response.status_code == 404
+
+
+def test_a_redirect_with_a_new_prefix_never_leaves_the_site() -> None:
+    LanguageRedirectFactory.create(old_prefix="/de/", new_prefix="/it/")
+    response = Client().get("/de//evil.example/")
+    assert response.status_code in {301, 404}
+    if response.status_code == 301:
+        assert response["Location"].startswith("/it/")
+
+
+def test_the_primary_prefix_redirect_cannot_be_an_open_redirect() -> None:
+    LanguageRedirectFactory.create(old_prefix="/", new_prefix="/it/")
+    response = Client().get("/%2Fevil.example/x")
+    assert response.status_code in {301, 404}
+    if response.status_code == 301:
+        assert response["Location"].startswith("/it/")
+
+
+def test_a_normal_path_keeps_its_query_string() -> None:
+    LanguageRedirectFactory.create(old_prefix="/de/", new_prefix="/")
+    response = Client().get("/de/shop/page/?a=1&b=two")
+    assert response.status_code == 301
+    assert response["Location"] == "/shop/page/?a=1&b=two"
+
+
+@pytest.mark.parametrize("path", ["/manager/nope/", "/api/v1/nope/", "/django-admin/nope/"])
+def test_manager_api_and_admin_paths_are_never_redirected(path: str) -> None:
+    LanguageRedirectFactory.create(old_prefix="/", new_prefix="/it/")
+    assert Client().get(path).status_code != 301
+
+
+def test_apply_records_the_removed_language_and_settings_must_drop_it(settings) -> None:  # type: ignore[no-untyped-def]
+    settings.LANGUAGES = [("en", "English"), ("it", "Italiano"), ("de", "Deutsch")]
+    settings.LANGUAGE_CODE = "en"
+    _record(["en", "it", "de"])
+    call_command("change_languages", "--to", "en,it", "--apply", stdout=StringIO())
+    assert SiteLanguages.objects.get().removed == ["de"]
+    assert [m.id for m in check_language_state(None, databases=["default"])] == ["core.E914"]
+    sync_language_state()  # a migrate while settings still list de
+    assert current_language_codes() == ["en", "it"]
+
+
+def test_re_enabling_by_the_command_clears_the_removed_record(settings) -> None:  # type: ignore[no-untyped-def]
+    settings.LANGUAGES = [("en", "English"), ("it", "Italiano"), ("de", "Deutsch")]
+    settings.LANGUAGE_CODE = "en"
+    _record(["en", "it", "de"])
+    call_command("change_languages", "--to", "en,it", "--apply", stdout=StringIO())
+    call_command("change_languages", "--to", "en,it,de", "--apply", stdout=StringIO())
+    assert SiteLanguages.objects.get().removed == []
+    assert check_language_state(None, databases=["default"]) == []

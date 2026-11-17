@@ -73,3 +73,13 @@ def test_settings_that_change_the_primary_conflict() -> None:
     message = settings_conflict(["en", "it"], ["it", "en"])
     assert message is not None
     assert "primary" in message
+
+
+def test_settings_that_bring_back_a_removed_language_conflict() -> None:
+    message = settings_conflict(["en", "it"], ["en", "it", "de"], removed=["de"])
+    assert message is not None
+    assert "de" in message
+
+
+def test_a_removed_language_not_in_settings_is_fine() -> None:
+    assert settings_conflict(["en", "it"], ["en", "it"], removed=["de"]) is None
