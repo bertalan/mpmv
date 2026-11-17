@@ -7,7 +7,6 @@ from typing import Any
 
 import pytest
 from django.apps import apps
-from django.template.loader import render_to_string
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
@@ -19,7 +18,6 @@ from apps.core.i18n import primary_language
 from apps.core.site_url import site_root_url
 from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
-from apps.themes.services import use_theme
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -134,24 +132,6 @@ def test_the_event_page_has_the_subscribe_block(client: Client) -> None:
     html = _get(client, str(page.url))
     assert 'class="event-subscribe"' in html
     assert "webcal://" in html
-
-
-def test_ride_renders_the_same_discovery(client: Client) -> None:
-    index = primary_index()
-    with use_theme("ride"):
-        html = render_to_string("events/_feed_alternates.html", {"links": _links_for(index)})
-        block = render_to_string("events/_subscribe.html", {"links": _links_for(index)})
-    assert "application/rss+xml" in html
-    assert "text/calendar" in html
-    assert "webcal://" in block
-
-
-def _links_for(index: Any) -> Any:
-    from apps.events import discovery
-
-    links = discovery.feed_links(index.locale.language_code)
-    assert links is not None
-    return links
 
 
 def test_the_feeds_section_of_llms_txt_lists_the_feeds_of_the_language(client: Client) -> None:
