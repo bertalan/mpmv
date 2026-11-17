@@ -63,7 +63,7 @@ def test_the_home_page_uses_the_ride_theme_and_its_stylesheet(
 ) -> None:
     html = client.get("/").content.decode()
     assert (
-        '<html lang=primary_language() data-theme="ride"' in html
+        f'<html lang="{primary_language()}" data-theme="ride"' in html
     )  # ride adds class="no-js" (THM.15 1/3)
     assert re.search(r'<link rel="stylesheet" href="[^"]*themes/ride/theme[^"]*\.css">', html)
     assert "themes/base/theme" not in html

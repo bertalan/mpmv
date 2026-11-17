@@ -107,7 +107,7 @@ def test_the_product_page_block_renders_the_gpsr_data() -> None:
     assert "safety@maker.example" in html
     assert "8001234567890" in html
     assert "Caution &lt;hot&gt;." in html  # escaped
-    assert "lang=primary_language()" in html  # the fallback text says its language
+    assert f'lang="{primary_language()}"' in html  # the fallback text says its language
 
 
 # --- The publication gate on the catalog's save
