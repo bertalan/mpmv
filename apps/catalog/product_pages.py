@@ -16,6 +16,7 @@ from typing import Any
 from django.conf import settings
 from django.db.models import Count, Q, prefetch_related_objects
 
+from apps.core import images as core_images
 from apps.core import translations
 from apps.core.models import MediaImage
 from apps.vendors import services as vendors
@@ -99,8 +100,10 @@ def gallery(product: Product, language: str) -> list[GalleryImage]:
     # the source language comes first, in `resolve`): a content image never has an empty alt.
     named = translations.resolve(product.translations.all(), language).translation
     fallback = named.title if named is not None and named.title else str(product.sku)
+    selected = engine.gallery_selection(rows, language)
+    core_images.prefetch_renditions(row.image for row in selected)
     shown = []
-    for row in engine.gallery_selection(rows, language):
+    for row in selected:
         text = translations.resolve(row.translations.all(), language).translation
         shown.append(
             GalleryImage(

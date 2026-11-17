@@ -21,7 +21,6 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from wagtail.models import Collection
 
-from apps.core import images as core_images
 from apps.core import tasks as core_tasks
 from apps.core import translations
 from apps.core.audit import AuditContext
@@ -46,10 +45,6 @@ IMAGE_LANGUAGE_SET = "catalog.product_image.language_set"
 IMAGE_REORDERED = "catalog.product_image.reordered"
 IMAGE_DELETED = "catalog.product_image.deleted"
 IMAGE_TEXT_SET = "catalog.product_image.text_set"
-
-# The rendition presets (`apps.core.images.PRESETS`) made on upload: the gallery tile and the
-# product card. Others are made on first use.
-PRERENDERED_PRESETS = ("content", "card")
 
 
 def image_snapshot(row: ProductImage) -> dict[str, Any]:
@@ -115,18 +110,8 @@ def _authorise(vendor: Vendor, ctx: AuditContext) -> None:
 
 
 def render_renditions(image_id: int) -> None:
-    """Make the AVIF, WebP and JPEG renditions of the presets used for products. Idempotent:
-    existing renditions are reused; a missing or SVG image is skipped."""
-    image = MediaImage.objects.filter(pk=image_id).first()
-    if image is None or image.is_svg():
-        return
-    formats = core_images.picture_formats()
-    specs = [
-        spec
-        for name in PRERENDERED_PRESETS
-        for spec in core_images.picture_specs(name, formats=formats)
-    ]
-    image.get_renditions(*specs)
+    """Make every rendition of the image now (the `core.render_image` job, run inline)."""
+    core_tasks.render_image(image_id=image_id)
 
 
 def upload_image(
@@ -208,12 +193,8 @@ def upload_image(
             image.collection = _own_collection(vendor, create=True)
             image.save()
         row.save()
-        if known is None and not image.is_svg():
-            # A job row in this transaction: it exists only if the upload commits, and the
-            # encoders run in the worker, not under the product lock.
-            from .tasks import render_product_image  # tasks imports this module
-
-            core_tasks.enqueue(render_product_image, image_id=image.pk)
+        # `image.save()` above queued the `core.render_image` job in this transaction (the
+        # `MediaImage` post_save receiver): the encoders run in the worker, not under the lock.
         if alt_text:
             _write_text(
                 row,

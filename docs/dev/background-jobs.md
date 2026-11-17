@@ -91,7 +91,8 @@ Jobs on `main` today (cron in Europe/Rome; a new job adds its row here):
 | `compliance.apply_due_terminations` | `10 * * * *` | none | Closes each vendor whose notice of termination has run out (`effective_at` reached, never earlier) through the vendor closure service and marks the notice applied; a vendor already closed just has its notice marked applied (CMP.5 part 4, P2B art. 4) |
 | `compliance.run_retention` | `45 3 * * *` | none | The retention lifecycle (CMP.4, D-29, D-30): orders past their active phase go to `restricted_tax_only`, past `tax_retention_until` to `anonymized`, pending account erasures complete; through the ORD.2 scrub services, one `compliance.retention_run` audit entry with counts only |
 | `compliance.check_published_gpsr` | `15 3 * * *` | none | Logs one error per published product whose GPSR data is incomplete and enqueues at most one email a day to the staff alert address (idempotency key per business date) (CMP.3); unpublishes nothing |
-| `catalog.render_product_image` | on demand | default backoff | Makes the AVIF, WebP and JPEG renditions of one product image's presets; queued by `media.upload_image` in the upload's transaction; a rendition that exists is reused, so a rerun is safe (CAT.4; monitoring of failed renditions is CAT.24) |
+| `core.render_image` | on demand | default backoff | Makes the AVIF, WebP and JPEG renditions of every preset (and the gallery carousel and blog operations) of one `MediaImage`; queued by a `post_save` receiver when the file is new or replaced (not for fixture loads, saves without `file`, or unchanged files), in the saving transaction, with queueing lock `core.render_image:<pk>` so one job per image waits at a time (CMS, import, seed, product and logo images); a corrupt, oversized or missing file is logged and dropped, not retried; a rendition that exists is reused, so a rerun is safe (CAT.4; monitoring is CAT.24) |
+| `catalog.render_product_image` | on demand | default backoff | Old name of the same work, kept so jobs queued before `core.render_image` still run; nothing queues it any more (TODO 2026-11-17: remove after one release) |
 | `core.send_email` | on demand | 5 retries, 1 min doubling to 1 h | Sends one outbox email ([transactional-email.md](transactional-email.md), ARC.16) |
 | `tax.recheck_vat_number` | on demand | 8 retries, 1 min doubling to 1 h | Asks VIES again about a VAT number while VIES is down (TAX.5) |
 
@@ -118,6 +119,9 @@ the last retry the job stays `failed` in the admin.
   runs waits for it to finish;
 - **queueing lock**: while one job with the key is waiting, `enqueue` and the scheduler do not
   queue another; `enqueue` returns `None` instead of a job id.
+
+`enqueue(job, queueing_lock=key, ...)` sets only the queueing lock on one call (no run-time lock),
+for example one waiting job per object: `core.render_image` uses `core.render_image:<image pk>`.
 
 Use a narrower key for per-object exclusivity, for example `@locked("ingest.stock:vendor-a")`
 on a job declared per source.
