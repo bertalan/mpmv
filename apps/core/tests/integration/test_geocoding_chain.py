@@ -18,6 +18,7 @@ from apps.core.geocoding import (
 from apps.core.geocoding import services as geo
 from apps.core.geocoding.adapters import LocationIQGeocoder, OpenCageGeocoder
 from apps.core.geocoding.fakes import FakeGeocoder, fake_result
+from apps.core.i18n import primary_language
 from apps.core.models import GeocodeCacheEntry, GeocoderState
 from apps.core.tests.factories import GeocodeCacheEntryFactory, GeocoderStateFactory, utc
 
@@ -242,7 +243,7 @@ def test_the_package_level_geocode_uses_the_configured_chain(
 
     photon = FakeGeocoder("photon", results=[fake_result("photon")])
     monkeypatch.setattr(geo, "configured_geocoders", lambda: [photon])
-    assert geocode(MILAN, language="en").provider == "photon"
+    assert geocode(MILAN, language=primary_language()).provider == "photon"
 
 
 # --- Secrets

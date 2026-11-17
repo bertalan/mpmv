@@ -4,6 +4,7 @@ import pytest
 from django.db import transaction
 
 from apps.core import services as core_services
+from apps.core.i18n import primary_language
 from apps.core.mail import html_violations
 from apps.core.models import OutboxEmail
 from apps.orders import notifications, services
@@ -47,7 +48,7 @@ def test_order_received_goes_once_to_the_customer_in_their_language() -> None:
 
 
 def test_unknown_language_falls_back_to_english() -> None:
-    order = place(language="en")
+    order = place(language=primary_language())
     Order.objects.filter(pk=order.pk).update(language="xx")
     order.refresh_from_db()
     notifications.notify_order_placed(order)

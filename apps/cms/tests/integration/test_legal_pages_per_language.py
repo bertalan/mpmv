@@ -42,7 +42,7 @@ from apps.cms.services import (
 )
 from apps.cms.tests.factories import LegalPageFactory, LegalPageReviewFactory
 from apps.core.audit import AuditContext
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import AuditLog
 
 pytestmark = pytest.mark.django_db
@@ -186,7 +186,7 @@ def test_the_seed_publishes_placeholders_of_the_five_pages_in_every_language(
     assert len(report.created) == len(GO_LIVE_LEGAL_KINDS) * len(configured_languages())
     italian_terms = live.get(kind="terms", locale__language_code="it")
     assert italian_terms.title == "Condizioni di vendita"
-    english_terms = live.get(kind="terms", locale__language_code="en")
+    english_terms = live.get(kind="terms", locale__language_code=primary_language())
     assert italian_terms.translation_key == english_terms.translation_key
     assert "Placeholder" in str(english_terms.body)
     assert all(page.versions.exists() for page in live)

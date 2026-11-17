@@ -20,6 +20,7 @@ from django.utils import timezone
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.orders import amendment_engine as am
@@ -156,7 +157,7 @@ def seed(
     ]
     order, _ = services.create_order(
         email="buyer@example.com",
-        language="en",
+        language=primary_language(),
         billing_address=address,
         billing_country=address["country"],
         shipping_address=address,
@@ -386,7 +387,7 @@ def test_an_unpaid_order_cannot_be_amended() -> None:
     a = product(owner, "10.00")
     order, _ = services.create_order(
         email="buyer@example.com",
-        language="en",
+        language=primary_language(),
         billing_address=ROME,
         billing_country="IT",
         shipping_address=ROME,

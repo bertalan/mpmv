@@ -4,6 +4,7 @@ import pytest
 from django.db import transaction
 
 from apps.core import services as core_services
+from apps.core.i18n import primary_language
 from apps.core.mail import html_violations
 from apps.core.models import OutboxEmail
 from apps.orders import notifications, services
@@ -56,7 +57,7 @@ def test_delivery_to_completed_does_not_resend() -> None:
 
 
 def test_cancelling_an_unpaid_order_tells_the_customer_once() -> None:
-    order = place(language="en")
+    order = place(language=primary_language())
     services.transition_order(order, "awaiting_payment", ctx=CTX)
     services.transition_order(order, "cancelled", ctx=CTX)
     notifications.notify_order_cancelled(order)

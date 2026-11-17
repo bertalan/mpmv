@@ -7,6 +7,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
+from apps.core.i18n import primary_language
 from apps.core.postcodes import PostcodePattern, parse_postcode_pattern
 from apps.core.tests.factories import utc
 from apps.tax import engine
@@ -20,6 +21,7 @@ from apps.tax.tests.factories import (
 )
 from apps.vendors.engine import FLAT_RATE_REGIME
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -327,11 +329,11 @@ def test_profiles_are_scoped_to_their_vendor() -> None:
 
 
 def test_the_legal_note_is_translated_per_profile_version() -> None:
-    note = VendorTaxProfileTranslationFactory.create(language="en")
-    VendorTaxProfileTranslationFactory.create(profile=note.profile, language="it")
+    note = VendorTaxProfileTranslationFactory.create(language=primary_language())
+    VendorTaxProfileTranslationFactory.create(profile=note.profile, language=other_language())
     assert note.profile.translations.count() == 2
     with pytest.raises(IntegrityError), transaction.atomic():
-        VendorTaxProfileTranslationFactory.create(profile=note.profile, language="it")
+        VendorTaxProfileTranslationFactory.create(profile=note.profile, language=other_language())
 
 
 # --- VatValidation

@@ -14,6 +14,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext, user_context
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, OutboxEmail
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.services import (
@@ -72,11 +73,11 @@ def _logo(vendor: Vendor, owner: User, alt: str = "Shop mark", upload: bool = Tr
 
 def test_a_revert_restores_the_previous_rich_text(vendor: Vendor, owner: User, staff: User) -> None:
     VendorTranslationFactory.create(
-        vendor=vendor, language="en", description="<p>Hand <strong>made</strong></p>"
+        vendor=vendor, language=primary_language(), description="<p>Hand <strong>made</strong></p>"
     )
     entry = _text_change(vendor, owner, description="<p>Buy <em>now</em> elsewhere</p>")
     revert_profile_change(entry.public_id, "Spam link.", actor=staff, ctx=STAFF_CTX)
-    row = VendorTranslation.objects.get(vendor=vendor, language="en")
+    row = VendorTranslation.objects.get(vendor=vendor, language=primary_language())
     assert row.description == "<p>Hand <strong>made</strong></p>"
     log = AuditLog.objects.get(action="vendor.profile_reverted")
     assert log.after is not None
@@ -86,7 +87,9 @@ def test_a_revert_restores_the_previous_rich_text(vendor: Vendor, owner: User, s
 def test_the_restored_rich_text_goes_through_the_allow_list_again(
     vendor: Vendor, owner: User, staff: User
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", description="<p>Old</p>")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=primary_language(), description="<p>Old</p>"
+    )
     entry = _text_change(vendor, owner, description="<p>New</p>")
     assert entry.before is not None
     crafted = AuditLog.objects.create(
@@ -100,7 +103,7 @@ def test_the_restored_rich_text_goes_through_the_allow_list_again(
         vendor_key=entry.vendor_key,
     )
     revert_profile_change(crafted.public_id, REASON, actor=staff, ctx=STAFF_CTX)
-    stored = VendorTranslation.objects.get(vendor=vendor, language="en").description
+    stored = VendorTranslation.objects.get(vendor=vendor, language=primary_language()).description
     assert "<script" not in stored
     assert "onclick" not in stored
     assert "Old" in stored
@@ -109,7 +112,9 @@ def test_the_restored_rich_text_goes_through_the_allow_list_again(
 def test_a_restored_text_embedding_media_outside_the_vendor_is_refused(
     vendor: Vendor, owner: User, staff: User
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", description="<p>Old</p>")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=primary_language(), description="<p>Old</p>"
+    )
     entry = _text_change(vendor, owner, description="<p>New</p>")
     assert entry.before is not None
     crafted = AuditLog.objects.create(
@@ -127,13 +132,16 @@ def test_a_restored_text_embedding_media_outside_the_vendor_is_refused(
     )
     with pytest.raises(ValidationError):
         revert_profile_change(crafted.public_id, REASON, actor=staff, ctx=STAFF_CTX)
-    assert VendorTranslation.objects.get(vendor=vendor, language="en").description == "<p>New</p>"
+    assert (
+        VendorTranslation.objects.get(vendor=vendor, language=primary_language()).description
+        == "<p>New</p>"
+    )
 
 
 def test_the_reason_is_plain_text_even_though_the_description_is_rich(
     vendor: Vendor, owner: User, staff: User
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), tagline="Old")
     entry = _text_change(vendor, owner, tagline="New")
     with pytest.raises(ValidationError):
         revert_profile_change(entry.public_id, "<b>bold</b> reason", actor=staff, ctx=STAFF_CTX)
@@ -216,7 +224,7 @@ def test_a_later_logo_change_or_a_second_revert_is_refused(
 def test_unknown_or_profile_entries_are_not_logo_entries(
     vendor: Vendor, owner: User, staff: User
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), tagline="Old")
     text = _text_change(vendor, owner, tagline="New")
     for public_id in (uuid.uuid4(), text.public_id):
         with pytest.raises(ValidationError):

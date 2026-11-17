@@ -7,6 +7,7 @@ from apps.catalog import brands
 from apps.catalog.models import Brand
 from apps.catalog.tests.factories import BrandFactory, ProductFactory, ProductTranslationFactory
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import OutboxEmail
 from apps.core.services import render_email
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
@@ -57,7 +58,7 @@ def test_the_notice_lists_the_product_name_and_sku_and_the_brand() -> None:
     vendor = VendorFactory.create()
     brand = BrandFactory.create(name="Acmee", status=Brand.Status.PENDING)
     product = ProductFactory.create(vendor=vendor, brand=brand, languages=["en"])
-    title = product.translations.get(language="en").title
+    title = product.translations.get(language=primary_language()).title
     brands.reject_brand(brand, ctx=CTX)
     (notice,) = _rejected_notices()
     rendered = render_email(TEMPLATE, notice.language, notice.context_data)

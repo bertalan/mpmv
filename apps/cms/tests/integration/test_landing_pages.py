@@ -38,6 +38,7 @@ from apps.catalog.tests.factories import (
 from apps.cms.models import HomePage, StandardPage, TermLandingPage, VendorLandingPage
 from apps.cms.services import SeedReport
 from apps.cms.tests.factories import TermLandingPageFactory, VendorLandingPageFactory
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
@@ -54,12 +55,12 @@ def _commit_hooks_run_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def _home(code: str = "en") -> HomePage:
+def _home(code: str = primary_language()) -> HomePage:
     home: HomePage = HomePage.objects.get(locale__language_code=code)
     return home
 
 
-def _about(code: str = "en") -> StandardPage:
+def _about(code: str = primary_language()) -> StandardPage:
     about: StandardPage = StandardPage.objects.get(
         locale__language_code=code, depth=_home(code).depth + 1
     )

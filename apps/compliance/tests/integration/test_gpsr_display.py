@@ -25,6 +25,7 @@ from apps.compliance.tests.factories import (
     VendorGpsrDefaultsFactory,
 )
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.mail import html_violations
 from apps.core.models import AuditLog, OutboxEmail
 from apps.core.services import render_email
@@ -55,7 +56,7 @@ def test_safety_text_is_saved_per_language_and_audited() -> None:
     services.set_product_safety_text(
         product, "en", {"safety_information": "Keep away from heat."}, ctx=CTX
     )
-    row = GpsrSafetyText.objects.get(product=product, language="en")
+    row = GpsrSafetyText.objects.get(product=product, language=primary_language())
     assert row.warnings == "Not suitable for children under 3."  # kept
     assert row.safety_information == "Keep away from heat."
     assert AuditLog.objects.filter(action=services.SAFETY_TEXT_UPDATED).count() == 1
@@ -88,7 +89,7 @@ def test_display_merges_the_vendor_defaults_and_picks_the_language() -> None:
 
 
 def test_display_falls_back_to_the_primary_language() -> None:
-    product = GpsrSafetyTextFactory.create(language="en", warnings="Caution.").product
+    product = GpsrSafetyTextFactory.create(language=primary_language(), warnings="Caution.").product
     shown = services.gpsr_display(product, "de")
     assert (shown.warnings, shown.text_language) == ("Caution.", "en")
 
@@ -106,7 +107,7 @@ def test_the_product_page_block_renders_the_gpsr_data() -> None:
     assert "safety@maker.example" in html
     assert "8001234567890" in html
     assert "Caution &lt;hot&gt;." in html  # escaped
-    assert 'lang="en"' in html  # the fallback text says its language
+    assert "lang=primary_language()" in html  # the fallback text says its language
 
 
 # --- The publication gate on the catalog's save

@@ -32,6 +32,7 @@ from apps.cms.tests.factories import (
     BlogIndexPageFactory,
     BlogPostPageFactory,
 )
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
@@ -55,7 +56,7 @@ def pottery() -> Vendor:
         display_name="Pottery Studio", slug="pottery-studio", status=Vendor.Status.ACTIVE
     )
     VendorTranslationFactory.create(
-        vendor=vendor, language="en", tagline="Hand-thrown bowls", status=PUBLISHED
+        vendor=vendor, language=primary_language(), tagline="Hand-thrown bowls", status=PUBLISHED
     )
     return vendor
 

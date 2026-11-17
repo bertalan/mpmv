@@ -21,11 +21,13 @@ from apps.compliance import gdpr
 from apps.compliance.models import ErasureRequest
 from apps.compliance.tests.factories import ErasureRequestFactory
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, OutboxEmail, OutboxEmailEvent
 from apps.orders import services as order_services
 from apps.orders.models import Order
 from apps.orders.services import LineInput, VendorOrderInput
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -61,7 +63,7 @@ def place(user: User | None, *, state: str = "closed", email: str = "") -> Order
     )
     order, _ = order_services.create_order(
         email=email or (user.email if user else "guest@example.com"),
-        language="it",
+        language=other_language(),
         billing_address={"line1": "1 Via Test", "city": "Roma"},
         billing_country="IT",
         shipping_address={"line1": "2 Via Test", "city": "Milano"},
@@ -94,7 +96,10 @@ def test_the_export_holds_every_model_with_the_customers_personal_data() -> None
     CartLineFactory.create(cart=CartFactory.create(user=user, session_key=""))
     order = place(user)
     OutboxEmail.objects.create(
-        recipient=user.email, template_key="order_confirmation", language="it", context="{}"
+        recipient=user.email,
+        template_key="order_confirmation",
+        language=other_language(),
+        context="{}",
     )
     vendor = VendorFactory.create()
     VendorMemberFactory.create(vendor=vendor, user=user, role="staff")
@@ -131,7 +136,10 @@ def test_the_export_never_includes_another_customers_data() -> None:
     place(other)
     CartLineFactory.create(cart=CartFactory.create(user=other, session_key=""))
     OutboxEmail.objects.create(
-        recipient=other.email, template_key="order_confirmation", language="en", context="{}"
+        recipient=other.email,
+        template_key="order_confirmation",
+        language=primary_language(),
+        context="{}",
     )
     text = dump(mine)
     assert "other@example.com" not in text
@@ -170,7 +178,7 @@ def test_erasure_anonymises_the_profile_and_deletes_the_non_fiscal_data() -> Non
     OutboxEmail.objects.create(
         recipient=user.email,
         template_key="order_confirmation",
-        language="it",
+        language=other_language(),
         context='{"name": "Mario"}',
         status="sent",
     )
@@ -323,7 +331,7 @@ def test_erasure_cancels_queued_and_retrying_mail_and_clears_every_row() -> None
         OutboxEmail.objects.create(
             recipient=user.email,
             template_key="order_confirmation",
-            language="it",
+            language=other_language(),
             context='{"name": "Mario"}',
             status=status,
         )

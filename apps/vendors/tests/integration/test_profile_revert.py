@@ -11,6 +11,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext, user_context
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, OutboxEmail
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.services import (
@@ -24,6 +25,7 @@ from apps.vendors.tests.factories import (
     VendorMemberFactory,
     VendorTranslationFactory,
 )
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -61,7 +63,9 @@ def _row(vendor: Vendor, language: str = "en") -> VendorTranslation:
 def test_the_revert_restores_the_previous_text_and_is_audited(
     vendor: Vendor, owner: User, staff: User
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", refund_policy="Fair", tagline="T")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=primary_language(), refund_policy="Fair", tagline="T"
+    )
     entry = _change(vendor, owner, refund_policy="No refunds ever")
     changes = revert_profile_change(
         entry.public_id, REASON, actor=staff, ctx=user_context(staff, None)
@@ -83,7 +87,9 @@ def test_the_vendor_owners_get_an_email_with_the_reason(
     vendor: Vendor, owner: User, staff: User
 ) -> None:
     VendorMemberFactory.create(vendor=vendor, role="staff")  # not told: cannot edit the profile
-    VendorTranslationFactory.create(vendor=vendor, language="en", refund_policy="Fair")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=primary_language(), refund_policy="Fair"
+    )
     entry = _change(vendor, owner, refund_policy="No refunds ever")
     revert_profile_change(entry.public_id, REASON, actor=staff, ctx=STAFF_CTX)
     mail = OutboxEmail.objects.get(template_key="vendors.profile_reverted")
@@ -92,7 +98,7 @@ def test_the_vendor_owners_get_an_email_with_the_reason(
 
 
 def test_a_reason_is_required(vendor: Vendor, owner: User, staff: User) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), tagline="Old")
     entry = _change(vendor, owner, tagline="New")
     for reason in ("", "   "):
         with pytest.raises(ValidationError):
@@ -102,7 +108,7 @@ def test_a_reason_is_required(vendor: Vendor, owner: User, staff: User) -> None:
 
 
 def test_without_the_permission_nothing_happens(vendor: Vendor, owner: User) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), tagline="Old")
     entry = _change(vendor, owner, tagline="New")
     plain = UserFactory.create(staff=True)
     for actor in (owner, plain, UserFactory.create()):
@@ -114,7 +120,7 @@ def test_without_the_permission_nothing_happens(vendor: Vendor, owner: User) -> 
 def test_a_dry_run_returns_the_change_and_writes_nothing(
     vendor: Vendor, owner: User, staff: User
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), tagline="Old")
     entry = _change(vendor, owner, tagline="New")
     changes = revert_profile_change(
         entry.public_id, REASON, actor=staff, ctx=STAFF_CTX, dry_run=True
@@ -128,7 +134,7 @@ def test_a_dry_run_returns_the_change_and_writes_nothing(
 def test_a_later_change_blocks_the_revert_of_an_earlier_one(
     vendor: Vendor, owner: User, staff: User
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), tagline="Old")
     first = _change(vendor, owner, tagline="Second")
     _change(vendor, owner, tagline="Third")
     with pytest.raises(ValidationError):
@@ -137,7 +143,7 @@ def test_a_later_change_blocks_the_revert_of_an_earlier_one(
 
 
 def test_a_change_is_reverted_once(vendor: Vendor, owner: User, staff: User) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), tagline="Old")
     entry = _change(vendor, owner, tagline="New")
     revert_profile_change(entry.public_id, REASON, actor=staff, ctx=STAFF_CTX)
     with pytest.raises(ValidationError):
@@ -145,16 +151,22 @@ def test_a_change_is_reverted_once(vendor: Vendor, owner: User, staff: User) -> 
 
 
 def test_reverting_a_first_save_blanks_the_texts(vendor: Vendor, owner: User, staff: User) -> None:
-    entry = _change(vendor, owner, language="it", tagline="Ciao", refund_policy="Nessuno")
+    entry = _change(
+        vendor, owner, language=other_language(), tagline="Ciao", refund_policy="Nessuno"
+    )
     revert_profile_change(entry.public_id, REASON, actor=staff, ctx=STAFF_CTX)
-    row = _row(vendor, "it")
+    row = _row(vendor, other_language())
     assert (row.tagline, row.refund_policy) == ("", "")
 
 
 def test_only_the_changed_fields_are_touched(vendor: Vendor, owner: User, staff: User) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="A", description="D")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=primary_language(), tagline="A", description="D"
+    )
     entry = _change(vendor, owner, tagline="B")
-    VendorTranslation.objects.filter(vendor=vendor, language="en").update(description="Edited")
+    VendorTranslation.objects.filter(vendor=vendor, language=primary_language()).update(
+        description="Edited"
+    )
     revert_profile_change(entry.public_id, REASON, actor=staff, ctx=STAFF_CTX)
     row = _row(vendor)
     assert (row.tagline, row.description) == ("A", "Edited")
@@ -178,7 +190,7 @@ def test_an_unknown_or_foreign_entry_is_refused(vendor: Vendor, owner: User, sta
 def test_a_suspended_vendor_can_still_be_reverted_by_staff(
     vendor: Vendor, owner: User, staff: User
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), tagline="Old")
     entry = _change(vendor, owner, tagline="New")
     Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.SUSPENDED)
     revert_profile_change(entry.public_id, REASON, actor=staff, ctx=STAFF_CTX)
@@ -209,9 +221,15 @@ def test_history_needs_the_permission_and_filters_by_vendor(
 def test_a_revert_of_the_source_text_sends_translations_back_to_review(
     vendor: Vendor, owner: User, staff: User
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Hi", status="published")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=primary_language(), tagline="Hi", status="published"
+    )
     it = VendorTranslationFactory.create(
-        vendor=vendor, language="it", tagline="Ciao", status="published", source_hash="old"
+        vendor=vendor,
+        language=other_language(),
+        tagline="Ciao",
+        status="published",
+        source_hash="old",
     )
     entry = _change(vendor, owner, tagline="Hello")
     VendorTranslation.objects.filter(pk=it.pk).update(status="published")  # back to published
@@ -227,7 +245,7 @@ def test_a_revert_of_the_source_text_sends_translations_back_to_review(
 def test_crafted_before_values_with_markup_are_refused(
     vendor: Vendor, owner: User, staff: User
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), tagline="Old")
     entry = _change(vendor, owner, tagline="New")
     assert entry.before is not None
     crafted = AuditLog.objects.create(
@@ -278,7 +296,7 @@ def test_two_simultaneous_reverts_apply_once() -> None:
     vendor = VendorFactory.create()
     owner = VendorMemberFactory.create(vendor=vendor, role="owner").user
     staff = UserFactory.create(permissions=[PROFILE_REVERT_PERMISSION])
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), tagline="Old")
     entry = _change(vendor, owner, tagline="New")
     results: list[str] = []
 

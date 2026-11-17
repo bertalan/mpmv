@@ -35,6 +35,7 @@ from apps.cms.blocks import LinkBlock, VendorChooserBlock
 from apps.cms.models import HomePage, StandardPage
 from apps.cms.services import SeedReport
 from apps.cms.tests.factories import StandardPageFactory
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
@@ -52,12 +53,12 @@ def _commit_hooks_run_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def _home(code: str = "en") -> HomePage:
+def _home(code: str = primary_language()) -> HomePage:
     home: HomePage = HomePage.objects.get(locale__language_code=code)
     return home
 
 
-def _about(code: str = "en") -> StandardPage:
+def _about(code: str = primary_language()) -> StandardPage:
     about: StandardPage = StandardPage.objects.get(
         locale__language_code=code, depth=_home(code).depth + 1
     )
@@ -83,21 +84,21 @@ def model_term() -> Term:
     """A child term with EN and IT texts: maker "Acme" → model "Roadster"."""
     taxonomy = TaxonomyFactory.create(code="compatibility")
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="en", name="Fits", slug="fits", status=PUBLISHED
+        taxonomy=taxonomy, language=primary_language(), name="Fits", slug="fits", status=PUBLISHED
     )
     TaxonomyTranslationFactory.create(
         taxonomy=taxonomy, language="it", name="Compatibile", slug="compatibile", status=PUBLISHED
     )
     maker = TermFactory.create(taxonomy=taxonomy)
     TermTranslationFactory.create(
-        term=maker, language="en", name="Acme", slug="acme", status=PUBLISHED
+        term=maker, language=primary_language(), name="Acme", slug="acme", status=PUBLISHED
     )
     TermTranslationFactory.create(
         term=maker, language="it", name="Acme", slug="acme-it", status=PUBLISHED
     )
     model: Term = TermFactory.create(parent=maker)
     TermTranslationFactory.create(
-        term=model, language="en", name="Roadster", slug="roadster", status=PUBLISHED
+        term=model, language=primary_language(), name="Roadster", slug="roadster", status=PUBLISHED
     )
     TermTranslationFactory.create(
         term=model, language="it", name="Spider", slug="spider", status=PUBLISHED
@@ -109,14 +110,18 @@ def model_term() -> Term:
 def english_only_term() -> Term:
     taxonomy = TaxonomyFactory.create(code="occasion", hierarchical=False)
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="en", name="Occasion", slug="occasion", status=PUBLISHED
+        taxonomy=taxonomy,
+        language=primary_language(),
+        name="Occasion",
+        slug="occasion",
+        status=PUBLISHED,
     )
     TaxonomyTranslationFactory.create(
         taxonomy=taxonomy, language="it", name="Occasione", slug="occasione", status=PUBLISHED
     )
     term: Term = TermFactory.create(taxonomy=taxonomy)
     TermTranslationFactory.create(
-        term=term, language="en", name="Weddings", slug="weddings", status=PUBLISHED
+        term=term, language=primary_language(), name="Weddings", slug="weddings", status=PUBLISHED
     )
     return term
 
@@ -127,7 +132,7 @@ def pottery() -> Vendor:
         display_name="Pottery Studio", slug="pottery-studio", status=Vendor.Status.ACTIVE
     )
     VendorTranslationFactory.create(
-        vendor=vendor, language="en", tagline="Hand-thrown bowls", status=PUBLISHED
+        vendor=vendor, language=primary_language(), tagline="Hand-thrown bowls", status=PUBLISHED
     )
     return vendor
 
@@ -170,7 +175,9 @@ def test_a_term_card_label_replaces_the_term_name(seeded: SeedReport, model_term
 
 def test_a_term_without_published_texts_gets_no_card(seeded: SeedReport) -> None:
     term = TermFactory.create()
-    TermTranslationFactory.create(term=term, language="en", name="Withheld", slug="withheld")
+    TermTranslationFactory.create(
+        term=term, language=primary_language(), name="Withheld", slug="withheld"
+    )
     html = _publish(_home(), [_featured(_card("term", term, label="Withheld"))])
     assert "Withheld" not in html
 
@@ -339,15 +346,27 @@ def test_a_link_to_a_page_that_is_not_live_has_no_href(seeded: SeedReport) -> No
 def _two_level_term(n: int) -> Term:
     taxonomy = TaxonomyFactory.create(code=f"bulk-{n}")
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="en", name=f"Tax {n}", slug=f"tax-{n}", status=PUBLISHED
+        taxonomy=taxonomy,
+        language=primary_language(),
+        name=f"Tax {n}",
+        slug=f"tax-{n}",
+        status=PUBLISHED,
     )
     parent = TermFactory.create(taxonomy=taxonomy)
     TermTranslationFactory.create(
-        term=parent, language="en", name=f"Maker {n}", slug=f"maker-{n}", status=PUBLISHED
+        term=parent,
+        language=primary_language(),
+        name=f"Maker {n}",
+        slug=f"maker-{n}",
+        status=PUBLISHED,
     )
     child: Term = TermFactory.create(parent=parent)
     TermTranslationFactory.create(
-        term=child, language="en", name=f"Model {n}", slug=f"model-{n}", status=PUBLISHED
+        term=child,
+        language=primary_language(),
+        name=f"Model {n}",
+        slug=f"model-{n}",
+        status=PUBLISHED,
     )
     return child
 
@@ -357,7 +376,7 @@ def _vendor(n: int) -> Vendor:
         display_name=f"Maker shop {n}", slug=f"maker-shop-{n}", status=Vendor.Status.ACTIVE
     )
     VendorTranslationFactory.create(
-        vendor=vendor, language="en", tagline=f"Tagline {n}", status=PUBLISHED
+        vendor=vendor, language=primary_language(), tagline=f"Tagline {n}", status=PUBLISHED
     )
     return vendor
 

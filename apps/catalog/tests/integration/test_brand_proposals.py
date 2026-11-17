@@ -19,6 +19,7 @@ from apps.catalog.tests.factories import (
     ProductFactory,
 )
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.core.translations import PUBLISHED
 from apps.vendors.models import Vendor
@@ -285,9 +286,13 @@ def test_merging_moves_products_deletes_the_brand_and_redirects_its_page(
 def test_merging_redirects_every_language_and_keeps_earlier_redirects_one_hop() -> None:
     source = BrandFactory.create(name="Old")
     target = BrandFactory.create(name="New")
-    BrandTranslationFactory.create(brand=source, slug="old", language="en", status=PUBLISHED)
+    BrandTranslationFactory.create(
+        brand=source, slug="old", language=primary_language(), status=PUBLISHED
+    )
     BrandTranslationFactory.create(brand=source, slug="vecchio", language="it", status=PUBLISHED)
-    BrandTranslationFactory.create(brand=target, slug="new", language="en", status=PUBLISHED)
+    BrandTranslationFactory.create(
+        brand=target, slug="new", language=primary_language(), status=PUBLISHED
+    )
     BrandTranslationFactory.create(brand=target, slug="nuovo", language="it", status=PUBLISHED)
     earlier = Redirect.objects.create(
         source_path="/brand/older/",

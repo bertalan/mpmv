@@ -36,7 +36,7 @@ from apps.catalog.tests.factories import (
     VariantFactory,
     VariantTranslationFactory,
 )
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.orders.ui import present
@@ -247,7 +247,7 @@ def test_an_rf20_vendor_shows_what_checkout_charges(client: Client) -> None:
     vendor.fiscal_regime = "RF20"
     vendor.save(update_fields=["fiscal_regime"])
     profile = VendorTaxProfile.objects.get(vendor=vendor)
-    VendorTaxProfileTranslationFactory.create(profile=profile, language="en")
+    VendorTaxProfileTranslationFactory.create(profile=profile, language=primary_language())
     price = prices.consumer_price(NET, "standard", vendor=vendor, country="IT")
     assert (price.gross, price.rate) == (NET, Decimal(0))
     live(vendor=vendor)
@@ -342,7 +342,7 @@ def test_variant_prices_are_gross(client: Client) -> None:
     variant = VariantFactory.create(
         product=product, sku="VAR-X", is_default=True, price_net_override=Decimal("24.00")
     )
-    VariantTranslationFactory.create(variant=variant, language="en", label="Large")
+    VariantTranslationFactory.create(variant=variant, language=primary_language(), label="Large")
     shown = page(client, "en").find(class_="variant-price")
     assert shown.find("data")["value"] == "29.28"  # 24.00 + 22 %
     assert NOTES["en"] in shown.get_text(" ", strip=True)

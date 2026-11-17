@@ -14,6 +14,7 @@ from apps.cart.tests.factories import CartFactory, CartLineFactory
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, VariantFactory
 from apps.core.changeset import ChangeSet
+from apps.core.i18n import primary_language
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -322,7 +323,7 @@ def test_merge_drops_guest_lines_that_can_no_longer_be_bought() -> None:
 
 def test_merge_takes_the_guest_language_and_country_hint() -> None:
     user = UserFactory.create()
-    mine = services.get_or_create_cart(user=user, language="en")
+    mine = services.get_or_create_cart(user=user, language=primary_language())
     guest = services.get_or_create_cart(session_key="s", language="it", country_hint="FR")
     services.add_to_cart(guest, sellable())
 

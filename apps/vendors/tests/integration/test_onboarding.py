@@ -18,6 +18,7 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.core.translations import source_hash
 from apps.vendors import engine
@@ -246,7 +247,7 @@ def test_an_accepted_version_can_no_longer_change() -> None:
         save_contract(contract, ctx=STAFF_CTX)
     with pytest.raises(engine.ContractLocked):
         contract.save()
-    text = contract.translations.get(language="en")
+    text = contract.translations.get(language=primary_language())
     text.body = "Rewritten terms"
     with pytest.raises(engine.ContractLocked):
         text.save()
@@ -257,7 +258,7 @@ def test_an_accepted_version_can_no_longer_change() -> None:
 def test_the_texts_of_an_accepted_version_cannot_be_deleted_or_rewritten() -> None:
     acceptance = ContractAcceptanceFactory.create()
     contract = acceptance.contract
-    text = contract.translations.get(language="en")
+    text = contract.translations.get(language=primary_language())
     with pytest.raises(engine.ContractLocked):
         text.delete()
     with pytest.raises(engine.ContractLocked):
@@ -296,7 +297,7 @@ def test_an_accepted_version_cannot_be_deleted_or_rewritten_in_the_database() ->
 def test_a_version_nobody_accepted_can_still_be_edited_and_deleted() -> None:
     contract = VendorContractFactory.create()
     VendorContractTranslation.objects.filter(contract=contract).update(body="Edited draft")
-    text = contract.translations.get(language="en")
+    text = contract.translations.get(language=primary_language())
     text.delete()
     contract.delete()
     assert not VendorContract.objects.exists()
@@ -338,7 +339,7 @@ def test_the_english_text_is_accepted_when_the_language_has_none() -> None:
     accept(member.vendor, member.user, language="de", ctx=vendor_ctx(member.user.pk))
     acceptance = ContractAcceptance.objects.get()
     assert acceptance.language == "en"
-    english = contract.translations.get(language="en")
+    english = contract.translations.get(language=primary_language())
     assert acceptance.text_hash == source_hash(english.source_values())
 
 
@@ -346,8 +347,8 @@ def test_accepting_the_same_version_twice_records_it_once() -> None:
     member = onboarding_owner()
     VendorContractFactory.create()
     ctx = vendor_ctx(member.user.pk)
-    accept(member.vendor, member.user, language="en", ctx=ctx)
-    again = accept(member.vendor, member.user, language="en", ctx=ctx)
+    accept(member.vendor, member.user, language=primary_language(), ctx=ctx)
+    again = accept(member.vendor, member.user, language=primary_language(), ctx=ctx)
     assert again.is_empty
     assert ContractAcceptance.objects.count() == 1
     assert AuditLog.objects.filter(action="vendor.contract_accepted").count() == 1
@@ -357,7 +358,11 @@ def test_an_acceptance_dry_run_records_nothing() -> None:
     member = onboarding_owner()
     VendorContractFactory.create()
     changes = accept(
-        member.vendor, member.user, language="en", ctx=vendor_ctx(member.user.pk), dry_run=True
+        member.vendor,
+        member.user,
+        language=primary_language(),
+        ctx=vendor_ctx(member.user.pk),
+        dry_run=True,
     )
     assert changes.summary()["create"] == 1
     assert not ContractAcceptance.objects.exists()
@@ -371,7 +376,7 @@ def test_vendor_staff_and_strangers_cannot_accept_for_the_vendor() -> None:
     stranger = UserFactory.create()
     for user in (staff, stranger):
         with pytest.raises(engine.ContractNotAcceptable, match="owner"):
-            accept(member.vendor, user, language="en", ctx=vendor_ctx(user.pk))
+            accept(member.vendor, user, language=primary_language(), ctx=vendor_ctx(user.pk))
     assert not ContractAcceptance.objects.exists()
 
 
@@ -381,10 +386,16 @@ def test_an_inactive_owner_cannot_accept_the_contract() -> None:
     member.user.is_active = False
     member.user.save()
     with pytest.raises(engine.ContractNotAcceptable, match="owner"):
-        accept(member.vendor, member.user, language="en", ctx=vendor_ctx(member.user.pk))
+        accept(
+            member.vendor, member.user, language=primary_language(), ctx=vendor_ctx(member.user.pk)
+        )
     with pytest.raises(engine.ContractNotAcceptable):
         accept(
-            member.vendor, member.user, language="en", ctx=vendor_ctx(member.user.pk), dry_run=True
+            member.vendor,
+            member.user,
+            language=primary_language(),
+            ctx=vendor_ctx(member.user.pk),
+            dry_run=True,
         )
     assert not ContractAcceptance.objects.exists()
     assert not AuditLog.objects.exists()
@@ -395,21 +406,25 @@ def test_applicants_and_closed_vendors_cannot_accept(status: str) -> None:
     member = VendorMemberFactory.create(vendor=VendorFactory.create(status=status))
     VendorContractFactory.create()
     with pytest.raises(engine.ContractNotAcceptable):
-        accept(member.vendor, member.user, language="en", ctx=vendor_ctx(member.user.pk))
+        accept(
+            member.vendor, member.user, language=primary_language(), ctx=vendor_ctx(member.user.pk)
+        )
 
 
 def test_nothing_can_be_accepted_without_a_contract_in_force() -> None:
     member = onboarding_owner()
     future = VendorContractFactory.create(valid_from=timezone.now() + dt.timedelta(days=1))
     with pytest.raises(engine.NoContract):
-        accept(member.vendor, member.user, language="en", ctx=vendor_ctx(member.user.pk))
-    text = future.translations.get(language="en")
+        accept(
+            member.vendor, member.user, language=primary_language(), ctx=vendor_ctx(member.user.pk)
+        )
+    text = future.translations.get(language=primary_language())
     with pytest.raises(engine.NoContract):
         accept_contract(
             member.vendor,
             member.user,
             contract=future,
-            language="en",
+            language=primary_language(),
             text_hash=source_hash(text.source_values()),
             ctx=vendor_ctx(member.user.pk),
         )
@@ -419,7 +434,9 @@ def test_a_contract_without_a_published_text_cannot_be_accepted() -> None:
     member = onboarding_owner()
     VendorContractFactory.create(languages=[])
     with pytest.raises(engine.NoContract, match="published"):
-        accept(member.vendor, member.user, language="en", ctx=vendor_ctx(member.user.pk))
+        accept(
+            member.vendor, member.user, language=primary_language(), ctx=vendor_ctx(member.user.pk)
+        )
 
 
 def test_acceptances_are_append_only_in_the_database() -> None:
@@ -469,7 +486,7 @@ def test_a_text_edited_after_it_was_shown_cannot_be_accepted() -> None:
     member = onboarding_owner()
     VendorContractFactory.create()
     shown = contract_offer("en")
-    text = shown.contract.translations.get(language="en")
+    text = shown.contract.translations.get(language=primary_language())
     text.body = "Terms edited by staff while the owner reads"
     text.save()
 
@@ -478,7 +495,7 @@ def test_a_text_edited_after_it_was_shown_cannot_be_accepted() -> None:
             member.vendor,
             member.user,
             contract=shown.contract,
-            language="en",
+            language=primary_language(),
             text_hash=text_hash,
             ctx=vendor_ctx(member.user.pk),
         )
@@ -574,7 +591,7 @@ def test_an_acceptance_waits_for_a_text_edit_in_progress_then_refuses_the_old_te
     VendorContractFactory.create()
     shown = contract_offer("en")
     with transaction.atomic():
-        text = shown.contract.translations.get(language="en")
+        text = shown.contract.translations.get(language=primary_language())
         text.body = "Terms edited at the same moment"
         text.save()
         thread, outcome = _in_thread(
@@ -582,7 +599,7 @@ def test_an_acceptance_waits_for_a_text_edit_in_progress_then_refuses_the_old_te
                 member.vendor,
                 member.user,
                 contract=shown.contract,
-                language="en",
+                language=primary_language(),
                 text_hash=shown.text_hash,
                 ctx=vendor_ctx(member.user.pk),
             )
@@ -610,7 +627,7 @@ def test_a_text_edit_waits_for_an_acceptance_in_progress_then_is_refused() -> No
             member.vendor,
             member.user,
             contract=shown.contract,
-            language="en",
+            language=primary_language(),
             text_hash=shown.text_hash,
             ctx=vendor_ctx(member.user.pk),
         )
@@ -653,9 +670,9 @@ def test_incomplete_dac7_or_payout_data_does_not_block_activation() -> None:
     # Trader data complete (CMP.25), but no IBAN and no tax residence (DAC7, payouts only).
     member = onboarding_owner(italian_company=True, iban="", tax_residence_country="")
     VendorContractFactory.create()
-    accept(member.vendor, member.user, language="en", ctx=vendor_ctx(member.user.pk))
+    accept(member.vendor, member.user, language=primary_language(), ctx=vendor_ctx(member.user.pk))
     certify_platform_duties(
-        member.vendor, member.user, language="en", ctx=vendor_ctx(member.user.pk)
+        member.vendor, member.user, language=primary_language(), ctx=vendor_ctx(member.user.pk)
     )
 
     change_status(member.vendor, Vendor.Status.ACTIVE, ctx=STAFF_CTX)

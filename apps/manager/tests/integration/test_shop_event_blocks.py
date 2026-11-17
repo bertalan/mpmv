@@ -26,6 +26,7 @@ from apps.catalog.tests.factories import (
 )
 from apps.core.geocoding import AddressQuery
 from apps.core.geocoding import engine as geo_engine
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, ImageLicence, MediaImage
 from apps.core.tests.factories import (
     GeocodeCacheEntryFactory,
@@ -78,7 +79,7 @@ def _product(vendor: Vendor, title: str = "", **fields: Any) -> Any:
     """A product of `vendor`; `title` is its English text (a product has no name column)."""
     product = ProductFactory.create(vendor=vendor, **fields)
     if title:
-        ProductTranslationFactory.create(product=product, language="en", title=title)
+        ProductTranslationFactory.create(product=product, language=primary_language(), title=title)
     return product
 
 
@@ -729,7 +730,7 @@ ADDRESS = AddressQuery(country="IT", postcode="20121", city="Milano", street="Vi
 def _cache() -> None:
     GeocodeCacheEntryFactory.create(
         key=geo_engine.cache_key(ADDRESS),
-        language="en",
+        language=primary_language(),
         normalised_address=geo_engine.normalised_address(ADDRESS),
         provider="photon",
         candidates=[

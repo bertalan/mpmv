@@ -22,6 +22,7 @@ from apps.catalog.tests.factories import (
     ProductTranslationFactory,
     VariantFactory,
 )
+from apps.core.i18n import primary_language
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -107,7 +108,7 @@ def test_an_exact_sku_ranks_before_a_longer_sku_and_before_text() -> None:
 
 
 def test_full_text_search_uses_the_language_stemming() -> None:
-    english = listed(title="Leather saddle bags", language="en")
+    english = listed(title="Leather saddle bags", language=primary_language())
     italian = listed(title="Borsa da sella in pelle", language="it")
     assert found("bag", "en") == [english.pk]
     assert found("borse", "it") == [italian.pk]
@@ -219,7 +220,10 @@ def test_a_title_match_ranks_before_a_description_match() -> None:
 def test_only_texts_published_in_the_requested_language_are_searched() -> None:
     product = listed(title="Borsa serbatoio", language="it")
     ProductTranslationFactory.create(
-        product=product, language="en", title="Tank bag", status=ProductTranslation.Status.MACHINE
+        product=product,
+        language=primary_language(),
+        title="Tank bag",
+        status=ProductTranslation.Status.MACHINE,
     )
     # Saving the EN source sent the IT text back to review (I18N.2); publish it again.
     product.translations.filter(language="it").update(status=PUBLISHED)

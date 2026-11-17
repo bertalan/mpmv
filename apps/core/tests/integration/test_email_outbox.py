@@ -22,6 +22,7 @@ from django.utils import timezone
 
 from apps.core import mail, services
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, EmailSuppression, OutboxEmail, OutboxEmailEvent
 from apps.core.tasks import list_jobs, run_worker
 from apps.core.tests.factories import (
@@ -135,7 +136,7 @@ def test_an_unknown_template_is_refused_at_enqueue() -> None:
         services.enqueue_email(
             recipient="customer@example.com",
             template_key="tests.missing",
-            language="en",
+            language=primary_language(),
             context={},
         )
     assert not OutboxEmail.objects.exists()
@@ -153,7 +154,7 @@ def test_the_same_idempotency_key_enqueues_one_email_only() -> None:
     again = services.enqueue_email(
         recipient="customer@example.com",
         template_key=ORDER,
-        language="en",
+        language=primary_language(),
         context=_order_context(),
         idempotency_key="order:A-1001:confirmation",
     )

@@ -11,6 +11,7 @@ from django.utils import timezone
 from apps.cms.tests.factories import LegalPageFactory
 from apps.compliance import services, terms_clauses
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors import engine
 from apps.vendors.models import ContractAcceptance, Vendor, VendorContract
@@ -53,7 +54,7 @@ def test_the_published_version_carries_clauses_d_to_h_in_english_and_italian() -
     for language in ("en", "it"):
         body = contract.translations.get(language=language).body
         assert terms_clauses.missing_clauses(terms_clauses.VENDOR, body, language) == []
-    assert "EUR 2.00" in contract.translations.get(language="en").body
+    assert "EUR 2.00" in contract.translations.get(language=primary_language()).body
     assert "EUR 2,00" in contract.translations.get(language="it").body
     entry = AuditLog.objects.get(action="vendor.contract_saved")
     assert entry.actor_label == "staff:legal"
@@ -81,7 +82,7 @@ def test_a_version_with_the_old_wording_is_reported_and_republishing_makes_a_new
     # The version in force before the owner's review carried the pass-on sentence in (f).
     old_fee = "The vendor may pass it on in its own return terms within the law. "
     first = publish()
-    text = first.translations.get(language="en")
+    text = first.translations.get(language=primary_language())
     head, fee_end = text.body.split("rounded up to the whole euro. ", 1)
     type(text).objects.filter(pk=text.pk).update(
         body=f"{head}rounded up to the whole euro. {old_fee}{fee_end}"
@@ -89,17 +90,19 @@ def test_a_version_with_the_old_wording_is_reported_and_republishing_makes_a_new
     assert "vendor_terms_clause_missing:en:f" in services.vendor_terms_problems(first)
     later = publish()
     assert later.version == first.version + 1
-    assert "pass it on" in first.translations.get(language="en").body
-    assert "pass it on" not in later.translations.get(language="en").body
+    assert "pass it on" in first.translations.get(language=primary_language()).body
+    assert "pass it on" not in later.translations.get(language=primary_language()).body
     assert "vendor_terms_clause_missing:en:f" not in services.vendor_terms_problems(later)
 
 
 def test_the_new_version_keeps_the_previous_text_before_the_clause_block() -> None:
     VendorContractFactory.create(valid_from=timezone.now() - dt.timedelta(days=30), languages=[])
     old = VendorContract.objects.get()
-    old.translations.create(language="en", title="Old title", body="Old terms.", status="published")
+    old.translations.create(
+        language=primary_language(), title="Old title", body="Old terms.", status="published"
+    )
     contract = publish()
-    text = contract.translations.get(language="en")
+    text = contract.translations.get(language=primary_language())
     assert text.title == "Old title"
     assert text.body.startswith("Old terms.")
     assert text.body.count(terms_clauses.BLOCK_MARKER) == 1
@@ -196,10 +199,10 @@ def test_an_accepted_clause_version_is_locked_and_the_next_one_is_a_new_version(
     ContractAcceptanceFactory.create(
         contract=first,
         vendor=VendorFactory.create(status=Vendor.Status.ONBOARDING),
-        language="en",
+        language=primary_language(),
     )
     with pytest.raises(engine.ContractLocked):
-        first.translations.get(language="en").delete()
+        first.translations.get(language=primary_language()).delete()
     later = services.publish_vendor_terms(valid_from=timezone.now() + dt.timedelta(days=1), ctx=CTX)
     assert later
     assert VendorContract.objects.count() == 2

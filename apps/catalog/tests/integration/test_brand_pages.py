@@ -25,6 +25,7 @@ from apps.catalog.tests.factories import (
     brand_logo_image,
 )
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
@@ -45,7 +46,8 @@ CTX = AuditContext(actor_id=1, actor_label="staff:catalog", source="admin", ip="
 def _brand(**fields: Any) -> Brand:
     brand = BrandFactory.create(name="Acme", **fields)
     BrandTranslationFactory.create(
-        brand=brand, language="en", slug="acme", description="<p>Anvils since 1949.</p>",
+        brand=brand, language=primary_language(), slug="acme",
+        description="<p>Anvils since 1949.</p>",
         status=PUBLISHED,
     )  # fmt: skip
     BrandTranslationFactory.create(
@@ -102,7 +104,7 @@ def test_an_unpublished_translation_is_not_shown(client: Client) -> None:
 
 def test_the_description_is_sanitised(client: Client) -> None:
     brand = _brand()
-    brand.translations.filter(language="en").update(
+    brand.translations.filter(language=primary_language()).update(
         description=(
             '<p onclick="x()">Hi</p><script>alert(1)</script><a href="javascript:alert(1)">l</a>'
         )
@@ -262,7 +264,9 @@ def test_a_merged_brand_redirects_in_one_hop_to_the_final_brand(client: Client) 
         name="Acme C"
     )  # fmt: skip
     for brand, slug in ((second, "acme-b"), (third, "acme-c")):
-        BrandTranslationFactory.create(brand=brand, language="en", slug=slug, status=PUBLISHED)
+        BrandTranslationFactory.create(
+            brand=brand, language=primary_language(), slug=slug, status=PUBLISHED
+        )
     brands.merge_brands(first, second, ctx=CTX)
     brands.merge_brands(second, third, ctx=CTX)
     response = client.get("/brand/acme/")

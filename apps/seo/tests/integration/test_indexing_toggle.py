@@ -13,6 +13,7 @@ from wagtail.models import Page, Site
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.core.audit import user_context
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.seo import services
 from apps.seo.models import SeoSettings
@@ -160,13 +161,15 @@ def test_listings_follow_the_toggle(client: Client) -> None:
     from apps.vendors.tests.factories import VendorFactory
 
     category = CategoryFactory.create()
-    CategoryTranslationFactory.create(category=category, language="en", status="published")
+    CategoryTranslationFactory.create(
+        category=category, language=primary_language(), status="published"
+    )
     ProductFactory.create(
         vendor=VendorFactory.create(status=Vendor.Status.ACTIVE),
         category=category,
         status=Product.Status.PUBLISHED,
     )
-    url = f"/product-category/{category.translations.get(language='en').slug}/"
+    url = f"/product-category/{category.translations.get(language=primary_language()).slug}/"
     assert metas(client.get(url)) == [NOINDEX]
     set_indexing(True)
     assert metas(client.get(url)) == ["index, follow"]

@@ -25,8 +25,10 @@ from apps.catalog.tests.factories import (
     TermFactory,
     TermTranslationFactory,
 )
+from apps.core.i18n import primary_language
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -148,17 +150,19 @@ def test_a_product_matching_several_ways_is_listed_once() -> None:
 
 def taxonomy_with_terms(slug_en: str, slug_it: str | None = None) -> Any:
     taxonomy = TaxonomyFactory.create()
-    TaxonomyTranslationFactory.create(taxonomy=taxonomy, language="en", slug=slug_en)
+    TaxonomyTranslationFactory.create(taxonomy=taxonomy, language=primary_language(), slug=slug_en)
     if slug_it:
-        TaxonomyTranslationFactory.create(taxonomy=taxonomy, language="it", slug=slug_it)
+        TaxonomyTranslationFactory.create(
+            taxonomy=taxonomy, language=other_language(), slug=slug_it
+        )
     return taxonomy
 
 
 def term(taxonomy: Any, slug_en: str, slug_it: str | None = None, parent: Any = None) -> Any:
     node = TermFactory.create(taxonomy=taxonomy, parent=parent)
-    TermTranslationFactory.create(term=node, language="en", slug=slug_en)
+    TermTranslationFactory.create(term=node, language=primary_language(), slug=slug_en)
     if slug_it:
-        TermTranslationFactory.create(term=node, language="it", slug=slug_it)
+        TermTranslationFactory.create(term=node, language=other_language(), slug=slug_it)
     return node
 
 
@@ -169,7 +173,7 @@ def test_term_keys_are_the_slugs_of_the_filterable_taxonomies_in_the_page_langua
     hidden.filterable = False
     hidden.save()
     assert services.listing_term_keys("en") == {"occasion": occasion, "colour": colour}
-    assert services.listing_term_keys("it") == {"occasione": occasion, "colour": colour}
+    assert services.listing_term_keys(other_language()) == {"occasione": occasion, "colour": colour}
 
 
 def test_term_filters_or_within_a_taxonomy_and_across_taxonomies() -> None:
@@ -212,15 +216,15 @@ def test_filter_slugs_resolve_in_the_page_language_with_the_english_fallback() -
     party = term(occasion, "party", "festa")
     picnic = term(occasion, "picnic")  # no IT slug
     bags = CategoryFactory.create()
-    CategoryTranslationFactory.create(category=bags, language="en", slug="bags")
-    CategoryTranslationFactory.create(category=bags, language="it", slug="borse")
+    CategoryTranslationFactory.create(category=bags, language=primary_language(), slug="bags")
+    CategoryTranslationFactory.create(category=bags, language=other_language(), slug="borse")
     on_party, on_picnic = listed(category=bags), listed(category=bags)
     on_party.terms.add(party)
     on_picnic.terms.add(picnic)
 
     query = {"occasione": ["festa,picnic"], "category": ["borse"]}
-    params = services.parse_listing_query(query, "it").params
-    resolved = services.resolve_listing_filter(params, "it")
+    params = services.parse_listing_query(query, other_language()).params
+    resolved = services.resolve_listing_filter(params, other_language())
     assert resolved.unknown == ()
     assert pks(services.listing_products(filters=resolved.filters)) == {on_party.pk, on_picnic.pk}
 
@@ -232,9 +236,9 @@ def resolve(query: dict[str, list[str]], language: str = "en") -> services.Resol
 
 def category(slug_en: str, parent: Any = None, slug_it: str | None = None) -> Any:
     node = CategoryFactory.create(parent=parent)
-    CategoryTranslationFactory.create(category=node, language="en", slug=slug_en)
+    CategoryTranslationFactory.create(category=node, language=primary_language(), slug=slug_en)
     if slug_it:
-        CategoryTranslationFactory.create(category=node, language="it", slug=slug_it)
+        CategoryTranslationFactory.create(category=node, language=other_language(), slug=slug_it)
     return node
 
 
@@ -290,11 +294,11 @@ def test_a_slug_path_resolves_each_level_in_the_page_language_with_the_english_f
     men = category("men", slug_it="uomo")
     bags = category("bags", parent=men)  # no IT slug: EN fallback
     product = listed(category=bags)
-    resolved = resolve({"category": ["uomo/bags"]}, "it")
+    resolved = resolve({"category": ["uomo/bags"]}, other_language())
     assert resolved.unknown == ()
     assert pks(services.listing_products(filters=resolved.filters)) == {product.pk}
     # On the IT page a level is matched by its IT slug, never by the EN slug it overrides.
-    assert resolve({"category": ["men/bags"]}, "it").unknown == ("category",)
+    assert resolve({"category": ["men/bags"]}, other_language()).unknown == ("category",)
 
 
 def test_a_slug_two_siblings_answer_to_through_the_fallback_is_ambiguous() -> None:
@@ -303,7 +307,7 @@ def test_a_slug_two_siblings_answer_to_through_the_fallback_is_ambiguous() -> No
     bags = category("borse")  # EN only: "borse" on the IT page too
     listed(category=shoes)
     listed(category=bags)
-    assert resolve({"category": ["borse"]}, "it").unknown == ("category",)
+    assert resolve({"category": ["borse"]}, other_language()).unknown == ("category",)
     assert resolve({"category": ["borse"]}, "en").unknown == ()
 
 
@@ -317,11 +321,11 @@ def test_a_taxonomy_key_prefers_the_page_language_over_another_taxonomys_fallbac
     product = listed()
     product.terms.add(red)
     with caplog.at_level("WARNING", logger="apps.catalog.services"):
-        keys = services.listing_term_keys("it")
+        keys = services.listing_term_keys(other_language())
     assert keys["colore"] == x
     assert y not in keys.values()
     assert "colore" in caplog.text
-    resolved = resolve({"colore": ["rosso"]}, "it")
+    resolved = resolve({"colore": ["rosso"]}, other_language())
     assert resolved.unknown == ()
     assert pks(services.listing_products(filters=resolved.filters)) == {product.pk}
     assert services.listing_term_keys("en") == {"colour": x, "colore": y}

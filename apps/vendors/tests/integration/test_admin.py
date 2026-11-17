@@ -10,9 +10,11 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -49,7 +51,7 @@ def vendor_form(**overrides: Any) -> dict[str, Any]:
         "legal_name": "Vendor B S.p.A.",
         "display_name": "Vendor B Mountain Shop",
         "slug": "",
-        "country": "it",
+        "country": other_language(),
         "vat_number": "IT01234567897",
         "tax_code": "",
         "registered_street": "Via Example",
@@ -94,7 +96,7 @@ def test_add_vendor_with_translations(staff_client: Client) -> None:
             "translations-0-shipping_policy": "Ships in 2 days.",
             "translations-0-refund_policy": "Refunds within 14 days.",
             "translations-0-cancellation_policy": "Cancel before shipping.",
-            "translations-1-language": "it",
+            "translations-1-language": other_language(),
             "translations-1-status": "machine",
             "translations-1-tagline": "Attrezzatura outdoor",
         }
@@ -102,7 +104,7 @@ def test_add_vendor_with_translations(staff_client: Client) -> None:
     response = staff_client.post(reverse("admin:vendors_vendor_add"), data)
     assert response.status_code == 302, response.content.decode()
     # I18N.2: staff set the workflow status; the IT draft falls back to the published EN texts.
-    resolved = Vendor.objects.get().translation("it")
+    resolved = Vendor.objects.get().translation(other_language())
     assert resolved.language == "en"
     assert resolved.is_fallback is True
 
@@ -111,8 +113,11 @@ def test_add_vendor_with_translations(staff_client: Client) -> None:
     assert vendor.status == Vendor.Status.APPLICANT
     assert vendor.country == "IT"
     assert vendor.registered_city == "Rome"
-    assert vendor.translations.get(language="en").refund_policy == "Refunds within 14 days."
-    assert vendor.translations.get(language="it").tagline == "Attrezzatura outdoor"
+    assert (
+        vendor.translations.get(language=primary_language()).refund_policy
+        == "Refunds within 14 days."
+    )
+    assert vendor.translations.get(language=other_language()).tagline == "Attrezzatura outdoor"
 
 
 def test_add_vendor_rejects_duplicate_translation_languages(staff_client: Client) -> None:
