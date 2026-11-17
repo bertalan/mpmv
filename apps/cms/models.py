@@ -1103,11 +1103,6 @@ class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
         if author is not None:
             context["author_bio"] = author.translated("bio", self.locale_id)
             context["author_job_title"] = author.translated("job_title", self.locale_id)
-            context["jsonld"] = engine.profile_page_jsonld(
-                url=self.author_url(author, request),
-                person=self.person(author, request),
-                language=self.locale.language_code,
-            )
         paginator = Paginator(queryset, self.PER_PAGE)
         try:
             posts: PaginatorPage[Any] = paginator.page(request.GET.get("page", 1))
@@ -1265,14 +1260,20 @@ class BlogPostPage(Page):  # type: ignore[misc]
         parent = self.get_parent()
         blog = parent.specific if parent is not None else None
         context["blog"] = blog  # the byline's link
+        return context
+
+    def blog_posting(self, request: HttpRequest) -> dict[str, Any]:
+        """schema.org BlogPosting of this article (a node of the page graph, SEO.7); its author
+        points at the author's Person `@id`."""
         url = self.get_full_url(request) or ""
+        blog = self.get_parent().specific
         author_id = ""
         if self.author is not None and isinstance(blog, BlogIndexPage) and self.author.slug:
             author_id = f"{blog.author_url(self.author, request)}#person"
         image = ""
         if self.image is not None:
             image = urljoin(url, self.image.get_rendition(ARTICLE_IMAGE_FILTER).url)
-        context["jsonld"] = engine.blog_posting_jsonld(
+        return engine.blog_posting_jsonld(
             url=url,
             headline=self.title,
             date_published=self.date,
@@ -1282,7 +1283,6 @@ class BlogPostPage(Page):  # type: ignore[misc]
             description=self.summary,
             image=image,
         )
-        return context
 
 
 # --- Term and vendor landing pages (CMS.4)

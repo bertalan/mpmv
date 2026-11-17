@@ -1,4 +1,4 @@
-{% load i18n static wagtailcore_tags cms_tags image_credits %}{% get_current_language as LANGUAGE_CODE %}{% wagtail_site as current_site %}{% firstof current_site.site_name site_name "MPMV" as site_name %}<!doctype html>
+{% load i18n static wagtailcore_tags cms_tags image_credits seo_jsonld %}{% get_current_language as LANGUAGE_CODE %}{% wagtail_site as current_site %}{% firstof current_site.site_name site_name "MPMV" as site_name %}<!doctype html>
 {% comment %}
 Public page layout of the base theme (THM.3, spec 14 §14.3, §14.6). Pages extend it and fill
 `content`; `title` and `description` default to the CMS page's SEO fields. The header holds the
@@ -31,7 +31,7 @@ state; fixed to the bottom of the viewport, last in reading order like in the ta
   {% help_context as help_chrome %}{% if help_chrome %}<script type="module" src="{% static 'themes/base/js/help.js' %}"></script>{% endif %}
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
   <script src="{% static 'vendor/alpine-csp.min.js' %}" defer></script>
-  {% if page %}{% faq_jsonld page %}{% endif %}
+  {% page_graph_jsonld %}
   {% seo_links %}
   {% block head %}{% endblock %}
   {% default_robots_meta %}
