@@ -1,11 +1,12 @@
 {% extends "layouts/content.html" %}
-{% load i18n wagtailcore_tags %}
+{% load i18n wagtailcore_tags event_feeds %}
 {% comment %}
 Month view (EVT.6): a server-rendered `<table>` with a caption, weekday column headers and the
 event links in the day cells, previous and next month links, the same filters. Below the small
 breakpoint the CSS shows the list of the month instead of the table. Always `noindex`.
 {% endcomment %}
-{% block head %}{% robots_meta robots %}{% endblock %}
+{% block head %}{% robots_meta robots %}
+  {% event_feed_alternates vendor=filters.vendor kind=filters.type %}{% endblock %}
 {% block title %}{{ month_start|date:"F Y" }} · {{ page.title }}{% endblock %}
 {% block page_content %}
   <h1>{{ page.title }}: {{ month_start|date:"F Y" }}</h1>

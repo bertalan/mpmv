@@ -1,0 +1,7 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}Your event {{ title }} was approved and is now published.{% endblocktranslate %}</p>
+<p><a href="{{ event_url }}">{% translate "Open the event" %}</a></p>
+</body>
+</html>

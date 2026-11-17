@@ -60,6 +60,7 @@ from wagtail.models import (
 from wagtail_localize.models import Translation, TranslationSource
 
 from apps.accounts.models import User
+from apps.catalog import search_page
 from apps.catalog.models import Category, Product
 from apps.cms.models import HomePage
 from apps.cms.services import sanitise_rich_text_fields
@@ -79,7 +80,7 @@ from apps.vendors.services import (
     vendor_logo_collection,
 )
 
-from . import engine
+from . import engine, notifications
 from .models import (
     EVENT_MODERATORS,
     TRANSLATION_COPIED_FIELDS,
@@ -947,14 +948,17 @@ def hide_event(
     reason: str,
     dsa_notice_ref: str = "",
     *,
+    statement_follows: bool = False,
     ctx: AuditContext | None = None,
     dry_run: bool = False,
 ) -> EventChangeSet:
     """Hide an event in every language: unpublish it, record who, when and why (spec 15).
 
-    Staff only, with a reason; `dsa_notice_ref` names the CMP.5 notice when there is one. A
-    review in progress is cancelled, so no approval publishes a hidden page. Only staff restore
-    it (`restore_event`).
+    Staff only, with a reason; `dsa_notice_ref` names the CMP.5 notice when there is one.
+    `statement_follows` is set by the CMP.5 flow (`issue_statement`), which stores the statement in
+    the same transaction: only then does the vendor's email link to it. A review in progress is
+    cancelled, so no approval publishes a hidden page. Only staff restore it
+    (`restore_event`).
     """
     _require_staff(staff)
     reason = (reason or "").strip()
@@ -985,6 +989,15 @@ def hide_event(
         after = _state(_fresh(stored)) | {"languages": len(pages)}
         changes.update(EVENT, _key(stored), before, after)
         _record(ctx, "events.event_hidden", stored, before, after)
+        fresh = _fresh(stored)
+        notifications.notify_vendor(
+            fresh,
+            notifications.HIDDEN,
+            fresh.hidden_at.isoformat() if fresh.hidden_at else "",
+            reason=reason,
+            dsa_notice_ref=dsa_notice_ref or "",
+            statement_url=notifications.statements_url(dsa_notice_ref) if statement_follows else "",
+        )
     return changes
 
 
@@ -1035,6 +1048,8 @@ def restore_event(
         after = _state(_fresh(stored)) | {"languages": len(pages)}
         changes.update(EVENT, _key(stored), before, after)
         _record(ctx, "events.event_restored", stored, before, after)
+        fresh = _fresh(stored)
+        notifications.notify_vendor(fresh, notifications.RESTORED, fresh.sequence)
     return changes
 
 
@@ -1115,6 +1130,38 @@ def record_review_decision(
             ctx = user_context(user, ip=None) if user is not None else SYSTEM
         action = "events.event_approved" if approved else "events.event_changes_requested"
         _record(ctx, action, current, before, after)
+        if task_state is not None:
+            if approved:
+                notifications.notify_vendor(current, notifications.APPROVED, state.pk)
+            else:
+                notifications.notify_changes_requested(
+                    current, task_state.pk, state.pk, task_state.get_comment() or "", ctx=ctx
+                )
+    return changes
+
+
+def send_review_digest(
+    *, today: dt.date | None = None, ctx: AuditContext | None = None, dry_run: bool = False
+) -> ChangeSet:
+    """Email the "Event moderators" the events awaiting review, once a day each (EVT.11).
+
+    Nothing is queued, and nothing audited, for an empty queue. The email lists titles and
+    vendors only; the link opens the review list.
+    """
+    pages = [page for page, _state in events_awaiting_review()]
+    with transaction.atomic():
+        changes = notifications.send_digest(
+            pages, day=today or timezone.localdate(), dry_run=dry_run
+        )
+        if changes.changes and not dry_run:
+            record(
+                ctx or SYSTEM,
+                "events.review_digest_queued",
+                EVENT,
+                "digest",
+                None,
+                {"emails": len(changes.changes), "events": len(pages)},
+            )
     return changes
 
 
@@ -1512,3 +1559,37 @@ def upload_event_image(
             stored[0].delete(stored[1])
         raise
     return image
+
+
+def search_events(
+    request: Any, query: str, language: str, limit: int
+) -> search_page.SearchGroup | None:
+    """The public events of `language` (EVT.8: the translation, else the original-language page)
+    whose title, summary, venue or city contain `query`, soonest first, for the search results
+    page (CAT.27). `limit` of them; `more` when there are others."""
+    locale = Locale.objects.filter(language_code=language).first()
+    if locale is None:
+        return None
+    needle = query.casefold()
+    # TODO(CAT.28): this loads every public event per search; filter in the database instead.
+    found = [
+        item
+        for item in events_for_locale(locale)
+        if needle
+        in " ".join(
+            (item.page.title, item.page.summary, item.page.venue_name, item.page.city)
+        ).casefold()
+    ]
+    found.sort(key=lambda item: item.page.sort_key())
+    items = [
+        search_page.SearchItem(
+            title=item.page.title,
+            url=item.page.get_url(request) or "",
+            summary=item.page.summary,
+            language=item.language if item.fallback else "",
+        )
+        for item in found[:limit]
+    ]
+    return search_page.SearchGroup(
+        "events", str(_("Events")), items, order=10, more=len(found) > limit
+    )

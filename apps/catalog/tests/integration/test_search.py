@@ -36,7 +36,7 @@ def active_vendor() -> Vendor:
     return VendorFactory.create(status=Vendor.Status.ACTIVE)
 
 
-def listed(title: str = "Plain item", language: str = "en", **kwargs: Any) -> Product:
+def listed(title: str = "Plain item", language: str = primary_language(), **kwargs: Any) -> Product:
     """A published product of an active vendor with one published text."""
     kwargs.setdefault("vendor", active_vendor())
     kwargs.setdefault("status", Product.Status.PUBLISHED)
@@ -52,7 +52,7 @@ def listed(title: str = "Plain item", language: str = "en", **kwargs: Any) -> Pr
     return product
 
 
-def found(query: str, language: str = "en", **kwargs: Any) -> list[int]:
+def found(query: str, language: str = primary_language(), **kwargs: Any) -> list[int]:
     return [p.pk for p in services.search(query, language, **kwargs)]
 
 
@@ -111,8 +111,8 @@ def test_an_exact_sku_ranks_before_a_longer_sku_and_before_text() -> None:
 def test_full_text_search_uses_the_language_stemming() -> None:
     english = listed(title="Leather saddle bags", language=primary_language())
     italian = listed(title="Borsa da sella in pelle", language=other_language())
-    assert found("bag", "en") == [english.pk]
-    assert found("borse", "it") == [italian.pk]
+    assert found("bag", primary_language()) == [english.pk]
+    assert found("borse", other_language()) == [italian.pk]
 
 
 def test_words_may_come_in_any_order() -> None:
@@ -128,7 +128,7 @@ def test_a_typo_still_finds_the_product() -> None:
 
 def _trigram_queries(query: str) -> int:
     with CaptureQueriesContext(connection) as queries:
-        list(services.search(query, "en"))
+        list(services.search(query, primary_language()))
     return sum("STRICT_WORD_SIMILARITY" in q["sql"].upper() for q in queries.captured_queries)
 
 
@@ -162,7 +162,7 @@ def test_a_leading_minus_is_ignored_not_a_negation() -> None:
 
 def _text_queries(query: str) -> list[str]:
     with CaptureQueriesContext(connection) as queries:
-        list(services.search(query, "en"))
+        list(services.search(query, primary_language()))
     return [q["sql"] for q in queries.captured_queries if "TSQUERY" in q["sql"].upper()]
 
 
@@ -228,15 +228,15 @@ def test_only_texts_published_in_the_requested_language_are_searched() -> None:
     )
     # Saving the EN source sent the IT text back to review (I18N.2); publish it again.
     product.translations.filter(language=other_language()).update(status=PUBLISHED)
-    assert found("serbatoio", "it") == [product.pk]
-    assert found("serbatoio", "en") == []
-    assert found("tank", "en") == []  # a machine draft is not public
-    assert found("tank", "it") == []
+    assert found("serbatoio", other_language()) == [product.pk]
+    assert found("serbatoio", primary_language()) == []
+    assert found("tank", primary_language()) == []  # a machine draft is not public
+    assert found("tank", other_language()) == []
 
 
 def test_a_sku_is_language_neutral() -> None:
     product = listed(sku="TB-2040", title="Borsa serbatoio", language=other_language())
-    assert found("tb-2040", "en") == [product.pk]
+    assert found("tb-2040", primary_language()) == [product.pk]
     assert found("tb-2040", "de") == [product.pk]
 
 
@@ -287,7 +287,7 @@ def test_a_too_short_query_finds_nothing_and_runs_no_query() -> None:
 
 def test_the_result_is_a_queryset_of_products() -> None:
     product = listed(sku="CASE-0001")
-    results = services.search("case-0001", "en")
+    results = services.search("case-0001", primary_language())
     assert results.model is Product
     assert results.select_related("vendor").get().pk == product.pk
 
@@ -320,7 +320,7 @@ def _search_query_kind(sql: str) -> str | None:
     return None
 
 
-@pytest.mark.parametrize("language", ["en", "it", "de", "fr", "es"])
+@pytest.mark.parametrize("language", [primary_language(), other_language(), "de", "fr", "es"])
 def test_every_search_query_is_served_by_an_index(language: str) -> None:
     """Each SKU, text and trigram query expression matches its own index, checked on that
     query's plan. With a few rows the planner would rather walk any small index and filter, so:

@@ -25,7 +25,9 @@ from apps.cms.tests.factories import (
     BlogIndexPageFactory,
     BlogPostPageFactory,
 )
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import MediaImageFactory
+from tests.i18n import language_prefix, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -167,18 +169,22 @@ def test_a_translated_article_brings_its_author_and_the_bio_is_translated(
     blog: BlogIndexPage, ada: BlogAuthor
 ) -> None:
     post = BlogPostPageFactory.create(parent=blog, title="Spring news", author=ada)
-    translate_page(blog, ["it"])
-    translate_page(post, ["it"])
+    translate_page(blog, [other_language()])
+    translate_page(post, [other_language()])
 
-    it_ada = BlogAuthor.objects.get(translation_key=ada.translation_key, locale=_locale("it"))
+    it_ada = BlogAuthor.objects.get(
+        translation_key=ada.translation_key, locale=_locale(other_language())
+    )
     assert it_ada.name == "Ada Example"
     assert it_ada.slug == "ada-example"
-    it_post = BlogPostPage.objects.get(translation_key=post.translation_key, locale=_locale("it"))
+    it_post = BlogPostPage.objects.get(
+        translation_key=post.translation_key, locale=_locale(other_language())
+    )
     assert it_post.author == it_ada
     it_ada.bio = "<p>Ada modella <i>ciotole</i> al tornio.</p>"
     it_ada.save()
 
-    it_page = _html("/it/blog/author/ada-example/")
+    it_page = _html(f"{language_prefix(other_language())}/blog/author/ada-example/")
     assert it_page.find("i", string="ciotole") is not None
     assert _titles(it_page) == ["Spring news"]
     en_page = _html("/blog/author/ada-example/")
@@ -190,7 +196,7 @@ def test_the_import_reuses_an_author_of_another_language_as_its_translation(
     seeded: SeedReport, ada: BlogAuthor
 ) -> None:
     it_blog: BlogIndexPage = BlogIndexPageFactory.create(
-        parent=HomePage.objects.get(locale__language_code="it")
+        parent=HomePage.objects.get(locale__language_code=other_language())
     )
     changes = import_article(
         it_blog,
@@ -201,22 +207,24 @@ def test_the_import_reuses_an_author_of_another_language_as_its_translation(
 
     it_ada = BlogPostPage.objects.get().author
     assert it_ada is not None
-    assert it_ada.locale.language_code == "it"
+    assert it_ada.locale.language_code == other_language()
     assert it_ada.translation_key == ada.translation_key
     assert it_ada.bio == ada.bio  # stored until translated, but not shown (owner answer)
     assert [c.model for c in changes.changes] == ["cms.blogauthor", "cms.blogpostpage"]
-    assert _titles(_html("/it/blog/author/ada-example/")) == ["Una visita"]
-    it_page = _html("/it/blog/author/ada-example/")
+    assert _titles(_html(f"{language_prefix(other_language())}/blog/author/ada-example/")) == [
+        "Una visita"
+    ]
+    it_page = _html(f"{language_prefix(other_language())}/blog/author/ada-example/")
     assert it_page.find("b", string="bowls") is None  # never the English bio in Italian
 
 
 def test_an_author_of_another_language_shows_no_bio(seeded: SeedReport, ada: BlogAuthor) -> None:
     it_blog: BlogIndexPage = BlogIndexPageFactory.create(
-        parent=HomePage.objects.get(locale__language_code="it")
+        parent=HomePage.objects.get(locale__language_code=other_language())
     )
     BlogPostPageFactory.create(parent=it_blog, title="Una visita", author=ada)
 
-    page = _html("/it/blog/author/ada-example/")
+    page = _html(f"{language_prefix(other_language())}/blog/author/ada-example/")
     assert page.find("b", string="bowls") is None
     assert _titles(page) == ["Una visita"]
     assert "description" not in _jsonld(page, "ProfilePage")["mainEntity"]
@@ -262,7 +270,7 @@ def test_the_author_page_is_a_profile_page_of_the_person(
     data = _jsonld(_html("/blog/author/ada-example/"), "ProfilePage")
     author_url = f"{blog.get_full_url()}author/ada-example/"
     assert data["url"] == author_url
-    assert data["inLanguage"] == "en"
+    assert data["inLanguage"] == primary_language()
     person = data["mainEntity"]
     assert person["@type"] == "Person"
     assert person["@id"] == _person_id(blog)
@@ -301,14 +309,18 @@ def test_an_article_without_author_has_no_author_in_its_data(blog: BlogIndexPage
 
 def test_the_person_speaks_the_page_language(blog: BlogIndexPage, profiled_ada: BlogAuthor) -> None:
     post = BlogPostPageFactory.create(parent=blog, title="Spring news", author=profiled_ada)
-    translate_page(blog, ["it"])
-    translate_page(post, ["it"])
-    it_blog = BlogIndexPage.objects.get(translation_key=blog.translation_key, locale=_locale("it"))
+    translate_page(blog, [other_language()])
+    translate_page(post, [other_language()])
+    it_blog = BlogIndexPage.objects.get(
+        translation_key=blog.translation_key, locale=_locale(other_language())
+    )
     it_ada = BlogAuthor.objects.get(
-        translation_key=profiled_ada.translation_key, locale=_locale("it")
+        translation_key=profiled_ada.translation_key, locale=_locale(other_language())
     )
 
-    untranslated = _jsonld(_html("/it/blog/author/ada-example/"), "ProfilePage")["mainEntity"]
+    untranslated = _jsonld(
+        _html(f"{language_prefix(other_language())}/blog/author/ada-example/"), "ProfilePage"
+    )["mainEntity"]
     assert "description" not in untranslated  # the English bio is not shown in Italian
     assert "jobTitle" not in untranslated
     assert untranslated["@id"] == _person_id(it_blog)
@@ -317,8 +329,12 @@ def test_the_person_speaks_the_page_language(blog: BlogIndexPage, profiled_ada: 
     it_ada.bio = "<p>Ada modella <i>ciotole</i>.</p>"
     it_ada.job_title = "Ceramista"
     it_ada.save()
-    person = _jsonld(_html("/it/blog/author/ada-example/"), "ProfilePage")["mainEntity"]
+    person = _jsonld(
+        _html(f"{language_prefix(other_language())}/blog/author/ada-example/"), "ProfilePage"
+    )["mainEntity"]
     assert person["description"] == "Ada modella ciotole."
     assert person["jobTitle"] == "Ceramista"
-    it_post = BlogPostPage.objects.get(translation_key=post.translation_key, locale=_locale("it"))
+    it_post = BlogPostPage.objects.get(
+        translation_key=post.translation_key, locale=_locale(other_language())
+    )
     assert _jsonld(_html(it_post.url), "BlogPosting")["author"]["@id"] == _person_id(it_blog)

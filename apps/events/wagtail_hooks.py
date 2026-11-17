@@ -27,6 +27,8 @@ from wagtail.admin.action_menu import ActionMenuItem
 from wagtail.admin.menu import Menu, MenuItem, SubmenuMenuItem
 from wagtail.admin.widgets import Button
 
+from apps.catalog.search_page import SEARCH_GROUPS_HOOK, SearchGroup
+
 from . import admin_views
 from .models import EventPage
 from .services import (
@@ -36,6 +38,7 @@ from .services import (
     may_edit_events_in_admin,
     may_moderate_events,
     may_review_events,
+    search_events,
 )
 
 PUBLISH = "action-publish"
@@ -228,3 +231,11 @@ def events_menu() -> MenuItem:
         ]
     )
     return SubmenuMenuItem(_("Events"), menu, name="events", icon_name="date", order=320)
+
+
+@hooks.register(SEARCH_GROUPS_HOOK)  # type: ignore[untyped-decorator]
+def search_events_group(
+    request: HttpRequest, query: str, language: str, limit: int
+) -> SearchGroup | None:
+    """The events below the products of the search results page (CAT.27)."""
+    return search_events(request, query, language, limit)

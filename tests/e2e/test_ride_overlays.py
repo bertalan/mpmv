@@ -30,7 +30,6 @@ CART = "a[data-bs-target='#mini-cart-offcanvas']"
 def _ride(settings: SettingsWrapper, live_server: LiveServer, _cms_site: None) -> None:
     settings.MPMV_THEME_DEFAULT = "ride"
     settings.MPMV_HELP_URL = "/about/#help"
-    settings.ROOT_URLCONF = "tests.e2e.urls_search"
 
 
 def open_page(page: Page, live_server: LiveServer, path: str, width: int = 1280) -> None:
@@ -91,8 +90,8 @@ def test_the_search_overlay_opens_traps_focus_and_returns_it_on_escape(
     trigger.focus()
     page.keyboard.press("Enter")
     expect(modal).to_be_visible()
-    expect(modal.locator("input[name='q']")).to_be_focused()
-    expect(modal.locator("form")).to_have_attribute("action", re.compile(r"/search/$"))
+    expect(modal.locator("input[name='s']")).to_be_focused()
+    expect(modal.locator("form")).to_have_attribute("action", "/")  # CAT.27: the language home
     clean(page)
     trapped(page, "#search-modal")
     page.keyboard.press("Escape")
@@ -105,9 +104,10 @@ def test_the_search_form_submits_to_the_results_page(page: Page, live_server: Li
     open_page(page, live_server, "/", 1280)
     page.locator(SEARCH).focus()
     page.keyboard.press("Enter")
-    page.locator("#search-modal input[name='q']").fill("bag")
+    page.locator("#search-modal input[name='s']").fill("bag")
     page.keyboard.press("Enter")
-    expect(page).to_have_url(re.compile(r"/search/\?q=bag$"))
+    # CAT.27: the language home answers `?s=` with the search results page.
+    expect(page).to_have_url(re.compile(r"/\?s=bag$"))
 
 
 def test_without_javascript_the_triggers_lead_to_the_pages(
@@ -115,7 +115,7 @@ def test_without_javascript_the_triggers_lead_to_the_pages(
 ) -> None:
     page.route("**/*.js", lambda route: route.abort())
     page.goto(f"{live_server.url}/")
-    expect(page.locator(SEARCH)).to_have_attribute("href", re.compile(r"/search/$"))
+    expect(page.locator(SEARCH)).to_have_attribute("href", "/")
     expect(page.locator(CART)).to_have_attribute("href", re.compile(r"/cart/$"))
     page.locator(CART).click()
     expect(page).to_have_url(re.compile(r"/cart/$"))

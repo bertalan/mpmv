@@ -20,6 +20,7 @@ from apps.accounts.tests.mfa import verified_login
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, OutboxEmail
 from apps.vendors.tests.factories import VendorMemberFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -207,7 +208,7 @@ def test_the_panic_button_needs_the_typed_word() -> None:
 
 
 def test_the_typed_word_is_in_the_language_of_the_page() -> None:
-    with override("it"):
+    with override(other_language()):
         from django.utils.translation import gettext
 
         assert gettext(WORD) == "TERMINA OGNI SESSIONE"

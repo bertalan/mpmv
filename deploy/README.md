@@ -156,7 +156,9 @@ On STAGE set `DJANGO_SETTINGS_MODULE=mpmv.settings.stage`, on LIVE `mpmv.setting
 Keep `MPMV_TRUSTED_PROXY_HEADER` and `MPMV_TRUSTED_PROXIES` as in the example (CORE.5): the app
 sees every request coming from Caddy, so it takes the client IP from the `X-Real-IP` header that
 Caddy overwrites, and only from the `mpmv-net` subnet fixed in `mpmv.network`. Without them the
-per-IP login lockout and registration limit act on the whole site; when they are missing,
+per-IP login lockout, registration limit and the search rate limit (CAT.27) act on the whole
+site (a request without a client IP falls in the shared `unknown` bucket, acceptable only behind
+correctly configured trusted proxies); when they are missing,
 `podman exec mpmv-app python manage.py check --deploy` warns (`core.W001`). A network created
 before the subnet was fixed must be removed (`podman network rm mpmv-net`) and recreated by its
 unit.

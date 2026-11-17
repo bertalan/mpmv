@@ -209,7 +209,9 @@ def test_a_vendor_with_products_cannot_be_deleted() -> None:
 
 
 def test_deleting_a_product_deletes_its_translations_and_variants() -> None:
-    product = ProductFactory.create(kind="variable", languages=["en", "it"])
+    product = ProductFactory.create(
+        kind="variable", languages=[primary_language(), other_language()]
+    )
     VariantTranslationFactory.create(variant=VariantFactory.create(product=product))
     product.delete()
     assert ProductTranslation.objects.count() == 0
@@ -313,7 +315,7 @@ def test_variants_are_ordered_by_position() -> None:
 
 
 def test_one_translation_per_product_and_language() -> None:
-    product = ProductFactory.create(languages=["en"])
+    product = ProductFactory.create(languages=[primary_language()])
     with pytest.raises(IntegrityError), transaction.atomic():
         ProductTranslationFactory.create(product=product, language=primary_language())
 
@@ -342,8 +344,8 @@ def test_product_texts_fall_back_to_published_english() -> None:
         product=product, language=primary_language(), status="published"
     )
     ProductTranslationFactory.create(product=product, language=other_language(), status="machine")
-    resolved = product.translation("it")
-    assert resolved.language == "en"
+    resolved = product.translation(other_language())
+    assert resolved.language == primary_language()
     assert resolved.is_fallback is True
 
 
@@ -367,4 +369,4 @@ def test_variant_texts_fall_back_to_published_english() -> None:
     VariantTranslationFactory.create(
         variant=variant, language=primary_language(), status="published"
     )
-    assert variant.translation("de").language == "en"
+    assert variant.translation("de").language == primary_language()

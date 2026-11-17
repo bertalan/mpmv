@@ -20,7 +20,9 @@ from apps.accounts.tests.factories import UserFactory
 from apps.cms import help as help_lookup
 from apps.cms.models import HelpEntry
 from apps.cms.tests.factories import HelpEntryFactory
+from apps.core.i18n import primary_language
 from tests import hostile_input as hi
+from tests.i18n import other_language
 from tests.unit.field_help_allowlist import ALLOWED_FIELD_NAMES
 
 pytestmark = pytest.mark.django_db
@@ -31,7 +33,7 @@ def _clean_cache() -> None:
     cache.clear()
 
 
-def general(language: str = "en") -> HelpEntry:
+def general(language: str = primary_language()) -> HelpEntry:
     return HelpEntry.objects.get(kind="general", locale__language_code=language)
 
 
@@ -57,7 +59,7 @@ def test_an_entry_is_one_per_language_kind_and_key() -> None:
 
 def test_the_same_key_may_exist_in_another_language() -> None:
     HelpEntryFactory.create(kind="route", key="home")
-    HelpEntryFactory.create(kind="route", key="home", locale=locale("it"))
+    HelpEntryFactory.create(kind="route", key="home", locale=locale(other_language()))
 
 
 @pytest.mark.parametrize(
@@ -65,7 +67,9 @@ def test_the_same_key_may_exist_in_another_language() -> None:
     [("general", "home"), ("route", ""), ("page_type", ""), ("route", "has space")],
 )
 def test_the_key_must_fit_the_kind(kind: str, key: str) -> None:
-    entry = HelpEntry(kind=kind, key=key, title="T", body="<p>b</p>", locale=locale("en"))
+    entry = HelpEntry(
+        kind=kind, key=key, title="T", body="<p>b</p>", locale=locale(primary_language())
+    )
     with pytest.raises(ValidationError):
         entry.full_clean()
 
@@ -91,20 +95,20 @@ def test_every_field_has_a_help_text() -> None:
 def test_the_route_entry_answers_before_the_page_type_and_the_general_entry() -> None:
     HelpEntryFactory.create(kind="route", key="home", title="Route help")
     HelpEntryFactory.create(kind="page_type", key="cms.StandardPage", title="Type help")
-    found = help_lookup.help_for("home", "cms.StandardPage", "en")
+    found = help_lookup.help_for("home", "cms.StandardPage", primary_language())
     assert found is not None
     assert (found.title, found.source) == ("Route help", "route")
 
 
 def test_the_page_type_entry_answers_when_the_route_has_none() -> None:
     HelpEntryFactory.create(kind="page_type", key="cms.StandardPage", title="Type help")
-    found = help_lookup.help_for("home", "cms.StandardPage", "en")
+    found = help_lookup.help_for("home", "cms.StandardPage", primary_language())
     assert found is not None
     assert (found.title, found.source) == ("Type help", "page_type")
 
 
 def test_a_screen_without_an_entry_gets_the_general_one() -> None:
-    found = help_lookup.help_for("no:such:route", "", "en")
+    found = help_lookup.help_for("no:such:route", "", primary_language())
     assert found is not None
     assert found.source == "general"
     assert found.title == general().title
@@ -112,38 +116,40 @@ def test_a_screen_without_an_entry_gets_the_general_one() -> None:
 
 def test_the_answer_follows_the_language_and_falls_back_to_the_primary_one() -> None:
     HelpEntryFactory.create(kind="route", key="home", title="Help")
-    HelpEntryFactory.create(kind="route", key="home", title="Aiuto", locale=locale("it"))
-    assert help_lookup.help_for("home", "", "it").title == "Aiuto"  # type: ignore[union-attr]
+    HelpEntryFactory.create(
+        kind="route", key="home", title="Aiuto", locale=locale(other_language())
+    )
+    assert help_lookup.help_for("home", "", other_language()).title == "Aiuto"  # type: ignore[union-attr]
     assert help_lookup.help_for("home", "", "de").title == "Help"  # type: ignore[union-attr]
 
 
 def test_without_any_entry_the_lookup_is_empty_not_an_error() -> None:
     HelpEntry.objects.all().delete()
-    assert help_lookup.help_for("home", "cms.StandardPage", "en") is None
+    assert help_lookup.help_for("home", "cms.StandardPage", primary_language()) is None
 
 
 def test_the_answer_is_cached_per_language_and_dropped_when_an_entry_changes() -> None:
     entry = HelpEntryFactory.create(kind="route", key="home", title="First")
-    help_lookup.help_for("home", "", "en")
+    help_lookup.help_for("home", "", primary_language())
     with CaptureQueriesContext(connection) as queries:
-        again = help_lookup.help_for("home", "", "en")
+        again = help_lookup.help_for("home", "", primary_language())
     assert again is not None
     assert again.title == "First"
     assert len(queries) == 0
     entry.title = "Second"
     entry.save()
-    changed = help_lookup.help_for("home", "", "en")
+    changed = help_lookup.help_for("home", "", primary_language())
     assert changed is not None
     assert changed.title == "Second"
     entry.delete()
-    after = help_lookup.help_for("home", "", "en")
+    after = help_lookup.help_for("home", "", primary_language())
     assert after is not None
     assert after.source == "general"
 
 
 def test_the_body_is_rendered_from_the_stored_rich_text() -> None:
     HelpEntryFactory.create(kind="route", key="home", body="<p>Hello <b>there</b></p>")
-    found = help_lookup.help_for("home", "", "en")
+    found = help_lookup.help_for("home", "", primary_language())
     assert found is not None
     assert "<b>there</b>" in found.html
 
@@ -211,9 +217,11 @@ def test_a_hostile_parameter_is_ignored() -> None:
 
 def test_the_language_parameter_selects_the_entry_and_a_bad_one_is_ignored() -> None:
     HelpEntryFactory.create(kind="route", key="home", title="Help")
-    HelpEntryFactory.create(kind="route", key="home", title="Aiuto", locale=locale("it"))
+    HelpEntryFactory.create(
+        kind="route", key="home", title="Aiuto", locale=locale(other_language())
+    )
     client = signed_in()
-    assert "Aiuto" in client.get(URL, {"route": "home", "lang": "it"}).content.decode()
+    assert "Aiuto" in client.get(URL, {"route": "home", "lang": other_language()}).content.decode()
     assert "Help" in client.get(URL, {"route": "home", "lang": "zz"}).content.decode()
 
 
@@ -248,7 +256,7 @@ def test_a_row_written_around_the_save_hook_is_sanitised_when_rendered() -> None
         body='<p>kept</p><script>alert(1)</script><img src=x onerror="alert(2)">'
     )
     cache.clear()
-    found = help_lookup.help_for("home", "", "en")
+    found = help_lookup.help_for("home", "", primary_language())
     assert found is not None
     assert "kept" in found.html
     assert hi.active_markup(found.html) == []
@@ -261,7 +269,7 @@ def test_two_long_keys_make_cache_keys_within_the_backend_limit() -> None:
     first, second = "a" * 120, "b" * 119 + "c"
     HelpEntryFactory.create(kind="route", key=first, title="First")
     HelpEntryFactory.create(kind="page_type", key=second, title="Second")
-    found = help_lookup.help_for(first, second, "en")
+    found = help_lookup.help_for(first, second, primary_language())
     assert found is not None
     assert found.title == "First"
     keys = [str(key) for key in cache._cache]  # type: ignore[attr-defined]
@@ -271,10 +279,10 @@ def test_two_long_keys_make_cache_keys_within_the_backend_limit() -> None:
 
 def test_an_unknown_key_gets_the_general_entry_and_caches_no_new_key() -> None:
     HelpEntryFactory.create(kind="route", key="home", title="Known")
-    help_lookup.help_for("home", "", "en")
+    help_lookup.help_for("home", "", primary_language())
     before = set(cache._cache)  # type: ignore[attr-defined]
     for n in range(20):
-        found = help_lookup.help_for(f"made:up:{n}", f"cms.Made{n}", "en")
+        found = help_lookup.help_for(f"made:up:{n}", f"cms.Made{n}", primary_language())
         assert found is not None
         assert found.source == "general"
     after = set(cache._cache)  # type: ignore[attr-defined]

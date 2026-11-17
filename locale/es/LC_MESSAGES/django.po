@@ -43,6 +43,19 @@ msgid_plural "%(counter)s events"
 msgstr[0] "%(counter)s evento"
 msgstr[1] "%(counter)s eventos"
 
+#: apps/events/templates/email/events/review_digest/subject.txt
+msgid "%(counter)s event awaiting review"
+msgid_plural "%(counter)s events awaiting review"
+msgstr[0] "%(counter)s evento pendiente de revisión"
+msgstr[1] "%(counter)s eventos pendientes de revisión"
+
+#: apps/events/templates/email/events/review_digest/body.html
+#: apps/events/templates/email/events/review_digest/body.txt
+msgid "%(counter)s event is awaiting review."
+msgid_plural "%(counter)s events are awaiting review."
+msgstr[0] "%(counter)s evento está pendiente de revisión."
+msgstr[1] "%(counter)s eventos están pendientes de revisión."
+
 #: apps/orders/templates/orders/_cart_mini.html
 msgid "%(counter)s item"
 msgid_plural "%(counter)s items"
@@ -328,6 +341,11 @@ msgstr ""
 "Una lista de enlaces https a la misma empresa en otros sitios: Wikidata, Wikipedia, perfiles "
 "oficiales. Los buscadores los usan para reconocer a la empresa. Ejemplo: "
 "[\"https://www.wikidata.org/wiki/Q7\"]."
+
+#: apps/events/templates/email/events/event_changes_requested/body.html
+#: apps/events/templates/email/events/event_changes_requested/body.txt
+msgid "A moderator asked for changes to your event %(title)s before it can be published."
+msgstr "Un moderador ha solicitado cambios en su evento %(title)s antes de que pueda publicarse."
 
 #: apps/manager/event_image_form.py
 msgid "A name for the library, for example Our stand 2027. Optional."
@@ -1328,6 +1346,10 @@ msgstr "Compra para una empresa"
 msgid "Button text"
 msgstr "Texto del botón"
 
+#: apps/events/templates/events/_subscribe.html
+msgid "Calendar address to copy"
+msgstr "Dirección del calendario para copiar"
+
 #: apps/manager/event_block_forms.py
 msgid "Call to action"
 msgstr "Llamada a la acción"
@@ -1528,6 +1550,10 @@ msgstr ""
 "Cambios realizados por los titulares en los textos, las condiciones y el logotipo de su tienda. "
 "Son visibles de inmediato; revierta uno indicando un motivo y se informará a los titulares. Un "
 "cambio solo se puede revertir mientras el texto no haya vuelto a cambiar."
+
+#: apps/events/templates/email/events/event_changes_requested/subject.txt
+msgid "Changes requested on your event %(title)s"
+msgstr "Cambios solicitados en su evento %(title)s"
 
 #: apps/manager/event_views.py
 msgid "Changes requested: %(comment)s"
@@ -1738,6 +1764,11 @@ msgstr "Cerrar ahora"
 #: apps/manager/fitment_forms.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Code"
 msgstr "Código"
+
+#: apps/events/templates/email/events/event_changes_requested/body.html
+#: apps/events/templates/email/events/event_changes_requested/body.txt
+msgid "Comment"
+msgstr "Comentario"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Commission change"
@@ -2218,6 +2249,10 @@ msgstr "completado"
 msgid "Download my data"
 msgstr "Descargar mis datos"
 
+#: apps/events/templates/events/_subscribe.html
+msgid "Download the calendar (ICS)"
+msgstr "Descargar el calendario (ICS)"
+
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download your shop profile, products and order amounts as a JSON file."
 msgstr ""
@@ -2489,6 +2524,7 @@ msgstr ""
 "year\"}]. Déjelo vacío si no son necesarios. El tipo es uno de: text, number, boolean."
 
 #: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/shop/statements.html
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Facts and circumstances"
 msgstr "Hechos y circunstancias"
@@ -2731,6 +2767,7 @@ msgstr ""
 "el visitante puede desplazar lateralmente."
 
 #: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/shop/statements.html
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Ground"
 msgstr "Fundamento jurídico"
@@ -3996,6 +4033,10 @@ msgstr "Preaviso de baja"
 msgid "Notice period (days)"
 msgstr "Duración del preaviso (días)"
 
+#: apps/manager/templates/manager/shop/statements.html
+msgid "Notice reference"
+msgstr "Referencia de la notificación"
+
 #: apps/manager/sections.py apps/manager/site_map.py
 msgid "Notices"
 msgstr "Avisos"
@@ -4349,9 +4390,23 @@ msgstr "Solo cuando el evento se oculta a raíz de un aviso."
 msgid "Open passkey window"
 msgstr "Abrir la ventana de clave de acceso (passkey)"
 
+#: apps/events/templates/email/events/event_approved/body.html
+#: apps/events/templates/email/events/event_restored/body.html
+msgid "Open the event"
+msgstr "Abrir el evento"
+
+#: apps/events/templates/email/events/event_changes_requested/body.html
+#: apps/events/templates/email/events/event_changes_requested/body.txt
+msgid "Open the event to make the changes and submit it again"
+msgstr "Abra el evento para hacer los cambios y enviarlo de nuevo"
+
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "Open the public page"
 msgstr "Abrir la página pública"
+
+#: apps/events/templates/email/events/review_digest/body.html
+msgid "Open the review list"
+msgstr "Abrir la lista de revisión"
 
 #: apps/seo/templates/seo/consent/preferences.html
 msgid "Optional cookies on:"
@@ -4801,6 +4856,11 @@ msgstr "Espacio de plataforma: panel de control"
 msgid "Platform staff"
 msgstr "Personal de la plataforma"
 
+#: apps/events/templates/email/events/event_hidden/body.html
+#: apps/events/templates/email/events/event_hidden/body.txt
+msgid "Platform staff hid your event %(title)s: it is no longer shown on the site."
+msgstr "El equipo de la plataforma ha ocultado su evento %(title)s: ya no se muestra en el sitio."
+
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid ""
 "Platform staff hold one or more roles. Vendor members cannot hold a platform role. Changes need "
@@ -4841,6 +4901,12 @@ msgstr ""
 #: apps/orders/amendments.py
 msgid "Platform staff must add a note to every amendment."
 msgstr "El personal de la plataforma debe añadir una nota a cada modificación."
+
+#: apps/events/templates/email/events/event_restored/body.html
+#: apps/events/templates/email/events/event_restored/body.txt
+msgid "Platform staff restored your event %(title)s: it is shown on the site again."
+msgstr ""
+"El equipo de la plataforma ha restablecido su evento %(title)s: se muestra de nuevo en el sitio."
 
 #: apps/vendors/templates/email/vendors/profile_reverted/body.html
 #: apps/vendors/templates/email/vendors/profile_reverted/body.txt
@@ -5130,6 +5196,11 @@ msgstr "Presupuesto solicitado"
 msgid "Read more and choose"
 msgstr "Más información y elegir"
 
+#: apps/events/templates/email/events/event_hidden/body.html
+#: apps/events/templates/email/events/event_hidden/body.txt
+msgid "Read the statement of reasons"
+msgstr "Leer la exposición de motivos"
+
 #: apps/orders/templates/email/orders/order_received/body.html
 msgid "Read this version online"
 msgstr "Leer esta versión en línea"
@@ -5142,8 +5213,9 @@ msgstr "Leer esta versión en línea:"
 msgid "Readiness probe"
 msgstr "Comprobación de disponibilidad"
 
-#: apps/manager/fitment_forms.py apps/manager/forms.py
-#: apps/manager/templates/email/manager/role_self_assigned/body.html
+#: apps/events/templates/email/events/event_hidden/body.html
+#: apps/events/templates/email/events/event_hidden/body.txt apps/manager/fitment_forms.py
+#: apps/manager/forms.py apps/manager/templates/email/manager/role_self_assigned/body.html
 #: apps/manager/templates/email/manager/role_self_assigned/body.txt
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/profile_changes.html
@@ -5226,6 +5298,7 @@ msgid "Recovery codes"
 msgstr "Códigos de recuperación"
 
 #: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/statements.html
 msgid "Reference"
 msgstr "Referencia"
 
@@ -5444,6 +5517,10 @@ msgstr "Roles"
 #: apps/manager/event_block_forms.py
 msgid "Row"
 msgstr "Fila"
+
+#: apps/events/templates/events/_subscribe.html
+msgid "RSS feed"
+msgstr "Canal RSS"
 
 #: apps/manager/forms.py apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/sales_terms.html
@@ -6015,6 +6092,11 @@ msgstr "Empezar a comprar"
 msgid "Starts at"
 msgstr "Empieza a las"
 
+#: apps/manager/templates/manager/shop/statements.html
+msgid "Statement of %(date)s"
+msgstr "Exposición de motivos del %(date)s"
+
+#: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Statements of reasons"
 msgstr "Exposiciones de motivos"
@@ -6095,6 +6177,14 @@ msgstr "Enviar"
 #: apps/manager/templates/manager/shop/events.html
 msgid "Submit for review"
 msgstr "Enviar a revisión"
+
+#: apps/events/templates/events/_subscribe.html
+msgid "Subscribe"
+msgstr "Suscribirse"
+
+#: apps/events/templates/events/_subscribe.html
+msgid "Subscribe in your calendar app"
+msgstr "Suscribirse en tu aplicación de calendario"
 
 #: apps/manager/amendment_views.py
 msgid "Substantial change: it needs the customer's acceptance, which is not available yet"
@@ -7289,6 +7379,11 @@ msgstr ""
 "comercial. Necesaria con un archivo nuevo. Ejemplo: «Obra propia» para un logotipo que nos ha "
 "facilitado la marca."
 
+#: apps/events/templates/email/events/event_changes_requested/body.html
+#: apps/events/templates/email/events/event_changes_requested/body.txt
+msgid "The link works once and expires on %(expires)s (UTC)."
+msgstr "El enlace funciona una sola vez y caduca el %(expires)s (UTC)."
+
 #: apps/cms/models.py
 msgid ""
 "The links of the menu, in the order shown. Add a page of this site or a link to another website. "
@@ -7864,6 +7959,10 @@ msgid ""
 msgstr ""
 "La plataforma no emite su factura. Registre aquí cuándo la ha emitido, para que cada cambio "
 "posterior le recuerde corregirla."
+
+#: apps/manager/templates/manager/shop/statements.html
+msgid "The platform has sent no statement of reasons for your shop."
+msgstr "La plataforma no ha enviado ninguna exposición de motivos para su tienda."
 
 #: apps/manager/amendment_views.py
 msgid "the platform owner"
@@ -8942,6 +9041,11 @@ msgstr ""
 "Este evento ha sido modificado por otra persona desde que lo abrió. Vuelva a cargar la página y "
 "repita el cambio."
 
+#: apps/events/templates/email/events/event_hidden/body.html
+#: apps/events/templates/email/events/event_hidden/body.txt
+msgid "This follows a notice (reference %(dsa_notice_ref)s)."
+msgstr "Esto sigue a una notificación (referencia %(dsa_notice_ref)s)."
+
 #: apps/orders/amendments.py
 msgid ""
 "This is a business order, so the address cannot be moved to %(place)s without a new VAT number "
@@ -9597,6 +9701,10 @@ msgstr "Sesiones de usuario"
 msgid "Uses a year"
 msgstr "Usa un año"
 
+#: apps/manager/templates/manager/shop/statements.html
+msgid "Valid until"
+msgstr "Válido hasta"
+
 #: apps/orders/ui/present.py apps/orders/ui/views.py
 msgid "VAT"
 msgstr "IVA"
@@ -9896,6 +10004,10 @@ msgstr "Qué ha cambiado:"
 #: apps/manager/templates/manager/amendment.html
 msgid "What changes"
 msgstr "Qué cambia"
+
+#: apps/manager/templates/manager/shop/statements.html
+msgid "What is restricted"
+msgstr "Qué está restringido"
 
 #: apps/compliance/forms.py
 msgid "What is restricted, where and for how long, in plain words. The vendor sees this text."
@@ -10709,6 +10821,23 @@ msgid ""
 msgstr ""
 "Su número EORI, el código aduanero de las empresas que mueven mercancías hacia o desde la UE. "
 "Déjelo vacío si no tiene uno."
+
+#: apps/events/templates/email/events/event_restored/subject.txt
+msgid "Your event %(title)s is back online"
+msgstr "Su evento %(title)s vuelve a estar en línea"
+
+#: apps/events/templates/email/events/event_approved/subject.txt
+msgid "Your event %(title)s was approved"
+msgstr "Su evento %(title)s ha sido aprobado"
+
+#: apps/events/templates/email/events/event_approved/body.html
+#: apps/events/templates/email/events/event_approved/body.txt
+msgid "Your event %(title)s was approved and is now published."
+msgstr "Su evento %(title)s ha sido aprobado y ya está publicado."
+
+#: apps/events/templates/email/events/event_hidden/subject.txt
+msgid "Your event %(title)s was hidden"
+msgstr "Su evento %(title)s ha sido ocultado"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Your factors"
