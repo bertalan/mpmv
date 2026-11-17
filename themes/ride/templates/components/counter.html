@@ -1,0 +1,10 @@
+{% load i18n %}{% comment %}
+Counter ("fun fact") of the `ride` theme (THM.14): the final number is in the HTML. `js/reveal.js`
+counts up to it once when the counter scrolls into view (never under `prefers-reduced-motion`).
+The animated digits are `aria-hidden`; a visually hidden copy gives screen readers the final
+value only. Without JavaScript the number simply shows.
+
+  {% include "components/counter.html" with value=1250 label=_("Orders shipped") suffix="+" only %}
+
+Context: `value` (required, an integer), `label` (required), `suffix` (optional, e.g. "+" or "%").
+{% endcomment %}<p class="ride-counter" data-counter="{{ value|stringformat:'d' }}"><span class="ride-counter__number" aria-hidden="true"><span data-counter-text>{{ value|floatformat:"0g" }}</span>{{ suffix }}</span><span class="visually-hidden">{{ value|floatformat:"0g" }}{{ suffix }}</span> <span class="ride-counter__label">{{ label }}</span></p>

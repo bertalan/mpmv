@@ -53,6 +53,7 @@ from apps.core.i18n import configured_languages, hreflang_alternates
 from apps.core.image_licences import Credit
 from apps.core.money import CURRENCY
 from apps.core.services import run_mutation
+from apps.core.site_url import absolute_url
 from apps.vendors.models import Vendor
 
 from . import engine
@@ -1106,13 +1107,13 @@ def vendor_landing_context(page: Any, request: HttpRequest | None) -> dict[str, 
     def absolute(url: str | None) -> str | None:
         if not url:
             return None
-        return request.build_absolute_uri(url) if request is not None else url
+        return absolute_url(request, url) if request is not None else url
 
     found: dict[str, str] = {}
     for code, url in page_language_urls(page, request).items():
-        absolute_url = absolute(url)
-        if absolute_url is not None:
-            found[code] = absolute_url
+        abs_url = absolute(url)
+        if abs_url is not None:
+            found[code] = abs_url
     alternates = hreflang_alternates(found)
     return {
         "featured": grid,

@@ -290,6 +290,11 @@ def test_transitions_only_inside_prefers_reduced_motion_no_preference(sources: s
     outside = code
     for body in allowed:
         outside = outside.replace(body, "")
+    # THM.14: under `reduce` a rule may only switch the transition off.
+    for prelude, body in _media_blocks(code):
+        if "prefers-reduced-motion: reduce" in prelude:
+            assert not re.search(r"transition[\w-]*:\s*(?!none\b)\S", body), prelude
+            outside = outside.replace(body, "")
     assert "transition" not in outside
     assert "animation" not in outside
     assert any("transition" in body for body in allowed)
@@ -312,7 +317,7 @@ def test_nothing_the_brief_drops_is_shipped(sources: str) -> None:
         assert banned not in sources, banned
     for path in (RIDE / "templates").rglob("*.html"):
         text = path.read_text(encoding="utf-8")
-        assert "autoplay" not in text, path
+        assert "data-bs-ride" not in text, path  # THM.14: rotation is opt-in, by `autoplay`
         assert "<video" not in text, path
         assert "marquee" not in text, path
 

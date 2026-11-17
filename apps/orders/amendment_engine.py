@@ -64,15 +64,17 @@ SUPPORT: Final = "support"
 INITIATORS: Final = (VENDOR_OWNER, VENDOR_MEMBER, PLATFORM_OWNER, SUPPORT)
 STAFF_INITIATORS: Final = frozenset({PLATFORM_OWNER, SUPPORT})
 
-# Operator setting `amendment_comparable_delay_days` (D-47): the default until the Manager
-# setting exists (ORD.20 part 3).
+# Operator settings (D-47, owner 2026-11-16): the code defaults of `amendment_answer_hours` and
+# `amendment_comparable_delay_days`; the services read the `PlatformOperator` version in force
+# (`amendments.amendment_settings`), whose field defaults are the same numbers.
+DEFAULT_ANSWER_HOURS: Final = 72
 DEFAULT_COMPARABLE_DELAY_DAYS: Final = 2
 
 # An amendment is possible only before shipping (spec 07: "When").
 AMENDABLE_VENDOR_ORDER_STATES: Final = frozenset({"pending", "accepted"})
 # After a partial unavailability the package cannot be shipped for this many hours, unless the
 # customer answers the cancel-the-rest offer earlier (operator setting
-# `amendment_cancel_hold_hours`, default 24; the Manager setting comes with ORD.20 part 3).
+# `amendment_cancel_hold_hours`, default 24, read by the services from the operator).
 DEFAULT_CANCEL_HOLD_HOURS: Final = 24
 # A draft nobody touched for this long is discarded (spec 07, Concurrency).
 DRAFT_IDLE_MINUTES: Final = 60

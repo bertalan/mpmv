@@ -31,6 +31,7 @@ from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, OutboxEmail
 from apps.core.services import render_email
 from apps.vendors import engine, services
@@ -212,7 +213,7 @@ def test_the_service_supports_dry_run() -> None:
         email=data["email"],
         business_name=data["business_name"],
         country=data["country"],
-        language="en",
+        language=primary_language(),
         ctx=SYSTEM,
         dry_run=True,
     )
@@ -232,7 +233,7 @@ def test_vendor_validation_fails_the_same_way_for_new_and_existing_addresses() -
                 email=address,
                 business_name="Ada Workshop",
                 country="US",  # outside the allowed countries
-                language="en",
+                language=primary_language(),
                 ctx=SYSTEM,
             )
     assert not OutboxEmail.objects.exists()

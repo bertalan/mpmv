@@ -1,0 +1,15 @@
+{% load i18n %}{% comment %}
+The results of the list and the archive (EVT.6): a count, the events grouped by month under their
+own headings, and the pagination. Context: `total`, `groups`, `empty_text`, pagination values.
+{% endcomment %}
+<section aria-labelledby="event-results-title">
+  <h2 id="event-results-title" class="visually-hidden">{% translate "Events" %}</h2>
+  <p role="status">{% blocktranslate count counter=total %}{{ counter }} event{% plural %}{{ counter }} events{% endblocktranslate %}</p>
+  {% for month_start, month_items in groups %}
+    <h3 class="event-month">{{ month_start|date:"F Y" }}</h3>
+    {% for item in month_items %}{% include "events/_summary.html" %}{% endfor %}
+  {% empty %}
+    <p>{{ empty_text }}</p>
+  {% endfor %}
+  {% include "components/pagination.html" with page=page_number page_count=page_count previous_url=previous_url next_url=next_url only %}
+</section>

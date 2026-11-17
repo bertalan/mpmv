@@ -28,6 +28,7 @@ from apps.cms import engine
 from apps.cms.tests.factories import HelpEntryFactory
 from apps.compliance.tests.factories import NoticeFactory, TerminationNoticeFactory
 from apps.events.tests.factories import EventPageFactory, primary_index
+from apps.fitment.tests.factories import FitmentNodeFactory
 from apps.manager.checks import manager_routes
 from apps.orders.tests.factories import paid_vendor_order
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
@@ -61,6 +62,13 @@ NOT_PAGES = (
     "manager:platform:profile_confirm",  # POST only, redirects to the changes page
     "manager:shop:termination_data",  # a JSON file download, not a page
     "manager:platform:user_sessions_find",  # POST only, redirects to the sessions page
+    # ORD.20 part 3: POST only, they redirect to the amendment page (or show the passkey prompt).
+    "manager:shop:amendment_apply",
+    "manager:shop:amendment_discard",
+    "manager:shop:order_cancel",
+    "manager:platform:amendment_apply",
+    "manager:platform:amendment_discard",
+    "manager:platform:order_cancel",
     *MODAL_FRAGMENTS,
 )
 
@@ -161,6 +169,13 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:sessions_panic": "platform",
         "manager:platform:terminations": "platform",
         "manager:platform:termination": "platform",
+        "manager:platform:fitment_scheme": "platform",  # FIT.1 part 2
+        "manager:platform:fitment_categories": "platform",
+        "manager:platform:fitment_nodes": "platform",
+        "manager:platform:fitment_proposals": "platform",
+        "manager:platform:fitment_node_new": "platform",
+        "manager:platform:fitment_node": "platform",
+        "manager:platform:fitment_node_merge": "platform",
         "manager:shop:termination": "shop",
         "manager:shop:sales_terms": "shop",
         "manager:shop:events": "shop",  # EVT.4
@@ -169,6 +184,10 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:event_cancel": "shop",  # the confirmation page
         "manager:shop:event_block_add": "shop",  # EVT.4 part 2
         "manager:shop:event_images": "shop",
+        "manager:shop:order_amend": "shop",  # ORD.20 part 3
+        "manager:platform:orders": "platform",
+        "manager:platform:order": "platform",
+        "manager:platform:amendment_settings": "platform",
     }
 
 
@@ -176,7 +195,7 @@ def _open(name: str) -> tuple[Client, str]:
     if _manager_pages()[name] == "shop":
         user, vendor = _shop_owner()
         kwargs = {}
-        if name == "manager:shop:order":
+        if name in ("manager:shop:order", "manager:shop:order_amend"):
             kwargs = {"public_id": paid_vendor_order(vendor).public_id}  # type: ignore[arg-type]
         if name in (
             "manager:shop:event_edit",
@@ -201,6 +220,10 @@ def _open(name: str) -> tuple[Client, str]:
             kwargs = {"public_id": NoticeFactory.create().public_id}
         if name == "manager:platform:termination":
             kwargs = {"public_id": TerminationNoticeFactory.create().public_id}
+        if name in ("manager:platform:fitment_node", "manager:platform:fitment_node_merge"):
+            kwargs = {"public_id": FitmentNodeFactory.create().public_id}
+        if name == "manager:platform:order":
+            kwargs = {"public_id": paid_vendor_order().public_id}
     client = Client()
     verified_login(client, user)  # type: ignore[arg-type]
     return client, reverse(name, kwargs=kwargs)

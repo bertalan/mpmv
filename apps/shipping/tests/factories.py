@@ -11,6 +11,7 @@ from decimal import Decimal
 import factory
 from factory.django import DjangoModelFactory
 
+from apps.core.i18n import primary_language
 from apps.shipping import engine
 from apps.shipping.config_format import empty_document
 from apps.shipping.models import (
@@ -47,7 +48,7 @@ class CarrierTranslationFactory(DjangoModelFactory[CarrierTranslation]):
         model = CarrierTranslation
 
     carrier = factory.SubFactory(CarrierFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     label = factory.Sequence(lambda n: f"Carrier {n}")
 
 
@@ -66,7 +67,7 @@ class CountryGroupTranslationFactory(DjangoModelFactory[CountryGroupTranslation]
         model = CountryGroupTranslation
 
     country_group = factory.SubFactory(CountryGroupFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     name = factory.Sequence(lambda n: f"Group {n}")
 
 
@@ -123,7 +124,7 @@ class ShippingMethodTranslationFactory(DjangoModelFactory[ShippingMethodTranslat
         model = ShippingMethodTranslation
 
     method = factory.SubFactory(ShippingMethodFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     name = "Standard courier"
 
 
@@ -153,7 +154,7 @@ class PickupOptionTranslationFactory(DjangoModelFactory[PickupOptionTranslation]
         model = PickupOptionTranslation
 
     pickup_option = factory.SubFactory(PickupOptionFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     label = "Pick up at the shop"
 
 

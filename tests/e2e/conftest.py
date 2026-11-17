@@ -39,6 +39,25 @@ def _cms_site(request: pytest.FixtureRequest) -> None:
     from apps.cms.services import seed_site
 
     seed_site()
+    # Canonical, hreflang and JSON-LD URLs come from the Wagtail site root, never the Host
+    # header (I18N.6): point the default site at the live server so the root is its URL.
+    from urllib.parse import urlsplit
+
+    from wagtail.models import Site
+
+    live = urlsplit(request.getfixturevalue("live_server").url)
+    Site.objects.filter(is_default_site=True).update(hostname=live.hostname, port=live.port or 80)
+
+
+@pytest.fixture
+def site_allows_indexing(_cms_site: None) -> None:
+    """The site's indexing switch on: only an indexable page prints canonical and hreflang."""
+    from django.apps import apps
+    from wagtail.models import Site
+
+    apps.get_model("seo", "SeoSettings").objects.update_or_create(
+        site=Site.objects.get(is_default_site=True), defaults={"allow_indexing": True}
+    )
 
 
 @pytest.fixture

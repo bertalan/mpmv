@@ -1,0 +1,172 @@
+/* Ride motion and small components (THM.14 part 2): scroll reveal, counters, progress bar,
+   section title, the launch countdown and the video button. Tokens only. Content is visible by
+   default: a revealed element is hidden only once `js/reveal.js` is running (it adds `reveal-ready`
+   to <html>; no module, nothing hidden), only when the visitor has not asked for reduced motion,
+   and never in print; the module then adds `.is-visible`. */
+@layer overrides {
+  @media screen and (prefers-reduced-motion: no-preference) {
+    html.reveal-ready [data-reveal] {
+      transform: translateY(var(--space-m));
+      opacity: 0;
+      transition:
+        opacity 0.5s ease-out,
+        transform 0.5s ease-out;
+    }
+
+    html.reveal-ready [data-reveal].is-visible {
+      transform: none;
+      opacity: 1;
+    }
+  }
+
+  /* --- Counters. */
+  .ride-counter {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin: 0;
+  }
+
+  .ride-counter__number {
+    color: var(--color-accent);
+    font-family: var(--font-display);
+    font-size: var(--step-4);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .ride-counter__label {
+    color: var(--color-text-muted);
+    font-size: var(--step-0);
+  }
+
+  /* --- Progress: the native element, drawn like Bootstrap's bar. */
+  .ride-progress {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-xs) var(--space-s);
+    align-items: center;
+    margin-block-end: var(--space-m);
+  }
+
+  .ride-progress__bar {
+    grid-column: 1 / -1;
+    inline-size: 100%;
+    block-size: 0.75rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--color-border);
+    appearance: none;
+    overflow: hidden;
+  }
+
+  .ride-progress__bar::-webkit-progress-bar {
+    background: var(--color-border);
+  }
+
+  .ride-progress__bar::-webkit-progress-value {
+    background: var(--color-accent);
+  }
+
+  .ride-progress__bar::-moz-progress-bar {
+    background: var(--color-accent);
+  }
+
+  .ride-progress__label {
+    font-weight: 600;
+  }
+
+  .ride-progress__value {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ride-progress__label,
+  .ride-progress__value {
+    grid-row: 1;
+  }
+
+  /* --- Section title: overline, heading, short accent rule. */
+  .ride-section-title {
+    margin-block: 0 var(--space-l);
+  }
+
+  .ride-section-title__overline {
+    margin-block: 0 var(--space-xs);
+    color: var(--color-secondary-text);
+    font-family: var(--font-display);
+    font-size: var(--step-1);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .ride-section-title__heading {
+    margin-block: 0;
+  }
+
+  .ride-section-title__heading::after {
+    display: block;
+    inline-size: 3.5rem;
+    block-size: 0.25rem;
+    margin-block-start: var(--space-s);
+    background: var(--color-secondary);
+    content: "";
+  }
+
+  .ride-section-title__text {
+    margin-block: var(--space-s) 0;
+    color: var(--color-text-muted);
+  }
+
+  /* --- Launch countdown (the markup keeps base's hooks). */
+  .ride-countdown.launch-countdown {
+    border: 0;
+    border-inline-start: 0.375rem solid var(--color-secondary);
+    border-radius: var(--card-radius);
+    background: var(--color-surface-inverse);
+    color: var(--color-text-inverse);
+  }
+
+  .ride-countdown .launch-countdown__title {
+    color: var(--color-text-inverse);
+    font-size: var(--step-3);
+  }
+
+  .ride-countdown .launch-countdown__date {
+    color: var(--color-text-inverse);
+  }
+
+  .ride-countdown__remaining {
+    font-family: var(--font-display);
+    font-size: var(--step-2);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+
+  .ride-countdown .btn-link {
+    color: var(--color-text-inverse);
+  }
+
+  .ride-countdown .btn-link:hover {
+    color: var(--color-secondary);
+  }
+
+  /* --- Video button and modal. */
+  .ride-video__open {
+    display: inline-flex;
+    gap: var(--space-xs);
+    align-items: center;
+    min-block-size: var(--target-primary);
+  }
+
+  .ride-video__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
+  }
+
+  .ride-video [data-video-frame] iframe {
+    border: 0;
+  }
+}

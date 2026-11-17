@@ -4,9 +4,11 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
+from apps.core.i18n import primary_language
 from apps.vendors import engine
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -102,7 +104,7 @@ def test_translations_hold_tagline_description_and_policies() -> None:
     vendor = VendorFactory.create()
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="en",
+        language=primary_language(),
         tagline="Outdoor gear",
         description="Family business.",
         shipping_policy="Ships in 2 days.",
@@ -110,9 +112,14 @@ def test_translations_hold_tagline_description_and_policies() -> None:
         cancellation_policy="Cancel before shipping.",
     )
     # Model defaults under test: blank texts and policies, so no factory values here.
-    VendorTranslation.objects.create(vendor=vendor, language="it", tagline="Attrezzatura")
-    assert sorted(vendor.translations.values_list("language", flat=True)) == ["en", "it"]
-    it = vendor.translations.get(language="it")
+    VendorTranslation.objects.create(
+        vendor=vendor, language=other_language(), tagline="Attrezzatura"
+    )
+    assert sorted(vendor.translations.values_list("language", flat=True)) == [
+        "en",
+        other_language(),
+    ]
+    it = vendor.translations.get(language=other_language())
     assert it.description == ""
     assert it.shipping_policy == ""
 
@@ -120,12 +127,12 @@ def test_translations_hold_tagline_description_and_policies() -> None:
 def test_one_translation_per_vendor_and_language() -> None:
     vendor = VendorFactory.create(languages=["en"])
     with pytest.raises(IntegrityError), transaction.atomic():
-        VendorTranslationFactory.create(vendor=vendor, language="en")
+        VendorTranslationFactory.create(vendor=vendor, language=primary_language())
 
 
 def test_same_language_is_allowed_for_different_vendors() -> None:
-    VendorTranslationFactory.create_batch(2, language="en")
-    assert VendorTranslation.objects.filter(language="en").count() == 2
+    VendorTranslationFactory.create_batch(2, language=primary_language())
+    assert VendorTranslation.objects.filter(language=primary_language()).count() == 2
 
 
 def test_translation_language_must_be_a_configured_language() -> None:

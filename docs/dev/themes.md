@@ -356,3 +356,43 @@ Point `settings.MPMV_THEMES_DIR` at a temporary directory and write the themes a
 sources; `shipped_tokens()` is a token set that meets the contract; `shipped_templates()` gives
 the shipped `base` templates, which a test `base` needs to render real pages); changing a `MPMV_THEME*`
 setting clears the registry cache. `SiteFactory` and `ThemeSettingsFactory` are in `apps.themes.tests.factories`.
+
+## `ride` carousels (THM.14 part 1)
+
+- Components in `themes/ride/templates/components/`: `hero_slider.html` (slides are the hero
+  component; slide titles `<h2>`, the page's one `<h1>` stays outside), `strip.html` (items grouped
+  by the `in_groups` filter, `per_view` 1 to 4, the group wraps on a narrow screen), `gallery.html`
+  (replaces base's list: thumbnail buttons plus base's `<dialog>` zoom) and the shared
+  `carousel_controls.html` (Previous, Pause/Play, Next).
+- They are Bootstrap carousels (`.carousel.slide`) with `aria-roledescription="carousel"`, slides
+  as `role="group"` with `aria-roledescription="slide"` and a "n of m" label, and labelled indicator
+  buttons. Bootstrap does the sliding and the arrow keys; `js/carousel.js` reveals the controls
+  and owns rotation: off unless the context sets `autoplay` (then `data-autoplay` holds the
+  interval), paused while the pointer or the focus is inside, never under
+  `prefers-reduced-motion` (the Pause/Play button is hidden then), and a polite live region
+  while nothing rotates.
+- Without JavaScript (`html.no-js`) every slide is shown in turn and the controls stay `hidden`.
+- `js/carousel.js` is loaded by `carousel_controls.html` itself (a module with the same URL runs
+  once), so a page without a carousel never fetches it.
+- CMS blocks (part 3): `HeroBlock` (layout, slides), `StripBlock`, `GalleryBlock` (the carousel
+  with thumbnails; `base` keeps its list), `CounterBlock`, `ProgressBlock`, `SectionTitleBlock`
+  and `VideoModalBlock` (YouTube and Vimeo addresses only, the no-tracking embed, consent-gated;
+  a CSP `frame-src` per provider is an operations follow-up). `base` renders a plain fallback of
+  each. The demo seed's showcase page (`/demo-showcase/`) places one of each.
+
+## `ride` reveal, counters and video (THM.14 part 2)
+
+- `js/reveal.js` adds `.is-visible` to `[data-reveal]` elements and counts `[data-counter]` up
+  once. The CSS hides a revealed element only with JavaScript on (`html:not(.no-js)`) and inside
+  `prefers-reduced-motion: no-preference`; otherwise everything is visible at once and nothing
+  animates. The counter's final number is in the HTML (an `aria-hidden` animated copy, a visually
+  hidden final value for screen readers).
+- Components: `counter.html`, `progress.html` (native `<progress>`, label and value as text),
+  `section_title.html` (overline and heading), `launch_countdown.html` (a copy of base's with the
+  same hooks and text, Bootstrap buttons and `ride-countdown`), `video_modal.html`.
+- `video_modal.html` is a plain link to the video first. With JavaScript it opens a Bootstrap
+  modal; `js/video.js` creates the `<iframe>` only when `window.mpmvConsent.allows("marketing")`,
+  else the modal shows a placeholder with a link to the cookie settings. No request goes to the
+  video site before consent. The provider's origin must be added to the CSP `frame-src` by a
+  reviewed setting (none is added here); until then the browser blocks the frame.
+- Not wired to the CMS yet (no block fields); the cta block carries `data-reveal` as the first use.
