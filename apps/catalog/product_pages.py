@@ -16,7 +16,7 @@ from typing import Any
 from django.conf import settings
 from django.db.models import Count, Q, prefetch_related_objects
 
-from apps.core import images, translations
+from apps.core import translations
 from apps.core.models import MediaImage
 from apps.vendors import services as vendors
 from apps.vendors.models import Vendor
@@ -233,14 +233,12 @@ def related(page: ProductPage, language: str | None = None) -> Sequence["service
 
 def gallery_items(page: ProductPage) -> list[dict[str, Any]]:
     """The gallery as the `components/gallery.html` context: the `image` renders as a
-    `<picture>` (AVIF, WebP, JPEG) and `url` is the JPEG fallback used by thumbnails."""
+    `<picture>` (AVIF, WebP, JPEG). No rendition is looked up or created here."""
     items: list[dict[str, Any]] = []
     for item in page.gallery:
-        spec = images.picture_specs("card", formats=("jpeg",), svg=bool(item.image.is_svg()))[0]
         items.append(
             {
                 "image": item.image,
-                "url": item.image.get_rendition(spec).url,
                 "alt": item.alt,
                 "caption": item.caption,
             }

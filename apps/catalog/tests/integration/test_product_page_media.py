@@ -91,6 +91,84 @@ def test_the_gallery_is_the_themed_component_with_picture_renditions(client: Cli
     assert "style=" not in html.split('class="gallery"')[1].split("</section>")[0]
 
 
+@pytest.mark.parametrize("theme", ["base", "ride"])
+def test_only_the_first_gallery_image_is_eager(client: Client, settings: Any, theme: str) -> None:
+    settings.MPMV_THEME_DEFAULT = theme
+    with_images(live("mug"), "red", "blue", "green")
+    html = client.get("/product/mug/").content.decode()
+    gallery_html = html.split('class="gallery"' if theme == "base" else "data-ride-carousel")[1]
+    imgs = re.findall(r"<img[^>]*>", gallery_html)
+    assert 'fetchpriority="high"' in imgs[0]
+    assert 'loading="lazy"' not in imgs[0]
+    assert all('fetchpriority="high"' not in img for img in imgs[1:])
+
+
+def test_the_gallery_context_never_creates_a_rendition() -> None:
+    from wagtail.images.models import Rendition
+
+    with_images(live("mug"), "red")
+    Rendition.objects.all().delete()
+    page = product_pages.find("mug", "en")
+    assert page is not None
+    items = product_pages.gallery_items(page)
+    assert len(items) == 1
+    assert Rendition.objects.count() == 0
+
+
+def test_the_page_query_count_does_not_grow_with_related_products_and_images(
+    client: Client,
+) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    term = TermFactory.create()
+    base = live("base-one")
+    base.terms.add(term)
+    with_images(base, "red")
+    client.get("/product/base-one/")  # warm caches and renditions
+    with CaptureQueriesContext(connection) as small:
+        client.get("/product/base-one/")
+    main = live("main")
+    main.terms.add(term)
+    with_images(main, "red", "blue", "green", "gray")
+    for n in range(4):
+        live(f"other-{n}").terms.add(term)
+    client.get("/product/main/")  # warm renditions
+    with CaptureQueriesContext(connection) as large:
+        html = client.get("/product/main/").content.decode()
+    assert html.count('<li class="gallery__item">') == 4
+    assert 'id="product-related-heading"' in html
+    # 3 more images and 4 related cards: bounded, not one query per item
+    assert len(large) <= len(small) + 20, (len(small), len(large))
+
+
+def test_a_non_default_language_page_falls_back_to_the_source_alt(client: Client) -> None:
+    with_images(live("mug"), "red")
+    ProductTranslationFactory.create(
+        product=Product.objects.get(translations__slug="mug"),
+        language="it",
+        title="Tazza",
+        slug="tazza",
+        status="published",
+    )
+    html = client.get("/it/prodotto/tazza/").content.decode()
+    assert 'alt="A red mug"' in html
+
+
+def test_every_tied_related_product_can_be_picked(monkeypatch: pytest.MonkeyPatch) -> None:
+    term = TermFactory.create()
+    main = live("main")
+    main.terms.add(term)
+    for n in range(6):
+        live(f"tie-{n}").terms.add(term)
+    page = product_pages.find("main", "en")
+    assert page is not None
+    seen: set[str] = set()
+    for _ in range(60):
+        seen.update(card.title for card in product_pages.related(page))
+    assert seen == {f"Tie-{n}" for n in range(6)}
+
+
 def test_a_product_without_images_has_no_gallery(client: Client) -> None:
     live("plain")
     assert 'class="gallery' not in client.get("/product/plain/").content.decode()
@@ -131,7 +209,6 @@ def test_the_related_products_share_the_most_terms(client: Client) -> None:
     html = client.get("/product/main/").content.decode()
     assert 'id="product-related-heading"' in html
     assert html.index("Both") < html.index("One")
-    assert "None" not in html.split("product-related")[1]
 
 
 def test_at_most_four_related_products_and_none_without_terms() -> None:

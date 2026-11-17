@@ -16,7 +16,7 @@ Context:
 {% endcomment %}<section class="gallery" aria-label="{{ label }}">
   {% if images %}<ul class="gallery__list" role="list">
     {% for image in images %}{% blocktranslate asvar fallback with count=forloop.counter total=images|length %}{{ label }}, image {{ count }} of {{ total }}{% endblocktranslate %}{% firstof image.alt fallback as name %}<li class="gallery__item">
-      {% if image.image %}{% responsive_image image.image "content" alt=image.alt %}{% else %}<img src="{{ image.url }}" alt="{{ image.alt }}" width="{{ image.width|default:800 }}" height="{{ image.height|default:800 }}"{% if not forloop.first %} loading="lazy"{% endif %}>{% endif %}
+      {% if image.image %}{% responsive_image image.image "content" alt=image.alt priority=forloop.first %}{% else %}<img src="{{ image.url }}" alt="{{ image.alt }}" width="{{ image.width|default:800 }}" height="{{ image.height|default:800 }}"{% if not forloop.first %} loading="lazy"{% endif %}>{% endif %}
       {% if image.caption %}<p class="gallery__caption">{{ image.caption }}</p>{% endif %}
       <button type="button" class="button button--secondary button--small gallery__zoom" data-dialog="{{ id }}-{{ forloop.counter }}" aria-haspopup="dialog" hidden>{% include "components/icon.html" with name="zoom" only %}{% translate "Enlarge" %}<span class="visually-hidden">: {{ name }}</span></button>
       <dialog class="dialog dialog--image" id="{{ id }}-{{ forloop.counter }}" aria-label="{{ name }}">
