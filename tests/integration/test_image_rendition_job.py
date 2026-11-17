@@ -109,3 +109,100 @@ def test_the_gallery_carousel_slide_uses_the_rendition_and_never_builds_one() ->
     assert slide["url"] != image.file.url
     assert slide["url"] != slide["large_url"]
     assert slide["width"] == 800
+
+
+# --- Review round 2: one job per changed file ---------------------------------------------------
+
+
+def _todo() -> int:
+    return len(core_tasks.list_jobs(JOB, status="todo"))
+
+
+def test_two_saves_of_the_same_image_queue_one_job() -> None:
+    image = MediaImageFactory.create()
+    image.title = "Again"
+    image.save()
+    image.refresh_from_db()
+    image.save()
+    assert _todo() == 1
+
+
+def test_a_metadata_only_save_queues_nothing() -> None:
+    image = MediaImageFactory.create()
+    render_image(image_id=image.pk)
+    base = _todo()
+    fresh = MediaImage.objects.get(pk=image.pk)
+    fresh.title = "Other title"
+    fresh.save(update_fields=["title"])
+    fresh.save()  # a full save of an unchanged file
+    assert _todo() == base
+
+
+def test_a_replaced_file_queues_a_job() -> None:
+    image = MediaImageFactory.create()
+    fresh = MediaImage.objects.get(pk=image.pk)
+    before = _todo()
+    fresh.file = SimpleUploadedFile("new.png", png())
+    fresh.save()
+    assert _todo() >= before
+    assert _todo() >= 1
+
+
+def test_a_fixture_load_queues_nothing() -> None:
+    from django.core import serializers
+
+    image = MediaImageFactory.create()
+    data = serializers.serialize("json", [MediaImage.objects.get(pk=image.pk)])
+    MediaImage.objects.filter(pk=image.pk).delete()
+    before = _todo()
+    for obj in serializers.deserialize("json", data):
+        obj.save()  # raw=True
+    assert _todo() == before
+
+
+def test_the_queueing_lock_is_per_image() -> None:
+    a = MediaImageFactory.create()
+    b = MediaImageFactory.create()
+    assert a.pk != b.pk
+    assert _todo() == 2
+    assert core_tasks.enqueue(render_image, image_id=a.pk, queueing_lock=f"{JOB}:{a.pk}") is None
+
+
+def test_an_upload_through_upload_image_queues_one_job() -> None:
+    from apps.catalog.media import upload_image
+    from apps.catalog.tests.factories import ProductFactory
+
+    product = ProductFactory.create()
+    licence = MediaImageFactory.create().licence
+    before = _todo()
+    upload_image(
+        product,
+        file=SimpleUploadedFile("p.png", png(), content_type="image/png"),
+        title="P",
+        licence=licence,
+        author="Vendor A",
+        ctx=AuditContext(actor_label="system:test", source="system"),
+    )
+    assert _todo() == before + 1
+
+
+def test_a_corrupt_file_is_logged_and_not_retried(caplog: pytest.LogCaptureFixture) -> None:
+    image = MediaImageFactory.create()
+    from django.core.files.storage import default_storage
+
+    default_storage.delete(image.file.name)
+    default_storage.save(image.file.name, SimpleUploadedFile("x.png", b"not an image"))
+    with caplog.at_level("WARNING"):
+        render_image(image_id=image.pk)  # no exception: nothing to retry
+    assert any("core.render_image" in r.getMessage() for r in caplog.records)
+
+
+def test_an_svg_image_runs_render_all_without_error() -> None:
+    from tests.integration.test_modern_image_formats import SAFE_SVG, _svg_image
+
+    image = _svg_image(SAFE_SVG)
+    image.save()
+    image = MediaImage.objects.get(pk=image.pk)
+    assert image.is_svg()
+    render_image(image_id=image.pk)
+    assert any("fill-240x240" in s or "width-" in s for s in _specs(image))
