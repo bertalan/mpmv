@@ -4,17 +4,18 @@
 Event page (EVT.1 part 2/2, spec 15 "Public pages"): a minimal page on the base theme layout.
 Dates are in the page's language and the event's own time zone, with machine-readable
 `<time datetime>` values; the type is text. No inline script or style (CSP, spec 14 §14.5).
-EVT.6 adds the ICS and report links, robots rules and the linked products; EVT.15 the map.
+EVT.6 adds the ICS and report links and the robots rule (cancelled or long-past events are
+noindex); the linked products come with EVT.8/EVT.15, the map with EVT.15.
 {% endcomment %}
-{% block head %}{% page_hreflang %}{% endblock %}
+{% block head %}{% if robots %}{% robots_meta robots %}{% endif %}{% endblock %}
 {% block page_content %}
   <article class="event">
     <header>
       <h1>{{ page.title }}</h1>
-      {% if page.cancelled_at %}<p role="status"><strong>{% translate "Cancelled" %}</strong></p>{% endif %}
+      {% if page.cancelled_at %}<p role="status" class="event-status">{% translate "Cancelled" %}</p>{% endif %}
       <p>{{ page.summary }}</p>
     </header>
-    <dl>
+    <dl class="event-facts">
       <dt>{% translate "When" %}</dt>
       <dd>
         {% if page.all_day %}
@@ -32,7 +33,7 @@ EVT.6 adds the ICS and report links, robots rules and the linked products; EVT.1
       <dd>{{ page.get_event_type_display }}</dd>
       {% if page.vendor %}
         <dt>{% translate "Vendor" %}</dt>
-        <dd>{{ page.vendor.display_name }}</dd>
+        <dd>{% if vendor_href %}<a href="{{ vendor_href }}">{{ page.vendor.display_name }}</a>{% else %}{{ page.vendor.display_name }}{% endif %}</dd>
       {% endif %}
       {% if page.attendance %}
         <dt>{% translate "Attendance" %}</dt>
@@ -56,5 +57,9 @@ EVT.6 adds the ICS and report links, robots rules and the linked products; EVT.1
       {% endif %}
     </dl>
     {% for block in page.body %}{% include_block block %}{% endfor %}
+    <p class="event-actions">
+      <a href="{{ ics_url }}" type="text/calendar" download>{% translate "Add to calendar" %}</a>
+      <a href="{{ report_url }}" rel="nofollow">{% translate "Report this event" %}</a>
+    </p>
   </article>
 {% endblock %}

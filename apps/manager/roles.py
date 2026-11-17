@@ -122,6 +122,11 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.owner_settings": {CONFIG: R, OWNER: E},
     "platform.catalog": {CATALOG: E, SUPPORT: R, OWNER: R},
     "platform.moderation": {CATALOG: E, OWNER: R},
+    # FIT.1 part 2: the fitment scheme and the categories expected to declare fitment (operator
+    # settings, Configuration and tax), and the nodes of the scheme (Catalog and moderation).
+    "platform.fitment_scheme": {CONFIG: E, OWNER: R},
+    "platform.fitment_categories": {CONFIG: E, CATALOG: R, OWNER: R},
+    "platform.fitment_nodes": {CATALOG: E, SUPPORT: R, OWNER: R},
     "platform.notices": {CATALOG: E, OWNER: R},  # CMP.5; still gated by compliance.review_notices
     # CMP.5 part 4; like a closure it is the owner's decision. Still gated by review_notices.
     "platform.terminations": {CATALOG: R, OWNER: E},
@@ -149,6 +154,9 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.owner_settings": "Platform: owner-only settings (CMP.13, CMP.11 approvals)",
     "platform.catalog": "Platform: catalog, categories, attributes, taxonomies, imports",
     "platform.moderation": "Platform: moderation (vendor events, storefront changes, content)",
+    "platform.fitment_scheme": "Platform: fitment scheme, the levels of the garage (FIT.1)",
+    "platform.fitment_categories": "Platform: categories expected to declare fitment (FIT.1)",
+    "platform.fitment_nodes": "Platform: fitment nodes, proposals, merge and retire (FIT.1)",
     "platform.notices": "Platform: notices of illegal content (CMP.5)",
     "platform.terminations": "Platform: 30 days' notice of termination of a vendor (CMP.5)",
     "platform.profile_changes": "Platform: storefront profile changes, history and revert (CORE.9)",

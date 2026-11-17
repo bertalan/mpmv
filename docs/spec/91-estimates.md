@@ -94,6 +94,7 @@ owner-approved activation per country (16 → 19 h), and the new rows CMP.14 (12
 requests), CMP.15 (4 h, Swiss counter) and CMP.24 (6 h, approval of legal wording) are added. P2
 gains 69 h: CMP.16 (3 h, Swiss threshold response), the opening to non-EU vendors CMP.17 to
 CMP.22 (58 h) and CMP.23 (8 h, EN 16931 order-data export).
+D-48 (2026-11-16) later moved CMP.23 to P1 at 12 h and added CMP.35 to CMP.39 (see the accounting connector in spec 11).
 
 The owner's answers on vendors, access and the catalogue (Q-16 to Q-18, Q-29 to Q-34, Q-55,
 Q-56, 2026-11-07) changed P1 by +48 h: CORE.8 grows (10 → 13 h: platform staff permission,

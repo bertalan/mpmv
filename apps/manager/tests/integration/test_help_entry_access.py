@@ -14,6 +14,7 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.cms.models import HelpEntry
+from apps.core.i18n import primary_language
 from apps.manager import roles
 from apps.manager.wagtail_hooks import HELP_SECTION, HelpEntryPermissionPolicy
 
@@ -69,7 +70,7 @@ def test_a_model_permission_alone_does_not_open_the_snippet() -> None:
 
 
 def test_the_instance_checks_follow_the_same_rule() -> None:
-    entry = HelpEntry.objects.get(kind="general", locale__language_code="en")
+    entry = HelpEntry.objects.get(kind="general", locale__language_code=primary_language())
     catalog, support = _with_role("catalog"), _with_role("support")
     assert POLICY.user_has_permission_for_instance(catalog, "change", entry)
     assert not POLICY.user_has_permission_for_instance(support, "change", entry)

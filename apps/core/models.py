@@ -14,7 +14,7 @@ from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import ArrayField, DateTimeRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.core.validators import MinValueValidator, URLValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -200,6 +200,40 @@ def resolve_translation[TM: TranslationModel](
         language__in={language, translations.source_language()},
     )
     return translations.resolve(candidates, language)
+
+
+class SiteLanguages(models.Model):
+    """The languages the site serves, as last applied (I18N.15): one row.
+
+    `codes` is ordered, the first being the primary language. Written by the post-migrate hook
+    (first run, and languages added in settings) and by `change_languages`, which is the only
+    way to remove a language or change the primary one. The `core.E914` check compares it with
+    `MPMV_LANGUAGES`.
+    """
+
+    codes = models.JSONField(default=list)
+    # Languages `change_languages` removed: settings must not list them again until the command
+    # brings them back (a `migrate` would otherwise re-add them silently).
+    removed = models.JSONField(default=list, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return ", ".join(self.codes)
+
+
+class LanguageRedirect(models.Model):
+    """A language prefix that was retired: `/de/...` → `/...` (I18N.15).
+
+    Created by `change_languages`; `LanguageRedirectMiddleware` applies it to a request that
+    would otherwise be a 404.
+    """
+
+    old_prefix = models.CharField(max_length=20, unique=True)
+    new_prefix = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return f"{self.old_prefix} → {self.new_prefix}"
 
 
 class Heartbeat(BaseModel):
@@ -389,6 +423,13 @@ def official_profile_errors(urls: Any) -> list[str]:
 
 
 DEFAULT_REFUND_FEE_SURCHARGE = Decimal("2.00")
+# ORD.20 (D-47, owner 2026-11-16): the order-amendment defaults and their bounds.
+DEFAULT_AMENDMENT_ANSWER_HOURS = 72
+DEFAULT_AMENDMENT_COMPARABLE_DELAY_DAYS = 2
+DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS = 24
+MAX_AMENDMENT_ANSWER_HOURS = 336
+MAX_AMENDMENT_COMPARABLE_DELAY_DAYS = 30
+MAX_AMENDMENT_CANCEL_HOLD_HOURS = 168
 PLATFORM_ERROR = "platform_error"
 VENDOR_DEFAULT = "vendor_default"
 PLATFORM_REFUND_CASES = (PLATFORM_ERROR, VENDOR_DEFAULT)
@@ -603,6 +644,32 @@ class PlatformOperator(Versioned):
             "Session settings that replace the defaults: how long customer and staff sessions"
             " last, the passkey window timers and the lists of actions. Leave it empty to keep"
             " the defaults. A value that does not fit is refused when you save."
+        ),
+    )
+    # ORD.20 (D-47, owner 2026-11-16): the three order-amendment settings. The services read
+    # them from the version in force (`apps.orders.amendments.amendment_settings`).
+    amendment_answer_hours = models.PositiveSmallIntegerField(
+        default=DEFAULT_AMENDMENT_ANSWER_HOURS,
+        validators=[MinValueValidator(1), MaxValueValidator(MAX_AMENDMENT_ANSWER_HOURS)],
+        help_text=_(
+            "How many hours the customer has to accept or decline a proposed change to a paid "
+            "order. After that the order stays as it was."
+        ),
+    )
+    amendment_comparable_delay_days = models.PositiveSmallIntegerField(
+        default=DEFAULT_AMENDMENT_COMPARABLE_DELAY_DAYS,
+        validators=[MaxValueValidator(MAX_AMENDMENT_COMPARABLE_DELAY_DAYS)],
+        help_text=_(
+            "How many days later a new carrier may deliver for the change to count as minor "
+            "and apply at once. A slower one needs the customer's acceptance."
+        ),
+    )
+    amendment_cancel_hold_hours = models.PositiveSmallIntegerField(
+        default=DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS,
+        validators=[MinValueValidator(1), MaxValueValidator(MAX_AMENDMENT_CANCEL_HOLD_HOURS)],
+        help_text=_(
+            "After an item is removed as unavailable, how many hours the seller must wait "
+            "before shipping, so the customer can cancel the rest of the package."
         ),
     )
     allowed_vendor_countries = ArrayField(

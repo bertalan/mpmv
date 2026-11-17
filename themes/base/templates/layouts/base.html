@@ -32,6 +32,7 @@ state; fixed to the bottom of the viewport, last in reading order like in the ta
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
   <script src="{% static 'vendor/alpine-csp.min.js' %}" defer></script>
   {% if page %}{% faq_jsonld page %}{% endif %}
+  {% seo_links %}
   {% block head %}{% endblock %}
   {% default_robots_meta %}
 </head>

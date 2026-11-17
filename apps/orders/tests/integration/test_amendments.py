@@ -20,6 +20,7 @@ from django.utils import timezone
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.orders import amendment_engine as am
@@ -156,7 +157,7 @@ def seed(
     ]
     order, _ = services.create_order(
         email="buyer@example.com",
-        language="en",
+        language=primary_language(),
         billing_address=address,
         billing_country=address["country"],
         shipping_address=address,
@@ -386,7 +387,7 @@ def test_an_unpaid_order_cannot_be_amended() -> None:
     a = product(owner, "10.00")
     order, _ = services.create_order(
         email="buyer@example.com",
-        language="en",
+        language=primary_language(),
         billing_address=ROME,
         billing_country="IT",
         shipping_address=ROME,
@@ -583,7 +584,9 @@ def test_staff_cannot_change_prices() -> None:
 
     sub = seed()
     staff = UserFactory.create(is_staff=True)
-    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    staff.user_permissions.add(
+        *Permission.objects.filter(codename__in=["view_all_vendors", "platform_support"])
+    )
     with pytest.raises(amendments.AmendmentRefused, match="prices"):
         draft(
             sub,
@@ -637,7 +640,9 @@ def test_staff_cannot_change_the_delivery_time_or_choose_a_dearer_carrier() -> N
     sub = seed()
     method(sub.vendor, "express", "14.00", 6)
     staff = UserFactory.create(is_staff=True)
-    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    staff.user_permissions.add(
+        *Permission.objects.filter(codename__in=["view_all_vendors", "platform_support"])
+    )
     with pytest.raises(amendments.AmendmentRefused) as refused:
         draft(sub, am.ChangeDeliveryTime(9), actor=staff, staff_note="customer called")
     assert "delivery times" in str(refused.value), plainly(
@@ -992,7 +997,9 @@ def test_a_staff_carrier_draft_that_became_dearer_is_refused_at_apply() -> None:
     sub = seed()
     method(sub.vendor, "express", "10.00", 5)
     staff = UserFactory.create(is_staff=True)
-    staff.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    staff.user_permissions.add(
+        *Permission.objects.filter(codename__in=["view_all_vendors", "platform_support"])
+    )
     amendment, _ = draft(
         sub,
         am.ChangeCarrier(am.ShippingOffer("express", "", D("0"))),

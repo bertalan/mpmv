@@ -12,6 +12,7 @@ import factory
 from factory.django import DjangoModelFactory
 
 from apps.catalog.tests.factories import CategoryFactory, ProductFactory, TreeNodeCreation
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.fitment.models import (
     FitmentCategory,
@@ -59,7 +60,7 @@ class FitmentLevelTranslationFactory(DjangoModelFactory[FitmentLevelTranslation]
         model = FitmentLevelTranslation
 
     level = factory.SubFactory(FitmentLevelFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     status = TranslationStatus.PUBLISHED
     label = factory.Sequence(lambda n: f"Level {n}")
     plural_label = factory.Sequence(lambda n: f"Levels {n}")
@@ -130,7 +131,7 @@ class FitmentNoteTranslationFactory(DjangoModelFactory[FitmentNoteTranslation]):
         model = FitmentNoteTranslation
 
     note = factory.SubFactory(FitmentNoteFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     status = TranslationStatus.PUBLISHED
     text = factory.Sequence(lambda n: f"Note text {n}")
 

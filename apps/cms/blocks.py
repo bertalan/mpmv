@@ -87,6 +87,7 @@ from .engine import (
     gallery_for_language,
     grid_limit,
     link_language,
+    parse_video_url,
     storefront_path,
     term_path,
 )
@@ -154,6 +155,21 @@ class GalleryImageBlock(FigureBlock):
     )
 
 
+def _gallery_slide(item: Mapping[str, Any]) -> dict[str, Any]:
+    """A gallery image as the context of the theme's gallery carousel."""
+    image = item["image"]
+    shown = image.get_rendition("width-800")
+    large = image.get_rendition("width-1600")
+    return {
+        "url": shown.url,
+        "large_url": large.url,
+        "alt": item.get("alt_text") or "",
+        "caption": item.get("caption") or "",
+        "width": shown.width,
+        "height": shown.height,
+    }
+
+
 class GalleryBlock(blocks.StructBlock):  # type: ignore[misc]
     """Images shown by the D-18 rule: a language's dedicated images, otherwise the neutral."""
 
@@ -166,7 +182,10 @@ class GalleryBlock(blocks.StructBlock):  # type: ignore[misc]
 
     def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
         context = super().get_context(value, parent_context=parent_context)
-        context["images"] = gallery_for_language(value["images"], _page_language(parent_context))
+        images = gallery_for_language(value["images"], _page_language(parent_context))
+        context["images"] = images
+        context["slides"] = [_gallery_slide(image) for image in images]
+        context["carousel_id"] = _unique_id(parent_context, "gallery", value)
         return context
 
 
@@ -234,8 +253,90 @@ class LinkBlock(blocks.StructBlock):  # type: ignore[misc]
         return value
 
 
+class HeroSlideBlock(blocks.StructBlock):  # type: ignore[misc]
+    """One more slide of a slider hero (THM.14): a picture, a title, a sentence and up to two
+    buttons."""
+
+    image = ImageChooserBlock(
+        required=False,
+        help_text=_("A picture for the slide. If you leave it empty, the slide has no picture."),
+    )
+    alt_text = blocks.CharBlock(
+        required=False,
+        max_length=250,
+        help_text=_(
+            "Describe the picture in a few words, for people who cannot see it. "
+            "Required when you choose a picture."
+        ),
+    )
+    heading = blocks.CharBlock(
+        max_length=120,
+        help_text=_("The slide's title, up to 120 characters. Required."),
+    )
+    text = blocks.TextBlock(
+        required=False,
+        max_length=400,
+        help_text=_("One or two sentences under the title. If you leave it empty, only the title."),
+    )
+    links = blocks.ListBlock(
+        LinkBlock(),
+        min_num=0,
+        max_num=2,
+        default=[],
+        help_text=_("Up to two buttons on the slide. If you add none, the slide has no buttons."),
+    )
+
+    class Meta:
+        icon = "image"
+        label = _("Slide")
+
+    def clean(self, value: blocks.StructValue) -> blocks.StructValue:
+        value = super().clean(value)
+        if value.get("image") is not None and not (value.get("alt_text") or "").strip():
+            raise StructBlockValidationError(
+                block_errors={"alt_text": ValidationError(_("Describe the image."))}
+            )
+        return value
+
+
+def _slide(value: Mapping[str, Any]) -> dict[str, Any]:
+    """A hero or a slide as the context of the theme's hero component."""
+    links = list(value.get("links") or [])
+    first = links[0] if links else None
+    second = links[1] if len(links) > 1 else None
+    return {
+        "title": value.get("heading") or "",
+        "text": value.get("text") or "",
+        "image": value.get("image"),
+        "image_alt": value.get("alt_text") or "",
+        "url": first.href() if first else "",
+        "action": first.get("label") if first else "",
+        "secondary_url": second.href() if second else "",
+        "secondary_action": second.get("label") if second else "",
+    }
+
+
+def _unique_id(context: Mapping[str, Any] | None, prefix: str, value: Any) -> str:
+    """`prefix-N`, N counting up per request, so two carousels on a page never share an id.
+    Without a request (a block rendered alone) the value's identity stands in."""
+    request = (context or {}).get("request")
+    if request is None:
+        return f"{prefix}-{id(value) % 100003}"
+    counters: dict[str, int] = request.__dict__.setdefault("_carousel_ids", {})
+    counters[prefix] = counters.get(prefix, 0) + 1
+    return f"{prefix}-{counters[prefix]}"
+
+
+class HeroValue(blocks.StructValue):  # type: ignore[misc]
+    @property
+    def is_slider(self) -> bool:
+        """A slider needs a slide besides the banner itself; without one it is a single image."""
+        return bool(self.get("layout") == "slider" and len(self.get("slides") or []) > 0)
+
+
 class HeroBlock(blocks.StructBlock):  # type: ignore[misc]
-    """The opening banner of a page: a heading, a short text, an image and up to two links."""
+    """The opening banner of a page: a heading, a short text, an image and up to two links; as
+    a single image, a split (text beside the picture) or a slider of slides (THM.14)."""
 
     heading = blocks.CharBlock(
         max_length=120,
@@ -273,11 +374,58 @@ class HeroBlock(blocks.StructBlock):  # type: ignore[misc]
             "Up to two buttons under the text. If you add none, the banner has no buttons."
         ),
     )
+    layout = blocks.ChoiceBlock(
+        choices=[
+            ("single", _("Single image")),
+            ("slider", _("Slider")),
+            ("split", _("Text beside the image")),
+        ],
+        default="single",
+        label=_("Layout"),
+        help_text=_(
+            "Single image: the picture fills the banner. Text beside the image: the text and "
+            "the picture sit side by side on wide screens. Slider: the banner above is the "
+            "first slide and the slides below follow."
+        ),
+    )
+    slides = blocks.ListBlock(
+        HeroSlideBlock(),
+        min_num=0,
+        max_num=6,
+        default=[],
+        label=_("More slides"),
+        help_text=_(
+            "Used by the slider layout: up to six slides after the banner. "
+            "Without slides the banner shows as a single image."
+        ),
+    )
+    autoplay = blocks.BooleanBlock(
+        required=False,
+        default=False,
+        label=_("Change slides by itself"),
+        help_text=_(
+            "Slider only. Off by default. When on, the slides change on their own, stop when "
+            "the visitor hovers or tabs into the slider, and never move for people who asked "
+            "their device for less motion."
+        ),
+    )
+    interval = blocks.IntegerBlock(
+        required=False,
+        default=6000,
+        min_value=3000,
+        max_value=20000,
+        label=_("Time between slides (milliseconds)"),
+        help_text=_(
+            "Slider with automatic change only: how long a slide stays, in milliseconds, "
+            "between 3000 and 20000. Example: 6000 is six seconds."
+        ),
+    )
 
     class Meta:
         icon = "pick"
         label = _("Hero")
         template = "cms/blocks/hero.html"
+        value_class = HeroValue
         # No caption area: a credited image goes to the page's "Image credits" (CMS.8).
         credit_in_disclosure = True
 
@@ -288,6 +436,19 @@ class HeroBlock(blocks.StructBlock):  # type: ignore[misc]
                 block_errors={"alt_text": ValidationError(_("Describe the image."))}
             )
         return value
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        slider = value.is_slider
+        context["slider"] = slider
+        context["slides"] = (
+            [_slide(value), *(_slide(slide) for slide in value["slides"])] if slider else []
+        )
+        context["extra_slides"] = [_slide(slide) for slide in value["slides"]] if slider else []
+        context["autoplay"] = bool(value.get("autoplay")) and slider
+        context["interval"] = value.get("interval") or 6000
+        context["carousel_id"] = _unique_id(parent_context, "hero-slider", value) if slider else ""
+        return context
 
 
 class CallToActionBlock(blocks.StructBlock):  # type: ignore[misc]
@@ -752,6 +913,304 @@ class ArticleLinksBlock(FeaturedLinksBlock):
         icon = "list-ul"
         label = _("Featured links")
         template = "cms/blocks/featured.html"
+
+
+class TestimonialBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A quote from a customer, shown in a strip (THM.14)."""
+
+    quote = blocks.TextBlock(
+        max_length=400,
+        help_text=_("What the person said, up to 400 characters. Required."),
+    )
+    author = blocks.CharBlock(
+        max_length=120,
+        help_text=_("Who said it, for example 'Ada'. Required."),
+    )
+    role = blocks.CharBlock(
+        required=False,
+        max_length=120,
+        help_text=_("A short line about the person, for example 'Rider'. Optional."),
+    )
+
+    class Meta:
+        icon = "openquote"
+        label = _("Testimonial")
+
+
+class StripBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A row of cards to pages (blog posts), vendors, products and customer quotes (THM.14): a
+    carousel in the `ride` theme, a plain list in `base`. Cards whose target is not public
+    are left out; a strip with none left is left out."""
+
+    heading = blocks.CharBlock(
+        required=False,
+        max_length=120,
+        help_text=_(
+            "A title above the strip, for example 'From the blog'. "
+            "Up to 120 characters. If you leave it empty, the strip has no title."
+        ),
+    )
+    cards = blocks.StreamBlock(
+        [
+            ("page", PageCardBlock()),
+            ("vendor", VendorCardBlock()),
+            ("product", ProductCardBlock()),
+            ("testimonial", TestimonialBlock()),
+        ],
+        min_num=1,
+        label=_("Cards"),
+        help_text=_(
+            "Add cards of the same kind: blog posts or pages, vendors, products or testimonials."
+        ),
+    )
+    per_view = blocks.ChoiceBlock(
+        choices=[("4", _("Four")), ("2", _("Two")), ("1", _("One"))],
+        default="4",
+        label=_("Cards per slide"),
+        help_text=_(
+            "How many cards a slide shows on a wide screen. Narrow screens show fewer. "
+            "Only the carousel theme uses it."
+        ),
+    )
+    autoplay = blocks.BooleanBlock(
+        required=False,
+        default=False,
+        label=_("Change slides by itself"),
+        help_text=_(
+            "Off by default. When on, the slides change on their own, stop when the visitor "
+            "hovers or tabs into the strip, and never move for people who asked their "
+            "device for less motion."
+        ),
+    )
+    interval = blocks.IntegerBlock(
+        required=False,
+        default=6000,
+        min_value=3000,
+        max_value=20000,
+        label=_("Time between slides (milliseconds)"),
+        help_text=_(
+            "Automatic change only: how long a slide stays, in milliseconds, between 3000 "
+            "and 20000. Example: 6000 is six seconds."
+        ),
+    )
+
+    class Meta:
+        icon = "list-ul"
+        label = _("Strip")
+        template = "cms/blocks/strip.html"
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        children = list(value["cards"])
+        values = [child.value for child in children if child.block_type != "testimonial"]
+        request = (parent_context or {}).get("request")
+        targets = _card_targets(values, _page_language(parent_context), request)
+        items: list[dict[str, Any]] = []
+        for child in children:
+            if child.block_type == "testimonial":
+                item = child.value
+                items.append(
+                    {
+                        "title": item["author"],
+                        "text": item["quote"],
+                        "meta": item.get("role") or "",
+                        "url": "",
+                        "quote": True,
+                    }
+                )
+                continue
+            card = child.value.card(targets)
+            if card is not None:
+                items.append(
+                    {
+                        "title": card.label,
+                        "text": card.text,
+                        "meta": "",
+                        "url": card.href,
+                        "quote": False,
+                    }
+                )
+        context["items"] = items
+        context["per_view"] = int(value.get("per_view") or 4)
+        context["autoplay"] = bool(value.get("autoplay"))
+        context["interval"] = value.get("interval") or 6000
+        context["carousel_id"] = _unique_id(parent_context, "strip", value)
+        return context
+
+
+class SectionTitleBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A heading with a small line above it and an optional lead (THM.14): the `ride` theme styles
+    it with the accent rule, `base` shows a plain heading."""
+
+    eyebrow = blocks.CharBlock(
+        required=False,
+        max_length=80,
+        label=_("Line above the title"),
+        help_text=_(
+            "A few words shown small above the title, for example 'Our range'. "
+            "Up to 80 characters. If you leave it empty, nothing is shown above."
+        ),
+    )
+    title = blocks.CharBlock(
+        max_length=120,
+        help_text=_("The heading of the section, up to 120 characters. Required."),
+    )
+    lead = blocks.CharBlock(
+        required=False,
+        max_length=250,
+        label=_("Short text below"),
+        help_text=_(
+            "One or two sentences under the title, up to 250 characters. "
+            "If you leave it empty, nothing is shown below."
+        ),
+    )
+
+    class Meta:
+        icon = "title"
+        label = _("Section title")
+        template = "cms/blocks/section_title.html"
+
+
+class CounterBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A number with a label (THM.14): the `ride` theme counts up to it once, when it scrolls into
+    view and the visitor accepts motion; the final value is always in the page."""
+
+    label = blocks.CharBlock(
+        max_length=80,
+        help_text=_("What the number counts, for example 'Orders shipped'. Up to 80 characters."),
+    )
+    value = blocks.IntegerBlock(
+        min_value=0,
+        max_value=999_999_999,
+        help_text=_("The number to show, a whole number. Example: 1250."),
+    )
+    suffix = blocks.CharBlock(
+        required=False,
+        max_length=8,
+        help_text=_(
+            "A short sign after the number, for example '+' or '%'. "
+            "If you leave it empty, the number stands alone."
+        ),
+    )
+
+    class Meta:
+        icon = "order"
+        label = _("Counter")
+        template = "cms/blocks/counter.html"
+
+
+class ProgressBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A labelled progress bar (THM.14); the value is also written as text."""
+
+    label = blocks.CharBlock(
+        max_length=80,
+        help_text=_("What the bar measures, for example 'Order packed'. Up to 80 characters."),
+    )
+    value = blocks.IntegerBlock(
+        min_value=0,
+        help_text=_("How far along it is. It cannot be more than the maximum below."),
+    )
+    max = blocks.IntegerBlock(
+        min_value=1,
+        default=100,
+        label=_("Maximum"),
+        help_text=_(
+            "The value that means 'done'. Leave 100 to show the value as a percentage; "
+            "any other number shows 'value / maximum'."
+        ),
+    )
+
+    class Meta:
+        icon = "order"
+        label = _("Progress bar")
+        template = "cms/blocks/progress.html"
+
+    def clean(self, value: Any) -> Any:
+        cleaned = super().clean(value)
+        if cleaned["value"] > cleaned["max"]:
+            raise StructBlockValidationError(
+                block_errors={
+                    "value": ValidationError(_("The value cannot be more than the maximum."))
+                }
+            )
+        return cleaned
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        context["progress_id"] = _unique_id(parent_context, "progress", value)
+        return context
+
+
+def validate_video_url(url: str) -> None:
+    """Only YouTube and Vimeo addresses (https), so the embed is a known no-tracking origin."""
+    if parse_video_url(url) is None:
+        raise ValidationError(
+            _(
+                "Use the address of a YouTube or Vimeo video, starting with https://. "
+                "Example: https://www.youtube.com/watch?v=abcdefghijk or https://vimeo.com/123456789."
+            )
+        )
+
+
+class VideoModalBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A poster with a play button that opens the video in a popup (THM.14). The video loads
+    only after the visitor accepts marketing cookies (consent gate); until then, and without
+    JavaScript, the button is a link to the video. The provider's origin must also be allowed
+    by the CSP `frame-src` (an operations setting, docs/dev/themes.md) for the frame to show."""
+
+    title = blocks.CharBlock(
+        max_length=120,
+        help_text=_("The name of the video, shown in the popup. Up to 120 characters. Required."),
+    )
+    poster = ImageChooserBlock(
+        required=False,
+        label=_("Cover picture"),
+        help_text=_(
+            "A picture shown before anyone plays the video. If you leave it empty, "
+            "only the play button is shown."
+        ),
+    )
+    alt_text = blocks.CharBlock(
+        required=False,
+        max_length=250,
+        help_text=_(
+            "Describe the cover picture in a few words, for people who cannot see it. "
+            "Required when you pick a cover picture."
+        ),
+    )
+    url = blocks.URLBlock(
+        validators=[validate_video_url],
+        label=_("Video address"),
+        help_text=_(
+            "The address of a YouTube or Vimeo video, starting with https://. "
+            "Other sites are not accepted."
+        ),
+    )
+
+    class Meta:
+        icon = "media"
+        label = _("Video")
+        template = "cms/blocks/video_modal.html"
+
+    def clean(self, value: Any) -> Any:
+        cleaned = super().clean(value)
+        if cleaned.get("poster") and not (cleaned.get("alt_text") or "").strip():
+            raise StructBlockValidationError(
+                block_errors={
+                    "alt_text": ValidationError(_("Describe the cover picture: this is required."))
+                }
+            )
+        return cleaned
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        links = parse_video_url(value["url"])
+        request = (parent_context or {}).get("request")
+        if links is not None and request is not None:
+            request.mpmv_video_embed = True  # the CSP middleware adds the frame origins
+        context["video"] = links
+        context["video_id"] = _unique_id(parent_context, "video", value)
+        return context
 
 
 # --- Product grid (CMS.10)

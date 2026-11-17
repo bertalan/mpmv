@@ -81,6 +81,7 @@ from apps.vendors import engine as vendor_engine
 from apps.vendors.commission import RefundEvent, compute_commission, refund_lines
 from apps.vendors.refund_fee import (
     CustomerRequestedAmendment,
+    CustomerRequestedCancellation,
     FeeExclusion,
     PlatformErrorExclusion,
     RefundFeeRule,
@@ -112,6 +113,7 @@ REFUND_DUE_DAYS = 14
 REFUND_ALERT_DAYS_BEFORE = 4
 CAUSE_AMENDMENT = "amendment"
 CAUSE_CANCEL_REST = "cancel_rest"
+CAUSE_CANCEL_PACKAGE = "cancel_package"  # the shop or staff cancel it (ORD.20)
 SUCCEEDED = "succeeded"
 FAILED_STATUSES = frozenset({"failed", "canceled"})
 REFUND_PENDING_SUBMISSION = "ledger.refund_pending_submission"
@@ -483,6 +485,8 @@ def _carry_out(
         fee_exclusion_reason=(
             FeeExclusionReason.CUSTOMER_REQUESTED_AMENDMENT
             if isinstance(exclusion, CustomerRequestedAmendment)
+            else FeeExclusionReason.CUSTOMER_REQUESTED_CANCELLATION
+            if isinstance(exclusion, CustomerRequestedCancellation)
             else FeeExclusionReason.NONE
         ),
         due_by=plan.due_by,
@@ -606,6 +610,8 @@ def _send(
                 "reason": exclusion.reason,
                 "set_by": exclusion.set_by,
                 "amendment": str(refund.amendment.public_id) if refund.amendment else "",
+                "fee_exclusion_reason": refund.fee_exclusion_reason,
+                "platform_error": refund.platform_error,
             },
         )
         audit_changes(flagged, ctx=ctx, action=REFUND_FEE_EXCLUDED)
@@ -629,6 +635,10 @@ def _alert_failed(refund: Refund) -> None:
 
 
 def _exclusion_of(refund: Refund) -> FeeExclusion | None:
+    if refund.fee_exclusion_reason == FeeExclusionReason.CUSTOMER_REQUESTED_CANCELLATION:
+        return CustomerRequestedCancellation(
+            vendor_order=str(refund.vendor_order.public_id), set_by="service:orders.amendments"
+        )
     if refund.fee_exclusion_reason and refund.amendment is not None:
         return CustomerRequestedAmendment(
             amendment=str(refund.amendment.public_id), set_by="service:orders.amendments"
@@ -900,6 +910,73 @@ def refund_rest_of_package(
     a full refund of what is left under PAY.4, refund fee charged to the vendor (D-05), due
     within 14 days. Called by `apps.orders.amendments.cancel_rest_of_package` (setting
     `ORDER_CANCEL_REST_REFUND_HOOK`); the package becomes cancelled or refunded."""
+    return _refund_what_is_left(
+        vendor_order,
+        cause=CAUSE_CANCEL_REST,
+        key="cancel-rest",
+        reason="The customer cancelled the rest of the package after an item was unavailable",
+        ctx=ctx,
+        now=now,
+        dry_run=dry_run,
+    )
+
+
+def refund_cancelled_package(
+    vendor_order: VendorOrder,
+    *,
+    reason: str,
+    cancel_cause: str,
+    note: str,
+    by_staff: bool,
+    ctx: AuditContext,
+    now: dt.datetime,
+    dry_run: bool = False,
+) -> "orders_amendments.RefundOutcome":
+    """The shop or platform staff cancel the package with a full refund (ORD.20, spec 07 Roles:
+    "Cancel the package (full refund)"): what is left is refunded under PAY.4, due within 14
+    days. Called by `apps.orders.amendments.cancel_package` (setting
+    `ORDER_CANCEL_PACKAGE_REFUND_HOOK`).
+
+    Who pays the refund fee follows `cancel_cause` (owner decision 2026-11-16): the vendor's
+    fault keeps it (D-05); a customer's request drops it with the exclusion
+    `customer_requested_cancellation`; a platform error drops it through the L-10 platform-error
+    flag, with `note` as its reason. Both exclusions are set here from the cause, never by hand,
+    and audited as `ledger.refund_fee_excluded`. A staff cancellation is a platform-initiated
+    refund (D-41 channel); the shop's is a refund through the platform."""
+    exclusion: FeeExclusion | None = None
+    if cancel_cause == orders_amendments.CANCEL_CUSTOMER_REQUEST:
+        exclusion = CustomerRequestedCancellation(
+            vendor_order=str(vendor_order.public_id), set_by="service:orders.amendments"
+        )
+    elif cancel_cause == orders_amendments.CANCEL_PLATFORM_ERROR:
+        exclusion = PlatformErrorExclusion(reason=note, set_by=ctx.actor_label)
+    elif cancel_cause != orders_amendments.CANCEL_VENDOR_FAULT:
+        raise orders_amendments.AmendmentRefused(f"{cancel_cause!r} is not a cancellation cause.")
+    return _refund_what_is_left(
+        vendor_order,
+        cause=CAUSE_CANCEL_PACKAGE,
+        key="cancel-package",
+        reason=reason,
+        ctx=ctx,
+        now=now,
+        dry_run=dry_run,
+        exclusion=exclusion,
+        channel=RefundChannel.PLATFORM_INITIATED if by_staff else RefundChannel.THROUGH_PLATFORM,
+    )
+
+
+def _refund_what_is_left(
+    vendor_order: VendorOrder,
+    *,
+    cause: str,
+    key: str,
+    reason: str,
+    ctx: AuditContext,
+    now: dt.datetime,
+    dry_run: bool,
+    exclusion: FeeExclusion | None = None,
+    channel: str = RefundChannel.THROUGH_PLATFORM,
+) -> "orders_amendments.RefundOutcome":
     sub = _lock(vendor_order)
     _check_paid(sub)
     left = round_line(sub.gross_total - _sum(_group(sub, MOVED), "refunded_gross"))
@@ -914,14 +991,15 @@ def refund_rest_of_package(
     plan = _Plan(
         gross=left,
         request={
-            "mode": CAUSE_CANCEL_REST,
+            "mode": cause,
             "amount": str(left),
             "lines": [{"line": line_id, "qty": qty} for line_id, qty in units],
         },
-        channel=RefundChannel.THROUGH_PLATFORM,
-        cause=CAUSE_CANCEL_REST,
-        key=f"refund:{sub.public_id}:cancel-rest",
-        reason="The customer cancelled the rest of the package after an item was unavailable",
+        channel=channel,
+        cause=cause,
+        key=f"refund:{sub.public_id}:{key}",
+        reason=reason,
+        exclusion=exclusion,
         due_by=now + dt.timedelta(days=REFUND_DUE_DAYS),
     )
     try:

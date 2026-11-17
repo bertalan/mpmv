@@ -11,9 +11,11 @@ from django.test import Client
 
 from apps.accounts.models import User
 from apps.accounts.tests.mfa import verified_login
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.tests.factories import VendorMemberFactory, VendorTranslationFactory
+from tests.i18n import other_language
 
 from .conftest import SHOP
 
@@ -47,11 +49,13 @@ def test_staff_get_404_and_see_no_menu_entry(client: Client, staff_member: User)
 def test_the_owner_saves_and_the_change_is_audited(
     client: Client, owner: User, vendor: Vendor
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), tagline="Old")
     verified_login(client, owner)
     response = client.post(PROFILE, {"language": "en", "tagline": "Fresh"})
     assert response.status_code == 302
-    assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "Fresh"
+    assert (
+        VendorTranslation.objects.get(vendor=vendor, language=primary_language()).tagline == "Fresh"
+    )
     entry = AuditLog.objects.get(action="vendor.profile_changed")
     assert entry.before is not None
     assert entry.after is not None
@@ -82,7 +86,9 @@ def test_every_field_has_a_label(client: Client, owner: User) -> None:
 def test_the_form_shows_the_chosen_language_and_refuses_an_unknown_one(
     client: Client, owner: User, vendor: Vendor
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="it", tagline="Ciao negozio")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=other_language(), tagline="Ciao negozio"
+    )
     verified_login(client, owner)
     assert "Ciao negozio" in client.get(f"{PROFILE}?language=it").text
     assert client.get(f"{PROFILE}?language=xx").status_code == 404
@@ -91,7 +97,9 @@ def test_the_form_shows_the_chosen_language_and_refuses_an_unknown_one(
 def test_another_vendors_texts_never_show_and_cannot_be_posted(
     client: Client, owner: User, other_vendor: Vendor
 ) -> None:
-    theirs = VendorTranslationFactory.create(vendor=other_vendor, language="en", tagline="Rival")
+    theirs = VendorTranslationFactory.create(
+        vendor=other_vendor, language=primary_language(), tagline="Rival"
+    )
     verified_login(client, owner)
     assert "Rival" not in client.get(PROFILE).text
     client.post(PROFILE, {"language": "en", "tagline": "Hijack", "vendor": str(other_vendor.pk)})
@@ -126,7 +134,9 @@ def test_a_suspended_vendor_sees_the_reason_and_no_form(
 
 
 def test_a_machine_draft_is_marked_on_the_form(client: Client, owner: User, vendor: Vendor) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="it", tagline="Bozza", status="machine")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=other_language(), tagline="Bozza", status="machine"
+    )
     verified_login(client, owner)
     assert "not public" in client.get(f"{PROFILE}?language=it").text.lower()
 
@@ -150,7 +160,7 @@ def test_html_in_a_rich_text_field_is_cleaned_and_stored(client: Client, owner: 
 
 def test_stored_text_is_escaped_on_output(client: Client, owner: User, vendor: Vendor) -> None:
     VendorTranslationFactory.create(
-        vendor=vendor, language="en", tagline="Fish & <chips>", status="published"
+        vendor=vendor, language=primary_language(), tagline="Fish & <chips>", status="published"
     )
     verified_login(client, owner)
     page = client.get(PROFILE).text
@@ -172,7 +182,7 @@ def test_saving_a_machine_draft_unchanged_says_it_is_still_a_draft(
 ) -> None:
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="it",
+        language=other_language(),
         tagline="Bozza",
         description="",
         shipping_policy="",
@@ -181,7 +191,7 @@ def test_saving_a_machine_draft_unchanged_says_it_is_still_a_draft(
         status="machine",
     )
     verified_login(client, owner)
-    response = client.post(PROFILE, {"language": "it", "tagline": "Bozza"}, follow=True)
+    response = client.post(PROFILE, {"language": other_language(), "tagline": "Bozza"}, follow=True)
     text = response.text.lower()
     assert "still a draft" in text
     assert "edit it to publish it" in text

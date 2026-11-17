@@ -11,7 +11,10 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.vendors.services import can_review_profiles
 
+from .amendment_views import PLATFORM_SECTION as ORDER_CHANGES_SECTION
+from .amendment_views import SETTINGS_SECTION as AMENDMENT_SETTINGS_SECTION
 from .event_views import SECTION as EVENTS_SECTION
+from .fitment_views import CATEGORIES_SECTION, NODES_SECTION, SCHEME_SECTION
 from .navigation import Registry, Section, anyone, platform_role, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
@@ -128,6 +131,31 @@ BUILT_IN = (
         order=20,
         allowed=can_review_profiles_section,
     ),
+    # FIT.1 part 2: the fitment scheme and categories (Configuration and tax), the nodes (Catalog).
+    Section(
+        SCHEME_SECTION,
+        Space.PLATFORM,
+        _("Fitment scheme"),
+        "manager:platform:fitment_scheme",
+        order=41,
+        allowed=platform_role(SCHEME_SECTION),
+    ),
+    Section(
+        CATEGORIES_SECTION,
+        Space.PLATFORM,
+        _("Fitment categories"),
+        "manager:platform:fitment_categories",
+        order=42,
+        allowed=platform_role(CATEGORIES_SECTION),
+    ),
+    Section(
+        NODES_SECTION,
+        Space.PLATFORM,
+        _("Fitment nodes"),
+        "manager:platform:fitment_nodes",
+        order=43,
+        allowed=platform_role(NODES_SECTION),
+    ),
     Section(
         NOTICES_SECTION,
         Space.PLATFORM,
@@ -154,6 +182,24 @@ BUILT_IN = (
         "manager:shop:termination",
         order=90,
         allowed=anyone,
+    ),
+    # ORD.20 part 3: the staff tools on a paid order (Support and the platform owner).
+    Section(
+        ORDER_CHANGES_SECTION,
+        Space.PLATFORM,
+        _("Order changes"),
+        "manager:platform:orders",
+        order=50,
+        allowed=platform_role(ORDER_CHANGES_SECTION),
+    ),
+    # ORD.20 part 3: the three amendment settings in force (configuration role and the owner).
+    Section(
+        AMENDMENT_SETTINGS_SECTION,
+        Space.PLATFORM,
+        _("Order change settings"),
+        "manager:platform:amendment_settings",
+        order=85,
+        allowed=platform_role(AMENDMENT_SETTINGS_SECTION),
     ),
     Section(
         "platform.staff_roles",

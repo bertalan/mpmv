@@ -1,0 +1,15 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}Add a fitment node (FIT.1 part 2): at the top, or under the node given by `?parent=`.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p class="manager-lead">{% if parent %}{% blocktranslate with name=parent.name %}Under {{ name }}. The level comes from its place in the tree.{% endblocktranslate %}{% else %}{% translate "At the top level of the scheme." %}{% endif %}</p>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" class="manager-form" novalidate>
+    {% csrf_token %}
+    {{ form.parent }}
+    {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% include "components/button.html" with label=_("Add the node") type="submit" only %}
+  </form>
+  <p><a href="{% url 'manager:platform:fitment_nodes' %}">{% translate "Back to the nodes" %}</a></p>
+{% endblock %}

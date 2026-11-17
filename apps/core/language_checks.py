@@ -3,6 +3,7 @@
 - core.E911: a language code the product does not know (`mpmv.settings.languages`).
 - core.E912: a language listed twice.
 - core.E913: LANGUAGE_CODE is not the first language (the primary language is the first one).
+- core.E914: settings alone removed a language or changed the primary one (change_languages).
 - core.W911 (core.I911 when informational): the gettext catalog of a non-English language is
   missing or incomplete. The msgids
   are English, so every gap would show English text on that language's pages. English needs no
@@ -86,3 +87,37 @@ def check_language_settings(
                 )
             )
     return messages
+
+
+def check_language_state(
+    app_configs: Iterable[AppConfig] | None, databases: Iterable[str] | None = None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """core.E914: removing a language or changing the primary one in settings alone (I18N.15).
+
+    Compares `MPMV_LANGUAGES` with the languages last applied (`SiteLanguages`). Adding a
+    language is accepted. Runs only when the database is checked, and stays silent while the
+    table does not exist yet (before the first migration).
+    """
+    if not databases:
+        return []
+    from django.db.utils import DatabaseError
+
+    from .language_engine import settings_conflict
+    from .language_services import configured_codes, recorded_codes, removed_codes
+
+    try:
+        recorded = recorded_codes()
+    except DatabaseError:
+        return []
+    problem = settings_conflict(recorded, configured_codes(), removed_codes())
+    if problem is None:
+        return []
+    return [
+        checks.Error(
+            problem,
+            hint="Removing a language or changing the primary one is a command, not a setting: "
+            "run `manage.py change_languages --to <codes>` (dry run, then --apply), then set "
+            "MPMV_LANGUAGES to the same list.",
+            id="core.E914",
+        )
+    ]

@@ -1,0 +1,3 @@
+# Known false positives (reviewed by lane-a). One fingerprint per line: commit:file:rule:line.
+# #573: the phrase "credential-like values" followed by a CSV field in a spec row, not a secret.
+bd8b3414c5f47cf58adb5d8abca1e7d270585f20:docs/spec/backlog.csv:generic-api-key:284
