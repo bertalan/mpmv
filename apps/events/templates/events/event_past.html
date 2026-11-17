@@ -1,0 +1,12 @@
+{% extends "layouts/content.html" %}
+{% load i18n %}
+{% comment %}Past events archive (EVT.6): events that ended, newest first. Always `noindex`.{% endcomment %}
+{% block head %}{% robots_meta robots %}{% endblock %}
+{% block title %}{% translate "Past events" %} · {{ page.title }}{% endblock %}
+{% block page_content %}
+  <h1>{% translate "Past events" %}</h1>
+  {% include "events/_links.html" with current="past" %}
+  {% include "events/_filters.html" with form_action=past_url %}
+  {% translate "No past events." as empty_text %}
+  {% include "events/_results.html" %}
+{% endblock %}

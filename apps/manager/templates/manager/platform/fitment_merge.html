@@ -1,0 +1,24 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}Merge a fitment node into one of its siblings (FIT.1 part 2); a dry-run preview follows.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p class="manager-lead">{% blocktranslate with children=children %}Its children ({{ children }}), its aliases and everything that refers to it move to the node you choose. Its old name stays findable and the old identifier keeps working. Nodes under different parents are merged after their parents are.{% endblocktranslate %}</p>
+  {% if used_by %}<ul>{% for name, count in used_by.items %}<li>{{ name }}: {{ count }}</li>{% endfor %}</ul>{% endif %}
+  {% if error %}{% include "components/alert.html" with level="danger" message=error live="assertive" only %}{% endif %}
+  {% if candidates and can_write %}
+    <form method="post" class="manager-form" novalidate>
+      {% csrf_token %}
+      <div class="field">
+        <label for="merge-target">{% translate "Merge into" %}</label>
+        <select id="merge-target" name="target" required>
+          {% for candidate in candidates %}<option value="{{ candidate.public_id }}">{{ candidate.name }}</option>{% endfor %}
+        </select>
+      </div>
+      {% include "components/button.html" with label=_("Preview the merge") type="submit" only %}
+    </form>
+  {% else %}
+    <p>{% translate "There is no other active node at this place to merge into." %}</p>
+  {% endif %}
+  <p><a href="{% url 'manager:platform:fitment_node' node.public_id %}">{% translate "Back to the node" %}</a></p>
+{% endblock %}
