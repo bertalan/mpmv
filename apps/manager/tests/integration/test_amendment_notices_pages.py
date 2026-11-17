@@ -111,6 +111,12 @@ def test_a_staff_cancellation_notifies_the_customer_by_cause_and_the_vendor(
         f"platform error {refund.platform_error}: {vendor}",
     )
     assert charged is (cause == "vendor_fault")
+    if not charged:  # the opposite case: an excluded fee says so, never "charged"
+        assert fee not in vendor
+        assert (
+            "No refund fee is charged to your shop." in vendor
+            or "no refund fee is charged to you" in vendor
+        ), vendor
     vendor_copy = OrderEvent.objects.get(vendor_order=seeded, audience="vendor")
     assert vendor_copy.payload["refund_fee"] is charged
     assert "Do not ship these items:" in vendor

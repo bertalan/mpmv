@@ -47,7 +47,7 @@ from apps.catalog.models import Product, Variant
 from apps.core.audit import VENDOR_FIELD, AuditContext, record
 from apps.core.changeset import Change, ChangeSet
 from apps.core.countries import InvalidCountry
-from apps.core.models import AuditLog
+from apps.core.models import MIN_AMENDMENT_CANCEL_HOLD_HOURS, AuditLog
 from apps.core.services import (
     PLATFORM_OWNER_PERMISSION,
     NoPlatformOperator,
@@ -100,7 +100,7 @@ class _DryRunRollback(Exception):
 # Counsel (2026-11-17, A2): the date until which the seller may not ship ("the seller will not
 # ship it before {date}") is never less than this after the A2 notice is sent, so the customer
 # has real time to read it and cancel the rest. The notice goes out when the change applies.
-A2_MIN_WINDOW_HOURS = 24
+A2_MIN_WINDOW_HOURS = MIN_AMENDMENT_CANCEL_HOLD_HOURS  # the setting cannot go lower either
 
 
 # --- the operator's settings (D-47, owner 2026-11-16) -------------------------------------------

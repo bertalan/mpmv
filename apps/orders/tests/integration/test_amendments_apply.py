@@ -331,6 +331,29 @@ def test_the_comparable_delay_is_read_from_the_configuration() -> None:
 
 
 def test_the_shipping_hold_is_read_from_the_configuration() -> None:
-    _configure(amendment_cancel_hold_hours=6)
+    _configure(amendment_cancel_hold_hours=30)
     rules = amendments.amendment_settings(NOW)
-    assert rules.cancel_hold_hours == 6, plainly("the hold must be 6 hours", f"it is {rules}")
+    assert rules.cancel_hold_hours == 30, plainly("the hold must be 30 hours", f"it is {rules}")
+
+
+def test_the_hold_setting_cannot_go_below_the_a2_minimum() -> None:
+    """Counsel (2026-11-17): the A2 date is at least 24 hours after the notice, so the admin and
+    the model refuse a shorter hold, the same floor the apply path checks."""
+    from django.core.exceptions import ValidationError
+
+    from apps.core.models import PlatformOperator
+
+    field = PlatformOperator._meta.get_field("amendment_cancel_hold_hours")
+    assert amendments.A2_MIN_WINDOW_HOURS == 24
+    with pytest.raises(ValidationError):
+        field.clean(23, None)
+    assert field.clean(24, None) == 24
+    # The admin's ModelForm validates the instance (`clean_fields`), as here.
+    from apps.core.tests.factories import PlatformOperatorFactory
+
+    short = PlatformOperatorFactory.build(amendment_cancel_hold_hours=23)
+    with pytest.raises(ValidationError) as refused:
+        short.clean_fields()
+    assert "amendment_cancel_hold_hours" in refused.value.message_dict
+    enough = PlatformOperatorFactory.build(amendment_cancel_hold_hours=24)
+    enough.clean_fields(exclude=[f.name for f in PlatformOperator._meta.fields if f is not field])
