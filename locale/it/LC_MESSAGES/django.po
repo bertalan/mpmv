@@ -8948,6 +8948,7 @@ msgstr ""
 #: apps/orders/amendments.py
 msgid "This is a substantial change: it needs the customer's acceptance first."
 msgstr "Questa è una modifica sostanziale: serve prima l’accettazione del cliente."
+
 #: apps/manager/templates/manager/shop/event_form.html
 msgid ""
 "This is a translation. Dates, place and products come from the original and are copied when it is "
