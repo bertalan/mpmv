@@ -71,6 +71,12 @@ shop = (
         ),
         path("orders/", views.VendorOrderListView.as_view(), name="orders"),
         path("orders/<uuid:public_id>/", views.VendorOrderDetailView.as_view(), name="order"),
+        # ORD.20 part 3b: the shop records that it issued its invoice (spec 07, Invoicing).
+        path(
+            "orders/<uuid:public_id>/invoice-issued/",
+            views.VendorInvoiceIssuedView.as_view(),
+            name="order_invoice_issued",
+        ),
         # ORD.20 part 3: change a paid order (draft, preview, apply with the passkey, discard).
         # Before `order_action`, whose slug would also match "amend".
         path(

@@ -82,7 +82,12 @@ EXTRA_FILES = (
     "apps/cms/templatetags/cms_tags.py",  # the header's "Site links" item (OPS.12)
 )
 # Single Python modules scanned in full: customer-facing messages of apps that are not in SCOPES.
-FILES = ("apps/orders/messages.py", "apps/orders/amendments.py")
+FILES = (
+    "apps/orders/messages.py",
+    "apps/orders/amendments.py",
+    "apps/orders/amendment_engine.py",  # the classification reasons and refusals (ORD.20)
+    "apps/orders/amendment_notices.py",
+)
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
 HELP_TEXT_SCOPES = (
@@ -100,7 +105,11 @@ HELP_TEXT_SCOPES = (
 # German, French and Spanish start with the order emails (ORD.16); the Manager and account pages
 # join them with their own I18N.7 slices. Italian covers every scope.
 # The customer order pages (ORD.7) join the Manager and account pages in I18N.7.
-_ORDER_EMAILS = ("apps/orders/templates/email", "apps/orders/templates/documents")
+_ORDER_EMAILS = (
+    "apps/orders/templates/email",
+    "apps/orders/templates/documents",
+    "apps/orders/amendment_notices.py",  # the change texts quoted in the amendment emails
+)
 _EVENT_PAGES = (*EVENT_FILES, "themes/base/templates/components/pagination.html")
 # The consumer price note (TAX.12) is a legal display: every language has it from the start.
 _PRICE_NOTE = ("apps/tax/prices.py",)

@@ -1,0 +1,18 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+{% if invoice_issued %}<p><strong>{% translate "Important:" %} {% include "email/orders/_invoice_notice.txt" %}</strong></p>
+{% endif %}<p>{% if by_staff %}{% blocktranslate %}Platform support changed your order {{ order_number }}. It is now version {{ version }}.{% endblocktranslate %}{% else %}{% blocktranslate %}Your order {{ order_number }} was changed. It is now version {{ version }}.{% endblocktranslate %}{% endif %}</p>
+<ul>
+{% for change in changes %}<li>{{ change }}</li>
+{% endfor %}</ul>
+<p>{% blocktranslate %}Reason: “{{ reason }}”{% endblocktranslate %}</p>
+{% if ship_to %}<p>{% translate "Ship to this address:" %}<br>{% for part in ship_to %}{{ part }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</p>
+{% endif %}<p>{% translate "Items to ship:" %}</p>
+<ul>
+{% for line in lines %}<li>{{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}</li>
+{% endfor %}</ul>
+<p>{% if refunded %}{% blocktranslate %}The customer was refunded {{ refund }} EUR.{% endblocktranslate %}{% else %}{% translate "No money was refunded." %}{% endif %}<br>{% blocktranslate %}New total of the order: {{ total }} EUR.{% endblocktranslate %}</p>
+{% if not invoice_issued %}<p>{% include "email/orders/_invoice_notice.txt" %}</p>
+{% endif %}</body>
+</html>

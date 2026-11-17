@@ -1,0 +1,11 @@
+{% load i18n %}{% translate "Hello," %}
+
+{% if cause == "vendor_fault" %}{% blocktranslate context "(L)" %}We are sorry to tell you that the seller {{ vendor_name }} cannot fulfil your order {{ order_number }}. Your order with {{ vendor_name }} has been cancelled and we have immediately refunded the full {{ refund }} EUR to the payment method you used for the purchase.{% endblocktranslate %}{% elif cause == "customer_request" %}{% blocktranslate %}As you asked, your order {{ order_number }} with {{ vendor_name }} has been cancelled, and we have refunded the full {{ refund }} EUR to the payment method you used for the purchase.{% endblocktranslate %}{% else %}{% blocktranslate context "(L)" %}Because of an error on our side, your order {{ order_number }} with {{ vendor_name }} has been cancelled, and we have immediately refunded the full {{ refund }} EUR to the payment method you used for the purchase.{% endblocktranslate %}{% endif %} {% include "email/orders/_credit_time.txt" %}
+
+{% translate "Cancelled items:" %}
+{% for line in lines %}- {{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}
+{% endfor %}
+{% blocktranslate %}Reason: “{{ reason }}”{% endblocktranslate %}
+{% if cause != "customer_request" %}
+{% translate "We apologise for the inconvenience." context "(L)" %}
+{% endif %}

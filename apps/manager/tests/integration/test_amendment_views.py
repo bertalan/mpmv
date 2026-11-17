@@ -21,8 +21,9 @@ from apps.accounts import levels
 from apps.accounts.models import User
 from apps.accounts.tests.factories import PasskeyDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import verified_login
+from apps.core import services as core_services
 from apps.core.audit import AuditContext
-from apps.core.models import AuditLog, PlatformOperator
+from apps.core.models import AuditLog, OutboxEmail, PlatformOperator
 from apps.core.services import configure_platform_operator, current_operator
 from apps.ledger.models import Refund
 from apps.ledger.tests.integration.test_amendment_refunds import (  # noqa: F401 (fixtures)
@@ -396,6 +397,17 @@ def test_support_finds_the_order_and_changes_the_carrier_with_note_and_passkey(
     assert client.post(apply_url).status_code == 302
     amendment.refresh_from_db()
     assert amendment.state == AmendmentState.APPLIED
+    # ORD.22: the vendor is told of every staff change; the customer gets the change notice.
+    vendor_mail = OutboxEmail.objects.get(template_key="orders.vendor_amendment_applied")
+    rendered = core_services.render_email(
+        vendor_mail.template_key, vendor_mail.language, vendor_mail.context_data
+    )
+    assert rendered.subject.endswith(f"platform support changed order {seeded.order.number}"), (
+        plainly("the vendor must get the staff-change email", rendered.subject)
+    )
+    assert "Shipping method changed to" in rendered.text_body
+    customer_mail = OutboxEmail.objects.get(template_key="orders.amendment_applied")
+    assert customer_mail.recipient == seeded.order.email
 
 
 def test_support_has_no_line_fields_and_cannot_touch_a_shop_draft(
@@ -501,7 +513,8 @@ def test_the_customer_keeps_or_cancels_the_rest(client: Client, seeded: VendorOr
         "cancelling the rest must cancel the package", f"it is {seeded.state}"
     )
     page = client.get(f"/account/orders/{seeded.order.public_id}/").text
-    assert "Cancel the rest of the order" not in page
+    # The kept A2 notice still quotes the action (durable medium); the live offer is gone.
+    assert "data-cancel-rest-offer" not in page
 
 
 def test_keeping_the_rest_ends_the_hold_and_the_offer_stays(
@@ -519,12 +532,12 @@ def test_keeping_the_rest_ends_the_hold_and_the_offer_stays(
         "keeping the rest only ends the hold: the offer stays open until shipping",
         "the offer was closed",
     )
-    page = client.get(f"/account/orders/{seeded.order.public_id}/").text
-    assert "Keep the rest" not in page
-    assert "will not ship it before" not in page, plainly(
+    offer = offer_section(client.get(f"/account/orders/{seeded.order.public_id}/").text)
+    assert "Keep the rest" not in offer
+    assert "will not ship it before" not in offer, plainly(
         "a hold that ended must not be shown as a date", "it was shown"
     )
-    assert "Cancel the rest of the order and refund everything" in page
+    assert "Cancel the rest of the order and refund everything" in offer
     assert client.post(f"{base}cancel-rest/").status_code == 302
     seeded.refresh_from_db()
     assert seeded.state == "cancelled", plainly(
@@ -534,6 +547,12 @@ def test_keeping_the_rest_ends_the_hold_and_the_offer_stays(
     assert "Rest of the package cancelled at your request" in page, plainly(
         "the cancellation must appear in the customer's timeline", "it does not"
     )
+
+
+def offer_section(page: str) -> str:
+    """The live cancel-the-rest offer of the page (the kept notices quote it too)."""
+    start = page.index("data-cancel-rest-offer")
+    return page[start : page.index("</section>", start)]
 
 
 def test_a_stranger_cannot_cancel_the_rest(client: Client, seeded: VendorOrder) -> None:

@@ -14,6 +14,27 @@ msgid_plural "%(counter)s events"
 msgstr[0] "%(counter)s événement"
 msgstr[1] "%(counter)s événements"
 
+#: apps/orders/amendment_notices.py
+msgid "%(title)s removed"
+msgstr "%(title)s retiré"
+
+#: apps/orders/amendment_notices.py
+msgid "%(title)s removed as unavailable"
+msgstr "%(title)s retiré car indisponible"
+
+#: apps/orders/amendment_notices.py
+msgid "%(title)s: lower price"
+msgstr "%(title)s : prix plus bas"
+
+#: apps/orders/amendment_notices.py
+msgid "%(title)s: quantity changed to %(quantity)s"
+msgstr "%(title)s : quantité changée à %(quantity)s"
+
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+msgid "%(vendor_name)s changed your order %(order_number)s before shipping it:"
+msgstr "%(vendor_name)s a modifié ta commande %(order_number)s avant de l’expédier :"
+
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "%(vendor_name)s shipped its part of order %(order_number)s."
@@ -35,12 +56,30 @@ msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
 msgstr "%(vendor_name)s : nouvelle commande payée %(order_number)s à expédier :"
 
 #: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
+#: apps/orders/templates/email/orders/vendor_package_cancelled/subject.txt
 msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
 msgstr "%(vendor_name)s : commande %(order_number)s annulée, ne pas expédier"
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/subject.txt
+msgid "%(vendor_name)s: order %(order_number)s changed (version %(version)s)"
+msgstr "%(vendor_name)s : commande %(order_number)s modifiée (version %(version)s)"
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/subject.txt
+msgid "%(vendor_name)s: platform support changed order %(order_number)s"
+msgstr "%(vendor_name)s : le support de la plateforme a modifié la commande %(order_number)s"
 
 #: apps/events/templates/events/event_page.html
 msgid "Add to calendar"
 msgstr "Ajouter au calendrier"
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid ""
+"After an item was unavailable, the customer cancelled the rest of order %(order_number)s, as the "
+"terms allow, and was refunded in full."
+msgstr ""
+"Après l’indisponibilité d’un article, le client a annulé le reste de la commande %(order_number)s,"
+" comme les conditions le permettent, et a été remboursé intégralement."
 
 #: apps/events/templates/events/_filters.html
 msgid "All types"
@@ -50,31 +89,112 @@ msgstr "Tous les types"
 msgid "All vendors"
 msgstr "Tous les vendeurs"
 
+#: apps/orders/amendment_notices.py
+msgid "an item"
+msgstr "un article"
+
 #: apps/events/templates/events/_filters.html
 msgid "Any month"
 msgstr "Tous les mois"
+
+#: apps/orders/templates/email/orders/rest_cancelled/body.html
+#: apps/orders/templates/email/orders/rest_cancelled/body.txt
+msgid ""
+"As you asked, the rest of your order %(order_number)s with %(vendor_name)s has been cancelled free"
+" of charge, and we have refunded %(refund)s EUR to the payment method you used for the purchase."
+msgstr ""
+"Comme tu l’as demandé, le reste de ta commande %(order_number)s auprès de %(vendor_name)s a été "
+"annulé gratuitement, et nous t’avons remboursé %(refund)s EUR sur le moyen de paiement utilisé "
+"pour l’achat."
+
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+msgid ""
+"As you asked, your order %(order_number)s with %(vendor_name)s has been cancelled, and we have "
+"refunded the full %(refund)s EUR to the payment method you used for the purchase."
+msgstr ""
+"Comme tu l’as demandé, ta commande %(order_number)s auprès de %(vendor_name)s a été annulée, et "
+"nous t’avons remboursé l’intégralité des %(refund)s EUR sur le moyen de paiement utilisé pour "
+"l’achat."
 
 #: apps/events/templates/events/event_page.html
 msgid "Attendance"
 msgstr "Participation"
 
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+msgctxt "(L)"
+msgid ""
+"Because of an error on our side, your order %(order_number)s with %(vendor_name)s has been "
+"cancelled, and we have immediately refunded the full %(refund)s EUR to the payment method you used"
+" for the purchase."
+msgstr ""
+"En raison d’une erreur de notre part, ta commande %(order_number)s auprès de %(vendor_name)s a été"
+" annulée, et nous avons procédé immédiatement au remboursement intégral de EUR %(refund)s sur le "
+"moyen de paiement utilisé lors de l’achat."
+
 #: apps/events/templates/events/event_page.html
 msgid "Booth %(booth)s"
 msgstr "Stand %(booth)s"
+
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+msgctxt "(L)"
+msgid "Cancel the rest of the order and refund everything"
+msgstr "Annuler le reste de la commande et tout rembourser"
+
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgctxt "(L)"
+msgid "Cancel the rest of the order and refund everything: %(cancel_url)s"
+msgstr "Annuler le reste de la commande et tout rembourser : %(cancel_url)s"
 
 #: apps/events/templates/events/_summary.html apps/events/templates/events/event_calendar.html
 #: apps/events/templates/events/event_page.html
 msgid "Cancelled"
 msgstr "Annulé"
 
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+#: apps/orders/templates/email/orders/rest_cancelled/body.html
+#: apps/orders/templates/email/orders/rest_cancelled/body.txt
+msgid "Cancelled items:"
+msgstr "Articles annulés :"
+
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Transporteur : %(carrier)s. Numéro de suivi : %(tracking_number)s."
 
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Cause: an error of the platform."
+msgstr "Cause : une erreur de la plateforme."
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Cause: the customer asked to cancel."
+msgstr "Cause : le client a demandé l’annulation."
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Cause: the shop cannot fulfil the order."
+msgstr "Cause : la boutique ne peut pas honorer la commande."
+
 #: apps/events/templates/events/_filters.html
 msgid "Clear filters"
 msgstr "Effacer les filtres"
+
+#: apps/orders/amendment_notices.py
+msgid "Delivery address corrected as you asked"
+msgstr "Adresse de livraison corrigée comme tu l’as demandé"
+
+#: apps/orders/amendment_notices.py
+msgid "Delivery address corrected at the customer's request"
+msgstr "Adresse de livraison corrigée à la demande du client"
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Do not ship these items:"
+msgstr "N’expédie pas ces articles :"
 
 #: apps/events/templates/events/_links.html
 msgid "Event views"
@@ -87,6 +207,11 @@ msgstr "Événements"
 #: apps/events/templates/events/event_calendar.html
 msgid "Events in %(month)s"
 msgstr "Événements de %(month)s"
+
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+#: apps/orders/templates/email/orders/rest_cancelled/body.txt
+msgid "Every change is listed on your order page: %(order_url)s"
+msgstr "Chaque modification figure sur la page de ta commande : %(order_url)s"
 
 #: apps/tax/prices.py
 msgid "excl. VAT"
@@ -113,14 +238,22 @@ msgstr "Filtrer les événements"
 msgid "Hello %(customer_name)s,"
 msgstr "Bonjour %(customer_name)s,"
 
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/rest_cancelled/body.html
+#: apps/orders/templates/email/orders/rest_cancelled/body.txt
 #: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
 #: apps/orders/templates/email/orders/vendor_order_delivered/body.html
@@ -129,6 +262,25 @@ msgstr "Bonjour %(customer_name)s,"
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello,"
 msgstr "Bonjour,"
+
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgctxt "(L)"
+msgid ""
+"If the unavailable item was essential to your purchase, you can cancel the rest of the order free "
+"of charge and get back everything you paid for it, until the package is handed to the carrier. The"
+" seller will not ship it before %(hold_until)s."
+msgstr ""
+"Si l’article manquant était essentiel à ton achat, tu peux annuler gratuitement le reste de la "
+"commande et obtenir le remboursement intégral du solde restant, jusqu’à la remise du colis au "
+"transporteur. Le vendeur ne l’expédiera pas avant le %(hold_until)s."
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Important:"
+msgstr "Important :"
 
 #: apps/events/models.py
 msgid "In person"
@@ -141,6 +293,20 @@ msgstr "Sur place et en ligne"
 #: apps/tax/prices.py
 msgid "Indicative price. Final amount at checkout."
 msgstr "Prix indicatif. Montant final lors du paiement."
+
+#: apps/orders/templates/email/orders/_credit_time.txt
+msgctxt "(L)"
+msgid ""
+"It is credited within 5 to 10 business days depending on the card issuer, and in any case within "
+"14 days."
+msgstr ""
+"Le crédit apparaîtra sous 5 à 10 jours ouvrés selon les délais bancaires, et au plus tard dans le "
+"délai légal de 14 jours."
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "Items to ship:"
+msgstr "Articles à expédier :"
 
 #: apps/events/templates/events/event_page.html
 msgid "Join online"
@@ -158,6 +324,16 @@ msgstr "Calendrier du mois"
 msgid "New paid order %(order_number)s"
 msgstr "Nouvelle commande payée %(order_number)s"
 
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "New total of the order: %(total)s EUR."
+msgstr "Nouveau total de la commande : %(total)s EUR."
+
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+msgid "New total of this part of your order: %(total)s EUR."
+msgstr "Nouveau total de cette partie de ta commande : %(total)s EUR."
+
 #: themes/base/templates/components/pagination.html
 msgid "Next"
 msgstr "Suivant"
@@ -174,9 +350,19 @@ msgstr "Aucun événement n'est prévu pour le moment."
 msgid "No events this month."
 msgstr "Aucun événement ce mois-ci."
 
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "No money was refunded."
+msgstr "Aucun montant n’a été remboursé."
+
 #: apps/events/templates/events/event_past.html
 msgid "No past events."
 msgstr "Aucun événement passé."
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "No refund fee is charged to your shop."
+msgstr "Aucuns frais de remboursement ne sont facturés à ta boutique."
 
 #: apps/events/models.py apps/events/templates/events/event_page.html
 msgid "Online"
@@ -210,6 +396,10 @@ msgstr "Commande %(order_number)s : un colis est en route"
 msgid "Order %(order_number)s: a shipment was delivered"
 msgstr "Commande %(order_number)s : un colis a été livré"
 
+#: apps/orders/templates/email/orders/package_cancelled/subject.txt
+msgid "Order %(order_number)s: cancelled as you asked, full refund"
+msgstr "Commande %(order_number)s : annulée comme demandé, remboursement intégral"
+
 #: apps/orders/templates/email/orders/order_confirmation/subject.txt
 msgid "Order %(order_number)s: confirmation from %(vendor_name)s"
 msgstr "Commande %(order_number)s : confirmation de %(vendor_name)s"
@@ -218,9 +408,51 @@ msgstr "Commande %(order_number)s : confirmation de %(vendor_name)s"
 msgid "Order %(order_number)s: part of your order was cancelled"
 msgstr "Commande %(order_number)s : une partie de ta commande a été annulée"
 
+#: apps/orders/templates/email/orders/rest_cancelled/subject.txt
+msgid "Order %(order_number)s: the rest of your order was cancelled, full refund"
+msgstr "Commande %(order_number)s : le reste de ta commande a été annulé, remboursement intégral"
+
+#: apps/orders/templates/email/orders/amendment_applied/subject.txt
+msgid "Order %(order_number)s: your order from %(vendor_name)s was changed"
+msgstr "Commande %(order_number)s : ta commande auprès de %(vendor_name)s a été modifiée"
+
+#: apps/orders/amendment_notices.py
+msgid "Order changed"
+msgstr "Commande modifiée"
+
+#: apps/orders/templates/email/orders/_invoice_notice.txt
+msgctxt "(L)"
+msgid ""
+"Order changed after payment: if you already issued an invoice or receipt for the previous version,"
+" remember to issue a credit or debit note to bring the document in line with the new amounts."
+msgstr ""
+"Commande modifiée après le paiement : si tu as déjà émis une facture ou un ticket pour la version "
+"précédente, pense à émettre un avoir ou une facture rectificative pour aligner le document sur les"
+" nouveaux montants."
+
+#: apps/orders/templates/email/orders/package_cancelled/subject.txt
+msgctxt "(L)"
+msgid "Order update %(order_number)s: order cancelled and full refund"
+msgstr "Mise à jour de ta commande %(order_number)s — Commande annulée et remboursement intégral"
+
+#: apps/orders/templates/email/orders/item_unavailable/subject.txt
+msgctxt "(L)"
+msgid "Order update %(order_number)s: partial refund for an unavailable item"
+msgstr ""
+"Mise à jour de ta commande %(order_number)s — Remboursement partiel suite à un article "
+"indisponible"
+
 #: apps/events/models.py
 msgid "Other"
 msgstr "Autre"
+
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+msgid ""
+"Our support team changed your order %(order_number)s from %(vendor_name)s before it was shipped:"
+msgstr ""
+"Notre équipe d’assistance a modifié ta commande %(order_number)s auprès de %(vendor_name)s avant "
+"son expédition :"
 
 #: themes/base/templates/components/pagination.html
 msgid "Page %(number)s"
@@ -242,6 +474,20 @@ msgstr "Événements passés"
 msgid "Payment received for order %(order_number)s"
 msgstr "Paiement reçu pour la commande %(order_number)s"
 
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Platform support cancelled your order %(order_number)s and refunded the customer in full."
+msgstr ""
+"Le support de la plateforme a annulé ta commande %(order_number)s et a remboursé intégralement le "
+"client."
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "Platform support changed your order %(order_number)s. It is now version %(version)s."
+msgstr ""
+"Le support de la plateforme a modifié ta commande %(order_number)s. Elle est maintenant en version"
+" %(version)s."
+
 #: themes/base/templates/components/pagination.html
 msgid "Previous"
 msgstr "Précédent"
@@ -262,6 +508,24 @@ msgstr "Lire cette version en ligne"
 msgid "Read this version online:"
 msgstr "Lire cette version en ligne :"
 
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Reason: “%(reason)s”"
+msgstr "Motif : « %(reason)s »"
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Refunded to the customer: %(refund)s EUR."
+msgstr "Remboursé au client : %(refund)s EUR."
+
 #: apps/events/templates/events/event_page.html
 msgid "Report this event"
 msgstr "Signaler cet événement"
@@ -271,10 +535,24 @@ msgstr "Signaler cet événement"
 msgid "Sales terms of %(name)s (version %(number)s)"
 msgstr "Conditions de vente de %(name)s (version %(number)s)"
 
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/rest_cancelled/body.html
+msgid "See your order page"
+msgstr "Voir la page de ta commande"
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "Ship to this address:"
+msgstr "Expédie à cette adresse :"
+
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "Ship to:"
 msgstr "Expédier à :"
+
+#: apps/orders/amendment_notices.py
+msgid "Shipping method changed to %(method)s"
+msgstr "Mode de livraison changé pour %(method)s"
 
 #: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
@@ -286,10 +564,37 @@ msgstr "Livraison : %(shipping)s EUR"
 msgid "Show events"
 msgstr "Afficher les événements"
 
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "The customer was refunded %(refund)s EUR."
+msgstr "Le client a été remboursé de %(refund)s EUR."
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "The refund fee is charged to your shop."
+msgstr "Les frais de remboursement sont facturés à ta boutique."
+
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgctxt "(L)"
+msgid ""
+"The seller %(vendor_name)s no longer has %(items)s in stock, while the other items in your order "
+"%(order_number)s are ready for dispatch."
+msgstr ""
+"Le vendeur %(vendor_name)s ne dispose plus en stock de %(items)s, tandis que les autres articles "
+"de ta commande %(order_number)s sont prêts pour l’expédition."
+
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 msgid "The terms you accepted, kept here for your records."
 msgstr "Les conditions que tu as acceptées, conservées ici pour tes archives."
+
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgid "To cancel the rest, contact our customer support with the order number %(order_number)s."
+msgstr ""
+"Pour annuler le reste, contacte notre service client en indiquant le numéro de commande "
+"%(order_number)s."
 
 #: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
@@ -318,6 +623,39 @@ msgstr "Vendeur"
 msgid "version %(number)s"
 msgstr "version %(number)s"
 
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+msgctxt "(L)"
+msgid "We apologise for the inconvenience."
+msgstr "Nous te prions de bien vouloir nous excuser pour ce désagrément."
+
+#: apps/orders/templates/email/orders/package_cancelled/body.html
+#: apps/orders/templates/email/orders/package_cancelled/body.txt
+msgctxt "(L)"
+msgid ""
+"We are sorry to tell you that the seller %(vendor_name)s cannot fulfil your order "
+"%(order_number)s. Your order with %(vendor_name)s has been cancelled and we have immediately "
+"refunded the full %(refund)s EUR to the payment method you used for the purchase."
+msgstr ""
+"Nous t’informons que le vendeur %(vendor_name)s ne peut pas honorer ta commande %(order_number)s. "
+"Ta commande auprès de %(vendor_name)s a été annulée et nous avons procédé immédiatement au "
+"remboursement intégral de EUR %(refund)s sur le moyen de paiement utilisé lors de l’achat."
+
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgctxt "(L)"
+msgid ""
+"We have already refunded %(refund)s EUR (VAT and any shipping share included) to the payment "
+"method you used."
+msgstr ""
+"Nous avons d’ores et déjà procédé au remboursement automatique de EUR %(refund)s (TVA et quote-"
+"part éventuelle des frais de livraison incluses) sur ton moyen de paiement initial."
+
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+msgid "We have refunded %(refund)s EUR to the payment method you used."
+msgstr "Nous t’avons remboursé %(refund)s EUR sur le moyen de paiement que tu as utilisé."
+
 #: apps/orders/templates/email/orders/order_received/subject.txt
 msgid "We received your order %(order_number)s"
 msgstr "Nous avons bien reçu ta commande %(order_number)s"
@@ -340,6 +678,11 @@ msgstr ""
 "Nous avons bien reçu ton paiement de %(total)s EUR pour la commande %(order_number)s. Chaque "
 "vendeur prépare sa part de la commande et tu recevras un message dès qu’elle sera expédiée."
 
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgid "What changed:"
+msgstr "Ce qui a changé :"
+
 #: apps/events/templates/events/event_page.html
 msgid "When"
 msgstr "Quand"
@@ -347,3 +690,25 @@ msgstr "Quand"
 #: apps/events/templates/events/event_page.html
 msgid "Where"
 msgstr "Où"
+
+#: apps/orders/templates/email/orders/amendment_applied/body.html
+#: apps/orders/templates/email/orders/amendment_applied/body.txt
+msgid "You pay nothing more, and there is nothing you need to do."
+msgstr "Tu ne paies rien de plus et tu n’as rien à faire."
+
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
+#: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
+msgid "Your order %(order_number)s was changed. It is now version %(version)s."
+msgstr "Ta commande %(order_number)s a été modifiée. Elle est maintenant en version %(version)s."
+
+#: apps/orders/templates/email/orders/item_unavailable/body.html
+#: apps/orders/templates/email/orders/item_unavailable/body.txt
+msgctxt "(L)"
+msgid "Your order goes on for the remaining items at the new total of %(total)s EUR."
+msgstr "Ta commande se poursuit pour les articles restants au nouveau total de EUR %(total)s."
+
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
+msgid "Your shop cancelled order %(order_number)s and the customer was refunded in full."
+msgstr ""
+"Ta boutique a annulé la commande %(order_number)s et le client a été remboursé intégralement."

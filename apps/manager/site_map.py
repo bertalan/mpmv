@@ -92,6 +92,7 @@ NOT_LISTED: Final = frozenset(
         "manager:shop:amendment_apply",
         "manager:shop:amendment_discard",
         "manager:shop:order_cancel",
+        "manager:shop:order_invoice_issued",
         "manager:platform:order",
         "manager:platform:amendment_apply",
         "manager:platform:amendment_discard",
