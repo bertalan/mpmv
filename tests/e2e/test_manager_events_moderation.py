@@ -71,15 +71,9 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     page.get_by_label("Type").select_option("promotion")
     page.get_by_label("Starts at").fill("2027-10-02T09:00")
     page.get_by_label("Ends at").fill("2027-10-09T18:00")
-    # The form has no language field until EVT.8: a new event takes the interface language
-    # (I18N.12), so the vendor's preference is Italian for the first save only.
-    seller.preferred_language = "it"
-    seller.save()
+    page.locator("#id_language").select_option("it")  # chosen explicitly (EVT.8)
     _press(page, "Save draft")
     expect(page).to_have_url(re.compile(r"/manager/shop/events/[0-9a-f-]+/$"))
-    seller.preferred_language = "en"
-    seller.save()
-    page.reload()  # the saved page was shown in Italian; the rest of the test reads English
     expect(page.get_by_role("heading", name="Edit the event")).to_be_visible()
     event = EventPage.objects.get(title="Saldi d'autunno")
     assert event.locale.language_code == "it"
