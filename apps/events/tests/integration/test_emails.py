@@ -11,8 +11,10 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import pytest
+from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied
+from django.shortcuts import resolve_url
 from django.test import Client
 from django.urls import reverse
 from wagtail.admin import signal_handlers
@@ -157,6 +159,12 @@ def _open(client: Client, token: str) -> Any:
     return client.post(reverse("action_link:continue"), {"token": token})
 
 
+def _assert_sent_to_login(response: Any) -> None:
+    """A refused action link ends on the sign-in page: a plain 302, never a 500 or the form."""
+    assert response.status_code == 302
+    assert urlsplit(response["Location"]).path == resolve_url(settings.MFA_LOGIN_URL)
+
+
 def test_the_changes_link_opens_the_event_form_once_for_the_owner() -> None:
     owner = _owner()
     page = _submitted(owner)
@@ -168,7 +176,7 @@ def test_the_changes_link_opens_the_event_form_once_for_the_owner() -> None:
     assert response.status_code == 302
     assert urlsplit(response["Location"]).path == form
     again = _open(Client(), token)  # single use: a second session is refused
-    assert urlsplit(again["Location"]).path != form
+    _assert_sent_to_login(again)
 
 
 def test_the_changes_link_is_dead_after_the_vendor_resubmits() -> None:
@@ -178,9 +186,7 @@ def test_the_changes_link_is_dead_after_the_vendor_resubmits() -> None:
     token = _token_of(_changes_requested_mail(page, count=1))
     submit_event(owner, EventPage.objects.get(pk=page.pk))
     TOTPDeviceFactory.create(user=owner)
-    response = _open(Client(), token)
-    form = reverse("manager:shop:event_edit", args=[page.public_id])
-    assert urlsplit(response["Location"]).path != form
+    _assert_sent_to_login(_open(Client(), token))
 
 
 def test_hide_and_restore_queue_one_email_each() -> None:

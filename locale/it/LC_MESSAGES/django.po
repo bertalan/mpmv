@@ -8287,7 +8287,7 @@ msgstr ""
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt
 msgid "This follows a notice (reference %(dsa_notice_ref)s)."
-msgstr "Segue a una segnalazione (riferimento %(dsa_notice_ref)s)."
+msgstr "Segue una segnalazione (riferimento %(dsa_notice_ref)s)."
 
 #: apps/orders/templates/orders/customer_order.html
 msgid "This is your order reference, not an invoice. Each seller issues its own invoice."

@@ -423,3 +423,46 @@ def test_the_statements_page_lists_this_shops_statements_only(
     assert str(mine.public_id) in response.text
     assert "Misleading dates." in response.text
     assert str(theirs.public_id) not in response.text
+
+
+def test_the_statements_page_hides_other_shops_by_any_parameter(
+    signed_in: Client, vendor: Vendor
+) -> None:
+    from apps.compliance.tests.factories import NoticeFactory, StatementOfReasonsFactory
+
+    theirs = StatementOfReasonsFactory.create(facts="Someone else's facts.")
+    notice = NoticeFactory.create()
+    other = StatementOfReasonsFactory.create(notice=notice, facts="Other shop notice facts.")
+    url = reverse("manager:shop:statements")
+    for query in (
+        f"?id={theirs.public_id}",
+        f"?statement={theirs.pk}",
+        f"?notice={notice.public_id}",
+        f"?vendor={theirs.vendor.pk}",
+    ):
+        response = signed_in.get(url + query)
+        assert response.status_code == 200, query
+        # The language switcher echoes the query string, so look for the page's own markers.
+        for text in (
+            f"statement-{theirs.public_id}",
+            f"notice-{notice.public_id}",
+            "Someone else's facts.",
+            "Other shop notice facts.",
+        ):
+            assert text not in response.text, (query, text)
+    # An id in the path is not a route at all.
+    assert signed_in.get(f"{url}{theirs.public_id}/").status_code == 404
+    assert other.vendor_id != vendor.pk
+
+
+def test_the_statements_page_shows_no_notifier_identity(signed_in: Client, vendor: Vendor) -> None:
+    from apps.compliance.tests.factories import NoticeFactory, StatementOfReasonsFactory
+
+    notice = NoticeFactory.create(
+        notifier_name="Zelda Notifier", notifier_email="zelda.notifier@example.org"
+    )
+    StatementOfReasonsFactory.create(vendor=vendor, notice=notice)
+    html = signed_in.get(reverse("manager:shop:statements")).text
+    assert str(notice.public_id) in html  # the page does list the statement
+    assert "Zelda Notifier" not in html
+    assert "zelda.notifier" not in html
