@@ -60,6 +60,7 @@ from wagtail.models import (
 from wagtail_localize.models import Translation, TranslationSource
 
 from apps.accounts.models import User
+from apps.catalog import search_page
 from apps.catalog.models import Category, Product
 from apps.cms.models import HomePage
 from apps.cms.services import sanitise_rich_text_fields
@@ -1512,3 +1513,36 @@ def upload_event_image(
             stored[0].delete(stored[1])
         raise
     return image
+
+
+def search_events(
+    request: Any, query: str, language: str, limit: int
+) -> search_page.SearchGroup | None:
+    """The public events of `language` (EVT.8: the translation, else the original-language page)
+    whose title, summary, venue or city contain `query`, soonest first, for the search results
+    page (CAT.27). `limit` of them; `more` when there are others."""
+    locale = Locale.objects.filter(language_code=language).first()
+    if locale is None:
+        return None
+    needle = query.casefold()
+    found = [
+        item
+        for item in events_for_locale(locale)
+        if needle
+        in " ".join(
+            (item.page.title, item.page.summary, item.page.venue_name, item.page.city)
+        ).casefold()
+    ]
+    found.sort(key=lambda item: item.page.sort_key())
+    items = [
+        search_page.SearchItem(
+            title=item.page.title,
+            url=item.page.get_url(request) or "",
+            summary=item.page.summary,
+            language=item.language if item.fallback else "",
+        )
+        for item in found[:limit]
+    ]
+    return search_page.SearchGroup(
+        "events", str(_("Events")), items, order=10, more=len(found) > limit
+    )

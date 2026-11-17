@@ -203,6 +203,14 @@ class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is u
     class Meta:
         verbose_name = _("home page")
 
+    def serve(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
+        """The legacy search URL `/?s=<query>` answers here with the results page (CAT.27)."""
+        from apps.catalog import search_page
+
+        if request.method in ("GET", "HEAD") and search_page.SEARCH_PARAMETER in request.GET:
+            return search_page.search_view(request)
+        return super().serve(request, *args, **kwargs)
+
     def clean(self) -> None:
         super().clean()
         others = HomePage.objects.filter(locale_id=self.locale_id).exclude(pk=self.pk)

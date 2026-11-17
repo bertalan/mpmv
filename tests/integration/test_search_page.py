@@ -126,7 +126,7 @@ def test_a_partial_sku_finds_the_product(client: Client) -> None:
 
 
 def test_a_variant_sku_finds_its_parent(client: Client) -> None:
-    product = listed("Parent thing", sku="PARENT-1")
+    product = listed("Parent thing", sku="PARENT-1", kind=Product.Kind.VARIABLE)
     VariantFactory.create(product=product, sku="VARIANT-77")
     assert "Parent thing" in html_of(search(client, "VARIANT-77"))
 

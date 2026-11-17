@@ -214,6 +214,9 @@ VENDOR_PROFILE_VENDOR_SAVE_LIMIT = 30  # all owners of one vendor together
 # confirm-page POSTs allowed per IP every 15 minutes (the form uses the registration limit).
 VENDOR_APPLICATION_LINK_MAX_AGE = 72 * 3600  # seconds
 VENDOR_APPLICATION_RATE_LIMIT = 20
+# Public search page (CAT.27): searches allowed per client IP per minute (the query is not
+# counted when empty); a client over it gets a 429.
+SEARCH_RATE_LIMIT = 30
 # Unconfirmed applications (owner decision D-24, VEN.22): the account and its applicant vendor
 # are deleted this many days after the request, and one reminder goes out after this many hours.
 VENDOR_APPLICATION_RETENTION_DAYS = 3
