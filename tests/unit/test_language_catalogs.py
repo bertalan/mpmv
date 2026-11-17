@@ -194,3 +194,38 @@ def test_second_factor_pages_use_the_formal_register(lang: str) -> None:
 def test_the_second_factor_verify_title_is_formal(lang: str, expected: str) -> None:
     entries = {e.msgid: e.msgstr for e in _po(lang)}
     assert entries["Verify it is you"] == expected
+
+
+# I18N.13 follow-up: the vendor application flow (VEN.22) is in the catalogs, in the formal
+# register (a prospective vendor is addressed with Lei / Sie / vous / usted).
+APPLY_MARKERS = (
+    "apps/vendors/templates/vendors/apply/",
+    "apps/vendors/templates/email/vendors/application_",
+    "apps/vendors/forms.py",
+)
+
+
+def _apply_entries(lang: str) -> list[polib.POEntry]:
+    return [e for e in _po(lang) if _any_in(e, APPLY_MARKERS)]
+
+
+def test_the_vendor_application_flow_is_in_scope() -> None:
+    found = catalog.collect()
+    places = {p for _k, (_pl, ps) in found.items() for p in ps}
+    for page in ("form", "confirm", "confirmed", "cancel", "cancelled", "invalid", "sent"):
+        assert f"apps/vendors/templates/vendors/apply/{page}.html" in places, page
+    for mail in ("application_confirm", "application_exists", "application_reminder"):
+        assert any(f"email/vendors/{mail}/" in p for p in places), mail
+    assert "apps/vendors/forms.py" in places
+    assert ("Send my application", None) in found
+
+
+@pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
+def test_the_vendor_application_flow_is_translated_and_formal(lang: str) -> None:
+    entries = _apply_entries(lang)
+    assert len(entries) >= 30
+    for entry in entries:
+        assert _texts(entry).strip(), entry.msgid
+        assert not INFORMAL[lang].search(_texts(entry)), (entry.msgid, _texts(entry))
+    by_id = {e.msgid: e.msgstr for e in entries}
+    assert by_id["Send my application"] != "Send my application"
