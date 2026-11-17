@@ -433,6 +433,9 @@ DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS = 24
 MAX_AMENDMENT_ANSWER_HOURS = 336
 MAX_AMENDMENT_COMPARABLE_DELAY_DAYS = 30
 MAX_AMENDMENT_CANCEL_HOLD_HOURS = 168
+# Counsel (2026-11-17, A2): the customer has at least this long after the notice to cancel the
+# rest before the seller may ship; `apps.orders.amendments` refuses a shorter hold too.
+MIN_AMENDMENT_CANCEL_HOLD_HOURS = 24
 PLATFORM_ERROR = "platform_error"
 VENDOR_DEFAULT = "vendor_default"
 PLATFORM_REFUND_CASES = (PLATFORM_ERROR, VENDOR_DEFAULT)
@@ -669,7 +672,10 @@ class PlatformOperator(Versioned):
     )
     amendment_cancel_hold_hours = models.PositiveSmallIntegerField(
         default=DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS,
-        validators=[MinValueValidator(1), MaxValueValidator(MAX_AMENDMENT_CANCEL_HOLD_HOURS)],
+        validators=[
+            MinValueValidator(MIN_AMENDMENT_CANCEL_HOLD_HOURS),
+            MaxValueValidator(MAX_AMENDMENT_CANCEL_HOLD_HOURS),
+        ],
         help_text=_(
             "After an item is removed as unavailable, how many hours the seller must wait "
             "before shipping, so the customer can cancel the rest of the package."
