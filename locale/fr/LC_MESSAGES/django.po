@@ -64,7 +64,7 @@ msgstr[1] "%(counter)s non utilisés."
 
 #: apps/orders/amendments.py
 msgid "%(country)r is not a country the address can be in."
-msgstr ""
+msgstr "%(country)r n'est pas un pays où l'adresse peut se trouver."
 
 #: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/present.py
 msgid "%(days)s working days"
@@ -202,6 +202,7 @@ msgstr ""
 #: apps/orders/amendments.py
 msgid "A cancellation the customer asked for needs the request's %(fields)s."
 msgstr ""
+"Une annulation demandée par le client nécessite les éléments suivants de la demande : %(fields)s."
 
 #: apps/cms/models.py
 msgid "A category or tag that has its own pages."
@@ -299,15 +300,15 @@ msgstr ""
 
 #: apps/orders/amendment_engine.py
 msgid "a higher price needs the customer's acceptance"
-msgstr ""
+msgstr "un prix plus élevé nécessite l'acceptation du client"
 
 #: apps/orders/amendment_engine.py
 msgid "a higher quantity needs the customer's acceptance"
-msgstr ""
+msgstr "une quantité plus élevée nécessite l'acceptation du client"
 
 #: apps/orders/amendment_engine.py
 msgid "A line needs at least one unit; remove the line instead."
-msgstr ""
+msgstr "Une ligne nécessite au moins une unité ; supprimez plutôt la ligne."
 
 #: apps/core/models.py
 msgid "A link to the text of the licence. Optional."
@@ -464,6 +465,8 @@ msgid ""
 "A shop cancels either for its own fault or because the customer asked; a platform error is for "
 "platform staff to record."
 msgstr ""
+"Une boutique annule soit par sa propre faute, soit parce que le client l'a demandé ; une erreur de"
+" la plateforme est enregistrée par l'équipe de la plateforme."
 
 #: apps/manager/amendment_views.py
 msgid "a shop member"
@@ -643,7 +646,7 @@ msgstr ""
 
 #: apps/orders/amendment_engine.py
 msgid "a substitute product needs the customer's consent"
-msgstr ""
+msgstr "un produit de remplacement nécessite le consentement du client"
 
 #: apps/seo/templates/seo/site_links.html
 msgid ""
@@ -950,16 +953,20 @@ msgstr "Texte alternatif %(number)d"
 
 #: apps/orders/amendment_engine.py
 msgid "an added line needs the customer's acceptance"
-msgstr ""
+msgstr "une ligne ajoutée nécessite l'acceptation du client"
 
 #: apps/orders/amendments.py
 msgid "An address change asked by the customer needs the request's %(fields)s."
 msgstr ""
+"Un changement d'adresse demandé par le client nécessite les éléments suivants de la demande : "
+"%(fields)s."
 
 #: apps/orders/amendment_engine.py
 msgid ""
 "an address change made on the vendor's or staff's own initiative needs the customer's acceptance"
 msgstr ""
+"un changement d'adresse à l'initiative du vendeur ou de l'équipe de la plateforme nécessite "
+"l'acceptation du client"
 
 #: apps/manager/event_block_forms.py
 msgid "An address starting with https://. Fill in this or one of your events."
@@ -971,14 +978,16 @@ msgid ""
 "An amendment can change the carrier once and the address once: put each change in its own "
 "amendment."
 msgstr ""
+"Une modification peut changer une fois le transporteur et une fois l'adresse : placez chaque "
+"changement dans sa propre modification."
 
 #: apps/orders/amendment_engine.py
 msgid "An amendment cannot remove every line: cancel the package instead."
-msgstr ""
+msgstr "Une modification ne peut pas supprimer toutes les lignes : annulez plutôt le colis."
 
 #: apps/orders/amendment_engine.py
 msgid "An amendment needs at least one change."
-msgstr ""
+msgstr "Une modification nécessite au moins un changement."
 
 #: apps/compliance/models.py
 msgid ""
@@ -1064,7 +1073,7 @@ msgstr ""
 
 #: apps/orders/amendments.py
 msgid "An order that is not paid has no invoice yet."
-msgstr ""
+msgstr "Une commande non payée n'a pas encore de facture."
 
 #: apps/seo/templates/seo/site_links.html
 msgid "And %(counter)s more."
@@ -1173,7 +1182,7 @@ msgstr "Interrogez %(vendor)s au sujet de ce produit : il n'est pas vendu en lig
 
 #: apps/orders/amendment_engine.py
 msgid "at the new address %(why)s"
-msgstr ""
+msgstr "à la nouvelle adresse %(why)s"
 
 #: apps/manager/templates/manager/platform/fitment_node_form.html
 msgid "At the top level of the scheme."
@@ -1409,6 +1418,8 @@ msgid ""
 "Cancelling the package refunds the customer in full, so it needs a fresh passkey confirmation (an "
 "open passkey window does not cover it)."
 msgstr ""
+"L'annulation du colis rembourse le client intégralement et nécessite donc une nouvelle "
+"confirmation par passkey (une fenêtre passkey ouverte ne la couvre pas)."
 
 #: apps/manager/fitment_forms.py
 msgid "Cannot change once the level has nodes."
@@ -1512,6 +1523,8 @@ msgid ""
 "Change the address and the carrier in two separate amendments: the address first, then the carrier"
 " quoted for the new address."
 msgstr ""
+"Changez l'adresse et le transporteur dans deux modifications distinctes : d'abord l'adresse, puis "
+"le transporteur proposé pour la nouvelle adresse."
 
 #: apps/manager/amendment_views.py
 msgid "Change the order"
@@ -1546,7 +1559,7 @@ msgstr "Chat ou message"
 
 #: apps/manager/templates/manager/platform/orders.html
 msgid "check"
-msgstr ""
+msgstr "à vérifier"
 
 #: apps/manager/event_forms.py
 msgid "Check the rule."
@@ -1715,6 +1728,8 @@ msgstr "Choisissez la provenance des produits : une catégorie, un tag, une marq
 msgid ""
 "Choose why the package is cancelled: the shop's fault, the customer's request or a platform error."
 msgstr ""
+"Choisissez la raison de l'annulation du colis : faute de la boutique, demande du client ou erreur "
+"de la plateforme."
 
 #: apps/manager/amendment_forms.py apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "City"
@@ -1979,7 +1994,7 @@ msgstr "Compte client"
 
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Customer: rest cancelled"
-msgstr ""
+msgstr "Client : reste annulé"
 
 #: apps/manager/forms.py
 msgid "Customers see this text. A change is live at once and the moderators are told."
@@ -2696,11 +2711,11 @@ msgstr "Indiquez le fondement juridique ou la clause des conditions."
 
 #: apps/orders/amendments.py
 msgid "Give the reason for the cancellation; the customer will read it."
-msgstr ""
+msgstr "Indiquez le motif de l'annulation ; le client le lira."
 
 #: apps/orders/amendments.py
 msgid "Give the reason for the change; the customer will read it."
-msgstr ""
+msgstr "Indiquez le motif de la modification ; le client le lira."
 
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Give the role"
@@ -3085,7 +3100,7 @@ msgstr "J'achète pour une entreprise"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "I have issued the invoice or receipt"
-msgstr ""
+msgstr "J'ai émis la facture ou le justificatif"
 
 #: apps/orders/templates/orders/_legal_boxes.html
 msgid "I have read and accept the marketplace terms and the sales terms of each seller named above."
@@ -3210,7 +3225,7 @@ msgstr "Code invalide. Réessayez."
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Invoice"
-msgstr ""
+msgstr "Facture"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "It also closes when you sign out or after inactivity."
@@ -3648,7 +3663,7 @@ msgstr "Fusionner les marques sélectionnées dans une autre marque"
 
 #: apps/orders/templates/orders/customer_order.html
 msgid "Messages we sent you about this package"
-msgstr ""
+msgstr "Messages que nous t'avons envoyés au sujet de ce colis"
 
 #: apps/manager/amendment_views.py
 msgid "Minor change: it applies at once"
@@ -3836,7 +3851,7 @@ msgstr "Aucune commande ne porte ce numéro."
 
 #: apps/manager/templates/manager/platform/orders.html
 msgid "No package was cancelled in this period."
-msgstr ""
+msgstr "Aucun colis n'a été annulé sur cette période."
 
 #: apps/accounts/mfa_views.py
 msgid "no passkey registered"
@@ -4197,15 +4212,15 @@ msgstr "Vente en ligne"
 
 #: apps/orders/amendments.py
 msgid "Only a draft can be applied; this one is %(state)s."
-msgstr ""
+msgstr "Seul un brouillon peut être appliqué ; celui-ci est %(state)s."
 
 #: apps/orders/amendments.py
 msgid "Only a draft can be discarded; this one is %(state)s."
-msgstr ""
+msgstr "Seul un brouillon peut être abandonné ; celui-ci est %(state)s."
 
 #: apps/orders/amendments.py
 msgid "Only a draft can be edited; this one is %(state)s."
-msgstr ""
+msgstr "Seul un brouillon peut être modifié ; celui-ci est %(state)s."
 
 #: apps/manager/termination_views.py
 msgid "Only a pending notice can be withdrawn."
@@ -4339,18 +4354,21 @@ msgstr "Seul le client qui a passé la commande peut répondre à cette offre."
 #: apps/orders/amendments.py
 msgid "Only the platform owner or Support may change an order from the platform side."
 msgstr ""
+"Seul le propriétaire de la plateforme ou le support peut modifier une commande côté plateforme."
 
 #: apps/orders/amendments.py
 msgid "Only the shop or platform staff may amend an order."
-msgstr ""
+msgstr "Seuls la boutique ou le personnel de la plateforme peuvent modifier une commande."
 
 #: apps/orders/amendments.py
 msgid "Only the shop records its own invoice."
-msgstr ""
+msgstr "Seule la boutique enregistre sa propre facture."
 
 #: apps/orders/amendments.py
 msgid "Only the shop's owner or a member with orders may amend."
 msgstr ""
+"Seuls le propriétaire de la boutique ou un membre ayant accès aux commandes peut effectuer des "
+"modifications."
 
 #: apps/manager/amendment_views.py
 msgid "Only the side that started this draft may discard it."
@@ -4588,11 +4606,11 @@ msgstr "Titulaire"
 
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Package cancellations by shop"
-msgstr ""
+msgstr "Annulations de colis par boutique"
 
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Package cancellations by shop and cause"
-msgstr ""
+msgstr "Annulations de colis par boutique et par cause"
 
 #: apps/orders/customer_views.py
 msgid "Package cancelled"
@@ -4838,6 +4856,9 @@ msgid ""
 "%(cost)s EUR net, more than the %(paid)s EUR the customer paid for shipping. The vendor can make "
 "this change itself."
 msgstr ""
+"Le personnel de la plateforme ne peut changer le transporteur que pour un transporteur au même "
+"prix ou moins cher : %(method)s coûte %(cost)s EUR HT, plus que les %(paid)s EUR payés par le "
+"client pour la livraison. Le vendeur peut effectuer ce changement lui-même."
 
 #: apps/manager/templates/manager/amendment.html
 msgid ""
@@ -4853,10 +4874,13 @@ msgid ""
 "Platform staff may only change the carrier, or the address when the customer asks; products, "
 "quantities, prices and delivery times are changed by the vendor, who is the seller."
 msgstr ""
+"Le personnel de la plateforme ne peut changer que le transporteur, ou l'adresse lorsque le client "
+"le demande ; les produits, quantités, prix et délais de livraison sont modifiés par le vendeur, "
+"qui est le vendeur au sens du contrat."
 
 #: apps/orders/amendments.py
 msgid "Platform staff must add a note to every amendment."
-msgstr ""
+msgstr "Le personnel de la plateforme doit ajouter une note à chaque modification."
 
 #: apps/vendors/templates/email/vendors/profile_reverted/body.html
 #: apps/vendors/templates/email/vendors/profile_reverted/body.txt
@@ -5205,12 +5229,17 @@ msgid ""
 "Recomputed today, this change moves %(now)s instead of the %(drafted)s shown in the draft: edit "
 "the draft so it shows today's amounts, then confirm it again."
 msgstr ""
+"Recalculée aujourd'hui, cette modification déplace %(now)s au lieu des %(drafted)s indiqués dans "
+"le brouillon : modifiez le brouillon pour qu'il affiche les montants d'aujourd'hui, puis "
+"confirmez-le de nouveau."
 
 #: apps/orders/amendments.py
 msgid ""
 "Recomputed today, this is a substantial change (%(reasons)s): it needs the customer's acceptance "
 "first."
 msgstr ""
+"Recalculée aujourd'hui, il s'agit d'une modification substantielle (%(reasons)s) : elle nécessite "
+"d'abord l'acceptation du client."
 
 #: apps/manager/amendment_forms.py
 msgid "Record how, when and in which words the customer asked."
@@ -5761,11 +5790,11 @@ msgstr "Espace boutique : profil de vitrine"
 
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Shop: cannot fulfil"
-msgstr ""
+msgstr "Boutique : ne peut pas livrer"
 
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Shop: the customer asked (no fee)"
-msgstr ""
+msgstr "Boutique : à la demande du client (sans frais)"
 
 #: apps/seo/site_links.py
 msgid "Shops"
@@ -6727,6 +6756,9 @@ msgid ""
 "seller may ship, but the shipping hold is set to %(set)s hours: raise the hold in the amendment "
 "settings."
 msgstr ""
+"Le client doit disposer d'au moins %(hours)s heures pour lire l'avis et annuler le reste avant que"
+" le vendeur puisse expédier, mais le blocage d'expédition est réglé sur %(set)s heures : augmentez"
+" le blocage dans les paramètres des modifications."
 
 #: apps/manager/amendment_forms.py
 msgid "The customer reads it. Write it in plain words."
@@ -6923,6 +6955,8 @@ msgid ""
 "The fiscal category of this line was not recorded when it was sold, so its tax cannot be decided "
 "again; the line can only be reduced or removed."
 msgstr ""
+"La catégorie fiscale de cette ligne n'a pas été enregistrée lors de la vente ; sa taxe ne peut "
+"donc pas être déterminée de nouveau, et la ligne ne peut qu'être réduite ou supprimée."
 
 #: apps/core/models.py
 msgid ""
@@ -7092,11 +7126,11 @@ msgstr "L'invitation, par exemple Visitez notre atelier. Obligatoire."
 
 #: apps/manager/views.py
 msgid "The invoice is recorded as issued."
-msgstr ""
+msgstr "La facture est enregistrée comme émise."
 
 #: apps/orders/amendments.py
 msgid "The invoice of this order is already recorded as issued."
-msgstr ""
+msgstr "La facture de cette commande est déjà enregistrée comme émise."
 
 #: apps/vendors/models.py
 msgid "The IP address the acceptance came from, kept as evidence. Empty if it was not known."
@@ -7228,6 +7262,9 @@ msgid ""
 "The last %(days)s days. When a shop says the customer asked to cancel, the shop pays no refund fee"
 " on its word alone: check the shops with many of them."
 msgstr ""
+"Les %(days)s derniers jours. Lorsqu'une boutique indique que le client a demandé l'annulation, "
+"elle ne paie aucun frais de remboursement sur sa seule parole : vérifiez les boutiques qui en ont "
+"beaucoup."
 
 #: apps/manager/event_forms.py
 msgid "The last day of an all-day event, included. Same as the first for one day."
@@ -7546,19 +7583,21 @@ msgstr "Le nom affiché dans les crédits des images, par exemple 'CC BY 4.0'."
 
 #: apps/orders/amendment_engine.py
 msgid "the new address changes the tax"
-msgstr ""
+msgstr "la nouvelle adresse modifie la taxe"
 
 #: apps/orders/amendment_engine.py
 msgid "the new address costs more to ship"
-msgstr ""
+msgstr "la nouvelle adresse coûte plus cher à expédier"
 
 #: apps/orders/amendment_engine.py
 msgid "the new address is in another country or tax territory, which is never a minor change"
 msgstr ""
+"la nouvelle adresse se trouve dans un autre pays ou territoire fiscal, ce qui n'est jamais une "
+"modification mineure"
 
 #: apps/orders/amendments.py
 msgid "The new address is incomplete: %(fields)s is missing."
-msgstr ""
+msgstr "La nouvelle adresse est incomplète : %(fields)s manque."
 
 #: apps/catalog/models.py
 msgid ""
@@ -7571,12 +7610,16 @@ msgstr ""
 #: apps/orders/amendment_engine.py
 msgid "the new delivery time is not known, so it cannot be shown to be comparable to the old one"
 msgstr ""
+"le nouveau délai de livraison n'est pas connu, il ne peut donc pas être démontré qu'il est "
+"comparable à l'ancien"
 
 #: apps/orders/amendment_engine.py
 msgid ""
 "the new maximum delivery time (%(after)s) is %(extra)s days longer than the old one (%(before)s), "
 "more than the %(allowed)s days a minor change allows"
 msgstr ""
+"le nouveau délai de livraison maximal (%(after)s) est plus long de %(extra)s jours que l'ancien "
+"(%(before)s), plus que les %(allowed)s jours qu'autorise une modification mineure"
 
 #: apps/manager/fitment_views.py
 msgid "The node is added."
@@ -7695,7 +7738,7 @@ msgstr ""
 
 #: apps/orders/amendment_engine.py
 msgid "The order already has a line %(key)r."
-msgstr ""
+msgstr "La commande a déjà une ligne %(key)r."
 
 #: apps/orders/ui/views.py
 msgid "The order could not be placed."
@@ -7703,7 +7746,7 @@ msgstr "La commande n'a pas pu être passée."
 
 #: apps/orders/amendment_engine.py
 msgid "The order has no line %(key)r in its current version."
-msgstr ""
+msgstr "La commande n'a pas de ligne %(key)r dans sa version actuelle."
 
 #: apps/catalog/attributes.py
 msgid ""
@@ -7742,6 +7785,8 @@ msgid ""
 "The package changed since this draft was made, so the draft was closed as superseded: start a new "
 "one."
 msgstr ""
+"Le colis a changé depuis ce brouillon, qui a donc été clos comme dépassé : commencez-en un "
+"nouveau."
 
 #: apps/manager/amendment_views.py
 msgid "The package changed since this draft was made, so the draft was closed. Start a new one."
@@ -7751,7 +7796,7 @@ msgstr ""
 
 #: apps/orders/amendments.py
 msgid "The package could not be cancelled (it is %(state)s); nothing changed."
-msgstr ""
+msgstr "Le colis n'a pas pu être annulé (il est %(state)s) ; rien n'a changé."
 
 #: apps/manager/amendment_views.py
 msgid ""
@@ -7774,6 +7819,8 @@ msgid ""
 "The package's shipping method (%(method)s) does not deliver to %(place)s, so the address cannot be"
 " changed to it."
 msgstr ""
+"Le mode d'expédition du colis (%(method)s) ne livre pas à %(place)s ; l'adresse ne peut donc pas "
+"être changée pour celle-ci."
 
 #: themes/base/templates/404.html
 msgid "The page you asked for does not exist or has moved."
@@ -7888,6 +7935,8 @@ msgid ""
 "The platform does not issue your invoice. Record here when you have issued it, so every later "
 "change reminds you to correct it."
 msgstr ""
+"La plateforme n'émet pas votre facture. Enregistrez ici quand vous l'avez émise, afin que chaque "
+"modification ultérieure vous rappelle de la corriger."
 
 #: apps/manager/amendment_views.py
 msgid "the platform owner"
@@ -8081,6 +8130,8 @@ msgstr ""
 #: apps/orders/amendment_engine.py
 msgid "the recompute raises what the customer pays by %(amount)s EUR, and a minor change never does"
 msgstr ""
+"le nouveau calcul augmente de %(amount)s EUR ce que le client paie, ce qu'une modification mineure"
+" ne fait jamais"
 
 #: apps/compliance/forms.py
 msgid ""
@@ -8211,12 +8262,17 @@ msgstr "Le vendeur (par défaut)"
 #: apps/orders/amendments.py
 msgid "The seller cannot deliver to %(place)s, so the address cannot be changed to it (%(why)s)"
 msgstr ""
+"Le vendeur ne peut pas livrer à %(place)s ; l'adresse ne peut donc pas être changée pour celle-ci "
+"(%(why)s)"
 
 #: apps/orders/amendments.py
 msgid ""
 "The seller has no fixed shipping price for %(place)s, so the address cannot be changed to it: such"
 " a change would need a shipping quote, which amendments do not support yet."
 msgstr ""
+"Le vendeur n'a pas de prix d'expédition fixe pour %(place)s ; l'adresse ne peut donc pas être "
+"changée pour celle-ci : un tel changement nécessiterait un devis d'expédition, que les "
+"modifications ne prennent pas encore en charge."
 
 #: apps/vendors/models.py
 msgid "The seller these terms belong to."
@@ -8254,7 +8310,7 @@ msgstr ""
 
 #: apps/orders/amendments.py
 msgid "The shipping method %(method)r is not offered for this package."
-msgstr ""
+msgstr "Le mode d'expédition %(method)r n'est pas proposé pour ce colis."
 
 #: apps/shipping/models.py
 msgid "The shipping price for this band, without VAT."
@@ -8306,11 +8362,13 @@ msgstr ""
 
 #: apps/manager/templates/manager/amendment.html
 msgid "The shop's invoice is already issued"
-msgstr ""
+msgstr "La facture de la boutique est déjà émise"
 
 #: apps/orders/amendments.py
 msgid "The shop's open orders are frozen pending staff review, so they cannot be amended."
 msgstr ""
+"Les commandes ouvertes de la boutique sont gelées dans l'attente d'un examen par le personnel de "
+"la plateforme ; elles ne peuvent donc pas être modifiées."
 
 #: apps/manager/amendment_views.py
 msgid "the shop's owner"
@@ -8438,7 +8496,7 @@ msgstr "Le supplément : un montant hors TVA pour un supplément fixe ou au kg, 
 
 #: apps/orders/amendment_engine.py
 msgid "The tax of the increase of line %(sku)s is not known."
-msgstr ""
+msgstr "La taxe de l'augmentation de la ligne %(sku)s n'est pas connue."
 
 #: apps/vendors/models.py
 msgid ""
@@ -8579,7 +8637,7 @@ msgstr ""
 
 #: apps/orders/amendment_engine.py
 msgid "The unit price must be an amount above zero, in cents."
-msgstr ""
+msgstr "Le prix unitaire doit être un montant supérieur à zéro, en centimes."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -8901,6 +8959,8 @@ msgstr "Cette action ne modifie rien."
 msgid ""
 "This amendment changes nothing: the lines, the shipping and the address would stay as they are."
 msgstr ""
+"Cette modification ne change rien : les lignes, l'expédition et l'adresse resteraient comme elles "
+"sont."
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/verify.html
@@ -8913,6 +8973,9 @@ msgid ""
 "amendment (an open passkey window does not cover it; a confirmation given before the draft was "
 "edited no longer counts)."
 msgstr ""
+"Cette modification déplace l'adresse de livraison et nécessite donc une nouvelle confirmation par "
+"passkey pour cette modification (une fenêtre passkey ouverte ne la couvre pas ; une confirmation "
+"donnée avant la modification du brouillon ne compte plus)."
 
 #: apps/manager/templates/manager/amendment_passkey.html
 msgid ""
@@ -8928,6 +8991,9 @@ msgid ""
 "amendment (an open passkey window does not cover it; a confirmation given before the draft was "
 "edited no longer counts)."
 msgstr ""
+"Cette modification rembourse de l'argent au client et nécessite donc une nouvelle confirmation par"
+" passkey pour cette modification (une fenêtre passkey ouverte ne la couvre pas ; une confirmation "
+"donnée avant la modification du brouillon ne compte plus)."
 
 #: apps/accounts/views.py
 msgid "This content is not available in this language."
@@ -8940,10 +9006,12 @@ msgstr "Cela ne ressemble pas à un numéro de TVA de l'UE. Vérifiez le préfix
 #: apps/orders/amendments.py
 msgid "This draft was started by platform staff: only that side may change or apply it."
 msgstr ""
+"Ce brouillon a été commencé par le personnel de la plateforme : seul ce côté peut le modifier ou "
+"l'appliquer."
 
 #: apps/orders/amendments.py
 msgid "This draft was started by the shop: only that side may change or apply it."
-msgstr ""
+msgstr "Ce brouillon a été commencé par la boutique : seul ce côté peut le modifier ou l'appliquer."
 
 #: apps/manager/event_block_views.py
 msgid ""
@@ -8958,10 +9026,14 @@ msgid ""
 "This is a business order, so the address cannot be moved to %(place)s without a new VAT number "
 "check for that destination, which amendments do not support yet."
 msgstr ""
+"Il s'agit d'une commande professionnelle ; l'adresse ne peut donc pas être déplacée à %(place)s "
+"sans une nouvelle vérification du numéro de TVA pour cette destination, que les modifications ne "
+"prennent pas encore en charge."
 
 #: apps/orders/amendments.py
 msgid "This is a substantial change: it needs the customer's acceptance first."
 msgstr ""
+"Il s'agit d'une modification substantielle : elle nécessite d'abord l'acceptation du client."
 
 #: apps/manager/templates/manager/shop/event_form.html
 msgid ""
@@ -9034,19 +9106,23 @@ msgstr "Cette commande n’est pas encore payée, elle ne peut donc pas être mo
 
 #: apps/orders/amendments.py
 msgid "This order is not paid yet: change it through the checkout or the quote instead."
-msgstr ""
+msgstr "Cette commande n'est pas encore payée : modifiez-la plutôt via le paiement ou le devis."
 
 #: apps/orders/amendments.py
 msgid ""
 "This package already has an open amendment (%(ref)s, %(state)s): finish, withdraw or discard it "
 "before drafting another."
 msgstr ""
+"Ce colis a déjà une modification ouverte (%(ref)s, %(state)s) : terminez-la, retirez-la ou "
+"abandonnez-la avant d'en rédiger une autre."
 
 #: apps/orders/amendments.py
 msgid ""
 "This package already has an open amendment: finish, withdraw or discard it before drafting "
 "another."
 msgstr ""
+"Ce colis a déjà une modification ouverte : terminez-la, retirez-la ou abandonnez-la avant d'en "
+"rédiger une autre."
 
 #: apps/manager/views.py
 msgid ""
@@ -9072,6 +9148,8 @@ msgid ""
 "This package is %(state)s: an order can be amended only before shipping, while the package is "
 "pending or accepted."
 msgstr ""
+"Ce colis est %(state)s : une commande ne peut être modifiée qu'avant l'expédition, tant que le "
+"colis est en attente ou accepté."
 
 #: apps/catalog/templates/catalog/product.html
 msgid "This page is not available in your language yet."
@@ -9502,7 +9580,7 @@ msgstr "Prix unitaire net"
 
 #: apps/orders/amendment_engine.py
 msgid "unknown"
-msgstr ""
+msgstr "inconnu"
 
 #: apps/accounts/templates/accounts/sessions/list.html
 #: apps/manager/templates/manager/platform/user_sessions.html
@@ -9616,14 +9694,16 @@ msgid ""
 "VAT cannot be decided for a delivery to %(place)s, so the address cannot be changed to it "
 "(%(why)s)."
 msgstr ""
+"La TVA ne peut pas être déterminée pour une livraison à %(place)s ; l'adresse ne peut donc pas "
+"être changée pour celle-ci (%(why)s)."
 
 #: apps/orders/amendments.py
 msgid "VAT cannot be decided for this change (%(why)s)."
-msgstr ""
+msgstr "La TVA ne peut pas être déterminée pour cette modification (%(why)s)."
 
 #: apps/orders/amendments.py
 msgid "VAT cannot be decided for this package (%(why)s)."
-msgstr ""
+msgstr "La TVA ne peut pas être déterminée pour ce colis (%(why)s)."
 
 #: apps/orders/ui/present.py
 msgid "VAT included in the total"
@@ -10637,6 +10717,8 @@ msgid ""
 "You recorded on %(when)s that your invoice or receipt for this order is issued. Every later change"
 " shows the reminder to correct it."
 msgstr ""
+"Vous avez enregistré le %(when)s que votre facture ou votre justificatif pour cette commande est "
+"émis. Chaque modification ultérieure affiche le rappel de le corriger."
 
 #: apps/accounts/templates/accounts/levels/prompt.html
 #: apps/manager/templates/manager/amendment_passkey.html
@@ -10737,7 +10819,7 @@ msgstr "Vos images"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Your invoice is already issued"
-msgstr ""
+msgstr "Votre facture est déjà émise"
 
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."
