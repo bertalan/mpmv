@@ -139,3 +139,17 @@ def test_every_non_english_configuration_is_well_formed(codes: list[str]) -> Non
 
     assert code == codes[0]
     assert [c for c, _name in languages] == codes
+
+
+def test_customers_are_served_only_english_and_italian_by_default() -> None:
+    """I18N.19 interim guard: the DE/FR/ES AI drafts stay off until the professional review."""
+    assert DEFAULT_LANGUAGE_CODES == ("en", "it")
+    assert [c for c, _n in language_settings([])[1]] == ["en", "it"]
+    for gated in ("de", "fr", "es"):
+        assert gated not in DEFAULT_LANGUAGE_CODES
+
+
+def test_an_operator_can_add_the_draft_languages_for_the_staff_preview() -> None:
+    codes = [c for c, _n in language_settings(["en", "it", "de", "fr", "es"])[1]]
+
+    assert codes == ["en", "it", "de", "fr", "es"]

@@ -357,7 +357,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Site languages (spec 09, D-18, I18N.15): MPMV_LANGUAGES, an ordered list of codes; the first is
-# the primary (source) language without URL prefix. Default: en,it,de,fr,es. Checked by core.E911.
+# the primary (source) language without URL prefix. Default: en,it (DE/FR/ES wait for the
+# I18N.19 review). Checked by core.E911.
 LANGUAGE_CODE, LANGUAGES = language_settings(env_list("MPMV_LANGUAGES"))
 USE_I18N = True
 LOCALE_PATHS = [BASE_DIR / "locale"]
