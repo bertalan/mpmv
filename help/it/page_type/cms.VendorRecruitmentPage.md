@@ -1,5 +1,5 @@
 # Pagina di reclutamento venditori
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 La pagina di reclutamento venditori è la pagina Vendi con noi: presenta i piani e le domande frequenti e invita i venditori a candidarsi.
 
@@ -10,10 +10,10 @@ La pagina di reclutamento venditori è la pagina Vendi con noi: presenta i piani
 - Invito all'azione: l'etichetta del pulsante di candidatura. Se la lascia vuota, viene usata un'etichetta predefinita.
 
 ## Immagini e licenze
-Questo tipo di pagina non ha un'immagine propria. Le immagini in un blocco provengono dalla libreria immagini: ciascuna richiede una licenza dell'elenco consentito, un autore e un testo alternativo.
+Le immagini nei blocchi provengono dalla libreria immagini e richiedono una licenza consentita, un autore e un testo alternativo.
 
 ## Traduzioni
-Ogni lingua è una pagina a sé. Usi le azioni della pagina per tradurla: lo strumento di traduzione copia il testo di origine e lo traduce lì; ogni traduzione si pubblica separatamente.
+Ogni lingua è una pagina a sé. Scelga Traduci questa pagina nelle azioni della pagina, traduca il testo di origine copiato e pubblichi ogni traduzione separatamente.
 
 ## Pubblicazione e anteprima
-Salva bozza tiene le modifiche private. Anteprima mostra la pagina come la vedranno i visitatori. Pubblica la mette sul sito. Il pulsante di candidatura porta al modulo di candidatura dei venditori e compare quando il modulo è disponibile.
+Salva la bozza tiene le modifiche private, Anteprima mostra la pagina come la vedranno i visitatori e Pubblica la mette sul sito. Il pulsante di candidatura porta al modulo di candidatura dei venditori e compare quando il modulo è disponibile.

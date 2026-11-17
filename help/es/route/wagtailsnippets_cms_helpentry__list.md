@@ -1,5 +1,5 @@
 # Textos de ayuda
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Esta lista contiene los textos de la ventana Ayuda para esta página, una fila por idioma. Una fila vale para una pantalla, para todas las páginas de un tipo de página o para cualquier pantalla sin texto propio.
 

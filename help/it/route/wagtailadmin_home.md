@@ -1,5 +1,5 @@
 # Dashboard
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Questa è la schermata iniziale dell'admin dei redattori. Il menu a sinistra contiene le sezioni che il Suo ruolo può aprire, come pagine, immagini, navigazione e testi di aiuto.
 

@@ -1,5 +1,5 @@
 # Pagina di destinazione di un venditore
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Una pagina di destinazione di un venditore racconta la storia di un negozio oltre la sua vetrina: la storia, il laboratorio e i prodotti in evidenza. La vetrina rimanda a questa pagina.
 
@@ -9,10 +9,10 @@ Una pagina di destinazione di un venditore racconta la storia di un negozio oltr
 - Prodotti in evidenza: quanti dei prodotti più recenti del venditore mostrare dopo la storia; 0 non ne mostra.
 
 ## Immagini e licenze
-Questo tipo di pagina non ha un'immagine propria. Le immagini in un blocco provengono dalla libreria immagini: ciascuna richiede una licenza dell'elenco consentito, un autore e un testo alternativo.
+Le immagini nei blocchi provengono dalla libreria immagini e richiedono una licenza consentita, un autore e un testo alternativo.
 
 ## Traduzioni
-Ogni lingua è una pagina a sé. Usi le azioni della pagina per tradurla: lo strumento di traduzione copia il testo di origine e lo traduce lì; ogni traduzione si pubblica separatamente.
+Ogni lingua è una pagina a sé. Scelga Traduci questa pagina nelle azioni della pagina, traduca il testo di origine copiato e pubblichi ogni traduzione separatamente.
 
 ## Pubblicazione e anteprima
-Salva bozza tiene le modifiche private. Anteprima mostra la pagina come la vedranno i visitatori. Pubblica la mette sul sito. La pagina è mostrata solo finché il venditore è attivo; altrimenti risponde pagina non trovata.
+Salva la bozza tiene le modifiche private, Anteprima mostra la pagina come la vedranno i visitatori e Pubblica la mette sul sito. La pagina è mostrata solo finché il venditore è attivo; altrimenti risponde pagina non trovata.

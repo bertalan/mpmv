@@ -1,5 +1,5 @@
 # Articolo del blog
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Un articolo del blog ha una data, un autore, un riassunto, un'immagine principale e un corpo. Si trova sotto l'indice del blog.
 
@@ -11,10 +11,10 @@ Un articolo del blog ha una data, un autore, un riassunto, un'immagine principal
 - Corpo: testo, immagini, gallerie, domande e link, costruiti con i blocchi.
 
 ## Immagini e licenze
-Le immagini provengono dalla libreria immagini. Ognuna richiede una licenza dell'elenco consentito e un autore, e la licenza può richiedere anche un indirizzo della fonte, un riferimento del permesso o un credito visibile. Completi questi dati nella libreria. Ogni immagine in un blocco richiede un testo alternativo che la descriva.
+Le immagini provengono dalla libreria immagini, dove ognuna richiede una licenza consentita e un autore, e talvolta un indirizzo della fonte, un riferimento del permesso o un credito visibile. Ogni immagine in un blocco richiede un testo alternativo.
 
 ## Traduzioni
-Ogni lingua è una pagina a sé. Usi le azioni della pagina per tradurla: lo strumento di traduzione copia il testo di origine e lo traduce lì; ogni traduzione si pubblica separatamente.
+Ogni lingua è una pagina a sé. Scelga Traduci questa pagina nelle azioni della pagina, traduca il testo di origine copiato e pubblichi ogni traduzione separatamente.
 
 ## Pubblicazione e anteprima
-Salva bozza tiene le modifiche private. Anteprima mostra la pagina come la vedranno i visitatori. Pubblica la mette sul sito.
+Salva la bozza tiene le modifiche private, Anteprima mostra la pagina come la vedranno i visitatori e Pubblica la mette sul sito.

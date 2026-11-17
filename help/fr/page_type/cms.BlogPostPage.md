@@ -1,5 +1,5 @@
 # Article de blog
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Un article de blog a une date, un auteur, un résumé, une image principale et un corps. Il se trouve sous l'index du blog.
 
@@ -11,10 +11,10 @@ Un article de blog a une date, un auteur, un résumé, une image principale et u
 - Corps : texte, images, galeries, questions et liens, construits avec des blocs.
 
 ## Images et licences
-Les images viennent de la bibliothèque d'images. Chacune a besoin d'une licence de la liste autorisée et d'un auteur, et sa licence peut aussi exiger l'adresse de la source, une référence d'autorisation ou un crédit visible. Complétez ces informations dans la bibliothèque. Chaque image d'un bloc a besoin d'un texte alternatif qui la décrit.
+Les images viennent de la bibliothèque d'images, où chacune a besoin d'une licence autorisée et d'un auteur, et parfois de l'adresse de la source, d'une référence d'autorisation ou d'un crédit visible. Chaque image d'un bloc a besoin d'un texte alternatif.
 
 ## Traductions
-Chaque langue est une page à part. Utilisez les actions de la page pour la traduire : l'outil de traduction reprend le texte source et vous le traduisez là, puis chaque traduction est publiée séparément.
+Chaque langue est une page à part. Choisissez Traduire cette page dans les actions de la page, traduisez le texte source copié et publiez chaque traduction séparément.
 
 ## Publication et aperçu
-Enregistrer le brouillon garde vos modifications privées. L'aperçu montre la page comme la verront les visiteurs. Publier la met en ligne.
+Enregistrer le brouillon garde les modifications privées, Aperçu montre la page comme la verront les visiteurs et Publier la met en ligne.

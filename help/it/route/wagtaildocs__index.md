@@ -1,5 +1,5 @@
 # Documenti
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Questa schermata elenca i file caricati come documenti. I documenti non compaiono nel menu: sono installati per lo strumento di traduzione.
 

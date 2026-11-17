@@ -1,11 +1,11 @@
 # Seite hinzufügen
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Mit diesem Formular legen Sie eine neue Seite unterhalb der gewählten Seite an. Die Felder hängen vom Seitentyp ab.
 
 ## Was Sie tun können
 - Geben Sie den Titel ein und füllen Sie dann die übrigen Felder im Reiter Inhalt aus.
-- Prüfen Sie die Webadresse (Slug) im Reiter Förderung.
+- Prüfen Sie die Webadresse (Slug) im Reiter Veröffentlichung.
 - Wählen Sie Entwurf speichern, um Ihre Arbeit privat zu halten, oder Veröffentlichen, um die Seite auf die Website zu stellen.
 
 ## Gut zu wissen

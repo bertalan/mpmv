@@ -1,5 +1,5 @@
 # Dokumente
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Diese Seite listet die als Dokumente hochgeladenen Dateien auf. Dokumente stehen nicht im Menü: Sie sind für das Übersetzungswerkzeug installiert.
 

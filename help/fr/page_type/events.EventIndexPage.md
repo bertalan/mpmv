@@ -1,5 +1,5 @@
 # Index des événements
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 L'index des événements est la page située à l'adresse des événements d'une langue. Il liste les événements à venir, un calendrier et les événements passés. Il y en a un par langue, sous sa page d'accueil.
 
@@ -8,10 +8,10 @@ L'index des événements est la page située à l'adresse des événements d'une
 - Les événements ne s'écrivent pas ici : ajoutez-les comme sous-pages de type événement.
 
 ## Images et licences
-Ce type de page n'a pas d'image propre. Les images d'un bloc viennent de la bibliothèque d'images : chacune a besoin d'une licence de la liste autorisée, d'un auteur et d'un texte alternatif.
+Les images des blocs viennent de la bibliothèque d'images et ont besoin d'une licence autorisée, d'un auteur et d'un texte alternatif.
 
 ## Traductions
-Chaque langue est une page à part. Utilisez les actions de la page pour la traduire : l'outil de traduction reprend le texte source et vous le traduisez là, puis chaque traduction est publiée séparément.
+Chaque langue est une page à part. Choisissez Traduire cette page dans les actions de la page, traduisez le texte source copié et publiez chaque traduction séparément.
 
 ## Publication et aperçu
-Enregistrer le brouillon garde vos modifications privées. L'aperçu montre la page comme la verront les visiteurs. Publier la met en ligne. La liste, le calendrier et les événements passés sont servis par cette page.
+Enregistrer le brouillon garde les modifications privées, Aperçu montre la page comme la verront les visiteurs et Publier la met en ligne. La liste, le calendrier et les événements passés sont servis par cette page.

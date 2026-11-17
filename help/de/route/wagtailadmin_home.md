@@ -1,5 +1,5 @@
 # Dashboard
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Dies ist die Startseite des Redaktionsbereichs. Das Menü links enthält die Bereiche, die Ihre Rolle öffnen darf, etwa Seiten, Bilder, Navigation und Hilfetexte.
 

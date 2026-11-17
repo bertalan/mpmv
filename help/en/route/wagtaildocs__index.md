@@ -1,5 +1,5 @@
 # Documents
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 This screen lists the files uploaded as documents. Documents are not in the menu: they are installed for the translation tool.
 

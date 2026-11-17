@@ -1,5 +1,5 @@
 # Modifier une page
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Utilisez cet écran pour modifier une page. L'onglet Contenu contient le texte et les images ; les autres onglets contiennent l'adresse web, les réglages de recherche et la publication programmée.
 

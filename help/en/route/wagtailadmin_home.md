@@ -1,5 +1,5 @@
 # Dashboard
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 This is the home screen of the editors' admin. The menu on the left holds the sections your role may open, such as pages, images, navigation and help texts.
 

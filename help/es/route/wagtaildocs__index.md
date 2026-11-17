@@ -1,5 +1,5 @@
 # Documentos
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Esta pantalla enumera los archivos subidos como documentos. Los documentos no aparecen en el menú: están instalados para la herramienta de traducción.
 

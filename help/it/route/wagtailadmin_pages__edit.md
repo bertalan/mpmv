@@ -1,10 +1,10 @@
 # Modificare una pagina
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Usi questa schermata per modificare una pagina. La scheda Contenuto contiene testo e immagini; le altre schede contengono l'indirizzo web, le impostazioni per i motori di ricerca e la pubblicazione programmata.
 
 ## Cosa può fare
-- Modifichi i campi, poi prema Salva bozza per tenere le modifiche private.
+- Modifichi i campi, poi prema Salva la bozza per tenere le modifiche private.
 - Prema Anteprima per vedere la pagina come la vedranno i visitatori.
 - Prema Pubblica per mettere le modifiche sul sito.
 

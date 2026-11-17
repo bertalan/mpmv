@@ -1,5 +1,5 @@
 # Add a page
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Use this form to create a new page under the page you chose. The fields depend on the page type.
 

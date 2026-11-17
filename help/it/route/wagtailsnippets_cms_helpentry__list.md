@@ -1,5 +1,5 @@
 # Testi di aiuto
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Questo elenco contiene i testi della finestra Aiuto per questa pagina, una riga per lingua. Una riga vale per una schermata, per tutte le pagine di un tipo di pagina, o per ogni schermata senza un testo proprio.
 

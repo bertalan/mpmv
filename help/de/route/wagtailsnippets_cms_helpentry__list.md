@@ -1,5 +1,5 @@
 # Hilfetexte
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Diese Liste enthält die Texte des Dialogs Hilfe zu dieser Seite, eine Zeile pro Sprache. Eine Zeile gilt für einen Bildschirm, für alle Seiten eines Seitentyps oder für jede Seite ohne eigenen Text.
 

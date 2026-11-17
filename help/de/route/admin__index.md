@@ -1,11 +1,11 @@
 # Django-Admin
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Dies ist die technische Verwaltungsseite für das Plattform-Team. Sie listet die Datentabellen auf, die der Django-Admin anbietet, nach Bereichen gruppiert.
 
 ## Was Sie tun können
 - Öffnen Sie eine Tabelle, um Zeilen zu suchen, zu filtern, zu bearbeiten oder hinzuzufügen.
-- Mit dem Verlauf einer Zeile sehen Sie frühere Änderungen.
+- Mit Geschichte an einer Zeile sehen Sie frühere Änderungen.
 
 ## Gut zu wissen
 - Die tägliche Arbeit findet im Manager und im Redaktionsbereich statt. Kommen Sie nur hierher, wenn eine Aufgabe es verlangt.

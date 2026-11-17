@@ -1,5 +1,5 @@
 # Help texts
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 This list holds the texts of the Help for this page dialog, one row per language. A row applies to one screen, to every page of one page type, or to every screen without a text of its own.
 

@@ -1,5 +1,5 @@
 # Edit a page
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Use this screen to change a page. The Content tab holds the text and pictures; the other tabs hold the web address, search settings and scheduled publishing.
 

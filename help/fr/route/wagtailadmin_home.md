@@ -1,5 +1,5 @@
 # Tableau de bord
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Voici l'écran d'accueil de l'admin des rédacteurs. Le menu de gauche contient les rubriques que votre rôle peut ouvrir, comme les pages, les images, la navigation et les textes d'aide.
 

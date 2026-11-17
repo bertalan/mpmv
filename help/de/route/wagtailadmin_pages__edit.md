@@ -1,5 +1,5 @@
 # Seite bearbeiten
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Auf dieser Seite ändern Sie eine Seite. Der Reiter Inhalt enthält Text und Bilder; die übrigen Reiter enthalten die Webadresse, Sucheinstellungen und die geplante Veröffentlichung.
 

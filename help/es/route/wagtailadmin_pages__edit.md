@@ -1,10 +1,10 @@
 # Editar una página
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Use esta pantalla para cambiar una página. La pestaña Contenido contiene el texto y las imágenes; las demás pestañas contienen la dirección web, los ajustes de búsqueda y la publicación programada.
 
 ## Qué puede hacer
-- Cambie los campos y pulse Guardar borrador para mantener los cambios privados.
+- Cambie los campos y pulse Guardar el borrador para mantener los cambios privados.
 - Pulse Vista previa para ver la página como la verán los visitantes.
 - Pulse Publicar para poner los cambios en el sitio.
 

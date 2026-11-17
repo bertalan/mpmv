@@ -1,5 +1,5 @@
-# Panel de inicio
-last-checked: 2026-11-17
+# Panel de control
+last-checked: 2026-11-18
 
 Esta es la pantalla de inicio del admin de los editores. El menú de la izquierda contiene las secciones que su rol puede abrir, como páginas, imágenes, navegación y textos de ayuda.
 

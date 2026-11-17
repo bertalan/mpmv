@@ -1,5 +1,5 @@
 # Textes d'aide
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Cette liste contient les textes de la fenêtre Aide pour cette page, une ligne par langue. Une ligne vaut pour un écran, pour toutes les pages d'un type de page, ou pour tout écran sans texte propre.
 

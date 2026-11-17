@@ -1,5 +1,5 @@
 # Documents
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 Cet écran liste les fichiers téléversés comme documents. Les documents ne figurent pas dans le menu : ils sont installés pour l'outil de traduction.
 

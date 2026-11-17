@@ -1,5 +1,5 @@
 # Vendor landing page
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 A vendor landing page tells the story of a shop beyond its storefront: its history, its workshop and its featured products. The storefront links to it.
 
@@ -9,10 +9,10 @@ A vendor landing page tells the story of a shop beyond its storefront: its histo
 - Featured products: how many of the vendor's newest products to show after the story; 0 shows none.
 
 ## Images and licences
-This page type has no picture of its own. Pictures in a block come from the image library: each needs a licence from the allow list, an author and an alt text.
+Pictures in blocks come from the image library and need an allowed licence, an author and an alt text.
 
 ## Translations
-Each language is its own page. Use the page actions to translate the page: the translation tool copies the source text and you translate it there, and each translation is published separately.
+Each language is its own page. Choose Translate this page in the page actions, translate the copied source text, and publish each translation separately.
 
 ## Publishing and preview
-Save draft keeps your changes private. Preview shows the page as visitors will see it. Publish puts it on the site. The page is shown only while the vendor is active; otherwise it answers not found.
+Save draft keeps changes private, Preview shows the page as visitors will see it, and Publish puts it on the site. The page is shown only while the vendor is active; otherwise it answers not found.

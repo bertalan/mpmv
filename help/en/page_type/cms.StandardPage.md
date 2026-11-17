@@ -1,5 +1,5 @@
 # Standard page
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 A standard page is a static page such as About us, Contact or an FAQ, with an optional main image.
 
@@ -9,10 +9,10 @@ A standard page is a static page such as About us, Contact or an FAQ, with an op
 - Hide from search engines (Promote tab): asks search engines to skip the page and leaves it out of the sitemaps.
 
 ## Images and licences
-Pictures come from the image library. Each one needs a licence from the allow list and an author, and its licence may also require a source address, a permission reference or a visible credit. Complete these in the library. Every picture in a block needs an alt text that describes it.
+Pictures come from the image library, where each needs an allowed licence and an author, and sometimes a source address, a permission reference or a visible credit. Every picture in a block needs an alt text.
 
 ## Translations
-Each language is its own page. Use the page actions to translate the page: the translation tool copies the source text and you translate it there, and each translation is published separately.
+Each language is its own page. Choose Translate this page in the page actions, translate the copied source text, and publish each translation separately.
 
 ## Publishing and preview
-Save draft keeps your changes private. Preview shows the page as visitors will see it. Publish puts it on the site.
+Save draft keeps changes private, Preview shows the page as visitors will see it, and Publish puts it on the site.

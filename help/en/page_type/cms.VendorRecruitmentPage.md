@@ -1,5 +1,5 @@
 # Vendor recruitment page
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 The vendor recruitment page is the Sell with us page: it presents the plans and a FAQ and invites sellers to apply.
 
@@ -10,10 +10,10 @@ The vendor recruitment page is the Sell with us page: it presents the plans and 
 - Call to action: the label of the apply button. If you leave it empty, a default label is used.
 
 ## Images and licences
-This page type has no picture of its own. Pictures in a block come from the image library: each needs a licence from the allow list, an author and an alt text.
+Pictures in blocks come from the image library and need an allowed licence, an author and an alt text.
 
 ## Translations
-Each language is its own page. Use the page actions to translate the page: the translation tool copies the source text and you translate it there, and each translation is published separately.
+Each language is its own page. Choose Translate this page in the page actions, translate the copied source text, and publish each translation separately.
 
 ## Publishing and preview
-Save draft keeps your changes private. Preview shows the page as visitors will see it. Publish puts it on the site. The apply button leads to the vendor application form and appears when that form is available.
+Save draft keeps changes private, Preview shows the page as visitors will see it, and Publish puts it on the site. The apply button leads to the vendor application form and appears when that form is available.

@@ -1,5 +1,5 @@
 # Event
-last-checked: 2026-11-17
+last-checked: 2026-11-18
 
 An event is a promotion, a trade fair or a meeting, written in any enabled language. It lives under the events index.
 
@@ -12,10 +12,10 @@ An event is a promotion, a trade fair or a meeting, written in any enabled langu
 - Body: the full description, built from blocks.
 
 ## Images and licences
-This page type has no picture of its own. Pictures in a block come from the image library: each needs a licence from the allow list, an author and an alt text.
+Pictures in blocks come from the image library and need an allowed licence, an author and an alt text.
 
 ## Translations
-Each language is its own page. Use the page actions to translate the page: the translation tool copies the source text and you translate it there, and each translation is published separately.
+Each language is its own page. Choose Translate this page in the page actions, translate the copied source text, and publish each translation separately.
 
 ## Publishing and preview
-Save draft keeps your changes private. Preview shows the page as visitors will see it. Publish puts it on the site. Some events go through an Event review before they are published, depending on the vendor's policy. Changing the date, time or place after publishing updates calendar subscribers. Hiding is done by platform staff.
+Save draft keeps changes private, Preview shows the page as visitors will see it, and Publish puts it on the site. Some events go through a review (Event review) before they are published, depending on the vendor's policy. Changing the date, time or place after publishing updates calendar subscribers. Hiding is done by platform staff.
