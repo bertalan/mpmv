@@ -7,6 +7,7 @@ from django.db import DatabaseError, IntegrityError, transaction
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors import engine
 from apps.vendors.models import LegalFieldRequirement, SelfCertification, Vendor
@@ -24,6 +25,7 @@ from apps.vendors.tests.factories import (
     VendorMemberFactory,
 )
 from apps.vendors.tests.fakes import seed_legal_requirements
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -133,11 +135,11 @@ def test_missing_dac7_data_does_not_block_activation() -> None:
 
 def test_the_self_certification_row_stores_version_language_and_hash() -> None:
     vendor = onboarding(eu_company=True)
-    certify(vendor, language="it")
+    certify(vendor, language=other_language())
     row = SelfCertification.objects.get()
     assert row.version == engine.SELF_CERTIFICATION_VERSION
-    assert row.language == "it"
-    assert row.text_hash == engine.self_certification_hash("it")
+    assert row.language == other_language()
+    assert row.text_hash == engine.self_certification_hash(other_language())
     assert not hasattr(row, "ip")  # data minimisation: the IP is not stored (decision on PR 181)
     assert row.vendor == vendor
     assert row.onboarding_round == vendor.onboarding_round
@@ -162,10 +164,14 @@ def test_only_an_owner_of_the_vendor_can_certify() -> None:
     vendor = onboarding(eu_company=True)
     stranger = UserFactory.create()
     with pytest.raises(engine.SelfCertificationError):
-        certify_platform_duties(vendor, stranger, language="en", ctx=owner_ctx(stranger.pk))
+        certify_platform_duties(
+            vendor, stranger, language=primary_language(), ctx=owner_ctx(stranger.pk)
+        )
     VendorMemberFactory.create(vendor=vendor, user=stranger, role="staff")
     with pytest.raises(engine.SelfCertificationError):
-        certify_platform_duties(vendor, stranger, language="en", ctx=owner_ctx(stranger.pk))
+        certify_platform_duties(
+            vendor, stranger, language=primary_language(), ctx=owner_ctx(stranger.pk)
+        )
 
 
 def test_a_certification_of_an_older_round_does_not_count_after_a_reopen() -> None:
@@ -195,7 +201,7 @@ def test_the_self_certification_table_is_append_only() -> None:
     with pytest.raises(PermissionError):
         row.save()
     with pytest.raises(DatabaseError), transaction.atomic():
-        SelfCertification.objects.filter(pk=row.pk).update(language="en")
+        SelfCertification.objects.filter(pk=row.pk).update(language=primary_language())
     with pytest.raises(DatabaseError), transaction.atomic():
         SelfCertification.objects.filter(pk=row.pk).delete()
 
@@ -206,7 +212,7 @@ def test_an_inactive_owner_cannot_certify() -> None:
     owner.is_active = False
     owner.save(update_fields=["is_active"])
     with pytest.raises(engine.SelfCertificationError):
-        certify_platform_duties(vendor, owner, language="en", ctx=owner_ctx(owner.pk))
+        certify_platform_duties(vendor, owner, language=primary_language(), ctx=owner_ctx(owner.pk))
     assert not SelfCertification.objects.exists()
 
 

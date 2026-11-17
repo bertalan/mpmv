@@ -17,9 +17,11 @@ from django.test.utils import CaptureQueriesContext
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import CategoryFactory, CategoryTranslationFactory
 from apps.catalog.tests.integration.test_listing_views import listed, prefix
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -30,7 +32,7 @@ def _vendor() -> Vendor:
     vendor: Vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="en",
+        language=primary_language(),
         status=PUBLISHED,
         tagline="Workshop tagline",
         description="Our story in English.",
@@ -40,7 +42,7 @@ def _vendor() -> Vendor:
     )
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="it",
+        language=other_language(),
         status=PUBLISHED,
         tagline="Slogan della bottega",
         description="La nostra storia in italiano.",
@@ -54,10 +56,10 @@ def _vendor() -> Vendor:
 def _category(en: str, it: str, parent: Any = None) -> Any:
     category = CategoryFactory.create(parent=parent)
     CategoryTranslationFactory.create(
-        category=category, language="en", name=en, slug=en.lower(), status=PUBLISHED
+        category=category, language=primary_language(), name=en, slug=en.lower(), status=PUBLISHED
     )
     CategoryTranslationFactory.create(
-        category=category, language="it", name=it, slug=it.lower(), status=PUBLISHED
+        category=category, language=other_language(), name=it, slug=it.lower(), status=PUBLISHED
     )
     return category
 
@@ -93,7 +95,7 @@ def test_a_draft_text_never_shows(client: Client) -> None:
     vendor = _vendor()
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="de",
+        language=third_language(),
         status=TranslationStatus.MACHINE,
         description="Entwurf nicht veroeffentlichen",
     )
@@ -103,7 +105,9 @@ def test_a_draft_text_never_shows(client: Client) -> None:
 
 def test_vendor_texts_are_escaped(client: Client) -> None:
     vendor = _vendor()
-    vendor.translations.filter(language="en").update(description="<script>alert(1)</script>")
+    vendor.translations.filter(language=primary_language()).update(
+        description="<script>alert(1)</script>"
+    )
     html = client.get(f"/shop/{vendor.slug}/").content.decode()
     assert "<script>alert(1)</script>" not in html
 
@@ -169,7 +173,7 @@ def test_other_listings_have_no_store_categories(client: Client) -> None:
 
 def test_tagline_and_policies_are_escaped(client: Client) -> None:
     vendor = _vendor()
-    vendor.translations.filter(language="en").update(
+    vendor.translations.filter(language=primary_language()).update(
         tagline="<b>tag</b>",
         shipping_policy="<script>ship()</script>",
         refund_policy="<img src=x onerror=r()>",
@@ -183,7 +187,7 @@ def test_tagline_and_policies_are_escaped(client: Client) -> None:
 
 def test_a_vendor_that_is_not_active_is_a_404_in_italian_too(client: Client) -> None:
     vendor = VendorFactory.create(status=Vendor.Status.SUSPENDED)
-    VendorTranslationFactory.create(vendor=vendor, language="it", status=PUBLISHED)
+    VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=PUBLISHED)
     assert client.get(f"{prefix('it')}/shop/{vendor.slug}/").status_code == 404
 
 
@@ -192,7 +196,7 @@ def test_a_draft_category_name_is_not_offered(client: Client) -> None:
     category = CategoryFactory.create()
     CategoryTranslationFactory.create(
         category=category,
-        language="en",
+        language=primary_language(),
         name="Hidden draft",
         slug="hidden",
         status=TranslationStatus.MACHINE,
@@ -207,11 +211,11 @@ def test_the_storefront_with_only_the_source_text_points_its_canonical_at_it(
     client: Client,
 ) -> None:
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
-    VendorTranslationFactory.create(vendor=vendor, language="en", status=PUBLISHED)
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), status=PUBLISHED)
     html = client.get(f"{prefix('it')}/shop/{vendor.slug}/").content.decode()
-    assert f'rel="canonical" href="http://testserver/shop/{vendor.slug}/"' in html
-    assert f'hreflang="en" href="http://testserver/shop/{vendor.slug}/"' in html
-    assert f'hreflang="x-default" href="http://testserver/shop/{vendor.slug}/"' in html
+    assert f'rel="canonical" href="http://localhost/shop/{vendor.slug}/"' in html
+    assert f'hreflang="en" href="http://localhost/shop/{vendor.slug}/"' in html
+    assert f'hreflang="x-default" href="http://localhost/shop/{vendor.slug}/"' in html
     assert 'hreflang="it"' not in html
 
 
@@ -228,3 +232,14 @@ def test_the_query_count_does_not_grow_with_the_categories(
     with django_assert_max_num_queries(len(small) + 1):
         response = client.get(f"/shop/{vendor.slug}/")
     assert len(response.context["store_categories"]) == 11
+
+
+@pytest.fixture(autouse=True)
+def _site_allows_indexing(db: None) -> None:
+    """The canonical and hreflang links are for indexable pages: the site's switch is on."""
+    from django.apps import apps
+    from wagtail.models import Site
+
+    apps.get_model("seo", "SeoSettings").objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )

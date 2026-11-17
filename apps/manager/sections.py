@@ -11,6 +11,8 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.vendors.services import can_review_profiles
 
+from .amendment_views import PLATFORM_SECTION as ORDER_CHANGES_SECTION
+from .amendment_views import SETTINGS_SECTION as AMENDMENT_SETTINGS_SECTION
 from .event_views import SECTION as EVENTS_SECTION
 from .fitment_views import CATEGORIES_SECTION, NODES_SECTION, SCHEME_SECTION
 from .navigation import Registry, Section, anyone, platform_role, vendor_action
@@ -180,6 +182,24 @@ BUILT_IN = (
         "manager:shop:termination",
         order=90,
         allowed=anyone,
+    ),
+    # ORD.20 part 3: the staff tools on a paid order (Support and the platform owner).
+    Section(
+        ORDER_CHANGES_SECTION,
+        Space.PLATFORM,
+        _("Order changes"),
+        "manager:platform:orders",
+        order=50,
+        allowed=platform_role(ORDER_CHANGES_SECTION),
+    ),
+    # ORD.20 part 3: the three amendment settings in force (configuration role and the owner).
+    Section(
+        AMENDMENT_SETTINGS_SECTION,
+        Space.PLATFORM,
+        _("Order change settings"),
+        "manager:platform:amendment_settings",
+        order=85,
+        allowed=platform_role(AMENDMENT_SETTINGS_SECTION),
     ),
     Section(
         "platform.staff_roles",

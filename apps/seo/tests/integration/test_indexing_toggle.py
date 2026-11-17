@@ -13,6 +13,7 @@ from wagtail.models import Page, Site
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.core.audit import user_context
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.seo import services
 from apps.seo.models import SeoSettings
@@ -160,13 +161,15 @@ def test_listings_follow_the_toggle(client: Client) -> None:
     from apps.vendors.tests.factories import VendorFactory
 
     category = CategoryFactory.create()
-    CategoryTranslationFactory.create(category=category, language="en", status="published")
+    CategoryTranslationFactory.create(
+        category=category, language=primary_language(), status="published"
+    )
     ProductFactory.create(
         vendor=VendorFactory.create(status=Vendor.Status.ACTIVE),
         category=category,
         status=Product.Status.PUBLISHED,
     )
-    url = f"/product-category/{category.translations.get(language='en').slug}/"
+    url = f"/product-category/{category.translations.get(language=primary_language()).slug}/"
     assert metas(client.get(url)) == [NOINDEX]
     set_indexing(True)
     assert metas(client.get(url)) == ["index, follow"]
@@ -175,20 +178,16 @@ def test_listings_follow_the_toggle(client: Client) -> None:
 # --- Sitemap line in robots.txt
 
 
-@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
-def test_robots_txt_has_no_sitemap_line_while_no_sitemap_route_exists(client: Client) -> None:
-    set_indexing(True)
-    assert "Sitemap:" not in client.get("/robots.txt").content.decode()
-
-
-@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False, ROOT_URLCONF="apps.seo.tests.urls")
+@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False, ALLOWED_HOSTS=["*"])
 def test_robots_txt_lists_the_sitemap_when_indexing_is_allowed(client: Client) -> None:
     set_indexing(True)
-    text = client.get("/robots.txt").content.decode()
-    assert text.endswith("Sitemap: http://testserver/sitemap.xml\n")
+    root = Site.objects.get(is_default_site=True).root_url
+    text = client.get("/robots.txt", HTTP_HOST="evil.example").content.decode()
+    assert text.endswith(f"Sitemap: {root}{reverse('sitemap')}\n")  # never the Host header
+    assert "evil.example" not in text
 
 
-@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False, ROOT_URLCONF="apps.seo.tests.urls")
+@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
 def test_a_noindex_robots_txt_has_no_sitemap_line(client: Client) -> None:
     text = client.get("/robots.txt").content.decode()
     assert "Sitemap:" not in text

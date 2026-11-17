@@ -92,5 +92,8 @@ def test_a_product_page_shows_its_content_and_structured_data(
     expect(page.locator(".product-companion")).to_contain_text("Glaze kit")
     shot(language)
     graph = json.loads(page.locator('script[type="application/ld+json"]').inner_text())["@graph"]
-    assert next(node for node in graph if node["@type"] == "Product")["name"] == title
+    assert (
+        next(node for node in graph if node["@type"] in {"Product", "ProductGroup"})["name"]
+        == title
+    )
     assert csp_violations(page) == [], "\n".join(csp_violations(page))

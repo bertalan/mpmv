@@ -19,6 +19,8 @@ from apps.catalog.tests.factories import (
     TermFactory,
     TermTranslationFactory,
 )
+from apps.core.i18n import primary_language
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -40,10 +42,10 @@ def test_categories_form_a_tree_in_path_order() -> None:
 def test_category_texts_resolve_with_the_explicit_english_fallback() -> None:
     category = CategoryFactory.create()
     CategoryTranslationFactory.create(
-        category=category, language="en", name="Bags", slug="bags", status="published"
+        category=category, language=primary_language(), name="Bags", slug="bags", status="published"
     )
     CategoryTranslationFactory.create(
-        category=category, language="it", name="Borse", slug="borse", status="machine"
+        category=category, language=other_language(), name="Borse", slug="borse", status="machine"
     )
     italian = category.translation("it")
     assert italian.is_fallback is True  # the IT draft is not published yet
@@ -54,9 +56,11 @@ def test_category_texts_resolve_with_the_explicit_english_fallback() -> None:
 
 def test_changing_the_english_name_sends_published_translations_back_to_review() -> None:
     category = CategoryFactory.create()
-    english = CategoryTranslationFactory.create(category=category, language="en", name="Bags")
+    english = CategoryTranslationFactory.create(
+        category=category, language=primary_language(), name="Bags"
+    )
     italian = CategoryTranslationFactory.create(
-        category=category, language="it", name="Borse", status="published"
+        category=category, language=other_language(), name="Borse", status="published"
     )
     english.name = "Bags and backpacks"
     english.save()
@@ -69,8 +73,10 @@ def test_sibling_categories_cannot_share_a_slug_in_one_language() -> None:
     parent = CategoryFactory.create()
     first = CategoryFactory.create(parent=parent)
     second = CategoryFactory.create(parent=parent)
-    CategoryTranslationFactory.create(category=first, language="en", slug="leather")
-    duplicate = CategoryTranslationFactory.build(category=second, language="en", slug="leather")
+    CategoryTranslationFactory.create(category=first, language=primary_language(), slug="leather")
+    duplicate = CategoryTranslationFactory.build(
+        category=second, language=primary_language(), slug="leather"
+    )
     with pytest.raises(ValidationError) as excinfo:
         duplicate.full_clean()
     assert excinfo.value.message_dict["slug"] == [
@@ -81,10 +87,14 @@ def test_sibling_categories_cannot_share_a_slug_in_one_language() -> None:
 def test_the_same_slug_is_allowed_under_another_parent_or_in_another_language() -> None:
     first = CategoryFactory.create(parent=CategoryFactory.create())
     cousin = CategoryFactory.create(parent=CategoryFactory.create())
-    CategoryTranslationFactory.create(category=first, language="en", slug="leather")
-    CategoryTranslationFactory.build(category=cousin, language="en", slug="leather").full_clean()
+    CategoryTranslationFactory.create(category=first, language=primary_language(), slug="leather")
+    CategoryTranslationFactory.build(
+        category=cousin, language=primary_language(), slug="leather"
+    ).full_clean()
     sibling = CategoryFactory.create(parent=first.get_parent())
-    CategoryTranslationFactory.build(category=sibling, language="it", slug="leather").full_clean()
+    CategoryTranslationFactory.build(
+        category=sibling, language=other_language(), slug="leather"
+    ).full_clean()
 
 
 def test_root_categories_are_siblings_too() -> None:
@@ -105,9 +115,9 @@ def test_slugs_are_lower_case_url_segments() -> None:
 
 def test_one_translation_per_category_and_language() -> None:
     category = CategoryFactory.create()
-    CategoryTranslationFactory.create(category=category, language="en")
+    CategoryTranslationFactory.create(category=category, language=primary_language())
     with pytest.raises(IntegrityError), transaction.atomic():
-        CategoryTranslationFactory.create(category=category, language="en")
+        CategoryTranslationFactory.create(category=category, language=primary_language())
 
 
 def test_deleting_a_category_deletes_its_translations_and_subtree() -> None:
@@ -130,10 +140,10 @@ def test_a_taxonomy_is_configured_as_data() -> None:
         term_attributes=[{"code": "model_year", "kind": "number"}],
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="en", name="Compatibility", slug="compatibility"
+        taxonomy=taxonomy, language=primary_language(), name="Compatibility", slug="compatibility"
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="it", name="Compatibilità", slug="compatibilita"
+        taxonomy=taxonomy, language=other_language(), name="Compatibilità", slug="compatibilita"
     )
     taxonomy.full_clean()
     assert sorted(taxonomy.translations.values_list("slug", flat=True)) == [
@@ -149,10 +159,10 @@ def test_taxonomy_codes_are_unique() -> None:
 
 
 def test_taxonomy_slugs_are_unique_per_language() -> None:
-    TaxonomyTranslationFactory.create(language="en", slug="occasion")
-    TaxonomyTranslationFactory.create(language="it", slug="occasion")
+    TaxonomyTranslationFactory.create(language=primary_language(), slug="occasion")
+    TaxonomyTranslationFactory.create(language=other_language(), slug="occasion")
     with pytest.raises(IntegrityError), transaction.atomic():
-        TaxonomyTranslationFactory.create(language="en", slug="occasion")
+        TaxonomyTranslationFactory.create(language=primary_language(), slug="occasion")
 
 
 def test_a_malformed_term_schema_is_rejected() -> None:
@@ -282,7 +292,7 @@ def test_term_texts_carry_the_seo_texts() -> None:
     term = TermFactory.create()
     TermTranslationFactory.create(
         term=term,
-        language="en",
+        language=primary_language(),
         name="Summer",
         slug="summer",
         description="<p>Light products for hot days.</p>",
@@ -307,16 +317,20 @@ def test_brand_names_are_unique_ignoring_case() -> None:
 
 
 def test_brand_slugs_are_unique_per_language() -> None:
-    BrandTranslationFactory.create(language="en", slug="maker-a")
-    BrandTranslationFactory.create(language="it", slug="maker-a")
+    BrandTranslationFactory.create(language=primary_language(), slug="maker-a")
+    BrandTranslationFactory.create(language=other_language(), slug="maker-a")
     with pytest.raises(IntegrityError), transaction.atomic():
-        BrandTranslationFactory.create(language="en", slug="maker-a")
+        BrandTranslationFactory.create(language=primary_language(), slug="maker-a")
 
 
 def test_brand_texts_resolve_with_the_explicit_english_fallback() -> None:
     brand = BrandFactory.create(name="Maker A")
     BrandTranslationFactory.create(
-        brand=brand, language="en", slug="maker-a", seo_title="Maker A", status="published"
+        brand=brand,
+        language=primary_language(),
+        slug="maker-a",
+        seo_title="Maker A",
+        status="published",
     )
     assert brand.translation("fr").is_fallback is True
     assert str(brand) == "Maker A"

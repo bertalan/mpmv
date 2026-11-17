@@ -12,6 +12,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 
 from apps.core.countries import EU_MEMBER_STATES, ISO_3166_ALPHA2
+from apps.core.i18n import primary_language
 from apps.core.translations import PUBLISHED, Resolved
 from apps.shipping import engine
 from apps.shipping.models import (
@@ -37,6 +38,7 @@ from apps.shipping.tests.factories import (
     WeightBandFactory,
 )
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -84,10 +86,10 @@ def test_carrier_defaults_and_translated_label() -> None:
     assert carrier.supports_api is False
     assert carrier.tracking_url_template == ""
     CarrierTranslationFactory.create(
-        carrier=carrier, language="en", label="Main courier", status=PUBLISHED
+        carrier=carrier, language=primary_language(), label="Main courier", status=PUBLISHED
     )
     CarrierTranslationFactory.create(
-        carrier=carrier, language="it", label="Corriere", status=PUBLISHED
+        carrier=carrier, language=other_language(), label="Corriere", status=PUBLISHED
     )
     assert label_of(carrier.translation("it")) == "Corriere"
     fallback = carrier.translation("de")
@@ -103,9 +105,9 @@ def test_carrier_code_is_unique() -> None:
 
 
 def test_carrier_has_one_translation_per_language() -> None:
-    translation = CarrierTranslationFactory.create(language="en")
+    translation = CarrierTranslationFactory.create(language=primary_language())
     with refused(), transaction.atomic():
-        CarrierTranslationFactory.create(carrier=translation.carrier, language="en")
+        CarrierTranslationFactory.create(carrier=translation.carrier, language=primary_language())
 
 
 # --- ShippingZone
@@ -236,7 +238,7 @@ def test_country_group_countries_are_normalized_and_named_by_translation() -> No
     group.save()
     assert group.countries == ["DE", "AT", "CH"]
     CountryGroupTranslationFactory.create(
-        country_group=group, language="en", name="DACH", status=PUBLISHED
+        country_group=group, language=primary_language(), name="DACH", status=PUBLISHED
     )
     assert label_of(group.translation("it"), "name") == "DACH"
     assert str(group) == "dach"
@@ -373,11 +375,13 @@ def test_method_free_shipping_threshold_is_net_money_and_not_negative() -> None:
 
 def test_method_name_is_translated() -> None:
     translation = ShippingMethodTranslationFactory.create(
-        name="Express courier", language="en", status=PUBLISHED
+        name="Express courier", language=primary_language(), status=PUBLISHED
     )
     assert label_of(translation.method.translation("it"), "name") == "Express courier"
     with refused(), transaction.atomic():
-        ShippingMethodTranslationFactory.create(method=translation.method, language="en")
+        ShippingMethodTranslationFactory.create(
+            method=translation.method, language=primary_language()
+        )
 
 
 def test_a_method_uses_platform_zones_or_its_vendors_own_zones() -> None:
@@ -519,7 +523,9 @@ def test_band_amounts_are_net_money_and_weights_have_three_decimals() -> None:
 
 def test_pickup_option_has_a_translated_label_and_a_unique_key_per_vendor() -> None:
     pickup = PickupOptionFactory.create(key="shop", cost_net=Decimal("0.00"))
-    PickupOptionTranslationFactory.create(pickup_option=pickup, language="en", status=PUBLISHED)
+    PickupOptionTranslationFactory.create(
+        pickup_option=pickup, language=primary_language(), status=PUBLISHED
+    )
     assert label_of(pickup.translation("it")) == "Pick up at the shop"
     PickupOptionFactory.create(key="shop")  # another vendor may reuse the key
     with refused(), transaction.atomic():
@@ -592,3 +598,16 @@ def test_rest_of_the_world_zone_takes_no_patterns_or_provinces() -> None:
             ShippingZoneFactory.build(world=True, **fields).full_clean()
         with refused(), transaction.atomic():
             ShippingZoneFactory.create(world=True, **fields)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_country_group_seed_with_italian_primary_language(settings: Any) -> None:
+    """I18N.15: the seed must not create the same language twice when the primary is 'it'."""
+    CountryGroup.objects.all().delete()
+    settings.LANGUAGE_CODE = "it"
+    importlib.import_module("apps.shipping.migrations.0005_seed_country_groups").seed(apps, None)
+    group = CountryGroup.objects.get(code="africa")
+    rows = list(group.translations.values_list("language", "name"))
+    assert rows == [("it", "Africa")]
+    europe_like = CountryGroup.objects.get(code="americas")
+    assert list(europe_like.translations.values_list("name", flat=True)) == ["Americhe"]

@@ -7,9 +7,11 @@ from apps.catalog import brands
 from apps.catalog.models import Brand
 from apps.catalog.tests.factories import BrandFactory, ProductFactory, ProductTranslationFactory
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import OutboxEmail
 from apps.core.services import render_email
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -42,7 +44,7 @@ def test_each_affected_vendor_gets_one_notice_with_its_own_products_only() -> No
 
 def test_the_notice_is_in_the_owners_language_with_english_fallback() -> None:
     vendor, other = VendorFactory.create(), VendorFactory.create()
-    VendorMemberFactory.create(vendor=vendor, user__preferred_language="it")
+    VendorMemberFactory.create(vendor=vendor, user__preferred_language=other_language())
     VendorMemberFactory.create(vendor=other, user__preferred_language="xx")
     brand = BrandFactory.create(name="Acmee", status=Brand.Status.PENDING)
     ProductFactory.create(vendor=vendor, brand=brand)
@@ -57,7 +59,7 @@ def test_the_notice_lists_the_product_name_and_sku_and_the_brand() -> None:
     vendor = VendorFactory.create()
     brand = BrandFactory.create(name="Acmee", status=Brand.Status.PENDING)
     product = ProductFactory.create(vendor=vendor, brand=brand, languages=["en"])
-    title = product.translations.get(language="en").title
+    title = product.translations.get(language=primary_language()).title
     brands.reject_brand(brand, ctx=CTX)
     (notice,) = _rejected_notices()
     rendered = render_email(TEMPLATE, notice.language, notice.context_data)
@@ -142,7 +144,9 @@ def test_the_title_falls_back_to_the_sku_without_a_translation() -> None:
     vendor = VendorFactory.create()
     brand = BrandFactory.create(status=Brand.Status.PENDING)
     product = ProductFactory.create(vendor=vendor, brand=brand)
-    ProductTranslationFactory.create(product=product, language="de", title="Nur Deutsch")
+    ProductTranslationFactory.create(
+        product=product, language=third_language(), title="Nur Deutsch"
+    )
     brands.reject_brand(brand, ctx=CTX)
     (notice,) = _rejected_notices()
     assert product.sku in str(notice.context_data)
