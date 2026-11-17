@@ -109,13 +109,16 @@ def test_a_focused_footer_link_is_not_covered_by_the_sticky_header(
     page: Page, live_server: LiveServer
 ) -> None:
     open_home(page, live_server, 1280)
-    page.locator(".site-footer a").last.focus()
-    covered = page.evaluate(
+    # The back-to-top link is `visibility: hidden` until the page is scrolled, so it cannot take
+    # focus here: the last menu or legal link stands for the footer.
+    page.locator(".site-footer a:not(.back-to-top)").last.focus()
+    # Smooth scrolling (60-banner-chrome.css) animates the focus scroll: wait until the focused
+    # link has settled below the header instead of sampling mid-animation.
+    page.wait_for_function(
         "() => { const e = document.activeElement.getBoundingClientRect();"
         " const h = document.querySelector('.site-header').getBoundingClientRect();"
-        " return e.top < h.bottom; }"
+        " return e.top >= h.bottom; }"
     )
-    assert not covered
 
 
 @pytest.mark.parametrize(("width", "burger"), [(1000, True), (1023, True), (1024, False)])

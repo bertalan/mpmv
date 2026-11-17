@@ -438,7 +438,7 @@ and THM.9 (catalog, content and system pages).
 | Header cart icon and mini-cart list | Offcanvas mini-cart (end side), content loaded with HTMX from the cart service, count in a live region, links to cart and checkout | THM.15 |
 | Header "info, location, message" popups | Dropped: no marketplace use (the help link and the contact page cover it) | - |
 | Page banner and breadcrumb (seven variants) | One `page_banner` component with image or colour background, title, optional lead and breadcrumb (`aria-label`, `aria-current`; JSON-LD stays in `seo`), used by listings, content and account pages | THM.15 |
-| Dark footer with widget columns, social links, back-to-top button | Footer with up to four widget columns from the CMS, payment and legal links, labelled social links, back-to-top button (shown after scroll, keyboard reachable, no motion under reduced motion) | THM.15 |
+| Dark footer with widget columns, social links, back-to-top button | Footer with up to four widget columns from the CMS, payment and legal links, labelled social links, back-to-top button (shown after scroll when JavaScript runs, always visible without it; keyboard reachable, no motion under reduced motion) | THM.15 |
 | Section title (overline and heading) | `section_title` component and heading scale | THM.6 (done), THM.14 |
 | Buttons (filled, grey, outline dark, outline accent; three sizes) | Bootstrap `.btn` variants mapped on tokens; sizes with 44 px primary targets; the raised shadow is `--shadow-raised`, not a glow on every button | THM.13 |
 | Product card, blog card, brand tile, testimonial card | Bootstrap card plus `ride` modifiers; sale and stock badges carry text | THM.7, THM.9 |

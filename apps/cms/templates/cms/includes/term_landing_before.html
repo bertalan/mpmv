@@ -4,7 +4,6 @@ page's heading on its first unfiltered page (catalog/listing.html) and in the ed
 The FAQ blocks of the intro give the page's FAQPage data (in the preview the layout's head has
 it already). No inline script or style.
 {% endcomment %}<div class="term-landing">
-  {% if not request.is_preview %}{% faq_jsonld page %}{% endif %}
   {% for block in page.body %}{% include_block block %}{% endfor %}
   {% if sections %}
     <section class="term-landing-categories" aria-labelledby="term-landing-categories-heading">

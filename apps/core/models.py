@@ -215,6 +215,9 @@ class SiteLanguages(models.Model):
     # Languages `change_languages` removed: settings must not list them again until the command
     # brings them back (a `migrate` would otherwise re-add them silently).
     removed = models.JSONField(default=list, blank=True)
+    # I18N.16: part of the sitemap and llms.txt cache keys, bumped by the services that change
+    # what they list (a database counter: the cache is per process). See `sitemap_version`.
+    sitemap_version = models.PositiveBigIntegerField(default=0)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:
