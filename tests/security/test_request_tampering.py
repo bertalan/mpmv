@@ -32,10 +32,12 @@ from apps.accounts.tests.mfa import password_login, totp_token, verified_login
 from apps.api.tests.factories import ApiClientFactory
 from apps.api.v1.api import api
 from apps.catalog.models import Product, ProductStatus
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, OutboxEmail
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests.factory_registry import app_factories, factory_model
+from tests.i18n import other_language
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("admin_open")]  # OPS.5
 
@@ -130,7 +132,7 @@ def test_extra_fields_in_an_api_payload_are_ignored(client: Client) -> None:
     payload = {
         "sku": "MASS-1",
         "price_net": "10.00",
-        "translations": [{"language": "en", "title": "Mug", "status": "published"}],
+        "translations": [{"language": primary_language(), "title": "Mug", "status": "published"}],
         # The attack: fields the schema does not declare.
         "status": ProductStatus.PUBLISHED,
         "is_staff": True,
@@ -248,7 +250,7 @@ def test_the_mfa_verification_never_redirects_off_site(client: Client, next_url:
 @pytest.mark.parametrize("next_url", OPEN_REDIRECTS)
 def test_the_language_switcher_never_redirects_off_site(client: Client, next_url: str) -> None:
     page = reverse("switch_language")
-    response = client.post(page, {"language": "it", "next": next_url})
+    response = client.post(page, {"language": other_language(), "next": next_url})
     assert response.status_code == 302
     assert _browser_target(response["Location"], page) == HOST, response["Location"]
 

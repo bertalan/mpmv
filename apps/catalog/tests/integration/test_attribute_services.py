@@ -14,10 +14,12 @@ from apps.catalog.models import Attribute, Product, ProductAttribute, Variant, V
 from apps.catalog.services import create_product, variant_axes, variant_label
 from apps.catalog.tests.factories import ProductFactory, VariantFactory, clothing_attributes
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.engine import VendorCannotWrite
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -45,7 +47,7 @@ def t_shirt(**overrides: object) -> engine.ProductIn:
         "kind": "variable",
         "price_net": Decimal("19.90"),
         "weight_kg": Decimal("0.200"),
-        "translations": (engine.TranslationIn("en", "Plain tee"),),
+        "translations": (engine.TranslationIn(primary_language(), "Plain tee"),),
         "attributes": (
             engine.AttributeIn("size", values=("s", "m"), axis=True),
             engine.AttributeIn("color", values=("red", "blue"), axis=True),
@@ -345,9 +347,9 @@ def test_variant_labels_use_the_translated_values_in_axis_order(
 ) -> None:
     create_product(vendor, t_shirt(), ctx=CTX)
     variant = Variant.objects.get(sku="TEE-1-M-RED")
-    assert variant_label(variant, "en") == "M / Red"
+    assert variant_label(variant, primary_language()) == "M / Red"
     # Colors are translated; sizes fall back to EN.
-    assert variant_label(variant, "it") == "M / Rosso"
+    assert variant_label(variant, other_language()) == "M / Rosso"
     assert VariantOption.objects.filter(variant=variant).count() == 2
 
 

@@ -261,8 +261,12 @@ class Throttle(BaseModel):
     Kept in PostgreSQL, the only datastore (ADR-0001): every gunicorn worker and container sees
     the same counters, they survive restarts, and `select_for_update` makes each increment
     atomic. A process-local cache would let an attacker multiply the budget by the number of
-    workers, and Django's database cache has no atomic increment. Only failures write here,
-    so the load is small. Expired rows are purged nightly (`core.purge_throttles`).
+    workers, and Django's database cache has no atomic increment. Failures write here (logins,
+    registrations), so does every request to a rate-limited public endpoint (`consume_rate_limit`,
+    e.g. the event feeds: one row per IP and path, valid keys only, one write per request), and so
+    does every non-empty public search (CAT.27 `search:ip:*` keys, one counter per client and
+    minute), so the load follows the public traffic. Expired rows are purged nightly
+    (`core.purge_throttles`).
     """
 
     key = models.CharField(max_length=320, unique=True)
@@ -433,6 +437,9 @@ DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS = 24
 MAX_AMENDMENT_ANSWER_HOURS = 336
 MAX_AMENDMENT_COMPARABLE_DELAY_DAYS = 30
 MAX_AMENDMENT_CANCEL_HOLD_HOURS = 168
+# Counsel (2026-11-17, A2): the customer has at least this long after the notice to cancel the
+# rest before the seller may ship; `apps.orders.amendments` refuses a shorter hold too.
+MIN_AMENDMENT_CANCEL_HOLD_HOURS = 24
 PLATFORM_ERROR = "platform_error"
 VENDOR_DEFAULT = "vendor_default"
 PLATFORM_REFUND_CASES = (PLATFORM_ERROR, VENDOR_DEFAULT)
@@ -669,7 +676,10 @@ class PlatformOperator(Versioned):
     )
     amendment_cancel_hold_hours = models.PositiveSmallIntegerField(
         default=DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS,
-        validators=[MinValueValidator(1), MaxValueValidator(MAX_AMENDMENT_CANCEL_HOLD_HOURS)],
+        validators=[
+            MinValueValidator(MIN_AMENDMENT_CANCEL_HOLD_HOURS),
+            MaxValueValidator(MAX_AMENDMENT_CANCEL_HOLD_HOURS),
+        ],
         help_text=_(
             "After an item is removed as unavailable, how many hours the seller must wait "
             "before shipping, so the customer can cancel the rest of the package."

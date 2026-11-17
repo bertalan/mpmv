@@ -47,7 +47,7 @@ from apps.core.audit import AuditContext
 from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, TranslationStatus
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import other_language
+from tests.i18n import language_prefix, localized, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -107,24 +107,52 @@ def add(**fields: Any) -> Redirect:
 
 
 def test_a_retired_sku_page_moves_to_the_replacement_product(client: Client, bag: Product) -> None:
-    add(source_path="/product/old-bag-en-sku-100/", target_kind="product", target_product=bag)
-    add(source_path="/it/prodotto/borsa-it-sku-100/", target_kind="product", target_product=bag)
-    assert_301(client.get("/product/old-bag-en-sku-100/"), "/product/leather-bag-en/")
-    assert_301(client.get("/it/prodotto/borsa-it-sku-100/"), "/it/prodotto/borsa-pelle-it/")
+    add(
+        source_path=localized("/product/old-bag-en-sku-100/"),
+        target_kind="product",
+        target_product=bag,
+    )
+    add(
+        source_path=localized("/product/borsa-it-sku-100/", other_language()),
+        target_kind="product",
+        target_product=bag,
+    )
+    assert_301(
+        client.get(localized("/product/old-bag-en-sku-100/")), localized("/product/leather-bag-en/")
+    )
+    assert_301(
+        client.get(localized("/product/borsa-it-sku-100/", other_language())),
+        localized("/product/borsa-pelle-it/", other_language()),
+    )
 
 
 def test_a_retired_sku_page_can_move_to_a_tag_page(client: Client, tags: dict[str, Any]) -> None:
-    add(source_path="/product/old-bag-en-sku-101/", target_kind="term", target_term=tags["bags"])
-    add(source_path="/it/prodotto/borsa-it-sku-101/", target_kind="term", target_term=tags["bags"])
-    assert_301(client.get("/product/old-bag-en-sku-101/"), "/tags/bags/")
-    assert_301(client.get("/it/prodotto/borsa-it-sku-101/"), "/it/etichette/borse/")
+    add(
+        source_path=localized("/product/old-bag-en-sku-101/"),
+        target_kind="term",
+        target_term=tags["bags"],
+    )
+    add(
+        source_path=localized("/product/borsa-it-sku-101/", other_language()),
+        target_kind="term",
+        target_term=tags["bags"],
+    )
+    assert_301(client.get(localized("/product/old-bag-en-sku-101/")), "/tags/bags/")
+    assert_301(
+        client.get(localized("/product/borsa-it-sku-101/", other_language())),
+        f"{language_prefix(other_language())}/etichette/borse/",
+    )
     assert client.get("/tags/bags/").status_code == 200  # a single hop to a live page
 
 
 def test_the_query_string_is_kept(client: Client, bag: Product) -> None:
-    add(source_path="/product/old-bag-en-sku-100/", target_kind="product", target_product=bag)
-    response = client.get("/product/old-bag-en-sku-100/?utm_source=feed")
-    assert_301(response, "/product/leather-bag-en/?utm_source=feed")
+    add(
+        source_path=localized("/product/old-bag-en-sku-100/"),
+        target_kind="product",
+        target_product=bag,
+    )
+    response = client.get(localized("/product/old-bag-en-sku-100/?utm_source=feed"))
+    assert_301(response, localized("/product/leather-bag-en/?utm_source=feed"))
 
 
 def test_a_product_without_a_slug_in_the_language_falls_back_to_the_default_one(
@@ -134,8 +162,15 @@ def test_a_product_without_a_slug_in_the_language_falls_back_to_the_default_one(
     ProductTranslationFactory.create(
         product=product, language=primary_language(), slug="only-en-en"
     )
-    add(source_path="/de/produkt/alt/", target_kind="product", target_product=product)
-    assert_301(client.get("/de/produkt/alt/"), "/product/only-en-en/")
+    add(
+        source_path=f"{language_prefix(third_language())}/produkt/alt/",
+        target_kind="product",
+        target_product=product,
+    )
+    assert_301(
+        client.get(f"{language_prefix(third_language())}/produkt/alt/"),
+        localized("/product/only-en-en/"),
+    )
 
 
 # --- Rule 2: a recently merged tag goes to the surviving tag
@@ -144,28 +179,36 @@ def test_a_product_without_a_slug_in_the_language_falls_back_to_the_default_one(
 def test_a_merged_tag_moves_to_the_surviving_tag(client: Client, tags: dict[str, Any]) -> None:
     add(source_path="/tag-product/handbags/", target_kind="term", target_term=tags["bags"])
     add(
-        source_path="/it/tag-product-it/borsette-it/",
+        source_path=f"{language_prefix(other_language())}/tag-product-it/borsette-it/",
         target_kind="term",
         target_term=tags["bags"],
         origin=Redirect.Origin.MERGED_TAG,
     )
     assert_301(client.get("/tag-product/handbags/"), "/tags/bags/")
-    assert_301(client.get("/it/tag-product-it/borsette-it/"), "/it/etichette/borse/")
+    assert_301(
+        client.get(f"{language_prefix(other_language())}/tag-product-it/borsette-it/"),
+        f"{language_prefix(other_language())}/etichette/borse/",
+    )
 
 
 # --- Rule 3: an old discontinued category goes to a search
 
 
 def test_a_discontinued_category_moves_to_a_search(client: Client) -> None:
-    add(source_path="/product-category/old-maps/", target_kind="search", target_query="old maps")
     add(
-        source_path="/it/categoria-prodotto/mappe-vecchie/",
+        source_path=localized("/product-category/old-maps/"),
+        target_kind="search",
+        target_query="old maps",
+    )
+    add(
+        source_path=localized("/product-category/mappe-vecchie/", other_language()),
         target_kind="search",
         target_query="mappe & carte",
     )
-    assert_301(client.get("/product-category/old-maps/"), "/?s=old+maps")
+    assert_301(client.get(localized("/product-category/old-maps/")), "/?s=old+maps")
     assert_301(
-        client.get("/it/categoria-prodotto/mappe-vecchie/?utm_source=x"), "/it/?s=mappe+%26+carte"
+        client.get(localized("/product-category/mappe-vecchie/?utm_source=x", other_language())),
+        f"{language_prefix(other_language())}/?s=mappe+%26+carte",
     )
 
 
@@ -174,10 +217,18 @@ def test_a_discontinued_category_moves_to_a_search(client: Client) -> None:
 
 def test_author_pages_go_home_in_their_language(client: Client) -> None:
     add(source_path="/author/", match_prefix=True, target_kind="path", target_path="/")
-    add(source_path="/it/author/", match_prefix=True, target_kind="path", target_path="/it/")
+    add(
+        source_path=f"{language_prefix(other_language())}/author/",
+        match_prefix=True,
+        target_kind="path",
+        target_path=f"{language_prefix(other_language())}/",
+    )
     assert_301(client.get("/author/someone/"), "/")
     assert_301(client.get("/author/someone/page/2/"), "/")
-    assert_301(client.get("/it/author/qualcuno/"), "/it/")
+    assert_301(
+        client.get(f"{language_prefix(other_language())}/author/qualcuno/"),
+        f"{language_prefix(other_language())}/",
+    )
 
 
 def test_an_exact_rule_wins_over_a_prefix_and_the_longest_prefix_wins(client: Client) -> None:
@@ -195,10 +246,12 @@ def test_an_exact_rule_wins_over_a_prefix_and_the_longest_prefix_wins(client: Cl
 def test_a_get_add_to_cart_goes_to_the_product_page(client: Client, bag: Product) -> None:
     response = client.get("/?add-to-cart=1001")
     assert response.status_code == 302
-    assert response["Location"] == "/product/leather-bag-en/"
-    response = client.get("/it/negozio/?add-to-cart=1002&quantity=2")
+    assert response["Location"] == localized("/product/leather-bag-en/")
+    response = client.get(
+        f"{language_prefix(other_language())}/negozio/?add-to-cart=1002&quantity=2"
+    )
     assert response.status_code == 302
-    assert response["Location"] == "/it/prodotto/borsa-pelle-it/"
+    assert response["Location"] == localized("/product/borsa-pelle-it/", other_language())
 
 
 def test_an_unknown_add_to_cart_id_only_drops_the_parameter(client: Client) -> None:
@@ -224,8 +277,8 @@ def test_a_post_with_add_to_cart_is_not_redirected(client: Client, bag: Product)
 
 
 def test_a_gone_rule_answers_410(client: Client) -> None:
-    add(source_path="/product/withdrawn-en/", code=Redirect.Code.GONE)
-    assert client.get("/product/withdrawn-en/").status_code == 410
+    add(source_path=localized("/product/withdrawn-en/"), code=Redirect.Code.GONE)
+    assert client.get(localized("/product/withdrawn-en/")).status_code == 410
 
 
 def test_an_expired_rule_no_longer_applies(client: Client) -> None:
@@ -267,7 +320,9 @@ def test_the_rule_matches_without_the_trailing_slash(client: Client) -> None:
 
 def test_an_old_product_slug_keeps_its_cat5_redirect(client: Client, bag: Product) -> None:
     SlugHistoryFactory.create(product=bag, language=primary_language(), slug="bag-en-sku-1")
-    assert_301(client.get("/product/bag-en-sku-1/"), "/product/leather-bag-en/")
+    assert_301(
+        client.get(localized("/product/bag-en-sku-1/")), localized("/product/leather-bag-en/")
+    )
 
 
 # --- The audited services
@@ -329,7 +384,7 @@ def test_an_off_site_target_is_refused(target: str) -> None:
     ],
 )
 def test_a_rule_names_exactly_its_target(fields: dict[str, Any], field: str) -> None:
-    source = "/it/" if fields.get("match_prefix") else "/old/"
+    source = f"{language_prefix(other_language())}/" if fields.get("match_prefix") else "/old/"
     with pytest.raises(ValidationError) as error:
         add(source_path=source, **fields)
     assert field in error.value.message_dict
@@ -353,7 +408,9 @@ def test_a_chain_is_refused_both_ways() -> None:
 def test_a_target_on_an_old_product_slug_is_a_chain(bag: Product) -> None:
     SlugHistoryFactory.create(product=bag, language=primary_language(), slug="bag-en-sku-1")
     with pytest.raises(ValidationError, match="old product slug"):
-        add(source_path="/old/", target_kind="path", target_path="/product/bag-en-sku-1/")
+        add(
+            source_path="/old/", target_kind="path", target_path=localized("/product/bag-en-sku-1/")
+        )
 
 
 def test_an_expired_rule_does_not_block_a_new_one() -> None:
@@ -370,37 +427,37 @@ def maps(bag: Product, tags: dict[str, Any]) -> list[dict[str, str]]:
     vendor = bag.vendor
     return [
         {
-            "source_path": "/product/old-bag-en-sku-100/",
+            "source_path": localized("/product/old-bag-en-sku-100/"),
             "target_kind": "product",
             "target": f"{vendor.slug}/bag-200",
             "origin": "retired_sku",
         },
         {
-            "source_path": "/product/old-bag-en-sku-101/",
+            "source_path": localized("/product/old-bag-en-sku-101/"),
             "target_kind": "product",
             "target": bag.staff_ref,
             "origin": "retired_sku",
         },
         {
-            "source_path": "/product/old-case-en-sku-102/",
+            "source_path": localized("/product/old-case-en-sku-102/"),
             "target_kind": "term",
             "target": "tags/bags",
             "origin": "retired_sku",
         },
         {
-            "source_path": "/it/tag-product-it/borsette-it/",
+            "source_path": f"{language_prefix(other_language())}/tag-product-it/borsette-it/",
             "target_kind": "term",
             "target": "tags/borse",
             "origin": "merged_tag",
         },
         {
-            "source_path": "/product-category/old-maps/",
+            "source_path": localized("/product-category/old-maps/"),
             "target_kind": "search",
             "target": "old maps",
             "origin": "discontinued_category",
         },
         {"source_path": "/author/", "match": "prefix", "target_kind": "path", "target": "/"},
-        {"source_path": "/product/withdrawn-en/", "code": "410", "expires_at": ""},
+        {"source_path": localized("/product/withdrawn-en/"), "code": "410", "expires_at": ""},
     ]
 
 
@@ -410,12 +467,20 @@ def test_the_maps_import_with_one_audit_entry_per_rule(
     changes = import_redirects(maps, ctx=CTX)
     assert changes.summary() == {"create": 7, "update": 0, "delete": 0}
     assert entries().filter(action="catalog.redirect.created").count() == 7
-    assert Redirect.objects.get(source_path="/product/old-bag-en-sku-100/").target_product == bag
-    merged = Redirect.objects.get(source_path="/it/tag-product-it/borsette-it/")
+    assert (
+        Redirect.objects.get(source_path=localized("/product/old-bag-en-sku-100/")).target_product
+        == bag
+    )
+    merged = Redirect.objects.get(
+        source_path=f"{language_prefix(other_language())}/tag-product-it/borsette-it/"
+    )
     assert merged.target_term == tags["bags"]
     assert merged.origin == Redirect.Origin.MERGED_TAG
-    assert_301(client.get("/it/tag-product-it/borsette-it/"), "/it/etichette/borse/")
-    assert client.get("/product/withdrawn-en/").status_code == 410
+    assert_301(
+        client.get(f"{language_prefix(other_language())}/tag-product-it/borsette-it/"),
+        f"{language_prefix(other_language())}/etichette/borse/",
+    )
+    assert client.get(localized("/product/withdrawn-en/")).status_code == 410
 
 
 def test_a_dry_run_import_writes_nothing(maps: list[dict[str, str]]) -> None:
@@ -431,7 +496,10 @@ def test_a_second_import_changes_only_what_differs(maps: list[dict[str, str]]) -
     maps[4]["target"] = "maps"
     changes = import_redirects(maps, ctx=CTX)
     assert changes.summary() == {"create": 0, "update": 1, "delete": 0}
-    assert Redirect.objects.get(source_path="/product-category/old-maps/").target_query == "maps"
+    assert (
+        Redirect.objects.get(source_path=localized("/product-category/old-maps/")).target_query
+        == "maps"
+    )
 
 
 def test_a_retired_sku_alias_still_finds_the_product(bag: Product) -> None:
@@ -456,7 +524,11 @@ def test_an_import_with_errors_writes_nothing_and_names_every_line(
         {"source_path": "/b/", "target_kind": "term", "target": "tags/no-such-term"},
         {"source_path": "/c/", "target_kind": "path", "target": "//example.com/"},
         {"source_path": "/d/", "target_kind": "teleport", "target": "/x/"},
-        {"source_path": "/product-category/old-maps/", "target_kind": "path", "target": "/x/"},
+        {
+            "source_path": localized("/product-category/old-maps/"),
+            "target_kind": "path",
+            "target": "/x/",
+        },
     ]
     with pytest.raises(ValidationError) as error:
         import_redirects(maps, ctx=CTX)
@@ -483,8 +555,8 @@ def csv_file(tmp_path: Path) -> Path:
     path.write_text(
         "source_path,target_kind,target,code,match,origin,expires_at,note\n"
         "/author/,path,/,,prefix,legacy_rule,,author archives\n"
-        "/product-category/old-maps/,search,old maps,301,,discontinued_category,,\n"
-        "/product/withdrawn-en/,,,410,,manual,2030-01-01T00:00:00+00:00,\n",
+        f"{localized('/product-category/old-maps/')},search,old maps,301,,discontinued_category,,\n"
+        f"{localized('/product/withdrawn-en/')},,,410,,manual,2030-01-01T00:00:00+00:00,\n",
         encoding="utf-8",
     )
     return path
@@ -500,7 +572,7 @@ def test_the_import_command(csv_file: Path) -> None:
     call_command("import_redirects", str(csv_file), stdout=out)
     assert "Created 3" in out.getvalue()
     assert Redirect.objects.get(source_path="/author/").match_prefix
-    gone = Redirect.objects.get(source_path="/product/withdrawn-en/")
+    gone = Redirect.objects.get(source_path=localized("/product/withdrawn-en/"))
     assert gone.code == Redirect.Code.GONE
     assert gone.expires_at is not None
     assert entries().get(target_key="/author/").actor_label == "command:import_redirects"
@@ -549,10 +621,19 @@ def test_a_percent_encoded_source_matches_the_decoded_and_the_encoded_request(
 
 
 def test_an_imported_percent_encoded_source_is_stored_decoded(client: Client) -> None:
-    rows = [{"source_path": "/it/caff%C3%A8/", "target_kind": "path", "target": "/it/"}]
+    rows = [
+        {
+            "source_path": f"{language_prefix(other_language())}/caff%C3%A8/",
+            "target_kind": "path",
+            "target": f"{language_prefix(other_language())}/",
+        }
+    ]
     import_redirects(rows, ctx=CTX)
-    assert Redirect.objects.get().source_path == "/it/caffè/"
-    assert_301(client.get("/it/caff%C3%A8/"), "/it/")
+    assert Redirect.objects.get().source_path == f"{language_prefix(other_language())}/caffè/"
+    assert_301(
+        client.get(f"{language_prefix(other_language())}/caff%C3%A8/"),
+        f"{language_prefix(other_language())}/",
+    )
     # Importing the same map again finds the stored rule instead of adding a duplicate.
     assert import_redirects(rows, ctx=CTX).is_empty
 
@@ -577,7 +658,7 @@ def test_a_permanent_redirect_is_cached_for_a_bounded_time(
     add(source_path="/old/", target_kind="path", target_path="/new/")
     add(source_path="/withdrawn/", code=Redirect.Code.GONE)
     SlugHistoryFactory.create(product=bag, language=primary_language(), slug="bag-en-sku-1")
-    for path in ("/old/", "/withdrawn/", "/product/bag-en-sku-1/"):
+    for path in ("/old/", "/withdrawn/", localized("/product/bag-en-sku-1/")):
         assert client.get(path)["Cache-Control"] == "max-age=3600", path
 
 

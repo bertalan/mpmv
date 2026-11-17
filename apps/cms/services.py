@@ -25,6 +25,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser, PermissionsMixin
 from django.core.exceptions import ValidationError
 from django.db import DEFAULT_DB_ALIAS, transaction
+from django.db.models import Q
 from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse
@@ -44,7 +45,7 @@ from wagtail_localize.models import (
 )
 from wagtail_localize.operations import TranslationCreator
 
-from apps.catalog import listings, slugs
+from apps.catalog import listings, search_page, slugs
 from apps.catalog import services as catalog
 from apps.catalog.models import Category, Term
 from apps.core.audit import AuditContext
@@ -1204,3 +1205,31 @@ def legal_page_url(kind: str, language: str) -> str:
         if page is not None:
             return str(page.get_url() or "")
     return ""
+
+
+# --- Search results page (CAT.27): the articles group, registered through the catalog's hook.
+
+
+def search_articles(
+    request: HttpRequest, query: str, language: str, limit: int
+) -> "search_page.SearchGroup | None":
+    """Live, public articles of `language` whose title or summary contain `query`, newest first
+    (`limit` of them; `more` when there are others). One query."""
+    from .models import BlogPostPage
+
+    pages = list(
+        BlogPostPage.objects.live()
+        .public()
+        .filter(locale__language_code=language)
+        .filter(Q(title__icontains=query) | Q(summary__icontains=query))
+        .order_by("-date", "-pk")[: limit + 1]
+    )
+    items = [
+        search_page.SearchItem(
+            title=page.title, url=page.get_url(request) or "", summary=page.summary
+        )
+        for page in pages[:limit]
+    ]
+    return search_page.SearchGroup(
+        "articles", str(_("Articles")), items, order=20, more=len(pages) > limit
+    )

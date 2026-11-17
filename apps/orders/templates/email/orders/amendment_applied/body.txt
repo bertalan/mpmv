@@ -1,0 +1,14 @@
+{% load i18n %}{% translate "Hello," %}
+
+{% if by_staff %}{% blocktranslate %}Our support team changed your order {{ order_number }} from {{ vendor_name }} before it was shipped:{% endblocktranslate %}{% else %}{% blocktranslate %}{{ vendor_name }} changed your order {{ order_number }} before shipping it:{% endblocktranslate %}{% endif %}
+
+{% for change in changes %}- {{ change }}
+{% endfor %}
+{% blocktranslate %}Reason: “{{ reason }}”{% endblocktranslate %}
+
+{% if refunded %}{% blocktranslate %}We have refunded {{ refund }} EUR to the payment method you used.{% endblocktranslate %} {% include "email/orders/_credit_time.txt" %}{% else %}{% translate "You pay nothing more, and there is nothing you need to do." %}{% endif %}
+
+{% blocktranslate %}New total of this part of your order: {{ total }} EUR.{% endblocktranslate %}
+{% if order_url %}
+{% blocktranslate %}Every change is listed on your order page: {{ order_url }}{% endblocktranslate %}
+{% endif %}

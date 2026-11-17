@@ -62,6 +62,7 @@ SHOP_PAGES: Final[Pages] = (
     (gettext_noop("Events"), "manager:shop:events"),
     (gettext_noop("Choose a vendor"), "manager:shop:vendor"),
     (gettext_noop("Termination notice"), "manager:shop:termination"),
+    (gettext_noop("Statements of reasons"), "manager:shop:statements"),
 )
 PLATFORM_PAGES: Final[Pages] = (
     (gettext_noop("Dashboard"), "manager:platform:dashboard"),
@@ -92,6 +93,7 @@ NOT_LISTED: Final = frozenset(
         "manager:shop:amendment_apply",
         "manager:shop:amendment_discard",
         "manager:shop:order_cancel",
+        "manager:shop:order_invoice_issued",
         "manager:platform:order",
         "manager:platform:amendment_apply",
         "manager:platform:amendment_discard",

@@ -51,14 +51,14 @@ def test_the_notice_is_in_the_owners_language_with_english_fallback() -> None:
     ProductFactory.create(vendor=other, brand=brand)
     brands.reject_brand(brand, ctx=CTX)
     languages = {n.recipient: n.language for n in _rejected_notices()}
-    assert languages[vendor.contact_email] == "it"
-    assert languages[other.contact_email] == "en"
+    assert languages[vendor.contact_email] == other_language()
+    assert languages[other.contact_email] == primary_language()
 
 
 def test_the_notice_lists_the_product_name_and_sku_and_the_brand() -> None:
     vendor = VendorFactory.create()
     brand = BrandFactory.create(name="Acmee", status=Brand.Status.PENDING)
-    product = ProductFactory.create(vendor=vendor, brand=brand, languages=["en"])
+    product = ProductFactory.create(vendor=vendor, brand=brand, languages=[primary_language()])
     title = product.translations.get(language=primary_language()).title
     brands.reject_brand(brand, ctx=CTX)
     (notice,) = _rejected_notices()
@@ -92,7 +92,9 @@ def test_the_proposing_vendor_is_told_even_when_no_product_used_the_brand() -> N
     assert "Acmee" in rendered.text_body
     assert "No products used it." in rendered.text_body
     assert "No products used it." in rendered.html_body
-    other = render_email(TEMPLATE, "en", by_recipient[user.contact_email].context_data)
+    other = render_email(
+        TEMPLATE, primary_language(), by_recipient[user.contact_email].context_data
+    )
     assert "No products used it." not in other.text_body
 
 

@@ -13,7 +13,7 @@ from apps.cms.models import NavigationMenu, StandardPage
 from apps.cms.services import SeedReport
 from apps.cms.tests.factories import NavigationMenuFactory, StandardPageFactory
 from apps.core.i18n import primary_language
-from tests.i18n import other_language
+from tests.i18n import language_prefix, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -28,11 +28,11 @@ def _footer(html: str) -> str:
 
 def test_each_language_shows_its_own_header_and_footer(client: Client, seeded: SeedReport) -> None:
     en = client.get("/").content.decode()
-    it = client.get("/it/").content.decode()
+    it = client.get(f"{language_prefix(other_language())}/").content.decode()
     assert '<a href="/about/">About us</a>' in _header(en)
-    assert '<a href="/it/chi-siamo/">Chi siamo</a>' in _header(it)
-    assert '<a href="/it/">Home</a>' in _footer(it)
-    assert '<a href="/it/chi-siamo/">Chi siamo</a>' in _footer(it)
+    assert f'<a href="{language_prefix(other_language())}/chi-siamo/">Chi siamo</a>' in _header(it)
+    assert f'<a href="{language_prefix(other_language())}/">Home</a>' in _footer(it)
+    assert f'<a href="{language_prefix(other_language())}/chi-siamo/">Chi siamo</a>' in _footer(it)
     assert "/about/" not in _header(it)
 
 
@@ -40,8 +40,8 @@ def test_a_language_without_its_menu_uses_the_primary_one_in_its_own_language(
     client: Client, seeded: SeedReport
 ) -> None:
     NavigationMenu.objects.filter(locale__language_code=other_language()).delete()
-    html = client.get("/de/").content.decode()
-    assert '<a href="/de/ueber-uns/">Über uns</a>' in _header(html)
+    html = client.get(f"{language_prefix(third_language())}/").content.decode()
+    assert f'<a href="{language_prefix(third_language())}/ueber-uns/">Über uns</a>' in _header(html)
 
 
 def test_menus_show_custom_labels_and_external_links_in_order(client: Client) -> None:

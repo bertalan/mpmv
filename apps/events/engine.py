@@ -6,6 +6,7 @@ SEQUENCE rule, the vendor-safe body rules and the slugs.
 """
 
 import calendar
+import functools
 import re
 import unicodedata
 from collections.abc import Mapping, Sequence, Set
@@ -1127,6 +1128,7 @@ class IcsEvent:
     exdate_days: tuple[date, ...] = ()
     latitude: str = ""
     longitude: str = ""
+    language: str = ""  # set on an original-language fallback item (`LANGUAGE`)
 
 
 # Control characters other than TAB and LF (CR is already folded into LF): not allowed in TEXT.
@@ -1161,6 +1163,10 @@ def _ics_utc(moment: datetime) -> str:
     return moment.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
+def _zone_name(span: Span) -> str:
+    return str(getattr(span.start.tzinfo, "key", "UTC"))
+
+
 def _ics_instants(event: IcsEvent) -> list[str]:
     span = event.span
     if span.all_day:
@@ -1168,28 +1174,105 @@ def _ics_instants(event: IcsEvent) -> list[str]:
             f"DTSTART;VALUE=DATE:{span.start:%Y%m%d}",
             f"DTEND;VALUE=DATE:{span.end:%Y%m%d}",  # exclusive, as RFC 5545 wants
         ]
-    if event.rrule:
-        # A recurring event keeps its wall-clock time across daylight saving: local time with
-        # TZID (EVT.9 adds the VTIMEZONE component with the feeds).
-        zone = span.start.tzinfo
-        name = getattr(zone, "key", "UTC")
-        return [
-            f"DTSTART;TZID={name}:{span.start:%Y%m%dT%H%M%S}",
-            f"DTEND;TZID={name}:{span.end:%Y%m%dT%H%M%S}",
+    # Local time with TZID: a recurring event keeps its wall-clock time across daylight saving,
+    # and the calendar carries the VTIMEZONE of every zone it uses.
+    name = _zone_name(span)
+    return [
+        f"DTSTART;TZID={name}:{span.start:%Y%m%dT%H%M%S}",
+        f"DTEND;TZID={name}:{span.end:%Y%m%dT%H%M%S}",
+    ]
+
+
+def _ics_text(name: str, value: str, language: str) -> str:
+    """A TEXT property; a fallback item names its language (`LANGUAGE`, §3.2.10)."""
+    return f"{name}{';LANGUAGE=' + language if language else ''}:{ics_escape(value)}"
+
+
+def _offset(zone: ZoneInfo, moment: datetime) -> timedelta:
+    return moment.astimezone(zone).utcoffset() or timedelta(0)
+
+
+def _ics_offset(delta: timedelta) -> str:
+    minutes = int(delta.total_seconds() // 60)
+    sign = "-" if minutes < 0 else "+"
+    return f"{sign}{abs(minutes) // 60:02d}{abs(minutes) % 60:02d}"
+
+
+@functools.lru_cache(maxsize=256)
+def _transitions(zone: ZoneInfo, first: int, last: int) -> tuple[datetime, ...]:
+    """The UTC instants (to the hour) where the zone's offset changes, from the tz database
+    (memoised: the scan walks every day of the years)."""
+    found: list[datetime] = []
+    day = datetime(first, 1, 1, tzinfo=UTC)
+    end = datetime(last + 1, 1, 1, tzinfo=UTC)
+    while day < end:
+        following = day + timedelta(days=1)
+        if _offset(zone, day) != _offset(zone, following):
+            hour = day
+            while _offset(zone, hour) == _offset(zone, day):
+                hour += timedelta(hours=1)
+            found.append(hour)
+        day = following
+    return tuple(found)
+
+
+def _yearly_rule(local: datetime) -> str:
+    """The yearly RRULE of a transition on this local date: the nth or last weekday of a month."""
+    days = calendar.monthrange(local.year, local.month)[1]
+    nth = "-1" if local.day + 7 > days else str((local.day - 1) // 7 + 1)
+    weekday = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")[local.weekday()]
+    return f"RRULE:FREQ=YEARLY;BYMONTH={local.month};BYDAY={nth}{weekday}"
+
+
+def _vtimezone(name: str, first: int, last: int, *, unbounded: bool = False) -> list[str]:
+    """A VTIMEZONE of explicit transitions (no RRULE) for the years of the events, from the tz
+    database; deterministic, so the body stays stable. For an unbounded recurrence the transitions
+    of the last year also carry a yearly RRULE, so the zone stays right after the explicit ones."""
+    zone = ZoneInfo(name)
+    start = datetime(first, 1, 1, tzinfo=UTC)
+    lines = ["BEGIN:VTIMEZONE", f"TZID:{name}"]
+    before = _offset(zone, start)
+    for moment in [start, *_transitions(zone, first, last)]:
+        after = _offset(zone, moment)
+        if moment is start:
+            before = after
+        local = (moment + before).replace(tzinfo=None)
+        kind = "DAYLIGHT" if (moment.astimezone(zone).dst() or timedelta(0)) else "STANDARD"
+        lines += [
+            f"BEGIN:{kind}",
+            f"DTSTART:{local:%Y%m%dT%H%M%S}",
+            f"TZNAME:{moment.astimezone(zone).tzname()}",
+            f"TZOFFSETFROM:{_ics_offset(before)}",
+            f"TZOFFSETTO:{_ics_offset(after)}",
+            *([_yearly_rule(local)] if unbounded and moment.year == last else []),
+            f"END:{kind}",
         ]
-    return [f"DTSTART:{_ics_utc(span.start)}", f"DTEND:{_ics_utc(span.end)}"]
+        before = after
+    lines.append("END:VTIMEZONE")
+    return lines
 
 
-def event_ics(event: IcsEvent) -> str:
-    """The `text/calendar` body of one event: CRLF lines folded at 75 octets."""
+def _vtimezones(events: Sequence[IcsEvent]) -> list[str]:
+    """One VTIMEZONE per zone used by a timed event, covering the years of the events (and five
+    years more for a recurring one)."""
+    years: dict[str, list[int]] = {}
+    unbounded: set[str] = set()
+    for event in events:
+        if event.span.all_day:
+            continue
+        span = years.setdefault(_zone_name(event.span), [])
+        if event.rrule and "UNTIL=" not in event.rrule and "COUNT=" not in event.rrule:
+            unbounded.add(_zone_name(event.span))
+        span += [event.span.start.year, event.span.end.year + (5 if event.rrule else 1)]
+    lines: list[str] = []
+    for name in sorted(years):
+        first, last = min(years[name]) - 1, max(years[name])
+        lines += _vtimezone(name, first, last, unbounded=name in unbounded)
+    return lines
+
+
+def _vevent(event: IcsEvent) -> list[str]:
     lines = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//MPMV//Events//EN",
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH",
-        f"NAME:{ics_escape(event.calendar_name)}",
-        f"X-WR-CALNAME:{ics_escape(event.calendar_name)}",
         "BEGIN:VEVENT",
         f"UID:{event.uid}",
         f"DTSTAMP:{_ics_utc(event.stamp)}",
@@ -1202,23 +1285,55 @@ def event_ics(event: IcsEvent) -> str:
     if event.rrule:
         lines.append(f"RRULE:{event.rrule}")
     for moment in event.exdates:
-        lines.append(f"EXDATE:{_ics_utc(moment)}")
+        if event.span.all_day:
+            lines.append(f"EXDATE:{_ics_utc(moment)}")
+        else:  # the same TZID form as DTSTART
+            zone = event.span.start.tzinfo
+            lines.append(
+                f"EXDATE;TZID={_zone_name(event.span)}:{moment.astimezone(zone):%Y%m%dT%H%M%S}"
+            )
     if event.exdate_days:
         lines.append("EXDATE;VALUE=DATE:" + ",".join(f"{day:%Y%m%d}" for day in event.exdate_days))
     lines.append("STATUS:CANCELLED" if event.cancelled else "STATUS:CONFIRMED")
     lines.append("TRANSP:TRANSPARENT")  # an event never blocks the subscriber's free time
-    lines.append(f"SUMMARY:{ics_escape(event.summary)}")
+    lines.append(_ics_text("SUMMARY", event.summary, event.language))
     if event.description:
-        lines.append(f"DESCRIPTION:{ics_escape(event.description)}")
+        lines.append(_ics_text("DESCRIPTION", event.description, event.language))
     if event.location:
-        lines.append(f"LOCATION:{ics_escape(event.location)}")
+        lines.append(_ics_text("LOCATION", event.location, event.language))
     if event.latitude and event.longitude:
         lines.append(f"GEO:{event.latitude};{event.longitude}")  # the one unescaped `;` (§3.8.1.6)
     lines.append(f"URL:{event.url}")
     if event.category:
         lines.append(f"CATEGORIES:{ics_escape(event.category)}")
-    lines += ["END:VEVENT", "END:VCALENDAR"]
+    lines.append("END:VEVENT")
+    return lines
+
+
+def calendar_ics(events: Sequence[IcsEvent], name: str) -> str:
+    """The `text/calendar` body of a feed: CRLF lines folded at 75 octets (RFC 5545). `name` is
+    the translated calendar name; an empty calendar is still a valid one."""
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//MPMV//Events//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"NAME:{ics_escape(name)}",
+        f"X-WR-CALNAME:{ics_escape(name)}",
+        "REFRESH-INTERVAL;VALUE=DURATION:PT6H",
+        "X-PUBLISHED-TTL:PT6H",
+        *_vtimezones(events),
+    ]
+    for event in events:
+        lines.extend(_vevent(event))
+    lines.append("END:VCALENDAR")
     return "".join(ics_fold(line) for line in lines)
+
+
+def event_ics(event: IcsEvent) -> str:
+    """The `text/calendar` body of one event."""
+    return calendar_ics([event], event.calendar_name)
 
 
 # --- Languages: original-language fallback and hreflang (EVT.8, spec 15 "Languages") ----------

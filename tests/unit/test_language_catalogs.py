@@ -58,6 +58,20 @@ def test_the_language_switch_notice_is_translated() -> None:
             assert entries[notice] != notice
 
 
+# Mails to the vendor (formal register). `vendor_order_cancelled` and the other `vendor_*` order
+# mails are named after the vendor's action and go to the customer, so they are not listed.
+VENDOR_FACING_EMAILS = (
+    "/vendor_package_cancelled/",
+    "/vendor_amendment_applied/",
+    "/vendor_order_cancelled_notice/",
+    "/_invoice_notice",
+)
+
+
+def _vendor_facing(path: str) -> bool:
+    return any(marker in path for marker in VENDOR_FACING_EMAILS)
+
+
 # I18N.13: customer emails address the customer informally (du / tu / tu); staff and vendor
 # strings stay formal. The formal forms below must not appear in the order email entries.
 FORMAL = {
@@ -70,7 +84,27 @@ FORMAL = {
 @pytest.mark.parametrize("lang", ["de", "fr", "es"])
 def test_customer_order_emails_use_the_informal_register(lang: str) -> None:
     for entry in _po(lang):
-        if not any(p.startswith("apps/orders/templates/email/") for p, _l in entry.occurrences):
+        # Vendor-facing mails stay formal.
+        if not any(
+            p.startswith("apps/orders/templates/email/") and not _vendor_facing(p)
+            for p, _l in entry.occurrences
+        ):
             continue
         text = " ".join([entry.msgstr, *entry.msgstr_plural.values()])
         assert not FORMAL[lang].search(text), entry.msgid
+
+
+@pytest.mark.parametrize("lang", ["de", "fr", "es"])
+def test_vendor_order_emails_use_the_formal_register(lang: str) -> None:
+    informal = {
+        "de": re.compile(r"\b(du|dein\w*|dir|dich)\b", re.IGNORECASE),
+        "fr": re.compile(r"\b(tu|ton|ta|tes|toi)\b", re.IGNORECASE),
+        "es": re.compile(r"\b(tú|tu|tus|ti|contigo)\b", re.IGNORECASE),
+    }[lang]
+    for entry in _po(lang):
+        paths = [p for p, _l in entry.occurrences if "/email/orders/" in p]
+        # A string shared with a customer mail follows the customer register.
+        if not paths or not all(_vendor_facing(p) for p in paths):
+            continue
+        text = " ".join([entry.msgstr, *entry.msgstr_plural.values()])
+        assert not informal.search(text), entry.msgid

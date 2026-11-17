@@ -69,6 +69,8 @@ NOT_PAGES = (
     "manager:platform:amendment_apply",
     "manager:platform:amendment_discard",
     "manager:platform:order_cancel",
+    # ORD.20 part 3b-1: POST only, records invoice_issued_at and redirects to the order page.
+    "manager:shop:order_invoice_issued",
     *MODAL_FRAGMENTS,
 )
 
@@ -177,6 +179,7 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:fitment_node": "platform",
         "manager:platform:fitment_node_merge": "platform",
         "manager:shop:termination": "shop",
+        "manager:shop:statements": "shop",
         "manager:shop:sales_terms": "shop",
         "manager:shop:events": "shop",  # EVT.4
         "manager:shop:event_new": "shop",

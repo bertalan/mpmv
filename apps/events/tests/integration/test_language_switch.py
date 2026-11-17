@@ -10,8 +10,10 @@ from django.test import Client
 from wagtail.models import Locale
 
 from apps.cms.services import seed_site, translate_page
+from apps.core.i18n import primary_language
 from apps.events.models import EventIndexPage, EventPage
 from apps.events.tests.factories import EventPageFactory
+from tests.i18n import language_prefix, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -40,7 +42,7 @@ def _commit_hooks_run_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _italian_event(slug: str) -> EventPage:
     seed_site()
-    index = EventIndexPage.objects.get(locale__language_code="it")
+    index = EventIndexPage.objects.get(locale__language_code=other_language())
     page: EventPage = EventPageFactory.create(parent=index, title=slug.title(), slug=slug)
     page.save_revision().publish()
     page.refresh_from_db()
@@ -49,14 +51,14 @@ def _italian_event(slug: str) -> EventPage:
 
 def test_an_event_with_a_translation_switches_to_it_and_matches_hreflang(client: Client) -> None:
     page = _italian_event("fiera")
-    translate_page(page, ["en"])
-    english = page.get_translation(Locale.objects.get(language_code="en"))
+    translate_page(page, [primary_language()])
+    english = page.get_translation(Locale.objects.get(language_code=primary_language()))
     html = client.get(page.url).content.decode()
     found = targets(html)
-    assert found["en"] == (english.url, False)
-    assert found["de"] == ("/de/", True)
+    assert found[primary_language()] == (english.url, False)
+    assert found["de"] == (f"{language_prefix(third_language())}/", True)
     alternates = {code: url for code, url in hreflang(html).items() if code != "x-default"}
-    assert set(alternates) == {"it", "en"}
+    assert set(alternates) == {other_language(), primary_language()}
     for code, url in alternates.items():
         assert url.endswith(found[code][0])
     assert {code for code, (_u, notice) in found.items() if not notice} == set(alternates)
@@ -66,18 +68,18 @@ def test_an_event_without_a_translation_has_no_alternate_and_a_notice(client: Cl
     page = _italian_event("solo-italiano")
     html = client.get(page.url).content.decode()
     found = targets(html)
-    assert found["en"] == ("/", True)
-    assert found["de"] == ("/de/", True)
-    assert {code for code in hreflang(html) if code != "x-default"} == {"it"}
+    assert found[primary_language()] == ("/", True)
+    assert found["de"] == (f"{language_prefix(third_language())}/", True)
+    assert {code for code in hreflang(html) if code != "x-default"} == {other_language()}
 
 
 def test_a_hidden_translation_is_not_offered(client: Client) -> None:
     page = _italian_event("nascosto")
-    translate_page(page, ["en"])
-    english = page.get_translation(Locale.objects.get(language_code="en")).specific
+    translate_page(page, [primary_language()])
+    english = page.get_translation(Locale.objects.get(language_code=primary_language())).specific
     EventPage.objects.filter(pk=english.pk).update(hidden_at=dt.datetime.now(dt.UTC))
     found = targets(client.get(page.url).content.decode())
-    assert found["en"][1] is True
+    assert found[primary_language()][1] is True
 
 
 @pytest.fixture(autouse=True)

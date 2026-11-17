@@ -1,0 +1,14 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+{% if invoice_issued %}<p><strong>{% translate "Important:" %} {% include "email/orders/_invoice_notice.txt" %}</strong></p>
+{% endif %}<p>{% if by == "staff" %}{% blocktranslate %}Platform support cancelled your order {{ order_number }} and refunded the customer in full.{% endblocktranslate %}{% elif by == "customer" %}{% blocktranslate %}After an item was unavailable, the customer cancelled the rest of order {{ order_number }}, as the terms allow, and was refunded in full.{% endblocktranslate %}{% else %}{% blocktranslate %}Your shop cancelled order {{ order_number }} and the customer was refunded in full.{% endblocktranslate %}{% endif %}</p>
+{% if by != "customer" %}<p>{% if cause == "vendor_fault" %}{% translate "Cause: the shop cannot fulfil the order." %}{% elif cause == "customer_request" %}{% translate "Cause: the customer asked to cancel." %}{% elif refund_fee %}{% translate "Cause: an error of the platform." %}{% else %}{% blocktranslate context "(L)" %}Order {{ order_number }} was cancelled because of a technical error attributable to the platform. The customer was refunded in full; under the vendor terms, the commission and the collection cost were reversed in full and no refund fee is charged to you.{% endblocktranslate %}{% endif %}<br>{% blocktranslate %}Reason: “{{ reason }}”{% endblocktranslate %}</p>
+{% endif %}<p>{% translate "Do not ship these items:" %}</p>
+<ul>
+{% for line in lines %}<li>{{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}</li>
+{% endfor %}</ul>
+<p>{% blocktranslate %}Refunded to the customer: {{ refund }} EUR.{% endblocktranslate %} {% if refund_fee %}{% translate "The refund fee is charged to your shop." %}{% else %}{% translate "No refund fee is charged to your shop." %}{% endif %}</p>
+{% if not invoice_issued %}<p>{% include "email/orders/_invoice_notice.txt" %}</p>
+{% endif %}</body>
+</html>

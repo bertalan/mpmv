@@ -30,8 +30,10 @@ from apps.cms.services import (
     translate_page,
 )
 from apps.cms.tests.factories import StandardPageFactory
+from apps.core.i18n import primary_language
 from apps.core.models import MediaImage
 from apps.core.tests.factories import MediaImageFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -156,10 +158,10 @@ def _publish_translation(client: Client, page: Page, code: str) -> None:
 def test_a_translation_is_created_under_the_home_page_of_its_language(
     workshop: StandardPage, editor: User
 ) -> None:
-    changes = translate_page(workshop, ["it", "de"], user=editor)
+    changes = translate_page(workshop, [other_language(), "de"], user=editor)
 
     assert changes.summary() == {"create": 2, "update": 0, "delete": 0}
-    for code in ("it", "de"):
+    for code in (other_language(), "de"):
         translated = _in(workshop, code)
         assert translated.live
         assert translated.get_parent().specific == HomePage.objects.get(locale=_locale(code))
@@ -171,18 +173,18 @@ def test_a_translation_is_created_under_the_home_page_of_its_language(
 def test_translating_again_or_into_the_source_language_changes_nothing(
     workshop: StandardPage, editor: User
 ) -> None:
-    translate_page(workshop, ["it"], user=editor)
-    assert translate_page(workshop, ["it", "en"], user=editor).is_empty
+    translate_page(workshop, [other_language()], user=editor)
+    assert translate_page(workshop, [other_language(), primary_language()], user=editor).is_empty
 
 
 def test_a_dry_run_lists_the_translations_and_writes_nothing(
     workshop: StandardPage, editor: User
 ) -> None:
-    changes = translate_page(workshop, ["it"], user=editor, dry_run=True)
+    changes = translate_page(workshop, [other_language()], user=editor, dry_run=True)
 
     assert changes.summary()["create"] == 1
     assert not StandardPage.objects.filter(
-        translation_key=workshop.translation_key, locale=_locale("it")
+        translation_key=workshop.translation_key, locale=_locale(other_language())
     ).exists()
     assert not TranslationSource.objects.filter(object_id=workshop.translation_key).exists()
 
@@ -190,10 +192,12 @@ def test_a_dry_run_lists_the_translations_and_writes_nothing(
 def test_sync_brings_source_changes_and_keeps_existing_translations(
     workshop: StandardPage, editor: User, client: Client
 ) -> None:
-    translate_page(workshop, ["it"], user=editor)
+    translate_page(workshop, [other_language()], user=editor)
     verified_login(client, editor)
-    _translate_string(client, workshop, "it", "A workbench with tools", "Un banco con attrezzi")
-    _publish_translation(client, workshop, "it")
+    _translate_string(
+        client, workshop, other_language(), "A workbench with tools", "Un banco con attrezzi"
+    )
+    _publish_translation(client, workshop, other_language())
 
     new_main = _image("main-en-2024")
     workshop.title = "Workshop tour"
@@ -201,7 +205,7 @@ def test_sync_brings_source_changes_and_keeps_existing_translations(
     workshop = _publish(workshop)
     changes = sync_page_translations(workshop, user=editor)
 
-    translated = _in(workshop, "it")
+    translated = _in(workshop, other_language())
     assert changes.summary()["update"] == 1
     assert translated.title == "Workshop tour"  # the new EN text, not yet translated
     assert translated.image == new_main  # a synchronised field follows the source
@@ -209,14 +213,14 @@ def test_sync_brings_source_changes_and_keeps_existing_translations(
 
 
 def test_a_sync_dry_run_writes_nothing(workshop: StandardPage, editor: User) -> None:
-    translate_page(workshop, ["it"], user=editor)
+    translate_page(workshop, [other_language()], user=editor)
     workshop.title = "Workshop tour"
     workshop = _publish(workshop)
 
     changes = sync_page_translations(workshop, user=editor, dry_run=True)
 
     assert changes.summary()["update"] == 1
-    assert _in(workshop, "it").title == "Workshop"
+    assert _in(workshop, other_language()).title == "Workshop"
 
 
 # --- Images per locale
@@ -225,9 +229,9 @@ def test_a_sync_dry_run_writes_nothing(workshop: StandardPage, editor: User) -> 
 def test_a_translator_replaces_one_image_in_one_locale_only(
     workshop: StandardPage, editor: User, client: Client
 ) -> None:
-    translate_page(workshop, ["it", "de"], user=editor)
+    translate_page(workshop, [other_language(), "de"], user=editor)
     italian = _image("main-it")
-    translation = _translation(workshop, "it")
+    translation = _translation(workshop, other_language())
     segment = OverridableSegment.objects.get(source=translation.source, context__path="image")
     verified_login(client, editor)
 
@@ -238,15 +242,15 @@ def test_a_translator_replaces_one_image_in_one_locale_only(
         content_type="application/x-www-form-urlencoded",
     )
     assert response.status_code == 201, response.content
-    _publish_translation(client, workshop, "it")
+    _publish_translation(client, workshop, other_language())
 
-    assert _in(workshop, "it").image == italian
+    assert _in(workshop, other_language()).image == italian
     assert _in(workshop, "de").image == workshop.image
     workshop.refresh_from_db()
     assert workshop.image is not None
     assert workshop.image.title == "main-en"
 
-    it_html = client.get(_in(workshop, "it").url).content.decode()
+    it_html = client.get(_in(workshop, other_language()).url).content.decode()
     de_html = client.get(_in(workshop, "de").url).content.decode()
     assert "main-it" in it_html
     assert "main-en" not in it_html
@@ -255,11 +259,11 @@ def test_a_translator_replaces_one_image_in_one_locale_only(
 
 
 def test_an_image_block_override_survives_a_sync(workshop: StandardPage, editor: User) -> None:
-    translate_page(workshop, ["it", "de"], user=editor)
+    translate_page(workshop, [other_language(), "de"], user=editor)
     italian = _image("figure-it")
     path = f"body.{_block_id(workshop, 'figure')}.image"
 
-    changes = override_image(workshop, "it", path, italian, user=editor)
+    changes = override_image(workshop, other_language(), path, italian, user=editor)
     assert changes.summary()["update"] == 1
 
     workshop.title = "Workshop tour"
@@ -269,27 +273,31 @@ def test_an_image_block_override_survives_a_sync(workshop: StandardPage, editor:
     def figure_image(page: StandardPage) -> str:
         return str(next(b.value["image"].title for b in page.body if b.block_type == "figure"))
 
-    assert figure_image(_in(workshop, "it")) == "figure-it"
+    assert figure_image(_in(workshop, other_language())) == "figure-it"
     assert figure_image(_in(workshop, "de")) == "figure-en"
     assert figure_image(workshop) == "figure-en"
-    assert _in(workshop, "it").title == "Workshop tour"
+    assert _in(workshop, other_language()).title == "Workshop tour"
 
 
 def test_an_image_override_dry_run_writes_nothing(workshop: StandardPage, editor: User) -> None:
-    translate_page(workshop, ["it"], user=editor)
+    translate_page(workshop, [other_language()], user=editor)
 
-    changes = override_image(workshop, "it", "image", _image("main-it"), user=editor, dry_run=True)
+    changes = override_image(
+        workshop, other_language(), "image", _image("main-it"), user=editor, dry_run=True
+    )
 
     assert changes.summary()["update"] == 1
-    assert _in(workshop, "it").image == workshop.image
+    assert _in(workshop, other_language()).image == workshop.image
 
 
 def test_overriding_an_unknown_path_or_an_untranslated_language_is_refused(
     workshop: StandardPage, editor: User
 ) -> None:
-    translate_page(workshop, ["it"], user=editor)
+    translate_page(workshop, [other_language()], user=editor)
     with pytest.raises(LookupError):
-        override_image(workshop, "it", "body.no-such-block.image", _image("x"), user=editor)
+        override_image(
+            workshop, other_language(), "body.no-such-block.image", _image("x"), user=editor
+        )
     with pytest.raises(LookupError):
         override_image(workshop, "fr", "image", _image("y"), user=editor)
 
@@ -321,13 +329,13 @@ def test_alt_texts_and_captions_are_translatable_segments(workshop: StandardPage
 def test_untranslated_alt_texts_fall_back_to_english(
     workshop: StandardPage, editor: User, client: Client
 ) -> None:
-    translate_page(workshop, ["it", "de"], user=editor)
+    translate_page(workshop, [other_language(), "de"], user=editor)
     verified_login(client, editor)
-    _translate_string(client, workshop, "it", "A lathe", "Un tornio")
-    _translate_string(client, workshop, "it", "The lathe", "Il tornio")
-    _publish_translation(client, workshop, "it")
+    _translate_string(client, workshop, other_language(), "A lathe", "Un tornio")
+    _translate_string(client, workshop, other_language(), "The lathe", "Il tornio")
+    _publish_translation(client, workshop, other_language())
 
-    it_html = client.get(_in(workshop, "it").url).content.decode()
+    it_html = client.get(_in(workshop, other_language()).url).content.decode()
     de_html = client.get(_in(workshop, "de").url).content.decode()
     assert 'alt="Un tornio"' in it_html
     assert "<figcaption>Il tornio</figcaption>" in it_html
@@ -341,14 +349,18 @@ def test_untranslated_alt_texts_fall_back_to_english(
 def test_the_gallery_shows_dedicated_images_in_their_language_and_neutral_ones_elsewhere(
     workshop: StandardPage, editor: User, client: Client
 ) -> None:
-    translate_page(workshop, ["it", "de"], user=editor)
+    translate_page(workshop, [other_language(), "de"], user=editor)
 
     def gallery(page: Page) -> str:
         html = client.get(page.url).content.decode()
         start = html.index('class="gallery"')
         return html[start : html.index("</ul>", start)]
 
-    en, it, de = gallery(workshop), gallery(_in(workshop, "it")), gallery(_in(workshop, "de"))
+    en, it, de = (
+        gallery(workshop),
+        gallery(_in(workshop, other_language())),
+        gallery(_in(workshop, "de")),
+    )
     for neutral in (en, it):
         assert "neutral-1" in neutral
         assert "neutral-2" in neutral
@@ -385,10 +397,12 @@ def test_the_main_image_renders_with_its_alt_text_and_caption(
 def test_the_translation_editor_loads_without_inline_scripts(
     workshop: StandardPage, editor: User, client: Client
 ) -> None:
-    translate_page(workshop, ["it"], user=editor)
+    translate_page(workshop, [other_language()], user=editor)
     verified_login(client, editor)
 
-    response = client.get(reverse("wagtailadmin_pages:edit", args=(_in(workshop, "it").pk,)))
+    response = client.get(
+        reverse("wagtailadmin_pages:edit", args=(_in(workshop, other_language()).pk,))
+    )
 
     assert response.status_code == 200
     html = response.content.decode()
