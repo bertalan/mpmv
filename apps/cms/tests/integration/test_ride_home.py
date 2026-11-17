@@ -94,7 +94,7 @@ def test_the_hero_offers_a_primary_and_a_secondary_action_and_no_carousel(
     assert "Sell with us" in hero
     assert 'class="button' in hero
     assert "button--secondary" in hero
-    # THM.14 loads carousel.js on every ride page; the home hero itself is not a carousel.
+    # The home hero itself is not a carousel; carousel.js loads only with one.
     assert "carousel" not in hero.lower()
     assert 'aria-roledescription="carousel"' not in html
     assert "data-autoplay" not in html
