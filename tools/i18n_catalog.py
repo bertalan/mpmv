@@ -44,6 +44,7 @@ EVENT_FILES = (
             "_links",
             "_results",
             "_summary",
+            "_subscribe",
         )
     ),
 )

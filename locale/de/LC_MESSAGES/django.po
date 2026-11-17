@@ -62,6 +62,10 @@ msgstr "Teilnahme"
 msgid "Booth %(booth)s"
 msgstr "Stand %(booth)s"
 
+#: apps/events/templates/events/_subscribe.html
+msgid "Calendar address to copy"
+msgstr "Kalenderadresse zum Kopieren"
+
 #: apps/events/templates/events/_summary.html apps/events/templates/events/event_calendar.html
 #: apps/events/templates/events/event_page.html
 msgid "Cancelled"
@@ -76,11 +80,15 @@ msgstr "Versanddienstleister: %(carrier)s. Sendungsnummer: %(tracking_number)s."
 msgid "Clear filters"
 msgstr "Filter zurücksetzen"
 
+#: apps/events/templates/events/_subscribe.html
+msgid "Download the calendar (ICS)"
+msgstr "Kalender herunterladen (ICS)"
+
 #: apps/events/templates/events/_links.html
 msgid "Event views"
 msgstr "Ansichten der Veranstaltungen"
 
-#: apps/events/listing.py apps/events/templates/events/_results.html
+#: apps/events/templates/events/_results.html
 msgid "Events"
 msgstr "Veranstaltungen"
 
@@ -270,6 +278,10 @@ msgstr "Diese Version online lesen:"
 msgid "Report this event"
 msgstr "Diese Veranstaltung melden"
 
+#: apps/events/templates/events/_subscribe.html
+msgid "RSS feed"
+msgstr "RSS-Feed"
+
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 msgid "Sales terms of %(name)s (version %(number)s)"
@@ -289,6 +301,14 @@ msgstr "Versand: %(shipping)s EUR"
 #: apps/events/templates/events/_filters.html
 msgid "Show events"
 msgstr "Veranstaltungen anzeigen"
+
+#: apps/events/templates/events/_subscribe.html
+msgid "Subscribe"
+msgstr "Abonnieren"
+
+#: apps/events/templates/events/_subscribe.html
+msgid "Subscribe in your calendar app"
+msgstr "In deiner Kalender-App abonnieren"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt

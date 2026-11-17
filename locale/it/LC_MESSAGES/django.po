@@ -1213,6 +1213,10 @@ msgstr "Acquisto per un'azienda"
 msgid "Button text"
 msgstr "Testo del pulsante"
 
+#: apps/events/templates/events/_subscribe.html
+msgid "Calendar address to copy"
+msgstr "Indirizzo del calendario da copiare"
+
 #: apps/manager/event_block_forms.py
 msgid "Call to action"
 msgstr "Invito all'azione"
@@ -2022,6 +2026,10 @@ msgstr "completato"
 msgid "Download my data"
 msgstr "Scarica i miei dati"
 
+#: apps/events/templates/events/_subscribe.html
+msgid "Download the calendar (ICS)"
+msgstr "Scarica il calendario (ICS)"
+
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download your shop profile, products and order amounts as a JSON file."
 msgstr "Scarica il profilo del negozio, i prodotti e gli importi degli ordini in un file JSON."
@@ -2185,8 +2193,8 @@ msgstr "Evento"
 msgid "Event views"
 msgstr "Viste degli eventi"
 
-#: apps/events/listing.py apps/events/templates/events/_results.html apps/manager/sections.py
-#: apps/manager/site_map.py apps/manager/templates/manager/shop/events.html
+#: apps/events/templates/events/_results.html apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/shop/events.html
 msgid "Events"
 msgstr "Eventi"
 
@@ -4972,6 +4980,10 @@ msgstr "Ruoli"
 msgid "Row"
 msgstr "Riga"
 
+#: apps/events/templates/events/_subscribe.html
+msgid "RSS feed"
+msgstr "Feed RSS"
+
 #: apps/manager/forms.py apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
@@ -5603,6 +5615,14 @@ msgstr "Invia"
 #: apps/manager/templates/manager/shop/events.html
 msgid "Submit for review"
 msgstr "Invia in revisione"
+
+#: apps/events/templates/events/_subscribe.html
+msgid "Subscribe"
+msgstr "Iscriviti"
+
+#: apps/events/templates/events/_subscribe.html
+msgid "Subscribe in your calendar app"
+msgstr "Iscriviti nella tua app di calendario"
 
 #: apps/manager/amendment_views.py
 msgid "Substantial change: it needs the customer's acceptance, which is not available yet"

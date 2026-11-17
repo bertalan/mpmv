@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% load i18n static %}
+{% load i18n static event_feeds %}
 {% comment %}
   Listing page (CAT.8): category, taxonomy term, brand, vendor storefront. Minimal and semantic;
   THM.3 and THM.7 restyle it. No inline script or style (the CSP has no 'unsafe-inline'): the
@@ -11,6 +11,7 @@
 {% block description %}{% if editorial.description %}<meta name="description" content="{{ editorial.description }}">{% endif %}{% endblock %}
 {% block head %}
   {% robots_meta robots %}
+  {% if anchor.scope.vendor %}{% event_feed_alternates vendor=anchor.scope.vendor.slug %}{% endif %}
   {% if previous_url %}<link rel="prev" href="{{ previous_url }}">{% endif %}
   {% if next_url %}<link rel="next" href="{{ next_url }}">{% endif %}
   <link rel="stylesheet" href="{% static 'catalog/listing.css' %}">
