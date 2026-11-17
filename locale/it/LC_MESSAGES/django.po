@@ -744,6 +744,10 @@ msgstr "Aggiungi un livello"
 msgid "Add a passkey"
 msgstr "Aggiungi una passkey"
 
+#: apps/manager/event_views.py
+msgid "Add a translation"
+msgstr "Aggiungi una traduzione"
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Add an authenticator app"
 msgstr "Aggiungi un’app di autenticazione"
@@ -789,6 +793,11 @@ msgstr "Aggiungi al calendario"
 #: apps/catalog/templates/catalog/product.html
 msgid "Add to cart"
 msgstr "Aggiungi al carrello"
+
+#: apps/manager/templates/manager/shop/event_translate.html
+#: apps/manager/templates/manager/shop/events.html
+msgid "Add translation"
+msgstr "Aggiungi traduzione"
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "added %(created)s"
@@ -1110,6 +1119,7 @@ msgstr "Torna all'evento"
 
 #: apps/manager/templates/manager/shop/event_form.html
 #: apps/manager/templates/manager/shop/event_images.html
+#: apps/manager/templates/manager/shop/event_translate.html
 msgid "Back to the events"
 msgstr "Torna agli eventi"
 
@@ -1145,6 +1155,10 @@ msgstr "Torna al sito"
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Back to the terminations"
 msgstr "Torna alle cessazioni"
+
+#: themes/ride/templates/components/footer.html
+msgid "Back to top"
+msgstr "Torna su"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Back to two-factor settings"
@@ -2340,7 +2354,7 @@ msgstr "Nodi di compatibilità"
 msgid "Fitment scheme"
 msgstr "Schema di compatibilità"
 
-#: themes/base/templates/components/footer.html
+#: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Footer"
 msgstr "Piè di pagina"
 
@@ -3028,7 +3042,8 @@ msgstr "Conservata con il preavviso, non mostrata al venditore. Termina il blocc
 msgid "Label"
 msgstr "Etichetta"
 
-#: apps/manager/fitment_forms.py apps/manager/templates/manager/platform/fitment_node.html
+#: apps/manager/event_forms.py apps/manager/fitment_forms.py
+#: apps/manager/templates/manager/platform/fitment_node.html
 #: apps/manager/templates/manager/shop/events.html
 #: themes/base/templates/components/language_switcher.html
 msgid "Language"
@@ -3037,6 +3052,10 @@ msgstr "Lingua"
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Language of the texts"
 msgstr "Lingua dei testi"
+
+#: apps/manager/templates/manager/shop/event_form.html
+msgid "Language: %(language)s. Original language of the event: %(original)s."
+msgstr "Lingua: %(language)s. Lingua originale dell’evento: %(original)s."
 
 #: apps/manager/event_forms.py
 msgid "Last day"
@@ -3123,7 +3142,7 @@ msgstr "Lascia la prima scelta, salvo che valga una di queste: consente un preav
 msgid "Leave the slot empty to skip it."
 msgstr "Lascia vuota la casella per saltarla."
 
-#: themes/base/templates/components/footer.html
+#: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Legal"
 msgstr "Note legali"
 
@@ -3789,6 +3808,10 @@ msgstr ""
 msgid "One of your events"
 msgstr "Uno dei tuoi eventi"
 
+#: apps/manager/event_forms.py
+msgid "One or two sentences that tell what the event is, up to 300 characters. Required."
+msgstr "Una o due frasi che dicono cos’è l’evento, fino a 300 caratteri. Obbligatorio."
+
 #: apps/events/models.py
 msgid ""
 "One or two sentences that tell what the event is, up to 300 characters. They are shown in the "
@@ -3858,6 +3881,10 @@ msgid ""
 msgstr ""
 "Solo i marchi approvati hanno una pagina pubblica e possono essere scelti da ogni venditore. Per "
 "rivedere una proposta usa le azioni di approvazione, rifiuto e unione. Esempio: Approvata."
+
+#: apps/events/templates/events/_filters.html
+msgid "Only events in %(language)s"
+msgstr "Solo eventi in %(language)s"
 
 #: apps/shipping/models.py
 msgid ""
@@ -5385,6 +5412,10 @@ msgstr ""
 "Solo slider con cambio automatico: quanto resta una slide, in millisecondi, tra 3000 e 20000. "
 "Esempio: 6000 sono sei secondi."
 
+#: themes/ride/templates/components/footer.html
+msgid "Social"
+msgstr "Social network"
+
 #: apps/catalog/templates/catalog/product.html
 msgid "Sold by"
 msgstr "Venduto da"
@@ -6583,6 +6614,10 @@ msgstr ""
 msgid "The language of the text that was shown when the contract was accepted."
 msgstr "La lingua del testo mostrato al momento dell'accettazione del contratto."
 
+#: apps/manager/event_forms.py
+msgid "The language of the translation. Required."
+msgstr "La lingua della traduzione. Obbligatorio."
+
 #: apps/core/translation_fields.py
 msgid "The language of this translation. Each language has one row for the same item."
 msgstr "La lingua di questa traduzione. Ogni lingua ha una sola riga per lo stesso elemento."
@@ -6614,6 +6649,14 @@ msgid ""
 msgstr ""
 "La lingua in cui è scritto questo testo. Obbligatorio: scegli una lingua per ogni testo; per lo "
 "stesso elemento puoi usare una lingua una volta sola."
+
+#: apps/manager/event_forms.py
+msgid ""
+"The language you write the event in. It cannot be changed later. You can add translations "
+"afterwards. If you leave it empty, the language of the page is used."
+msgstr ""
+"La lingua in cui scrivi l’evento. Non si può cambiare dopo. Potrai aggiungere traduzioni in "
+"seguito. Se lasci vuoto, si usa la lingua della pagina."
 
 #: apps/core/models.py
 msgid ""
@@ -6842,6 +6885,10 @@ msgstr ""
 "non ha un nome per chi compra."
 
 #: apps/manager/event_forms.py
+msgid "The name of the event in this language. Required."
+msgstr "Il nome dell’evento in questa lingua. Obbligatorio."
+
+#: apps/manager/event_forms.py
 msgid "The name of the event, as shoppers see it. Required."
 msgstr "Il nome dell'evento, come lo vedono i clienti. Obbligatorio."
 
@@ -6872,6 +6919,10 @@ msgid ""
 msgstr ""
 "Il nome del punto di ritiro in questa lingua, per esempio 'Ritiro in laboratorio'. Compare ai "
 "clienti quando il checkout userà la spedizione."
+
+#: apps/manager/event_forms.py
+msgid "The name of the place in this language, if it has one. Optional."
+msgstr "Il nome del luogo in questa lingua, se ne ha uno. Facoltativo."
 
 #: apps/events/models.py
 msgid ""
@@ -7850,6 +7901,14 @@ msgstr "Il comune o la città dell'indirizzo di consegna. Obbligatorio."
 msgid "The town or city of the place, for example 'Milano'."
 msgstr "Il paese o la città del luogo, per esempio 'Milano'."
 
+#: apps/manager/event_forms.py
+msgid "The translation"
+msgstr "La traduzione"
+
+#: apps/manager/event_views.py
+msgid "The translation is saved as a draft. Submit it when it is ready."
+msgstr "La traduzione è salvata come bozza. Inviala quando è pronta."
+
 #: apps/catalog/attributes.py
 msgid ""
 "The unit of a number attribute, for example cm, kg or ml. Leave it empty for choice and text "
@@ -8202,6 +8261,14 @@ msgid ""
 msgstr ""
 "Questo evento è stato modificato da qualcun altro dopo che lo hai aperto. Ricarica la pagina e "
 "rifai la modifica."
+
+#: apps/manager/templates/manager/shop/event_form.html
+msgid ""
+"This is a translation. Dates, place and products come from the original and are copied when it is "
+"published."
+msgstr ""
+"Questa è una traduzione. Date, luogo e prodotti vengono dall’originale e si copiano quando viene "
+"pubblicato."
 
 #: apps/orders/templates/orders/customer_order.html
 msgid "This is your order reference, not an invoice. Each seller issues its own invoice."
@@ -8611,6 +8678,22 @@ msgstr "Numero di tracciamento: %(number)s"
 msgid "Trade fair or meeting"
 msgstr "Fiera o incontro"
 
+#: apps/manager/templates/manager/shop/event_translate.html
+msgid ""
+"Translate “%(name)s”. Dates, place and products stay the same as in the original: you write the "
+"title, the summary and the venue name, then add the text blocks."
+msgstr ""
+"Traduci “%(name)s”. Date, luogo e prodotti restano quelli dell’originale: scrivi il titolo, il "
+"riassunto e il nome del luogo, poi aggiungi i blocchi di testo."
+
+#: apps/manager/templates/manager/shop/events.html
+msgid "Translation of the %(original)s original"
+msgstr "Traduzione dell’originale in %(original)s"
+
+#: apps/manager/templates/manager/shop/events.html
+msgid "Translations: %(languages)s"
+msgstr "Traduzioni: %(languages)s"
+
 #: apps/manager/event_forms.py
 msgid "Tuesday"
 msgstr "Martedì"
@@ -8811,6 +8894,10 @@ msgstr "Guida per i venditori"
 #: apps/manager/event_forms.py
 msgid "Venue"
 msgstr "Sede"
+
+#: apps/manager/event_forms.py
+msgid "Venue name"
+msgstr "Nome del luogo"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Verify"

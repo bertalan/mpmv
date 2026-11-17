@@ -51,3 +51,8 @@ MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="mpmv-test-media-"))
 # Transactional email (ARC.16): the in-memory backend, and the templates of the outbox tests.
 EMAIL_SENDER = "apps.core.mail.MemoryEmailSender"
 TEMPLATES[0]["DIRS"] = [*TEMPLATES[0]["DIRS"], BASE_DIR / "apps" / "core" / "tests" / "templates"]  # noqa: F405
+
+# I18N.18: absolute URLs come from WAGTAILADMIN_BASE_URL; in tests it matches the default Wagtail
+# Site (`http://localhost`), so canonical, hreflang and sitemap expectations stay on one root.
+SITE_BASE_URL = "http://localhost"
+WAGTAILADMIN_BASE_URL = SITE_BASE_URL

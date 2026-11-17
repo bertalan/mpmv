@@ -4,6 +4,7 @@ import os
 import re
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from playwright.sync_api import Page
@@ -26,7 +27,7 @@ def _built_themes() -> None:
 
 
 @pytest.fixture(autouse=True)
-def _cms_site(request: pytest.FixtureRequest) -> None:
+def _cms_site(request: pytest.FixtureRequest, settings: Any) -> None:
     """The site's pages for every test that runs a live server (CMS.1).
 
     Transactional tests flush the database after each test, so the home page created by the
@@ -45,8 +46,11 @@ def _cms_site(request: pytest.FixtureRequest) -> None:
 
     from wagtail.models import Site
 
-    live = urlsplit(request.getfixturevalue("live_server").url)
+    live_url = request.getfixturevalue("live_server").url
+    live = urlsplit(live_url)
     Site.objects.filter(is_default_site=True).update(hostname=live.hostname, port=live.port or 80)
+    # Absolute URLs come from the configured base URL (I18N.16): point it at the live server too.
+    settings.SITE_BASE_URL = settings.WAGTAILADMIN_BASE_URL = live_url
 
 
 @pytest.fixture

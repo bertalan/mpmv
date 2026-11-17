@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 from django.apps import apps
+from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import Client, override_settings
 from django.urls import reverse
@@ -184,7 +185,7 @@ def test_listings_follow_the_toggle(client: Client) -> None:
 @override_settings(FORCE_NOINDEX=False, DEMO_MODE=False, ALLOWED_HOSTS=["*"])
 def test_robots_txt_lists_the_sitemap_when_indexing_is_allowed(client: Client) -> None:
     set_indexing(True)
-    root = Site.objects.get(is_default_site=True).root_url
+    root = settings.WAGTAILADMIN_BASE_URL.rstrip("/")
     text = client.get("/robots.txt", HTTP_HOST="evil.example").content.decode()
     assert text.endswith(f"Sitemap: {root}{reverse('sitemap')}\n")  # never the Host header
     assert "evil.example" not in text

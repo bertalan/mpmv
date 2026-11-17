@@ -68,7 +68,7 @@ def test_llms_txt_is_markdown_text_with_title_and_sections(client: Client) -> No
     text = response.content.decode()
     assert text.startswith("# ")
     assert "\n## " in text
-    root = Site.objects.get(is_default_site=True).root_url
+    root = settings.WAGTAILADMIN_BASE_URL.rstrip("/")
     found = dict(links(text))
     assert found["Bottega Uno"] == root + slugs.vendor_path(
         PRIMARY, vendor.slug, default_language=PRIMARY
@@ -85,7 +85,7 @@ def test_llms_txt_never_takes_the_host_header(client: Client) -> None:
     StandardPageFactory.create().save_revision().publish()
     text = client.get(reverse("llms_txt"), HTTP_HOST=HOSTILE).content.decode()
     assert HOSTILE not in text
-    assert Site.objects.get(is_default_site=True).root_url in text
+    assert settings.WAGTAILADMIN_BASE_URL.rstrip("/") in text
 
 
 def test_each_language_has_its_own_file_with_its_own_pages_only(client: Client) -> None:

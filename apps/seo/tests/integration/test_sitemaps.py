@@ -137,7 +137,7 @@ HOSTILE = "evil.example"
 
 @override_settings(FORCE_NOINDEX=False, DEMO_MODE=False, ALLOWED_HOSTS=["*"])
 def test_robots_txt_lists_the_sitemap_index(client: Client) -> None:
-    root = Site.objects.get(is_default_site=True).root_url
+    root = settings.WAGTAILADMIN_BASE_URL.rstrip("/")
     text = client.get("/robots.txt", HTTP_HOST=HOSTILE).content.decode()
     assert text.endswith(f"Sitemap: {root}{reverse('sitemap')}\n")
     assert HOSTILE not in text
@@ -149,7 +149,7 @@ def test_no_url_takes_the_host_header(client: Client) -> None:
     item = product([PRIMARY, other_language()])
     page = StandardPageFactory.create()
     page.save_revision().publish()
-    root = Site.objects.get(is_default_site=True).root_url
+    root = settings.WAGTAILADMIN_BASE_URL.rstrip("/")
     index = client.get(reverse("sitemap"), HTTP_HOST=HOSTILE).content.decode()
     sitemap = client.get(
         reverse("sitemap_section", kwargs={"language": PRIMARY, "kind": "products"}),

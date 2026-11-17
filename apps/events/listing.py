@@ -3,26 +3,27 @@ archive and the single-event ICS download.
 
 `EventIndexPage` and `EventPage` call into this module from their routes. The reading is I/O
 (the index's public events); the time rules (occurrences, the month grid, robots) are pure and
-live in `engine`. Everything here shows the events of the index's own language: the
-original-language fallback is EVT.8.
+live in `engine`. A list shows every public event once (EVT.8): in the index's language when
+the event has a translation there, otherwise in its original language, marked as such.
 """
 
 import datetime as dt
 from collections import defaultdict
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
 from django.core.paginator import Paginator
 from django.http import Http404, HttpRequest, HttpResponse
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.translation import gettext as _
 
 from apps.catalog import slugs
-from apps.core.i18n import primary_language
-from apps.events import engine
+from apps.cms import services as cms_services
+from apps.core.i18n import configured_languages, primary_language
+from apps.events import engine, services
 
 if TYPE_CHECKING:
     from apps.events.models import EventIndexPage, EventPage
@@ -33,10 +34,19 @@ EVENT_TYPE_VALUES = frozenset(engine.EVENT_TYPES)
 
 @dataclass(frozen=True)
 class Item:
-    """One event occurrence on a public page."""
+    """One event occurrence on a public page. `language` is the language code of an
+    original-language fallback (the page is in another language than the list), else empty."""
 
     page: "EventPage"
     span: engine.Span
+    language: str = ""
+
+    @property
+    def language_name(self) -> str:
+        """The fallback's language in that language ("Deutsch"), for the visible label."""
+        return (
+            str(translation.get_language_info(self.language)["name_local"]) if self.language else ""
+        )
 
 
 @dataclass(frozen=True)
@@ -46,6 +56,7 @@ class Filters:
     vendor: str = ""
     type: str = ""
     month: str = ""  # YYYY-MM
+    translated_only: bool = False  # "Only events in <language>": real translations only
 
     @classmethod
     def parse(cls, query: Mapping[str, str]) -> "Filters":
@@ -55,15 +66,18 @@ class Filters:
             vendor=query.get("vendor", "")[:100],
             type=query.get("type", "") if query.get("type", "") in EVENT_TYPE_VALUES else "",
             month=month if engine.parse_month(month) else "",
+            translated_only=query.get("translated", "") == "1",
         )
 
     def active(self) -> bool:
-        return bool(self.vendor or self.type or self.month)
+        return bool(self.vendor or self.type or self.month or self.translated_only)
 
     def query(self, *, month: bool = True, **extra: object) -> str:
         pairs = [("vendor", self.vendor), ("type", self.type)]
         if month:
             pairs.append(("month", self.month))
+        if self.translated_only:
+            pairs.append(("translated", "1"))
         pairs += [(key, str(value)) for key, value in extra.items()]
         return urlencode([(key, value) for key, value in pairs if value])
 
@@ -71,48 +85,58 @@ class Filters:
 # --- Reading
 
 
-def _next_item(page: "EventPage", now: dt.datetime) -> Item | None:
-    spans = engine.event_spans(page.recurrence_spec(), now, engine.horizon_end(now))
-    return Item(page, spans[0]) if spans else None
+def _fallback(event: services.LocalisedEvent) -> str:
+    return event.language if event.fallback else ""
 
 
-def upcoming(pages: list["EventPage"], now: dt.datetime) -> list[Item]:
+def _next_item(event: services.LocalisedEvent, now: dt.datetime) -> Item | None:
+    spans = engine.event_spans(event.page.recurrence_spec(), now, engine.horizon_end(now))
+    return Item(event.page, spans[0], _fallback(event)) if spans else None
+
+
+def upcoming(events: list[services.LocalisedEvent], now: dt.datetime) -> list[Item]:
     """Each event once, at its next (or current) occurrence, soonest first."""
-    items = [item for page in pages if (item := _next_item(page, now)) is not None]
+    items = [item for event in events if (item := _next_item(event, now)) is not None]
     return sorted(items, key=lambda item: (item.span.start, item.page.pk))
 
 
-def past(pages: list["EventPage"], now: dt.datetime) -> list[Item]:
+def past(events: list[services.LocalisedEvent], now: dt.datetime) -> list[Item]:
     """Events that ended, each at its last occurrence, newest first."""
     items: list[Item] = []
-    for page in pages:
-        spec = page.recurrence_spec()
-        if _next_item(page, now) is not None:
+    for event in events:
+        spec = event.page.recurrence_spec()
+        if _next_item(event, now) is not None:
             continue
         first = engine.first_span(spec)
         window_start = max(first.start, now - dt.timedelta(days=30 * engine.HORIZON_MONTHS))
         spans = engine.event_spans(spec, window_start, now)
         if spans:
-            items.append(Item(page, spans[-1]))
+            items.append(Item(event.page, spans[-1], _fallback(event)))
     return sorted(items, key=lambda item: (item.span.end, item.page.pk), reverse=True)
 
 
 def month_items(
-    pages: list["EventPage"], year: int, month: int, *, not_before: dt.datetime | None = None
+    events: list[services.LocalisedEvent],
+    year: int,
+    month: int,
+    *,
+    not_before: dt.datetime | None = None,
 ) -> list[Item]:
     """Every occurrence that touches the month, by start."""
     items: list[Item] = []
-    for page in pages:
-        start, end = engine.month_bounds(year, month, page.zone())
+    for event in events:
+        start, end = engine.month_bounds(year, month, event.page.zone())
         if not_before is not None:
             start = max(start, not_before)
         items.extend(
-            Item(page, span) for span in engine.event_spans(page.recurrence_spec(), start, end)
+            Item(event.page, span, _fallback(event))
+            for span in engine.event_spans(event.page.recurrence_spec(), start, end)
         )
     return sorted(items, key=lambda item: (item.span.start, item.page.pk))
 
 
 def apply_filters(items: list[Item], filters: Filters) -> list[Item]:
+    """The vendor and type filters (the language filter is applied when the events are read)."""
     result = items
     if filters.vendor:
         result = [
@@ -189,6 +213,9 @@ def _common(index: "EventIndexPage", filters: Filters) -> dict[str, Any]:
         "past_url": base + "past/",
         "calendar_url": f"{base}calendar/{timezone.localdate():%Y-%m}/",
         "event_types": list(EVENT_TYPE_CHOICES()),
+        "language_name": str(
+            translation.get_language_info(index.locale.language_code)["name_translated"]
+        ),
     }
 
 
@@ -198,16 +225,23 @@ def EVENT_TYPE_CHOICES() -> list[tuple[str, str]]:
     return [(str(value), str(label)) for value, label in EventType.choices]
 
 
+def _events(index: "EventIndexPage", filters: Filters) -> list[services.LocalisedEvent]:
+    """Every public event of the index's language, with the language filter only: the vendor and
+    type filters are applied to the items, so the filter choices keep listing every vendor."""
+    wide = replace(filters, vendor="", type="")
+    return services.events_for_locale(index.locale, wide, site=index.get_site())
+
+
 def render_list(index: "EventIndexPage", request: HttpRequest) -> HttpResponse:
     now = timezone.now()
     filters = Filters.parse(request.GET)
-    pages = list(index.public_events())
+    events = _events(index, filters)
     if filters.month:
         year, month = engine.parse_month(filters.month) or (now.year, now.month)
-        every = month_items(pages, year, month, not_before=now)
+        every = month_items(events, year, month, not_before=now)
     else:
-        every = upcoming(pages, now)
-    options = filter_options(upcoming(pages, now))
+        every = upcoming(events, now)
+    options = filter_options(upcoming(events, now))
     shown = apply_filters(every, filters)
     paged = _paged(request, shown, index.url or "", filters)
     context = {
@@ -224,7 +258,7 @@ def render_list(index: "EventIndexPage", request: HttpRequest) -> HttpResponse:
 def render_past(index: "EventIndexPage", request: HttpRequest) -> HttpResponse:
     now = timezone.now()
     filters = Filters.parse(request.GET)
-    items = apply_filters(past(list(index.public_events()), now), filters)
+    items = apply_filters(past(_events(index, filters), now), filters)
     paged = _paged(request, items, (index.url or "") + "past/", filters)
     context = {
         **_common(index, filters),
@@ -251,8 +285,7 @@ def render_calendar(
     if engine.parse_month(f"{year:04d}-{month:02d}") is None:
         raise Http404("No such month")
     filters = Filters.parse(request.GET)
-    pages = list(index.public_events())
-    items = apply_filters(month_items(pages, year, month), filters)
+    items = apply_filters(month_items(_events(index, filters), year, month), filters)
     by_day: dict[dt.date, list[Item]] = defaultdict(list)
     for item in items:
         for day in item.span.days():
@@ -293,6 +326,7 @@ def event_context(page: "EventPage", request: HttpRequest) -> dict[str, Any]:
     event_url = page.get_full_url(request) or ""
     vendor = page.vendor
     return {
+        **_language_links(page, request),
         "robots": NOINDEX if page.is_noindex() else "",
         "event_url": event_url,
         "ics_url": f"{url}{engine.ICS_PATH}" if (url := page.get_url(request)) else "",
@@ -305,6 +339,27 @@ def event_context(page: "EventPage", request: HttpRequest) -> dict[str, Any]:
             else ""
         ),
     }
+
+
+def _language_links(page: "EventPage", request: HttpRequest) -> dict[str, Any]:
+    """The canonical URL and the `hreflang` alternates of an event page (`{% seo_links %}`):
+    only translations that exist and are published, `x-default` on the EN translation or else the
+    original (spec 15 "One URL per existing translation"). Nothing in a preview."""
+    site = page.get_site()
+    if site is None or getattr(request, "is_preview", False):
+        return {}
+
+    def absolute(url: str) -> str:
+        return url if "://" in url else site.root_url + url
+
+    own = page.get_url(request)
+    found = {
+        code: absolute(url) for code, url in cms_services.page_language_urls(page, request).items()
+    }
+    alternates = engine.event_hreflang(
+        found, page.original_locale.language_code, configured_languages()
+    )
+    return {"canonical_url": absolute(own) if own else "", "alternates": alternates}
 
 
 def _location(page: "EventPage") -> str:
