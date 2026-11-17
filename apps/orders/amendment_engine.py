@@ -21,11 +21,15 @@ as **portions**, each with its own net, rate, rules and `tax_on` date:
 - a move to another country or tax territory reverses every line and taxes it again for the new
   destination on the amendment's tax date (a change of regime, art. 26 c. 2).
 
-Shipping follows the goods (TAX.17): `resolve_shipping_tax` splits it over the goods' decisions,
-so removing a line can move the shipping VAT split. Each line counts in the split under its base
-decision (its first portion), so an increment taxed at a newer rate does not re-split the paid
-shipping. A shipping portion whose decision was already in the previous version keeps that
-version's `tax_on`; a new one takes the amendment's tax date.
+Shipping follows the goods (TAX.17; tax adviser opinion 2026-11-17, spec 07 recompute rules (a)
+to (e)): `resolve_shipping_tax` splits it over the goods of the final version, so removing a line
+or replacing a 4 % item with a 22 % one moves the whole shipping VAT split. Up to the shipping
+already paid, each line counts under its base decision (its first portion), so an increment taxed
+at a newer rate does not re-rate the paid shipping. A shipping portion whose decision was already
+in the previous version keeps that version's `tax_on`; a new one takes the amendment's tax date.
+The excess over the shipping already paid (collected with the second payment) is split in the
+same proportions under each line's category decided on the amendment's tax date, and carries that
+date: after a change in law only the excess takes the new rate.
 
 Money: `Decimal`, `ROUND_HALF_UP` per line and per portion, never floats.
 """
@@ -825,20 +829,29 @@ def _shipping_portions(
     ctx: RecomputeContext,
     lines: Sequence[VersionLine],
     net: Decimal,
-    previous: Sequence[VersionPortion],
+    previous: VersionShipping,
     *,
     retaxed: bool = False,
 ) -> tuple[VersionPortion, ...]:
-    """TAX.17: the shipping split over the goods, each line under its base decision. A portion
-    whose rate and reason were already in the previous version keeps its `tax_on`; after a
+    """TAX.17 and the tax adviser opinion of 2026-11-17 (spec 07, recompute rules (b) to (e)).
+
+    The shipping is split over the goods of the final version (b, e). Up to the shipping already
+    paid, each line counts under its base decision (its first portion, the one it was paid with),
+    so a change in law never re-rates the paid shipping (d); a portion whose rate and reason were
+    already in the previous version keeps its `tax_on`. The excess over the paid shipping (a
+    supplement collected with the second payment) is split in the same proportions, each line
+    under its category decided on the amendment's tax date, and carries that date (c, d). After a
     territory change (`retaxed`) every portion is taxed again on the amendment's tax date."""
     if not lines or net == 0:
         return ()
     goods = [(line.net, line.portions[0].decision) for line in lines if line.portions]
     if not goods:
         return ()
-    dates = {} if retaxed else {(p.rate, p.reason): p.tax_on for p in previous}
-    return tuple(
+    paid = ZERO if retaxed else min(net, previous.net)
+    excess = net - paid if not retaxed and net > previous.net else ZERO
+    base = net - excess
+    dates = {} if retaxed else {(p.rate, p.reason): p.tax_on for p in previous.portions}
+    portions = [
         VersionPortion(
             net=portion.net,
             tax=portion.tax,
@@ -849,8 +862,23 @@ def _shipping_portions(
             legal_note_key=portion.legal_note_key,
             nature_code=portion.nature_code,
         )
-        for portion in resolve_shipping_tax(ctx.tax, goods, ShippingCharge(net=net))
-    )
+        for portion in resolve_shipping_tax(ctx.tax, goods, ShippingCharge(net=base))
+    ]
+    if excess > 0:
+        today = [(line.net, _today(ctx, line)) for line in lines if line.portions]
+        portions += [
+            VersionPortion.taxed(portion.net, portion.decision, ctx.tax_on)
+            for portion in resolve_shipping_tax(ctx.tax, today, ShippingCharge(net=excess))
+        ]
+    return tuple(portions)
+
+
+def _today(ctx: RecomputeContext, line: VersionLine) -> TaxDecision:
+    """The decision of a line's category on the amendment's tax date; a line sold without a
+    category snapshot (legacy) keeps the decision it was paid with."""
+    if not (line.fiscal_category or ctx.categories.get(line.line_key)):
+        return line.portions[0].decision
+    return _decide(ctx, line.line_key, line.fiscal_category)
 
 
 def _movements(
@@ -1004,7 +1032,7 @@ def recompute_vendor_order(
             ctx,
             new_lines,
             shipping.net,
-            version.shipping.portions,
+            version.shipping,
             retaxed=territory_changed,
         ),
     )
