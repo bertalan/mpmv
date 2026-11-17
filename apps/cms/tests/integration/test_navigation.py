@@ -12,6 +12,8 @@ from wagtail.models import Locale, Site
 from apps.cms.models import NavigationMenu, StandardPage
 from apps.cms.services import SeedReport
 from apps.cms.tests.factories import NavigationMenuFactory, StandardPageFactory
+from apps.core.i18n import primary_language
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -37,7 +39,7 @@ def test_each_language_shows_its_own_header_and_footer(client: Client, seeded: S
 def test_a_language_without_its_menu_uses_the_primary_one_in_its_own_language(
     client: Client, seeded: SeedReport
 ) -> None:
-    NavigationMenu.objects.filter(locale__language_code="de").delete()
+    NavigationMenu.objects.filter(locale__language_code=other_language()).delete()
     html = client.get("/de/").content.decode()
     assert '<a href="/de/ueber-uns/">Über uns</a>' in _header(html)
 
@@ -61,9 +63,9 @@ def test_menus_show_custom_labels_and_external_links_in_order(client: Client) ->
 def test_menus_hide_links_to_unpublished_or_deleted_pages(
     client: Client, seeded: SeedReport
 ) -> None:
-    StandardPage.objects.filter(locale__language_code="en").update(live=False)
+    StandardPage.objects.filter(locale__language_code=primary_language()).update(live=False)
     assert "About us" not in _header(client.get("/").content.decode())
-    StandardPage.objects.filter(locale__language_code="en").delete()
+    StandardPage.objects.filter(locale__language_code=primary_language()).delete()
     assert "About us" not in _header(client.get("/").content.decode())
 
 

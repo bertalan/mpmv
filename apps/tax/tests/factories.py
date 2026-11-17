@@ -13,6 +13,7 @@ from django.utils import timezone
 from factory.django import DjangoModelFactory
 
 from apps.accounts.tests.factories import UserFactory
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import utc
 from apps.tax import engine
 from apps.tax.models import (
@@ -101,7 +102,7 @@ class VendorTaxProfileTranslationFactory(DjangoModelFactory[VendorTaxProfileTran
         model = VendorTaxProfileTranslation
 
     profile = factory.SubFactory(VendorTaxProfileFactory, art74=True)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     legal_note = "VAT not applicable: example exemption wording."
 
 

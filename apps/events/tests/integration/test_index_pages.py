@@ -18,9 +18,11 @@ from wagtail.models import Locale, Page, Revision
 from apps.cms.models import HomePage
 from apps.cms.services import seed_site
 from apps.cms.tests.factories import HomePageFactory
+from apps.core.i18n import primary_language
 from apps.events.models import EventIndexPage
 from apps.events.services import ensure_event_indexes
 from apps.events.tests.factories import EventIndexPageFactory, EventPageFactory
+from tests.i18n import other_language
 
 remove_event_pages = importlib.import_module(
     "apps.events.migrations.0002_page_cleanup_and_status"
@@ -50,7 +52,7 @@ def test_every_enabled_locale_gets_one_index_after_the_seed() -> None:
     assert indexes.count() == len(_codes())
     assert len({index.translation_key for index in indexes}) == 1
     assert all(index.live and index.slug == "events" for index in indexes)
-    italian = indexes.get(locale__language_code="it")
+    italian = indexes.get(locale__language_code=other_language())
     assert italian.title == "Eventi"
 
 
@@ -76,7 +78,7 @@ def test_post_migrate_restores_a_missing_index() -> None:
 def test_a_language_added_later_gets_its_index() -> None:
     seed_site()
     portuguese = EventIndexPage.objects.get(locale__language_code="pt")
-    english = EventIndexPage.objects.get(locale__language_code="en")
+    english = EventIndexPage.objects.get(locale__language_code=primary_language())
     assert portuguese.translation_key == english.translation_key
     assert portuguese.title == "Events"  # no sample title: the primary language's
 

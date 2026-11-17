@@ -10,6 +10,7 @@ from factory.django import DjangoModelFactory
 from wagtail.models import Collection
 
 from apps.core import flags
+from apps.core.i18n import primary_language
 from apps.core.models import (
     AuditLog,
     EmailSuppression,
@@ -160,7 +161,7 @@ class GeocodeCacheEntryFactory(DjangoModelFactory[GeocodeCacheEntry]):
         model = GeocodeCacheEntry
 
     key = factory.Sequence(lambda n: f"{n:064x}")
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     normalised_address = factory.Sequence(lambda n: f"it|20121|milano|via roma {n}")
     provider = "nominatim"
     candidates = factory.LazyFunction(
@@ -266,7 +267,7 @@ class OutboxEmailFactory(DjangoModelFactory[OutboxEmail]):
 
     recipient = factory.Sequence(lambda n: f"recipient{n}@example.com")
     template_key = "tests.one_time_code"
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     context = factory.LazyFunction(lambda: '{"code": "000000", "minutes": 10}')
     status = OutboxEmail.Status.QUEUED
 

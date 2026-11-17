@@ -4,6 +4,7 @@ import pytest
 from django.db import IntegrityError, transaction
 
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.fitment import services
 from apps.fitment.models import FitmentLevel, FitmentLevelTranslation, FitmentScheme
@@ -59,7 +60,7 @@ def test_a_two_level_scheme_in_one_sector_and_a_four_level_in_another() -> None:
         applied = services.add_level(code=code, labels=labels(one, many), ctx=CTX)
         assert applied.obj is not None
         assert applied.obj.position == position
-    assert FitmentLevelTranslation.objects.filter(language="en").count() == 4
+    assert FitmentLevelTranslation.objects.filter(language=primary_language()).count() == 4
 
 
 def test_a_fifth_level_is_refused() -> None:
@@ -101,7 +102,7 @@ def test_renaming_a_label_is_allowed_even_when_nodes_exist() -> None:
     services.rename_level(
         level, labels={"en": LevelLabels("Brand", "Brands", "Pick a brand")}, ctx=CTX
     )
-    row = level.translations.get(language="en")
+    row = level.translations.get(language=primary_language())
     assert (row.label, row.plural_label, row.placeholder) == ("Brand", "Brands", "Pick a brand")
     assert AuditLog.objects.filter(action="fitment.level.updated").exists()
 
