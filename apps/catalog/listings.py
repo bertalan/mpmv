@@ -285,6 +285,7 @@ class ListingEditorial:
     after: str = ""
     title: str = ""
     description: str = ""
+    faq: tuple[tuple[str, str], ...] = ()  # (question, answer HTML) for the page graph
 
 
 def shows_editorial(params: ListingParams) -> bool:

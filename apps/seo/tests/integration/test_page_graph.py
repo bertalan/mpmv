@@ -12,8 +12,7 @@ from typing import Any
 
 import pytest
 from django.apps import apps
-from django.template.loader import render_to_string
-from django.test import Client, RequestFactory
+from django.test import Client
 from wagtail.models import Page, Site, get_page_models
 
 from apps.catalog.tests.factories import BrandFactory, BrandTranslationFactory, CategoryFactory
@@ -24,10 +23,8 @@ from apps.cms.tests.factories import (
     StandardPageFactory,
 )
 from apps.core.i18n import primary_language
-from apps.core.tests.factories import PlatformOperatorFactory
 from apps.events.tests.factories import EventPageFactory
 from apps.seo import page_graph, schema_check
-from apps.themes import services as themes
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
@@ -35,15 +32,12 @@ SCRIPT = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
 
 
 @pytest.fixture(autouse=True)
-def _site() -> None:
+def _site(consumer_prices: None) -> None:
     apps.get_model("seo", "SeoSettings").objects.create(
         site=Site.objects.get(is_default_site=True), allow_indexing=True
     )
-    PlatformOperatorFactory.create(
-        open_ended=True,
-        valid_from=dt.datetime(2020, 1, 1, tzinfo=dt.UTC),
-        legal_name="Operator Legal Name Srl",
-    )
+    # `consumer_prices` made the operator row; rows are history, so only a queryset update.
+    apps.get_model("core", "PlatformOperator").objects.update(legal_name="Operator Legal Name Srl")
 
 
 def graph_of(path: str) -> list[dict[str, Any]]:
@@ -163,13 +157,6 @@ def test_the_graph_is_the_same_under_the_ride_theme(settings: Any) -> None:
     settings.MPMV_THEME_DEFAULT = "ride"
     graph = graph_of("/")
     assert types(graph) == ["Organization", "WebSite", "WebPage"]
-
-
-def test_ride_layout_renders_one_block() -> None:
-    request = RequestFactory().get("/")
-    with themes.use_theme("ride"):
-        html = render_to_string("layouts/base.html", {"request": request})
-    assert len(SCRIPT.findall(html)) <= 1
 
 
 def test_no_graph_without_an_operator() -> None:

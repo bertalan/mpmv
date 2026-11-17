@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% load i18n l10n static responsive_images wagtailcore_tags consumer_prices seo_jsonld %}
+{% load i18n l10n static responsive_images wagtailcore_tags consumer_prices %}
 {% comment %}
   Product page (CAT.7). Semantic and unstyled beyond catalog/product.css; THM.7 restyles it. No
   inline script or style (the CSP has no 'unsafe-inline'). Shows published data only: the
@@ -13,7 +13,6 @@
 {% block head %}
   {% robots_meta robots %}
   <link rel="stylesheet" href="{% static 'catalog/product.css' %}">
-  {% product_jsonld page_data %}
 {% endblock %}
 {% block content %}
   <article class="product-page">

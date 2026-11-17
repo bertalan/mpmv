@@ -3,6 +3,7 @@
 import datetime as dt
 import json
 import re
+from typing import Any
 
 import pytest
 from django.test import Client, override_settings
@@ -26,6 +27,16 @@ def operator(**kwargs: object) -> None:
     PlatformOperatorFactory.create(
         open_ended=True, valid_from=dt.datetime(2020, 1, 1, tzinfo=dt.UTC), **kwargs
     )
+
+
+def operator_node(raw: str) -> dict[str, Any]:
+    """The operator `Organization` of the page's one `@graph` (SEO.7)."""
+    [node] = [
+        n
+        for n in json.loads(raw)["@graph"]
+        if str(n["@id"]).count("/") == 3 and "#organization" in n["@id"]
+    ]
+    return dict(node)
 
 
 def default_site() -> Site:
@@ -57,10 +68,8 @@ def test_home_page_has_one_organization_node() -> None:
     operator(legal_name="Acme </script><b>x</b> Srl", support_email="help@example.org")
     response = Client().get("/")
     body = response.content.decode()
-    nodes = [json.loads(raw) for raw in LD.findall(body)]
-    orgs = [n for n in nodes if n.get("@type") == "Organization"]
-    assert len(orgs) == 1
-    org = orgs[0]
+    assert len(LD.findall(body)) == 1
+    org = operator_node(LD.findall(body)[0])
     assert org["name"] == "Acme </script><b>x</b> Srl"
     assert org["url"].startswith("http")
     assert org["contactPoint"]["email"] == "help@example.org"
@@ -70,7 +79,7 @@ def test_home_page_has_one_organization_node() -> None:
 
 def test_home_page_without_operator_has_no_organization() -> None:
     body = Client().get("/").content.decode()
-    assert "Organization" not in body
+    assert '"Organization"' not in body
 
 
 def test_organization_node_has_logo_and_profiles_wikidata_first() -> None:
@@ -160,13 +169,15 @@ def test_url_and_logo_ignore_the_host_header_and_a_missing_file() -> None:
     body = response.content.decode()
     assert "evil.example" not in body
     assert "</script>?" not in body
-    node = json.loads(LD.findall(body)[0])
+    node = operator_node(LD.findall(body)[0])
     assert node["url"].startswith(site.root_url)
     assert node["logo"].startswith(site.root_url)
     logo.file.storage.delete(logo.file.name)  # the file is gone from storage: still no crash
     assert Client().get("/", HTTP_HOST="evil.example").status_code == 200
     type(logo).objects.filter(pk=logo.pk).update(file="")  # no file behind the field
-    node = json.loads(LD.findall(Client().get("/", HTTP_HOST="evil.example").content.decode())[0])
+    node = operator_node(
+        LD.findall(Client().get("/", HTTP_HOST="evil.example").content.decode())[0]
+    )
     assert "logo" not in node
 
 

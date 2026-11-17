@@ -226,14 +226,19 @@ def test_an_author_of_another_language_shows_no_bio(seeded: SeedReport, ada: Blo
 
 
 def _jsonld(page: BeautifulSoup, kind: str) -> dict[str, Any]:
-    found = [
-        json.loads(script.string or "")
-        for script in page.find_all("script", attrs={"type": "application/ld+json"})
-    ]
-    matching = [data for data in found if data.get("@type") == kind]
-    assert len(matching) == 1, found
-    data: dict[str, Any] = matching[0]
-    assert data["@context"] == "https://schema.org"
+    """The `kind` node of the page's one `@graph` (SEO.7); a `mainEntity` reference is replaced
+    by the node it points at."""
+    scripts = page.find_all("script", attrs={"type": "application/ld+json"})
+    assert len(scripts) == 1, "one JSON-LD block per page"
+    document = json.loads(scripts[0].string or "")
+    assert document["@context"] == "https://schema.org"
+    graph = {node["@id"]: node for node in document["@graph"] if "@id" in node}
+    matching = [node for node in document["@graph"] if node.get("@type") == kind]
+    assert len(matching) == 1, document
+    data: dict[str, Any] = dict(matching[0])
+    ref = data.get("mainEntity")
+    if isinstance(ref, dict) and set(ref) == {"@id"}:
+        data["mainEntity"] = graph[ref["@id"]]
     return data
 
 

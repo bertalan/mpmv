@@ -19,7 +19,18 @@ LD = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
 # schema.org Organization: Google requires nothing, recommends these; we require name and url and
 # type-check every optional property we emit.
 REQUIRED = ("@context", "@type", "name", "url")
-KNOWN = {"@context", "@type", "@id", "name", "url", "logo", "sameAs", "contactPoint"}
+KNOWN = {
+    "@context",
+    "@type",
+    "@id",
+    "name",
+    "legalName",
+    "url",
+    "vatID",
+    "logo",
+    "sameAs",
+    "contactPoint",
+}
 CONTACT_POINT_KNOWN = {"@type", "contactType", "email", "telephone", "availableLanguage"}
 
 
@@ -64,6 +75,13 @@ def schema_errors(node: dict[str, Any]) -> list[str]:
     return errors
 
 
+def _operator(script: str) -> dict[str, Any]:
+    """The operator Organization of a page's one `@graph` (SEO.7), with the graph's context."""
+    document = json.loads(script)
+    [node] = [n for n in document["@graph"] if n["@id"].endswith("/#organization")]
+    return {"@context": document["@context"], **node}
+
+
 def test_full_node_is_valid() -> None:
     node = organization_jsonld(
         "Acme",
@@ -101,7 +119,7 @@ def test_home_page_node_is_valid_and_values_come_from_the_operator() -> None:
     body = Client().get("/").content.decode()
     scripts = LD.findall(body)
     assert len(scripts) == 1
-    node = json.loads(scripts[0])
+    node = _operator(scripts[0])
     assert schema_errors(node) == []
     assert node["name"] == "Operator Legal Name Srl"
     assert node["contactPoint"]["email"] == "support@operator.example"
@@ -122,7 +140,7 @@ def test_node_follows_the_current_operator_version() -> None:
         valid_from=dt.datetime(2020, 1, 1, tzinfo=dt.UTC),
         legal_name="New Operator",
     )
-    node = json.loads(LD.findall(Client().get("/").content.decode())[0])
+    node = _operator(LD.findall(Client().get("/").content.decode())[0])
     assert node["name"] == "New Operator"
     assert "contactPoint" not in node
     assert "sameAs" not in node

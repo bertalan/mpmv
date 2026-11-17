@@ -82,6 +82,17 @@ def faq_page_jsonld(questions: Iterable[tuple[str, str]]) -> dict[str, Any]:
     }
 
 
+def faq_questions(page: Any) -> list[tuple[str, str]]:
+    """The (question, answer HTML) pairs of every FAQ block of `page`, in order (spec 10: one
+    FAQPage per page)."""
+    return [
+        (item["question"], str(item["answer"]))
+        for block in getattr(page, "body", None) or []
+        if block.block_type == "faq"
+        for item in block.value["items"]
+    ]
+
+
 def profile_links(urls: Iterable[str]) -> list[str]:
     """The https profile links without a user name or password, each once (same link up to host
     case, IDN form and a trailing slash), Wikidata first."""

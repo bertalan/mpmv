@@ -29,10 +29,10 @@ from wagtail.views import serve
 from apps.core import translations
 from apps.core.i18n import hreflang_alternates
 from apps.core.money import CURRENCY
-from apps.core.site_url import absolute_url, site_root_url
+from apps.core.site_url import absolute_url
 from apps.vendors import services as vendors_services
 
-from . import engine, listings, product_pages, services, slugs
+from . import listings, product_pages, services, slugs
 
 TEMPLATE = "catalog/listing.html"
 PRODUCT_TEMPLATE = "catalog/product.html"
@@ -178,14 +178,13 @@ def _listing(
     }
     labels.update({(listings.VENDOR, option.value): option.label for option in vendors})
     brand = anchor.scope.brand
-    site = site_root_url(request)
+    editorial = (
+        _editorial(request, anchor.scope, language) if listings.shows_editorial(params) else None
+    )
 
     context: dict[str, Any] = {
-        "editorial": (
-            _editorial(request, anchor.scope, language)
-            if listings.shows_editorial(params)
-            else None
-        ),
+        "editorial": editorial,
+        "editorial_faq": editorial.faq if editorial else (),
         "anchor": anchor,
         "location": location,
         "cards": services.product_cards(page.products, language),
@@ -198,12 +197,8 @@ def _listing(
         "store_categories": store_categories,
         "vendor_profile": vendor_profile,
         "brand_profile": services.brand_profile(brand, language) if brand else None,
-        # One JSON-LD block per page (SEO.7): the brand page's graph until `seo.page_graph`.
-        "jsonld": (
-            engine.jsonld_text(services.brand_graph(brand, language, site=site, paths=anchor.paths))
-            if brand
-            else ""
-        ),
+        # SEO.7: the layout prints the page's one graph from these.
+        "graph_object": anchor,
         "policy_items": [
             {"title": title, "content": RichText(text)}
             for title, text in (vendor_profile.policies if vendor_profile else ())
