@@ -219,7 +219,7 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
 |---|---|---|
 | `applicant` | `onboarding`, `closed` | Staff approve the application, or reject it (a rejected application is `closed`) |
 | `onboarding` | `active`, `closed` | Activation after the checklist and the activation gates (CMP.13); closure |
-| `active` | `suspended`, `closed` | Staff suspend (for example expired documents, VEN.16 consequences) or close |
+| `active` | `suspended`, `closed` | Staff suspend (for example expired documents, VEN.16 consequences, a serious breach under vendor-terms clause (m)) or close |
 | `suspended` | `active`, `closed` | Reinstatement once the cause is solved; closure |
 | `closed` | `onboarding` | Staff reopen a closed vendor, with a mandatory reason recorded in the `AuditLog` (VEN.21) |
 
@@ -698,6 +698,9 @@ the terms (article 3(2)), so a new version's `valid_from` is at least 15 days af
 unless a legal obligation requires otherwise. It also requires a statement of reasons on a
 restriction or suspension and 30 days' notice before terminating a vendor (article 4); the VEN.1
 status machine and VEN.16 consequences record the reason and the notice date (CMP.5). The
+grounds, the statement of reasons, the notice and the effects of a suspension are in vendor-terms
+clause (m) "Limitazione, sospensione e cessazione" (spec 11 CMP.5), which the clause (l)
+anti-abuse rule refers to. The
 Commission's Digital Omnibus proposal of 2025-11-19 would repeal parts of P2B; until it is
 adopted the regulation applies in full.
 

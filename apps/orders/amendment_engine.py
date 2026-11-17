@@ -21,17 +21,24 @@ as **portions**, each with its own net, rate, rules and `tax_on` date:
 - a move to another country or tax territory reverses every line and taxes it again for the new
   destination on the amendment's tax date (a change of regime, art. 26 c. 2).
 
-Shipping follows the goods (TAX.17): `resolve_shipping_tax` splits it over the goods' decisions,
-so removing a line can move the shipping VAT split. Each line counts in the split under its base
-decision (its first portion), so an increment taxed at a newer rate does not re-split the paid
-shipping. A shipping portion whose decision was already in the previous version keeps that
-version's `tax_on`; a new one takes the amendment's tax date.
+Shipping follows the goods (TAX.17; tax adviser opinion 2026-11-17, spec 07 recompute rules (a)
+to (e)): `resolve_shipping_tax` splits it over the goods of the final version, so removing a line
+or replacing a 4 % item with a 22 % one moves the whole shipping VAT split. Up to the shipping
+already paid, each line counts under its base decision (its first portion), so an increment taxed
+at a newer rate does not re-rate the paid shipping. A shipping portion whose decision was already
+in the previous version keeps that version's `tax_on`; a new one takes the amendment's tax date.
+The excess over the shipping already paid (collected with the second payment) is split in the
+same proportions under each line's category decided on the amendment's tax date, and carries that
+date: after a change in law only the excess takes the new rate. A later version keeps each
+payment's shipping as its own layer (portions grouped by `tax_on`): unchanged goods and shipping
+copy the portions, a lower shipping comes off the newest layer first, and each layer is re-split
+under the decisions its categories had on its own date (`_shipping_portions`).
 
 Money: `Decimal`, `ROUND_HALF_UP` per line and per portion, never floats.
 """
 
 import datetime as dt
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any, ClassVar, Final
@@ -118,9 +125,19 @@ class VersionPortion:
     country_of_taxation: str | None = None
     legal_note_key: str | None = None
     nature_code: str | None = None
+    # Shipping portions only: the fiscal categories of the goods this share of the shipping
+    # follows (TAX.17). A later version re-splits each payment's shipping with the decision each
+    # category had on that payment's date (spec 07, recompute rules (d) and chained amendments).
+    categories: tuple[str, ...] = ()
 
     @classmethod
-    def taxed(cls, net: Decimal, decision: TaxDecision, tax_on: dt.date) -> "VersionPortion":
+    def taxed(
+        cls,
+        net: Decimal,
+        decision: TaxDecision,
+        tax_on: dt.date,
+        categories: tuple[str, ...] = (),
+    ) -> "VersionPortion":
         return cls(
             net=round_line(net),
             tax=tax_amount(round_line(net), decision.rate),
@@ -130,6 +147,7 @@ class VersionPortion:
             country_of_taxation=decision.country_of_taxation,
             legal_note_key=decision.legal_note_key,
             nature_code=decision.nature_code,
+            categories=categories,
         )
 
     @property
@@ -147,7 +165,7 @@ class VersionPortion:
         return replace(self, net=net, tax=tax_amount(net, self.rate))
 
     def to_json(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "net": str(self.net),
             "tax": str(self.tax),
             "rate": str(self.rate),
@@ -157,6 +175,9 @@ class VersionPortion:
             "legal_note_key": self.legal_note_key,
             "nature_code": self.nature_code,
         }
+        if self.categories:
+            data["categories"] = list(self.categories)
+        return data
 
     @classmethod
     def from_json(cls, data: Mapping[str, Any]) -> "VersionPortion":
@@ -169,6 +190,7 @@ class VersionPortion:
             country_of_taxation=_opt(data.get("country_of_taxation")),
             legal_note_key=_opt(data.get("legal_note_key")),
             nature_code=_opt(data.get("nature_code")),
+            categories=tuple(str(c) for c in data.get("categories") or ()),
         )
 
 
@@ -825,32 +847,111 @@ def _shipping_portions(
     ctx: RecomputeContext,
     lines: Sequence[VersionLine],
     net: Decimal,
-    previous: Sequence[VersionPortion],
+    previous: VersionSnapshot,
     *,
     retaxed: bool = False,
 ) -> tuple[VersionPortion, ...]:
-    """TAX.17: the shipping split over the goods, each line under its base decision. A portion
-    whose rate and reason were already in the previous version keeps its `tax_on`; after a
-    territory change (`retaxed`) every portion is taxed again on the amendment's tax date."""
-    if not lines or net == 0:
+    """TAX.17 and the tax adviser opinion of 2026-11-17 (spec 07, recompute rules (b) to (e) and
+    chained amendments).
+
+    The shipping of the previous version is a stack of **payment layers**: its portions grouped
+    by `tax_on` (the first payment, then each second payment). When neither the goods nor the
+    shipping net change, the portions are copied as they are. Otherwise:
+
+    - a lower shipping comes off the newest layer first, each at the rates it was paid with;
+    - each layer is split again over the goods of the final version (b, e), each line under the
+      decision its category had on that layer's date (read from the layer's own portions), so
+      a change in law never re-rates shipping already paid (d); a line of a category the layer
+      did not have (a substitute, an added line) counts under the decision it was sold with;
+      a portion keeps the layer's date when the layer already had its rate and reason;
+    - a higher shipping adds a layer for the excess, split in the same proportions under each
+      line's category decided on the amendment's tax date and dated on it (c, d).
+
+    After a territory change (`retaxed`) every portion is taxed again on the amendment's date."""
+    if not lines or net == 0 or not any(line.portions for line in lines):
         return ()
-    goods = [(line.net, line.portions[0].decision) for line in lines if line.portions]
-    if not goods:
-        return ()
-    dates = {} if retaxed else {(p.rate, p.reason): p.tax_on for p in previous}
-    return tuple(
-        VersionPortion(
-            net=portion.net,
-            tax=portion.tax,
-            rate=portion.rate,
-            reason=str(portion.reason),
-            tax_on=dates.get((portion.rate, str(portion.reason)), ctx.tax_on),
-            country_of_taxation=portion.country_of_taxation,
-            legal_note_key=portion.legal_note_key,
-            nature_code=portion.nature_code,
+    goods = [line for line in lines if line.portions]
+    if retaxed:
+        return tuple(_split(ctx, goods, net, lambda line: line.portions[0].decision, None))
+    paid = previous.shipping
+    if net == paid.net and tuple(goods) == tuple(x for x in previous.lines if x.portions):
+        return paid.portions
+    layers: dict[dt.date, list[VersionPortion]] = {}
+    for portion in paid.portions:
+        layers.setdefault(portion.tax_on, []).append(portion)
+    dated = sorted(layers.items())
+    nets = [_sum(p.net for p in portions) for _, portions in dated]
+    cut = max(ZERO, _sum(nets) - net)
+    for index in reversed(range(len(nets))):  # a decrease comes off the newest payment first
+        taken = min(nets[index], cut)
+        nets[index] -= taken
+        cut -= taken
+    result: list[VersionPortion] = []
+    for (on, portions), layer_net in zip(dated, nets, strict=True):
+        if layer_net > 0:
+            decide = _layer_decision(ctx, on, portions)
+            result += _split(ctx, goods, layer_net, decide, on, portions)
+    excess = net - _sum(nets)
+    if excess > 0:
+        result += _split(ctx, goods, excess, lambda line: _today(ctx, line), None)
+    return tuple(result)
+
+
+def _today(ctx: RecomputeContext, line: VersionLine) -> TaxDecision:
+    """The decision of a line's category on the amendment's tax date; a line sold without a
+    category snapshot (legacy) keeps the decision it was paid with."""
+    if not _category(ctx, line):
+        return line.portions[0].decision
+    return _decide(ctx, line.line_key, line.fiscal_category)
+
+
+def _category(ctx: RecomputeContext, line: VersionLine) -> str:
+    return line.fiscal_category or ctx.categories.get(line.line_key, "")
+
+
+def _layer_decision(
+    ctx: RecomputeContext, on: dt.date, portions: Sequence[VersionPortion]
+) -> Callable[[VersionLine], TaxDecision]:
+    """How a line counts in the re-split of the shipping paid on `on`: under the decision its
+    category had in that payment's portions; otherwise (a layer written before categories were
+    recorded, or a category new to the layer) under its goods portion in force on that date, or
+    the decision it was sold with."""
+    known = {c: p.decision for p in portions for c in p.categories}
+
+    def decide(line: VersionLine) -> TaxDecision:
+        category = _category(ctx, line)
+        if category in known:
+            return known[category]
+        dated = [p for p in line.portions if p.tax_on <= on]
+        return (dated[-1] if dated else line.portions[0]).decision
+
+    return decide
+
+
+def _split(
+    ctx: RecomputeContext,
+    lines: Sequence[VersionLine],
+    net: Decimal,
+    decide: Callable[[VersionLine], TaxDecision],
+    on: dt.date | None,
+    layer: Sequence[VersionPortion] = (),
+) -> list[VersionPortion]:
+    """`net` of shipping split over `lines` (TAX.17), each line under `decide(line)`. A portion
+    is dated `on` when the payment it belongs to already had its rate and reason, otherwise on
+    the amendment's tax date (`on` None: always the amendment's date)."""
+    decisions = [(line, decide(line)) for line in lines]
+    rates = {(p.rate, p.reason) for p in layer}
+    result = []
+    for portion in resolve_shipping_tax(
+        ctx.tax, [(line.net, d) for line, d in decisions], ShippingCharge(net=net)
+    ):
+        categories = tuple(
+            sorted({_category(ctx, line) for line, d in decisions if d == portion.decision} - {""})
         )
-        for portion in resolve_shipping_tax(ctx.tax, goods, ShippingCharge(net=net))
-    )
+        kept = on is not None and (portion.rate, str(portion.reason)) in rates
+        dated_on = on if kept and on is not None else ctx.tax_on
+        result.append(VersionPortion.taxed(portion.net, portion.decision, dated_on, categories))
+    return result
 
 
 def _movements(
@@ -1004,7 +1105,7 @@ def recompute_vendor_order(
             ctx,
             new_lines,
             shipping.net,
-            version.shipping.portions,
+            version,
             retaxed=territory_changed,
         ),
     )
