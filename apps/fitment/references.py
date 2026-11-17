@@ -91,3 +91,48 @@ def register_builtin_references() -> None:
     """This app's own references, called from `FitmentConfig.ready()`."""
     if ("fitment.fitmentnodemerge", "into_node") not in registered_fields():
         register_node_reference(FitmentNodeMerge, "into_node")
+
+    if ("fitment.productfitment", "node") not in registered_fields():
+        _register_product_rows()
+
+
+def _register_product_rows() -> None:
+    """FIT.2: a product row follows a merge, its copied tree path is refreshed (children moved
+    just before), and a row that would repeat one already on the target is dropped."""
+    from django.db.models import OuterRef, Subquery
+
+    from .models import ProductFitment, ProductFitmentState
+
+    def count(node: FitmentNode) -> int:
+        return ProductFitment.objects.filter(node=node).count()
+
+    def move(source: FitmentNode, target: FitmentNode) -> object:
+        rows = ProductFitment.objects.filter(node=source)
+        product_ids = set(rows.values_list("product_id", flat=True))
+        for row in list(rows):
+            twin = ProductFitment.objects.filter(
+                product_id=row.product_id,
+                node=target,
+                years=row.years,
+                is_exclusion=row.is_exclusion,
+            )
+            if twin.exists():
+                row.delete()
+            else:
+                row.node = target
+                row.save(update_fields=["node", "updated_at"])
+        fresh = Subquery(FitmentNode.objects.filter(pk=OuterRef("node_id")).values("path")[:1])
+        stale = ProductFitment.objects.exclude(node_path=fresh)
+        product_ids |= set(stale.values_list("product_id", flat=True))
+        stale.update(node_path=fresh)
+        for state in ProductFitmentState.objects.filter(product_id__in=product_ids):
+            state.rows_version += 1
+            state.save(update_fields=["rows_version", "updated_at"])
+        return None
+
+    register_reference(
+        "fitment.productfitment.node",
+        count=count,
+        move=move,
+        field=("fitment.productfitment", "node"),
+    )

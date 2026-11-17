@@ -12,14 +12,16 @@ position. Create and move nodes through `apps.fitment.services`, never by writin
 
 from typing import Any, ClassVar, Self
 
+from django.contrib.postgres.fields import IntegerRangeField
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
 
-from apps.catalog.models import Category
+from apps.catalog.models import Category, Product
 from apps.core.fields import LanguageField
 from apps.core.models import BaseModel, TranslationModel
+from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
 
@@ -365,3 +367,120 @@ class FitmentCategory(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.category_id}"
+
+
+class DeclarationMode(models.TextChoices):
+    UNDECLARED = "undeclared", _("Not declared")
+    SPECIFIC = "specific", _("Specific items")
+    UNIVERSAL = "universal", _("Fits everything")
+
+
+class ProductFitmentState(BaseModel):
+    """What a product says about fitment: nothing, specific items, or everything (FIT.2).
+
+    One row per product that has any declaration. Written only by
+    `services.set_product_fitment`, which keeps `always_visible` and `rows_version` right.
+    """
+
+    Mode = DeclarationMode
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects = VendorScopedManager()
+
+    product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name="fitment_state")
+    mode = models.CharField(
+        _("declaration"),
+        max_length=16,
+        choices=DeclarationMode.choices,
+        default=DeclarationMode.UNDECLARED,
+    )
+    always_visible = models.BooleanField(
+        default=False,
+        editable=False,
+        help_text=_("Kept by the service: universal, or a category with no fitment."),
+    )
+    rows_version = models.PositiveIntegerField(
+        default=0, editable=False, help_text=_("Raised on every change, for caches.")
+    )
+
+    class Meta:
+        indexes: ClassVar[list[models.Index]] = [
+            models.Index(
+                fields=["product"],
+                condition=models.Q(always_visible=True),
+                name="fitment_state_always_visible",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.product_id}: {self.mode}"
+
+
+class FitmentSourceKind(models.TextChoices):
+    MANUAL = "manual", _("Entered by hand")
+    CSV = "csv", _("CSV file")
+    FEED = "feed", _("Supplier feed")
+    STANDARD = "standard", _("Reference data")
+
+
+class ProductFitment(BaseModel):
+    """One row of the fitment table: a product fits (or, excluded, does not fit) a node."""
+
+    Source = FitmentSourceKind
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects = VendorScopedManager()
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="fitments")
+    node = models.ForeignKey(
+        FitmentNode,
+        on_delete=models.PROTECT,
+        related_name="product_rows",
+        help_text=_("At any depth: a make row covers every model below it."),
+    )
+    node_path = models.CharField(
+        max_length=255,
+        editable=False,
+        db_index=True,
+        help_text=_("The node tree path, copied for the less-specific profile query."),
+    )
+    years = IntegerRangeField(
+        null=True,
+        blank=True,
+        help_text=_("First and last year, both included. Empty means every year."),
+    )
+    is_exclusion = models.BooleanField(
+        _("excludes"),
+        default=False,
+        help_text=_("Turn on for All models of the make, except this one."),
+    )
+    note = models.ForeignKey(
+        "FitmentNote", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    source = models.CharField(max_length=16, choices=FitmentSourceKind.choices)
+
+    class Meta:
+        ordering = ["product", "node_path", "id"]
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(
+                fields=["product", "node", "years", "is_exclusion"],
+                nulls_distinct=False,
+                name="fitment_productfitment_unique",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(years__isnull=True) | models.Q(years__isempty=False),
+                name="fitment_productfitment_years_not_empty",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.product_id} -> {self.node_id}"
+
+    @property
+    def year_from(self) -> int | None:
+        return None if self.years is None else self.years.lower
+
+    @property
+    def year_to(self) -> int | None:
+        # PostgreSQL stores integer ranges as [lower, upper): the last year is upper - 1.
+        return None if self.years is None or self.years.upper is None else self.years.upper - 1
