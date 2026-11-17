@@ -43,9 +43,10 @@ def _date(value: dt.datetime | None) -> dt.date | None:
 
 def page_is_noindex(page: Page) -> bool:
     """The page's own robots rule, the one its template prints: a term landing page is noindex
-    (its term page is the indexed one). The environment floor and the site's switch are checked
-    once for the whole sitemap (the views answer 404 when indexing is off)."""
-    return isinstance(page, TermLandingPage)
+    (its term page is the indexed one), and so is a page whose own `noindex` field is set (THM.14
+    showcase and any page type that adds the field). The environment floor and the site's switch
+    are checked once for the whole sitemap (the views answer 404 when indexing is off)."""
+    return isinstance(page, TermLandingPage) or bool(getattr(page, "noindex", False))
 
 
 def _cms_entries(language: str, request: HttpRequest, *, events: bool) -> Iterator[Entry]:
