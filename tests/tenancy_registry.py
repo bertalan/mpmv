@@ -701,6 +701,10 @@ ENDPOINTS: dict[str, Access] = {
         methods=("POST",),
         sample={"public_id": NIL_UUID},
     ),
+    "manager:shop:event_translate": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        sample={"public_id": NIL_UUID},
+    ),
     # EVT.4 part 2: the block editor, the preview and the image library.
     "manager:shop:event_block_add": VendorScoped(
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
@@ -1069,6 +1073,10 @@ API_OPERATIONS: dict[str, Access] = {
         login=active_vendor_events_key,
     ),
     "POST /api/v1/events/{public_id}/cancel": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        login=active_vendor_events_key,
+    ),
+    "POST /api/v1/events/{public_id}/translations": VendorScoped(
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
         login=active_vendor_events_key,
     ),

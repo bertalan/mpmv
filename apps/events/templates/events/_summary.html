@@ -1,17 +1,20 @@
-{% load i18n tz wagtailcore_tags %}{% comment %}
+{% load i18n tz wagtailcore_tags %}{% get_current_language as page_language %}{% comment %}
 One event in a list (EVT.6): a heading link, the dates as `<time datetime>`, the type as text and
-the vendor, never colour alone. Context: `item` (an `events.listing.Item`).
+the vendor, never colour alone. Context: `item` (an `events.listing.Item`). An original-language
+fallback (EVT.8) carries `lang` on the article and `hreflang` on the link, and shows its language
+name; the interface strings around it (the meta line) say they are in the page's language.
 {% endcomment %}
 {% with event=item.page span=item.span %}
-<article class="event-summary">
-  <h4><a href="{% pageurl event %}">{{ event.title }}</a></h4>
-  <p class="event-meta">
+<article class="event-summary"{% if item.language %} lang="{{ item.language }}"{% endif %}>
+  <h4><a href="{% pageurl event %}"{% if item.language %} hreflang="{{ item.language }}"{% endif %}>{{ event.title }}</a></h4>
+  <p class="event-meta"{% if item.language %} lang="{{ page_language }}"{% endif %}>
     {% if event.all_day %}
       <time datetime="{{ span.start|date:'Y-m-d' }}">{{ span.start|date:"DATE_FORMAT" }}</time>{% if span.days|length > 1 %} – {% with last=span.days|last %}<time datetime="{{ last|date:'Y-m-d' }}">{{ last|date:"DATE_FORMAT" }}</time>{% endwith %}{% endif %}
     {% else %}
       <time datetime="{{ span.start|date:'c' }}">{{ span.start|date:"DATETIME_FORMAT" }}</time>
     {% endif %}
     · {{ event.get_event_type_display }}{% if event.vendor %} · {{ event.vendor.display_name }}{% endif %}
+    {% if item.language %} · <span class="event-language" lang="{{ item.language }}">{{ item.language_name }}</span>{% endif %}
     {% if event.cancelled_at %} · <span class="event-status">{% translate "Cancelled" %}</span>{% endif %}
   </p>
   {% if event.summary %}<p>{{ event.summary }}</p>{% endif %}

@@ -375,6 +375,10 @@ msgstr "No se cobra a su tienda ninguna tarifa de reembolso."
 msgid "Online"
 msgstr "En línea"
 
+#: apps/events/templates/events/_filters.html
+msgid "Only events in %(language)s"
+msgstr "Solo eventos en %(language)s"
+
 #: apps/orders/templates/email/orders/order_cancelled/subject.txt
 msgid "Order %(order_number)s was cancelled"
 msgstr "El pedido %(order_number)s se ha cancelado"
