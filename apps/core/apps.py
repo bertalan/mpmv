@@ -72,6 +72,9 @@ class CoreConfig(AppConfig):
         checks.register(check_field_encryption_keys, checks.Tags.security)
         checks.register(check_encrypted_data, checks.Tags.database)
         checks.register(check_feature_flag_settings)
+        from .site_checks import check_site_hostname
+
+        checks.register(check_site_hostname, checks.Tags.database)
         checks.register(check_language_settings)
         checks.register(check_language_state, checks.Tags.database)
         post_migrate.connect(_sync_language_state, sender=self, dispatch_uid="core.language_state")

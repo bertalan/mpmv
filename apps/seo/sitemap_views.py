@@ -18,6 +18,7 @@ from apps.catalog.models import Product
 from apps.core.i18n import configured_languages, primary_language
 from apps.core.indexing import is_noindex
 from apps.core.site_url import absolute_url
+from apps.core.sitemap_version import sitemap_version
 
 from . import llms, sitemaps
 from . import sitemap_engine as engine
@@ -39,23 +40,29 @@ CACHE_SECONDS = 300
 
 
 def _version(site: Site | None) -> str:
-    """A cheap fingerprint of the content a sitemap lists (two aggregate queries): the count and
-    the latest change of the pages and of the products. The short TTL covers the rest (a
-    vendor, brand or category change)."""
+    """A cheap fingerprint of the content a sitemap lists: the sitemap version (bumped by the
+    services on a vendor status, product or language change, I18N.16), then the count and the
+    latest change of the pages and of the products. The short TTL covers the rest (a brand or
+    category change)."""
     pages = Page.objects.live().aggregate(n=Count("pk"), last=Max("last_published_at"))
     products = Product.objects.aggregate(n=Count("pk"), last=Max("updated_at"))
-    return (
-        f"{site.pk if site else 0}:{pages['n']}:{pages['last']}:{products['n']}:{products['last']}"
-    )
+    head = f"{site.pk if site else 0}:v{sitemap_version()}"
+    return f"{head}:{pages['n']}:{pages['last']}:{products['n']}:{products['last']}"
+
+
+def content_version(request: HttpRequest) -> str:
+    """The content version, computed once per request (the index asks for every language)."""
+    version: str | None = getattr(request, "_sitemap_version", None)
+    if version is None:
+        version = _version(Site.find_for_request(request))
+        request._sitemap_version = version  # type: ignore[attr-defined]
+    return version
 
 
 def _chunks(request: HttpRequest, language: str, kind: str) -> list[list[engine.Entry]]:
     """The language's entries of one type in files of at most 50,000 URLs, built once per site,
     language, type and content version for five minutes: the index and every part share them."""
-    version: str | None = getattr(request, "_sitemap_version", None)
-    if version is None:  # once per request: the index asks for every language
-        version = _version(Site.find_for_request(request))
-        request._sitemap_version = version  # type: ignore[attr-defined]
+    version = content_version(request)
     key = "sitemap:" + hashlib.sha256(f"{language}:{kind}:{version}".encode()).hexdigest()
     chunks: list[list[engine.Entry]] | None = cache.get(key)
     if chunks is None:
@@ -131,4 +138,9 @@ def llms_txt(request: HttpRequest, language: str | None = None) -> HttpResponse:
     language = language or primary_language()
     if language not in configured_languages():
         raise Http404("No such language.")
-    return HttpResponse(llms.llms_txt(language, request), content_type="text/plain; charset=utf-8")
+    key = "llms:" + hashlib.sha256(f"{language}:{content_version(request)}".encode()).hexdigest()
+    text: str | None = cache.get(key)
+    if text is None:
+        text = llms.llms_txt(language, request)
+        cache.set(key, text, CACHE_SECONDS)
+    return HttpResponse(text, content_type="text/plain; charset=utf-8")
