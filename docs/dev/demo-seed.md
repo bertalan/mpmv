@@ -87,6 +87,14 @@ Vendor E (RF20) shows up in the tax profile consistency report (`inconsistent_ta
 review note without errors: every RF20 profile is flagged for a manual check (VEN.18). That is
 expected, not a seed defect.
 
+## Showcase page
+
+The seed adds a page "Showcase (demo)" at `/demo-showcase/` (EN and IT) that places one of each
+`ride` motion block (THM.14): a three-slide hero slider, a strip, a gallery, a section title, a
+counter, a progress bar and a video modal (a CC BY 3.0 sample video; source and licence are in
+`apps/seed/data.py`). The page has its own `noindex`, so it stays out of the sitemaps and
+`llms.txt` whatever the environment. The seed is idempotent and `--reset` removes the page.
+
 ## Tests
 
 The `demo_seed` fixture (root `conftest.py`) seeds the test database through the services and

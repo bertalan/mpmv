@@ -377,7 +377,7 @@ setting clears the registry cache. `SiteFactory` and `ThemeSettingsFactory` are 
 - CMS blocks (part 3): `HeroBlock` (layout, slides), `StripBlock`, `GalleryBlock` (the carousel
   with thumbnails; `base` keeps its list), `CounterBlock`, `ProgressBlock`, `SectionTitleBlock`
   and `VideoModalBlock` (YouTube and Vimeo addresses only, the no-tracking embed, consent-gated;
-  a CSP `frame-src` per provider is an operations follow-up). `base` renders a plain fallback of
+  `apps.cms.middleware.VideoEmbedCspMiddleware` adds the two embed origins to `frame-src` of a page that rendered a video block, and of no other page). `base` renders a plain fallback of
   each. The demo seed's showcase page (`/demo-showcase/`) places one of each.
 
 ## `ride` reveal, counters and video (THM.14 part 2)
@@ -393,6 +393,7 @@ setting clears the registry cache. `SiteFactory` and `ThemeSettingsFactory` are 
 - `video_modal.html` is a plain link to the video first. With JavaScript it opens a Bootstrap
   modal; `js/video.js` creates the `<iframe>` only when `window.mpmvConsent.allows("marketing")`,
   else the modal shows a placeholder with a link to the cookie settings. No request goes to the
-  video site before consent. The provider's origin must be added to the CSP `frame-src` by a
-  reviewed setting (none is added here); until then the browser blocks the frame.
-- Not wired to the CMS yet (no block fields); the cta block carries `data-reveal` as the first use.
+  video site before consent. The CMS video block marks its request, and `VideoEmbedCspMiddleware`
+  then adds `youtube-nocookie.com` and `player.vimeo.com` (never a wildcard) to that response's
+  `frame-src`; other pages keep the site policy.
+- The CMS blocks are wired in part 3 (see above); the cta block carries `data-reveal`.

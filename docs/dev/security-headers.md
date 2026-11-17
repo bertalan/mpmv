@@ -32,6 +32,10 @@ redirect.
 | `Server` | not removable | deleted (`-Server`): Caddy's own and gunicorn's |
 | `Via` | none | deleted (`-Via`): `reverse_proxy` adds `Via: 1.0 Caddy` |
 
+One page-level exception: `apps.cms.middleware.VideoEmbedCspMiddleware` adds the two no-tracking
+video origins to `frame-src` of a response that rendered a CMS video block. No other page gets
+them, and the frame itself appears only after `marketing` consent.
+
 ZAP findings and their accepted exceptions are in `docs/dev/security-scans.md`.
 
 ## Documented exceptions

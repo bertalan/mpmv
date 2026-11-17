@@ -107,3 +107,18 @@ Customer emails use the informal form of address: tu (Italian), du (German), tu 
 
 The Read me, the banner and the rule wording exist in EN, IT, DE, FR and ES (informal register: tu, du, tu, tú; the same content in each). To add another language, add it to `RULES`, `READ_ME` and `BANNERS` in `apps/core/i18n_review/engine.py`. The
 rule texts are shown in the Read me and quoted in row errors, so one entry serves both.
+
+## Removing a site language or changing the primary one (I18N.15)
+
+Adding a language is a `MPMV_LANGUAGES` setting. Removing one or changing the primary language is
+a command, never a settings change alone (the database check `core.E914` refuses that):
+
+```sh
+manage.py change_languages --to it,de           # dry run: prints the ChangeSet
+manage.py change_languages --to it,de --apply   # applies, audits (language.change), records the set
+```
+
+The command writes `LanguageRedirect` rows from each old prefix to its replacement; the
+`LanguageRedirectMiddleware` answers 301 only for a request that would be a 404, keeps the query
+string, redirects to same-site paths only and skips Manager, API, account and admin paths.
+Content in a removed language is kept, not deleted. Re-enabling a language drops its redirects.
