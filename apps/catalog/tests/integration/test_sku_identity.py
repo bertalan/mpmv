@@ -26,6 +26,7 @@ from apps.catalog.services import (
 )
 from apps.catalog.tests.factories import ProductFactory, SkuAliasFactory, VariantFactory
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.tests.factories import VendorFactory
 
@@ -62,7 +63,7 @@ def test_sku_space() -> None:
 
 def test_sku_slash() -> None:
     """SKU-SLASH: `BAG/100` is accepted with a warning; slugs never carry the SKU."""
-    product = ProductFactory.create(sku="BAG/100", languages=["en"])
+    product = ProductFactory.create(sku="BAG/100", languages=[primary_language()])
     product.full_clean()
     product.refresh_from_db()
     assert product.sku == "BAG/100"

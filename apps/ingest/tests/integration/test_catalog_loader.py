@@ -22,9 +22,11 @@ from apps.catalog.models import (
     VariantTranslation,
 )
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, TranslationStatus
 from apps.ingest import services
 from apps.vendors.models import Vendor, VendorTranslation
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -65,8 +67,8 @@ def bundle() -> dict[str, Any]:
                 "commission_percent": "12.50",
                 "vat_regime": "oss",
                 "translations": {
-                    "en": {"description": "<p>About</p>"},
-                    "it": {"description": "<p>Chi siamo</p>"},
+                    primary_language(): {"description": "<p>About</p>"},
+                    other_language(): {"description": "<p>Chi siamo</p>"},
                 },
             },
             {
@@ -78,26 +80,50 @@ def bundle() -> dict[str, Any]:
             },
         ],
         "categories": [
-            {"term_id": 1, "group_id": 100, "lang": "en", "name": "Bags", "slug": "bags"},
-            {"term_id": 2, "group_id": 100, "lang": "it", "name": "Borse", "slug": "borse"},
+            {
+                "term_id": 1,
+                "group_id": 100,
+                "lang": primary_language(),
+                "name": "Bags",
+                "slug": "bags",
+            },
+            {
+                "term_id": 2,
+                "group_id": 100,
+                "lang": other_language(),
+                "name": "Borse",
+                "slug": "borse",
+            },
             {
                 "term_id": 3,
                 "group_id": 101,
-                "lang": "en",
+                "lang": primary_language(),
                 "name": "Panniers",
                 "slug": "panniers",
                 "parent_id": 1,
             },
         ],
         "brands": [
-            {"term_id": 20, "group_id": 200, "lang": "en", "name": "Maker", "slug": "maker"},
-            {"term_id": 21, "group_id": 200, "lang": "it", "name": "Maker", "slug": "maker"},
+            {
+                "term_id": 20,
+                "group_id": 200,
+                "lang": primary_language(),
+                "name": "Maker",
+                "slug": "maker",
+            },
+            {
+                "term_id": 21,
+                "group_id": 200,
+                "lang": other_language(),
+                "name": "Maker",
+                "slug": "maker",
+            },
         ],
         "tags": [
             {
                 "term_id": 30,
                 "group_id": 300,
-                "lang": "en",
+                "lang": primary_language(),
                 "name": "Model X",
                 "slug": "model-x",
                 "role": "model",
@@ -105,21 +131,27 @@ def bundle() -> dict[str, Any]:
             {
                 "term_id": 31,
                 "group_id": 301,
-                "lang": "en",
+                "lang": primary_language(),
                 "name": "Orphan",
                 "slug": "orphan",
                 "role": "leftover",
             },
-            {"term_id": 32, "group_id": 302, "lang": "en", "name": "No role", "slug": "no-role"},
+            {
+                "term_id": 32,
+                "group_id": 302,
+                "lang": primary_language(),
+                "name": "No role",
+                "slug": "no-role",
+            },
         ],
         "attributes": [
             {
                 "code": "pa_color",
                 "kind": "choice",
-                "labels": {"en": "Colour", "it": "Colore"},
+                "labels": {primary_language(): "Colour", other_language(): "Colore"},
                 "values": [
-                    {"group_id": 1, "lang": "en", "value": "red", "label": "Red"},
-                    {"group_id": 1, "lang": "it", "value": "red", "label": "Rosso"},
+                    {"group_id": 1, "lang": primary_language(), "value": "red", "label": "Red"},
+                    {"group_id": 1, "lang": other_language(), "value": "red", "label": "Rosso"},
                 ],
             },
             {"code": "colour", "kind": "choice", "values": []},
@@ -129,7 +161,7 @@ def bundle() -> dict[str, Any]:
         "posts": [
             post(
                 10,
-                "en",
+                primary_language(),
                 1,
                 "A-1",
                 category_ids=[3],
@@ -138,8 +170,8 @@ def bundle() -> dict[str, Any]:
                 attributes={"pa_width": "12.5", "pa_color": ["red"]},
                 upsell_skus=["A-2"],
             ),
-            post(11, "it", 1, "A-1"),
-            post(12, "en", 2, "A-2", companion_sku="A-1"),  # no IT twin
+            post(11, other_language(), 1, "A-1"),
+            post(12, primary_language(), 2, "A-2", companion_sku="A-1"),  # no IT twin
         ],
     }
 
@@ -203,9 +235,9 @@ def test_a_vendor_loads_with_its_texts_as_published_translations_and_stays_appli
     vendor = Vendor.objects.get(legacy_wp_user_id=7)
     assert vendor.status == Vendor.Status.APPLICANT
     rows = {t.language: t for t in VendorTranslation.objects.filter(vendor=vendor)}
-    assert rows["it"].description == "<p>Chi siamo</p>"
-    assert rows["it"].status == TranslationStatus.PUBLISHED
-    assert rows["en"].status == TranslationStatus.PUBLISHED
+    assert rows[other_language()].description == "<p>Chi siamo</p>"
+    assert rows[other_language()].status == TranslationStatus.PUBLISHED
+    assert rows[primary_language()].status == TranslationStatus.PUBLISHED
     # Hooks: commission (CommissionRule, VEN.2) and the VAT regime (tax app) are listed, not loaded.
     assert report.deferred["commission"] == [f"vendor {vendor.public_id}: 12.50"]
     assert report.deferred["vat_regime"] == [f"vendor {vendor.public_id}: oss"]
@@ -214,10 +246,15 @@ def test_a_vendor_loads_with_its_texts_as_published_translations_and_stays_appli
 def test_products_are_keyed_by_vendor_sku_and_group_never_by_sku_alone() -> None:
     data = bundle()
     data["posts"] = [
-        post(10, "en", 1, "SAME"),
-        post(11, "it", 1, "SAME"),
-        {**post(20, "en", 2, "same"), "author_id": 8},  # other vendor: same SKU is fine
-        post(30, "en", 3, "SAME "),  # same vendor and SKU key, another group: not merged
+        post(10, primary_language(), 1, "SAME"),
+        post(11, other_language(), 1, "SAME"),
+        {
+            **post(20, primary_language(), 2, "same"),
+            "author_id": 8,
+        },  # other vendor: same SKU is fine
+        post(
+            30, primary_language(), 3, "SAME "
+        ),  # same vendor and SKU key, another group: not merged
     ]
     report = load(data)
     assert Product.objects.filter(sku_key="same").count() == 2
@@ -231,20 +268,25 @@ def test_a_twin_pair_becomes_one_product_with_two_published_texts() -> None:
     load()
     product = Product.objects.get(sku="A-1")
     texts = {t.language: t for t in product.translations.all()}
-    assert set(texts) == {"en", "it"}  # the legacy languages only: no placeholder for de, fr, es
-    assert texts["it"].status == TranslationStatus.PUBLISHED
-    assert texts["it"].slug
-    assert texts["en"].slug
-    assert not product.translation("it").is_fallback
+    assert set(texts) == {
+        primary_language(),
+        other_language(),
+    }  # the legacy languages only: no placeholder for de, fr, es
+    assert texts[other_language()].status == TranslationStatus.PUBLISHED
+    assert texts[other_language()].slug
+    assert texts[primary_language()].slug
+    assert not product.translation(other_language()).is_fallback
 
 
 def test_a_product_with_no_it_twin_is_en_only_with_fallback_and_a_queue_entry() -> None:
     report = load()
     product = Product.objects.get(sku="A-2")
-    it = product.translations.get(language="it")
+    it = product.translations.get(language=other_language())
     assert it.status == TranslationStatus.MACHINE  # the translation-queue entry (I18N.4)
-    assert product.translation("it").is_fallback  # the IT page shows the fallback notice
-    english = product.translation("en").translation
+    assert product.translation(
+        other_language()
+    ).is_fallback  # the IT page shows the fallback notice
+    english = product.translation(primary_language()).translation
     assert english is not None
     assert english.title == "Bag A-2 en"
     assert "product 'A-2' [it]" in report.translation_queue
@@ -253,20 +295,31 @@ def test_a_product_with_no_it_twin_is_en_only_with_fallback_and_a_queue_entry() 
 def test_variations_load_with_options_and_an_untranslated_one_goes_to_the_queue() -> None:
     data = bundle()
     data["posts"] = [
-        post(10, "en", 1, "V-1", type="variable", price_net=""),
-        post(11, "it", 1, "V-1", type="variable", price_net=""),
+        post(10, primary_language(), 1, "V-1", type="variable", price_net=""),
+        post(11, other_language(), 1, "V-1", type="variable", price_net=""),
         {
-            **post(100, "en", 50, "V-1-R", price_net="15.00", options={"pa_color": "red"}),
+            **post(
+                100, primary_language(), 50, "V-1-R", price_net="15.00", options={"pa_color": "red"}
+            ),
             "post_type": "product_variation",
             "parent_id": 10,
         },
         {
-            **post(101, "it", 50, "V-1-R", price_net="15.00", options={"pa_color": "red"}),
+            **post(
+                101, other_language(), 50, "V-1-R", price_net="15.00", options={"pa_color": "red"}
+            ),
             "post_type": "product_variation",
             "parent_id": 11,
         },
         {
-            **post(102, "en", 51, "V-1-B", price_net="18.00", options={"pa_color": "blue"}),
+            **post(
+                102,
+                primary_language(),
+                51,
+                "V-1-B",
+                price_net="18.00",
+                options={"pa_color": "blue"},
+            ),
             "post_type": "product_variation",
             "parent_id": 10,
         },  # no IT twin
@@ -278,18 +331,21 @@ def test_variations_load_with_options_and_an_untranslated_one_goes_to_the_queue(
     assert product.variants.count() == 2
     assert VariantOption.objects.count() == 2
     assert ProductAttribute.objects.get(product=product, attribute__code="color").is_variant_axis
-    queued = Variant.objects.get(sku="V-1-B").translations.get(language="it")
+    queued = Variant.objects.get(sku="V-1-B").translations.get(language=other_language())
     assert queued.status == TranslationStatus.MACHINE
     assert "variant 'V-1-B' [it]" in report.translation_queue
-    assert Variant.objects.get(sku="V-1-R").translations.get(language="it").status == "published"
+    assert (
+        Variant.objects.get(sku="V-1-R").translations.get(language=other_language()).status
+        == "published"
+    )
 
 
 def test_drafts_and_archived_load_hidden_only_when_the_vendor_chose_so() -> None:
     data = bundle()
     data["posts"] = [
-        post(10, "en", 1, "P-1"),
-        post(11, "en", 2, "D-1", status="draft"),
-        post(12, "en", 3, "R-1", status="archived"),
+        post(10, primary_language(), 1, "P-1"),
+        post(11, primary_language(), 2, "D-1", status="draft"),
+        post(12, primary_language(), 3, "R-1", status="archived"),
     ]
     report = load(data)
     assert set(Product.objects.values_list("sku", flat=True)) == {"P-1"}
@@ -305,7 +361,10 @@ def test_drafts_and_archived_load_hidden_only_when_the_vendor_chose_so() -> None
 
 def test_trashed_products_are_only_redirect_sources() -> None:
     data = bundle()
-    data["posts"] = [post(10, "en", 1, "T-1", status="trash"), post(11, "en", 2, "L-1")]
+    data["posts"] = [
+        post(10, primary_language(), 1, "T-1", status="trash"),
+        post(11, primary_language(), 2, "L-1"),
+    ]
     report = load(data, include_unpublished=True)
     assert set(Product.objects.values_list("sku", flat=True)) == {"L-1"}
     assert report.redirect_sources == ["post 10"]
@@ -316,7 +375,7 @@ def test_a_publication_check_that_blocks_keeps_a_live_product_hidden_and_reporte
 ) -> None:
     monkeypatch.setattr(publishing, "_CHECKS", {"gpsr": lambda product: ["GPSR data missing"]})
     data = bundle()
-    data["posts"] = [post(10, "en", 1, "G-1")]
+    data["posts"] = [post(10, primary_language(), 1, "G-1")]
     report = load(data)
     assert Product.objects.get(sku="G-1").status == ProductStatus.DRAFT
     assert report.held_back == ["product 'G-1': gpsr"]
@@ -324,7 +383,7 @@ def test_a_publication_check_that_blocks_keeps_a_live_product_hidden_and_reporte
 
 def test_commission_override_of_a_product_is_listed_for_the_commission_rule_follow_up() -> None:
     data = bundle()
-    data["posts"] = [post(10, "en", 1, "C-1", commission_override_percent="8.00")]
+    data["posts"] = [post(10, primary_language(), 1, "C-1", commission_override_percent="8.00")]
     report = load(data)
     product = Product.objects.get(sku="C-1")
     assert report.deferred["commission"][-1] == f"product {product.public_id}: 8.00"
@@ -340,7 +399,7 @@ def test_taxonomies_brands_and_typed_attributes_follow_the_data_map() -> None:
     attributes = {pa.attribute.code: pa for pa in product.attributes.select_related("attribute")}
     assert str(attributes["width"].numeric_value) == "12.500"
     assert [v.value for v in attributes["color"].values.all()] == ["red"]
-    it_label = attributes["color"].values.get().translations.get(language="it").label
+    it_label = attributes["color"].values.get().translations.get(language=other_language()).label
     assert it_label == "Rosso"
     # The tag with no role waits for MIG.2; the unused taxonomy and attribute are dropped.
     assert not Taxonomy.objects.filter(code="leftover").exists()
@@ -352,7 +411,7 @@ def test_taxonomies_brands_and_typed_attributes_follow_the_data_map() -> None:
 
 def test_attribute_aliases_merge_typos_and_duplicates() -> None:
     data = bundle()
-    data["posts"] = [post(10, "en", 1, "AL-1", attributes={"colour": ["red"]})]
+    data["posts"] = [post(10, primary_language(), 1, "AL-1", attributes={"colour": ["red"]})]
     load(data, attribute_aliases={"colour": "pa_color"})
     assert Attribute.objects.filter(code="color").count() == 1
     assert not Attribute.objects.filter(code="colour").exists()
@@ -368,7 +427,10 @@ def test_companions_and_upsells_link_by_sku_within_the_vendor() -> None:
 
 def test_a_malformed_price_rejects_only_that_product() -> None:
     data = bundle()
-    data["posts"] = [post(10, "en", 1, "BAD-1", price_net="1,50 EUR"), post(11, "en", 2, "OK-1")]
+    data["posts"] = [
+        post(10, primary_language(), 1, "BAD-1", price_net="1,50 EUR"),
+        post(11, primary_language(), 2, "OK-1"),
+    ]
     report = load(data)
     assert set(Product.objects.values_list("sku", flat=True)) == {"OK-1"}
     assert any("bad-1" in problem and "not a number" in problem for problem in report.problems)
@@ -378,8 +440,14 @@ def test_a_rejected_record_leaves_no_trace_in_the_report_or_the_audit_trail() ->
     data = bundle()
     data["posts"] = [
         # The comma decimal fails after the product, its queue entry and a new value were written.
-        post(10, "en", 1, "BAD-1", attributes={"pa_color": ["blue"], "pa_width": "12,5"}),
-        post(11, "en", 2, "OK-1"),
+        post(
+            10,
+            primary_language(),
+            1,
+            "BAD-1",
+            attributes={"pa_color": ["blue"], "pa_width": "12,5"},
+        ),
+        post(11, primary_language(), 2, "OK-1"),
     ]
     report = load(data)
     assert set(Product.objects.values_list("sku", flat=True)) == {"OK-1"}
@@ -400,7 +468,7 @@ def test_a_rejected_record_leaves_no_trace_in_the_report_or_the_audit_trail() ->
 
 def test_a_product_of_an_unknown_vendor_is_rejected() -> None:
     data = bundle()
-    data["posts"] = [{**post(10, "en", 1, "NV-1"), "author_id": 999}]
+    data["posts"] = [{**post(10, primary_language(), 1, "NV-1"), "author_id": 999}]
     report = load(data)
     assert not Product.objects.exists()
     assert any("vendor 999 is not loaded" in problem for problem in report.problems)
@@ -423,7 +491,13 @@ def test_the_dry_run_changeset_matches_the_real_run() -> None:
 def test_invalid_input_is_a_report_not_a_crash() -> None:
     data = bundle()
     data["categories"].append(
-        {"term_id": 9, "group_id": 109, "lang": "en", "name": "Orphan", "parent_id": 999}
+        {
+            "term_id": 9,
+            "group_id": 109,
+            "lang": primary_language(),
+            "name": "Orphan",
+            "parent_id": 999,
+        }
     )
     report = load(data)
     assert any("unknown parent 999" in problem for problem in report.problems)

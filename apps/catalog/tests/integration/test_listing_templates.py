@@ -31,9 +31,11 @@ from apps.catalog.tests.factories import (
     TermFactory,
     TermTranslationFactory,
 )
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -60,7 +62,11 @@ def listed(title: str, **kwargs: Any) -> Product:
         product=product, title=title, slug=f"{slug}-en", status=PUBLISHED
     )
     ProductTranslationFactory.create(
-        product=product, language="it", title=f"{title} IT", slug=f"{slug}-it", status=PUBLISHED
+        product=product,
+        language=other_language(),
+        title=f"{title} IT",
+        slug=f"{slug}-it",
+        status=PUBLISHED,
     )
     return product
 
@@ -74,25 +80,25 @@ def shop() -> dict[str, Any]:
         taxonomy=compat, name="Compatibility", slug="compatibility", status=PUBLISHED
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=compat, language="it", name="Compatibilità", slug="compatibilita",
+        taxonomy=compat, language=other_language(), name="Compatibilità", slug="compatibilita",
         status=PUBLISHED,
     )  # fmt: skip
     maker = TermFactory.create(taxonomy=compat)
     TermTranslationFactory.create(term=maker, name="Maker", slug="maker", status=PUBLISHED)
     TermTranslationFactory.create(
-        term=maker, language="it", name="Marca", slug="marca", status=PUBLISHED
+        term=maker, language=other_language(), name="Marca", slug="marca", status=PUBLISHED
     )
     colour = TaxonomyFactory.create(code="colour", hierarchical=False)
     TaxonomyTranslationFactory.create(
         taxonomy=colour, name="Colour", slug="colour", status=PUBLISHED
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=colour, language="it", name="Colore", slug="colore", status=PUBLISHED
+        taxonomy=colour, language=other_language(), name="Colore", slug="colore", status=PUBLISHED
     )
     red = TermFactory.create(taxonomy=colour)
     TermTranslationFactory.create(term=red, name="Red", slug="red", status=PUBLISHED)
     TermTranslationFactory.create(
-        term=red, language="it", name="Rosso", slug="rosso", status=PUBLISHED
+        term=red, language=other_language(), name="Rosso", slug="rosso", status=PUBLISHED
     )
     blue = TermFactory.create(taxonomy=colour)
     TermTranslationFactory.create(term=blue, name="Blue", slug="blue", status=PUBLISHED)
@@ -130,7 +136,7 @@ def test_the_head_has_title_canonical_robots_and_hreflang(
     )
     assert page.head.find("meta", attrs={"name": "robots"})["content"] == "index, follow"
     hreflangs = {link["hreflang"] for link in page.head.find_all("link", hreflang=True)}
-    assert {"en", "it", "x-default"} <= hreflangs
+    assert {primary_language(), other_language(), "x-default"} <= hreflangs
 
 
 def test_no_inline_script_or_style(client: Client, shop: dict[str, Any]) -> None:

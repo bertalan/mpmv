@@ -17,9 +17,11 @@ from apps.cms.models import LegalPage
 from apps.cms.tests.factories import LegalPageFactory
 from apps.compliance import engine, services
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, PlatformOperator
 from apps.core.services import configure_platform_operator
 from apps.core.tests.factories import PlatformOperatorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -32,10 +34,10 @@ def operator(**extra: object) -> PlatformOperator:
         "valid_from": timezone.now() - dt.timedelta(days=1),
         "country": "AT",
         "authority_contact_email": "authorities@example.com",
-        "authority_contact_languages": ["de", "en"],
+        "authority_contact_languages": ["de", primary_language()],
         "support_email": "support@example.com",
         "user_contact_url": "https://example.com/contact",
-        "user_contact_languages": ["de", "en", "it"],
+        "user_contact_languages": ["de", primary_language(), other_language()],
     }
     values.update(extra)
     return PlatformOperatorFactory.create(**values)
@@ -72,13 +74,13 @@ def test_contact_data_changes_through_an_audited_new_version() -> None:
     new = PlatformOperatorFactory.build(
         valid_from=timezone.now() + dt.timedelta(days=1),
         authority_contact_email="new-authority@example.com",
-        authority_contact_languages=["de", "en"],
+        authority_contact_languages=["de", primary_language()],
     )
     configure_platform_operator(new, ctx=CTX)
     entry = AuditLog.objects.filter(target_key=str(new.public_id)).get()
     assert entry.after is not None
     assert entry.after["authority_contact_email"] == "new-authority@example.com"
-    assert entry.after["authority_contact_languages"] == ["de", "en"]
+    assert entry.after["authority_contact_languages"] == ["de", primary_language()]
     assert old.pk != new.pk
 
 
@@ -101,7 +103,7 @@ def test_contact_page_follows_the_current_operator() -> None:
     new = PlatformOperatorFactory.build(
         valid_from=timezone.now() + dt.timedelta(seconds=1),
         authority_contact_email="moved@example.com",
-        authority_contact_languages=["de", "en"],
+        authority_contact_languages=["de", primary_language()],
         support_email="support@example.com",
     )
     configure_platform_operator(new, ctx=CTX)
@@ -134,13 +136,13 @@ def codes(problems: Sequence[engine.DsaProblem]) -> list[str]:
 def test_readiness_is_clean_with_contacts_and_both_pages() -> None:
     operator()
     full_pages()
-    assert services.dsa_p2b_readiness(["en"]) == []
+    assert services.dsa_p2b_readiness([primary_language()]) == []
 
 
 def test_readiness_reports_missing_contacts() -> None:
     operator(authority_contact_email="", authority_contact_languages=[])
     full_pages()
-    found = codes(services.dsa_p2b_readiness(["en"]))
+    found = codes(services.dsa_p2b_readiness([primary_language()]))
     assert "authority_email" in found
     assert "authority_languages" in found
 
@@ -148,7 +150,7 @@ def test_readiness_reports_missing_contacts() -> None:
 def test_readiness_reports_missing_pages_and_sections() -> None:
     operator()
     publish("platform_terms", "restrictions", "moderation_policy", "complaint_handling")
-    found = services.dsa_p2b_readiness(["en"])
+    found = services.dsa_p2b_readiness([primary_language()])
     assert [p.code for p in found] == ["section_missing", "page_missing"]
 
 
@@ -159,7 +161,7 @@ def test_readiness_ignores_unpublished_pages_and_empty_sections() -> None:
     )
     assert page.live is False
     publish("platform_terms", *TERMS_SECTIONS)
-    assert codes(services.dsa_p2b_readiness(["en"])) == ["page_missing"]
+    assert codes(services.dsa_p2b_readiness([primary_language()])) == ["page_missing"]
     LegalPageFactory.create(
         kind="ranking",
         title="R2",
@@ -171,19 +173,19 @@ def test_readiness_ignores_unpublished_pages_and_empty_sections() -> None:
             )
         ],
     ).save_revision().publish()
-    assert codes(services.dsa_p2b_readiness(["en"])) == ["section_missing"]
+    assert codes(services.dsa_p2b_readiness([primary_language()])) == ["section_missing"]
 
 
 def test_readiness_command_fails_and_lists_problems() -> None:
     operator()
     with pytest.raises(CommandError, match="platform_terms"):
-        call_command("dsa_p2b_readiness", "--language", "en")
+        call_command("dsa_p2b_readiness", "--language", primary_language())
 
 
 def test_readiness_command_passes_when_ready(capsys: pytest.CaptureFixture[str]) -> None:
     operator()
     full_pages()
-    call_command("dsa_p2b_readiness", "--language", "en")
+    call_command("dsa_p2b_readiness", "--language", primary_language())
     assert "ready" in capsys.readouterr().out
 
 
@@ -213,7 +215,7 @@ def test_language_codes_are_stored_lower_case_without_duplicates() -> None:
     configure_platform_operator(new, ctx=CTX)
     assert PlatformOperator.objects.get(pk=new.pk).authority_contact_languages == [
         "de-at",
-        "en",
+        primary_language(),
         "nl",
     ]
 
@@ -244,10 +246,10 @@ def test_golive_readiness_includes_the_dsa_checks_and_reviews(
 
     operator(authority_contact_languages=["de"])  # no English
     full_pages()
-    messages = golive_problems(["en"])
+    messages = golive_problems([primary_language()])
     assert any("authority_english_language" in m for m in messages)
     # The DSA pages need the native and counsel reviews like the other legal pages (D-27).
     assert any("platform_terms [en]: no native_review" in m for m in messages)
     assert any("ranking [en]: no counsel_check" in m for m in messages)
     with pytest.raises(CommandError, match="authority_english_language"):
-        call_command("golive_readiness", "--language", "en")
+        call_command("golive_readiness", "--language", primary_language())

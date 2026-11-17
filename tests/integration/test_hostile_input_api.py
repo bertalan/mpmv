@@ -21,6 +21,7 @@ from apps.accounts.tests.mfa import password_login
 from apps.api.tests.factories import ApiClientFactory
 from apps.catalog.models import Attribute
 from apps.catalog.tests.factories import clothing_attributes
+from apps.core.i18n import primary_language
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests import hostile_input as hi
@@ -56,7 +57,7 @@ def product(sku: str = "SKU-1", **overrides: Any) -> dict[str, Any]:
         "sku": sku,
         "kind": "simple",
         "price_net": "19.90",
-        "translations": [{"language": "en", "title": "Plain tee"}],
+        "translations": [{"language": primary_language(), "title": "Plain tee"}],
         "attributes": [],
     }
     payload.update(overrides)
@@ -74,7 +75,12 @@ def _texts(value: str, sku: str | None = None) -> dict[str, Any]:
     return product(
         sku=value if sku is None else sku,
         translations=[
-            {"language": "en", "title": value, "short_description": value, "description": value}
+            {
+                "language": primary_language(),
+                "title": value,
+                "short_description": value,
+                "description": value,
+            }
         ],
         attributes=[{"attribute": "material", "text": value}],
     )

@@ -9,18 +9,27 @@ from django.test import Client, override_settings
 from django.urls import resolve, reverse
 from django.utils import translation
 
+from apps.core.i18n import primary_language
+from tests.i18n import language_prefix, other_language, third_language
+
 pytestmark = pytest.mark.django_db
 
 LANGUAGES_PLUS_PORTUGUESE = [
-    ("en", "English"),
-    ("it", "Italiano"),
+    (primary_language(), "English"),
+    (other_language(), "Italiano"),
     ("de", "Deutsch"),
     ("fr", "Français"),
     ("es", "Español"),
     ("pt", "Português"),
 ]
 
-LANGUAGE_PATHS = [("en", "/"), ("it", "/it/"), ("de", "/de/"), ("fr", "/fr/"), ("es", "/es/")]
+LANGUAGE_PATHS = [
+    (primary_language(), "/"),
+    (other_language(), f"{language_prefix(other_language())}/"),
+    ("de", f"{language_prefix(third_language())}/"),
+    ("fr", "/fr/"),
+    ("es", "/es/"),
+]
 PATH_LANGUAGES = [(path, language) for language, path in LANGUAGE_PATHS]
 
 
@@ -47,7 +56,7 @@ def test_each_language_prefix_serves_the_page_in_that_language(
 
 
 def test_the_primary_language_has_no_prefix(client: Client) -> None:
-    assert client.get("/en/").status_code == 404
+    assert client.get(f"{language_prefix(primary_language())}/").status_code == 404
 
 
 def test_unconfigured_language_prefixes_are_not_routed(client: Client) -> None:
@@ -57,11 +66,18 @@ def test_unconfigured_language_prefixes_are_not_routed(client: Client) -> None:
 def test_browser_language_does_not_redirect_the_unprefixed_home(client: Client) -> None:
     response = client.get("/", headers={"accept-language": "it,de;q=0.8"})
     assert response.status_code == 200
-    assert response["Content-Language"] == "en"
+    assert response["Content-Language"] == primary_language()
 
 
 @pytest.mark.parametrize(
-    "path", ["/it/healthz", "/de/healthz", "/fr/healthz", "/es/healthz", "/it/django-admin/"]
+    "path",
+    [
+        f"{language_prefix(other_language())}/healthz",
+        f"{language_prefix(third_language())}/healthz",
+        "/fr/healthz",
+        "/es/healthz",
+        f"{language_prefix(other_language())}/django-admin/",
+    ],
 )
 def test_operational_routes_stay_outside_the_language_prefixes(client: Client, path: str) -> None:
     # Under a prefix the path is a CMS page lookup (CMS.1), after the trailing-slash redirect.
@@ -88,6 +104,6 @@ def test_home_shows_a_switcher_for_every_configured_language(
     html = client.get(path + "?page=2").content.decode()
     assert f'action="{reverse("switch_language")}"' in html
     assert f'name="next" value="{path}?page=2"' in html
-    for code in ("en", "it", "de", "fr", "es"):
+    for code in (primary_language(), other_language(), "de", "fr", "es"):
         assert f'name="language" value="{code}"' in html
     assert f'value="{current}" lang="{current}" aria-current="true"' in html

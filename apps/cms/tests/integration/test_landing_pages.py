@@ -42,7 +42,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import other_language
+from tests.i18n import language_prefix, localized, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -309,10 +309,12 @@ def test_a_term_page_without_a_landing_page_is_the_plain_listing(
 
 def test_the_landing_page_follows_the_page_language(seeded: SeedReport, maker: Term) -> None:
     page = term_landing(maker)
-    assert _editorial(_html("/it/compatibilita/marca/")) is None  # no IT landing page yet
-    copy = _translate(page, "it", body=_intro("Tutto sulla marca."))
-    assert copy.url == "/it/compatibilita/marca/"
-    editorial = _editorial(_html("/it/compatibilita/marca/"))
+    assert (
+        _editorial(_html(f"{language_prefix(other_language())}/compatibilita/marca/")) is None
+    )  # no IT landing page yet
+    copy = _translate(page, other_language(), body=_intro("Tutto sulla marca."))
+    assert copy.url == f"{language_prefix(other_language())}/compatibilita/marca/"
+    editorial = _editorial(_html(f"{language_prefix(other_language())}/compatibilita/marca/"))
     assert "Tutto sulla marca." in editorial.get_text()
     assert "Everything about the maker." in _editorial(_html("/compatibility/maker/")).get_text()
 
@@ -343,7 +345,7 @@ def test_one_landing_page_per_term_and_language(seeded: SeedReport, maker: Term)
         _home().add_child(instance=TermLandingPage(title="Again", slug="again", term=maker))
     # Another language has its own landing page (a translation).
     other = term_landing(maker, parent=_home(other_language()), slug="guida")
-    assert other.locale.language_code == "it"
+    assert other.locale.language_code == other_language()
 
 
 def test_the_preview_renders_the_editorial_and_the_products(
@@ -372,7 +374,7 @@ def test_a_vendor_page_tells_the_story_and_features_the_products(seeded: SeedRep
     assert "Three generations of craft." in html.get_text()
     featured = html.find("section", class_="vendor-landing-products")
     assert _titles(featured) == ["Acme bag"]
-    assert featured.find("a", class_="product-grid-all")["href"] == "/shop/acme/"
+    assert featured.find("a", class_="product-grid-all")["href"] == localized("/shop/acme/")
 
 
 def test_a_vendor_page_without_featured_products(seeded: SeedReport) -> None:
@@ -385,15 +387,15 @@ def test_a_vendor_page_without_featured_products(seeded: SeedReport) -> None:
 def test_the_vendor_page_has_its_own_canonical_and_hreflang(seeded: SeedReport) -> None:
     acme = VendorFactory.create(status=Vendor.Status.ACTIVE, slug="acme")
     page = vendor_landing(acme)
-    _translate(page, "it", slug="il-laboratorio")
+    _translate(page, other_language(), slug="il-laboratorio")
     html = _html(page.url)
     assert [link["href"] for link in html.find_all("link", rel="canonical")] == [
         "http://localhost/our-workshop/"
     ]
     alternates = {link["hreflang"]: link["href"] for link in html.find_all("link", rel="alternate")}
     assert alternates == {
-        "en": "http://localhost/our-workshop/",
-        "it": "http://localhost/it/il-laboratorio/",
+        primary_language(): "http://localhost/our-workshop/",
+        other_language(): "http://localhost/it/il-laboratorio/",
         "x-default": "http://localhost/our-workshop/",
     }
 
@@ -401,7 +403,7 @@ def test_the_vendor_page_has_its_own_canonical_and_hreflang(seeded: SeedReport) 
 def test_the_vendor_page_switch_targets_equal_its_hreflang_set(seeded: SeedReport) -> None:
     acme = VendorFactory.create(status=Vendor.Status.ACTIVE, slug="acme")
     page = vendor_landing(acme)
-    _translate(page, "it", slug="il-laboratorio")
+    _translate(page, other_language(), slug="il-laboratorio")
     html = _html(page.url)
     alternates = {
         link["hreflang"]: link["href"]
@@ -444,9 +446,9 @@ def test_one_vendor_page_per_vendor_and_language(seeded: SeedReport) -> None:
 def test_the_storefront_links_to_the_vendor_story(seeded: SeedReport) -> None:
     acme = VendorFactory.create(status=Vendor.Status.ACTIVE, slug="acme", display_name="Acme")
     listed("Acme bag", vendor=acme)
-    assert _html("/shop/acme/").find("a", class_="vendor-story-link") is None
+    assert _html(localized("/shop/acme/")).find("a", class_="vendor-story-link") is None
     page = vendor_landing(acme)
-    link = _html("/shop/acme/").find("a", class_="vendor-story-link")
+    link = _html(localized("/shop/acme/")).find("a", class_="vendor-story-link")
     assert link["href"] == page.url
 
 

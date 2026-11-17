@@ -22,6 +22,7 @@ from apps.catalog.tests.factories import ProductFactory
 from apps.compliance import engine, services
 from apps.compliance.tests.factories import GpsrSafetyTextFactory
 from apps.core.countries import OFFICIAL_LANGUAGES
+from apps.core.i18n import primary_language
 
 pytestmark = pytest.mark.django_db
 
@@ -42,7 +43,7 @@ GERMAN_ONLY = _country_speaking("de")
 def test_a_product_without_warnings_is_sold_everywhere() -> None:
     product = ProductFactory.create()
     GpsrSafetyTextFactory.create(
-        product=product, language="en", warnings="", safety_information="x"
+        product=product, language=primary_language(), warnings="", safety_information="x"
     )
     assert services.warnings_sale_check(product, FRENCH_ONLY).allowed
     assert services.warnings_language_gaps(product) == []
@@ -105,21 +106,21 @@ def _render_notice(product: object, country: str, path: str = "/p/") -> str:
 def test_the_notice_explains_the_block_and_links_the_available_warnings() -> None:
     product = ProductFactory.create()
     GpsrSafetyTextFactory.create(product=product, language="de", warnings="Achtung.")
-    with translation.override("en"):
+    with translation.override(primary_language()):
         html = _render_notice(product, FRENCH_ONLY)
     assert 'role="status"' in html or 'role="alert"' in html
     assert FRENCH_ONLY in html
     assert "cannot be shipped" in html
     assert 'hreflang="de"' in html
     assert "#product-safety-texts" in html
-    with translation.override("en"):
+    with translation.override(primary_language()):
         assert _render_notice(product, GERMAN).strip() == ""
 
 
 def test_the_safety_block_has_the_anchor_the_notice_links_to() -> None:
     product = ProductFactory.create()
-    GpsrSafetyTextFactory.create(product=product, language="en", warnings="Careful.")
-    with translation.override("en"):
+    GpsrSafetyTextFactory.create(product=product, language=primary_language(), warnings="Careful.")
+    with translation.override(primary_language()):
         html = Template("{% load compliance_tags %}{% product_safety product %}").render(
             Context({"product": product})
         )

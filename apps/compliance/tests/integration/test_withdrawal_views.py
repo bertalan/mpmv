@@ -16,10 +16,12 @@ from apps.accounts.captcha import TOKEN_FIELD
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
 from apps.compliance import withdrawal
 from apps.compliance.models import WithdrawalStatement
+from apps.core.i18n import primary_language
 from apps.core.models import OutboxEmail, Throttle
 from apps.orders.models import Order, VendorOrder
 from apps.orders.tests.integration.test_services import line_input, pay, place, vendor_input
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import language_prefix, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -28,9 +30,9 @@ IP = "203.0.113.9"
 
 @pytest.fixture(autouse=True)
 def _english() -> Iterator[None]:
-    translation.activate("en")
+    translation.activate(primary_language())
     yield
-    translation.activate("en")
+    translation.activate(primary_language())
 
 
 @pytest.fixture(autouse=True)
@@ -71,7 +73,7 @@ def test_the_start_page_is_public_and_uses_the_mandated_label_in_english(client:
 
 
 def test_the_start_page_uses_the_italian_labels(client: Client) -> None:
-    response = client.get("/it/withdrawal/")
+    response = client.get(f"{language_prefix(other_language())}/withdrawal/")
     assert response.status_code == 200
     assert "recedere dal contratto qui" in response.content.decode().lower()
 
@@ -325,7 +327,11 @@ def test_the_information_page_follows_the_period_setting(client: Client, setting
 
 
 def test_the_information_page_in_italian_uses_the_italian_label(client: Client) -> None:
-    html = client.get("/it/consumer-information/").content.decode().lower()
+    html = (
+        client.get(f"{language_prefix(other_language())}/consumer-information/")
+        .content.decode()
+        .lower()
+    )
     assert "recedere dal contratto qui" in html
 
 

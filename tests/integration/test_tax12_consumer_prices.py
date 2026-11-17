@@ -50,13 +50,13 @@ from apps.tax.tests.factories import (
 from apps.themes.services import use_theme
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import other_language, third_language
+from tests.i18n import localized, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
 NOTES = {
-    "en": "Indicative price. Final amount at checkout.",
-    "it": "Prezzo indicativo. Importo finale al checkout.",
+    primary_language(): "Indicative price. Final amount at checkout.",
+    other_language(): "Prezzo indicativo. Importo finale al checkout.",
     "de": "Unverbindlicher Preis. Endbetrag an der Kasse.",
     "fr": "Prix indicatif. Montant final lors du paiement.",
     "es": "Precio orientativo. Importe final al finalizar la compra.",
@@ -120,7 +120,9 @@ def page(client: Client, language: str) -> Any:
     return BeautifulSoup(response.content, "html.parser")
 
 
-def request(language: str = "en", session: dict[str, Any] | None = None) -> HttpRequest:
+def request(
+    language: str = primary_language(), session: dict[str, Any] | None = None
+) -> HttpRequest:
     req = RequestFactory().get("/")
     req.session = session if session is not None else {}  # type: ignore[assignment]
     req.LANGUAGE_CODE = language
@@ -157,13 +159,13 @@ def test_a_consumer_gets_the_destination_rate(country: str, rate: Decimal, gross
     )
     assert price.amount == gross
     assert price.vat_included
-    assert price.note == NOTES["en"]
+    assert price.note == NOTES[primary_language()]
 
 
 @pytest.mark.parametrize(
     ("language", "country", "gross"),
     [
-        ("it", "IT", Decimal("15.25")),
+        (other_language(), "IT", Decimal("15.25")),
         ("de", "DE", Decimal("14.88")),
         ("fr", "FR", Decimal("15.00")),
     ],
@@ -177,13 +179,13 @@ def test_before_an_address_the_language_gives_the_estimated_country(
 
 
 def test_english_falls_back_to_the_operator_country() -> None:
-    with translation.override("en"):
+    with translation.override(primary_language()):
         price = prices.consumer_price(NET, "standard", vendor=VENDOR, request=request())
     assert (price.country, price.estimated, price.gross) == ("IT", True, Decimal("15.25"))
 
 
 def test_the_delivery_country_given_at_checkout_wins_over_the_language() -> None:
-    req = request("it")
+    req = request(other_language())
     prices.remember_delivery_address(req, "DE")
     with translation.override(other_language()):
         price = prices.consumer_price(NET, "standard", vendor=VENDOR, request=req)
@@ -236,9 +238,9 @@ def test_a_forfettario_vendor_shows_the_net_price_as_the_final_price(client: Cli
         price = prices.consumer_price(NET, "standard", vendor=vendor, country=country)
         assert (price.gross, price.rate) == (NET, Decimal(0))
     live(vendor=vendor)
-    shown = page(client, "it").find(class_="product-price")
+    shown = page(client, other_language()).find(class_="product-price")
     assert shown.find("data")["value"] == "12.50"
-    assert NOTES["it"] in shown.get_text(" ", strip=True)
+    assert NOTES[other_language()] in shown.get_text(" ", strip=True)
 
 
 def test_an_rf20_vendor_shows_what_checkout_charges(client: Client) -> None:
@@ -252,7 +254,10 @@ def test_an_rf20_vendor_shows_what_checkout_charges(client: Client) -> None:
     price = prices.consumer_price(NET, "standard", vendor=vendor, country="IT")
     assert (price.gross, price.rate) == (NET, Decimal(0))
     live(vendor=vendor)
-    assert page(client, "en").find(class_="product-price").find("data")["value"] == "12.50"
+    assert (
+        page(client, primary_language()).find(class_="product-price").find("data")["value"]
+        == "12.50"
+    )
 
 
 def test_a_domestic_only_vendor_seen_from_germany_shows_its_own_rate() -> None:
@@ -275,7 +280,7 @@ def test_an_art74_publisher_book_shows_no_vat_and_a_bookshop_the_books_rate() ->
 
 
 def test_a_remembered_postcode_in_a_territory_outside_the_vat_area_shows_no_vat() -> None:
-    req = request("it")
+    req = request(other_language())
     prices.remember_delivery_address(req, "IT", "23041")  # Livigno
     with translation.override(other_language()):
         price = prices.consumer_price(NET, "standard", vendor=VENDOR, request=req)
@@ -290,7 +295,7 @@ def test_a_remembered_northern_ireland_address_follows_the_xi_rules() -> None:
 
 
 def test_a_language_estimate_never_uses_a_remembered_postcode_of_another_country() -> None:
-    req = request("it", {prices.DELIVERY_POSTCODE_KEY: "23041"})
+    req = request(other_language(), {prices.DELIVERY_POSTCODE_KEY: "23041"})
     with translation.override(other_language()):
         price = prices.consumer_price(NET, "standard", vendor=VENDOR, request=req)
     assert (price.estimated, price.gross) == (True, Decimal("15.25"))
@@ -323,7 +328,7 @@ def test_the_owner_note_in_each_language(language: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("language", "amount"), [("it", "15,25"), ("de", "14,88"), ("fr", "15,00")]
+    ("language", "amount"), [(other_language(), "15,25"), ("de", "14,88"), ("fr", "15,00")]
 )
 def test_the_product_page_shows_the_destination_gross_price_and_the_note(
     client: Client, language: str, amount: str
@@ -344,20 +349,20 @@ def test_variant_prices_are_gross(client: Client) -> None:
         product=product, sku="VAR-X", is_default=True, price_net_override=Decimal("24.00")
     )
     VariantTranslationFactory.create(variant=variant, language=primary_language(), label="Large")
-    shown = page(client, "en").find(class_="variant-price")
+    shown = page(client, primary_language()).find(class_="variant-price")
     assert shown.find("data")["value"] == "29.28"  # 24.00 + 22 %
-    assert NOTES["en"] in shown.get_text(" ", strip=True)
+    assert NOTES[primary_language()] in shown.get_text(" ", strip=True)
 
 
 def test_an_on_request_product_is_never_priced(client: Client) -> None:
     live(sales_mode=Product.SalesMode.ON_REQUEST, price_net=Decimal("120.00"))
-    buy = page(client, "en").find(class_="product-buy")
+    buy = page(client, primary_language()).find(class_="product-buy")
     text = buy.get_text(" ", strip=True)
     assert "Price on request" in text
     assert buy.find("data") is None
     assert "146.40" not in text
     assert "120.00" not in text
-    assert NOTES["en"] not in text
+    assert NOTES[primary_language()] not in text
 
 
 def test_the_ride_theme_renders_the_gross_price_and_the_note(
@@ -365,9 +370,9 @@ def test_the_ride_theme_renders_the_gross_price_and_the_note(
 ) -> None:
     settings.MPMV_THEME_DEFAULT = "ride"
     live()
-    price = page(client, "it").find(class_="product-price")
+    price = page(client, other_language()).find(class_="product-price")
     assert price.find("data")["value"] == "15.25"
-    assert NOTES["it"] in price.get_text(" ", strip=True)
+    assert NOTES[other_language()] in price.get_text(" ", strip=True)
 
 
 def test_a_business_buyer_who_opted_in_sees_net_prices_on_the_page(client: Client) -> None:
@@ -375,7 +380,7 @@ def test_a_business_buyer_who_opted_in_sees_net_prices_on_the_page(client: Clien
     session = client.session
     session[prices.BUSINESS_NET_VIEW_KEY] = True
     session.save()
-    price = page(client, "en").find(class_="product-price")
+    price = page(client, primary_language()).find(class_="product-price")
     assert price.find("data")["value"] == "12.50"
     assert "excl. VAT" in price.get_text(" ", strip=True)
 
@@ -385,7 +390,7 @@ def test_a_business_buyer_who_opted_in_sees_net_prices_on_the_page(client: Clien
 
 def card(**kwargs: Any) -> ProductCard:
     kwargs.setdefault("vendor", VENDOR)
-    return ProductCard(title="Mug", url="/product/mug/", price=NET, **kwargs)
+    return ProductCard(title="Mug", url=localized("/product/mug/"), price=NET, **kwargs)
 
 
 @pytest.mark.parametrize("theme", ["base", "ride"])

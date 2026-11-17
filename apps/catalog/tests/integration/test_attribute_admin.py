@@ -9,6 +9,7 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.catalog.models import Attribute, AttributeValue
 from apps.catalog.tests.factories import clothing_attributes
+from apps.core.i18n import primary_language
 
 pytestmark = pytest.mark.django_db
 
@@ -38,7 +39,10 @@ def test_staff_add_an_attribute_with_names_and_values(staff_client: Client) -> N
         "kind": "choice",
         "unit": "",
         "position": "0",
-        **_formset("translations", [{"language": "en", "name": "Finish", "status": "published"}]),
+        **_formset(
+            "translations",
+            [{"language": primary_language(), "name": "Finish", "status": "published"}],
+        ),
         **_formset(
             "values", [{"value": "matte", "position": "0"}, {"value": "gloss", "position": "1"}]
         ),

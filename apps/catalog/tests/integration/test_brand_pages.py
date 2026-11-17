@@ -27,7 +27,7 @@ from apps.catalog.tests.factories import (
 from apps.core.audit import AuditContext
 from apps.core.i18n import primary_language
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import other_language
+from tests.i18n import localized, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -83,8 +83,8 @@ def _node(graph: list[dict[str, Any]], kind: str) -> dict[str, Any]:
 
 def test_the_page_shows_the_description_in_the_page_language(client: Client) -> None:
     _brand()
-    assert "Anvils since 1949." in _page(client, "/brand/acme/").get_text()
-    italian = _page(client, "/it/marchio/acme-it/").get_text()
+    assert "Anvils since 1949." in _page(client, localized("/brand/acme/")).get_text()
+    italian = _page(client, localized("/brand/acme-it/", other_language())).get_text()
     assert "Incudini dal 1949." in italian
     assert "Anvils since 1949." not in italian
 
@@ -92,7 +92,7 @@ def test_the_page_shows_the_description_in_the_page_language(client: Client) -> 
 def test_a_missing_translation_gives_no_description_never_a_fallback(client: Client) -> None:
     brand = _brand()
     brand.translations.filter(language=other_language()).update(description="")
-    page = _page(client, "/it/marchio/acme-it/")
+    page = _page(client, localized("/brand/acme-it/", other_language()))
     assert "Anvils since 1949." not in page.get_text()
     assert page.select_one(".brand-description") is None
 
@@ -100,7 +100,9 @@ def test_a_missing_translation_gives_no_description_never_a_fallback(client: Cli
 def test_an_unpublished_translation_is_not_shown(client: Client) -> None:
     brand = _brand()
     brand.translations.filter(language=other_language()).update(status="reviewed")
-    page = _page(client, "/it/marchio/acme/")  # the fallback page uses the source slug
+    page = _page(
+        client, localized("/brand/acme/", other_language())
+    )  # the fallback page uses the source slug
     assert "Incudini dal 1949." not in page.get_text()
 
 
@@ -111,7 +113,7 @@ def test_the_description_is_sanitised(client: Client) -> None:
             '<p onclick="x()">Hi</p><script>alert(1)</script><a href="javascript:alert(1)">l</a>'
         )
     )
-    block = _page(client, "/brand/acme/").select_one(".brand-description")
+    block = _page(client, localized("/brand/acme/")).select_one(".brand-description")
     assert block is not None
     assert block.find("script") is None
     assert "onclick" not in str(block)
@@ -125,7 +127,7 @@ def test_the_page_shows_logo_website_wikidata_and_manufacturer(client: Client) -
         logo=logo, logo_alt="Acme anvil", url="https://acme.example/", wikidata_id="Q42",
         manufacturer=maker,
     )  # fmt: skip
-    page = _page(client, "/brand/acme/")
+    page = _page(client, localized("/brand/acme/"))
     image = page.select_one(".brand-profile img")
     assert image is not None
     assert image["alt"] == "Acme anvil"
@@ -141,14 +143,14 @@ def test_a_brand_with_nothing_to_show_has_no_profile_block(client: Client) -> No
     BrandTranslationFactory.create(
         brand=BrandFactory.create(name="Plain"), slug="plain", description="", status=PUBLISHED
     )
-    assert _page(client, "/brand/plain/").select_one(".brand-profile") is None
+    assert _page(client, localized("/brand/plain/")).select_one(".brand-profile") is None
 
 
 def test_a_non_https_stored_link_is_never_rendered(client: Client) -> None:
     # Legacy data that skipped validation (a queryset update) must stay inert.
     brand = _brand()
     Brand.objects.filter(pk=brand.pk).update(url="javascript:alert(1)")
-    page = _page(client, "/brand/acme/")
+    page = _page(client, localized("/brand/acme/"))
     assert "javascript:" not in str(page)
 
 
@@ -161,7 +163,7 @@ def test_the_page_has_one_graph_with_the_brand_node(client: Client) -> None:
         wikidata_id="Q42", url="https://acme.example/",
         same_as=["https://en.wikipedia.org/wiki/Acme"], manufacturer=maker,
     )  # fmt: skip
-    graph = _graph(_page(client, "/brand/acme/"))
+    graph = _graph(_page(client, localized("/brand/acme/")))
     node = _node(graph, "Brand")
     assert node["name"] == "Acme"
     assert node["@id"] == "http://localhost/brand/acme/#brand"
@@ -179,8 +181,8 @@ def test_the_page_has_one_graph_with_the_brand_node(client: Client) -> None:
 
 def test_the_brand_id_is_the_same_in_every_language(client: Client) -> None:
     _brand()
-    english = _node(_graph(_page(client, "/brand/acme/")), "Brand")
-    italian = _node(_graph(_page(client, "/it/marchio/acme-it/")), "Brand")
+    english = _node(_graph(_page(client, localized("/brand/acme/"))), "Brand")
+    italian = _node(_graph(_page(client, localized("/brand/acme-it/", other_language()))), "Brand")
     assert english["@id"] == italian["@id"]
     assert english["description"] == "Anvils since 1949."
     assert italian["description"] == "Incudini dal 1949."
@@ -189,7 +191,7 @@ def test_the_brand_id_is_the_same_in_every_language(client: Client) -> None:
 def test_the_node_has_no_description_for_a_missing_translation(client: Client) -> None:
     brand = _brand()
     brand.translations.filter(language=other_language()).update(description="")
-    node = _node(_graph(_page(client, "/it/marchio/acme-it/")), "Brand")
+    node = _node(_graph(_page(client, localized("/brand/acme-it/", other_language()))), "Brand")
     assert "description" not in node
 
 
@@ -197,7 +199,7 @@ def test_two_vendors_selling_the_brand_share_one_node(client: Client) -> None:
     brand = _brand(wikidata_id="Q42")
     ProductFactory.create(brand=brand, vendor=VendorFactory.create())
     ProductFactory.create(brand=brand, vendor=VendorFactory.create())
-    page_id = _node(_graph(_page(client, "/brand/acme/")), "Brand")["@id"]
+    page_id = _node(_graph(_page(client, localized("/brand/acme/"))), "Brand")["@id"]
     # What the product pages (SEO.1) reference: one id per brand, whoever sells the product.
     products = Product.objects.filter(brand=brand).select_related("brand")
     assert products.count() == 2
@@ -212,7 +214,7 @@ def test_two_vendors_selling_the_brand_share_one_node(client: Client) -> None:
 def test_a_hostile_brand_name_is_inert_in_the_json_ld(client: Client) -> None:
     brand = _brand()
     Brand.objects.filter(pk=brand.pk).update(name="</script><img src=x onerror=alert(1)>")
-    page = _page(client, "/brand/acme/")
+    page = _page(client, localized("/brand/acme/"))
     assert page.find("img", attrs={"src": "x"}) is None
     node = _node(_graph(page), "Brand")
     assert node["name"] == "</script><img src=x onerror=alert(1)>"
@@ -223,7 +225,7 @@ def test_a_stored_non_https_link_is_not_in_the_graph(client: Client) -> None:
     Brand.objects.filter(pk=brand.pk).update(
         url="http://acme.example/", same_as=["http://x.example/", "https://ok.example/"]
     )
-    node = _node(_graph(_page(client, "/brand/acme/")), "Brand")
+    node = _node(_graph(_page(client, localized("/brand/acme/"))), "Brand")
     assert "url" not in node
     assert node["sameAs"] == ["https://ok.example/"]
 
@@ -231,7 +233,7 @@ def test_a_stored_non_https_link_is_not_in_the_graph(client: Client) -> None:
 def test_the_logo_is_in_the_node(client: Client) -> None:
     logo = brand_logo_image()
     _brand(logo=logo, logo_alt="Acme anvil")
-    node = _node(_graph(_page(client, "/brand/acme/")), "Brand")
+    node = _node(_graph(_page(client, localized("/brand/acme/"))), "Brand")
     assert node["logo"].startswith("http://localhost/")
 
 
@@ -242,13 +244,13 @@ def test_a_pending_brand_has_no_page_and_no_graph(client: Client) -> None:
     pending = brands.propose_brand(VendorFactory.create(), "Newcomer", ctx=CTX).brand
     assert pending is not None
     BrandTranslationFactory.create(brand=pending, slug="newcomer", status=PUBLISHED)
-    assert client.get("/brand/newcomer/").status_code == 404
+    assert client.get(localized("/brand/newcomer/")).status_code == 404
 
 
 @override_settings(FORCE_NOINDEX=True)
 def test_a_forced_noindex_brand_page_is_noindex(client: Client) -> None:
     _brand()
-    response = client.get("/brand/acme/")
+    response = client.get(localized("/brand/acme/"))
     assert response["X-Robots-Tag"] == "noindex, nofollow"
     assert b"noindex" in response.content
 
@@ -256,7 +258,7 @@ def test_a_forced_noindex_brand_page_is_noindex(client: Client) -> None:
 @override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
 def test_not_forced_a_brand_page_is_indexable(client: Client) -> None:
     _brand()
-    response = client.get("/brand/acme/")
+    response = client.get(localized("/brand/acme/"))
     assert "X-Robots-Tag" not in response
     assert b"noindex" not in response.content
 
@@ -271,8 +273,8 @@ def test_a_merged_brand_redirects_in_one_hop_to_the_final_brand(client: Client) 
         )
     brands.merge_brands(first, second, ctx=CTX)
     brands.merge_brands(second, third, ctx=CTX)
-    response = client.get("/brand/acme/")
+    response = client.get(localized("/brand/acme/"))
     assert response.status_code == 301
-    assert response["Location"] == "/brand/acme-c/"
-    assert client.get("/brand/acme-b/").status_code == 301
-    assert client.get("/brand/acme-c/").status_code == 200
+    assert response["Location"] == localized("/brand/acme-c/")
+    assert client.get(localized("/brand/acme-b/")).status_code == 301
+    assert client.get(localized("/brand/acme-c/")).status_code == 200

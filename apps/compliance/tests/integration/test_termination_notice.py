@@ -19,12 +19,14 @@ from apps.compliance import engine, services, tasks
 from apps.compliance.models import StatementOfReasons, TerminationNotice, TransparencySubmission
 from apps.compliance.tests.factories import TerminationNoticeFactory
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, OutboxEmail
 from apps.core.tests.factories import PlatformOperatorFactory
 from apps.orders import services as order_services
 from apps.orders.tests.factories import paid_vendor_order
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -102,19 +104,24 @@ def test_the_vendor_is_sent_the_notice_on_a_durable_medium(staff: Any, vendor: V
     issue(staff, vendor)
     mail = OutboxEmail.objects.get(template_key="compliance.termination_notice")
     assert mail.recipient == vendor.contact_email
-    assert mail.language == "en"
+    assert mail.language == primary_language()
 
 
 def test_the_vendor_language_is_the_owner_language_with_english_fallback(
     staff: Any, vendor: Vendor
 ) -> None:
-    VendorMemberFactory.create(vendor=vendor, role="owner", user__preferred_language="it")
+    VendorMemberFactory.create(
+        vendor=vendor, role="owner", user__preferred_language=other_language()
+    )
     issue(staff, vendor)
-    assert OutboxEmail.objects.get(template_key="compliance.termination_notice").language == "it"
+    assert (
+        OutboxEmail.objects.get(template_key="compliance.termination_notice").language
+        == other_language()
+    )
 
 
 def test_a_vendor_without_an_owner_gets_english(staff: Any, vendor: Vendor) -> None:
-    assert services.vendor_language(vendor) == "en"
+    assert services.vendor_language(vendor) == primary_language()
 
 
 def test_a_configured_longer_period_applies_and_a_shorter_one_never(

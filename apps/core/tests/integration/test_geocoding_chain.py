@@ -75,14 +75,14 @@ def test_nominatim_failing_over_to_photon_returns_photon_result(clock: FakeClock
     assert outcome.cached is False
     entry = GeocodeCacheEntry.objects.get()
     assert entry.provider == "photon"  # what EVT.1 stores as `geo_provider`
-    assert entry.language == "it"
+    assert entry.language == other_language()
 
 
 def test_a_second_lookup_of_the_same_address_is_served_from_the_cache(clock: FakeClock) -> None:
     nominatim = FakeGeocoder("nominatim", results=[fake_result("nominatim")])
     first = lookup(MILAN, [nominatim], clock)
     same = AddressQuery(
-        country="it", postcode="20122", city=" MILANO ", street="piazza del  duomo 1"
+        country=other_language(), postcode="20122", city=" MILANO ", street="piazza del  duomo 1"
     )
     second = lookup(same, [nominatim], clock)
     assert len(nominatim.calls) == 1

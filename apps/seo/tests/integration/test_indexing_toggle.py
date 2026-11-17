@@ -17,6 +17,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.seo import services
 from apps.seo.models import SeoSettings
+from tests.i18n import localized
 
 pytestmark = pytest.mark.django_db
 
@@ -169,7 +170,9 @@ def test_listings_follow_the_toggle(client: Client) -> None:
         category=category,
         status=Product.Status.PUBLISHED,
     )
-    url = f"/product-category/{category.translations.get(language=primary_language()).slug}/"
+    url = localized(
+        f"/product-category/{category.translations.get(language=primary_language()).slug}/"
+    )
     assert metas(client.get(url)) == [NOINDEX]
     set_indexing(True)
     assert metas(client.get(url)) == ["index, follow"]

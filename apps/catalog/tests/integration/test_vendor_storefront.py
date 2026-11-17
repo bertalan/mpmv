@@ -21,7 +21,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
-from tests.i18n import other_language, third_language
+from tests.i18n import localized, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -66,7 +66,7 @@ def _category(en: str, it: str, parent: Any = None) -> Any:
 
 def test_the_storefront_shows_bio_and_policies_in_the_page_language(client: Client) -> None:
     vendor = _vendor()
-    html = client.get(f"/shop/{vendor.slug}/").content.decode()
+    html = client.get(localized(f"/shop/{vendor.slug}/")).content.decode()
     for text in (
         "Workshop tagline",
         "Our story in English.",
@@ -76,7 +76,7 @@ def test_the_storefront_shows_bio_and_policies_in_the_page_language(client: Clie
     ):
         assert text in html
     assert "La nostra storia" not in html
-    it = client.get(f"{prefix('it')}/shop/{vendor.slug}/").content.decode()
+    it = client.get(f"{prefix(other_language())}/shop/{vendor.slug}/").content.decode()
     assert "La nostra storia in italiano." in it
     assert "Spedizione in due giorni." in it
     assert "Our story in English." not in it
@@ -108,7 +108,7 @@ def test_vendor_texts_are_escaped(client: Client) -> None:
     vendor.translations.filter(language=primary_language()).update(
         description="<script>alert(1)</script>"
     )
-    html = client.get(f"/shop/{vendor.slug}/").content.decode()
+    html = client.get(localized(f"/shop/{vendor.slug}/")).content.decode()
     assert "<script>alert(1)</script>" not in html
 
 
@@ -116,14 +116,14 @@ def test_a_vendor_that_is_not_active_has_no_storefront(client: Client) -> None:
     for status in (Vendor.Status.APPLICANT, Vendor.Status.SUSPENDED, Vendor.Status.CLOSED):
         vendor = VendorFactory.create(status=status)
         VendorTranslationFactory.create(vendor=vendor, status=PUBLISHED)
-        assert client.get(f"/shop/{vendor.slug}/").status_code == 404
+        assert client.get(localized(f"/shop/{vendor.slug}/")).status_code == 404
 
 
 def test_unpublished_products_never_show(client: Client) -> None:
     vendor = _vendor()
     shown = listed(vendor=vendor)
     listed(vendor=vendor, status=Product.Status.DRAFT)
-    response = client.get(f"/shop/{vendor.slug}/")
+    response = client.get(localized(f"/shop/{vendor.slug}/"))
     assert [p.pk for p in response.context["products"]] == [shown.pk]
 
 
@@ -137,14 +137,14 @@ def test_store_categories_are_the_vendors_own_in_the_page_language(client: Clien
     listed(category=other_only)  # another vendor's category
     listed(vendor=vendor, category=other_only, status=Product.Status.DRAFT)  # draft: not counted
 
-    it = client.get(f"{prefix('it')}/shop/{vendor.slug}/")
+    it = client.get(f"{prefix(other_language())}/shop/{vendor.slug}/")
     options = {o.label: o.value for o in it.context["store_categories"]}
     assert options == {"Vasi": "vasi", "Lino": "lino"}
     html = it.content.decode()
     assert "Candele" not in html
-    assert f'href="/it/shop/{vendor.slug}/?category=vasi"' in html
+    assert f'href="{localized(f"/shop/{vendor.slug}/?category=vasi", other_language())}"' in html
 
-    en = client.get(f"/shop/{vendor.slug}/")
+    en = client.get(localized(f"/shop/{vendor.slug}/"))
     assert {o.label for o in en.context["store_categories"]} == {"Vases", "Linen"}
 
 
@@ -154,7 +154,7 @@ def test_store_categories_include_parents_and_mark_the_selected_one(client: Clie
     child = _category("Vases", "Vasi", parent=parent)
     listed(vendor=vendor, category=child)
     other = listed(vendor=vendor)
-    response = client.get(f"{prefix('it')}/shop/{vendor.slug}/?category=casa/vasi")
+    response = client.get(f"{prefix(other_language())}/shop/{vendor.slug}/?category=casa/vasi")
     options = response.context["store_categories"]
     assert [(o.label, o.depth, o.selected) for o in options] == [
         ("Casa", 1, False),
@@ -166,7 +166,7 @@ def test_store_categories_include_parents_and_mark_the_selected_one(client: Clie
 def test_other_listings_have_no_store_categories(client: Client) -> None:
     category = _category("Vases", "Vasi")
     listed(category=category)
-    response = client.get("/product-category/vases/")
+    response = client.get(localized("/product-category/vases/"))
     assert response.context["store_categories"] == []
     assert response.context["vendor_profile"] is None
 
@@ -179,7 +179,7 @@ def test_tagline_and_policies_are_escaped(client: Client) -> None:
         refund_policy="<img src=x onerror=r()>",
         cancellation_policy="<script>cancel()</script>",
     )
-    html = client.get(f"/shop/{vendor.slug}/").content.decode()
+    html = client.get(localized(f"/shop/{vendor.slug}/")).content.decode()
     for raw in ("<b>tag</b>", "<script>ship()", "<img src=x", "<script>cancel()"):
         assert raw not in html
     assert "&lt;b&gt;tag&lt;/b&gt;" in html
@@ -188,7 +188,7 @@ def test_tagline_and_policies_are_escaped(client: Client) -> None:
 def test_a_vendor_that_is_not_active_is_a_404_in_italian_too(client: Client) -> None:
     vendor = VendorFactory.create(status=Vendor.Status.SUSPENDED)
     VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=PUBLISHED)
-    assert client.get(f"{prefix('it')}/shop/{vendor.slug}/").status_code == 404
+    assert client.get(f"{prefix(other_language())}/shop/{vendor.slug}/").status_code == 404
 
 
 def test_a_draft_category_name_is_not_offered(client: Client) -> None:
@@ -202,7 +202,7 @@ def test_a_draft_category_name_is_not_offered(client: Client) -> None:
         status=TranslationStatus.MACHINE,
     )
     listed(vendor=vendor, category=category)
-    response = client.get(f"/shop/{vendor.slug}/")
+    response = client.get(localized(f"/shop/{vendor.slug}/"))
     assert response.context["store_categories"] == []
     assert "Hidden draft" not in response.content.decode()
 
@@ -212,11 +212,11 @@ def test_the_storefront_with_only_the_source_text_points_its_canonical_at_it(
 ) -> None:
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
     VendorTranslationFactory.create(vendor=vendor, language=primary_language(), status=PUBLISHED)
-    html = client.get(f"{prefix('it')}/shop/{vendor.slug}/").content.decode()
+    html = client.get(f"{prefix(other_language())}/shop/{vendor.slug}/").content.decode()
     assert f'rel="canonical" href="http://localhost/shop/{vendor.slug}/"' in html
-    assert f'hreflang="en" href="http://localhost/shop/{vendor.slug}/"' in html
+    assert f'hreflang="{primary_language()}" href="http://localhost/shop/{vendor.slug}/"' in html
     assert f'hreflang="x-default" href="http://localhost/shop/{vendor.slug}/"' in html
-    assert 'hreflang="it"' not in html
+    assert f'hreflang="{other_language()}"' not in html
 
 
 def test_the_query_count_does_not_grow_with_the_categories(
@@ -224,13 +224,13 @@ def test_the_query_count_does_not_grow_with_the_categories(
 ) -> None:
     vendor = _vendor()
     listed(vendor=vendor, category=_category("Cat0", "Cat0"))
-    client.get(f"/shop/{vendor.slug}/")  # warm caches (content types, site, languages)
+    client.get(localized(f"/shop/{vendor.slug}/"))  # warm caches (content types, site, languages)
     with CaptureQueriesContext(connection) as small:
-        client.get(f"/shop/{vendor.slug}/")
+        client.get(localized(f"/shop/{vendor.slug}/"))
     for number in range(1, 11):
         listed(vendor=vendor, category=_category(f"Cat{number}", f"Cat{number}"))
     with django_assert_max_num_queries(len(small) + 1):
-        response = client.get(f"/shop/{vendor.slug}/")
+        response = client.get(localized(f"/shop/{vendor.slug}/"))
     assert len(response.context["store_categories"]) == 11
 
 

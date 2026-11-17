@@ -17,6 +17,8 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import password_login
 from apps.cms.services import seed_site
+from apps.core.i18n import primary_language
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -111,7 +113,7 @@ def test_the_header_has_the_language_switcher(rendered_page: tuple[str, list[str
     html, _ = rendered_page
     header = html.split('<header class="site-header">', 1)[1].split("</header>", 1)[0]
     assert re.search(r'<nav class="language-switcher" aria-label="Language"', header)
-    for code in ("en", "it"):
+    for code in (primary_language(), other_language()):
         assert f'name="language" value="{code}"' in header
 
 

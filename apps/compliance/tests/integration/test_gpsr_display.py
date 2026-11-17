@@ -44,10 +44,10 @@ CTX = AuditContext(actor_label="staff:compliance", source="admin", ip="127.0.0.1
 def test_safety_text_is_saved_per_language_and_audited() -> None:
     product = ProductFactory.create()
     services.set_product_safety_text(
-        product, "it", {"warnings": "Non adatto ai bambini sotto i 3 anni."}, ctx=CTX
+        product, other_language(), {"warnings": "Non adatto ai bambini sotto i 3 anni."}, ctx=CTX
     )
     services.set_product_safety_text(
-        product, "en", {"warnings": "Not suitable for children under 3."}, ctx=CTX
+        product, primary_language(), {"warnings": "Not suitable for children under 3."}, ctx=CTX
     )
     assert GpsrSafetyText.objects.filter(product=product).count() == 2
     entry = AuditLog.objects.filter(action=services.SAFETY_TEXT_CREATED).first()
@@ -55,7 +55,7 @@ def test_safety_text_is_saved_per_language_and_audited() -> None:
     assert entry.vendor_key == str(product.vendor.public_id)
 
     services.set_product_safety_text(
-        product, "en", {"safety_information": "Keep away from heat."}, ctx=CTX
+        product, primary_language(), {"safety_information": "Keep away from heat."}, ctx=CTX
     )
     row = GpsrSafetyText.objects.get(product=product, language=primary_language())
     assert row.warnings == "Not suitable for children under 3."  # kept
@@ -78,21 +78,23 @@ def test_display_merges_the_vendor_defaults_and_picks_the_language() -> None:
     defaults = VendorGpsrDefaultsFactory.create(manufacturer_name="Example Maker S.r.l.")
     product = ProductFactory.create(vendor=defaults.vendor, gtin="8001234567890")
     GpsrInfoFactory.create(product=product, model_number="M-1", batch="")
-    services.set_product_safety_text(product, "it", {"warnings": "Attenzione."}, ctx=CTX)
-    services.set_product_safety_text(product, "en", {"warnings": "Caution."}, ctx=CTX)
+    services.set_product_safety_text(
+        product, other_language(), {"warnings": "Attenzione."}, ctx=CTX
+    )
+    services.set_product_safety_text(product, primary_language(), {"warnings": "Caution."}, ctx=CTX)
 
-    shown = services.gpsr_display(product, "it")
+    shown = services.gpsr_display(product, other_language())
     assert shown.parties.manufacturer_name == "Example Maker S.r.l."
     assert ("GTIN", "8001234567890") in shown.identifiers
     assert ("Model", "M-1") in shown.identifiers
     assert all(value for _label, value in shown.identifiers)  # empty ones are left out
-    assert (shown.warnings, shown.text_language) == ("Attenzione.", "it")
+    assert (shown.warnings, shown.text_language) == ("Attenzione.", other_language())
 
 
 def test_display_falls_back_to_the_primary_language() -> None:
     product = GpsrSafetyTextFactory.create(language=primary_language(), warnings="Caution.").product
     shown = services.gpsr_display(product, "de")
-    assert (shown.warnings, shown.text_language) == ("Caution.", "en")
+    assert (shown.warnings, shown.text_language) == ("Caution.", primary_language())
 
 
 def test_the_product_page_block_renders_the_gpsr_data() -> None:
@@ -100,7 +102,9 @@ def test_the_product_page_block_renders_the_gpsr_data() -> None:
         manufacturer_name="Example Maker S.r.l.", manufacturer_contact="safety@maker.example"
     )
     product = ProductFactory.create(vendor=defaults.vendor, gtin="8001234567890")
-    services.set_product_safety_text(product, "en", {"warnings": "Caution <hot>."}, ctx=CTX)
+    services.set_product_safety_text(
+        product, primary_language(), {"warnings": "Caution <hot>."}, ctx=CTX
+    )
     template = Template("{% load compliance_tags %}{% product_safety product %}")
     with translation.override(third_language()):
         html = template.render(Context({"product": product}))
@@ -247,7 +251,7 @@ def test_the_nightly_email_renders() -> None:
     rows = services.published_products_failing_gpsr()
     rendered = render_email(
         services.PUBLISHED_INCOMPLETE_EMAIL_TEMPLATE,
-        "en",
+        primary_language(),
         services.published_incomplete_email_context(rows),
     )
     assert product.sku in rendered.text_body
@@ -261,14 +265,14 @@ def test_display_falls_back_to_a_language_of_the_destination() -> None:
     product = ProductFactory.create()
     GpsrSafetyTextFactory.create(product=product, language=third_language(), warnings="Achtung.")
     GpsrSafetyTextFactory.create(product=product, language="fr", warnings="Attention.")
-    shown = services.gpsr_display(product, "it", country="AT")
+    shown = services.gpsr_display(product, other_language(), country="AT")
     assert (shown.warnings, shown.text_language) == ("Achtung.", "de")
 
 
 def test_display_falls_back_to_any_available_language() -> None:
     product = ProductFactory.create()
     GpsrSafetyTextFactory.create(product=product, language=third_language(), warnings="Achtung.")
-    shown = services.gpsr_display(product, "it")
+    shown = services.gpsr_display(product, other_language())
     assert (shown.warnings, shown.text_language) == ("Achtung.", "de")
     assert shown.text_language_name
 

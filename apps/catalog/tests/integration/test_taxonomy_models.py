@@ -47,7 +47,7 @@ def test_category_texts_resolve_with_the_explicit_english_fallback() -> None:
     CategoryTranslationFactory.create(
         category=category, language=other_language(), name="Borse", slug="borse", status="machine"
     )
-    italian = category.translation("it")
+    italian = category.translation(other_language())
     assert italian.is_fallback is True  # the IT draft is not published yet
     assert italian.translation is not None
     assert italian.translation.name == "Bags"
@@ -121,8 +121,8 @@ def test_one_translation_per_category_and_language() -> None:
 
 
 def test_deleting_a_category_deletes_its_translations_and_subtree() -> None:
-    parent = CategoryFactory.create(languages=["en"])
-    CategoryFactory.create(parent=parent, languages=["en"])
+    parent = CategoryFactory.create(languages=[primary_language()])
+    CategoryFactory.create(parent=parent, languages=[primary_language()])
     parent.delete()
     assert Category.objects.count() == 0
     assert CategoryTranslation.objects.count() == 0
@@ -409,7 +409,9 @@ def test_a_category_lists_the_products_of_its_subtree_main_or_secondary() -> Non
     assert list(services.products_in_category(bags, include_secondary=False)) == [in_child]
 
 
-@pytest.mark.parametrize("slug", ["de", "it", "brand", "shop", "product-category", "prodotto"])
+@pytest.mark.parametrize(
+    "slug", ["de", other_language(), "brand", "shop", "product-category", "prodotto"]
+)
 def test_a_taxonomy_slug_cannot_be_a_language_code_or_a_catalog_segment(slug: str) -> None:
     text = TaxonomyTranslationFactory.build(taxonomy=TaxonomyFactory.create(), slug=slug)
     with pytest.raises(ValidationError) as excinfo:

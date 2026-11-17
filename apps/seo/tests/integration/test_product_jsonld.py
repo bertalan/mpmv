@@ -17,12 +17,13 @@ from apps.catalog.tests.factories import (
     VariantFactory,
     VariantTranslationFactory,
 )
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
 from apps.seo import schema_check
 from apps.tax import prices
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import product_url
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
@@ -60,8 +61,11 @@ def live(title: str = "Mug", **kwargs: Any) -> Product:
     return product
 
 
-def graph_of(client: Client, path: str = "/product/mug-en/") -> tuple[str, dict[str, Any]]:
-    html = client.get(path).content.decode()
+MUG = product_url(primary_language(), f"mug-{primary_language()}")
+
+
+def graph_of(client: Client, path: str = "") -> tuple[str, dict[str, Any]]:
+    html = client.get(path or MUG).content.decode()
     blocks = SCRIPT.findall(html)
     assert len(blocks) == 1, "a product page has exactly one JSON-LD script"
     return html, json.loads(blocks[0])
@@ -125,7 +129,7 @@ def test_the_breadcrumb_ends_at_the_product(client: Client, theme: str) -> None:
 
 def test_a_hostile_name_is_inert(client: Client, theme: str) -> None:
     live(title="</script><img src=x onerror=alert(1)>")
-    html = client.get("/product/mug-en/").content.decode()
+    html = client.get(MUG).content.decode()
     assert "<img src=x" not in html
     assert len(SCRIPT.findall(html)) == 1
     document = json.loads(SCRIPT.findall(html)[0])
@@ -134,15 +138,15 @@ def test_a_hostile_name_is_inert(client: Client, theme: str) -> None:
 
 def test_the_canonical_and_robots_are_one_each(client: Client, theme: str) -> None:
     live()
-    html = client.get("/product/mug-en/").content.decode()
+    html = client.get(MUG).content.decode()
     assert html.count('rel="canonical"') == 1
     assert html.count('name="robots"') <= 1
-    assert 'href="http://localhost/product/mug-en/"' in html
+    assert f'href="http://localhost{MUG}"' in html
 
 
 def test_the_product_json_ld_stays_under_the_budget(client: Client, theme: str) -> None:
     live(price_net=Decimal("12.50"), gtin="4006381333931", mpn="MUG-77")
-    html = client.get("/product/mug-en/").content.decode()
+    html = client.get(MUG).content.decode()
     assert len(SCRIPT.findall(html)[0].encode()) < 30 * 1024
 
 

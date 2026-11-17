@@ -39,7 +39,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
-from tests.i18n import other_language
+from tests.i18n import localized, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -164,7 +164,10 @@ def test_a_term_card_links_to_its_taxonomy_url_with_its_name(
 
 def test_a_term_card_follows_the_page_language(seeded: SeedReport, model_term: Term) -> None:
     html = _publish(_home(other_language()), [_featured(_card("term", model_term))])
-    assert '<a href="/it/compatibile/acme-it/spider/">Spider</a>' in html
+    assert (
+        '<a href=f"{language_prefix(other_language())}/compatibile/acme-it/spider/">Spider</a>'
+        in html
+    )
 
 
 def test_a_term_card_falls_back_to_the_primary_language(
@@ -196,13 +199,16 @@ def test_a_term_without_published_texts_gets_no_card(seeded: SeedReport) -> None
 
 def test_a_vendor_card_links_to_the_storefront(seeded: SeedReport, pottery: Vendor) -> None:
     html = _publish(_home(), [_featured(_card("vendor", pottery))])
-    assert '<a href="/shop/pottery-studio/">Pottery Studio</a>' in html
+    assert f'<a href="{localized("/shop/pottery-studio/")}">Pottery Studio</a>' in html
     assert "Hand-thrown bowls" in html
 
 
 def test_a_vendor_card_follows_the_page_language(seeded: SeedReport, pottery: Vendor) -> None:
     html = _publish(_home(other_language()), [_featured(_card("vendor", pottery))])
-    assert '<a href="/it/shop/pottery-studio/">Pottery Studio</a>' in html
+    assert (
+        f'<a href="{localized("/shop/pottery-studio/", other_language())}">Pottery Studio</a>'
+        in html
+    )
 
 
 def test_a_vendor_that_is_no_longer_active_gets_no_card(
@@ -214,7 +220,7 @@ def test_a_vendor_that_is_no_longer_active_gets_no_card(
     Vendor.objects.filter(pk=pottery.pk).update(status=Vendor.Status.SUSPENDED)
     html = Client().get(home.url).content.decode()
     assert "Pottery Studio" not in html
-    assert "/shop/pottery-studio/" not in html
+    assert localized("/shop/pottery-studio/") not in html
 
 
 def test_only_an_active_vendor_can_be_chosen(seeded: SeedReport, pottery: Vendor) -> None:
@@ -411,6 +417,6 @@ def test_featured_cards_render_with_a_constant_number_of_queries(seeded: SeedRep
     many, html = _queries_to_render(range(8))
     for n in range(8):
         assert f'<a href="/tax-{n}/maker-{n}/model-{n}/">Model {n}</a>' in html
-        assert f'<a href="/shop/maker-shop-{n}/">Maker shop {n}</a>' in html
+        assert f'<a href="{localized(f"/shop/maker-shop-{n}/")}">Maker shop {n}</a>' in html
         assert f"Story {n}</a>" in html
     assert many <= one

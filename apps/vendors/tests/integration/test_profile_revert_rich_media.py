@@ -58,7 +58,7 @@ def staff() -> User:
 
 
 def _text_change(vendor: Vendor, owner: User, **values: str) -> AuditLog:
-    save_storefront_profile(vendor, "en", values, actor=owner, ctx=CTX)
+    save_storefront_profile(vendor, primary_language(), values, actor=owner, ctx=CTX)
     return AuditLog.objects.filter(action=CHANGED).latest("id")
 
 

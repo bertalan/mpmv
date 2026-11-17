@@ -15,10 +15,12 @@ from apps.cart.tests.factories import CartFactory, CartLineFactory
 from apps.catalog.models import Product
 from apps.cms.models import LegalPage, LegalPageVersion
 from apps.core.changeset import ChangeSet
+from apps.core.i18n import primary_language
 from apps.seed import data
 from apps.seed.services import TEST_CONTEXT, reset, seed, seed_vendors
 from apps.vendors.models import SalesTermsInForce, SalesTermsVersion
 from apps.vendors.terms_services import version_in_force
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -47,7 +49,7 @@ def test_every_demo_vendor_has_terms_in_force_with_the_expected_clauses(
 def test_the_customer_terms_pages_list_onerous_clauses_in_both_languages(
     demo_seed: ChangeSet,
 ) -> None:
-    for language in ("en", "it"):
+    for language in (primary_language(), other_language()):
         locale = Locale.objects.get(language_code=language)
         page = LegalPage.objects.get(kind="terms", locale=locale, slug__startswith="demo")
         assert page.live

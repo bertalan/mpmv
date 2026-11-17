@@ -38,7 +38,7 @@ from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
-from tests.i18n import other_language
+from tests.i18n import language_prefix, localized, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -121,8 +121,8 @@ def test_a_term_page_answers_200_in_every_configured_language(
     client: Client, compat: dict[str, Any], language: str
 ) -> None:
     path = (
-        "/it/compatibilita/marca/"
-        if language == "it"
+        f"{language_prefix(other_language())}/compatibilita/marca/"
+        if language == other_language()
         else f"{prefix(language)}/compatibility/maker/"
     )
     response = client.get(path)
@@ -139,39 +139,46 @@ def test_a_child_term_page_lists_its_subtree_only(client: Client, compat: dict[s
     response = client.get("/compatibility/maker/model/")
     assert response.status_code == 200
     assert [p.pk for p in response.context["products"]] == [compat["product"].pk]
-    assert client.get("/it/compatibilita/marca/modello/").status_code == 200
+    assert (
+        client.get(f"{language_prefix(other_language())}/compatibilita/marca/modello/").status_code
+        == 200
+    )
 
 
 def test_other_language_slugs_redirect_once_to_the_page_language(
     client: Client, compat: dict[str, Any]
 ) -> None:
     assert_redirect(
-        client.get("/it/compatibility/maker/model/"), "/it/compatibilita/marca/modello/"
+        client.get(f"{language_prefix(other_language())}/compatibility/maker/model/"),
+        f"{language_prefix(other_language())}/compatibilita/marca/modello/",
     )
     assert_redirect(client.get("/compatibilita/marca/"), "/compatibility/maker/")
     # Query kept, and made canonical in the same hop.
     assert_redirect(
-        client.get("/it/compatibility/maker/?page=1&utm_source=x"),
-        "/it/compatibilita/marca/?utm_source=x",
+        client.get(f"{language_prefix(other_language())}/compatibility/maker/?page=1&utm_source=x"),
+        f"{language_prefix(other_language())}/compatibilita/marca/?utm_source=x",
     )
 
 
 def test_a_language_without_a_published_text_uses_the_en_slugs(
     client: Client, compat: dict[str, Any]
 ) -> None:
-    response = client.get("/de/compatibility/maker/")
+    response = client.get(f"{language_prefix(third_language())}/compatibility/maker/")
     assert response.status_code == 200
     assert response.context["is_fallback"] is True
     assert response.context["canonical_url"] == "http://localhost/compatibility/maker/"
-    assert_redirect(client.get("/de/compatibilita/marca/"), "/de/compatibility/maker/")
+    assert_redirect(
+        client.get(f"{language_prefix(third_language())}/compatibilita/marca/"),
+        f"{language_prefix(third_language())}/compatibility/maker/",
+    )
 
 
 def test_hreflang_lists_only_published_languages(client: Client, compat: dict[str, Any]) -> None:
     response = client.get("/compatibility/maker/")
     alternates = dict(response.context["alternates"])
     assert alternates == {
-        "en": "http://localhost/compatibility/maker/",
-        "it": "http://localhost/it/compatibilita/marca/",
+        primary_language(): "http://localhost/compatibility/maker/",
+        other_language(): "http://localhost/it/compatibilita/marca/",
         "x-default": "http://localhost/compatibility/maker/",
     }
     assert response.context["canonical_url"] == "http://localhost/compatibility/maker/"
@@ -241,8 +248,11 @@ def test_a_page_past_the_last_answers_404(client: Client, compat: dict[str, Any]
     for _ in range(3):
         listed().terms.add(compat["model"])
     # Four products, 24 per page: page 2 is past the end.
-    assert client.get("/it/compatibilita/marca/?page=2").status_code == 404
-    response = client.get("/it/compatibilita/marca/")
+    assert (
+        client.get(f"{language_prefix(other_language())}/compatibilita/marca/?page=2").status_code
+        == 404
+    )
+    response = client.get(f"{language_prefix(other_language())}/compatibilita/marca/")
     assert response.context["window"].page_count == 1
 
 
@@ -253,16 +263,25 @@ def test_paginated_urls_build_on_the_term_url(
 
     monkeypatch.setattr(services, "LISTING_PER_PAGE", 1)
     listed().terms.add(compat["model"])
-    first = client.get("/it/compatibilita/marca/")
+    first = client.get(f"{language_prefix(other_language())}/compatibilita/marca/")
     assert first.status_code == 200
-    assert first.context["next_url"] == "/it/compatibilita/marca/?page=2"
+    assert (
+        first.context["next_url"]
+        == f"{language_prefix(other_language())}/compatibilita/marca/?page=2"
+    )
     assert first.context["previous_url"] is None
-    second = client.get("/it/compatibilita/marca/?page=2")
+    second = client.get(f"{language_prefix(other_language())}/compatibilita/marca/?page=2")
     assert second.status_code == 200
     assert second.context["canonical_url"] == "http://localhost/it/compatibilita/marca/?page=2"
-    assert second.context["previous_url"] == "/it/compatibilita/marca/"
+    assert (
+        second.context["previous_url"]
+        == f"{language_prefix(other_language())}/compatibilita/marca/"
+    )
     assert second.context["next_url"] is None
-    assert client.get("/it/compatibilita/marca/?page=3").status_code == 404
+    assert (
+        client.get(f"{language_prefix(other_language())}/compatibilita/marca/?page=3").status_code
+        == 404
+    )
 
 
 def test_an_unknown_filter_value_answers_404(client: Client, compat: dict[str, Any]) -> None:
@@ -285,14 +304,16 @@ def test_a_filtered_listing_is_indexable_on_its_canonical_url(
 def test_a_filtered_fallback_page_has_the_en_listing_as_canonical(
     client: Client, compat: dict[str, Any]
 ) -> None:
-    response = client.get("/de/compatibility/maker/?compatibility=maker/model&price_min=1")
+    response = client.get(
+        f"{language_prefix(third_language())}/compatibility/maker/?compatibility=maker/model&price_min=1"
+    )
     assert response.status_code == 200
     assert response.context["canonical_url"] == (
         "http://localhost/compatibility/maker/?compatibility=maker/model&price_min=1"
     )
     # The IT page re-expresses the filter in IT slugs for its alternate.
     response = client.get("/compatibility/maker/?compatibility=maker/model")
-    assert dict(response.context["alternates"])["it"] == (
+    assert dict(response.context["alternates"])[other_language()] == (
         "http://localhost/it/compatibilita/marca/?compatibilita=marca/modello"
     )
 
@@ -326,7 +347,7 @@ def test_the_page_renders_canonical_robots_and_hreflang_tags(
     assert '<link rel="canonical" href="http://localhost/compatibility/maker/">' in html
     assert '<meta name="robots" content="index, follow">' in html
     assert (
-        '<link rel="alternate" hreflang="it" href="http://localhost/it/compatibilita/marca/">'
+        '<link rel="alternate" hreflang=other_language() href="http://localhost/it/compatibilita/marca/">'
         in html
     )
 
@@ -349,21 +370,24 @@ def category() -> dict[str, Any]:
 
 
 def test_category_pages_per_language(client: Client, category: dict[str, Any]) -> None:
-    response = client.get("/product-category/bags/backpacks/")
+    response = client.get(localized("/product-category/bags/backpacks/"))
     assert response.status_code == 200
     assert [p.pk for p in response.context["products"]] == [category["product"].pk]
-    assert client.get("/product-category/bags/").status_code == 200
+    assert client.get(localized("/product-category/bags/")).status_code == 200
     # The child has no IT text: its EN slug under the IT parent slug.
-    assert client.get("/it/categoria-prodotto/borse/backpacks/").status_code == 200
-    assert_redirect(
-        client.get("/it/product-category/bags/backpacks/"),
-        "/it/categoria-prodotto/borse/backpacks/",
+    assert (
+        client.get(localized("/product-category/borse/backpacks/", other_language())).status_code
+        == 200
     )
-    assert_redirect(client.get("/categoria-prodotto/borse/"), "/product-category/bags/")
+    assert_redirect(
+        client.get(localized("/product-category/bags/backpacks/", other_language())),
+        localized("/product-category/borse/backpacks/", other_language()),
+    )
+    assert_redirect(client.get("/categoria-prodotto/borse/"), localized("/product-category/bags/"))
     for language in configured_languages():
-        if language not in ("en", "it"):
+        if language not in (primary_language(), other_language()):
             assert client.get(f"/{language}/product-category/bags/").status_code == 200
-    assert client.get("/product-category/nothing/").status_code == 404
+    assert client.get(localized("/product-category/nothing/")).status_code == 404
 
 
 def test_brand_pages_per_language(client: Client) -> None:
@@ -374,13 +398,16 @@ def test_brand_pages_per_language(client: Client) -> None:
     )
     product = listed(brand=brand)
     listed()
-    response = client.get("/brand/acme/")
+    response = client.get(localized("/brand/acme/"))
     assert response.status_code == 200
     assert [p.pk for p in response.context["products"]] == [product.pk]
-    assert client.get("/it/marchio/acme-it/").status_code == 200
-    assert_redirect(client.get("/it/brand/acme/"), "/it/marchio/acme-it/")
-    assert client.get("/de/brand/acme/").status_code == 200
-    assert client.get("/brand/nothing/").status_code == 404
+    assert client.get(localized("/brand/acme-it/", other_language())).status_code == 200
+    assert_redirect(
+        client.get(localized("/brand/acme/", other_language())),
+        localized("/brand/acme-it/", other_language()),
+    )
+    assert client.get(localized("/brand/acme/", third_language())).status_code == 200
+    assert client.get(localized("/brand/nothing/")).status_code == 404
 
 
 def test_vendor_storefronts_per_language(client: Client) -> None:
@@ -388,13 +415,13 @@ def test_vendor_storefronts_per_language(client: Client) -> None:
     VendorTranslationFactory.create(vendor=vendor, status=PUBLISHED)
     product = listed(vendor=vendor)
     listed()
-    response = client.get(f"/shop/{vendor.slug}/")
+    response = client.get(localized(f"/shop/{vendor.slug}/"))
     assert response.status_code == 200
     assert [p.pk for p in response.context["products"]] == [product.pk]
     for language in configured_languages():
         assert client.get(f"{prefix(language)}/shop/{vendor.slug}/").status_code == 200
     closed = VendorFactory.create(status=Vendor.Status.CLOSED)
-    assert client.get(f"/shop/{closed.slug}/").status_code == 404
+    assert client.get(localized(f"/shop/{closed.slug}/")).status_code == 404
 
 
 def test_the_vendor_storefront_shows_the_logo_with_its_alt_text(client: Client) -> None:
@@ -408,7 +435,7 @@ def test_the_vendor_storefront_shows_the_logo_with_its_alt_text(client: Client) 
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
     VendorTranslationFactory.create(vendor=vendor, status=PUBLISHED)
     listed(vendor=vendor)
-    assert b"listing-logo" not in client.get(f"/shop/{vendor.slug}/").content
+    assert b"listing-logo" not in client.get(localized(f"/shop/{vendor.slug}/")).content
     owner = VendorMemberFactory.create(vendor=vendor, role="owner").user
     set_vendor_logo(
         vendor,
@@ -417,7 +444,7 @@ def test_the_vendor_storefront_shows_the_logo_with_its_alt_text(client: Client) 
         actor=owner,
         ctx=AuditContext(actor_label="user:owner", source="vendor"),
     )
-    page = client.get(f"/shop/{vendor.slug}/").text
+    page = client.get(localized(f"/shop/{vendor.slug}/")).text
     assert 'class="listing-logo"' in page
     assert 'alt="Acme anvil mark"' in page
 
@@ -440,7 +467,7 @@ def test_a_taxonomy_slug_never_shadows_the_catalog_segments(client: Client) -> N
     TermTranslationFactory.create(term=term, slug="acme", status=PUBLISHED)
     brand = BrandFactory.create()
     BrandTranslationFactory.create(brand=brand, slug="acme", status=PUBLISHED)
-    response = client.get("/brand/acme/")
+    response = client.get(localized("/brand/acme/"))
     assert response.status_code == 200
     assert response.context["scope"].brand == brand
 
@@ -484,8 +511,10 @@ def test_an_other_language_redirect_re_expresses_the_filter(
     client: Client, compat: dict[str, Any]
 ) -> None:
     assert_redirect(
-        client.get("/it/compatibility/maker/?compatibility=maker/model&utm_source=x"),
-        "/it/compatibilita/marca/?compatibilita=marca/modello&utm_source=x",
+        client.get(
+            f"{language_prefix(other_language())}/compatibility/maker/?compatibility=maker/model&utm_source=x"
+        ),
+        f"{language_prefix(other_language())}/compatibilita/marca/?compatibilita=marca/modello&utm_source=x",
     )
     assert_redirect(
         client.get("/compatibilita/marca/?compatibilita=marca/modello"),
