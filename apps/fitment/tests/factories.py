@@ -11,7 +11,7 @@ from typing import Any
 import factory
 from factory.django import DjangoModelFactory
 
-from apps.catalog.tests.factories import CategoryFactory, TreeNodeCreation
+from apps.catalog.tests.factories import CategoryFactory, ProductFactory, TreeNodeCreation
 from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.fitment.models import (
@@ -25,6 +25,8 @@ from apps.fitment.models import (
     FitmentNote,
     FitmentNoteTranslation,
     FitmentScheme,
+    ProductFitment,
+    ProductFitmentState,
 )
 
 
@@ -139,3 +141,21 @@ class FitmentCategoryFactory(DjangoModelFactory[FitmentCategory]):
         model = FitmentCategory
 
     category = factory.SubFactory(CategoryFactory)
+
+
+class ProductFitmentStateFactory(DjangoModelFactory[ProductFitmentState]):
+    class Meta:
+        model = ProductFitmentState
+
+    product = factory.SubFactory(ProductFactory)
+    mode = ProductFitmentState.Mode.SPECIFIC
+
+
+class ProductFitmentFactory(DjangoModelFactory[ProductFitment]):
+    class Meta:
+        model = ProductFitment
+
+    product = factory.SubFactory(ProductFactory)
+    node = factory.SubFactory(FitmentNodeFactory)
+    node_path = factory.LazyAttribute(lambda o: o.node.path)
+    source = ProductFitment.Source.MANUAL
