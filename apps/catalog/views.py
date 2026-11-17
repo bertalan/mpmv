@@ -281,8 +281,8 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
         "canonical_url": absolute_url(request, page.canonical_path),
         "robots": listings.ROBOTS_INDEX,
         "vendor_url": slugs.vendor_path(language, page.vendor.slug, default_language=default),
-        # CAT.15: related products and the other sellers of this product.
-        "related": product_pages.related(page),
+        "gallery_items": product_pages.gallery_items(page),
+        "related": product_pages.related(page, language),
     }
     response: HttpResponse = render(request, PRODUCT_TEMPLATE, context)
     return response

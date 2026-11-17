@@ -27,7 +27,6 @@ from apps.catalog.tests.factories import (
 )
 from apps.core.audit import AuditContext
 from apps.core.tests.factories import ImageLicenceFactory
-from apps.themes.services import use_theme
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -97,11 +96,11 @@ def test_a_product_without_images_has_no_gallery(client: Client) -> None:
     assert 'class="gallery' not in client.get("/product/plain/").content.decode()
 
 
-def test_the_ride_gallery_is_a_carousel_with_thumbnails(client: Client) -> None:
+def test_the_ride_gallery_is_a_carousel_with_thumbnails(client: Client, settings: Any) -> None:
+    settings.MPMV_THEME_DEFAULT = "ride"
     product = live("mug")
     with_images(product, "red", "blue")
-    with use_theme("ride"):
-        html = client.get("/product/mug/").content.decode()
+    html = client.get("/product/mug/").content.decode()
     assert "data-ride-carousel" in html
     assert html.count("data-bs-slide-to=") == 2
     assert "<picture>" in html
@@ -123,7 +122,7 @@ def test_the_related_products_share_the_most_terms(client: Client) -> None:
     Product.objects.filter(pk=hidden.pk).update(status="draft")
     gone = live("gone", vendor=VendorFactory.create(status=Vendor.Status.SUSPENDED))
     gone.terms.add(t1, t2)
-    upsold = live("upsold")
+    upsold = live("upsold", vendor=main.vendor)
     upsold.terms.add(t1, t2)
     main.upsells.add(upsold)
     page = product_pages.find("main", "en")
