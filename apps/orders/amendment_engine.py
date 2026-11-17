@@ -58,6 +58,22 @@ from apps.tax.engine import (
 )
 from apps.vendors.commission import compute_commission
 
+# Translation without Django (ARC.18: the engine stays pure). The texts are English until the
+# orders app installs Django's `gettext` at start-up (`OrdersConfig.ready`); the catalog tool
+# extracts the calls to `gettext` below like any other.
+_translate: Callable[[str], str] = str
+
+
+def install_translation(translate: Callable[[str], str]) -> None:
+    """Make the engine's refusals and classification reasons follow the active language."""
+    global _translate  # one start-up hook, set once
+    _translate = translate
+
+
+def gettext(message: str) -> str:
+    return _translate(message)
+
+
 ZERO: Final = Decimal("0.00")
 
 MINOR: Final = "minor"
@@ -772,9 +788,9 @@ def _commission(snapshot: VersionSnapshot) -> Decimal:
 
 def _line_net(unit_price_net: Decimal, quantity: int, discount_net: Decimal) -> Decimal:
     if quantity < 1:
-        raise AmendmentRefused("A line needs at least one unit; remove the line instead.")
+        raise AmendmentRefused(gettext("A line needs at least one unit; remove the line instead."))
     if unit_price_net <= 0 or unit_price_net != round_line(unit_price_net):
-        raise AmendmentRefused("The unit price must be an amount above zero, in cents.")
+        raise AmendmentRefused(gettext("The unit price must be an amount above zero, in cents."))
     return round_line(unit_price_net * quantity - discount_net)
 
 
@@ -803,7 +819,9 @@ def _reprice(
                 remaining -= last.net
     elif delta > 0:
         if increment is None:
-            raise AmendmentRefused(f"The tax of the increase of line {line.sku} is not known.")
+            raise AmendmentRefused(
+                gettext("The tax of the increase of line %(sku)s is not known.") % {"sku": line.sku}
+            )
         portions.append(VersionPortion.taxed(delta, increment, tax_on))
     return replace(
         line,
@@ -818,8 +836,10 @@ def _decide(ctx: RecomputeContext, key: str, category: str | None) -> TaxDecisio
     category = category or ctx.categories.get(key)
     if not category:
         raise AmendmentRefused(
-            "The fiscal category of this line was not recorded when it was sold, so its tax "
-            "cannot be decided again; the line can only be reduced or removed."
+            gettext(
+                "The fiscal category of this line was not recorded when it was sold, so its tax "
+                "cannot be decided again; the line can only be reduced or removed."
+            )
         )
     return resolve_goods_tax(ctx.tax, category)
 
@@ -983,7 +1003,7 @@ def recompute_vendor_order(
     cannot be computed (an unknown line, a quantity below one, a price that is not in cents).
     """
     if not changes:
-        raise AmendmentRefused("An amendment needs at least one change.")
+        raise AmendmentRefused(gettext("An amendment needs at least one change."))
     _refuse_combinations(changes)
     lines: dict[str, VersionLine] = {line.line_key: line for line in version.lines}
     order: list[str] = list(lines)
@@ -998,7 +1018,9 @@ def recompute_vendor_order(
 
     def existing(key: str) -> VersionLine:
         if key not in lines:
-            raise AmendmentRefused(f"The order has no line {key!r} in its current version.")
+            raise AmendmentRefused(
+                gettext("The order has no line %(key)r in its current version.") % {"key": key}
+            )
         return lines[key]
 
     for change in changes:
@@ -1038,13 +1060,17 @@ def recompute_vendor_order(
                 )
             case AddLine(line=new):
                 if new.line_key in lines:
-                    raise AmendmentRefused(f"The order already has a line {new.line_key!r}.")
+                    raise AmendmentRefused(
+                        gettext("The order already has a line %(key)r.") % {"key": new.line_key}
+                    )
                 lines[new.line_key] = _new_line(new, ctx)
                 order.append(new.line_key)
             case Substitute(line_key=key, line=new):
                 existing(key)
                 if new.line_key in lines:
-                    raise AmendmentRefused(f"The order already has a line {new.line_key!r}.")
+                    raise AmendmentRefused(
+                        gettext("The order already has a line %(key)r.") % {"key": new.line_key}
+                    )
                 lines[new.line_key] = _new_line(new, ctx, replaces=key)
                 order[order.index(key)] = new.line_key
                 del lines[key]
@@ -1096,7 +1122,9 @@ def recompute_vendor_order(
                 line, portions=(VersionPortion.taxed(line.net, decision, ctx.tax_on),)
             )
     if not order:
-        raise AmendmentRefused("An amendment cannot remove every line: cancel the package instead.")
+        raise AmendmentRefused(
+            gettext("An amendment cannot remove every line: cancel the package instead.")
+        )
     _refuse_no_op(version, lines, order, shipping, changes, ctx)
     new_lines = tuple(lines[key] for key in order)
     shipping = replace(
@@ -1141,13 +1169,17 @@ def _refuse_combinations(changes: Sequence[AmendmentChange]) -> None:
     addresses = sum(isinstance(c, ChangeAddress) for c in changes)
     if carriers > 1 or addresses > 1:
         raise AmendmentRefused(
-            "An amendment can change the carrier once and the address once: put each change in "
-            "its own amendment."
+            gettext(
+                "An amendment can change the carrier once and the address once: put each change "
+                "in its own amendment."
+            )
         )
     if carriers and addresses:
         raise AmendmentRefused(
-            "Change the address and the carrier in two separate amendments: the address first, "
-            "then the carrier quoted for the new address."
+            gettext(
+                "Change the address and the carrier in two separate amendments: the address "
+                "first, then the carrier quoted for the new address."
+            )
         )
 
 
@@ -1174,8 +1206,10 @@ def _refuse_no_op(
     )
     if same_lines and same_shipping and not moved:
         raise AmendmentRefused(
-            "This amendment changes nothing: the lines, the shipping and the address would stay "
-            "as they are."
+            gettext(
+                "This amendment changes nothing: the lines, the shipping and the address would "
+                "stay as they are."
+            )
         )
 
 
@@ -1207,24 +1241,24 @@ class Classification:
 
 
 def _days(value: int | None) -> str:
-    return "unknown" if value is None else f"{value} days"
+    return gettext("unknown") if value is None else gettext("%(n)s days") % {"n": value}
 
 
 def _slower(before: int | None, after: int | None, allowed: int) -> str | None:
     """Why a new delivery time is not comparable, or None when it is."""
     if after is None:
-        return (
-            "the new delivery time is not known, so it cannot be shown to be comparable "
-            "to the old one"
+        return gettext(
+            "the new delivery time is not known, so it cannot be shown to be comparable to the "
+            "old one"
         )
     if before is None:
         return None
     extra = after - before
     if extra > allowed:
-        return (
-            f"the new maximum delivery time ({_days(after)}) is {extra} days longer than the old "
-            f"one ({_days(before)}), more than the {allowed} days a minor change allows"
-        )
+        return gettext(
+            "the new maximum delivery time (%(after)s) is %(extra)s days longer than the old one "
+            "(%(before)s), more than the %(allowed)s days a minor change allows"
+        ) % {"after": _days(after), "extra": extra, "before": _days(before), "allowed": allowed}
     return None
 
 
@@ -1250,17 +1284,17 @@ def classify_amendment(
     for change in changes:
         match change:
             case Substitute():
-                reasons.append("a substitute product needs the customer's consent")
+                reasons.append(gettext("a substitute product needs the customer's consent"))
             case AddLine():
-                reasons.append("an added line needs the customer's acceptance")
+                reasons.append(gettext("an added line needs the customer's acceptance"))
             case ChangeQuantity(line_key=key, quantity=quantity):
                 old = before.line(key)
                 if old is not None and quantity > old.quantity:
-                    reasons.append("a higher quantity needs the customer's acceptance")
+                    reasons.append(gettext("a higher quantity needs the customer's acceptance"))
             case ChangePrice(line_key=key, unit_price_net=price):
                 old = before.line(key)
                 if old is not None and price > old.unit_price_net:
-                    reasons.append("a higher price needs the customer's acceptance")
+                    reasons.append(gettext("a higher price needs the customer's acceptance"))
             case ChangeCarrier(offer=offer):
                 slower = _slower(before.shipping.max_days, offer.max_days, comparable_delay_days)
                 if slower:
@@ -1272,28 +1306,35 @@ def classify_amendment(
             case ChangeAddress():
                 if not change.requested_by_customer:
                     reasons.append(
-                        "an address change made on the vendor's or staff's own initiative needs "
-                        "the customer's acceptance"
+                        gettext(
+                            "an address change made on the vendor's or staff's own initiative "
+                            "needs the customer's acceptance"
+                        )
                     )
                 if preview.territory_changed:
                     reasons.append(
-                        "the new address is in another country or tax territory, which is never "
-                        "a minor change"
+                        gettext(
+                            "the new address is in another country or tax territory, which is "
+                            "never a minor change"
+                        )
                     )
                 elif _tax_changed(before, after):
-                    reasons.append("the new address changes the tax")
+                    reasons.append(gettext("the new address changes the tax"))
                 if after.shipping.net > before.shipping.net:
-                    reasons.append("the new address costs more to ship")
+                    reasons.append(gettext("the new address costs more to ship"))
                 if change.shipping is not None:  # the method quoted again for the new address
                     slower = _slower(
                         before.shipping.max_days, change.shipping.max_days, comparable_delay_days
                     )
                     if slower:
-                        reasons.append(f"at the new address {slower}")
+                        reasons.append(gettext("at the new address %(why)s") % {"why": slower})
     if preview.money_delta > 0:
         reasons.append(
-            f"the recompute raises what the customer pays by {preview.money_delta} EUR, and a "
-            "minor change never does"
+            gettext(
+                "the recompute raises what the customer pays by %(amount)s EUR, and a minor "
+                "change never does"
+            )
+            % {"amount": preview.money_delta}
         )
     unique = tuple(dict.fromkeys(reasons))
     return Classification(SUBSTANTIAL if unique else MINOR, unique)
@@ -1318,7 +1359,7 @@ def staff_change_error(initiator: str, changes: Sequence[AmendmentChange]) -> st
             continue
         if isinstance(change, ChangeAddress) and change.requested_by_customer:
             continue
-        return (
+        return gettext(
             "Platform staff may only change the carrier, or the address when the customer asks; "
             "products, quantities, prices and delivery times are changed by the vendor, who is "
             "the seller."
@@ -1337,10 +1378,13 @@ def staff_carrier_error(
     paid = preview.before.shipping.net
     for change in changes:
         if isinstance(change, ChangeCarrier) and change.offer.net > paid:
-            return (
-                f"Platform staff may change the carrier only to one at the same or a lower price: "
-                f"{change.offer.label or change.offer.key} costs {change.offer.net} EUR net, more "
-                f"than the {paid} EUR the customer paid for shipping. The vendor can make this "
-                "change itself."
-            )
+            return gettext(
+                "Platform staff may change the carrier only to one at the same or a lower price: "
+                "%(method)s costs %(cost)s EUR net, more than the %(paid)s EUR the customer paid "
+                "for shipping. The vendor can make this change itself."
+            ) % {
+                "method": change.offer.label or change.offer.key,
+                "cost": change.offer.net,
+                "paid": paid,
+            }
     return None

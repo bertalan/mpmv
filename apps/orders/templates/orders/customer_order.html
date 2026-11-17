@@ -55,6 +55,19 @@
           {% endfor %}
         </ol>
       {% endif %}
+      {% if part.notices %}
+        <h3 id="notices-{{ forloop.counter }}">{% translate "Messages we sent you about this package" %}</h3>
+        <ul class="order-notices" aria-labelledby="notices-{{ forloop.counter }}" data-notices>
+          {% for notice in part.notices %}
+            <li>
+              <details>
+                <summary><time datetime="{{ notice.at|date:'c' }}">{{ notice.at|date:"DATETIME_FORMAT" }}</time>: {{ notice.subject }}</summary>
+                <div class="order-notice-text">{{ notice.text|linebreaks }}</div>
+              </details>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
       {% if part.tracking %}
         <h3>{% translate "Tracking" %}</h3>
         <p>

@@ -354,6 +354,12 @@ class VendorOrder(_StateGuarded):
     ship_hold_until = models.DateTimeField(
         null=True, blank=True, help_text="Shipping is refused until then (cancel-the-rest hold)."
     )
+    # ORD.20 part 3b (spec 07, Invoicing): the vendor may record that it already issued its
+    # invoice or receipt; every applied change then shows the invoice notice prominently. It never
+    # blocks a change: correcting the fiscal document is the vendor's job.
+    invoice_issued_at = models.DateTimeField(
+        null=True, blank=True, help_text="When the vendor says it issued its invoice or receipt."
+    )
 
     class Meta:
         ordering = ["order", "id"]
@@ -793,3 +799,59 @@ class OrderAmendment(BaseModel):
 
     def delete(self, *args: Any, **kwargs: Any) -> Any:
         raise PermissionError("An amendment is kept as a record; discard a draft instead")
+
+
+class OrderEventAudience(models.TextChoices):
+    CUSTOMER = "customer", "Customer"
+    VENDOR = "vendor", "Vendor"
+
+
+class OrderEvent(BaseModel):
+    """A notice sent about an order, kept on a durable medium (art. 51(7) Codice del consumo;
+    spec 07, Durable medium; ORD.20 part 3b).
+
+    `subject` and `text` are the exact text of the email, in `language`, rendered when the email
+    was queued with the same context. `wording_version` is the CMP.24 version of the wording: the
+    SHA-256 of the template rendered in that language with fixed placeholders, so a changed text
+    in any language changes it. `terms` names the customer terms version in force when it was
+    sent. Append-only: a database trigger refuses updates and deletes, except the anonymisation
+    scrub (D-29) replacing the text, which may quote the vendor's free-text reason.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor_order__vendor"
+    objects: ClassVar[VendorScopedManager["OrderEvent"]] = VendorScopedManager()
+
+    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name="events")
+    vendor_order = models.ForeignKey(
+        VendorOrder, on_delete=models.PROTECT, null=True, blank=True, related_name="events"
+    )
+    kind = models.CharField(max_length=64, help_text="The email template key.")
+    audience = models.CharField(max_length=16, choices=OrderEventAudience.choices)
+    language = LanguageField()
+    subject = models.CharField(max_length=300)
+    text = models.TextField()
+    wording_version = models.CharField(max_length=71, help_text="sha256:<hex> (CMP.24).")
+    terms = models.JSONField(
+        default=dict, blank=True, help_text="The customer terms version in force when sent."
+    )
+    payload = models.JSONField(default=dict, blank=True, help_text="Amounts and references.")
+
+    class Meta:
+        ordering = ["order", "created_at", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(audience__in=OrderEventAudience.values),
+                name="orders_orderevent_audience_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.kind} ({self.audience}) on {self.order_id}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise PermissionError("An order event is append-only")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> Any:
+        raise PermissionError("An order event is append-only")

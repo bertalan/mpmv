@@ -1,0 +1,1 @@
+{% load i18n %}{% blocktranslate context "(L)" %}Order update {{ order_number }}: partial refund for an unavailable item{% endblocktranslate %}

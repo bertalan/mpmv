@@ -48,6 +48,7 @@ EVENT_FILES = (
             "_links",
             "_results",
             "_summary",
+            "_subscribe",
         )
     ),
 )
@@ -87,7 +88,12 @@ EXTRA_FILES = (
     "apps/cms/templatetags/cms_tags.py",  # the header's "Site links" item (OPS.12)
 )
 # Single Python modules scanned in full: customer-facing messages of apps that are not in SCOPES.
-FILES = ("apps/orders/messages.py", "apps/orders/amendments.py")
+FILES = (
+    "apps/orders/messages.py",
+    "apps/orders/amendments.py",
+    "apps/orders/amendment_engine.py",  # the classification reasons and refusals (ORD.20)
+    "apps/orders/amendment_notices.py",
+)
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
 HELP_TEXT_SCOPES = (

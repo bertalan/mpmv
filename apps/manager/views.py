@@ -41,10 +41,17 @@ from apps.core.audit import audit_context
 from apps.core.models import AuditLog
 from apps.core.public_forms import Protection, pre_mfa_step, public_form
 from apps.core.services import flag_enabled
+from apps.orders import amendments as orders_amendments
 from apps.orders import engine as orders_engine
 from apps.orders import versions as orders_versions
 from apps.orders.models import VendorOrder, VendorOrderState
-from apps.orders.services import AmendmentOpen, OrdersFrozen, ShipmentOnHold, fulfil_vendor_order
+from apps.orders.services import (
+    PAID_OR_LATER,
+    AmendmentOpen,
+    OrdersFrozen,
+    ShipmentOnHold,
+    fulfil_vendor_order,
+)
 from apps.payments import connect
 from apps.payments.models import ConnectedAccount
 from apps.payments.stripe_provider import client_from_settings
@@ -371,6 +378,13 @@ class VendorOrderDetailView(ManagerView):
             accept_url=reverse("manager:shop:order_action", args=[sub.public_id, "accept"]),
             ship_url=reverse("manager:shop:order_action", args=[sub.public_id, "ship"]),
             deliver_url=reverse("manager:shop:order_action", args=[sub.public_id, "deliver"]),
+            # ORD.20 part 3b (spec 07, Invoicing): the invoice notice after a change or a
+            # cancellation, prominent once the shop recorded its invoice; recording it is a POST.
+            invoice_issued_at=sub.invoice_issued_at,
+            invoice_notice=(version is not None and version.number > 1)
+            or (sub.state in {"cancelled", "refunded"} and order.state in PAID_OR_LATER),
+            can_record_invoice=sub.invoice_issued_at is None and order.state in PAID_OR_LATER,
+            invoice_url=reverse("manager:shop:order_invoice_issued", args=[sub.public_id]),
         )
         context.setdefault("form", ShipmentForm(initial={"carrier": sub.carrier}))
         return context
@@ -417,6 +431,30 @@ class VendorOrderActionView(VendorOrderDetailView):
         except (orders_engine.IllegalTransition, ValueError):
             return self.refused(sub)
         messages.success(request, _("The order was updated."))
+        return HttpResponseRedirect(reverse("manager:shop:order", args=[sub.public_id]))
+
+
+class VendorInvoiceIssuedView(VendorOrderDetailView):
+    """POST: the shop records that it issued its invoice or receipt for the order (spec 07,
+    Invoicing). Every later change then shows the invoice notice first; nothing is blocked."""
+
+    http_method_names = ["post", "options"]
+
+    @requires_level_method("orders_in_progress")
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        sub = self.sub_order()
+        actor = self.manager.user
+        if not isinstance(actor, User):
+            raise Http404("No such order.")
+        ctx = replace(audit_context(request), source=AuditLog.Source.VENDOR)
+        try:
+            orders_amendments.record_invoice_issued(sub, actor=actor, ctx=ctx)
+        except orders_amendments.AmendmentRefused as error:
+            context = self.get_context_data(action_error=str(error))
+            return self.render_to_response(context, status=409)
+        except PermissionDenied:
+            raise Http404("No such order.") from None
+        messages.success(request, _("The invoice is recorded as issued."))
         return HttpResponseRedirect(reverse("manager:shop:order", args=[sub.public_id]))
 
 
