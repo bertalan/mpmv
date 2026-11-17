@@ -30,7 +30,8 @@ def _photo(name: str) -> MediaImage:
     # Pages only use renditions that exist (CAT.4): make them as the upload job does.
     formats = picture_formats()
     image.get_renditions(*picture_specs("content", formats=formats))
-    return MediaImage.objects.get(pk=image.pk)
+    fresh: MediaImage = MediaImage.objects.get(pk=image.pk)
+    return fresh
 
 
 def test_a_page_serves_avif_and_webp_pictures_with_no_csp_violation(

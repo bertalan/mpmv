@@ -52,7 +52,8 @@ def _photo(
     specs = [s for preset in presets for s in images.picture_specs(preset, formats=formats)]
     if specs:
         image.get_renditions(*specs)
-    return MediaImage.objects.get(pk=image.pk)
+    fresh: MediaImage = MediaImage.objects.get(pk=image.pk)
+    return fresh
 
 
 def _logos() -> Collection:
