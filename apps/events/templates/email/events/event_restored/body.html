@@ -1,0 +1,7 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}Platform staff restored your event {{ title }}: it is shown on the site again.{% endblocktranslate %}</p>
+<p><a href="{{ event_url }}">{% translate "Open the event" %}</a></p>
+</body>
+</html>

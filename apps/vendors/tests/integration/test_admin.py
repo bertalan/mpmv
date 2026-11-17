@@ -89,7 +89,7 @@ def test_add_vendor_with_translations(staff_client: Client) -> None:
     data.update(management_form(2))
     data.update(
         {
-            "translations-0-language": "en",
+            "translations-0-language": primary_language(),
             "translations-0-status": "published",
             "translations-0-tagline": "Outdoor gear",
             "translations-0-description": "Family business.",
@@ -105,7 +105,7 @@ def test_add_vendor_with_translations(staff_client: Client) -> None:
     assert response.status_code == 302, response.content.decode()
     # I18N.2: staff set the workflow status; the IT draft falls back to the published EN texts.
     resolved = Vendor.objects.get().translation(other_language())
-    assert resolved.language == "en"
+    assert resolved.language == primary_language()
     assert resolved.is_fallback is True
 
     vendor = Vendor.objects.get()
@@ -123,7 +123,12 @@ def test_add_vendor_with_translations(staff_client: Client) -> None:
 def test_add_vendor_rejects_duplicate_translation_languages(staff_client: Client) -> None:
     data = vendor_form()
     data.update(management_form(2))
-    data.update({"translations-0-language": "en", "translations-1-language": "en"})
+    data.update(
+        {
+            "translations-0-language": primary_language(),
+            "translations-1-language": primary_language(),
+        }
+    )
     response = staff_client.post(reverse("admin:vendors_vendor_add"), data)
     assert response.status_code == 200  # form redisplayed with errors
     assert Vendor.objects.count() == 0
@@ -170,7 +175,7 @@ def test_change_vendor_does_not_let_staff_edit_the_status_directly(staff_client:
 
 
 def test_delete_vendor(staff_client: Client) -> None:
-    vendor = VendorFactory.create(languages=["en"])
+    vendor = VendorFactory.create(languages=[primary_language()])
     response = staff_client.post(
         reverse("admin:vendors_vendor_delete", args=[vendor.pk]), {"post": "yes"}
     )

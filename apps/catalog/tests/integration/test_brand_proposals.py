@@ -24,7 +24,7 @@ from apps.core.models import AuditLog
 from apps.core.translations import PUBLISHED
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import other_language
+from tests.i18n import localized, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -213,11 +213,11 @@ def test_approving_makes_the_brand_public_and_audits_it(client: Client) -> None:
     brand = brands.propose_brand(vendor, "Acme", ctx=CTX).brand
     assert brand is not None
     BrandTranslationFactory.create(brand=brand, slug="acme", status=PUBLISHED)
-    assert client.get("/brand/acme/").status_code == 404
+    assert client.get(localized("/brand/acme/")).status_code == 404
     brands.approve_brand(brand, ctx=CTX)
     brand.refresh_from_db()
     assert brand.status == Brand.Status.APPROVED
-    assert client.get("/brand/acme/").status_code == 200
+    assert client.get(localized("/brand/acme/")).status_code == 200
     assert _audits(brands.BRAND_APPROVED) == 1
 
 
@@ -261,7 +261,7 @@ def test_merging_moves_products_deletes_the_brand_and_redirects_its_page(
     BrandTranslationFactory.create(brand=target, slug="acme", status=PUBLISHED)
     ProductFactory.create_batch(2, brand=source)
     other = ProductFactory.create(brand=target)
-    assert client.get("/brand/acme-old/").status_code == 200
+    assert client.get(localized("/brand/acme-old/")).status_code == 200
 
     changes = brands.merge_brands(source, target, ctx=CTX)
 
@@ -269,18 +269,18 @@ def test_merging_moves_products_deletes_the_brand_and_redirects_its_page(
     assert Product.objects.filter(brand=target).count() == 3
     other.refresh_from_db()
     assert other.brand == target
-    redirect = Redirect.objects.get(source_path="/brand/acme-old/")
-    assert redirect.target_path == "/brand/acme/"
+    redirect = Redirect.objects.get(source_path=localized("/brand/acme-old/"))
+    assert redirect.target_path == localized("/brand/acme/")
     assert redirect.code == 301
     assert redirect.origin == Redirect.Origin.MERGED_BRAND
-    response = client.get("/brand/acme-old/")
+    response = client.get(localized("/brand/acme-old/"))
     assert response.status_code == 301
-    assert response["Location"] == "/brand/acme/"
+    assert response["Location"] == localized("/brand/acme/")
     assert not changes.is_empty
     # The removed brand, and the target with its new product count.
     assert _audits(brands.BRAND_MERGED) == 2
     assert AuditLog.objects.filter(
-        action="catalog.redirect.created", target_key="/brand/acme-old/"
+        action="catalog.redirect.created", target_key=localized("/brand/acme-old/")
     ).exists()
 
 
@@ -300,17 +300,19 @@ def test_merging_redirects_every_language_and_keeps_earlier_redirects_one_hop() 
         brand=target, slug="nuovo", language=other_language(), status=PUBLISHED
     )
     earlier = Redirect.objects.create(
-        source_path="/brand/older/",
+        source_path=localized("/brand/older/"),
         code=301,
         target_kind=Redirect.Target.PATH,
-        target_path="/brand/old/",
+        target_path=localized("/brand/old/"),
     )
     brands.merge_brands(source, target, ctx=CTX)
     paths = dict(Redirect.objects.values_list("source_path", "target_path"))
-    assert paths["/brand/old/"] == "/brand/new/"
-    assert paths["/it/marchio/vecchio/"] == "/it/marchio/nuovo/"
+    assert paths[localized("/brand/old/")] == localized("/brand/new/")
+    assert paths[localized("/brand/vecchio/", other_language())] == localized(
+        localized("/brand/nuovo/"), other_language()
+    )
     earlier.refresh_from_db()
-    assert earlier.target_path == "/brand/new/"
+    assert earlier.target_path == localized("/brand/new/")
 
 
 def test_merging_a_pending_brand_makes_no_redirect_and_moves_vendor_products() -> None:

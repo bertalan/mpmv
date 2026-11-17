@@ -31,9 +31,11 @@ from apps.catalog.tests.factories import (
     TermFactory,
     TermTranslationFactory,
 )
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import language_prefix, other_language, product_url
 
 pytestmark = pytest.mark.django_db
 
@@ -60,7 +62,11 @@ def listed(title: str, **kwargs: Any) -> Product:
         product=product, title=title, slug=f"{slug}-en", status=PUBLISHED
     )
     ProductTranslationFactory.create(
-        product=product, language="it", title=f"{title} IT", slug=f"{slug}-it", status=PUBLISHED
+        product=product,
+        language=other_language(),
+        title=f"{title} IT",
+        slug=f"{slug}-it",
+        status=PUBLISHED,
     )
     return product
 
@@ -74,25 +80,25 @@ def shop() -> dict[str, Any]:
         taxonomy=compat, name="Compatibility", slug="compatibility", status=PUBLISHED
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=compat, language="it", name="Compatibilità", slug="compatibilita",
+        taxonomy=compat, language=other_language(), name="Compatibilità", slug="compatibilita",
         status=PUBLISHED,
     )  # fmt: skip
     maker = TermFactory.create(taxonomy=compat)
     TermTranslationFactory.create(term=maker, name="Maker", slug="maker", status=PUBLISHED)
     TermTranslationFactory.create(
-        term=maker, language="it", name="Marca", slug="marca", status=PUBLISHED
+        term=maker, language=other_language(), name="Marca", slug="marca", status=PUBLISHED
     )
     colour = TaxonomyFactory.create(code="colour", hierarchical=False)
     TaxonomyTranslationFactory.create(
         taxonomy=colour, name="Colour", slug="colour", status=PUBLISHED
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=colour, language="it", name="Colore", slug="colore", status=PUBLISHED
+        taxonomy=colour, language=other_language(), name="Colore", slug="colore", status=PUBLISHED
     )
     red = TermFactory.create(taxonomy=colour)
     TermTranslationFactory.create(term=red, name="Red", slug="red", status=PUBLISHED)
     TermTranslationFactory.create(
-        term=red, language="it", name="Rosso", slug="rosso", status=PUBLISHED
+        term=red, language=other_language(), name="Rosso", slug="rosso", status=PUBLISHED
     )
     blue = TermFactory.create(taxonomy=colour)
     TermTranslationFactory.create(term=blue, name="Blue", slug="blue", status=PUBLISHED)
@@ -117,7 +123,12 @@ def test_the_name_is_the_only_h1(client: Client, shop: dict[str, Any]) -> None:
     assert [
         h.get_text(strip=True) for h in soup(client, "/compatibility/maker/").find_all("h1")
     ] == ["Maker"]
-    assert soup(client, "/it/compatibilita/marca/").h1.get_text(strip=True) == "Marca"
+    assert (
+        soup(client, f"{language_prefix(other_language())}/compatibilita/marca/").h1.get_text(
+            strip=True
+        )
+        == "Marca"
+    )
 
 
 def test_the_head_has_title_canonical_robots_and_hreflang(
@@ -130,7 +141,7 @@ def test_the_head_has_title_canonical_robots_and_hreflang(
     )
     assert page.head.find("meta", attrs={"name": "robots"})["content"] == "index, follow"
     hreflangs = {link["hreflang"] for link in page.head.find_all("link", hreflang=True)}
-    assert {"en", "it", "x-default"} <= hreflangs
+    assert {primary_language(), other_language(), "x-default"} <= hreflangs
 
 
 def test_no_inline_script_or_style(client: Client, shop: dict[str, Any]) -> None:
@@ -148,9 +159,11 @@ def test_no_inline_script_or_style(client: Client, shop: dict[str, Any]) -> None
 def test_the_filter_form_is_a_plain_get_form_on_the_page_url(
     client: Client, shop: dict[str, Any]
 ) -> None:
-    form = soup(client, "/it/compatibilita/marca/").find("form", attrs={"role": "search"})
+    form = soup(client, f"{language_prefix(other_language())}/compatibilita/marca/").find(
+        "form", attrs={"role": "search"}
+    )
     assert form["method"].lower() == "get"
-    assert form["action"] == "/it/compatibilita/marca/"
+    assert form["action"] == f"{language_prefix(other_language())}/compatibilita/marca/"
     boxes = {(box["name"], box["value"]) for box in form.find_all("input", type="checkbox")}
     assert ("colore", "rosso") in boxes
     # A term without an IT text is offered with its EN slug (the explicit fallback).
@@ -202,9 +215,9 @@ def test_product_cards_show_title_link_and_public_price(
     assert set(by_title) == {"Steel bag", "Custom bag"}
     priced = by_title["Steel bag"]
     assert priced.find("a")["href"] == "/product/steel-bag-en/"
-    it_page = soup(client, "/it/compatibilita/marca/")
+    it_page = soup(client, f"{language_prefix(other_language())}/compatibilita/marca/")
     assert it_page.find("a", string=re.compile("Steel bag IT"))["href"] == (
-        "/it/prodotto/steel-bag-it/"
+        product_url(other_language(), "steel-bag-it")
     )
     # The consumer price with Italian VAT (TAX.12): 12.50 + 22 % = 15.25. The machine-readable
     # price is never localised (the IT page shows "15,25").
@@ -305,7 +318,7 @@ def test_a_card_on_a_fallback_language_page_links_to_the_source_language_url(
         product=product, title="Plain bag", slug="plain-bag-en", status=PUBLISHED
     )
     product.terms.add(shop["maker"])
-    page = soup(client, "/it/compatibilita/marca/")
+    page = soup(client, f"{language_prefix(other_language())}/compatibilita/marca/")
     assert page.find("a", string=re.compile("Plain bag"))["href"] == "/product/plain-bag-en/"
 
 

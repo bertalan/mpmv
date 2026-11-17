@@ -19,6 +19,7 @@ from apps.accounts.tests.fakes import FakeCaptchaVerifier
 from apps.compliance.models import Notice
 from apps.compliance.tests.integration.test_withdrawal_views import paid_order
 from apps.core.public_forms import Protection, public_form_report
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -184,11 +185,14 @@ def test_the_language_switch_is_rate_limited_per_ip(client: Client) -> None:
     from apps.accounts.views import SWITCH_LIMIT
 
     for _ in range(SWITCH_LIMIT):
-        assert client.post("/i18n/switch/", {"language": "it", "next": "/"}).status_code == 302
-    limited = client.post("/i18n/switch/", {"language": "it", "next": "/"})
+        assert (
+            client.post("/i18n/switch/", {"language": other_language(), "next": "/"}).status_code
+            == 302
+        )
+    limited = client.post("/i18n/switch/", {"language": other_language(), "next": "/"})
     assert limited.status_code == 429
     assert int(limited["Retry-After"]) >= 1
     other = client.post(
-        "/i18n/switch/", {"language": "it", "next": "/"}, REMOTE_ADDR="198.51.100.77"
+        "/i18n/switch/", {"language": other_language(), "next": "/"}, REMOTE_ADDR="198.51.100.77"
     )
     assert other.status_code == 302

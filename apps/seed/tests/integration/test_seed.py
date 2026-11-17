@@ -24,6 +24,7 @@ from apps.catalog.tests.factories import (
 from apps.cms.models import HomePage, LegalPage, StandardPage
 from apps.cms.tests.factories import StandardPageFactory
 from apps.core.changeset import ChangeSet
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import AuditLog
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage
@@ -46,8 +47,12 @@ from apps.vendors import engine as vendors_engine
 from apps.vendors import services as vendors_services
 from apps.vendors.models import CommissionRule, ContractAcceptance, Vendor
 from apps.vendors.tests.factories import CommissionRuleFactory, VendorFactory
+from tests.i18n import language_prefix, localized, other_language, third_language
 
 pytestmark = pytest.mark.django_db
+
+if len(configured_languages()) < 3:  # I18N.15 part 3: these cases name three languages
+    pytest.skip("needs three configured languages", allow_module_level=True)
 
 SEEDED_MODELS = (
     Vendor,
@@ -84,7 +89,10 @@ def test_the_seed_builds_active_vendors_with_every_regime(demo_seed: ChangeSet) 
         assert profile.exempt_country == spec.exempt_country  # TAX.13
         profile.full_clean()
         assert ContractAcceptance.objects.filter(vendor=vendor).count() == 1
-        assert {t.language for t in vendor.translations.all()} == {"en", "it"}
+        assert {t.language for t in vendor.translations.all()} == {
+            primary_language(),
+            other_language(),
+        }
         assert (
             vendors_engine.dac7_missing(
                 vendor.legal_identity(), vendors_engine.SEEDED_NO_TIN_COUNTRIES
@@ -122,7 +130,7 @@ def test_the_seed_builds_a_published_bilingual_catalog(demo_seed: ChangeSet) -> 
         assert isinstance(product.price_net, Decimal)
         assert product.price_net > 0
         texts = {t.language: t for t in product.translations.all()}
-        assert set(texts) == {"en", "it"}
+        assert set(texts) == {primary_language(), other_language()}
         assert {t.status for t in texts.values()} == {"published"}
         assert all(t.slug for t in texts.values())
     assert Variant.objects.filter(product__in=products).count() > 20
@@ -176,7 +184,7 @@ def test_a_dry_run_writes_nothing() -> None:
 
 def test_reset_removes_only_the_seed_and_a_new_seed_restores_it() -> None:
     other_vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
-    other_product = ProductFactory.create(vendor=other_vendor, languages=["en"])
+    other_product = ProductFactory.create(vendor=other_vendor, languages=[primary_language()])
     other_category = CategoryFactory.create()
     CategoryTranslationFactory.create(category=other_category, slug="other-things")
     seed(ctx=TEST_CONTEXT)
@@ -187,7 +195,7 @@ def test_reset_removes_only_the_seed_and_a_new_seed_restores_it() -> None:
 
     assert not Product.objects.filter(vendor__in=seeded).exists()
     assert not ShippingZone.objects.filter(vendor__in=seeded).exists()
-    assert not StandardPage.objects.filter(slug=data.HOW_IT_WORKS.slug["en"]).exists()
+    assert not StandardPage.objects.filter(slug=data.HOW_IT_WORKS.slug[primary_language()]).exists()
     assert not EventPage.objects.filter(slug__startswith="demo-").exists()
     assert not LegalPage.objects.filter(live=True, slug__startswith="demo-").exists()
     # Contract acceptances are append-only legal evidence (VEN.5): the vendors are closed.
@@ -218,23 +226,32 @@ def test_the_command_reports_the_changes_and_the_time() -> None:
 
 STOREFRONT = (
     ("/", "Made by independent makers"),
-    ("/it/", "Fatto da artigiani indipendenti"),
-    ("/de/", "Von unabhängigen Herstellern"),
-    ("/product-category/demo-home-kitchen/", "Stoneware dinner plate"),
-    ("/it/categoria-prodotto/demo-casa-e-cucina/", "Piatto piano in gres"),
+    (f"{language_prefix(other_language())}/", "Fatto da artigiani indipendenti"),
+    (f"{language_prefix(third_language())}/", "Von unabhängigen Herstellern"),
+    (localized("/product-category/demo-home-kitchen/"), "Stoneware dinner plate"),
+    (
+        localized("/product-category/demo-casa-e-cucina/", other_language()),
+        "Piatto piano in gres",
+    ),
     ("/material/wool/", "Merino crew-neck jumper"),
-    ("/it/materiale/lana/", "Maglione girocollo in merino"),
-    ("/brand/demo-brand-gamma/", "Essays on slow making"),
-    ("/shop/vendor-d-outdoor/", "Steel camp lantern"),
-    ("/it/shop/vendor-e-studio/", "Lampada da tavolo in ceramica"),
+    (f"{language_prefix(other_language())}/materiale/lana/", "Maglione girocollo in merino"),
+    (localized("/brand/demo-brand-gamma/"), "Essays on slow making"),
+    (localized("/shop/vendor-d-outdoor/"), "Steel camp lantern"),
+    (
+        localized("/shop/vendor-e-studio/", other_language()),
+        "Lampada da tavolo in ceramica",
+    ),
     ("/demo-how-it-works/", "How it works (demo)"),
-    ("/it/demo-come-funziona/", "Come funziona (demo)"),
+    (f"{language_prefix(other_language())}/demo-come-funziona/", "Come funziona (demo)"),
     ("/demo-showcase/", "Showcase (demo)"),
-    ("/it/demo-vetrina/", "Vetrina (demo)"),
+    (f"{language_prefix(other_language())}/demo-vetrina/", "Vetrina (demo)"),
     ("/demo-terms-of-sale/", "DEMO PLACEHOLDER"),
-    ("/it/demo-condizioni-di-vendita/", "SEGNAPOSTO"),
+    (f"{language_prefix(other_language())}/demo-condizioni-di-vendita/", "SEGNAPOSTO"),
     ("/events/", "Makers fair (demo)"),
-    ("/it/events/demo-fiera-artigiani/", "Fiera degli artigiani (demo)"),
+    (
+        f"{language_prefix(other_language())}/events/demo-fiera-artigiani/",
+        "Fiera degli artigiani (demo)",
+    ),
 )
 
 
@@ -362,7 +379,7 @@ def test_the_showcase_page_is_noindex_by_itself_and_frames_only_the_video_origin
     assert not StandardPage.objects.filter(noindex=True).exclude(pk__in=pages).exists()
     SeoSettings.objects.create(site=Site.objects.get(is_default_site=True), allow_indexing=True)
     with override_settings(FORCE_NOINDEX=False, DEMO_MODE=False):
-        for path in ("/demo-showcase/", "/it/demo-vetrina/"):
+        for path in ("/demo-showcase/", f"{language_prefix(other_language())}/demo-vetrina/"):
             response = client.get(path)
             assert 'name="robots" content="noindex"' in response.content.decode(), path
             assert "https://www.youtube-nocookie.com" in response["Content-Security-Policy"]

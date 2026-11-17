@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% load i18n static %}
+{% load i18n static event_feeds events_tags %}
 {% comment %}
   Listing page (CAT.8): category, taxonomy term, brand, vendor storefront. Minimal and semantic;
   THM.3 and THM.7 restyle it. No inline script or style (the CSP has no 'unsafe-inline'): the
@@ -11,6 +11,7 @@
 {% block description %}{% if editorial.description %}<meta name="description" content="{{ editorial.description }}">{% endif %}{% endblock %}
 {% block head %}
   {% robots_meta robots %}
+  {% if anchor.scope.vendor %}{% event_feed_alternates vendor=anchor.scope.vendor.slug %}{% endif %}
   {% if previous_url %}<link rel="prev" href="{{ previous_url }}">{% endif %}
   {% if next_url %}<link rel="next" href="{{ next_url }}">{% endif %}
   <link rel="stylesheet" href="{% static 'catalog/listing.css' %}">
@@ -26,6 +27,7 @@
     {% if vendor_profile %}{% include "catalog/includes/vendor_profile.html" %}{% endif %}
     {% if brand_profile and not brand_profile.is_empty %}{% include "catalog/includes/brand_profile.html" %}{% endif %}
     {% if editorial.before %}{{ editorial.before }}{% endif %}
+    {% if scope.vendor %}{% get_current_language as page_language %}{% storefront_events scope.vendor page_language %}{% endif %}
     {% if store_categories %}{% include "catalog/includes/store_categories.html" %}{% endif %}
 
     {% include "catalog/includes/listing_filters.html" %}

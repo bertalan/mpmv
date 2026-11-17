@@ -29,9 +29,12 @@ class EventsConfig(AppConfig):
 
         from apps.cms.models import HomePage
 
-        from . import signals
+        from . import notifications, signals
         from .models import EventPage
 
+        # EVT.11: the vendor gets its moderation emails from the outbox, not from Wagtail.
+        notifications.register_changes_purpose()
+        notifications.switch_off_wagtail_vendor_emails()
         # An events index in every enabled language: after migrate, and when a home page of a
         # new language is published (spec 15 "Languages").
         post_migrate.connect(

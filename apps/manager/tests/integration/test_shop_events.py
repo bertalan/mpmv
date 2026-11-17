@@ -24,6 +24,7 @@ from apps.events.models import EVENT_MODERATORS, EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -159,12 +160,14 @@ def test_creating_an_event_saves_a_draft_of_the_shop(signed_in: Client, vendor: 
 
 def test_a_new_event_is_written_in_the_active_language(signed_in: Client) -> None:
     seed_site()  # a home page per language, then an events index for each
-    User.objects.update(preferred_language="it")  # I18N.12: decides the Manager's language
+    User.objects.update(
+        preferred_language=other_language()
+    )  # I18N.12: decides the Manager's language
     response = signed_in.post(reverse(NEW), _post_data())
     assert response.status_code == 302, response.context["form"].errors
     page = EventPage.objects.get(title="Autumn fair")
-    assert page.locale.language_code == "it"
-    assert page.original_locale.language_code == "it"
+    assert page.locale.language_code == other_language()
+    assert page.original_locale.language_code == other_language()
 
 
 def test_the_weekly_preset_writes_the_rrule_and_the_form_shows_it_again(
@@ -406,3 +409,63 @@ def test_the_pages_render_under_the_ride_theme(
     html = signed_in.get(_urls(page)["edit"]).text
     assert 'name="recurrence"' in html
     assert 'name="title"' in html
+
+
+# --- The statements of reasons page (the hidden-event email links to it)
+
+
+def test_the_statements_page_lists_this_shops_statements_only(
+    signed_in: Client, vendor: Vendor
+) -> None:
+    from apps.compliance.tests.factories import StatementOfReasonsFactory
+
+    mine = StatementOfReasonsFactory.create(vendor=vendor, facts="Misleading dates.")
+    theirs = StatementOfReasonsFactory.create(facts="Someone else's facts.")
+    response = signed_in.get(reverse("manager:shop:statements"))
+    assert response.status_code == 200
+    assert str(mine.public_id) in response.text
+    assert "Misleading dates." in response.text
+    assert str(theirs.public_id) not in response.text
+
+
+def test_the_statements_page_hides_other_shops_by_any_parameter(
+    signed_in: Client, vendor: Vendor
+) -> None:
+    from apps.compliance.tests.factories import NoticeFactory, StatementOfReasonsFactory
+
+    theirs = StatementOfReasonsFactory.create(facts="Someone else's facts.")
+    notice = NoticeFactory.create()
+    other = StatementOfReasonsFactory.create(notice=notice, facts="Other shop notice facts.")
+    url = reverse("manager:shop:statements")
+    for query in (
+        f"?id={theirs.public_id}",
+        f"?statement={theirs.pk}",
+        f"?notice={notice.public_id}",
+        f"?vendor={theirs.vendor.pk}",
+    ):
+        response = signed_in.get(url + query)
+        assert response.status_code == 200, query
+        # The language switcher echoes the query string, so look for the page's own markers.
+        for text in (
+            f"statement-{theirs.public_id}",
+            f"notice-{notice.public_id}",
+            "Someone else's facts.",
+            "Other shop notice facts.",
+        ):
+            assert text not in response.text, (query, text)
+    # An id in the path is not a route at all.
+    assert signed_in.get(f"{url}{theirs.public_id}/").status_code == 404
+    assert other.vendor_id != vendor.pk
+
+
+def test_the_statements_page_shows_no_notifier_identity(signed_in: Client, vendor: Vendor) -> None:
+    from apps.compliance.tests.factories import NoticeFactory, StatementOfReasonsFactory
+
+    notice = NoticeFactory.create(
+        notifier_name="Zelda Notifier", notifier_email="zelda.notifier@example.org"
+    )
+    StatementOfReasonsFactory.create(vendor=vendor, notice=notice)
+    html = signed_in.get(reverse("manager:shop:statements")).text
+    assert str(notice.public_id) in html  # the page does list the statement
+    assert "Zelda Notifier" not in html
+    assert "zelda.notifier" not in html

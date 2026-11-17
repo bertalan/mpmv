@@ -326,7 +326,7 @@ def test_an_owner_accepts_the_current_contract_from_the_request_ip() -> None:
     assert acceptance.vendor == member.vendor
     assert acceptance.contract == contract
     assert acceptance.user == member.user
-    assert acceptance.language == "it"
+    assert acceptance.language == other_language()
     assert acceptance.ip == "203.0.113.7"
     assert acceptance.text_hash == source_hash(italian.source_values())
     assert timezone.now() - acceptance.accepted_at < dt.timedelta(minutes=1)
@@ -345,7 +345,7 @@ def test_the_english_text_is_accepted_when_the_language_has_none() -> None:
     contract = VendorContractFactory.create()
     accept(member.vendor, member.user, language=third_language(), ctx=vendor_ctx(member.user.pk))
     acceptance = ContractAcceptance.objects.get()
-    assert acceptance.language == "en"
+    assert acceptance.language == primary_language()
     english = contract.translations.get(language=primary_language())
     assert acceptance.text_hash == source_hash(english.source_values())
 
@@ -464,16 +464,16 @@ def test_acceptances_are_append_only_in_the_database() -> None:
 def test_the_offer_is_the_version_in_force_with_the_hash_of_its_text() -> None:
     contract = VendorContractFactory.create()
     italian = VendorContractTranslationFactory.create(contract=contract, language=other_language())
-    offer = contract_offer("it")
+    offer = contract_offer(other_language())
     assert (offer.contract, offer.text) == (contract, italian)
     assert offer.text_hash == source_hash(italian.source_values())
-    assert contract_offer("de").text.language == "en"
+    assert contract_offer("de").text.language == primary_language()
 
 
 def test_a_version_that_is_no_longer_in_force_cannot_be_accepted() -> None:
     member = onboarding_owner()
     VendorContractFactory.create(valid_from=timezone.now() - dt.timedelta(days=10))
-    shown = contract_offer("en")
+    shown = contract_offer(primary_language())
     VendorContractFactory.create(valid_from=timezone.now() - dt.timedelta(seconds=1))
 
     with pytest.raises(engine.ContractChanged, match="no longer in force"):
@@ -492,7 +492,7 @@ def test_a_version_that_is_no_longer_in_force_cannot_be_accepted() -> None:
 def test_a_text_edited_after_it_was_shown_cannot_be_accepted() -> None:
     member = onboarding_owner()
     VendorContractFactory.create()
-    shown = contract_offer("en")
+    shown = contract_offer(primary_language())
     text = shown.contract.translations.get(language=primary_language())
     text.body = "Terms edited by staff while the owner reads"
     text.save()
@@ -512,7 +512,7 @@ def test_a_text_edited_after_it_was_shown_cannot_be_accepted() -> None:
             accept_shown(stale)
     assert not ContractAcceptance.objects.exists()
 
-    reread = contract_offer("en")  # the page shows the edited text again
+    reread = contract_offer(primary_language())  # the page shows the edited text again
     accept_shown(reread.text_hash)
     acceptance = ContractAcceptance.objects.get()
     assert acceptance.text_hash == source_hash(text.source_values())
@@ -522,7 +522,7 @@ def test_a_text_unpublished_after_it_was_shown_cannot_be_accepted() -> None:
     member = onboarding_owner()
     contract = VendorContractFactory.create()
     italian = VendorContractTranslationFactory.create(contract=contract, language=other_language())
-    shown = contract_offer("it")
+    shown = contract_offer(other_language())
     italian.status = VendorContractTranslation.Status.MACHINE
     italian.save()
     with pytest.raises(engine.ContractChanged):
@@ -596,7 +596,7 @@ def test_two_new_versions_saved_at_once_are_numbered_one_after_the_other(existin
 def test_an_acceptance_waits_for_a_text_edit_in_progress_then_refuses_the_old_text() -> None:
     member = onboarding_owner()
     VendorContractFactory.create()
-    shown = contract_offer("en")
+    shown = contract_offer(primary_language())
     with transaction.atomic():
         text = shown.contract.translations.get(language=primary_language())
         text.body = "Terms edited at the same moment"
@@ -622,7 +622,7 @@ def test_an_acceptance_waits_for_a_text_edit_in_progress_then_refuses_the_old_te
 def test_a_text_edit_waits_for_an_acceptance_in_progress_then_is_refused() -> None:
     member = onboarding_owner()
     VendorContractFactory.create()
-    shown = contract_offer("en")
+    shown = contract_offer(primary_language())
 
     def edit() -> None:
         text = VendorContractTranslation.objects.get(pk=shown.text.pk)

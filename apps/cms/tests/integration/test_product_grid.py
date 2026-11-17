@@ -46,7 +46,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import other_language
+from tests.i18n import language_prefix, localized, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -162,7 +162,7 @@ def test_a_term_grid_renders_the_cat8_results(seeded: SeedReport, maker: Term) -
     newer.terms.add(maker)
     html = _publish(_home(), [_grid("term", maker)])
     expected = catalog.listing_page(
-        catalog.ListingScope(term=maker), ListingParams(), "en"
+        catalog.ListingScope(term=maker), ListingParams(), primary_language()
     ).products
     assert [p.pk for p in expected] == [newer.pk, older.pk]
     assert _titles(html) == ["Leather bag", "Steel bag"]
@@ -174,7 +174,7 @@ def test_a_term_grid_renders_the_cat8_results(seeded: SeedReport, maker: Term) -
     note = "Indicative price. Final amount at checkout."  # TAX.12: with VAT, IT 22 %
     assert prices == [f"EUR 12.20 {note}", f"EUR 15.25 {note}"]
     links = [a["href"] for a in section.find_all("a")]
-    assert any(href.endswith("-en/") and "/product/" in href for href in links)
+    assert any(href.endswith("-en/") and localized("/product/") in href for href in links)
 
 
 def test_the_grid_renders_the_base_theme_product_tiles(seeded: SeedReport, maker: Term) -> None:
@@ -200,7 +200,7 @@ def test_the_grid_follows_the_page_language(seeded: SeedReport, maker: Term) -> 
     html = _publish(_home(other_language()), [_grid("term", maker, heading="Scelti per te")])
     assert _titles(html) == ["Steel bag IT"]
     see_all = _grid_section(html).find("a", class_="product-grid-all")
-    assert see_all["href"] == "/it/compatibilita/marca/"
+    assert see_all["href"] == f"{language_prefix(other_language())}/compatibilita/marca/"
 
 
 def test_the_grid_shows_at_most_its_limit(seeded: SeedReport, maker: Term) -> None:
@@ -305,7 +305,7 @@ def test_a_category_grid(seeded: SeedReport) -> None:
     html = _publish(_home(), [_grid("category", bags)])
     assert _titles(html) == ["Steel bag"]
     see_all = _grid_section(html).find("a", class_="product-grid-all")
-    assert see_all["href"] == "/product-category/bags/"
+    assert see_all["href"] == localized("/product-category/bags/")
 
 
 def test_a_brand_grid(seeded: SeedReport) -> None:
@@ -316,7 +316,7 @@ def test_a_brand_grid(seeded: SeedReport) -> None:
     html = _publish(_home(), [_grid("brand", brand)])
     assert _titles(html) == ["Steel bag"]
     see_all = _grid_section(html).find("a", class_="product-grid-all")
-    assert see_all["href"] == "/brand/ferro/"
+    assert see_all["href"] == localized("/brand/ferro/")
 
 
 def test_a_vendor_grid(seeded: SeedReport) -> None:
@@ -328,7 +328,7 @@ def test_a_vendor_grid(seeded: SeedReport) -> None:
     html = _publish(_about(), [_grid("vendor", vendor)])
     assert _titles(html) == ["Acme bag"]
     see_all = _grid_section(html).find("a", class_="product-grid-all")
-    assert see_all["href"] == "/shop/acme/"
+    assert see_all["href"] == localized("/shop/acme/")
 
 
 # --- The block's rules
@@ -444,11 +444,11 @@ def test_a_grid_without_its_listing_link_skips_the_listing_lookup(
     listed("Steel bag").terms.add(maker)
     scope = catalog.ListingScope(term=maker)
     with CaptureQueriesContext(connection) as with_anchor:
-        grid = catalog.product_grid(scope, "en", limit=8, with_anchor=True)
+        grid = catalog.product_grid(scope, primary_language(), limit=8, with_anchor=True)
     assert grid.see_all_url == "/compatibility/maker/"
     assert grid.name == "Maker"
     with django_assert_num_queries(2):
-        bare = catalog.product_grid(scope, "en", limit=8, with_anchor=False)
+        bare = catalog.product_grid(scope, primary_language(), limit=8, with_anchor=False)
     assert len(with_anchor) > 2
     assert [c.title for c in bare.cards] == ["Steel bag"]
     assert bare.see_all_url is None

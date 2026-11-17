@@ -1,0 +1,22 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}The statements of reasons sent to the shop (DSA art. 17, P2B art. 4): read only.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}: {{ manager.vendor.display_name }}</h1>
+  {% for statement in statements %}
+    <section id="{% if statement.notice %}notice-{{ statement.notice.public_id }}{% else %}statement-{{ statement.public_id }}{% endif %}" aria-labelledby="statement-{{ statement.public_id }}-title">
+      <h2 id="statement-{{ statement.public_id }}-title">{% blocktranslate with date=statement.sent_at|date:"SHORT_DATETIME_FORMAT" %}Statement of {{ date }}{% endblocktranslate %}</h2>
+      <dl class="manager-details">
+        <dt>{% translate "Reference" %}</dt><dd>{{ statement.public_id }}</dd>
+        {% if statement.notice %}<dt>{% translate "Notice reference" %}</dt><dd>{{ statement.notice.public_id }}</dd>{% endif %}
+        <dt>{% translate "What is restricted" %}</dt><dd>{{ statement.scope|linebreaksbr }}</dd>
+        {% if statement.valid_until %}<dt>{% translate "Valid until" %}</dt><dd>{{ statement.valid_until|date:"Y-m-d" }}</dd>{% endif %}
+        <dt>{% translate "Facts and circumstances" %}</dt><dd>{{ statement.facts|linebreaksbr }}</dd>
+        <dt>{% translate "Ground" %}</dt><dd>{{ statement.ground|linebreaksbr }}</dd>
+      </dl>
+      {% if statement.redress_text %}<p>{{ statement.redress_text|linebreaksbr }}</p>{% endif %}
+    </section>
+  {% empty %}
+    <p>{% translate "The platform has sent no statement of reasons for your shop." %}</p>
+  {% endfor %}
+{% endblock %}

@@ -116,7 +116,7 @@ def test_translations_hold_tagline_description_and_policies() -> None:
         vendor=vendor, language=other_language(), tagline="Attrezzatura"
     )
     assert sorted(vendor.translations.values_list("language", flat=True)) == [
-        "en",
+        primary_language(),
         other_language(),
     ]
     it = vendor.translations.get(language=other_language())
@@ -125,7 +125,7 @@ def test_translations_hold_tagline_description_and_policies() -> None:
 
 
 def test_one_translation_per_vendor_and_language() -> None:
-    vendor = VendorFactory.create(languages=["en"])
+    vendor = VendorFactory.create(languages=[primary_language()])
     with pytest.raises(IntegrityError), transaction.atomic():
         VendorTranslationFactory.create(vendor=vendor, language=primary_language())
 
@@ -143,6 +143,6 @@ def test_translation_language_must_be_a_configured_language() -> None:
 
 
 def test_translations_are_deleted_with_the_vendor() -> None:
-    vendor = VendorFactory.create(languages=["en"])
+    vendor = VendorFactory.create(languages=[primary_language()])
     vendor.delete()
     assert VendorTranslation.objects.count() == 0

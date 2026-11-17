@@ -635,6 +635,10 @@ ENDPOINTS: dict[str, Access] = {
     # CMP.5 part 4: the notice of termination and the data download show the selected vendor only.
     "manager:shop:sales_terms": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:shop:termination": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # The statements of reasons of the selected shop (DSA art. 17); another shop's are never listed.
+    "manager:shop:statements": VendorScopedList(
+        make=lambda vendor: StatementOfReasonsFactory.create(vendor=vendor)
+    ),
     # The download exists only while a notice is pending: the vendor made here has one.
     "manager:shop:termination_data": VendorScopedList(
         make=vendor_with_pending_termination, identify=vendor_display_name

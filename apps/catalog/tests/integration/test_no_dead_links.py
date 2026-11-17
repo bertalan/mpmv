@@ -13,19 +13,21 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import localized, other_language
 
 pytestmark = pytest.mark.django_db
 
-PRODUCT_PREFIXES = ("/product/", "/it/prodotto/")
+PRODUCT_PREFIXES = (localized("/product/"), localized("/product/", other_language()))
 
 
 def _shop() -> Any:
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, slug="acme")
     product = ProductFactory.create(vendor=vendor, status=Product.Status.PUBLISHED)
-    for language, slug in (("en", "steel-bag"), ("it", "borsa-acciaio")):
+    for language, slug in ((primary_language(), "steel-bag"), (other_language(), "borsa-acciaio")):
         ProductTranslationFactory.create(
             product=product,
             language=language,
@@ -44,7 +46,9 @@ def _product_links(client: Client, path: str) -> tuple[list[str], str]:
     return [h for h in links if h.startswith(PRODUCT_PREFIXES)], page.get_text()
 
 
-@pytest.mark.parametrize("path", ["/shop/acme/", "/it/shop/acme/"])
+@pytest.mark.parametrize(
+    "path", [localized("/shop/acme/"), localized("/shop/acme/", other_language())]
+)
 def test_no_page_links_to_a_missing_product_page(
     client: Client, settings: SettingsWrapper, path: str
 ) -> None:
@@ -55,14 +59,24 @@ def test_no_page_links_to_a_missing_product_page(
     assert "steel-bag" in text or "borsa-acciaio" in text  # the card is still shown
 
 
-@pytest.mark.parametrize(("path", "language"), [("/shop/acme/", "en"), ("/it/shop/acme/", "it")])
+@pytest.mark.parametrize(
+    ("path", "language"),
+    [
+        (localized("/shop/acme/"), primary_language()),
+        (localized("/shop/acme/", other_language()), other_language()),
+    ],
+)
 def test_every_product_link_of_a_listing_is_a_200_product_page(
     client: Client, settings: SettingsWrapper, path: str, language: str
 ) -> None:
     settings.PRODUCT_PAGES_ROUTED = True
     _shop()
     links, _ = _product_links(client, path)
-    expected = "/product/steel-bag/" if language == "en" else "/it/prodotto/borsa-acciaio/"
+    expected = (
+        localized("/product/steel-bag/")
+        if language == primary_language()
+        else localized("/product/borsa-acciaio/", other_language())
+    )
     assert links == [expected]
     for link in links:
         response = client.get(link)

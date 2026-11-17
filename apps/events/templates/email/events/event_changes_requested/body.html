@@ -1,0 +1,9 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}A moderator asked for changes to your event {{ title }} before it can be published.{% endblocktranslate %}</p>
+<p>{% translate "Comment" %}: {{ comment }}</p>
+<p><a href="{{ action_url }}">{% translate "Open the event to make the changes and submit it again" %}</a></p>
+<p>{% blocktranslate with expires=action_link_expires_at|date:"Y-m-d H:i" %}The link works once and expires on {{ expires }} (UTC).{% endblocktranslate %}</p>
+</body>
+</html>
