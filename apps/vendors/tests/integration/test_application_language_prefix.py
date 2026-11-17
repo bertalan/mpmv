@@ -62,7 +62,7 @@ def test_an_emailed_link_opens_the_page_in_the_language_chosen_in_the_session(
     )
     page = italian.get(response["Location"])
     assert page.status_code == 200
-    assert "lang=other_language()" in page.content.decode()
+    assert f'lang="{other_language()}"' in page.content.decode()
 
 
 def test_a_link_opened_before_the_move_still_confirms_through_the_old_url(client: Client) -> None:

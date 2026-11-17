@@ -82,7 +82,7 @@ def test_a_second_lookup_of_the_same_address_is_served_from_the_cache(clock: Fak
     nominatim = FakeGeocoder("nominatim", results=[fake_result("nominatim")])
     first = lookup(MILAN, [nominatim], clock)
     same = AddressQuery(
-        country=other_language(), postcode="20122", city=" MILANO ", street="piazza del  duomo 1"
+        country="it", postcode="20122", city=" MILANO ", street="piazza del  duomo 1"
     )
     second = lookup(same, [nominatim], clock)
     assert len(nominatim.calls) == 1

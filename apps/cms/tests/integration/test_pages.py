@@ -149,5 +149,5 @@ def test_a_page_without_translation_switches_to_the_other_languages_home(
     home = Site.objects.get(is_default_site=True).root_page
     StandardPageFactory.create(title="Only in English", parent=home)
     html = client.get("/only-in-english/?page=2").content.decode()
-    assert 'name="next" value=f"{language_prefix(other_language())}/?page=2"' in html
+    assert f'name="next" value="{language_prefix(other_language())}/?page=2"' in html
     assert 'name="next" value="/only-in-english/?page=2"' in html

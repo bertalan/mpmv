@@ -39,7 +39,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
-from tests.i18n import localized, other_language
+from tests.i18n import language_prefix, localized, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -165,7 +165,7 @@ def test_a_term_card_links_to_its_taxonomy_url_with_its_name(
 def test_a_term_card_follows_the_page_language(seeded: SeedReport, model_term: Term) -> None:
     html = _publish(_home(other_language()), [_featured(_card("term", model_term))])
     assert (
-        '<a href=f"{language_prefix(other_language())}/compatibile/acme-it/spider/">Spider</a>'
+        f'<a href="{language_prefix(other_language())}/compatibile/acme-it/spider/">Spider</a>'
         in html
     )
 

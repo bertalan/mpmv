@@ -91,7 +91,7 @@ def test_carrier_defaults_and_translated_label() -> None:
     CarrierTranslationFactory.create(
         carrier=carrier, language=other_language(), label="Corriere", status=PUBLISHED
     )
-    assert label_of(carrier.translation(other_language())) == "Corriere"
+    assert label_of(carrier.translation("it")) == "Corriere"
     fallback = carrier.translation("de")
     assert fallback.is_fallback  # explicit EN fallback
     assert label_of(fallback) == "Main courier"
@@ -240,7 +240,7 @@ def test_country_group_countries_are_normalized_and_named_by_translation() -> No
     CountryGroupTranslationFactory.create(
         country_group=group, language=primary_language(), name="DACH", status=PUBLISHED
     )
-    assert label_of(group.translation(other_language()), "name") == "DACH"
+    assert label_of(group.translation("it"), "name") == "DACH"
     assert str(group) == "dach"
 
 
@@ -284,10 +284,10 @@ def test_a_country_group_in_use_keeps_its_code() -> None:
 
 def test_the_eu_group_is_seeded_with_the_member_states(seeded_groups: None) -> None:
     assert members("eu") == set(EU_MEMBER_STATES)
-    assert label_of(
-        CountryGroup.objects.get(code="eu").translation(primary_language()), "name"
-    ) == ("European Union")
-    assert label_of(CountryGroup.objects.get(code="eu").translation(other_language()), "name") == (
+    assert label_of(CountryGroup.objects.get(code="eu").translation("en"), "name") == (
+        "European Union"
+    )
+    assert label_of(CountryGroup.objects.get(code="eu").translation("it"), "name") == (
         "Unione europea"
     )
 
@@ -377,7 +377,7 @@ def test_method_name_is_translated() -> None:
     translation = ShippingMethodTranslationFactory.create(
         name="Express courier", language=primary_language(), status=PUBLISHED
     )
-    assert label_of(translation.method.translation(other_language()), "name") == "Express courier"
+    assert label_of(translation.method.translation("it"), "name") == "Express courier"
     with refused(), transaction.atomic():
         ShippingMethodTranslationFactory.create(
             method=translation.method, language=primary_language()
@@ -526,7 +526,7 @@ def test_pickup_option_has_a_translated_label_and_a_unique_key_per_vendor() -> N
     PickupOptionTranslationFactory.create(
         pickup_option=pickup, language=primary_language(), status=PUBLISHED
     )
-    assert label_of(pickup.translation(other_language())) == "Pick up at the shop"
+    assert label_of(pickup.translation("it")) == "Pick up at the shop"
     PickupOptionFactory.create(key="shop")  # another vendor may reuse the key
     with refused(), transaction.atomic():
         PickupOptionFactory.create(vendor=pickup.vendor, key="shop")
@@ -602,12 +602,12 @@ def test_rest_of_the_world_zone_takes_no_patterns_or_provinces() -> None:
 
 @pytest.mark.django_db(transaction=True)
 def test_country_group_seed_with_italian_primary_language(settings: Any) -> None:
-    """The seed must not create the same language twice when the primary is Italian."""
+    """I18N.15: the seed must not create the same language twice when the primary is 'it'."""
     CountryGroup.objects.all().delete()
-    settings.LANGUAGE_CODE = other_language()
+    settings.LANGUAGE_CODE = "it"
     importlib.import_module("apps.shipping.migrations.0005_seed_country_groups").seed(apps, None)
     group = CountryGroup.objects.get(code="africa")
     rows = list(group.translations.values_list("language", "name"))
-    assert rows == [(other_language(), "Africa")]
+    assert rows == [("it", "Africa")]
     europe_like = CountryGroup.objects.get(code="americas")
     assert list(europe_like.translations.values_list("name", flat=True)) == ["Americhe"]

@@ -13,6 +13,7 @@ from django.conf import settings
 from django.test import Client
 from wagtail.models import Site
 
+from apps.catalog import slugs
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import (
     BrandFactory,
@@ -27,7 +28,7 @@ from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import localized, other_language
+from tests.i18n import language_prefix, localized, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -119,7 +120,9 @@ def test_an_old_slug_answers_a_301_to_the_current_one(client: Client) -> None:
 
 def test_another_segment_spelling_redirects_to_the_page(client: Client) -> None:
     live()
-    response = client.get(localized("/product/mug-it/", other_language()))
+    if slugs.segment_for(slugs.PRODUCT_SEGMENTS, other_language()) == "product":
+        pytest.skip("the other language spells the segment the same")
+    response = client.get(f"{language_prefix(other_language())}/product/mug-it/")
     assert response.status_code == 301
     assert response["Location"] == path(other_language(), "mug-it")
 

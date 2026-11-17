@@ -347,7 +347,7 @@ def test_the_page_renders_canonical_robots_and_hreflang_tags(
     assert '<link rel="canonical" href="http://localhost/compatibility/maker/">' in html
     assert '<meta name="robots" content="index, follow">' in html
     assert (
-        '<link rel="alternate" hreflang=other_language() href="http://localhost/it/compatibilita/marca/">'
+        f'<link rel="alternate" hreflang="{other_language()}" href="http://localhost{language_prefix(other_language())}/compatibilita/marca/">'
         in html
     )
 

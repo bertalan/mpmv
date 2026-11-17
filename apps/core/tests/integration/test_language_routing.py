@@ -26,7 +26,7 @@ LANGUAGES_PLUS_PORTUGUESE = [
 LANGUAGE_PATHS = [
     (primary_language(), "/"),
     (other_language(), f"{language_prefix(other_language())}/"),
-    ("de", f"{language_prefix(third_language())}/"),
+    (third_language(), f"{language_prefix(third_language())}/"),
     ("fr", "/fr/"),
     ("es", "/es/"),
 ]
@@ -56,7 +56,7 @@ def test_each_language_prefix_serves_the_page_in_that_language(
 
 
 def test_the_primary_language_has_no_prefix(client: Client) -> None:
-    assert client.get(f"{language_prefix(primary_language())}/").status_code == 404
+    assert client.get(f"/{primary_language()}/").status_code == 404
 
 
 def test_unconfigured_language_prefixes_are_not_routed(client: Client) -> None:
