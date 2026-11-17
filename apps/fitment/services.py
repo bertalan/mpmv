@@ -17,7 +17,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.backends.postgresql.psycopg_any import NumericRange
 from django.db.models import Count
@@ -28,8 +29,10 @@ from apps.catalog.models import Category, Product
 from apps.core import translations
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
-from apps.core.models import TranslationStatus
+from apps.core.models import AuditLog, TranslationStatus
 from apps.core.services import run_mutation
+from apps.vendors import services as vendors_services
+from apps.vendors.scoping import is_platform_staff
 
 from . import engine, garage, references
 from .models import (
@@ -935,6 +938,28 @@ def _fitment_snapshot(product: Product, mode: str, rows: list[dict[str, Any]]) -
     }
 
 
+_SYSTEM_SOURCES = {AuditLog.Source.COMMAND, AuditLog.Source.TASK, AuditLog.Source.SYSTEM}
+
+
+def _check_actor(product: Product, ctx: AuditContext) -> None:
+    """The actor is platform staff or a member of the product's vendor with the products right.
+
+    A system run (command, task, feed refresh) carries no user and is allowed; a user context
+    whose user is missing, or belongs to another vendor, is refused (spec 17 §17.2.4, FIT.2).
+    """
+    if ctx.actor_id is None:
+        if ctx.source in _SYSTEM_SOURCES:
+            return
+        raise PermissionDenied("A user action needs a signed-in actor.")
+    user = get_user_model().objects.filter(pk=ctx.actor_id).first()
+    if user is None or not user.is_active:
+        raise PermissionDenied("The actor does not exist or is inactive.")
+    if is_platform_staff(user):
+        return
+    if not vendors_services.has_vendor_permission(user, product.vendor, "products"):
+        raise PermissionDenied("The actor may not change this product's fitment.")
+
+
 def set_product_fitment(
     product: Product,
     mode: str,
@@ -950,9 +975,10 @@ def set_product_fitment(
     rows that came from a feed, so a seller's own rows stay. The ChangeSet lists each row that
     is created, changed or deleted; one `AuditLog` entry records the whole replace, with every
     row before and after. Nothing is written when the declaration is unchanged. Refusals raise
-    `FitmentError`; warnings (an exclusion with nothing to exclude from) are
-    `product_fitment_warnings`.
+    `FitmentError`, an actor outside the product's vendor `PermissionDenied`; warnings (an
+    exclusion with nothing to exclude from) are `product_fitment_warnings`.
     """
+    _check_actor(product, ctx)
     if source not in ProductFitment.Source.values:
         raise FitmentError(f"Unknown source {source!r}.")
     wanted = list(rows)

@@ -1,11 +1,13 @@
 """FIT.2: `set_product_fitment` (spec 17 §17.2.3, §17.2.4, §17.3.1)."""
 
 import pytest
+from django.core.exceptions import PermissionDenied
 from django.test import override_settings
 
+from apps.accounts.tests.factories import UserFactory
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import CategoryFactory, ProductFactory
-from apps.core.audit import AuditContext
+from apps.core.audit import AuditContext, user_context
 from apps.core.changeset import ChangeSet
 from apps.core.models import AuditLog
 from apps.fitment import services
@@ -18,10 +20,11 @@ from apps.fitment.tests.factories import (
     ProductFitmentFactory,
     ProductFitmentStateFactory,
 )
+from apps.vendors.tests.factories import VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
 
-CTX = AuditContext(actor_id=1, actor_label="vendor:a", source="manager", ip="127.0.0.1")
+CTX = AuditContext(actor_label="system:test", source="system")
 
 
 @pytest.fixture
@@ -213,3 +216,45 @@ def test_the_factories_make_rows_the_vendor_scoped_manager_returns() -> None:
     assert row.node_path == row.node.path
     assert ProductFitmentState.objects.filter(pk=state.pk).exists()
     assert ProductFitment.objects.filter(pk=row.pk).exists()
+
+
+def _as(user: object) -> AuditContext:
+    ctx = user_context(user, "127.0.0.1")  # type: ignore[arg-type]
+    return AuditContext(actor_id=ctx.actor_id, actor_label=ctx.actor_label, source="vendor")
+
+
+def test_a_member_of_the_products_vendor_may_declare_but_another_vendors_may_not(
+    tree: dict[str, FitmentNode],
+) -> None:
+    product = ProductFactory.create()
+    own = VendorMemberFactory.create(vendor=product.vendor)
+    other = VendorMemberFactory.create()
+    rows = [RowInput(tree["a"])]
+    services.set_product_fitment(product, "specific", rows, "manual", ctx=_as(own.user))
+    assert ProductFitment.objects.filter(product=product).count() == 1
+    with pytest.raises(PermissionDenied):
+        services.set_product_fitment(product, "universal", [], "manual", ctx=_as(other.user))
+    with pytest.raises(PermissionDenied):
+        services.set_product_fitment(
+            product, "universal", [], "manual", ctx=_as(other.user), dry_run=True
+        )
+    assert ProductFitmentState.objects.get(product=product).mode == "specific"
+
+
+def test_an_actor_without_membership_or_a_vanished_actor_is_refused(
+    tree: dict[str, FitmentNode],
+) -> None:
+    product = ProductFactory.create()
+    stranger = UserFactory.create()
+    with pytest.raises(PermissionDenied):
+        services.set_product_fitment(product, "universal", [], "manual", ctx=_as(stranger))
+    ghost = AuditContext(actor_id=987654, actor_label="vendor:x", source="vendor")
+    with pytest.raises(PermissionDenied):
+        services.set_product_fitment(product, "universal", [], "manual", ctx=ghost)
+
+
+def test_platform_staff_may_declare_for_any_vendor(tree: dict[str, FitmentNode]) -> None:
+    product = ProductFactory.create()
+    staff = UserFactory.create(superuser=True)
+    services.set_product_fitment(product, "universal", [], "manual", ctx=_as(staff))
+    assert ProductFitmentState.objects.get(product=product).mode == "universal"
