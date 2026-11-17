@@ -23,8 +23,14 @@ reports stay on the runner. This page records the alerts we fixed and the ones w
   vendored htmx 2.0.4 (`apps/themes/static/vendor/htmx.min.js`, hx-on and `js:` expressions).
   The layout sets `allowEval: false` (`themes/base/templates/layouts/base.html`) and the CSP has
   no `'unsafe-eval'`, so the code never runs. Our own JS has no such calls.
+- 10202, Absence of Anti-CSRF Tokens (medium; accepted by the owner, 2026-11-17): the cookie
+  consent banner and the cookie settings page post to `consent_save`, which is CSRF-exempt by
+  design. Pages are served from a shared cache, so they cannot carry a per-visitor token; the view
+  refuses cross-site requests, is rate-limited per IP and only stores the visitor's own consent
+  cookie. ZAP cannot scope an ignore to a URL or a form, so `tests/unit/test_post_forms_csrf.py`
+  holds the line: it fails if any other template posts a form without `{% csrf_token %}`.
 
-Both ids cover only these cases: 90004 is also raised for CORP, which is fixed above, and a
+The first two ids cover only these cases: 90004 is also raised for CORP, which is fixed above, and a
 regression would be hidden by the ignore. The header tests above are what guards CORP.
 
 ## Re-triage

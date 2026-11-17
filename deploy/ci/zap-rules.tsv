@@ -3,3 +3,4 @@
 # Anything not listed here is reported and fails the scan at medium or higher.
 90004	IGNORE	(Insufficient Site Isolation Against Spectre: COEP accepted, see docs)
 10110	IGNORE	(Dangerous JS Functions: vendored htmx, eval disabled by config, see docs)
+10202	IGNORE	(Absence of Anti-CSRF Tokens: cookie consent form is CSRF-exempt by design; guard test tests/unit/test_post_forms_csrf.py; owner 2026-11-17)
