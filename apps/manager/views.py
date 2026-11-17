@@ -19,6 +19,7 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http.response import HttpResponseBase
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
+from django.utils import formats
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
@@ -41,8 +42,9 @@ from apps.core.models import AuditLog
 from apps.core.public_forms import Protection, pre_mfa_step, public_form
 from apps.core.services import flag_enabled
 from apps.orders import engine as orders_engine
+from apps.orders import versions as orders_versions
 from apps.orders.models import VendorOrder, VendorOrderState
-from apps.orders.services import OrdersFrozen, fulfil_vendor_order
+from apps.orders.services import AmendmentOpen, OrdersFrozen, ShipmentOnHold, fulfil_vendor_order
 from apps.payments import connect
 from apps.payments.models import ConnectedAccount
 from apps.payments.stripe_provider import client_from_settings
@@ -318,18 +320,27 @@ class VendorOrderDetailView(ManagerView):
         context = super().get_context_data(**kwargs)
         sub = self.sub_order()
         order = sub.order
-        context.update(
-            sub=sub,
-            number=order.number,
-            placed=order.created_at,
-            customer_name=order.customer_name,
-            # Minimisation (D-30): the address is for shipping, so not after delivery nor once
-            # the order is restricted or anonymised.
-            show_address=sub.state in {"pending", "accepted", "shipped"}
-            and order.privacy_status == "active",
-            address=address_lines(order.shipping_address),
-            country=order.shipping_country,
-            lines=[
+        # ORD.20: from v2 on, the lines and the address are those of the current version.
+        version = (
+            orders_versions.current_version(sub) if sub.current_version_id is not None else None
+        )
+        address = (
+            orders_versions.delivery_address(sub, version)
+            if version is not None
+            else order.shipping_address
+        )
+        lines = (
+            [
+                {
+                    "title": line["title"],
+                    "variant": line.get("variant_label", ""),
+                    "sku": line["sku"],
+                    "quantity": line["quantity"],
+                }
+                for line in version.snapshot.get("lines", [])
+            ]
+            if version is not None
+            else [
                 {
                     "title": line.title,
                     "variant": line.variant_label,
@@ -337,7 +348,23 @@ class VendorOrderDetailView(ManagerView):
                     "quantity": line.quantity,
                 }
                 for line in sub.lines.all()
-            ],
+            ]
+        )
+        context.update(
+            sub=sub,
+            version_number=version.number if version is not None else None,
+            can_amend=version is not None and sub.state in {"pending", "accepted"},
+            amend_url=reverse("manager:shop:order_amend", args=[sub.public_id]),
+            number=order.number,
+            placed=order.created_at,
+            customer_name=order.customer_name,
+            # Minimisation (D-30): the address is for shipping, so not after delivery nor once
+            # the order is restricted or anonymised.
+            show_address=sub.state in {"pending", "accepted", "shipped"}
+            and order.privacy_status == "active",
+            address=address_lines(address),
+            country="" if version is not None else order.shipping_country,
+            lines=lines,
             can_accept=sub.state == "pending",
             can_ship=sub.state == "accepted",
             can_deliver=sub.state == "shipped",
@@ -384,10 +411,25 @@ class VendorOrderActionView(VendorOrderDetailView):
             )
         except OrdersFrozen:  # a terminated vendor's orders wait for staff review
             return self.refused(sub)
+        except AmendmentOpen as error:  # ORD.20: an open change or the cancel-the-rest hold
+            context = self.get_context_data(action_error=_amendment_refusal(error, sub))
+            return self.render_to_response(context, status=409)
         except (orders_engine.IllegalTransition, ValueError):
             return self.refused(sub)
         messages.success(request, _("The order was updated."))
         return HttpResponseRedirect(reverse("manager:shop:order", args=[sub.public_id]))
+
+
+def _amendment_refusal(error: AmendmentOpen, sub: VendorOrder) -> str:
+    if isinstance(error, ShipmentOnHold) and sub.ship_hold_until is not None:
+        return _(
+            "This package cannot be shipped before %(when)s: an item was removed as unavailable "
+            "and the customer may still cancel the rest of it."
+        ) % {"when": formats.date_format(sub.ship_hold_until, "SHORT_DATETIME_FORMAT")}
+    return _(
+        "This package has a change in progress: apply or discard it before marking the package "
+        "shipped."
+    )
 
 
 class PlatformDashboardView(ManagerView):

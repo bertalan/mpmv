@@ -1,0 +1,13 @@
+{% comment %}
+Section title of the `ride` theme (THM.14): a small uppercase overline above the heading, with
+the accent rule. The heading level is the caller's (default 2); the overline is a plain
+paragraph, not a heading.
+
+  {% include "components/section_title.html" with overline=_("Our range") title=_("Gear for every ride") heading_level=2 only %}
+
+Context: `title` (required), `overline` (optional), `heading_level` 2 to 6 (default 2), `text`, `id` (of the heading).
+{% endcomment %}<header class="ride-section-title">
+  {% if overline %}<p class="ride-section-title__overline">{{ overline }}</p>
+  {% endif %}<h{{ heading_level|default:2 }} class="ride-section-title__heading"{% if id %} id="{{ id }}"{% endif %}>{{ title }}</h{{ heading_level|default:2 }}>
+  {% if text %}<p class="ride-section-title__text">{{ text }}</p>{% endif %}
+</header>

@@ -268,6 +268,33 @@ def sample_library() -> dict[str, Any]:
             {"title": _("Tank bag"), "text": "€ 79.00", "url": "#sg-carousel"},
             {"title": _("Helmet visor"), "text": "€ 29.00", "url": "#sg-carousel"},
         ],
+        "hero_slides": [
+            {
+                "title": _("Ride in any weather"),
+                "text": _("Jackets, covers and gloves from small workshops."),
+                "url": "#sg-motion",
+                "action": _("Shop outerwear"),
+                "image_url": image,
+            },
+            {
+                "title": _("Sell with us"),
+                "text": _("Open your shop in a day."),
+                "url": "#sg-motion",
+                "action": _("Apply now"),
+                "image_url": image,
+            },
+            {
+                "title": _("New this week"),
+                "text": _("Fresh parts and gear."),
+                "url": "#sg-motion",
+                "action": _("See what is new"),
+                "image_url": image,
+            },
+        ],
+        "video": {
+            "url": "https://video.example/watch/workshop-tour",
+            "embed_url": "https://video.example/embed/workshop-tour",
+        },
         "images": [
             {"url": image, "alt": _("The jacket from the front")},
             {"url": image, "alt": _("The jacket from the side")},
