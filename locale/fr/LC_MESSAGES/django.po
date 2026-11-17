@@ -38,6 +38,12 @@ msgstr "%(amount)s remboursés."
 msgid "%(browser)s on %(system)s"
 msgstr "%(browser)s sur %(system)s"
 
+#: apps/events/templates/events/_results.html
+msgid "%(counter)s event"
+msgid_plural "%(counter)s events"
+msgstr[0] "%(counter)s événement"
+msgstr[1] "%(counter)s événements"
+
 #: apps/orders/templates/orders/_cart_mini.html
 msgid "%(counter)s item"
 msgid_plural "%(counter)s items"
@@ -158,6 +164,10 @@ msgstr "(version %(n)s)"
 msgid "-- root --"
 msgstr "-- racine --"
 
+#: apps/manager/fitment_forms.py
+msgid "0 means this year."
+msgstr ""
+
 #: apps/manager/event_forms.py
 msgid "1 repeats every time, 2 every second time, up to 12. Empty means 1."
 msgstr "1 se répète à chaque fois, 2 une fois sur deux, jusqu'à 12. Vide équivaut à 1."
@@ -227,6 +237,12 @@ msgid ""
 msgstr ""
 "Quelques mots affichés en haut de la liste des événements. Si vous le laissez vide, la liste "
 "commence juste sous le titre."
+
+#: apps/cms/blocks.py
+msgid ""
+"A few words shown small above the title, for example 'Our range'. Up to 80 characters. If you "
+"leave it empty, nothing is shown above."
+msgstr ""
 
 #: apps/vendors/models.py
 msgid ""
@@ -307,6 +323,16 @@ msgstr ""
 msgid "A picture for the banner. If you leave it empty, the banner has no picture."
 msgstr "Une image pour la bannière. Si vous la laissez vide, la bannière n'a pas d'image."
 
+#: apps/cms/blocks.py
+msgid "A picture for the slide. If you leave it empty, the slide has no picture."
+msgstr ""
+
+#: apps/cms/blocks.py
+msgid ""
+"A picture shown before anyone plays the video. If you leave it empty, only the play button is "
+"shown."
+msgstr ""
+
 #: apps/manager/amendment_forms.py
 msgid "A platform error: no refund fee for the shop"
 msgstr "Une erreur de la plateforme : aucuns frais de remboursement pour la boutique"
@@ -345,6 +371,10 @@ msgid "A promotion (an offer, with no place), a trade fair or meeting, or someth
 msgstr ""
 "Une promotion (une offre, sans lieu), un salon ou une rencontre, ou autre chose. Obligatoire."
 
+#: apps/manager/fitment_forms.py
+msgid "A proposed node waits for review and is not offered in pickers."
+msgstr ""
+
 #: apps/cms/models.py
 msgid ""
 "A question a new seller would ask, for example 'How much does it cost?'. Required: the question "
@@ -360,6 +390,10 @@ msgstr "un remboursement au client"
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer by platform staff"
 msgstr "un remboursement au client par l’équipe de la plateforme"
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "A scheme has at most %(max)s levels. The new level goes last."
+msgstr ""
 
 #: apps/cms/blocks.py
 msgid ""
@@ -436,6 +470,10 @@ msgid ""
 msgstr ""
 "Un libellé court de l'import. Il indique aux relecteurs d'où viennent les marques. Exemple : "
 "'tarif de printemps, import du 02/11/2026'."
+
+#: apps/cms/blocks.py
+msgid "A short line about the person, for example 'Rider'. Optional."
+msgstr ""
 
 #: apps/cms/models.py
 msgid ""
@@ -521,6 +559,12 @@ msgstr ""
 "Un court motif affiché au personnel lorsque la commission est nulle, par exemple 'Promo de "
 "lancement'. Laissez vide pour une règle normale."
 
+#: apps/cms/blocks.py
+msgid ""
+"A short sign after the number, for example '+' or '%'. If you leave it empty, the number stands "
+"alone."
+msgstr ""
+
 #: apps/catalog/models.py
 msgid ""
 "A short teaser of one or two sentences, for example 'Hand-made ceramic mug, 300 ml'. Optional: you"
@@ -591,6 +635,12 @@ msgstr "Un titre au-dessus des questions. Laissez vide s'il n'y en a pas."
 
 #: apps/cms/blocks.py
 msgid ""
+"A title above the strip, for example 'From the blog'. Up to 120 characters. If you leave it empty,"
+" the strip has no title."
+msgstr ""
+
+#: apps/cms/blocks.py
+msgid ""
 "A title shown above the products, for example 'Our favourites'. Up to 120 characters. If you leave"
 " it empty, no title is shown."
 msgstr ""
@@ -655,6 +705,10 @@ msgstr "Action sur les lignes sélectionnées"
 msgid "Actions"
 msgstr "Actions"
 
+#: apps/manager/fitment_forms.py
+msgid "Active"
+msgstr ""
+
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Add"
 msgstr "Ajouter"
@@ -663,9 +717,17 @@ msgstr "Ajouter"
 msgid "Add a block"
 msgstr "Ajouter un bloc"
 
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Add a child"
+msgstr ""
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Add a factor"
 msgstr "Ajouter un facteur"
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Add a level"
+msgstr ""
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "Add a passkey"
@@ -696,6 +758,22 @@ msgid "Add at least one question. They show as a list that opens one answer at a
 msgstr ""
 "Ajoutez au moins une question. Elles s'affichent sous forme de liste qui ouvre une réponse à la "
 "fois."
+
+#: apps/cms/blocks.py
+msgid "Add cards of the same kind: blog posts or pages, vendors, products or testimonials."
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Add the alias"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_node_form.html
+msgid "Add the node"
+msgstr ""
+
+#: apps/events/templates/events/event_page.html
+msgid "Add to calendar"
+msgstr "Ajouter au calendrier"
 
 #: apps/catalog/templates/catalog/product.html
 msgid "Add to cart"
@@ -743,6 +821,14 @@ msgstr ""
 "Après la suppression d’un article indisponible, le vendeur attend ce délai avant d’expédier, afin "
 "que le client puisse annuler le reste du colis."
 
+#: apps/manager/fitment_forms.py
+msgid "Alias"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Aliases"
+msgstr ""
+
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
@@ -756,6 +842,18 @@ msgstr "Toute la journée"
 #: apps/manager/views.py
 msgid "all languages"
 msgstr "toutes les langues"
+
+#: apps/manager/fitment_views.py
+msgid "All nodes"
+msgstr ""
+
+#: apps/events/templates/events/_filters.html
+msgid "All types"
+msgstr "Tous les types"
+
+#: apps/events/templates/events/_filters.html
+msgid "All vendors"
+msgstr "Tous les vendeurs"
 
 #: apps/seo/admin_views.py
 msgid "Allow search engines to index this site"
@@ -878,6 +976,14 @@ msgstr ""
 msgid "Answer %(number)d"
 msgstr "Réponse %(number)d"
 
+#: apps/manager/fitment_forms.py
+msgid "Any language"
+msgstr ""
+
+#: apps/events/templates/events/_filters.html
+msgid "Any month"
+msgstr "Tous les mois"
+
 #: apps/orders/ui/forms.py
 msgid "Apartment, floor or other detail. Optional."
 msgstr "Appartement, étage ou autre précision. Facultatif."
@@ -904,6 +1010,10 @@ msgstr ""
 "Pour l’appliquer, votre clé d’accès est requise : elle déplace de l’argent ou l’adresse de "
 "livraison."
 
+#: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_node.html
+msgid "Approve"
+msgstr ""
+
 #: apps/catalog/taxonomy_admin.py
 msgid "Approve all brands of the selected batches"
 msgstr "Approuver toutes les marques des lots sélectionnés"
@@ -929,7 +1039,11 @@ msgstr ""
 msgid "Ask %(vendor)s about this product: it is not sold online."
 msgstr "Interrogez %(vendor)s au sujet de ce produit : il n'est pas vendu en ligne."
 
-#: apps/manager/event_forms.py
+#: apps/manager/templates/manager/platform/fitment_node_form.html
+msgid "At the top level of the scheme."
+msgstr ""
+
+#: apps/events/templates/events/event_page.html apps/manager/event_forms.py
 msgid "Attendance"
 msgstr "Participation"
 
@@ -952,6 +1066,12 @@ msgstr "Auteur"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Authorities told: %(authority)s, %(at)s."
 msgstr "Autorités informées : %(authority)s, %(at)s."
+
+#: apps/cms/blocks.py
+msgid ""
+"Automatic change only: how long a slide stays, in milliseconds, between 3000 and 20000. Example: "
+"6000 is six seconds."
+msgstr ""
 
 #: apps/seo/site_links.py
 msgid "Back office"
@@ -982,6 +1102,15 @@ msgstr "Retour à l'événement"
 #: apps/manager/templates/manager/shop/event_images.html
 msgid "Back to the events"
 msgstr "Retour aux événements"
+
+#: apps/manager/templates/manager/platform/fitment_merge.html
+msgid "Back to the node"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+#: apps/manager/templates/manager/platform/fitment_node_form.html
+msgid "Back to the nodes"
+msgstr ""
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Back to the notices"
@@ -1032,6 +1161,10 @@ msgstr "En préparation"
 msgid "block %(number)s, %(label)s"
 msgstr "bloc %(number)s, %(label)s"
 
+#: apps/events/templates/events/event_page.html
+msgid "Booth %(booth)s"
+msgstr "Stand %(booth)s"
+
 #: apps/manager/event_forms.py
 msgid "Booth or stand"
 msgstr "Stand"
@@ -1061,6 +1194,7 @@ msgid "Call to action"
 msgstr "Appel à l'action"
 
 #: apps/manager/templates/manager/bulk_preview.html
+#: apps/manager/templates/manager/platform/fitment_preview.html
 msgid "Cancel"
 msgstr "Annuler"
 
@@ -1098,9 +1232,14 @@ msgstr "Annulation"
 msgid "Cancellation policy"
 msgstr "Conditions d'annulation"
 
-#: apps/orders/customer_views.py
+#: apps/events/templates/events/_summary.html apps/events/templates/events/event_calendar.html
+#: apps/events/templates/events/event_page.html apps/orders/customer_views.py
 msgid "Cancelled"
 msgstr "Annulé"
+
+#: apps/manager/fitment_forms.py
+msgid "Cannot change once the level has nodes."
+msgstr ""
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Cannot scan? Enter this key:"
@@ -1156,9 +1295,21 @@ msgstr "Catalogue : produits"
 msgid "Categories"
 msgstr "Catégories"
 
+#: apps/manager/fitment_views.py
+msgid "Categories expected to declare fitment"
+msgstr ""
+
+#: apps/manager/fitment_views.py
+msgid "Category"
+msgstr ""
+
 #: apps/manager/event_fields.py
 msgid "Category %(number)d"
 msgstr "Catégorie %(number)d"
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Change"
+msgstr ""
 
 #: apps/orders/templates/orders/_review_body.html
 msgid "Change details"
@@ -1210,6 +1361,10 @@ msgstr "Paiement"
 #: themes/base/templates/components/step_indicator.html
 msgid "Checkout steps"
 msgstr "Étapes de la commande"
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Children"
+msgstr ""
 
 #: apps/compliance/forms.py
 msgid "Choose 'Action taken' if the content was restricted, or 'No action' if it was left as it is."
@@ -1314,6 +1469,10 @@ msgstr ""
 "Choisissez la catégorie ou le tag vers lequel mène la carte. Une carte vers un élément masqué est "
 "omise."
 
+#: apps/manager/fitment_views.py
+msgid "Choose the node to merge into."
+msgstr ""
+
 #: apps/cms/models.py
 msgid "Choose the page of this site the menu entry leads to. Required."
 msgstr "Choisissez la page de ce site vers laquelle mène l'entrée du menu. Obligatoire."
@@ -1362,6 +1521,10 @@ msgstr "Ville"
 msgid "Clauses for approval by business buyers (art. 1341 Civil Code)"
 msgstr "Clauses à approuver par les acheteurs professionnels (art. 1341 du Code civil)"
 
+#: apps/events/templates/events/_filters.html
+msgid "Clear filters"
+msgstr "Effacer les filtres"
+
 #: themes/ride/templates/components/header.html
 msgid "Close"
 msgstr "Fermer"
@@ -1369,6 +1532,10 @@ msgstr "Fermer"
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "Close now"
 msgstr "Fermer maintenant"
+
+#: apps/manager/fitment_forms.py apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Code"
+msgstr ""
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Commission change"
@@ -1442,6 +1609,7 @@ msgid "Compute the change"
 msgstr "Calculer la modification"
 
 #: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
+#: apps/manager/templates/manager/platform/fitment_preview.html
 msgid "Confirm"
 msgstr "Confirmer"
 
@@ -1670,6 +1838,10 @@ msgstr "Diminuer la quantité"
 msgid "Defaults to 'Apply now'."
 msgstr "Par défaut : 'Postuler maintenant'."
 
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Delete (only when nothing uses it and it has no children)"
+msgstr ""
+
 #: apps/accounts/admin.py
 msgid "Delete selected %(verbose_name_plural)s"
 msgstr "Supprimer les %(verbose_name_plural)s sélectionnés"
@@ -1705,6 +1877,12 @@ msgstr "Délai de livraison en jours"
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Delivery, returns and law"
 msgstr "Livraison, retours et droit applicable"
+
+#: apps/cms/blocks.py
+msgid ""
+"Describe the cover picture in a few words, for people who cannot see it. Required when you pick a "
+"cover picture."
+msgstr ""
 
 #: apps/manager/termination_views.py
 msgid "Describe the facts relied on."
@@ -1755,6 +1933,12 @@ msgstr ""
 "en céramique rouge sur une table en bois'. Obligatoire : l'image ne peut pas être enregistrée sans"
 " cette description."
 
+#: apps/cms/blocks.py
+msgid ""
+"Describe the picture in a few words, for people who cannot see it. Required when you choose a "
+"picture."
+msgstr ""
+
 #: apps/manager/event_block_forms.py
 msgid "Describe the picture in a few words, for people who cannot see it. Required with a picture."
 msgstr ""
@@ -1796,6 +1980,10 @@ msgstr "Fermer"
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid "Do it once"
 msgstr "Le faire une seule fois"
+
+#: apps/manager/fitment_views.py
+msgid "Do not expect fitment"
+msgstr ""
 
 #: apps/manager/event_forms.py
 msgid "Does not repeat"
@@ -1842,9 +2030,17 @@ msgstr ""
 "l'expédition, de la conformité, de la facturation, des retours et des rétractations. La place de "
 "marché fournit le service et encaisse le paiement."
 
+#: apps/manager/fitment_forms.py
+msgid "Earliest year"
+msgstr ""
+
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Edit"
 msgstr "Modifier"
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Edit %(label)s"
+msgstr ""
 
 #: apps/manager/event_block_views.py
 msgid "Edit the block"
@@ -1963,9 +2159,18 @@ msgstr "Erreur"
 msgid "Event"
 msgstr "Événement"
 
-#: apps/manager/sections.py apps/manager/site_map.py apps/manager/templates/manager/shop/events.html
+#: apps/events/templates/events/_links.html
+msgid "Event views"
+msgstr "Affichages des événements"
+
+#: apps/events/listing.py apps/events/templates/events/_results.html apps/manager/sections.py
+#: apps/manager/site_map.py apps/manager/templates/manager/shop/events.html
 msgid "Events"
 msgstr "Événements"
+
+#: apps/events/templates/events/event_calendar.html
+msgid "Events in %(month)s"
+msgstr "Événements de %(month)s"
 
 #: apps/manager/templates/manager/platform/map.html
 msgid ""
@@ -2017,6 +2222,18 @@ msgstr "Emplacement exact"
 msgid "excl. VAT"
 msgstr "HT"
 
+#: apps/manager/fitment_views.py
+msgid "Expect fitment"
+msgstr ""
+
+#: apps/manager/fitment_views.py
+msgid "Expected"
+msgstr ""
+
+#: apps/manager/fitment_views.py
+msgid "Expected to declare fitment"
+msgstr ""
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Explanation"
 msgstr "Explication"
@@ -2054,6 +2271,10 @@ msgstr "Fichier"
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filter"
 msgstr "Filtrer"
+
+#: apps/events/templates/events/_filters.html
+msgid "Filter events"
+msgstr "Filtrer les événements"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/terminations.html
@@ -2096,6 +2317,23 @@ msgstr "Empreinte %(hash)s."
 #: apps/manager/event_forms.py
 msgid "First day"
 msgstr "Premier jour"
+
+#: apps/manager/fitment_views.py
+msgid "Fitment"
+msgstr ""
+
+#: apps/manager/sections.py apps/manager/site_map.py
+msgid "Fitment categories"
+msgstr ""
+
+#: apps/manager/fitment_views.py apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/platform/fitment_list.html
+msgid "Fitment nodes"
+msgstr ""
+
+#: apps/manager/fitment_views.py apps/manager/sections.py apps/manager/site_map.py
+msgid "Fitment scheme"
+msgstr ""
 
 #: themes/base/templates/components/footer.html
 msgid "Footer"
@@ -2149,6 +2387,10 @@ msgstr "Nom et prénom"
 msgid "Gallery"
 msgstr "Galerie"
 
+#: apps/manager/fitment_forms.py
+msgid "Garage noun"
+msgstr ""
+
 #: apps/cms/models.py
 msgid "General (every other screen)"
 msgstr "Général (tous les autres écrans)"
@@ -2172,6 +2414,14 @@ msgstr "Attribuer un rôle"
 #: apps/manager/event_forms.py
 msgid "Give both coordinates, or neither."
 msgstr "Indiquez les deux coordonnées, ou aucune."
+
+#: apps/manager/fitment_forms.py
+msgid "Give both the label and the plural label."
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Give each level a position number. A level that has nodes cannot move."
+msgstr ""
 
 #: apps/manager/event_forms.py
 msgid "Give how many times the event takes place."
@@ -2316,7 +2566,7 @@ msgstr "Masqué par la plateforme."
 msgid "Hidden by the platform: %(reason)s"
 msgstr "Masqué par la plateforme : %(reason)s"
 
-#: apps/manager/site_map.py
+#: apps/manager/site_map.py apps/seo/product_jsonld.py
 msgid "Home"
 msgstr "Accueil"
 
@@ -2346,6 +2596,10 @@ msgstr ""
 "Précision de la position trouvée à partir de l'adresse, par exemple une rue ou une ville. "
 "Renseigné pour vous."
 
+#: apps/cms/blocks.py
+msgid "How far along it is. It cannot be more than the maximum below."
+msgstr ""
+
 #: apps/shipping/models.py
 msgid "How fast or how costly the service is: standard, express, economy or other."
 msgstr "Rapidité ou coût du service : standard, express, économique ou autre."
@@ -2357,6 +2611,12 @@ msgid ""
 msgstr ""
 "Délai dont dispose le client pour accepter ou refuser une modification proposée ; passé ce délai, "
 "la commande reste telle quelle."
+
+#: apps/cms/blocks.py
+msgid ""
+"How many cards a slide shows on a wide screen. Narrow screens show fewer. Only the carousel theme "
+"uses it."
+msgstr ""
 
 #: apps/events/admin_views.py
 msgid ""
@@ -2593,9 +2853,13 @@ msgstr "lot d'import"
 msgid "in force"
 msgstr "en vigueur"
 
-#: apps/manager/amendment_forms.py
+#: apps/events/models.py apps/manager/amendment_forms.py
 msgid "In person"
-msgstr "En personne"
+msgstr "Sur place"
+
+#: apps/events/models.py
+msgid "In person and online"
+msgstr "Sur place et en ligne"
 
 #: apps/manager/event_forms.py
 msgid "In person, online or both. Required except for a promotion, which has no place."
@@ -2710,6 +2974,21 @@ msgstr "Articles"
 msgid "Items in the current version"
 msgstr "Articles de la version actuelle"
 
+#: apps/manager/fitment_forms.py
+msgid "Items reveal sensitive information"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_merge.html
+msgid ""
+"Its children (%(children)s), its aliases and everything that refers to it move to the node you "
+"choose. Its old name stays findable and the old identifier keeps working. Nodes under different "
+"parents are merged after their parents are."
+msgstr ""
+
+#: apps/events/templates/events/event_page.html
+msgid "Join online"
+msgstr "Participer en ligne"
+
 #: apps/manager/templates/manager/shop/event_block_remove.html
 msgid "Keep it"
 msgstr "Le conserver"
@@ -2730,10 +3009,19 @@ msgstr "Conserver la règle déjà enregistrée : %(rule)s"
 msgid "Keeps the site working: sign-in, cart and security. Always on."
 msgstr "Assure le fonctionnement du site : connexion, panier et sécurité. Toujours actifs."
 
+#: apps/manager/fitment_forms.py
+msgid "Kept in the audit log. A refusal removes the proposal."
+msgstr ""
+
 #: apps/compliance/forms.py
 msgid "Kept with the notice, not shown to the vendor. Ends the payout freeze."
 msgstr "Conservée avec le préavis, non affichée au vendeur. Met fin au gel des versements."
 
+#: apps/manager/fitment_forms.py apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Label"
+msgstr ""
+
+#: apps/manager/fitment_forms.py apps/manager/templates/manager/platform/fitment_node.html
 #: apps/manager/templates/manager/shop/events.html
 #: themes/base/templates/components/language_switcher.html
 msgid "Language"
@@ -2762,6 +3050,10 @@ msgstr "dernière utilisation le %(used)s"
 #: apps/accounts/templates/accounts/sessions/list.html
 msgid "Last used %(used)s"
 msgstr "Dernière utilisation %(used)s"
+
+#: apps/manager/fitment_forms.py
+msgid "Latest year, years from now"
+msgstr ""
 
 #: apps/manager/event_forms.py
 msgid "Latitude"
@@ -2835,6 +3127,22 @@ msgstr "Nous permet de mesurer nos publicités et de vous montrer des offres sur
 #: apps/manager/forms.py
 msgid "Letters, digits, spaces and . / _ - only."
 msgstr "Uniquement des lettres, des chiffres, des espaces et . / _ -"
+
+#: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_node.html
+msgid "Level"
+msgstr ""
+
+#: apps/manager/fitment_views.py
+msgid "Level position"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Levels"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Levels of the scheme"
+msgstr ""
 
 #: apps/manager/event_image_form.py
 msgid "Licence"
@@ -2929,6 +3237,10 @@ msgstr "Longitude"
 msgid "Lost your device?"
 msgstr "Vous avez perdu votre appareil ?"
 
+#: apps/manager/fitment_forms.py
+msgid "Lower case letters, digits, - and _. It cannot change later."
+msgstr ""
+
 #: themes/base/templates/components/header.html themes/ride/templates/components/header.html
 msgid "Main"
 msgstr "Principal"
@@ -2987,13 +3299,21 @@ msgstr ""
 msgid "Menu"
 msgstr "Menu"
 
+#: apps/manager/fitment_views.py
+msgid "Merge %(name)s"
+msgstr ""
+
 #: apps/catalog/taxonomy_admin.py
 msgid "Merge brands"
 msgstr "Fusionner les marques"
 
-#: apps/catalog/taxonomy_admin.py
+#: apps/catalog/taxonomy_admin.py apps/manager/templates/manager/platform/fitment_merge.html
 msgid "Merge into"
 msgstr "Fusionner dans"
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Merge into another node"
+msgstr ""
 
 #: apps/catalog/taxonomy_admin.py
 msgid "Merge the selected brands into another brand"
@@ -3015,6 +3335,14 @@ msgstr "Lundi"
 msgid "Money"
 msgstr "Argent"
 
+#: apps/events/templates/events/_filters.html
+msgid "Month"
+msgstr "Mois"
+
+#: apps/events/templates/events/_links.html
+msgid "Month calendar"
+msgstr "Calendrier du mois"
+
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Move down"
 msgstr "Descendre"
@@ -3031,9 +3359,22 @@ msgstr "Mes commandes"
 msgid "My shop"
 msgstr "Ma boutique"
 
+#: apps/manager/fitment_forms.py apps/manager/fitment_views.py
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Name"
+msgstr ""
+
 #: apps/catalog/taxonomy.py
 msgid "name"
 msgstr "nom"
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Names by language"
+msgstr ""
+
+#: apps/manager/fitment_forms.py apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Names differ by language"
+msgstr ""
 
 #: apps/seo/providers.py
 msgid "Necessary"
@@ -3063,9 +3404,17 @@ msgstr "jamais utilisée"
 msgid "New event"
 msgstr "Nouvel événement"
 
+#: apps/manager/fitment_views.py
+msgid "New fitment node"
+msgstr ""
+
 #: apps/catalog/taxonomy_admin.py
 msgid "New logo file"
 msgstr "Nouveau fichier du logo"
+
+#: apps/manager/fitment_views.py
+msgid "New node"
+msgstr ""
 
 #: apps/orders/templates/email/orders/vendor_new_order/subject.txt
 msgid "New paid order %(order_number)s"
@@ -3091,6 +3440,14 @@ msgstr "Nouveau prix unitaire de %(title)s, EUR hors TVA (actuellement %(price)s
 msgid "Next"
 msgstr "Suivant"
 
+#: apps/events/templates/events/event_calendar.html
+msgid "Next month"
+msgstr "Mois suivant"
+
+#: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "No"
+msgstr ""
+
 #: apps/manager/templates/manager/forbidden.html
 msgid "No access"
 msgstr "Aucun accès"
@@ -3103,9 +3460,21 @@ msgstr "Aucune modification"
 msgid "No event"
 msgstr "Aucun événement"
 
+#: apps/events/templates/events/event_index_page.html
+msgid "No events are planned at the moment."
+msgstr "Aucun événement n'est prévu pour le moment."
+
+#: apps/events/templates/events/event_calendar.html
+msgid "No events this month."
+msgstr "Aucun événement ce mois-ci."
+
 #: apps/manager/event_block_forms.py
 msgid "No image"
 msgstr "Aucune image"
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "No level yet."
+msgstr ""
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid "No logo yet."
@@ -3122,6 +3491,10 @@ msgstr "Aucune commande ne porte ce numéro."
 #: apps/accounts/mfa_views.py
 msgid "no passkey registered"
 msgstr "aucune clé d'accès enregistrée"
+
+#: apps/events/templates/events/event_past.html
+msgid "No past events."
+msgstr "Aucun événement passé."
 
 #: apps/accounts/mfa_views.py
 msgid "no pending passkey authentication"
@@ -3157,9 +3530,21 @@ msgstr ""
 msgid "Nobody holds a platform role yet."
 msgstr "Personne n'a encore de rôle de plateforme."
 
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Nodes"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "None."
+msgstr ""
+
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Not connected"
 msgstr "Non connecté"
+
+#: apps/manager/fitment_views.py
+msgid "Not expected"
+msgstr ""
 
 #: apps/manager/amendment_views.py
 msgid "not in the order"
@@ -3245,6 +3630,7 @@ msgid "Nothing changed: this text is still a draft. Edit it to publish it."
 msgstr "Aucune modification : ce texte est encore un brouillon. Modifiez-le pour le publier."
 
 #: apps/manager/templates/manager/bulk_preview.html
+#: apps/manager/templates/manager/platform/fitment_preview.html
 msgid "Nothing has changed yet. Check the changes below, then confirm."
 msgstr "Rien n'a encore été modifié. Vérifiez les modifications ci-dessous, puis confirmez."
 
@@ -3309,6 +3695,12 @@ msgstr ""
 "site. Activé : les pages peuvent apparaître dans les résultats de recherche. Sans effet tant que "
 "le serveur impose noindex (STAGE ou démo)."
 
+#: apps/cms/blocks.py
+msgid ""
+"Off by default. When on, the slides change on their own, stop when the visitor hovers or tabs into"
+" the strip, and never move for people who asked their device for less motion."
+msgstr ""
+
 #: apps/seo/admin_views.py
 msgid ""
 "Off keeps every page noindex (meta tag, X-Robots-Tag header and robots.txt). A new site starts "
@@ -3319,6 +3711,10 @@ msgstr ""
 "nouveau site démarre désactivé. Activez-le uniquement lorsque la boutique est ouverte au public. "
 "Une valeur enregistrée prend effet dès que le blocage du serveur est levé : vérifiez-la à nouveau "
 "lors du passage de STAGE à LIVE."
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Offer it again"
+msgstr ""
 
 #: apps/core/models.py
 msgid ""
@@ -3397,15 +3793,29 @@ msgstr ""
 
 #: apps/cms/blocks.py
 msgid ""
+"One or two sentences under the title, up to 250 characters. If you leave it empty, nothing is "
+"shown below."
+msgstr ""
+
+#: apps/cms/blocks.py
+msgid ""
 "One or two sentences under the title, up to 400 characters. If you leave it empty, only the title "
 "is shown."
 msgstr ""
 "Une ou deux phrases sous le titre, 400 caractères au maximum. Si vous les laissez vides, seul le "
 "titre est affiché."
 
+#: apps/cms/blocks.py
+msgid "One or two sentences under the title. If you leave it empty, only the title."
+msgstr ""
+
 #: apps/manager/forms.py
 msgid "Onerous clauses"
 msgstr "Clauses onéreuses"
+
+#: apps/events/models.py apps/events/templates/events/event_page.html
+msgid "Online"
+msgstr "En ligne"
 
 #: apps/manager/event_forms.py
 msgid "Online link"
@@ -3591,6 +4001,7 @@ msgstr ""
 msgid "Optional: replaces the credit shown under the image."
 msgstr "Facultatif : remplace le crédit affiché sous l'image."
 
+#: apps/manager/templates/manager/platform/fitment_scheme.html
 #: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_orders.html
 msgid "Order"
 msgstr "Commande"
@@ -3686,7 +4097,7 @@ msgstr "Les commandes ne sont pas encore ouvertes. Votre panier est conservé."
 msgid "Orders"
 msgstr "Commandes"
 
-#: apps/manager/amendment_forms.py
+#: apps/events/models.py apps/manager/amendment_forms.py
 msgid "Other"
 msgstr "Autre"
 
@@ -3797,6 +4208,14 @@ msgstr "Les clés d'accès nécessitent JavaScript."
 msgid "Password"
 msgstr "Mot de passe"
 
+#: apps/events/templates/events/_links.html apps/events/templates/events/event_past.html
+msgid "Past events"
+msgstr "Événements passés"
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Path"
+msgstr ""
+
 #: apps/orders/templates/orders/confirmation.html
 msgid "Pay now"
 msgstr "Payer maintenant"
@@ -3885,6 +4304,10 @@ msgstr ""
 #: apps/cms/blocks.py
 msgid "Pick the picture from the library or upload a new one. Required."
 msgstr "Choisissez l'image dans la médiathèque ou téléversez-en une nouvelle. Obligatoire."
+
+#: apps/manager/fitment_forms.py
+msgid "Picker hint"
+msgstr ""
 
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Pictures for the event page come from"
@@ -3985,6 +4408,10 @@ msgid_plural "Please correct the errors below."
 msgstr[0] "Veuillez corriger l'erreur ci-dessous."
 msgstr[1] "Veuillez corriger les erreurs ci-dessous."
 
+#: apps/manager/fitment_forms.py
+msgid "Plural label"
+msgstr ""
+
 #: apps/manager/forms.py
 msgid "PNG, JPEG or WebP. Leave empty to keep the current image."
 msgstr "PNG, JPEG ou WebP. Laissez vide pour conserver l'image actuelle."
@@ -4009,7 +4436,7 @@ msgstr ""
 msgid "Point on the map"
 msgstr "Point sur la carte"
 
-#: apps/catalog/taxonomy_admin.py
+#: apps/catalog/taxonomy_admin.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Position"
 msgstr "Position"
 
@@ -4029,6 +4456,34 @@ msgstr "Préparer une modification"
 msgid "Preview"
 msgstr "Aperçu"
 
+#: apps/manager/fitment_views.py
+msgid "Preview of the change"
+msgstr ""
+
+#: apps/manager/fitment_views.py
+msgid "Preview of the merge"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Preview the change"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Preview the labels"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Preview the level"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_merge.html
+msgid "Preview the merge"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Preview the order"
+msgstr ""
+
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Preview the saved draft"
 msgstr "Aperçu du brouillon enregistré"
@@ -4040,6 +4495,10 @@ msgstr "Aperçu : %(action)s"
 #: themes/base/templates/components/pagination.html
 msgid "Previous"
 msgstr "Précédent"
+
+#: apps/events/templates/events/event_calendar.html
+msgid "Previous month"
+msgstr "Mois précédent"
 
 #: apps/catalog/templates/catalog/product.html
 msgid "Price and availability"
@@ -4114,9 +4573,29 @@ msgstr "Produits et catégories"
 msgid "professional seller"
 msgstr "vendeur professionnel"
 
+#: apps/manager/fitment_forms.py
+msgid "Profiles per customer"
+msgstr ""
+
+#: apps/events/models.py
+msgid "Promotion"
+msgstr "Promotion"
+
+#: apps/manager/fitment_views.py
+msgid "Proposals"
+msgstr ""
+
+#: apps/manager/fitment_forms.py
+msgid "Proposed"
+msgstr ""
+
 #: apps/catalog/taxonomy.py
 msgid "proposed by"
 msgstr "proposé par"
+
+#: apps/manager/fitment_views.py apps/manager/site_map.py
+msgid "Proposed nodes"
+msgstr ""
 
 #: apps/manager/amendment_forms.py apps/orders/ui/forms.py
 msgid "Province or state"
@@ -4188,7 +4667,8 @@ msgstr "Lire cette version en ligne :"
 msgid "Readiness probe"
 msgstr "Contrôle de disponibilité opérationnelle"
 
-#: apps/manager/forms.py apps/manager/templates/email/manager/role_self_assigned/body.html
+#: apps/manager/fitment_forms.py apps/manager/forms.py
+#: apps/manager/templates/email/manager/role_self_assigned/body.html
 #: apps/manager/templates/email/manager/role_self_assigned/body.txt
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/profile_changes.html
@@ -4257,6 +4737,10 @@ msgstr ""
 msgid "Refunded"
 msgstr "Remboursé"
 
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Refuse and remove the proposal"
+msgstr ""
+
 #: apps/manager/event_forms.py
 msgid "Region"
 msgstr "Région"
@@ -4291,6 +4775,7 @@ msgstr "Mémorise les choix que vous faites, comme votre garage ou la dispositio
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 #: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/manager/templates/manager/platform/fitment_node.html
 #: apps/manager/templates/manager/shop/_event_blocks.html
 #: apps/manager/templates/manager/shop/event_block_remove.html
 #: themes/base/templates/components/cart_line.html
@@ -4313,9 +4798,17 @@ msgstr "Retirer le logo"
 msgid "Remove this block?"
 msgstr "Retirer ce bloc ?"
 
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Remove this level"
+msgstr ""
+
 #: apps/manager/amendment_views.py
 msgid "removed"
 msgstr "supprimé"
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Rename (the old name becomes an alias)"
+msgstr ""
 
 #: apps/manager/event_forms.py
 msgid "Repeats"
@@ -4332,6 +4825,10 @@ msgstr "Signaler un contenu illicite"
 #: apps/seo/site_links.py
 msgid "Report illegal content (DSA)"
 msgstr "Signaler un contenu illicite (DSA)"
+
+#: apps/events/templates/events/event_page.html
+msgid "Report this event"
+msgstr "Signaler cet événement"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
@@ -4362,6 +4859,14 @@ msgstr "Reste du colis annulé à votre demande"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Restrict and send the statement of reasons"
 msgstr "Restreindre et envoyer l'exposé des motifs"
+
+#: apps/manager/fitment_views.py
+msgid "Retire"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Retire (hide it and its children from pickers)"
+msgstr ""
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Retired"
@@ -4481,10 +4986,18 @@ msgstr ""
 "Enregistrez d'abord l'événement : vous pourrez ensuite ajouter du texte, des images et d'autres "
 "blocs à sa page."
 
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Save the name"
+msgstr ""
+
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
 msgstr ""
 "Enregistrez d'abord vos modifications : c'est le dernier brouillon enregistré qui est envoyé."
+
+#: apps/manager/fitment_views.py
+msgid "Saved."
+msgstr ""
 
 #: apps/compliance/forms.py
 msgid "Say whether the content is illegal or only against the platform terms."
@@ -4596,6 +5109,10 @@ msgstr "Configurer une application d'authentification"
 #: apps/accounts/templates/accounts/mfa/setup.html apps/seo/site_links.py
 msgid "Set up two-factor authentication"
 msgstr "Configurer la vérification en deux étapes"
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Settings"
+msgstr ""
 
 #: apps/manager/site_map.py
 msgid "Setup"
@@ -4723,6 +5240,10 @@ msgstr "Préavis plus court parce que"
 msgid "Show all"
 msgstr "Tout afficher"
 
+#: apps/events/templates/events/_filters.html
+msgid "Show events"
+msgstr "Afficher les événements"
+
 #: apps/cms/choosers.py
 msgid "Show only the products of one brand."
 msgstr "Afficher uniquement les produits d'une marque."
@@ -4807,6 +5328,13 @@ msgstr ""
 msgid "Since when the item is no longer in the feed. Empty while it is there."
 msgstr "Depuis quand l'article n'est plus dans le flux. Vide tant qu'il y est."
 
+#: apps/cms/blocks.py
+msgid ""
+"Single image: the picture fills the banner. Text beside the image: the text and the picture sit "
+"side by side on wide screens. Slider: the banner above is the first slide and the slides below "
+"follow."
+msgstr ""
+
 #: apps/seo/admin_views.py
 msgid "Site"
 msgstr "Site"
@@ -4826,6 +5354,18 @@ msgstr "Aller au contenu principal"
 #: apps/catalog/templates/catalog/product.html apps/manager/templates/manager/shop/order.html
 msgid "SKU"
 msgstr "SKU"
+
+#: apps/cms/blocks.py
+msgid ""
+"Slider only. Off by default. When on, the slides change on their own, stop when the visitor hovers"
+" or tabs into the slider, and never move for people who asked their device for less motion."
+msgstr ""
+
+#: apps/cms/blocks.py
+msgid ""
+"Slider with automatic change only: how long a slide stays, in milliseconds, between 3000 and "
+"20000. Example: 6000 is six seconds."
+msgstr ""
 
 #: apps/catalog/templates/catalog/product.html
 msgid "Sold by"
@@ -4943,7 +5483,9 @@ msgstr "Exposés des motifs"
 msgid "Statistics"
 msgstr "Statistiques"
 
+#: apps/manager/fitment_forms.py apps/manager/fitment_views.py
 #: apps/manager/templates/manager/amendment.html
+#: apps/manager/templates/manager/platform/fitment_node.html
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/orders.html
@@ -5038,6 +5580,10 @@ msgstr "Suspicion d'infraction pénale (DSA article 18)"
 msgid "Switch"
 msgstr "Changer"
 
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Switch names by language"
+msgstr ""
+
 #: apps/manager/forms.py
 msgid "Tagline"
 msgstr "Slogan"
@@ -5126,6 +5672,11 @@ msgstr ""
 "électroniques qui vous sont adressées. 0000000 s'utilise avec une adresse PEC, que vous indiquez "
 "dans le champ PEC ; XXXXXXX est destiné aux entreprises établies hors d'Italie. Votre comptable ou"
 " votre logiciel de facturation peut vous communiquer ce code."
+
+#: apps/cms/blocks.py
+msgid ""
+"The address of a YouTube or Vimeo video, starting with https://. Other sites are not accepted."
+msgstr ""
 
 #: apps/ingest/models.py
 msgid "The address of the item in the supplier's feed. It identifies the item in that feed."
@@ -5902,6 +6453,10 @@ msgstr ""
 msgid "The general text has no screen or page type."
 msgstr "Le texte général n'a ni écran ni type de page."
 
+#: apps/cms/blocks.py
+msgid "The heading of the section, up to 120 characters. Required."
+msgstr ""
+
 #: apps/shipping/models.py
 msgid "The heaviest parcel of the band, in kg, included. Leave it empty for no upper limit."
 msgstr ""
@@ -6338,6 +6893,10 @@ msgstr ""
 msgid "The name of the territory, for example 'Canary Islands'."
 msgstr "Le nom du territoire, par exemple 'Îles Canaries'."
 
+#: apps/cms/blocks.py
+msgid "The name of the video, shown in the popup. Up to 120 characters. Required."
+msgstr ""
+
 #: apps/shipping/models.py
 msgid "The name of the zone, for example 'Italy, mainland'."
 msgstr "Le nom de la zone, par exemple 'Italie, continent'."
@@ -6381,6 +6940,14 @@ msgid ""
 msgstr ""
 "La nouvelle adresse sur ce site, par exemple /it/. Jamais un autre site web. Ne la renseignez que "
 "lorsque la cible est un chemin."
+
+#: apps/manager/fitment_views.py
+msgid "The node is added."
+msgstr ""
+
+#: apps/manager/fitment_views.py
+msgid "The nodes are merged."
+msgstr ""
 
 #: apps/events/models.py
 msgid ""
@@ -6441,6 +7008,10 @@ msgid ""
 msgstr ""
 "Le numéro que ce produit avait dans les pages en italien de l'ancien site. Utilisé uniquement pour"
 " déplacer d'anciennes données ; laissez vide pour les nouveaux produits."
+
+#: apps/cms/blocks.py
+msgid "The number to show, a whole number. Example: 1250."
+msgstr ""
 
 #: apps/catalog/models.py
 msgid ""
@@ -6930,6 +7501,16 @@ msgstr "Le rapport de l'exécution, en texte brut."
 msgid "The sales terms of %(vendor)s. Buyers read them before they pay."
 msgstr "Les conditions de vente de %(vendor)s. Les acheteurs les lisent avant de payer."
 
+#: apps/manager/fitment_views.py
+msgid "The scheme is updated."
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid ""
+"The scheme says what customers pick: for example a make and a model, or a brand and a machine. "
+"Nothing is written until you confirm on the preview page."
+msgstr ""
+
 #: apps/manager/forms.py
 msgid "The seller (default)"
 msgstr "Le vendeur (par défaut)"
@@ -7060,6 +7641,10 @@ msgstr "Le site auquel appartiennent ces paramètres ; chaque site a son propre 
 #: apps/themes/models.py
 msgid "The site this theme is for. Each site has one theme."
 msgstr "Le site auquel s'applique ce thème. Chaque site a un seul thème."
+
+#: apps/cms/blocks.py
+msgid "The slide's title, up to 120 characters. Required."
+msgstr ""
 
 #: apps/shipping/models.py
 msgid "The special area this treatment is for. A method has one treatment per area."
@@ -7265,6 +7850,12 @@ msgstr ""
 "L'unité d'un attribut numérique, par exemple cm, kg ou ml. Laissez vide pour les attributs à choix"
 " et les attributs de texte."
 
+#: apps/cms/blocks.py
+msgid ""
+"The value that means 'done'. Leave 100 to show the value as a percentage; any other number shows "
+"'value / maximum'."
+msgstr ""
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "The values of the extra details its set asks for, written as code and value, for example "
@@ -7434,6 +8025,10 @@ msgstr ""
 "Le mot que les acheteurs voient pour cette valeur dans cette langue, par exemple 'Rouge'. "
 "Obligatoire : sans lui, la valeur n'a pas de nom dans cette langue."
 
+#: apps/manager/fitment_forms.py
+msgid "The word shown to customers for their saved items, for example Garage or My devices."
+msgstr ""
+
 #: apps/manager/media.py
 msgid ""
 "The words buyers click on. If you leave it empty, the words you selected are used, or the address "
@@ -7514,6 +8109,10 @@ msgstr "Il n'y a pas encore de texte d'aide pour cette page."
 msgid "There is no offer to cancel the rest of this package."
 msgstr "Il n’y a aucune offre d’annulation du reste de ce colis."
 
+#: apps/manager/templates/manager/platform/fitment_merge.html
+msgid "There is no other active node at this place to merge into."
+msgstr ""
+
 #: apps/manager/templates/manager/shop/termination.html
 msgid "There is no termination notice for your shop."
 msgstr "Il n'y a aucun préavis de résiliation pour votre boutique."
@@ -7560,6 +8159,7 @@ msgstr ""
 "quelques minutes."
 
 #: apps/manager/templates/manager/bulk_preview.html
+#: apps/manager/templates/manager/platform/fitment_preview.html
 msgid "This action changes nothing."
 msgstr "Cette action ne modifie rien."
 
@@ -7675,6 +8275,10 @@ msgstr "Ce colis a déjà été expédié ou est clos, son reste ne peut donc pl
 #: apps/catalog/templates/catalog/product.html
 msgid "This page is not available in your language yet."
 msgstr "Cette page n'est pas encore disponible dans votre langue."
+
+#: apps/manager/fitment_forms.py
+msgid "This parent does not exist."
+msgstr ""
 
 #: apps/catalog/templates/catalog/product.html
 msgid "This product is no longer available."
@@ -7861,6 +8465,12 @@ msgid "Tick the box to confirm the statement. Without it the report cannot be se
 msgstr ""
 "Cochez la case pour confirmer la déclaration. Sans cela, le signalement ne peut pas être envoyé."
 
+#: apps/cms/models.py
+msgid ""
+"Tick this to ask search engines to skip this page. The page is also left out of the sitemaps and "
+"of llms.txt. Leave it unticked for a normal public page."
+msgstr ""
+
 #: apps/orders/ui/forms.py
 msgid ""
 "Tick this to enter your company and VAT number. A valid EU VAT number can remove the VAT on a "
@@ -7991,9 +8601,23 @@ msgstr "Numéro de suivi"
 msgid "Tracking number: %(number)s"
 msgstr "Numéro de suivi : %(number)s"
 
+#: apps/events/models.py
+msgid "Trade fair or meeting"
+msgstr "Salon ou rencontre"
+
 #: apps/manager/event_forms.py
 msgid "Tuesday"
 msgstr "Mardi"
+
+#: apps/manager/fitment_forms.py
+msgid ""
+"Turn on only when what a customer saves could reveal sensitive personal data. The garage is then "
+"kept for the visit only and not saved to the account."
+msgstr ""
+
+#: apps/manager/fitment_forms.py
+msgid "Turn on when a year or year range means something in this sector."
+msgstr ""
 
 #: apps/manager/amendment_forms.py
 msgid "Two letters, for example IT."
@@ -8012,6 +8636,7 @@ msgstr "La vérification en deux étapes est activée"
 msgid "Two-factor settings"
 msgstr "Paramètres de la vérification en deux étapes"
 
+#: apps/events/templates/events/_filters.html apps/events/templates/events/event_page.html
 #: apps/manager/event_forms.py
 msgid "Type"
 msgstr "Type"
@@ -8027,6 +8652,14 @@ msgstr "Saisissez les mots exactement comme indiqué."
 #: apps/manager/forms.py
 msgid "Type the words shown above, in capitals, to end every session."
 msgstr "Saisissez en majuscules les mots indiqués ci-dessus pour terminer toutes les sessions."
+
+#: apps/manager/fitment_views.py
+msgid "Under"
+msgstr ""
+
+#: apps/manager/templates/manager/platform/fitment_node_form.html
+msgid "Under %(name)s. The level comes from its place in the tree."
+msgstr ""
 
 #: apps/manager/event_image_form.py
 msgid "Under which licence you may use the image. Your own photo is Own work. Required."
@@ -8060,9 +8693,17 @@ msgstr ""
 " sont vendus sur demande : les clients ne peuvent pas les ajouter au panier."
 
 #: apps/cms/blocks.py
+msgid "Up to two buttons on the slide. If you add none, the slide has no buttons."
+msgstr ""
+
+#: apps/cms/blocks.py
 msgid "Up to two buttons under the text. If you add none, the banner has no buttons."
 msgstr ""
 "Jusqu'à deux boutons sous le texte. Si vous n'en ajoutez pas, la bannière n'a pas de boutons."
+
+#: apps/events/templates/events/_links.html
+msgid "Upcoming events"
+msgstr "Événements à venir"
 
 #: apps/orders/templates/orders/_cart_body.html
 msgid "Update cart"
@@ -8110,10 +8751,24 @@ msgstr "Utiliser un code de récupération"
 msgid "Use this device's screen lock or a security key."
 msgstr "Utilisez le verrouillage d'écran de cet appareil ou une clé de sécurité."
 
+#: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_node.html
+msgid "Used by"
+msgstr ""
+
+#: apps/cms/blocks.py
+msgid ""
+"Used by the slider layout: up to six slides after the banner. Without slides the banner shows as a"
+" single image."
+msgstr ""
+
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/platform/user_sessions.html
 msgid "User sessions"
 msgstr "Sessions des utilisateurs"
+
+#: apps/manager/fitment_forms.py
+msgid "Uses a year"
+msgstr ""
 
 #: apps/orders/ui/present.py apps/orders/ui/views.py
 msgid "VAT"
@@ -8127,6 +8782,7 @@ msgstr "TVA incluse dans le total"
 msgid "VAT number"
 msgstr "Numéro de TVA"
 
+#: apps/events/templates/events/_filters.html apps/events/templates/events/event_page.html
 #: apps/manager/templates/manager/layout.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/dashboard.html
@@ -8400,6 +9056,10 @@ msgid "What the authority asks or what the notice reports, in a few sentences. R
 msgstr ""
 "Ce que demande l'autorité ou ce que signale le signalement, en quelques phrases. Obligatoire."
 
+#: apps/cms/blocks.py
+msgid "What the bar measures, for example 'Order packed'. Up to 80 characters."
+msgstr ""
+
 #: apps/manager/forms.py
 msgid ""
 "What the buyer is told before the order about the cost of returning goods, for example how it is "
@@ -8419,6 +9079,14 @@ msgstr ""
 #: apps/vendors/models.py
 msgid "What the field is needed for: a payout request or the activation of the vendor."
 msgstr "À quoi sert le champ : une demande de versement ou l'activation du vendeur."
+
+#: apps/cms/blocks.py
+msgid "What the number counts, for example 'Orders shipped'. Up to 80 characters."
+msgstr ""
+
+#: apps/cms/blocks.py
+msgid "What the person said, up to 400 characters. Required."
+msgstr ""
 
 #: apps/cms/models.py
 msgid ""
@@ -8482,7 +9150,8 @@ msgstr ""
 "Ce que vous restreignez : un produit est dépublié, un événement est masqué, la boutique d'un "
 "vendeur est suspendue."
 
-#: apps/manager/event_forms.py apps/manager/templates/manager/shop/events.html
+#: apps/events/templates/events/event_page.html apps/manager/event_forms.py
+#: apps/manager/templates/manager/shop/events.html
 msgid "When"
 msgstr "Quand"
 
@@ -8619,7 +9288,7 @@ msgstr ""
 "Lorsque vous passez la commande, nous réservons les articles pour vous. Le paiement suit à l'étape"
 " suivante."
 
-#: apps/manager/event_forms.py
+#: apps/events/templates/events/event_page.html apps/manager/event_forms.py
 msgid "Where"
 msgstr "Où"
 
@@ -8826,6 +9495,10 @@ msgstr ""
 msgid "Who pays the return"
 msgstr "Qui paie le retour"
 
+#: apps/cms/blocks.py
+msgid "Who said it, for example 'Ada'. Required."
+msgstr ""
+
 #: apps/cms/models.py
 msgid ""
 "Who the plan is for, in a sentence or two, up to 300 characters. If you leave it empty, only the "
@@ -8958,6 +9631,10 @@ msgstr ""
 "Écrivez votre texte ici. Utilisez la barre d'outils pour les titres, le gras, les listes et les "
 "liens. Un titre rend la page plus facile à parcourir."
 
+#: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "Yes"
+msgstr ""
+
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid ""
 "You are a member of several vendors. Choose the one to work on; you can switch from the header "
@@ -9002,6 +9679,10 @@ msgstr ""
 "Vous pouvez contester cette décision par une réclamation interne (DSA article 20), un règlement "
 "extrajudiciaire des litiges (DSA article 21) ou devant un tribunal. Les conditions de la "
 "plateforme expliquent comment."
+
+#: apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "You can read the scheme but not change it."
+msgstr ""
 
 #: apps/manager/event_block_views.py
 msgid "You cannot add images for this shop."

@@ -7,6 +7,7 @@ from decimal import Decimal
 import pytest
 from pytest_django.fixtures import Settings as SettingsWrapper
 
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.tax import engine, services
 from apps.tax.tests.factories import (
@@ -221,7 +222,7 @@ def test_d26_the_legal_note_of_an_other_exemption_comes_from_the_profile() -> No
     ctx = services.build_tax_context(profile.vendor, destination_country="FR", at=AT)
     with pytest.raises(engine.IncompleteTaxProfile):
         engine.resolve_goods_tax(ctx, engine.STANDARD)
-    VendorTaxProfileTranslationFactory.create(profile=profile, language="en")
+    VendorTaxProfileTranslationFactory.create(profile=profile, language=primary_language())
     ctx = services.build_tax_context(profile.vendor, destination_country="FR", at=AT)
     d = engine.resolve_goods_tax(ctx, engine.STANDARD)
     assert (d.reason, d.nature_code) == ("exempt_other", "N4")

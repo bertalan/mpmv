@@ -734,6 +734,7 @@ def test_the_reason_guard_catches_empty_reasons_and_missing_tests() -> None:
 
 # Parameters of the routable pages' sub-routes, by "<model label>:<route name>".
 SUBPAGE_KWARGS: dict[str, Callable[[Page], dict[str, object]]] = {
+    "events.EventIndexPage:calendar_view": lambda page: {"year": "2027", "month": "5"},
     "cms.LegalPage:archived_version": lambda page: {
         "number": page.versions.order_by("number").values_list("number", flat=True).first()
     },

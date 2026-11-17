@@ -25,11 +25,13 @@ from apps.compliance.tests.factories import (
     VendorGpsrDefaultsFactory,
 )
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.mail import html_violations
 from apps.core.models import AuditLog, OutboxEmail
 from apps.core.services import render_email
 from apps.core.tasks import schedules
 from apps.core.tests.factories import PlatformOperatorFactory
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -55,7 +57,7 @@ def test_safety_text_is_saved_per_language_and_audited() -> None:
     services.set_product_safety_text(
         product, "en", {"safety_information": "Keep away from heat."}, ctx=CTX
     )
-    row = GpsrSafetyText.objects.get(product=product, language="en")
+    row = GpsrSafetyText.objects.get(product=product, language=primary_language())
     assert row.warnings == "Not suitable for children under 3."  # kept
     assert row.safety_information == "Keep away from heat."
     assert AuditLog.objects.filter(action=services.SAFETY_TEXT_UPDATED).count() == 1
@@ -88,7 +90,7 @@ def test_display_merges_the_vendor_defaults_and_picks_the_language() -> None:
 
 
 def test_display_falls_back_to_the_primary_language() -> None:
-    product = GpsrSafetyTextFactory.create(language="en", warnings="Caution.").product
+    product = GpsrSafetyTextFactory.create(language=primary_language(), warnings="Caution.").product
     shown = services.gpsr_display(product, "de")
     assert (shown.warnings, shown.text_language) == ("Caution.", "en")
 
@@ -100,13 +102,13 @@ def test_the_product_page_block_renders_the_gpsr_data() -> None:
     product = ProductFactory.create(vendor=defaults.vendor, gtin="8001234567890")
     services.set_product_safety_text(product, "en", {"warnings": "Caution <hot>."}, ctx=CTX)
     template = Template("{% load compliance_tags %}{% product_safety product %}")
-    with translation.override("de"):
+    with translation.override(third_language()):
         html = template.render(Context({"product": product}))
     assert "Example Maker S.r.l." in html
     assert "safety@maker.example" in html
     assert "8001234567890" in html
     assert "Caution &lt;hot&gt;." in html  # escaped
-    assert 'lang="en"' in html  # the fallback text says its language
+    assert f'lang="{primary_language()}"' in html  # the fallback text says its language
 
 
 # --- The publication gate on the catalog's save
@@ -257,7 +259,7 @@ def test_the_nightly_email_renders() -> None:
 
 def test_display_falls_back_to_a_language_of_the_destination() -> None:
     product = ProductFactory.create()
-    GpsrSafetyTextFactory.create(product=product, language="de", warnings="Achtung.")
+    GpsrSafetyTextFactory.create(product=product, language=third_language(), warnings="Achtung.")
     GpsrSafetyTextFactory.create(product=product, language="fr", warnings="Attention.")
     shown = services.gpsr_display(product, "it", country="AT")
     assert (shown.warnings, shown.text_language) == ("Achtung.", "de")
@@ -265,7 +267,7 @@ def test_display_falls_back_to_a_language_of_the_destination() -> None:
 
 def test_display_falls_back_to_any_available_language() -> None:
     product = ProductFactory.create()
-    GpsrSafetyTextFactory.create(product=product, language="de", warnings="Achtung.")
+    GpsrSafetyTextFactory.create(product=product, language=third_language(), warnings="Achtung.")
     shown = services.gpsr_display(product, "it")
     assert (shown.warnings, shown.text_language) == ("Achtung.", "de")
     assert shown.text_language_name
@@ -273,9 +275,9 @@ def test_display_falls_back_to_any_available_language() -> None:
 
 def test_the_block_labels_warnings_in_another_language() -> None:
     product = ProductFactory.create()
-    GpsrSafetyTextFactory.create(product=product, language="de", warnings="Achtung.")
+    GpsrSafetyTextFactory.create(product=product, language=third_language(), warnings="Achtung.")
     template = Template("{% load compliance_tags %}{% product_safety product %}")
-    with translation.override("it"):
+    with translation.override(other_language()):
         html = template.render(Context({"product": product}))
     assert "Achtung." in html
     assert 'lang="de"' in html

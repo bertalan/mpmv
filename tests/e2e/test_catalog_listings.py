@@ -79,7 +79,7 @@ def no_js_page(browser: Browser) -> Iterator[Page]:
     context.close()
 
 
-@pytest.mark.usefixtures("term_page")
+@pytest.mark.usefixtures("term_page", "site_allows_indexing")
 @pytest.mark.parametrize(("path", "language", "heading"),
                          [("/compatibility/maker/", "en", "Maker"),
                           ("/it/compatibilita/marca/", "it", "Marca")])  # fmt: skip

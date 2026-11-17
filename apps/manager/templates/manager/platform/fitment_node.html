@@ -1,0 +1,83 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}One fitment node (FIT.1 part 2): details, rename, aliases, translated names, status
+changes, the proposal review and the way to merge. No inline script or style.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ node.name }}</h1>
+  <dl class="manager-details">
+    <dt>{% translate "Level" %}</dt><dd>{{ level }}</dd>
+    <dt>{% translate "Status" %}</dt><dd>{{ node.get_status_display }}</dd>
+    <dt>{% translate "Path" %}</dt><dd>{% for ancestor in ancestors %}<a href="{% url 'manager:platform:fitment_node' ancestor.public_id %}">{{ ancestor.name }}</a> › {% endfor %}{{ node.name }}</dd>
+    <dt>{% translate "Used by" %}</dt><dd>{% for name, count in used_by.items %}{{ name }}: {{ count }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</dd>
+  </dl>
+
+  <h2>{% translate "Children" %}</h2>
+  <ul>
+    {% for child in children %}<li><a href="{% url 'manager:platform:fitment_node' child.public_id %}">{{ child.name }}</a> ({{ child.get_status_display }})</li>{% empty %}<li>{% translate "None." %}</li>{% endfor %}
+  </ul>
+  {% if can_write %}<p><a href="{% url 'manager:platform:fitment_node_new' %}?parent={{ node.public_id }}">{% translate "Add a child" %}</a></p>{% endif %}
+
+  <h2>{% translate "Aliases" %}</h2>
+  <ul>
+    {% for alias in aliases %}<li>{{ alias.alias }}{% if alias.language %} ({{ alias.language }}){% endif %}
+      {% if can_write %}<form method="post" class="manager-inline">{% csrf_token %}<input type="hidden" name="action" value="remove_alias"><input type="hidden" name="alias" value="{{ alias.public_id }}">{% include "components/button.html" with label=_("Remove") type="submit" variant="ghost" size="small" only %}</form>{% endif %}</li>
+    {% empty %}<li>{% translate "None." %}</li>{% endfor %}
+  </ul>
+
+  {% if names %}
+    <h2>{% translate "Names by language" %}</h2>
+    <ul>{% for code, label, name in names %}<li>{{ label }}: {{ name|default:"—" }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if can_write %}
+    <h2>{% translate "Change" %}</h2>
+    <form method="post" class="manager-form" novalidate>
+      {% csrf_token %}<input type="hidden" name="action" value="rename">
+      {% include "components/error_summary.html" with form=rename_form only %}
+      {% for field in rename_form %}{% include "components/field.html" with field=field only %}{% endfor %}
+      {% include "components/button.html" with label=_("Rename (the old name becomes an alias)") type="submit" only %}
+    </form>
+    <form method="post" class="manager-form" novalidate>
+      {% csrf_token %}<input type="hidden" name="action" value="add_alias">
+      {% include "components/error_summary.html" with form=alias_form only %}
+      {% for field in alias_form %}{% include "components/field.html" with field=field only %}{% endfor %}
+      {% include "components/button.html" with label=_("Add the alias") type="submit" only %}
+    </form>
+    {% if names %}
+      <form method="post" class="manager-form" novalidate>
+        {% csrf_token %}<input type="hidden" name="action" value="set_name">
+        {% if name_form %}{% include "components/error_summary.html" with form=name_form only %}{% for field in name_form %}{% include "components/field.html" with field=field only %}{% endfor %}
+        {% else %}
+          <div class="field"><label for="name-language">{% translate "Language" %}</label>
+            <select id="name-language" name="language">{% for code, label, name in names %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="name-name">{% translate "Name" %}</label><input id="name-name" name="name" type="text" maxlength="120" required></div>
+        {% endif %}
+        {% include "components/button.html" with label=_("Save the name") type="submit" only %}
+      </form>
+    {% endif %}
+
+    <h2>{% translate "Status" %}</h2>
+    {% if node.status == "proposed" %}
+      <form method="post" class="manager-inline">{% csrf_token %}<input type="hidden" name="action" value="approve">
+        {% include "components/button.html" with label=_("Approve") type="submit" only %}</form>
+      <form method="post" class="manager-form" novalidate>
+        {% csrf_token %}<input type="hidden" name="action" value="refuse">
+        {% include "components/error_summary.html" with form=refuse_form only %}
+        {% for field in refuse_form %}{% include "components/field.html" with field=field only %}{% endfor %}
+        {% include "components/button.html" with label=_("Refuse and remove the proposal") type="submit" variant="danger" only %}
+      </form>
+    {% elif node.status == "active" %}
+      <form method="post" class="manager-inline">{% csrf_token %}<input type="hidden" name="action" value="retire">
+        {% include "components/button.html" with label=_("Retire (hide it and its children from pickers)") type="submit" variant="secondary" only %}</form>
+    {% else %}
+      <form method="post" class="manager-inline">{% csrf_token %}<input type="hidden" name="action" value="reactivate">
+        {% include "components/button.html" with label=_("Offer it again") type="submit" only %}</form>
+    {% endif %}
+    {% if node.status != "proposed" %}
+      <p><a href="{% url 'manager:platform:fitment_node_merge' node.public_id %}">{% translate "Merge into another node" %}</a></p>
+      <form method="post" class="manager-inline">{% csrf_token %}<input type="hidden" name="action" value="delete">
+        {% include "components/button.html" with label=_("Delete (only when nothing uses it and it has no children)") type="submit" variant="danger" only %}</form>
+    {% endif %}
+  {% endif %}
+  <p><a href="{% url 'manager:platform:fitment_nodes' %}">{% translate "Back to the nodes" %}</a></p>
+{% endblock %}

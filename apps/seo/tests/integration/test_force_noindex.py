@@ -16,6 +16,7 @@ from apps.catalog.tests.factories import (
     CategoryTranslationFactory,
     ProductFactory,
 )
+from apps.core.i18n import primary_language
 from apps.seo.tests.factories import SeoSettingsFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
@@ -32,13 +33,15 @@ def metas(response: Any) -> list[str]:
 
 def category_url() -> str:
     category = CategoryFactory.create()
-    CategoryTranslationFactory.create(category=category, language="en", status="published")
+    CategoryTranslationFactory.create(
+        category=category, language=primary_language(), status="published"
+    )
     ProductFactory.create(
         vendor=VendorFactory.create(status=Vendor.Status.ACTIVE),
         category=category,
         status=Product.Status.PUBLISHED,
     )
-    translation = category.translations.get(language="en")
+    translation = category.translations.get(language=primary_language())
     return f"/product-category/{translation.slug}/"
 
 

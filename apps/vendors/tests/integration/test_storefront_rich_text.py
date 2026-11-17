@@ -13,6 +13,7 @@ from wagtail.models import Collection
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import MediaImageFactory
 from apps.vendors import engine
 from apps.vendors.models import Vendor, VendorTranslation
@@ -22,6 +23,7 @@ from apps.vendors.tests.factories import (
     VendorMemberFactory,
     VendorTranslationFactory,
 )
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -52,7 +54,9 @@ def _document(collection: Collection) -> object:
 
 
 def _stored(vendor: Vendor, field: str) -> str:
-    return str(getattr(VendorTranslation.objects.get(vendor=vendor, language="en"), field))
+    return str(
+        getattr(VendorTranslation.objects.get(vendor=vendor, language=primary_language()), field)
+    )
 
 
 def _save(vendor: Vendor, owner: User, field: str, html: str) -> None:
@@ -133,7 +137,7 @@ def test_render_rechecks_the_collection_and_hides_the_text(client: Client, vendo
     image = MediaImageFactory.create(collection=own)
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="en",
+        language=primary_language(),
         status="published",
         description=f'<p>Story</p><embed embedtype="image" id="{image.pk}" alt="a" format="left"/>',
     )
@@ -148,7 +152,7 @@ def test_the_storefront_renders_formatting_and_strips_stored_xss(
 ) -> None:
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="en",
+        language=primary_language(),
         status="published",
         description="<p>Hi <b>there</b></p><script>boom()</script>",
         shipping_policy='<ul><li>fast</li></ul><p><a href="https://example.org/">x</a></p>',
@@ -166,7 +170,7 @@ def test_the_storefront_renders_formatting_and_strips_stored_xss(
 def test_a_legacy_plain_text_policy_renders_as_paragraphs(client: Client, vendor: Vendor) -> None:
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="en",
+        language=primary_language(),
         status="published",
         shipping_policy="First line\nsecond line\n\nNew paragraph",
         description="",
@@ -212,11 +216,13 @@ def test_the_data_migration_converts_plain_text_and_is_idempotent() -> None:
         "refund_policy": "",
         "cancellation_policy": "a < b",
     }
-    en = OldTranslation.objects.create(vendor=vendor, language="en", status="published", **texts)
+    en = OldTranslation.objects.create(
+        vendor=vendor, language=primary_language(), status="published", **texts
+    )
     en.source_hash = source_hash(texts)
     en.save()
     it = OldTranslation.objects.create(
-        vendor=vendor, language="it", status="published", source_hash=en.source_hash
+        vendor=vendor, language=other_language(), status="published", source_hash=en.source_hash
     )
     executor = MigrationExecutor(connection)
     executor.migrate(after)
@@ -290,7 +296,7 @@ def test_the_storefront_never_fails_on_a_bogus_image_format(
     image = MediaImageFactory.create(collection=_collection(vendor))
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="en",
+        language=primary_language(),
         status="published",
         description=f'<p>Story</p><embed embedtype="image" id="{image.pk}" alt="a"{fmt}/>',
     )

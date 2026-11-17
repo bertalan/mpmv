@@ -13,7 +13,7 @@ from django.urls import NoReverseMatch, reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_safe
 
-from . import indexing, mail, services
+from . import indexing, mail, services, site_url
 from .audit import AuditContext
 from .http import client_ip
 from .models import AuditLog
@@ -56,7 +56,7 @@ def robots_view(request: HttpRequest) -> HttpResponse:
     """`/robots.txt` (SEO.8): public, no language prefix, no vendor data."""
     forced = indexing.is_noindex(request)
     try:
-        sitemap_url = "" if forced else request.build_absolute_uri(reverse("sitemap"))
+        sitemap_url = "" if forced else site_url.absolute_url(request, reverse("sitemap"))
     except NoReverseMatch:  # the sitemaps (SEO.2) add the route
         sitemap_url = ""
     return HttpResponse(

@@ -1,5 +1,6 @@
 {% extends "layouts/content.html" %}
-{% load wagtailcore_tags image_credits responsive_images %}
+{% load wagtailcore_tags image_credits responsive_images seo_robots %}
+{% block head %}{% if page.noindex %}{% robots_meta "noindex" %}{% endif %}{% endblock %}
 {% block page_content %}
   <article>
     <h1>{{ page.title }}</h1>

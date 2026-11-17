@@ -33,6 +33,7 @@ from apps.accounts.tests.factories import (
 from apps.accounts.tests.integration.urls import APPROVE_PURPOSE, APPROVED, DOCUMENTS, Document
 from apps.accounts.tests.mfa import totp_token, verified_login
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, OutboxEmail
 
 pytestmark = [pytest.mark.django_db, pytest.mark.urls("apps.accounts.tests.integration.urls")]
@@ -443,7 +444,7 @@ def test_tokens_never_reach_the_audit_log(client: Client) -> None:
 
 def test_the_email_helper_queues_the_link_through_the_outbox(settings: SettingsWrapper) -> None:
     settings.SITE_BASE_URL = "https://shop.example.com"
-    user = UserFactory.create(preferred_language="en")
+    user = UserFactory.create(preferred_language=primary_language())
     owned_document(user)
 
     services.send_action_link_email(

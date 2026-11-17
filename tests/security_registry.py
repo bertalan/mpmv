@@ -162,6 +162,7 @@ PUBLIC: dict[str, str] = {
     "api-v1:api-root": "API root: links only.",
     "api-v1:openapi-json": "API description, the same for every caller.",
     "api-v1:openapi-view": "Interactive API documentation page.",
+    "events_resource": "Public event ICS download (EVT.6): a published event's calendar file.",
     "wagtail_serve": PUBLIC_CMS,
     "wagtailcore_login": "Sign-in for password-protected CMS pages.",
     "wagtailcore_authenticate_with_password": "Password form of a private CMS page.",
@@ -201,8 +202,24 @@ GET_WRITES_ALLOWED: frozenset[str] = frozenset({"django_session", "accounts_user
 # slug, a token, a page id) must be `VendorScoped` or `StaffOnly` in `tests.tenancy_registry`,
 # where the cross-tenant tests reach it with another vendor's object, or be listed here with what
 # keeps one user from reaching another's object through it.
+SITEMAP = (
+    "A per-language, per-type sitemap (I18N.6, SEO.2), one of its parts or the llms.txt of a "
+    "language is public by design and takes a language code (and a type and part number), not "
+    "an object: it "
+    "lists only published, indexable pages, and an unknown language or indexing off answers 404 "
+    "whoever asks."
+)
+
 IDOR_REVIEWED: dict[str, str] = {
+    "events_resource": (
+        "Public by design (EVT.6): the path names a published event's calendar file, the same "
+        "for every visitor; a hidden event and an unknown path are a 404 "
+        "(`test_pending_draft_and_hidden_events_are_404_to_visitors`)."
+    ),
     "media": MEDIA,
+    "sitemap_section": SITEMAP,
+    "llms_language": SITEMAP,
+    "sitemap_part": SITEMAP,
     "customer_order": (
         "The order is looked up among the signed-in customer's own (ORD.7); a stranger's order "
         "and a guest order answer 404 (`test_a_stranger_s_order_is_a_404_like_an_unknown_one`)."
@@ -293,6 +310,9 @@ OBJECT_PATHS: dict[str, ObjectKwargs] = {
 # Routes with an identifier, called with placeholder parameters, that may answer 404 to a caller
 # who is not signed in or not allowed, with why that 404 hides nothing.
 PLACEHOLDER_404: dict[str, str] = {
+    "sitemap_section": SITEMAP,
+    "llms_language": SITEMAP,
+    "sitemap_part": SITEMAP,
     "vendor_terms:read": (
         "Public by design (VEN.35): the signed token is the credential; a tampered, expired or "
         "superseded token is a 404 for everyone, and the route shows only the terms in force."

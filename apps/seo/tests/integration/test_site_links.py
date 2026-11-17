@@ -31,6 +31,7 @@ from apps.catalog.tests.factories import (
     TermTranslationFactory,
 )
 from apps.cms.tests.factories import StandardPageFactory
+from apps.core.i18n import primary_language
 from apps.core.indexing import robots_txt
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
@@ -54,24 +55,30 @@ def demo() -> dict[str, Any]:
     published product."""
     page = StandardPageFactory.create(title="Riding season")
     vendor = VendorFactory.create(display_name="Throttle Garage", status=Vendor.Status.ACTIVE)
-    VendorTranslationFactory.create(vendor=vendor, language="en", status=PUBLISHED)
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), status=PUBLISHED)
     taxonomy = TaxonomyFactory.create(code="material", has_landing=True)
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="en", slug="material", status=PUBLISHED
+        taxonomy=taxonomy, language=primary_language(), slug="material", status=PUBLISHED
     )
     term = TermFactory.create(taxonomy=taxonomy)
     TermTranslationFactory.create(
-        term=term, language="en", name="Leather", slug="leather", status=PUBLISHED
+        term=term, language=primary_language(), name="Leather", slug="leather", status=PUBLISHED
     )
     category = CategoryFactory.create()
     CategoryTranslationFactory.create(
-        category=category, language="en", name="Jackets", slug="jackets", status=PUBLISHED
+        category=category,
+        language=primary_language(),
+        name="Jackets",
+        slug="jackets",
+        status=PUBLISHED,
     )
     brand = BrandFactory.create(name="Roadstar", status=Brand.Status.APPROVED)
-    BrandTranslationFactory.create(brand=brand, language="en", slug="roadstar", status=PUBLISHED)
+    BrandTranslationFactory.create(
+        brand=brand, language=primary_language(), slug="roadstar", status=PUBLISHED
+    )
     product = ProductFactory.create(vendor=vendor, status=Product.Status.PUBLISHED)
     ProductTranslationFactory.create(
-        product=product, language="en", title="Touring jacket", slug="touring-jacket"
+        product=product, language=primary_language(), title="Touring jacket", slug="touring-jacket"
     )
     product.terms.add(term)
     return {"page": page, "vendor": vendor}

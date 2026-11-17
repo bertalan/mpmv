@@ -38,9 +38,11 @@ from apps.catalog.tests.factories import (
 from apps.cms.models import HomePage, StandardPage, TermLandingPage, VendorLandingPage
 from apps.cms.services import SeedReport
 from apps.cms.tests.factories import TermLandingPageFactory, VendorLandingPageFactory
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -54,12 +56,12 @@ def _commit_hooks_run_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def _home(code: str = "en") -> HomePage:
+def _home(code: str = primary_language()) -> HomePage:
     home: HomePage = HomePage.objects.get(locale__language_code=code)
     return home
 
 
-def _about(code: str = "en") -> StandardPage:
+def _about(code: str = primary_language()) -> StandardPage:
     about: StandardPage = StandardPage.objects.get(
         locale__language_code=code, depth=_home(code).depth + 1
     )
@@ -85,7 +87,11 @@ def listed(title: str, **kwargs: Any) -> Product:
         product=product, title=title, slug=f"{slug}-en", status=PUBLISHED
     )
     ProductTranslationFactory.create(
-        product=product, language="it", title=f"{title} IT", slug=f"{slug}-it", status=PUBLISHED
+        product=product,
+        language=other_language(),
+        title=f"{title} IT",
+        slug=f"{slug}-it",
+        status=PUBLISHED,
     )
     return product
 
@@ -94,7 +100,7 @@ def _category(name: str, slug: str, it_name: str, it_slug: str) -> Category:
     category: Category = CategoryFactory.create()
     CategoryTranslationFactory.create(category=category, name=name, slug=slug, status=PUBLISHED)
     CategoryTranslationFactory.create(
-        category=category, language="it", name=it_name, slug=it_slug, status=PUBLISHED
+        category=category, language=other_language(), name=it_name, slug=it_slug, status=PUBLISHED
     )
     return category
 
@@ -108,13 +114,13 @@ def maker() -> Term:
         taxonomy=compat, name="Compatibility", slug="compatibility", status=PUBLISHED
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=compat, language="it", name="Compatibilità", slug="compatibilita",
+        taxonomy=compat, language=other_language(), name="Compatibilità", slug="compatibilita",
         status=PUBLISHED,
     )  # fmt: skip
     term: Term = TermFactory.create(taxonomy=compat)
     TermTranslationFactory.create(term=term, name="Maker", slug="maker", status=PUBLISHED)
     TermTranslationFactory.create(
-        term=term, language="it", name="Marca", slug="marca", status=PUBLISHED
+        term=term, language=other_language(), name="Marca", slug="marca", status=PUBLISHED
     )
     return term
 
@@ -268,7 +274,7 @@ def test_the_term_page_keeps_its_single_canonical(seeded: SeedReport, maker: Ter
     term_landing(maker)
     html = _html("/compatibility/maker/")
     canonicals = html.find_all("link", rel="canonical")
-    assert [link["href"] for link in canonicals] == ["http://testserver/compatibility/maker/"]
+    assert [link["href"] for link in canonicals] == ["http://localhost/compatibility/maker/"]
 
 
 def test_the_seo_title_and_description_apply_to_the_term_page(
@@ -336,7 +342,7 @@ def test_one_landing_page_per_term_and_language(seeded: SeedReport, maker: Term)
     with pytest.raises(ValidationError):
         _home().add_child(instance=TermLandingPage(title="Again", slug="again", term=maker))
     # Another language has its own landing page (a translation).
-    other = term_landing(maker, parent=_home("it"), slug="guida")
+    other = term_landing(maker, parent=_home(other_language()), slug="guida")
     assert other.locale.language_code == "it"
 
 
@@ -382,13 +388,13 @@ def test_the_vendor_page_has_its_own_canonical_and_hreflang(seeded: SeedReport) 
     _translate(page, "it", slug="il-laboratorio")
     html = _html(page.url)
     assert [link["href"] for link in html.find_all("link", rel="canonical")] == [
-        "http://testserver/our-workshop/"
+        "http://localhost/our-workshop/"
     ]
     alternates = {link["hreflang"]: link["href"] for link in html.find_all("link", rel="alternate")}
     assert alternates == {
-        "en": "http://testserver/our-workshop/",
-        "it": "http://testserver/it/il-laboratorio/",
-        "x-default": "http://testserver/our-workshop/",
+        "en": "http://localhost/our-workshop/",
+        "it": "http://localhost/it/il-laboratorio/",
+        "x-default": "http://localhost/our-workshop/",
     }
 
 
@@ -471,3 +477,14 @@ def test_the_factories_build_landing_pages_under_the_home(seeded: SeedReport) ->
     assert vendor_page.vendor.status == Vendor.Status.ACTIVE
     assert term_page.get_parent().specific == _home()
     assert vendor_page.get_parent().specific == _home()
+
+
+@pytest.fixture(autouse=True)
+def _site_allows_indexing(db: None) -> None:
+    """The canonical and hreflang links are for indexable pages: the site's switch is on."""
+    from django.apps import apps
+    from wagtail.models import Site
+
+    apps.get_model("seo", "SeoSettings").objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )

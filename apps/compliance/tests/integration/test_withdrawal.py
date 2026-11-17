@@ -16,11 +16,13 @@ from apps.compliance.models import WithdrawalStatement
 from apps.compliance.tests.factories import WithdrawalStatementFactory
 from apps.core import services as core_services
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, OutboxEmail
 from apps.orders import services as orders_services
 from apps.orders.models import Order, PrivacyStatus, VendorOrder
 from apps.orders.tests.integration.test_services import line_input, pay, place, vendor_input
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -201,7 +203,7 @@ def test_the_database_allows_one_statement_per_vendor_order() -> None:
             order=order,
             vendor_order=first.vendor_order,
             submitted_at=timezone.now(),
-            language="en",
+            language=primary_language(),
         )
 
 
@@ -220,7 +222,7 @@ def test_a_statement_is_append_only() -> None:
 
 
 def test_the_buyer_gets_one_acknowledgement_with_content_date_and_time() -> None:
-    order = paid_order(language="en")
+    order = paid_order(language=primary_language())
     withdrawal.submit_withdrawal(order, [sub_of(order).public_id], ctx=BUYER)
     mail = OutboxEmail.objects.get(template_key=withdrawal.ACK_TEMPLATE)
     assert mail.recipient == order.email
@@ -237,7 +239,7 @@ def test_the_buyer_gets_one_acknowledgement_with_content_date_and_time() -> None
 
 
 def test_the_acknowledgement_is_in_the_order_language() -> None:
-    order = paid_order(language="it")
+    order = paid_order(language=other_language())
     withdrawal.submit_withdrawal(order, [sub_of(order).public_id], ctx=BUYER)
     mail = OutboxEmail.objects.get(template_key=withdrawal.ACK_TEMPLATE)
     assert mail.language == "it"

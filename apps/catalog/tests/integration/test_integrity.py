@@ -28,10 +28,12 @@ from apps.catalog.tests.factories import (
     VariantTranslationFactory,
 )
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
 from apps.vendors.services import set_cross_vendor_consent
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -257,12 +259,12 @@ def make_rich_product() -> Product:
         brand=BrandFactory.create(),
         legacy_wp_id_en=101,
     )
-    ProductTranslationFactory.create(product=product, language="en", slug="bag-en")
-    ProductTranslationFactory.create(product=product, language="it")
+    ProductTranslationFactory.create(product=product, language=primary_language(), slug="bag-en")
+    ProductTranslationFactory.create(product=product, language=other_language())
     variant = VariantFactory.create(
         product=product, sku="VAR-RED", stock_qty=4, stock_status=StockStatus.IN_STOCK
     )
-    VariantTranslationFactory.create(variant=variant, language="en", label="Red")
+    VariantTranslationFactory.create(variant=variant, language=primary_language(), label="Red")
     product.required_companion = ProductFactory.create(vendor=product.vendor)
     product.save()
     product.upsells.add(ProductFactory.create(vendor=product.vendor))
@@ -290,7 +292,7 @@ def test_staff_duplicate_a_product_to_another_vendor_as_a_draft() -> None:
     assert copy.legacy_wp_id_en is None
     assert copy.required_companion is None
     assert not copy.upsells.exists()
-    assert set(copy.translations.values_list("language", flat=True)) == {"en", "it"}
+    assert set(copy.translations.values_list("language", flat=True)) == {"en", other_language()}
     copied_slugs = ProductTranslation.objects.filter(product=copy).values_list("slug", flat=True)
     assert all(copied_slugs)
     copied_variant = Variant.objects.get(product=copy)

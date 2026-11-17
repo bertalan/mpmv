@@ -202,6 +202,40 @@ def resolve_translation[TM: TranslationModel](
     return translations.resolve(candidates, language)
 
 
+class SiteLanguages(models.Model):
+    """The languages the site serves, as last applied (I18N.15): one row.
+
+    `codes` is ordered, the first being the primary language. Written by the post-migrate hook
+    (first run, and languages added in settings) and by `change_languages`, which is the only
+    way to remove a language or change the primary one. The `core.E914` check compares it with
+    `MPMV_LANGUAGES`.
+    """
+
+    codes = models.JSONField(default=list)
+    # Languages `change_languages` removed: settings must not list them again until the command
+    # brings them back (a `migrate` would otherwise re-add them silently).
+    removed = models.JSONField(default=list, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return ", ".join(self.codes)
+
+
+class LanguageRedirect(models.Model):
+    """A language prefix that was retired: `/de/...` → `/...` (I18N.15).
+
+    Created by `change_languages`; `LanguageRedirectMiddleware` applies it to a request that
+    would otherwise be a 404.
+    """
+
+    old_prefix = models.CharField(max_length=20, unique=True)
+    new_prefix = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return f"{self.old_prefix} → {self.new_prefix}"
+
+
 class Heartbeat(BaseModel):
     """Proof that the worker and its scheduler are alive: one row per name, updated in place.
 

@@ -11,9 +11,7 @@
 {% block description %}{% if editorial.description %}<meta name="description" content="{{ editorial.description }}">{% endif %}{% endblock %}
 {% block head %}
   {% robots_meta robots %}
-  <link rel="canonical" href="{{ canonical_url }}">
-  {% for lang, url in alternates %}<link rel="alternate" hreflang="{{ lang }}" href="{{ url }}">
-  {% endfor %}{% if previous_url %}<link rel="prev" href="{{ previous_url }}">{% endif %}
+  {% if previous_url %}<link rel="prev" href="{{ previous_url }}">{% endif %}
   {% if next_url %}<link rel="next" href="{{ next_url }}">{% endif %}
   <link rel="stylesheet" href="{% static 'catalog/listing.css' %}">
   {% if jsonld %}<script type="application/ld+json">{{ jsonld|safe }}</script>{% endif %}

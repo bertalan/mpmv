@@ -104,3 +104,13 @@ def test_stdout_export_has_header(fake_po: None, capsys: pytest.CaptureFixture[s
     catalog.review_export("de")
     first = next(csv.reader(io.StringIO(capsys.readouterr().out)))
     assert tuple(first) == catalog.REVIEW_COLUMNS
+
+
+@pytest.mark.parametrize("lead", ["=", "+", "-", "@", "\t", "\r"])
+def test_a_cell_that_could_be_a_formula_is_neutralised(lead: str) -> None:
+    assert catalog._safe_cell(f"{lead}SUM(A1)") == f"'{lead}SUM(A1)"
+
+
+def test_an_ordinary_cell_is_left_alone() -> None:
+    assert catalog._safe_cell("Dear customer") == "Dear customer"
+    assert catalog._safe_cell("") == ""

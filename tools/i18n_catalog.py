@@ -33,6 +33,24 @@ import polib
 ROOT = Path(__file__).resolve().parent.parent
 LOCALE = ROOT / "locale"
 LANGUAGES = ("it", "de", "fr", "es")  # grows with I18N.7 slices
+# The public event pages (EVT.6): their templates, the listing module and the type labels.
+EVENT_FILES = (
+    "apps/events/listing.py",
+    "apps/events/models.py",
+    *(
+        f"apps/events/templates/events/{name}.html"
+        for name in (
+            "event_calendar",
+            "event_index_page",
+            "event_page",
+            "event_past",
+            "_filters",
+            "_links",
+            "_results",
+            "_summary",
+        )
+    ),
+)
 SCOPES = (
     "apps/manager",
     "apps/accounts",
@@ -60,6 +78,7 @@ SCOPES = (
     # Temporary staff "Site links" page (OPS.12); remove before LIVE.
     "apps/seo/site_links.py",
     "apps/seo/templates/seo/site_links.html",
+    *EVENT_FILES,  # the public event pages (EVT.6)
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (
@@ -120,6 +139,7 @@ THEME_FILES = (
 ONLY_CLASSES = {
     "apps/compliance/forms.py": ("WithdrawalLookupForm",),
     "apps/cms/models.py": ("HelpEntry",),
+    "apps/events/models.py": ("EventType", "Attendance"),  # the labels the pages show
 }
 SKIP_PARTS = {"tests", "migrations", "static", "node_modules"}
 
@@ -375,6 +395,11 @@ def review_rows(lang: str, *, everything: bool = False, pending: bool = False) -
     return rows
 
 
+def _safe_cell(value: str) -> str:
+    """Spreadsheet formula injection: a cell starting with = + - @ tab or CR gets a leading apostrophe."""
+    return "'" + value if value[:1] in ("=", "+", "-", "@", "\t", "\r") else value
+
+
 def review_export(
     lang: str, out: Path | None = None, *, everything: bool = False, pending: bool = False
 ) -> int:
@@ -383,7 +408,7 @@ def review_export(
     try:
         writer = csv.writer(handle, lineterminator="\r\n")
         writer.writerow(REVIEW_COLUMNS)
-        writer.writerows(rows)
+        writer.writerows([_safe_cell(cell) for cell in row] for row in rows)
     finally:
         if out:
             handle.close()

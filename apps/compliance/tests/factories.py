@@ -27,6 +27,7 @@ from apps.compliance.models import (
     VendorGpsrDefaults,
     WithdrawalStatement,
 )
+from apps.core.i18n import primary_language
 from apps.core.privacy import suppression_digest
 from apps.orders.tests.factories import VendorOrderFactory
 from apps.vendors.tests.factories import VendorFactory
@@ -62,7 +63,7 @@ class GpsrSafetyTextFactory(DjangoModelFactory[GpsrSafetyText]):
         model = GpsrSafetyText
 
     product = factory.SubFactory(ProductFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     warnings = "Keep out of the reach of children."
 
 
@@ -103,7 +104,7 @@ class NoticeFactory(DjangoModelFactory[Notice]):
     explanation = "The item is counterfeit."
     notifier_name = "Ada Reporter"
     notifier_email = factory.Sequence(lambda n: f"reporter{n}@example.org")
-    notifier_language = "en"
+    notifier_language = factory.LazyFunction(primary_language)
     status = Notice.Status.RECEIVED
     good_faith = True
     decided_at = factory.LazyAttribute(
@@ -135,7 +136,7 @@ class StatementOfReasonsFactory(DjangoModelFactory[StatementOfReasons]):
     ground_kind = "illegal_content"
     ground = "Trade mark infringement"
     transparency_explanation = "Counterfeit item offered."
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     sent_at = factory.LazyFunction(timezone.now)
 
 
@@ -169,7 +170,7 @@ class TerminationNoticeFactory(DjangoModelFactory[TerminationNotice]):
     facts = "The storefront keeps selling goods the terms forbid."
     ground = "Platform terms, prohibited goods"
     notice_days = 30
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     issued_at = factory.LazyFunction(timezone.now)
     effective_at = factory.LazyAttribute(lambda n: n.issued_at + dt.timedelta(days=30))
 
@@ -193,4 +194,4 @@ class WithdrawalStatementFactory(DjangoModelFactory[WithdrawalStatement]):
     vendor_order = factory.SubFactory(VendorOrderFactory)
     order = factory.SelfAttribute("vendor_order.order")
     submitted_at = factory.LazyFunction(timezone.now)
-    language = "en"
+    language = factory.LazyFunction(primary_language)

@@ -23,6 +23,7 @@ from wagtail.admin.rich_text.converters.contentstate import ContentstateConverte
 from apps.cms.blocks import RICH_TEXT_FEATURES
 from apps.core import mail
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.services import enqueue_email, render_email
 from apps.shipping import config_format as fmt
 from apps.shipping.config_io import export_config, import_config
@@ -101,7 +102,10 @@ def test_a_stored_formula_is_exported_as_an_inert_cell(vendor: Vendor, formula: 
 def test_a_recipient_with_a_line_break_is_refused(recipient: str) -> None:
     with pytest.raises(ValueError, match="recipient"):
         enqueue_email(
-            recipient=recipient, template_key="tests.order_confirmation", language="en", context={}
+            recipient=recipient,
+            template_key="tests.order_confirmation",
+            language=primary_language(),
+            context={},
         )
 
 
@@ -120,7 +124,7 @@ def test_a_hostile_context_is_stored_and_sent_as_queued() -> None:
     changes = enqueue_email(
         recipient="customer@example.com",
         template_key="tests.order_confirmation",
-        language="en",
+        language=primary_language(),
         context={"customer_name": hi.HTML[1], "order_number": hi.HEADER_INJECTION[0]},
     )
     assert not changes.is_empty

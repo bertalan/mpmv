@@ -372,8 +372,13 @@ setting clears the registry cache. `SiteFactory` and `ThemeSettingsFactory` are 
   `prefers-reduced-motion` (the Pause/Play button is hidden then), and a polite live region
   while nothing rotates.
 - Without JavaScript (`html.no-js`) every slide is shown in turn and the controls stay `hidden`.
-- Not wired to the CMS yet: the hero block has no `layout` or slides field (needs a `cms`
-  migration), so the components are shown on the styleguide only.
+- `js/carousel.js` is loaded by `carousel_controls.html` itself (a module with the same URL runs
+  once), so a page without a carousel never fetches it.
+- CMS blocks (part 3): `HeroBlock` (layout, slides), `StripBlock`, `GalleryBlock` (the carousel
+  with thumbnails; `base` keeps its list), `CounterBlock`, `ProgressBlock`, `SectionTitleBlock`
+  and `VideoModalBlock` (YouTube and Vimeo addresses only, the no-tracking embed, consent-gated;
+  a CSP `frame-src` per provider is an operations follow-up). `base` renders a plain fallback of
+  each. The demo seed's showcase page (`/demo-showcase/`) places one of each.
 
 ## `ride` reveal, counters and video (THM.14 part 2)
 

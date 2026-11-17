@@ -19,9 +19,11 @@ from apps.catalog.tests.factories import (
     ProductTranslationFactory,
     VariantFactory,
 )
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -122,7 +124,7 @@ def test_add_product_with_translations_and_a_variant(staff_client: Client) -> No
             "translations-0-slug": "",
             "translations-0-seo_title": "",
             "translations-0-seo_description": "",
-            "translations-1-language": "it",
+            "translations-1-language": other_language(),
             "translations-1-status": "machine",
             "translations-1-title": "Borsa in pelle",
         }
@@ -147,8 +149,8 @@ def test_add_product_with_translations_and_a_variant(staff_client: Client) -> No
     assert product.vendor == vendor
     assert product.status == Product.Status.DRAFT
     assert product.price_net == Decimal("25.00")
-    assert product.translations.get(language="en").title == "Leather bag"
-    assert product.translation("it").is_fallback is True
+    assert product.translations.get(language=primary_language()).title == "Leather bag"
+    assert product.translation(other_language()).is_fallback is True
     variant = product.variants.get()
     assert (variant.sku, variant.vendor, variant.is_default) == ("bag-01-red", vendor, True)
     assert variant.price_net_override == Decimal("27.00")

@@ -13,6 +13,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, OutboxEmail
 from apps.core.tests.factories import PlatformOperatorFactory
 from apps.vendors.models import Vendor, VendorTranslation
@@ -22,6 +23,7 @@ from apps.vendors.tests.factories import (
     VendorMemberFactory,
     VendorTranslationFactory,
 )
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -46,22 +48,26 @@ def _operator(**emails: str) -> None:
 
 
 def test_the_owner_changes_the_texts_and_policies(vendor: Vendor, owner: User) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", refund_policy="Old refund")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=primary_language(), refund_policy="Old refund"
+    )
     values = {"tagline": "New tagline", "refund_policy": "New refund"}
     save_storefront_profile(vendor, "en", values, actor=owner, ctx=CTX)
-    row = VendorTranslation.objects.get(vendor=vendor, language="en")
+    row = VendorTranslation.objects.get(vendor=vendor, language=primary_language())
     assert (row.tagline, row.refund_policy) == ("New tagline", "New refund")
 
 
 def test_a_language_without_a_row_gets_one(vendor: Vendor, owner: User) -> None:
     save_storefront_profile(vendor, "it", {"tagline": "Ciao"}, actor=owner, ctx=CTX)
-    assert VendorTranslation.objects.get(vendor=vendor, language="it").tagline == "Ciao"
+    assert VendorTranslation.objects.get(vendor=vendor, language=other_language()).tagline == "Ciao"
 
 
 def test_the_audit_entry_has_before_and_after_and_names_the_vendor(
     vendor: Vendor, owner: User
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", refund_policy="Old refund")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=primary_language(), refund_policy="Old refund"
+    )
     save_storefront_profile(vendor, "en", {"refund_policy": "New refund"}, actor=owner, ctx=CTX)
     entry = AuditLog.objects.get(action=ACTION)
     assert entry.before is not None
@@ -134,7 +140,7 @@ def test_an_unchanged_save_writes_no_audit_entry_and_sends_no_email(
 ) -> None:
     _operator(support_email="help@platform.example")
     VendorTranslationFactory.create(
-        vendor=vendor, language="en", tagline="Same", status="published"
+        vendor=vendor, language=primary_language(), tagline="Same", status="published"
     )
     changes = save_storefront_profile(vendor, "en", {"tagline": "Same"}, actor=owner, ctx=CTX)
     assert changes.is_empty
@@ -154,7 +160,7 @@ def test_a_dry_run_returns_the_changes_and_writes_nothing(vendor: Vendor, owner:
 
 
 def test_another_vendors_translation_is_untouched(vendor: Vendor, owner: User) -> None:
-    other = VendorTranslationFactory.create(language="en", tagline="Theirs")
+    other = VendorTranslationFactory.create(language=primary_language(), tagline="Theirs")
     save_storefront_profile(vendor, "en", {"tagline": "Mine"}, actor=owner, ctx=CTX)
     other.refresh_from_db()
     assert other.tagline == "Theirs"
@@ -182,7 +188,7 @@ def test_long_texts_are_capped_at_the_service(
 
 def test_the_audit_entry_holds_only_the_changed_fields(vendor: Vendor, owner: User) -> None:
     VendorTranslationFactory.create(
-        vendor=vendor, language="en", description="d" * 9000, refund_policy="Old"
+        vendor=vendor, language=primary_language(), description="d" * 9000, refund_policy="Old"
     )
     save_storefront_profile(vendor, "en", {"refund_policy": "New"}, actor=owner, ctx=CTX)
     entry = AuditLog.objects.get(action=ACTION)
@@ -202,7 +208,7 @@ def test_saves_are_rate_limited_per_owner(vendor: Vendor, owner: User, settings:
     with pytest.raises(ValidationError):
         save_storefront_profile(vendor, "en", {"tagline": "v4"}, actor=owner, ctx=CTX)
     assert OutboxEmail.objects.count() == 3
-    assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "v2"
+    assert VendorTranslation.objects.get(vendor=vendor, language=primary_language()).tagline == "v2"
 
 
 def test_unchanged_saves_and_dry_runs_do_not_use_the_rate_limit(
@@ -219,27 +225,42 @@ def test_saving_a_machine_draft_without_edits_does_not_publish_it(
     vendor: Vendor, owner: User
 ) -> None:
     _operator(support_email="help@platform.example")
-    VendorTranslationFactory.create(vendor=vendor, language="it", tagline="Bozza", status="machine")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=other_language(), tagline="Bozza", status="machine"
+    )
     changes = save_storefront_profile(vendor, "it", {"tagline": "Bozza"}, actor=owner, ctx=CTX)
     assert changes.is_empty
-    assert VendorTranslation.objects.get(vendor=vendor, language="it").status == "machine"
+    assert (
+        VendorTranslation.objects.get(vendor=vendor, language=other_language()).status == "machine"
+    )
     assert not OutboxEmail.objects.exists()
 
 
 def test_an_edit_publishes_the_draft_and_notifies(vendor: Vendor, owner: User) -> None:
     _operator(support_email="help@platform.example")
-    VendorTranslationFactory.create(vendor=vendor, language="it", tagline="Bozza", status="machine")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=other_language(), tagline="Bozza", status="machine"
+    )
     save_storefront_profile(vendor, "it", {"tagline": "Nuovo"}, actor=owner, ctx=CTX)
-    assert VendorTranslation.objects.get(vendor=vendor, language="it").status == "published"
+    assert (
+        VendorTranslation.objects.get(vendor=vendor, language=other_language()).status
+        == "published"
+    )
     assert OutboxEmail.objects.count() == 1
 
 
 def test_a_source_language_edit_that_stales_other_languages_is_audited(
     vendor: Vendor, owner: User
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Hi", status="published")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=primary_language(), tagline="Hi", status="published"
+    )
     it = VendorTranslationFactory.create(
-        vendor=vendor, language="it", tagline="Ciao", status="published", source_hash="old"
+        vendor=vendor,
+        language=other_language(),
+        tagline="Ciao",
+        status="published",
+        source_hash="old",
     )
     save_storefront_profile(vendor, "en", {"tagline": "Hello"}, actor=owner, ctx=CTX)
     it.refresh_from_db()
@@ -253,7 +274,7 @@ def test_a_source_language_edit_that_stales_other_languages_is_audited(
 
 
 def test_no_stale_entry_when_other_languages_are_untouched(vendor: Vendor, owner: User) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="it", status="machine")
+    VendorTranslationFactory.create(vendor=vendor, language=other_language(), status="machine")
     save_storefront_profile(vendor, "en", {"tagline": "Hello"}, actor=owner, ctx=CTX)
     assert not AuditLog.objects.filter(action="vendor.profile_translation_stale").exists()
 
@@ -275,7 +296,9 @@ def test_an_inactive_owner_cannot_edit(vendor: Vendor, owner: User) -> None:
 
 def test_staff_are_refused_on_a_dry_run_too(vendor: Vendor) -> None:
     staff = VendorMemberFactory.create(vendor=vendor, role="staff").user
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Secret draft")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=primary_language(), tagline="Secret draft"
+    )
     with pytest.raises(PermissionDenied):
         save_storefront_profile(vendor, "en", {"tagline": "x"}, actor=staff, ctx=CTX, dry_run=True)
 
@@ -327,7 +350,10 @@ def test_control_characters_are_refused_not_a_500(
 def test_line_breaks_and_tabs_are_allowed_in_the_texts(vendor: Vendor, owner: User) -> None:
     text = "Line one\r\nLine two\n\tindented"
     save_storefront_profile(vendor, "en", {"refund_policy": text}, actor=owner, ctx=CTX)
-    assert VendorTranslation.objects.get(vendor=vendor, language="en").refund_policy == text
+    assert (
+        VendorTranslation.objects.get(vendor=vendor, language=primary_language()).refund_policy
+        == text
+    )
 
 
 def test_several_owners_share_the_vendors_limit(
@@ -361,13 +387,13 @@ def test_the_policy_headings_are_translated_in_italian(vendor: Vendor) -> None:
 
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="en",
+        language=primary_language(),
         status=TranslationStatus.PUBLISHED,
         shipping_policy="Ships in 3 days",
         refund_policy="Refunds in 14 days",
         cancellation_policy="Cancel before shipping",
     )
-    with translation.override("it"):
+    with translation.override(other_language()):
         profile = storefront_profile(vendor, "en")
     assert profile is not None
     assert [title for title, _body in profile.policies] == [
