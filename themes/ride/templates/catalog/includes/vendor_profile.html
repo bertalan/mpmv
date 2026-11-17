@@ -1,0 +1,21 @@
+{% load i18n wagtailcore_tags %}{% comment %}
+The vendor's public texts on its storefront (VEN.10) of `ride` (THM.7): tagline, bio and policies
+in the page language (the source language as a fallback, announced by the page notice). Copied
+from the app's includes/vendor_profile.html: same data, same escaping (tagline plain text; bio
+and policies rich text, cleaned in `storefront_profile`). The policies are a Bootstrap accordion
+(without JavaScript every item stays open, see css/46-product.css). Needs `vendor_profile` and
+`policy_items`.
+{% endcomment %}<section class="vendor-profile mb-4" aria-labelledby="vendor-profile-heading"{% if vendor_profile.is_fallback %} lang="{{ vendor_profile.language }}"{% endif %}>
+  <h2 id="vendor-profile-heading" class="visually-hidden">{% translate "About this vendor" %}</h2>
+  {% if vendor_profile.tagline %}<p class="vendor-profile__tagline lead">{{ vendor_profile.tagline }}</p>{% endif %}
+  {% if vendor_profile.description %}<div class="vendor-profile__bio">{{ vendor_profile.description|richtext }}</div>{% endif %}
+  {% if policy_items %}
+    <h3 class="h5">{% translate "Store policies" %}</h3>
+    <div class="accordion" id="vendor-policies">
+      {% for item in policy_items %}<div class="accordion-item">
+        <h4 class="accordion-header"><button type="button" class="accordion-button{% if not forloop.first %} collapsed{% endif %}" data-bs-toggle="collapse" data-bs-target="#vendor-policy-{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="vendor-policy-{{ forloop.counter }}">{{ item.title }}</button></h4>
+        <div id="vendor-policy-{{ forloop.counter }}" class="accordion-collapse collapse{% if forloop.first %} show{% endif %}" data-bs-parent="#vendor-policies"><div class="accordion-body">{{ item.content }}</div></div>
+      </div>{% endfor %}
+    </div>
+  {% endif %}
+</section>
