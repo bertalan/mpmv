@@ -13,6 +13,7 @@ import pytest
 from bs4 import BeautifulSoup
 from django.apps import apps
 from django.test import Client
+from pytest_django.fixtures import Settings as SettingsWrapper
 from wagtail.models import Site
 
 from apps.catalog import services
@@ -26,7 +27,6 @@ from apps.catalog.tests.factories import (
     TermTranslationFactory,
 )
 from apps.core.models import TranslationStatus
-from apps.themes.services import use_theme
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -36,8 +36,9 @@ PUBLISHED = TranslationStatus.PUBLISHED
 
 
 @pytest.fixture
-def term_page(monkeypatch: pytest.MonkeyPatch) -> str:
+def term_page(monkeypatch: pytest.MonkeyPatch, settings: SettingsWrapper) -> str:
     """A term "maker" with three products, one per page."""
+    settings.MPMV_THEME_DEFAULT = "ride"
     apps.get_model("seo", "SeoSettings").objects.create(
         site=Site.objects.get(is_default_site=True), allow_indexing=True
     )
@@ -61,8 +62,7 @@ def term_page(monkeypatch: pytest.MonkeyPatch) -> str:
 
 
 def page(client: Client, path: str) -> Any:
-    with use_theme("ride"):
-        response = client.get(path)
+    response = client.get(path)
     assert response.status_code == 200
     return BeautifulSoup(response.content, "html.parser")
 
