@@ -3,6 +3,7 @@
 import pytest
 
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.fitment import references, services
 from apps.fitment.models import FitmentLevel, FitmentNode, FitmentNodeAlias, FitmentNodeMerge
@@ -12,6 +13,7 @@ from apps.fitment.tests.factories import (
     FitmentNodeAliasFactory,
     FitmentNodeFactory,
 )
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -76,21 +78,21 @@ def test_names_are_nfc_normalised_and_trimmed() -> None:
 def test_a_translated_name_needs_a_level_that_translates_names() -> None:
     make = make_node("Make One")
     with pytest.raises(FitmentError):
-        services.set_node_name(make, "it", "Marca Uno", ctx=CTX)
+        services.set_node_name(make, other_language(), "Marca Uno", ctx=CTX)
     services.set_translate_names(FitmentLevel.objects.get(code="model"), True, ctx=CTX)
     model = make_node("Model A", make)
-    services.set_node_name(model, "it", "Modello A", ctx=CTX)
-    services.set_node_name(model, "it", "Modello Uno", ctx=CTX)
-    assert model.translations.get(language="it").name == "Modello Uno"
+    services.set_node_name(model, other_language(), "Modello A", ctx=CTX)
+    services.set_node_name(model, other_language(), "Modello Uno", ctx=CTX)
+    assert model.translations.get(language=other_language()).name == "Modello Uno"
 
 
 def test_aliases_are_added_and_removed_with_audit() -> None:
     node = make_node("Make One")
-    alias = services.add_alias(node, "Make-1", language="en", ctx=CTX).obj
+    alias = services.add_alias(node, "Make-1", language=primary_language(), ctx=CTX).obj
     assert alias is not None
     assert alias.normalized == "make 1"
     with pytest.raises(FitmentError):
-        services.add_alias(node, "make 1", language="en", ctx=CTX)
+        services.add_alias(node, "make 1", language=primary_language(), ctx=CTX)
     services.remove_alias(alias, ctx=CTX)
     assert not FitmentNodeAlias.objects.exists()
     assert AuditLog.objects.filter(action="fitment.alias.created").exists()

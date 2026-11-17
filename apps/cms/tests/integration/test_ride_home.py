@@ -14,6 +14,7 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.cms.models import HomePage
 from apps.cms.services import seed_site
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import MediaImageFactory
 
 pytestmark = pytest.mark.django_db
@@ -27,7 +28,7 @@ def _ride(settings: SettingsWrapper) -> None:
 @pytest.fixture
 def home(db: None) -> HomePage:
     seed_site()
-    page: HomePage = HomePage.objects.get(locale__language_code="en")
+    page: HomePage = HomePage.objects.get(locale__language_code=primary_language())
     banner = MediaImageFactory.create(title="Banner", file__filename="banner.png")
     page.body = [
         (
@@ -61,7 +62,9 @@ def test_the_home_page_uses_the_ride_theme_and_its_stylesheet(
     client: Client, home: HomePage
 ) -> None:
     html = client.get("/").content.decode()
-    assert '<html lang="en" data-theme="ride"' in html  # ride adds class="no-js" (THM.15 1/3)
+    assert (
+        f'<html lang="{primary_language()}" data-theme="ride"' in html
+    )  # ride adds class="no-js" (THM.15 1/3)
     assert re.search(r'<link rel="stylesheet" href="[^"]*themes/ride/theme[^"]*\.css">', html)
     assert "themes/base/theme" not in html
 

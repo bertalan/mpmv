@@ -19,6 +19,7 @@ from wagtail.models import Locale  # noqa: F401  (the primary locale exists in t
 
 from apps.cms.models import LegalPage
 from apps.cms.tests.factories import LegalPageFactory
+from apps.core.i18n import primary_language
 from apps.core.models import OutboxEmail, PlatformOperator
 from apps.orders import legal
 from apps.orders.models import Order
@@ -377,7 +378,7 @@ def test_the_confirmation_email_carries_the_terms_text_in_the_versions_of_the_or
 
 def test_the_step_texts_are_built_from_the_pure_rules_only(client: Client) -> None:
     """`build_step` for a consumer lists no clause group whatever the parties are."""
-    step = legal.build_step([], language="en", business=False)
+    step = legal.build_step([], language=primary_language(), business=False)
     assert not step.box2_required
     assert step.sellers == []
     assert NBSP

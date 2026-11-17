@@ -21,6 +21,8 @@ from apps.accounts.tests.mfa import verified_login
 from apps.cms import roles
 from apps.cms.models import HomePage, NavigationMenu
 from apps.cms.services import SeedReport, can_access_cms_admin
+from apps.core.i18n import primary_language
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -59,7 +61,7 @@ def test_the_admin_refuses_a_second_home_page_in_a_language(client: Client) -> N
     )
     assert response.status_code == 200  # the form again, with the error
     assert "This language already has a home page." in response.content.decode()
-    assert HomePage.objects.filter(locale__language_code="en").count() == 1
+    assert HomePage.objects.filter(locale__language_code=primary_language()).count() == 1
 
 
 def test_wagtail_editors_must_use_mfa_even_without_staff_status() -> None:
@@ -121,7 +123,7 @@ def test_admin_editors_edit_menus_without_inline_scripts(
     client: Client, seeded: SeedReport
 ) -> None:
     verified_login(client, UserFactory.create(superuser=True))
-    menu = NavigationMenu.objects.get(locale__language_code="it", location="header")
+    menu = NavigationMenu.objects.get(locale__language_code=other_language(), location="header")
     html = client.get(f"/admin/snippets/cms/navigationmenu/edit/{menu.pk}/").content.decode()
     assert "Chi siamo" in html
     assert not re.search(r"<script(?![^>]*\b(?:src|type)=)[^>]*>", html)
@@ -139,7 +141,7 @@ def test_an_editor_saves_admin_preferences_without_a_name_form(client: Client) -
     response = client.post(
         "/admin/account/",
         {
-            "locale-preferred_language": "it",
+            "locale-preferred_language": other_language(),
             "locale-current_time_zone": "",
             "theme-theme": "dark",
             "theme-contrast": "system",
@@ -149,7 +151,11 @@ def test_an_editor_saves_admin_preferences_without_a_name_form(client: Client) -
     assert response.status_code == 302
     assert response["Location"] == "/admin/account/"
     profile = UserProfile.get_for_user(editor)
-    assert (profile.preferred_language, profile.theme, profile.density) == ("it", "dark", "snug")
+    assert (profile.preferred_language, profile.theme, profile.density) == (
+        other_language(),
+        "dark",
+        "snug",
+    )
 
 
 def test_editors_upload_no_profile_picture(client: Client) -> None:

@@ -12,6 +12,7 @@ from django.db import connection, transaction
 
 from apps.catalog.tests.factories import ProductFactory
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.orders import services
 from apps.orders.engine import IllegalTransition
@@ -19,6 +20,7 @@ from apps.orders.models import Order, OrderNumberSequence, VendorOrder
 from apps.orders.services import LineInput, VendorOrderInput
 from apps.orders.tests.factories import OrderNumberSequenceFactory
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 COMMISSION = {
     "rule_id": "default",
@@ -70,7 +72,7 @@ def vendor_input(vendor: object = None, **overrides: object) -> VendorOrderInput
 def place(**overrides: object) -> Order:
     values: dict[str, object] = {
         "email": "buyer@example.com",
-        "language": "it",
+        "language": other_language(),
         "billing_address": {"line1": "1 Via Test", "city": "Roma"},
         "billing_country": "IT",
         "shipping_address": {"line1": "1 Via Test", "city": "Roma"},
@@ -125,7 +127,7 @@ def test_a_rolled_back_order_leaves_no_gap() -> None:
 def test_a_dry_run_changes_nothing_and_burns_no_number() -> None:
     order, changeset = services.create_order(
         email="buyer@example.com",
-        language="en",
+        language=primary_language(),
         billing_address={},
         billing_country="IT",
         shipping_address={},
