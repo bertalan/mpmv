@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **429** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3413 h** (P1 2536 h · P2 789 h · P3 88 h)
+- Micro-tasks: **430** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3417 h** (P1 2540 h · P2 789 h · P3 88 h)
 - P1 critical path (schedule lower bound with full parallelism): **197 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → PAY.7 → ORD.20 → ORD.21 → ORD.22 → ORD.23
 
 ## By macro area
@@ -28,7 +28,7 @@
 | CMS | Wagtail content | 16 | 67 | 21 | 0 | 88 |
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
 | TRU | Trust, reviews and community (D-37 proposal) | 11 | 0 | 70 | 16 | 86 |
-| FIT | Garage and fitment (D-38) | 17 | 170 | 0 | 14 | 184 |
+| FIT | Garage and fitment (D-38) | 18 | 174 | 0 | 14 | 188 |
 | THM | Frontend themes | 16 | 118 | 12 | 0 | 130 |
 | SEO | SEO, feeds, analytics | 15 | 50 | 31 | 0 | 81 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
@@ -36,7 +36,7 @@
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 14 | 25 | 37 | 8 | 70 |
 | MIG | Migration and cutover | 22 | 141 | 29 | 0 | 170 |
-| **Total** | | **429** | **2536** | **789** | **88** | **3413** |
+| **Total** | | **430** | **2540** | **789** | **88** | **3417** |
 
 ## By phase
 
@@ -370,7 +370,7 @@
 | MIG.20 | Refunds migration (owner decision 2026-11-11, relayed by lane-a, #86): refund child orders and marketplace refund requests are stored inside the historical order (refunded amount, date, reason); there is no separate refund model for legacy data; no new ledger entry and no tax recalculation | P1 | 4 | MIG.4 | A migrated order shows its refunded amount, date and reason; the MIG.5 parity report reconciles order total minus refunds against the legacy figures; a refund amount that does not parse as `Decimal` is rejected with a report; the migration writes no ledger entry for a refund (MIG.8 covers balances); no refund model or table exists for legacy data |
 | MIG.22 | Domains, mail and TLS at cutover (owner decision 2026-11-16, §13.4): DNS inventory exported from the registrar into private storage, a dedicated mail host record and the MX moved to it before the switch when mail is self-managed on the legacy server (a dedicated mail service is a recommended follow-up, and a precondition for shutting the legacy server down), SPF, DKIM and DMARC for the transactional provider (ARC.16), TTL 300 s from T−7, production certificates issued before the switch (ACME DNS-01), legacy site on an internal hostname behind basic auth and `noindex`, Stripe webhook URLs and domain verification updated, staged HSTS | P1 | 6 | MIG.9 | Runbook checklist: the inventory file is in private storage; a mail test send and receive passes after the MX change, before the switch; the TTL check shows 300 s on the switched records; certificates are valid before the switch; the legacy host answers 401 over valid HTTPS without credentials (HSTS `includeSubDomains` applies to it) and carries `noindex`; rollback by DNS was rehearsed in a dress rehearsal |
 
-### F6 — After go-live (P2) (119 tasks, 899 h)
+### F6 — After go-live (P2) (120 tasks, 903 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -459,6 +459,7 @@
 | FIT.14 | Performance (D-38, slice FIT-d): dataset generator (200 000 products, 3 million rows), EXPLAIN budget test (p95 database time under 150 ms with an active garage), the optional matched-set cache only if the budget fails, bulk write timing | P1 | 6 | FIT.8 | The budget test passes in CI and fails when an index is dropped |
 | FIT.15 | Legacy carry-over (D-38, slice FIT-f): convert the migrated `compatibility` terms into fitment nodes (dry run, report, aliases from the legacy names), map the legacy model articles to nodes with an editor-assisted list, keep all legacy URLs | P1 | 8 | FIT.1, FIT.10, MIG.3, MIG.11 | Every legacy compatibility term maps to a node or is listed as unmatched; each legacy article is linked to a node or in the unmatched report; no legacy URL changes |
 | FIT.17 | Fit answer on the order line (D-38 Q-G6, slice FIT-d): an order-line annotation hook in `orders` (opaque validated JSON, no `fitment` import), the product page posts the shown answer (tier, wording version, profile node id and label), shown on the order, the confirmation and the vendor order view as seller-declared compatibility, in the order export and in the retention scrub; vehicle snapshot (Q-G8, adviser opinion 2026-11-11): an order placed with an active garage vehicle also snapshots that vehicle (make, model, year labels at that time) and shows "Vehicle selected by the customer in the compatibility filter: <make, model, year> — compatibility declared by the vendor" in the order summary and in the ORD.9 emails to the customer and the vendor | P1 | 6 | FIT.9, ORD.2 | A purchase with an active garage stores the answer and never the profiles; an order without a garage has no annotation; the import contract shows `orders` does not import `fitment`; a return view shows the wording the customer saw; a purchase with an active vehicle shows the vehicle line in the order summary, the customer email and the vendor email (snapshot tests in five languages); a later rename or retirement of the node does not change the order's line |
+| FIT.18 | Publish gate for undeclared products (D-38 §17.2.4): the per-category setting (default off) and the check in the publish path, wired through a registered hook so the catalog never imports fitment: a `buy` product in a fitment-relevant category cannot be published with `mode=undeclared`, the refusal says what to declare | P1 | 4 | FIT.2, CAT.19 | With the setting on, publishing an undeclared `buy` product in a relevant category is refused and a declared one publishes; with it off, nothing changes; the catalog has no `fitment` import |
 | THM.11 | Vendor branding (paid plan option): `BrandPalette` and `VendorBranding` in `vendors` with explicit foreground per role, the nine presets (operator palette included) seeded by a data migration, every preset editable, `derive_palette`, `check_brand_palette` over every registered theme's surface, `nearest_compliant` and `suggest_foreground` offered in one click, logo and banner (CMS.8 images), `render_brand_css` to a hashed same-origin file, storefront and product page hooks gated by `plan_allows`, preview, audit | P2 | 12 | VEN.19, THM.4, VEN.10, CAT.7, CMS.8 | The §14.12 unit tests pass (nine presets valid, `#C65D00` fixed close to `#BE5900`, fixed point unchanged, white on `#FBA926` gives None and `#1A1A1A` as foreground); a custom palette with a 3:1 pair is rejected with its ratio and a one-click fix; a branded vendor's storefront and product pages load its stylesheet with no CSP violation and pass axe; listings and checkout never load it; a vendor whose plan loses the entitlement renders with the theme only and keeps its stored branding |
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget; cacheability rules taken from wagtail-cache (owner decision D-36; the list below is the minimum and the spike checks it against the package): only anonymous `GET` and `HEAD` with a 200 answer are cached, nothing with a session, cart, consent or CSRF cookie or a `Vary: Cookie`, nothing in the Manager or admin, the key includes the locale and the host, a publish or unpublish purges the page and the pages that list it; **a cached page never carries a per-request CSP nonce** (replaying one nonce to every visitor defeats it), so a page that needs a nonce is not cacheable; package or mirror decided at a short spike inside this row | P2 | 6 | THM.3 | LCP < 2.5 s on product page; tests: a cacheable public response has no `nonce` attribute and its CSP has no nonce source, a page that needs a nonce is served uncached; a cart, consent, Manager or logged-in request is never cached; a locale change and a publish purge the right entries |
