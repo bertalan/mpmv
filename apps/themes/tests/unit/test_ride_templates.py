@@ -121,6 +121,7 @@ def test_the_header_has_no_native_dialog_markup() -> None:
 
 
 def test_the_search_link_is_a_modal_trigger_that_still_leads_to_the_search_page() -> None:
+    """With an explicit `search_url` the trigger and the form use it; the field is `s` (CAT.27)."""
     html = render("components/header.html", site_name="Ride", links=LINKS, search_url="/search/")
     trigger = re.search(r'<a[^>]*href="/search/"[^>]*>', html)
     assert trigger
@@ -133,7 +134,7 @@ def test_the_search_link_is_a_modal_trigger_that_still_leads_to_the_search_page(
     form = re.search(r'<form[^>]*role="search"[^>]*>', html)
     assert form
     assert 'action="/search/"' in form.group(0)
-    assert 'name="q"' in html
+    assert 'name="s"' in html  # CAT.27: the search page reads `s` on the language home
     assert re.search(r'<button[^>]*data-bs-dismiss="modal"[^>]*aria-label="Close"', html)
 
 
@@ -262,3 +263,30 @@ def test_the_mini_cart_request_is_background_and_skipped_on_sign_in_pages() -> N
     assert 'hx-headers=\'{"X-MPMV-Poll": "1"}\'' in header
     for guard in ('app_name != "mfa"', 'app_name != "levels"', '"login" not in page_path'):
         assert header.count(guard) == 2, guard  # the trigger link and the offcanvas agree
+
+
+def test_without_a_search_url_the_header_searches_on_the_language_home() -> None:
+    """CAT.27: with no route named `search`, the form targets the home, which answers `?s=`."""
+    html = render("components/header.html", site_name="Ride", links=LINKS)
+    form = re.search(r'<form[^>]*role="search"[^>]*>', html)
+    assert form
+    # The home URL carries the active language prefix (/en/, /it/ ...), so read it from the router.
+    home = reverse("wagtail_serve", args=[""])
+    assert f'action="{home}"' in form.group(0)
+    assert 'name="s"' in html
+
+
+def test_the_default_search_action_is_the_active_language_home() -> None:
+    """CAT.27: without an explicit `search_url` the header form targets the language home."""
+    from django.conf import settings
+    from django.utils import translation
+
+    # A non-primary language carries a URL prefix (/it/ under en,it; /de/ under it,de).
+    other = next(code for code, _name in settings.LANGUAGES if code != settings.LANGUAGE_CODE)
+    with translation.override(other):
+        html = render("components/header.html", site_name="Ride", links=LINKS)
+        home = reverse("wagtail_serve", args=[""])
+    form = re.search(r'<form[^>]*role="search"[^>]*>', html)
+    assert form
+    # The router decides the prefix (none for the primary language), so compare with it.
+    assert f'action="{home}"' in form.group(0)

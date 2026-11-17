@@ -261,10 +261,12 @@ class Throttle(BaseModel):
     Kept in PostgreSQL, the only datastore (ADR-0001): every gunicorn worker and container sees
     the same counters, they survive restarts, and `select_for_update` makes each increment
     atomic. A process-local cache would let an attacker multiply the budget by the number of
-    workers, and Django's database cache has no atomic increment. Failures write here, and so does
-    every request to a rate-limited public endpoint (`consume_rate_limit`, e.g. the event feeds:
-    one row per IP and path, valid keys only, one write per request). Expired rows are purged
-    nightly (`core.purge_throttles`).
+    workers, and Django's database cache has no atomic increment. Failures write here (logins,
+    registrations), so does every request to a rate-limited public endpoint (`consume_rate_limit`,
+    e.g. the event feeds: one row per IP and path, valid keys only, one write per request), and so
+    does every non-empty public search (CAT.27 `search:ip:*` keys, one counter per client and
+    minute), so the load follows the public traffic. Expired rows are purged nightly
+    (`core.purge_throttles`).
     """
 
     key = models.CharField(max_length=320, unique=True)

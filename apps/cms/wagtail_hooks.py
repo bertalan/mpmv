@@ -38,6 +38,7 @@ from wagtail.snippets.views.snippets import SnippetViewSet
 from wagtail.users import wagtail_hooks as wagtail_users_hooks
 
 from apps.catalog.listings import EDITORIAL_HOOK, ListingEditorial
+from apps.catalog.search_page import SEARCH_GROUPS_HOOK, SearchGroup
 from apps.catalog.services import ListingScope
 from apps.core.services import classified
 
@@ -51,7 +52,7 @@ from .choosers import (
     vendor_chooser,
 )
 from .models import BlogAuthor, NavigationMenu
-from .services import listing_editorial
+from .services import listing_editorial, search_articles
 
 
 class NavigationMenuViewSet(SnippetViewSet):  # type: ignore[misc]  # Wagtail is untyped
@@ -201,3 +202,11 @@ def landing_page_editorial(
     """A term landing page on its term's listing page; the vendor story link on a storefront
     (CMS.4)."""
     return listing_editorial(request, scope, language)
+
+
+@hooks.register(SEARCH_GROUPS_HOOK)  # type: ignore[untyped-decorator]
+def search_articles_group(
+    request: HttpRequest, query: str, language: str, limit: int
+) -> SearchGroup | None:
+    """The articles below the products of the search results page (CAT.27)."""
+    return search_articles(request, query, language, limit)
