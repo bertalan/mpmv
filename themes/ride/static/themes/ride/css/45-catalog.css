@@ -46,8 +46,11 @@
     font-family: var(--font-display);
   }
 
+  /* The same 44 px target as a page link. */
   .filter-chips .btn {
-    min-block-size: 2rem;
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2.75rem;
   }
 
   @media (prefers-reduced-motion: reduce) {

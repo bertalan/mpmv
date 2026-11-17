@@ -107,3 +107,33 @@ def test_reduced_motion_shows_no_transition_on_cards(page: Page, live_server: Li
     )
     assert durations
     assert all(d in ("0s", "0.01ms", "1e-05s") for d in durations), durations
+
+
+def test_the_filter_chips_are_at_least_44_px(page: Page, live_server: LiveServer) -> None:
+    page.set_viewport_size({"width": 360, "height": 900})
+    page.goto(f"{live_server.url}/compatibility/maker/?price_min=5")
+    chips = page.locator(".filter-chips a").all()
+    assert len(chips) >= 2
+    for chip in chips:
+        box = chip.bounding_box()
+        assert box is not None
+        assert min(box["width"], box["height"]) >= 44
+
+
+def test_the_filter_form_submits_with_the_keyboard_only(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.goto(f"{live_server.url}/compatibility/maker/")
+    page.locator("#filter-price-min").focus()
+    page.keyboard.type("5")
+    page.keyboard.press("Enter")  # implicit submission from a text field
+    expect(page).to_have_url(f"{live_server.url}/compatibility/maker/?price_min=5")
+    expect(page.locator(".filter-chips")).to_be_visible()
+    page.locator("#filter-price-max").focus()
+    page.keyboard.type("50")
+    for _ in range(10):  # Tab to the submit button
+        page.keyboard.press("Tab")
+        if page.evaluate("() => document.activeElement.matches('button[type=submit]')"):
+            break
+    page.keyboard.press("Enter")
+    expect(page).to_have_url(f"{live_server.url}/compatibility/maker/?price_min=5&price_max=50")
