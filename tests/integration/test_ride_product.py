@@ -68,7 +68,12 @@ def mug(ride: None) -> str:
     )
     product.terms.add(term)
     for sku, label, default in (("MUG-S", "Small", False), ("MUG-L", "Large", True)):
-        variant = VariantFactory.create(product=product, sku=sku, is_default=default)
+        variant = VariantFactory.create(
+            product=product,
+            sku=sku,
+            is_default=default,
+            price_net_override=Decimal("20.00"),
+        )
         VariantTranslationFactory.create(
             variant=variant, language="en", label=label, status=PUBLISHED
         )
@@ -138,10 +143,13 @@ def test_the_buy_box_keeps_the_hooks_and_the_form_behaviour(client: Client, mug:
     assert soup.select_one(".product-vendor a")["href"].endswith("/shop/acme/")
 
 
-def test_the_variant_prices_are_consumer_prices(client: Client, mug: str) -> None:
+def test_each_variant_keeps_its_stock_and_sku_hooks(client: Client, mug: str) -> None:
     soup = page(client, mug)
-    assert soup.select(".variant-price data[value]")
-    assert soup.select_one(".price-note") is not None
+    labels = soup.select("form.product-form label.form-check-label")
+    assert len(labels) == 2
+    for label in labels:
+        assert label.select_one(".variant-stock")
+        assert label.select_one(".variant-sku")
 
 
 def test_description_and_details_are_bootstrap_tabs(client: Client, mug: str) -> None:
@@ -183,10 +191,12 @@ def test_the_related_products_are_a_card_strip(client: Client, mug: str) -> None
     assert all(card.select_one(".product-card-price") for card in cards)
 
 
-def test_the_gallery_is_the_shared_carousel_component(client: Client, mug: str) -> None:
+def test_without_images_the_page_shows_no_gallery_and_keeps_the_buy_box(
+    client: Client, mug: str
+) -> None:
     soup = page(client, mug)
-    # No images: the neutral placeholder of the component, hidden from assistive technology.
-    assert soup.select_one("#product-images, .gallery .gallery__placeholder") is not None
+    assert soup.select_one("#product-images") is None
+    assert soup.select_one("section.product-buy form.product-form") is not None
 
 
 def test_the_storefront_policies_are_a_bootstrap_accordion(client: Client, ride: None) -> None:
@@ -200,7 +210,8 @@ def test_the_storefront_policies_are_a_bootstrap_accordion(client: Client, ride:
         tagline="Copper since 1950",
         description="Our story.",
         shipping_policy="Ships in two days.",
-        returns_policy="Thirty days.",
+        refund_policy="Thirty days.",
+        cancellation_policy="Cancel any time.",
     )
     product = ProductFactory.create(vendor=vendor, status=Product.Status.PUBLISHED)
     ProductTranslationFactory.create(
@@ -215,7 +226,7 @@ def test_the_storefront_policies_are_a_bootstrap_accordion(client: Client, ride:
     accordion = profile.select_one(".accordion")
     assert accordion is not None
     items = accordion.select(".accordion-item")
-    assert len(items) == 2
+    assert len(items) == 3
     for item in items:
         button = item.select_one("h4.accordion-header > button.accordion-button")
         assert button is not None

@@ -289,6 +289,7 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
         "vendor_url": slugs.vendor_path(language, page.vendor.slug, default_language=default),
         "gallery_items": product_pages.gallery_items(page),
         "related": product_pages.related(page, language),
+        "trail": _trail(page.title, location),
     }
     response: HttpResponse = render(request, PRODUCT_TEMPLATE, context)
     return response

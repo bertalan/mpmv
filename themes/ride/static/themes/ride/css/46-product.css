@@ -1,0 +1,104 @@
+/* Ride: product page and vendor storefront (THM.7 part 2): tabs, accordion, buy box. Bootstrap
+   classes do the layout; this file maps tabs and the accordion on the ride tokens and gives the
+   no-JavaScript fallback (`html.no-js`, removed by ride.js): all tab panels follow one another and
+   every accordion item is open. Colours only through tokens. Transitions only when the visitor
+   has no reduced-motion preference. */
+@layer overrides {
+  .nav-tabs {
+    --bs-nav-tabs-border-color: var(--color-border);
+    --bs-nav-tabs-border-radius: var(--radius-control);
+    --bs-nav-tabs-link-hover-border-color: var(--color-border);
+    --bs-nav-tabs-link-active-color: var(--color-heading);
+    --bs-nav-tabs-link-active-bg: var(--color-surface);
+    --bs-nav-tabs-link-active-border-color: var(--color-border) var(--color-border)
+      var(--color-surface);
+    --bs-nav-link-color: var(--color-accent-hover);
+    --bs-nav-link-hover-color: var(--color-heading);
+  }
+
+  .nav-tabs .nav-link {
+    min-block-size: var(--target-primary);
+    min-inline-size: var(--target-primary);
+    font-family: var(--font-display);
+    font-weight: 700;
+  }
+
+  .nav-tabs .nav-link:focus-visible,
+  .accordion-button:focus-visible {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: calc(var(--focus-offset) * -1);
+    box-shadow: none;
+  }
+
+  .tab-content {
+    background: var(--color-surface);
+    border-color: var(--color-border) !important;
+  }
+
+  .accordion-button {
+    min-block-size: var(--target-primary);
+    font-family: var(--font-display);
+    font-weight: 700;
+  }
+
+  .product-buy .card {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+  }
+
+  .product-price {
+    font-family: var(--font-display);
+    color: var(--color-heading);
+  }
+
+  .product-variants .form-check {
+    min-block-size: var(--target-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .product-variants .form-check-input {
+    float: none;
+    margin: 0;
+    flex: none;
+  }
+
+  .store-categories .nav-link {
+    min-block-size: var(--target-primary);
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--color-border);
+    color: var(--color-accent-hover);
+  }
+
+  .store-categories .nav-link.active {
+    color: var(--color-text-inverse);
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+
+  /* Without JavaScript: panels in turn, accordion items open, no tab strip (it has no effect). */
+  .no-js .product-info .nav-tabs {
+    display: none;
+  }
+
+  .no-js .product-info .tab-pane {
+    display: block;
+    opacity: 1;
+  }
+
+  .no-js .accordion-collapse {
+    display: block;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nav-link,
+    .tab-pane,
+    .accordion-button,
+    .accordion-collapse,
+    .collapsing {
+      transition: none;
+    }
+  }
+}

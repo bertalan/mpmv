@@ -57,7 +57,8 @@ def _ride(settings: SettingsWrapper, live_server: LiveServer, site_allows_indexi
         tagline="Ceramics since 1950",
         description="Our story.",
         shipping_policy="Ships in two days.",
-        returns_policy="Thirty days.",
+        refund_policy="Thirty days.",
+        cancellation_policy="Cancel any time.",
     )
     term = TermFactory.create(taxonomy=TaxonomyFactory.create(code="compat"))
     product = ProductFactory.create(
