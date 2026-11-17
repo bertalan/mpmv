@@ -10611,7 +10611,9 @@ msgstr ""
 msgid ""
 "Who owns the text. A text that comes from a repository file is read-only here: change the file and"
 " the next deploy updates it."
-msgstr "Wer den Text pflegt. Ein Text aus einer Repository-Datei ist hier schreibgeschützt: Ändern Sie die Datei, die nächste Freigabe aktualisiert ihn."
+msgstr ""
+"Wer den Text pflegt. Ein Text aus einer Repository-Datei ist hier schreibgeschützt: Ändern Sie die"
+" Datei, die nächste Freigabe aktualisiert ihn."
 
 #: apps/vendors/models.py
 msgid ""

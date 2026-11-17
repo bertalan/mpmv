@@ -10460,7 +10460,9 @@ msgstr ""
 msgid ""
 "Who owns the text. A text that comes from a repository file is read-only here: change the file and"
 " the next deploy updates it."
-msgstr "Chi gestisce il testo. Un testo che arriva da un file del repository qui è in sola lettura: cambia il file e il prossimo rilascio lo aggiorna."
+msgstr ""
+"Chi gestisce il testo. Un testo che arriva da un file del repository qui è in sola lettura: cambia"
+" il file e il prossimo rilascio lo aggiorna."
 
 #: apps/vendors/models.py
 msgid ""
