@@ -35,11 +35,11 @@
             {% if page_data.retired %}
               <p class="product-retired alert alert-secondary" role="note">{% translate "This product is no longer available." %}</p>
             {% elif page_data.on_request %}
-              <p class="product-price h3">{% translate "Price on request" %}</p>
+              <div class="h3"><p class="product-price">{% translate "Price on request" %}</p></div>
               <p class="product-on-request">{% blocktranslate with vendor=page_data.vendor.display_name %}Ask {{ vendor }} about this product: it is not sold online.{% endblocktranslate %}</p>
             {% else %}
               {% if not page_data.variants %}
-                <p class="product-price h3">{% if page_data.price is not None %}{% consumer_price page_data.price page_data.product.fiscal_category page_data.vendor as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note text-body-secondary">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p>
+                <div class="h3"><p class="product-price">{% if page_data.price is not None %}{% consumer_price page_data.price page_data.product.fiscal_category page_data.vendor as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note text-body-secondary">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p></div>
                 <p class="product-stock">{% include "catalog/includes/stock_status.html" with status=page_data.stock_status %}</p>
               {% endif %}
               <form class="product-form" method="post" action="{% url 'orders:cart_add' %}" hx-post="{% url 'orders:cart_add' %}" hx-target="#add-to-cart-result" hx-swap="innerHTML">
