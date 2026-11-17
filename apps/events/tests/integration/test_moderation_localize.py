@@ -25,6 +25,7 @@ from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.cms import roles
 from apps.cms.services import translate_page
+from apps.core.i18n import primary_language
 from apps.events.models import EventPage, PolicyMode, VendorEventPolicy
 from apps.events.services import hide_event, restore_event, save_event_draft, submit_event
 from apps.events.tests.factories import STARTS_AT
@@ -70,8 +71,10 @@ def _live_translated() -> tuple[EventPage, EventPage]:
     submit_event(owner, page)
     page = _fresh(page)
     assert page.live
-    translate_page(page, ["en"])
-    english = _fresh(page.get_translation(Locale.objects.get(language_code="en")).specific)
+    translate_page(page, [primary_language()])
+    english = _fresh(
+        page.get_translation(Locale.objects.get(language_code=primary_language())).specific
+    )
     assert english.live
     return page, english
 

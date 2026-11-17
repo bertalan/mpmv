@@ -23,15 +23,17 @@ from apps.cart.models import Cart
 from apps.cart.session import GUEST_CART_SESSION_KEY, current_cart
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory
+from apps.core.i18n import primary_language
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
 BACKEND = "django.contrib.auth.backends.ModelBackend"
 
 
-def visitor_request(language: str = "en") -> HttpRequest:
+def visitor_request(language: str = primary_language()) -> HttpRequest:
     request = RequestFactory().get("/")
     SessionMiddleware(lambda r: HttpResponse()).process_request(request)
     request.user = AnonymousUser()
@@ -64,9 +66,9 @@ def test_a_visitor_has_no_cart_until_one_is_needed() -> None:
 
 
 def test_a_guest_cart_takes_the_visitors_language() -> None:
-    cart = current_cart(visitor_request(language="it"), create=True)
+    cart = current_cart(visitor_request(language=other_language()), create=True)
     assert cart is not None
-    assert cart.language == "it"
+    assert cart.language == other_language()
 
 
 def test_signing_in_merges_the_guest_cart_into_the_users_cart() -> None:
@@ -109,7 +111,7 @@ def same_session_request(request: HttpRequest) -> HttpRequest:
     middleware.process_request(twin)
     assert twin.session.get(GUEST_CART_SESSION_KEY)  # loads the session data now
     twin.user = AnonymousUser()
-    twin.LANGUAGE_CODE = "en"
+    twin.LANGUAGE_CODE = primary_language()
     return twin
 
 

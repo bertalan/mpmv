@@ -13,6 +13,7 @@ from django.test import Client
 from django.urls import reverse
 from django.utils import translation
 
+from apps.core.i18n import primary_language
 from apps.vendors.tests.integration.test_application import (
     IP,
     applied,
@@ -20,11 +21,12 @@ from apps.vendors.tests.integration.test_application import (
     new_password,
 )
 from apps.vendors.tests.integration.test_claim import open_link
+from tests.i18n import language_prefix, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
 
-@pytest.mark.parametrize("code", ["it", "de", "fr", "es"])
+@pytest.mark.parametrize("code", [other_language(), "de", "fr", "es"])
 def test_the_pages_exist_in_every_language(client: Client, code: str) -> None:
     for name in ("vendors:apply", "vendors:apply_sent"):
         with translation.override(code):
@@ -36,10 +38,10 @@ def test_the_pages_exist_in_every_language(client: Client, code: str) -> None:
 
 
 def test_the_english_urls_are_the_old_unprefixed_ones(client: Client) -> None:
-    with translation.override("en"):
+    with translation.override(primary_language()):
         assert reverse("vendors:apply") == "/vendor/apply/"
         assert reverse("vendors:apply_sent") == "/vendor/apply/sent/"
-    response = client.get("/vendor/apply/", HTTP_ACCEPT_LANGUAGE="it")
+    response = client.get("/vendor/apply/", HTTP_ACCEPT_LANGUAGE=other_language())
     assert response.status_code == 200  # no redirect to /it/: this is the English page
 
 
@@ -52,12 +54,15 @@ def test_an_emailed_link_opens_the_page_in_the_language_chosen_in_the_session(
     english = Client()
     assert open_link(english, path)["Location"] == confirm_url(user)
     italian = Client()
-    italian.post(reverse("switch_language"), {"language": "it", "next": "/"})
+    italian.post(reverse("switch_language"), {"language": other_language(), "next": "/"})
     response = open_link(italian, path)
-    assert response["Location"] == f"/it/vendor/apply/confirm/{user.public_id}/"
+    assert (
+        response["Location"]
+        == f"{language_prefix(other_language())}/vendor/apply/confirm/{user.public_id}/"
+    )
     page = italian.get(response["Location"])
     assert page.status_code == 200
-    assert 'lang="it"' in page.content.decode()
+    assert f'lang="{other_language()}"' in page.content.decode()
 
 
 def test_a_link_opened_before_the_move_still_confirms_through_the_old_url(client: Client) -> None:
@@ -74,4 +79,9 @@ def test_a_link_opened_before_the_move_still_confirms_through_the_old_url(client
 def test_the_prefixed_confirm_page_works_in_the_same_session(client: Client) -> None:
     _, user, path = applied(client)
     open_link(client, path)
-    assert client.get(f"/de/vendor/apply/confirm/{user.public_id}/").status_code == 200
+    assert (
+        client.get(
+            f"{language_prefix(third_language())}/vendor/apply/confirm/{user.public_id}/"
+        ).status_code
+        == 200
+    )

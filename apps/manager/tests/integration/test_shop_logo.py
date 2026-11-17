@@ -9,6 +9,7 @@ from django.test import Client
 
 from apps.accounts.models import User
 from apps.accounts.tests.mfa import verified_login
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, MediaImage
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorMemberFactory
@@ -22,7 +23,7 @@ PROFILE = f"{SHOP}profile/"
 
 
 def _post_logo(client: Client, **fields: object) -> Any:
-    data = {"action": "logo", "language": "en", **fields}
+    data = {"action": "logo", "language": primary_language(), **fields}
     return client.post(PROFILE, data)
 
 

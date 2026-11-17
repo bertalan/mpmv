@@ -36,7 +36,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
-from tests.i18n import other_language
+from tests.i18n import language_prefix, localized, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -164,8 +164,8 @@ def test_an_article_goes_under_the_blog_of_its_language(blog: BlogIndexPage) -> 
     import_article(it_blog, _legacy_article(slug="una-visita", title="Una visita"))
 
     post = BlogPostPage.objects.get()
-    assert post.locale.language_code == "it"
-    assert post.url == "/it/blog/una-visita/"
+    assert post.locale.language_code == other_language()
+    assert post.url == f"{language_prefix(other_language())}/blog/una-visita/"
 
 
 def test_a_schedule_with_the_expiry_before_the_go_live_is_refused(blog: BlogIndexPage) -> None:
@@ -269,8 +269,8 @@ def test_the_body_cards_link_products_and_vendors_and_skip_the_hidden_ones(
 
     page = _html(BlogPostPage.objects.get().url)
     links = {a.get_text(strip=True): a["href"] for a in page.select("section.block-featured a")}
-    assert links["Blue bowl"] == "/product/blue-bowl/"
-    assert links["Pottery Studio"] == "/shop/pottery-studio/"
+    assert links["Blue bowl"] == localized("/product/blue-bowl/")
+    assert links["Pottery Studio"] == localized("/shop/pottery-studio/")
     assert "Secret jug" not in links
 
 

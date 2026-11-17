@@ -37,6 +37,7 @@ from apps.events.models import EventIndexPage, EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -62,10 +63,6 @@ def _commit_hooks_run_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "django.db.transaction.on_commit", lambda func, using=None, robust=False: func()
     )
-
-
-def other_language() -> str:
-    return next(code for code in configured_languages() if code != PRIMARY)
 
 
 def index_paths(client: Client) -> list[str]:

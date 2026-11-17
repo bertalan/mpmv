@@ -62,7 +62,7 @@ from apps.cms.tests.factories import (
     VendorLandingPageFactory,
     VendorRecruitmentPageFactory,
 )
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
 from apps.events.models import EventIndexPage
 from apps.events.tests.factories import EventPageFactory
@@ -72,6 +72,7 @@ from apps.vendors.tests.factories import (
     VendorMemberFactory,
     VendorTranslationFactory,
 )
+from tests.i18n import language_prefix, localized, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -234,18 +235,24 @@ def home_en() -> Case:
 
 def home_it() -> Case:
     seed_site()
-    return Case("/it/", {code: (home_of(code), False) for code in LANGUAGES})
+    return Case(
+        f"{language_prefix(other_language())}/",
+        {code: (home_of(code), False) for code in LANGUAGES},
+    )
 
 
 def _about(start: str) -> Case:
     seed_site()
     slugs = {code: SEED_TEXTS[code].about.slug for code in LANGUAGES}
-    paths = {code: f"{'' if code == 'en' else '/' + code}/{slugs[code]}/" for code in LANGUAGES}
+    paths = {
+        code: f"{'' if code == primary_language() else '/' + code}/{slugs[code]}/"
+        for code in LANGUAGES
+    }
     return Case(paths[start], {code: (paths[code], False) for code in LANGUAGES})
 
 
 def about_en() -> Case:
-    return _about("en")
+    return _about(primary_language())
 
 
 def about_de() -> Case:
@@ -255,41 +262,50 @@ def about_de() -> Case:
 def legal_en() -> Case:
     seed_site(legal_placeholders=True)
     paths = {
-        code: f"{'' if code == 'en' else '/' + code}/{LEGAL_PLACEHOLDER_TITLES[code]['terms'][1]}/"
+        code: f"{language_prefix(code)}/{LEGAL_PLACEHOLDER_TITLES[code]['terms'][1]}/"
         for code in LANGUAGES
     }
-    return Case(paths["en"], {code: (paths[code], False) for code in LANGUAGES})
+    return Case(paths[primary_language()], {code: (paths[code], False) for code in LANGUAGES})
 
 
 def standard_page_untranslated() -> Case:
     seed_site()
     page = StandardPageFactory.create(title="Only in English")
     page.save_revision().publish()
-    return Case(page.url, _expect_pages(page, {"en": page.url}))
+    return Case(page.url, _expect_pages(page, {primary_language(): page.url}))
 
 
 def standard_page_partly_translated() -> Case:
     seed_site()
     page = StandardPageFactory.create(title="Half translated")
     page.save_revision().publish()
-    _translate(page, "it")
-    return Case(page.url, _expect_pages(page, {"en": page.url, "it": _translated_url(page, "it")}))
+    _translate(page, other_language())
+    return Case(
+        page.url,
+        _expect_pages(
+            page,
+            {
+                primary_language(): page.url,
+                other_language(): _translated_url(page, other_language()),
+            },
+        ),
+    )
 
 
 def legal_page_untranslated() -> Case:
     seed_site()
     page = LegalPageFactory.create(title="Cookie policy", slug="cookie-policy")
     page.save_revision().publish()
-    return Case(page.url, _expect_pages(page, {"en": page.url}))
+    return Case(page.url, _expect_pages(page, {primary_language(): page.url}))
 
 
 def blog_index_translated() -> Case:
     seed_site()
     index = BlogIndexPageFactory.create()
-    _translate(index, "it", "fr")
+    _translate(index, other_language(), "fr")
     found = {
-        "en": index.url,
-        "it": _translated_url(index, "it"),
+        primary_language(): index.url,
+        other_language(): _translated_url(index, other_language()),
         "fr": _translated_url(index, "fr"),
     }
     return Case(index.url, _expect_pages(index, found))
@@ -300,9 +316,12 @@ def blog_post_translated() -> Case:
     index = BlogIndexPageFactory.create()
     post = BlogPostPageFactory.create(parent=index, title="Workshop news")
     post.save_revision().publish()
-    _translate(index, "it")
-    _translate(post, "it")
-    found = {"en": post.url, "it": _translated_url(post, "it")}
+    _translate(index, other_language())
+    _translate(post, other_language())
+    found = {
+        primary_language(): post.url,
+        other_language(): _translated_url(post, other_language()),
+    }
     return Case(post.url, _expect_pages(post, found))
 
 
@@ -310,35 +329,41 @@ def blog_post_untranslated() -> Case:
     seed_site()
     post = BlogPostPageFactory.create(title="Only English news")
     post.save_revision().publish()
-    return Case(post.url, _expect_pages(post, {"en": post.url}))
+    return Case(post.url, _expect_pages(post, {primary_language(): post.url}))
 
 
 def event_translated() -> Case:
     seed_site()
-    index = EventIndexPage.objects.get(locale__language_code="it")
+    index = EventIndexPage.objects.get(locale__language_code=other_language())
     page = EventPageFactory.create(parent=index, title="Fiera", slug="fiera")
     page.save_revision().publish()
     page.refresh_from_db()
-    _translate(page, "en")
-    found = {"it": page.url, "en": _translated_url(page, "en")}
+    _translate(page, primary_language())
+    found = {
+        other_language(): page.url,
+        primary_language(): _translated_url(page, primary_language()),
+    }
     return Case(page.url, _expect_pages(page, found))
 
 
 def event_untranslated() -> Case:
     seed_site()
-    index = EventIndexPage.objects.get(locale__language_code="it")
+    index = EventIndexPage.objects.get(locale__language_code=other_language())
     page = EventPageFactory.create(parent=index, title="Solo italiano", slug="solo-italiano")
     page.save_revision().publish()
     page.refresh_from_db()
-    return Case(page.url, _expect_pages(page, {"it": page.url}))
+    return Case(page.url, _expect_pages(page, {other_language(): page.url}))
 
 
 def vendor_landing_page() -> Case:
     seed_site()
     page = VendorLandingPageFactory.create(title="Our story")
     page.save_revision().publish()
-    _translate(page, "it")
-    found = {"en": page.url, "it": _translated_url(page, "it")}
+    _translate(page, other_language())
+    found = {
+        primary_language(): page.url,
+        other_language(): _translated_url(page, other_language()),
+    }
     return Case(page.url, _expect_pages(page, found))
 
 
@@ -346,14 +371,14 @@ def vendor_landing_page_untranslated() -> Case:
     seed_site()
     page = VendorLandingPageFactory.create(title="Our solo story")
     page.save_revision().publish()
-    return Case(page.url, _expect_pages(page, {"en": page.url}))
+    return Case(page.url, _expect_pages(page, {primary_language(): page.url}))
 
 
 def sell_with_us_page() -> Case:
     seed_site()
     page = VendorRecruitmentPageFactory.create(title="Sell with us")
     page.save_revision().publish()
-    return Case(page.url, _expect_pages(page, {"en": page.url}))
+    return Case(page.url, _expect_pages(page, {primary_language(): page.url}))
 
 
 def _listed(**kwargs: Any) -> Any:
@@ -364,79 +389,101 @@ def _listed(**kwargs: Any) -> Any:
 
 def term_listing_translated() -> Case:
     taxonomy = TaxonomyFactory.create(code="compat", has_landing=True)
-    for lang, slug in (("en", "compatibility"), ("it", "compatibilita")):
+    for lang, slug in ((primary_language(), "compatibility"), (other_language(), "compatibilita")):
         TaxonomyTranslationFactory.create(
             taxonomy=taxonomy, language=lang, slug=slug, status=PUBLISHED
         )
     term = TermFactory.create(taxonomy=taxonomy)
-    for lang, slug in (("en", "maker"), ("it", "marca")):
+    for lang, slug in ((primary_language(), "maker"), (other_language(), "marca")):
         TermTranslationFactory.create(term=term, language=lang, slug=slug, status=PUBLISHED)
     _listed().terms.add(term)
-    found = {"en": "/compatibility/maker/", "it": "/it/compatibilita/marca/"}
+    found = {
+        primary_language(): "/compatibility/maker/",
+        other_language(): f"{language_prefix(other_language())}/compatibilita/marca/",
+    }
     return Case("/compatibility/maker/", _expect_pages(None, found))
 
 
 def term_listing_in_italian() -> Case:
     case = term_listing_translated()
-    return Case("/it/compatibilita/marca/", case.expect)
+    return Case(f"{language_prefix(other_language())}/compatibilita/marca/", case.expect)
 
 
 def term_listing_untranslated() -> Case:
     taxonomy = TaxonomyFactory.create(code="compat", has_landing=True)
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="en", slug="compatibility", status=PUBLISHED
+        taxonomy=taxonomy, language=primary_language(), slug="compatibility", status=PUBLISHED
     )
     term = TermFactory.create(taxonomy=taxonomy)
-    TermTranslationFactory.create(term=term, language="en", slug="maker", status=PUBLISHED)
+    TermTranslationFactory.create(
+        term=term, language=primary_language(), slug="maker", status=PUBLISHED
+    )
     _listed().terms.add(term)
     return Case(
         "/compatibility/maker/",
-        _expect_pages(None, {"en": "/compatibility/maker/"}),
+        _expect_pages(None, {primary_language(): "/compatibility/maker/"}),
     )
 
 
 def brand_listing() -> Case:
     brand = BrandFactory.create()
     BrandTranslationFactory.create(brand=brand, slug="acme", status=PUBLISHED)
-    BrandTranslationFactory.create(brand=brand, language="it", slug="acme-it", status=PUBLISHED)
+    BrandTranslationFactory.create(
+        brand=brand, language=other_language(), slug="acme-it", status=PUBLISHED
+    )
     _listed(brand=brand)
-    found = {"en": "/brand/acme/", "it": "/it/marchio/acme-it/"}
-    return Case("/brand/acme/", _expect_pages(None, found))
+    found = {
+        primary_language(): localized("/brand/acme/"),
+        other_language(): localized("/brand/acme-it/", other_language()),
+    }
+    return Case(localized("/brand/acme/"), _expect_pages(None, found))
 
 
 def category_listing() -> Case:
     parent = CategoryFactory.create()
     CategoryTranslationFactory.create(category=parent, slug="bags", status=PUBLISHED)
     CategoryTranslationFactory.create(
-        category=parent, language="it", slug="borse", status=PUBLISHED
+        category=parent, language=other_language(), slug="borse", status=PUBLISHED
     )
     _listed(category=parent)
-    found = {"en": "/product-category/bags/", "it": "/it/categoria-prodotto/borse/"}
-    return Case("/product-category/bags/", _expect_pages(None, found))
+    found = {
+        primary_language(): localized("/product-category/bags/"),
+        other_language(): localized("/product-category/borse/", other_language()),
+    }
+    return Case(localized("/product-category/bags/"), _expect_pages(None, found))
 
 
 def category_listing_untranslated() -> Case:
     category = CategoryFactory.create()
     CategoryTranslationFactory.create(category=category, slug="hats", status=PUBLISHED)
     _listed(category=category)
-    found = {"en": "/product-category/hats/"}
-    return Case("/product-category/hats/", _expect_pages(None, found))
+    found = {primary_language(): localized("/product-category/hats/")}
+    return Case(localized("/product-category/hats/"), _expect_pages(None, found))
 
 
 def vendor_storefront() -> Case:
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
-    VendorTranslationFactory.create(vendor=vendor, language="en", status=PUBLISHED)
-    VendorTranslationFactory.create(vendor=vendor, language="it", status=PUBLISHED)
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), status=PUBLISHED)
+    VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=PUBLISHED)
     _listed(vendor=vendor)
-    en = f"/shop/{vendor.slug}/"
-    return Case(en, _expect_pages(None, {"en": en, "it": f"/it/shop/{vendor.slug}/"}))
+    en = localized(f"/shop/{vendor.slug}/")
+    return Case(
+        en,
+        _expect_pages(
+            None,
+            {
+                primary_language(): en,
+                other_language(): localized(f"/shop/{vendor.slug}/", other_language()),
+            },
+        ),
+    )
 
 
 def vendor_storefront_untranslated() -> Case:
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
     _listed(vendor=vendor)
-    en = f"/shop/{vendor.slug}/"
-    return Case(en, _expect_pages(None, {"en": en}))
+    en = localized(f"/shop/{vendor.slug}/")
+    return Case(en, _expect_pages(None, {primary_language(): en}))
 
 
 def not_found() -> Case:

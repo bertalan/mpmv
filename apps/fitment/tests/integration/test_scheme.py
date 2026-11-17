@@ -21,7 +21,7 @@ CTX = AuditContext(actor_id=1, actor_label="staff:catalog", source="admin", ip="
 
 
 def labels(singular: str, plural: str) -> dict[str, LevelLabels]:
-    return {"en": LevelLabels(label=singular, plural_label=plural)}
+    return {primary_language(): LevelLabels(label=singular, plural_label=plural)}
 
 
 def test_the_scheme_is_the_one_seeded_row_with_the_safe_defaults() -> None:
@@ -100,7 +100,7 @@ def test_renaming_a_label_is_allowed_even_when_nodes_exist() -> None:
     assert level is not None
     FitmentNodeFactory.create(level=level)
     services.rename_level(
-        level, labels={"en": LevelLabels("Brand", "Brands", "Pick a brand")}, ctx=CTX
+        level, labels={primary_language(): LevelLabels("Brand", "Brands", "Pick a brand")}, ctx=CTX
     )
     row = level.translations.get(language=primary_language())
     assert (row.label, row.plural_label, row.placeholder) == ("Brand", "Brands", "Pick a brand")
