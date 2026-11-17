@@ -24,8 +24,12 @@ def storefront_events(vendor: Any, language: str) -> dict[str, Any]:
     locale = Locale.objects.filter(language_code=language).first()
     if vendor is None or locale is None:
         return {"items": []}
-    events = services.events_for_locale(locale, listing.Filters(vendor=vendor.slug))
-    items = listing.upcoming(events, timezone.now())[:STOREFRONT_EVENTS]
     index = EventIndexPage.objects.live().filter(locale=locale).first()
+    events = services.events_for_locale(
+        locale,
+        listing.Filters(vendor=vendor.slug),
+        site=index.get_site() if index is not None else None,
+    )
+    items = listing.upcoming(events, timezone.now())[:STOREFRONT_EVENTS]
     link = f"{index.url}?vendor={vendor.slug}" if index is not None and index.url else ""
     return {"items": items, "events_url": link, "vendor": vendor}

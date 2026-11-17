@@ -6,7 +6,7 @@ the vendor's events. Nothing is rendered without an upcoming event.
 <section class="vendor-events" aria-labelledby="vendor-events-heading">
   <h2 id="vendor-events-heading">{% translate "Upcoming events" %}</h2>
   <ul class="event-list">
-    {% for item in items %}<li>{% include "events/_summary.html" %}</li>{% endfor %}
+    {% for item in items %}<li>{% include "events/_summary.html" with heading_tag="h3" %}</li>{% endfor %}
   </ul>
   {% if events_url %}<p><a href="{{ events_url }}">{% blocktranslate with name=vendor.display_name %}All events of {{ name }}{% endblocktranslate %}</a></p>{% endif %}
 </section>

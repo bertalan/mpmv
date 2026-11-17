@@ -9,9 +9,12 @@ stale copy).
 
 import datetime as dt
 import re
+from collections.abc import Callable
 
 import pytest
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone, translation
 from wagtail.models import Locale
 
@@ -131,9 +134,75 @@ def test_hiding_cancelling_and_publishing_show_on_the_next_response(client: Clie
     html = _storefront(client, vendor)
     assert "Hidden soon" not in html
     assert "Stays here" in html
-    assert "max-age" not in client.get("/").get("Cache-Control", "")
+    anchor = catalog_services.vendor_anchor(vendor.slug, primary_language())
+    assert anchor is not None
+    response = client.get(anchor.paths[primary_language()])
+    assert "max-age" not in response.get("Cache-Control", "")
+    assert "s-maxage" not in response.get("Cache-Control", "")
     _event(vendor, "Newly published", 1)
     assert "Newly published" in _storefront(client, vendor)
     services.cancel_event(staff, keep)
     cancelled = _section(_storefront(client, vendor))
     assert "Cancelled" in cancelled  # a cancelled event stays, marked (spec 15)
+
+
+def test_the_query_count_does_not_grow_with_the_number_of_events(client: Client) -> None:
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    for number in range(3):
+        _event(vendor, f"Event {number}", number + 1)
+    _storefront(client, vendor)  # warm caches that are not per-event
+
+    def count() -> int:
+        with CaptureQueriesContext(connection) as queries:
+            _storefront(client, vendor)
+        return len(queries)
+
+    few = count()
+    for number in range(9):
+        _event(vendor, f"More {number}", number + 10)
+    assert count() == few
+
+
+def _draft(vendor: Vendor) -> EventPage:
+    page = _event(vendor, "Hidden one", 3)
+    page.unpublish()
+    return page
+
+
+def _pending(vendor: Vendor) -> EventPage:
+    page = _event(vendor, "Hidden one", 3)
+    page.live = False
+    page.save()
+    EventPage.objects.filter(pk=page.pk).update(status="pending")
+    return page
+
+
+def _past(vendor: Vendor) -> EventPage:
+    return _event(vendor, "Hidden one", -5)
+
+
+@pytest.mark.parametrize("make", [_draft, _pending, _past])
+def test_the_storefront_never_shows_a_draft_pending_or_past_event(
+    client: Client, make: Callable[[Vendor], EventPage]
+) -> None:
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    make(vendor)
+    assert "Hidden one" not in _storefront(client, vendor)
+
+
+def test_a_suspended_vendors_events_are_not_shown(client: Client) -> None:
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    _event(vendor, "Hidden one", 3)
+    Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.SUSPENDED)
+    vendor.refresh_from_db()
+    anchor = catalog_services.vendor_anchor(vendor.slug, primary_language())
+    if anchor is None:
+        return  # the storefront itself is gone for a suspended vendor
+    response = client.get(anchor.paths[primary_language()])
+    assert "Hidden one" not in response.content.decode()
+
+
+def test_no_locale_leaves_the_section_empty() -> None:
+    from apps.events.templatetags.events_tags import storefront_events
+
+    assert storefront_events(VendorFactory.create(), "xx")["items"] == []
