@@ -2399,8 +2399,8 @@ msgstr "Evento"
 msgid "Event views"
 msgstr "Vistas de los eventos"
 
-#: apps/events/listing.py apps/events/templates/events/_results.html apps/manager/sections.py
-#: apps/manager/site_map.py apps/manager/templates/manager/shop/events.html
+#: apps/events/templates/events/_results.html apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/shop/events.html
 msgid "Events"
 msgstr "Eventos"
 
