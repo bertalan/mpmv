@@ -4,16 +4,14 @@ the page-level FAQPage structured data (CMS.2); the page's image credits (CMS.8)
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urljoin
 
 from django import template
 from django.conf import settings
 from django.http import HttpRequest
 from django.urls import NoReverseMatch, reverse
 from django.utils import translation
-from django.utils.safestring import SafeString, mark_safe
 from django.utils.translation import gettext
-from wagtail.models import Locale, Page, Site
+from wagtail.models import Locale, Page
 
 from apps.core.i18n import (
     LanguageLink,
@@ -23,10 +21,8 @@ from apps.core.i18n import (
     translate_path,
 )
 from apps.core.image_licences import Credit
-from apps.core.services import NoPlatformOperator, current_operator
 
 from .. import engine, services
-from ..engine import faq_page_jsonld, jsonld_text, organization_jsonld
 from ..models import NavigationMenu
 
 register = template.Library()
@@ -143,67 +139,6 @@ def switch_next_url(context: dict[str, Any]) -> str:
 def page_image_credits(page: Page) -> list[Credit]:
     """The credits for the page's "Image credits" disclosure (CMS.8)."""
     return services.page_image_credits(page)
-
-
-@register.simple_tag
-def faq_jsonld(page: Any) -> SafeString:
-    """One FAQPage `<script>` for every question of the page's FAQ blocks, in order; "" if none.
-
-    One page-level object, as search engines expect one FAQPage per page (spec 10).
-    """
-    questions = [
-        (item["question"], str(item["answer"]))
-        for block in getattr(page, "body", None) or []
-        if block.block_type == "faq"
-        for item in block.value["items"]
-    ]
-    if not questions:
-        return mark_safe("")
-    # JSON with <, > and & escaped: it cannot leave its script element (`jsonld_text`).
-    data = jsonld_text(faq_page_jsonld(questions))
-    return mark_safe(f'<script type="application/ld+json">{data}</script>')  # noqa: S308 (escaped by jsonld_text)
-
-
-@register.simple_tag
-def jsonld_script(data: Mapping[str, Any] | None) -> SafeString:
-    """`data` as a `<script type="application/ld+json">` (CMS.3 articles and author pages);
-    "" for none. Escaped by `jsonld_text`, so it cannot leave its script element."""
-    if not data:
-        return mark_safe("")
-    return mark_safe(f'<script type="application/ld+json">{jsonld_text(data)}</script>')  # noqa: S308 (escaped by jsonld_text)
-
-
-@register.simple_tag(takes_context=True)
-def operator_organization_jsonld(context: template.Context) -> SafeString:
-    """The platform operator as one Organization JSON-LD script (home page); "" without a
-    request or a configured operator."""
-    try:
-        operator = current_operator()
-    except NoPlatformOperator:
-        return mark_safe("")
-    # Absolute URLs come from the default site, never from the request's Host header (the page
-    # may be served from a cache): the home page of the page's language, and the logo file.
-    site = Site.objects.filter(is_default_site=True).first()
-    if site is None:
-        return mark_safe("")
-    page: Page | None = context.get("page")
-    home = (page.relative_url(site) if page is not None else None) or "/"
-    logo_url = ""
-    logo = operator.logo
-    if logo is not None and logo.file:
-        try:
-            logo_url = urljoin(site.root_url, logo.file.url)
-        except ValueError:  # no file behind the field
-            logo_url = ""
-    return jsonld_script(
-        organization_jsonld(
-            operator.legal_name,
-            urljoin(site.root_url, home),
-            operator.support_email,
-            logo_url,
-            operator.official_profiles,
-        )
-    )
 
 
 # --- Contextual help (ARC.32)

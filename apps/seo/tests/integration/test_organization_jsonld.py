@@ -9,8 +9,8 @@ from urllib.parse import urlsplit
 import pytest
 from django.test import Client
 
-from apps.cms.engine import organization_jsonld
 from apps.core.tests.factories import PlatformOperatorFactory
+from apps.seo import graph_engine
 
 pytestmark = pytest.mark.django_db
 
@@ -19,7 +19,18 @@ LD = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
 # schema.org Organization: Google requires nothing, recommends these; we require name and url and
 # type-check every optional property we emit.
 REQUIRED = ("@context", "@type", "name", "url")
-KNOWN = {"@context", "@type", "@id", "name", "url", "logo", "sameAs", "contactPoint"}
+KNOWN = {
+    "@context",
+    "@type",
+    "@id",
+    "name",
+    "legalName",
+    "url",
+    "vatID",
+    "logo",
+    "sameAs",
+    "contactPoint",
+}
 CONTACT_POINT_KNOWN = {"@type", "contactType", "email", "telephone", "availableLanguage"}
 
 
@@ -64,11 +75,21 @@ def schema_errors(node: dict[str, Any]) -> list[str]:
     return errors
 
 
+def _operator(script: str) -> dict[str, Any]:
+    """The operator Organization of a page's one `@graph` (SEO.7), with the graph's context."""
+    document = json.loads(script)
+    [node] = [n for n in document["@graph"] if n["@id"].endswith("/#organization")]
+    return {"@context": document["@context"], **node}
+
+
+def organization(**kwargs: Any) -> dict[str, Any]:
+    node = graph_engine.operator_node(site="https://example.org", name="Acme", **kwargs)
+    return {"@context": "https://schema.org", **node}
+
+
 def test_full_node_is_valid() -> None:
-    node = organization_jsonld(
-        "Acme",
-        "https://example.org/",
-        support_email="help@example.org",
+    node = organization(
+        email="help@example.org",
         logo_url="https://example.org/logo.svg",
         profiles=["https://www.wikidata.org/wiki/Q1", "https://example.org/p"],
     )
@@ -76,13 +97,15 @@ def test_full_node_is_valid() -> None:
 
 
 def test_minimal_node_is_valid_and_omits_absent_fields() -> None:
-    node = organization_jsonld("Acme", "https://example.org/")
+    node = organization()
     assert schema_errors(node) == []
-    assert set(node) == {"@context", "@type", "name", "url"}
+    assert "logo" not in node
+    assert "sameAs" not in node
+    assert "contactPoint" not in node
 
 
 def test_checker_rejects_broken_nodes() -> None:
-    good = organization_jsonld("Acme", "https://example.org/", support_email="a@example.org")
+    good = organization(email="a@example.org")
     assert schema_errors({**good, "name": ""})
     assert schema_errors({**good, "url": "/relative"})
     assert schema_errors({**good, "sameAs": ["http://example.org/x"]})
@@ -101,7 +124,7 @@ def test_home_page_node_is_valid_and_values_come_from_the_operator() -> None:
     body = Client().get("/").content.decode()
     scripts = LD.findall(body)
     assert len(scripts) == 1
-    node = json.loads(scripts[0])
+    node = _operator(scripts[0])
     assert schema_errors(node) == []
     assert node["name"] == "Operator Legal Name Srl"
     assert node["contactPoint"]["email"] == "support@operator.example"
@@ -122,7 +145,7 @@ def test_node_follows_the_current_operator_version() -> None:
         valid_from=dt.datetime(2020, 1, 1, tzinfo=dt.UTC),
         legal_name="New Operator",
     )
-    node = json.loads(LD.findall(Client().get("/").content.decode())[0])
+    node = _operator(LD.findall(Client().get("/").content.decode())[0])
     assert node["name"] == "New Operator"
     assert "contactPoint" not in node
     assert "sameAs" not in node
