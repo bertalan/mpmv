@@ -19,6 +19,7 @@ from apps.cms.blocks import (
 from apps.cms.engine import parse_video_url
 from apps.cms.models import HomePage
 from apps.cms.services import seed_site
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import MediaImageFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("english_interface")]
@@ -165,7 +166,7 @@ def test_a_page_without_a_carousel_does_not_load_the_carousel_script(client: Any
 
 def test_a_page_with_a_gallery_loads_the_carousel_script(client: Any) -> None:
     seed_site()
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     home.body = [("gallery", gallery_value())]
     home.save_revision().publish()
     with override_settings(MPMV_THEME_DEFAULT="ride"):
@@ -202,7 +203,7 @@ def test_a_page_with_a_video_allows_the_two_no_tracking_origins_in_frame_src(
     client: Any, theme: str
 ) -> None:
     seed_site()
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     home.body = [("video_modal", {"title": "Tour", "url": YOUTUBE})]
     home.save_revision().publish()
     with override_settings(MPMV_THEME_DEFAULT=theme):

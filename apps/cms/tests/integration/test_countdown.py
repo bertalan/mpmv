@@ -36,6 +36,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import localized
 
 pytestmark = pytest.mark.django_db
 
@@ -266,12 +267,12 @@ def test_the_cta_and_the_expired_link_default_to_the_category_or_the_product(
     upcoming = _block_html(
         _publish(_home(), _countdown(future, category=category, cta_link="")).content.decode()
     )
-    assert 'href="/product-category/clothing/jackets/"' in upcoming
+    assert f'href="{localized("/product-category/clothing/jackets/")}"' in upcoming
 
     expired = _block_html(
         _publish(_home(), _countdown(past, product=product, expired_link="")).content.decode()
     )
-    assert 'href="/product/touring-jacket-en/"' in expired
+    assert f'href="{localized("/product/touring-jacket-en/")}"' in expired
 
 
 def test_a_countdown_links_to_a_product_or_a_category_not_both(

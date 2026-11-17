@@ -49,6 +49,18 @@ event has an `original_locale`, a reader in a language the event lacks gets the 
 event (`events.engine.pick_language`), the listing has an "Only events in <language>" filter, and the
 event page lists `hreflang` alternates only for the languages that exist.
 
+### Event emails (EVT.11)
+
+`apps/events/notifications.py` queues them through the ARC.16 outbox, in the recipient's language
+and in the formal register. Only the vendor's **owner** members (active, with an email) receive
+the vendor emails: a staff member, an inactive user or one without an address gets nothing. A
+hidden-event email links to `/manager/shop/statements/` (section `shop.statements`, every member,
+read only) only when the CMP.5 flow issues the statement in the same transaction
+(`hide_event(statement_follows=True)`); a hide outside that flow never promises one. Wagtail's own
+approval and rejection emails to the vendor are switched off by patching the `can_handle` of its
+two notifiers (`switch_off_wagtail_vendor_emails`), which is coupled to Wagtail internals: the
+rejection test in `apps/events/tests/integration/test_emails.py` guards a Wagtail upgrade.
+
 ## The vendor choice
 
 A member of several vendors picks one (`vendor_choice.py`, a vendor public id in the session). It

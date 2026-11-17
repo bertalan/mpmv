@@ -22,6 +22,7 @@ from apps.api.services import AuthResult, vendor_keys_with_platform_scopes
 from apps.api.tests.factories import ApiClientFactory
 from apps.api.v1 import security
 from apps.catalog.models import Product
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
@@ -36,7 +37,7 @@ def _mug(**overrides: Any) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "sku": "MUG-1",
         "price_net": "9.90",
-        "translations": [{"language": "en", "title": "Mug"}],
+        "translations": [{"language": primary_language(), "title": "Mug"}],
     }
     payload.update(overrides)
     return payload

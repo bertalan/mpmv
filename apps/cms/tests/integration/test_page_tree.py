@@ -15,6 +15,8 @@ from wagtail.models import Locale, Page, Site
 from apps.cms.models import HomePage, NavigationMenu, StandardPage
 from apps.cms.services import SeedReport, seed_site, sync_locales
 from apps.cms.tests.factories import HomePageFactory, StandardPageFactory
+from apps.core.i18n import primary_language
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -30,7 +32,7 @@ def _codes() -> list[str]:
 
 def test_every_configured_language_has_a_wagtail_locale() -> None:
     assert set(Locale.objects.values_list("language_code", flat=True)) >= set(_codes())
-    assert Locale.get_default().language_code == settings.LANGUAGE_CODE == "en"
+    assert Locale.get_default().language_code == settings.LANGUAGE_CODE == primary_language()
 
 
 @override_settings(LANGUAGES=LANGUAGES_PLUS_ONE)
@@ -53,7 +55,7 @@ def test_after_migrate_the_default_site_serves_an_english_home_page() -> None:
     site = Site.objects.get(is_default_site=True)
     home = site.root_page.specific
     assert isinstance(home, HomePage)
-    assert home.locale.language_code == "en"
+    assert home.locale.language_code == primary_language()
     assert home.live
     assert home.depth == 2  # directly under the tree root
 
@@ -70,7 +72,7 @@ def test_seed_creates_a_home_and_a_static_page_per_language(seeded: SeedReport) 
     assert len({page.translation_key for page in abouts.values()}) == 1
     for code, about in abouts.items():
         assert about.get_parent().specific == homes[code]
-    assert (abouts["en"].slug, abouts["it"].slug, abouts["de"].slug) == (
+    assert (abouts[primary_language()].slug, abouts[other_language()].slug, abouts["de"].slug) == (
         "about",
         "chi-siamo",
         "ueber-uns",
@@ -94,7 +96,7 @@ def test_seeded_menus_are_translations_of_the_primary_menus(seeded: SeedReport) 
         assert {menu.locale.language_code for menu in menus} == set(_codes())
         assert len({menu.translation_key for menu in menus}) == 1
         primary = menus.get(locale=Locale.get_default())
-        it = Locale.objects.get(language_code="it")
+        it = Locale.objects.get(language_code=other_language())
         assert primary.get_translation(it).location == location
 
 
@@ -146,7 +148,7 @@ def test_a_language_has_one_home_page() -> None:
 
 def test_a_language_without_a_home_page_can_get_one() -> None:
     root = Page.get_first_root_node()
-    it = Locale.objects.get(language_code="it")
+    it = Locale.objects.get(language_code=other_language())
     home = root.add_child(instance=HomePage(title="Home", slug="home-it", locale=it))
     home.title = "Pagina iniziale"
     home.save()  # editing the one home of a language is fine

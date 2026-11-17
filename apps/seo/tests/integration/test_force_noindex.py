@@ -20,6 +20,7 @@ from apps.core.i18n import primary_language
 from apps.seo.tests.factories import SeoSettingsFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import localized
 
 pytestmark = pytest.mark.django_db
 
@@ -42,7 +43,7 @@ def category_url() -> str:
         status=Product.Status.PUBLISHED,
     )
     translation = category.translations.get(language=primary_language())
-    return f"/product-category/{translation.slug}/"
+    return localized(f"/product-category/{translation.slug}/")
 
 
 def cms_url() -> str:

@@ -52,7 +52,7 @@ def test_the_published_version_carries_clauses_d_to_h_in_english_and_italian() -
     assert all(
         p.startswith("vendor_terms_text_missing:") for p in services.vendor_terms_problems(contract)
     )
-    for language in ("en", "it"):
+    for language in (primary_language(), other_language()):
         body = contract.translations.get(language=language).body
         assert terms_clauses.missing_clauses(terms_clauses.VENDOR, body, language) == []
     assert "EUR 2.00" in contract.translations.get(language=primary_language()).body
@@ -64,8 +64,8 @@ def test_the_published_version_carries_clauses_d_to_h_in_english_and_italian() -
 @pytest.mark.parametrize(
     ("language", "amount", "pass_on"),
     [
-        ("en", "EUR 2.00", ("pass it on", "return terms")),
-        ("it", "EUR 2,00", ("trasferirlo", "condizioni di reso")),
+        (primary_language(), "EUR 2.00", ("pass it on", "return terms")),
+        (other_language(), "EUR 2,00", ("trasferirlo", "condizioni di reso")),
     ],
 )
 def test_the_published_refund_fee_clause_has_no_pass_on_sentence(
@@ -175,7 +175,7 @@ def test_a_vendor_cannot_be_activated_before_accepting_the_version_with_the_clau
     assert vendor.status == Vendor.Status.ONBOARDING
 
 
-@pytest.mark.parametrize("language", ["en", "it"])
+@pytest.mark.parametrize("language", [primary_language(), other_language()])
 def test_accepting_the_new_version_records_the_hash_of_the_clause_text(language: str) -> None:
     old = VendorContractFactory.create(valid_from=timezone.now() - dt.timedelta(days=30))
     acceptance = ContractAcceptanceFactory.create(
@@ -225,15 +225,17 @@ def publish_terms(language_body: str) -> None:
 
 def test_customer_terms_without_the_clauses_are_reported() -> None:
     publish_terms("Sample terms.")
-    problems = services.customer_terms_problems(["en"])
+    problems = services.customer_terms_problems([primary_language()])
     assert problems == [f"customer_terms_clause_missing:en:{c}" for c in "abc"]
     assert services.customer_terms_problems(["fr"]) == ["customer_terms_missing:fr"]
 
 
 def test_customer_terms_with_the_clauses_pass() -> None:
-    block = terms_clauses.clause_block(terms_clauses.CUSTOMER, "en").replace("\n\n", "</p><p>")
+    block = terms_clauses.clause_block(terms_clauses.CUSTOMER, primary_language()).replace(
+        "\n\n", "</p><p>"
+    )
     publish_terms(block)
-    assert services.customer_terms_problems(["en"]) == []
+    assert services.customer_terms_problems([primary_language()]) == []
 
 
 # --- The command

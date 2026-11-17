@@ -22,6 +22,7 @@ from apps.catalog import brands
 from apps.catalog.models import Brand
 from apps.catalog.tests.factories import BrandFactory, brand_logo_image
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, ImageLicence, MediaImage
 from apps.core.tests.factories import MediaImageFactory
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
@@ -379,8 +380,8 @@ def test_the_graph_reuses_the_page_paths_it_is_given(brand: Brand) -> None:
     BrandTranslationFactory.create(brand=brand, slug="acme", status="published")
     paths = services.brand_page_paths(brand)
     with CaptureQueriesContext(connection) as without:
-        first = services.brand_graph(brand, "en", site="http://x")
+        first = services.brand_graph(brand, primary_language(), site="http://x")
     with CaptureQueriesContext(connection) as given:
-        second = services.brand_graph(brand, "en", site="http://x", paths=paths)
+        second = services.brand_graph(brand, primary_language(), site="http://x", paths=paths)
     assert first == second
     assert len(given) < len(without)

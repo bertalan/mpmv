@@ -65,6 +65,8 @@ def test_event_pages_pass_axe_and_csp_at_three_widths(
         for name, url in urls.items():
             page.goto(url)
             expect(page.get_by_role("heading", level=1)).to_be_visible()
+            if name in ("list", "event"):
+                expect(page.locator(".event-subscribe a[href^='webcal://']")).to_be_visible()
             shot(f"event-{name}-{width}")
             found = run_axe(page)
             assert found == [], f"{name} at {width}px: {format_violations(found)}"

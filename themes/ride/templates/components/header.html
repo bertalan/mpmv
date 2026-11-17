@@ -30,7 +30,7 @@ by `ride/js/mini-cart.js` from `data-cart-count` of the loaded fragment. On the 
 pages (app `orders`) the icon stays a plain link: their own markup would repeat the panel's ids.
 
 Context: `site_name`, `links` (label, url, optional children), `languages`, `search_url` and
-`cart_url` (default: the routes named `search` and `orders:cart`; an icon is left out without a
+`cart_url` (default: the language home, where `?s=` is the CAT.27 search page, and `orders:cart`; an icon is left out without a
 url, never rendered as a dead link), and the context of the help link.
 {% endcomment %}{% with page_path=request.path|default:"" %}<header class="site-header">
   <div class="site-header__inner navbar">
@@ -66,7 +66,7 @@ url, never rendered as a dead link), and the context of the help link.
       </div>
     {% endif %}
     <div class="site-header__tools">
-      {% url 'search' as search_default %}{% url 'orders:cart' as cart_default %}
+      {% url 'wagtail_serve' '' as search_default %}{% url 'orders:cart' as cart_default %}
       {% firstof search_url search_default as search_href %}{% firstof cart_url cart_default as cart_href %}
       {% with search_url=search_href|safe_href cart_url=cart_href|safe_href %}
         {% if search_url %}<a class="tool" href="{{ search_url }}" data-bs-toggle="modal" data-bs-target="#search-modal">{% include "components/icon.html" with name="search" only %}<span class="visually-hidden">{% translate "Search" %}</span></a>{% endif %}
@@ -88,7 +88,7 @@ url, never rendered as a dead link), and the context of the help link.
                 <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
               </div>
               <div class="modal-body">
-                {% include "components/search_form.html" with id="site-search" action=search_url query=request.GET.q only %}
+                {% include "components/search_form.html" with id="site-search" action=search_url name="s" query=request.GET.s only %}
               </div>
             </div>
           </div>

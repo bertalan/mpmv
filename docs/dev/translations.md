@@ -107,3 +107,27 @@ Customer emails use the informal form of address: tu (Italian), du (German), tu 
 
 The Read me, the banner and the rule wording exist in EN, IT, DE, FR and ES (informal register: tu, du, tu, tú; the same content in each). To add another language, add it to `RULES`, `READ_ME` and `BANNERS` in `apps/core/i18n_review/engine.py`. The
 rule texts are shown in the Read me and quoted in row errors, so one entry serves both.
+
+## German, French and Spanish: the review gate (I18N.19)
+
+The `de`, `fr` and `es` catalogs are AI drafts (#588). Until a professional translator has reviewed
+the sensitive strings and counsel has signed off the legal and tax wording, production serves only
+`en,it`: the default of `MPMV_LANGUAGES` leaves the three languages out (no system check yet
+refuses a LIVE deploy that lists them). Staff preview them on STAGE with
+`MPMV_LANGUAGES=en,it,de,fr,es`.
+
+```sh
+python tools/i18n_catalog.py review-export <lang> [--all] [--pending] [--out FILE]
+```
+
+writes the entries in `SENSITIVE_GROUPS` (order emails and documents, compliance forms, terms,
+price notes, cart and order components, order-change pages) as a CSV for the translator.
+A reviewed entry carries the translator comment `# reviewed` in the `.po`. The per-language gate
+checks, the staff preview switch and the counsel sign-off mark are not built yet (I18N.19).
+
+## Absolute URLs (I18N.18)
+
+`MPMV_BASE_URL` is the public https root. On LIVE and STAGE the check `core.E921` fails when it is
+empty, a placeholder or not https, or when the default Wagtail `Site` differs from it (the seed
+syncs the `Site`). `site_root_url()` raises `ImproperlyConfigured` in production settings and never
+returns an empty string, so a canonical, hreflang or sitemap URL is never relative.

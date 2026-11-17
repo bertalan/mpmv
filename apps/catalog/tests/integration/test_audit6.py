@@ -18,8 +18,10 @@ from apps.catalog.services import (
 )
 from apps.catalog.tests.factories import ProductFactory, VariantFactory, clothing_attributes
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -37,8 +39,8 @@ def tee(**overrides: object) -> engine.ProductIn:
         "kind": "variable",
         "price_net": Decimal("19.90"),
         "translations": (
-            engine.TranslationIn("en", "Plain tee"),
-            engine.TranslationIn("it", "Maglia semplice"),
+            engine.TranslationIn(primary_language(), "Plain tee"),
+            engine.TranslationIn(other_language(), "Maglia semplice"),
         ),
         "attributes": (
             engine.AttributeIn("size", values=("s", "m"), axis=True),
@@ -140,7 +142,10 @@ def test_create_product_gives_every_translation_its_slug(
     assert shown == ["maglia-semplice", "plain-tee"]
     if not dry_run:
         product = Product.objects.get(sku="TEE-1")
-        assert slugs_of(product) == {"en": "plain-tee", "it": "maglia-semplice"}
+        assert slugs_of(product) == {
+            primary_language(): "plain-tee",
+            other_language(): "maglia-semplice",
+        }
         created = AuditLog.objects.filter(action="catalog.product.created")
         assert created.filter(target_key=str(product.public_id)).exists()
 
@@ -148,10 +153,10 @@ def test_create_product_gives_every_translation_its_slug(
 def test_create_product_suffixes_a_slug_taken_by_another_product(
     attributes: dict[str, Attribute],
 ) -> None:
-    other = ProductFactory.create(languages=["en"])
+    other = ProductFactory.create(languages=[primary_language()])
     other.translations.update(title="Plain tee", slug="plain-tee")
     create_product(VendorFactory.create(), tee(), ctx=CTX)
-    assert slugs_of(Product.objects.get(sku="TEE-1"))["en"] == "plain-tee-2"
+    assert slugs_of(Product.objects.get(sku="TEE-1"))[primary_language()] == "plain-tee-2"
 
 
 def test_a_duplicate_regenerates_unique_slugs(attributes: dict[str, Attribute]) -> None:
@@ -165,7 +170,10 @@ def test_a_duplicate_regenerates_unique_slugs(attributes: dict[str, Attribute]) 
         ctx=CTX,
     )
     copy = Product.objects.exclude(pk=original.pk).get()
-    assert slugs_of(copy) == {"en": "plain-tee-2", "it": "maglia-semplice-2"}
+    assert slugs_of(copy) == {
+        primary_language(): "plain-tee-2",
+        other_language(): "maglia-semplice-2",
+    }
     entries = [c for c in changes.changes if c.model == "catalog.producttranslation"]
     assert sorted(str(c.after["slug"]) for c in entries if c.after) == [
         "maglia-semplice-2",

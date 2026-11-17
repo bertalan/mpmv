@@ -33,6 +33,7 @@ from apps.cms.choosers import product_chooser
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -46,7 +47,10 @@ def _product(sku: str, title: str, vendor: Vendor, **kwargs: Any) -> Product:
         product=product, title=title, slug=sku.lower(), status=PUBLISHED
     )
     ProductTranslationFactory.create(
-        product=product, language="it", title=f"{title} italiano", slug=f"{sku.lower()}-it",
+        product=product,
+        language=other_language(),
+        title=f"{title} italiano",
+        slug=f"{sku.lower()}-it",
         status=PUBLISHED,
     )  # fmt: skip
     return product

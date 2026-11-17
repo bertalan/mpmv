@@ -19,6 +19,7 @@ from wagtail import blocks
 from apps.cms.blocks import HeroBlock, StripBlock
 from apps.cms.models import HomePage, body_field
 from apps.cms.services import seed_site
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import MediaImageFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("english_interface")]
@@ -196,7 +197,7 @@ def _ride(settings: SettingsWrapper) -> None:
 
 def make_home(autoplay: bool = False) -> HomePage:
     seed_site()
-    page: HomePage = HomePage.objects.get(locale__language_code="en")
+    page: HomePage = HomePage.objects.get(locale__language_code=primary_language())
     hero_value = {
         "heading": "Ride better",
         "text": "Gear from small workshops.",
