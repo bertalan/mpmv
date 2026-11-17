@@ -197,7 +197,7 @@ def _baseline_on_main() -> list[str] | None:
     """The baseline keys as `origin/main` has them, or None when git or the ref is not there."""
     try:
         result = subprocess.run(
-            ["git", "show", "origin/main:tests/help_coverage_baseline.txt"],  # noqa: S607
+            ["git", "show", "origin/main:tests/help_coverage_baseline.txt"],  # noqa: S607 (git from PATH, as in CI)
             cwd=REPO,
             capture_output=True,
             text=True,
