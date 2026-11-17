@@ -209,9 +209,9 @@ def test_the_storefront_with_only_the_source_text_points_its_canonical_at_it(
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
     VendorTranslationFactory.create(vendor=vendor, language="en", status=PUBLISHED)
     html = client.get(f"{prefix('it')}/shop/{vendor.slug}/").content.decode()
-    assert f'rel="canonical" href="http://testserver/shop/{vendor.slug}/"' in html
-    assert f'hreflang="en" href="http://testserver/shop/{vendor.slug}/"' in html
-    assert f'hreflang="x-default" href="http://testserver/shop/{vendor.slug}/"' in html
+    assert f'rel="canonical" href="http://localhost/shop/{vendor.slug}/"' in html
+    assert f'hreflang="en" href="http://localhost/shop/{vendor.slug}/"' in html
+    assert f'hreflang="x-default" href="http://localhost/shop/{vendor.slug}/"' in html
     assert 'hreflang="it"' not in html
 
 
@@ -228,3 +228,14 @@ def test_the_query_count_does_not_grow_with_the_categories(
     with django_assert_max_num_queries(len(small) + 1):
         response = client.get(f"/shop/{vendor.slug}/")
     assert len(response.context["store_categories"]) == 11
+
+
+@pytest.fixture(autouse=True)
+def _site_allows_indexing(db: None) -> None:
+    """The canonical and hreflang links are for indexable pages: the site's switch is on."""
+    from django.apps import apps
+    from wagtail.models import Site
+
+    apps.get_model("seo", "SeoSettings").objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )

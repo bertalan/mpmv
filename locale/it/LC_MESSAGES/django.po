@@ -225,6 +225,14 @@ msgstr ""
 "Poche parole mostrate in cima all'elenco degli eventi. Se lo lasci vuoto, l'elenco parte subito "
 "sotto il titolo."
 
+#: apps/cms/blocks.py
+msgid ""
+"A few words shown small above the title, for example 'Our range'. Up to 80 characters. If you "
+"leave it empty, nothing is shown above."
+msgstr ""
+"Poche parole in piccolo sopra il titolo, per esempio 'La nostra gamma'. Al massimo 80 caratteri. "
+"Se lo lasci vuoto, sopra non appare nulla."
+
 #: apps/vendors/models.py
 msgid ""
 "A fingerprint (SHA-256) of the exact text that was accepted, to prove later that it has not "
@@ -302,6 +310,18 @@ msgstr ""
 #: apps/cms/blocks.py
 msgid "A picture for the banner. If you leave it empty, the banner has no picture."
 msgstr "Un'immagine per il banner. Se la lasci vuota, il banner non ha immagine."
+
+#: apps/cms/blocks.py
+msgid "A picture for the slide. If you leave it empty, the slide has no picture."
+msgstr "Un'immagine per la slide. Se la lasci vuota, la slide non ha immagine."
+
+#: apps/cms/blocks.py
+msgid ""
+"A picture shown before anyone plays the video. If you leave it empty, only the play button is "
+"shown."
+msgstr ""
+"Un'immagine mostrata prima che qualcuno avvii il video. Se la lasci vuota, appare solo il pulsante"
+" di avvio."
 
 #: apps/manager/amendment_forms.py
 msgid "A platform error: no refund fee for the shop"
@@ -433,6 +453,10 @@ msgstr ""
 "Un'etichetta breve dell'importazione. Dice ai revisori da dove arrivano i marchi. Esempio: "
 "'listino di primavera, importazione del 02/11/2026'."
 
+#: apps/cms/blocks.py
+msgid "A short line about the person, for example 'Rider'. Optional."
+msgstr "Una breve riga sulla persona, per esempio 'Ciclista'. Facoltativa."
+
 #: apps/cms/models.py
 msgid ""
 "A short line shown under the main picture, up to 250 characters. If you leave it empty, no caption"
@@ -517,6 +541,13 @@ msgstr ""
 "Un breve motivo mostrato allo staff quando la commissione è zero, per esempio «Promo di lancio». "
 "Lascialo vuoto per una regola normale."
 
+#: apps/cms/blocks.py
+msgid ""
+"A short sign after the number, for example '+' or '%'. If you leave it empty, the number stands "
+"alone."
+msgstr ""
+"Un breve segno dopo il numero, per esempio '+' o '%'. Se lo lasci vuoto, il numero appare da solo."
+
 #: apps/catalog/models.py
 msgid ""
 "A short teaser of one or two sentences, for example 'Hand-made ceramic mug, 300 ml'. Optional: you"
@@ -584,6 +615,14 @@ msgstr ""
 #: apps/manager/event_block_forms.py
 msgid "A title above the questions. Leave it empty for none."
 msgstr "Un titolo sopra le domande. Lascialo vuoto se non serve."
+
+#: apps/cms/blocks.py
+msgid ""
+"A title above the strip, for example 'From the blog'. Up to 120 characters. If you leave it empty,"
+" the strip has no title."
+msgstr ""
+"Un titolo sopra la striscia, per esempio 'Dal blog'. Fino a 120 caratteri. Se lo lasci vuoto, la "
+"striscia non ha titolo."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -692,6 +731,12 @@ msgstr "Aggiungi almeno una domanda con la sua risposta."
 #: apps/cms/blocks.py
 msgid "Add at least one question. They show as a list that opens one answer at a time."
 msgstr "Aggiungi almeno una domanda. Si vedono come un elenco che apre una risposta alla volta."
+
+#: apps/cms/blocks.py
+msgid "Add cards of the same kind: blog posts or pages, vendors, products or testimonials."
+msgstr ""
+"Aggiungi schede dello stesso tipo: articoli del blog o pagine, venditori, prodotti o "
+"testimonianze."
 
 #: apps/catalog/templates/catalog/product.html
 msgid "Add to cart"
@@ -941,6 +986,14 @@ msgstr "Autore"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Authorities told: %(authority)s, %(at)s."
 msgstr "Autorità informate: %(authority)s, %(at)s."
+
+#: apps/cms/blocks.py
+msgid ""
+"Automatic change only: how long a slide stays, in milliseconds, between 3000 and 20000. Example: "
+"6000 is six seconds."
+msgstr ""
+"Solo con cambio automatico: quanto resta una slide, in millisecondi, tra 3000 e 20000. Esempio: "
+"6000 sono sei secondi."
 
 #: apps/seo/site_links.py
 msgid "Back office"
@@ -1686,6 +1739,14 @@ msgstr "Tempo di consegna in giorni"
 msgid "Delivery, returns and law"
 msgstr "Consegna, resi e legge"
 
+#: apps/cms/blocks.py
+msgid ""
+"Describe the cover picture in a few words, for people who cannot see it. Required when you pick a "
+"cover picture."
+msgstr ""
+"Descrivi l'immagine di copertina in poche parole, per chi non può vederla. Obbligatorio se scegli "
+"un'immagine di copertina."
+
 #: apps/manager/termination_views.py
 msgid "Describe the facts relied on."
 msgstr "Descrivi i fatti su cui si basa la decisione."
@@ -1733,6 +1794,14 @@ msgid ""
 msgstr ""
 "Descrivi l'immagine in poche parole, per chi non può vederla. Esempio: 'Tazza di ceramica rossa su"
 " un tavolo di legno'. Obbligatorio: senza non si può salvare l'immagine."
+
+#: apps/cms/blocks.py
+msgid ""
+"Describe the picture in a few words, for people who cannot see it. Required when you choose a "
+"picture."
+msgstr ""
+"Descrivi l'immagine in poche parole, per chi non può vederla. Obbligatorio quando scegli "
+"un'immagine."
 
 #: apps/manager/event_block_forms.py
 msgid "Describe the picture in a few words, for people who cannot see it. Required with a picture."
@@ -2318,6 +2387,10 @@ msgstr ""
 "Quanto è precisa la posizione trovata dall'indirizzo, per esempio una via o una città. Compilato "
 "per te."
 
+#: apps/cms/blocks.py
+msgid "How far along it is. It cannot be more than the maximum below."
+msgstr "A che punto è. Non può superare il massimo qui sotto."
+
 #: apps/shipping/models.py
 msgid "How fast or how costly the service is: standard, express, economy or other."
 msgstr "Quanto è veloce o costoso il servizio: standard, express, economico o altro."
@@ -2329,6 +2402,14 @@ msgid ""
 msgstr ""
 "Quanto tempo ha il cliente per accettare o rifiutare una modifica proposta; dopo, l'ordine resta "
 "com'era."
+
+#: apps/cms/blocks.py
+msgid ""
+"How many cards a slide shows on a wide screen. Narrow screens show fewer. Only the carousel theme "
+"uses it."
+msgstr ""
+"Quante schede mostra una slide su uno schermo largo. Gli schermi stretti ne mostrano meno. Lo usa "
+"solo il tema con carosello."
 
 #: apps/events/admin_views.py
 msgid ""
@@ -3275,6 +3356,15 @@ msgstr ""
 " questo sito. Attivato: le pagine possono comparire nei risultati di ricerca. Non ha effetto "
 "finché il server impone noindex (STAGE o demo)."
 
+#: apps/cms/blocks.py
+msgid ""
+"Off by default. When on, the slides change on their own, stop when the visitor hovers or tabs into"
+" the strip, and never move for people who asked their device for less motion."
+msgstr ""
+"Disattivato per impostazione predefinita. Se attivo, le slide cambiano da sole, si fermano quando "
+"il visitatore passa sopra o vi entra con Tab e non si muovono mai per chi ha chiesto meno "
+"movimento al dispositivo."
+
 #: apps/seo/admin_views.py
 msgid ""
 "Off keeps every page noindex (meta tag, X-Robots-Tag header and robots.txt). A new site starts "
@@ -3362,10 +3452,22 @@ msgstr ""
 
 #: apps/cms/blocks.py
 msgid ""
+"One or two sentences under the title, up to 250 characters. If you leave it empty, nothing is "
+"shown below."
+msgstr ""
+"Una o due frasi sotto il titolo, al massimo 250 caratteri. Se lo lasci vuoto, sotto non appare "
+"nulla."
+
+#: apps/cms/blocks.py
+msgid ""
 "One or two sentences under the title, up to 400 characters. If you leave it empty, only the title "
 "is shown."
 msgstr ""
 "Una o due frasi sotto il titolo, fino a 400 caratteri. Se le lasci vuote, si vede solo il titolo."
+
+#: apps/cms/blocks.py
+msgid "One or two sentences under the title. If you leave it empty, only the title."
+msgstr "Una o due frasi sotto il titolo. Se la lasci vuota, c'è solo il titolo."
 
 #: apps/manager/forms.py
 msgid "Onerous clauses"
@@ -4765,6 +4867,16 @@ msgstr ""
 msgid "Since when the item is no longer in the feed. Empty while it is there."
 msgstr "Da quando l'articolo non è più nel flusso. Vuoto finché c'è."
 
+#: apps/cms/blocks.py
+msgid ""
+"Single image: the picture fills the banner. Text beside the image: the text and the picture sit "
+"side by side on wide screens. Slider: the banner above is the first slide and the slides below "
+"follow."
+msgstr ""
+"Immagine singola: l'immagine riempie il banner. Testo accanto all'immagine: testo e immagine "
+"stanno affiancati sugli schermi larghi. Slider: il banner qui sopra è la prima slide e seguono le "
+"slide sotto."
+
 #: apps/seo/admin_views.py
 msgid "Site"
 msgstr "Sito"
@@ -4784,6 +4896,23 @@ msgstr "Vai al contenuto principale"
 #: apps/catalog/templates/catalog/product.html apps/manager/templates/manager/shop/order.html
 msgid "SKU"
 msgstr "SKU"
+
+#: apps/cms/blocks.py
+msgid ""
+"Slider only. Off by default. When on, the slides change on their own, stop when the visitor hovers"
+" or tabs into the slider, and never move for people who asked their device for less motion."
+msgstr ""
+"Solo slider. Disattivato per impostazione predefinita. Se attivo, le slide cambiano da sole, si "
+"fermano quando il visitatore passa sopra o vi entra con Tab e non si muovono mai per chi ha "
+"chiesto meno movimento al dispositivo."
+
+#: apps/cms/blocks.py
+msgid ""
+"Slider with automatic change only: how long a slide stays, in milliseconds, between 3000 and "
+"20000. Example: 6000 is six seconds."
+msgstr ""
+"Solo slider con cambio automatico: quanto resta una slide, in millisecondi, tra 3000 e 20000. "
+"Esempio: 6000 sono sei secondi."
 
 #: apps/catalog/templates/catalog/product.html
 msgid "Sold by"
@@ -5082,6 +5211,13 @@ msgstr ""
 "elettroniche a te intestate. 0000000 si usa insieme a un indirizzo PEC, che indichi nel campo PEC;"
 " XXXXXXX è per le imprese con sede fuori dall'Italia. Il codice te lo può dire il tuo "
 "commercialista o il tuo programma di fatturazione."
+
+#: apps/cms/blocks.py
+msgid ""
+"The address of a YouTube or Vimeo video, starting with https://. Other sites are not accepted."
+msgstr ""
+"L'indirizzo di un video di YouTube o Vimeo, che inizia con https://. Gli altri siti non sono "
+"accettati."
 
 #: apps/ingest/models.py
 msgid "The address of the item in the supplier's feed. It identifies the item in that feed."
@@ -5862,6 +5998,10 @@ msgstr ""
 msgid "The general text has no screen or page type."
 msgstr "Il testo generale non ha una schermata né un tipo di pagina."
 
+#: apps/cms/blocks.py
+msgid "The heading of the section, up to 120 characters. Required."
+msgstr "Il titolo della sezione, al massimo 120 caratteri. Obbligatorio."
+
 #: apps/shipping/models.py
 msgid "The heaviest parcel of the band, in kg, included. Leave it empty for no upper limit."
 msgstr ""
@@ -6283,6 +6423,10 @@ msgstr ""
 msgid "The name of the territory, for example 'Canary Islands'."
 msgstr "Il nome del territorio, per esempio 'Isole Canarie'."
 
+#: apps/cms/blocks.py
+msgid "The name of the video, shown in the popup. Up to 120 characters. Required."
+msgstr "Il nome del video, mostrato nella finestra. Al massimo 120 caratteri. Obbligatorio."
+
 #: apps/shipping/models.py
 msgid "The name of the zone, for example 'Italy, mainland'."
 msgstr "Il nome della zona, per esempio 'Italia, terraferma'."
@@ -6386,6 +6530,10 @@ msgid ""
 msgstr ""
 "Il numero che questo prodotto aveva nelle pagine in italiano del vecchio sito. Serve solo per "
 "spostare i dati vecchi; lascialo vuoto per i prodotti nuovi."
+
+#: apps/cms/blocks.py
+msgid "The number to show, a whole number. Example: 1250."
+msgstr "Il numero da mostrare, un numero intero. Esempio: 1250."
 
 #: apps/catalog/models.py
 msgid ""
@@ -7002,6 +7150,10 @@ msgstr "Il sito a cui appartengono queste impostazioni; ogni sito ha il proprio 
 msgid "The site this theme is for. Each site has one theme."
 msgstr "Il sito a cui si applica questo tema. Ogni sito ha un solo tema."
 
+#: apps/cms/blocks.py
+msgid "The slide's title, up to 120 characters. Required."
+msgstr "Il titolo della slide, fino a 120 caratteri. Obbligatorio."
+
 #: apps/shipping/models.py
 msgid "The special area this treatment is for. A method has one treatment per area."
 msgstr ""
@@ -7200,6 +7352,14 @@ msgid ""
 msgstr ""
 "L'unità di un attributo numerico, per esempio cm, kg o ml. Lasciala vuota per gli attributi a "
 "scelta e di testo."
+
+#: apps/cms/blocks.py
+msgid ""
+"The value that means 'done'. Leave 100 to show the value as a percentage; any other number shows "
+"'value / maximum'."
+msgstr ""
+"Il valore che significa 'completato'. Lascia 100 per mostrare il valore in percentuale; con un "
+"altro numero appare 'valore / massimo'."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -7790,6 +7950,14 @@ msgid "Tick the box to confirm the statement. Without it the report cannot be se
 msgstr ""
 "Spunta la casella per confermare la dichiarazione. Senza non si può inviare la segnalazione."
 
+#: apps/cms/models.py
+msgid ""
+"Tick this to ask search engines to skip this page. The page is also left out of the sitemaps and "
+"of llms.txt. Leave it unticked for a normal public page."
+msgstr ""
+"Spunta questa casella per chiedere ai motori di ricerca di ignorare questa pagina. La pagina resta"
+" fuori anche dalle sitemap e da llms.txt. Lasciala senza spunta per una normale pagina pubblica."
+
 #: apps/orders/ui/forms.py
 msgid ""
 "Tick this to enter your company and VAT number. A valid EU VAT number can remove the VAT on a "
@@ -7986,6 +8154,10 @@ msgstr ""
 "vendono su richiesta: i clienti non possono aggiungerli al carrello."
 
 #: apps/cms/blocks.py
+msgid "Up to two buttons on the slide. If you add none, the slide has no buttons."
+msgstr "Fino a due pulsanti sulla slide. Se non ne aggiungi, la slide non ha pulsanti."
+
+#: apps/cms/blocks.py
 msgid "Up to two buttons under the text. If you add none, the banner has no buttons."
 msgstr "Fino a due pulsanti sotto il testo. Se non ne aggiungi, il banner non ha pulsanti."
 
@@ -8034,6 +8206,14 @@ msgstr "Usa un codice di recupero"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Use this device's screen lock or a security key."
 msgstr "Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
+
+#: apps/cms/blocks.py
+msgid ""
+"Used by the slider layout: up to six slides after the banner. Without slides the banner shows as a"
+" single image."
+msgstr ""
+"Usato dal layout slider: fino a sei slide dopo il banner. Senza slide il banner appare come "
+"immagine singola."
 
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/platform/user_sessions.html
@@ -8319,6 +8499,10 @@ msgstr ""
 msgid "What the authority asks or what the notice reports, in a few sentences. Required."
 msgstr "Che cosa chiede l'autorità o che cosa segnala l'avviso, in poche frasi. Obbligatorio."
 
+#: apps/cms/blocks.py
+msgid "What the bar measures, for example 'Order packed'. Up to 80 characters."
+msgstr "Che cosa misura la barra, per esempio 'Ordine imballato'. Al massimo 80 caratteri."
+
 #: apps/manager/forms.py
 msgid ""
 "What the buyer is told before the order about the cost of returning goods, for example how it is "
@@ -8339,6 +8523,14 @@ msgstr ""
 #: apps/vendors/models.py
 msgid "What the field is needed for: a payout request or the activation of the vendor."
 msgstr "A cosa serve il campo: una richiesta di pagamento o l'attivazione del venditore."
+
+#: apps/cms/blocks.py
+msgid "What the number counts, for example 'Orders shipped'. Up to 80 characters."
+msgstr "Che cosa conta il numero, per esempio 'Ordini spediti'. Al massimo 80 caratteri."
+
+#: apps/cms/blocks.py
+msgid "What the person said, up to 400 characters. Required."
+msgstr "Che cosa ha detto la persona, fino a 400 caratteri. Obbligatorio."
 
 #: apps/cms/models.py
 msgid ""
@@ -8744,6 +8936,10 @@ msgstr ""
 #: apps/manager/forms.py
 msgid "Who pays the return"
 msgstr "Chi paga il reso"
+
+#: apps/cms/blocks.py
+msgid "Who said it, for example 'Ada'. Required."
+msgstr "Chi l'ha detto, per esempio 'Ada'. Obbligatorio."
 
 #: apps/cms/models.py
 msgid ""

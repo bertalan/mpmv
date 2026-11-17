@@ -112,6 +112,7 @@ class StandardPageFactory(_InTree, DjangoModelFactory[StandardPage]):
     image = None
     image_alt_text = ""
     image_caption = ""
+    noindex = False
 
     @classmethod
     def _default_parent(cls) -> Page:

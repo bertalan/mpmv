@@ -151,7 +151,7 @@ def test_a_language_without_a_published_text_uses_the_en_slugs(
     response = client.get("/de/compatibility/maker/")
     assert response.status_code == 200
     assert response.context["is_fallback"] is True
-    assert response.context["canonical_url"] == "http://testserver/compatibility/maker/"
+    assert response.context["canonical_url"] == "http://localhost/compatibility/maker/"
     assert_redirect(client.get("/de/compatibilita/marca/"), "/de/compatibility/maker/")
 
 
@@ -159,11 +159,11 @@ def test_hreflang_lists_only_published_languages(client: Client, compat: dict[st
     response = client.get("/compatibility/maker/")
     alternates = dict(response.context["alternates"])
     assert alternates == {
-        "en": "http://testserver/compatibility/maker/",
-        "it": "http://testserver/it/compatibilita/marca/",
-        "x-default": "http://testserver/compatibility/maker/",
+        "en": "http://localhost/compatibility/maker/",
+        "it": "http://localhost/it/compatibilita/marca/",
+        "x-default": "http://localhost/compatibility/maker/",
     }
-    assert response.context["canonical_url"] == "http://testserver/compatibility/maker/"
+    assert response.context["canonical_url"] == "http://localhost/compatibility/maker/"
     assert response.context["is_fallback"] is False
 
 
@@ -222,7 +222,7 @@ def test_tracking_parameters_stay_without_a_redirect_and_leave_the_canonical(
     response = client.get("/compatibility/maker/?price_min=5&utm_source=x")
     assert response.status_code == 200
     assert response.context["canonical_url"] == (
-        "http://testserver/compatibility/maker/?price_min=5"
+        "http://localhost/compatibility/maker/?price_min=5"
     )
 
 
@@ -248,7 +248,7 @@ def test_paginated_urls_build_on_the_term_url(
     assert first.context["previous_url"] is None
     second = client.get("/it/compatibilita/marca/?page=2")
     assert second.status_code == 200
-    assert second.context["canonical_url"] == "http://testserver/it/compatibilita/marca/?page=2"
+    assert second.context["canonical_url"] == "http://localhost/it/compatibilita/marca/?page=2"
     assert second.context["previous_url"] == "/it/compatibilita/marca/"
     assert second.context["next_url"] is None
     assert client.get("/it/compatibilita/marca/?page=3").status_code == 404
@@ -267,7 +267,7 @@ def test_a_filtered_listing_is_indexable_on_its_canonical_url(
     assert response.status_code == 200
     assert response.context["robots"] == INDEX
     assert response.context["canonical_url"] == (
-        f"http://testserver/compatibility/maker/?vendor={vendor.slug}"
+        f"http://localhost/compatibility/maker/?vendor={vendor.slug}"
     )
 
 
@@ -277,12 +277,12 @@ def test_a_filtered_fallback_page_has_the_en_listing_as_canonical(
     response = client.get("/de/compatibility/maker/?compatibility=maker/model&price_min=1")
     assert response.status_code == 200
     assert response.context["canonical_url"] == (
-        "http://testserver/compatibility/maker/?compatibility=maker/model&price_min=1"
+        "http://localhost/compatibility/maker/?compatibility=maker/model&price_min=1"
     )
     # The IT page re-expresses the filter in IT slugs for its alternate.
     response = client.get("/compatibility/maker/?compatibility=maker/model")
     assert dict(response.context["alternates"])["it"] == (
-        "http://testserver/it/compatibilita/marca/?compatibilita=marca/modello"
+        "http://localhost/it/compatibilita/marca/?compatibilita=marca/modello"
     )
 
 
@@ -312,10 +312,10 @@ def test_the_page_renders_canonical_robots_and_hreflang_tags(
     client: Client, compat: dict[str, Any]
 ) -> None:
     html = client.get("/compatibility/maker/").content.decode()
-    assert '<link rel="canonical" href="http://testserver/compatibility/maker/">' in html
+    assert '<link rel="canonical" href="http://localhost/compatibility/maker/">' in html
     assert '<meta name="robots" content="index, follow">' in html
     assert (
-        '<link rel="alternate" hreflang="it" href="http://testserver/it/compatibilita/marca/">'
+        '<link rel="alternate" hreflang="it" href="http://localhost/it/compatibilita/marca/">'
         in html
     )
 

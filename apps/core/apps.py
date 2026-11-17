@@ -1,5 +1,15 @@
+from typing import Any
+
 from django.apps import AppConfig
 from django.core import checks
+from django.db import DEFAULT_DB_ALIAS
+from django.db.models.signals import post_migrate
+
+
+def _sync_language_state(using: str = DEFAULT_DB_ALIAS, **kwargs: Any) -> None:
+    from .language_services import sync_language_state
+
+    sync_language_state(using=using)
 
 
 class CoreConfig(AppConfig):
@@ -10,6 +20,10 @@ class CoreConfig(AppConfig):
     audited_models = ("platformoperator", "featureflag", "emailsuppression", "imagelicence")
     unaudited_models = {
         "auditlog": "the audit log itself (append-only)",
+        "sitelanguages": "applied language set; written by the change_languages command, which "
+        "audits it, and by the post-migrate hook that records added languages",
+        "languageredirect": "retired language prefix; created by the change_languages command, "
+        "which audits it",
         "heartbeat": "worker telemetry, not a domain change",
         "throttle": "login counters; the lockouts they cause are audited by accounts",
         "geocodecacheentry": "cache of public geocoding answers, not a domain change",
@@ -46,7 +60,7 @@ class CoreConfig(AppConfig):
             check_trusted_proxy_for_deploy,
             translation_models,
         )
-        from .language_checks import check_language_settings
+        from .language_checks import check_language_settings, check_language_state
 
         checks.register(translation_models)
         checks.register(check_audit_policy, checks.Tags.security)
@@ -59,6 +73,8 @@ class CoreConfig(AppConfig):
         checks.register(check_encrypted_data, checks.Tags.database)
         checks.register(check_feature_flag_settings)
         checks.register(check_language_settings)
+        checks.register(check_language_state, checks.Tags.database)
+        post_migrate.connect(_sync_language_state, sender=self, dispatch_uid="core.language_state")
         checks.register(check_email_settings)
         checks.register(check_privacy_pepper, checks.Tags.security)
         checks.register(check_avif_support)

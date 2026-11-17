@@ -268,7 +268,7 @@ def test_the_term_page_keeps_its_single_canonical(seeded: SeedReport, maker: Ter
     term_landing(maker)
     html = _html("/compatibility/maker/")
     canonicals = html.find_all("link", rel="canonical")
-    assert [link["href"] for link in canonicals] == ["http://testserver/compatibility/maker/"]
+    assert [link["href"] for link in canonicals] == ["http://localhost/compatibility/maker/"]
 
 
 def test_the_seo_title_and_description_apply_to_the_term_page(
@@ -382,13 +382,13 @@ def test_the_vendor_page_has_its_own_canonical_and_hreflang(seeded: SeedReport) 
     _translate(page, "it", slug="il-laboratorio")
     html = _html(page.url)
     assert [link["href"] for link in html.find_all("link", rel="canonical")] == [
-        "http://testserver/our-workshop/"
+        "http://localhost/our-workshop/"
     ]
     alternates = {link["hreflang"]: link["href"] for link in html.find_all("link", rel="alternate")}
     assert alternates == {
-        "en": "http://testserver/our-workshop/",
-        "it": "http://testserver/it/il-laboratorio/",
-        "x-default": "http://testserver/our-workshop/",
+        "en": "http://localhost/our-workshop/",
+        "it": "http://localhost/it/il-laboratorio/",
+        "x-default": "http://localhost/our-workshop/",
     }
 
 
@@ -471,3 +471,14 @@ def test_the_factories_build_landing_pages_under_the_home(seeded: SeedReport) ->
     assert vendor_page.vendor.status == Vendor.Status.ACTIVE
     assert term_page.get_parent().specific == _home()
     assert vendor_page.get_parent().specific == _home()
+
+
+@pytest.fixture(autouse=True)
+def _site_allows_indexing(db: None) -> None:
+    """The canonical and hreflang links are for indexable pages: the site's switch is on."""
+    from django.apps import apps
+    from wagtail.models import Site
+
+    apps.get_model("seo", "SeoSettings").objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )

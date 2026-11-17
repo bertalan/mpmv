@@ -160,7 +160,7 @@ def test_the_page_has_one_graph_with_the_brand_node(client: Client) -> None:
     graph = _graph(_page(client, "/brand/acme/"))
     node = _node(graph, "Brand")
     assert node["name"] == "Acme"
-    assert node["@id"] == "http://testserver/brand/acme/#brand"
+    assert node["@id"] == "http://localhost/brand/acme/#brand"
     assert node["url"] == "https://acme.example/"
     assert node["description"] == "Anvils since 1949."
     assert node["sameAs"] == [
@@ -198,7 +198,7 @@ def test_two_vendors_selling_the_brand_share_one_node(client: Client) -> None:
     products = Product.objects.filter(brand=brand).select_related("brand")
     assert products.count() == 2
     ids = {
-        services.brand_node_id(product.brand, site="http://testserver")
+        services.brand_node_id(product.brand, site="http://localhost")
         for product in products
         if product.brand is not None
     }
@@ -228,7 +228,7 @@ def test_the_logo_is_in_the_node(client: Client) -> None:
     logo = brand_logo_image()
     _brand(logo=logo, logo_alt="Acme anvil")
     node = _node(_graph(_page(client, "/brand/acme/")), "Brand")
-    assert node["logo"].startswith("http://testserver/")
+    assert node["logo"].startswith("http://localhost/")
 
 
 # --- Visibility, indexing and redirects
