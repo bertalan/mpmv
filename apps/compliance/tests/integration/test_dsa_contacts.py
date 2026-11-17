@@ -249,7 +249,7 @@ def test_golive_readiness_includes_the_dsa_checks_and_reviews(
     messages = golive_problems([primary_language()])
     assert any("authority_english_language" in m for m in messages)
     # The DSA pages need the native and counsel reviews like the other legal pages (D-27).
-    assert any("platform_terms [en]: no native_review" in m for m in messages)
-    assert any("ranking [en]: no counsel_check" in m for m in messages)
+    assert any(f"platform_terms [{primary_language()}]: no native_review" in m for m in messages)
+    assert any(f"ranking [{primary_language()}]: no counsel_check" in m for m in messages)
     with pytest.raises(CommandError, match="authority_english_language"):
         call_command("golive_readiness", "--language", primary_language())

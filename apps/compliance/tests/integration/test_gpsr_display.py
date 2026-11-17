@@ -65,7 +65,9 @@ def test_safety_text_is_saved_per_language_and_audited() -> None:
 
 def test_safety_text_dry_run_and_unknown_language() -> None:
     product = ProductFactory.create()
-    services.set_product_safety_text(product, "de", {"warnings": "Achtung."}, ctx=CTX, dry_run=True)
+    services.set_product_safety_text(
+        product, other_language(), {"warnings": "Achtung."}, ctx=CTX, dry_run=True
+    )
     assert not GpsrSafetyText.objects.exists()
     with pytest.raises(ValidationError):
         services.set_product_safety_text(product, "xx", {"warnings": "?"}, ctx=CTX)
@@ -93,7 +95,7 @@ def test_display_merges_the_vendor_defaults_and_picks_the_language() -> None:
 
 def test_display_falls_back_to_the_primary_language() -> None:
     product = GpsrSafetyTextFactory.create(language=primary_language(), warnings="Caution.").product
-    shown = services.gpsr_display(product, "de")
+    shown = services.gpsr_display(product, other_language())
     assert (shown.warnings, shown.text_language) == ("Caution.", primary_language())
 
 
@@ -266,14 +268,14 @@ def test_display_falls_back_to_a_language_of_the_destination() -> None:
     GpsrSafetyTextFactory.create(product=product, language=third_language(), warnings="Achtung.")
     GpsrSafetyTextFactory.create(product=product, language="fr", warnings="Attention.")
     shown = services.gpsr_display(product, other_language(), country="AT")
-    assert (shown.warnings, shown.text_language) == ("Achtung.", "de")
+    assert (shown.warnings, shown.text_language) == ("Achtung.", third_language())
 
 
 def test_display_falls_back_to_any_available_language() -> None:
     product = ProductFactory.create()
     GpsrSafetyTextFactory.create(product=product, language=third_language(), warnings="Achtung.")
     shown = services.gpsr_display(product, other_language())
-    assert (shown.warnings, shown.text_language) == ("Achtung.", "de")
+    assert (shown.warnings, shown.text_language) == ("Achtung.", third_language())
     assert shown.text_language_name
 
 
@@ -284,5 +286,5 @@ def test_the_block_labels_warnings_in_another_language() -> None:
     with translation.override(other_language()):
         html = template.render(Context({"product": product}))
     assert "Achtung." in html
-    assert 'lang="de"' in html
+    assert f'lang="{third_language()}"' in html
     assert "product-safety-language" in html

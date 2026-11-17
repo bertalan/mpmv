@@ -395,7 +395,7 @@ def test_the_vendor_page_has_its_own_canonical_and_hreflang(seeded: SeedReport) 
     alternates = {link["hreflang"]: link["href"] for link in html.find_all("link", rel="alternate")}
     assert alternates == {
         primary_language(): "http://localhost/our-workshop/",
-        other_language(): "http://localhost/it/il-laboratorio/",
+        other_language(): f"http://localhost{language_prefix(other_language())}/il-laboratorio/",
         "x-default": "http://localhost/our-workshop/",
     }
 

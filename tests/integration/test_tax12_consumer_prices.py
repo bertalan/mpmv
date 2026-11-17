@@ -54,14 +54,20 @@ from tests.i18n import localized, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
-NOTES = {
-    primary_language(): "Indicative price. Final amount at checkout.",
-    other_language(): "Prezzo indicativo. Importo finale al checkout.",
+NOTES = {  # each key is the language its text is written in
+    "en": "Indicative price. Final amount at checkout.",
+    "it": "Prezzo indicativo. Importo finale al checkout.",
     "de": "Unverbindlicher Preis. Endbetrag an der Kasse.",
     "fr": "Prix indicatif. Montant final lors du paiement.",
     "es": "Precio orientativo. Importe final al finalizar la compra.",
 }
 NET = Decimal("12.50")
+
+
+def need_language(code: str) -> None:
+    """Skip a test about one specific language when this run does not configure it."""
+    if code not in configured_languages():
+        pytest.skip(f"{code} is not a configured language")
 
 
 @pytest.fixture(autouse=True)
@@ -120,12 +126,10 @@ def page(client: Client, language: str) -> Any:
     return BeautifulSoup(response.content, "html.parser")
 
 
-def request(
-    language: str = primary_language(), session: dict[str, Any] | None = None
-) -> HttpRequest:
+def request(language: str | None = None, session: dict[str, Any] | None = None) -> HttpRequest:
     req = RequestFactory().get("/")
     req.session = session if session is not None else {}  # type: ignore[assignment]
-    req.LANGUAGE_CODE = language
+    req.LANGUAGE_CODE = language or primary_language()
     return req
 
 
@@ -165,7 +169,7 @@ def test_a_consumer_gets_the_destination_rate(country: str, rate: Decimal, gross
 @pytest.mark.parametrize(
     ("language", "country", "gross"),
     [
-        (other_language(), "IT", Decimal("15.25")),
+        ("it", "IT", Decimal("15.25")),
         ("de", "DE", Decimal("14.88")),
         ("fr", "FR", Decimal("15.00")),
     ],
@@ -173,6 +177,7 @@ def test_a_consumer_gets_the_destination_rate(country: str, rate: Decimal, gross
 def test_before_an_address_the_language_gives_the_estimated_country(
     language: str, country: str, gross: Decimal
 ) -> None:
+    need_language(language)
     with translation.override(language):
         price = prices.consumer_price(NET, "standard", vendor=VENDOR, request=request(language))
     assert (price.country, price.estimated, price.gross) == (country, True, gross)
@@ -328,11 +333,12 @@ def test_the_owner_note_in_each_language(language: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("language", "amount"), [(other_language(), "15,25"), ("de", "14,88"), ("fr", "15,00")]
+    ("language", "amount"), [("it", "15,25"), ("de", "14,88"), ("fr", "15,00")]
 )
 def test_the_product_page_shows_the_destination_gross_price_and_the_note(
     client: Client, language: str, amount: str
 ) -> None:
+    need_language(language)
     live()
     price = page(client, language).find(class_="product-price")
     assert price.find("data")["value"] == amount.replace(",", ".")

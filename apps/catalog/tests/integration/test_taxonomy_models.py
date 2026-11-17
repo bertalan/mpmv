@@ -20,7 +20,7 @@ from apps.catalog.tests.factories import (
     TermTranslationFactory,
 )
 from apps.core.i18n import primary_language
-from tests.i18n import other_language
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -410,9 +410,13 @@ def test_a_category_lists_the_products_of_its_subtree_main_or_secondary() -> Non
 
 
 @pytest.mark.parametrize(
-    "slug", ["de", other_language(), "brand", "shop", "product-category", "prodotto"]
+    "slug", ["<other>", "<third>", "brand", "shop", "product-category", "prodotto"]
 )
 def test_a_taxonomy_slug_cannot_be_a_language_code_or_a_catalog_segment(slug: str) -> None:
+    if slug == "<other>":
+        slug = other_language()
+    elif slug == "<third>":
+        slug = third_language()
     text = TaxonomyTranslationFactory.build(taxonomy=TaxonomyFactory.create(), slug=slug)
     with pytest.raises(ValidationError) as excinfo:
         text.full_clean()

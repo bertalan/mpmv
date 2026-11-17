@@ -178,7 +178,7 @@ def test_hreflang_lists_only_published_languages(client: Client, compat: dict[st
     alternates = dict(response.context["alternates"])
     assert alternates == {
         primary_language(): "http://localhost/compatibility/maker/",
-        other_language(): "http://localhost/it/compatibilita/marca/",
+        other_language(): f"http://localhost{language_prefix(other_language())}/compatibilita/marca/",
         "x-default": "http://localhost/compatibility/maker/",
     }
     assert response.context["canonical_url"] == "http://localhost/compatibility/maker/"
@@ -272,7 +272,10 @@ def test_paginated_urls_build_on_the_term_url(
     assert first.context["previous_url"] is None
     second = client.get(f"{language_prefix(other_language())}/compatibilita/marca/?page=2")
     assert second.status_code == 200
-    assert second.context["canonical_url"] == "http://localhost/it/compatibilita/marca/?page=2"
+    assert (
+        second.context["canonical_url"]
+        == f"http://localhost{language_prefix(other_language())}/compatibilita/marca/?page=2"
+    )
     assert (
         second.context["previous_url"]
         == f"{language_prefix(other_language())}/compatibilita/marca/"
@@ -314,7 +317,7 @@ def test_a_filtered_fallback_page_has_the_en_listing_as_canonical(
     # The IT page re-expresses the filter in IT slugs for its alternate.
     response = client.get("/compatibility/maker/?compatibility=maker/model")
     assert dict(response.context["alternates"])[other_language()] == (
-        "http://localhost/it/compatibilita/marca/?compatibilita=marca/modello"
+        f"http://localhost{language_prefix(other_language())}/compatibilita/marca/?compatibilita=marca/modello"
     )
 
 
