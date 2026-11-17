@@ -1,8 +1,9 @@
 """Event emails through the ARC.16 outbox (EVT.11, spec 15 "Emails").
 
 To the vendor's owner members, in their language: approved, changes requested (with the
-moderator's comment and a CORE.15 secure link to the event form), hidden (with the reason and the
-DSA notice reference) and restored. To the "Event moderators": a daily digest of the events
+moderator's comment and a CORE.15 secure link to the event form), hidden (with the reason, the
+DSA notice reference and, when the CMP.5 flow issues the statement of reasons with it, the link
+to it) and restored. To the "Event moderators": a daily digest of the events
 awaiting review, nothing when the queue is empty. Each email is queued in the caller's
 transaction with an idempotency key of event, transition, version and recipient, so a repeated
 signal or retry queues nothing more. Wagtail's own moderation emails to vendors are off
@@ -47,6 +48,12 @@ def _base_url() -> str:
 
 def _form_url(page: EventPage) -> str:
     return _base_url() + reverse("manager:shop:event_edit", args=[page.public_id])
+
+
+def statements_url(notice_ref: str = "") -> str:
+    """The vendor's page of statements of reasons, at the statement that follows `notice_ref`."""
+    url = _base_url() + reverse("manager:shop:statements")
+    return f"{url}#notice-{notice_ref}" if notice_ref else url
 
 
 def owners(page: EventPage) -> list[User]:

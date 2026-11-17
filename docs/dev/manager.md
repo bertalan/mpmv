@@ -44,6 +44,18 @@ fields and the map picker. Every change goes through the EVT.3 services (`save_e
 `submit_event`, `cancel_event`); POSTs carry the CORE.25 gate `content_edit`. Staff hide, restore
 and the `VendorEventPolicy` page live in the Wagtail admin (EVT.3).
 
+### Event emails (EVT.11)
+
+`apps/events/notifications.py` queues them through the ARC.16 outbox, in the recipient's language
+and in the formal register. Only the vendor's **owner** members (active, with an email) receive
+the vendor emails: a staff member, an inactive user or one without an address gets nothing. A
+hidden-event email links to `/manager/shop/statements/` (section `shop.statements`, every member,
+read only) only when the CMP.5 flow issues the statement in the same transaction
+(`hide_event(statement_follows=True)`); a hide outside that flow never promises one. Wagtail's own
+approval and rejection emails to the vendor are switched off by patching the `can_handle` of its
+two notifiers (`switch_off_wagtail_vendor_emails`), which is coupled to Wagtail internals: the
+rejection test in `apps/events/tests/integration/test_emails.py` guards a Wagtail upgrade.
+
 ## The vendor choice
 
 A member of several vendors picks one (`vendor_choice.py`, a vendor public id in the session). It

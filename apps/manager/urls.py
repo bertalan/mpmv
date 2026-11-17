@@ -16,6 +16,7 @@ from . import (
     notice_views,
     sales_terms_views,
     session_views,
+    statement_views,
     termination_views,
     views,
 )
@@ -104,6 +105,12 @@ shop = (
             "termination/",
             termination_views.VendorTerminationView.as_view(),
             name="termination",
+        ),
+        # The statements of reasons sent to the shop (DSA art. 17), read only.
+        path(
+            "statements/",
+            statement_views.VendorStatementsView.as_view(),
+            name="statements",
         ),
         path(
             "termination/data/",

@@ -406,3 +406,20 @@ def test_the_pages_render_under_the_ride_theme(
     html = signed_in.get(_urls(page)["edit"]).text
     assert 'name="recurrence"' in html
     assert 'name="title"' in html
+
+
+# --- The statements of reasons page (the hidden-event email links to it)
+
+
+def test_the_statements_page_lists_this_shops_statements_only(
+    signed_in: Client, vendor: Vendor
+) -> None:
+    from apps.compliance.tests.factories import StatementOfReasonsFactory
+
+    mine = StatementOfReasonsFactory.create(vendor=vendor, facts="Misleading dates.")
+    theirs = StatementOfReasonsFactory.create(facts="Someone else's facts.")
+    response = signed_in.get(reverse("manager:shop:statements"))
+    assert response.status_code == 200
+    assert str(mine.public_id) in response.text
+    assert "Misleading dates." in response.text
+    assert str(theirs.public_id) not in response.text

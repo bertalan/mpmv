@@ -3,6 +3,7 @@
 <body>
 <p>{% blocktranslate %}Platform staff hid your event {{ title }}: it is no longer shown on the site.{% endblocktranslate %}</p>
 <p>{% translate "Reason" %}: {{ reason }}</p>
-{% if dsa_notice_ref %}<p>{% blocktranslate %}This follows a notice (reference {{ dsa_notice_ref }}). You receive the statement of reasons in a separate email.{% endblocktranslate %}</p>{% endif %}
+{% if dsa_notice_ref %}<p>{% blocktranslate %}This follows a notice (reference {{ dsa_notice_ref }}).{% endblocktranslate %}</p>{% endif %}
+{% if statement_url %}<p><a href="{{ statement_url }}">{% translate "Read the statement of reasons" %}</a></p>{% endif %}
 </body>
 </html>

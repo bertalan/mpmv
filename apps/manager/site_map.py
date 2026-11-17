@@ -62,6 +62,7 @@ SHOP_PAGES: Final[Pages] = (
     (gettext_noop("Events"), "manager:shop:events"),
     (gettext_noop("Choose a vendor"), "manager:shop:vendor"),
     (gettext_noop("Termination notice"), "manager:shop:termination"),
+    (gettext_noop("Statements of reasons"), "manager:shop:statements"),
 )
 PLATFORM_PAGES: Final[Pages] = (
     (gettext_noop("Dashboard"), "manager:platform:dashboard"),

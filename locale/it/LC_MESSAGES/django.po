@@ -311,7 +311,7 @@ msgstr ""
 #: apps/events/templates/email/events/event_changes_requested/body.txt
 msgid "A moderator asked for changes to your event %(title)s before it can be published."
 msgstr ""
-"Un moderatore ha chiesto modifiche al tuo evento %(title)s prima che possa essere pubblicato."
+"Un moderatore ha chiesto modifiche al Suo evento %(title)s prima che possa essere pubblicato."
 
 #: apps/manager/event_image_form.py
 msgid "A name for the library, for example Our stand 2027. Optional."
@@ -1368,7 +1368,7 @@ msgstr ""
 
 #: apps/events/templates/email/events/event_changes_requested/subject.txt
 msgid "Changes requested on your event %(title)s"
-msgstr "Modifiche richieste al tuo evento %(title)s"
+msgstr "Modifiche richieste al Suo evento %(title)s"
 
 #: apps/manager/event_views.py
 msgid "Changes requested: %(comment)s"
@@ -2283,6 +2283,7 @@ msgstr ""
 "modello\"}]. Lascialo vuoto se non servono. Il tipo è uno tra: text, number, boolean."
 
 #: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/shop/statements.html
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Facts and circumstances"
 msgstr "Fatti e circostanze"
@@ -2517,6 +2518,7 @@ msgstr ""
 "visitatore può far scorrere di lato."
 
 #: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/shop/statements.html
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Ground"
 msgstr "Motivo giuridico"
@@ -3703,6 +3705,10 @@ msgstr "Preavviso di cessazione"
 msgid "Notice period (days)"
 msgstr "Durata del preavviso (giorni)"
 
+#: apps/manager/templates/manager/shop/statements.html
+msgid "Notice reference"
+msgstr "Riferimento della segnalazione"
+
 #: apps/manager/sections.py apps/manager/site_map.py
 msgid "Notices"
 msgstr "Segnalazioni"
@@ -4018,12 +4024,12 @@ msgstr "Apri la finestra passkey"
 #: apps/events/templates/email/events/event_approved/body.html
 #: apps/events/templates/email/events/event_restored/body.html
 msgid "Open the event"
-msgstr "Apri l'evento"
+msgstr "Apra l'evento"
 
 #: apps/events/templates/email/events/event_changes_requested/body.html
 #: apps/events/templates/email/events/event_changes_requested/body.txt
 msgid "Open the event to make the changes and submit it again"
-msgstr "Apri l'evento per fare le modifiche e inviarlo di nuovo"
+msgstr "Apra l'evento per fare le modifiche e inviarlo di nuovo"
 
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "Open the public page"
@@ -4031,7 +4037,7 @@ msgstr "Apri la pagina pubblica"
 
 #: apps/events/templates/email/events/review_digest/body.html
 msgid "Open the review list"
-msgstr "Apri l'elenco da revisionare"
+msgstr "Apra l'elenco da revisionare"
 
 #: apps/seo/templates/seo/consent/preferences.html
 msgid "Optional cookies on:"
@@ -4422,7 +4428,7 @@ msgstr "Staff della piattaforma"
 #: apps/events/templates/email/events/event_hidden/body.txt
 msgid "Platform staff hid your event %(title)s: it is no longer shown on the site."
 msgstr ""
-"Lo staff della piattaforma ha nascosto il tuo evento %(title)s: non è più visibile sul sito."
+"Lo staff della piattaforma ha nascosto il Suo evento %(title)s: non è più visibile sul sito."
 
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid ""
@@ -4446,7 +4452,7 @@ msgstr ""
 #: apps/events/templates/email/events/event_restored/body.txt
 msgid "Platform staff restored your event %(title)s: it is shown on the site again."
 msgstr ""
-"Lo staff della piattaforma ha ripristinato il tuo evento %(title)s: è di nuovo visibile sul sito."
+"Lo staff della piattaforma ha ripristinato il Suo evento %(title)s: è di nuovo visibile sul sito."
 
 #: apps/vendors/templates/email/vendors/profile_reverted/body.html
 #: apps/vendors/templates/email/vendors/profile_reverted/body.txt
@@ -4722,6 +4728,11 @@ msgstr "Preventivo richiesto"
 msgid "Read more and choose"
 msgstr "Scopri di più e scegli"
 
+#: apps/events/templates/email/events/event_hidden/body.html
+#: apps/events/templates/email/events/event_hidden/body.txt
+msgid "Read the statement of reasons"
+msgstr "Legga la motivazione della decisione"
+
 #: apps/orders/templates/email/orders/order_received/body.html
 msgid "Read this version online"
 msgstr "Leggi questa versione online"
@@ -4790,6 +4801,7 @@ msgid "Recovery codes"
 msgstr "Codici di recupero"
 
 #: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/statements.html
 msgid "Reference"
 msgstr "Riferimento"
 
@@ -5547,9 +5559,14 @@ msgstr "Inizia a fare acquisti"
 msgid "Starts at"
 msgstr "Inizia alle"
 
+#: apps/manager/templates/manager/shop/statements.html
+msgid "Statement of %(date)s"
+msgstr "Motivazione del %(date)s"
+
+#: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Statements of reasons"
-msgstr "Motivazioni"
+msgstr "Motivazioni delle decisioni"
 
 #: apps/seo/providers.py
 msgid "Statistics"
@@ -7293,6 +7310,10 @@ msgstr ""
 "I piani tra cui può scegliere un nuovo venditore, affiancati. Se non ne aggiungi, la pagina non "
 "mostra piani."
 
+#: apps/manager/templates/manager/shop/statements.html
+msgid "The platform has sent no statement of reasons for your shop."
+msgstr "La piattaforma non ha inviato alcuna motivazione per il Suo negozio."
+
 #: apps/manager/amendment_views.py
 msgid "the platform owner"
 msgstr "il titolare della piattaforma"
@@ -8265,12 +8286,8 @@ msgstr ""
 
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt
-msgid ""
-"This follows a notice (reference %(dsa_notice_ref)s). You receive the statement of reasons in a "
-"separate email."
-msgstr ""
-"Segue una segnalazione (riferimento %(dsa_notice_ref)s). Riceverai la motivazione della decisione "
-"in un'email separata."
+msgid "This follows a notice (reference %(dsa_notice_ref)s)."
+msgstr "Segue a una segnalazione (riferimento %(dsa_notice_ref)s)."
 
 #: apps/orders/templates/orders/customer_order.html
 msgid "This is your order reference, not an invoice. Each seller issues its own invoice."
@@ -8846,6 +8863,10 @@ msgstr "Sessioni utente"
 msgid "Uses a year"
 msgstr "Usa un anno"
 
+#: apps/manager/templates/manager/shop/statements.html
+msgid "Valid until"
+msgstr "Valida fino al"
+
 #: apps/orders/ui/present.py apps/orders/ui/views.py
 msgid "VAT"
 msgstr "IVA"
@@ -9086,6 +9107,10 @@ msgstr ""
 #: apps/manager/templates/manager/amendment.html
 msgid "What changes"
 msgstr "Cosa cambia"
+
+#: apps/manager/templates/manager/shop/statements.html
+msgid "What is restricted"
+msgstr "Che cosa è limitato"
 
 #: apps/compliance/forms.py
 msgid "What is restricted, where and for how long, in plain words. The vendor sees this text."
@@ -9880,20 +9905,20 @@ msgstr ""
 
 #: apps/events/templates/email/events/event_restored/subject.txt
 msgid "Your event %(title)s is back online"
-msgstr "Il tuo evento %(title)s è di nuovo online"
+msgstr "Il Suo evento %(title)s è di nuovo online"
 
 #: apps/events/templates/email/events/event_approved/subject.txt
 msgid "Your event %(title)s was approved"
-msgstr "Il tuo evento %(title)s è stato approvato"
+msgstr "Il Suo evento %(title)s è stato approvato"
 
 #: apps/events/templates/email/events/event_approved/body.html
 #: apps/events/templates/email/events/event_approved/body.txt
 msgid "Your event %(title)s was approved and is now published."
-msgstr "Il tuo evento %(title)s è stato approvato ed è ora pubblicato."
+msgstr "Il Suo evento %(title)s è stato approvato ed è ora pubblicato."
 
 #: apps/events/templates/email/events/event_hidden/subject.txt
 msgid "Your event %(title)s was hidden"
-msgstr "Il tuo evento %(title)s è stato nascosto"
+msgstr "Il Suo evento %(title)s è stato nascosto"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Your factors"

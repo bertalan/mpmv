@@ -812,14 +812,17 @@ def hide_event(
     reason: str,
     dsa_notice_ref: str = "",
     *,
+    statement_follows: bool = False,
     ctx: AuditContext | None = None,
     dry_run: bool = False,
 ) -> EventChangeSet:
     """Hide an event in every language: unpublish it, record who, when and why (spec 15).
 
-    Staff only, with a reason; `dsa_notice_ref` names the CMP.5 notice when there is one. A
-    review in progress is cancelled, so no approval publishes a hidden page. Only staff restore
-    it (`restore_event`).
+    Staff only, with a reason; `dsa_notice_ref` names the CMP.5 notice when there is one.
+    `statement_follows` is set by the CMP.5 flow (`issue_statement`), which stores the statement in
+    the same transaction: only then does the vendor's email link to it. A review in progress is
+    cancelled, so no approval publishes a hidden page. Only staff restore it
+    (`restore_event`).
     """
     _require_staff(staff)
     reason = (reason or "").strip()
@@ -857,6 +860,7 @@ def hide_event(
             fresh.hidden_at.isoformat() if fresh.hidden_at else "",
             reason=reason,
             dsa_notice_ref=dsa_notice_ref or "",
+            statement_url=notifications.statements_url(dsa_notice_ref) if statement_follows else "",
         )
     return changes
 

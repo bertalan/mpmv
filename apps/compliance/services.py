@@ -1387,7 +1387,13 @@ def _apply_restriction(
             ref = str(notice.public_id) if notice else ""
             return list(
                 hide_event(
-                    staff, target, facts, dsa_notice_ref=ref, ctx=ctx, dry_run=dry_run
+                    staff,
+                    target,
+                    facts,
+                    dsa_notice_ref=ref,
+                    statement_follows=True,
+                    ctx=ctx,
+                    dry_run=dry_run,
                 ).changes
             )
         if target_kind == "product":
