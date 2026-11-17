@@ -26,6 +26,7 @@ from apps.catalog.tests.factories import (
     TermFactory,
 )
 from apps.core.audit import AuditContext
+from apps.core.models import MediaImage
 from apps.core.tests.factories import ImageLicenceFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
@@ -77,6 +78,12 @@ def with_images(product: Product, *colors: str) -> None:
 def test_the_gallery_is_the_themed_component_with_picture_renditions(client: Client) -> None:
     product = live("mug")
     with_images(product, "red", "blue")
+    # A page never builds renditions (CAT.4): without the job it shows the originals.
+    bare = client.get("/product/mug/").content.decode()
+    assert 'type="image/webp"' not in bare
+    assert "<picture>" in bare
+    for image_id in MediaImage.objects.values_list("pk", flat=True):
+        media.render_renditions(image_id)  # the catalog.render_product_image job
     html = client.get("/product/mug/").content.decode()
     assert 'class="gallery"' in html
     assert html.count('<li class="gallery__item">') == 2
