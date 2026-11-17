@@ -775,6 +775,7 @@ msgstr "Aggiungi l'alias"
 #: apps/manager/templates/manager/platform/fitment_node_form.html
 msgid "Add the node"
 msgstr "Aggiungi il nodo"
+
 #: apps/events/templates/events/event_page.html
 msgid "Add to calendar"
 msgstr "Aggiungi al calendario"
@@ -850,6 +851,7 @@ msgstr "tutte le lingue"
 #: apps/manager/fitment_views.py
 msgid "All nodes"
 msgstr "Tutti i nodi"
+
 #: apps/events/templates/events/_filters.html
 msgid "All types"
 msgstr "Tutti i tipi"
@@ -977,6 +979,7 @@ msgstr "Risposta %(number)d"
 #: apps/manager/fitment_forms.py
 msgid "Any language"
 msgstr "Qualsiasi lingua"
+
 #: apps/events/templates/events/_filters.html
 msgid "Any month"
 msgstr "Qualsiasi mese"
@@ -1038,7 +1041,6 @@ msgstr "Chiedi a %(vendor)s informazioni su questo prodotto: non si vende online
 msgid "At the top level of the scheme."
 msgstr "Al livello più alto dello schema."
 
-#: apps/manager/event_forms.py
 #: apps/events/templates/events/event_page.html apps/manager/event_forms.py
 msgid "Attendance"
 msgstr "Partecipazione"
@@ -2971,6 +2973,7 @@ msgstr ""
 "I suoi figli (%(children)s), i suoi alias e tutto ciò che vi fa riferimento passano al nodo "
 "scelto. Il vecchio nome resta ricercabile e il vecchio identificativo continua a funzionare. I "
 "nodi sotto genitori diversi si uniscono dopo i loro genitori."
+
 #: apps/events/templates/events/event_page.html
 msgid "Join online"
 msgstr "Partecipa online"
@@ -3425,12 +3428,13 @@ msgstr "Nuovo prezzo unitario di %(title)s, EUR IVA esclusa (ora %(price)s)"
 msgid "Next"
 msgstr "Avanti"
 
-#: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
-msgid "No"
-msgstr "No"
 #: apps/events/templates/events/event_calendar.html
 msgid "Next month"
 msgstr "Mese successivo"
+
+#: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
+msgid "No"
+msgstr "No"
 
 #: apps/manager/templates/manager/forbidden.html
 msgid "No access"
@@ -4192,12 +4196,13 @@ msgstr "Le passkey richiedono JavaScript."
 msgid "Password"
 msgstr "Password"
 
-#: apps/manager/templates/manager/platform/fitment_node.html
-msgid "Path"
-msgstr "Percorso"
 #: apps/events/templates/events/_links.html apps/events/templates/events/event_past.html
 msgid "Past events"
 msgstr "Eventi passati"
+
+#: apps/manager/templates/manager/platform/fitment_node.html
+msgid "Path"
+msgstr "Percorso"
 
 #: apps/orders/templates/orders/confirmation.html
 msgid "Pay now"
@@ -4557,6 +4562,10 @@ msgstr "venditore professionale"
 msgid "Profiles per customer"
 msgstr "Profili per cliente"
 
+#: apps/events/models.py
+msgid "Promotion"
+msgstr "Promozione"
+
 #: apps/manager/fitment_views.py
 msgid "Proposals"
 msgstr "Proposte"
@@ -4564,9 +4573,6 @@ msgstr "Proposte"
 #: apps/manager/fitment_forms.py
 msgid "Proposed"
 msgstr "Proposto"
-#: apps/events/models.py
-msgid "Promotion"
-msgstr "Promozione"
 
 #: apps/catalog/taxonomy.py
 msgid "proposed by"
