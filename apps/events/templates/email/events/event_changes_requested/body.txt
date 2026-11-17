@@ -1,0 +1,7 @@
+{% load i18n %}{% blocktranslate %}A moderator asked for changes to your event {{ title }} before it can be published.{% endblocktranslate %}
+
+{% translate "Comment" %}: {{ comment }}
+
+{% translate "Open the event to make the changes and submit it again" %}:
+{{ action_url }}
+{% blocktranslate with expires=action_link_expires_at|date:"Y-m-d H:i" %}The link works once and expires on {{ expires }} (UTC).{% endblocktranslate %}

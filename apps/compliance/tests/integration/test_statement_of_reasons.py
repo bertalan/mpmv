@@ -28,7 +28,7 @@ from apps.core.tests.factories import PlatformOperatorFactory
 from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory
 from apps.vendors.models import Vendor
-from apps.vendors.tests.factories import VendorFactory
+from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -124,6 +124,35 @@ def test_a_hide_of_an_event_carries_the_notice_reference(staff: Any) -> None:
     assert event.dsa_notice_ref == str(notice.public_id)
     assert changes.statement is not None
     assert changes.statement.target_kind == "event"
+
+
+def test_a_notice_on_an_event_ends_with_the_page_gone_from_pages_and_feeds(
+    staff: Any, client: Client
+) -> None:
+    """EVT.11: unpublished, a statement of reasons, and out of pages and feeds."""
+    notice = NoticeFactory.create(
+        status=Notice.Status.ACTION_TAKEN, target_kind=Notice.TargetKind.EVENT
+    )
+    event = EventPageFactory.create(title="Scam fair")
+    VendorMemberFactory.create(vendor=event.vendor)
+    event.save_revision().publish()
+    event = EventPage.objects.get(pk=event.pk)
+    index = event.get_parent()
+    assert client.get(event.url).status_code == 200
+    changes = issue(
+        staff, target_kind="event", target_ref=str(event.public_id), notice_id=notice.public_id
+    )
+    stored = EventPage.objects.get(pk=event.pk)
+    assert not stored.live
+    assert stored.dsa_notice_ref == str(notice.public_id)
+    assert changes.statement is not None
+    assert StatementOfReasons.objects.filter(target_ref=event.public_id).count() == 1
+    assert client.get(event.url).status_code == 404
+    for suffix in ("feed.rss", "calendar.ics"):
+        assert "Scam fair" not in client.get(f"{index.url}{suffix}").content.decode()
+    hidden = OutboxEmail.objects.filter(template_key="events.event_hidden")
+    assert hidden.count() == 1
+    assert str(notice.public_id) in hidden[0].context
 
 
 def test_a_storefront_restriction_suspends_the_vendor(staff: Any) -> None:
