@@ -21,6 +21,7 @@ from .notice_views import can_review
 from .sales_terms_views import SECTION as SALES_TERMS_SECTION
 from .session_views import PANIC_SECTION, USER_SESSIONS_SECTION
 from .spaces import Space
+from .statement_views import SECTION as STATEMENTS_SECTION
 from .termination_views import PLATFORM_SECTION as TERMINATIONS_SECTION
 from .termination_views import SHOP_SECTION as TERMINATION_SECTION
 from .termination_views import can_give_notice
@@ -181,6 +182,15 @@ BUILT_IN = (
         _("Termination notice"),
         "manager:shop:termination",
         order=90,
+        allowed=anyone,
+    ),
+    # The statements of reasons the platform sent the shop: every member, read only.
+    Section(
+        STATEMENTS_SECTION,
+        Space.SHOP,
+        _("Statements of reasons"),
+        "manager:shop:statements",
+        order=91,
         allowed=anyone,
     ),
     # ORD.20 part 3: the staff tools on a paid order (Support and the platform owner).
