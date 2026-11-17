@@ -52,6 +52,7 @@ from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalManyToManyField
 from wagtail import blocks
 from wagtail.admin.panels import FieldPanel
+from wagtail.contrib.routable_page.models import RoutablePageMixin, path
 from wagtail.contrib.settings.models import BaseSiteSetting
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images import get_image_model_string
@@ -65,6 +66,7 @@ from wagtail.models import (
     WorkflowState,
     WorkflowTask,
 )
+from wagtail.url_routing import RouteResult
 from wagtail_localize.fields import SynchronizedField
 
 from apps.cms import roles
@@ -148,10 +150,11 @@ def event_blocks() -> list[tuple[str, blocks.Block]]:
 # --- Pages
 
 
-class EventIndexPage(Page):  # type: ignore[misc]  # Wagtail is untyped
+class EventIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]  # Wagtail is untyped
     """`/<lang>/events/`: one per language, under that language's home page.
 
-    The listing, calendar and feed routes come with EVT.6 and EVT.9.
+    Routes (EVT.6): the list (default), `calendar/YYYY-MM/` and `past/`. The feeds come with
+    EVT.9, the original-language fallback with EVT.8, the map with EVT.15.
     """
 
     intro = RichTextField(
@@ -172,14 +175,10 @@ class EventIndexPage(Page):  # type: ignore[misc]  # Wagtail is untyped
     class Meta:
         verbose_name = _("events index")
 
-    def events(self) -> list["EventPage"]:
+    def public_events(self) -> "models.QuerySet[EventPage]":
         """The live, public, not hidden events of an active vendor (or of the platform) in this
-        index's language, soonest first (spec 15 §Status).
-
-        A minimal list: the EVT.6 listing rules (upcoming only, filters, months, pagination,
-        the original-language fallback) replace it.
-        """
-        pages = (
+        index's language (spec 15 §Status): what every public page and feed starts from."""
+        pages: models.QuerySet[EventPage] = (
             EventPage.objects.child_of(self)
             .live()
             .public()
@@ -187,12 +186,29 @@ class EventIndexPage(Page):  # type: ignore[misc]  # Wagtail is untyped
             .filter(Q(vendor__isnull=True) | Q(vendor__status=Vendor.Status.ACTIVE))
             .select_related("vendor")
         )
-        return sorted(pages, key=lambda page: page.sort_key())
+        return pages
 
-    def get_context(self, request: HttpRequest, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        context: dict[str, Any] = super().get_context(request, *args, **kwargs)
-        context["events"] = self.events()
-        return context
+    def events(self) -> list["EventPage"]:
+        """The public events, soonest first."""
+        return sorted(self.public_events(), key=lambda page: page.sort_key())
+
+    @path("")  # type: ignore[untyped-decorator]
+    def list_view(self, request: HttpRequest) -> Any:
+        from apps.events import listing
+
+        return listing.render_list(self, request)
+
+    @path("calendar/<int:year>-<int:month>/")  # type: ignore[untyped-decorator]
+    def calendar_view(self, request: HttpRequest, year: int, month: int) -> Any:
+        from apps.events import listing
+
+        return listing.render_calendar(self, request, year, month)
+
+    @path("past/")  # type: ignore[untyped-decorator]
+    def past_view(self, request: HttpRequest) -> Any:
+        from apps.events import listing
+
+        return listing.render_past(self, request)
 
 
 class EventPageQuerySet(PageQuerySet, VendorScopedQuerySet["EventPage"]):  # type: ignore[misc]
@@ -875,14 +891,34 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
         return vendor is None or vendor.status == Vendor.Status.ACTIVE
 
     def route(self, request: HttpRequest, path_components: list[str]) -> Any:
-        """A hidden event, or one of a suspended or closed vendor, is a 404 to visitors.
+        """A hidden event, or one of a suspended or closed vendor, is a 404 to visitors, on the
+        page and on its `calendar.ics` alike.
 
         `route` serves public URLs only: Wagtail's admin and vendor-area previews call `serve`
         directly, so staff and the vendor still preview such a page.
         """
-        if not path_components and not self.is_publicly_visible():
+        if not self.is_publicly_visible():
             raise Http404
+        if path_components == [engine.ICS_PATH]:
+            if not self.live:  # Wagtail's own `live` check sits in `super().route()`, skipped here
+                raise Http404  # Wagtail's own routes always end in a slash
+            return RouteResult(self, kwargs={"ics": True})
         return super().route(request, path_components)
+
+    def get_context(self, request: HttpRequest, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        from apps.events import listing
+
+        context: dict[str, Any] = super().get_context(request, *args, **kwargs)
+        context.update(listing.event_context(self, request))
+        return context
+
+    def serve(self, request: HttpRequest, *args: Any, **kwargs: Any) -> Any:
+        """The page, or its single-event ICS download (EVT.6; the feeds and caching are EVT.9)."""
+        if kwargs.pop("ics", False):
+            from apps.events import listing
+
+            return listing.ics_response(self, request)
+        return super().serve(request, *args, **kwargs)
 
     # --- Display (templates)
 
@@ -895,6 +931,27 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
             return self.starts_at
         day = self.start_date or dt.date.max
         return dt.datetime.combine(day, dt.time.min, tzinfo=self.zone())
+
+    def recurrence_spec(self) -> engine.RecurrenceSpec:
+        return engine.RecurrenceSpec(
+            all_day=self.all_day,
+            timezone=self.timezone,
+            rrule=self.rrule,
+            starts_at=self.starts_at,
+            ends_at=self.ends_at,
+            start_date=self.start_date,
+            end_date=self.end_date,
+            exdates=tuple(self.exdates),
+            exdate_days=tuple(self.exdate_days),
+        )
+
+    def is_noindex(self, now: dt.datetime | None = None) -> bool:
+        """Cancelled, or ended more than 30 days ago (spec 15 "Public pages", Robots)."""
+        return engine.is_noindex(
+            self.recurrence_spec(),
+            cancelled=self.cancelled_at is not None,
+            now=now or timezone.now(),
+        )
 
     def has_address(self) -> bool:
         return any(getattr(self, name) for name in ("venue_name", "booth", *ADDRESS_FIELDS))

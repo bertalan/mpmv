@@ -1,0 +1,40 @@
+{% extends "layouts/content.html" %}
+{% load i18n wagtailcore_tags %}
+{% comment %}
+Month view (EVT.6): a server-rendered `<table>` with a caption, weekday column headers and the
+event links in the day cells, previous and next month links, the same filters. Below the small
+breakpoint the CSS shows the list of the month instead of the table. Always `noindex`.
+{% endcomment %}
+{% block head %}{% robots_meta robots %}{% endblock %}
+{% block title %}{{ month_start|date:"F Y" }} · {{ page.title }}{% endblock %}
+{% block page_content %}
+  <h1>{{ page.title }}: {{ month_start|date:"F Y" }}</h1>
+  {% include "events/_links.html" with current="calendar" %}
+  {% include "events/_filters.html" with form_action=request.path %}
+  <p class="event-nav">
+    {% if previous_url %}<a href="{{ previous_url }}" rel="prev">{% translate "Previous month" %}</a>{% endif %}
+    {% if next_url %}<a href="{{ next_url }}" rel="next">{% translate "Next month" %}</a>{% endif %}
+  </p>
+  <table class="calendar-table">
+    <caption>{% blocktranslate with month=month_start|date:"F Y" %}Events in {{ month }}{% endblocktranslate %}</caption>
+    <thead>
+      <tr>{% for cell in weekdays %}<th scope="col"><abbr title="{{ cell.day|date:'l' }}">{{ cell.day|date:"D" }}</abbr></th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+      {% for week in weeks %}
+        <tr>
+          {% for cell in week %}
+            <td class="calendar-day{% if not cell.in_month %} calendar-day--outside{% endif %}">
+              <time class="calendar-day__number" datetime="{{ cell.day|date:'Y-m-d' }}">{{ cell.day.day }}</time>
+              {% if cell.items %}<ul>{% for item in cell.items %}<li><a href="{% pageurl item.page %}">{{ item.page.title }}</a>{% if item.page.cancelled_at %} ({% translate "Cancelled" %}){% endif %}</li>{% endfor %}</ul>{% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <section class="calendar-list" aria-labelledby="calendar-list-title">
+    <h2 id="calendar-list-title">{% blocktranslate with month=month_start|date:"F Y" %}Events in {{ month }}{% endblocktranslate %}</h2>
+    {% for item in items %}{% include "events/_summary.html" %}{% empty %}<p>{% translate "No events this month." %}</p>{% endfor %}
+  </section>
+{% endblock %}

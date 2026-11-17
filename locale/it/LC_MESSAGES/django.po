@@ -36,6 +36,12 @@ msgstr "%(amount)s rimborsati."
 msgid "%(browser)s on %(system)s"
 msgstr "%(browser)s su %(system)s"
 
+#: apps/events/templates/events/_results.html
+msgid "%(counter)s event"
+msgid_plural "%(counter)s events"
+msgstr[0] "%(counter)s evento"
+msgstr[1] "%(counter)s eventi"
+
 #: apps/orders/templates/orders/_cart_mini.html
 msgid "%(counter)s item"
 msgid_plural "%(counter)s items"
@@ -769,6 +775,9 @@ msgstr "Aggiungi l'alias"
 #: apps/manager/templates/manager/platform/fitment_node_form.html
 msgid "Add the node"
 msgstr "Aggiungi il nodo"
+#: apps/events/templates/events/event_page.html
+msgid "Add to calendar"
+msgstr "Aggiungi al calendario"
 
 #: apps/catalog/templates/catalog/product.html
 msgid "Add to cart"
@@ -841,6 +850,13 @@ msgstr "tutte le lingue"
 #: apps/manager/fitment_views.py
 msgid "All nodes"
 msgstr "Tutti i nodi"
+#: apps/events/templates/events/_filters.html
+msgid "All types"
+msgstr "Tutti i tipi"
+
+#: apps/events/templates/events/_filters.html
+msgid "All vendors"
+msgstr "Tutti i venditori"
 
 #: apps/seo/admin_views.py
 msgid "Allow search engines to index this site"
@@ -961,6 +977,9 @@ msgstr "Risposta %(number)d"
 #: apps/manager/fitment_forms.py
 msgid "Any language"
 msgstr "Qualsiasi lingua"
+#: apps/events/templates/events/_filters.html
+msgid "Any month"
+msgstr "Qualsiasi mese"
 
 #: apps/orders/ui/forms.py
 msgid "Apartment, floor or other detail. Optional."
@@ -1020,6 +1039,7 @@ msgid "At the top level of the scheme."
 msgstr "Al livello più alto dello schema."
 
 #: apps/manager/event_forms.py
+#: apps/events/templates/events/event_page.html apps/manager/event_forms.py
 msgid "Attendance"
 msgstr "Partecipazione"
 
@@ -1139,6 +1159,10 @@ msgstr "In preparazione"
 msgid "block %(number)s, %(label)s"
 msgstr "blocco %(number)s, %(label)s"
 
+#: apps/events/templates/events/event_page.html
+msgid "Booth %(booth)s"
+msgstr "Stand %(booth)s"
+
 #: apps/manager/event_forms.py
 msgid "Booth or stand"
 msgstr "Stand"
@@ -1206,7 +1230,8 @@ msgstr "Annullamento"
 msgid "Cancellation policy"
 msgstr "Condizioni di annullamento"
 
-#: apps/orders/customer_views.py
+#: apps/events/templates/events/_summary.html apps/events/templates/events/event_calendar.html
+#: apps/events/templates/events/event_page.html apps/orders/customer_views.py
 msgid "Cancelled"
 msgstr "Annullato"
 
@@ -1491,6 +1516,10 @@ msgstr "Città"
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Clauses for approval by business buyers (art. 1341 Civil Code)"
 msgstr "Clausole da approvare da parte degli acquirenti professionali (art. 1341 Codice civile)"
+
+#: apps/events/templates/events/_filters.html
+msgid "Clear filters"
+msgstr "Rimuovi i filtri"
 
 #: themes/ride/templates/components/header.html
 msgid "Close"
@@ -2118,9 +2147,18 @@ msgstr "Errore"
 msgid "Event"
 msgstr "Evento"
 
-#: apps/manager/sections.py apps/manager/site_map.py apps/manager/templates/manager/shop/events.html
+#: apps/events/templates/events/_links.html
+msgid "Event views"
+msgstr "Viste degli eventi"
+
+#: apps/events/listing.py apps/events/templates/events/_results.html apps/manager/sections.py
+#: apps/manager/site_map.py apps/manager/templates/manager/shop/events.html
 msgid "Events"
 msgstr "Eventi"
+
+#: apps/events/templates/events/event_calendar.html
+msgid "Events in %(month)s"
+msgstr "Eventi di %(month)s"
 
 #: apps/manager/templates/manager/platform/map.html
 msgid ""
@@ -2218,6 +2256,10 @@ msgstr "File"
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filter"
 msgstr "Filtra"
+
+#: apps/events/templates/events/_filters.html
+msgid "Filter events"
+msgstr "Filtra gli eventi"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/terminations.html
@@ -2794,9 +2836,13 @@ msgstr "lotto di importazione"
 msgid "in force"
 msgstr "in vigore"
 
-#: apps/manager/amendment_forms.py
+#: apps/events/models.py apps/manager/amendment_forms.py
 msgid "In person"
 msgstr "Di persona"
+
+#: apps/events/models.py
+msgid "In person and online"
+msgstr "Di persona e online"
 
 #: apps/manager/event_forms.py
 msgid "In person, online or both. Required except for a promotion, which has no place."
@@ -2925,6 +2971,9 @@ msgstr ""
 "I suoi figli (%(children)s), i suoi alias e tutto ciò che vi fa riferimento passano al nodo "
 "scelto. Il vecchio nome resta ricercabile e il vecchio identificativo continua a funzionare. I "
 "nodi sotto genitori diversi si uniscono dopo i loro genitori."
+#: apps/events/templates/events/event_page.html
+msgid "Join online"
+msgstr "Partecipa online"
 
 #: apps/manager/templates/manager/shop/event_block_remove.html
 msgid "Keep it"
@@ -3271,6 +3320,14 @@ msgstr "Lunedì"
 msgid "Money"
 msgstr "Denaro"
 
+#: apps/events/templates/events/_filters.html
+msgid "Month"
+msgstr "Mese"
+
+#: apps/events/templates/events/_links.html
+msgid "Month calendar"
+msgstr "Calendario del mese"
+
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Move down"
 msgstr "Sposta giù"
@@ -3371,6 +3428,9 @@ msgstr "Avanti"
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "No"
 msgstr "No"
+#: apps/events/templates/events/event_calendar.html
+msgid "Next month"
+msgstr "Mese successivo"
 
 #: apps/manager/templates/manager/forbidden.html
 msgid "No access"
@@ -3383,6 +3443,14 @@ msgstr "Nessuna modifica"
 #: apps/manager/event_block_forms.py
 msgid "No event"
 msgstr "Nessun evento"
+
+#: apps/events/templates/events/event_index_page.html
+msgid "No events are planned at the moment."
+msgstr "Al momento non ci sono eventi in programma."
+
+#: apps/events/templates/events/event_calendar.html
+msgid "No events this month."
+msgstr "Nessun evento questo mese."
 
 #: apps/manager/event_block_forms.py
 msgid "No image"
@@ -3407,6 +3475,10 @@ msgstr "Nessun ordine ha questo numero."
 #: apps/accounts/mfa_views.py
 msgid "no passkey registered"
 msgstr "nessuna passkey registrata"
+
+#: apps/events/templates/events/event_past.html
+msgid "No past events."
+msgstr "Nessun evento passato."
 
 #: apps/accounts/mfa_views.py
 msgid "no pending passkey authentication"
@@ -3726,6 +3798,10 @@ msgstr "Una o due frasi sotto il titolo. Se la lasci vuota, c'è solo il titolo.
 msgid "Onerous clauses"
 msgstr "Clausole onerose"
 
+#: apps/events/models.py apps/events/templates/events/event_page.html
+msgid "Online"
+msgstr "Online"
+
 #: apps/manager/event_forms.py
 msgid "Online link"
 msgstr "Link online"
@@ -4005,7 +4081,7 @@ msgstr "Gli ordini non sono ancora aperti. Il tuo carrello viene conservato."
 msgid "Orders"
 msgstr "Ordini"
 
-#: apps/manager/amendment_forms.py
+#: apps/events/models.py apps/manager/amendment_forms.py
 msgid "Other"
 msgstr "Altro"
 
@@ -4119,6 +4195,9 @@ msgstr "Password"
 #: apps/manager/templates/manager/platform/fitment_node.html
 msgid "Path"
 msgstr "Percorso"
+#: apps/events/templates/events/_links.html apps/events/templates/events/event_past.html
+msgid "Past events"
+msgstr "Eventi passati"
 
 #: apps/orders/templates/orders/confirmation.html
 msgid "Pay now"
@@ -4399,6 +4478,10 @@ msgstr "Anteprima: %(action)s"
 msgid "Previous"
 msgstr "Indietro"
 
+#: apps/events/templates/events/event_calendar.html
+msgid "Previous month"
+msgstr "Mese precedente"
+
 #: apps/catalog/templates/catalog/product.html
 msgid "Price and availability"
 msgstr "Prezzo e disponibilità"
@@ -4481,6 +4564,9 @@ msgstr "Proposte"
 #: apps/manager/fitment_forms.py
 msgid "Proposed"
 msgstr "Proposto"
+#: apps/events/models.py
+msgid "Promotion"
+msgstr "Promozione"
 
 #: apps/catalog/taxonomy.py
 msgid "proposed by"
@@ -4719,6 +4805,10 @@ msgstr "Segnala contenuti illegali"
 #: apps/seo/site_links.py
 msgid "Report illegal content (DSA)"
 msgstr "Segnala contenuti illegali (DSA)"
+
+#: apps/events/templates/events/event_page.html
+msgid "Report this event"
+msgstr "Segnala questo evento"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
@@ -5127,6 +5217,10 @@ msgstr "Preavviso più breve perché"
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Show all"
 msgstr "Mostra tutto"
+
+#: apps/events/templates/events/_filters.html
+msgid "Show events"
+msgstr "Mostra gli eventi"
 
 #: apps/cms/choosers.py
 msgid "Show only the products of one brand."
@@ -8472,6 +8566,10 @@ msgstr "Numero di tracciamento"
 msgid "Tracking number: %(number)s"
 msgstr "Numero di tracciamento: %(number)s"
 
+#: apps/events/models.py
+msgid "Trade fair or meeting"
+msgstr "Fiera o incontro"
+
 #: apps/manager/event_forms.py
 msgid "Tuesday"
 msgstr "Martedì"
@@ -8505,6 +8603,7 @@ msgstr "La verifica in due passaggi è attiva"
 msgid "Two-factor settings"
 msgstr "Impostazioni della verifica in due passaggi"
 
+#: apps/events/templates/events/_filters.html apps/events/templates/events/event_page.html
 #: apps/manager/event_forms.py
 msgid "Type"
 msgstr "Tipo"
@@ -8565,6 +8664,10 @@ msgstr "Fino a due pulsanti sulla slide. Se non ne aggiungi, la slide non ha pul
 #: apps/cms/blocks.py
 msgid "Up to two buttons under the text. If you add none, the banner has no buttons."
 msgstr "Fino a due pulsanti sotto il testo. Se non ne aggiungi, il banner non ha pulsanti."
+
+#: apps/events/templates/events/_links.html
+msgid "Upcoming events"
+msgstr "Prossimi eventi"
 
 #: apps/orders/templates/orders/_cart_body.html
 msgid "Update cart"
@@ -8645,6 +8748,7 @@ msgstr "IVA inclusa nel totale"
 msgid "VAT number"
 msgstr "Partita IVA"
 
+#: apps/events/templates/events/_filters.html apps/events/templates/events/event_page.html
 #: apps/manager/templates/manager/layout.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/dashboard.html
@@ -9007,7 +9111,8 @@ msgstr ""
 "Che cosa limiti: un prodotto viene rimosso dalla pubblicazione, un evento viene nascosto, il "
 "negozio di un venditore viene sospeso."
 
-#: apps/manager/event_forms.py apps/manager/templates/manager/shop/events.html
+#: apps/events/templates/events/event_page.html apps/manager/event_forms.py
+#: apps/manager/templates/manager/shop/events.html
 msgid "When"
 msgstr "Quando"
 
@@ -9143,7 +9248,7 @@ msgid "When you place the order we hold the items for you. Payment follows in th
 msgstr ""
 "Quando confermi l'ordine riserviamo gli articoli per te. Il pagamento segue nel passo successivo."
 
-#: apps/manager/event_forms.py
+#: apps/events/templates/events/event_page.html apps/manager/event_forms.py
 msgid "Where"
 msgstr "Dove"
 

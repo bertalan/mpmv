@@ -1,0 +1,35 @@
+{% load i18n %}{% comment %}
+Filters of the events list, the month view and the archive (EVT.6): a plain GET form, so it works
+without JavaScript. Every control has a visible label. Context: `list_url` (the form action),
+`filters`, `event_types`, and for the list `options` (the vendors and months that have events).
+{% endcomment %}
+<form class="event-filters" method="get" action="{{ form_action }}" aria-labelledby="event-filters-title">
+  <h2 id="event-filters-title" class="visually-hidden">{% translate "Filter events" %}</h2>
+  {% if options.vendors %}
+  <div class="field">
+    <label for="event-filter-vendor">{% translate "Vendor" %}</label>
+    <select id="event-filter-vendor" name="vendor">
+      <option value="">{% translate "All vendors" %}</option>
+      {% for slug, name in options.vendors %}<option value="{{ slug }}"{% if slug == filters.vendor %} selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  <div class="field">
+    <label for="event-filter-type">{% translate "Type" %}</label>
+    <select id="event-filter-type" name="type">
+      <option value="">{% translate "All types" %}</option>
+      {% for value, label in event_types %}<option value="{{ value }}"{% if value == filters.type %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  {% if options.months %}
+  <div class="field">
+    <label for="event-filter-month">{% translate "Month" %}</label>
+    <select id="event-filter-month" name="month">
+      <option value="">{% translate "Any month" %}</option>
+      {% for value, first_day in options.months %}<option value="{{ value }}"{% if value == filters.month %} selected{% endif %}>{{ first_day|date:"F Y" }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  {% include "components/button.html" with label=_("Show events") type="submit" only %}
+  {% if filters.vendor or filters.type or filters.month %}<a href="{{ form_action }}">{% translate "Clear filters" %}</a>{% endif %}
+</form>
