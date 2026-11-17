@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pytest
 from django.test import Client
+from django.utils import translation
+from django.utils.translation import gettext
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
@@ -24,7 +26,11 @@ from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
-NOTICE = "not available in this language"
+
+def switch_notice(language: str) -> str:
+    """The switch notice as the page shows it in `language` (the catalogs translate it)."""
+    with translation.override(language):
+        return gettext("This content is not available in this language.")
 
 
 def _lang(page: Page, code: str) -> None:
@@ -58,7 +64,7 @@ def test_an_untranslated_page_falls_back_to_the_home_with_a_notice(
     page.locator('nav.language-switcher button[value="fr"]').click()
     expect(page).to_have_url(f"{live_server.url}/fr/")
     _lang(page, "fr")
-    expect(page.locator(".site-messages")).to_contain_text(NOTICE)
+    expect(page.locator(".site-messages")).to_contain_text(switch_notice("fr"))
     shot("fr-notice")
     page.reload()
     expect(page.locator(".site-messages")).to_have_count(0)
