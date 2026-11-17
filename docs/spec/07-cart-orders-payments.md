@@ -643,8 +643,8 @@ the same CMP.24 approval.
   hours, silence is a refusal; on refusal the vendor ships the original order or cancels it with a
   full refund and the refund fee; **anti-abuse rule**: the vendor must not systematically propose
   price increases after payment to get around its catalogue prices ("bait pricing"), a serious
-  breach under the vendor-terms suspension clause (letter "[x]" until set), with suspension under
-  the P2B rules (statement of reasons, CMP.5); clause (l) is approved with the second signature
+  breach under the vendor-terms suspension clause (m) "Limitazione, sospensione e cessazione",
+  with suspension under the P2B rules (statement of reasons, CMP.5); clause (l) is approved with the second signature
   (arts. 1341 and 1342 c.c., counsel 2026-11-16); the
   correction of invoices already issued is the vendor's alone. Staff see, per vendor, the count of
   price-increase proposals and their acceptance rate (ORD.22) to apply it.

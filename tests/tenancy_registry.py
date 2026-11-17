@@ -34,6 +34,8 @@ from apps.catalog.models import (
     PriceHistory,
     Product,
     ProductAttribute,
+    ProductImage,
+    ProductImageTranslation,
     ProductTranslation,
     SkuAlias,
     SlugHistory,
@@ -46,6 +48,8 @@ from apps.catalog.tests.factories import (
     PriceHistoryFactory,
     ProductAttributeFactory,
     ProductFactory,
+    ProductImageFactory,
+    ProductImageTranslationFactory,
     ProductTranslationFactory,
     SlugHistoryFactory,
     TaxonomyFactory,
@@ -237,6 +241,12 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ),
     BrandBatch: lambda vendor: BrandBatchFactory.create(vendor=vendor),
     SkuAlias: lambda vendor: renamed_product_alias(vendor),
+    ProductImage: lambda vendor: ProductImageFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    ProductImageTranslation: lambda vendor: ProductImageTranslationFactory.create(
+        product_image__product=ProductFactory.create(vendor=vendor)
+    ),
     ProductAttribute: lambda vendor: ProductAttributeFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
