@@ -124,7 +124,7 @@ def test_the_platform_ics_parses_and_has_the_calendar_properties() -> None:
 def test_vendor_and_type_feeds_filter_by_scope() -> None:
     client = Client()
     mine = _event(10, title="Mine")
-    _event(11, title="Theirs", event_type=EventPage.EventType.PROMOTION)
+    _event(11, title="Theirs", promotion=True)
     base = _index_path()
     vendor = mine.vendor
     assert vendor is not None
@@ -150,7 +150,7 @@ def test_a_feed_holds_at_most_500_items() -> None:
 # --- Case 12: hidden, draft and pending events are in no feed
 
 
-def _all_titles(client: Client, vendor: Vendor, kind: str = "fair") -> dict[str, list[str]]:
+def _all_titles(client: Client, vendor: Any, kind: str = "fair") -> dict[str, list[str]]:
     base = _index_path()
     scopes = ("", f"vendor/{vendor.slug}/", f"type/{kind}/")
     found: dict[str, list[str]] = {}
@@ -282,9 +282,7 @@ def test_no_feed_contains_an_email_a_phone_or_a_member_name() -> None:
     page = _event(10, title="Private fair", located=True)
     vendor = page.vendor
     assert vendor is not None
-    member = User.objects.create(
-        email="secret.member@example.test", first_name="Zoltan", last_name="Quxbar"
-    )
+    member = User.objects.create(email="secret.member@example.test", full_name="Zoltan Quxbar")
     page.owner = member
     page.save()
     page.save_revision().publish()
@@ -370,6 +368,7 @@ def test_the_31st_request_in_a_minute_from_one_ip_gets_429_with_retry_after() ->
 
 def test_a_304_answer_counts_towards_the_limit() -> None:
     client = Client()
+    _event(10)
     path = _index_path() + "feed.rss"
     etag = client.get(path, REMOTE_ADDR="203.0.113.9")["ETag"]
     for _ in range(29):

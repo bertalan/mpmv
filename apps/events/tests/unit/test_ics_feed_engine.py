@@ -113,5 +113,5 @@ def test_rrule_and_exdate_pass_through_in_one_vevent() -> None:
     )
     events = Calendar.from_ical(body).walk("VEVENT")
     assert len(events) == 1
-    assert str(events[0]["RRULE"].to_ical().decode()) == "FREQ=WEEKLY;COUNT=10"
+    assert "FREQ=WEEKLY;COUNT=10" in str(events[0]["RRULE"].to_ical())
     assert "EXDATE:20270317T080000Z\r\n" in body

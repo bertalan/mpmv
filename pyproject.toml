@@ -27,13 +27,13 @@ dependencies = [
   "weasyprint==70.0",
   "polib>=1.2",  # gettext catalogs: tools/i18n_catalog.py, i18n review files (I18N.13)
   "openpyxl>=3.1.5",  # XLSX review files (I18N.13); already pulled in by Wagtail
-  "icalendar>=7.3.0",
 ]
 
 [dependency-groups]
 dev = [
   "pytest>=8.4",
   "pytest-django>=4.11",
+  "icalendar>=7.3.0",  # parses every ICS feed in the tests (EVT.9); the serializer is ours
   "pytest-cov>=6.2",
   "ruff>=0.13",
   "mypy>=1.18",

@@ -961,8 +961,9 @@ ENDPOINTS: dict[str, Access] = {
         "every visitor; no vendor data."
     ),
     "events_resource": NoVendorData(
-        "File-like routes of public event pages (EVT.6): the single-event ICS of a published "
-        "event, the same for every visitor; hidden events are a 404.",
+        "File-like routes of public event pages (EVT.6, EVT.9): the single-event ICS and the RSS "
+        "and ICS feeds (platform, vendor, type), the same for every visitor; hidden events are a "
+        "404 and in no feed.",
         kwargs={"path": "events/no-such-event/calendar.ics"},
     ),
     "wagtail_serve": NoVendorData(
