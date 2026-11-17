@@ -164,12 +164,26 @@ def test_escape_closes_an_open_dropdown_before_the_offcanvas(
     page: Page, live_server: LiveServer
 ) -> None:
     open_home(page, live_server, 360)
+    # Wait for Bootstrap's own "shown" events: a key pressed while the offcanvas is still in its
+    # show transition can be lost when Bootstrap moves the focus into the panel.
+    page.evaluate(
+        """() => {
+            window.__shown = {offcanvas: false, dropdown: false};
+            const seen = window.__shown;
+            document.getElementById("site-offcanvas")
+                .addEventListener("shown.bs.offcanvas", () => { seen.offcanvas = true; });
+            document.addEventListener("shown.bs.dropdown", () => { seen.dropdown = true; });
+        }"""
+    )
     page.locator(".nav-toggle").click()
+    page.wait_for_function("() => window.__shown.offcanvas")
     panel = page.locator("#site-offcanvas")
     expect(panel).to_be_visible()
     sub_toggle = page.locator("[data-bs-toggle='dropdown']")
     sub_toggle.focus()
+    expect(sub_toggle).to_be_focused()
     page.keyboard.press("Enter")
+    page.wait_for_function("() => window.__shown.dropdown")
     expect(sub_toggle).to_have_attribute("aria-expanded", "true")
     expect(page.locator("#site-offcanvas .dropdown-menu.show")).to_be_visible()
     # Bootstrap handles Escape in both the dropdown and the offcanvas, and which one acts first is

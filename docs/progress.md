@@ -1077,7 +1077,20 @@ Compliance, security and content:
 | #580 | VEN.13, VEN.16, CMP.5 | Spec: clause (l) counsel answer |
 | #585 | SEO.5, MIG.22 | Spec: Matomo replaces Google Analytics; domains, mail and TLS at cutover |
 | #589 | CAT.22, CAT.23, VEN.40, SEO.13 to SEO.15, I18N.16 to I18N.18, CMS.17 | Spec: follow-up rows from the SEO.1, I18N.6 and THM.15 reviews |
-| (this PR) | none | Coherence check 35 |
+| #561 | SEO.1 | Product structured data, breadcrumb, return and shipping nodes, canonical |
+| #563 | I18N.6 | hreflang, canonical and per-language sitemaps without fallback copies |
+| #571 | THM.14 | Ride carousels (1/3: hero slider, strips, gallery) |
+| #572 | FIT.1 | Manager pages for the fitment scheme, nodes and categories (2/2) |
+| #573 | none | Spec: D-48 accounting connector, data flow to vendors' accounting software |
+| #575 | SEO.2 | Per-type sitemaps and generated `llms.txt` (a page's own `noindex` keeps it out) |
+| #576 | EVT.6 | Public event pages: list, filters, calendar, archive, event page, ICS |
+| #578 | I18N.15 | `change_languages` command, language redirects, check `core.E914` (`core/0029`) |
+| #579 | THM.14 | Ride reveal, counters, progress, section title, countdown, video modal (2/3) |
+| #582 | I18N.15 | Non-English integration suite: country-group seed with a non-English primary language |
+| #591 | THM.14 | CMS wiring: hero layouts and slides, strip blocks, showcase blocks (3/3; `cms/0019` to `0021`) |
+| #593 | none | Coherence check 35 |
+| #597 | I18N.15 | Tests independent of English (non-English integration run) |
+| (this PR) | none | Coherence check 36 |
 
 ## Coherence checks
 
@@ -2250,3 +2263,35 @@ Findings and actions:
 Human review needed: ORD.20 3a and ORD.22 (money: the cancel-cause refund-fee rule, restock, the ledger 0007 fee exclusion for a customer's request or a platform error, the passkey for refunds); CMP.34 thresholds (tax); clause (l) and the P2B waiver wording (legal, counsel); Matomo without consent (legal, privacy).
 
 Verdict: GO with follow-ups. No blocker.
+
+### Coherence check 36 (main at b6241cbe)
+
+Scope: the merges after check 35 (main at 08800668), the first-parent chain being train merges: #561, #563, #571, #572, #573, #575, #576, #578, #579, #582, #591, #593 and #597 (50 commits, 247 files). #589 was already in check 35.
+
+| Area | Result |
+|---|---|
+| Migrations | Linear, no duplicate number in any app: core 0028 then 0029 (`site_languages`), cms 0018 then 0019, 0020, 0021, shipping 0004 then 0005 (data seed of country groups). Ledger stays at 0007, fitment and events have no new migration. `makemigrations --check` reports no changes |
+| Spec and backlog | `make docs` in a clean worktree at the sha gives no diff in `backlog.csv`, `90-backlog.md` or the generated docs |
+| Progress rows | Missing for #561, #563, #571, #572, #573, #575, #576, #578, #579, #582, #591, #593 and #597; added with the PR table. #575, #579 and #591 show as closed on GitHub because the train PRs merged their commits |
+| Anonymization | The diff adds no credential-like literal, no real vendor name and no hostname. The only external origins are the two public no-tracking video hosts (see below). The CMP.35 commit adds a gitleaks ignore for a false positive in an earlier spec commit |
+| Gates | `make check` pass at the sha. Unit, integration and e2e suites not run locally; CI and the non-English nightly job are the gate |
+
+Operator notes for STAGE v0.1.17:
+
+1. New environment variables: none in the application. The only new `MPMV_LANGUAGES` use is the CI job (`it,de`); the setting itself exists since #321.
+2. Migrations to apply: `core/0029_site_languages`, `cms/0019_hero_layout_strip`, `cms/0020_showcase_blocks`, `cms/0021_standard_page_noindex`, `shipping/0005_seed_country_groups`. All run in order on a database at core 0028, cms 0018 and shipping 0004.
+3. New management command: `change_languages` (I18N.15, #578): changes the site languages and records language redirects. A removed language keeps same-site redirects only.
+4. CSP: `frame-src` is not a setting. The origins `https://www.youtube-nocookie.com` and `https://player.vimeo.com` are the constant `VIDEO_EMBED_ORIGINS` in `apps/cms/engine.py`; `VideoEmbedCspMiddleware` adds them only on responses that render a video block. Nothing to configure; a reverse proxy must not set its own stricter `frame-src`.
+5. Matomo and analytics: no setting added. #585 (Matomo replaces Google Analytics) is spec only; the banner and consent log of SEO.5 stay until counsel answers (MQ-46).
+6. Sitemaps are now per type and per language, and `llms.txt` is generated (SEO.2); sitemap chunks refill their cache after the deploy.
+
+Findings and actions:
+
+1. Minor, fixed here: 13 PRs without a `progress.md` row.
+2. Minor, open: the task table rows for I18N.15 and FIT.1 still say "partial" with the command and the Manager pages open; both are built now (#578, #572).
+3. Minor, open: #576 (EVT.6) shows as open on GitHub although train #605 merged it.
+4. Info: Matomo and consent-free analytics wait for MQ-46; D-48 (#573) is spec only.
+
+Human review needed: none new in tax, payments or ledger. The public event and showcase pages and the CSP change for video embeds are for the release smoke test.
+
+Verdict: GO. No blocker.
