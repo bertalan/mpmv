@@ -44,6 +44,7 @@ from apps.cms.tests.factories import LegalPageFactory, LegalPageReviewFactory
 from apps.core.audit import AuditContext
 from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import AuditLog
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -184,7 +185,7 @@ def test_the_seed_publishes_placeholders_of_the_five_pages_in_every_language(
         (kind, code) for kind in GO_LIVE_LEGAL_KINDS for code in configured_languages()
     }
     assert len(report.created) == len(GO_LIVE_LEGAL_KINDS) * len(configured_languages())
-    italian_terms = live.get(kind="terms", locale__language_code="it")
+    italian_terms = live.get(kind="terms", locale__language_code=other_language())
     assert italian_terms.title == "Condizioni di vendita"
     english_terms = live.get(kind="terms", locale__language_code=primary_language())
     assert italian_terms.translation_key == english_terms.translation_key
@@ -200,7 +201,7 @@ def test_the_seed_publishes_placeholders_of_the_five_pages_in_every_language(
 
 def test_a_placeholder_says_it_is_not_a_legal_text(client: Client, seeded: SeedReport) -> None:
     seed_site(legal_placeholders=True)
-    page = LegalPage.objects.live().get(kind="withdrawal", locale__language_code="de")
+    page = LegalPage.objects.live().get(kind="withdrawal", locale__language_code=third_language())
 
     html = client.get(page.url).content.decode()
 
@@ -307,7 +308,7 @@ def test_the_page_is_marked_as_a_draft_until_counsel_has_checked_it(
 
 def _italian(english: LegalPage) -> LegalPage:
     page: LegalPage = LegalPage.objects.get(
-        translation_key=english.translation_key, locale__language_code="it"
+        translation_key=english.translation_key, locale__language_code=other_language()
     )
     return page
 
@@ -329,7 +330,7 @@ def test_a_translator_sets_the_translations_own_date_while_sync_stays_on(
             title="Terms of sale", effective_date=dt.date(2027, 1, 1), live=False
         )
     )
-    translate_page(english, ["it"], user=editor)
+    translate_page(english, [other_language()], user=editor)
     italian = _italian(english)
 
     set_legal_effective_date(italian, dt.date(2027, 3, 1), user=editor, ctx=CTX)
@@ -371,7 +372,7 @@ def test_a_sync_of_a_newer_source_text_does_not_backdate_the_translation(
     english = _publish(
         LegalPageFactory.create(title="Terms of sale", effective_date=first, live=False)
     )
-    translate_page(english, ["it"], user=editor)
+    translate_page(english, [other_language()], user=editor)
     italian = _italian(english)
     assert italian.effective_date == first
 
@@ -396,7 +397,7 @@ def test_a_translators_date_is_checked_and_can_be_dry_run(seeded: SeedReport, ed
             title="Terms of sale", effective_date=dt.date(2027, 3, 1), live=False
         )
     )
-    translate_page(english, ["it"], user=editor)
+    translate_page(english, [other_language()], user=editor)
     italian = _italian(english)
 
     changes = set_legal_effective_date(
@@ -421,7 +422,7 @@ def test_staff_set_a_translations_date_from_the_command_line(
     seeded: SeedReport, editor: User
 ) -> None:
     english = _publish(LegalPageFactory.create(title="Terms of sale", live=False))
-    translate_page(english, ["it"], user=editor)
+    translate_page(english, [other_language()], user=editor)
     italian = _italian(english)
     out = io.StringIO()
     args = [str(italian.pk), "2027-04-01"]

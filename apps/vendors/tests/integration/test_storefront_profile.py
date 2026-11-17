@@ -23,6 +23,7 @@ from apps.vendors.tests.factories import (
     VendorMemberFactory,
     VendorTranslationFactory,
 )
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -58,7 +59,7 @@ def test_the_owner_changes_the_texts_and_policies(vendor: Vendor, owner: User) -
 
 def test_a_language_without_a_row_gets_one(vendor: Vendor, owner: User) -> None:
     save_storefront_profile(vendor, "it", {"tagline": "Ciao"}, actor=owner, ctx=CTX)
-    assert VendorTranslation.objects.get(vendor=vendor, language="it").tagline == "Ciao"
+    assert VendorTranslation.objects.get(vendor=vendor, language=other_language()).tagline == "Ciao"
 
 
 def test_the_audit_entry_has_before_and_after_and_names_the_vendor(
@@ -224,18 +225,27 @@ def test_saving_a_machine_draft_without_edits_does_not_publish_it(
     vendor: Vendor, owner: User
 ) -> None:
     _operator(support_email="help@platform.example")
-    VendorTranslationFactory.create(vendor=vendor, language="it", tagline="Bozza", status="machine")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=other_language(), tagline="Bozza", status="machine"
+    )
     changes = save_storefront_profile(vendor, "it", {"tagline": "Bozza"}, actor=owner, ctx=CTX)
     assert changes.is_empty
-    assert VendorTranslation.objects.get(vendor=vendor, language="it").status == "machine"
+    assert (
+        VendorTranslation.objects.get(vendor=vendor, language=other_language()).status == "machine"
+    )
     assert not OutboxEmail.objects.exists()
 
 
 def test_an_edit_publishes_the_draft_and_notifies(vendor: Vendor, owner: User) -> None:
     _operator(support_email="help@platform.example")
-    VendorTranslationFactory.create(vendor=vendor, language="it", tagline="Bozza", status="machine")
+    VendorTranslationFactory.create(
+        vendor=vendor, language=other_language(), tagline="Bozza", status="machine"
+    )
     save_storefront_profile(vendor, "it", {"tagline": "Nuovo"}, actor=owner, ctx=CTX)
-    assert VendorTranslation.objects.get(vendor=vendor, language="it").status == "published"
+    assert (
+        VendorTranslation.objects.get(vendor=vendor, language=other_language()).status
+        == "published"
+    )
     assert OutboxEmail.objects.count() == 1
 
 
@@ -246,7 +256,11 @@ def test_a_source_language_edit_that_stales_other_languages_is_audited(
         vendor=vendor, language=primary_language(), tagline="Hi", status="published"
     )
     it = VendorTranslationFactory.create(
-        vendor=vendor, language="it", tagline="Ciao", status="published", source_hash="old"
+        vendor=vendor,
+        language=other_language(),
+        tagline="Ciao",
+        status="published",
+        source_hash="old",
     )
     save_storefront_profile(vendor, "en", {"tagline": "Hello"}, actor=owner, ctx=CTX)
     it.refresh_from_db()
@@ -260,7 +274,7 @@ def test_a_source_language_edit_that_stales_other_languages_is_audited(
 
 
 def test_no_stale_entry_when_other_languages_are_untouched(vendor: Vendor, owner: User) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="it", status="machine")
+    VendorTranslationFactory.create(vendor=vendor, language=other_language(), status="machine")
     save_storefront_profile(vendor, "en", {"tagline": "Hello"}, actor=owner, ctx=CTX)
     assert not AuditLog.objects.filter(action="vendor.profile_translation_stale").exists()
 
@@ -379,7 +393,7 @@ def test_the_policy_headings_are_translated_in_italian(vendor: Vendor) -> None:
         refund_policy="Refunds in 14 days",
         cancellation_policy="Cancel before shipping",
     )
-    with translation.override("it"):
+    with translation.override(other_language()):
         profile = storefront_profile(vendor, "en")
     assert profile is not None
     assert [title for title, _body in profile.policies] == [

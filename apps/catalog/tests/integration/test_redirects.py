@@ -47,6 +47,7 @@ from apps.core.audit import AuditContext
 from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, TranslationStatus
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -71,13 +72,15 @@ def tags() -> dict[str, Any]:
         taxonomy=taxonomy, language=primary_language(), slug="tags", status=PUBLISHED
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="it", slug="etichette", status=PUBLISHED
+        taxonomy=taxonomy, language=other_language(), slug="etichette", status=PUBLISHED
     )
     bags = TermFactory.create(taxonomy=taxonomy)
     TermTranslationFactory.create(
         term=bags, language=primary_language(), slug="bags", status=PUBLISHED
     )
-    TermTranslationFactory.create(term=bags, language="it", slug="borse", status=PUBLISHED)
+    TermTranslationFactory.create(
+        term=bags, language=other_language(), slug="borse", status=PUBLISHED
+    )
     return {"taxonomy": taxonomy, "bags": bags}
 
 
@@ -88,7 +91,9 @@ def bag() -> Product:
     ProductTranslationFactory.create(
         product=product, language=primary_language(), slug="leather-bag-en"
     )
-    ProductTranslationFactory.create(product=product, language="it", slug="borsa-pelle-it")
+    ProductTranslationFactory.create(
+        product=product, language=other_language(), slug="borsa-pelle-it"
+    )
     return product
 
 

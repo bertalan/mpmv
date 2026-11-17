@@ -27,6 +27,7 @@ from apps.catalog.tests.factories import (
 from apps.core.audit import AuditContext
 from apps.core.i18n import primary_language
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -51,7 +52,8 @@ def _brand(**fields: Any) -> Brand:
         status=PUBLISHED,
     )  # fmt: skip
     BrandTranslationFactory.create(
-        brand=brand, language="it", slug="acme-it", description="<p>Incudini dal 1949.</p>",
+        brand=brand, language=other_language(), slug="acme-it",
+        description="<p>Incudini dal 1949.</p>",
         status=PUBLISHED,
     )  # fmt: skip
     return brand
@@ -89,7 +91,7 @@ def test_the_page_shows_the_description_in_the_page_language(client: Client) -> 
 
 def test_a_missing_translation_gives_no_description_never_a_fallback(client: Client) -> None:
     brand = _brand()
-    brand.translations.filter(language="it").update(description="")
+    brand.translations.filter(language=other_language()).update(description="")
     page = _page(client, "/it/marchio/acme-it/")
     assert "Anvils since 1949." not in page.get_text()
     assert page.select_one(".brand-description") is None
@@ -97,7 +99,7 @@ def test_a_missing_translation_gives_no_description_never_a_fallback(client: Cli
 
 def test_an_unpublished_translation_is_not_shown(client: Client) -> None:
     brand = _brand()
-    brand.translations.filter(language="it").update(status="reviewed")
+    brand.translations.filter(language=other_language()).update(status="reviewed")
     page = _page(client, "/it/marchio/acme/")  # the fallback page uses the source slug
     assert "Incudini dal 1949." not in page.get_text()
 
@@ -186,7 +188,7 @@ def test_the_brand_id_is_the_same_in_every_language(client: Client) -> None:
 
 def test_the_node_has_no_description_for_a_missing_translation(client: Client) -> None:
     brand = _brand()
-    brand.translations.filter(language="it").update(description="")
+    brand.translations.filter(language=other_language()).update(description="")
     node = _node(_graph(_page(client, "/it/marchio/acme-it/")), "Brand")
     assert "description" not in node
 

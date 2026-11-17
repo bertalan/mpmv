@@ -17,6 +17,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.i18n import primary_language
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -61,7 +62,9 @@ def test_get_or_create_cart_for_a_user_and_for_a_guest_session() -> None:
     assert (mine.user, mine.session_key) == (user, "")
     assert services.get_or_create_cart(user=user) == mine
 
-    guest = services.get_or_create_cart(session_key="abc", language="it", country_hint="de")
+    guest = services.get_or_create_cart(
+        session_key="abc", language=other_language(), country_hint="de"
+    )
     assert (guest.user, guest.session_key, guest.language, guest.country_hint) == (
         None,
         "abc",
@@ -74,7 +77,9 @@ def test_get_or_create_cart_for_a_user_and_for_a_guest_session() -> None:
 
 def test_get_or_create_cart_dry_run_writes_nothing_and_describes_the_cart() -> None:
     user = UserFactory.create()
-    changes = services.get_or_create_cart(user=user, language="it", country_hint="de", dry_run=True)
+    changes = services.get_or_create_cart(
+        user=user, language=other_language(), country_hint="de", dry_run=True
+    )
     assert isinstance(changes, ChangeSet)
     assert Cart.objects.count() == 0
     [change] = changes.changes
@@ -324,7 +329,9 @@ def test_merge_drops_guest_lines_that_can_no_longer_be_bought() -> None:
 def test_merge_takes_the_guest_language_and_country_hint() -> None:
     user = UserFactory.create()
     mine = services.get_or_create_cart(user=user, language=primary_language())
-    guest = services.get_or_create_cart(session_key="s", language="it", country_hint="FR")
+    guest = services.get_or_create_cart(
+        session_key="s", language=other_language(), country_hint="FR"
+    )
     services.add_to_cart(guest, sellable())
 
     services.merge_carts(guest, user)

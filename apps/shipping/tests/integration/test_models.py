@@ -38,6 +38,7 @@ from apps.shipping.tests.factories import (
     WeightBandFactory,
 )
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -88,7 +89,7 @@ def test_carrier_defaults_and_translated_label() -> None:
         carrier=carrier, language=primary_language(), label="Main courier", status=PUBLISHED
     )
     CarrierTranslationFactory.create(
-        carrier=carrier, language="it", label="Corriere", status=PUBLISHED
+        carrier=carrier, language=other_language(), label="Corriere", status=PUBLISHED
     )
     assert label_of(carrier.translation("it")) == "Corriere"
     fallback = carrier.translation("de")

@@ -30,6 +30,7 @@ from apps.core.tests.factories import (
     OutboxEmailEventFactory,
     OutboxEmailFactory,
 )
+from tests.i18n import other_language
 
 ROOT = Path(settings.BASE_DIR)
 QUEUE_TABLES = (
@@ -96,7 +97,7 @@ def test_enqueue_dry_run_returns_the_change_and_writes_nothing() -> None:
     changeset = services.enqueue_email(
         recipient="customer@example.com",
         template_key=OTP,
-        language="it",
+        language=other_language(),
         context={"code": "482913", "minutes": 10},
         dry_run=True,
     )
@@ -111,7 +112,7 @@ def test_enqueue_dry_run_returns_the_change_and_writes_nothing() -> None:
 
 @pytest.mark.django_db
 def test_enqueue_stores_a_snapshot_queues_the_job_and_records_the_history() -> None:
-    email = _enqueue(language="it")
+    email = _enqueue(language=other_language())
     assert email.status == OutboxEmail.Status.QUEUED
     assert email.language == "it"
     assert email.context_data == {"code": "482913", "minutes": 10}
@@ -201,7 +202,7 @@ def test_otp_reminder_and_order_emails_go_through_the_outbox(
     reminder = _enqueue(
         REMINDER,
         recipient="vendor@example.com",
-        language="it",
+        language=other_language(),
         context={"item": "GPSR", "due": "2026-12-01", "action_url": "https://x.test/c"},
     )
     order = _enqueue(ORDER, recipient="customer@example.com", context=_order_context())

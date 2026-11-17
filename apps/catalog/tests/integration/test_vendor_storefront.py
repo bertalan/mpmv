@@ -21,6 +21,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -41,7 +42,7 @@ def _vendor() -> Vendor:
     )
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="it",
+        language=other_language(),
         status=PUBLISHED,
         tagline="Slogan della bottega",
         description="La nostra storia in italiano.",
@@ -58,7 +59,7 @@ def _category(en: str, it: str, parent: Any = None) -> Any:
         category=category, language=primary_language(), name=en, slug=en.lower(), status=PUBLISHED
     )
     CategoryTranslationFactory.create(
-        category=category, language="it", name=it, slug=it.lower(), status=PUBLISHED
+        category=category, language=other_language(), name=it, slug=it.lower(), status=PUBLISHED
     )
     return category
 
@@ -94,7 +95,7 @@ def test_a_draft_text_never_shows(client: Client) -> None:
     vendor = _vendor()
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="de",
+        language=third_language(),
         status=TranslationStatus.MACHINE,
         description="Entwurf nicht veroeffentlichen",
     )
@@ -186,7 +187,7 @@ def test_tagline_and_policies_are_escaped(client: Client) -> None:
 
 def test_a_vendor_that_is_not_active_is_a_404_in_italian_too(client: Client) -> None:
     vendor = VendorFactory.create(status=Vendor.Status.SUSPENDED)
-    VendorTranslationFactory.create(vendor=vendor, language="it", status=PUBLISHED)
+    VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=PUBLISHED)
     assert client.get(f"{prefix('it')}/shop/{vendor.slug}/").status_code == 404
 
 

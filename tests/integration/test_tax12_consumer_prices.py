@@ -50,6 +50,7 @@ from apps.tax.tests.factories import (
 from apps.themes.services import use_theme
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -184,7 +185,7 @@ def test_english_falls_back_to_the_operator_country() -> None:
 def test_the_delivery_country_given_at_checkout_wins_over_the_language() -> None:
     req = request("it")
     prices.remember_delivery_address(req, "DE")
-    with translation.override("it"):
+    with translation.override(other_language()):
         price = prices.consumer_price(NET, "standard", vendor=VENDOR, request=req)
     assert (price.country, price.estimated, price.gross) == ("DE", False, Decimal("14.88"))
 
@@ -256,7 +257,7 @@ def test_an_rf20_vendor_shows_what_checkout_charges(client: Client) -> None:
 
 def test_a_domestic_only_vendor_seen_from_germany_shows_its_own_rate() -> None:
     vendor = seller("domestic_only")
-    with translation.override("de"):
+    with translation.override(third_language()):
         price = prices.consumer_price(NET, "standard", vendor=vendor, request=request("de"))
     # Italian VAT (22 %), not the German 19 % the vendor will not charge.
     assert (price.country, price.rate, price.gross) == ("DE", Decimal("22.0000"), Decimal("15.25"))
@@ -276,7 +277,7 @@ def test_an_art74_publisher_book_shows_no_vat_and_a_bookshop_the_books_rate() ->
 def test_a_remembered_postcode_in_a_territory_outside_the_vat_area_shows_no_vat() -> None:
     req = request("it")
     prices.remember_delivery_address(req, "IT", "23041")  # Livigno
-    with translation.override("it"):
+    with translation.override(other_language()):
         price = prices.consumer_price(NET, "standard", vendor=VENDOR, request=req)
     assert (price.country, price.estimated, price.gross) == ("IT", False, NET)
 
@@ -290,7 +291,7 @@ def test_a_remembered_northern_ireland_address_follows_the_xi_rules() -> None:
 
 def test_a_language_estimate_never_uses_a_remembered_postcode_of_another_country() -> None:
     req = request("it", {prices.DELIVERY_POSTCODE_KEY: "23041"})
-    with translation.override("it"):
+    with translation.override(other_language()):
         price = prices.consumer_price(NET, "standard", vendor=VENDOR, request=req)
     assert (price.estimated, price.gross) == (True, Decimal("15.25"))
 
@@ -389,7 +390,7 @@ def card(**kwargs: Any) -> ProductCard:
 
 @pytest.mark.parametrize("theme", ["base", "ride"])
 def test_a_catalog_card_shows_the_gross_price_and_the_note(theme: str) -> None:
-    with use_theme(theme), translation.override("de"):
+    with use_theme(theme), translation.override(third_language()):
         html = render_to_string(
             "catalog/includes/product_card.html",
             {"card": card(), "currency": "EUR", "request": request("de")},
@@ -437,7 +438,7 @@ def test_a_card_without_a_rate_shows_no_net_price() -> None:
 
 
 def test_cart_lines_before_the_address_use_the_estimated_rate() -> None:
-    with translation.override("de"):
+    with translation.override(third_language()):
         unit, total = present.line_prices(
             Decimal("0.25"), 3, "standard", vendor=VENDOR, request=request("de")
         )

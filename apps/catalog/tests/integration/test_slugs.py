@@ -30,6 +30,7 @@ from apps.catalog.tests.factories import (
 from apps.core.audit import AuditContext
 from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -119,7 +120,7 @@ def test_a_slug_taken_by_another_product_gets_a_suffix() -> None:
 
 def test_the_same_slug_in_another_language_is_no_collision() -> None:
     ProductTranslationFactory.create(title="Bag", language=primary_language(), slug="bag")
-    translation = ProductTranslationFactory.create(title="Bag", language="it", slug="")
+    translation = ProductTranslationFactory.create(title="Bag", language=other_language(), slug="")
     sync_product_slug(translation, ctx=CTX)
     translation.refresh_from_db()
     assert translation.slug == "bag"
@@ -164,7 +165,10 @@ def test_rebuild_turns_current_sku_slugs_into_history() -> None:
         slug="leather-bag-en-sku-00001",
     )
     it = ProductTranslationFactory.create(
-        product=product, language="it", title="Borsa in pelle", slug="borsa-in-pelle-it-sku-00001"
+        product=product,
+        language=other_language(),
+        title="Borsa in pelle",
+        slug="borsa-in-pelle-it-sku-00001",
     )
     changes = rebuild_product_slugs(ctx=CTX)
     en.refresh_from_db()
@@ -207,7 +211,9 @@ def test_rebuild_command_has_a_dry_run() -> None:
 
 
 def test_old_slugs_are_recorded_as_history() -> None:
-    translation = ProductTranslationFactory.create(language="it", title="Borsa", slug="borsa")
+    translation = ProductTranslationFactory.create(
+        language=other_language(), title="Borsa", slug="borsa"
+    )
     changes = record_old_slugs(
         translation.product,
         "it",
@@ -234,7 +240,7 @@ def test_an_old_slug_of_another_product_stops_the_load() -> None:
 
 def test_an_old_slug_resolves_to_the_current_path() -> None:
     ProductTranslationFactory.create(
-        language="it", title="Borsa in pelle", slug="borsa-in-pelle-it-sku-00001"
+        language=other_language(), title="Borsa in pelle", slug="borsa-in-pelle-it-sku-00001"
     )
     rebuild_product_slugs(ctx=CTX)
     assert old_slug_redirect("it", "borsa-in-pelle-it-sku-00001") == (
@@ -262,7 +268,7 @@ def test_a_current_sku_slug_answers_301_to_the_new_slug(client: Client) -> None:
 
 def test_the_italian_old_slug_redirects_under_the_italian_prefix(client: Client) -> None:
     ProductTranslationFactory.create(
-        language="it", title="Borsa in pelle", slug="borsa-in-pelle-it-sku-00001"
+        language=other_language(), title="Borsa in pelle", slug="borsa-in-pelle-it-sku-00001"
     )
     rebuild_product_slugs(ctx=CTX)
     response = client.get("/it/prodotto/borsa-in-pelle-it-sku-00001/?utm_source=feed")
@@ -351,7 +357,7 @@ def test_a_first_generation_title_lang_slug_becomes_history_and_redirects_once(
     client: Client,
 ) -> None:
     ProductTranslationFactory.create(
-        language="it", title="Borsa in pelle", slug="borsa-in-pelle-it"
+        language=other_language(), title="Borsa in pelle", slug="borsa-in-pelle-it"
     )
     rebuild_product_slugs(ctx=CTX)
     response = client.get("/it/prodotto/borsa-in-pelle-it/")
@@ -381,7 +387,9 @@ def test_the_same_title_in_two_languages_gets_the_same_slug() -> None:
     en = ProductTranslationFactory.create(
         product=product, language=primary_language(), title="Safari", slug=""
     )
-    it = ProductTranslationFactory.create(product=product, language="it", title="Safari", slug="")
+    it = ProductTranslationFactory.create(
+        product=product, language=other_language(), title="Safari", slug=""
+    )
     sync_product_slug(en, ctx=CTX)
     sync_product_slug(it, ctx=CTX)
     assert (en.slug, it.slug) == ("safari", "safari")
@@ -397,7 +405,9 @@ def test_two_products_with_the_same_title_in_a_language_get_a_numbered_slug() ->
 
 
 def test_the_new_slug_is_at_most_80_characters_without_a_language_suffix() -> None:
-    translation = ProductTranslationFactory.create(language="de", title="x" * 120, slug="")
+    translation = ProductTranslationFactory.create(
+        language=third_language(), title="x" * 120, slug=""
+    )
     sync_product_slug(translation, ctx=CTX)
     assert translation.slug == "x" * 80
 

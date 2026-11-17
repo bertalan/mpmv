@@ -25,6 +25,7 @@ from apps.catalog.tests.factories import (
 from apps.core.i18n import primary_language
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -109,7 +110,7 @@ def test_an_exact_sku_ranks_before_a_longer_sku_and_before_text() -> None:
 
 def test_full_text_search_uses_the_language_stemming() -> None:
     english = listed(title="Leather saddle bags", language=primary_language())
-    italian = listed(title="Borsa da sella in pelle", language="it")
+    italian = listed(title="Borsa da sella in pelle", language=other_language())
     assert found("bag", "en") == [english.pk]
     assert found("borse", "it") == [italian.pk]
 
@@ -218,7 +219,7 @@ def test_a_title_match_ranks_before_a_description_match() -> None:
 
 
 def test_only_texts_published_in_the_requested_language_are_searched() -> None:
-    product = listed(title="Borsa serbatoio", language="it")
+    product = listed(title="Borsa serbatoio", language=other_language())
     ProductTranslationFactory.create(
         product=product,
         language=primary_language(),
@@ -226,7 +227,7 @@ def test_only_texts_published_in_the_requested_language_are_searched() -> None:
         status=ProductTranslation.Status.MACHINE,
     )
     # Saving the EN source sent the IT text back to review (I18N.2); publish it again.
-    product.translations.filter(language="it").update(status=PUBLISHED)
+    product.translations.filter(language=other_language()).update(status=PUBLISHED)
     assert found("serbatoio", "it") == [product.pk]
     assert found("serbatoio", "en") == []
     assert found("tank", "en") == []  # a machine draft is not public
@@ -234,7 +235,7 @@ def test_only_texts_published_in_the_requested_language_are_searched() -> None:
 
 
 def test_a_sku_is_language_neutral() -> None:
-    product = listed(sku="TB-2040", title="Borsa serbatoio", language="it")
+    product = listed(sku="TB-2040", title="Borsa serbatoio", language=other_language())
     assert found("tb-2040", "en") == [product.pk]
     assert found("tb-2040", "de") == [product.pk]
 

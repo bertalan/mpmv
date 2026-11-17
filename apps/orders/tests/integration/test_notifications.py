@@ -12,6 +12,7 @@ from apps.orders.models import Order, VendorOrder
 from apps.orders.tests.factories import unchecked
 from apps.orders.tests.integration.test_services import CTX, line_input, pay, place, vendor_input
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -35,7 +36,7 @@ def render(mail: OutboxEmail):  # type: ignore[no-untyped-def]
 
 
 def test_order_received_goes_once_to_the_customer_in_their_language() -> None:
-    order = place(language="it")
+    order = place(language=other_language())
     notifications.notify_order_placed(order)
     notifications.notify_order_placed(order)  # same event again: no second email
     mail = OutboxEmail.objects.get()
@@ -129,7 +130,7 @@ def test_every_kind_renders_in_every_language(lang: str) -> None:
 
 
 def test_shipping_notifies_the_customer_once_with_tracking() -> None:
-    order = place(language="it")
+    order = place(language=other_language())
     pay(order)
     sub = order.vendor_orders.get()
     services.transition_vendor_order(sub, "accepted", ctx=CTX)
@@ -178,7 +179,7 @@ def test_no_payment_data_or_internal_fields_in_any_context() -> None:
 
 
 def test_italian_and_english_wording_differ_per_the_catalog() -> None:
-    order = place(language="it")
+    order = place(language=other_language())
     notifications.notify_order_placed(order)
     mail = OutboxEmail.objects.get()
     assert "Abbiamo ricevuto" in render(mail).text_body

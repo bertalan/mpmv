@@ -22,6 +22,7 @@ from apps.catalog.tests.factories import (
 )
 from apps.core.i18n import primary_language
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -319,7 +320,7 @@ def test_one_translation_per_product_and_language() -> None:
 
 def test_slugs_are_unique_per_language_once_set() -> None:
     ProductTranslationFactory.create(language=primary_language(), slug="red-bag-en-sku-1")
-    ProductTranslationFactory.create(language="it", slug="red-bag-en-sku-1")
+    ProductTranslationFactory.create(language=other_language(), slug="red-bag-en-sku-1")
     ProductTranslationFactory.create(language=primary_language(), slug="")
     ProductTranslationFactory.create(
         language=primary_language(), slug=""
@@ -340,7 +341,7 @@ def test_product_texts_fall_back_to_published_english() -> None:
     ProductTranslationFactory.create(
         product=product, language=primary_language(), status="published"
     )
-    ProductTranslationFactory.create(product=product, language="it", status="machine")
+    ProductTranslationFactory.create(product=product, language=other_language(), status="machine")
     resolved = product.translation("it")
     assert resolved.language == "en"
     assert resolved.is_fallback is True
@@ -351,7 +352,9 @@ def test_changing_the_english_title_sends_translations_back_to_review() -> None:
     en = ProductTranslationFactory.create(
         product=product, language=primary_language(), status="published"
     )
-    it = ProductTranslationFactory.create(product=product, language="it", status="published")
+    it = ProductTranslationFactory.create(
+        product=product, language=other_language(), status="published"
+    )
     en.title = "A new title"
     en.save()
     it.refresh_from_db()

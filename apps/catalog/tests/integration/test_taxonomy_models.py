@@ -20,6 +20,7 @@ from apps.catalog.tests.factories import (
     TermTranslationFactory,
 )
 from apps.core.i18n import primary_language
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -44,7 +45,7 @@ def test_category_texts_resolve_with_the_explicit_english_fallback() -> None:
         category=category, language=primary_language(), name="Bags", slug="bags", status="published"
     )
     CategoryTranslationFactory.create(
-        category=category, language="it", name="Borse", slug="borse", status="machine"
+        category=category, language=other_language(), name="Borse", slug="borse", status="machine"
     )
     italian = category.translation("it")
     assert italian.is_fallback is True  # the IT draft is not published yet
@@ -59,7 +60,7 @@ def test_changing_the_english_name_sends_published_translations_back_to_review()
         category=category, language=primary_language(), name="Bags"
     )
     italian = CategoryTranslationFactory.create(
-        category=category, language="it", name="Borse", status="published"
+        category=category, language=other_language(), name="Borse", status="published"
     )
     english.name = "Bags and backpacks"
     english.save()
@@ -91,7 +92,9 @@ def test_the_same_slug_is_allowed_under_another_parent_or_in_another_language() 
         category=cousin, language=primary_language(), slug="leather"
     ).full_clean()
     sibling = CategoryFactory.create(parent=first.get_parent())
-    CategoryTranslationFactory.build(category=sibling, language="it", slug="leather").full_clean()
+    CategoryTranslationFactory.build(
+        category=sibling, language=other_language(), slug="leather"
+    ).full_clean()
 
 
 def test_root_categories_are_siblings_too() -> None:
@@ -140,7 +143,7 @@ def test_a_taxonomy_is_configured_as_data() -> None:
         taxonomy=taxonomy, language=primary_language(), name="Compatibility", slug="compatibility"
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="it", name="Compatibilità", slug="compatibilita"
+        taxonomy=taxonomy, language=other_language(), name="Compatibilità", slug="compatibilita"
     )
     taxonomy.full_clean()
     assert sorted(taxonomy.translations.values_list("slug", flat=True)) == [
@@ -157,7 +160,7 @@ def test_taxonomy_codes_are_unique() -> None:
 
 def test_taxonomy_slugs_are_unique_per_language() -> None:
     TaxonomyTranslationFactory.create(language=primary_language(), slug="occasion")
-    TaxonomyTranslationFactory.create(language="it", slug="occasion")
+    TaxonomyTranslationFactory.create(language=other_language(), slug="occasion")
     with pytest.raises(IntegrityError), transaction.atomic():
         TaxonomyTranslationFactory.create(language=primary_language(), slug="occasion")
 
@@ -315,7 +318,7 @@ def test_brand_names_are_unique_ignoring_case() -> None:
 
 def test_brand_slugs_are_unique_per_language() -> None:
     BrandTranslationFactory.create(language=primary_language(), slug="maker-a")
-    BrandTranslationFactory.create(language="it", slug="maker-a")
+    BrandTranslationFactory.create(language=other_language(), slug="maker-a")
     with pytest.raises(IntegrityError), transaction.atomic():
         BrandTranslationFactory.create(language=primary_language(), slug="maker-a")
 

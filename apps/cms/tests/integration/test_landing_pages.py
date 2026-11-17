@@ -42,6 +42,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -86,7 +87,11 @@ def listed(title: str, **kwargs: Any) -> Product:
         product=product, title=title, slug=f"{slug}-en", status=PUBLISHED
     )
     ProductTranslationFactory.create(
-        product=product, language="it", title=f"{title} IT", slug=f"{slug}-it", status=PUBLISHED
+        product=product,
+        language=other_language(),
+        title=f"{title} IT",
+        slug=f"{slug}-it",
+        status=PUBLISHED,
     )
     return product
 
@@ -95,7 +100,7 @@ def _category(name: str, slug: str, it_name: str, it_slug: str) -> Category:
     category: Category = CategoryFactory.create()
     CategoryTranslationFactory.create(category=category, name=name, slug=slug, status=PUBLISHED)
     CategoryTranslationFactory.create(
-        category=category, language="it", name=it_name, slug=it_slug, status=PUBLISHED
+        category=category, language=other_language(), name=it_name, slug=it_slug, status=PUBLISHED
     )
     return category
 
@@ -109,13 +114,13 @@ def maker() -> Term:
         taxonomy=compat, name="Compatibility", slug="compatibility", status=PUBLISHED
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=compat, language="it", name="Compatibilità", slug="compatibilita",
+        taxonomy=compat, language=other_language(), name="Compatibilità", slug="compatibilita",
         status=PUBLISHED,
     )  # fmt: skip
     term: Term = TermFactory.create(taxonomy=compat)
     TermTranslationFactory.create(term=term, name="Maker", slug="maker", status=PUBLISHED)
     TermTranslationFactory.create(
-        term=term, language="it", name="Marca", slug="marca", status=PUBLISHED
+        term=term, language=other_language(), name="Marca", slug="marca", status=PUBLISHED
     )
     return term
 
@@ -337,7 +342,7 @@ def test_one_landing_page_per_term_and_language(seeded: SeedReport, maker: Term)
     with pytest.raises(ValidationError):
         _home().add_child(instance=TermLandingPage(title="Again", slug="again", term=maker))
     # Another language has its own landing page (a translation).
-    other = term_landing(maker, parent=_home("it"), slug="guida")
+    other = term_landing(maker, parent=_home(other_language()), slug="guida")
     assert other.locale.language_code == "it"
 
 

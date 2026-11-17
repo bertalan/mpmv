@@ -47,6 +47,7 @@ from apps.vendors.tests.factories import (
     VendorFactory,
     VendorMemberFactory,
 )
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -262,7 +263,7 @@ def test_the_texts_of_an_accepted_version_cannot_be_deleted_or_rewritten() -> No
     with pytest.raises(engine.ContractLocked):
         text.delete()
     with pytest.raises(engine.ContractLocked):
-        VendorContractTranslationFactory.create(contract=contract, language="it")
+        VendorContractTranslationFactory.create(contract=contract, language=other_language())
 
     texts = VendorContractTranslation.objects.filter(contract=contract)
     with pytest.raises(DatabaseError, match="accepted"), transaction.atomic():
@@ -271,7 +272,11 @@ def test_the_texts_of_an_accepted_version_cannot_be_deleted_or_rewritten() -> No
         texts.delete()
     with pytest.raises(DatabaseError, match="accepted"), transaction.atomic():
         VendorContractTranslation.objects.bulk_create(
-            [VendorContractTranslation(contract=contract, language="de", title="T", body="B")]
+            [
+                VendorContractTranslation(
+                    contract=contract, language=third_language(), title="T", body="B"
+                )
+            ]
         )
     stored = texts.get()
     assert source_hash(stored.source_values()) == acceptance.text_hash
@@ -310,9 +315,11 @@ def test_a_version_nobody_accepted_can_still_be_edited_and_deleted() -> None:
 def test_an_owner_accepts_the_current_contract_from_the_request_ip() -> None:
     member = onboarding_owner()
     contract = VendorContractFactory.create()
-    italian = VendorContractTranslationFactory.create(contract=contract, language="it")
+    italian = VendorContractTranslationFactory.create(contract=contract, language=other_language())
 
-    changes = accept(member.vendor, member.user, language="it", ctx=vendor_ctx(member.user.pk))
+    changes = accept(
+        member.vendor, member.user, language=other_language(), ctx=vendor_ctx(member.user.pk)
+    )
 
     assert changes.summary() == {"create": 1, "update": 0, "delete": 0}
     acceptance = ContractAcceptance.objects.get()
@@ -336,7 +343,7 @@ def test_an_owner_accepts_the_current_contract_from_the_request_ip() -> None:
 def test_the_english_text_is_accepted_when_the_language_has_none() -> None:
     member = onboarding_owner()
     contract = VendorContractFactory.create()
-    accept(member.vendor, member.user, language="de", ctx=vendor_ctx(member.user.pk))
+    accept(member.vendor, member.user, language=third_language(), ctx=vendor_ctx(member.user.pk))
     acceptance = ContractAcceptance.objects.get()
     assert acceptance.language == "en"
     english = contract.translations.get(language=primary_language())
@@ -445,7 +452,7 @@ def test_acceptances_are_append_only_in_the_database() -> None:
         acceptance.save()
     rows = ContractAcceptance.objects.filter(pk=acceptance.pk)
     with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():
-        rows.update(language="de")
+        rows.update(language=third_language())
     with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():
         rows.delete()
     assert rows.get().language == acceptance.language
@@ -456,7 +463,7 @@ def test_acceptances_are_append_only_in_the_database() -> None:
 
 def test_the_offer_is_the_version_in_force_with_the_hash_of_its_text() -> None:
     contract = VendorContractFactory.create()
-    italian = VendorContractTranslationFactory.create(contract=contract, language="it")
+    italian = VendorContractTranslationFactory.create(contract=contract, language=other_language())
     offer = contract_offer("it")
     assert (offer.contract, offer.text) == (contract, italian)
     assert offer.text_hash == source_hash(italian.source_values())
@@ -514,7 +521,7 @@ def test_a_text_edited_after_it_was_shown_cannot_be_accepted() -> None:
 def test_a_text_unpublished_after_it_was_shown_cannot_be_accepted() -> None:
     member = onboarding_owner()
     contract = VendorContractFactory.create()
-    italian = VendorContractTranslationFactory.create(contract=contract, language="it")
+    italian = VendorContractTranslationFactory.create(contract=contract, language=other_language())
     shown = contract_offer("it")
     italian.status = VendorContractTranslation.Status.MACHINE
     italian.save()
@@ -523,7 +530,7 @@ def test_a_text_unpublished_after_it_was_shown_cannot_be_accepted() -> None:
             member.vendor,
             member.user,
             contract=contract,
-            language="it",
+            language=other_language(),
             text_hash=shown.text_hash,
             ctx=vendor_ctx(member.user.pk),
         )

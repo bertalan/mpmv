@@ -16,6 +16,7 @@ from apps.orders.models import Order, PrivacyStatus, VendorOrder
 from apps.orders.tests.integration.test_notifications import BANNED, LANGS, two_vendor_order
 from apps.orders.tests.integration.test_services import CTX, line_input, pay, place, vendor_input
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -140,7 +141,7 @@ def test_hostile_names_are_inert_and_shown_as_text(monkeypatch: pytest.MonkeyPat
 
 
 def test_the_pdf_is_tagged_with_language_and_title() -> None:
-    order = two_vendor_order(language="de")
+    order = two_vendor_order(language=third_language())
     pdf = documents.render_vendor_confirmation_pdf(sub_orders(order)[0])
     rd = reader(pdf)
     root: Any = rd.trailer["/Root"]

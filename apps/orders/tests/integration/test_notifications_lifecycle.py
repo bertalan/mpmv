@@ -13,6 +13,7 @@ from apps.orders.tests.factories import unchecked
 from apps.orders.tests.integration.test_notifications import render, two_vendor_order
 from apps.orders.tests.integration.test_services import CTX, pay, place
 from apps.vendors.models import Vendor
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -35,7 +36,7 @@ def mails(kind: str) -> list[OutboxEmail]:
 
 
 def test_delivery_tells_the_customer_once_in_their_language() -> None:
-    order = place(language="it")
+    order = place(language=other_language())
     pay(order)
     sub = order.vendor_orders.get()
     ship(sub)
@@ -67,7 +68,7 @@ def test_cancelling_an_unpaid_order_tells_the_customer_once() -> None:
 
 
 def test_a_cancelled_vendor_order_tells_customer_and_vendor() -> None:
-    order = two_vendor_order(language="it")
+    order = two_vendor_order(language=other_language())
     pay(order)
     sub = order.vendor_orders.order_by("id").first()
     assert sub is not None
@@ -172,7 +173,7 @@ def test_every_new_kind_renders_in_every_language(lang: str) -> None:
 
 
 def test_italian_wording_for_delivery() -> None:
-    order = place(language="it")
+    order = place(language=other_language())
     pay(order)
     sub = order.vendor_orders.get()
     ship(sub)

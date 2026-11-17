@@ -13,6 +13,7 @@ from apps.cms.models import NavigationMenu, StandardPage
 from apps.cms.services import SeedReport
 from apps.cms.tests.factories import NavigationMenuFactory, StandardPageFactory
 from apps.core.i18n import primary_language
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -38,7 +39,7 @@ def test_each_language_shows_its_own_header_and_footer(client: Client, seeded: S
 def test_a_language_without_its_menu_uses_the_primary_one_in_its_own_language(
     client: Client, seeded: SeedReport
 ) -> None:
-    NavigationMenu.objects.filter(locale__language_code="de").delete()
+    NavigationMenu.objects.filter(locale__language_code=other_language()).delete()
     html = client.get("/de/").content.decode()
     assert '<a href="/de/ueber-uns/">Über uns</a>' in _header(html)
 

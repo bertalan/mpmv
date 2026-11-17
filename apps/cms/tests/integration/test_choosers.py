@@ -39,6 +39,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -87,21 +88,25 @@ def model_term() -> Term:
         taxonomy=taxonomy, language=primary_language(), name="Fits", slug="fits", status=PUBLISHED
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="it", name="Compatibile", slug="compatibile", status=PUBLISHED
+        taxonomy=taxonomy,
+        language=other_language(),
+        name="Compatibile",
+        slug="compatibile",
+        status=PUBLISHED,
     )
     maker = TermFactory.create(taxonomy=taxonomy)
     TermTranslationFactory.create(
         term=maker, language=primary_language(), name="Acme", slug="acme", status=PUBLISHED
     )
     TermTranslationFactory.create(
-        term=maker, language="it", name="Acme", slug="acme-it", status=PUBLISHED
+        term=maker, language=other_language(), name="Acme", slug="acme-it", status=PUBLISHED
     )
     model: Term = TermFactory.create(parent=maker)
     TermTranslationFactory.create(
         term=model, language=primary_language(), name="Roadster", slug="roadster", status=PUBLISHED
     )
     TermTranslationFactory.create(
-        term=model, language="it", name="Spider", slug="spider", status=PUBLISHED
+        term=model, language=other_language(), name="Spider", slug="spider", status=PUBLISHED
     )
     return model
 
@@ -117,7 +122,11 @@ def english_only_term() -> Term:
         status=PUBLISHED,
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="it", name="Occasione", slug="occasione", status=PUBLISHED
+        taxonomy=taxonomy,
+        language=other_language(),
+        name="Occasione",
+        slug="occasione",
+        status=PUBLISHED,
     )
     term: Term = TermFactory.create(taxonomy=taxonomy)
     TermTranslationFactory.create(
@@ -154,14 +163,14 @@ def test_a_term_card_links_to_its_taxonomy_url_with_its_name(
 
 
 def test_a_term_card_follows_the_page_language(seeded: SeedReport, model_term: Term) -> None:
-    html = _publish(_home("it"), [_featured(_card("term", model_term))])
+    html = _publish(_home(other_language()), [_featured(_card("term", model_term))])
     assert '<a href="/it/compatibile/acme-it/spider/">Spider</a>' in html
 
 
 def test_a_term_card_falls_back_to_the_primary_language(
     seeded: SeedReport, english_only_term: Term
 ) -> None:
-    html = _publish(_home("it"), [_featured(_card("term", english_only_term))])
+    html = _publish(_home(other_language()), [_featured(_card("term", english_only_term))])
     assert '<a href="/occasion/weddings/">Weddings</a>' in html
 
 
@@ -192,7 +201,7 @@ def test_a_vendor_card_links_to_the_storefront(seeded: SeedReport, pottery: Vend
 
 
 def test_a_vendor_card_follows_the_page_language(seeded: SeedReport, pottery: Vendor) -> None:
-    html = _publish(_home("it"), [_featured(_card("vendor", pottery))])
+    html = _publish(_home(other_language()), [_featured(_card("vendor", pottery))])
     assert '<a href="/it/shop/pottery-studio/">Pottery Studio</a>' in html
 
 

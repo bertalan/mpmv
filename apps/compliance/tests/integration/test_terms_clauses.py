@@ -27,6 +27,7 @@ from apps.vendors.tests.factories import (
     VendorContractFactory,
     VendorFactory,
 )
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -55,7 +56,7 @@ def test_the_published_version_carries_clauses_d_to_h_in_english_and_italian() -
         body = contract.translations.get(language=language).body
         assert terms_clauses.missing_clauses(terms_clauses.VENDOR, body, language) == []
     assert "EUR 2.00" in contract.translations.get(language=primary_language()).body
-    assert "EUR 2,00" in contract.translations.get(language="it").body
+    assert "EUR 2,00" in contract.translations.get(language=other_language()).body
     entry = AuditLog.objects.get(action="vendor.contract_saved")
     assert entry.actor_label == "staff:legal"
 
@@ -111,15 +112,19 @@ def test_the_new_version_keeps_the_previous_text_before_the_clause_block() -> No
 def test_a_published_foreign_text_is_kept_and_a_draft_is_never_published() -> None:
     VendorContractFactory.create(valid_from=timezone.now() - dt.timedelta(days=30), languages=[])
     old = VendorContract.objects.get()
-    old.translations.create(language="de", title="Alt", body="Alte Texte.", status="published")
-    old.translations.create(language="it", title="Bozza", body="Bozza segreta.", status="machine")
+    old.translations.create(
+        language=third_language(), title="Alt", body="Alte Texte.", status="published"
+    )
+    old.translations.create(
+        language=other_language(), title="Bozza", body="Bozza segreta.", status="machine"
+    )
     contract = publish()
-    de = contract.translations.get(language="de")
+    de = contract.translations.get(language=third_language())
     assert (de.status, de.title) == ("published", "Alt")
     assert de.body.startswith("Alte Texte.")
     assert terms_clauses.missing_clauses(terms_clauses.VENDOR, de.body, "de") == []
     assert "EUR 2.00" in de.body  # the English block
-    it = contract.translations.get(language="it")
+    it = contract.translations.get(language=other_language())
     assert "Bozza segreta" not in it.body
     assert it.title == "Condizioni per i venditori"
     assert not contract.translations.exclude(status="published").exists()

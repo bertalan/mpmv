@@ -36,6 +36,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -158,7 +159,7 @@ def test_an_article_already_imported_is_left_alone(blog: BlogIndexPage) -> None:
 
 
 def test_an_article_goes_under_the_blog_of_its_language(blog: BlogIndexPage) -> None:
-    it_home = HomePage.objects.get(locale__language_code="it")
+    it_home = HomePage.objects.get(locale__language_code=other_language())
     it_blog: BlogIndexPage = BlogIndexPageFactory.create(parent=it_home)
     import_article(it_blog, _legacy_article(slug="una-visita", title="Una visita"))
 
