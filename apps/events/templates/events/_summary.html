@@ -2,11 +2,11 @@
 One event in a list (EVT.6): a heading link, the dates as `<time datetime>`, the type as text and
 the vendor, never colour alone. Context: `item` (an `events.listing.Item`). An original-language
 fallback (EVT.8) carries `lang` on the article and `hreflang` on the link, and shows its language
-name; the interface strings around it (the meta line) say they are in the page's language.
+name; `heading_tag` (default h4) sets the heading level; the interface strings around it (the meta line) say they are in the page's language.
 {% endcomment %}
 {% with event=item.page span=item.span %}
 <article class="event-summary"{% if item.language %} lang="{{ item.language }}"{% endif %}>
-  <h4><a href="{% pageurl event %}"{% if item.language %} hreflang="{{ item.language }}"{% endif %}>{{ event.title }}</a></h4>
+  {% with heading=heading_tag|default:"h4" %}<{{ heading }}><a href="{% pageurl event %}"{% if item.language %} hreflang="{{ item.language }}"{% endif %}>{{ event.title }}</a></{{ heading }}>{% endwith %}
   <p class="event-meta"{% if item.language %} lang="{{ page_language }}"{% endif %}>
     {% if event.all_day %}
       <time datetime="{{ span.start|date:'Y-m-d' }}">{{ span.start|date:"DATE_FORMAT" }}</time>{% if span.days|length > 1 %} – {% with last=span.days|last %}<time datetime="{{ last|date:'Y-m-d' }}">{{ last|date:"DATE_FORMAT" }}</time>{% endwith %}{% endif %}
