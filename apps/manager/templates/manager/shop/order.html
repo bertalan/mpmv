@@ -9,6 +9,10 @@ data are not shown. Every action is a POST with a CSRF token. No inline script o
   <h1>{% blocktranslate %}Order {{ number }}{% endblocktranslate %}</h1>
   <p><a href="{% url 'manager:shop:orders' %}">{% translate "Back to the orders" %}</a></p>
   {% if action_error %}{% include "components/alert.html" with level="danger" message=action_error live="assertive" only %}{% endif %}
+  {% if invoice_notice %}
+    {% translate "Order changed after payment: if you already issued an invoice or receipt for the previous version, remember to issue a credit or debit note to bring the document in line with the new amounts." context "(L)" as invoice_text %}
+    {% if invoice_issued_at %}{% include "components/alert.html" with level="warning" title=_("Your invoice is already issued") message=invoice_text only %}{% else %}{% include "components/alert.html" with level="info" message=invoice_text only %}{% endif %}
+  {% endif %}
   <dl class="manager-facts">
     <dt>{% translate "Status" %}</dt><dd data-order-state>{{ sub.get_state_display }}</dd>
     <dt>{% translate "Placed" %}</dt><dd>{{ placed|date:"SHORT_DATETIME_FORMAT" }}</dd>
@@ -40,6 +44,16 @@ data are not shown. Every action is a POST with a CSRF token. No inline script o
       </tbody>
     </table>
   </div>
+  <h2>{% translate "Invoice" %}</h2>
+  {% if invoice_issued_at %}
+    <p data-invoice-issued>{% blocktranslate with when=invoice_issued_at|date:"SHORT_DATETIME_FORMAT" %}You recorded on {{ when }} that your invoice or receipt for this order is issued. Every later change shows the reminder to correct it.{% endblocktranslate %}</p>
+  {% elif can_record_invoice %}
+    <form method="post" action="{{ invoice_url }}" class="manager-form">
+      {% csrf_token %}
+      <p>{% translate "The platform does not issue your invoice. Record here when you have issued it, so every later change reminds you to correct it." %}</p>
+      {% include "components/button.html" with label=_("I have issued the invoice or receipt") type="submit" variant="secondary" only %}
+    </form>
+  {% endif %}
   {% if can_amend %}
     <p><a href="{{ amend_url }}">{% translate "Change this order" %}</a>{% if version_number and version_number > 1 %} <span data-version>{% blocktranslate with n=version_number %}(version {{ n }}){% endblocktranslate %}</span>{% endif %}</p>
   {% endif %}

@@ -153,8 +153,8 @@ def event_blocks() -> list[tuple[str, blocks.Block]]:
 class EventIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]  # Wagtail is untyped
     """`/<lang>/events/`: one per language, under that language's home page.
 
-    Routes (EVT.6): the list (default), `calendar/YYYY-MM/` and `past/`. The feeds come with
-    EVT.9, the original-language fallback with EVT.8, the map with EVT.15.
+    Routes (EVT.6): the list (default), `calendar/YYYY-MM/` and `past/`. The feeds (EVT.9)
+    are file-like routes, the original-language fallback with EVT.8, the map with EVT.15.
     """
 
     intro = RichTextField(
@@ -209,6 +209,44 @@ class EventIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]  # Wagtail 
         from apps.events import listing
 
         return listing.render_past(self, request)
+
+    # Feeds (EVT.9): file-like routes, reached through `events_resource`.
+
+    @path("feed.rss/")  # type: ignore[untyped-decorator]
+    def feed_view(self, request: HttpRequest) -> Any:
+        from apps.events import feeds
+
+        return feeds.index_rss_response(self, request, feeds.Scope())
+
+    @path("calendar.ics/")  # type: ignore[untyped-decorator]
+    def ics_view(self, request: HttpRequest) -> Any:
+        from apps.events import feeds
+
+        return feeds.index_ics_response(self, request, feeds.Scope())
+
+    @path("vendor/<slug:vendor>/feed.rss/")  # type: ignore[untyped-decorator]
+    def vendor_feed_view(self, request: HttpRequest, vendor: str) -> Any:
+        from apps.events import feeds
+
+        return feeds.index_rss_response(self, request, feeds.Scope(vendor=vendor))
+
+    @path("vendor/<slug:vendor>/calendar.ics/")  # type: ignore[untyped-decorator]
+    def vendor_ics_view(self, request: HttpRequest, vendor: str) -> Any:
+        from apps.events import feeds
+
+        return feeds.index_ics_response(self, request, feeds.Scope(vendor=vendor))
+
+    @path("type/<slug:kind>/feed.rss/")  # type: ignore[untyped-decorator]
+    def type_feed_view(self, request: HttpRequest, kind: str) -> Any:
+        from apps.events import feeds
+
+        return feeds.index_rss_response(self, request, feeds.Scope(type=kind))
+
+    @path("type/<slug:kind>/calendar.ics/")  # type: ignore[untyped-decorator]
+    def type_ics_view(self, request: HttpRequest, kind: str) -> Any:
+        from apps.events import feeds
+
+        return feeds.index_ics_response(self, request, feeds.Scope(type=kind))
 
 
 class EventPageQuerySet(PageQuerySet, VendorScopedQuerySet["EventPage"]):  # type: ignore[misc]
@@ -972,11 +1010,11 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
         return context
 
     def serve(self, request: HttpRequest, *args: Any, **kwargs: Any) -> Any:
-        """The page, or its single-event ICS download (EVT.6; the feeds and caching are EVT.9)."""
+        """The page, or its single-event ICS download (EVT.6, cached and rate limited by EVT.9)."""
         if kwargs.pop("ics", False):
-            from apps.events import listing
+            from apps.events import feeds
 
-            return listing.ics_response(self, request)
+            return feeds.event_ics_response(self, request)
         return super().serve(request, *args, **kwargs)
 
     # --- Display (templates)

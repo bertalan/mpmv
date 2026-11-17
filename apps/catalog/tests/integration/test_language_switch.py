@@ -11,6 +11,9 @@ from typing import Any
 import pytest
 from django.test import Client
 from django.urls import reverse
+from django.utils import translation
+from django.utils.html import escape
+from django.utils.translation import gettext
 
 from apps.catalog.tests.factories import BrandFactory, BrandTranslationFactory
 from apps.catalog.tests.integration.test_listing_views import compat, listed  # noqa: F401
@@ -23,7 +26,14 @@ from tests.i18n import language_prefix, localized, other_language, third_languag
 pytestmark = pytest.mark.django_db
 
 PUBLISHED = TranslationStatus.PUBLISHED
-NOTICE = "not available in this language"
+
+
+def notice(language: str) -> str:
+    """The switch notice as the page shows it in `language` (translated, HTML-escaped)."""
+    with translation.override(language):
+        return escape(gettext("This content is not available in this language."))
+
+
 FORM = re.compile(
     r'<input type="hidden" name="exact" value="(?P<exact>[01])">\s*'
     r'<input type="hidden" name="notice" value="(?P<notice>[01])">\s*'
@@ -126,7 +136,7 @@ def test_switching_to_a_translation_goes_there_without_a_notice(
         response.redirect_chain[-1][0]
         == f"{language_prefix(other_language())}/compatibilita/marca/"
     )
-    assert NOTICE not in response.content.decode()
+    assert notice(other_language()) not in response.content.decode()
 
 
 def test_switching_to_a_language_without_translation_shows_the_notice_once(
@@ -144,8 +154,11 @@ def test_switching_to_a_language_without_translation_shows_the_notice_once(
         follow=True,
     )
     assert response.redirect_chain[-1][0] == f"{language_prefix(third_language())}/"
-    assert NOTICE in response.content.decode()
-    assert NOTICE not in client.get(f"{language_prefix(third_language())}/").content.decode()
+    assert notice(third_language()) in response.content.decode()
+    assert (
+        notice(third_language())
+        not in client.get(f"{language_prefix(third_language())}/").content.decode()
+    )
 
 
 def test_every_configured_language_has_a_switch_target(client: Client) -> None:

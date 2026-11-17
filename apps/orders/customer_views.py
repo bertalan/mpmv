@@ -9,7 +9,8 @@ passed to the template. The order reference is not an invoice: the platform issu
 ORD.20 part 3: a package changed after payment shows its current version (lines and totals)
 and a timeline of its versions (what changed, the money refunded, the date), without internal
 notes. After an item removed as unavailable, the customer may cancel the rest of the package
-(a full refund) or keep it, by POST, while the offer is open.
+(a full refund) or keep it, by POST, while the offer is open. Part 3b: the notices sent about the
+package (changes, cancellations) are listed with the exact text of their emails.
 """
 
 import uuid
@@ -36,7 +37,7 @@ from apps.core.money import CURRENCY
 from apps.core.public_forms import not_anonymous
 
 from . import amendment_engine as am
-from . import amendments, engine, services, versions
+from . import amendment_notices, amendments, engine, services, versions
 from .models import Order, OrderLine, VendorOrder
 
 PAGE_SIZE = 20
@@ -106,29 +107,7 @@ def _line(line: OrderLine) -> dict[str, Any]:
 
 def _change_text(change: am.AmendmentChange, before: am.VersionSnapshot | None) -> str:
     """One applied change in the customer's words (no internal note, no address)."""
-    key = str(getattr(change, "line_key", ""))
-    line = before.line(key) if before is not None and key else None
-    title = line.title if line is not None else gettext("an item")
-    match change:
-        case am.RemoveLine(unavailable=True):
-            return gettext("%(title)s removed as unavailable") % {"title": title}
-        case am.RemoveLine():
-            return gettext("%(title)s removed") % {"title": title}
-        case am.ChangeQuantity(quantity=quantity):
-            return gettext("%(title)s: quantity changed to %(quantity)s") % {
-                "title": title,
-                "quantity": quantity,
-            }
-        case am.ChangePrice():
-            return gettext("%(title)s: lower price") % {"title": title}
-        case am.ChangeCarrier(offer=offer):
-            return gettext("Shipping method changed to %(method)s") % {
-                "method": offer.label or offer.key
-            }
-        case am.ChangeAddress():
-            return gettext("Delivery address corrected as you asked")
-        case _:
-            return gettext("Order changed")
+    return amendment_notices.change_text(change, before)
 
 
 def _versions(sub: VendorOrder) -> list[dict[str, Any]]:
@@ -228,6 +207,11 @@ def _part(sub: VendorOrder, order: Order, templates: dict[str, str]) -> dict[str
         "total": total,
         "versions": history if (amended or len(history) > 1) else [],
         "offer": _offer(sub, order),
+        # The notices sent about this package, with their exact text (durable medium, ORD.20).
+        "notices": [
+            {"at": notice.created_at, "subject": notice.subject, "text": notice.text}
+            for notice in amendment_notices.customer_notices(sub)
+        ],
         "tracking": {
             "carrier": sub.carrier,
             "number": sub.tracking_number,

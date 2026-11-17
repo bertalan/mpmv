@@ -1,6 +1,6 @@
 """Public event resources Wagtail's own URL pattern cannot reach (EVT.6).
 
-Wagtail serves slash-terminated paths only, so a file-like route of a page (`calendar.ics`) needs
+Wagtail serves slash-terminated paths only, so a file-like route (`calendar.ics`, `feed.rss`) needs
 its own pattern. The view hands the path to Wagtail's `serve`, which routes it through the
 page tree to the `RoutablePageMixin` route of the event (hidden events are a 404 there). EVT.9
 adds the feed routes of the index pages (`feed.rss`, `calendar.ics`) to the same pattern.
@@ -20,5 +20,9 @@ def event_resource(request: HttpRequest, path: str) -> HttpResponse:
 
 
 urlpatterns = [
-    re_path(r"^(?P<path>(?:[\w\-]+/)+calendar\.ics)$", event_resource, name="events_resource"),
+    re_path(
+        r"^(?P<path>(?:[\w\-]+/)+(?:calendar\.ics|feed\.rss))$",
+        event_resource,
+        name="events_resource",
+    ),
 ]

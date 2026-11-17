@@ -30,4 +30,33 @@ request or cancel the package with a full refund. A GET search writes nothing.
       <p>{% translate "No order has this number." %}</p>
     {% endif %}
   {% endif %}
+  <h2>{% translate "Package cancellations by shop" %}</h2>
+  <p>{% blocktranslate with days=cancellation_days %}The last {{ days }} days. When a shop says the customer asked to cancel, the shop pays no refund fee on its word alone: check the shops with many of them.{% endblocktranslate %}</p>
+  {% if cancellations %}
+    <div class="table-scroll" role="region" aria-labelledby="cancellations-caption" tabindex="0">
+      <table class="table" data-cancellation-counts>
+        <caption id="cancellations-caption">{% translate "Package cancellations by shop and cause" %}</caption>
+        <thead><tr>
+          <th scope="col">{% translate "Shop" %}</th>
+          <th scope="col" class="numeric">{% translate "Shop: the customer asked (no fee)" %}</th>
+          <th scope="col" class="numeric">{% translate "Shop: cannot fulfil" %}</th>
+          <th scope="col" class="numeric">{% translate "Platform staff" %}</th>
+          <th scope="col" class="numeric">{% translate "Customer: rest cancelled" %}</th>
+          <th scope="col" class="numeric">{% translate "Total" %}</th>
+        </tr></thead>
+        <tbody>
+          {% for row in cancellations %}<tr{% if row.shop_customer_request %} data-self-declared{% endif %}>
+            <th scope="row">{{ row.vendor_name }}</th>
+            <td class="numeric">{% if row.shop_customer_request %}<strong>{{ row.shop_customer_request }}</strong> ({% translate "check" %}){% else %}0{% endif %}</td>
+            <td class="numeric">{{ row.shop_fault }}</td>
+            <td class="numeric">{{ row.staff }}</td>
+            <td class="numeric">{{ row.customer_rest }}</td>
+            <td class="numeric">{{ row.total }}</td>
+          </tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>{% translate "No package was cancelled in this period." %}</p>
+  {% endif %}
 {% endblock %}

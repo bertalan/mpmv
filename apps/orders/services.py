@@ -46,6 +46,7 @@ from .models import (
     OPEN_AMENDMENT_STATES,
     Order,
     OrderAmendment,
+    OrderEvent,
     OrderLine,
     OrderNumberSequence,
     OrderState,
@@ -712,6 +713,21 @@ def _scrub_amendments(order: Order, changeset: ChangeSet) -> None:
         )
 
 
+def _scrub_order_events(order: Order, changeset: ChangeSet) -> None:
+    """ORD.20 part 3b: a kept notice quotes the vendor's free-text reason, which may name the
+    customer; anonymisation replaces its subject, text and amounts (the trigger allows only
+    this). Its kind, language, date and wording version stay."""
+    found = OrderEvent.objects.filter(order=order).exclude(text=engine.ANONYMISED)
+    count = found.update(subject=engine.ANONYMISED, text=engine.ANONYMISED, payload={})
+    if count:
+        changeset.update(
+            "orders.order",
+            str(order.public_id),
+            {"order_events_personal_data": count},
+            {"order_events_personal_data": 0},
+        )
+
+
 def _clear_non_fiscal(order: Order, changeset: ChangeSet) -> None:
     for sub in order.vendor_orders.select_for_update().select_related("vendor"):
         if not (sub.carrier_contact_phone or sub.support_notes):
@@ -793,6 +809,7 @@ def _scrub(
                     vendor_order__order=locked, shipping_address__isnull=False
                 ).update(shipping_address=engine.ANONYMISED_ORDER_FIELDS["shipping_address"])
                 _scrub_amendments(locked, changeset)
+                _scrub_order_events(locked, changeset)
             _set_scrub_mode("")
             locked.refresh_from_db()
             changeset.update("orders.order", str(locked.public_id), before, _scrub_snapshot(locked))
