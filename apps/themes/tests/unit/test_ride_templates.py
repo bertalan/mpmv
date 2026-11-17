@@ -270,5 +270,7 @@ def test_without_a_search_url_the_header_searches_on_the_language_home() -> None
     html = render("components/header.html", site_name="Ride", links=LINKS)
     form = re.search(r'<form[^>]*role="search"[^>]*>', html)
     assert form
-    assert 'action="/"' in form.group(0)
+    # The home URL carries the active language prefix (/en/, /it/ ...), so read it from the router.
+    home = reverse("wagtail_serve", args=[""])
+    assert f'action="{home}"' in form.group(0)
     assert 'name="s"' in html
