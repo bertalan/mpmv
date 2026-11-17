@@ -2,12 +2,15 @@
 
 Names are compared after NFC, case and punctuation folding, so "Model-X" and "model x" are one
 name. A scheme has one to four node levels, in a fixed order; nodes sit at the depth of their
-level. The matching of products to profiles (FIT.2) will live here too.
+level. The matching of products to
+profiles and the rules of a product's declaration (FIT.2) live here too, as pure functions
+over node paths: a path starting with another is below it.
 """
 
 import re
 import unicodedata
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 
 MAX_LEVELS = 4
 
@@ -97,3 +100,197 @@ def status_transition_error(old: str, new: str) -> str | None:
     if (old, new) in _ALLOWED_TRANSITIONS:
         return None
     return f"A {old} node cannot become {new}."
+
+
+# --- Matching a profile against a product's declaration (FIT.2, spec 17 §17.2.3)
+
+UNDECLARED = "undeclared"
+SPECIFIC = "specific"
+UNIVERSAL = "universal"
+MODES = (UNDECLARED, SPECIFIC, UNIVERSAL)
+
+FITS = "fits"
+CHECK = "check"
+NO = "no"
+UNKNOWN = "unknown"
+
+DEFAULT_MAX_ROWS = 500
+
+
+@dataclass(frozen=True)
+class Row:
+    """One declaration row: a node path, a flag, and an optional year range (both included)."""
+
+    node_path: str
+    is_exclusion: bool = False
+    year_from: int | None = None
+    year_to: int | None = None
+
+
+@dataclass(frozen=True)
+class Profile:
+    """What the customer chose: a node path and, optionally, a year."""
+
+    node_path: str
+    year: int | None = None
+
+
+def _covers_node(row: Row, profile: Profile) -> bool:
+    """The row's node is the profile's node or one of its ancestors."""
+    return profile.node_path.startswith(row.node_path)
+
+
+def _below_node(row: Row, profile: Profile) -> bool:
+    """The row names something more specific than the profile."""
+    return row.node_path.startswith(profile.node_path) and row.node_path != profile.node_path
+
+
+def _year_state(row: Row, year: int | None) -> str:
+    """`in`, `out`, or `unknown` (the row has a range and the profile has no year)."""
+    if row.year_from is None and row.year_to is None:
+        return "in"
+    if year is None:
+        return "unknown"
+    low = row.year_from if row.year_from is not None else year
+    high = row.year_to if row.year_to is not None else year
+    return "in" if low <= year <= high else "out"
+
+
+def _specific_answer(rows: Sequence[Row], profile: Profile) -> str:
+    full_include = partial = partial_exclusion = False
+    for row in rows:
+        year = _year_state(row, profile.year)
+        if _covers_node(row, profile):
+            if row.is_exclusion:
+                if year == "in":
+                    return NO  # an exclusion beats an include at the same or an ancestor depth
+                partial_exclusion |= year == "unknown"
+            elif year == "in":
+                full_include = True
+            else:
+                partial |= year == "unknown"
+        elif _below_node(row, profile) and year != "out":
+            if row.is_exclusion:
+                partial_exclusion = True
+            else:
+                partial = True
+    if full_include:
+        return CHECK if partial_exclusion else FITS
+    return CHECK if partial else NO
+
+
+def answer(mode: str, rows: Sequence[Row], profile: Profile) -> str:
+    """`fits`, `check`, `no` or `unknown` for a profile against a product's declaration."""
+    if mode == UNIVERSAL:
+        return FITS
+    if mode == SPECIFIC:
+        return _specific_answer(rows, profile)
+    return UNKNOWN
+
+
+def fits(mode: str, rows: Sequence[Row], profile: Profile) -> bool:
+    return answer(mode, rows, profile) == FITS
+
+
+def check(mode: str, rows: Sequence[Row], profile: Profile) -> bool:
+    return answer(mode, rows, profile) == CHECK
+
+
+def no(mode: str, rows: Sequence[Row], profile: Profile) -> bool:
+    return answer(mode, rows, profile) == NO
+
+
+def unknown(mode: str, rows: Sequence[Row], profile: Profile) -> bool:
+    return answer(mode, rows, profile) == UNKNOWN
+
+
+# --- Validation of a declaration (spec 17 §17.2.4)
+
+
+@dataclass
+class Problems:
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+def _bounds(row: Row, low: int, high: int) -> tuple[int, int]:
+    return (
+        row.year_from if row.year_from is not None else low,
+        row.year_to if row.year_to is not None else high,
+    )
+
+
+def _years_overlap(first: Row, second: Row) -> bool:
+    # Open ends are compared on a range wider than any year.
+    a_low, a_high = _bounds(first, -(10**6), 10**6)
+    b_low, b_high = _bounds(second, -(10**6), 10**6)
+    return a_low <= b_high and b_low <= a_high
+
+
+def declaration_problems(
+    mode: str,
+    rows: Sequence[Row],
+    *,
+    max_rows: int = DEFAULT_MAX_ROWS,
+    year_min: int | None = None,
+    year_max: int | None = None,
+    years_enabled: bool = True,
+) -> Problems:
+    """The errors that refuse a declaration and the warnings that only inform the seller."""
+    problems = Problems()
+    errors = problems.errors
+    if mode not in MODES:
+        errors.append(f"Unknown declaration {mode!r}.")
+        return problems
+    includes = [row for row in rows if not row.is_exclusion]
+    if mode == SPECIFIC and not includes:
+        errors.append("Specific items need at least one row that fits.")
+    if mode == UNIVERSAL and includes:
+        errors.append("An item that fits everything takes no row that fits; remove the rows.")
+    if mode == UNDECLARED and rows:
+        errors.append("An undeclared item takes no rows.")
+    if len(rows) > max_rows:
+        errors.append(
+            f"A product has at most {max_rows} rows: use a higher-level node for a bigger set."
+        )
+    for number, row in enumerate(rows, start=1):
+        has_years = row.year_from is not None or row.year_to is not None
+        if has_years and not years_enabled:
+            errors.append(f"Row {number}: this scheme does not use a year.")
+            continue
+        if row.year_from is not None and row.year_to is not None and row.year_from > row.year_to:
+            errors.append(f"Row {number}: the first year is after the last year.")
+        for value in (row.year_from, row.year_to):
+            if value is None:
+                continue
+            if (year_min is not None and value < year_min) or (
+                year_max is not None and value > year_max
+            ):
+                errors.append(
+                    f"Row {number}: the year {value} is outside {year_min} to {year_max}."
+                )
+    for i, first in enumerate(rows):
+        for j in range(i + 1, len(rows)):
+            second = rows[j]
+            if first.node_path != second.node_path:
+                continue
+            if first.is_exclusion == second.is_exclusion:
+                if (first.year_from, first.year_to) == (second.year_from, second.year_to):
+                    errors.append(f"Row {j + 1} repeats row {i + 1}.")
+            elif _years_overlap(first, second):
+                errors.append(
+                    f"Rows {i + 1} and {j + 1} contradict each other: the same item is both "
+                    "included and excluded in overlapping years."
+                )
+    if not errors and mode != UNIVERSAL:
+        for number, row in enumerate(rows, start=1):
+            if row.is_exclusion and not any(
+                not other.is_exclusion
+                and row.node_path.startswith(other.node_path)
+                and _years_overlap(row, other)
+                for other in rows
+            ):
+                problems.warnings.append(
+                    f"Row {number}: an exclusion without anything to exclude from."
+                )
+    return problems

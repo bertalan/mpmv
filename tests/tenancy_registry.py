@@ -34,6 +34,8 @@ from apps.catalog.models import (
     PriceHistory,
     Product,
     ProductAttribute,
+    ProductImage,
+    ProductImageTranslation,
     ProductTranslation,
     SkuAlias,
     SlugHistory,
@@ -46,6 +48,8 @@ from apps.catalog.tests.factories import (
     PriceHistoryFactory,
     ProductAttributeFactory,
     ProductFactory,
+    ProductImageFactory,
+    ProductImageTranslationFactory,
     ProductTranslationFactory,
     SlugHistoryFactory,
     TaxonomyFactory,
@@ -82,6 +86,8 @@ from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
+from apps.fitment.models import ProductFitment, ProductFitmentState
+from apps.fitment.tests.factories import ProductFitmentFactory, ProductFitmentStateFactory
 from apps.ingest.models import (
     ImportRun,
     MappingTable,
@@ -213,6 +219,12 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
+    ProductFitmentState: lambda vendor: ProductFitmentStateFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    ProductFitment: lambda vendor: ProductFitmentFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
     SlugHistory: lambda vendor: SlugHistoryFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
@@ -229,6 +241,12 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ),
     BrandBatch: lambda vendor: BrandBatchFactory.create(vendor=vendor),
     SkuAlias: lambda vendor: renamed_product_alias(vendor),
+    ProductImage: lambda vendor: ProductImageFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    ProductImageTranslation: lambda vendor: ProductImageTranslationFactory.create(
+        product_image__product=ProductFactory.create(vendor=vendor)
+    ),
     ProductAttribute: lambda vendor: ProductAttributeFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
