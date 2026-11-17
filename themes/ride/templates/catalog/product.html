@@ -1,0 +1,111 @@
+{% extends "layouts/base.html" %}
+{% load i18n l10n static responsive_images wagtailcore_tags consumer_prices %}
+{% comment %}
+  Product page of `ride` (THM.7 part 2): the app template's structure (copied from
+  catalog/product.html, CAT.7: same ids, hooks, i18n, consumer-price rules, add-to-cart form with
+  its htmx hooks and the companion) on the Bootstrap grid. The title is the only h1, in the page
+  banner with the breadcrumb (`trail`); the gallery is the theme's `components/gallery.html`
+  (carousel with thumbnails and zoom `<dialog>`); the buy box is a card; the description and the
+  product details are Bootstrap tabs (without JavaScript both panels follow one another, see
+  css/46-product.css); the related products are a strip of Bootstrap cards. No inline script or
+  style (the CSP has no 'unsafe-inline') and no stylesheet of the app's minimal layout.
+{% endcomment %}
+{% block title %}{{ page_data.title }}{% if site_name %} · {{ site_name }}{% endif %}{% endblock %}
+{% block description %}{% if page_data.short_description %}<meta name="description" content="{{ page_data.short_description }}">{% endif %}{% endblock %}
+{% block head %}{{ block.super }}
+  {% robots_meta robots %}
+{% endblock %}
+{% block content %}
+  <article class="product-page">
+    {% include "components/page_banner.html" with title=page_data.title items=trail text=page_data.short_description only %}
+    {% if page_data.is_fallback %}<p class="product-notice alert alert-info mt-3" role="note">{% translate "This page is not available in your language yet." %}</p>{% endif %}
+
+    <div class="row g-4 my-0 py-4">
+      <div class="col-lg-7">
+        {% if gallery_items %}
+          {% include "components/gallery.html" with id="product-images" label=_("Product images") images=gallery_items only %}
+        {% endif %}
+      </div>
+
+      <section class="product-buy col-lg-5" aria-labelledby="product-buy-heading">
+        <div class="card">
+          <div class="card-body">
+            <h2 id="product-buy-heading" class="visually-hidden">{% translate "Price and availability" %}</h2>
+            <p class="product-sku text-body-secondary">{% translate "SKU" %}: <span class="product-sku-value">{{ page_data.product.sku }}</span></p>
+            {% if page_data.retired %}
+              <p class="product-retired alert alert-secondary" role="note">{% translate "This product is no longer available." %}</p>
+            {% elif page_data.on_request %}
+              <div class="h3"><p class="product-price">{% translate "Price on request" %}</p></div>
+              <p class="product-on-request">{% blocktranslate with vendor=page_data.vendor.display_name %}Ask {{ vendor }} about this product: it is not sold online.{% endblocktranslate %}</p>
+            {% else %}
+              {% if not page_data.variants %}
+                <div class="h3"><p class="product-price">{% if page_data.price is not None %}{% consumer_price page_data.price page_data.product.fiscal_category page_data.vendor as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note text-body-secondary">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p></div>
+                <p class="product-stock">{% include "catalog/includes/stock_status.html" with status=page_data.stock_status %}</p>
+              {% endif %}
+              <form class="product-form" method="post" action="{% url 'orders:cart_add' %}" hx-post="{% url 'orders:cart_add' %}" hx-target="#add-to-cart-result" hx-swap="innerHTML">
+                {% csrf_token %}
+                <input type="hidden" name="product" value="{{ page_data.product.public_id }}">
+                <input type="hidden" name="next" value="{{ request.path }}">
+                {% if page_data.variants %}
+                  <fieldset class="product-variants mb-3">
+                    <legend class="h6">{% translate "Choose a version" %}</legend>
+                    <ul class="list-unstyled mb-0">
+                      {% for variant in page_data.variants %}
+                        <li class="form-check">
+                          <input class="form-check-input" type="radio" name="variant" id="variant-{{ forloop.counter }}" value="{{ variant.sku }}"{% if variant.selected %} checked{% endif %}>
+                          <label class="form-check-label" for="variant-{{ forloop.counter }}">{{ variant.label }}{% if variant.price is not None %}{% consumer_price variant.price page_data.product.fiscal_category page_data.vendor as shown %}{% if shown %} <span class="variant-price"><data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note text-body-secondary">{{ shown.note }}</small></span>{% endif %}{% endif %} <span class="variant-stock">{% include "catalog/includes/stock_status.html" with status=variant.stock_status %}</span> <span class="variant-sku text-body-secondary">({{ variant.sku }})</span></label>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </fieldset>
+                {% endif %}
+                <div class="d-flex flex-wrap align-items-end gap-3">
+                  {% include "components/quantity_stepper.html" with id="product-quantity" value=1 only %}
+                  <button type="submit" class="btn btn-primary">{% translate "Add to cart" %}</button>
+                </div>
+                <div id="add-to-cart-result" class="mt-3"></div>
+              </form>
+            {% endif %}
+            <p class="product-vendor mt-3 mb-0">{% translate "Sold by" %} <a href="{{ vendor_url }}">{{ page_data.vendor.display_name }}</a></p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="product-info mb-4">
+      <ul class="nav nav-tabs" role="tablist">
+        {% if page_data.description %}<li class="nav-item" role="presentation"><button type="button" class="nav-link active" id="product-tab-description" data-bs-toggle="tab" data-bs-target="#product-panel-description" role="tab" aria-controls="product-panel-description" aria-selected="true">{% translate "Description" %}</button></li>{% endif %}
+        <li class="nav-item" role="presentation"><button type="button" class="nav-link{% if not page_data.description %} active{% endif %}" id="product-tab-details" data-bs-toggle="tab" data-bs-target="#product-panel-details" role="tab" aria-controls="product-panel-details" aria-selected="{% if page_data.description %}false{% else %}true{% endif %}"{% if page_data.description %} tabindex="-1"{% endif %}>{% translate "Details" %}</button></li>
+      </ul>
+      <div class="tab-content border border-top-0 p-3">
+        {% if page_data.description %}
+          <div class="tab-pane fade show active product-description" id="product-panel-description" role="tabpanel" aria-labelledby="product-tab-description" tabindex="0"{% if page_data.is_fallback %} lang="{{ page_data.shown }}"{% endif %}>
+            {{ page_data.description|richtext }}
+          </div>
+        {% endif %}
+        <div class="tab-pane fade{% if not page_data.description %} show active{% endif %} product-details" id="product-panel-details" role="tabpanel" aria-labelledby="product-tab-details" tabindex="0">
+          <dl class="row mb-0">
+            <dt class="col-sm-3">{% translate "SKU" %}</dt><dd class="col-sm-9">{{ page_data.product.sku }}</dd>
+            <dt class="col-sm-3">{% translate "Sold by" %}</dt><dd class="col-sm-9 mb-0"><a href="{{ vendor_url }}">{{ page_data.vendor.display_name }}</a></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    {% if page_data.companion %}
+      <aside class="product-companion mb-4" aria-labelledby="product-companion-heading">
+        <h2 id="product-companion-heading" class="h4">{% translate "Needed with this product" %}</h2>
+        <div class="row"><div class="col-sm-6 col-lg-4">{% include "catalog/includes/product_card.html" with card=page_data.companion %}</div></div>
+      </aside>
+    {% endif %}
+
+    {% if related %}
+      <section class="product-related mb-4" aria-labelledby="product-related-heading">
+        <h2 id="product-related-heading" class="h4">{% translate "You may also like" %}</h2>
+        <ul class="product-grid row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 list-unstyled">
+          {% for card in related %}<li class="col">{% include "catalog/includes/product_card.html" %}</li>{% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+  </article>
+{% endblock %}
