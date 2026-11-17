@@ -81,3 +81,11 @@ def test_elsewhere_site_root_url_logs_an_error_and_is_never_empty(
         root = site_root_url(RequestFactory().get("/"))
     assert root.startswith("http")
     assert "site" in caplog.text.lower()
+
+
+def test_the_check_is_silent_before_the_site_table_exists(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`migrate` runs the database checks before it creates the tables (the upgrade path in CI)."""
+    from django.db import connection
+
+    monkeypatch.setattr(connection.introspection, "table_names", lambda *a, **k: [])
+    assert check_site_hostname(None) == []

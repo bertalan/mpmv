@@ -12,6 +12,7 @@ from typing import Any
 from django.apps import AppConfig
 from django.conf import settings
 from django.core import checks
+from django.db import connection
 from wagtail.models import Site
 
 PLACEHOLDER_HOSTNAME = "localhost"  # what the installer (cms migration 0002) creates
@@ -36,6 +37,8 @@ def site_is_strict() -> bool:
 def check_site_hostname(
     app_configs: Iterable[AppConfig] | None, **kwargs: Any
 ) -> list[checks.CheckMessage]:
+    if Site._meta.db_table not in connection.introspection.table_names():
+        return []  # `migrate` runs the database checks before it creates the table
     site = Site.objects.filter(is_default_site=True).first()
     problem = "There is no default Site" if site is None else hostname_problem(site.hostname)
     if site is not None and problem is not None:
