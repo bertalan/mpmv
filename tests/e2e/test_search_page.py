@@ -26,7 +26,9 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 
 @pytest.fixture(autouse=True)
-def _content(settings: SettingsWrapper, live_server: LiveServer, _cms_site: None) -> None:
+def _content(
+    settings: SettingsWrapper, live_server: LiveServer, site_allows_indexing: None
+) -> None:
     settings.MPMV_HELP_URL = "/about/#help"
     vendor = VendorFactory.create(
         status=Vendor.Status.ACTIVE, sells_online=True, display_name="Bagworks", slug="bagworks"
@@ -82,9 +84,9 @@ def no_js_page(browser: Browser) -> Iterator[Page]:
 
 def test_the_search_works_without_javascript(no_js_page: Page, live_server: LiveServer) -> None:
     no_js_page.goto(f"{live_server.url}/?s=bag")
-    expect(no_js_page.get_by_role("link", name="Leather bag")).to_be_visible()
-    field = no_js_page.locator("main input[name='s']")
+    expect(no_js_page.get_by_role("link", name="Leather bag", exact=True)).to_be_visible()
+    field = no_js_page.locator("#search-page-input")
     field.fill("leather")
     field.press("Enter")
     expect(no_js_page).to_have_url(re.compile(r"/\?s=leather$"))
-    expect(no_js_page.get_by_role("link", name="Leather bag")).to_be_visible()
+    expect(no_js_page.get_by_role("link", name="Leather bag", exact=True)).to_be_visible()
