@@ -179,6 +179,7 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:fitment_node": "platform",
         "manager:platform:fitment_node_merge": "platform",
         "manager:shop:termination": "shop",
+        "manager:shop:statements": "shop",
         "manager:shop:sales_terms": "shop",
         "manager:shop:events": "shop",  # EVT.4
         "manager:shop:event_new": "shop",
