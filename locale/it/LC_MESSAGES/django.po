@@ -279,6 +279,12 @@ msgstr "Un'impronta dei dati. Gli stessi dati vengono salvati una sola volta per
 msgid "A grid, or one row that scrolls sideways."
 msgstr "Una griglia, oppure una sola riga che scorre di lato."
 
+#: apps/catalog/models.py
+msgid "A hand-picked cover that imports and automatic updates never replace."
+msgstr ""
+"Una copertina scelta a mano che le importazioni e gli aggiornamenti automatici non sostituiscono "
+"mai."
+
 #: apps/core/models.py
 msgid "A link to the text of the licence. Optional."
 msgstr "Un link al testo della licenza. Facoltativo."
@@ -952,6 +958,10 @@ msgstr "Un articolo non era disponibile"
 #: apps/orders/ui/views.py
 msgid "An item went out of stock."
 msgstr "Un articolo è esaurito."
+
+#: apps/catalog/models.py
+msgid "An optional line shown with the image."
+msgstr "Una riga facoltativa mostrata con l'immagine."
 
 #: apps/catalog/models.py
 msgid ""
@@ -1965,6 +1975,14 @@ msgstr ""
 msgid "Describe the picture in a few words, for people who cannot see it. Required with a picture."
 msgstr ""
 "Descrivi l'immagine in poche parole, per chi non può vederla. Obbligatorio se scegli un'immagine."
+
+#: apps/catalog/models.py
+msgid ""
+"Describes the image for people who cannot see it, for example 'Red ceramic mug, front view'. "
+"Required."
+msgstr ""
+"Descrive l'immagine a chi non può vederla, ad esempio 'Tazza in ceramica rossa, vista frontale'. "
+"Obbligatorio."
 
 #: apps/catalog/taxonomy.py
 msgid "description"
@@ -3079,6 +3097,15 @@ msgstr "Latitudine"
 #: apps/manager/event_block_forms.py
 msgid "Layout"
 msgstr "Disposizione"
+
+#: apps/catalog/models.py
+msgid ""
+"Leave empty for an image that suits every language. Choose a language when the image is only for "
+"it, for example packaging printed in German: that language then shows only its own images."
+msgstr ""
+"Lascia vuoto per un'immagine adatta a ogni lingua. Scegli una lingua quando l'immagine è solo per "
+"quella, ad esempio una confezione stampata in tedesco: quella lingua mostrerà solo le proprie "
+"immagini."
 
 #: apps/compliance/forms.py
 msgid ""
@@ -6787,6 +6814,10 @@ msgstr ""
 "La categoria principale del prodotto. Compare nel percorso sopra il prodotto, così chi compra lo "
 "trova. Puoi lasciarla vuota finché il prodotto è una bozza."
 
+#: apps/catalog/models.py
+msgid "The main image of the gallery."
+msgstr "L'immagine principale della galleria."
+
 #: apps/manager/templates/manager/forbidden.html
 msgid ""
 "The Manager is for platform staff and for vendor members. If you need access, ask the platform "
@@ -7108,6 +7139,10 @@ msgid ""
 msgstr ""
 "L'ordine in cui un prodotto elenca i suoi attributi: i numeri più bassi vengono prima. Lascia 0 se"
 " l'ordine non conta."
+
+#: apps/catalog/models.py
+msgid "The order of the images: lower numbers come first."
+msgstr "L'ordine delle immagini: i numeri più bassi vengono prima."
 
 #: apps/catalog/attributes.py
 msgid ""

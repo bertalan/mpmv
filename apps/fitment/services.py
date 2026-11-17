@@ -17,18 +17,22 @@ from dataclasses import dataclass
 from typing import Any
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.backends.postgresql.psycopg_any import NumericRange
 from django.db.models import Count
 from django.http import HttpRequest
 from django.utils import timezone
 
-from apps.catalog.models import Category
+from apps.catalog.models import Category, Product
 from apps.core import translations
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
-from apps.core.models import TranslationStatus
+from apps.core.models import AuditLog, TranslationStatus
 from apps.core.services import run_mutation
+from apps.vendors import services as vendors_services
+from apps.vendors.scoping import is_platform_staff
 
 from . import engine, garage, references
 from .models import (
@@ -39,8 +43,11 @@ from .models import (
     FitmentNodeAlias,
     FitmentNodeMerge,
     FitmentNodeTranslation,
+    FitmentNote,
     FitmentScheme,
     NodeStatus,
+    ProductFitment,
+    ProductFitmentState,
     code_validator,
 )
 
@@ -57,6 +64,7 @@ NODE_DELETED = "fitment.node.deleted"
 ALIAS_CREATED = "fitment.alias.created"
 ALIAS_DELETED = "fitment.alias.deleted"
 CATEGORY_RELEVANCE_CHANGED = "fitment.category.relevance_changed"
+PRODUCT_FITMENT_SET = "fitment.product.fitment_set"
 
 SCHEME_FIELDS = (
     "garage_noun_key",
@@ -764,6 +772,7 @@ def set_fitment_relevant(
                 )
             else:
                 FitmentCategory.objects.filter(category__in=todo).delete()
+            _refresh_always_visible(categories=todo)
 
         return run_mutation(
             changeset, apply, ctx=ctx, action=CATEGORY_RELEVANCE_CHANGED, dry_run=dry_run
@@ -844,3 +853,274 @@ def vehicle_from_labels(make: object, model: object, year: object = "") -> garag
             raise FitmentError("The year is outside the range of the scheme.")
         label = vehicle.year
     return garage.Vehicle(root.name, child.name, label)
+
+
+# --- What a product fits (FIT.2) ------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RowInput:
+    """One row a seller declares. A year range may be open at one end (the scheme's bound)."""
+
+    node: FitmentNode
+    year_from: int | None = None
+    year_to: int | None = None
+    is_exclusion: bool = False
+    note: FitmentNote | None = None
+
+
+def max_rows_per_product() -> int:
+    return int(getattr(settings, "FITMENT_MAX_ROWS_PER_PRODUCT", engine.DEFAULT_MAX_ROWS))
+
+
+def _year_bounds(scheme: FitmentScheme) -> tuple[int, int]:
+    return scheme.year_min, timezone.now().year + scheme.year_max_offset
+
+
+def _engine_row(row: RowInput) -> engine.Row:
+    return engine.Row(row.node.path, row.is_exclusion, row.year_from, row.year_to)
+
+
+def product_fitment_warnings(mode: str, rows: Iterable[RowInput]) -> list[str]:
+    """What the rules only warn about, for the seller to read before confirming."""
+    return engine.declaration_problems(mode, [_engine_row(row) for row in rows]).warnings
+
+
+def _is_always_visible(product: Product, mode: str, relevant_ids: set[int]) -> bool:
+    return mode == engine.UNIVERSAL or product.category_id not in relevant_ids
+
+
+def _refresh_always_visible(*, categories: Iterable[Category]) -> None:
+    """After the operator marks or unmarks categories: refresh the denormalised flag of the
+    declarations of their products."""
+    relevant = relevant_category_ids()
+    for category in categories:
+        states = ProductFitmentState.objects.filter(product__category=category)
+        if category.pk in relevant:
+            states.update(always_visible=False)
+            states.filter(mode=engine.UNIVERSAL).update(always_visible=True)
+        else:
+            states.update(always_visible=True)
+
+
+def _row_snapshot(
+    node: FitmentNode,
+    years: tuple[int | None, int | None],
+    is_exclusion: bool,
+    note: FitmentNote | None,
+    source: str,
+) -> dict[str, Any]:
+    return {
+        "node": str(node.public_id),
+        "years": None if years == (None, None) else list(years),
+        "exclusion": is_exclusion,
+        "note": None if note is None else note.code,
+        "source": source,
+    }
+
+
+def _normalized_years(row: RowInput, low: int, high: int) -> tuple[int | None, int | None]:
+    if row.year_from is None and row.year_to is None:
+        return (None, None)
+    return (
+        row.year_from if row.year_from is not None else low,
+        row.year_to if row.year_to is not None else high,
+    )
+
+
+def _fitment_snapshot(product: Product, mode: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    ordered = sorted(rows, key=lambda r: (r["node"], str(r["years"]), r["exclusion"]))
+    return {
+        "vendor": str(product.vendor.public_id),
+        "product": str(product.public_id),
+        "mode": mode,
+        "rows": ordered,
+    }
+
+
+_SYSTEM_SOURCES = {AuditLog.Source.COMMAND, AuditLog.Source.TASK, AuditLog.Source.SYSTEM}
+
+
+def _check_actor(product: Product, ctx: AuditContext) -> None:
+    """The actor is platform staff or a member of the product's vendor with the products right.
+
+    A system run (command, task, feed refresh) carries no user and is allowed; a user context
+    whose user is missing, or belongs to another vendor, is refused (spec 17 §17.2.4, FIT.2).
+    """
+    if ctx.actor_id is None:
+        if ctx.source in _SYSTEM_SOURCES:
+            return
+        raise PermissionDenied("A user action needs a signed-in actor.")
+    user = get_user_model().objects.filter(pk=ctx.actor_id).first()
+    if user is None or not user.is_active:
+        raise PermissionDenied("The actor does not exist or is inactive.")
+    if is_platform_staff(user):
+        return
+    if not vendors_services.has_vendor_permission(user, product.vendor, "products"):
+        raise PermissionDenied("The actor may not change this product's fitment.")
+
+
+def set_product_fitment(
+    product: Product,
+    mode: str,
+    rows: Iterable[RowInput],
+    source: str,
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Replace what `product` declares it fits (spec 17 §17.2.3, §17.2.4).
+
+    A replace by hand, CSV or reference data swaps every row; a `feed` refresh swaps only the
+    rows that came from a feed, so a seller's own rows stay. The ChangeSet lists each row that
+    is created, changed or deleted; one `AuditLog` entry records the whole replace, with every
+    row before and after. Nothing is written when the declaration is unchanged. Refusals raise
+    `FitmentError`, an actor outside the product's vendor `PermissionDenied`; warnings (an
+    exclusion with nothing to exclude from) are `product_fitment_warnings`.
+    """
+    _check_actor(product, ctx)
+    if source not in ProductFitment.Source.values:
+        raise FitmentError(f"Unknown source {source!r}.")
+    wanted = list(rows)
+    with transaction.atomic():
+        scheme = current_scheme()
+        low, high = _year_bounds(scheme)
+        existing_state = (
+            ProductFitmentState.objects.select_for_update().filter(product=product).first()
+        )
+        existing = list(
+            ProductFitment.objects.select_for_update(of=("self",))
+            .filter(product=product)
+            .select_related("node", "note")
+        )
+        replaced = [
+            r for r in existing if source != ProductFitment.Source.FEED or r.source == source
+        ]
+        kept = [r for r in existing if r not in replaced]
+        known_nodes = {r.node_id for r in existing}
+        nodes = {
+            n.pk: n
+            for n in FitmentNode.objects.select_for_update().filter(
+                pk__in={r.node.pk for r in wanted}
+            )
+        }
+        resolved: list[tuple[RowInput, FitmentNode]] = []
+        for row in wanted:
+            node = nodes.get(row.node.pk)
+            if node is None:
+                raise FitmentError("A node of the declaration no longer exists.")
+            if node.status != NodeStatus.ACTIVE and node.pk not in known_nodes:
+                raise FitmentError(f"The node {node.name!r} is not active: choose an active node.")
+            resolved.append(
+                (RowInput(node, row.year_from, row.year_to, row.is_exclusion, row.note), node)
+            )
+        new_rows = [(r, _normalized_years(r, low, high)) for r, _ in resolved]
+        checked = [
+            engine.Row(r.node.path, r.is_exclusion, years[0], years[1]) for r, years in new_rows
+        ] + [engine.Row(r.node_path, r.is_exclusion, r.year_from, r.year_to) for r in kept]
+        problems = engine.declaration_problems(
+            mode,
+            checked,
+            max_rows=max_rows_per_product(),
+            year_min=low,
+            year_max=high,
+            years_enabled=scheme.year_enabled,
+        )
+        if problems.errors:
+            raise FitmentError(" ".join(problems.errors))
+
+        old_key = {(r.node_id, (r.year_from, r.year_to), r.is_exclusion): r for r in replaced}
+        new_key = {(r.node.pk, years, r.is_exclusion): (r, years) for r, years in new_rows}
+        changeset = ChangeSet()
+        to_create: list[tuple[RowInput, tuple[int | None, int | None]]] = []
+        to_update: list[tuple[ProductFitment, RowInput]] = []
+        for key, (row, years) in new_key.items():
+            snap = _row_snapshot(row.node, years, row.is_exclusion, row.note, source)
+            label = "fitment.productfitment"
+            old = old_key.get(key)
+            if old is None:
+                to_create.append((row, years))
+                changeset.create(label, f"{product.public_id}:{row.node.public_id}", snap)
+            elif old.note_id != (row.note.pk if row.note else None) or old.source != source:
+                before = _row_snapshot(old.node, key[1], old.is_exclusion, old.note, old.source)
+                to_update.append((old, row))
+                changeset.update(label, f"{product.public_id}:{row.node.public_id}", before, snap)
+        for key, old in old_key.items():
+            if key not in new_key:
+                before = _row_snapshot(old.node, key[1], old.is_exclusion, old.note, old.source)
+                changeset.delete(
+                    "fitment.productfitment", f"{product.public_id}:{old.node.public_id}", before
+                )
+
+        before_mode = existing_state.mode if existing_state else engine.UNDECLARED
+        relevant_ids = relevant_category_ids()
+        visible = _is_always_visible(product, mode, relevant_ids)
+        if existing_state is None and mode == engine.UNDECLARED and not wanted:
+            return changeset  # nothing declared, nothing to record
+        if before_mode != mode:
+            changeset.update(
+                "fitment.productfitmentstate",
+                str(product.public_id),
+                {"mode": before_mode},
+                {"mode": mode},
+            )
+        changed = not changeset.is_empty
+        if dry_run:
+            return changeset
+
+        def snapshot_of(state_mode: str, items: list[dict[str, Any]]) -> dict[str, Any]:
+            return _fitment_snapshot(product, state_mode, items)
+
+        if not changed:
+            if existing_state is not None and existing_state.always_visible != visible:
+                existing_state.always_visible = visible
+                existing_state.save(update_fields=["always_visible", "updated_at"])
+            return changeset
+        before_snapshot = snapshot_of(
+            before_mode,
+            [
+                _row_snapshot(r.node, (r.year_from, r.year_to), r.is_exclusion, r.note, r.source)
+                for r in existing
+            ],
+        )
+        for key, old in old_key.items():
+            if key not in new_key:
+                old.delete()
+        for old, row in to_update:
+            old.note = row.note
+            old.source = source
+            old.save(update_fields=["note", "source", "updated_at"])
+        ProductFitment.objects.bulk_create(
+            [
+                ProductFitment(
+                    product=product,
+                    node=row.node,
+                    node_path=row.node.path,
+                    years=None if years == (None, None) else NumericRange(years[0], years[1], "[]"),
+                    is_exclusion=row.is_exclusion,
+                    note=row.note,
+                    source=source,
+                )
+                for row, years in to_create
+            ]
+        )
+        state = existing_state or ProductFitmentState(product=product)
+        state.mode = mode
+        state.always_visible = visible
+        state.rows_version += 1
+        state.save()
+        after_rows = [
+            _row_snapshot(r.node, years, r.is_exclusion, r.note, source) for r, years in new_rows
+        ] + [
+            _row_snapshot(r.node, (r.year_from, r.year_to), r.is_exclusion, r.note, r.source)
+            for r in kept
+        ]
+        record(
+            ctx,
+            PRODUCT_FITMENT_SET,
+            "fitment.productfitmentstate",
+            str(product.public_id),
+            before_snapshot,
+            snapshot_of(mode, after_rows),
+        )
+        return changeset
