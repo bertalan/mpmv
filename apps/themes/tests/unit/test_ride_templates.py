@@ -278,10 +278,13 @@ def test_without_a_search_url_the_header_searches_on_the_language_home() -> None
 
 def test_the_default_search_action_is_the_active_language_home() -> None:
     """CAT.27: without an explicit `search_url` the header form targets the language home."""
+    from django.conf import settings
     from django.utils import translation
 
-    with translation.override("it"):
+    # A non-primary language carries a URL prefix (/it/ under en,it; /de/ under it,de).
+    other = next(code for code, _name in settings.LANGUAGES if code != settings.LANGUAGE_CODE)
+    with translation.override(other):
         html = render("components/header.html", site_name="Ride", links=LINKS)
     form = re.search(r'<form[^>]*role="search"[^>]*>', html)
     assert form
-    assert 'action="/it/"' in form.group(0)
+    assert f'action="/{other}/"' in form.group(0)
