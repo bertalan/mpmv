@@ -53,6 +53,7 @@ from apps.catalog.taxonomy import (
     Term,
     TermTranslation,
 )
+from apps.cms.help_sync import sync_help
 from apps.cms.models import HomePage, LegalPage, StandardPage
 from apps.cms.seed import seed_text
 from apps.cms.services import seed_site
@@ -1118,6 +1119,8 @@ def _cms(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> Non
         run.created("cms.page", line)
     for line in sync_default_site():
         run.created("cms.site", line)
+    for change in sync_help().changes:  # ARC.36: the help files; rolled back with a dry run
+        run.created("cms.helpentry", change.key)
     locales = _locales()
     home = HomePage.objects.get(locale=Locale.get_default(), depth=2)
 
