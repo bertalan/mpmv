@@ -46,7 +46,6 @@ def operator_node(
     email: str = "",
     vat_id: str = "",
     profiles: Sequence[str] = (),
-    language: str = "",
 ) -> dict[str, Any]:
     """The platform operator: legal name, logo, VAT ID, profiles and a support contact point."""
     return _clean(

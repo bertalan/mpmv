@@ -15,7 +15,12 @@ from django.apps import apps
 from django.test import Client
 from wagtail.models import Page, Site, get_page_models
 
-from apps.catalog.tests.factories import BrandFactory, BrandTranslationFactory, CategoryFactory
+from apps.catalog.tests.factories import (
+    BrandFactory,
+    BrandTranslationFactory,
+    CategoryFactory,
+    CategoryTranslationFactory,
+)
 from apps.cms.tests.factories import (
     BlogAuthorFactory,
     BlogIndexPageFactory,
@@ -139,11 +144,14 @@ def test_event_page_graph() -> None:
 
 def test_category_and_brand_listings_are_collection_pages() -> None:
     category = CategoryFactory.create()
+    CategoryTranslationFactory.create(
+        category=category, language=primary_language(), status="published"
+    )
     from apps.catalog import services
 
     path = services.category_url(category, primary_language())
-    if path:
-        assert of(graph_of(path), "CollectionPage")["inLanguage"] == primary_language()
+    assert path
+    assert of(graph_of(path), "CollectionPage")["inLanguage"] == primary_language()
     brand = BrandFactory.create(name="Acme", status="approved")
     BrandTranslationFactory.create(
         brand=brand, language=primary_language(), slug="acme", status="published"

@@ -82,33 +82,6 @@ def test_home_page_without_operator_has_no_organization() -> None:
     assert '"Organization"' not in body
 
 
-def test_organization_node_has_logo_and_profiles_wikidata_first() -> None:
-    from apps.cms.engine import organization_jsonld
-
-    node = organization_jsonld(
-        "Acme",
-        "https://example.org/",
-        logo_url="https://example.org/logo.svg",
-        profiles=[
-            "https://example.org/p",
-            "http://insecure.example/x",
-            "https://user:pw@example.org/y",
-            "https://www.wikidata.org/wiki/Q1",
-            "https://example.org/p",
-        ],
-    )
-    assert node["logo"] == "https://example.org/logo.svg"
-    assert node["sameAs"] == ["https://www.wikidata.org/wiki/Q1", "https://example.org/p"]
-
-
-def test_no_logo_no_profiles_no_fields() -> None:
-    from apps.cms.engine import organization_jsonld
-
-    node = organization_jsonld("Acme", "https://example.org/")
-    assert "logo" not in node
-    assert "sameAs" not in node
-
-
 def test_operator_refuses_bad_profiles() -> None:
     from django.core.exceptions import ValidationError
 

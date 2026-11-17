@@ -19,7 +19,7 @@ def _logo_url(operator: Any, site: str) -> str:
         return ""
 
 
-def operator_graph_node(operator: Any, site: str, language: str) -> dict[str, Any]:
+def operator_graph_node(operator: Any, site: str) -> dict[str, Any]:
     from apps.cms.engine import profile_links
 
     return ge.operator_node(
@@ -29,15 +29,14 @@ def operator_graph_node(operator: Any, site: str, language: str) -> dict[str, An
         email=str(operator.support_email),
         vat_id=str(operator.vat_number),
         profiles=profile_links(operator.official_profiles),
-        language=language,
     )
 
 
 def website_graph_node(
-    request: HttpRequest, site: str, language: str, *, publisher: bool
+    request: HttpRequest, site: str, language: str, *, publisher: bool, operator_name: str = ""
 ) -> dict[str, Any]:
     row = Site.find_for_request(request)
-    name = (row.site_name if row is not None and row.site_name else "") or "MPMV"
+    name = row.site_name if row is not None and row.site_name else operator_name
     return ge.website_node(
         site=site, name=name, language=language, search_template="", publisher=publisher
     )

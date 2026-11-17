@@ -9,8 +9,8 @@ from urllib.parse import urlsplit
 import pytest
 from django.test import Client
 
-from apps.cms.engine import organization_jsonld
 from apps.core.tests.factories import PlatformOperatorFactory
+from apps.seo import graph_engine
 
 pytestmark = pytest.mark.django_db
 
@@ -82,11 +82,14 @@ def _operator(script: str) -> dict[str, Any]:
     return {"@context": document["@context"], **node}
 
 
+def organization(**kwargs: Any) -> dict[str, Any]:
+    node = graph_engine.operator_node(site="https://example.org", name="Acme", **kwargs)
+    return {"@context": "https://schema.org", **node}
+
+
 def test_full_node_is_valid() -> None:
-    node = organization_jsonld(
-        "Acme",
-        "https://example.org/",
-        support_email="help@example.org",
+    node = organization(
+        email="help@example.org",
         logo_url="https://example.org/logo.svg",
         profiles=["https://www.wikidata.org/wiki/Q1", "https://example.org/p"],
     )
@@ -94,13 +97,15 @@ def test_full_node_is_valid() -> None:
 
 
 def test_minimal_node_is_valid_and_omits_absent_fields() -> None:
-    node = organization_jsonld("Acme", "https://example.org/")
+    node = organization()
     assert schema_errors(node) == []
-    assert set(node) == {"@context", "@type", "name", "url"}
+    assert "logo" not in node
+    assert "sameAs" not in node
+    assert "contactPoint" not in node
 
 
 def test_checker_rejects_broken_nodes() -> None:
-    good = organization_jsonld("Acme", "https://example.org/", support_email="a@example.org")
+    good = organization(email="a@example.org")
     assert schema_errors({**good, "name": ""})
     assert schema_errors({**good, "url": "/relative"})
     assert schema_errors({**good, "sameAs": ["http://example.org/x"]})

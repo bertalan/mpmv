@@ -148,7 +148,11 @@ def test_only_same_origin_script_files_are_loaded(rendered_page: tuple[str, list
     html, _ = rendered_page
     scripts = re.findall(r"<script\b([^>]*)>", html)
     # The one JSON-LD data block (SEO.7) is not executable; every other script loads a file.
-    executable = [attrs for attrs in scripts if 'type="application/ld+json"' not in attrs]
+    executable = [
+        attrs
+        for attrs in scripts
+        if not re.search(r'(?:^|\s)type="application/ld\+json"(?:\s|$)', attrs)
+    ]
     sources = [re.search(r'src="([^"]+)"', attrs) for attrs in executable]
     assert all(source is not None for source in sources), "inline <script> found"
     urls = [source.group(1) for source in sources if source is not None]
@@ -167,3 +171,18 @@ def test_only_same_origin_script_files_are_loaded(rendered_page: tuple[str, list
 def test_the_login_switcher_returns_to_the_same_page(client: Client) -> None:
     html, _ = login_page(client)
     assert f'name="next" value="{reverse("mfa:verify")}"' in html
+
+
+def test_only_the_base_layout_emits_a_json_ld_script() -> None:
+    """The one graph per page comes from `{% page_graph_jsonld %}` in the base layout (SEO.7):
+    no other template or tag may write an `application/ld+json` element."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    allowed = {"themes/base/templates/layouts/base.html"}
+    offenders = [
+        str(path.relative_to(root))
+        for path in [*root.glob("apps/**/*.html"), *root.glob("themes/**/*.html")]
+        if "application/ld+json" in path.read_text() and str(path.relative_to(root)) not in allowed
+    ]
+    assert offenders == []

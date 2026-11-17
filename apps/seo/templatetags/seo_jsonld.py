@@ -7,31 +7,13 @@ The only writer of the block: the graph is JSON escaped like Django's `json_scri
 from typing import Any
 
 from django import template
-from django.http import HttpRequest
 from django.template.context import Context
 from django.utils.html import format_html
 from django.utils.safestring import SafeString, mark_safe
 
-from apps.catalog.product_pages import ProductPage
-from apps.core.site_url import site_root_url
-from apps.seo import product_jsonld as jsonld
 from apps.seo.page_graph import graph_text, page_graph
 
 register = template.Library()
-
-
-@register.simple_tag(takes_context=True)
-def product_jsonld(context: Context, page: ProductPage) -> SafeString:
-    request = context["request"]
-    site = site_root_url(request)
-    return format_html(
-        '<script type="application/ld+json">{}</script>',
-        SafeString(product_jsonld_text(page, site, request)),
-    )
-
-
-def product_jsonld_text(page: ProductPage, site: str, request: HttpRequest | None = None) -> str:
-    return jsonld.graph_text(page, site=site, request=request)
 
 
 @register.simple_tag(takes_context=True)

@@ -10,7 +10,6 @@ from django.conf import settings
 from django.http import HttpRequest
 from django.urls import NoReverseMatch, reverse
 from django.utils import translation
-from django.utils.safestring import SafeString, mark_safe
 from django.utils.translation import gettext
 from wagtail.models import Locale, Page
 
@@ -24,7 +23,6 @@ from apps.core.i18n import (
 from apps.core.image_licences import Credit
 
 from .. import engine, services
-from ..engine import faq_page_jsonld, jsonld_text
 from ..models import NavigationMenu
 
 register = template.Library()
@@ -141,29 +139,6 @@ def switch_next_url(context: dict[str, Any]) -> str:
 def page_image_credits(page: Page) -> list[Credit]:
     """The credits for the page's "Image credits" disclosure (CMS.8)."""
     return services.page_image_credits(page)
-
-
-@register.simple_tag
-def faq_jsonld(page: Any) -> SafeString:
-    """One FAQPage `<script>` for every question of the page's FAQ blocks, in order; "" if none.
-
-    One page-level object, as search engines expect one FAQPage per page (spec 10).
-    """
-    questions = engine.faq_questions(page)
-    if not questions:
-        return mark_safe("")
-    # JSON with <, > and & escaped: it cannot leave its script element (`jsonld_text`).
-    data = jsonld_text(faq_page_jsonld(questions))
-    return mark_safe(f'<script type="application/ld+json">{data}</script>')  # noqa: S308 (escaped by jsonld_text)
-
-
-@register.simple_tag
-def jsonld_script(data: Mapping[str, Any] | None) -> SafeString:
-    """`data` as a `<script type="application/ld+json">` (CMS.3 articles and author pages);
-    "" for none. Escaped by `jsonld_text`, so it cannot leave its script element."""
-    if not data:
-        return mark_safe("")
-    return mark_safe(f'<script type="application/ld+json">{jsonld_text(data)}</script>')  # noqa: S308 (escaped by jsonld_text)
 
 
 # --- Contextual help (ARC.32)

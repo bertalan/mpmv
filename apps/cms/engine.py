@@ -106,38 +106,6 @@ def profile_links(urls: Iterable[str]) -> list[str]:
     )
 
 
-def organization_jsonld(
-    name: str,
-    url: str,
-    support_email: str = "",
-    logo_url: str = "",
-    profiles: Iterable[str] = (),
-) -> dict[str, Any]:
-    """A minimal schema.org Organization for the platform operator (SEO.8 follow-up).
-
-    SEO.7 replaces it with the shared `@graph` node. `sameAs` lists the operator's verified https
-    profiles and `logo` its logo, each only when set; the contact point is the public support
-    address.
-    """
-    node: dict[str, Any] = {
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        "name": name,
-        "url": url,
-    }
-    if logo_url:
-        node["logo"] = logo_url
-    if links := profile_links(profiles):
-        node["sameAs"] = links
-    if support_email:
-        node["contactPoint"] = {
-            "@type": "ContactPoint",
-            "contactType": "customer support",
-            "email": support_email,
-        }
-    return node
-
-
 def jsonld_text(data: Mapping[str, Any]) -> str:
     """`data` as JSON safe to put inside `<script type="application/ld+json">`."""
     return json.dumps(data, ensure_ascii=False).translate(_JSONLD_ESCAPES)

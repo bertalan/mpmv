@@ -92,8 +92,14 @@ def _site_nodes(ctx: PageContext) -> list[Node]:
     except NoPlatformOperator:
         return [website_graph_node(ctx.request, ctx.site, ctx.language, publisher=False)]
     return [
-        operator_graph_node(operator, ctx.site, ctx.language),
-        website_graph_node(ctx.request, ctx.site, ctx.language, publisher=True),
+        operator_graph_node(operator, ctx.site),
+        website_graph_node(
+            ctx.request,
+            ctx.site,
+            ctx.language,
+            publisher=True,
+            operator_name=str(operator.legal_name),
+        ),
     ]
 
 
