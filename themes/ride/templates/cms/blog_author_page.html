@@ -1,0 +1,35 @@
+{% extends "layouts/base.html" %}
+{% load i18n wagtailcore_tags wagtailimages_tags image_credits cms_tags %}
+{% comment %}
+Author page of `ride` (THM.9 part 1): the app template's content (name, photo with its CMS.8
+credit, job title, bio in this language, profile links, then their articles) under the page
+banner (the only h1; the trail is Home, the blog, the author). `page` is the blog index; the
+page graph (SEO.7) holds the ProfilePage. The `{% image %}` tag is the app's (CAT.29).
+{% endcomment %}
+{% block title %}{{ author.name }} · {{ page.title }} · {{ site_name }}{% endblock %}
+{% block description %}{% endblock %}
+{% block content %}
+  {% page_trail page current=author.name as trail %}
+  {% include "components/page_banner.html" with title=author.name items=trail text=author_job_title only %}
+  <div class="page-content">
+    <section class="author-profile row g-4 mb-4">
+      {% if author.photo %}
+        {% image_credit_of author.photo as credit %}
+        <figure class="col-sm-auto figure">
+          {% image author.photo fill-240x240 alt=author.photo_alt_text %}
+          {% if credit %}<figcaption class="figure-caption">{% include "core/components/image_credit.html" %}</figcaption>{% endif %}
+        </figure>
+      {% endif %}
+      <div class="col-sm">
+        {% if author_bio %}{{ author_bio|richtext }}{% endif %}
+        {% with links=author.profile_urls %}{% if links %}
+          <ul class="author-links">
+            {% for url in links %}<li><a href="{{ url }}" rel="me noopener">{{ url }}</a></li>{% endfor %}
+          </ul>
+        {% endif %}{% endwith %}
+      </div>
+    </section>
+    {% translate "No articles by this author yet." as empty %}
+    {% include "cms/includes/post_list.html" with empty=empty %}
+  </div>
+{% endblock %}

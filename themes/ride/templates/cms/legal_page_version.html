@@ -1,0 +1,18 @@
+{% extends "layouts/base.html" %}
+{% load i18n wagtailcore_tags cms_tags %}
+{% comment %}An archived version of a legal page on `ride` (THM.9 part 1): the app template's content under the page banner.{% endcomment %}
+{% block content %}
+  <article class="legal-page">
+    {% blocktranslate trimmed asvar version_label with number=version.number %}Version {{ number }}{% endblocktranslate %}
+    {% page_trail page current=version_label as trail %}
+    {% include "components/page_banner.html" with title=version.title items=trail only %}
+    <div class="page-content">
+      {% include "cms/includes/legal_version_meta.html" %}
+      <p class="legal-notice alert alert-info">
+        {% translate "This is an archived version." %}
+        <a href="{% pageurl page %}">{% translate "Read the current version" %}</a>
+      </p>
+      {% for block in version.body %}{% include_block block %}{% endfor %}
+    </div>
+  </article>
+{% endblock %}
