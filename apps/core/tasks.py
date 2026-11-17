@@ -383,6 +383,21 @@ def run_worker(
 # --- Jobs of the core app -------------------------------------------------------------------
 
 
+@task("core.render_image")
+def render_image(image_id: int) -> None:
+    """Make the renditions of every preset of one `MediaImage` (CAT.4 review).
+
+    Queued by the `post_save` receiver of `apps.core.signals` on every save, in the saving
+    transaction. Safe to run twice: a rendition that exists is reused; a deleted image is skipped.
+    """
+    from . import images
+    from .models import MediaImage
+
+    image = MediaImage.objects.filter(pk=image_id).first()
+    if image is not None:
+        images.render_all(image)
+
+
 @periodic("*/5 * * * *")
 @locked()
 @task("core.heartbeat", retry=NO_RETRY)

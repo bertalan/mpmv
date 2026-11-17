@@ -69,7 +69,7 @@ def test_an_upload_returns_without_renditions_and_queues_the_job(licence: ImageL
     row = upload(product, licence)
     assert row.image.collection.name == vendor_collection_name(str(product.vendor.public_id))
     assert not MediaImageRendition.objects.filter(image=row.image).exists()
-    assert len(core_tasks.list_jobs("catalog.render_product_image", status="todo")) == 1
+    assert len(core_tasks.list_jobs("core.render_image", status="todo")) == 1
     assert AuditLog.objects.filter(action="catalog.product_image.created").count() == 1
 
 
@@ -77,13 +77,13 @@ def test_the_job_makes_the_renditions_in_every_format_and_can_run_twice(
     licence: ImageLicence,
 ) -> None:
     row = upload(ProductFactory.create(), licence)
-    catalog_tasks.render_product_image(image_id=row.image_id)
+    core_tasks.render_image(image_id=row.image_id)
     specs = set(
         MediaImageRendition.objects.filter(image=row.image).values_list("filter_spec", flat=True)
     )
     assert any(s.startswith("format-webp|") for s in specs)
     assert any(s.startswith("format-avif|") for s in specs) == core_images.avif_supported()
-    catalog_tasks.render_product_image(image_id=row.image_id)  # idempotent
+    core_tasks.render_image(image_id=row.image_id)  # idempotent
     assert (
         set(
             MediaImageRendition.objects.filter(image=row.image).values_list(
@@ -92,7 +92,13 @@ def test_the_job_makes_the_renditions_in_every_format_and_can_run_twice(
         )
         == specs
     )
-    catalog_tasks.render_product_image(image_id=row.image_id + 999)  # a vanished image: no error
+    core_tasks.render_image(image_id=row.image_id + 999)  # a vanished image: no error
+
+
+def test_the_old_job_name_still_runs_jobs_queued_before_the_move(licence: ImageLicence) -> None:
+    row = upload(ProductFactory.create(), licence)
+    catalog_tasks.render_product_image(image_id=row.image_id)
+    assert MediaImageRendition.objects.filter(image=row.image).exists()
 
 
 def test_a_rolled_back_upload_queues_no_job(licence: ImageLicence) -> None:
@@ -105,7 +111,7 @@ def test_a_rolled_back_upload_queues_no_job(licence: ImageLicence) -> None:
 
     with pytest.raises(RuntimeError):
         upload_then_fail()
-    assert not core_tasks.list_jobs("catalog.render_product_image")
+    assert not core_tasks.list_jobs("core.render_image")
 
 
 def test_the_page_renders_before_the_renditions_exist(client: Any, licence: ImageLicence) -> None:

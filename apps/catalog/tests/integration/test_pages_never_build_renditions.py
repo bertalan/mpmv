@@ -82,13 +82,17 @@ def test_without_the_fallback_format_the_original_is_shown() -> None:
     assert f'src="{image.file.url}"' in html
 
 
-def test_the_page_query_count_does_not_grow_with_the_images() -> None:
+@pytest.mark.parametrize("rendered", [False, True], ids=["no-renditions", "renditions-present"])
+def test_the_page_query_count_does_not_grow_with_the_images(rendered: bool) -> None:
     from apps.catalog import product_pages
 
     def queries(count: int) -> int:
         product = ProductFactory.create()
         for _ in range(count):
-            ProductImageFactory.create(product=product, image=_photo())
+            image = _photo()
+            if rendered:
+                media.render_renditions(image.pk)  # the prefetch path has rows to load
+            ProductImageFactory.create(product=product, image=image)
         template = Template(
             "{% load responsive_images %}{% for item in gallery %}"
             '{% responsive_image item.image "content" alt=item.alt %}{% endfor %}'

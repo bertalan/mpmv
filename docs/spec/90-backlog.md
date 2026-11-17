@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **437** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3452 h** (P1 2565 h · P2 799 h · P3 88 h)
+- Micro-tasks: **438** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3454 h** (P1 2565 h · P2 801 h · P3 88 h)
 - P1 critical path (schedule lower bound with full parallelism): **197 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → PAY.7 → ORD.20 → ORD.21 → ORD.22 → ORD.23
 
 ## By macro area
@@ -16,7 +16,7 @@
 |---|---|---:|---:|---:|---:|---:|
 | ARC | Architecture and foundations | 33 | 200 | 52 | 0 | 252 |
 | CORE | Identity, permissions, API, backoffice | 32 | 224 | 4 | 6 | 234 |
-| CAT | Product catalog | 27 | 162 | 81 | 0 | 243 |
+| CAT | Product catalog | 28 | 162 | 83 | 0 | 245 |
 | VEN | Vendors, commissions, ledger | 40 | 298 | 35 | 0 | 333 |
 | TAX | Tax engine | 22 | 98 | 37 | 0 | 135 |
 | SHP | Shipping and quotes | 15 | 96 | 30 | 0 | 126 |
@@ -36,7 +36,7 @@
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 14 | 25 | 37 | 8 | 70 |
 | MIG | Migration and cutover | 22 | 141 | 29 | 0 | 170 |
-| **Total** | | **437** | **2565** | **799** | **88** | **3452** |
+| **Total** | | **438** | **2565** | **801** | **88** | **3454** |
 
 ## By phase
 
@@ -374,7 +374,7 @@
 | MIG.20 | Refunds migration (owner decision 2026-11-11, relayed by lane-a, #86): refund child orders and marketplace refund requests are stored inside the historical order (refunded amount, date, reason); there is no separate refund model for legacy data; no new ledger entry and no tax recalculation | P1 | 4 | MIG.4 | A migrated order shows its refunded amount, date and reason; the MIG.5 parity report reconciles order total minus refunds against the legacy figures; a refund amount that does not parse as `Decimal` is rejected with a report; the migration writes no ledger entry for a refund (MIG.8 covers balances); no refund model or table exists for legacy data |
 | MIG.22 | Domains, mail and TLS at cutover (owner decision 2026-11-16, §13.4): DNS inventory exported from the registrar into private storage, a dedicated mail host record and the MX moved to it before the switch when mail is self-managed on the legacy server (a dedicated mail service is a recommended follow-up, and a precondition for shutting the legacy server down), SPF, DKIM and DMARC for the transactional provider (ARC.16), TTL 300 s from T−7, production certificates issued before the switch (ACME DNS-01), legacy site on an internal hostname behind basic auth and `noindex`, Stripe webhook URLs and domain verification updated, staged HSTS | P1 | 6 | MIG.9 | Runbook checklist: the inventory file is in private storage; a mail test send and receive passes after the MX change, before the switch; the TTL check shows 300 s on the switched records; certificates are valid before the switch; the legacy host answers 401 over valid HTTPS without credentials (HSTS `includeSubDomains` applies to it) and carries `noindex`; rollback by DNS was rehearsed in a dress rehearsal |
 
-### F6 — After go-live (P2) (123 tasks, 913 h)
+### F6 — After go-live (P2) (124 tasks, 915 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -394,6 +394,7 @@
 | CAT.24 | Monitoring of the product image renditions (follow-up of the CAT.4 review): the renditions of an upload are made by the `catalog.render_product_image` job after the upload commits; staff see the images still without their renditions and the failed jobs, and a failed job is retried and alerts after the retry limit; a missing rendition never breaks a product page | P2 | 3 | CAT.4, ARC.9 | A page shows the original-size fallback while a rendition is missing; a job that keeps failing raises one alert; a re-run of the job changes nothing |
 | CAT.25 | Orphan `MediaImage` cleanup (follow-up of the CAT.4 review): a staff review list of library images that no product, brand or page uses, and an audited, dry-run delete that never removes an image still referenced | P2 | 3 | CAT.4, CMS.8 | An image used by no ProductImage is listed; deleting it writes an AuditLog row; an image still in a gallery cannot be deleted |
 | CAT.26 | Variant galleries on the product page (follow-up of the CAT.4 review): the images dedicated to a variant (`ProductImage.variant`) are shown when that variant is selected, with the product's own gallery as the fallback, in the same language rule as the product gallery (D-18) | P2 | 4 | CAT.4, CAT.7 | Selecting a variant with its own images shows them first; a variant without images shows the product gallery; a DE-dedicated variant image shows in DE only |
+| CAT.28 | Blog article and author pages without request-time renditions (follow-up of the CAT.4 review): `blog_post_page.html` and `blog_author_page.html` render the main image and the author photo through `{% responsive_image %}` (a preset for the article image and one for the author photo, in both themes) instead of `{% image %}`, which builds renditions in the request; the manager event image list and the CMS image review thumbnails keep Wagtail's own `{% image %}` (staff pages) | P2 | 2 | CAT.4 | An article and an author page render without creating a rendition (tested like CAT.4); the images still carry alt text, credits and width and height; axe clean in both themes |
 | VEN.7 | Payouts: eligibility, block if DAC7 incomplete (`assert_payout_allowed`), history | P2 | 8 | VEN.4, PAY.3, VEN.12 | Tests on every blocking condition |
 | VEN.11 | Tax regime change request by vendor with staff review and email | P2 | 6 | TAX.2, ARC.16 | Parity with VTO 2.4 |
 | VEN.19 | Plan entitlements and plan fees: `plan_allows(vendor, feature)` service over `VendorPlan.features`, plan change with effective date and audit; `plan_fee` ledger debit per billing period (monthly, quarterly or yearly, D-43) by a scheduled idempotent job, one entry per vendor and period; non-fiscal statement PDF per charge in the vendor's language (no invoice issued by the marketplace; the operator invoices outside the platform) | P2 | 8 | VEN.2, VEN.4, VEN.15, ARC.9 | A vendor whose plan lacks a feature cannot use it and keeps its data (the `accounting_connector` key gates every CMP.36 to CMP.38 route and webhook); a plan or vendor subscription with a monthly, quarterly or yearly period gets exactly one `plan_fee` entry per period even when the job runs twice (a quarterly one charges once in three months, a yearly one once in twelve); the statement PDF states that it is not a tax invoice and matches the ledger entry; no fiscal document or e-invoice is produced |

@@ -88,6 +88,7 @@ class CoreConfig(AppConfig):
         # still-image decode cap (SEC.2), so every Pillow use of the process (uploads,
         # renditions, imports) sees the same value whatever ran before. Uploads above the cap
         # are refused by apps.core.uploads itself.
+        from . import signals  # noqa: F401  (registers the receivers)
         from .uploads import configure_pillow
 
         configure_pillow(settings.WAGTAILIMAGES_MAX_IMAGE_PIXELS)

@@ -8,7 +8,9 @@ only resized, rendered as a plain `<img>` in the `<picture>`.
 
 A page never builds a rendition (CAT.4, CAT.24): it uses the ones that exist (`prefetch_renditions`
 loads them for a list of images in one query) and falls back to the original file with its own
-width and height; the `catalog.render_product_image` job makes them after an upload.
+width and height. The `core.render_image` job makes them for every preset: it is queued on every
+`MediaImage` save (`apps.core.signals`), so CMS, import, seed, product and logo images alike get
+their renditions moments after they are stored.
 
 AVIF needs an image library that can encode it; the Pillow wheels in uv.lock bundle libavif,
 so the container image can. Where it cannot, AVIF is left out (WebP and JPEG remain) and the
@@ -52,6 +54,11 @@ PRESETS: dict[str, Preset] = {
     # Logos in a strip: 3rem high, so 96 px covers 2x screens.
     "logo": Preset((96,), "6rem", op="height", fallback="png"),
 }
+
+
+# Operations outside the presets that pages also use: the gallery carousel (`apps.cms.blocks`),
+# the blog article image and author photo (`apps.cms.models`, JSON-LD). Made by the same job.
+EXTRA_OPERATIONS = ("width-800", "width-1600", "width-1200", "fill-240x240")
 
 
 @cache
@@ -100,6 +107,30 @@ def all_specs() -> list[str]:
     return sorted(specs)
 
 
+def render_all(image: Any) -> None:
+    """Make every rendition the pages can use for `image`: all presets, in the formats that can
+    be encoded here (an SVG: its resized operations), and `EXTRA_OPERATIONS`. Idempotent:
+    Wagtail reuses a rendition that exists."""
+    svg = bool(image.is_svg())
+    formats = picture_formats()
+    specs: set[str] = set(EXTRA_OPERATIONS)
+    for name in PRESETS:
+        specs.update(picture_specs(name, formats=formats, svg=svg))
+    image.get_renditions(*sorted(specs))
+
+
+def rendition_or_original(image: Any, spec: str) -> tuple[str, int | None, int | None]:
+    """(url, width, height) of the existing rendition `spec`, else of the original file: a page
+    never builds a rendition (see the module docstring)."""
+    from wagtail.images.models import Filter
+
+    wanted = Filter(spec=spec)
+    found = image.find_existing_renditions(wanted).get(wanted)
+    if found is not None:
+        return str(found.url), found.width, found.height
+    return str(image.file.url), image.width, image.height
+
+
 def prefetch_renditions(images: Iterable[Any]) -> None:
     """Load the existing renditions of `images` in one query, so rendering a gallery or a grid
     of cards does not query per image. Images without renditions get an empty list."""
@@ -117,6 +148,8 @@ def prefetch_renditions(images: Iterable[Any]) -> None:
         found[rendition.image_id].append(rendition)
     for pk, instances in by_pk.items():
         for image in instances:
+            for rendition in found[pk]:
+                rendition.image = image  # rendering reads it: no query per rendition
             image.prefetched_renditions = found[pk]
 
 
@@ -124,7 +157,7 @@ def render_picture(image: Any, name: str, **attrs: Any) -> SafeString:
     """`<picture>` HTML for a Wagtail image (see the module docstring).
 
     Only renditions that already exist are used: a page never builds one (CAT.4: the
-    `catalog.render_product_image` job does, after the upload). A format with no rendition gets
+    `core.render_image` job does, after the upload). A format with no rendition gets
     no `<source>`; without the fallback format (JPEG, PNG for logos; the resized SVG) the
     original file is shown with its own width and height.
 
@@ -153,6 +186,10 @@ def render_picture(image: Any, name: str, **attrs: Any) -> SafeString:
         img_attrs["decoding"] = "async"
     img_attrs.update({key: value for key, value in attrs.items() if value not in (None, "")})
     if not renditions:
+        # The fallback has no srcset: the browser takes the one original, which can be large, for
+        # every such image (24 cards = 24 originals). It is rare: `core.render_image` is queued on
+        # every save and makes the renditions within moments, so only an image shown before the
+        # worker ran (or after a failed job, CAT.24) gets here.
         original = {"src": image.file.url, "width": image.width, "height": image.height}
         del img_attrs["sizes"]
         img_attrs.update({k: v for k, v in original.items() if v})

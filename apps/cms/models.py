@@ -62,6 +62,7 @@ from wagtail.models import Page, PageManager, PageQuerySet, TranslatableMixin
 from wagtail_localize.fields import BaseTranslatableField, SynchronizedField, TranslatableField
 from wagtail_localize.models import Translation
 
+from apps.core.images import rendition_or_original
 from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
 from apps.vendors.services import has_public_storefront
 
@@ -1119,7 +1120,7 @@ class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
         url = self.author_url(author, request)
         image = ""
         if author.photo is not None:
-            image = urljoin(url, author.photo.get_rendition(AUTHOR_PHOTO_FILTER).url)
+            image = urljoin(url, rendition_or_original(author.photo, AUTHOR_PHOTO_FILTER)[0])
         return engine.person_jsonld(
             person_id=f"{url}#person",
             name=author.name,
@@ -1264,7 +1265,7 @@ class BlogPostPage(Page):  # type: ignore[misc]
             author_id = f"{blog.author_url(self.author, request)}#person"
         image = ""
         if self.image is not None:
-            image = urljoin(url, self.image.get_rendition(ARTICLE_IMAGE_FILTER).url)
+            image = urljoin(url, rendition_or_original(self.image, ARTICLE_IMAGE_FILTER)[0])
         return engine.blog_posting_jsonld(
             url=url,
             headline=self.title,
