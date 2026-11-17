@@ -17,10 +17,11 @@ from django.utils.translation import gettext
 
 from apps.catalog.tests.factories import BrandFactory, BrandTranslationFactory
 from apps.catalog.tests.integration.test_listing_views import compat, listed  # noqa: F401
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
+from tests.i18n import language_prefix, localized, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -65,8 +66,11 @@ def same_as_hreflang(html: str) -> None:
 def test_a_term_page_switches_to_its_translation(client: Client, compat: dict[str, Any]) -> None:  # noqa: F811
     html = client.get("/compatibility/maker/").content.decode()
     targets = switch_targets(html)
-    assert targets["it"] == ("/it/compatibilita/marca/", False)
-    assert targets["en"][0] == "/compatibility/maker/"
+    assert targets[other_language()] == (
+        f"{language_prefix(other_language())}/compatibilita/marca/",
+        False,
+    )
+    assert targets[primary_language()][0] == "/compatibility/maker/"
     for code in ("de", "fr", "es"):
         assert targets[code] == (f"/{code}/", True)
     same_as_hreflang(html)
@@ -75,25 +79,30 @@ def test_a_term_page_switches_to_its_translation(client: Client, compat: dict[st
 def test_a_brand_page_switches_to_its_translation(client: Client) -> None:
     brand = BrandFactory.create()
     BrandTranslationFactory.create(brand=brand, slug="acme", status=PUBLISHED)
-    BrandTranslationFactory.create(brand=brand, language="it", slug="acme-it", status=PUBLISHED)
+    BrandTranslationFactory.create(
+        brand=brand, language=other_language(), slug="acme-it", status=PUBLISHED
+    )
     listed(brand=brand)
-    html = client.get("/brand/acme/").content.decode()
+    html = client.get(localized("/brand/acme/")).content.decode()
     targets = switch_targets(html)
-    assert targets["it"] == ("/it/marchio/acme-it/", False)
-    assert targets["de"] == ("/de/", True)
+    assert targets[other_language()] == (
+        localized("/brand/acme-it/", other_language()),
+        False,
+    )
+    assert targets["de"] == (f"{language_prefix(third_language())}/", True)
     same_as_hreflang(html)
 
 
 def test_a_vendor_storefront_switches_to_its_translation(client: Client) -> None:
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
-    VendorTranslationFactory.create(vendor=vendor, language="en", status=PUBLISHED)
-    VendorTranslationFactory.create(vendor=vendor, language="it", status=PUBLISHED)
+    VendorTranslationFactory.create(vendor=vendor, language=primary_language(), status=PUBLISHED)
+    VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=PUBLISHED)
     listed(vendor=vendor)
-    html = client.get(f"/shop/{vendor.slug}/").content.decode()
+    html = client.get(localized(f"/shop/{vendor.slug}/")).content.decode()
     targets = switch_targets(html)
-    assert targets["it"][0].startswith("/it/")
-    assert vendor.slug in targets["it"][0]
-    assert targets["it"][1] is False
+    assert targets[other_language()][0].startswith(f"{language_prefix(other_language())}/")
+    assert vendor.slug in targets[other_language()][0]
+    assert targets[other_language()][1] is False
     assert targets["fr"] == ("/fr/", True)
     same_as_hreflang(html)
 
@@ -103,8 +112,10 @@ def test_a_vendor_storefront_in_the_fallback_language_offers_the_other_languages
 ) -> None:
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
     listed(vendor=vendor)
-    targets = switch_targets(client.get(f"/it/shop/{vendor.slug}/").content.decode())
-    assert targets["de"] == ("/de/", True)
+    targets = switch_targets(
+        client.get(localized(f"/shop/{vendor.slug}/", other_language())).content.decode()
+    )
+    assert targets["de"] == (f"{language_prefix(third_language())}/", True)
 
 
 def test_switching_to_a_translation_goes_there_without_a_notice(
@@ -113,11 +124,19 @@ def test_switching_to_a_translation_goes_there_without_a_notice(
 ) -> None:
     response = client.post(
         reverse("switch_language"),
-        {"language": "it", "next": "/it/compatibilita/marca/", "exact": "1", "notice": "0"},
+        {
+            "language": other_language(),
+            "next": f"{language_prefix(other_language())}/compatibilita/marca/",
+            "exact": "1",
+            "notice": "0",
+        },
         follow=True,
     )
-    assert response.redirect_chain[-1][0] == "/it/compatibilita/marca/"
-    assert notice("it") not in response.content.decode()
+    assert (
+        response.redirect_chain[-1][0]
+        == f"{language_prefix(other_language())}/compatibilita/marca/"
+    )
+    assert notice(other_language()) not in response.content.decode()
 
 
 def test_switching_to_a_language_without_translation_shows_the_notice_once(
@@ -126,18 +145,26 @@ def test_switching_to_a_language_without_translation_shows_the_notice_once(
 ) -> None:
     response = client.post(
         reverse("switch_language"),
-        {"language": "de", "next": "/de/", "exact": "1", "notice": "1"},
+        {
+            "language": "de",
+            "next": f"{language_prefix(third_language())}/",
+            "exact": "1",
+            "notice": "1",
+        },
         follow=True,
     )
-    assert response.redirect_chain[-1][0] == "/de/"
-    assert notice("de") in response.content.decode()
-    assert notice("de") not in client.get("/de/").content.decode()
+    assert response.redirect_chain[-1][0] == f"{language_prefix(third_language())}/"
+    assert notice(third_language()) in response.content.decode()
+    assert (
+        notice(third_language())
+        not in client.get(f"{language_prefix(third_language())}/").content.decode()
+    )
 
 
 def test_every_configured_language_has_a_switch_target(client: Client) -> None:
     listed()
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
-    html = client.get(f"/shop/{vendor.slug}/").content.decode()
+    html = client.get(localized(f"/shop/{vendor.slug}/")).content.decode()
     assert set(switch_targets(html)) == set(configured_languages())
 
 
@@ -146,7 +173,7 @@ def test_a_listing_never_carries_its_query_to_a_home_page(
     compat: dict[str, Any],  # noqa: F811
 ) -> None:
     targets = switch_targets(client.get("/compatibility/maker/?utm_source=x").content.decode())
-    assert targets["de"] == ("/de/", True)
+    assert targets["de"] == (f"{language_prefix(third_language())}/", True)
 
 
 @pytest.fixture(autouse=True)

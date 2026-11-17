@@ -1,0 +1,2 @@
+{% load i18n %}{% blocktranslate %}Your event {{ title }} was approved and is now published.{% endblocktranslate %}
+{{ event_url }}

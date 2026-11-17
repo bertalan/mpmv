@@ -79,7 +79,7 @@ def _make_due() -> None:
 
 def _enqueue(template_key: str = OTP, **kwargs: Any) -> OutboxEmail:
     kwargs.setdefault("recipient", "customer@example.com")
-    kwargs.setdefault("language", "en")
+    kwargs.setdefault("language", primary_language())
     kwargs.setdefault("context", {"code": "482913", "minutes": 10})
     changeset = services.enqueue_email(template_key=template_key, **kwargs)
     return OutboxEmail.objects.get(public_id=changeset.changes[0].key)
@@ -114,7 +114,7 @@ def test_enqueue_dry_run_returns_the_change_and_writes_nothing() -> None:
 def test_enqueue_stores_a_snapshot_queues_the_job_and_records_the_history() -> None:
     email = _enqueue(language=other_language())
     assert email.status == OutboxEmail.Status.QUEUED
-    assert email.language == "it"
+    assert email.language == other_language()
     assert email.context_data == {"code": "482913", "minutes": 10}
     assert email.attempts == 0
     assert _history(email) == [OutboxEmail.Status.QUEUED]
@@ -146,7 +146,7 @@ def test_an_unknown_template_is_refused_at_enqueue() -> None:
 @pytest.mark.django_db
 def test_an_unknown_language_falls_back_to_english() -> None:
     email = _enqueue(language="xx")
-    assert email.language == "en"
+    assert email.language == primary_language()
 
 
 @pytest.mark.django_db
@@ -174,7 +174,7 @@ def _order_context() -> dict[str, Any]:
 @pytest.mark.django_db
 def test_a_per_language_template_wins_and_missing_ones_fall_back_to_english() -> None:
     context = {"item": "the GPSR checklist", "due": "2026-12-01", "action_url": "https://x.test/c"}
-    italian = services.render_email(REMINDER, "it", context)
+    italian = services.render_email(REMINDER, other_language(), context)
     german = services.render_email(REMINDER, "de", context)
     assert italian.subject == "Promemoria: the GPSR checklist"
     assert german.subject == "Reminder: the GPSR checklist"  # no German text: EN, as spec 09
@@ -184,7 +184,9 @@ def test_a_per_language_template_wins_and_missing_ones_fall_back_to_english() ->
 
 @pytest.mark.django_db
 def test_the_text_body_is_not_html_escaped_but_the_html_body_is() -> None:
-    rendered = services.render_email(ORDER, "en", {**_order_context(), "customer_name": "A & B"})
+    rendered = services.render_email(
+        ORDER, primary_language(), {**_order_context(), "customer_name": "A & B"}
+    )
     assert "Thank you, A & B." in rendered.text_body
     assert "Thank you, A &amp; B." in rendered.html_body
     assert "\n" not in rendered.subject

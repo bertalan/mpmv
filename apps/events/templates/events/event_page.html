@@ -1,5 +1,5 @@
 {% extends "layouts/content.html" %}
-{% load i18n tz wagtailcore_tags cms_tags %}
+{% load i18n tz wagtailcore_tags cms_tags event_feeds %}
 {% comment %}
 Event page (EVT.1 part 2/2, spec 15 "Public pages"): a minimal page on the base theme layout.
 Dates are in the page's language and the event's own time zone, with machine-readable
@@ -7,7 +7,8 @@ Dates are in the page's language and the event's own time zone, with machine-rea
 EVT.6 adds the ICS and report links and the robots rule (cancelled or long-past events are
 noindex); the linked products come with EVT.8/EVT.15, the map with EVT.15.
 {% endcomment %}
-{% block head %}{% if robots %}{% robots_meta robots %}{% endif %}{% endblock %}
+{% block head %}{% if robots %}{% robots_meta robots %}{% endif %}
+  {% event_feed_alternates vendor=page.vendor.slug %}{% endblock %}
 {% block page_content %}
   <article class="event">
     <header>
@@ -62,4 +63,5 @@ noindex); the linked products come with EVT.8/EVT.15, the map with EVT.15.
       <a href="{{ report_url }}" rel="nofollow">{% translate "Report this event" %}</a>
     </p>
   </article>
+  {% event_subscribe vendor=page.vendor.slug %}
 {% endblock %}

@@ -5,7 +5,10 @@ event, no inactive vendor)."""
 from django.http import HttpRequest
 from wagtail.models import Locale, Site
 
+from apps.events import discovery
+
 from . import llms_engine, sitemaps
+from .sitemap_engine import Entry
 
 SECTIONS = (
     ("Pages", "pages"),
@@ -30,6 +33,17 @@ def _site_summary(site: Site | None, language: str) -> tuple[str, str]:
     return site.site_name or site.hostname, summary
 
 
+def _feed_entries(language: str) -> list[Entry]:
+    """The event feeds of the language (EVT.9): RSS and ICS, on the site's base URL."""
+    links = discovery.feed_links(language)
+    if links is None:
+        return []
+    return [
+        Entry(links.rss_url, title=f"{links.rss_title} (RSS)"),
+        Entry(links.ics_url, title=f"{links.ics_title} (ICS)"),
+    ]
+
+
 def llms_txt(language: str, request: HttpRequest) -> str:
     site = Site.find_for_request(request)
     title, summary = _site_summary(site, language)
@@ -37,4 +51,5 @@ def llms_txt(language: str, request: HttpRequest) -> str:
         (heading, list(sitemaps.kind_entries(kind, language, request, titles=True)))
         for heading, kind in SECTIONS
     ]
+    sections.append(("Event feeds", _feed_entries(language)))
     return llms_engine.llms_text(title or "Marketplace", summary, sections)

@@ -32,3 +32,17 @@ def test_ride_renders_the_event_list_calendar_archive_and_page(client: Client) -
         month = f"{index}calendar/{start:%Y-%m}/"
         assert "<table" in client.get(month).content.decode()
         assert client.get(f"{index}past/").status_code == 200
+
+
+def test_ride_carries_the_feed_discovery_and_the_subscribe_block(client: Client) -> None:
+    """EVT.9 part 2: the shared discovery partials render inside ride's layout."""
+    apps.get_model("seo", "SeoSettings").objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )
+    index = primary_index()
+    with use_theme("ride"):
+        html = client.get(str(index.url)).content.decode()
+    assert 'rel="alternate" type="application/rss+xml"' in html
+    assert 'rel="alternate" type="text/calendar"' in html
+    assert 'class="event-subscribe"' in html
+    assert 'href="webcal://' in html

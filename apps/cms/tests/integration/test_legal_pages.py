@@ -25,7 +25,9 @@ from apps.cms.models import LegalPage, LegalPageVersion
 from apps.cms.services import SeedReport, record_legal_version
 from apps.cms.tests.factories import LegalPageFactory, LegalPageVersionFactory
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
+from tests.i18n import language_prefix, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -46,7 +48,9 @@ def _publish(page: LegalPage, user: User | None = None) -> LegalPage:
 
 
 def _italian(page: LegalPage, title: str, effective_date: dt.date) -> LegalPage:
-    translation: LegalPage = page.copy_for_translation(Locale.objects.get(language_code="it"))
+    translation: LegalPage = page.copy_for_translation(
+        Locale.objects.get(language_code=other_language())
+    )
     translation = translation.specific
     translation.title = title
     translation.slug = "condizioni"
@@ -65,7 +69,7 @@ def test_publishing_a_legal_page_records_its_first_version(seeded: SeedReport) -
     version = page.versions.get()
     assert version.number == 1
     assert version.title == "Terms of sale"
-    assert version.language_code == "en"
+    assert version.language_code == primary_language()
     assert version.effective_date == dt.date(2027, 1, 1)
     assert "Sample terms." in str(version.body)
     assert version.published_by == f"staff:{editor.public_id}"
@@ -82,7 +86,7 @@ def test_each_recorded_version_is_audited(seeded: SeedReport) -> None:
     assert entry.before is None
     after = entry.after or {}
     assert after["effective_date"] == "2027-01-01"
-    assert after["language_code"] == "en"
+    assert after["language_code"] == primary_language()
 
 
 def test_republishing_the_same_text_records_no_new_version(seeded: SeedReport) -> None:
@@ -134,10 +138,10 @@ def test_a_translation_has_its_own_versions_and_effective_date(seeded: SeedRepor
 
     assert italian.translation_key == english.translation_key
     assert [(v.language_code, v.number, v.effective_date) for v in italian.versions.all()] == [
-        ("it", 1, dt.date(2027, 3, 1))
+        (other_language(), 1, dt.date(2027, 3, 1))
     ]
     assert [(v.language_code, v.number, v.effective_date) for v in english.versions.all()] == [
-        ("en", 1, dt.date(2027, 1, 1))
+        (primary_language(), 1, dt.date(2027, 1, 1))
     ]
 
     italian.body = [("paragraph", "<p>Condizioni aggiornate.</p>")]
@@ -153,7 +157,7 @@ def test_the_translated_page_shows_its_own_effective_date(
     english = _publish(LegalPageFactory.create(title="Terms of sale", live=False))
     _italian(english, "Condizioni di vendita", dt.date(2027, 3, 1))
 
-    html = client.get("/it/condizioni/").content.decode()
+    html = client.get(f"{language_prefix(other_language())}/condizioni/").content.decode()
     assert '<time datetime="2027-03-01">' in html
     assert '<time datetime="2027-01-01">' not in html
 
@@ -162,7 +166,9 @@ def test_an_alias_in_another_language_records_no_version(seeded: SeedReport) -> 
     """Wagtail republishes aliases with the source's revision (`page_published(alias=True)`):
     an alias is not a translation, so it must not get a version with the source's text."""
     english = _publish(LegalPageFactory.create(title="Terms of sale", live=False))
-    alias = english.copy_for_translation(Locale.objects.get(language_code="it"), alias=True)
+    alias = english.copy_for_translation(
+        Locale.objects.get(language_code=other_language()), alias=True
+    )
     assert alias.alias_of_id == english.pk
 
     english.body = [("paragraph", "<p>New terms.</p>")]
@@ -171,7 +177,7 @@ def test_an_alias_in_another_language_records_no_version(seeded: SeedReport) -> 
 
     assert english.versions.count() == 2
     assert not LegalPageVersion.objects.filter(page_id=alias.pk).exists()
-    assert not LegalPageVersion.objects.filter(language_code="it").exists()
+    assert not LegalPageVersion.objects.filter(language_code=other_language()).exists()
 
 
 # --- Append-only archive

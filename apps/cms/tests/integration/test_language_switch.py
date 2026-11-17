@@ -10,6 +10,8 @@ from django.urls import reverse
 from wagtail.models import Site
 
 from apps.cms.tests.factories import StandardPageFactory
+from apps.core.i18n import primary_language
+from tests.i18n import language_prefix, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -29,18 +31,23 @@ def test_a_cms_page_switches_to_its_translation_and_the_untranslated_to_home(
     client: Client, seeded: Any
 ) -> None:
     html = client.get("/").content.decode()
-    assert switch_targets(html)["it"] == ("/it/", False)
+    assert switch_targets(html)[other_language()] == (
+        f"{language_prefix(other_language())}/",
+        False,
+    )
     home = Site.objects.get(is_default_site=True).root_page
     StandardPageFactory.create(title="Only in English", parent=home)
     targets = switch_targets(client.get("/only-in-english/").content.decode())
-    assert targets["it"] == ("/it/", True)
-    assert targets["en"][0] == "/only-in-english/"
+    assert targets[other_language()] == (f"{language_prefix(other_language())}/", True)
+    assert targets[primary_language()][0] == "/only-in-english/"
 
 
 def test_a_translated_slug_is_the_switch_target(client: Client, seeded: Any) -> None:
-    targets = switch_targets(client.get("/it/chi-siamo/").content.decode())
-    assert targets["en"] == ("/about/", False)
-    assert targets["de"] == ("/de/ueber-uns/", False)
+    targets = switch_targets(
+        client.get(f"{language_prefix(other_language())}/chi-siamo/").content.decode()
+    )
+    assert targets[primary_language()] == ("/about/", False)
+    assert targets["de"] == (f"{language_prefix(third_language())}/ueber-uns/", False)
 
 
 def test_the_notice_is_shown_after_switching_to_a_missing_translation(
@@ -48,7 +55,12 @@ def test_the_notice_is_shown_after_switching_to_a_missing_translation(
 ) -> None:
     response = client.post(
         reverse("switch_language"),
-        {"language": "it", "next": "/it/", "exact": "1", "notice": "1"},
+        {
+            "language": other_language(),
+            "next": f"{language_prefix(other_language())}/",
+            "exact": "1",
+            "notice": "1",
+        },
         follow=True,
     )
     assert "Questo contenuto non è disponibile in questa lingua." in response.content.decode()
@@ -59,16 +71,18 @@ def test_a_page_without_an_object_stays_on_its_path_with_no_notice(
 ) -> None:
     """A 404 (like search, cart or account pages) has no translations: each language keeps the
     path, the query string, and shows no notice."""
-    response = client.get("/it/nothing-here/?q=bag")
+    response = client.get(f"{language_prefix(other_language())}/nothing-here/?q=bag")
     assert response.status_code == 404
     found = switch_targets(response.content.decode())
-    assert found["de"] == ("/de/nothing-here/?q=bag", False)
-    assert found["en"] == ("/nothing-here/?q=bag", False)
+    assert found["de"] == (f"{language_prefix(third_language())}/nothing-here/?q=bag", False)
+    assert found[primary_language()] == ("/nothing-here/?q=bag", False)
 
 
 def test_switch_ignores_the_notice_flag_without_exact(client: Client, seeded: Any) -> None:
     response = client.post(
-        reverse("switch_language"), {"language": "it", "next": "/", "notice": "1"}, follow=True
+        reverse("switch_language"),
+        {"language": other_language(), "next": "/", "notice": "1"},
+        follow=True,
     )
     assert "Questo contenuto non è disponibile" not in response.content.decode()
 
@@ -76,6 +90,11 @@ def test_switch_ignores_the_notice_flag_without_exact(client: Client, seeded: An
 def test_an_off_site_next_is_refused_even_with_exact(client: Client) -> None:
     response = client.post(
         reverse("switch_language"),
-        {"language": "it", "next": "https://evil.example/", "exact": "1", "notice": "1"},
+        {
+            "language": other_language(),
+            "next": "https://evil.example/",
+            "exact": "1",
+            "notice": "1",
+        },
     )
     assert response["Location"] == "/"

@@ -230,6 +230,11 @@ def _feed_title(vendor: Vendor | None, scope: Scope) -> str:
     return _("Events")
 
 
+def scope_title(scope: Scope) -> str:
+    """The translated title of the feed of `scope` (the active language), for discovery links."""
+    return _feed_title(_vendor_for(scope), scope)
+
+
 def _type_labels() -> list[tuple[str, str]]:
     from apps.events.models import EventType
 
@@ -296,6 +301,18 @@ def _when(span: engine.Span) -> str:
     return f"{start_text} ({getattr(zone, 'key', 'UTC')})"
 
 
+def storefront_url(vendor: Vendor, language: str) -> str:
+    """The absolute URL of the vendor's public storefront in `language`; "" when it has none."""
+    from apps.catalog import slugs
+    from apps.core.i18n import primary_language
+    from apps.vendors.services import has_public_storefront
+
+    if not has_public_storefront(vendor):
+        return ""
+    path = slugs.vendor_path(language, vendor.slug, default_language=primary_language())
+    return absolute_url(None, path)
+
+
 def _description(found: services.LocalisedEvent, now: dt.datetime) -> str:
     page = found.page
     spec = page.recurrence_spec()
@@ -304,6 +321,11 @@ def _description(found: services.LocalisedEvent, now: dt.datetime) -> str:
     parts = [page.summary, _("When: %(when)s") % {"when": _when(span)}]
     if page.vendor is not None:
         parts.append(_("By: %(vendor)s") % {"vendor": page.vendor.display_name})
+        shop = storefront_url(
+            page.vendor, found.language if found.fallback else page.locale.language_code
+        )
+        if shop:
+            parts.append(_("Shop: %(url)s") % {"url": shop})
     where = _location(page)
     if where:
         parts.append(_("Where: %(where)s") % {"where": where})

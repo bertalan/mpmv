@@ -98,7 +98,7 @@ def test_add_a_root_category_with_translations_and_seo_texts(staff_client: Clien
         translation_rows(
             [
                 texts(
-                    "en",
+                    primary_language(),
                     "Bags",
                     "bags",
                     description="<p>Hand-made bags.</p>",
@@ -122,7 +122,7 @@ def test_add_a_subcategory_first_under_its_parent(staff_client: Client) -> None:
     bags = CategoryFactory.create()
     later = CategoryFactory.create(parent=bags)
     data = placement(bags, "first-child")
-    data.update(translation_rows([texts("en", "Backpacks", "backpacks")]))
+    data.update(translation_rows([texts(primary_language(), "Backpacks", "backpacks")]))
     response = staff_client.post(reverse("admin:catalog_category_add"), data)
     assert response.status_code == 302, errors_of(response)
     backpacks = CategoryTranslation.objects.get(slug="backpacks").category
@@ -134,7 +134,7 @@ def test_add_a_category_after_a_sibling(staff_client: Client) -> None:
     first = CategoryFactory.create()
     last = CategoryFactory.create()
     data = placement(first, "right")
-    data.update(translation_rows([texts("en", "Hats", "hats")]))
+    data.update(translation_rows([texts(primary_language(), "Hats", "hats")]))
     response = staff_client.post(reverse("admin:catalog_category_add"), data)
     assert response.status_code == 302, errors_of(response)
     hats = CategoryTranslation.objects.get(slug="hats").category
@@ -144,7 +144,7 @@ def test_add_a_category_after_a_sibling(staff_client: Client) -> None:
 def test_a_sibling_slug_conflict_is_refused_and_nothing_is_saved(staff_client: Client) -> None:
     CategoryTranslationFactory.create(category=CategoryFactory.create(), slug="bags")
     data = placement()
-    data.update(translation_rows([texts("en", "Bags", "bags")]))
+    data.update(translation_rows([texts(primary_language(), "Bags", "bags")]))
     response = staff_client.post(reverse("admin:catalog_category_add"), data)
     assert response.status_code == 200
     assert "already uses this slug" in response.content.decode()
@@ -171,7 +171,8 @@ def test_change_texts_and_move_a_category_under_another(staff_client: Client) ->
     data = placement(bags, "first-child")
     data.update(
         translation_rows(
-            [{**texts("en", "Caps and hats", "hats"), "id": str(english.pk)}], initial=1
+            [{**texts(primary_language(), "Caps and hats", "hats"), "id": str(english.pk)}],
+            initial=1,
         )
     )
     response = staff_client.post(reverse("admin:catalog_category_change", args=[hats.pk]), data)
@@ -188,7 +189,9 @@ def test_moving_a_category_next_to_a_same_slug_sibling_is_refused(staff_client: 
     english = CategoryTranslationFactory.create(category=hats, name="Hats", slug="hats")
     data = placement(bags, "first-child")
     data.update(
-        translation_rows([{**texts("en", "Hats", "hats"), "id": str(english.pk)}], initial=1)
+        translation_rows(
+            [{**texts(primary_language(), "Hats", "hats"), "id": str(english.pk)}], initial=1
+        )
     )
     response = staff_client.post(reverse("admin:catalog_category_change", args=[hats.pk]), data)
     assert response.status_code == 200
@@ -198,7 +201,7 @@ def test_moving_a_category_next_to_a_same_slug_sibling_is_refused(staff_client: 
 
 
 def test_delete_a_leaf_category_with_its_translations(staff_client: Client) -> None:
-    category = CategoryFactory.create(languages=["en", other_language()])
+    category = CategoryFactory.create(languages=[primary_language(), other_language()])
     response = staff_client.post(
         reverse("admin:catalog_category_delete", args=[category.pk]), {"post": "yes"}
     )
@@ -248,7 +251,12 @@ def test_add_a_taxonomy_with_translated_names_and_slugs(staff_client: Client) ->
     data.update(
         translation_rows(
             [
-                {"language": "en", "status": "published", "name": "Occasion", "slug": "occasion"},
+                {
+                    "language": primary_language(),
+                    "status": "published",
+                    "name": "Occasion",
+                    "slug": "occasion",
+                },
                 {
                     "language": other_language(),
                     "status": "machine",
@@ -296,7 +304,7 @@ def test_change_and_delete_a_taxonomy(staff_client: Client) -> None:
             [
                 {
                     "id": str(english.pk),
-                    "language": "en",
+                    "language": primary_language(),
                     "status": "published",
                     "name": "Seasons",
                     "slug": "seasons",
@@ -334,7 +342,11 @@ def test_add_terms_on_two_levels_with_translations(staff_client: Client) -> None
         hierarchical=True, term_attributes=[{"code": "model_year", "kind": "number"}]
     )
     data = term_form(taxonomy, attributes='{"model_year": 2020}', **placement())
-    data.update(translation_rows([texts("en", "Maker A", "maker-a", seo_title="Maker A parts")]))
+    data.update(
+        translation_rows(
+            [texts(primary_language(), "Maker A", "maker-a", seo_title="Maker A parts")]
+        )
+    )
     response = staff_client.post(reverse("admin:catalog_term_add"), data)
     assert response.status_code == 302, errors_of(response)
     maker = Term.objects.get()
@@ -342,7 +354,7 @@ def test_add_terms_on_two_levels_with_translations(staff_client: Client) -> None
     assert maker.translations.get().seo_title == "Maker A parts"
 
     data = term_form(taxonomy, **placement(maker, "first-child"))
-    data.update(translation_rows([texts("en", "Model 1", "model-1")]))
+    data.update(translation_rows([texts(primary_language(), "Model 1", "model-1")]))
     response = staff_client.post(reverse("admin:catalog_term_add"), data)
     assert response.status_code == 302, errors_of(response)
     child = TermTranslation.objects.get(slug="model-1").term
@@ -352,7 +364,7 @@ def test_add_terms_on_two_levels_with_translations(staff_client: Client) -> None
 def test_a_flat_taxonomy_refuses_a_child_term_in_the_admin(staff_client: Client) -> None:
     root = TermFactory.create(taxonomy=TaxonomyFactory.create(hierarchical=False))
     data = term_form(root.taxonomy, **placement(root, "first-child"))
-    data.update(translation_rows([texts("en", "Beach", "beach")]))
+    data.update(translation_rows([texts(primary_language(), "Beach", "beach")]))
     response = staff_client.post(reverse("admin:catalog_term_add"), data)
     assert response.status_code == 200
     assert "This taxonomy is flat" in response.content.decode()
@@ -362,7 +374,7 @@ def test_a_flat_taxonomy_refuses_a_child_term_in_the_admin(staff_client: Client)
 def test_a_flat_taxonomy_accepts_a_term_placed_after_another(staff_client: Client) -> None:
     root = TermFactory.create(taxonomy=TaxonomyFactory.create(hierarchical=False))
     data = term_form(root.taxonomy, **placement(root, "right"))
-    data.update(translation_rows([texts("en", "Beach", "beach")]))
+    data.update(translation_rows([texts(primary_language(), "Beach", "beach")]))
     response = staff_client.post(reverse("admin:catalog_term_add"), data)
     assert response.status_code == 302, errors_of(response)
     assert TermTranslation.objects.get(slug="beach").term.is_root()
@@ -371,7 +383,7 @@ def test_a_flat_taxonomy_accepts_a_term_placed_after_another(staff_client: Clien
 def test_a_term_cannot_be_placed_under_another_taxonomy(staff_client: Client) -> None:
     other = TermFactory.create()
     data = term_form(TaxonomyFactory.create(), **placement(other, "first-child"))
-    data.update(translation_rows([texts("en", "Beach", "beach")]))
+    data.update(translation_rows([texts(primary_language(), "Beach", "beach")]))
     response = staff_client.post(reverse("admin:catalog_term_add"), data)
     assert response.status_code == 200
     assert "same taxonomy" in response.content.decode()
@@ -384,7 +396,9 @@ def test_moving_a_term_under_another_in_a_flat_taxonomy_is_refused(staff_client:
     second, english = term_of(taxonomy, "Snow")
     data = term_form(None, **placement(first, "first-child"))
     data.update(
-        translation_rows([{**texts("en", "Snow", "snow"), "id": str(english.pk)}], initial=1)
+        translation_rows(
+            [{**texts(primary_language(), "Snow", "snow"), "id": str(english.pk)}], initial=1
+        )
     )
     response = staff_client.post(reverse("admin:catalog_term_change", args=[second.pk]), data)
     assert response.status_code == 200
@@ -399,7 +413,9 @@ def test_moving_a_term_next_to_a_same_slug_sibling_is_refused(staff_client: Clie
     model, english = term_of(taxonomy, "Model")
     data = term_form(None, **placement(maker, "first-child"))
     data.update(
-        translation_rows([{**texts("en", "Model", "model"), "id": str(english.pk)}], initial=1)
+        translation_rows(
+            [{**texts(primary_language(), "Model", "model"), "id": str(english.pk)}], initial=1
+        )
     )
     response = staff_client.post(reverse("admin:catalog_term_change", args=[model.pk]), data)
     assert response.status_code == 200
@@ -410,7 +426,7 @@ def test_moving_a_term_next_to_a_same_slug_sibling_is_refused(staff_client: Clie
 def test_term_attributes_outside_the_schema_are_refused(staff_client: Client) -> None:
     taxonomy = TaxonomyFactory.create(term_attributes=[])
     data = term_form(taxonomy, attributes='{"colour": "red"}', **placement())
-    data.update(translation_rows([texts("en", "Red", "red")]))
+    data.update(translation_rows([texts(primary_language(), "Red", "red")]))
     response = staff_client.post(reverse("admin:catalog_term_add"), data)
     assert response.status_code == 200
     assert "colour is not an attribute of this taxonomy." in response.content.decode()
@@ -423,7 +439,8 @@ def test_change_a_term_keeps_its_taxonomy(staff_client: Client) -> None:
     data = term_form(TaxonomyFactory.create(), **placement())  # the taxonomy is read-only
     data.update(
         translation_rows(
-            [{**texts("en", "Summer time", "summer"), "id": str(english.pk)}], initial=1
+            [{**texts(primary_language(), "Summer time", "summer"), "id": str(english.pk)}],
+            initial=1,
         )
     )
     response = staff_client.post(reverse("admin:catalog_term_change", args=[term.pk]), data)
@@ -483,7 +500,9 @@ def test_saving_a_root_term_unchanged_keeps_its_place(staff_client: Client) -> N
     assert form.status_code == 200
     data = term_form(None, **rendered_placement(form))
     data.update(
-        translation_rows([{**texts("en", "O2 renamed", "o2"), "id": str(english.pk)}], initial=1)
+        translation_rows(
+            [{**texts(primary_language(), "O2 renamed", "o2"), "id": str(english.pk)}], initial=1
+        )
     )
     response = staff_client.post(url, data)
     assert response.status_code == 302, errors_of(response)
@@ -498,7 +517,11 @@ def test_the_root_option_moves_a_term_first_within_its_taxonomy(staff_client: Cl
     o1, _ = term_of(occasion, "O1")
     o2, english = term_of(occasion, "O2")  # roots: S1, O1, O2
     data = term_form(None, **placement())
-    data.update(translation_rows([{**texts("en", "O2", "o2"), "id": str(english.pk)}], initial=1))
+    data.update(
+        translation_rows(
+            [{**texts(primary_language(), "O2", "o2"), "id": str(english.pk)}], initial=1
+        )
+    )
     response = staff_client.post(reverse("admin:catalog_term_change", args=[o2.pk]), data)
     assert response.status_code == 302, errors_of(response)
     assert list(Term.get_root_nodes()) == [s1, o2, o1]  # the season terms are not passed over
@@ -549,7 +572,7 @@ def test_add_change_and_delete_a_brand_with_translations(staff_client: Client) -
     data.update(
         translation_rows(
             [
-                brand_texts("en", "maker-a", seo_title="Maker A products"),
+                brand_texts(primary_language(), "maker-a", seo_title="Maker A products"),
                 brand_texts(other_language(), "maker-a", status="machine"),
             ]
         )
@@ -565,7 +588,7 @@ def test_add_change_and_delete_a_brand_with_translations(staff_client: Client) -
     data.update(
         translation_rows(
             [
-                {**brand_texts("en", "maker-a-works"), "id": str(english.pk)},
+                {**brand_texts(primary_language(), "maker-a-works"), "id": str(english.pk)},
                 {
                     **brand_texts(other_language(), "maker-a", status="machine"),
                     "id": str(italian.pk),

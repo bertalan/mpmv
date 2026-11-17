@@ -10,7 +10,9 @@ from django.template.loader import render_to_string
 from django.test import RequestFactory
 from django.urls import reverse
 
+from apps.core.i18n import primary_language
 from apps.themes.services import use_theme
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -69,9 +71,9 @@ def test_the_ride_prompt_keeps_every_variant_of_the_base_page(
 def test_the_ride_prompt_is_translated() -> None:
     from django.utils import translation
 
-    with translation.override("it"):
+    with translation.override(other_language()):
         italian = _render()
-    with translation.override("en"):
+    with translation.override(primary_language()):
         english = _render()
     assert "This needs your passkey" in english
     assert italian != english  # the Italian catalogue covers the refusal page (6fca0f69)

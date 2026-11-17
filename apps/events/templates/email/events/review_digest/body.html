@@ -1,0 +1,8 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate count counter=count %}{{ counter }} event is awaiting review.{% plural %}{{ counter }} events are awaiting review.{% endblocktranslate %}</p>
+<ul>{% for item in items %}<li>{{ item.title }}{% if item.vendor %} ({{ item.vendor }}){% endif %}</li>{% endfor %}</ul>
+<p><a href="{{ review_url }}">{% translate "Open the review list" %}</a></p>
+</body>
+</html>
