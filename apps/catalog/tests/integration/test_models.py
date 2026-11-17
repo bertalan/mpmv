@@ -20,7 +20,9 @@ from apps.catalog.tests.factories import (
     VariantFactory,
     VariantTranslationFactory,
 )
+from apps.core.i18n import primary_language
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -313,29 +315,33 @@ def test_variants_are_ordered_by_position() -> None:
 def test_one_translation_per_product_and_language() -> None:
     product = ProductFactory.create(languages=["en"])
     with pytest.raises(IntegrityError), transaction.atomic():
-        ProductTranslationFactory.create(product=product, language="en")
+        ProductTranslationFactory.create(product=product, language=primary_language())
 
 
 def test_slugs_are_unique_per_language_once_set() -> None:
-    ProductTranslationFactory.create(language="en", slug="red-bag-en-sku-1")
-    ProductTranslationFactory.create(language="it", slug="red-bag-en-sku-1")
-    ProductTranslationFactory.create(language="en", slug="")
-    ProductTranslationFactory.create(language="en", slug="")  # empty: not generated yet (CAT.5)
+    ProductTranslationFactory.create(language=primary_language(), slug="red-bag-en-sku-1")
+    ProductTranslationFactory.create(language=other_language(), slug="red-bag-en-sku-1")
+    ProductTranslationFactory.create(language=primary_language(), slug="")
+    ProductTranslationFactory.create(
+        language=primary_language(), slug=""
+    )  # empty: not generated yet (CAT.5)
     with pytest.raises(IntegrityError), transaction.atomic():
-        ProductTranslationFactory.create(language="en", slug="red-bag-en-sku-1")
+        ProductTranslationFactory.create(language=primary_language(), slug="red-bag-en-sku-1")
 
 
 def test_one_translation_per_variant_and_language() -> None:
     variant = VariantFactory.create()
-    VariantTranslationFactory.create(variant=variant, language="en")
+    VariantTranslationFactory.create(variant=variant, language=primary_language())
     with pytest.raises(IntegrityError), transaction.atomic():
-        VariantTranslationFactory.create(variant=variant, language="en")
+        VariantTranslationFactory.create(variant=variant, language=primary_language())
 
 
 def test_product_texts_fall_back_to_published_english() -> None:
     product = ProductFactory.create()
-    ProductTranslationFactory.create(product=product, language="en", status="published")
-    ProductTranslationFactory.create(product=product, language="it", status="machine")
+    ProductTranslationFactory.create(
+        product=product, language=primary_language(), status="published"
+    )
+    ProductTranslationFactory.create(product=product, language=other_language(), status="machine")
     resolved = product.translation("it")
     assert resolved.language == "en"
     assert resolved.is_fallback is True
@@ -343,8 +349,12 @@ def test_product_texts_fall_back_to_published_english() -> None:
 
 def test_changing_the_english_title_sends_translations_back_to_review() -> None:
     product = ProductFactory.create()
-    en = ProductTranslationFactory.create(product=product, language="en", status="published")
-    it = ProductTranslationFactory.create(product=product, language="it", status="published")
+    en = ProductTranslationFactory.create(
+        product=product, language=primary_language(), status="published"
+    )
+    it = ProductTranslationFactory.create(
+        product=product, language=other_language(), status="published"
+    )
     en.title = "A new title"
     en.save()
     it.refresh_from_db()
@@ -354,5 +364,7 @@ def test_changing_the_english_title_sends_translations_back_to_review() -> None:
 
 def test_variant_texts_fall_back_to_published_english() -> None:
     variant = VariantFactory.create()
-    VariantTranslationFactory.create(variant=variant, language="en", status="published")
+    VariantTranslationFactory.create(
+        variant=variant, language=primary_language(), status="published"
+    )
     assert variant.translation("de").language == "en"

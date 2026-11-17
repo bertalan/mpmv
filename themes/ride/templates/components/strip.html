@@ -1,8 +1,8 @@
 {% load i18n theme_tags %}{% comment %}
 Multi-item strip of the `ride` theme (THM.14): products, vendors, testimonials or blog posts in a
 Bootstrap carousel. The items are grouped by the `in_groups` filter, one group per slide, so a
-slide shows up to `per_view` items side by side (fewer columns on a narrow screen: the group
-wraps). Previous, Pause/Play and Next are buttons, the indicators are labelled buttons, the
+slide shows up to `per_view` items side by side (fewer columns on a narrow screen; under 40rem one
+item is in view and the group scrolls sideways, so the group is a focusable scroll region). Previous, Pause/Play and Next are buttons, the indicators are labelled buttons, the
 arrow keys work once the focus is inside. Nothing moves unless `autoplay` is set; then it
 pauses on hover and focus and never runs under `prefers-reduced-motion`. Without JavaScript all
 items are listed one after the other.
@@ -19,7 +19,7 @@ Context:
   {% if total > 1 %}{% include "components/carousel_controls.html" with id=id autoplay=autoplay only %}{% endif %}
   <div class="carousel-inner" id="{{ id }}-slides" aria-live="{% if autoplay %}off{% else %}polite{% endif %}">
     {% for group in groups %}{% blocktranslate asvar slide_label with count=forloop.counter total=total %}{{ count }} of {{ total }}{% endblocktranslate %}<div class="carousel-item{% if forloop.first %} active{% endif %}" role="group" aria-roledescription="slide" aria-label="{{ slide_label }}">
-      <ul class="ride-strip__group" role="list">
+      <ul class="ride-strip__group" role="list" tabindex="0">
         {% for slide in group %}<li class="ride-strip__item">
           {% if slide.image_url %}<img src="{{ slide.image_url }}" alt="{{ slide.image_alt|default:'' }}" width="400" height="400" loading="lazy">{% endif %}
           <h{{ heading_level|default:3 }} class="ride-strip__title">{% with href=slide.url|safe_href %}{% if href %}<a href="{{ href }}">{{ slide.title }}</a>{% else %}{{ slide.title }}{% endif %}{% endwith %}</h{{ heading_level|default:3 }}>

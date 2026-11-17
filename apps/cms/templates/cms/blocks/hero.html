@@ -1,4 +1,7 @@
-{% load responsive_images %}
+{% load responsive_images %}{% comment %}
+The hero (CMS.2, THM.14). `base` has no carousel: a slider shows the banner and then each slide as
+a section of its own, so every slide stays readable.
+{% endcomment %}
 <section class="block block-hero">
   {% responsive_image value.image "hero" alt=value.alt_text priority=True %}
   <h2>{{ value.heading }}</h2>
@@ -7,3 +10,11 @@
     <p class="block-links">{% for link in value.links %}{% include "cms/blocks/link.html" with link=link only %} {% endfor %}</p>
   {% endif %}
 </section>
+{% for slide in extra_slides %}
+<section class="block block-hero block-hero--slide">
+  {% if slide.image %}{% responsive_image slide.image "hero" alt=slide.image_alt %}{% endif %}
+  <h2>{{ slide.title }}</h2>
+  {% if slide.text %}<p>{{ slide.text|linebreaksbr }}</p>{% endif %}
+  {% if slide.url and slide.action %}<p class="block-links"><a href="{{ slide.url }}">{{ slide.action }}</a>{% if slide.secondary_url and slide.secondary_action %} <a href="{{ slide.secondary_url }}">{{ slide.secondary_action }}</a>{% endif %}</p>{% endif %}
+</section>
+{% endfor %}

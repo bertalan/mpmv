@@ -1,0 +1,6 @@
+{% comment %}The progress bar (THM.14): the native element plus the value as text.{% endcomment %}
+<div class="block block-progress">
+  <label for="{{ progress_id }}">{{ value.label }}</label>
+  <progress id="{{ progress_id }}" value="{{ value.value }}" max="{{ value.max }}">{{ value.value }} / {{ value.max }}</progress>
+  <span>{% if value.max == 100 %}{{ value.value }}%{% else %}{{ value.value }} / {{ value.max }}{% endif %}</span>
+</div>

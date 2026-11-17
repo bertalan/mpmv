@@ -32,6 +32,7 @@ from apps.catalog.tests.factories import (
 from apps.cms.blocks import LaunchCountdownBlock
 from apps.cms.models import CountdownCacheMixin, HomePage, StandardPage
 from apps.cms.services import SeedReport
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
@@ -42,7 +43,7 @@ PUBLISHED = TranslationStatus.PUBLISHED
 
 
 def _home() -> HomePage:
-    home: HomePage = HomePage.objects.get(locale__language_code="en")
+    home: HomePage = HomePage.objects.get(locale__language_code=primary_language())
     return home
 
 
@@ -103,7 +104,7 @@ def product() -> Product:
     item: Product = ProductFactory.create(vendor=vendor, status=Product.Status.PUBLISHED)
     ProductTranslationFactory.create(
         product=item,
-        language="en",
+        language=primary_language(),
         title="Touring jacket",
         slug="touring-jacket-en",
         status=PUBLISHED,
@@ -115,11 +116,19 @@ def product() -> Product:
 def category() -> Category:
     parent = CategoryFactory.create()
     CategoryTranslationFactory.create(
-        category=parent, language="en", name="Clothing", slug="clothing", status=PUBLISHED
+        category=parent,
+        language=primary_language(),
+        name="Clothing",
+        slug="clothing",
+        status=PUBLISHED,
     )
     child: Category = CategoryFactory.create(parent=parent)
     CategoryTranslationFactory.create(
-        category=child, language="en", name="Jackets", slug="jackets", status=PUBLISHED
+        category=child,
+        language=primary_language(),
+        name="Jackets",
+        slug="jackets",
+        status=PUBLISHED,
     )
     return child
 

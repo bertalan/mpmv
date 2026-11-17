@@ -1,11 +1,12 @@
 """HTTP middleware owned by the platform (thin adapters over apps.core.security)."""
 
+import contextlib
 import re
 import uuid
 from collections.abc import Callable
 
 from django.conf import settings
-from django.http import Http404, HttpRequest
+from django.http import Http404, HttpRequest, HttpResponsePermanentRedirect
 from django.http.response import HttpResponseBase
 from django.urls import NoReverseMatch, reverse
 from django.utils.cache import add_never_cache_headers
@@ -131,3 +132,37 @@ class AdminNetworkAllowlistMiddleware:
         except NoReverseMatch:  # a URLconf without the Django admin (some tests)
             return False
         return path == bare or path.startswith(bare + "/")
+
+
+def _skips_language_redirect(path: str) -> bool:
+    """Manager, API and admin paths are never redirected: their 404 stays a 404."""
+    prefixes = ["/manager/", "/api/", "/account/", "/admin/"]
+    with contextlib.suppress(NoReverseMatch):  # a URLconf without the Django admin (some tests)
+        prefixes.append(reverse("admin:index"))
+    return any(path == p.rstrip("/") or path.startswith(p) for p in prefixes)
+
+
+class LanguageRedirectMiddleware:
+    """Send a retired language prefix to its replacement (I18N.15).
+
+    Only a request that would be a 404 is looked at, so a page that exists is never shadowed
+    and the cost is one small query on a 404. The longest matching `LanguageRedirect` wins; the
+    query string is kept.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        response = self.get_response(request)
+        if response.status_code != 404 or request.method not in {"GET", "HEAD"}:
+            return response
+        if _skips_language_redirect(request.path):
+            return response
+        from .language_services import redirect_target
+
+        target = redirect_target(request.path)
+        if target is None:
+            return response
+        query = request.META.get("QUERY_STRING", "")
+        return HttpResponsePermanentRedirect(f"{target}?{query}" if query else target)

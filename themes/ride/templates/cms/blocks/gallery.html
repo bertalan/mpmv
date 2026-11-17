@@ -1,0 +1,6 @@
+{% load i18n %}{% comment %}
+Gallery block of the `ride` theme (THM.14): the gallery carousel with thumbnails, Previous, Pause or
+Play and Next, and the enlarge dialog. Nothing moves by itself. Left out without images.
+{% endcomment %}{% if slides %}<section class="block block-gallery">
+  {% include "components/gallery.html" with id=carousel_id label=_("Gallery") images=slides only %}
+</section>{% endif %}

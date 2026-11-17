@@ -203,8 +203,9 @@ GET_WRITES_ALLOWED: frozenset[str] = frozenset({"django_session", "accounts_user
 # where the cross-tenant tests reach it with another vendor's object, or be listed here with what
 # keeps one user from reaching another's object through it.
 SITEMAP = (
-    "A per-language sitemap (I18N.6) or one of its parts is public by design and takes a "
-    "language code (and a part number), not an object: it "
+    "A per-language, per-type sitemap (I18N.6, SEO.2), one of its parts or the llms.txt of a "
+    "language is public by design and takes a language code (and a type and part number), not "
+    "an object: it "
     "lists only published, indexable pages, and an unknown language or indexing off answers 404 "
     "whoever asks."
 )
@@ -216,7 +217,8 @@ IDOR_REVIEWED: dict[str, str] = {
         "(`test_pending_draft_and_hidden_events_are_404_to_visitors`)."
     ),
     "media": MEDIA,
-    "sitemap_language": SITEMAP,
+    "sitemap_section": SITEMAP,
+    "llms_language": SITEMAP,
     "sitemap_part": SITEMAP,
     "customer_order": (
         "The order is looked up among the signed-in customer's own (ORD.7); a stranger's order "
@@ -308,7 +310,8 @@ OBJECT_PATHS: dict[str, ObjectKwargs] = {
 # Routes with an identifier, called with placeholder parameters, that may answer 404 to a caller
 # who is not signed in or not allowed, with why that 404 hides nothing.
 PLACEHOLDER_404: dict[str, str] = {
-    "sitemap_language": SITEMAP,
+    "sitemap_section": SITEMAP,
+    "llms_language": SITEMAP,
     "sitemap_part": SITEMAP,
     "vendor_terms:read": (
         "Public by design (VEN.35): the signed token is the credential; a tampered, expired or "

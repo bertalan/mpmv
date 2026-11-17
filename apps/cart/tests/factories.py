@@ -13,6 +13,7 @@ from factory.django import DjangoModelFactory
 
 from apps.cart.models import Cart, CartLine
 from apps.catalog.tests.factories import ProductFactory
+from apps.core.i18n import primary_language
 
 
 class CartFactory(DjangoModelFactory[Cart]):
@@ -20,7 +21,7 @@ class CartFactory(DjangoModelFactory[Cart]):
         model = Cart
 
     session_key = factory.Sequence(lambda n: f"session{n:028d}")
-    language = "en"
+    language = factory.LazyFunction(primary_language)
 
 
 class CartLineFactory(DjangoModelFactory[CartLine]):

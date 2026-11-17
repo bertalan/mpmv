@@ -118,6 +118,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",  # Wagtail's inline pickers (CMS.1)
+    "apps.cms.middleware.VideoEmbedCspMiddleware",  # frame-src for a page with a video (THM.14)
     "apps.core.middleware.PermissionsPolicyMiddleware",
     "apps.seo.middleware.ForceNoindexMiddleware",  # X-Robots-Tag when forced (SEO.8)
     # With the other header middleware, so responses returned early by an inner middleware
@@ -126,6 +127,7 @@ MIDDLEWARE = [
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
+    "apps.core.middleware.LanguageRedirectMiddleware",  # retired language prefixes (I18N.15)
     # OPS.5: the Django admin answers the normal 404 outside the networks; before CommonMiddleware
     # so `/django-admin` gets no slash redirect, after Locale and Theme for the normal 404 page.
     "apps.core.middleware.AdminNetworkAllowlistMiddleware",

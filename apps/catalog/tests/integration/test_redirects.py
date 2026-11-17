@@ -44,8 +44,10 @@ from apps.catalog.tests.factories import (
     TermTranslationFactory,
 )
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, TranslationStatus
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -67,14 +69,18 @@ def tags() -> dict[str, Any]:
     """A landing taxonomy "tags" (IT "etichette") with a "bags" term ("borse"), published."""
     taxonomy = TaxonomyFactory.create(code="tags", has_landing=True)
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="en", slug="tags", status=PUBLISHED
+        taxonomy=taxonomy, language=primary_language(), slug="tags", status=PUBLISHED
     )
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="it", slug="etichette", status=PUBLISHED
+        taxonomy=taxonomy, language=other_language(), slug="etichette", status=PUBLISHED
     )
     bags = TermFactory.create(taxonomy=taxonomy)
-    TermTranslationFactory.create(term=bags, language="en", slug="bags", status=PUBLISHED)
-    TermTranslationFactory.create(term=bags, language="it", slug="borse", status=PUBLISHED)
+    TermTranslationFactory.create(
+        term=bags, language=primary_language(), slug="bags", status=PUBLISHED
+    )
+    TermTranslationFactory.create(
+        term=bags, language=other_language(), slug="borse", status=PUBLISHED
+    )
     return {"taxonomy": taxonomy, "bags": bags}
 
 
@@ -82,8 +88,12 @@ def tags() -> dict[str, Any]:
 def bag() -> Product:
     """The replacement product, with an EN and an IT slug."""
     product = ProductFactory.create(sku="BAG-200", legacy_wp_id_en=1001, legacy_wp_id_it=1002)
-    ProductTranslationFactory.create(product=product, language="en", slug="leather-bag-en")
-    ProductTranslationFactory.create(product=product, language="it", slug="borsa-pelle-it")
+    ProductTranslationFactory.create(
+        product=product, language=primary_language(), slug="leather-bag-en"
+    )
+    ProductTranslationFactory.create(
+        product=product, language=other_language(), slug="borsa-pelle-it"
+    )
     return product
 
 
@@ -121,7 +131,9 @@ def test_a_product_without_a_slug_in_the_language_falls_back_to_the_default_one(
     client: Client,
 ) -> None:
     product = ProductFactory.create()
-    ProductTranslationFactory.create(product=product, language="en", slug="only-en-en")
+    ProductTranslationFactory.create(
+        product=product, language=primary_language(), slug="only-en-en"
+    )
     add(source_path="/de/produkt/alt/", target_kind="product", target_product=product)
     assert_301(client.get("/de/produkt/alt/"), "/product/only-en-en/")
 
@@ -254,7 +266,7 @@ def test_the_rule_matches_without_the_trailing_slash(client: Client) -> None:
 
 
 def test_an_old_product_slug_keeps_its_cat5_redirect(client: Client, bag: Product) -> None:
-    SlugHistoryFactory.create(product=bag, language="en", slug="bag-en-sku-1")
+    SlugHistoryFactory.create(product=bag, language=primary_language(), slug="bag-en-sku-1")
     assert_301(client.get("/product/bag-en-sku-1/"), "/product/leather-bag-en/")
 
 
@@ -339,7 +351,7 @@ def test_a_chain_is_refused_both_ways() -> None:
 
 
 def test_a_target_on_an_old_product_slug_is_a_chain(bag: Product) -> None:
-    SlugHistoryFactory.create(product=bag, language="en", slug="bag-en-sku-1")
+    SlugHistoryFactory.create(product=bag, language=primary_language(), slug="bag-en-sku-1")
     with pytest.raises(ValidationError, match="old product slug"):
         add(source_path="/old/", target_kind="path", target_path="/product/bag-en-sku-1/")
 
@@ -564,7 +576,7 @@ def test_a_permanent_redirect_is_cached_for_a_bounded_time(
     settings.REDIRECT_PERMANENT_MAX_AGE = 3600
     add(source_path="/old/", target_kind="path", target_path="/new/")
     add(source_path="/withdrawn/", code=Redirect.Code.GONE)
-    SlugHistoryFactory.create(product=bag, language="en", slug="bag-en-sku-1")
+    SlugHistoryFactory.create(product=bag, language=primary_language(), slug="bag-en-sku-1")
     for path in ("/old/", "/withdrawn/", "/product/bag-en-sku-1/"):
         assert client.get(path)["Cache-Control"] == "max-age=3600", path
 

@@ -26,9 +26,11 @@ from apps.cms.blocks import PRODUCT_CARDS_LAYOUTS, ProductCardsBlock, page_graph
 from apps.cms.models import BlogPostPage, HomePage, StandardPage, TermLandingPage, VendorLandingPage
 from apps.cms.services import SeedReport
 from apps.cms.tests.integration.test_product_grid import _grid, _home, _publish, listed
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -106,7 +108,7 @@ def test_only_products_published_in_the_page_language_are_shown(seeded: SeedRepo
     )
     html = _publish(_home(), [_cards(both, english_only)])
     assert _titles(html) == ["Blue bowl", "Red jug"]
-    italian = _home("it")
+    italian = _home(other_language())
     italian.body = [_cards(both, english_only)]
     italian.save_revision().publish()
     response = Client().get(italian.url)
@@ -178,7 +180,9 @@ def test_legal_pages_do_not_offer_product_blocks() -> None:
 
 
 def test_the_cards_render_on_a_standard_page(seeded: SeedReport) -> None:
-    about = StandardPage.objects.get(locale__language_code="en", depth=_home().depth + 1)
+    about = StandardPage.objects.get(
+        locale__language_code=primary_language(), depth=_home().depth + 1
+    )
     html = _publish(about, [_cards(listed("Blue bowl"))])
     assert _titles(html) == ["Blue bowl"]
 

@@ -21,8 +21,10 @@ from apps.accounts.tests.mfa import verified_login
 from apps.cms.blocks import HeroBlock, LinkBlock
 from apps.cms.models import HomePage, StandardPage
 from apps.cms.services import SeedReport
+from apps.core.i18n import primary_language
 from apps.core.models import MediaImage
 from apps.core.tests.factories import MediaImageFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -35,12 +37,12 @@ def _commit_hooks_run_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def _home(code: str = "en") -> HomePage:
+def _home(code: str = primary_language()) -> HomePage:
     home: HomePage = HomePage.objects.get(locale__language_code=code)
     return home
 
 
-def _about(code: str = "en") -> StandardPage:
+def _about(code: str = primary_language()) -> StandardPage:
     about: StandardPage = StandardPage.objects.get(
         locale__language_code=code, depth=_home(code).depth + 1
     )
@@ -169,9 +171,9 @@ def test_a_link_to_a_page_leads_to_its_translation(
     client: Client, home: HomePage, editor: User
 ) -> None:
     """The home pages are translations of each other; the IT home links to the IT About page."""
-    italian_about = _about("it")
+    italian_about = _about(other_language())
     assert italian_about.translation_key == _about().translation_key
-    italian_home = _home("it")
+    italian_home = _home(other_language())
     assert italian_home.translation_key == home.translation_key
 
     italian_home.body = home.body.raw_data

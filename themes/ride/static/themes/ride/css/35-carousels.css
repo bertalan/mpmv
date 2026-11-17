@@ -116,6 +116,29 @@
     list-style: none;
   }
 
+  /* Under 40rem one item is in view: the group is a row the visitor scrolls sideways (swipe,
+     arrow keys once focused, no script), and Previous and Next still move between groups. */
+  @media (width < 40rem) {
+    .ride-strip__group {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 100%;
+      grid-template-columns: none;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x mandatory;
+    }
+
+    .ride-strip__item {
+      scroll-snap-align: start;
+    }
+
+    .ride-strip__group:focus-visible {
+      outline: var(--focus-width) solid var(--color-focus);
+      outline-offset: var(--focus-offset);
+    }
+  }
+
   .ride-strip__item {
     padding: var(--card-padding);
     border: 1px solid var(--color-border);
@@ -214,6 +237,21 @@
     position: absolute;
     inset: auto var(--space-s) var(--space-s) auto;
     background: var(--color-surface);
+  }
+
+  .ride-gallery__caption {
+    margin: var(--space-xs) 0 0;
+    color: var(--color-text-muted);
+  }
+
+  .ride-video__poster {
+    margin: 0 0 var(--space-s);
+  }
+
+  .ride-video__poster img {
+    inline-size: 100%;
+    block-size: auto;
+    border-radius: var(--radius-card);
   }
 
   .ride-gallery__zoom[hidden] {
