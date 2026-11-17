@@ -14,6 +14,11 @@ os.environ.setdefault("DJANGO_ALLOWED_HOSTS", "testserver")
 os.environ.setdefault("MPMV_PRIVACY_PEPPER", secrets.token_urlsafe(32))
 os.environ.setdefault("MPMV_FIELD_ENCRYPTION_KEYS", generate_key("test"))
 
+# I18N.19: production serves only en,it until the DE/FR/ES review; the suite tests all five unless
+# a CI job exports its own MPMV_LANGUAGES. The default itself is tested in test_language_settings.
+if not os.environ.get("MPMV_LANGUAGES", "").strip():
+    os.environ["MPMV_LANGUAGES"] = "en,it,de,fr,es"
+
 from .base import *  # noqa: F403
 
 # OPS.5: the technical admin from loopback only, as the test client connects (empty denies all).
