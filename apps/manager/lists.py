@@ -90,6 +90,8 @@ class ManagerListView(ManagerView):
     columns: ClassVar[Sequence[Column]] = ()
     filters: ClassVar[Sequence[ListFilter]] = ()
     bulk_actions: ClassVar[Sequence[BulkAction]] = ()
+    # Errors a bulk action may raise to refuse a selection: shown as a message, nothing changes.
+    bulk_errors: ClassVar[tuple[type[Exception], ...]] = ()
 
     def get_queryset(self) -> QuerySet[Any]:
         raise NotImplementedError
@@ -170,7 +172,11 @@ class ManagerListView(ManagerView):
             enrolled = user.is_authenticated and has_second_factor(user)
             target = "mfa:verify" if enrolled else "mfa:setup"
             return mfa_redirect(request, target, next_url=self.list_url())
-        changes = action.run(objects, ctx=audit_context(request), dry_run=not confirmed)
+        try:
+            changes = action.run(objects, ctx=audit_context(request), dry_run=not confirmed)
+        except self.bulk_errors as error:
+            messages.error(request, str(error))
+            return HttpResponseRedirect(self.list_url())
         if not confirmed:
             return self.preview(action, ids, changes)
         messages.success(

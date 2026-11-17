@@ -28,6 +28,9 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Platform: owner-only settings (CMP.13, CMP.11 approvals) | R |  |  |  | E |  |
 | Platform: catalog, categories, attributes, taxonomies, imports |  | E |  | R | R |  |
 | Platform: moderation (vendor events, storefront changes, content) |  | E |  |  | R |  |
+| Platform: fitment scheme, the levels of the garage (FIT.1) | E |  |  |  | R |  |
+| Platform: categories expected to declare fitment (FIT.1) | E | R |  |  | R |  |
+| Platform: fitment nodes, proposals, merge and retire (FIT.1) |  | E |  | R | R |  |
 | Platform: notices of illegal content (CMP.5) |  | E |  |  | R |  |
 | Platform: 30 days' notice of termination of a vendor (CMP.5) |  | R |  |  | E |  |
 | Platform: storefront profile changes, history and revert (CORE.9) |  | E |  |  | E |  |

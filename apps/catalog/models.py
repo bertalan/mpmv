@@ -2,7 +2,7 @@
 
 The category tree, taxonomies, terms and brands (CAT.2) live in `taxonomy.py`; products link
 to them here, and to the typed attributes of `attributes.py` (CAT.3) through `ProductAttribute`
-and `VariantOption`. Fields owned by later tasks are added there: images (CAT.4). GPSR data
+and `VariantOption`. Product images (CAT.4) are `ProductImage` at the end. GPSR data
 (CMP.3) lives in `apps.compliance` (`product.gpsr`, a reverse one-to-one); its publication check
 is registered in `publishing.py`, which the publishing services of CAT.10 call.
 Slugs are derived from the title by `services.sync_product_slug` (CAT.5), which keeps the
@@ -91,6 +91,8 @@ __all__ = [
     "Manufacturer",
     "Product",
     "ProductAttribute",
+    "ProductImage",
+    "ProductImageTranslation",
     "ProductKind",
     "ProductStatus",
     "ProductTranslation",
@@ -1384,3 +1386,131 @@ class VariantOption(BaseModel):
         if self.attribute_id is None and self.value_id is not None:
             self.attribute_id = self.value.attribute_id
         super().save(*args, **kwargs)
+
+
+class ProductImage(BaseModel):
+    """One image of a product's gallery, or of one of its variants' own galleries (CAT.4, D-18).
+
+    The file is a `core.MediaImage` (Wagtail image model with licence and credit, CMS.8);
+    renditions in WebP, AVIF and JPEG come from `apps.core.images`. `language` is empty for a
+    language-neutral image; set, the image is dedicated to that language (spec 03 §3.2, spec 09
+    §9.2): a language with at least one dedicated image in a gallery shows only those
+    (`engine.gallery_selection`).
+    `is_cover` marks the cover of the set a gallery and language show (one per gallery and
+    language); `cover_locked` keeps a hand-picked cover safe from pipelines. `source_hash` is the
+    SHA-256 of the uploaded file: the same file of the same vendor is stored once
+    (`media.upload_image`, never across vendors). Alt text and captions: `ProductImageTranslation`.
+    """
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects = VendorScopedManager()
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="images")
+    variant = models.ForeignKey(
+        Variant, on_delete=models.CASCADE, null=True, blank=True, related_name="images"
+    )
+    image = models.ForeignKey(
+        "core.MediaImage", on_delete=models.PROTECT, related_name="product_images"
+    )
+    language = LanguageField(
+        null=True,
+        blank=True,
+        help_text=_(
+            "Leave empty for an image that suits every language. Choose a language when the "
+            "image is only for it, for example packaging printed in German: that language then "
+            "shows only its own images."
+        ),
+    )
+    position = models.PositiveIntegerField(
+        default=0, help_text=_("The order of the images: lower numbers come first.")
+    )
+    is_cover = models.BooleanField(
+        "cover", default=False, help_text=_("The main image of the gallery.")
+    )
+    cover_locked = models.BooleanField(
+        "cover locked",
+        default=False,
+        help_text=_("A hand-picked cover that imports and automatic updates never replace."),
+    )
+    source_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        editable=False,
+        db_index=True,
+        help_text="SHA-256 of the uploaded file: the same file is stored once per vendor.",
+    )
+
+    class Meta:
+        ordering = ["product", "variant", "position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "variant", "language"],
+                condition=models.Q(is_cover=True),
+                nulls_distinct=False,
+                name="catalog_productimage_one_cover",
+                violation_error_message="The gallery already has a cover for this language.",
+            ),
+            models.UniqueConstraint(
+                fields=["product", "variant", "language", "image"],
+                nulls_distinct=False,
+                name="catalog_productimage_image_once",
+                violation_error_message="This image is already in the gallery.",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(is_cover=True) | models.Q(cover_locked=False),
+                name="catalog_productimage_lock_needs_cover",
+                violation_error_message="Only the cover can be locked.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.product_id}:{self.image_id}"
+
+    def clean(self) -> None:
+        if self.variant is not None and self.variant.product_id != self.product_id:
+            raise ValidationError({"variant": "The variant belongs to another product."})
+
+    def translation(self, language: str) -> "Resolved[ProductImageTranslation]":
+        """Alt text and caption to show in `language`: published, or the source language."""
+        return resolve_translation(self.translations.all(), language)
+
+
+class ProductImageTranslation(TranslationModel):
+    """Alt text and caption of a product image in one language (CAT.4, spec 09 §9.2).
+
+    Always translatable text with the EN (source language) fallback: alt text matters for SEO
+    and accessibility. Changed through `media.set_text`.
+    """
+
+    translation_of = "product_image"
+    translated_fields = ("alt_text", "caption")
+
+    vendor_scope: ClassVar[str] = "product_image__product__vendor"
+    objects = VendorScopedManager()
+
+    language = language_field()
+    status = translation_status_field()
+    product_image = models.ForeignKey(
+        ProductImage, on_delete=models.CASCADE, related_name="translations"
+    )
+    alt_text = models.CharField(
+        max_length=255,
+        help_text=_(
+            "Describes the image for people who cannot see it, for example 'Red ceramic mug, "
+            "front view'. Required."
+        ),
+    )
+    caption = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text=_("An optional line shown with the image."),
+    )
+
+    class Meta(TranslationModel.Meta):
+        ordering = ["product_image", "language"]
+        constraints = [
+            *TranslationModel.Meta.constraints,
+            models.UniqueConstraint(
+                fields=["product_image", "language"], name="catalog_productimagetranslation_unique"
+            ),
+        ]

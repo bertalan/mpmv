@@ -34,6 +34,8 @@ from apps.catalog.models import (
     PriceHistory,
     Product,
     ProductAttribute,
+    ProductImage,
+    ProductImageTranslation,
     ProductTranslation,
     SkuAlias,
     SlugHistory,
@@ -46,6 +48,8 @@ from apps.catalog.tests.factories import (
     PriceHistoryFactory,
     ProductAttributeFactory,
     ProductFactory,
+    ProductImageFactory,
+    ProductImageTranslationFactory,
     ProductTranslationFactory,
     SlugHistoryFactory,
     TaxonomyFactory,
@@ -82,6 +86,8 @@ from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
+from apps.fitment.models import ProductFitment, ProductFitmentState
+from apps.fitment.tests.factories import ProductFitmentFactory, ProductFitmentStateFactory
 from apps.ingest.models import (
     ImportRun,
     MappingTable,
@@ -213,6 +219,12 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
+    ProductFitmentState: lambda vendor: ProductFitmentStateFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    ProductFitment: lambda vendor: ProductFitmentFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
     SlugHistory: lambda vendor: SlugHistoryFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
@@ -229,6 +241,12 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ),
     BrandBatch: lambda vendor: BrandBatchFactory.create(vendor=vendor),
     SkuAlias: lambda vendor: renamed_product_alias(vendor),
+    ProductImage: lambda vendor: ProductImageFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    ProductImageTranslation: lambda vendor: ProductImageTranslationFactory.create(
+        product_image__product=ProductFactory.create(vendor=vendor)
+    ),
     ProductAttribute: lambda vendor: ProductAttributeFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
@@ -803,6 +821,36 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:termination": StaffOnly(
         "One notice of termination (CMP.5 part 4): needs the compliance.review_notices "
         "permission, so a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "manager:platform:fitment_scheme": StaffOnly(
+        "Fitment scheme (FIT.1): platform data, one scheme per installation, no vendor data; "
+        "Configuration and tax writes, the owner reads, every other role and a vendor member get "
+        "404 (apps/manager/tests/integration/test_fitment_pages.py)."
+    ),
+    "manager:platform:fitment_categories": StaffOnly(
+        "Categories expected to declare fitment (FIT.1): platform data, no vendor data; "
+        "Configuration and tax writes, Catalog and the owner read, a vendor member gets 404."
+    ),
+    "manager:platform:fitment_nodes": StaffOnly(
+        "Fitment nodes (FIT.1): the shared vocabulary, not vendor-owned; Catalog and moderation "
+        "writes, Support and the owner read, a vendor member gets 404."
+    ),
+    "manager:platform:fitment_proposals": StaffOnly(
+        "Proposed fitment nodes (FIT.1): the review queue of the Catalog and moderation role; a "
+        "vendor member gets 404."
+    ),
+    "manager:platform:fitment_node_new": StaffOnly(
+        "Add a fitment node (FIT.1): Catalog and moderation only; a vendor member gets 404."
+    ),
+    "manager:platform:fitment_node": StaffOnly(
+        "One fitment node (FIT.1): the shared vocabulary, not vendor-owned; Catalog and "
+        "moderation writes, a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "manager:platform:fitment_node_merge": StaffOnly(
+        "Merge of one fitment node (FIT.1): Catalog and moderation only, shown as a dry run "
+        "first; a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "subprocessors": NoVendorData(

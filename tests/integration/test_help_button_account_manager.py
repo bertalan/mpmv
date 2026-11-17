@@ -28,6 +28,7 @@ from apps.cms import engine
 from apps.cms.tests.factories import HelpEntryFactory
 from apps.compliance.tests.factories import NoticeFactory, TerminationNoticeFactory
 from apps.events.tests.factories import EventPageFactory, primary_index
+from apps.fitment.tests.factories import FitmentNodeFactory
 from apps.manager.checks import manager_routes
 from apps.orders.tests.factories import paid_vendor_order
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
@@ -168,6 +169,13 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:sessions_panic": "platform",
         "manager:platform:terminations": "platform",
         "manager:platform:termination": "platform",
+        "manager:platform:fitment_scheme": "platform",  # FIT.1 part 2
+        "manager:platform:fitment_categories": "platform",
+        "manager:platform:fitment_nodes": "platform",
+        "manager:platform:fitment_proposals": "platform",
+        "manager:platform:fitment_node_new": "platform",
+        "manager:platform:fitment_node": "platform",
+        "manager:platform:fitment_node_merge": "platform",
         "manager:shop:termination": "shop",
         "manager:shop:sales_terms": "shop",
         "manager:shop:events": "shop",  # EVT.4
@@ -214,6 +222,8 @@ def _open(name: str) -> tuple[Client, str]:
             kwargs = {"public_id": NoticeFactory.create().public_id}
         if name == "manager:platform:termination":
             kwargs = {"public_id": TerminationNoticeFactory.create().public_id}
+        if name in ("manager:platform:fitment_node", "manager:platform:fitment_node_merge"):
+            kwargs = {"public_id": FitmentNodeFactory.create().public_id}
         if name == "manager:platform:order":
             kwargs = {"public_id": paid_vendor_order().public_id}
     client = Client()

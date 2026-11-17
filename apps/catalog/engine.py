@@ -1131,3 +1131,73 @@ def manufacturer_node(
 def brand_graph(nodes: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     """The `@graph` document of a brand page."""
     return {"@context": SCHEMA_ORG, "@graph": [dict(node) for node in nodes]}
+
+
+# --- Product structured data (CAT.7, spec 10 SEO.7)
+
+PRODUCT_FRAGMENT = "#product"
+
+
+def product_node(
+    *,
+    url: str,
+    name: str,
+    sku: str,
+    description: str = "",
+    brand_id: str = "",
+    mpn: str = "",
+    gtin: str = "",
+) -> dict[str, Any]:
+    """The schema.org `Product` node of a product page. The brand is a reference to the brand
+    page's node (CAT.20), never a copy. No `offers` here: the gross consumer price comes from
+    `apps.tax.prices.consumer_price` (TAX.12), which SEO.1 adds, and an on-request product has
+    none; an empty value is left out."""
+    optional: dict[str, Any] = {
+        "description": description,
+        "brand": {"@id": brand_id} if brand_id else "",
+        "mpn": mpn,
+        "gtin": gtin,
+    }
+    node: dict[str, Any] = {
+        "@type": "Product",
+        "@id": f"{url}{PRODUCT_FRAGMENT}",
+        "url": url,
+        "name": name,
+        "sku": sku,
+    }
+    node.update({key: value for key, value in optional.items() if value})
+    return node
+
+
+# --- Product images (CAT.4, D-18)
+
+
+class GalleryRow(Protocol):
+    """What the image rule reads of a gallery image: `ProductImage` and test doubles fit."""
+
+    @property
+    def language(self) -> str | None: ...
+
+    @property
+    def is_cover(self) -> bool: ...
+
+    @property
+    def position(self) -> int: ...
+
+
+def gallery_selection[R: GalleryRow](rows: Iterable[R], language: str) -> list[R]:
+    """The images of one gallery shown in `language`, the cover first (D-18, spec 03 §3.2).
+
+    A language with at least one image dedicated to it shows only its dedicated images; every
+    other language shows the neutral ones (an image dedicated to another language is never
+    shown). The cover is the shown image flagged `is_cover`, else the first by position; the
+    others follow by position.
+    """
+    rows = list(rows)
+    dedicated = [row for row in rows if row.language == language]
+    shown = dedicated or [row for row in rows if row.language is None]
+    ordered = sorted(shown, key=lambda row: row.position)
+    cover = next((row for row in ordered if row.is_cover), None)
+    if cover is None:
+        return ordered
+    return [cover, *(row for row in ordered if row is not cover)]
