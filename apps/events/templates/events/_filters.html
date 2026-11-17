@@ -30,6 +30,10 @@ without JavaScript. Every control has a visible label. Context: `list_url` (the 
     </select>
   </div>
   {% endif %}
+  <div class="field field--checkbox">
+    <input type="checkbox" id="event-filter-translated" name="translated" value="1"{% if filters.translated_only %} checked{% endif %}>
+    <label for="event-filter-translated">{% blocktranslate with language=language_name %}Only events in {{ language }}{% endblocktranslate %}</label>
+  </div>
   {% include "components/button.html" with label=_("Show events") type="submit" only %}
-  {% if filters.vendor or filters.type or filters.month %}<a href="{{ form_action }}">{% translate "Clear filters" %}</a>{% endif %}
+  {% if filters.vendor or filters.type or filters.month or filters.translated_only %}<a href="{{ form_action }}">{% translate "Clear filters" %}</a>{% endif %}
 </form>

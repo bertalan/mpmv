@@ -9,6 +9,10 @@ form, once the event exists. Works without JavaScript. No inline script or style
 {% block manager_content %}
   <h1>{{ title }}</h1>
   <p><a href="{{ list_url }}">{% translate "Back to the events" %}</a></p>
+  {% if event %}
+    <p>{% blocktranslate with language=language_name original=original_language_name %}Language: {{ language }}. Original language of the event: {{ original }}.{% endblocktranslate %}</p>
+    {% if is_translation %}<p>{% translate "This is a translation. Dates, place and products come from the original and are copied when it is published." %}</p>{% endif %}
+  {% endif %}
   {% if moderation %}{% include "components/alert.html" with level="warning" message=moderation live="polite" only %}{% endif %}
   {% include "components/error_summary.html" with form=form autofocus=True only %}
   <form method="post" class="manager-form" novalidate>
@@ -19,11 +23,11 @@ form, once the event exists. Works without JavaScript. No inline script or style
         {% for field in fields %}{% include "components/field.html" with field=field only %}{% endfor %}
       </fieldset>
     {% endfor %}
-    <fieldset class="manager-form__group">
+    {% if map_picker %}<fieldset class="manager-form__group">
       <legend>{% translate "Point on the map" %}</legend>
       {% include "events/admin/map_picker_panel.html" with inputs=map_picker.inputs picked_inputs=map_picker.picked_inputs source_input=map_picker.source_input find_url=map_picker.find_url language=map_picker.language help_id=map_picker.help_id tile_url=map_picker.tile_url attribution=map_picker.attribution attribution_url=map_picker.attribution_url default_latitude=map_picker.default_latitude default_longitude=map_picker.default_longitude default_zoom=map_picker.default_zoom only %}
       {% for field in form.point_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
-    </fieldset>
+    </fieldset>{% endif %}
     {% for field in form.hidden_fields %}{{ field }}{% endfor %}
     {% include "components/button.html" with label=_("Save draft") type="submit" only %}
   </form>

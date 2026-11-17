@@ -35,7 +35,8 @@
     color: var(--color-text-muted);
   }
 
-  .event-status {
+  .event-status,
+  .event-language {
     font-weight: 700;
   }
 
