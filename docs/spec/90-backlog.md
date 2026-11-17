@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **422** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3355 h** (P1 2484 h · P2 783 h · P3 88 h)
+- Micro-tasks: **424** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3361 h** (P1 2484 h · P2 789 h · P3 88 h)
 - P1 critical path (schedule lower bound with full parallelism): **197 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → PAY.7 → ORD.20 → ORD.21 → ORD.22 → ORD.23
 
 ## By macro area
@@ -30,13 +30,13 @@
 | TRU | Trust, reviews and community (D-37 proposal) | 11 | 0 | 70 | 16 | 86 |
 | FIT | Garage and fitment (D-38) | 17 | 170 | 0 | 14 | 184 |
 | THM | Frontend themes | 16 | 118 | 12 | 0 | 130 |
-| SEO | SEO, feeds, analytics | 13 | 50 | 25 | 0 | 75 |
+| SEO | SEO, feeds, analytics | 15 | 50 | 31 | 0 | 81 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
 | CMP | Compliance | 34 | 195 | 88 | 0 | 283 |
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 14 | 25 | 37 | 8 | 70 |
 | MIG | Migration and cutover | 22 | 141 | 29 | 0 | 170 |
-| **Total** | | **422** | **2484** | **783** | **88** | **3355** |
+| **Total** | | **424** | **2484** | **789** | **88** | **3361** |
 
 ## By phase
 
@@ -365,7 +365,7 @@
 | MIG.20 | Refunds migration (owner decision 2026-11-11, relayed by lane-a, #86): refund child orders and marketplace refund requests are stored inside the historical order (refunded amount, date, reason); there is no separate refund model for legacy data; no new ledger entry and no tax recalculation | P1 | 4 | MIG.4 | A migrated order shows its refunded amount, date and reason; the MIG.5 parity report reconciles order total minus refunds against the legacy figures; a refund amount that does not parse as `Decimal` is rejected with a report; the migration writes no ledger entry for a refund (MIG.8 covers balances); no refund model or table exists for legacy data |
 | MIG.22 | Domains, mail and TLS at cutover (owner decision 2026-11-16, §13.4): DNS inventory exported from the registrar into private storage, a dedicated mail host record and the MX moved to it before the switch when mail is self-managed on the legacy server (a dedicated mail service is a recommended follow-up, and a precondition for shutting the legacy server down), SPF, DKIM and DMARC for the transactional provider (ARC.16), TTL 300 s from T−7, production certificates issued before the switch (ACME DNS-01), legacy site on an internal hostname behind basic auth and `noindex`, Stripe webhook URLs and domain verification updated, staged HSTS | P1 | 6 | MIG.9 | Runbook checklist: the inventory file is in private storage; a mail test send and receive passes after the MX change, before the switch; the TTL check shows 300 s on the switched records; certificates are valid before the switch; the legacy host answers 401 over valid HTTPS without credentials (HSTS `includeSubDomains` applies to it) and carries `noindex`; rollback by DNS was rehearsed in a dress rehearsal |
 
-### F6 — After go-live (P2) (117 tasks, 893 h)
+### F6 — After go-live (P2) (119 tasks, 899 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -459,6 +459,8 @@
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget; cacheability rules taken from wagtail-cache (owner decision D-36; the list below is the minimum and the spike checks it against the package): only anonymous `GET` and `HEAD` with a 200 answer are cached, nothing with a session, cart, consent or CSRF cookie or a `Vary: Cookie`, nothing in the Manager or admin, the key includes the locale and the host, a publish or unpublish purges the page and the pages that list it; **a cached page never carries a per-request CSP nonce** (replaying one nonce to every visitor defeats it), so a page that needs a nonce is not cacheable; package or mirror decided at a short spike inside this row | P2 | 6 | THM.3 | LCP < 2.5 s on product page; tests: a cacheable public response has no `nonce` attribute and its CSP has no nonce source, a page that needs a nonce is served uncached; a cart, consent, Manager or logged-in request is never cached; a locale change and a publish purge the right entries |
 | SEO.9 | `ConsentProvider` interface and docs (owner decision D-10, 2026-11-11): the consent banner is one provider behind an interface (state of each category, gating of tags and e-commerce events, consent log, change of choice); the self-hosted one of SEO.5 is the default and an operator who prefers an external certified CMP plugs it in through a setting, not a fork; `docs/dev/consent-providers.md` "how to add a consent provider" lists what a provider must do (block before consent, signal state, keep proof, CSP and script allow-list per the §14 rule) | P2 | 4 | SEO.5 | The doc exists; the setting selects the provider and an unknown value fails a system check; a test provider replaces the default without changing the tag-gating code; no tag fires before consent with either provider |
 | SEO.10 | Vendor role in product structured data (producer or reseller) (owner 2026-11-13 via lane-a): `Vendor.default_product_role` (choices producer, reseller; blank means unknown) and the per-product override `Product.vendor_role` (blank means use the vendor default); in every role the vendor stays the offer's `seller`; `brand` is the CAT.20 Brand when set (a producer vendor is the brand only when CAT.20 has none, so one GTIN gives one brand `@id`); `manufacturer` is the CAT.20 Manufacturer when set, else the producer vendor; reseller and unknown take both from CAT.20 only, and an unknown role never names the vendor as manufacturer (conservative, never invented); the vendor field is edited in the Manager vendor settings and the product field in the product form (catalog area); help texts in EN and IT; a migration in each app (vendors and catalog); offers wait for TAX.12, as the product page already says | P2 | 3 | SEO.7, CAT.7, CAT.20 | JSON-LD snapshot for each of producer, reseller and unknown; the product override wins over the vendor default; help texts exist in EN and IT; a migration adds the two fields; regression tests: with an unknown role the vendor is never the `manufacturer`; for a reseller or unknown role without a CAT.20 Manufacturer no `manufacturer` is emitted; for a producer without a CAT.20 Manufacturer the vendor is the `manufacturer`; a producer's and a reseller's pages for the same GTIN share the brand `@id`; a CAT.20 Manufacturer wins over a producer vendor |
+| SEO.11 | Return policy completeness: `merchantReturnLink` to the vendor's returns page and `returnPolicyCountry` falling back to the vendor's country, then the operator's (`current_operator()`), when the vendor has none; the vendor's own return window replaces the 14-day floor when a vendor setting exists (SEO.1 uses the floor, customer pays the return shipping, a lack of conformity is free) | P2 | 3 | SEO.1, VEN.2 | A vendor with no country gets the operator's country in `returnPolicyCountry`; the policy links the vendor's returns page; a vendor window longer than 14 days is stated, a shorter one is raised to 14 for consumers |
+| SEO.12 | Richer shipping details in product JSON-LD: `handlingTime` from the vendor's dispatch settings and VEN.20 closures, `name` of the shipping service, rates for weight bands beyond the single-unit band, and shipping nodes for a product without weight data once vendors can price by order value; variant `gtin`, `mpn` and `image` (the variant model has none yet); a gross `shippingRate` for destinations other than the visitor's estimated one | P2 | 3 | SEO.1, SHP.3, VEN.20 | A vendor closure extends the stated handling time in the JSON-LD; each node names its service; the page graph stays under 30 KB |
 | SEO.13 | Product node attributes from the catalogue data (follow-up of the SEO.1 review, 2026-11-16): `width`, `height`, `depth` and `weight` as `QuantitativeValue` with the UN/CEFACT `unitCode` (CAT.22), `material`, `color`, `countryOfOrigin`, a `manufacturer` that points to the CAT.20 `Brand` node (producer role per SEO.10), and per-variant `gtin`, `mpn` and `image` (CAT.23; takes over that clause of SEO.12); a field that is empty is omitted, never emitted blank | P2 | 4 | SEO.1, CAT.22, CAT.23, CAT.20, SEO.10 | A product with dimensions, weight and origin shows them as `QuantitativeValue` and an ISO country; each variant carries its own identifiers and image; an empty field is absent; the page graph stays under 30 KB |
 | AI.1 | MCP server: auth, read tools (catalog, orders, quotes, simulations, reports) | P2 | 12 | CORE.7 | Tools usable from Claude Code with scopes |
 | AI.2 | Mutating MCP tools with dry-run, confirmation and audit | P2 | 10 | AI.1 | Every mutation has a diff and an audit entry |

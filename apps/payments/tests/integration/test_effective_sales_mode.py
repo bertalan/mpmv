@@ -101,7 +101,7 @@ def test_a_vendor_without_an_account_row_is_on_request_everywhere(client: Client
     assert "Price on request" in text
     assert "12.34" not in text
     assert "Add to cart" not in text
-    assert '"offers"' not in product_pages.structured_data(shown, site="https://shop.example.test")
+    assert '"offers"' not in text  # the page's JSON-LD has no offer either
     assert product.pk not in priced()
     with pytest.raises(ValidationError, match="on request"):
         cart.add_to_cart(CartFactory.create(), product)

@@ -178,24 +178,6 @@ def _build(product: Product, language: str) -> ProductPage | None:
     )
 
 
-def structured_data(page: ProductPage, *, site: str) -> str:
-    """The product page's JSON-LD graph as safe script text."""
-    brand = page.product.brand
-    brand_node_id = ""
-    if brand is not None and brand.status == brand.Status.APPROVED:
-        brand_node_id = services.brand_node_id(brand, site=site)
-    node = engine.product_node(
-        url=f"{site}{page.canonical_path}",
-        name=page.title,
-        sku=str(page.product.sku),
-        description=engine.plain_description(page.description or page.short_description),
-        brand_id=brand_node_id,
-        mpn=str(page.product.mpn),
-        gtin=str(page.product.gtin),
-    )
-    return engine.jsonld_text(engine.brand_graph([node]))
-
-
 def related(page: ProductPage) -> Sequence["services.ProductCard"]:
     """Related products and other sellers: CAT.15 fills this."""
     return ()
