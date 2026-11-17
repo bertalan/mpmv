@@ -22,6 +22,7 @@ from apps.catalog.tests.factories import (
     VariantOptionFactory,
     clothing_attributes,
 )
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -122,13 +123,13 @@ def test_value_labels_fall_back_to_english() -> None:
     attributes = clothing_attributes()
     red = attributes["color"].values.get(value="red")
     small = attributes["size"].values.get(value="s")
-    rosso = red.translation("it").translation
+    rosso = red.translation(other_language()).translation
     assert rosso is not None
     assert rosso.label == "Rosso"
-    resolved = small.translation("it")
+    resolved = small.translation(other_language())
     assert resolved.is_fallback
     assert resolved.translation is not None
     assert resolved.translation.label == "S"
-    colore = attributes["color"].translation("it").translation
+    colore = attributes["color"].translation(other_language()).translation
     assert colore is not None
     assert colore.name == "Colore"

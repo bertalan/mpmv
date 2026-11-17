@@ -13,8 +13,10 @@ import pytest
 from wagtail.models import Locale
 
 from apps.cms.services import seed_site, sync_page_translations, translate_page
+from apps.core.i18n import primary_language
 from apps.events.models import EventIndexPage, EventPage
 from apps.events.tests.factories import EventPageFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -32,7 +34,7 @@ def _commit_hooks_run_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
 def italian_event() -> EventPage:
     """A published event written in Italian only: no EN page exists."""
     seed_site()
-    index = EventIndexPage.objects.get(locale__language_code="it")
+    index = EventIndexPage.objects.get(locale__language_code=other_language())
     page: EventPage = EventPageFactory.create(
         parent=index,
         title="Fiera di primavera",
@@ -47,18 +49,25 @@ def italian_event() -> EventPage:
 
 
 def test_an_event_needs_no_english_page(italian_event: EventPage) -> None:
-    assert italian_event.original_locale.language_code == "it"
-    assert italian_event.get_translation_or_none(Locale.objects.get(language_code="en")) is None
+    assert italian_event.original_locale.language_code == other_language()
+    assert (
+        italian_event.get_translation_or_none(Locale.objects.get(language_code=primary_language()))
+        is None
+    )
     assert italian_event.status == EventPage.Status.PUBLISHED
 
 
 def test_an_italian_page_translates_to_english_with_synchronised_dates(
     italian_event: EventPage,
 ) -> None:
-    translate_page(italian_event, ["en"])
-    english = italian_event.get_translation(Locale.objects.get(language_code="en")).specific
+    translate_page(italian_event, [primary_language()])
+    english = italian_event.get_translation(
+        Locale.objects.get(language_code=primary_language())
+    ).specific
 
-    assert english.get_parent().specific == EventIndexPage.objects.get(locale__language_code="en")
+    assert english.get_parent().specific == EventIndexPage.objects.get(
+        locale__language_code=primary_language()
+    )
     for field in (
         "starts_at",
         "ends_at",
@@ -73,7 +82,7 @@ def test_an_italian_page_translates_to_english_with_synchronised_dates(
         "geo_source",
     ):
         assert getattr(english, field) == getattr(italian_event, field), field
-    assert english.original_locale.language_code == "it"
+    assert english.original_locale.language_code == other_language()
     assert english.translation_key == italian_event.translation_key
     assert english.public_id != italian_event.public_id
 
@@ -93,7 +102,9 @@ def test_an_italian_page_translates_to_english_with_synchronised_dates(
 
 def test_a_copy_for_translation_of_a_live_event_is_a_draft(italian_event: EventPage) -> None:
     """The status is each page's own: "Add translation" makes a draft, never a published row."""
-    english = italian_event.copy_for_translation(Locale.objects.get(language_code="en")).specific
+    english = italian_event.copy_for_translation(
+        Locale.objects.get(language_code=primary_language())
+    ).specific
     english = EventPage.objects.get(pk=english.pk)
     assert not english.live
     assert english.status == EventPage.Status.DRAFT
@@ -101,8 +112,8 @@ def test_a_copy_for_translation_of_a_live_event_is_a_draft(italian_event: EventP
 
 
 def test_a_wagtail_localize_translation_keeps_its_own_status(italian_event: EventPage) -> None:
-    translate_page(italian_event, ["en"])
-    english = italian_event.get_translation(Locale.objects.get(language_code="en"))
+    translate_page(italian_event, [primary_language()])
+    english = italian_event.get_translation(Locale.objects.get(language_code=primary_language()))
     assert EventPage.objects.get(pk=english.pk).status == (
         EventPage.Status.PUBLISHED if english.live else EventPage.Status.DRAFT
     )

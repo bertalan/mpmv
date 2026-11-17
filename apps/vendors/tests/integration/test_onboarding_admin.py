@@ -7,6 +7,7 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.models import User
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor, VendorContract
 from apps.vendors.tests.factories import (
@@ -36,7 +37,7 @@ def test_staff_add_a_contract_version_with_its_texts(staff_client: Client) -> No
             "translations-INITIAL_FORMS": "0",
             "translations-MIN_NUM_FORMS": "0",
             "translations-MAX_NUM_FORMS": "1000",
-            "translations-0-language": "en",
+            "translations-0-language": primary_language(),
             "translations-0-status": "published",
             "translations-0-title": "Vendor agreement",
             "translations-0-body": "The terms.",

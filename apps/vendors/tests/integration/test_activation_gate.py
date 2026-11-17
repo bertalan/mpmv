@@ -47,7 +47,9 @@ def onboarding(**fields: object) -> Vendor:
     return vendor
 
 
-def certify(vendor: Vendor, *, language: str = "en", dry_run: bool = False) -> ChangeSet:
+def certify(
+    vendor: Vendor, *, language: str = primary_language(), dry_run: bool = False
+) -> ChangeSet:
     owner = vendor.members.get().user
     return certify_platform_duties(
         vendor, owner, language=language, ctx=owner_ctx(owner.pk), dry_run=dry_run

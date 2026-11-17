@@ -172,7 +172,10 @@ def test_term_keys_are_the_slugs_of_the_filterable_taxonomies_in_the_page_langua
     hidden = taxonomy_with_terms("internal")
     hidden.filterable = False
     hidden.save()
-    assert services.listing_term_keys("en") == {"occasion": occasion, "colour": colour}
+    assert services.listing_term_keys(primary_language()) == {
+        "occasion": occasion,
+        "colour": colour,
+    }
     assert services.listing_term_keys(other_language()) == {"occasione": occasion, "colour": colour}
 
 
@@ -187,8 +190,8 @@ def test_term_filters_or_within_a_taxonomy_and_across_taxonomies() -> None:
     party_only.terms.add(party)
 
     def matching(query: dict[str, list[str]]) -> set[int]:
-        params = services.parse_listing_query(query, "en").params
-        resolved = services.resolve_listing_filter(params, "en")
+        params = services.parse_listing_query(query, primary_language()).params
+        resolved = services.resolve_listing_filter(params, primary_language())
         assert resolved.unknown == ()
         return pks(services.listing_products(filters=resolved.filters))
 
@@ -206,8 +209,8 @@ def test_a_term_filter_includes_child_terms() -> None:
     model = term(compatibility, "model-1", parent=maker)
     product = listed()
     product.terms.add(model)
-    params = services.parse_listing_query({"compatibility": ["maker-1"]}, "en").params
-    resolved = services.resolve_listing_filter(params, "en")
+    params = services.parse_listing_query({"compatibility": ["maker-1"]}, primary_language()).params
+    resolved = services.resolve_listing_filter(params, primary_language())
     assert pks(services.listing_products(filters=resolved.filters)) == {product.pk}
 
 
@@ -229,7 +232,9 @@ def test_filter_slugs_resolve_in_the_page_language_with_the_english_fallback() -
     assert pks(services.listing_products(filters=resolved.filters)) == {on_party.pk, on_picnic.pk}
 
 
-def resolve(query: dict[str, list[str]], language: str = "en") -> services.ResolvedFilter:
+def resolve(
+    query: dict[str, list[str]], language: str = primary_language()
+) -> services.ResolvedFilter:
     params = services.parse_listing_query(query, language).params
     return services.resolve_listing_filter(params, language)
 
@@ -308,7 +313,7 @@ def test_a_slug_two_siblings_answer_to_through_the_fallback_is_ambiguous() -> No
     listed(category=shoes)
     listed(category=bags)
     assert resolve({"category": ["borse"]}, other_language()).unknown == ("category",)
-    assert resolve({"category": ["borse"]}, "en").unknown == ()
+    assert resolve({"category": ["borse"]}, primary_language()).unknown == ()
 
 
 def test_a_taxonomy_key_prefers_the_page_language_over_another_taxonomys_fallback(
@@ -328,15 +333,15 @@ def test_a_taxonomy_key_prefers_the_page_language_over_another_taxonomys_fallbac
     resolved = resolve({"colore": ["rosso"]}, other_language())
     assert resolved.unknown == ()
     assert pks(services.listing_products(filters=resolved.filters)) == {product.pk}
-    assert services.listing_term_keys("en") == {"colour": x, "colore": y}
+    assert services.listing_term_keys(primary_language()) == {"colour": x, "colore": y}
 
 
 def test_the_vendor_filter_takes_an_active_vendor_slug() -> None:
     vendor = active_vendor(slug="vendor-one")
     own = listed(vendor=vendor)
     listed()
-    params = services.parse_listing_query({"vendor": ["vendor-one"]}, "en").params
-    resolved = services.resolve_listing_filter(params, "en")
+    params = services.parse_listing_query({"vendor": ["vendor-one"]}, primary_language()).params
+    resolved = services.resolve_listing_filter(params, primary_language())
     assert resolved.filters.vendor == vendor
     assert pks(services.listing_products(filters=resolved.filters)) == {own.pk}
 
@@ -348,8 +353,8 @@ def test_an_unknown_slug_is_reported_and_matches_nothing() -> None:
     product.terms.add(party)
     VendorFactory.create(slug="closed-vendor", status=Vendor.Status.CLOSED)
     query = {"occasion": ["party,nothing"], "category": ["nowhere"], "vendor": ["closed-vendor"]}
-    params = services.parse_listing_query(query, "en").params
-    resolved = services.resolve_listing_filter(params, "en")
+    params = services.parse_listing_query(query, primary_language()).params
+    resolved = services.resolve_listing_filter(params, primary_language())
     assert resolved.unknown == ("category", "occasion", "vendor")
     assert not services.listing_products(filters=resolved.filters).exists()
 
@@ -360,8 +365,8 @@ def test_an_unknown_slug_is_reported_and_matches_nothing() -> None:
 def test_a_listing_page_is_ordered_newest_first_and_paginated() -> None:
     products = [listed() for _ in range(5)]
     newest_first = [p.pk for p in reversed(products)]
-    params = services.parse_listing_query({"page": ["2"]}, "en").params
-    page = services.listing_page(ListingScope(), params, "en", per_page=2)
+    params = services.parse_listing_query({"page": ["2"]}, primary_language()).params
+    page = services.listing_page(ListingScope(), params, primary_language(), per_page=2)
     assert [p.pk for p in page.products] == newest_first[2:4]
     assert page.window.total == 5
     assert page.window.page_count == 3
@@ -371,8 +376,8 @@ def test_a_listing_page_is_ordered_newest_first_and_paginated() -> None:
 
 def test_a_listing_page_past_the_end_is_out_of_range_and_empty() -> None:
     listed()
-    params = services.parse_listing_query({"page": ["9"]}, "en").params
-    page = services.listing_page(ListingScope(), params, "en", per_page=2)
+    params = services.parse_listing_query({"page": ["9"]}, primary_language()).params
+    page = services.listing_page(ListingScope(), params, primary_language(), per_page=2)
     assert page.window.out_of_range
     assert page.products == []
 

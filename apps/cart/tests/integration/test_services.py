@@ -68,7 +68,7 @@ def test_get_or_create_cart_for_a_user_and_for_a_guest_session() -> None:
     assert (guest.user, guest.session_key, guest.language, guest.country_hint) == (
         None,
         "abc",
-        "it",
+        other_language(),
         "DE",
     )
     assert services.get_cart(session_key="abc") == guest
@@ -87,7 +87,7 @@ def test_get_or_create_cart_dry_run_writes_nothing_and_describes_the_cart() -> N
     assert change.after is not None
     assert (change.after["user"], change.after["language"], change.after["country_hint"]) == (
         user.pk,
-        "it",
+        other_language(),
         "DE",
     )
 
@@ -336,7 +336,7 @@ def test_merge_takes_the_guest_language_and_country_hint() -> None:
 
     services.merge_carts(guest, user)
     mine.refresh_from_db()
-    assert (mine.language, mine.country_hint) == ("it", "FR")
+    assert (mine.language, mine.country_hint) == (other_language(), "FR")
 
 
 def test_merge_dry_run_changes_nothing() -> None:

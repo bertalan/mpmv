@@ -116,7 +116,7 @@ def test_add_product_with_translations_and_a_variant(staff_client: Client) -> No
     data.update(management_form("translations", total=2))
     data.update(
         {
-            "translations-0-language": "en",
+            "translations-0-language": primary_language(),
             "translations-0-status": "published",
             "translations-0-title": "Leather bag",
             "translations-0-short_description": "Hand-stitched.",
@@ -268,7 +268,7 @@ def test_changing_a_variant_price_in_the_product_page_writes_the_audit_log(
 
 
 def test_delete_product(staff_client: Client) -> None:
-    product = ProductFactory.create(languages=["en"])
+    product = ProductFactory.create(languages=[primary_language()])
     response = staff_client.post(
         reverse("admin:catalog_product_delete", args=[product.pk]), {"post": "yes"}
     )
@@ -292,7 +292,7 @@ def test_variant_page_edits_translations_and_audits_the_price(staff_client: Clie
     data.update(management_form("translations", total=1))
     data.update(
         {
-            "translations-0-language": "en",
+            "translations-0-language": primary_language(),
             "translations-0-status": "published",
             "translations-0-label": "Red",
             "translations-0-description": "",
@@ -303,7 +303,7 @@ def test_variant_page_edits_translations_and_audits_the_price(staff_client: Clie
     variant.refresh_from_db()
     assert variant.stock_qty == 4
     assert variant.price_net_override == Decimal("33.00")
-    assert variant.translation("en").translation is not None
+    assert variant.translation(primary_language()).translation is not None
     assert domain_entries().get().action == "catalog.variant.price_changed"
 
 

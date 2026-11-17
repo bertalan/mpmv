@@ -51,7 +51,7 @@ def test_the_owner_saves_and_the_change_is_audited(
 ) -> None:
     VendorTranslationFactory.create(vendor=vendor, language=primary_language(), tagline="Old")
     verified_login(client, owner)
-    response = client.post(PROFILE, {"language": "en", "tagline": "Fresh"})
+    response = client.post(PROFILE, {"language": primary_language(), "tagline": "Fresh"})
     assert response.status_code == 302
     assert (
         VendorTranslation.objects.get(vendor=vendor, language=primary_language()).tagline == "Fresh"
@@ -67,7 +67,7 @@ def test_a_too_long_tagline_shows_an_error_summary_tied_to_the_field(
     client: Client, owner: User
 ) -> None:
     verified_login(client, owner)
-    response = client.post(PROFILE, {"language": "en", "tagline": "x" * 201})
+    response = client.post(PROFILE, {"language": primary_language(), "tagline": "x" * 201})
     assert response.status_code == 200
     page = response.text
     assert 'class="error-summary"' in page
@@ -102,7 +102,10 @@ def test_another_vendors_texts_never_show_and_cannot_be_posted(
     )
     verified_login(client, owner)
     assert "Rival" not in client.get(PROFILE).text
-    client.post(PROFILE, {"language": "en", "tagline": "Hijack", "vendor": str(other_vendor.pk)})
+    client.post(
+        PROFILE,
+        {"language": primary_language(), "tagline": "Hijack", "vendor": str(other_vendor.pk)},
+    )
     theirs.refresh_from_db()
     assert theirs.tagline == "Rival"
 
@@ -126,7 +129,7 @@ def test_a_suspended_vendor_sees_the_reason_and_no_form(
     assert page.status_code == 200
     assert "suspended" in page.text.lower()
     assert 'name="tagline"' not in page.text
-    refused = client.post(PROFILE, {"language": "en", "tagline": "Sneaky"})
+    refused = client.post(PROFILE, {"language": primary_language(), "tagline": "Sneaky"})
     assert refused.status_code == 403
     assert "suspended" in refused.text.lower()
     assert 'name="tagline"' not in refused.text
@@ -143,7 +146,9 @@ def test_a_machine_draft_is_marked_on_the_form(client: Client, owner: User, vend
 
 def test_html_in_a_field_shows_an_error_and_is_not_stored(client: Client, owner: User) -> None:
     verified_login(client, owner)
-    response = client.post(PROFILE, {"language": "en", "tagline": "<script>x</script>"})
+    response = client.post(
+        PROFILE, {"language": primary_language(), "tagline": "<script>x</script>"}
+    )
     assert response.status_code == 200
     assert 'href="#id_tagline"' in response.text
     assert not VendorTranslation.objects.exists()
@@ -152,7 +157,7 @@ def test_html_in_a_field_shows_an_error_and_is_not_stored(client: Client, owner:
 def test_html_in_a_rich_text_field_is_cleaned_and_stored(client: Client, owner: User) -> None:
     verified_login(client, owner)
     html = "<p>ok <b>bold</b></p><script>x()</script>"
-    response = client.post(PROFILE, {"language": "en", "description": html})
+    response = client.post(PROFILE, {"language": primary_language(), "description": html})
     assert response.status_code == 302
     stored = VendorTranslation.objects.get().description
     assert stored == "<p>ok <b>bold</b></p>"
@@ -171,8 +176,10 @@ def test_stored_text_is_escaped_on_output(client: Client, owner: User, vendor: V
 def test_too_many_saves_show_a_form_error(client: Client, owner: User, settings: object) -> None:
     settings.VENDOR_PROFILE_SAVE_LIMIT = 1  # type: ignore[attr-defined]
     verified_login(client, owner)
-    assert client.post(PROFILE, {"language": "en", "tagline": "one"}).status_code == 302
-    response = client.post(PROFILE, {"language": "en", "tagline": "two"})
+    assert (
+        client.post(PROFILE, {"language": primary_language(), "tagline": "one"}).status_code == 302
+    )
+    response = client.post(PROFILE, {"language": primary_language(), "tagline": "two"})
     assert response.status_code == 200
     assert 'class="error-summary"' in response.text
 
@@ -199,6 +206,6 @@ def test_saving_a_machine_draft_unchanged_says_it_is_still_a_draft(
 
 def test_a_nul_byte_posted_to_the_page_is_a_form_error(client: Client, owner: User) -> None:
     verified_login(client, owner)
-    response = client.post(PROFILE, {"language": "en", "tagline": "a\x00b"})
+    response = client.post(PROFILE, {"language": primary_language(), "tagline": "a\x00b"})
     assert response.status_code == 200
     assert 'class="error-summary"' in response.text

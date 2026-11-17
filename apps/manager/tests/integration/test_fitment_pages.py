@@ -24,6 +24,7 @@ from apps.fitment.models import (
     FitmentNodeMerge,
 )
 from apps.fitment.tests.factories import FitmentLevelFactory, FitmentNodeFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -216,7 +217,7 @@ def test_a_level_is_renamed_in_a_language(client: Client) -> None:
             "confirm": "1",
         },
     )
-    row = FitmentLevel.objects.get(code="make").translations.get(language="it")
+    row = FitmentLevel.objects.get(code="make").translations.get(language=other_language())
     assert (row.label, row.plural_label) == ("Marca", "Marche")
 
 
@@ -340,8 +341,10 @@ def test_a_node_is_renamed_and_its_aliases_and_names_are_kept(
     alias = FitmentNodeAlias.objects.get(node=node, alias="M-One")
     client.post(detail(node), {"action": "remove_alias", "alias": str(alias.public_id)})
     assert not node.aliases.filter(alias="M-One").exists()
-    client.post(detail(node), {"action": "set_name", "language": "it", "name": "Marca Uno"})
-    assert node.translations.get(language="it").name == "Marca Uno"
+    client.post(
+        detail(node), {"action": "set_name", "language": other_language(), "name": "Marca Uno"}
+    )
+    assert node.translations.get(language=other_language()).name == "Marca Uno"
 
 
 def test_a_proposed_node_is_invisible_to_pickers_until_approved(

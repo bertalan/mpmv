@@ -7,7 +7,9 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import Client
 
+from apps.core.i18n import primary_language
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import localized
 
 
 def variant_foreign_keys() -> set[tuple[str, ...]]:
@@ -93,7 +95,7 @@ def test_d25_migration_dry_run_changes_nothing() -> None:
     from apps.core.models import AuditLog
 
     translation = ProductTranslationFactory.create(
-        language="en", title="Leather Bag", slug="leather-bag-en"
+        language=primary_language(), title="Leather Bag", slug="leather-bag-en"
     )
     changes = _d25_migration().reslug_products(apps, None, dry_run=True)
     assert changes == [(translation.pk, "leather-bag-en", "leather-bag")]
@@ -128,12 +130,17 @@ def test_d25_migration_reslugs_both_legacy_shapes_on_the_historical_state(
         vendor_id=vendor.pk, sku="BAG-2", sku_key="bag-2", price_net="1.00"
     )
     translation_model.objects.create(
-        product=first, language="en", title="Leather Bag", slug="leather-bag-en"
+        product=first, language=primary_language(), title="Leather Bag", slug="leather-bag-en"
     )
     translation_model.objects.create(
-        product=second, language="en", title="Leather Bag", slug="leather-bag-en-bag-2"
+        product=second,
+        language=primary_language(),
+        title="Leather Bag",
+        slug="leather-bag-en-bag-2",
     )
-    history_model.objects.create(product=first, language="en", slug="leather-bag-en-bag-1")
+    history_model.objects.create(
+        product=first, language=primary_language(), slug="leather-bag-en-bag-1"
+    )
 
     executor.loader.build_graph()
     executor.migrate(executor.loader.graph.leaf_nodes())
@@ -153,9 +160,9 @@ def test_d25_migration_reslugs_both_legacy_shapes_on_the_historical_state(
         ("leather-bag-en-bag-1", "leather-bag"),
         ("leather-bag-en-bag-2", "leather-bag-2"),
     ):
-        response = client.get(f"/product/{old_slug}/")
+        response = client.get(localized(f"/product/{old_slug}/"))
         assert response.status_code == 301
-        assert response["Location"] == f"/product/{new_slug}/"
+        assert response["Location"] == localized(f"/product/{new_slug}/")
 
     # A rerun changes nothing.
     assert _d25_migration().reslug_products(django_apps, None) == []
@@ -195,7 +202,9 @@ def test_d25_migration_first_slug_has_no_history_or_audit_and_bumps_updated_at()
     from apps.catalog.tests.factories import ProductTranslationFactory
     from apps.core.models import AuditLog
 
-    translation = ProductTranslationFactory.create(language="en", title="Safari", slug="")
+    translation = ProductTranslationFactory.create(
+        language=primary_language(), title="Safari", slug=""
+    )
     before = translation.updated_at
     _d25_migration().reslug_products(apps, None)
     translation.refresh_from_db()
@@ -213,9 +222,11 @@ def test_d25_migration_reclaims_an_own_old_slug_without_a_loop() -> None:
     from apps.catalog.tests.factories import ProductTranslationFactory
 
     translation = ProductTranslationFactory.create(
-        language="en", title="Leather Bag", slug="travel-bag"
+        language=primary_language(), title="Leather Bag", slug="travel-bag"
     )
-    SlugHistory.objects.create(product=translation.product, language="en", slug="leather-bag")
+    SlugHistory.objects.create(
+        product=translation.product, language=primary_language(), slug="leather-bag"
+    )
     _d25_migration().reslug_products(apps, None)
     translation.refresh_from_db()
     assert translation.slug == "leather-bag"

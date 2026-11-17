@@ -9,9 +9,11 @@ from django.contrib.auth import authenticate
 from apps.accounts.tests.factories import UserFactory
 from apps.api.services import authenticate as authenticate_api_key
 from apps.api.tests.factories import ApiClientFactory
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.vendors.tests.factories import VendorFactory
 from tests.factory_registry import Factory, app_factories
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -58,8 +60,11 @@ def test_platform_operator_batches_have_adjacent_non_overlapping_periods() -> No
 
 
 def test_vendor_factory_creates_translations_per_language() -> None:
-    vendor = VendorFactory.create(languages=["en", "it"])
-    assert sorted(vendor.translations.values_list("language", flat=True)) == ["en", "it"]
+    vendor = VendorFactory.create(languages=[primary_language(), other_language()])
+    assert sorted(vendor.translations.values_list("language", flat=True)) == [
+        primary_language(),
+        other_language(),
+    ]
     assert vendor.display_name.startswith("Vendor ")
     assert vendor.contact_email.endswith("@example.com")
 

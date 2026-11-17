@@ -10,18 +10,15 @@ import pytest
 from django.db import IntegrityError, transaction
 from django.test import override_settings
 
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.translations import MACHINE, PUBLISHED, REVIEWED, source_hash
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
-LANGUAGES_PLUS_FRENCH = [
-    ("en", "English"),
-    ("it", "Italiano"),
-    ("de", "Deutsch"),
-    ("fr", "Français"),
-]
+LANGUAGES_PLUS_FRENCH = [(code, code) for code in dict.fromkeys([*configured_languages(), "fr"])]
 
 
 def refreshed(row: VendorTranslation) -> VendorTranslation:
@@ -30,7 +27,9 @@ def refreshed(row: VendorTranslation) -> VendorTranslation:
 
 
 def en_row(vendor: Vendor, **kwargs: str) -> VendorTranslation:
-    return VendorTranslationFactory.create(vendor=vendor, language="en", status=PUBLISHED, **kwargs)
+    return VendorTranslationFactory.create(
+        vendor=vendor, language=primary_language(), status=PUBLISHED, **kwargs
+    )
 
 
 # --- source_hash
@@ -45,13 +44,13 @@ def test_the_en_row_stores_the_hash_of_its_own_texts() -> None:
 def test_a_new_translation_records_the_current_en_hash() -> None:
     vendor = VendorFactory.create()
     en = en_row(vendor)
-    it = VendorTranslationFactory.create(vendor=vendor, language="it")
+    it = VendorTranslationFactory.create(vendor=vendor, language=other_language())
     assert refreshed(it).source_hash == en.source_hash
     assert it.is_stale is False
 
 
 def test_a_translation_without_an_en_row_is_not_stale() -> None:
-    it = VendorTranslationFactory.create(language="it", status=PUBLISHED)
+    it = VendorTranslationFactory.create(language=other_language(), status=PUBLISHED)
     assert it.source_hash == ""
     assert it.is_stale is False
 
@@ -66,8 +65,8 @@ def test_source_hash_is_not_editable_in_forms() -> None:
 def test_en_text_change_sends_reviewed_and_published_translations_back_to_review() -> None:
     vendor = VendorFactory.create()
     en = en_row(vendor, tagline="Outdoor gear")
-    it = VendorTranslationFactory.create(vendor=vendor, language="it", status=PUBLISHED)
-    de = VendorTranslationFactory.create(vendor=vendor, language="de", status=REVIEWED)
+    it = VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=PUBLISHED)
+    de = VendorTranslationFactory.create(vendor=vendor, language=third_language(), status=REVIEWED)
     old_hash = en.source_hash
 
     en.tagline = "Outdoor and climbing gear"
@@ -84,7 +83,7 @@ def test_en_text_change_sends_reviewed_and_published_translations_back_to_review
 def test_saving_en_without_a_text_change_keeps_translations_published() -> None:
     vendor = VendorFactory.create()
     en = en_row(vendor)
-    it = VendorTranslationFactory.create(vendor=vendor, language="it", status=PUBLISHED)
+    it = VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=PUBLISHED)
     en.save()
     assert refreshed(it).status == PUBLISHED
     assert it.is_stale is False
@@ -93,7 +92,7 @@ def test_saving_en_without_a_text_change_keeps_translations_published() -> None:
 def test_save_with_update_fields_still_refreshes_the_en_hash() -> None:
     vendor = VendorFactory.create()
     en = en_row(vendor, tagline="Outdoor gear")
-    it = VendorTranslationFactory.create(vendor=vendor, language="it", status=PUBLISHED)
+    it = VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=PUBLISHED)
     en.tagline = "Climbing gear"
     en.save(update_fields=["tagline"])
     assert refreshed(en).source_hash == source_hash(en.source_values())
@@ -104,7 +103,9 @@ def test_an_en_change_does_not_touch_other_vendors() -> None:
     first, second = VendorFactory.create_batch(2)
     en = en_row(first)
     en_row(second)
-    other = VendorTranslationFactory.create(vendor=second, language="it", status=PUBLISHED)
+    other = VendorTranslationFactory.create(
+        vendor=second, language=other_language(), status=PUBLISHED
+    )
     en.description = "New description."
     en.save()
     assert refreshed(other).status == PUBLISHED
@@ -113,23 +114,25 @@ def test_an_en_change_does_not_touch_other_vendors() -> None:
 def test_mark_stale_translations_reports_how_many_went_back_to_review() -> None:
     vendor = VendorFactory.create()
     en = en_row(vendor)
-    VendorTranslationFactory.create(vendor=vendor, language="it", status=PUBLISHED)
-    VendorTranslationFactory.create(vendor=vendor, language="de", status=MACHINE)
-    VendorTranslation.objects.filter(language="en").update(tagline="Changed behind save()")
+    VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=PUBLISHED)
+    VendorTranslationFactory.create(vendor=vendor, language=third_language(), status=MACHINE)
+    VendorTranslation.objects.filter(language=primary_language()).update(
+        tagline="Changed behind save()"
+    )
     en.refresh_from_db()
     en.save()  # recomputes the hash from the stored texts
     assert en.mark_stale_translations() == 0  # already done by save()
     assert sorted(vendor.translations.values_list("language", "status")) == [
-        ("de", MACHINE),
-        ("en", PUBLISHED),
-        ("it", MACHINE),
+        (third_language(), MACHINE),
+        (primary_language(), PUBLISHED),
+        (other_language(), MACHINE),
     ]
 
 
 def test_reviewing_a_stale_translation_records_the_new_en_hash() -> None:
     vendor = VendorFactory.create()
     en = en_row(vendor, tagline="Outdoor gear")
-    it = VendorTranslationFactory.create(vendor=vendor, language="it", status=PUBLISHED)
+    it = VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=PUBLISHED)
     en.tagline = "Climbing gear"
     en.save()
 
@@ -145,7 +148,7 @@ def test_reviewing_a_stale_translation_records_the_new_en_hash() -> None:
 def test_editing_a_stale_draft_without_review_keeps_it_stale() -> None:
     vendor = VendorFactory.create()
     en = en_row(vendor, tagline="Outdoor gear")
-    it = VendorTranslationFactory.create(vendor=vendor, language="it", status=PUBLISHED)
+    it = VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=PUBLISHED)
     en.tagline = "Climbing gear"
     en.save()
 
@@ -169,8 +172,8 @@ def test_status_outside_the_workflow_is_refused_by_the_database() -> None:
 def test_vendor_translation_resolves_the_published_language() -> None:
     vendor = VendorFactory.create()
     en_row(vendor)
-    it = VendorTranslationFactory.create(vendor=vendor, language="it", status=PUBLISHED)
-    resolved = vendor.translation("it")
+    it = VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=PUBLISHED)
+    resolved = vendor.translation(other_language())
     assert resolved.translation == it
     assert resolved.is_fallback is False
 
@@ -178,25 +181,27 @@ def test_vendor_translation_resolves_the_published_language() -> None:
 def test_vendor_translation_falls_back_to_en_when_not_published() -> None:
     vendor = VendorFactory.create()
     en = en_row(vendor)
-    VendorTranslationFactory.create(vendor=vendor, language="it", status=REVIEWED)
-    resolved = vendor.translation("it")
+    VendorTranslationFactory.create(vendor=vendor, language=other_language(), status=REVIEWED)
+    resolved = vendor.translation(other_language())
     assert resolved.translation == en
-    assert resolved.language == "en"
+    assert resolved.language == primary_language()
     assert resolved.is_fallback is True
 
 
 def test_vendor_translation_falls_back_after_an_en_change() -> None:
     vendor = VendorFactory.create()
     en = en_row(vendor, tagline="Outdoor gear")
-    VendorTranslationFactory.create(vendor=vendor, language="de", status=PUBLISHED)
+    VendorTranslationFactory.create(vendor=vendor, language=third_language(), status=PUBLISHED)
     en.tagline = "Climbing gear"
     en.save()
-    assert vendor.translation("de").is_fallback is True
+    assert vendor.translation(third_language()).is_fallback is True
 
 
 def test_vendor_without_published_texts_resolves_to_missing() -> None:
-    vendor = VendorFactory.create(languages=["en", "it"])  # machine drafts only
-    assert vendor.translation("it").is_missing is True
+    vendor = VendorFactory.create(
+        languages=[primary_language(), other_language()]
+    )  # machine drafts only
+    assert vendor.translation(other_language()).is_missing is True
 
 
 # --- Languages are configuration (coherence check 2, finding 1)
