@@ -16,7 +16,13 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.permission_policies.base import BasePermissionPolicy
 from wagtail.permissions import register_permission_policy
 from wagtail.snippets.models import register_snippet
-from wagtail.snippets.views.snippets import CopyView, DeleteView, EditView, SnippetViewSet
+from wagtail.snippets.views.snippets import (
+    CopyView,
+    CreateView,
+    DeleteView,
+    EditView,
+    SnippetViewSet,
+)
 
 from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
@@ -70,6 +76,16 @@ class _FileRowGuard:
         return obj
 
 
+class HelpEntryCreateView(CreateView):  # type: ignore[misc]
+    @requires_level_method(GATE_ACTION)
+    def post(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().post(request, *args, **kwargs)
+
+    @requires_level_method(GATE_ACTION)
+    def put(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().put(request, *args, **kwargs)
+
+
 class HelpEntryEditView(_FileRowGuard, EditView):  # type: ignore[misc]  # Wagtail is untyped
     @requires_level_method(GATE_ACTION)
     def post(self, request: Any, *args: Any, **kwargs: Any) -> Any:
@@ -102,6 +118,7 @@ class HelpEntryCopyView(_FileRowGuard, CopyView):  # type: ignore[misc]
 
 class HelpEntryViewSet(SnippetViewSet):  # type: ignore[misc]  # Wagtail is untyped
     model = HelpEntry
+    add_view_class = HelpEntryCreateView
     edit_view_class = HelpEntryEditView
     delete_view_class = HelpEntryDeleteView
     copy_view_class = HelpEntryCopyView
