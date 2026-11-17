@@ -1,6 +1,5 @@
 {% load i18n %}{% comment %}
-The "Subscribe" and navigation links of the event pages. The RSS and ICS feeds are EVT.9; until
-then the pages link each other. Context: `list_url`, `calendar_url`, `past_url`, `current`.
+The "Subscribe" and navigation links of the event pages. The feeds are in `_subscribe.html` (EVT.9). Context: `list_url`, `calendar_url`, `past_url`, `current`.
 {% endcomment %}
 <nav class="event-nav" aria-label="{% translate 'Event views' %}">
   <a href="{{ list_url }}"{% if current == "list" %} aria-current="page"{% endif %}>{% translate "Upcoming events" %}</a>
