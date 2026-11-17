@@ -149,3 +149,51 @@ def test_the_rss_item_of_a_vendor_event_carries_the_storefront_url(client: Clien
     body = _get(client, f"{index}feed.rss")
     shop = slugs.vendor_path(primary_language(), vendor.slug, default_language=primary_language())
     assert f"{_root()}{shop}" in body
+
+
+# --- #640 review follow-ups (EVT.9)
+
+
+def test_the_rss_and_ics_alternates_have_distinct_titles(client: Client) -> None:
+    html = _get(client, str(primary_index().url))
+    rss, ics = RSS_LINK.search(html), ICS_LINK.search(html)
+    assert rss is not None
+    assert ics is not None
+    assert rss.group(1) != ics.group(1), "a feed reader lists both: the titles must differ"
+    assert rss.group(1).endswith("(RSS)")
+    assert ics.group(1).endswith("(ICS)")
+
+
+def test_a_suspended_vendor_gets_no_alternates(client: Client) -> None:
+    vendor = VendorFactory.create(status=Vendor.Status.SUSPENDED)
+    index = str(primary_index().url)
+    html = _get(client, f"{index}?vendor={vendor.slug}")
+    for match in (RSS_LINK.search(html), ICS_LINK.search(html)):
+        assert match is None or f"vendor/{vendor.slug}/" not in match.group(2)
+
+
+def test_a_foreign_host_header_still_gives_base_url_links(client: Client) -> None:
+    index = str(primary_index().url)
+    response = client.get(index, HTTP_HOST="evil.example")
+    if response.status_code != 200:  # ALLOWED_HOSTS refused the host: nothing can leak
+        return
+    rss, ics = _links(response.content.decode())
+    assert "evil.example" not in rss + ics
+    assert rss.startswith(_root())
+
+
+def test_the_feed_links_are_computed_once_per_request(
+    client: Client, django_assert_max_num_queries: Any
+) -> None:
+    from django.template import Context, Template
+    from django.test import RequestFactory
+
+    request = RequestFactory().get("/")
+    template = Template(
+        "{% load event_feeds %}{% event_feed_alternates %}{% event_subscribe %}"
+        "{% event_feed_alternates %}"
+    )
+    context = Context({"request": request})
+    template.render(context)  # warm: one lookup
+    with django_assert_max_num_queries(0):
+        template.render(Context({"request": request}))
