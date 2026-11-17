@@ -274,3 +274,14 @@ def test_without_a_search_url_the_header_searches_on_the_language_home() -> None
     home = reverse("wagtail_serve", args=[""])
     assert f'action="{home}"' in form.group(0)
     assert 'name="s"' in html
+
+
+def test_the_default_search_action_is_the_active_language_home() -> None:
+    """CAT.27: without an explicit `search_url` the header form targets the language home."""
+    from django.utils import translation
+
+    with translation.override("it"):
+        html = render("components/header.html", site_name="Ride", links=LINKS)
+    form = re.search(r'<form[^>]*role="search"[^>]*>', html)
+    assert form
+    assert 'action="/it/"' in form.group(0)

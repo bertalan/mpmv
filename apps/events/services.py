@@ -1525,6 +1525,7 @@ def search_events(
     if locale is None:
         return None
     needle = query.casefold()
+    # TODO(CAT.28): this loads every public event per search; filter in the database instead.
     found = [
         item
         for item in events_for_locale(locale)

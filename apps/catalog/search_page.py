@@ -44,6 +44,8 @@ SEARCH_PARAMETER = services.SEARCH_PARAMETER
 GROUP_PARAMETER = "in"  # the see-all link of a group: only that group, longer
 QUERY_MAX_LENGTH = 100
 RATE_WINDOW = dt.timedelta(minutes=1)
+# The keys of the groups below the products: events and articles come from hooks, vendors from here.
+KNOWN_GROUPS = frozenset({"events", "articles", "vendors"})
 GROUP_LIMIT = 5  # items a group shows below the products
 GROUP_ALL_LIMIT = 50  # items a group shows on its own see-all page
 SUGGESTION_LIMIT = 8
@@ -197,6 +199,7 @@ def _rate_limited(request: HttpRequest) -> HttpResponse | None:
         status=429,
         content_type="text/plain; charset=utf-8",
     )
+    response["X-Robots-Tag"] = listings.ROBOTS_NOINDEX
     response["Retry-After"] = str(max(1, math.ceil(wait.total_seconds())))
     add_never_cache_headers(response)
     return response
@@ -214,6 +217,8 @@ def search_view(request: HttpRequest) -> HttpResponseBase:
     parsed = listings.parse_listing_params(dict(request.GET.lists()), term_keys=term_keys)
     params = parsed.params
     only = request.GET.get(GROUP_PARAMETER, "")
+    if only not in KNOWN_GROUPS:
+        only = ""  # an unknown group is ignored, never an empty page
     path = request.path
     results: ProductResults | None = None
     shown_groups: list[SearchGroup] = []

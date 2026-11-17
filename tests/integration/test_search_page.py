@@ -17,7 +17,7 @@ from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
-from wagtail.models import Site
+from wagtail.models import PageViewRestriction, Site
 
 from apps.catalog import search_page, services
 from apps.catalog.models import Product
@@ -29,7 +29,7 @@ from apps.catalog.tests.factories import (
     VariantFactory,
 )
 from apps.cms.services import seed_site
-from apps.cms.tests.factories import BlogPostPageFactory
+from apps.cms.tests.factories import BlogIndexPageFactory, BlogPostPageFactory
 from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.events.tests.factories import EventPageFactory
@@ -290,6 +290,7 @@ def test_the_rate_limit_answers_429(client: Client, settings: Any) -> None:
     blocked = search(client, token)
     assert blocked.status_code == 429
     assert int(blocked["Retry-After"]) >= 1
+    assert blocked["X-Robots-Tag"] == "noindex, follow"
 
 
 def test_an_empty_query_costs_no_rate_limit_slot(client: Client, settings: Any) -> None:
@@ -302,3 +303,72 @@ def test_the_home_without_a_query_is_still_the_home(client: Client) -> None:
     response = client.get("/")
     assert response.status_code == 200
     assert "no-store" not in response.get("Cache-Control", "")
+
+
+# --- Review round (lane-a, 2026-11-17)
+
+
+def test_a_view_restricted_article_never_appears(client: Client) -> None:
+    BlogPostPageFactory.create(title="Quokka public article")
+    private = BlogPostPageFactory.create(title="Quokka private article")
+    PageViewRestriction.objects.create(page=private, restriction_type=PageViewRestriction.LOGIN)
+    page = html_of(search(client, "quokka"))
+    assert "Quokka public article" in page
+    assert "Quokka private article" not in page
+
+
+def test_an_article_in_another_language_never_appears(client: Client) -> None:
+    BlogIndexPageFactory.create()  # the primary language's blog
+    foreign_blog = BlogIndexPageFactory.create()  # the next language's blog
+    BlogPostPageFactory.create(title="Wombat home article")
+    BlogPostPageFactory.create(title="Wombat foreign article", parent=foreign_blog)
+    page = html_of(search(client, "wombat"))
+    assert "Wombat home article" in page
+    assert "Wombat foreign article" not in page
+
+
+@pytest.mark.parametrize("number", ["abc", "-3", "0", "99999999999999999999999", "1e9"])
+def test_a_bad_page_number_gives_no_server_error(client: Client, number: str) -> None:
+    listed("Pagination thing")
+    response = search(client, "pagination", page=number)
+    assert response.status_code < 500
+
+
+def test_an_exact_sku_ranks_first_among_other_matches(client: Client) -> None:
+    for index in range(3):
+        listed(f"Gasket ZX-7788 variant {index}", sku=f"OTHER-{index}")
+    listed("Plain exact one", sku="ZX-7788")
+    page = html_of(search(client, "ZX-7788"))
+    assert page.index("Plain exact one") < page.index("Gasket ZX-7788 variant 0")
+
+
+def test_an_exact_gtin_ranks_first_among_other_matches(client: Client) -> None:
+    for index in range(3):
+        listed(f"Box 4006381333931 variant {index}")
+    listed("Barcode exact one", gtin="4006381333931")
+    page = html_of(search(client, "4006381333931"))
+    assert page.index("Barcode exact one") < page.index("Box 4006381333931 variant 0")
+
+
+def test_the_title_and_the_input_value_escape_quotes(client: Client) -> None:
+    payload = "\"'><b>x</b>"
+    page = html_of(search(client, payload))
+    assert "<b>x</b>" not in page
+    value = re.search(r'<input[^>]*name="s"[^>]*value="([^"]*)"', page)
+    assert value is not None
+    assert "&quot;" in value.group(1)
+    title = re.search(r"<title>(.*?)</title>", page, re.S)
+    assert title is not None
+    assert '"' not in title.group(1)
+    assert "<b>" not in title.group(1)
+
+
+def test_an_unknown_group_is_ignored(client: Client) -> None:
+    listed("Marmot thing")
+    page = html_of(search(client, "marmot", **{"in": "bogus"}))
+    assert "Marmot thing" in page
+
+
+def test_an_unknown_group_with_no_match_shows_nothing_found(client: Client) -> None:
+    page = html_of(search(client, "zzzqqq", **{"in": "bogus"}))
+    assert "Nothing found" in page
