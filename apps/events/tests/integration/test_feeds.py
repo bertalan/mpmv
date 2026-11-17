@@ -303,7 +303,10 @@ def test_no_feed_contains_an_email_a_phone_or_a_member_name() -> None:
         text = client.get(path).content.decode()
         assert not re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", re.sub(r"UID:[^\r\n]*", "", text)), path
         assert not re.search(
-            r"\+?\d[\d ()-]{8,}\d", re.sub(r"\d{8}T\d{6}Z?|urn:uuid:\S+", "", text)
+            r"\+?\d[\d ()-]{8,}\d",
+            re.sub(
+                r"\d{8}T\d{6}Z?|urn:uuid:\S+|[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}", "", text
+            ),
         )
         assert "Zoltan" not in text
         assert "Quxbar" not in text
