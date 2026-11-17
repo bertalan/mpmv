@@ -6,16 +6,18 @@ recurrence presets of `apps.events.engine` write the RRULE, and a promotion has 
 
 import datetime as dt
 import zoneinfo
+from collections.abc import Iterable
 from typing import Any
 
 from django import forms
 from django.core.exceptions import ValidationError
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Category, Product
 from apps.core.geocoding import AddressQuery, GeocodeResult
 from apps.core.geocoding import engine as geo_engine
+from apps.core.i18n import configured_languages
 from apps.events import engine, services
 from apps.events.models import EventPage, default_timezone
 from apps.vendors.models import Vendor
@@ -56,7 +58,26 @@ ADDRESS_QUERY_FIELDS = ("country", "postcode", "city", "street")
 _DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 
 
+def language_choices(exclude: Iterable[str] = ()) -> list[tuple[str, str]]:
+    """The enabled site languages as (code, name in that language), less `exclude`."""
+    skip = set(exclude)
+    return [
+        (code, str(translation.get_language_info(code)["name_local"]))
+        for code in configured_languages()
+        if code not in skip
+    ]
+
+
 class EventForm(forms.Form):
+    language = forms.ChoiceField(
+        label=_("Language"),
+        required=False,
+        choices=(),
+        help_text=_(
+            "The language you write the event in. It cannot be changed later. You can add "
+            "translations afterwards. If you leave it empty, the language of the page is used."
+        ),
+    )
     title = forms.CharField(
         label=_("Title"),
         max_length=255,
@@ -260,7 +281,7 @@ class EventForm(forms.Form):
     )
 
     SECTIONS = (
-        (_("The event"), ("title", "summary", "event_type")),
+        (_("The event"), ("language", "title", "summary", "event_type")),
         (
             _("When"),
             ("all_day", "starts_at", "ends_at", "start_date", "end_date", "timezone"),
@@ -305,6 +326,10 @@ class EventForm(forms.Form):
             self.fields["products"].label_from_instance = product_label  # type: ignore[attr-defined]
             self.fields["categories"].queryset = categories  # type: ignore[attr-defined]
             self.fields["categories"].label_from_instance = category_label  # type: ignore[attr-defined]
+        if page is None:
+            self.fields["language"].choices = language_choices()  # type: ignore[attr-defined]
+        else:  # the original language is fixed once the event exists
+            del self.fields["language"]
         self.kept_rule = kept_rule  # a rule the presets cannot write, kept by "custom"
         if kept_rule:
             self.fields["recurrence"].choices = [  # type: ignore[attr-defined]
@@ -314,7 +339,10 @@ class EventForm(forms.Form):
         self.fields["timezone"].initial = default_timezone()
 
     def sections(self) -> list[tuple[Any, list[forms.BoundField]]]:
-        return [(title, [self[name] for name in names]) for title, names in self.SECTIONS]
+        return [
+            (title, [self[name] for name in names if name in self.fields])
+            for title, names in self.SECTIONS
+        ]
 
     def point_fields(self) -> list[forms.BoundField]:
         return [self[name] for name in self.POINT_FIELDS]
@@ -414,6 +442,10 @@ class EventForm(forms.Form):
                 self.add_error(field, message)
             return ""
 
+    def chosen_language(self) -> str:
+        """The language code chosen for a new event, "" for the page's own language."""
+        return str(self.cleaned_data.get("language") or "")
+
     def event_data(self) -> dict[str, Any]:
         """What the service gets: the cleaned fields in the shape of `EventInput`."""
         data = self.cleaned_data
@@ -512,3 +544,54 @@ def initial_from_page(page: EventPage) -> dict[str, Any]:
             recurrence_until=choice.until,
         )
     return initial
+
+
+class EventTranslationForm(forms.Form):
+    """The text of a translation (EVT.8): title, summary and venue name. Everything else is the
+    original's and is copied on publish. With `languages`, the form also asks which language to
+    add (the "Add translation" page)."""
+
+    language = forms.ChoiceField(
+        label=_("Language"),
+        choices=(),
+        help_text=_("The language of the translation. Required."),
+    )
+    title = forms.CharField(
+        label=_("Title"),
+        max_length=255,
+        help_text=_("The name of the event in this language. Required."),
+    )
+    summary = forms.CharField(
+        label=_("Summary"),
+        max_length=300,
+        help_text=_(
+            "One or two sentences that tell what the event is, up to 300 characters. Required."
+        ),
+    )
+    venue_name = forms.CharField(
+        label=_("Venue name"),
+        max_length=255,
+        required=False,
+        help_text=_("The name of the place in this language, if it has one. Optional."),
+    )
+
+    def __init__(
+        self, *args: Any, languages: list[tuple[str, str]] | None = None, **kwargs: Any
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        if languages is None:
+            del self.fields["language"]
+        else:
+            self.fields["language"].choices = languages  # type: ignore[attr-defined]
+
+    def sections(self) -> list[tuple[Any, list[forms.BoundField]]]:
+        return [(_("The translation"), [self[name] for name in self.fields])]
+
+    def point_fields(self) -> list[forms.BoundField]:
+        return []
+
+    def event_data(self) -> dict[str, Any]:
+        return {name: self.cleaned_data[name] for name in ("title", "summary", "venue_name")}
+
+    def chosen_language(self) -> str:
+        return str(self.cleaned_data.get("language") or "")

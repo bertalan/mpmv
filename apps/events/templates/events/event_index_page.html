@@ -3,13 +3,14 @@
 {% comment %}
 Events list (EVT.6, spec 15 "Public pages"): the upcoming and ongoing events of this language,
 grouped by month, with a plain GET filter form (vendor, type, month), a results count and
-pagination. It works without JavaScript. Filtered and later pages are `noindex`. EVT.8 adds the
-original-language fallback, EVT.15 the map.
+pagination. It works without JavaScript. Filtered and later pages are `noindex`. EVT.8: events
+without a translation in this language show in their original language, marked; "Only events in
+<language>" keeps real translations. EVT.15 adds the map.
 {% endcomment %}
 {% block head %}{% if robots %}{% robots_meta robots %}{% endif %}{% endblock %}
 {% block page_content %}
   <h1>{{ page.title }}</h1>
-  {% if page.intro and not filters.vendor and not filters.type and not filters.month %}{{ page.intro|richtext }}{% endif %}
+  {% if page.intro and not filters.active %}{{ page.intro|richtext }}{% endif %}
   {% include "events/_links.html" with current="list" %}
   {% include "events/_filters.html" with form_action=list_url %}
   {% translate "No events are planned at the moment." as empty_text %}
