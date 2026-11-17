@@ -79,7 +79,7 @@ from apps.vendors.services import (
     vendor_logo_collection,
 )
 
-from . import engine
+from . import engine, notifications
 from .models import (
     EVENT_MODERATORS,
     EventIndexPage,
@@ -850,6 +850,14 @@ def hide_event(
         after = _state(_fresh(stored)) | {"languages": len(pages)}
         changes.update(EVENT, _key(stored), before, after)
         _record(ctx, "events.event_hidden", stored, before, after)
+        fresh = _fresh(stored)
+        notifications.notify_vendor(
+            fresh,
+            notifications.HIDDEN,
+            fresh.hidden_at.isoformat() if fresh.hidden_at else "",
+            reason=reason,
+            dsa_notice_ref=dsa_notice_ref or "",
+        )
     return changes
 
 
@@ -900,6 +908,8 @@ def restore_event(
         after = _state(_fresh(stored)) | {"languages": len(pages)}
         changes.update(EVENT, _key(stored), before, after)
         _record(ctx, "events.event_restored", stored, before, after)
+        fresh = _fresh(stored)
+        notifications.notify_vendor(fresh, notifications.RESTORED, fresh.sequence)
     return changes
 
 
@@ -980,7 +990,24 @@ def record_review_decision(
             ctx = user_context(user, ip=None) if user is not None else SYSTEM
         action = "events.event_approved" if approved else "events.event_changes_requested"
         _record(ctx, action, current, before, after)
+        if task_state is not None:
+            if approved:
+                notifications.notify_vendor(current, notifications.APPROVED, state.pk)
+            else:
+                notifications.notify_changes_requested(
+                    current, task_state.pk, state.pk, task_state.get_comment() or "", ctx=ctx
+                )
     return changes
+
+
+def send_review_digest(*, today: dt.date | None = None, dry_run: bool = False) -> ChangeSet:
+    """Email the "Event moderators" the events awaiting review, once a day each (EVT.11).
+
+    Nothing is queued for an empty queue. The email lists titles and vendors only; the link
+    opens the review list.
+    """
+    pages = [page for page, _state in events_awaiting_review()]
+    return notifications.send_digest(pages, day=today or timezone.localdate(), dry_run=dry_run)
 
 
 # --- Moderation policy and settings (staff, audited)

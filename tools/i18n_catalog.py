@@ -54,6 +54,7 @@ SCOPES = (
     "apps/seo",
     "apps/orders/ui",
     "apps/vendors/templates/email/vendors/profile_reverted",
+    "apps/events/templates/email",  # the event moderation emails (EVT.11)
     "apps/orders/customer_views.py",  # the customer area labels (ORD.7)
     "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
     "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)

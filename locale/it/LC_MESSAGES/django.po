@@ -42,6 +42,19 @@ msgid_plural "%(counter)s events"
 msgstr[0] "%(counter)s evento"
 msgstr[1] "%(counter)s eventi"
 
+#: apps/events/templates/email/events/review_digest/subject.txt
+msgid "%(counter)s event awaiting review"
+msgid_plural "%(counter)s events awaiting review"
+msgstr[0] "%(counter)s evento in attesa di revisione"
+msgstr[1] "%(counter)s eventi in attesa di revisione"
+
+#: apps/events/templates/email/events/review_digest/body.html
+#: apps/events/templates/email/events/review_digest/body.txt
+msgid "%(counter)s event is awaiting review."
+msgid_plural "%(counter)s events are awaiting review."
+msgstr[0] "%(counter)s evento è in attesa di revisione."
+msgstr[1] "%(counter)s eventi sono in attesa di revisione."
+
 #: apps/orders/templates/orders/_cart_mini.html
 msgid "%(counter)s item"
 msgid_plural "%(counter)s items"
@@ -287,6 +300,12 @@ msgstr ""
 "Un elenco di link https alla stessa azienda altrove: Wikidata, Wikipedia, profili ufficiali. I "
 "motori di ricerca li usano per riconoscere l'azienda. Esempio: "
 "[\"https://www.wikidata.org/wiki/Q7\"]."
+
+#: apps/events/templates/email/events/event_changes_requested/body.html
+#: apps/events/templates/email/events/event_changes_requested/body.txt
+msgid "A moderator asked for changes to your event %(title)s before it can be published."
+msgstr ""
+"Un moderatore ha chiesto modifiche al tuo evento %(title)s prima che possa essere pubblicato."
 
 #: apps/manager/event_image_form.py
 msgid "A name for the library, for example Our stand 2027. Optional."
@@ -1337,6 +1356,10 @@ msgstr ""
 "subito; annullane una indicando un motivo e i titolari ne saranno informati. Una modifica si può "
 "annullare solo finché il testo non è cambiato di nuovo."
 
+#: apps/events/templates/email/events/event_changes_requested/subject.txt
+msgid "Changes requested on your event %(title)s"
+msgstr "Modifiche richieste al tuo evento %(title)s"
+
 #: apps/manager/event_views.py
 msgid "Changes requested: %(comment)s"
 msgstr "Modifiche richieste: %(comment)s"
@@ -1534,6 +1557,11 @@ msgstr "Chiudi ora"
 #: apps/manager/fitment_forms.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Code"
 msgstr "Codice"
+
+#: apps/events/templates/email/events/event_changes_requested/body.html
+#: apps/events/templates/email/events/event_changes_requested/body.txt
+msgid "Comment"
+msgstr "Commento"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Commission change"
@@ -3960,9 +3988,23 @@ msgstr "Solo quando l'evento viene nascosto in seguito a una segnalazione."
 msgid "Open passkey window"
 msgstr "Apri la finestra passkey"
 
+#: apps/events/templates/email/events/event_approved/body.html
+#: apps/events/templates/email/events/event_restored/body.html
+msgid "Open the event"
+msgstr "Apri l'evento"
+
+#: apps/events/templates/email/events/event_changes_requested/body.html
+#: apps/events/templates/email/events/event_changes_requested/body.txt
+msgid "Open the event to make the changes and submit it again"
+msgstr "Apri l'evento per fare le modifiche e inviarlo di nuovo"
+
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "Open the public page"
 msgstr "Apri la pagina pubblica"
+
+#: apps/events/templates/email/events/review_digest/body.html
+msgid "Open the review list"
+msgstr "Apri l'elenco da revisionare"
 
 #: apps/seo/templates/seo/consent/preferences.html
 msgid "Optional cookies on:"
@@ -4349,6 +4391,12 @@ msgstr "Spazio piattaforma: cruscotto"
 msgid "Platform staff"
 msgstr "Staff della piattaforma"
 
+#: apps/events/templates/email/events/event_hidden/body.html
+#: apps/events/templates/email/events/event_hidden/body.txt
+msgid "Platform staff hid your event %(title)s: it is no longer shown on the site."
+msgstr ""
+"Lo staff della piattaforma ha nascosto il tuo evento %(title)s: non è più visibile sul sito."
+
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid ""
 "Platform staff hold one or more roles. Vendor members cannot hold a platform role. Changes need "
@@ -4366,6 +4414,12 @@ msgstr ""
 "Lo staff della piattaforma può cambiare il corriere con uno allo stesso prezzo o più economico, o "
 "correggere l'indirizzo quando lo chiede il cliente. Prodotti, quantità e prezzi spettano al "
 "negozio."
+
+#: apps/events/templates/email/events/event_restored/body.html
+#: apps/events/templates/email/events/event_restored/body.txt
+msgid "Platform staff restored your event %(title)s: it is shown on the site again."
+msgstr ""
+"Lo staff della piattaforma ha ripristinato il tuo evento %(title)s: è di nuovo visibile sul sito."
 
 #: apps/vendors/templates/email/vendors/profile_reverted/body.html
 #: apps/vendors/templates/email/vendors/profile_reverted/body.txt
@@ -4653,8 +4707,9 @@ msgstr "Leggi questa versione online:"
 msgid "Readiness probe"
 msgstr "Controllo di prontezza"
 
-#: apps/manager/fitment_forms.py apps/manager/forms.py
-#: apps/manager/templates/email/manager/role_self_assigned/body.html
+#: apps/events/templates/email/events/event_hidden/body.html
+#: apps/events/templates/email/events/event_hidden/body.txt apps/manager/fitment_forms.py
+#: apps/manager/forms.py apps/manager/templates/email/manager/role_self_assigned/body.html
 #: apps/manager/templates/email/manager/role_self_assigned/body.txt
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/profile_changes.html
@@ -6707,6 +6762,11 @@ msgstr ""
 "La licenza con cui si usa il logo; sono elencate solo le licenze che consentono l'uso commerciale."
 " Serve con un nuovo file. Esempio: 'Opera propria' per un logo che ci ha dato il marchio."
 
+#: apps/events/templates/email/events/event_changes_requested/body.html
+#: apps/events/templates/email/events/event_changes_requested/body.txt
+msgid "The link works once and expires on %(expires)s (UTC)."
+msgstr "Il link funziona una sola volta e scade il %(expires)s (UTC)."
+
 #: apps/cms/models.py
 msgid ""
 "The links of the menu, in the order shown. Add a page of this site or a link to another website. "
@@ -8167,6 +8227,15 @@ msgid ""
 msgstr ""
 "Questo evento è stato modificato da qualcun altro dopo che lo hai aperto. Ricarica la pagina e "
 "rifai la modifica."
+
+#: apps/events/templates/email/events/event_hidden/body.html
+#: apps/events/templates/email/events/event_hidden/body.txt
+msgid ""
+"This follows a notice (reference %(dsa_notice_ref)s). You receive the statement of reasons in a "
+"separate email."
+msgstr ""
+"Segue una segnalazione (riferimento %(dsa_notice_ref)s). Riceverai la motivazione della decisione "
+"in un'email separata."
 
 #: apps/orders/templates/orders/customer_order.html
 msgid "This is your order reference, not an invoice. Each seller issues its own invoice."
@@ -9773,6 +9842,23 @@ msgid ""
 msgstr ""
 "Il tuo numero EORI, il codice doganale delle imprese che spostano merci da o verso l'UE. Lascialo "
 "vuoto se non ne hai uno."
+
+#: apps/events/templates/email/events/event_restored/subject.txt
+msgid "Your event %(title)s is back online"
+msgstr "Il tuo evento %(title)s è di nuovo online"
+
+#: apps/events/templates/email/events/event_approved/subject.txt
+msgid "Your event %(title)s was approved"
+msgstr "Il tuo evento %(title)s è stato approvato"
+
+#: apps/events/templates/email/events/event_approved/body.html
+#: apps/events/templates/email/events/event_approved/body.txt
+msgid "Your event %(title)s was approved and is now published."
+msgstr "Il tuo evento %(title)s è stato approvato ed è ora pubblicato."
+
+#: apps/events/templates/email/events/event_hidden/subject.txt
+msgid "Your event %(title)s was hidden"
+msgstr "Il tuo evento %(title)s è stato nascosto"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Your factors"

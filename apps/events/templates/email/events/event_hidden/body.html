@@ -1,0 +1,8 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}Platform staff hid your event {{ title }}: it is no longer shown on the site.{% endblocktranslate %}</p>
+<p>{% translate "Reason" %}: {{ reason }}</p>
+{% if dsa_notice_ref %}<p>{% blocktranslate %}This follows a notice (reference {{ dsa_notice_ref }}). You receive the statement of reasons in a separate email.{% endblocktranslate %}</p>{% endif %}
+</body>
+</html>

@@ -1,0 +1,5 @@
+{% load i18n %}{% blocktranslate %}Platform staff hid your event {{ title }}: it is no longer shown on the site.{% endblocktranslate %}
+
+{% translate "Reason" %}: {{ reason }}
+{% if dsa_notice_ref %}{% blocktranslate %}This follows a notice (reference {{ dsa_notice_ref }}). You receive the statement of reasons in a separate email.{% endblocktranslate %}
+{% endif %}

@@ -28,7 +28,7 @@ from apps.core.tests.factories import PlatformOperatorFactory
 from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory
 from apps.vendors.models import Vendor
-from apps.vendors.tests.factories import VendorFactory
+from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -134,6 +134,7 @@ def test_a_notice_on_an_event_ends_with_the_page_gone_from_pages_and_feeds(
         status=Notice.Status.ACTION_TAKEN, target_kind=Notice.TargetKind.EVENT
     )
     event = EventPageFactory.create(title="Scam fair")
+    VendorMemberFactory.create(vendor=event.vendor)
     event.save_revision().publish()
     event = EventPage.objects.get(pk=event.pk)
     index = event.get_parent()
