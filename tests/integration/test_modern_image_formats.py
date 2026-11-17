@@ -38,11 +38,21 @@ def seeded(db: None) -> SeedReport:
     return seed_site()
 
 
-def _photo(name: str = "lake", width: int = 2000, height: int = 1500) -> MediaImage:
+def _photo(
+    name: str = "lake", width: int = 2000, height: int = 1500, presets: tuple[str, ...] = ()
+) -> MediaImage:
+    """A photo; `presets` are rendered up front, as the `catalog.render_product_image` job does:
+    a page only uses renditions that exist (CAT.4)."""
+    from apps.core import images
+
     image: MediaImage = MediaImageFactory.create(
         file__filename=f"{name}.png", file__width=width, file__height=height
     )
-    return image
+    formats = images.picture_formats()
+    specs = [s for preset in presets for s in images.picture_specs(preset, formats=formats)]
+    if specs:
+        image.get_renditions(*specs)
+    return MediaImage.objects.get(pk=image.pk)
 
 
 def _logos() -> Collection:
@@ -105,7 +115,7 @@ def _sources(html: str) -> dict[str, str]:
 
 
 def test_the_responsive_tag_renders_avif_webp_and_a_jpeg_fallback() -> None:
-    image = _photo()
+    image = _photo(presets=("content",))
     html = Template(
         '{% load responsive_images %}{% responsive_image image "content" alt="A lake" %}'
     ).render(Context({"image": image}))
@@ -129,7 +139,7 @@ def test_the_responsive_tag_renders_avif_webp_and_a_jpeg_fallback() -> None:
 def test_the_hero_preset_is_eager_with_high_fetch_priority() -> None:
     html = Template(
         '{% load responsive_images %}{% responsive_image image "hero" alt="" priority=True %}'
-    ).render(Context({"image": _photo()}))
+    ).render(Context({"image": _photo(presets=("hero",))}))
 
     tag = re.search(r"<img [^>]+>", html)
     assert tag is not None
@@ -143,7 +153,7 @@ def test_without_avif_the_picture_keeps_webp_and_jpeg(monkeypatch: pytest.Monkey
     monkeypatch.setattr(images, "avif_supported", lambda: False)
     html = Template(
         '{% load responsive_images %}{% responsive_image image "card" alt="" %}'
-    ).render(Context({"image": _photo()}))
+    ).render(Context({"image": _photo(presets=("card",))}))
 
     assert list(_sources(html)) == ["image/webp"]
     assert ".avif" not in html
@@ -154,14 +164,37 @@ def test_a_cms_page_serves_pictures_for_its_lead_image_hero_figure_and_gallery(
 ) -> None:
     page = _published(
         slug="formats",
-        image=_photo("lead"),
+        image=_photo("lead", presets=("content",)),
         image_alt_text="Lead",
         body=[
-            ("hero", {"heading": "Ride", "image": _photo("hero"), "alt_text": "", "links": []}),
-            ("figure", {"image": _photo("figure"), "alt_text": "Hills", "caption": ""}),
+            (
+                "hero",
+                {
+                    "heading": "Ride",
+                    "image": _photo("hero", presets=("hero",)),
+                    "alt_text": "",
+                    "links": [],
+                },
+            ),
+            (
+                "figure",
+                {
+                    "image": _photo("figure", presets=("content",)),
+                    "alt_text": "Hills",
+                    "caption": "",
+                },
+            ),
             (
                 "gallery",
-                {"images": [{"image": _photo("gal"), "alt_text": "One", "caption": ""}]},
+                {
+                    "images": [
+                        {
+                            "image": _photo("gal", presets=("gallery",)),
+                            "alt_text": "One",
+                            "caption": "",
+                        }
+                    ]
+                },
             ),
         ],
     )
@@ -185,7 +218,15 @@ def test_without_a_lead_image_only_the_first_hero_has_high_priority(
     seeded: SeedReport, client: Client
 ) -> None:
     def hero(name: str) -> tuple[str, dict[str, Any]]:
-        return ("hero", {"heading": name, "image": _photo(name), "alt_text": "", "links": []})
+        return (
+            "hero",
+            {
+                "heading": name,
+                "image": _photo(name, presets=("hero",)),
+                "alt_text": "",
+                "links": [],
+            },
+        )
 
     page = _published(slug="heroes", body=[hero("first"), hero("second"), hero("third")])
 
@@ -202,7 +243,11 @@ def test_a_product_card_with_an_image_renders_a_picture() -> None:
     from apps.catalog.services import ProductCard
 
     card = ProductCard(
-        title="Jacket", url="/p/jacket/", price=None, image=_photo("jacket"), image_alt="Jacket"
+        title="Jacket",
+        url="/p/jacket/",
+        price=None,
+        image=_photo("jacket", presets=("card",)),
+        image_alt="Jacket",
     )
     html = Template('{% include "catalog/includes/product_card.html" %}').render(
         Context({"card": card, "currency": "EUR"})
@@ -217,9 +262,9 @@ def test_a_product_card_with_an_image_renders_a_picture() -> None:
 def test_the_theme_product_tile_and_hero_render_pictures() -> None:
     tile = Template(
         '{% include "components/product_tile.html" with name="Jacket" url="/p/" image=image %}'
-    ).render(Context({"image": _photo("tile")}))
+    ).render(Context({"image": _photo("tile", presets=("card",))}))
     hero = Template('{% include "components/hero.html" with title="Ride" image=image %}').render(
-        Context({"image": _photo("hero2")})
+        Context({"image": _photo("hero2", presets=("hero",))})
     )
 
     assert list(_sources(tile)) == ["image/avif", "image/webp"]

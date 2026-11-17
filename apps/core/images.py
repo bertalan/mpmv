@@ -6,15 +6,21 @@ elements and a JPEG `<img>` fallback, each with a `srcset` of the preset's width
 `sizes`; the fallback carries width and height (no layout shift). An SVG logo keeps its format:
 only resized, rendered as a plain `<img>` in the `<picture>`.
 
+A page never builds a rendition (CAT.4, CAT.24): it uses the ones that exist (`prefetch_renditions`
+loads them for a list of images in one query) and falls back to the original file with its own
+width and height; the `catalog.render_product_image` job makes them after an upload.
+
 AVIF needs an image library that can encode it; the Pillow wheels in uv.lock bundle libavif,
 so the container image can. Where it cannot, AVIF is left out (WebP and JPEG remain) and the
 system check core.W501 says so.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cache
 from typing import Any, Literal
 
+from django.forms.utils import flatatt
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 from PIL import features
@@ -84,20 +90,61 @@ def picture_specs(name: str, *, formats: tuple[str, ...], svg: bool = False) -> 
     return [f"format-{fmt}|{operation}" for fmt in formats for operation in operations]
 
 
+def all_specs() -> list[str]:
+    """Every rendition spec any preset can ask for (raster formats and SVG operations)."""
+    formats = picture_formats()
+    specs: set[str] = set()
+    for name in PRESETS:
+        specs.update(picture_specs(name, formats=formats))
+        specs.update(picture_specs(name, formats=formats, svg=True))
+    return sorted(specs)
+
+
+def prefetch_renditions(images: Iterable[Any]) -> None:
+    """Load the existing renditions of `images` in one query, so rendering a gallery or a grid
+    of cards does not query per image. Images without renditions get an empty list."""
+    by_pk: dict[Any, list[Any]] = {}
+    for image in images:
+        if image is not None:
+            by_pk.setdefault(image.pk, []).append(image)
+    if not by_pk:
+        return
+    first = next(iter(by_pk.values()))[0]
+    found: dict[Any, list[Any]] = {pk: [] for pk in by_pk}
+    for rendition in first.get_rendition_model().objects.filter(
+        image_id__in=list(by_pk), filter_spec__in=all_specs()
+    ):
+        found[rendition.image_id].append(rendition)
+    for pk, instances in by_pk.items():
+        for image in instances:
+            image.prefetched_renditions = found[pk]
+
+
 def render_picture(image: Any, name: str, **attrs: Any) -> SafeString:
     """`<picture>` HTML for a Wagtail image (see the module docstring).
+
+    Only renditions that already exist are used: a page never builds one (CAT.4: the
+    `catalog.render_product_image` job does, after the upload). A format with no rendition gets
+    no `<source>`; without the fallback format (JPEG, PNG for logos; the resized SVG) the
+    original file is shown with its own width and height.
 
     `priority=True` marks the LCP image: `fetchpriority="high"` and no lazy loading. Other
     attributes (`alt`, `class`) go on the `<img>`; `alt` defaults to "" (decorative).
     """
-    from wagtail.images.models import Picture
+    from wagtail.images.models import Filter, Picture
 
     priority = bool(attrs.pop("priority", False))
     svg = bool(image.is_svg())
     specs = picture_specs(name, formats=picture_formats(), svg=svg)
     # Largest first: the <img> fallback takes the first rendition, and its width and height
     # (the intrinsic size the layout reserves) should be the largest, as `{% image %}` gave.
-    renditions = image.get_renditions(*reversed(specs))
+    filters = [Filter(spec=spec) for spec in reversed(specs)]
+    existing = image.find_existing_renditions(*filters)
+    renditions = {f.spec: existing[f] for f in filters if f in existing}
+    if not svg:
+        fallback = PRESETS[name].fallback
+        if not any(f"format-{fallback}|" in spec for spec in renditions):
+            renditions = {}
     img_attrs: dict[str, Any] = {"alt": attrs.pop("alt", "") or "", "sizes": PRESETS[name].sizes}
     if priority:
         img_attrs["fetchpriority"] = "high"
@@ -105,5 +152,9 @@ def render_picture(image: Any, name: str, **attrs: Any) -> SafeString:
         img_attrs["loading"] = "lazy"
         img_attrs["decoding"] = "async"
     img_attrs.update({key: value for key, value in attrs.items() if value not in (None, "")})
-    picture = Picture(renditions, img_attrs)
-    return format_html("{}", picture)
+    if not renditions:
+        original = {"src": image.file.url, "width": image.width, "height": image.height}
+        del img_attrs["sizes"]
+        img_attrs.update({k: v for k, v in original.items() if v})
+        return format_html("<picture><img{}></picture>", flatatt(img_attrs))
+    return format_html("{}", Picture(renditions, img_attrs))

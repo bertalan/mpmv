@@ -295,8 +295,11 @@ def test_the_product_page_renders_the_language_set_with_its_alt_text(
         ProductTranslationFactory.create(
             product=product, language=language, slug=f"mug-{language}", status="published"
         )
-    upload(product, licence, "red", alt_text="Neutral mug")
-    upload(product, licence, "blue", language="de", alt_text="Deutsche Tasse")
+    for row in (
+        upload(product, licence, "red", alt_text="Neutral mug"),
+        upload(product, licence, "blue", language="de", alt_text="Deutsche Tasse"),
+    ):
+        media.render_renditions(row.image_id)  # the job; a page never builds renditions
     german = client.get("/de/product/mug-de/").content.decode()
     english = client.get("/product/mug-en/").content.decode()
     assert "Deutsche Tasse" in german
