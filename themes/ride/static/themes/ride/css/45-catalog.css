@@ -1,4 +1,5 @@
-/* Ride: catalog listings (THM.7 part 1): filter column, product cards, numbered pagination.
+/* Ride: catalog listings (THM.7 part 1): filter column, product cards, numbered pagination;
+   the search results page (THM.17): form, list groups.
    Bootstrap classes do the layout; this file maps them on the ride tokens. Colours only through
    tokens. Transitions only when the visitor has no reduced-motion preference. */
 @layer overrides {
@@ -53,9 +54,39 @@
     min-block-size: 2.75rem;
   }
 
+
+  /* THM.17: the search results page. A list-group row is one stretched link of at least 44 px. */
+  .search-group .list-group-item a:not(.btn),
+  .search-suggestions .list-group-item a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2.75rem;
+    font-family: var(--font-display);
+  }
+
+  .search-group .list-group-item:has(a:focus-visible),
+  .search-suggestions .list-group-item:has(a:focus-visible) {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: calc(var(--focus-offset) * -1);
+  }
+
+  .search-group .btn,
+  .search-page .input-group .btn {
+    min-block-size: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .search-page .input-group .form-control {
+    min-block-size: 2.75rem;
+  }
+
+
   @media (prefers-reduced-motion: reduce) {
     .product-card,
     .page-link,
+    .form-control,
+    .list-group-item,
     .btn {
       transition: none;
     }
