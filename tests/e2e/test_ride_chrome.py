@@ -31,12 +31,23 @@ def test_back_to_top_is_reached_with_the_keyboard_and_scrolls_to_the_top(
     link = page.locator(BACK_TO_TOP)
     expect(link).to_have_attribute("href", "#top")
     page.evaluate("document.body.style.minHeight = '3000px'")
+    page.evaluate("window.scrollTo(0, 1500)")
+    expect(link).to_be_visible()
     link.focus()
     expect(link).to_be_visible()
     page.keyboard.press("Enter")
     page.wait_for_function("window.scrollY === 0")
     assert page.url.endswith("#top")
     assert csp_violations(page) == []
+
+
+def test_back_to_top_appears_only_after_scrolling(page: Page, live_server: LiveServer) -> None:
+    open_page(page, live_server, "/", 1280)
+    page.evaluate("document.body.style.minHeight = '3000px'")
+    page.evaluate("window.scrollTo(0, 0)")
+    expect(page.locator(BACK_TO_TOP)).to_be_hidden()
+    page.evaluate("window.scrollTo(0, 1500)")
+    expect(page.locator(BACK_TO_TOP)).to_be_visible()
 
 
 def test_smooth_scroll_is_off_under_reduced_motion_and_on_otherwise(

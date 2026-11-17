@@ -103,6 +103,12 @@
     font-weight: 700;
   }
 
+  /* Shown after scroll; visibility (not opacity) keeps it out of the tab order while hidden. The
+     no-js class stays on <html> without JavaScript, so the link is then always visible. */
+  html:not(.no-js):not(.is-scrolled) .back-to-top {
+    visibility: hidden;
+  }
+
   .back-to-top .icon {
     transform: rotate(180deg);
   }

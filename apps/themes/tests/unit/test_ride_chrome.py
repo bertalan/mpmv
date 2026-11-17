@@ -109,3 +109,16 @@ def test_smooth_scroll_only_without_a_reduced_motion_preference(css: str) -> Non
 
 def test_the_sticky_header_keeps_the_focus_offset(css: str) -> None:
     assert "scroll-padding-top: var(--header-offset" in css
+
+
+def test_the_banner_heading_level_is_clamped_to_h1_or_h2() -> None:
+    for level, tag in ((None, "h1"), (1, "h1"), (2, "h2"), (7, "h1"), ("x><b", "h1")):
+        html = render("components/page_banner.html", title="T", heading_level=level)
+        assert f'<{tag} class="page-banner__title">T</{tag}>' in html
+
+
+def test_back_to_top_is_hidden_until_scrolled_only_when_javascript_runs(css: str) -> None:
+    assert "html:not(.no-js):not(.is-scrolled) .back-to-top" in css
+    js = (SHIPPED_THEMES / "ride/static/themes/ride/js/ride.js").read_text()
+    assert "is-scrolled" in js
+    assert "scroll" in js
