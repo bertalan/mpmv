@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **434** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3430 h** (P1 2543 h · P2 799 h · P3 88 h)
+- Micro-tasks: **435** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3440 h** (P1 2553 h · P2 799 h · P3 88 h)
 - P1 critical path (schedule lower bound with full parallelism): **197 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → PAY.7 → ORD.20 → ORD.21 → ORD.22 → ORD.23
 
 ## By macro area
@@ -16,7 +16,7 @@
 |---|---|---:|---:|---:|---:|---:|
 | ARC | Architecture and foundations | 33 | 200 | 52 | 0 | 252 |
 | CORE | Identity, permissions, API, backoffice | 32 | 224 | 4 | 6 | 234 |
-| CAT | Product catalog | 26 | 152 | 81 | 0 | 233 |
+| CAT | Product catalog | 27 | 162 | 81 | 0 | 243 |
 | VEN | Vendors, commissions, ledger | 40 | 298 | 35 | 0 | 333 |
 | TAX | Tax engine | 22 | 98 | 37 | 0 | 135 |
 | SHP | Shipping and quotes | 15 | 96 | 30 | 0 | 126 |
@@ -36,7 +36,7 @@
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 14 | 25 | 37 | 8 | 70 |
 | MIG | Migration and cutover | 22 | 141 | 29 | 0 | 170 |
-| **Total** | | **434** | **2543** | **799** | **88** | **3430** |
+| **Total** | | **435** | **2553** | **799** | **88** | **3440** |
 
 ## By phase
 
@@ -119,7 +119,7 @@
 | OPS.13 | Scanner container for uploads (lane-a deploys, ADR-0009): ClamAV-class scanner image in its own container with its own Quadlet unit on STAGE and LIVE, reachable only on the private network or loopback by the app and worker, no published port, read-only root filesystem, memory and CPU limits, a persistent volume for signatures only; automatic signature updates (freshclam-style, at least every 6 hours, from the official mirrors, failure alerts after 24 h without a successful update); health check (scanner answers a ping and a scan of the EICAR string) feeding the OPS.2 alerts: scanner down, signatures older than 48 h, scan latency over threshold; documented in the deploy docs and an OPS.3 runbook (restart, manual update, what uploads do while it is down) | P1 | 5 | ARC.13, OPS.2 | On STAGE the unit starts after the app network, answers a ping, detects the EICAR string, and has no host port; stopping it raises an OPS.2 alert and the app refuses uploads (SEC.15); a stale signature database raises the alert; a signature update is applied without restarting the app; the runbook exists |
 | OPS.14 | Staff-only release indicator (owner, 2026-11-13): the deployed version from `MPMV_VERSION` (baked into the release image, `dev` locally) shown to staff only, never to anonymous users or customers: a small muted "Version X" in the Manager footer and in the account menu of the header; the value comes from a context processor that returns nothing for anyone but an active staff user; no public footer, meta tag or header carries it | P1 | 1 | OPS.1, CORE.17 | Staff see the version string on a Manager page and in the storefront account menu; an anonymous visitor and a signed-in non-staff customer never get the value in the HTML; with `MPMV_VERSION` unset the value is `dev`; no inline script or style |
 
-### F1 — Catalog, import, base frontend (56 tasks, 483 h)
+### F1 — Catalog, import, base frontend (57 tasks, 493 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -139,6 +139,7 @@
 | CAT.19 | Vendor products in the Manager shop space `/manager/shop/products/` (spec 02 backoffice; CORE.9 shop space): tenant-filtered list with search, status and stock filters; create and edit form for the fields a vendor owns (texts per language, price, stock, variants, images with re-encoding, categories, attributes and brand from the shared CAT.20 list) through `upsert_products`/`publish`/`retire` and the CAT.12 audited edit service, with dry-run preview and ChangeSet; fields the vendor cannot change (owning vendor, fiscal category once published, staff-only flags) are read-only; owner and vendor staff roles as in CORE.2; every change in the AuditLog | P1 | 16 | CORE.9, CAT.10, CAT.12, SEC.2 | A vendor creates, edits, publishes and retires a product without the API; another vendor's product is 404; a staff-only field cannot be changed by a crafted POST; the change shows in the AuditLog with before and after |
 | CAT.20 | Brand and manufacturer as linked entities (owner, 2026-11-09; SEO.7): `Brand` gains a logo (sanitised SVG or raster, THM.12), official URL and `sameAs` links (absolute `https://` URLs only (Wikidata item ID validated by format without fetching, Wikipedia per language, official profiles), a translatable description (I18N; a missing translation gives no description, never a fallback) and an optional `Manufacturer` (legal name, URL, `sameAs`, country); brands are one shared list for all vendors: a vendor sells any number of brands: it picks existing brands freely, and proposes a missing one, which stays pending until reviewed (anti-flooding limit on pending manual proposals per vendor, a platform setting, default 20, freed as soon as a proposal is reviewed; brands that arrive with a feed or import are grouped in one batch proposal per import run, reviewed and approved together, outside that limit), which Catalog and moderation approves or merges into an existing brand (duplicate detection on normalised name and Wikidata ID), every change audited; merging two brands moves their products and keeps a permanent redirect from the old brand page through the catalog slug history and redirect middleware used for renamed terms; the brand page is the CAT.8 brand listing | P1 | 8 | CAT.2, CAT.8 | Two vendors selling the same GTIN show the same brand `@id` and `sameAs` in their JSON-LD; a vendor's proposed brand is not public until approved; a merged brand's old URL redirects and its products moved; an invalid Wikidata ID or a non-https link is refused; a vendor with 50 approved brands can add products of all of them; the 21st pending manual proposal is refused with a message, the 20 approved free the slots; an import with 80 new brands creates one batch proposal |
 | CAT.21 | (formerly CAT.5b) Data migration reslugging existing products to the D-25 slug through the slug service (dry run, audit, history rows, no redirect chains) | P1 | 2 | CAT.5 | After the migration every old slug answers one 301 to the new slug; a rerun changes nothing |
+| CAT.27 | Public search results page (owner decision 2026-11-17): the legacy URL `/?s=<query>` (and `/<lang>/?s=`) answers on the language home with a results page, a plain GET form that works without JavaScript; **products first** through CAT.9 (FTS, trigram typos, SKU prefix ≥ 4 incl. variant SKU → parent) with the CAT.8 listing filters, sort and numbered pagination and the product cards of the listings, then, below, short groups of matching **events** (public ones only, EVT.8 language rule), **articles** (live, public CMS pages) and **vendors** (active, with a storefront), each with a link to see all; an exact SKU, GTIN or MPN match shows that product first; an empty query shows the form, no results; no match shows suggestions (categories, the typo fallback); results respect the language, never show drafts, hidden, retired or suspended-vendor items; the page is `noindex, follow` in every case (spec 10) and never cached per query in the shared cache; the query is cut to 100 characters and searches are rate-limited to 30 per minute per client (a setting), answering 429 above it; the page lives on the language home only (`/?s=`, `/<lang>/?s=`), other paths ignore `s`; both themes (base view template, ride through THM.7); the SEO.7 `SearchResultsPage` node and `WebSite` + `SearchAction` are added by SEO.7 part 2 once this exists | P1 | 10 | CAT.9, CAT.8, EVT.8, CMS.3 | `/?s=` and `/it/?s=` return 200 with products first and the other groups below; SKU, GTIN and partial-SKU queries find the product; a typo finds it through the fallback; drafts, hidden events and suspended vendors never appear (tested); the page carries `noindex, follow`; works without JavaScript; axe and CSP clean at 3 widths in both themes; a query-count test bounds the queries; the rate limit answers 429 |
 | ING.1 | `ingest` app: staging models, ImportRun, ReviewItem, MappingTable; staging rows keyed by vendor and SKU match key, products referenced by internal identity | P1 | 10 | CAT.1, CAT.13 | Migrations + admin; an ambiguous SKU match becomes a blocking ReviewItem |
 | ING.2 | Port of `state.py` (source state, change history, stock state) to Django models + existing tests | P1 | 12 | ING.1 | Current pytest suite passes on the new storage |
 | ING.3 | HTML adapter (Vendor A) + generic Store API adapter | P1 | 12 | ING.2 | Dry-run equivalent to the current one |
