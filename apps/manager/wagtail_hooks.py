@@ -18,6 +18,7 @@ from wagtail.permissions import register_permission_policy
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import CopyView, DeleteView, EditView, SnippetViewSet
 
+from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
 from apps.cms.models import HelpEntry
 
@@ -26,6 +27,7 @@ from .role_groups import user_roles
 
 HELP_SECTION = "platform.moderation"
 READ_ACTIONS = frozenset({"view"})
+GATE_ACTION = "content_edit"  # the session level of every state change here (CORE.25)
 
 
 class HelpEntryPermissionPolicy(BasePermissionPolicy):  # type: ignore[misc]  # Wagtail is untyped
@@ -69,15 +71,33 @@ class _FileRowGuard:
 
 
 class HelpEntryEditView(_FileRowGuard, EditView):  # type: ignore[misc]  # Wagtail is untyped
-    pass
+    @requires_level_method(GATE_ACTION)
+    def post(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().post(request, *args, **kwargs)
+
+    @requires_level_method(GATE_ACTION)
+    def put(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().put(request, *args, **kwargs)
 
 
 class HelpEntryDeleteView(_FileRowGuard, DeleteView):  # type: ignore[misc]
-    pass
+    @requires_level_method(GATE_ACTION)
+    def post(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().post(request, *args, **kwargs)
+
+    @requires_level_method(GATE_ACTION)
+    def delete(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().delete(request, *args, **kwargs)
 
 
 class HelpEntryCopyView(_FileRowGuard, CopyView):  # type: ignore[misc]
-    pass
+    @requires_level_method(GATE_ACTION)
+    def post(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().post(request, *args, **kwargs)
+
+    @requires_level_method(GATE_ACTION)
+    def put(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().put(request, *args, **kwargs)
 
 
 class HelpEntryViewSet(SnippetViewSet):  # type: ignore[misc]  # Wagtail is untyped
