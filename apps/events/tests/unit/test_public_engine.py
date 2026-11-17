@@ -144,7 +144,10 @@ def test_the_ics_body_is_crlf_folded_and_escaped() -> None:
     assert "DESCRIPTION:Line one\\nLine two\r\n" in body
     assert "UID:abc@example.test\r\n" in body
     assert "SEQUENCE:2\r\n" in body
-    assert "DTSTART:20270310T080000Z\r\nDTEND:20270310T160000Z\r\n" in body
+    assert (
+        "DTSTART;TZID=Europe/Rome:20270310T090000\r\nDTEND;TZID=Europe/Rome:20270310T170000\r\n"
+        in body
+    )
     assert "STATUS:CONFIRMED\r\n" in body
     assert "TRANSP:TRANSPARENT\r\n" in body
     assert "ORGANIZER" not in body

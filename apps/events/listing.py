@@ -18,7 +18,6 @@ from django.core.paginator import Paginator
 from django.http import Http404, HttpRequest, HttpResponse
 from django.urls import reverse
 from django.utils import timezone, translation
-from django.utils.translation import gettext as _
 
 from apps.catalog import slugs
 from apps.cms import services as cms_services
@@ -360,39 +359,3 @@ def _language_links(page: "EventPage", request: HttpRequest) -> dict[str, Any]:
         found, page.original_locale.language_code, configured_languages()
     )
     return {"canonical_url": absolute(own) if own else "", "alternates": alternates}
-
-
-def _location(page: "EventPage") -> str:
-    town = " ".join(part for part in (page.postcode, page.city) if part)
-    parts = (page.venue_name, page.street, town, page.country)
-    return ", ".join(part for part in parts if part)
-
-
-def ics_response(page: "EventPage", request: HttpRequest) -> HttpResponse:
-    site = page.get_site()
-    host = site.hostname if site is not None else request.get_host()
-    body = engine.event_ics(
-        engine.IcsEvent(
-            uid=f"{page.translation_key}@{host}",
-            stamp=page.content_changed_at or page.last_published_at or timezone.now(),
-            created=page.first_published_at,
-            sequence=page.sequence,
-            summary=page.title,
-            description=page.summary,
-            location=_location(page),
-            url=page.get_full_url(request) or "",
-            category=str(page.get_event_type_display()),
-            span=engine.first_span(page.recurrence_spec()),
-            cancelled=page.cancelled_at is not None,
-            calendar_name=_("Events"),
-            rrule=page.rrule,
-            exdates=tuple(page.exdates),
-            exdate_days=tuple(page.exdate_days),
-            latitude=str(page.latitude) if page.latitude is not None else "",
-            longitude=str(page.longitude) if page.longitude is not None else "",
-        )
-    )
-    response = HttpResponse(body, content_type="text/calendar; charset=utf-8")
-    response["Content-Disposition"] = f'attachment; filename="{page.slug}.ics"'
-    response["Cache-Control"] = "public, max-age=300, s-maxage=60"
-    return response
