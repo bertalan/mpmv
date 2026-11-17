@@ -37,6 +37,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.models import MediaImage
 from apps.core.money import CURRENCY
 from apps.core.services import audit_changes, holds_permission, run_mutation, save_audited
+from apps.core.sitemap_version import bump_sitemap_version
 from apps.core.text import ascii_int
 from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor, VendorTranslation
@@ -380,6 +381,7 @@ def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) 
         if action == PRODUCT_CREATED and product.price_net is not None:
             _record_price_history(product)
         audit_changes(changes, ctx=ctx, action=action)
+        bump_sitemap_version()  # I18N.16: a publish or retire changes what the sitemaps list
     return changes
 
 
@@ -408,6 +410,7 @@ def delete_product(product: Product, *, ctx: AuditContext, dry_run: bool = False
             stored.delete()
             audit_changes(product_changes, ctx=ctx, action=PRODUCT_DELETED)
             audit_changes(variant_changes, ctx=ctx, action=VARIANT_DELETED)
+            bump_sitemap_version()  # I18N.16
     return ChangeSet([*product_changes.changes, *variant_changes.changes])
 
 
@@ -2076,6 +2079,31 @@ def scope_anchor(scope: ListingScope, language: str) -> ListingAnchor | None:
     if vendor is None or vendor.status != Vendor.Status.ACTIVE:
         return None
     return _vendor_anchor(vendor)
+
+
+def listing_names(scopes: Sequence[ListingScope], language: str) -> list[str]:
+    """The name of each one-part scope in `language` (like `scope_anchor(...).name`, "" where
+    there is none) in two queries: the texts of every category and term at once."""
+    texts: dict[str, dict[int, list[Any]]] = {"category": {}, "term": {}}
+    for owner, model in (("category", CategoryTranslation), ("term", TermTranslation)):
+        nodes = [getattr(s, owner) for s in scopes if getattr(s, owner) is not None]
+        for row in model.objects.filter(**{f"{owner}__in": nodes}):
+            texts[owner].setdefault(getattr(row, f"{owner}_id"), []).append(row)
+    names: list[str] = []
+    for scope in scopes:
+        if scope.category is not None:
+            rows = texts["category"].get(scope.category.pk, [])
+            names.append(_translated_name(translations.resolve(rows, language)))
+        elif scope.term is not None:
+            rows = texts["term"].get(scope.term.pk, [])
+            names.append(_translated_name(translations.resolve(rows, language)))
+        elif scope.brand is not None:
+            names.append(str(scope.brand.name))
+        elif scope.vendor is not None:
+            names.append(str(scope.vendor.display_name))
+        else:
+            names.append("")
+    return names
 
 
 def listing_page_paths(
