@@ -43,6 +43,12 @@ shop = (
             event_views.EventCancelView.as_view(),
             name="event_cancel",
         ),
+        # EVT.8: "Add translation" of an event.
+        path(
+            "events/<uuid:public_id>/translate/",
+            event_views.EventTranslateView.as_view(),
+            name="event_translate",
+        ),
         # EVT.4 part 2: the body blocks, the image library and the preview.
         path("events/images/", event_block_views.EventImagesView.as_view(), name="event_images"),
         path(

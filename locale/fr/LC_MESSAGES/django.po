@@ -182,6 +182,10 @@ msgstr "Aucun événement passé."
 msgid "Online"
 msgstr "En ligne"
 
+#: apps/events/templates/events/_filters.html
+msgid "Only events in %(language)s"
+msgstr "Seulement les événements en %(language)s"
+
 #: apps/orders/templates/email/orders/order_cancelled/subject.txt
 msgid "Order %(order_number)s was cancelled"
 msgstr "La commande %(order_number)s a été annulée"

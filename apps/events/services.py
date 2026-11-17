@@ -33,7 +33,7 @@ from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, TypedDict
+from typing import Any, Protocol, TypedDict
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser, Group
@@ -82,6 +82,7 @@ from apps.vendors.services import (
 from . import engine, notifications
 from .models import (
     EVENT_MODERATORS,
+    TRANSLATION_COPIED_FIELDS,
     EventIndexPage,
     EventPage,
     EventSettings,
@@ -656,6 +657,12 @@ def _index_for(locale: Locale) -> EventIndexPage:
     return index
 
 
+def _require_enabled(locale: Locale) -> None:
+    """Events are written in an enabled site language only (spec 15 "Languages")."""
+    if locale.language_code not in configured_languages():
+        raise ValidationError({"language": _("Events cannot be written in this language.")})
+
+
 def _record(ctx: AuditContext, action: str, page: EventPage, before: Any, after: Any) -> None:
     """The one audit entry of a service call (spec 15 "Services")."""
     record(ctx, action, EVENT, _key(page), before, after)
@@ -738,6 +745,7 @@ def _create_event(
     if not _may_author(actor, vendor):
         raise PermissionDenied("no permission to manage this vendor's events")
     locale = locale or Locale.get_default()
+    _require_enabled(locale)
     changes = EventChangeSet()
     with _mutation(dry_run, actor=actor, vendor=vendor):
         index = _index_for(locale)
@@ -757,6 +765,133 @@ def _create_event(
         _record(ctx, "events.event_created", page, None, after)
         changes.page = None if dry_run else page
     return changes
+
+
+TRANSLATION_TEXT_FIELDS = frozenset({"title", "slug", "summary", "venue_name", "body"})
+
+
+def add_event_translation(
+    actor: Any,
+    page: EventPage,
+    locale: Locale,
+    data: Mapping[str, Any],
+    *,
+    ctx: AuditContext | None = None,
+    dry_run: bool = False,
+) -> EventChangeSet:
+    """Add a translation of `page` in `locale`: a draft page in that language's tree, made with
+    Wagtail's `copy_for_translation()` (the same `translation_key`), carrying the text in `data`
+    (`title`, `summary`, `venue_name`, `body`, `slug`: the translatable fields only).
+
+    The structured fields come from the original's latest draft and are copied again on every
+    publish. The new page is a draft: `submit_event` publishes it, or sends it to "Event review"
+    like any edit (the review threshold counts events, not translations). The original language
+    and a language that already has a translation are refused (`ValidationError`), and so is a
+    hidden event for its vendor (`EventRefused`).
+    """
+    ctx = _context(actor, ctx)
+    staff = _is_staff(actor)
+    stored = _event_for(actor, page)
+    _refuse_hidden(actor, stored)
+    unknown = sorted(set(data) - TRANSLATION_TEXT_FIELDS)
+    if unknown:
+        raise ValidationError(dict.fromkeys(unknown, _("This field cannot be set.")))
+    _require_enabled(locale)
+    if locale.pk == stored.original_locale_id or locale.pk == stored.locale_id:
+        raise ValidationError({"language": _("The event is already written in this language.")})
+    if EventPage.objects.filter(translation_key=stored.translation_key, locale=locale).exists():
+        raise ValidationError(
+            {"language": _("The event already has a translation in this language.")}
+        )
+    changes = EventChangeSet()
+    with _mutation(dry_run, actor=actor, vendor=stored.vendor):
+        index = _index_for(locale)
+        latest: EventPage = stored.get_latest_revision_as_object()
+        translated: EventPage = stored.copy_for_translation(locale).specific
+        for name in TRANSLATION_COPIED_FIELDS:
+            attname = translated._meta.get_field(name).attname
+            setattr(translated, attname, getattr(latest, attname))
+        _apply(translated, data, staff=staff)
+        if not data.get("slug"):
+            taken = set(
+                Page.objects.child_of(index)
+                .exclude(pk=translated.pk)
+                .values_list("slug", flat=True)
+            )
+            translated.slug = engine.event_slug(translated.title or "", taken=taken)
+        translated.full_clean(exclude=TREE_FIELDS)
+        translated.save()
+        for link in ("products", "categories"):
+            getattr(translated, link).set(list(getattr(latest, link).all()))
+            getattr(translated, link).commit()
+        translated.save_revision(user=_user(actor), log_action=True)
+        after = _snapshot(translated) | {"language": locale.language_code}
+        changes.create(EVENT, _key(translated), after)
+        _record(ctx, "events.event_translation_added", translated, None, after)
+        changes.page = None if dry_run else translated
+    return changes
+
+
+@dataclass(frozen=True)
+class LocalisedEvent:
+    """One public event as a page of `locale` shows it: the translation in that language, or the
+    page in the event's original language (`fallback`) with its own language code."""
+
+    page: EventPage
+    language: str
+    fallback: bool
+
+
+class LocaleFilters(Protocol):
+    """What `events_for_locale` reads of the list filters (`listing.Filters`)."""
+
+    @property
+    def vendor(self) -> str: ...
+
+    @property
+    def type(self) -> str: ...
+
+    @property
+    def translated_only(self) -> bool: ...
+
+
+def events_for_locale(
+    locale: Locale, filters: LocaleFilters | None = None, *, site: Site | None = None
+) -> list[LocalisedEvent]:
+    """The public events of a language, each once (spec 15 "Languages"): the translation in
+    `locale` when it exists, otherwise the original-language page. Only live, public, not hidden
+    pages of an active vendor (or of the platform) count; `site` limits the pages to that
+    site's trees. `filters.translated_only` keeps real translations; the vendor and type
+    filters read the structured fields, which every translation shares."""
+    pages = (
+        EventPage.objects.live()
+        .public()
+        .filter(hidden_at__isnull=True)
+        .filter(Q(vendor__isnull=True) | Q(vendor__status=Vendor.Status.ACTIVE))
+        .select_related("vendor", "locale", "original_locale")
+    )
+    if site is not None:
+        trees = Q()
+        for root in site.root_page.get_translations(inclusive=True):
+            trees |= Q(path__startswith=root.path, depth__gte=root.depth)
+        pages = pages.filter(trees)
+    if filters is not None and filters.type:
+        pages = pages.filter(event_type=filters.type)
+    if filters is not None and filters.vendor:
+        pages = pages.filter(vendor__slug=filters.vendor)
+    by_event: dict[uuid.UUID, dict[str, EventPage]] = {}
+    for found in pages:
+        by_event.setdefault(found.translation_key, {})[found.locale.language_code] = found
+    order = configured_languages()
+    wanted = locale.language_code
+    result = []
+    for versions in by_event.values():
+        original = next(iter(versions.values())).original_locale.language_code
+        chosen = engine.pick_language(list(versions), wanted, original, order)
+        if chosen is None or (filters is not None and filters.translated_only and chosen != wanted):
+            continue
+        result.append(LocalisedEvent(versions[chosen], chosen, chosen != wanted))
+    return result
 
 
 def submit_event(

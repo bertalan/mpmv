@@ -183,6 +183,7 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:event_new": "shop",
         "manager:shop:event_edit": "shop",
         "manager:shop:event_cancel": "shop",  # the confirmation page
+        "manager:shop:event_translate": "shop",  # EVT.8
         "manager:shop:event_block_add": "shop",  # EVT.4 part 2
         "manager:shop:event_images": "shop",
         "manager:shop:order_amend": "shop",  # ORD.20 part 3
@@ -201,6 +202,7 @@ def _open(name: str) -> tuple[Client, str]:
         if name in (
             "manager:shop:event_edit",
             "manager:shop:event_cancel",
+            "manager:shop:event_translate",
             "manager:shop:event_block_add",
         ):
             primary_index()

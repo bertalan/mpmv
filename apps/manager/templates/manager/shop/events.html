@@ -25,7 +25,7 @@ cancel are plain forms. No inline script or style.
           <th scope="row"><a href="{{ event.edit_url }}">{{ event.title }}</a></th>
           <td>{{ event.when }}</td>
           <td>{{ event.status }}</td>
-          <td>{{ event.language }}</td>
+          <td>{{ event.language }}{% if event.original %}{% if event.languages|length > 1 %}<br><span class="manager-muted">{% blocktranslate with languages=event.languages|join:", " %}Translations: {{ languages }}{% endblocktranslate %}</span>{% endif %}{% else %}<br><span class="manager-muted">{% blocktranslate with original=event.original_language %}Translation of the {{ original }} original{% endblocktranslate %}</span>{% endif %}</td>
           <td>{{ event.moderation }}</td>
           <td>
             {% if event.submit_url %}
@@ -34,6 +34,7 @@ cancel are plain forms. No inline script or style.
                 {% include "components/button.html" with label=_("Submit for review") type="submit" variant="secondary" size="small" only %}
               </form>
             {% endif %}
+            {% if event.translate_url %}<a href="{{ event.translate_url }}">{% translate "Add translation" %}</a>{% endif %}
             {% if event.cancel_url %}<a href="{{ event.cancel_url }}">{% translate "Cancel the event" %}</a>{% endif %}
           </td>
         </tr>
