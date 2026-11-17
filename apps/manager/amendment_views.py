@@ -456,7 +456,15 @@ class PlatformOrdersView(ManagerView):
                 }
                 for sub in found
             ]
-        context.update(number=number, rows=rows, searched=bool(number))
+        context.update(
+            number=number,
+            rows=rows,
+            searched=bool(number),
+            # ORD.22: package cancellations per shop and cause; a shop's own "the customer asked"
+            # drops the refund fee on its word alone, so those come first and are marked.
+            cancellation_days=amendments.CANCELLATION_COUNT_DAYS,
+            cancellations=amendments.cancellation_counts(),
+        )
         return context
 
 

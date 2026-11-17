@@ -1,0 +1,17 @@
+{% load i18n %}{% comment %}
+The Subscribe block (EVT.9, spec 15 "Discovery"): the RSS feed, the ICS download, a `webcal://`
+link with the same path and the https URL in a read-only field to copy. No script.
+{% endcomment %}{% if links %}
+<section class="event-subscribe" aria-labelledby="event-subscribe-title">
+  <h2 id="event-subscribe-title">{% translate "Subscribe" %}</h2>
+  <ul>
+    <li><a href="{{ links.webcal_url }}">{% translate "Subscribe in your calendar app" %}</a></li>
+    <li><a href="{{ links.ics_url }}" type="text/calendar" download>{% translate "Download the calendar (ICS)" %}</a></li>
+    <li><a href="{{ links.rss_url }}" type="application/rss+xml">{% translate "RSS feed" %}</a></li>
+  </ul>
+  <p>
+    <label for="event-subscribe-url">{% translate "Calendar address to copy" %}</label>
+    <input id="event-subscribe-url" type="text" readonly value="{{ links.ics_url }}">
+  </p>
+</section>
+{% endif %}

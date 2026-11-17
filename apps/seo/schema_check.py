@@ -1,8 +1,8 @@
 """A schema check for structured data graphs (SEO.1; SEO.7 extends it to the other page types).
 
-`rich_result_errors` lists what Google's rich results require of the nodes it knows (Product
-and BreadcrumbList for now); `dangling_references` lists every `@id` reference that resolves to
-no node of the same graph.
+`rich_result_errors` lists what Google's rich results require of the nodes it knows (Product,
+BreadcrumbList, Article, ProfilePage and Event); `dangling_references` lists every `@id`
+reference that resolves to no node of the same graph.
 """
 
 from collections.abc import Iterator, Mapping
@@ -85,6 +85,21 @@ def rich_result_errors(document: Mapping[str, Any]) -> list[str]:
         elif kind == "OfferShippingDetails":
             if not node.get("shippingRate"):
                 errors.append("OfferShippingDetails: shippingRate is missing")
+        elif kind in {"BlogPosting", "Article"}:
+            errors += [
+                f"{kind}: {key} is missing"
+                for key in ("headline", "datePublished")
+                if not node.get(key)
+            ]
+        elif kind == "ProfilePage":
+            if not node.get("mainEntity"):
+                errors.append("ProfilePage: mainEntity is missing")
+        elif kind == "Event":
+            errors += [
+                f"Event: {key} is missing"
+                for key in ("name", "startDate", "location")
+                if not node.get(key)
+            ]
         elif kind == "BreadcrumbList":
             items = node.get("itemListElement") or []
             if not items:

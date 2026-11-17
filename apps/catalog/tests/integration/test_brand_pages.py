@@ -171,7 +171,7 @@ def test_the_page_has_one_graph_with_the_brand_node(client: Client) -> None:
         "https://www.wikidata.org/wiki/Q42",
         "https://en.wikipedia.org/wiki/Acme",
     ]
-    org = _node(graph, "Organization")
+    org = next(n for n in graph if n["@id"] == node["manufacturer"]["@id"])  # not the operator
     assert node["manufacturer"] == {"@id": org["@id"]}
     assert org["brand"] == [{"@id": node["@id"]}]
     assert org["legalName"] == "Acme Holdings Ltd"

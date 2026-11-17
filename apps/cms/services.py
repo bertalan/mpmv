@@ -1042,6 +1042,7 @@ def _term_editorial(
         after=render_to_string("cms/includes/term_landing_after.html", context, request),
         title=page.seo_title,
         description=page.search_description,
+        faq=tuple(engine.faq_questions(page)),
     )
 
 

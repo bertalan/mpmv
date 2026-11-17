@@ -1,0 +1,16 @@
+{% load i18n %}{% translate "Hello," %}
+
+{% blocktranslate context "(L)" %}The seller {{ vendor_name }} no longer has {{ items }} in stock, while the other items in your order {{ order_number }} are ready for dispatch.{% endblocktranslate %}
+
+{% if refunded %}{% blocktranslate context "(L)" %}We have already refunded {{ refund }} EUR (VAT and any shipping share included) to the payment method you used.{% endblocktranslate %} {% include "email/orders/_credit_time.txt" %}
+
+{% endif %}{% if cancel_url %}{% blocktranslate context "(L)" %}Your order goes on for the remaining items at the new total of {{ total }} EUR.{% endblocktranslate %}
+
+{% blocktranslate context "(L)" %}If the unavailable item was essential to your purchase, you can cancel the rest of the order free of charge and get back everything you paid for it, until the package is handed to the carrier. The seller will not ship it before {{ hold_until }}.{% endblocktranslate %}
+
+{% blocktranslate context "(L)" %}Cancel the rest of the order and refund everything: {{ cancel_url }}{% endblocktranslate %}{% else %}{% if support_email %}{% blocktranslate context "(L)" %}Your order will proceed for the remaining items at the new total of EUR {{ total }}. However, if the unavailable item was essential to your purchase, you can cancel the rest of the order free of charge until the parcel is handed over to the carrier (the seller will not ship it before {{ hold_until }}): since you checked out as a guest, simply contact support at {{ support_email }} quoting order number {{ order_number }} to receive a full refund of the remaining balance.{% endblocktranslate %}{% else %}{% blocktranslate %}To cancel the rest, contact our customer support with the order number {{ order_number }}.{% endblocktranslate %}{% endif %}{% endif %}
+
+{% translate "What changed:" %}
+{% for change in changes %}- {{ change }}
+{% endfor %}
+{% blocktranslate %}Reason: “{{ reason }}”{% endblocktranslate %}
