@@ -100,6 +100,7 @@ NOT_LISTED: Final = frozenset(
         "manager:shop:event_edit",
         "manager:shop:event_submit",
         "manager:shop:event_cancel",
+        "manager:shop:event_translate",
         "manager:shop:event_images",
         "manager:shop:event_block_add",
         "manager:shop:event_block_edit",
