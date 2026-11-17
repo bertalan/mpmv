@@ -24,7 +24,7 @@ from apps.catalog.tests.factories import (
 from apps.cms.models import HomePage, LegalPage, StandardPage
 from apps.cms.tests.factories import StandardPageFactory
 from apps.core.changeset import ChangeSet
-from apps.core.i18n import primary_language
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import AuditLog
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage
@@ -50,6 +50,9 @@ from apps.vendors.tests.factories import CommissionRuleFactory, VendorFactory
 from tests.i18n import language_prefix, localized, other_language, third_language
 
 pytestmark = pytest.mark.django_db
+
+if len(configured_languages()) < 3:  # I18N.15 part 3: these cases name three languages
+    pytest.skip("needs three configured languages", allow_module_level=True)
 
 SEEDED_MODELS = (
     Vendor,

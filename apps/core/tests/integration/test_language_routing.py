@@ -9,10 +9,13 @@ from django.test import Client, override_settings
 from django.urls import resolve, reverse
 from django.utils import translation
 
-from apps.core.i18n import primary_language
+from apps.core.i18n import configured_languages, primary_language
 from tests.i18n import language_prefix, other_language, third_language
 
 pytestmark = pytest.mark.django_db
+
+if len(configured_languages()) < 3:  # I18N.15 part 3: these cases name three languages
+    pytest.skip("needs three configured languages", allow_module_level=True)
 
 LANGUAGES_PLUS_PORTUGUESE = [
     (primary_language(), "English"),

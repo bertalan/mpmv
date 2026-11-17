@@ -6,6 +6,7 @@ the same page in the other language even when its slug is translated.
 """
 
 import re
+from collections.abc import Callable
 
 import pytest
 from django.conf import settings
@@ -73,17 +74,18 @@ def test_the_italian_home_shows_italian_content(client: Client, seeded: SeedRepo
 
 
 @pytest.mark.parametrize(
-    "path",
+    "path_of",
     [
-        f"{language_prefix(other_language())}/about/",
-        f"{language_prefix(third_language())}/chi-siamo/",
-        "/chi-siamo/",
-        "/missing/",
+        lambda: f"{language_prefix(other_language())}/about/",
+        lambda: f"{language_prefix(third_language())}/chi-siamo/",
+        lambda: "/chi-siamo/",
+        lambda: "/missing/",
     ],
 )
 def test_a_page_is_found_only_in_its_own_language_tree(
-    client: Client, seeded: SeedReport, path: str
+    client: Client, seeded: SeedReport, path_of: Callable[[], str]
 ) -> None:
+    path = path_of()
     assert client.get(path).status_code == 404
 
 
