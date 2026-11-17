@@ -10351,3 +10351,12 @@ msgstr ""
 "La tua partita IVA, con o senza il prefisso del paese, per esempio "
 "IT12345678901. La verifichiamo nel registro europeo VIES. Non sai se ne hai "
 "una? Chiedi al tuo commercialista."
+
+#: apps/cms/models.py
+msgid ""
+"Tick this to ask search engines to skip this page. The page is also left out "
+"of the sitemaps and of llms.txt. Leave it unticked for a normal public page."
+msgstr ""
+"Spunta questa casella per chiedere ai motori di ricerca di ignorare questa "
+"pagina. La pagina resta fuori anche dalle sitemap e da llms.txt. Lasciala "
+"senza spunta per una normale pagina pubblica."

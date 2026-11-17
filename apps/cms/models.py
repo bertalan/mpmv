@@ -243,6 +243,14 @@ class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
             "If you leave it empty, no caption is shown."
         ),
     )
+    noindex = models.BooleanField(
+        _("hide from search engines"),
+        default=False,
+        help_text=_(
+            "Tick this to ask search engines to skip this page. The page is also left out of "
+            "the sitemaps and of llms.txt. Leave it unticked for a normal public page."
+        ),
+    )
     body = body_field(countdown=True, products=True)
 
     content_panels: ClassVar[list[Any]] = [
@@ -252,6 +260,7 @@ class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
         FieldPanel("image_caption"),
         FieldPanel("body"),
     ]
+    promote_panels: ClassVar[list[Any]] = [*Page.promote_panels, FieldPanel("noindex")]
     # Spec 10 "Images per locale": the source image until a translator replaces it.
     override_translatable_fields: ClassVar[list[Any]] = [
         SynchronizedField("image", overridable=True)

@@ -115,3 +115,28 @@ def test_base_renders_the_fallbacks_without_errors(
     expect(page.locator("[data-bs-slide]")).to_have_count(0)
     assert errors == []
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
+
+
+@pytest.mark.usefixtures("_showcase_home")
+def test_the_video_frames_the_no_tracking_embed_only_after_marketing_consent(
+    page: Page, live_server: LiveServer, settings: SettingsWrapper
+) -> None:
+    """The frame is created only with consent to `marketing`; its address is the nocookie one.
+    The network is not needed: the test reads the frame's `src`, not its content."""
+    from apps.seo import engine
+
+    settings.MPMV_THEME_DEFAULT = "ride"
+    open_home(page, live_server, 1280)
+    page.locator(".ride-video__open").click()
+    expect(page.locator("[data-video-gate]")).to_be_visible()
+    expect(page.locator("[data-video] iframe")).to_have_count(0)  # no consent: no frame
+
+    cookie = engine.encode_cookie(
+        engine.ConsentState(True, frozenset({"marketing"}), engine.BANNER_VERSION, "0" * 32)
+    )
+    page.context.add_cookies([{"name": "mpmv_consent", "value": cookie, "url": live_server.url}])
+    open_home(page, live_server, 1280)
+    page.locator(".ride-video__open").click()
+    expect(page.locator("[data-video] iframe")).to_have_attribute(
+        "src", "https://www.youtube-nocookie.com/embed/abcdefghijk"
+    )

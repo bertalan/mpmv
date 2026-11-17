@@ -172,3 +172,48 @@ def test_a_page_with_a_gallery_loads_the_carousel_script(client: Any) -> None:
         html = client.get("/").content.decode()
     assert "js/carousel.js" in html
     assert 'aria-roledescription="carousel"' in html
+
+
+def test_vimeo_unlisted_addresses_keep_their_hash() -> None:
+    links = parse_video_url("https://vimeo.com/123456789/abcdef0123")
+    assert links is not None
+    assert links.watch_url == "https://vimeo.com/123456789/abcdef0123"
+    assert links.embed_url == "https://player.vimeo.com/video/123456789?h=abcdef0123&dnt=1"
+    player = parse_video_url("https://player.vimeo.com/video/123456789?h=abcdef0123")
+    assert player is not None
+    assert player.embed_url == links.embed_url
+    assert parse_video_url("https://vimeo.com/123456789/not-a-hash!") is None
+    assert parse_video_url("https://vimeo.com/123456789/abcdef0123/extra") is None
+
+
+VIDEO_ORIGINS = ("https://www.youtube-nocookie.com", "https://player.vimeo.com")
+
+
+def _frame_src(response: Any) -> list[str]:
+    for directive in response["Content-Security-Policy"].split(";"):
+        name, _, sources = directive.strip().partition(" ")
+        if name == "frame-src":
+            return list(sources.split())
+    return []
+
+
+@pytest.mark.parametrize("theme", ["ride", "base"])
+def test_a_page_with_a_video_allows_the_two_no_tracking_origins_in_frame_src(
+    client: Any, theme: str
+) -> None:
+    seed_site()
+    home = HomePage.objects.get(locale__language_code="en")
+    home.body = [("video_modal", {"title": "Tour", "url": YOUTUBE})]
+    home.save_revision().publish()
+    with override_settings(MPMV_THEME_DEFAULT=theme):
+        response = client.get("/")
+    sources = _frame_src(response)
+    assert set(VIDEO_ORIGINS) <= set(sources)
+    assert "*" not in sources
+    assert "<iframe" not in response.content.decode()  # nothing is framed before consent
+
+
+def test_a_page_without_a_video_keeps_the_site_frame_src(client: Any) -> None:
+    seed_site()
+    response = client.get("/")
+    assert not set(VIDEO_ORIGINS) & set(_frame_src(response))

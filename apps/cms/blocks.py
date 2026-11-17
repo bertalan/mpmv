@@ -1205,6 +1205,9 @@ class VideoModalBlock(blocks.StructBlock):  # type: ignore[misc]
     def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
         context = super().get_context(value, parent_context=parent_context)
         links = parse_video_url(value["url"])
+        request = (parent_context or {}).get("request")
+        if links is not None and request is not None:
+            request.mpmv_video_embed = True  # the CSP middleware adds the frame origins
         context["video"] = links
         context["video_id"] = _unique_id(parent_context, "video", value)
         return context

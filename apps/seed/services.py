@@ -1173,6 +1173,7 @@ def _standard_page(
             slug=spec.slug["en"],
             image=image,
             image_alt_text=_text(data.HOME_HERO_ALT, "en"),
+            noindex=spec.noindex,
             body=make_body("en"),
         )
         home.add_child(instance=page)
@@ -1186,6 +1187,7 @@ def _standard_page(
         copy.title = copy.draft_title = spec.title[language]
         copy.slug = spec.slug[language]
         copy.image_alt_text = _text(data.HOME_HERO_ALT, language)
+        copy.noindex = spec.noindex
         copy.body = make_body(language)
         copy = _publish(copy)
         run.created("cms.standardpage", copy.url_path)

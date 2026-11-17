@@ -1260,6 +1260,7 @@ class PageSeed:
     slug: Texts
     title: Texts
     body: Texts  # rich text HTML
+    noindex: bool = False  # the page asks search engines to skip it (its own robots rule)
 
 
 DEMO_NOTICE: Final[Texts] = {
@@ -1333,9 +1334,11 @@ SHOWCASE: Final = PageSeed(
     slug={"en": "demo-showcase", "it": "demo-vetrina"},
     title={"en": "Showcase (demo)", "it": "Vetrina (demo)"},
     body={"en": "", "it": ""},
+    noindex=True,  # a demo page: never in the sitemaps or llms.txt, whatever the site's switch
 )
-# A placeholder: the address is valid for the video block but points to no real recording.
-SHOWCASE_VIDEO_URL: Final = "https://www.youtube.com/watch?v=demoVideo01"
+# "Big Buck Bunny" (c) Blender Foundation, https://peach.blender.org, licensed CC BY 3.0, which
+# allows sharing and embedding with credit; the official channel's upload, embedded without cookies.
+SHOWCASE_VIDEO_URL: Final = "https://www.youtube.com/watch?v=YE7VzlLtp-4"
 SHOWCASE_QUOTES: Final = (
     ("Fast delivery and a kind note in the box.", "Demo customer A"),
     ("The jacket fits as described.", "Demo customer B"),

@@ -725,6 +725,12 @@ _YOUTUBE_HOSTS = frozenset(
 _VIMEO_HOSTS = frozenset({"vimeo.com", "www.vimeo.com", "player.vimeo.com"})
 
 
+# The only origins a video block ever frames (never a wildcard); the CSP `frame-src` gets them on
+# the responses that render such a block (apps.cms.middleware.VideoEmbedCspMiddleware).
+VIDEO_EMBED_ORIGINS = ("https://www.youtube-nocookie.com", "https://player.vimeo.com")
+_VIMEO_HASH = re.compile(r"^[0-9a-f]{6,20}$")
+
+
 @dataclass(frozen=True)
 class VideoLinks:
     """The page of a video and the no-tracking address of its embed."""
@@ -742,6 +748,7 @@ def parse_video_url(url: str) -> VideoLinks | None:
     host = (parts.hostname or "").lower()
     segments = [s for s in parts.path.split("/") if s]
     video_id = ""
+    unlisted_hash = ""
     if host in _YOUTUBE_HOSTS:
         if segments[:1] == ["watch"]:
             ids = [
@@ -767,10 +774,19 @@ def parse_video_url(url: str) -> VideoLinks | None:
     elif host in _VIMEO_HOSTS:
         if host == "player.vimeo.com" and len(segments) == 2 and segments[0] == "video":
             video_id = segments[1]
-        elif host != "player.vimeo.com" and len(segments) == 1:
+        elif host != "player.vimeo.com" and len(segments) in (1, 2):
             video_id = segments[0]
+            if len(segments) == 2:  # an unlisted video: vimeo.com/<id>/<hash>
+                unlisted_hash = segments[1]
+        if player_unlisted := dict(  # player.vimeo.com/video/<id>?h=<hash>
+            q.split("=", 1) for q in parts.query.split("&") if "=" in q
+        ).get("h"):
+            unlisted_hash = unlisted_hash or player_unlisted
+        if unlisted_hash and not _VIMEO_HASH.match(unlisted_hash):
+            return None
         if video_id.isdigit():
-            return VideoLinks(
-                f"https://vimeo.com/{video_id}", f"https://player.vimeo.com/video/{video_id}?dnt=1"
-            )
+            watch = f"https://vimeo.com/{video_id}" + (f"/{unlisted_hash}" if unlisted_hash else "")
+            embed = f"https://player.vimeo.com/video/{video_id}?"
+            embed += f"h={unlisted_hash}&dnt=1" if unlisted_hash else "dnt=1"
+            return VideoLinks(watch, embed)
     return None
