@@ -140,3 +140,68 @@ def test_the_pagination_is_a_bootstrap_pagination_with_numbers(
 def test_the_empty_state_offers_the_way_back(client: Client, term_page: str) -> None:
     soup = page(client, term_page + "?price_min=900")
     assert soup.select_one(".listing-empty a")
+
+
+def listing_data(
+    client: Client, path: str, theme: str, settings: SettingsWrapper
+) -> dict[str, Any]:
+    """What a listing says, not how it is marked up: controls, links, prices, robots, rel links."""
+    settings.MPMV_THEME_DEFAULT = theme
+    soup = page(client, path)
+    form = soup.select_one("form[role=search]")
+    assert form is not None
+    robots = soup.find("meta", attrs={"name": "robots"})
+    return {
+        "form_action": form["action"],
+        "controls": sorted(
+            (c["name"], c.get("type", c.name), c.get("value", ""), c.has_attr("checked"))
+            for c in form.select("input[name], select[name]")
+        ),
+        "chips": [(a["href"], a.get_text(" ", strip=True)) for a in soup.select(".filter-chips a")],
+        "pagination": [
+            (a["href"], a.get("rel", [None])[0], a.has_attr("aria-current"))
+            for a in soup.select("nav[aria-label=Pagination] a")
+        ],
+        "prices": [p.get_text(" ", strip=True) for p in soup.select(".product-card-price")],
+        "titles": [a.get_text(strip=True) for a in soup.select(".product-card h3 a")],
+        "robots": robots["content"] if robots else None,
+        "prev": [link["href"] for link in soup.find_all("link", rel="prev")],
+        "next": [link["href"] for link in soup.find_all("link", rel="next")],
+    }
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["", "?page=2", "?price_min=5&price_max=50", "?price_min=5&page=2"],
+    ids=["first", "middle", "filtered", "filtered-paged"],
+)
+def test_base_and_ride_listings_carry_the_same_data(
+    client: Client, term_page: str, settings: SettingsWrapper, query: str
+) -> None:
+    base = listing_data(client, term_page + query, "base", settings)
+    ride = listing_data(client, term_page + query, "ride", settings)
+    assert ride == base
+    assert base["prices"]  # the comparison is not vacuous
+
+
+def test_a_filtered_listing_carries_chips_and_filters_across_pages(
+    client: Client, term_page: str, settings: SettingsWrapper
+) -> None:
+    for theme in ("base", "ride"):
+        data = listing_data(client, term_page + "?price_min=5&page=2", theme, settings)
+        assert data["chips"][0][1].startswith("From")
+        assert data["chips"][-1][1] == "Clear all filters"
+        assert data["pagination"]
+        assert all("price_min=5" in href for href, _, _ in data["pagination"])
+        assert ("price_min", "number", "5", False) in data["controls"]
+
+
+def test_a_filtered_listing_with_no_products_is_noindex_in_both_themes(
+    client: Client, term_page: str, settings: SettingsWrapper
+) -> None:
+    data = {
+        t: listing_data(client, term_page + "?price_min=900", t, settings) for t in ("base", "ride")
+    }
+    assert data["ride"] == data["base"]
+    assert data["base"]["robots"] == "noindex, follow"
+    assert data["base"]["chips"]
