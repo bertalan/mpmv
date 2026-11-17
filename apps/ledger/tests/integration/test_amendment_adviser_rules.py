@@ -43,7 +43,8 @@ from apps.ledger.tests.integration.test_amendment_refunds import (
 )
 from apps.ledger.tests.integration.test_refunds import webhook
 from apps.orders import amendment_engine as am
-from apps.orders.models import OrderAmendment, VendorOrder
+from apps.orders import versions
+from apps.orders.models import AmendmentState, OrderAmendment, VendorOrder
 from apps.orders.services import place_order
 from apps.orders.tests.control import plainly
 from apps.orders.tests.integration.test_place_order import FakeTax, line, preview, vendor_of
@@ -402,4 +403,68 @@ def test_am8_the_whole_shipping_original_plus_extra_follows_the_goods_shipped(
     )
     assert amendment.preview["to_pay"] == "14.78", plainly(
         "AM8 must ask 14.78", f"it asks {amendment.preview['to_pay']}"
+    )
+
+
+# --- chained amendments: a later version keeps what each payment paid -------------------------
+
+
+def paid_second(sub: VendorOrder, amendment: OrderAmendment, address: dict[str, str]) -> None:
+    """Stand-in for ORD.21 (not built yet): the customer paid the supplement, so the drafted
+    version is written and becomes current, and the amendment is applied."""
+    after = am.VersionSnapshot.from_json(amendment.preview["after_snapshot"])
+    versions.create_next_version(
+        sub, after, number=2, amendment=amendment, shipping_address=address
+    )
+    OrderAmendment.objects.filter(pk=amendment.pk).update(state=AmendmentState.APPLIED)
+    sub.refresh_from_db()
+
+
+@pytest.mark.rate_change
+def test_am9_a_later_version_keeps_the_second_payment_shipping_at_its_rate(
+    stripe: FakeStripeClient,
+) -> None:
+    sub = place(stripe, dearer_milan(), mixed=False)
+    actor = owner_of(sub)
+    second = timezone.now() + dt.timedelta(days=4)
+    am6 = draft(sub, actor, am.ChangeQuantity(key_of(sub, "P22"), 2), to_milan(), now=second)
+    paid_second(sub, am6, MILAN)
+    third = second + dt.timedelta(days=4)
+    am9 = draft(sub, actor, am.ChangeQuantity(key_of(sub, "P22"), 1), now=third)
+    d1, d2 = paid_day(sub), day(second)
+    split = shipping(am9)
+    assert split == [("10.00", "22", "2.20", d1), ("4.00", "23", "0.92", d2)], plainly(
+        "the unchanged 14.00 shipping must keep 10.00 at 22 % (first payment) and 4.00 at 23 % "
+        "(second payment): no payment event re-rates it",
+        f"the shipping is {split}",
+    )
+    assert (am9.kind, am9.preview["refund"]) == ("minor", "61.50"), plainly(
+        "AM9 must be a minor change refunding 61.50 (50.00 + 11.50 at 23 %)",
+        f"it is {am9.kind} refunding {am9.preview['refund']}",
+    )
+    assert am9.preview["after"]["gross_total"] == "78.12"
+
+
+def test_am10_the_same_rate_paid_on_two_dates_keeps_both_dates(stripe: FakeStripeClient) -> None:
+    sub = place(stripe, dearer_milan(), mixed=True)
+    actor = owner_of(sub)
+    second = timezone.now() + dt.timedelta(days=4)
+    paid_second(sub, draft(sub, actor, to_milan(), now=second), MILAN)
+    am10 = draft(
+        sub, actor, am.ChangePrice(key_of(sub, "P22"), D("40.00")), now=second + dt.timedelta(1)
+    )
+    d1, d2 = paid_day(sub), day(second)
+    split = shipping(am10)
+    assert split == [
+        ("4.44", "22", "0.98", d1),
+        ("5.56", "4", "0.22", d1),
+        ("1.78", "22", "0.39", d2),
+        ("2.22", "4", "0.09", d2),
+    ], plainly(
+        "each payment's shipping (10.00, then 4.00) must be re-split on its own and keep its date",
+        f"the shipping is {split}",
+    )
+    assert am10.preview["refund"] == "12.34", plainly(
+        "AM10 must refund 12.34 (12.20 + 0.14 of shipping VAT)",
+        f"it refunds {am10.preview['refund']}",
     )

@@ -22,6 +22,7 @@ from apps.tax import engine as tax
 D = Decimal
 D1 = dt.date(2027, 3, 1)
 D2 = dt.date(2027, 3, 5)
+D3 = dt.date(2027, 3, 9)
 RATES = tax.RateTable({("IT", tax.STANDARD): D("22"), ("IT", tax.SUPER_REDUCED): D("4")})
 RATES_23 = tax.RateTable({("IT", tax.STANDARD): D("23"), ("IT", tax.SUPER_REDUCED): D("4")})
 COMMISSION = {
@@ -52,9 +53,9 @@ def tax_ctx(rates: tax.RateTable = RATES) -> tax.TaxContext:
     )
 
 
-def ctx(rates: tax.RateTable = RATES) -> am.RecomputeContext:
+def ctx(rates: tax.RateTable = RATES, on: dt.date = D2) -> am.RecomputeContext:
     return am.RecomputeContext(
-        tax_on=D2, tax=tax_ctx(rates), address_before=ROME, categories=dict(CATEGORY)
+        tax_on=on, tax=tax_ctx(rates), address_before=ROME, categories=dict(CATEGORY)
     )
 
 
@@ -295,3 +296,87 @@ def test_am8_the_whole_shipping_original_plus_extra_follows_the_goods_shipped() 
         f"it is {shipping_of(preview)}",
     )
     assert preview.to_pay == D("14.78"), plainly("AM8 must ask 14.78", f"it asks {preview.to_pay}")
+
+
+# --- chained amendments: a later version keeps what each payment paid -------------------------
+
+
+def am6_v2() -> am.VersionSnapshot:
+    """AM6 applied: P22 50.00 at 22 % (D1) + 50.00 at 23 % (D2); shipping 10.00 at 22 % (D1)
+    + 4.00 at 23 % (D2); gross 139.62."""
+    changes: list[am.AmendmentChange] = [am.ChangeQuantity("P22", 2), dearer_address()]
+    return am.recompute_vendor_order(seed_s(), changes, ctx(RATES_23)).after
+
+
+def am5_v2() -> am.VersionSnapshot:
+    """AM5 applied: shipping 5.00 at 22 % and 5.00 at 4 % (D1), 2.00 at 22 % and 2.00 at 4 %
+    (D2); gross 128.82."""
+    return am.recompute_vendor_order(seed_m(), [dearer_address()], ctx()).after
+
+
+def test_am9_a_later_version_keeps_the_second_payment_shipping_at_its_rate() -> None:
+    v2 = am6_v2()
+    assert v2.totals.gross_total == D("139.62")
+    preview = am.recompute_vendor_order(v2, [am.ChangeQuantity("P22", 1)], ctx(RATES_23, D3))
+    assert goods_of(preview, "P22") == [(D("50.00"), D("11.00"), D1)], plainly(
+        "lowering P22 back to 1 must take out the newest unit (50.00 at 23 %)",
+        f"P22 is {goods_of(preview, 'P22')}",
+    )
+    assert shipping_of(preview) == [
+        (D("10.00"), D("22"), D("2.20"), D1),
+        (D("4.00"), D("23"), D("0.92"), D2),
+    ], plainly(
+        "the unchanged 14.00 shipping must keep 10.00 at 22 % (D1) and 4.00 at 23 % (D2): no "
+        "payment event re-rates it",
+        f"the shipping is {shipping_of(preview)}",
+    )
+    assert (preview.refund, preview.after.totals.gross_total) == (D("61.50"), D("78.12")), plainly(
+        "AM9 must refund 61.50 (50.00 + 11.50) and leave v3 at 78.12",
+        f"it refunds {preview.refund} and v3 totals {preview.after.totals.gross_total}",
+    )
+
+
+def test_a_version_with_unchanged_goods_and_shipping_copies_the_shipping_portions() -> None:
+    v2 = am6_v2()
+    change = am.ChangeDeliveryTime(max_days=4)
+    preview = am.recompute_vendor_order(v2, [change], ctx(RATES_23, D3))
+    assert preview.after.shipping.portions == v2.shipping.portions, plainly(
+        "a change that touches neither the goods nor the shipping price must copy the shipping "
+        "portions as they are",
+        f"they became {shipping_of(preview)}",
+    )
+    assert preview.money_delta == 0
+
+
+def test_the_same_rate_on_two_payment_dates_stays_two_portions() -> None:
+    v2 = am5_v2()
+    preview = am.recompute_vendor_order(v2, [am.ChangePrice("P22", D("40.00"))], ctx(on=D3))
+    assert shipping_of(preview) == [
+        (D("4.44"), D("22"), D("0.98"), D1),
+        (D("5.56"), D("4"), D("0.22"), D1),
+        (D("1.78"), D("22"), D("0.39"), D2),
+        (D("2.22"), D("4"), D("0.09"), D2),
+    ], plainly(
+        "each payment's shipping (10.00 on D1, 4.00 on D2) must be re-split on its own and "
+        "keep its date",
+        f"the shipping is {shipping_of(preview)}",
+    )
+    assert preview.refund == D("12.34"), plainly(
+        "AM10 must refund 12.34 (12.20 + 0.14 of shipping VAT)", f"it refunds {preview.refund}"
+    )
+
+
+def test_a_lower_shipping_reduces_the_newest_payment_first() -> None:
+    v2 = am6_v2()
+    cheaper = am.ShippingOffer(key="economy", label="Economy", net=D("11.00"), max_days=3)
+    preview = am.recompute_vendor_order(v2, [am.ChangeCarrier(cheaper)], ctx(RATES_23, D3))
+    assert shipping_of(preview) == [
+        (D("10.00"), D("22"), D("2.20"), D1),
+        (D("1.00"), D("23"), D("0.23"), D2),
+    ], plainly(
+        "a 3.00 lower shipping must come off the second payment's 4.00 at 23 % first",
+        f"the shipping is {shipping_of(preview)}",
+    )
+    assert preview.refund == D("3.69"), plainly(
+        "AM11 must refund 3.69 (3.00 + 0.69)", f"it refunds {preview.refund}"
+    )
