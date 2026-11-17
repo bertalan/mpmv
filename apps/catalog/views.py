@@ -20,7 +20,9 @@ from django.conf import settings
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponsePermanentRedirect
 from django.http.response import HttpResponseBase
 from django.shortcuts import render
+from django.urls import reverse
 from django.utils import translation
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_safe
 from wagtail import hooks
 from wagtail.rich_text import RichText
@@ -122,6 +124,14 @@ def _editorial(
     return None
 
 
+def _trail(name: str, location: str) -> list[dict[str, str]]:
+    """The breadcrumb of a listing: the home page, then the page itself (last, the current page)."""
+    return [
+        {"label": str(_("Home")), "url": reverse("home")},
+        {"label": name, "url": location},
+    ]
+
+
 def _listing(
     request: HttpRequest, anchor: services.ListingAnchor | None, language: str
 ) -> HttpResponseBase:
@@ -212,6 +222,7 @@ def _listing(
         else [],
         "scope": anchor.scope,
         "name": anchor.name,
+        "trail": _trail(anchor.name, location),
         "products": page.products,
         "params": params,
         "window": window,
@@ -278,6 +289,7 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
         "vendor_url": slugs.vendor_path(language, page.vendor.slug, default_language=default),
         "gallery_items": product_pages.gallery_items(page),
         "related": product_pages.related(page, language),
+        "trail": _trail(page.title, location),
     }
     response: HttpResponse = render(request, PRODUCT_TEMPLATE, context)
     return response

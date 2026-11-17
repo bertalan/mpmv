@@ -1,0 +1,70 @@
+{% extends "layouts/base.html" %}
+{% load i18n %}
+{% comment %}
+  Listing page of `ride` (THM.7): the app template's structure (copied from catalog/listing.html,
+  CAT.8: same blocks, `robots`, prev/next links, JSON-LD, editorial, hooks) on the Bootstrap
+  grid. The name sits in the page banner (the only h1) with the breadcrumb (`trail`); the filters
+  are a column from 62rem and a block above the products below it; the products are a grid of
+  Bootstrap cards; the numbered pagination is Bootstrap's `.pagination`. No inline script or
+  style (the CSP has no 'unsafe-inline'): the filter form is a plain GET form.
+{% endcomment %}
+{% block title %}{% if editorial.title %}{{ editorial.title }}{% else %}{{ name }}{% endif %}{% if window.page > 1 %} · {% blocktranslate with page=window.page %}Page {{ page }}{% endblocktranslate %}{% endif %}{% if current_site.site_name %} · {{ current_site.site_name }}{% endif %}{% endblock %}
+{% block description %}{% if editorial.description %}<meta name="description" content="{{ editorial.description }}">{% endif %}{% endblock %}
+{% block head %}{{ block.super }}
+  {% robots_meta robots %}
+  {% if previous_url %}<link rel="prev" href="{{ previous_url }}">{% endif %}
+  {% if next_url %}<link rel="next" href="{{ next_url }}">{% endif %}
+{% endblock %}
+{% block content %}
+  <div class="listing">
+    {% translate "Products" as products_label %}
+    {% blocktranslate asvar count_text count counter=window.total %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktranslate %}
+    {% include "components/page_banner.html" with title=name items=trail text=count_text only %}
+    {% if scope.vendor.logo %}<img class="listing-logo mb-3" src="{{ scope.vendor.logo.file.url }}" alt="{{ scope.vendor.logo_alt }}" width="{{ scope.vendor.logo.width }}" height="{{ scope.vendor.logo.height }}">{% endif %}
+    {% if is_fallback %}<p class="listing-notice alert alert-info" role="note">{% translate "This page is not available in your language yet." %}</p>{% endif %}
+    {% if vendor_profile %}{% include "catalog/includes/vendor_profile.html" %}{% endif %}
+    {% if brand_profile and not brand_profile.is_empty %}{% include "catalog/includes/brand_profile.html" %}{% endif %}
+    {% if editorial.before %}{{ editorial.before }}{% endif %}
+    {% if store_categories %}{% include "catalog/includes/store_categories.html" %}{% endif %}
+
+    <div class="row g-4">
+      <div class="col-lg-3">{% include "catalog/includes/listing_filters.html" %}</div>
+      <section class="listing-results col-lg-9" aria-labelledby="listing-results-heading">
+        <h2 id="listing-results-heading" class="visually-hidden">{{ products_label }}</h2>
+        {% if chips %}
+          <section class="filter-chips mb-3" aria-label="{% translate 'Applied filters' %}">
+            <ul class="list-unstyled d-flex flex-wrap gap-2 mb-0">
+              {# The hidden text follows the label: as the first child it would take the click point. #}
+              {% for chip in chips %}<li><a class="btn btn-sm btn-outline-secondary" href="{{ chip.url }}">{% if chip.key == "price_min" %}{% blocktranslate with amount=chip.label %}From {{ currency }} {{ amount }}{% endblocktranslate %}{% elif chip.key == "price_max" %}{% blocktranslate with amount=chip.label %}Up to {{ currency }} {{ amount }}{% endblocktranslate %}{% else %}{{ chip.label }}{% endif %}<span class="visually-hidden"> ({% translate "remove filter" %})</span></a></li>{% endfor %}
+              <li><a class="btn btn-sm btn-link" href="{{ clear_url }}">{% translate "Clear all filters" %}</a></li>
+            </ul>
+          </section>
+        {% endif %}
+
+        {% if cards %}
+          <ul class="product-grid row row-cols-1 row-cols-sm-2 row-cols-xl-3 g-3 list-unstyled">
+            {% for card in cards %}<li class="col">{% include "catalog/includes/product_card.html" %}</li>{% endfor %}
+          </ul>
+        {% else %}
+          <div class="listing-empty alert alert-secondary">
+            <p>{% if params.has_filters %}{% translate "No products match these filters." %}{% else %}{% translate "No products here yet." %}{% endif %}</p>
+            {% if params.has_filters %}<p class="mb-0"><a href="{{ clear_url }}">{% translate "Clear all filters" %}</a></p>{% endif %}
+          </div>
+        {% endif %}
+
+        {% if page_links %}
+          <nav class="mt-4" aria-label="{% translate 'Pagination' %}">
+            <ul class="pagination flex-wrap justify-content-center">
+              {% if previous_url %}<li class="page-item"><a class="page-link" href="{{ previous_url }}" rel="prev">{% translate "Previous" %}</a></li>{% endif %}
+              {% for link in page_links %}
+                <li class="page-item{% if link.current %} active{% elif link.number is None %} disabled{% endif %}">{% if link.number is None %}<span class="page-link" aria-hidden="true">…</span>{% elif link.current %}<a class="page-link" href="{{ link.url }}" aria-current="page">{{ link.number }}</a>{% else %}<a class="page-link" href="{{ link.url }}">{{ link.number }}</a>{% endif %}</li>
+              {% endfor %}
+              {% if next_url %}<li class="page-item"><a class="page-link" href="{{ next_url }}" rel="next">{% translate "Next" %}</a></li>{% endif %}
+            </ul>
+          </nav>
+        {% endif %}
+      </section>
+    </div>
+    {% if editorial.after %}{{ editorial.after }}{% endif %}
+  </div>
+{% endblock %}
