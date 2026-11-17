@@ -51,12 +51,14 @@ def staff() -> User:
     return UserFactory.create(permissions=[PROFILE_REVERT_PERMISSION])
 
 
-def _change(vendor: Vendor, owner: User, language: str = "en", **values: str) -> AuditLog:
+def _change(
+    vendor: Vendor, owner: User, language: str = primary_language(), **values: str
+) -> AuditLog:
     save_storefront_profile(vendor, language, values, actor=owner, ctx=CTX)
     return AuditLog.objects.filter(action=CHANGED).latest("id")
 
 
-def _row(vendor: Vendor, language: str = "en") -> VendorTranslation:
+def _row(vendor: Vendor, language: str = primary_language()) -> VendorTranslation:
     return VendorTranslation.objects.get(vendor=vendor, language=language)
 
 
@@ -197,7 +199,7 @@ def test_a_suspended_vendor_can_still_be_reverted_by_staff(
     assert _row(vendor).tagline == "Old"
     # and the revert does not lock the owner out (conservative reading of the spec)
     Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.ACTIVE)
-    save_storefront_profile(vendor, "en", {"tagline": "Again"}, actor=owner, ctx=CTX)
+    save_storefront_profile(vendor, primary_language(), {"tagline": "Again"}, actor=owner, ctx=CTX)
 
 
 def test_history_needs_the_permission_and_filters_by_vendor(
@@ -267,9 +269,13 @@ def test_crafted_before_values_with_markup_are_refused(
     "after",
     [
         {},
-        {"language": "en", "tagline": "x"},
-        {"vendor": "not-a-uuid", "language": "en", "tagline": "x"},
-        {"vendor": "00000000-0000-0000-0000-000000000000", "language": "en", "tagline": "x"},
+        {"language": primary_language(), "tagline": "x"},
+        {"vendor": "not-a-uuid", "language": primary_language(), "tagline": "x"},
+        {
+            "vendor": "00000000-0000-0000-0000-000000000000",
+            "language": primary_language(),
+            "tagline": "x",
+        },
         ["not", "a", "dict"],
     ],
 )

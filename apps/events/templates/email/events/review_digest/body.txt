@@ -1,0 +1,4 @@
+{% load i18n %}{% blocktranslate count counter=count %}{{ counter }} event is awaiting review.{% plural %}{{ counter }} events are awaiting review.{% endblocktranslate %}
+{% for item in items %}- {{ item.title }}{% if item.vendor %} ({{ item.vendor }}){% endif %}
+{% endfor %}
+{{ review_url }}

@@ -21,6 +21,7 @@ from django.utils import translation
 from django.utils.translation import gettext
 
 from apps.accounts.tests.factories import UserFactory
+from tests.i18n import other_language
 from tests.integration.test_language_switcher_everywhere import CASES
 
 pytestmark = pytest.mark.django_db
@@ -129,7 +130,7 @@ def test_the_help_chrome_follows_the_pages_language() -> None:
     soup = _soup(client.get(case.url).content)
     tools = soup.select_one("header .user-tools")
     assert tools is not None
-    assert tools["data-help-lang"] == "it"
+    assert tools["data-help-lang"] == other_language()
     button = tools.select_one("button.help-button")
     assert button is not None
     assert button["aria-label"] == "Aiuto per questa pagina"

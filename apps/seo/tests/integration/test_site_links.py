@@ -36,6 +36,7 @@ from apps.core.indexing import robots_txt
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
+from tests.i18n import localized
 
 pytestmark = pytest.mark.django_db
 
@@ -111,13 +112,13 @@ def test_staff_see_pages_shops_and_the_manager(staff_client: Client, demo: dict[
     paths = listed_paths(html)
     assert "/riding-season/" in paths
     assert "Riding season" in html
-    assert "/shop/throttle-garage/" in paths
+    assert localized("/shop/throttle-garage/") in paths
     assert "Throttle Garage" in html
     assert "/manager/shop/" in paths
     assert "/manager/platform/" in paths
     assert "/material/leather/" in paths
-    assert "/product-category/jackets/" in paths
-    assert "/brand/roadstar/" in paths
+    assert localized("/product-category/jackets/") in paths
+    assert localized("/brand/roadstar/") in paths
     assert "/api/v1/docs" in paths
 
 

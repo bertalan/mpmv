@@ -17,6 +17,7 @@ from apps.catalog.tests.factories import (
     ProductFactory,
 )
 from apps.core.translations import PUBLISHED
+from tests.i18n import localized
 
 pytestmark = pytest.mark.django_db
 
@@ -99,16 +100,16 @@ def test_a_pending_brand_has_no_public_page(client: Client) -> None:
     brand = BrandFactory.create(status=Brand.Status.PENDING)
     BrandTranslationFactory.create(brand=brand, slug="proposed", status=PUBLISHED)
     ProductFactory.create(brand=brand)
-    assert client.get("/brand/proposed/").status_code == 404
+    assert client.get(localized("/brand/proposed/")).status_code == 404
     brand.status = Brand.Status.APPROVED
     brand.save()
-    assert client.get("/brand/proposed/").status_code == 200
+    assert client.get(localized("/brand/proposed/")).status_code == 200
 
 
 def test_a_rejected_brand_has_no_public_page(client: Client) -> None:
     brand = BrandFactory.create(status=Brand.Status.REJECTED)
     BrandTranslationFactory.create(brand=brand, slug="nope", status=PUBLISHED)
-    assert client.get("/brand/nope/").status_code == 404
+    assert client.get(localized("/brand/nope/")).status_code == 404
 
 
 def test_staff_admin_edits_the_new_fields(staff_client: Client) -> None:

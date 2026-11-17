@@ -23,7 +23,7 @@ from apps.vendors.tests.factories import (
     VendorMemberFactory,
     VendorTranslationFactory,
 )
-from tests.i18n import other_language
+from tests.i18n import localized, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -60,7 +60,7 @@ def _stored(vendor: Vendor, field: str) -> str:
 
 
 def _save(vendor: Vendor, owner: User, field: str, html: str) -> None:
-    save_storefront_profile(vendor, "en", {field: html}, actor=owner, ctx=CTX)
+    save_storefront_profile(vendor, primary_language(), {field: html}, actor=owner, ctx=CTX)
 
 
 @pytest.mark.parametrize("field", FIELDS)
@@ -141,10 +141,10 @@ def test_render_rechecks_the_collection_and_hides_the_text(client: Client, vendo
         status="published",
         description=f'<p>Story</p><embed embedtype="image" id="{image.pk}" alt="a" format="left"/>',
     )
-    assert "Story" in client.get(f"/shop/{vendor.slug}/").content.decode()
+    assert "Story" in client.get(localized(f"/shop/{vendor.slug}/")).content.decode()
     root = Collection.get_first_root_node()
     type(image).objects.filter(pk=image.pk).update(collection=root)
-    assert "Story" not in client.get(f"/shop/{vendor.slug}/").content.decode()
+    assert "Story" not in client.get(localized(f"/shop/{vendor.slug}/")).content.decode()
 
 
 def test_the_storefront_renders_formatting_and_strips_stored_xss(
@@ -159,7 +159,7 @@ def test_the_storefront_renders_formatting_and_strips_stored_xss(
         refund_policy='<p onclick="x()">r</p><iframe src="https://example.org"></iframe>',
         cancellation_policy='<p><a href="javascript:alert(1)">c</a></p>',
     )
-    html = client.get(f"/shop/{vendor.slug}/").content.decode()
+    html = client.get(localized(f"/shop/{vendor.slug}/")).content.decode()
     assert "<b>there</b>" in html
     assert "<li>fast</li>" in html
     assert 'href="https://example.org/"' in html
@@ -175,7 +175,7 @@ def test_a_legacy_plain_text_policy_renders_as_paragraphs(client: Client, vendor
         shipping_policy="First line\nsecond line\n\nNew paragraph",
         description="",
     )
-    html = client.get(f"/shop/{vendor.slug}/").content.decode()
+    html = client.get(localized(f"/shop/{vendor.slug}/")).content.decode()
     assert "<p>First line<br/>second line</p>" in html
     assert "<p>New paragraph</p>" in html
 
@@ -300,7 +300,7 @@ def test_the_storefront_never_fails_on_a_bogus_image_format(
         status="published",
         description=f'<p>Story</p><embed embedtype="image" id="{image.pk}" alt="a"{fmt}/>',
     )
-    response = client.get(f"/shop/{vendor.slug}/")
+    response = client.get(localized(f"/shop/{vendor.slug}/"))
     assert response.status_code == 200
     assert "Story" in response.content.decode()
     assert "<embed" not in response.content.decode()

@@ -19,6 +19,7 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 from apps.cms.services import seed_site
 from apps.themes import views
 from apps.themes.services import use_theme
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -66,7 +67,7 @@ def test_404_renders_with_base_and_the_full_chrome(client: Client) -> None:
 
 def test_csrf_failure_renders_with_base(client: Client) -> None:
     client = Client(enforce_csrf_checks=True)
-    response = client.post(reverse("switch_language"), {"language": "it", "next": "/"})
+    response = client.post(reverse("switch_language"), {"language": other_language(), "next": "/"})
     assert response.status_code == 403
     html = response.content.decode()
     assert_base_page(html)
