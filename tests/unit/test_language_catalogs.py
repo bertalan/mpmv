@@ -119,7 +119,7 @@ MFA_PAGES = "accounts/mfa/"
 
 INFORMAL = {
     "it": re.compile(
-        r"\b(tu|tuo|tua|tuoi|tue|ti|hai|riesci|scegli|scansiona|inserisci|guarda|usa)\b",
+        r"\b(tu|tuo|tua|tuoi|tue|ti|hai|riesci|scegli|scansiona|inserisci|guarda)\b",
         re.IGNORECASE,
     ),
     "de": re.compile(
