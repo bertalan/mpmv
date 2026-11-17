@@ -27,6 +27,7 @@ dependencies = [
   "weasyprint==70.0",
   "polib>=1.2",  # gettext catalogs: tools/i18n_catalog.py, i18n review files (I18N.13)
   "openpyxl>=3.1.5",  # XLSX review files (I18N.13); already pulled in by Wagtail
+  "markdown>=3.5",  # help files rendered by sync_help at runtime (ARC.36); also tools/build_docs.py
 ]
 
 [dependency-groups]
@@ -54,8 +55,6 @@ dev = [
   # comes as its own Dependabot PR, so a new failing example points at the bump, not at a change
   # in our code (docs/dev/dependency-updates.md).
   "hypothesis==6.170.15",
-  # tools/build_docs.py renders the HTML spec; tests/unit/test_build_docs_eof.py checks it.
-  "markdown>=3.5",
   "pytest-xdist>=3.6",
   # ORD.9 3/3: text extraction from the confirmation PDF in tests only (ADR-0010).
   "pypdf>=6",

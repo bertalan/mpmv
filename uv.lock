@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -1737,6 +1737,7 @@ dependencies = [
     { name = "django-otp" },
     { name = "django-stubs-ext" },
     { name = "gunicorn" },
+    { name = "markdown" },
     { name = "openpyxl" },
     { name = "polib" },
     { name = "procrastinate", extra = ["django"] },
@@ -1758,7 +1759,6 @@ dev = [
     { name = "hypothesis" },
     { name = "icalendar" },
     { name = "import-linter" },
-    { name = "markdown" },
     { name = "mypy" },
     { name = "openapi-spec-validator" },
     { name = "pre-commit" },
@@ -1784,6 +1784,7 @@ requires-dist = [
     { name = "django-otp", specifier = ">=1.7.5" },
     { name = "django-stubs-ext", specifier = ">=5.2" },
     { name = "gunicorn", specifier = ">=26.0" },
+    { name = "markdown", specifier = ">=3.5" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "polib", specifier = ">=1.2" },
     { name = "procrastinate", extras = ["django"], specifier = ">=3.10" },
@@ -1805,7 +1806,6 @@ dev = [
     { name = "hypothesis", specifier = "==6.170.15" },
     { name = "icalendar", specifier = ">=7.3.0" },
     { name = "import-linter", specifier = ">=2.5" },
-    { name = "markdown", specifier = ">=3.5" },
     { name = "mypy", specifier = ">=1.18" },
     { name = "openapi-spec-validator", specifier = ">=0.9.0" },
     { name = "pre-commit", specifier = ">=4.3" },
