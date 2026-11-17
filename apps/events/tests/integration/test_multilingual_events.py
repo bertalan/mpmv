@@ -122,7 +122,7 @@ def test_hreflang_of_an_original_only_event_lists_it_with_x_default(client: Clie
 def test_the_sitemaps_list_the_event_in_its_own_language_only(client: Client) -> None:
     page = Fixture().create("de")
     for code in ("de", "en", "it", "fr", "es"):
-        path = f"/sitemap-{code}.xml"
+        path = f"/sitemap-{code}-events.xml"
         body = client.get(path).content.decode()
         assert (f"/de/events/{page.slug}/" in body) is (code == "de"), path
 
@@ -378,7 +378,7 @@ def test_a_draft_translation_is_not_in_hreflang_and_has_no_url_to_visitors(
     html = _get(client, page.url)
     assert 'hreflang="fr"' not in html
     _get(client, f"/fr/events/{draft.slug}/", 404)
-    assert f"/fr/events/{draft.slug}/" not in client.get("/sitemap-fr.xml").content.decode()
+    assert f"/fr/events/{draft.slug}/" not in client.get("/sitemap-fr-events.xml").content.decode()
 
 
 def test_no_fallback_copy_of_an_event_page_exists_in_a_language_without_a_translation(
@@ -397,8 +397,8 @@ def test_the_sitemap_of_a_language_lists_its_translation_only(client: Client) ->
     fixture = Fixture()
     page = fixture.create("de")
     italian = fixture.translate(page, "it")
-    it_map = client.get("/sitemap-it.xml").content.decode()
-    de_map = client.get("/sitemap-de.xml").content.decode()
+    it_map = client.get("/sitemap-it-events.xml").content.decode()
+    de_map = client.get("/sitemap-de-events.xml").content.decode()
     assert f"/it/events/{italian.slug}/" in it_map
     assert f"/de/events/{page.slug}/" not in it_map
     assert f"/de/events/{page.slug}/" in de_map
