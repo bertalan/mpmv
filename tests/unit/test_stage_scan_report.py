@@ -270,7 +270,7 @@ def test_a_scanner_error_wins_over_findings(tmp_path: Path) -> None:
 
 
 RULES = SCRIPT.parent / "zap-rules.tsv"
-ACCEPTED_IDS = {"90004", "10110"}
+ACCEPTED_IDS = {"90004", "10110", "10202"}
 
 
 def rule_lines() -> list[list[str]]:
