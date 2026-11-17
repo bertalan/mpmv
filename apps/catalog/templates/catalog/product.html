@@ -1,19 +1,18 @@
 {% extends "layouts/base.html" %}
-{% load i18n l10n static responsive_images wagtailcore_tags consumer_prices seo_jsonld %}
+{% load i18n l10n static responsive_images wagtailcore_tags consumer_prices %}
 {% comment %}
   Product page (CAT.7). Semantic and unstyled beyond catalog/product.css; THM.7 restyles it. No
   inline script or style (the CSP has no 'unsafe-inline'). Shows published data only: the
   `ProductPage` built by `product_pages.find`. Prices, variant prices included, are consumer
   prices (TAX.12): the gross amount from the tax app's `consumer_price` tag with the owner's
   note, as on includes/product_card.html. The variant choice and the buy button are a POST form (ORD.19)
-  shown only when the product sells online; htmx swaps the answer into #add-to-cart-result. `related` (CAT.15) holds the related products and other sellers.
+  shown only when the product sells online; htmx swaps the answer into #add-to-cart-result. The gallery is the theme's `components/gallery.html`; `related` holds the related products (spec 03).
 {% endcomment %}
 {% block title %}{{ page_data.title }}{% if site_name %} · {{ site_name }}{% endif %}{% endblock %}
 {% block description %}{% if page_data.short_description %}<meta name="description" content="{{ page_data.short_description }}">{% endif %}{% endblock %}
 {% block head %}
   {% robots_meta robots %}
   <link rel="stylesheet" href="{% static 'catalog/product.css' %}">
-  {% product_jsonld page_data %}
 {% endblock %}
 {% block content %}
   <article class="product-page">
@@ -23,13 +22,8 @@
       {% if page_data.short_description %}<p class="product-teaser">{{ page_data.short_description }}</p>{% endif %}
     </header>
 
-    {% if page_data.gallery %}
-      <section class="product-gallery" aria-labelledby="product-gallery-heading">
-        <h2 id="product-gallery-heading" class="visually-hidden">{% translate "Product images" %}</h2>
-        <ul>
-          {% for item in page_data.gallery %}<li>{% responsive_image item.image "content" alt=item.alt %}</li>{% endfor %}
-        </ul>
-      </section>
+    {% if gallery_items %}
+      {% include "components/gallery.html" with id="product-images" label=_("Product images") images=gallery_items only %}
     {% endif %}
 
     <section class="product-buy" aria-labelledby="product-buy-heading">

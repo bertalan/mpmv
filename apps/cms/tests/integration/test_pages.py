@@ -108,7 +108,11 @@ def test_pages_render_under_the_strict_csp(
     assert "'unsafe-inline'" not in policy
     html = response.content.decode()
     # Only same-origin script files (THM.3: vendored htmx and Alpine, the theme module).
-    assert all("src=" in tag for tag in re.findall(r"<script\b[^>]*>", html))
+    # (and JSON-LD data blocks, which never execute: the CSP lint allows exactly this type).
+    assert all(
+        "src=" in tag or tag == '<script type="application/ld+json">'
+        for tag in re.findall(r"<script\b[^>]*>", html)
+    )
     assert "<style" not in html
     assert not re.search(r"\sstyle=", html)
     assert re.search(r'<link rel="stylesheet" href="/static/themes/base/theme\.css', html)

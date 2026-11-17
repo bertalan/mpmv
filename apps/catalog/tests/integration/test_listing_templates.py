@@ -147,7 +147,11 @@ def test_the_head_has_title_canonical_robots_and_hreflang(
 def test_no_inline_script_or_style(client: Client, shop: dict[str, Any]) -> None:
     page = soup(client, "/compatibility/maker/?colour=red")
     assert page.find("style") is None
-    assert all(script.get("src") for script in page.find_all("script"))
+    # A JSON-LD block is data, not code (the CSP lint allows exactly this type).
+    assert all(
+        script.get("src") or script.get("type") == "application/ld+json"
+        for script in page.find_all("script")
+    )
     assert page.find(attrs={"style": True}) is None
     assert not [tag for tag in page.find_all(True) if any(a.startswith("on") for a in tag.attrs)]
 
