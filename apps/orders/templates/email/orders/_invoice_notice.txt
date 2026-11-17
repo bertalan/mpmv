@@ -1,0 +1,1 @@
+{% load i18n %}{% translate "Order changed after payment: if you already issued an invoice or receipt for the previous version, remember to issue a credit or debit note to bring the document in line with the new amounts." context "(L)" %}

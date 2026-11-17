@@ -11,6 +11,10 @@ answers with the passkey prompt. No inline script or style.
   <h1>{% blocktranslate %}Change order {{ number }}{% endblocktranslate %}</h1>
   <p><a href="{{ order_url }}">{% if staff %}{% translate "Back to the order lookup" %}{% else %}{% translate "Back to the order" %}{% endif %}</a></p>
   {% if action_error %}{% include "components/alert.html" with level="danger" message=action_error live="assertive" only %}{% endif %}
+  {% if sub.invoice_issued_at %}
+    {% translate "Order changed after payment: if you already issued an invoice or receipt for the previous version, remember to issue a credit or debit note to bring the document in line with the new amounts." context "(L)" as invoice_text %}
+    <div data-invoice-notice>{% include "components/alert.html" with level="warning" title=_("The shop's invoice is already issued") message=invoice_text only %}</div>
+  {% endif %}
   <dl class="manager-facts">
     <dt>{% translate "Status" %}</dt><dd data-order-state>{{ sub.get_state_display }}</dd>
     {% if staff %}<dt>{% translate "Shop" %}</dt><dd>{{ sub.vendor.display_name }}</dd>{% endif %}

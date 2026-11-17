@@ -1,0 +1,12 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% translate "Hello," %}</p>
+<p>{% blocktranslate %}As you asked, the rest of your order {{ order_number }} with {{ vendor_name }} has been cancelled free of charge, and we have refunded {{ refund }} EUR to the payment method you used for the purchase.{% endblocktranslate %} {% include "email/orders/_credit_time.txt" %}</p>
+<p>{% translate "Cancelled items:" %}</p>
+<ul>
+{% for line in lines %}<li>{{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}</li>
+{% endfor %}</ul>
+{% if order_url %}<p><a href="{{ order_url }}">{% translate "See your order page" %}</a></p>
+{% endif %}</body>
+</html>
