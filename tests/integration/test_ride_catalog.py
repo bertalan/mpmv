@@ -107,7 +107,7 @@ def test_the_filter_form_uses_bootstrap_controls_with_labels(
     client: Client, term_page: str
 ) -> None:
     soup = page(client, term_page)
-    form = soup.select_one("form[role=search]")
+    form = soup.select_one("form[aria-labelledby=listing-filters-heading]")
     assert form is not None
     assert form["method"] == "get"
     assert form.select("input.form-control")
@@ -148,7 +148,7 @@ def listing_data(
     """What a listing says, not how it is marked up: controls, links, prices, robots, rel links."""
     settings.MPMV_THEME_DEFAULT = theme
     soup = page(client, path)
-    form = soup.select_one("form[role=search]")
+    form = soup.select_one("form[aria-labelledby=listing-filters-heading]")
     assert form is not None
     robots = soup.find("meta", attrs={"name": "robots"})
     return {
