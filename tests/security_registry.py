@@ -32,6 +32,12 @@ from tests.tenancy import CrossTenant
 
 PUBLIC_CATALOG = "Public catalog listing (CAT.8): published products of active vendors only."
 PUBLIC_CMS = "Public CMS page (CMS.1)."
+DOCUMENT = (
+    "Wagtail document serve view (CMS.15, `test_the_serve_view_sends_an_attachment_with_nosniff`): "
+    "a library document as an attachment with nosniff; one in a private collection is refused "
+    "(`test_a_document_in_a_private_collection_is_refused_to_anonymous_visitors`); an unknown id "
+    "is a 404."
+)
 MEDIA = (
     "Public image files (THM.12, apps.core.media): published images and renditions, served to "
     "anyone as on STAGE/LIVE through Caddy. The path names a file in the image folders only, not "
@@ -180,6 +186,7 @@ PUBLIC: dict[str, str] = {
     "events_resource": "Public event ICS download and RSS/ICS feeds (EVT.6, EVT.9): a published "
     "event's calendar file; rate limited per IP and path (30 a minute, then 429).",
     "wagtail_serve": PUBLIC_CMS,
+    "wagtaildocs_serve": DOCUMENT,
     "wagtailcore_login": "Sign-in for password-protected CMS pages.",
     "wagtailcore_authenticate_with_password": "Password form of a private CMS page.",
     "wagtailadmin_login": SIGN_IN,
@@ -238,6 +245,7 @@ IDOR_REVIEWED: dict[str, str] = {
         "(`test_pending_draft_and_hidden_events_are_404_to_visitors`)."
     ),
     "media": MEDIA,
+    "wagtaildocs_serve": DOCUMENT,
     "map_tile": TILE,
     "sitemap_section": SITEMAP,
     "llms_language": SITEMAP,
@@ -340,6 +348,7 @@ PLACEHOLDER_404: dict[str, str] = {
         "superseded token is a 404 for everyone, and the route shows only the terms in force."
     ),
     "media": MEDIA,
+    "wagtaildocs_serve": DOCUMENT,
     "map_tile": TILE,
     "wagtailadmin_password_reset_confirm": (
         "Password reset confirmation of the editors' admin, public by design (PUBLIC): the uid "
