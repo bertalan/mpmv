@@ -330,8 +330,9 @@ def test_the_schema_check_covers_specification_seller_breadcrumb_and_variants() 
     del item["variesBy"]
     del document["@graph"][1]["itemListElement"][0]["item"]  # type: ignore[index]
     errors = " ".join(schema_check.rich_result_errors(document))
-    for expected in ("priceSpecification", "seller", "@id", "variesBy", "item URL"):
+    for expected in ("priceSpecification", "@id", "variesBy", "item URL"):
         assert expected in errors
+    assert "seller" not in errors  # SEO.15: an omitted seller (a natural person) is no error
 
 
 def test_the_schema_check_finds_a_missing_price_and_a_dangling_reference() -> None:

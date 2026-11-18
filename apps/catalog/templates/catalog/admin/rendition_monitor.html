@@ -1,0 +1,88 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load i18n %}
+{% block main_content %}
+  <h2>{% translate "Failed render jobs" %}</h2>
+  {% if failed %}
+    <table class="listing">
+      <thead>
+        <tr>
+          <th>{% translate "Image" %}</th>
+          <th>{% translate "Group" %}</th>
+          <th>{% translate "Status" %}</th>
+          <th>{% translate "Attempts" %}</th>
+          <th>{% translate "Last error" %}</th>
+          <th><span class="w-sr-only">{% translate "Retry" %}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in failed %}
+          <tr>
+            <td><a href="{% url 'wagtailimages:edit' job.image.pk %}">{{ job.image.title }}</a></td>
+            <td>{{ job.group }}</td>
+            <td>{% if job.requeued %}{% translate "queued again" %}{% else %}{{ job.status }}{% endif %}</td>
+            <td>{{ job.attempts }}</td>
+            <td>{{ job.error }}</td>
+            <td>
+              {% if not job.requeued %}
+                <form method="post" action="{% url 'catalog_rendition_monitor' %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="image" value="{{ job.image.pk }}">
+                  <input type="hidden" name="group" value="{{ job.group }}">
+                  <button type="submit" class="button button-small button-secondary">{% translate "Retry" %}</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>{% translate "No render job has failed." %}</p>
+  {% endif %}
+
+  <h2>{% translate "Images without all their renditions" %}</h2>
+  {% if missing %}
+    <p>{% blocktranslate count counter=report.rows|length %}{{ counter }} image lacks renditions. Pages show its original file until they are made.{% plural %}{{ counter }} images lack renditions. Pages show their original files until they are made.{% endblocktranslate %}</p>
+    {% if report.truncated %}
+      <p>{% blocktranslate with scanned=report.scanned %}Only the newest {{ scanned }} images were checked.{% endblocktranslate %}</p>
+    {% endif %}
+    <table class="listing">
+      <thead>
+        <tr>
+          <th>{% translate "Title" %}</th>
+          <th>{% translate "Missing groups" %}</th>
+          <th>{% translate "Uploaded" %}</th>
+          <th><span class="w-sr-only">{% translate "Retry" %}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in missing %}
+          <tr>
+            <td><a href="{% url 'wagtailimages:edit' row.image.pk %}">{{ row.image.title }}</a></td>
+            <td>{{ row.groups|join:", " }}</td>
+            <td>{{ row.image.created_at|date:"SHORT_DATE_FORMAT" }}</td>
+            <td>
+              {% for group in row.groups %}
+                <form method="post" action="{% url 'catalog_rendition_monitor' %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="image" value="{{ row.image.pk }}">
+                  <input type="hidden" name="group" value="{{ group }}">
+                  <button type="submit" class="button button-small button-secondary">{% blocktranslate %}Queue {{ group }}{% endblocktranslate %}</button>
+                </form>
+              {% endfor %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if page_obj.has_other_pages %}
+      <nav aria-label="{% translate 'Pages' %}">
+        {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">{% translate "Previous" %}</a>{% endif %}
+        <span>{% blocktranslate with number=page_obj.number total=page_obj.paginator.num_pages %}Page {{ number }} of {{ total }}{% endblocktranslate %}</span>
+        {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">{% translate "Next" %}</a>{% endif %}
+      </nav>
+    {% endif %}
+  {% else %}
+    <p>{% translate "Every image has its renditions." %}</p>
+  {% endif %}
+{% endblock %}
