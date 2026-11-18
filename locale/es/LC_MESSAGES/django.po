@@ -6277,7 +6277,6 @@ msgstr "Política de devoluciones y reembolsos"
 msgid "Returns go to: %(country)s"
 msgstr "Las devoluciones se envían a: %(country)s"
 
-#: apps/vendors/templates/vendors/terms/read.html
 #: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the consumer bears the direct cost of returning the goods."
 msgstr "Devoluciones: el coste directo de devolver los bienes corre a cargo del consumidor."

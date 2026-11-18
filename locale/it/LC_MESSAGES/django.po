@@ -6271,7 +6271,6 @@ msgstr "Condizioni di reso e rimborso"
 msgid "Returns go to: %(country)s"
 msgstr "I resi vanno a: %(country)s"
 
-#: apps/vendors/templates/vendors/terms/read.html
 #: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the consumer bears the direct cost of returning the goods."
 msgstr "Resi: il costo diretto di restituzione dei beni è a carico del consumatore."

@@ -6335,7 +6335,6 @@ msgstr "Rückgabe- und Erstattungsbedingungen"
 msgid "Returns go to: %(country)s"
 msgstr "Rücksendungen gehen an: %(country)s"
 
-#: apps/vendors/templates/vendors/terms/read.html
 #: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the consumer bears the direct cost of returning the goods."
 msgstr "Rückgabe: Die unmittelbaren Kosten der Rücksendung der Waren trägt der Verbraucher."
