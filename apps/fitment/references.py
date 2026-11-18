@@ -21,7 +21,7 @@ from dataclasses import dataclass
 
 from django.db import models
 
-from .models import FitmentNode, FitmentNodeMerge
+from .models import FitmentNode, FitmentNodeMerge, FitmentNodeProposal
 
 
 @dataclass(frozen=True)
@@ -94,6 +94,7 @@ def register_builtin_references() -> None:
 
     if ("fitment.productfitment", "node") not in registered_fields():
         _register_product_rows()
+    register_proposal_reference()
 
 
 def _register_product_rows() -> None:
@@ -135,4 +136,17 @@ def _register_product_rows() -> None:
         count=count,
         move=move,
         field=("fitment.productfitment", "node"),
+    )
+
+
+def register_proposal_reference() -> None:
+    """FIT.3: the record of which shop proposed a node goes with the node: it never blocks a
+    delete or a refusal (the services drop it first) and a merge drops the merged node's record."""
+    if ("fitment.fitmentnodeproposal", "node") in registered_fields():
+        return
+    register_reference(
+        "fitment.fitmentnodeproposal.node",
+        count=lambda node: 0,
+        move=lambda source, target: FitmentNodeProposal.objects.filter(node=source).delete(),
+        field=("fitment.fitmentnodeproposal", "node"),
     )

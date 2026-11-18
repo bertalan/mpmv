@@ -11,6 +11,8 @@ import pytest
 from bs4 import BeautifulSoup
 from django.apps import apps
 from django.test import Client
+from django.utils import translation
+from django.utils.translation import gettext as _
 from pytest_django.fixtures import Settings as SettingsWrapper
 from wagtail.models import Site
 
@@ -72,18 +74,28 @@ def specs(client: Client, language: str) -> dict[str, str]:
     }
 
 
+def labelled(rows: dict[str, str], language: str) -> dict[str, str]:
+    """The rows keyed by their English label, whatever language the page is in."""
+    with translation.override(language):
+        names = {
+            _(name): name
+            for name in ("Length", "Width", "Height", "Material", "Colour", "Country of origin")
+        }
+    return {names.get(label, label): value for label, value in rows.items()}
+
+
 def test_the_fields_show_in_each_language(client: Client, theme: str) -> None:
     product = make_product(length_mm=300, width_mm=200, height_mm=100, country_of_origin="IT")
     translate(product, primary_language(), material="Glazed ceramic", colour="Matt black")
     translate(product, other_language(), material="Ceramica smaltata", colour="Nero opaco")
-    first = specs(client, primary_language())
+    first = labelled(specs(client, primary_language()), primary_language())
     assert first["Length"] == "300 mm"
     assert first["Width"] == "200 mm"
     assert first["Height"] == "100 mm"
     assert first["Material"] == "Glazed ceramic"
     assert first["Colour"] == "Matt black"
     assert first["Country of origin"] == "IT"
-    second = specs(client, other_language())
+    second = labelled(specs(client, other_language()), other_language())
     assert second["Material"] == "Ceramica smaltata"
     assert second["Colour"] == "Nero opaco"
     assert second["Length"] == "300 mm"
@@ -92,7 +104,7 @@ def test_the_fields_show_in_each_language(client: Client, theme: str) -> None:
 def test_absent_values_render_nothing(client: Client, theme: str) -> None:
     product = make_product(width_mm=200)
     translate(product, primary_language(), material="Glazed ceramic")
-    rows = specs(client, primary_language())
+    rows = labelled(specs(client, primary_language()), primary_language())
     assert rows == {"Width": "200 mm", "Material": "Glazed ceramic"}
 
 
