@@ -47,6 +47,7 @@ DATABASES["default"]["TEST"] = {"NAME": os.environ.get("MPMV_TEST_DB_NAME", "tes
 # EVT.12: no test reaches a geocoding provider. Adapters built without an explicit transport get
 # one that refuses; tests use FakeGeocoder or a recording transport.
 GEOCODING_TRANSPORT = "apps.core.geocoding.adapters.refuse_network"
+MAP_TILE_UPSTREAM = "apps.core.maps.adapters.RefuseNetworkUpstream"
 GEOCODING_LOCATIONIQ_KEY = ""
 GEOCODING_OPENCAGE_KEY = ""
 

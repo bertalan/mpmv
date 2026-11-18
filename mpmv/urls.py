@@ -69,6 +69,7 @@ urlpatterns = [
     path("vendor/terms/", include("apps.vendors.terms_urls")),  # sales terms in force (VEN.35)
     path("_help/", include("apps.cms.help_urls")),  # contextual help dialog (ARC.32)
     path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
+    path("maps/", include("apps.core.maps.urls")),  # same-origin map tile proxy (EVT.14)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
     path("_styleguide/", include("apps.themes.urls")),
     # Temporary staff "Site links" page for STAGE testing (OPS.12); remove before LIVE.

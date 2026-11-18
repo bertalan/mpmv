@@ -215,3 +215,13 @@ def test_every_setting_read_from_the_environment_is_in_the_env_template() -> Non
     listed = set(re.findall(r"^(MPMV_[A-Z0-9_]+)=", template, re.M))
     assert read, "no MPMV_ variable found: the pattern is stale"
     assert sorted(read - listed) == []
+
+
+def test_the_tile_upstream_must_be_an_https_template() -> None:
+    from mpmv.settings.env import map_tile_upstream_url
+
+    url = "https://tiles.example.eu/{z}/{x}/{y}.png"
+    assert map_tile_upstream_url(url) == url
+    for bad in ("http://tiles.example.eu/{z}/{x}/{y}.png", "https://tiles.example.eu/a.png"):
+        with pytest.raises(ImproperlyConfigured, match="MPMV_MAP_TILE_UPSTREAM_URL"):
+            map_tile_upstream_url(bad)
