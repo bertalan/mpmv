@@ -659,6 +659,7 @@ def test_each_variant_carries_its_own_identifiers_and_image(client: Client) -> N
         for language in configured_languages():
             VariantTranslationFactory.create(variant=variant, language=language, label="V")
     _html, document = graph_of(client)
+    assert schema_check.dangling_references(document) == []
     group = node(document, "ProductGroup")
     by_sku = {v["sku"]: v for v in group["hasVariant"]}
     assert by_sku[str(own.sku)]["gtin8"] == "96385074"
@@ -733,8 +734,78 @@ def test_the_banded_shipping_nodes_cost_no_query_per_band(client: Client, theme:
     assert len(more) <= len(one)
 
 
+def test_more_than_four_extra_bands_emit_exactly_four_ordered_by_weight(
+    client: Client, theme: str
+) -> None:
+    from apps.shipping.tests.factories import WeightBandFactory
+
+    product = live(price_net=Decimal("12.50"), weight_kg=Decimal("0.500"))
+    method = _banded_method(product)
+    method.bands.filter(from_kg__gte=Decimal("5")).delete()
+    for low in range(5, 11):  # six more bands above the 1-5 kg one: seven extra in all
+        WeightBandFactory.create(
+            method=method, from_kg=Decimal(low), to_kg=Decimal(low + 1), cost_net="9.90"
+        )
+    _html, document = graph_of(client)
+    nodes = [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"]
+    extra = [n for n in nodes if "hasShippingService" in n]
+    assert len(extra) == 4
+    lows = [n["hasShippingService"]["shippingConditions"]["weight"]["minValue"] for n in extra]
+    assert lows == ["1.000", "5.000", "6.000", "7.000"]
+    assert schema_check.dangling_references(document) == []
+
+
 def test_a_product_without_weight_gets_no_banded_nodes(client: Client, theme: str) -> None:
     product = live(price_net=Decimal("12.50"), weight_kg=None)
     _banded_method(product)
     _html, document = graph_of(client)
     assert [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"] == []
+
+
+def _add_variants(product: Product, count: int, start: int = 0) -> None:
+    from apps.catalog.tests.factories import ProductImageFactory
+
+    for number in range(start, start + count):
+        variant = VariantFactory.create(
+            product=product,
+            gtin="96385074",
+            mpn=f"MUG-{number}",
+            cover_image=ProductImageFactory.create(product=product),
+        )
+        for language in configured_languages():
+            VariantTranslationFactory.create(variant=variant, language=language, label=f"V{number}")
+
+
+def _variable_with(count: int) -> Product:
+    product = live(kind=Product.Kind.VARIABLE, price_net=Decimal("10.00"))
+    _add_variants(product, count)
+    return product
+
+
+@pytest.mark.parametrize("count", [2, 6])
+def test_a_product_with_variants_has_no_dangling_references(client: Client, count: int) -> None:
+    _variable_with(count)
+    _html, document = graph_of(client)
+    assert len(node(document, "ProductGroup")["hasVariant"]) == count
+    assert schema_check.dangling_references(document) == []
+
+
+def test_the_query_count_does_not_grow_with_the_variants(client: Client) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    product = _variable_with(3)
+    client.get(MUG)  # warm the caches
+    client.get(MUG)
+    with CaptureQueriesContext(connection) as two:
+        client.get(MUG)
+    _add_variants(product, 3, start=3)
+    client.get(MUG)
+    client.get(MUG)
+    with CaptureQueriesContext(connection) as six:
+        client.get(MUG)
+
+    def about_variants(queries: Any) -> list[str]:
+        return [q["sql"] for q in queries if "variant" in q["sql"] or "image" in q["sql"]]
+
+    assert len(about_variants(six)) == len(about_variants(two))
