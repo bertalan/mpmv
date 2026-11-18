@@ -2643,6 +2643,10 @@ msgstr "Nodos de compatibilidad"
 msgid "Fitment scheme"
 msgstr "Esquema de compatibilidad"
 
+#: apps/catalog/templates/catalog/product.html
+msgid "Fits"
+msgstr "Compatible con"
+
 #: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Footer"
 msgstr "Pie de página"
@@ -6102,6 +6106,10 @@ msgstr "Dirección de la fuente"
 msgid "Specific approval of onerous clauses (articles 1341 and 1342 of the Italian Civil Code)"
 msgstr ""
 "Aprobación específica de las cláusulas onerosas (artículos 1341 y 1342 del Código Civil italiano)"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "Specifications"
+msgstr "Especificaciones"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Staff"

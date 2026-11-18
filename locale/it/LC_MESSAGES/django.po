@@ -2637,6 +2637,10 @@ msgstr "Nodi di compatibilità"
 msgid "Fitment scheme"
 msgstr "Schema di compatibilità"
 
+#: apps/catalog/templates/catalog/product.html
+msgid "Fits"
+msgstr "Compatibile con"
+
 #: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Footer"
 msgstr "Piè di pagina"
@@ -6095,6 +6099,10 @@ msgstr "Indirizzo della fonte"
 #: apps/orders/templates/orders/_legal_boxes.html
 msgid "Specific approval of onerous clauses (articles 1341 and 1342 of the Italian Civil Code)"
 msgstr "Approvazione specifica delle clausole onerose (artt. 1341 e 1342 del codice civile)"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "Specifications"
+msgstr "Specifiche tecniche"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Staff"
