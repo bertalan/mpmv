@@ -443,9 +443,15 @@ class FooterSettingsFactory(DjangoModelFactory[FooterSettings]):
 
     class Meta:
         model = FooterSettings
-        django_get_or_create = ("site",)
 
-    site = factory.LazyFunction(lambda: Site.objects.get(is_default_site=True))
+    site = None
+
+    @classmethod
+    def _create(cls, model_class: type[FooterSettings], *args: Any, **kwargs: Any) -> Any:
+        if kwargs.get("site") is None:
+            kwargs["site"] = Site.objects.get(is_default_site=True)
+        row, _ = model_class._default_manager.get_or_create(site=kwargs.pop("site"), **kwargs)
+        return row
 
 
 class FooterColumnFactory(DjangoModelFactory[FooterColumn]):
