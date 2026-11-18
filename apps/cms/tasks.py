@@ -1,7 +1,11 @@
 """Background jobs of the CMS (ADR-0004, docs/dev/background-jobs.md)."""
 
+import logging
+
 from django.core.management import call_command
 
+from apps.core.audit import AuditContext
+from apps.core.models import AuditLog
 from apps.core.tasks import NO_RETRY, locked, periodic, task
 
 
@@ -12,3 +16,22 @@ def publish_scheduled(timestamp: int) -> None:
     """Every five minutes: publish the pages whose go-live has come and unpublish the expired
     ones (Wagtail's `publish_scheduled`), so a scheduled article (CMS.3) appears on time."""
     call_command("publish_scheduled")
+
+
+logger = logging.getLogger(__name__)
+
+
+@periodic("33 4 * * *")
+@locked()
+@task("cms.purge_form_submissions", retry=NO_RETRY)
+def purge_form_submissions(timestamp: int) -> None:
+    """Every night: delete the form page submissions kept past their page's retention (CMS.13).
+
+    One audit entry per page, counts only; a second run finds nothing, so a replay is safe.
+    """
+    from . import services
+
+    changes = services.purge_expired_form_submissions(
+        ctx=AuditContext(actor_label="system:purge_form_submissions", source=AuditLog.Source.SYSTEM)
+    )
+    logger.info("cms.purge_form_submissions purged %d form page(s)", len(changes.changes))

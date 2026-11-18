@@ -649,6 +649,14 @@ msgstr ""
 "Un breve riassunto mostrato nell'elenco del blog, fino a 300 caratteri. Se lo lasci vuoto, "
 "l'elenco non mostra alcun riassunto."
 
+#: apps/cms/forms_pages.py
+msgid ""
+"A short text above the form. Say who reads the answers and what you do with them. If you leave it "
+"empty, the form starts right under the title."
+msgstr ""
+"Un breve testo sopra il modulo. Dica chi legge le risposte e che cosa ne fa. Se lo lascia vuoto, "
+"il modulo inizia subito sotto il titolo."
+
 #: apps/cms/models.py
 msgid ""
 "A short text shown above the products of this category or tag. If you add none, the page starts "
@@ -944,6 +952,10 @@ msgstr "Tutti"
 #: apps/manager/event_forms.py
 msgid "All day"
 msgstr "Tutto il giorno"
+
+#: apps/cms/templates/cms/help_guide_section.html
+msgid "All help topics"
+msgstr "Tutti gli argomenti di aiuto"
 
 #: apps/manager/views.py
 msgid "all languages"
@@ -2972,6 +2984,7 @@ msgstr "Ciao %(customer_name)s,"
 msgid "Hello,"
 msgstr "Ciao,"
 
+#: apps/cms/templates/cms/help_guide_index.html apps/cms/templates/cms/help_guide_section.html
 #: themes/base/templates/components/user_tools.html
 msgid "Help"
 msgstr "Aiuto"
@@ -2995,6 +3008,10 @@ msgstr "testo di aiuto"
 #: apps/manager/wagtail_hooks.py
 msgid "Help texts"
 msgstr "Testi di aiuto"
+
+#: apps/cms/templates/cms/help_guide_index.html apps/cms/templates/cms/help_guide_section.html
+msgid "Help topics"
+msgstr "Argomenti di aiuto"
 
 #: apps/manager/event_views.py
 msgid "Hidden by the platform."
@@ -3066,6 +3083,14 @@ msgid ""
 msgstr ""
 "Per quanti giorni un evento annullato resta nei calendari, segnato come annullato, così che i "
 "calendari delle persone lo sappiano. Esempio: 30. Obbligatorio."
+
+#: apps/cms/forms_pages.py
+msgid ""
+"How many days each submission is kept before it is deleted for good, from 1 to 365. Keep it as "
+"short as your work allows. The default is 90 days."
+msgstr ""
+"Per quanti giorni ogni invio viene conservato prima di essere eliminato definitivamente, da 1 a "
+"365. Scelga il periodo più breve che il Suo lavoro consente. Il valore predefinito è 90 giorni."
 
 #: apps/manager/amendment_views.py
 msgid ""
@@ -3888,6 +3913,10 @@ msgstr "Mese"
 #: apps/events/templates/events/_links.html
 msgid "Month calendar"
 msgstr "Calendario del mese"
+
+#: themes/base/templates/components/help_entry.html
+msgid "More help"
+msgstr "Altro aiuto"
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Move down"
@@ -6092,6 +6121,10 @@ msgstr "Negozio: l’ha chiesto il cliente (senza costo)"
 msgid "Shops"
 msgstr "Negozi"
 
+#: apps/cms/templates/cms/help_guide_index.html
+msgid "Short answers to the questions customers ask most. Pick a topic."
+msgstr "Risposte brevi alle domande più frequenti dei clienti. Scegli un argomento."
+
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Shorter notice because"
@@ -6144,6 +6177,11 @@ msgstr "Mostra i prodotti più recenti di questo negozio."
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Showing %(vendor)s only."
 msgstr "Solo %(vendor)s."
+
+#: apps/cms/forms_pages.py
+msgid ""
+"Shown after a successful submission. If you leave it empty, a short standard message is shown."
+msgstr "Mostrato dopo un invio riuscito. Se lo lascia vuoto, compare un breve messaggio standard."
 
 #: apps/cms/models.py
 msgid "Shown on the article; a migrated article keeps its original date."
@@ -8786,6 +8824,14 @@ msgstr "Il sito a cui si applica questo tema. Ogni sito ha un solo tema."
 msgid "The slide's title, up to 120 characters. Required."
 msgstr "Il titolo della slide, fino a 120 caratteri. Obbligatorio."
 
+#: apps/cms/slugs.py
+msgid ""
+"The slug '%(slug)s' is reserved for the site's help pages and cannot be used for a page directly "
+"under the home page. Choose another slug."
+msgstr ""
+"Lo slug '%(slug)s' è riservato alle pagine di aiuto del sito e non può essere usato per una pagina"
+" direttamente sotto la home page. Scegli un altro slug."
+
 #: apps/shipping/models.py
 msgid "The special area this treatment is for. A method has one treatment per area."
 msgstr ""
@@ -8913,6 +8959,14 @@ msgstr ""
 "Il testo sulla pagina del marchio, solo in questa lingua: una lingua senza testo non mostra "
 "nessuna descrizione, mai quella di un'altra lingua. La formattazione di base viene mantenuta. "
 "Esempio: 'Incudini e attrezzi da forgia prodotti a Bergamo dal 1949.'"
+
+#: apps/cms/forms_pages.py
+msgid ""
+"The text on the send button, for example 'Send your question'. If you leave it empty, the button "
+"says 'Send'."
+msgstr ""
+"Il testo sul pulsante di invio, per esempio «Invia la domanda». Se lo lascia vuoto, il pulsante "
+"dice «Invia»."
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid ""

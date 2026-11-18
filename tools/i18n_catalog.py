@@ -91,12 +91,16 @@ SCOPES = (
     # The customer privacy page (I18N.13 follow-up): informal register, "Your data" has its own context.
     "apps/compliance/templates/compliance/privacy_account.html",
     "themes/ride/templates/compliance/privacy_account.html",
+    # The customer help pages (ARC.37): informal register.
+    "apps/cms/templates/cms/help_guide_index.html",
+    "apps/cms/templates/cms/help_guide_section.html",
     *EVENT_FILES,  # the public event pages (EVT.6)
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (
     "apps/vendors/services.py",
     "apps/cms/templatetags/cms_tags.py",  # the header's "Site links" item (OPS.12)
+    "apps/cms/slugs.py",  # the reserved-slug error of the page form (ARC.37)
 )
 # Single Python modules scanned in full: customer-facing messages of apps that are not in SCOPES.
 FILES = (
