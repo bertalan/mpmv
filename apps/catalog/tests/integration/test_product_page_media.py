@@ -83,7 +83,7 @@ def test_the_gallery_is_the_themed_component_with_picture_renditions(client: Cli
     assert 'type="image/webp"' not in bare
     assert "<picture>" in bare
     for image_id in MediaImage.objects.values_list("pk", flat=True):
-        media.render_renditions(image_id)  # the catalog.render_product_image job
+        media.render_renditions(image_id)  # the core.render_image job
     html = client.get("/product/mug/").content.decode()
     assert 'class="gallery"' in html
     assert html.count('<li class="gallery__item">') == 2

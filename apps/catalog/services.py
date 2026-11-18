@@ -35,6 +35,7 @@ from django.utils.module_loading import import_string
 from apps.core import translations
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
+from apps.core.i18n import primary_language
 from apps.core.models import MediaImage
 from apps.core.money import CURRENCY
 from apps.core.services import audit_changes, holds_permission, run_mutation, save_audited
@@ -1041,9 +1042,15 @@ def _attribute_catalogue(codes: set[str]) -> Catalogue:
 
 
 def _product_errors(
-    vendor: Vendor, data: engine.ProductIn, catalogue: Catalogue
+    vendor: Vendor,
+    data: engine.ProductIn,
+    catalogue: Catalogue,
+    *,
+    check_identity: bool = True,
 ) -> dict[str, list[str]]:
-    """Every reason the payload cannot be created, by field (NON_FIELD_ERRORS: its shape)."""
+    """Every reason the payload cannot be created, by field (NON_FIELD_ERRORS: its shape).
+    `check_identity=False` skips the SKU namespace checks, for the update of an existing
+    product (CAT.10)."""
     errors: dict[str, list[str]] = {}
     price = _amount(errors, "price_net", data.price_net)
     if price is not None and price == 0:  # CAT.14, Q-31: never 0.00
@@ -1096,7 +1103,8 @@ def _product_errors(
         elif variant.stock_qty > engine.MAX_STOCK:
             _add_error(errors, "variants", f"{variant.sku}: the stock is too large.")
 
-    _sku_namespace_errors(errors, vendor, data)
+    if check_identity:
+        _sku_namespace_errors(errors, vendor, data)
     return errors
 
 
@@ -3086,3 +3094,368 @@ def product_kpis(products: VendorScopedQuerySet[Product]) -> ProductKpis:
         ),
     )
     return ProductKpis(**counts)
+
+
+# --- Upsert, publish and retire (CAT.10, spec 03 §3.2 "Main services" and "Rules")
+#
+# Batch services for imports and the bulk API. Identity is the vendor plus the SKU match key,
+# then the SkuAlias history (`match_skus`); an ambiguous match stops the run before anything is
+# written. Every service takes `dry_run` and returns the same ChangeSet a real run applies and
+# audits (creates differ only in the keys of the new rows).
+
+type RowErrors = dict[str, list[str]]
+
+
+@dataclass(frozen=True)
+class RowError:
+    """Why one row of a batch was refused: its position, SKU as given and the errors by field."""
+
+    index: int
+    sku: str
+    errors: RowErrors
+
+
+@dataclass
+class UpsertReport:
+    """The outcome of `upsert_products`: what changed (or would, on a dry run), the SKUs
+    created, updated and left unchanged, and the rows refused. A refused row writes nothing; the
+    other rows are still applied."""
+
+    changes: ChangeSet = field(default_factory=ChangeSet)
+    created: list[str] = field(default_factory=list)
+    updated: list[str] = field(default_factory=list)
+    unchanged: list[str] = field(default_factory=list)
+    errors: list[RowError] = field(default_factory=list)
+
+
+@dataclass
+class StatusReport:
+    """The outcome of `publish` and `retire`: the ChangeSet and, for each product refused, its
+    public id and the reasons by check (publish only)."""
+
+    changes: ChangeSet = field(default_factory=ChangeSet)
+    refused: dict[str, RowErrors] = field(default_factory=dict)
+
+
+def _load_existing(products: Iterable[Product]) -> dict[int, Product]:
+    """The matched products with their texts, variants and attributes, in a fixed number of
+    queries whatever the batch size."""
+    return {
+        p.pk: p
+        for p in Product.objects.filter(pk__in=[p.pk for p in products])
+        .select_related("vendor")
+        .prefetch_related(
+            "translations",
+            Prefetch("variants", queryset=Variant.objects.select_related("cover_image")),
+            "attributes__attribute",
+            "attributes__values",
+            "variants__variant_options__attribute",
+            "variants__variant_options__value",
+        )
+    }
+
+
+def _translation_snapshot(text: ProductTranslation) -> dict[str, Any]:
+    return {
+        "vendor": str(text.product.vendor.public_id),
+        "product": str(text.product.public_id),
+        "language": text.language,
+        "title": text.title,
+        "slug": text.slug,
+        **{name: getattr(text, name) for name in engine.UPSERT_TEXT_FIELDS if name != "title"},
+    }
+
+
+def _update_errors(product: Product, data: engine.ProductIn, catalogue: Catalogue) -> RowErrors:
+    errors = _product_errors(product.vendor, data, catalogue, check_identity=False)
+    if data.kind != product.kind:
+        _add_error(errors, "kind", "The kind of an existing product cannot be changed.")
+    stored_attributes = {
+        row.attribute.code: (
+            tuple(sorted(v.value for v in row.values.all())),
+            row.numeric_value,
+            row.text_value,
+            row.is_variant_axis,
+        )
+        for row in product.attributes.all()
+    }
+    stored_options = {
+        variant.sku_key: {o.attribute.code: o.value.value for o in variant.variant_options.all()}
+        for variant in product.variants.all()
+    }
+    for message in engine.structure_mismatch(stored_attributes, stored_options, data):
+        _add_error(errors, NON_FIELD_ERRORS, message)
+    unknown = [v.sku for v in data.variants if engine.sku_match_key(v.sku) not in stored_options]
+    if unknown:
+        _add_error(
+            errors,
+            "variants",
+            "Variants cannot be added to an existing product by an upsert: "
+            + ", ".join(unknown)
+            + ".",
+        )
+    return errors
+
+
+def _update_product(
+    product: Product, data: engine.ProductIn, *, ctx: AuditContext, dry_run: bool
+) -> ChangeSet:
+    """Apply `data` to the existing `product` through the audited services; only what differs
+    is written, so an identical payload changes nothing."""
+    changes = ChangeSet()
+    stored = {name: getattr(product, name) for name in engine.UPSERT_PRODUCT_FIELDS}
+    fields = engine.product_field_changes(stored, data)
+    if fields:
+        for name, value in fields.items():
+            setattr(
+                product,
+                name,
+                _stored(value, engine.WEIGHT_DECIMALS) if name == "weight_kg" else value,
+            )
+        changes.changes.extend(save_product(product, ctx=ctx, dry_run=dry_run).changes)
+
+    price = engine.to_price(data.price_net)
+    if price != product.price_net:
+        changes.changes.extend(
+            set_product_price(
+                product,
+                price_net=price,
+                sale_price_net=product.sale_price_net,
+                sale_from=product.sale_from,
+                sale_to=product.sale_to,
+                ctx=ctx,
+                dry_run=dry_run,
+            ).changes
+        )
+
+    by_language = {t.language: t for t in product.translations.all()}
+    new_texts, changed_texts = engine.translation_plan(
+        {
+            language: {name: getattr(t, name) for name in engine.UPSERT_TEXT_FIELDS}
+            for language, t in by_language.items()
+        },
+        data.translations,
+    )
+    text_changes = ChangeSet()
+    created: list[ProductTranslation] = []
+    for text in new_texts:
+        row = ProductTranslation(
+            product=product,
+            language=text.language,
+            **{name: getattr(text, name) for name in engine.UPSERT_TEXT_FIELDS},
+        )
+        row.slug = slugs.unique_product_slug(
+            row.title, taken=_SlugsOfOtherProducts(row.language, product.pk)
+        )
+        text_changes.create(TRANSLATION_MODEL, str(row.public_id), _translation_snapshot(row))
+        created.append(row)
+    updated: list[ProductTranslation] = []
+    for language, values in changed_texts.items():
+        row = by_language[language]
+        before = _translation_snapshot(row)
+        for name, value in values.items():
+            setattr(row, name, value)
+        after = _translation_snapshot(row)
+        if "title" in values:  # the slug follows the title (CAT.5); the old one is kept
+            after["slug"] = slugs.unique_product_slug(
+                row.title, taken=_SlugsOfOtherProducts(language, product.pk)
+            )
+        text_changes.update(TRANSLATION_MODEL, str(row.public_id), before, after)
+        updated.append(row)
+    if not dry_run and not text_changes.is_empty:
+        for row in updated:
+            row.save()
+            if "title" in changed_texts[row.language]:
+                sync_product_slug(row, ctx=ctx)
+        for row in created:
+            row.save()
+        audit_changes(text_changes, ctx=ctx, action=PRODUCT_UPDATED)
+    changes.changes.extend(text_changes.changes)
+
+    variants = {v.sku_key: v for v in product.variants.all()}
+    plan, _ = engine.variant_plan(
+        {
+            key: {name: getattr(v, name) for name in engine.UPSERT_VARIANT_FIELDS}
+            for key, v in variants.items()
+        },
+        data.variants,
+    )
+    for key in sorted(
+        plan, key=lambda k: plan[k].get("is_default") is True
+    ):  # clear defaults first
+        variant = variants[key]
+        values = dict(plan[key])
+        price_given = "price_net_override" in values
+        override = values.pop("price_net_override", None)
+        if values:
+            for name, value in values.items():
+                setattr(variant, name, value)
+            changes.changes.extend(save_variant(variant, ctx=ctx, dry_run=dry_run).changes)
+        if price_given:
+            changes.changes.extend(
+                set_variant_price(
+                    variant, price_net_override=override, ctx=ctx, dry_run=dry_run
+                ).changes
+            )
+    return changes
+
+
+def upsert_products(
+    vendor: Vendor,
+    payload: Sequence[engine.ProductIn],
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+    require_active_vendor: bool = False,
+) -> UpsertReport:
+    """Create or update `vendor`'s products from `payload`, matched by SKU match key, then by
+    SkuAlias (`match_skus`).
+
+    A new SKU is created as a draft (`create_product`); a known one is updated through the audited
+    services (`save_product`, the price services, `save_variant`): fields, price, texts per
+    language and the variants' own fields. Texts of languages the payload omits are kept. What an
+    existing product's payload may not do is refused as a row error: change its kind, its
+    attributes or axes, a variant's options, or add variants. A payload equal to the stored data
+    changes nothing (idempotent). A SKU that is a variant's SKU, or given twice in the payload, is
+    refused for that row.
+
+    One bad row never aborts the batch: it is listed in `errors` and writes nothing, the other
+    rows apply (each in its own transaction). An ambiguous SKU (`AmbiguousSkuMatch`) stops the run
+    before anything is written, also on dry-run. With `dry_run` nothing is written and the report
+    holds the ChangeSet of a real run. Reads are fixed per batch (one match, one prefetch); each
+    changed row adds its own writes.
+    """
+    rows = list(payload)
+    matches = match_skus(vendor, (row.sku for row in rows))
+    existing = _load_existing(m for m in matches.values() if isinstance(m, Product))
+    catalogue = _attribute_catalogue({a.code for row in rows for a in row.attributes})
+    report = UpsertReport()
+    seen: set[str] = set()
+    touched: set[int] = set()  # products already matched by an earlier row
+    for index, row in enumerate(rows):
+        key = engine.sku_match_key(row.sku)
+        item = matches[row.sku]
+        if key and key in seen:
+            report.errors.append(
+                RowError(index, row.sku, {"sku": [f"The SKU {row.sku!r} is given twice."]})
+            )
+            continue
+        seen.add(key)
+        try:
+            with transaction.atomic():
+                if item is None:
+                    changes = create_product(
+                        vendor,
+                        row,
+                        ctx=ctx,
+                        dry_run=dry_run,
+                        require_active_vendor=require_active_vendor,
+                    )
+                    report.created.append(row.sku)
+                elif isinstance(item, Variant):
+                    raise ValidationError({"sku": "This SKU belongs to a variant, not a product."})
+                else:
+                    if item.pk in touched:
+                        raise ValidationError(
+                            {"sku": "An earlier row already updates this product."}
+                        )
+                    touched.add(item.pk)
+                    product = existing[item.pk]
+                    errors = _update_errors(product, row, catalogue)
+                    if errors:
+                        raise ValidationError(errors)
+                    changes = _update_product(product, row, ctx=ctx, dry_run=dry_run)
+                    (report.updated if not changes.is_empty else report.unchanged).append(row.sku)
+        except ValidationError as exc:
+            if report.created and report.created[-1] == row.sku and item is None:
+                report.created.pop()
+            report.errors.append(
+                RowError(index, row.sku, {k: list(v) for k, v in exc.message_dict.items()})
+            )
+            continue
+        report.changes.changes.extend(changes.changes)
+    return report
+
+
+def _publish_errors(product: Product) -> RowErrors:
+    """Why `product` cannot go live: the spec's own rules, then the checks other apps register."""
+    errors: RowErrors = {}
+    own = engine.publication_errors(
+        product.sales_mode,
+        product.price_net,
+        product.weight_kg,
+        (t.language for t in product.translations.all()),
+        primary_language(),
+    )
+    if own:
+        errors["product"] = own
+    for name, messages in publishing.publication_blockers(product).items():
+        errors[name] = list(messages)
+    return errors
+
+
+def _change_status(
+    products: Iterable[Product],
+    status: ProductStatus,
+    *,
+    ctx: AuditContext,
+    dry_run: bool,
+    reason: str = "",
+) -> StatusReport:
+    report = StatusReport()
+    with transaction.atomic():
+        locked = list(
+            Product.objects.select_for_update(of=("self",))
+            .select_related("vendor")
+            .prefetch_related("translations")
+            .filter(pk__in=[p.pk for p in products])
+            .order_by("pk")
+        )
+        moving: list[Product] = []
+        for stored in locked:
+            if stored.status == status:
+                continue
+            if status == ProductStatus.PUBLISHED:
+                errors = _publish_errors(stored)
+                if errors:
+                    report.refused[str(stored.public_id)] = errors
+                    continue
+            before = {**product_snapshot(stored), "status": stored.status}
+            after = {**before, "status": status}
+            if reason:
+                after["reason"] = reason
+            report.changes.update(PRODUCT_MODEL, str(stored.public_id), before, after)
+            moving.append(stored)
+        if dry_run or report.changes.is_empty:
+            return report
+        for stored in moving:
+            stored.status = status
+            stored.save(update_fields=["status", "updated_at"])
+        audit_changes(report.changes, ctx=ctx, action=PRODUCT_STATUS_CHANGED)
+        bump_sitemap_version()  # I18N.16
+    return report
+
+
+def publish(
+    products: Iterable[Product], *, ctx: AuditContext, dry_run: bool = False
+) -> StatusReport:
+    """Make every product in `products` live (published), unless a publishing rule fails.
+
+    The rules: a `buy` product needs a weight and a price above 0, every product the
+    primary-language text (`engine.publication_errors`), and every check other apps register
+    passes (`publishing.check_publishable`: GPSR, CMP.3). A product that fails is not published;
+    it is listed in `refused` (public id to the reasons) and the others are published. Products
+    already published are skipped. One AuditLog row per product that changes. Also on dry-run.
+    """
+    return _change_status(products, ProductStatus.PUBLISHED, ctx=ctx, dry_run=dry_run)
+
+
+def retire(
+    products: Iterable[Product], *, ctx: AuditContext, reason: str = "", dry_run: bool = False
+) -> StatusReport:
+    """Retire every product in `products`: the page stays online, not purchasable (spec 03).
+
+    `reason` is kept in the audit entry. Stock is left as it is. Products already retired are
+    skipped. Also on dry-run.
+    """
+    return _change_status(products, ProductStatus.RETIRED, ctx=ctx, dry_run=dry_run, reason=reason)

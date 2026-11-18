@@ -26,6 +26,7 @@ from apps.cms.models import (
     BlogAuthor,
     BlogIndexPage,
     BlogPostPage,
+    ContentSnippet,
     EditorRoleSeed,
     FooterColumn,
     FooterSettings,
@@ -344,6 +345,23 @@ class BlogAuthorFactory(DjangoModelFactory[BlogAuthor]):
 
     @classmethod
     def _create(cls, model_class: type[BlogAuthor], *args: Any, **kwargs: Any) -> Any:
+        kwargs.setdefault("locale", Locale.get_default())
+        return super()._create(model_class, *args, **kwargs)  # type: ignore[no-untyped-call]
+
+
+class ContentSnippetFactory(DjangoModelFactory[ContentSnippet]):
+    """A live snippet (CMS.14) of the default language unless `locale` is given."""
+
+    class Meta:
+        model = ContentSnippet
+        django_get_or_create = ("title", "locale")
+
+    title = factory.Sequence(lambda n: f"Snippet {n}")
+    body = "<p>Reusable text.</p>"
+    live = True
+
+    @classmethod
+    def _create(cls, model_class: type[ContentSnippet], *args: Any, **kwargs: Any) -> Any:
         kwargs.setdefault("locale", Locale.get_default())
         return super()._create(model_class, *args, **kwargs)  # type: ignore[no-untyped-call]
 

@@ -1,0 +1,43 @@
+"""Factories for the trust app (ARC.12)."""
+
+import datetime as dt
+from typing import Any
+
+import factory
+from factory.django import DjangoModelFactory
+
+from apps.trust import engine
+from apps.trust.models import TrustRules, VendorTrustSnapshot
+from apps.vendors.tests.factories import VendorFactory
+
+
+def _result(snapshot: Any) -> engine.VendorTrustResult:
+    inputs = engine.VendorTrustInputs(vendor_ref="factory", as_of=snapshot.as_of)
+    return engine.compute_vendor_trust(
+        inputs, engine.TrustRulesData(version=snapshot.rules_version)
+    )
+
+
+class TrustRulesFactory(DjangoModelFactory[TrustRules]):
+    """The spec default thresholds; consecutive rows are closed one-year periods."""
+
+    class Meta:
+        model = TrustRules
+
+    version = factory.Sequence(lambda n: n + 1)
+    params = factory.LazyFunction(lambda: engine.rules_to_params(engine.TrustRulesData(version=1)))
+    valid_from = factory.Sequence(lambda n: dt.datetime(2026 + n, 1, 1, tzinfo=dt.UTC))
+    valid_to = factory.LazyAttribute(lambda o: o.valid_from.replace(year=o.valid_from.year + 1))
+
+
+class VendorTrustSnapshotFactory(DjangoModelFactory[VendorTrustSnapshot]):
+    class Meta:
+        model = VendorTrustSnapshot
+
+    vendor = factory.SubFactory(VendorFactory)
+    rules = factory.SubFactory(TrustRulesFactory)
+    rules_version = factory.SelfAttribute("rules.version")
+    as_of = factory.LazyFunction(lambda: dt.datetime(2027, 3, 2, 12, 0, tzinfo=dt.UTC))
+    # A real result: the engine always returns the seven badges, so neither field is ever empty.
+    metrics = factory.LazyAttribute(lambda o: _result(o).metrics)
+    badges = factory.LazyAttribute(lambda o: [b.to_json() for b in _result(o).badges])
