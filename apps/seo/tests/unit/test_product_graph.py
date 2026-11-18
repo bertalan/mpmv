@@ -406,3 +406,32 @@ def test_vendor_role_refs(role: str, brand: str, maker: str, expected: tuple[str
 
 def test_a_producer_without_a_public_vendor_node_claims_nothing() -> None:
     assert pg.vendor_role_refs("producer", brand_id="", maker_id="", vendor_id="") == ("", "")
+
+
+def test_dimensions_are_quantitative_values_in_millimetres() -> None:
+    node = pg.product_node(product(width_mm=200, height_mm=100, depth_mm=300))
+    for key, value in (("width", 200), ("height", 100), ("depth", 300)):
+        assert node[key] == {"@type": "QuantitativeValue", "value": value, "unitCode": "MMT"}
+
+
+def test_material_colour_and_origin_are_stated_when_known() -> None:
+    node = pg.product_node(
+        product(material="Glazed ceramic", color="Matt black", country_of_origin="IT")
+    )
+    assert node["material"] == "Glazed ceramic"
+    assert node["color"] == "Matt black"
+    assert node["countryOfOrigin"] == {"@type": "Country", "name": "IT"}
+
+
+def test_an_unknown_attribute_is_absent_never_blank() -> None:
+    node = pg.product_node(product(width_mm=None, material="", color="", country_of_origin=""))
+    for key in ("width", "height", "depth", "material", "color", "countryOfOrigin"):
+        assert key not in node
+
+
+def test_the_attributes_sit_on_the_group_of_a_product_with_variants() -> None:
+    variant = pg.VariantData(sku="ACME-1-A", name="Mug A")
+    node = pg.product_node(product(variants=(variant,), width_mm=200, material="Steel"))
+    assert node["@type"] == "ProductGroup"
+    assert node["width"]["value"] == 200
+    assert "width" not in node["hasVariant"][0]

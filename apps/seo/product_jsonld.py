@@ -19,6 +19,9 @@ Rules (spec 10 "Product node"):
 - Variants: `variesBy` from the attributes the variants take a value on, a `@id` per variant;
   no variant URL (the page picks a variant in a form, no URL selects one), and no per-variant
   gtin, mpn or image (the variant model has none yet).
+- Attributes (SEO.13): width, height and depth (the product's length) as `QuantitativeValue` in
+  millimetres (`MMT`), `material` and `color` from the page-language text, `countryOfOrigin` as a
+  `Country`; each only when stored.
 - Brand: the CAT.20 brand graph (Brand and manufacturer nodes) joins the page graph, so the
   `brand` reference resolves.
 """
@@ -37,6 +40,7 @@ from apps.catalog import services as catalog
 from apps.catalog import slugs
 from apps.catalog.models import VariantOption
 from apps.catalog.product_pages import GalleryImage, ProductPage, page_return_policy
+from apps.core import translations
 from apps.core.money import CURRENCY
 from apps.core.services import NoPlatformOperator, current_operator
 from apps.shipping import engine as shipping_engine
@@ -293,6 +297,8 @@ def build_graph(
         maker_id=maker_id,
         vendor_id=vendor_id,
     )
+    # The prefetched translation of the page language (no query): material and colour are texts.
+    text = translations.resolve(page.product.translations.all(), language).translation
     names_vendor = bool(vendor_id) and vendor_id in (brand_id, maker_id)
     data = pg.ProductData(
         url=url,
@@ -306,6 +312,12 @@ def build_graph(
         manufacturer_id=maker_id,
         images=tuple(_image(image, site) for image in page.gallery),
         weight_kg=page.product.weight_kg,
+        width_mm=page.product.width_mm,
+        height_mm=page.product.height_mm,
+        depth_mm=page.product.length_mm,
+        material=str(text.material) if text is not None else "",
+        color=str(text.colour) if text is not None else "",
+        country_of_origin=str(page.product.country_of_origin or ""),
         offer=_offer(
             page,
             page.price,
