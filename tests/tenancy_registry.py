@@ -95,20 +95,30 @@ from apps.fitment.tests.factories import (
 )
 from apps.ingest.models import (
     ImportRun,
+    ItemChange,
     MappingTable,
     ProductDraft,
     ReviewItem,
     SourceItem,
+    SourceMissing,
     SourceObservation,
+    SourceState,
+    SourceStateVersion,
+    SourceVariation,
     SupplierSource,
 )
 from apps.ingest.tests.factories import (
     ImportRunFactory,
+    ItemChangeFactory,
     MappingTableFactory,
     ProductDraftFactory,
     ReviewItemFactory,
     SourceItemFactory,
+    SourceMissingFactory,
     SourceObservationFactory,
+    SourceStateFactory,
+    SourceStateVersionFactory,
+    SourceVariationFactory,
     SupplierSourceFactory,
 )
 from apps.ledger.models import LedgerEntry, Refund
@@ -276,6 +286,13 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     SourceItem: lambda vendor: SourceItemFactory.create(source__vendor=vendor),
     SourceObservation: lambda vendor: SourceObservationFactory.create(item__source__vendor=vendor),
     ProductDraft: lambda vendor: ProductDraftFactory.create(item__source__vendor=vendor),
+    SourceState: lambda vendor: SourceStateFactory.create(item__source__vendor=vendor),
+    SourceStateVersion: lambda vendor: SourceStateVersionFactory.create(
+        item__source__vendor=vendor
+    ),
+    SourceVariation: lambda vendor: SourceVariationFactory.create(item__source__vendor=vendor),
+    SourceMissing: lambda vendor: SourceMissingFactory.create(item__source__vendor=vendor),
+    ItemChange: lambda vendor: ItemChangeFactory.create(item__source__vendor=vendor),
     ImportRun: lambda vendor: ImportRunFactory.create(source__vendor=vendor),
     ReviewItem: lambda vendor: ReviewItemFactory.create(run__source__vendor=vendor),
     MappingTable: lambda vendor: MappingTableFactory.create(vendor=vendor),
