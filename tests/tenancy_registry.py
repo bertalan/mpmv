@@ -585,6 +585,10 @@ ENDPOINTS: dict[str, Access] = {
         "Contextual help (ARC.32): the platform's help text for a screen, the same for every "
         "signed-in caller; reads no vendor data."
     ),
+    "map_tile": NoVendorData(
+        "Map tile proxy (EVT.14): a tile image, the same for everyone, no vendor data.",
+        kwargs={"z": "99", "x": "0", "y": "0"},
+    ),
     "geocoding_find": NoVendorData(
         "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
     ),

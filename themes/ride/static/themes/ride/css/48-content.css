@@ -1,0 +1,47 @@
+/* Ride: content and system pages (THM.9 part 1): blog, standard, legal, contact, landing,
+   recruitment and error pages. Bootstrap classes do the layout; this file maps them on the ride
+   tokens. Colours only through tokens. No transitions under reduced motion. */
+@layer overrides {
+  .page-content {
+    padding-block: var(--space-m);
+  }
+
+  .page-content img,
+  .figure img {
+    max-inline-size: 100%;
+    block-size: auto;
+  }
+
+  .post-summary .card-title a {
+    color: inherit;
+  }
+
+  .post-summary .card-title a:hover,
+  .post-summary .card-title a:focus-visible {
+    color: var(--color-accent);
+  }
+
+  /* The plan is a Bootstrap card: its padding and border come from the card. */
+  .plan.card {
+    padding: 0;
+  }
+
+  .plan--highlighted {
+    border-color: var(--color-accent);
+  }
+
+  .recruitment-cta .btn,
+  .contact-points .btn,
+  .error-page .btn,
+  .vendor-landing .btn {
+    min-block-size: 2.75rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .post-summary,
+    .plan,
+    .btn {
+      transition: none;
+    }
+  }
+}

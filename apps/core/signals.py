@@ -5,6 +5,7 @@ from typing import Any
 from django.db.models.signals import post_init, post_save
 from django.dispatch import receiver
 
+from . import images
 from .models import MediaImage
 from .tasks import enqueue, render_image
 
@@ -31,7 +32,8 @@ def queue_renditions(
     so no page serves the full-size original for good. Nothing is queued for a fixture load, a
     save that leaves out `file`, or a save of an unchanged file (title, alt, collection, focal
     point). `enqueue` writes the job row in the saving transaction: it exists only if the save
-    commits. One job per image waits at a time (queueing lock), so a second save adds none."""
+    commits. One job per image and group waits at a time (queueing lock), so a second save adds
+    none."""
     if raw:
         return
     if update_fields is not None and "file" not in update_fields:
@@ -40,4 +42,10 @@ def queue_renditions(
     instance._rendered_file_name = instance.file.name
     if not created and previous == instance.file.name:
         return
-    enqueue(render_image, image_id=instance.pk, queueing_lock=f"core.render_image:{instance.pk}")
+    for group in images.RENDER_GROUPS:  # hero first: jobs run in the order they were queued
+        enqueue(
+            render_image,
+            image_id=instance.pk,
+            group=group,
+            queueing_lock=f"core.render_image:{instance.pk}:{group}",
+        )

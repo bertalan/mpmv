@@ -38,6 +38,12 @@ MEDIA = (
     "an object a caller could swap for another tenant's; anything outside them is a 404 "
     "(tests/integration/test_modern_image_formats.py)."
 )
+TILE = (
+    "Map tile proxy (EVT.14, apps.core.maps): the path is three validated integers, never an "
+    "object; a tile is the same for everyone and carries no user or tenant data. An invalid "
+    "tile is a 404 before any database or upstream call (`apps/core/tests/integration/"
+    "test_map_tiles.py`)."
+)
 SIGN_IN = "Sign-in page: must answer before the visitor is signed in."
 PASSWORD_RESET = "Password reset flow of the editors' admin: answers before sign-in."
 
@@ -53,6 +59,7 @@ PUBLIC: dict[str, str] = {
     ),
     "home": "Public home page.",
     "media": MEDIA,
+    "map_tile": TILE,
     "catalog:category": PUBLIC_CATALOG,
     "catalog:product": PUBLIC_CATALOG,
     "catalog:brand": PUBLIC_CATALOG,
@@ -218,6 +225,7 @@ IDOR_REVIEWED: dict[str, str] = {
         "(`test_pending_draft_and_hidden_events_are_404_to_visitors`)."
     ),
     "media": MEDIA,
+    "map_tile": TILE,
     "sitemap_section": SITEMAP,
     "llms_language": SITEMAP,
     "sitemap_part": SITEMAP,
@@ -319,6 +327,7 @@ PLACEHOLDER_404: dict[str, str] = {
         "superseded token is a 404 for everyone, and the route shows only the terms in force."
     ),
     "media": MEDIA,
+    "map_tile": TILE,
     "wagtailadmin_password_reset_confirm": (
         "Password reset confirmation of the editors' admin, public by design (PUBLIC): the uid "
         "and token in the URL are the credential, not a reference to an object a caller could "
