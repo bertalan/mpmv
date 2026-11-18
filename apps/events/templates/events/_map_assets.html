@@ -1,0 +1,9 @@
+{% load static %}{% comment %}
+The assets of a public map (EVT.15): the vendored Leaflet (THM.3) and the shared map module
+(EVT.13). External files only, no inline script or style. Leaflet is a classic script and the
+module runs after it. Context: none.
+{% endcomment %}
+<link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+<link rel="stylesheet" href="{% static 'events/map.css' %}">
+<script src="{% static 'vendor/leaflet/leaflet.js' %}" defer></script>
+<script type="module" src="{% static 'events/map.js' %}"></script>

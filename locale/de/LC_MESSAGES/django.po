@@ -1065,6 +1065,14 @@ msgstr ""
 "Ein Zuschlag, der zum Preis der Stufe addiert wird, ohne MwSt. Verwenden Sie 0, wenn es keinen "
 "gibt."
 
+#: apps/catalog/templates/catalog/admin/orphan_images_old_versions.html
+msgid ""
+"An image that is only in an old version of a page may be listed here. If you delete it, going back"
+" to that version would show a missing image."
+msgstr ""
+"Ein Bild, das nur in einer alten Version einer Seite vorkommt, kann hier aufgeführt sein. Wenn Sie"
+" es löschen, würde beim Zurückkehren zu dieser Version ein fehlendes Bild angezeigt."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "An introduction shown on the category page, for example what you find in it. Basic formatting is "
@@ -2343,6 +2351,14 @@ msgstr "Entwicklung und System"
 msgid "Device"
 msgstr "Gerät"
 
+#: apps/events/templates/events/_event_map.html
+msgid "Directions on Google Maps"
+msgstr "Route in Google Maps"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Directions on OpenStreetMap"
+msgstr "Route auf OpenStreetMap"
+
 #: apps/manager/templates/manager/amendment.html
 msgid "Discard the draft"
 msgstr "Entwurf verwerfen"
@@ -2967,6 +2983,10 @@ msgid ""
 msgstr ""
 "Ländergruppen, die der Zone hinzugefügt werden, mit ihren Codes, zum Beispiel 'eu' oder 'europe', "
 "durch Kommas getrennt."
+
+#: apps/catalog/templates/catalog/product.html
+msgid "GTIN"
+msgstr "GTIN"
 
 #: apps/manager/event_block_forms.py
 msgid "Heading"
@@ -3860,6 +3880,14 @@ msgstr "Manager-Shopbereich: %(vendor)s"
 msgid "manufacturer"
 msgstr "hersteller"
 
+#: apps/events/templates/events/_index_map.html
+msgid "Map of the listed events"
+msgstr "Karte der aufgelisteten Veranstaltungen"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Map: %(name)s"
+msgstr "Karte: %(name)s"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Mark as delivered"
 msgstr "Als zugestellt markieren"
@@ -3953,6 +3981,10 @@ msgstr "Nach unten verschieben"
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Move up"
 msgstr "Nach oben verschieben"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "MPN"
+msgstr "MPN"
 
 #: apps/manager/site_map.py apps/orders/templates/orders/customer_orders.html
 msgid "My orders"
@@ -4654,6 +4686,14 @@ msgstr "Nur aktiven oder gesperrten Verkäufern kann gekündigt werden."
 #: apps/events/admin_views.py
 msgid "Only when the event is hidden after a notice."
 msgstr "Nur, wenn die Veranstaltung nach einer Meldung ausgeblendet wird."
+
+#: apps/events/templates/events/_event_map.html
+msgid "Open in a maps app"
+msgstr "In einer Karten-App öffnen"
+
+#: apps/events/templates/events/event_page.html
+msgid "Open in maps"
+msgstr "In Karten öffnen"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 #: apps/accounts/templates/accounts/levels/prompt.html
@@ -6294,6 +6334,10 @@ msgstr "website"
 msgid "Site links"
 msgstr "Website-Links"
 
+#: apps/events/templates/events/_event_map.html apps/events/templates/events/_index_map.html
+msgid "Skip map"
+msgstr "Karte überspringen"
+
 #: themes/base/templates/components/skip_link.html
 msgid "Skip to main content"
 msgstr "Zum Hauptinhalt springen"
@@ -6790,6 +6834,16 @@ msgid ""
 msgstr ""
 "Die Barcode-Nummer (EAN, UPC oder ISBN), 8 bis 14 Ziffern, zum Beispiel 4006381333931. Lassen Sie "
 "das Feld leer, wenn das Produkt keinen Barcode hat."
+
+#: apps/catalog/models.py
+msgid ""
+"The barcode number of this version only (EAN, UPC or ISBN), 8, 12, 13 or 14 digits with a correct "
+"last digit, for example 4006381333931. Leave it empty if this version has no barcode of its own: "
+"the product's barcode is not used for it."
+msgstr ""
+"Die Strichcode-Nummer nur dieser Variante (EAN, UPC oder ISBN), 8, 12, 13 oder 14 Ziffern mit "
+"korrekter letzter Ziffer, zum Beispiel 4006381333931. Lassen Sie das Feld leer, wenn diese "
+"Variante keinen eigenen Strichcode hat: der Strichcode des Produkts wird dafür nicht verwendet."
 
 #: apps/compliance/models.py
 msgid ""
@@ -8322,6 +8376,14 @@ msgstr ""
 "der Marke ermöglicht sie dem Shop, denselben Artikel zu erkennen, der von verschiedenen Verkäufern"
 " angeboten wird."
 
+#: apps/catalog/models.py
+msgid ""
+"The part number the maker gave this version, up to 70 characters. Leave it empty if it has none of"
+" its own."
+msgstr ""
+"Die Artikelnummer, die der Hersteller dieser Variante gegeben hat, bis zu 70 Zeichen. Lassen Sie "
+"das Feld leer, wenn sie keine eigene hat."
+
 #: apps/accounts/mfa_views.py
 msgid "the passkey could not be registered"
 msgstr "der Passkey konnte nicht registriert werden"
@@ -8392,6 +8454,14 @@ msgid ""
 msgstr ""
 "Das Bild, das neben der Veranstaltung in Listen und Feeds angezeigt wird. Wenn Sie das Feld leer "
 "lassen, wird die Veranstaltung ohne Bild aufgeführt."
+
+#: apps/catalog/models.py
+msgid ""
+"The picture shown when a buyer chooses this version. Pick one of this product's own pictures. "
+"Leave it empty to keep the product's gallery."
+msgstr ""
+"Das Bild, das angezeigt wird, wenn Käufer diese Variante wählen. Wählen Sie eines der Bilder "
+"dieses Produkts. Lassen Sie das Feld leer, um die Galerie des Produkts beizubehalten."
 
 #: apps/ingest/models.py
 msgid ""

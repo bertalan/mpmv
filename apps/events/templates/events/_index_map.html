@@ -1,0 +1,17 @@
+{% load i18n %}{% comment %}
+The map of the events list (EVT.15, spec 15 "Maps"): an enhancement above the list, hidden until
+`events/map.js` builds it from the `data-lat` and `data-lng` of the listed items (no extra
+endpoint). Without JavaScript the list is all there is. Context: `map` and `plotted`, set only
+when a listed event has coordinates.
+{% endcomment %}
+<div class="events-map" data-events-map hidden
+    data-tile-url="{{ map.tile_url }}" data-attribution="{{ map.attribution }}"
+    data-attribution-url="{{ map.attribution_url }}"
+    data-default-lat="{{ map.default_latitude|stringformat:'f' }}"
+    data-default-lng="{{ map.default_longitude|stringformat:'f' }}"
+    data-default-zoom="{{ map.default_zoom }}">
+  <p class="event-map__skip-wrap"><a class="event-map__skip" href="#events-map-end">{% translate "Skip map" %}</a></p>
+  <div class="event-map__canvas" data-map-canvas role="region"
+      aria-label="{% translate 'Map of the listed events' %}"></div>
+</div>
+<div id="events-map-end" tabindex="-1"></div>
