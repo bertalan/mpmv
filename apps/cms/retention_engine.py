@@ -3,7 +3,8 @@
 The service (`retention`) reads revisions and hands them over as plain data; this module decides
 which of them may be deleted. A revision is kept when any of these holds:
 
-- it is the page's live or latest revision, or has a scheduled publication;
+- it is the page's live or latest revision, has a scheduled publication, or is held by an
+  unfinished workflow;
 - it is one of the object's `keep_last` newest revisions;
 - it is not older than `keep_months` calendar months.
 """
@@ -24,14 +25,18 @@ class RevisionInfo:
     is_live: bool = False
     is_latest: bool = False
     is_scheduled: bool = False  # `approved_go_live_at` is set
+    is_held: bool = False  # an unfinished workflow task or approval points at it
 
     @property
     def is_protected(self) -> bool:
-        return self.is_live or self.is_latest or self.is_scheduled
+        return self.is_live or self.is_latest or self.is_scheduled or self.is_held
 
 
 def months_back(moment: dt.datetime, months: int) -> dt.datetime:
-    """`moment` minus `months` calendar months; the day is clamped to the target month's end."""
+    """`moment` minus `months` calendar months; the day is clamped to the target month's end.
+    Whole months are counted on `moment`'s own calendar, so pass it in the zone that counts."""
+    if moment.tzinfo is None:
+        raise ValueError("moment must be timezone-aware")
     index = moment.year * 12 + moment.month - 1 - months
     year, month = divmod(index, 12)
     month += 1
@@ -50,7 +55,7 @@ def revisions_to_delete(
     The `keep_last` newest are ranked by (created_at, id), so equal timestamps stay stable.
     A revision exactly `keep_months` old is kept.
     """
-    cutoff = months_back(now, keep_months)
+    cutoff = months_back(now, keep_months)  # raises for a naive `now`
     result: dict[str, list[int]] = {}
     for key, revisions in revisions_per_object.items():
         newest_first = sorted(revisions, key=lambda r: (r.created_at, r.pk), reverse=True)

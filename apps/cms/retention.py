@@ -18,11 +18,14 @@ import datetime as dt
 from collections import defaultdict
 from dataclasses import dataclass, field
 from itertools import batched
+from zoneinfo import ZoneInfo
 
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
-from wagtail.models import Page, Revision
+from wagtail.models import Page, Revision, TaskState, WorkflowState
 
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
@@ -43,6 +46,34 @@ class PurgeResult:
     @property
     def deleted_total(self) -> int:
         return sum(len(ids) for ids in self.deleted.values())
+
+
+UNFINISHED = (WorkflowState.STATUS_IN_PROGRESS, WorkflowState.STATUS_NEEDS_CHANGES)
+
+
+def _workflow_held(revision_ids: list[int]) -> set[int]:
+    """Revisions an unfinished approval still points at (deleting one cascades into its task
+    state)."""
+    return set(
+        TaskState.objects.filter(revision_id__in=revision_ids)
+        .filter(Q(status=TaskState.STATUS_IN_PROGRESS) | Q(workflow_state__status__in=UNFINISHED))
+        .values_list("revision_id", flat=True)
+    )
+
+
+def _protected_now(revision_ids: list[int]) -> set[int]:
+    """Re-read, inside the delete transaction, which of `revision_ids` became live, latest,
+    scheduled or held since the plan was made. The pages are locked so a publish waits."""
+    pages = Page.objects.select_for_update().filter(
+        Q(live_revision_id__in=revision_ids) | Q(latest_revision_id__in=revision_ids)
+    )
+    pointed: set[int] = set()
+    for live, latest in pages.values_list("live_revision_id", "latest_revision_id"):
+        pointed.update(pk for pk in (live, latest) if pk is not None)
+    scheduled = Revision.objects.filter(
+        pk__in=revision_ids, approved_go_live_at__isnull=False
+    ).values_list("pk", flat=True)
+    return (pointed & set(revision_ids)) | set(scheduled) | _workflow_held(revision_ids)
 
 
 def _page_ids_with_old_revisions(cutoff: dt.datetime) -> list[str]:
@@ -67,6 +98,8 @@ def _revisions_of(page_ids: list[str]) -> dict[str, list[RevisionInfo]]:
     rows = Revision.objects.filter(base_content_type=page_ct, object_id__in=page_ids).values_list(
         "pk", "object_id", "created_at", "approved_go_live_at"
     )
+    rows = list(rows)
+    held = _workflow_held([row[0] for row in rows])
     for pk, object_id, created_at, go_live in rows:
         live, latest = pointers.get(object_id, (None, None))
         found[object_id].append(
@@ -76,9 +109,21 @@ def _revisions_of(page_ids: list[str]) -> dict[str, list[RevisionInfo]]:
                 is_live=pk == live,
                 is_latest=pk == latest,
                 is_scheduled=go_live is not None,
+                is_held=pk in held,
             )
         )
     return found
+
+
+def _without(result: PurgeResult, skipped: set[int]) -> PurgeResult:
+    """The result minus revisions that were not deleted after all."""
+    pruned = PurgeResult()
+    for page_id, ids in result.deleted.items():
+        kept = [pk for pk in ids if pk not in skipped]
+        if kept:
+            pruned.deleted[page_id] = kept
+            pruned.changeset.delete(PAGE_MODEL, page_id, {"revisions_deleted": len(kept)})
+    return pruned
 
 
 def purge_page_revisions(
@@ -91,6 +136,10 @@ def purge_page_revisions(
     """Delete the page revisions the retention rule allows; `dry_run` (the default) only
     reports them."""
     now = now or timezone.now()
+    if timezone.is_naive(now):
+        raise ValueError("now must be timezone-aware")
+    # Months are counted on the business calendar, not UTC's.
+    now = now.astimezone(ZoneInfo(settings.BUSINESS_TIME_ZONE))
     cutoff = engine.months_back(now, engine.KEEP_MONTHS)
     result = PurgeResult()
     for chunk in batched(_page_ids_with_old_revisions(cutoff), batch_size, strict=False):
@@ -101,9 +150,15 @@ def purge_page_revisions(
     if dry_run:
         return result
     all_ids = [pk for ids in result.deleted.values() for pk in ids]
+    skipped: set[int] = set()
     for batch in batched(all_ids, batch_size, strict=False):
         with transaction.atomic():
-            Revision.objects.filter(pk__in=batch).delete()
+            # The plan may be stale: skip whatever became protected meanwhile.
+            protected = _protected_now(list(batch))
+            skipped |= protected
+            Revision.objects.filter(pk__in=batch).exclude(pk__in=protected).delete()
+    if skipped:
+        result = _without(result, skipped)
     record(
         ctx,
         RETENTION_PURGED,
