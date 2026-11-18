@@ -98,6 +98,55 @@ def test_only_get_is_allowed(client: Client, upstream: FakeTileUpstream) -> None
     assert upstream.calls == []
 
 
+def test_put_is_not_allowed_either(client: Client, upstream: FakeTileUpstream) -> None:
+    assert client.put("/maps/tiles/3/4/5.png").status_code == 405
+    assert upstream.calls == []
+
+
+def test_head_on_a_cached_tile_is_a_bodyless_get(
+    client: Client, upstream: FakeTileUpstream
+) -> None:
+    got = _get(client)
+    head = client.head("/maps/tiles/3/4/5.png")
+    assert head.status_code == 200
+    assert head.content == b""
+    assert head["Content-Type"] == "image/png"
+    assert head["Cache-Control"].startswith("public, max-age=")
+    assert head["X-Tile-Cache"] == "hit"
+    assert not head.cookies
+    vary = {v.strip().lower() for v in head.get("Vary", "").split(",")}
+    assert "accept-language" not in vary
+    assert got["Content-Type"] == head["Content-Type"]
+    assert len(upstream.calls) == 1
+
+
+def test_a_cold_head_fetches_the_upstream_like_get(
+    client: Client, upstream: FakeTileUpstream
+) -> None:
+    head = client.head("/maps/tiles/3/4/5.png")
+    assert head.status_code == 200
+    assert head.content == b""
+    assert len(upstream.calls) == 1
+    assert _get(client)["X-Tile-Cache"] == "hit"
+
+
+def test_head_on_an_invalid_tile_is_404_without_an_upstream_call(
+    client: Client, upstream: FakeTileUpstream
+) -> None:
+    response = client.head("/maps/tiles/99/4/5.png")
+    assert response.status_code == 404
+    assert upstream.calls == []
+    assert Throttle.objects.count() == 0
+
+
+def test_head_counts_against_the_rate_limit(
+    client: Client, upstream: FakeTileUpstream, settings: Any
+) -> None:
+    settings.MAP_TILE_IP_LIMIT = 1
+    assert client.head("/maps/tiles/3/4/5.png").status_code == 200
+    assert client.head("/maps/tiles/3/4/5.png").status_code == 429
+
+
 def test_long_cache_headers_for_the_cdn(client: Client, upstream: FakeTileUpstream) -> None:
     response = _get(client)
     assert response["Cache-Control"] == "public, max-age=604800"

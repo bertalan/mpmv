@@ -85,7 +85,11 @@ and caches the PNG. A cold tile is single-flight: the miss path takes a PostgreS
 burst for one tile makes one upstream call and one count; the others wait, re-read the cache and
 answer from it. After `MAP_TILE_SINGLE_FLIGHT_WAIT` seconds a waiter answers 503 with
 `Retry-After: 2` and never calls the upstream. The lock covers only fetch and store (never the
-response stream) and only that tile, so other tiles do not wait. Upstream errors are 502, timeouts 504, a non-PNG answer 502, none
+response stream) and only that tile, so other tiles do not wait. If the unlock fails, the connection is closed so
+PostgreSQL drops the lock. Session advisory locks are not compatible with transaction-mode
+connection poolers (such as PgBouncer in transaction mode); use session mode or a direct connection.
+`HEAD` is served like `GET` without a body (same headers, same rate limit, cache first); a cold `HEAD`
+fetches the upstream like a `GET` (one counted request), so the next `GET` is a hit. Other methods are 405. Upstream errors are 502, timeouts 504, a non-PNG answer 502, none
 cached.
 The daily cap counts attempts, failed fetches included. Requests without a client IP share one
 rate-limit bucket (fine behind the configured proxy). `TileResponseNeutralMiddleware` strips
