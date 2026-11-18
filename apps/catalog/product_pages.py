@@ -297,13 +297,23 @@ def specifications(product: Product, language: str) -> list[SpecRow]:
             rows.append(found)
     if product.weight_kg is not None:
         rows.append(SpecRow(_("Weight"), f"{_number(product.weight_kg)} kg"))
-    for label, value in (
-        (_("Length"), product.length_cm),
-        (_("Width"), product.width_cm),
-        (_("Height"), product.height_cm),
+    # Sizes in mm (CAT.22) take over from the older centimetre fields, one row per side.
+    for label, mm, cm in (
+        (_("Length"), product.length_mm, product.length_cm),
+        (_("Width"), product.width_mm, product.width_cm),
+        (_("Height"), product.height_mm, product.height_cm),
     ):
-        if value is not None:
-            rows.append(SpecRow(label, f"{_number(value)} cm"))
+        if mm is not None:
+            rows.append(SpecRow(label, f"{mm} mm"))
+        elif cm is not None:
+            rows.append(SpecRow(label, f"{_number(cm)} cm"))
+    texts = translations.resolve(product.translations.all(), language).translation
+    if texts is not None and texts.material:
+        rows.append(SpecRow(_("Material"), texts.material))
+    if texts is not None and texts.colour:
+        rows.append(SpecRow(_("Colour"), texts.colour))
+    if product.country_of_origin:
+        rows.append(SpecRow(_("Country of origin"), product.country_of_origin))
     if product.gtin:
         rows.append(SpecRow(_("GTIN"), product.gtin))
     if product.mpn:

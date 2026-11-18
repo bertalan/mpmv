@@ -36,12 +36,13 @@ from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 from django.db.models.functions import Now
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from apps.core.countries import ISO_3166_ALPHA2
 from apps.core.fields import LanguageField, MoneyField
 from apps.core.models import BaseModel, TranslationModel, TranslationStatus, resolve_translation
 from apps.core.translations import Resolved
@@ -116,6 +117,15 @@ gtin_validator = RegexValidator(r"^\d{8,14}$", "A GTIN (EAN, UPC, ISBN) has 8 to
 
 def _choice(field: str, choices: type[models.TextChoices], name: str) -> models.CheckConstraint:
     return models.CheckConstraint(condition=models.Q(**{f"{field}__in": choices.values}), name=name)
+
+
+def country_code_validator(value: str) -> None:
+    """CAT.22: an ISO 3166-1 alpha-2 code in upper case, as listed (no aliases like UK or EL)."""
+    if value not in ISO_3166_ALPHA2:
+        raise ValidationError(
+            "Use an upper-case ISO 3166-1 alpha-2 country code, for example IT.",
+            code="invalid_country",
+        )
 
 
 def _not_negative(field: str, label: str, name: str) -> models.CheckConstraint:
@@ -442,6 +452,47 @@ class Product(BaseModel):
         help_text=_("The height of the packed product in centimetres, for example 10. Optional."),
     )
 
+    length_mm = models.PositiveIntegerField(
+        "length (mm)",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        help_text=_(
+            "The longest side of the product in millimetres, for example 300. Optional: leave it "
+            "empty if you do not know it."
+        ),
+    )
+    width_mm = models.PositiveIntegerField(
+        "width (mm)",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        help_text=_(
+            "The width of the product in millimetres, for example 200. Optional: leave it "
+            "empty if you do not know it."
+        ),
+    )
+    height_mm = models.PositiveIntegerField(
+        "height (mm)",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        help_text=_(
+            "The height of the product in millimetres, for example 100. Optional: leave it "
+            "empty if you do not know it."
+        ),
+    )
+    country_of_origin = models.CharField(
+        "country of origin",
+        max_length=2,
+        blank=True,
+        validators=[country_code_validator],
+        help_text=_(
+            "Where the product was made, as a two-letter upper-case country code, for example "
+            "IT. Optional."
+        ),
+    )
+
     gtin = models.CharField(
         "GTIN",
         max_length=14,
@@ -617,6 +668,9 @@ class Product(BaseModel):
             _not_negative("length_cm", "length", "catalog_product_length_not_negative"),
             _not_negative("width_cm", "width", "catalog_product_width_not_negative"),
             _not_negative("height_cm", "height", "catalog_product_height_not_negative"),
+            _above_zero("length_mm", "length", "catalog_product_length_mm_positive"),
+            _above_zero("width_mm", "width", "catalog_product_width_mm_positive"),
+            _above_zero("height_mm", "height", "catalog_product_height_mm_positive"),
             models.CheckConstraint(
                 condition=~models.Q(required_companion=models.F("pk")),
                 name="catalog_product_companion_not_self",
@@ -723,6 +777,8 @@ class ProductTranslation(TranslationModel):
         "description",
         "seo_title",
         "seo_description",
+        "material",
+        "colour",
     )
 
     vendor_scope: ClassVar[str] = "product__vendor"
@@ -745,6 +801,18 @@ class ProductTranslation(TranslationModel):
             "The full text of the product page: materials, sizes, what is in the box. Basic "
             "formatting is allowed. Optional, but buyers decide faster with a clear text."
         ),
+    )
+    material = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text=_(
+            "What the product is made of, in this language, for example 'Glazed ceramic'. Optional."
+        ),
+    )
+    colour = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text=_("The main colour in this language, for example 'Matt black'. Optional."),
     )
     # Derived {title} (no language suffix, D-25) from the title by `services.sync_product_slug`
     # (CAT.5), never the SKU; empty until generated. Replaced slugs move to SlugHistory and answer
