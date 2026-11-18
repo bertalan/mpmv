@@ -69,9 +69,9 @@ def test_the_country_must_be_an_iso_code() -> None:
     assert "return_country" in engine.policy_errors(values(return_country=""))
 
 
-def test_the_default_is_the_14_day_floor_with_the_customer_paying() -> None:
+def test_the_default_is_the_14_day_floor_with_the_shop_paying() -> None:
     default = engine.default_policy("DE")
     assert default.return_window_days == 14
-    assert default.return_shipping_paid_by == "customer"
+    assert default.return_shipping_paid_by == "vendor"
     assert default.return_country == "DE"
     assert default.is_default is True

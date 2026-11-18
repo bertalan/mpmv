@@ -12680,8 +12680,8 @@ msgid "You have no orders yet"
 msgstr "Du hast noch keine Bestellungen"
 
 #: apps/manager/templates/manager/shop/return_policy.html
-msgid "You have not set a policy yet. The standard one applies."
-msgstr "Sie haben noch keine Richtlinie festgelegt. Es gilt die Standardrichtlinie."
+msgid "You have not set a policy yet. The standard one applies: the shop pays the return shipping."
+msgstr "Sie haben noch keine Richtlinie festgelegt. Es gilt die Standardrichtlinie: Der Shop trägt die Rücksendekosten."
 
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "You may also like"
