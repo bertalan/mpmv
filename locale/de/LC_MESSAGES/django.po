@@ -748,6 +748,10 @@ msgstr ""
 msgid "About the shop"
 msgstr "Über den Shop"
 
+#: apps/vendors/templates/email/vendors/application_exists/subject.txt
+msgid "About your request to sell with us"
+msgstr "Zu Ihrer Anfrage, bei uns zu verkaufen"
+
 #: apps/seo/templates/seo/consent/_actions.html
 msgid "Accept all"
 msgstr "Alle akzeptieren"
@@ -924,6 +928,14 @@ msgid ""
 msgstr ""
 "Nachdem ein Artikel nicht verfügbar war, hat der Kunde den Rest der Bestellung %(order_number)s "
 "storniert, wie es die Bedingungen erlauben, und den vollen Betrag erstattet bekommen."
+
+#: apps/vendors/templates/vendors/apply/form.html
+msgid ""
+"After you confirm your email you sign in and set up an authenticator app: it is required for every"
+" seller."
+msgstr ""
+"Nachdem Sie Ihre E-Mail-Adresse bestätigt haben, melden Sie sich an und richten eine "
+"Authenticator-App ein: Sie ist für jeden Verkäufer vorgeschrieben."
 
 #: apps/manager/fitment_forms.py
 msgid "Alias"
@@ -1138,6 +1150,10 @@ msgstr "Wohnung, Stockwerk oder eine andere Angabe. Optional."
 msgid "API documentation"
 msgstr "API-Dokumentation"
 
+#: apps/vendors/templates/vendors/apply/cancelled.html
+msgid "Application cancelled"
+msgstr "Bewerbung storniert"
+
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Applied"
 msgstr "Angewendet"
@@ -1149,6 +1165,10 @@ msgstr "gilt für"
 #: apps/manager/templates/manager/amendment.html
 msgid "Apply the change"
 msgstr "Änderung anwenden"
+
+#: apps/vendors/templates/vendors/apply/form.html
+msgid "Apply to sell with us"
+msgstr "Bewerben Sie sich, bei uns zu verkaufen"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Applying it asks for your passkey: it moves money or the delivery address."
@@ -1384,6 +1404,16 @@ msgstr ""
 "\"%(title)s\" absagen? Die Veranstaltung bleibt in jeder Sprache mit einem Hinweis auf die Absage "
 "online. Dies kann nicht rückgängig gemacht werden."
 
+#: apps/vendors/templates/email/vendors/application_confirm/body.html
+#: apps/vendors/templates/email/vendors/application_reminder/body.html
+#: apps/vendors/templates/vendors/apply/cancel.html
+msgid "Cancel the application"
+msgstr "Bewerbung stornieren"
+
+#: apps/vendors/templates/vendors/apply/cancel.html
+msgid "Cancel the application, this was not me"
+msgstr "Bewerbung stornieren, das war ich nicht"
+
 #: apps/manager/event_views.py apps/manager/templates/manager/shop/event_cancel.html
 #: apps/manager/templates/manager/shop/event_form.html
 #: apps/manager/templates/manager/shop/events.html
@@ -1411,6 +1441,10 @@ msgstr "Den Rest der Bestellung stornieren und alles erstatten"
 msgctxt "(L)"
 msgid "Cancel the rest of the order and refund everything: %(cancel_url)s"
 msgstr "Restliche Bestellung stornieren und gesamten Restbetrag erstatten: %(cancel_url)s"
+
+#: apps/vendors/templates/vendors/apply/cancel.html
+msgid "Cancel this application"
+msgstr "Diese Bewerbung stornieren"
 
 #: apps/vendors/services.py
 msgid "Cancellation"
@@ -1595,6 +1629,10 @@ msgstr "prüfen"
 msgid "Check the rule."
 msgstr "Prüfen Sie die Regel."
 
+#: apps/vendors/templates/vendors/apply/sent.html
+msgid "Check your email"
+msgstr "Prüfen Sie Ihre E-Mail"
+
 #: apps/orders/templates/orders/checkout.html
 msgid "Checkout"
 msgstr "Kasse"
@@ -1634,6 +1672,18 @@ msgid "Choose a page of this site to link to. Fill in this or the web address be
 msgstr ""
 "Wählen Sie eine Seite dieser Website, auf die verlinkt werden soll. Füllen Sie dieses Feld oder "
 "die Webadresse darunter aus, nicht beide."
+
+#: apps/vendors/forms.py
+msgid "Choose a password"
+msgstr "Wählen Sie ein Passwort"
+
+#: apps/vendors/templates/vendors/apply/confirm.html
+msgid ""
+"Choose a password to activate your account. You then sign in with it and set up an authenticator "
+"app. Our team reviews your application afterwards."
+msgstr ""
+"Wählen Sie ein Passwort, um Ihr Konto zu aktivieren. Danach melden Sie sich damit an und richten "
+"eine Authenticator-App ein. Unser Team prüft anschließend Ihre Bewerbung."
 
 #: apps/manager/event_forms.py
 msgid "Choose a time zone such as Europe/Rome."
@@ -1874,6 +1924,15 @@ msgstr "Bestätigen"
 msgid "Confirm and delete the old logo"
 msgstr "Bestätigen und das alte Logo löschen"
 
+#: apps/vendors/templates/vendors/apply/confirm.html
+msgid "Confirm my email"
+msgstr "Meine E-Mail-Adresse bestätigen"
+
+#: apps/vendors/templates/email/vendors/application_confirm/body.html
+#: apps/vendors/templates/email/vendors/application_reminder/body.html
+msgid "Confirm my email address"
+msgstr "Meine E-Mail-Adresse bestätigen"
+
 #: apps/orders/ui/views.py
 msgid "Confirm order and pay now – EUR %(total)s"
 msgstr "Bestellung bestätigen und jetzt bezahlen – EUR %(total)s"
@@ -1900,6 +1959,18 @@ msgstr ""
 "Bestätigen Sie mit Ihrem Passkey, um ein Passkey-Zeitfenster zu öffnen: Es deckt mehrere sensible "
 "Aktionen hintereinander ab. Es schließt sich beim Abmelden, nach einer Zeit der Inaktivität oder "
 "nach Erreichen der maximalen Dauer."
+
+#: apps/vendors/templates/vendors/apply/confirm.html
+msgid "Confirm your email"
+msgstr "Bestätigen Sie Ihre E-Mail-Adresse"
+
+#: apps/vendors/templates/vendors/apply/confirm.html
+msgid "Confirm your email address"
+msgstr "Bestätigen Sie Ihre E-Mail-Adresse"
+
+#: apps/vendors/templates/email/vendors/application_confirm/subject.txt
+msgid "Confirm your email address to finish your application"
+msgstr "Bestätigen Sie Ihre E-Mail-Adresse, um Ihre Bewerbung abzuschließen"
 
 #: apps/manager/forms.py
 msgid "Confirmation"
@@ -1995,6 +2066,10 @@ msgstr "Land"
 #: apps/catalog/taxonomy.py
 msgid "country"
 msgstr "land"
+
+#: apps/vendors/forms.py
+msgid "Country where your business is established"
+msgstr "Land, in dem Ihr Unternehmen ansässig ist"
 
 #: apps/events/models.py
 msgid ""
@@ -2380,13 +2455,17 @@ msgstr "Entfernen Sie entweder die Position oder ändern Sie ihre Menge, nicht b
 msgid "Email"
 msgstr "E-Mail"
 
-#: apps/orders/ui/forms.py
+#: apps/orders/ui/forms.py apps/vendors/forms.py
 msgid "Email address"
 msgstr "E-Mail-Adresse"
 
 #: apps/compliance/forms.py
 msgid "Email address of the order"
 msgstr "E-Mail-Adresse der Bestellung"
+
+#: apps/vendors/templates/vendors/apply/confirmed.html
+msgid "Email confirmed"
+msgstr "E-Mail-Adresse bestätigt"
 
 #: apps/vendors/models.py
 msgid "Email language"
@@ -3200,6 +3279,14 @@ msgstr ""
 msgid "I understand and want to erase my account"
 msgstr "Ich habe verstanden und möchte mein Konto löschen"
 
+#: apps/vendors/templates/vendors/apply/sent.html
+msgid ""
+"If the details were valid, we sent you an email. Open the link in it to confirm your address; the "
+"link works once."
+msgstr ""
+"Wenn die Angaben gültig waren, haben wir Ihnen eine E-Mail gesendet. Öffnen Sie darin den Link, um"
+" Ihre Adresse zu bestätigen; der Link funktioniert nur einmal."
+
 #: apps/orders/templates/email/orders/item_unavailable/body.html
 #: apps/orders/templates/email/orders/item_unavailable/body.txt
 msgctxt "(L)"
@@ -3219,6 +3306,15 @@ msgid ""
 msgstr ""
 "Wenn du nicht angemeldet bist, meldet „Weiter“ dich einmalig mit diesem Link an; bevor du etwas "
 "genehmigst oder ablehnst, bestätigst du deine Identität trotzdem mit deinem zweiten Faktor."
+
+#: apps/vendors/templates/vendors/apply/cancel.html
+msgid ""
+"If you did not apply to sell with us, cancel here. We delete the application and the account "
+"created with it right away, and keep nothing. You can apply again later if you wish."
+msgstr ""
+"Wenn Sie sich nicht beworben haben, bei uns zu verkaufen, stornieren Sie hier. Wir löschen die "
+"Bewerbung und das damit erstellte Konto sofort und behalten nichts. Sie können sich später erneut "
+"bewerben, wenn Sie möchten."
 
 #: apps/manager/event_block_forms.py
 msgid "Image"
@@ -3586,6 +3682,10 @@ msgstr "Lizenz"
 msgid "Line total"
 msgstr "Zeilensumme"
 
+#: apps/vendors/templates/vendors/apply/invalid.html
+msgid "Link not valid"
+msgstr "Link ungültig"
+
 #: apps/manager/media.py
 msgid "Link text"
 msgstr "Linktext"
@@ -3804,6 +3904,10 @@ msgstr "Name"
 #: apps/catalog/taxonomy.py
 msgid "name"
 msgstr "name"
+
+#: apps/vendors/forms.py
+msgid "Name of your business or shop"
+msgstr "Name Ihres Unternehmens oder Shops"
 
 #: apps/manager/templates/manager/platform/fitment_node.html
 msgid "Names by language"
@@ -4081,6 +4185,10 @@ msgstr ""
 msgid "not yet"
 msgstr "noch nicht"
 
+#: apps/vendors/templates/vendors/apply/sent.html
+msgid "Nothing arrived after a few minutes? Check your spam folder."
+msgstr "Nach einigen Minuten nichts angekommen? Prüfen Sie Ihren Spam-Ordner."
+
 #: apps/manager/views.py
 msgid "Nothing changed."
 msgstr "Nichts geändert."
@@ -4094,6 +4202,10 @@ msgstr ""
 #: apps/manager/templates/manager/platform/fitment_preview.html
 msgid "Nothing has changed yet. Check the changes below, then confirm."
 msgstr "Es wurde noch nichts geändert. Prüfen Sie die Änderungen unten und bestätigen Sie dann."
+
+#: apps/vendors/templates/vendors/apply/cancelled.html
+msgid "Nothing is waiting"
+msgstr "Nichts wartet auf Bearbeitung"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/terminations.html
@@ -5457,6 +5569,10 @@ msgstr "Bezogen auf"
 msgid "Remembers choices you make, such as your garage or your layout."
 msgstr "Merkt sich Ihre Auswahl, etwa Ihre Garage oder Ihre Seitenanordnung."
 
+#: apps/vendors/templates/email/vendors/application_reminder/subject.txt
+msgid "Reminder: confirm your email address to finish your application"
+msgstr "Erinnerung: Bestätigen Sie Ihre E-Mail-Adresse, um Ihre Bewerbung abzuschließen"
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 #: apps/accounts/templates/accounts/mfa/setup.html
 #: apps/manager/templates/manager/platform/fitment_node.html
@@ -5742,7 +5858,7 @@ msgstr "Auswählen"
 msgid "Select at least one row."
 msgstr "Wählen Sie mindestens eine Zeile aus."
 
-#: apps/manager/site_map.py
+#: apps/manager/site_map.py apps/vendors/templates/vendors/apply/form.html
 msgid "Sell with us"
 msgstr "Bei uns verkaufen"
 
@@ -5757,6 +5873,10 @@ msgstr "Verkäufer"
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Selling mode"
 msgstr "Verkaufsart"
+
+#: apps/vendors/templates/vendors/apply/form.html
+msgid "Send my application"
+msgstr "Meine Bewerbung senden"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid ""
@@ -5973,7 +6093,7 @@ msgstr "Nur die Produkte einer Kategorie und der darunterliegenden Kategorien an
 msgid "Show only the products of one vendor."
 msgstr "Nur die Produkte eines Verkäufers anzeigen."
 
-#: apps/accounts/forms.py apps/manager/templates/manager/login.html
+#: apps/accounts/forms.py apps/manager/templates/manager/login.html apps/vendors/forms.py
 msgid "Show password"
 msgstr "Passwort anzeigen"
 
@@ -6016,6 +6136,8 @@ msgstr ""
 "können."
 
 #: apps/manager/site_map.py apps/manager/templates/manager/login.html apps/seo/site_links.py
+#: apps/vendors/templates/email/vendors/application_exists/body.html
+#: apps/vendors/templates/vendors/apply/confirmed.html
 msgid "Sign in"
 msgstr "Anmelden"
 
@@ -6149,6 +6271,28 @@ msgstr "Behebe die obigen Punkte, um fortzufahren."
 #: apps/orders/templates/orders/_review_actions.html
 msgid "Solve the points above to place the order."
 msgstr "Behebe die obigen Punkte, um die Bestellung aufzugeben."
+
+#: apps/vendors/templates/email/vendors/application_exists/body.html
+#: apps/vendors/templates/email/vendors/application_exists/body.txt
+msgid ""
+"Someone used this email address to apply to sell with us, but it already has an account. Nothing "
+"was changed. If it was you, sign in with your existing account or reset its password instead. If "
+"it was not you, ignore this email."
+msgstr ""
+"Jemand hat diese E-Mail-Adresse verwendet, um sich zu bewerben, bei uns zu verkaufen, aber es gibt"
+" bereits ein Konto. Es wurde nichts geändert. Wenn Sie es waren, melden Sie sich stattdessen mit "
+"Ihrem bestehenden Konto an oder setzen Sie dessen Passwort zurück. Wenn Sie es nicht waren, "
+"ignorieren Sie diese E-Mail."
+
+#: apps/vendors/templates/email/vendors/application_confirm/body.html
+#: apps/vendors/templates/email/vendors/application_confirm/body.txt
+msgid ""
+"Someone, probably you, used this email address to apply to sell with us. To go on, open this link,"
+" confirm your email address and choose a password."
+msgstr ""
+"Jemand, wahrscheinlich Sie, hat diese E-Mail-Adresse verwendet, um sich zu bewerben, bei uns zu "
+"verkaufen. Um fortzufahren, öffnen Sie diesen Link, bestätigen Sie Ihre E-Mail-Adresse und wählen "
+"Sie ein Passwort."
 
 #: themes/base/templates/500.html
 msgid "Something went wrong"
@@ -6372,6 +6516,16 @@ msgstr ""
 "Sagen Sie Käufern, bis wann und wie sie eine Bestellung stornieren können, zum Beispiel 'bevor das"
 " Paket an den Versanddienstleister übergeben wird'. Käufer lesen es in Ihrem Shop, bevor sie "
 "bestellen."
+
+#: apps/vendors/templates/vendors/apply/form.html
+msgid ""
+"Tell us who you are and the name of your business. We send you an email to confirm your address; "
+"you choose your password there. Our team then reviews your application before you can sell. We ask"
+" for nothing else now."
+msgstr ""
+"Teilen Sie uns mit, wer Sie sind und wie Ihr Unternehmen heißt. Wir senden Ihnen eine E-Mail, um "
+"Ihre Adresse zu bestätigen; dort wählen Sie Ihr Passwort. Unser Team prüft Ihre Bewerbung "
+"anschließend, bevor Sie verkaufen können. Mehr verlangen wir jetzt nicht."
 
 #: apps/compliance/forms.py
 msgid "Tell us why you think the content is illegal. Required."
@@ -7527,10 +7681,36 @@ msgstr ""
 "kommerzielle Nutzung erlauben. Erforderlich bei einer neuen Datei. Beispiel: 'Eigenes Werk' für "
 "ein Logo, das uns die Marke gegeben hat."
 
+#: apps/vendors/templates/vendors/apply/invalid.html
+msgid ""
+"The link has expired, was already used, or does not belong to a pending application. Open the link"
+" from the most recent email, or apply again."
+msgstr ""
+"Der Link ist abgelaufen, wurde bereits verwendet oder gehört zu keiner offenen Bewerbung. Öffnen "
+"Sie den Link aus der neuesten E-Mail oder bewerben Sie sich erneut."
+
 #: apps/events/templates/email/events/event_changes_requested/body.html
 #: apps/events/templates/email/events/event_changes_requested/body.txt
 msgid "The link works once and expires on %(expires)s (UTC)."
 msgstr "Der Link funktioniert nur einmal und läuft am %(expires)s (UTC) ab."
+
+#: apps/vendors/templates/email/vendors/application_reminder/body.html
+#: apps/vendors/templates/email/vendors/application_reminder/body.txt
+msgid ""
+"The link works once and expires on %(expires)s (UTC). If you do not confirm, the application is "
+"deleted after a few days."
+msgstr ""
+"Der Link funktioniert nur einmal und läuft am %(expires)s (UTC) ab. Wenn Sie nicht bestätigen, "
+"wird die Bewerbung nach einigen Tagen gelöscht."
+
+#: apps/vendors/templates/email/vendors/application_confirm/body.html
+#: apps/vendors/templates/email/vendors/application_confirm/body.txt
+msgid ""
+"The link works once and expires on %(expires)s (UTC). Our team reviews your application "
+"afterwards. If you do not confirm, the application is deleted after a few days."
+msgstr ""
+"Der Link funktioniert nur einmal und läuft am %(expires)s (UTC) ab. Unser Team prüft anschließend "
+"Ihre Bewerbung. Wenn Sie nicht bestätigen, wird die Bewerbung nach einigen Tagen gelöscht."
 
 #: apps/cms/models.py
 msgid ""
@@ -9091,6 +9271,14 @@ msgid "There is no other active node at this place to merge into."
 msgstr ""
 "An dieser Stelle gibt es keinen anderen aktiven Knoten, in den zusammengeführt werden könnte."
 
+#: apps/vendors/templates/vendors/apply/cancelled.html
+msgid ""
+"There is no pending application for this link: it was cancelled, confirmed or has expired. Nothing"
+" more to do."
+msgstr ""
+"Für diesen Link gibt es keine offene Bewerbung: Sie wurde storniert, bestätigt oder ist "
+"abgelaufen. Es ist nichts weiter zu tun."
+
 #: apps/manager/templates/manager/shop/termination.html
 msgid "There is no termination notice for your shop."
 msgstr "Für Ihren Shop liegt keine Kündigung vor."
@@ -9228,6 +9416,17 @@ msgstr ""
 "Dies ist eine Übersetzung. Termine, Ort und Produkte stammen aus dem Original und werden bei der "
 "Veröffentlichung übernommen."
 
+#: apps/vendors/templates/email/vendors/application_reminder/body.html
+#: apps/vendors/templates/email/vendors/application_reminder/body.txt
+msgid ""
+"This is the only reminder: an application to sell with us was made with this email address and is "
+"still waiting for your confirmation. To go on, open this link, confirm your email address and "
+"choose a password."
+msgstr ""
+"Dies ist die einzige Erinnerung: Mit dieser E-Mail-Adresse wurde eine Bewerbung, bei uns zu "
+"verkaufen, eingereicht, die noch auf Ihre Bestätigung wartet. Um fortzufahren, öffnen Sie diesen "
+"Link, bestätigen Sie Ihre E-Mail-Adresse und wählen Sie ein Passwort."
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "This is your order reference, not an invoice. Each seller issues its own invoice."
 msgstr ""
@@ -9250,6 +9449,10 @@ msgstr ""
 #: apps/orders/ui/present.py
 msgid "This item is sold on request only. Ask the vendor for a quote."
 msgstr "Dieser Artikel wird nur auf Anfrage verkauft. Fordere beim Verkäufer ein Angebot an."
+
+#: apps/vendors/templates/vendors/apply/invalid.html
+msgid "This link is not valid"
+msgstr "Dieser Link ist ungültig"
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "This link was sent to you by email. Press Continue to open the page it leads to."
@@ -9383,6 +9586,16 @@ msgid ""
 msgstr ""
 "Dieser Verkäufer ist gesperrt oder geschlossen, daher kann das Shopprofil nicht geändert werden. "
 "Wenden Sie sich an den Support, um es wieder öffnen zu lassen."
+
+#: apps/vendors/templates/email/vendors/application_confirm/body.html
+#: apps/vendors/templates/email/vendors/application_confirm/body.txt
+#: apps/vendors/templates/email/vendors/application_reminder/body.html
+#: apps/vendors/templates/email/vendors/application_reminder/body.txt
+msgid ""
+"This was not me: open this link to cancel the application and delete the data created with it."
+msgstr ""
+"Das war ich nicht: Öffnen Sie diesen Link, um die Bewerbung zu stornieren und die damit erstellten"
+" Daten zu löschen."
 
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid ""
@@ -10158,6 +10371,15 @@ msgid ""
 msgstr ""
 "Wir verwenden deine Angaben nur, um deine Bestellung zu liefern und die Rechnungen der Verkäufer "
 "auszustellen, bei denen du kaufst."
+
+#: apps/vendors/templates/vendors/apply/form.html
+msgid ""
+"We use your name and email only to handle this application and, if you are accepted, your seller "
+"account. An application nobody confirms is deleted after a few days."
+msgstr ""
+"Wir verwenden Ihren Namen und Ihre E-Mail-Adresse nur, um diese Bewerbung und, falls sie "
+"angenommen wird, Ihr Verkäuferkonto zu bearbeiten. Eine Bewerbung, die niemand bestätigt, wird "
+"nach einigen Tagen gelöscht."
 
 #: apps/manager/event_block_forms.py apps/manager/media.py
 msgid "Web address"
@@ -10976,6 +11198,14 @@ msgstr "Ihr Konto ist mit einem Passkey geschützt."
 msgid "Your account is protected with an authenticator app."
 msgstr "Ihr Konto ist mit einer Authenticator-App geschützt."
 
+#: apps/vendors/templates/vendors/apply/confirmed.html
+msgid ""
+"Your application is with our team for review. Sign in with the password you chose: you will be "
+"asked to set up an authenticator app the first time."
+msgstr ""
+"Ihre Bewerbung wird von unserem Team geprüft. Melden Sie sich mit dem von Ihnen gewählten Passwort"
+" an: Beim ersten Mal werden Sie aufgefordert, eine Authenticator-App einzurichten."
+
 #: apps/orders/templates/orders/cart.html
 msgid "Your cart"
 msgstr "Dein Warenkorb"
@@ -11035,6 +11265,10 @@ msgstr ""
 "Entscheidung mit. Pflichtfeld, außer bei einer Meldung von Material über sexuellen Missbrauch von "
 "Kindern."
 
+#: apps/vendors/templates/vendors/apply/confirmed.html
+msgid "Your email is confirmed"
+msgstr "Ihre E-Mail-Adresse ist bestätigt"
+
 #: apps/vendors/models.py
 msgid ""
 "Your EORI number, the customs identification number for businesses that move goods in or out of "
@@ -11071,6 +11305,10 @@ msgid ""
 msgstr ""
 "Ihr Vor- und Nachname. Wir verwenden ihn, um Sie anzusprechen und Ihr Konto einzurichten. "
 "Pflichtfeld: Ohne ihn können wir die Bewerbung nicht bearbeiten."
+
+#: apps/vendors/forms.py
+msgid "Your full name"
+msgstr "Ihr vollständiger Name"
 
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "your image library"
