@@ -1,4 +1,4 @@
-# count: 72
+# count: 56
 # Routes and page types without help files in every enabled language (ARC.36).
 # Only shrinks: delete a line when its files exist (ARC.37 fills them).
 page_type cms.BlogIndexPage
@@ -34,22 +34,6 @@ route manager:platform:staff_roles
 route manager:platform:termination
 route manager:platform:terminations
 route manager:platform:user_sessions
-route manager:shop:dashboard
-route manager:shop:event_block_add
-route manager:shop:event_cancel
-route manager:shop:event_edit
-route manager:shop:event_images
-route manager:shop:event_new
-route manager:shop:event_translate
-route manager:shop:events
-route manager:shop:order
-route manager:shop:order_amend
-route manager:shop:orders
-route manager:shop:payments
-route manager:shop:profile
-route manager:shop:sales_terms
-route manager:shop:termination
-route manager:shop:vendor
 route mfa:overview
 route mfa:recovery_codes
 route mfa:setup
