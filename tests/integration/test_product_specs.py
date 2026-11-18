@@ -310,3 +310,34 @@ def test_fitment_costs_a_fixed_number_of_queries(
     add_fitment(few, models_per_make=40, makes=3)
     with django_assert_max_num_queries(len(small) + 1):
         assert client.get(PATH).status_code == 200
+
+
+# I18N.20 part 1: the specification labels follow the page language.
+SPEC_LABELS = {
+    "it": ("Peso", "Paese d'origine"),
+    "de": ("Gewicht", "Herkunftsland"),
+    "fr": ("Poids", "Pays d'origine"),
+    "es": ("Peso", "País de origen"),
+}
+
+
+def test_the_spec_labels_are_translated(client: Client, theme: str) -> None:
+    from django.conf import settings
+
+    from apps.core.i18n import configured_languages
+    from tests.i18n import product_url
+
+    langs = [code for code in configured_languages() if code in SPEC_LABELS]
+    assert langs, "no configured language has a catalog"
+    product = make_product(weight_kg=Decimal("1.250"), country_of_origin="IT")
+    for lang in langs:
+        if lang != settings.LANGUAGE_CODE:
+            ProductTranslationFactory.create(
+                product=product, language=lang, title="Tazza", slug="tazza", status=PUBLISHED
+            )
+    for lang in langs:
+        slug = "hand-made-mug" if lang == settings.LANGUAGE_CODE else "tazza"
+        response = client.get(product_url(lang, slug))
+        assert response.status_code == 200, lang
+        labels = [label for label, _value in specs(BeautifulSoup(response.content, "html.parser"))]
+        assert set(SPEC_LABELS[lang]) <= set(labels), (lang, labels)
