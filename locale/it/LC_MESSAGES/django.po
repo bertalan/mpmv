@@ -100,6 +100,12 @@ msgstr "%(n)s giorni"
 msgid "%(n)s hours"
 msgstr "%(n)s ore"
 
+#: apps/manager/templates/manager/shop/fitment_bulk.html
+msgid "%(n)s product selected."
+msgid_plural "%(n)s products selected."
+msgstr[0] "%(n)s prodotto selezionato."
+msgstr[1] "%(n)s prodotti selezionati."
+
 #: apps/accounts/mfa_views.py
 msgid "%(name)s removed."
 msgstr "%(name)s rimosso."
@@ -111,6 +117,10 @@ msgstr "%(qty)s x %(unit)s"
 #: apps/orders/templates/orders/_package.html
 msgid "%(quantity)s × %(unit_price)s"
 msgstr "%(quantity)s × %(unit_price)s"
+
+#: apps/manager/templates/manager/shop/fitment_product.html
+msgid "%(sku)s: %(state)s."
+msgstr "%(sku)s: %(state)s."
 
 #: apps/orders/amendment_notices.py
 msgid "%(title)s removed"
@@ -446,6 +456,14 @@ msgstr ""
 msgid "A promotion (an offer, with no place), a trade fair or meeting, or something else. Required."
 msgstr ""
 "Una promozione (un'offerta, senza luogo), una fiera o un incontro, oppure altro. Obbligatorio."
+
+#: apps/manager/templates/manager/shop/fitment_proposals.html
+msgid ""
+"A proposed item stays hidden until the platform reviews it. Pending proposals: %(pending)s of "
+"%(limit)s."
+msgstr ""
+"Un elemento proposto resta nascosto finché la piattaforma non lo verifica. Proposte in attesa: "
+"%(pending)s su %(limit)s."
 
 #: apps/manager/fitment_forms.py
 msgid "A proposed node waits for review and is not offered in pickers."
@@ -879,6 +897,10 @@ msgid "Add cards of the same kind: blog posts or pages, vendors, products or tes
 msgstr ""
 "Aggiungi schede dello stesso tipo: articoli del blog o pagine, venditori, prodotti o "
 "testimonianze."
+
+#: apps/manager/fitment_shop_views.py
+msgid "Add fitment to the selected products"
+msgstr "Aggiungi la compatibilità ai prodotti selezionati"
 
 #: apps/manager/templates/manager/platform/fitment_node.html
 msgid "Add the alias"
@@ -1365,6 +1387,9 @@ msgid "Back to the orders"
 msgstr "Torna agli ordini"
 
 #: apps/manager/templates/manager/platform/product.html
+#: apps/manager/templates/manager/shop/fitment_product.html
+#: apps/manager/templates/manager/shop/fitment_proposals.html
+#: apps/manager/templates/manager/shop/fitment_report.html
 msgid "Back to the products"
 msgstr "Torna ai prodotti"
 
@@ -1408,6 +1433,10 @@ msgstr "Prima e dopo"
 #: apps/orders/customer_views.py
 msgid "Being prepared"
 msgstr "In preparazione"
+
+#: apps/manager/fitment_shop_forms.py
+msgid "Belongs under"
+msgstr "Appartiene a"
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "block %(number)s, %(label)s"
@@ -1464,6 +1493,8 @@ msgstr "Invito all'azione"
 #: apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
 #: apps/manager/templates/manager/platform/product.html
+#: apps/manager/templates/manager/shop/fitment_bulk.html
+#: apps/manager/templates/manager/shop/fitment_product.html
 msgid "Cancel"
 msgstr "Annulla"
 
@@ -1616,7 +1647,7 @@ msgstr "Categorie"
 msgid "Categories expected to declare fitment"
 msgstr "Categorie che devono dichiarare la compatibilità"
 
-#: apps/manager/fitment_views.py apps/manager/product_views.py
+#: apps/manager/fitment_shop_views.py apps/manager/fitment_views.py apps/manager/product_views.py
 #: apps/manager/templates/manager/platform/product.html
 msgid "Category"
 msgstr "Categoria"
@@ -1845,6 +1876,10 @@ msgstr ""
 "Scegli la categoria o l'etichetta a cui porta la scheda. Una scheda verso una non visibile viene "
 "omessa."
 
+#: apps/manager/fitment_shop_forms.py
+msgid "Choose the item this row is about."
+msgstr "Scelga l'articolo a cui si riferisce questa riga."
+
 #: apps/manager/fitment_views.py
 msgid "Choose the node to merge into."
 msgstr "Scegli il nodo in cui unire."
@@ -2013,6 +2048,8 @@ msgstr "Calcola la modifica"
 #: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
 #: apps/manager/templates/manager/platform/product.html
+#: apps/manager/templates/manager/shop/fitment_bulk.html
+#: apps/manager/templates/manager/shop/fitment_product.html
 msgid "Confirm"
 msgstr "Conferma"
 
@@ -2143,6 +2180,10 @@ msgstr "Impostazioni dei cookie"
 msgid "Cookies and your privacy"
 msgstr "Cookie e la tua privacy"
 
+#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/fitment_product.html
+msgid "Copy from another product"
+msgstr "Copia da un altro prodotto"
+
 #: apps/manager/amendment_forms.py
 msgid "Correct the delivery address, as the customer asked"
 msgstr "Correggi l'indirizzo di consegna, come chiesto dal cliente"
@@ -2268,6 +2309,10 @@ msgstr "Addebiti"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Decided"
 msgstr "Deciso"
+
+#: apps/manager/fitment_shop_forms.py apps/manager/fitment_shop_views.py
+msgid "Declaration"
+msgstr "Dichiarazione"
 
 #: themes/base/templates/components/quantity_stepper.html
 msgid "Decrease quantity"
@@ -2750,6 +2795,14 @@ msgstr "Posizione esatta"
 msgid "excl. VAT"
 msgstr "IVA esclusa"
 
+#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "Excludes"
+msgstr "Esclude"
+
+#: apps/manager/templates/manager/shop/fitment_report.html
+msgid "Exclusions with nothing to exclude from"
+msgstr "Esclusioni senza nulla da escludere"
+
 #: apps/manager/fitment_views.py
 msgid "Expect fitment"
 msgstr "Richiedi la compatibilità"
@@ -2866,7 +2919,8 @@ msgstr "Primo giorno"
 msgid "Fiscal category"
 msgstr "Categoria fiscale"
 
-#: apps/manager/fitment_views.py
+#: apps/manager/fitment_shop_views.py apps/manager/fitment_views.py apps/manager/sections.py
+#: apps/manager/site_map.py
 msgid "Fitment"
 msgstr "Compatibilità"
 
@@ -2879,6 +2933,11 @@ msgstr "Categorie di compatibilità"
 msgid "Fitment nodes"
 msgstr "Nodi di compatibilità"
 
+#: apps/manager/fitment_shop_views.py apps/manager/site_map.py
+#: apps/manager/templates/manager/shop/fitment_list.html
+msgid "Fitment report"
+msgstr "Rapporto sulla compatibilità"
+
 #: apps/manager/fitment_views.py apps/manager/sections.py apps/manager/site_map.py
 msgid "Fitment scheme"
 msgstr "Schema di compatibilità"
@@ -2886,6 +2945,10 @@ msgstr "Schema di compatibilità"
 #: apps/catalog/templates/catalog/product.html
 msgid "Fits"
 msgstr "Compatibile con"
+
+#: apps/manager/fitment_shop_forms.py
+msgid "Fits everything"
+msgstr "Si adatta a tutto"
 
 #: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Footer"
@@ -2930,6 +2993,9 @@ msgstr "Venerdì"
 #: apps/manager/templates/manager/shop/_money_filters.html
 msgid "From"
 msgstr "Dal"
+#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "From year"
+msgstr "Dall'anno"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Frozen orders and payouts"
@@ -3627,6 +3693,7 @@ msgstr ""
 "Italia: il tuo codice fiscale, 16 caratteri per una persona o 11 cifre per una società. Altrove: "
 "il tuo numero di identificazione fiscale nazionale (TIN). Viene conservato cifrato."
 
+#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
 #: apps/orders/templates/orders/customer_order.html
 msgid "Item"
 msgstr "Articolo"
@@ -3766,6 +3833,10 @@ msgid ""
 msgstr ""
 "Lascia vuoto per la data più vicina consentita. Senza eccezione non può essere meno di 30 giorni "
 "avanti."
+
+#: apps/manager/fitment_shop_forms.py
+msgid "Leave empty for the top level."
+msgstr "Lasci vuoto per il livello più alto."
 
 #: apps/cms/models.py
 msgid "Leave empty to show the profile in every language."
@@ -4097,12 +4168,17 @@ msgstr "Il mio negozio"
 
 #: apps/manager/fitment_forms.py apps/manager/fitment_views.py
 #: apps/manager/templates/manager/platform/fitment_node.html
+#: apps/manager/templates/manager/shop/fitment_proposals.html
 msgid "Name"
 msgstr "Nome"
 
 #: apps/catalog/taxonomy.py
 msgid "name"
 msgstr "nome"
+
+#: apps/manager/fitment_shop_forms.py
+msgid "Name of the missing item"
+msgstr "Nome dell'elemento mancante"
 
 #: apps/vendors/forms.py
 msgid "Name of your business or shop"
@@ -4318,6 +4394,10 @@ msgstr "Non aggiunto: %(item)s, %(reason)s."
 msgid "Not connected"
 msgstr "Non collegato"
 
+#: apps/manager/fitment_shop_forms.py
+msgid "Not declared"
+msgstr "Non dichiarato"
+
 #: apps/manager/fitment_views.py
 msgid "Not expected"
 msgstr "Non richiesta"
@@ -4398,6 +4478,10 @@ msgstr ""
 msgid "not yet"
 msgstr "non ancora"
 
+#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "Note"
+msgstr "Nota"
+
 #: apps/vendors/templates/vendors/apply/sent.html
 msgid "Nothing arrived after a few minutes? Check your spam folder."
 msgstr "Non è arrivato nulla dopo qualche minuto? Controlli la cartella dello spam."
@@ -4413,6 +4497,8 @@ msgstr "Nessuna modifica: questo testo è ancora una bozza. Modificalo per pubbl
 #: apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
 #: apps/manager/templates/manager/platform/product.html
+#: apps/manager/templates/manager/shop/fitment_bulk.html
+#: apps/manager/templates/manager/shop/fitment_product.html
 msgid "Nothing has changed yet. Check the changes below, then confirm."
 msgstr "Non è stato ancora modificato nulla. Controlli le modifiche qui sotto, poi confermi."
 
@@ -4423,6 +4509,8 @@ msgstr "Nessuna candidatura in attesa"
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/_money_table.html
+#: apps/manager/templates/manager/shop/fitment_proposals.html
+#: apps/manager/templates/manager/shop/fitment_report.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Nothing to show."
 msgstr "Niente da mostrare."
@@ -5488,6 +5576,8 @@ msgid "Prepare a change"
 msgstr "Prepara una modifica"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/product.html
+#: apps/manager/templates/manager/shop/fitment_bulk.html
+#: apps/manager/templates/manager/shop/fitment_product.html
 msgid "Preview"
 msgstr "Anteprima"
 
@@ -5502,6 +5592,10 @@ msgstr "Anteprima dell'unione"
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Preview the change"
 msgstr "Anteprima della modifica"
+
+#: apps/manager/templates/manager/shop/fitment_product.html
+msgid "Preview the copy"
+msgstr "Anteprima della copia"
 
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Preview the labels"
@@ -5603,6 +5697,10 @@ msgstr "Prodotti"
 msgid "Products and categories"
 msgstr "Prodotti e categorie"
 
+#: apps/manager/templates/manager/shop/fitment_report.html
+msgid "Products still undeclared"
+msgstr "Prodotti ancora non dichiarati"
+
 #: apps/orders/templates/orders/_legal_recap.html
 msgid "professional seller"
 msgstr "venditore professionale"
@@ -5618,6 +5716,11 @@ msgstr "Promozione"
 #: apps/manager/fitment_views.py
 msgid "Proposals"
 msgstr "Proposte"
+
+#: apps/manager/site_map.py apps/manager/templates/manager/shop/fitment_list.html
+#: apps/manager/templates/manager/shop/fitment_product.html
+msgid "Propose a missing item"
+msgstr "Proponi un elemento mancante"
 
 #: apps/manager/fitment_forms.py
 msgid "Proposed"
@@ -5883,6 +5986,7 @@ msgstr "Promemoria: confermi il Suo indirizzo email per completare la candidatur
 #: apps/accounts/templates/accounts/mfa/setup.html
 #: apps/manager/templates/manager/platform/fitment_node.html
 #: apps/manager/templates/manager/shop/_event_blocks.html
+#: apps/manager/templates/manager/shop/_fitment_rows.html
 #: apps/manager/templates/manager/shop/event_block_remove.html
 #: themes/base/templates/components/cart_line.html
 msgid "Remove"
@@ -6050,6 +6154,10 @@ msgstr "Ruoli"
 msgid "Row"
 msgstr "Riga"
 
+#: apps/manager/templates/manager/shop/fitment_report.html
+msgid "Rows waiting on an item that is not approved"
+msgstr "Righe in attesa di un elemento non approvato"
+
 #: apps/events/templates/events/_subscribe.html
 msgid "RSS feed"
 msgstr "Feed RSS"
@@ -6143,7 +6251,7 @@ msgstr "Schermata (nome della route)"
 msgid "screen or page type"
 msgstr "schermata o tipo di pagina"
 
-#: apps/manager/product_views.py apps/seo/page_builders.py
+#: apps/manager/fitment_shop_views.py apps/manager/product_views.py apps/seo/page_builders.py
 #: themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Cerca"
@@ -6173,7 +6281,7 @@ msgstr "Vai alla pagina del tuo ordine"
 msgid "Select"
 msgstr "Seleziona"
 
-#: apps/manager/lists.py
+#: apps/manager/fitment_shop_views.py apps/manager/lists.py
 msgid "Select at least one row."
 msgstr "Seleziona almeno una riga."
 
@@ -6196,6 +6304,10 @@ msgstr "Modalità di vendita"
 #: apps/vendors/templates/vendors/apply/form.html
 msgid "Send my application"
 msgstr "Invia la mia candidatura"
+
+#: apps/manager/templates/manager/shop/fitment_proposals.html
+msgid "Send the proposal"
+msgstr "Invia la proposta"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid ""
@@ -6519,8 +6631,8 @@ msgstr "Salta la mappa"
 msgid "Skip to main content"
 msgstr "Vai al contenuto principale"
 
-#: apps/catalog/templates/catalog/product.html apps/manager/product_views.py
-#: apps/manager/templates/manager/platform/product.html
+#: apps/catalog/templates/catalog/product.html apps/manager/fitment_shop_views.py
+#: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/shop/order.html
 msgid "SKU"
 msgstr "SKU"
@@ -6636,6 +6748,10 @@ msgstr "Indirizzo della fonte"
 msgid "Specific approval of onerous clauses (articles 1341 and 1342 of the Italian Civil Code)"
 msgstr "Approvazione specifica delle clausole onerose (artt. 1341 e 1342 del codice civile)"
 
+#: apps/manager/fitment_shop_forms.py
+msgid "Specific items"
+msgstr "Elementi specifici"
+
 #: apps/catalog/templates/catalog/product.html
 msgid "Specifications"
 msgstr "Specifiche tecniche"
@@ -6712,8 +6828,10 @@ msgstr "Statistiche"
 #: apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/platform/terminations.html
-#: apps/manager/templates/manager/shop/events.html apps/manager/templates/manager/shop/order.html
-#: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_order.html
+#: apps/manager/templates/manager/shop/events.html
+#: apps/manager/templates/manager/shop/fitment_proposals.html
+#: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
+#: apps/orders/templates/orders/customer_order.html
 #: apps/orders/templates/orders/customer_orders.html
 msgid "Status"
 msgstr "Stato"
@@ -7649,6 +7767,14 @@ msgid ""
 msgstr ""
 "La categoria fiscale di questa riga non è stata registrata alla vendita, quindi l’imposta non si "
 "può ricalcolare; la riga si può solo ridurre o togliere."
+
+#: apps/manager/fitment_shop_views.py
+msgid "The fitment is added to the selected products."
+msgstr "La compatibilità è aggiunta ai prodotti selezionati."
+
+#: apps/manager/fitment_shop_views.py
+msgid "The fitment of this product is saved."
+msgstr "La compatibilità di questo prodotto è salvata."
 
 #: apps/core/models.py
 msgid ""
@@ -9812,6 +9938,7 @@ msgstr ""
 
 #: apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
+#: apps/manager/templates/manager/shop/fitment_product.html
 msgid "This action changes nothing."
 msgstr "Questa azione non modifica nulla."
 
@@ -10276,8 +10403,9 @@ msgstr "Fuso orario"
 msgid "Times above are read in this time zone, e.g. Europe/Rome."
 msgstr "Gli orari qui sopra sono letti in questo fuso orario, per esempio Europe/Rome."
 
-#: apps/manager/event_forms.py apps/manager/event_image_form.py apps/manager/media.py
-#: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
+#: apps/manager/event_forms.py apps/manager/event_image_form.py apps/manager/fitment_shop_views.py
+#: apps/manager/media.py apps/manager/product_views.py
+#: apps/manager/templates/manager/platform/product.html
 msgid "Title"
 msgstr "Titolo"
 
@@ -10325,6 +10453,10 @@ msgstr ""
 "Per limitare la zona ad alcune province o stati, elenca i loro codici separati da virgole, per "
 "esempio 'SS' o 'CA'."
 
+#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "To year"
+msgstr "All'anno"
+
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py
 msgid "Too many attempts. Please try again later."
 msgstr "Troppi tentativi. Riprova più tardi."
@@ -10336,6 +10468,10 @@ msgstr "Troppi download. Riprova più tardi."
 #: apps/orders/ui/views.py
 msgid "Too many requests from this address. Try again later."
 msgstr "Troppe richieste da questo indirizzo. Riprova più tardi."
+
+#: apps/manager/fitment_shop_forms.py
+msgid "Top level"
+msgstr "Livello più alto"
 
 #: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_order.html
@@ -10933,6 +11069,10 @@ msgid "What is restricted, where and for how long, in plain words. The vendor se
 msgstr ""
 "Che cosa viene limitato, dove e per quanto tempo, in parole semplici. Il venditore vede questo "
 "testo."
+
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "What it fits"
+msgstr "A che cosa si adatta"
 
 #: apps/shipping/models.py
 msgid "What kind of area it is: an island, a remote area or a territory with its own VAT rules."
@@ -11930,6 +12070,14 @@ msgstr "I tuoi prodotti, fino a 12. Obbligatorio."
 msgid "Your payout account is active. Customers can buy your products online."
 msgstr ""
 "Il Suo account per i pagamenti è attivo. I clienti possono acquistare i Suoi prodotti online."
+
+#: apps/manager/fitment_shop_views.py
+msgid "Your proposal is sent. It stays hidden until it is reviewed."
+msgstr "La sua proposta è inviata. Resta nascosta finché non viene verificata."
+
+#: apps/manager/templates/manager/shop/fitment_proposals.html
+msgid "Your proposals"
+msgstr "Le sue proposte"
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your protection"

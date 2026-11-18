@@ -160,6 +160,10 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:event_block_add": "shop",  # EVT.4 part 2
         "manager:shop:event_images": "shop",
         "manager:shop:order_amend": "shop",  # ORD.20 part 3
+        "manager:shop:fitment": "shop",  # FIT.3
+        "manager:shop:fitment_product": "shop",
+        "manager:shop:fitment_proposals": "shop",
+        "manager:shop:fitment_report": "shop",
         "manager:platform:orders": "platform",
         "manager:platform:order": "platform",
         "manager:platform:amendment_settings": "platform",
@@ -172,6 +176,8 @@ def _open(name: str) -> tuple[Client, str]:
         kwargs = {}
         if name in ("manager:shop:order", "manager:shop:order_amend"):
             kwargs = {"public_id": paid_vendor_order(vendor).public_id}  # type: ignore[arg-type]
+        if name == "manager:shop:fitment_product":
+            kwargs = {"public_id": ProductFactory.create(vendor=vendor).public_id}
         if name in (
             "manager:shop:event_edit",
             "manager:shop:event_cancel",

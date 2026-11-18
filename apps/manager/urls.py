@@ -11,6 +11,7 @@ from . import (
     amendment_views,
     event_block_views,
     event_views,
+    fitment_shop_views,
     fitment_views,
     media,
     money_views,
@@ -122,6 +123,21 @@ shop = (
             "orders/<uuid:public_id>/<slug:action>/",
             views.VendorOrderActionView.as_view(),
             name="order_action",
+        ),
+        # FIT.3: the Fits pages of the shop (list with bulk add, product tab, proposals, report).
+        path("fitment/", fitment_shop_views.FitmentList.as_view(), name="fitment"),
+        path(
+            "fitment/proposals/",
+            fitment_shop_views.FitmentProposalsView.as_view(),
+            name="fitment_proposals",
+        ),
+        path(
+            "fitment/report/", fitment_shop_views.FitmentReportView.as_view(), name="fitment_report"
+        ),
+        path(
+            "fitment/<uuid:public_id>/",
+            fitment_shop_views.FitmentProductView.as_view(),
+            name="fitment_product",
         ),
         path("vendor/", views.VendorPickerView.as_view(), name="vendor"),
         # The 30 days' notice of termination (CMP.5 part 4): the reason, and the data download.

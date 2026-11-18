@@ -14,6 +14,7 @@ from apps.vendors.services import can_review_profiles
 from .amendment_views import PLATFORM_SECTION as ORDER_CHANGES_SECTION
 from .amendment_views import SETTINGS_SECTION as AMENDMENT_SETTINGS_SECTION
 from .event_views import SECTION as EVENTS_SECTION
+from .fitment_shop_views import SECTION as SHOP_FITMENT_SECTION
 from .fitment_views import CATEGORIES_SECTION, NODES_SECTION, SCHEME_SECTION
 from .money_views import SECTION as MONEY_SECTION
 from .navigation import Registry, Section, anyone, platform_role, vendor_action
@@ -68,6 +69,15 @@ BUILT_IN = (
         "manager:shop:events",
         order=35,
         allowed=vendor_action("events"),
+    ),
+    # The shop's fitment declarations (FIT.3): owners and staff, by the `products` action.
+    Section(
+        SHOP_FITMENT_SECTION,
+        Space.SHOP,
+        _("Fitment"),
+        "manager:shop:fitment",
+        order=36,
+        allowed=vendor_action("products"),
     ),
     # The payout account (VEN.6): owners only, like the other financial settings.
     Section(

@@ -21,6 +21,7 @@ from apps.fitment.models import (
     FitmentNode,
     FitmentNodeAlias,
     FitmentNodeMerge,
+    FitmentNodeProposal,
     FitmentNodeTranslation,
     FitmentNote,
     FitmentNoteTranslation,
@@ -28,6 +29,7 @@ from apps.fitment.models import (
     ProductFitment,
     ProductFitmentState,
 )
+from apps.vendors.tests.factories import VendorFactory
 
 
 class FitmentSchemeFactory(DjangoModelFactory[FitmentScheme]):
@@ -159,3 +161,11 @@ class ProductFitmentFactory(DjangoModelFactory[ProductFitment]):
     node = factory.SubFactory(FitmentNodeFactory)
     node_path = factory.LazyAttribute(lambda o: o.node.path)
     source = ProductFitment.Source.MANUAL
+
+
+class FitmentNodeProposalFactory(DjangoModelFactory[FitmentNodeProposal]):
+    class Meta:
+        model = FitmentNodeProposal
+
+    vendor = factory.SubFactory(VendorFactory)
+    node = factory.SubFactory(FitmentNodeFactory, status=FitmentNode.Status.PROPOSED)
