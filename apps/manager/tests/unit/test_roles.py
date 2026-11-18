@@ -99,3 +99,15 @@ def test_support_reads_but_never_writes_the_products_section_cat30() -> None:
     assert roles.allows("platform.products", [roles.SUPPORT])
     assert not roles.allows("platform.products", [roles.SUPPORT], write=True)
     assert not roles.allows("platform.products", [roles.FINANCE])
+
+
+def test_the_catalog_services_know_every_platform_role_permission() -> None:
+    """CAT.30: the catalog services list the permission of every platform role."""
+    from apps.catalog import services
+
+    own = {perm for role in roles.ROLES for perm in role.permissions if perm.startswith("manager.")}
+    assert own <= set(services.PLATFORM_ROLE_PERMISSIONS)
+    assert set(services.CATALOG_EDITOR_PERMISSIONS) == {
+        "manager.platform_catalog",
+        roles.PLATFORM_OWNER_PERMISSION,
+    }
