@@ -171,8 +171,7 @@ def test_your_data_has_a_customer_context_and_the_vendor_page_stays_formal(
     vendor = by_ctx[None]
     assert not _any_in(vendor, PRIVACY_PAGES)
     assert _any_in(vendor, ("manager/shop/termination.html",))
-    if lang != "it":
-        assert vendor.msgstr != expected
+    assert vendor.msgstr != expected
 
 
 @pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
@@ -229,3 +228,133 @@ def test_the_vendor_application_flow_is_translated_and_formal(lang: str) -> None
         assert not INFORMAL[lang].search(_texts(entry)), (entry.msgid, _texts(entry))
     by_id = {e.msgid: e.msgstr for e in entries}
     assert by_id["Send my application"] != "Send my application"
+
+
+# I18N.13 register follow-up: the Manager (vendor and staff screens) and the vendor mails are
+# formal. The check has two parts. Informal pronouns and verb forms are refused anywhere. An
+# informal imperative ("Annulla", "Scegli", "Wähle", "Choisis", "Elige") is refused at the start of
+# a sentence, but not in a short label: a button or link name of at most twelve words with no
+# sentence punctuation may be an infinitive or imperative (translations.md, Tone).
+FORMAL_SCOPE = (
+    "apps/manager/templates/",
+    "apps/vendors/templates/",
+    "apps/accounts/templates/accounts/mfa/",
+)
+SHARED_WITH_CUSTOMER = ("compliance/privacy_account.html", "apps/events/", "apps/orders/")
+
+INFORMAL_VERBS = {
+    "it": r"tu|tuo|tua|tuoi|tue|ti|hai|sei|puoi|potrai|vuoi|devi|riesci|ricordati|assicurati",
+    "de": r"du|dein\w*|dir|dich|kannst|musst|willst|hast|bist|euch|euer\w*",
+    "fr": r"tu|ton|ta|tes|toi|te|peux|veux|dois|as|es",
+    "es": r"tú|tu|tus|ti|contigo|tienes|puedes|quieres|debes|eres",
+}
+IMPERATIVES = {
+    "it": (
+        "annulla traduci scegli inserisci clicca vai scansiona guarda seleziona compila carica usa "
+        "controlla verifica aggiungi salva conferma rimuovi elimina modifica crea invia apri "
+        "scrivi digita premi torna leggi ricorda attendi prova imposta indica descrivi cerca "
+        "scarica collega configura registra chiedi usa trascina trova"
+    ),
+    "de": (
+        "gib wähle scanne sieh bewahre verwende klicke gehe füge speichere lösche bestätige prüfe "
+        "trage lade nutze öffne schreibe melde lege stelle achte beachte wechsle kopiere suche "
+        "setze bearbeite starte aktiviere übersetze fordere gebe lies halte drücke nimm"
+    ),
+    "fr": (
+        "ajoute choisis clique saisis vérifie enregistre supprime confirme ouvre écris scanne "
+        "utilise garde conserve contrôle télécharge regarde sélectionne remplis crée envoie "
+        "modifie retourne reviens annule traduis va lis appuie renseigne indique ajoute"
+    ),
+    "es": (
+        "elige escanea introduce guárdalos haz pulsa selecciona añade guarda elimina confirma "
+        "abre escribe revisa usa comprueba descarga vuelve cancela traduce crea envía ve busca "
+        "rellena completa sube pide recuerda asegúrate indica configura conecta registra cambia "
+        "modifica"
+    ),
+}
+SENTENCE_START = r"(?:^|[.:;!?]\s+|\(\s*)"
+INFORMAL_PRONOUN = {
+    lang: re.compile(rf"\b({words})\b", re.IGNORECASE) for lang, words in INFORMAL_VERBS.items()
+}
+INFORMAL_IMPERATIVE = {
+    lang: re.compile(SENTENCE_START + "(" + "|".join(words.split()) + r")\b", re.IGNORECASE)
+    for lang, words in IMPERATIVES.items()
+}
+
+
+def _is_label(text: str) -> bool:
+    return len(text.split()) <= 12 and not re.search(r"[.:;!?]", text)
+
+
+def _formal_scope_entries(lang: str) -> list[polib.POEntry]:
+    """Entries used only on formal pages (a string shared with a customer page is skipped)."""
+    result = []
+    for entry in _po(lang):
+        paths = [p for p, _l in entry.occurrences]
+        if not paths or not all(any(p.startswith(s) for s in FORMAL_SCOPE) for p in paths):
+            continue
+        if any(m in p for p in paths for m in SHARED_WITH_CUSTOMER):
+            continue
+        result.append(entry)
+    return result
+
+
+@pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
+def test_formal_pages_have_no_informal_pronoun_or_sentence_imperative(lang: str) -> None:
+    entries = _formal_scope_entries(lang)
+    assert len(entries) > 100
+    bad = []
+    for entry in entries:
+        for text in [entry.msgstr, *entry.msgstr_plural.values()]:
+            if INFORMAL_PRONOUN[lang].search(text) or (
+                not _is_label(text) and INFORMAL_IMPERATIVE[lang].search(text)
+            ):
+                bad.append((entry.msgid, text))
+    assert bad == []
+
+
+@pytest.mark.parametrize(
+    ("lang", "text", "flagged"),
+    [
+        ("it", "Salva prima le modifiche: viene inviata l'ultima bozza.", True),
+        ("it", "Inserisca il numero. Scegli un corriere.", True),
+        ("it", "Annulla", False),
+        ("it", "Il Suo ruolo non può confermare questa modifica.", False),
+        ("it", "Il tuo ruolo", True),
+        ("de", "Wähle eine Datei, die du hochladen willst.", True),
+        ("de", "Wählen Sie eine Datei.", False),
+        ("fr", "Choisis un fichier. Puis enregistre.", True),
+        ("fr", "Choisissez un fichier.", False),
+        ("es", "Elige un archivo. Luego guarda.", True),
+        ("es", "Elija un archivo.", False),
+    ],
+)
+def test_the_register_regexes_flag_what_they_should(lang: str, text: str, flagged: bool) -> None:
+    hit = bool(INFORMAL_PRONOUN[lang].search(text)) or (
+        not _is_label(text) and bool(INFORMAL_IMPERATIVE[lang].search(text))
+    )
+    assert hit is flagged
+
+
+# I18N.13 follow-up: the Italian help uses one apostrophe, the ASCII one (the large majority
+# of the help and of the catalog). A typographic one would make a quoted label differ from the
+# screen's label and from a search typed on a keyboard.
+def test_italian_help_uses_only_the_ascii_apostrophe() -> None:
+    bad = [
+        str(p.relative_to(ROOT))
+        for p in sorted((ROOT / "help" / "it").rglob("*.md"))
+        if re.search(r"[\u2019\u2018\u02bc]", p.read_text(encoding="utf-8"))
+    ]
+    assert bad == []
+
+
+def test_the_italian_labels_quoted_by_the_help_use_the_ascii_apostrophe() -> None:
+    labels = {
+        "Use an authenticator app",
+        "Set up an authenticator app",
+        "Ship the order",
+        "Account status",
+    }
+    found = {e.msgid: e.msgstr for e in _po("it") if e.msgid in labels}
+    assert set(found) == labels
+    assert all("\u2019" not in text for text in found.values()), found

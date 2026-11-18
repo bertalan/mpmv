@@ -1,11 +1,11 @@
-{% load i18n tz wagtailcore_tags %}{% get_current_language as page_language %}{% comment %}
+{% load i18n l10n tz wagtailcore_tags %}{% get_current_language as page_language %}{% comment %}
 One event in a list (EVT.6): a heading link, the dates as `<time datetime>`, the type as text and
 the vendor, never colour alone. Context: `item` (an `events.listing.Item`). An original-language
 fallback (EVT.8) carries `lang` on the article and `hreflang` on the link, and shows its language
-name; `heading_tag` (default h4) sets the heading level; the interface strings around it (the meta line) say they are in the page's language.
+name; `plot` (the list only) adds `data-lat` and `data-lng` for the map of EVT.15; `heading_tag` (default h4) sets the heading level; the interface strings around it (the meta line) say they are in the page's language.
 {% endcomment %}
 {% with event=item.page span=item.span %}
-<article class="event-summary"{% if item.language %} lang="{{ item.language }}"{% endif %}>
+<article class="event-summary"{% if plot and event.latitude is not None %} data-lat="{{ event.latitude|unlocalize }}" data-lng="{{ event.longitude|unlocalize }}"{% endif %}{% if item.language %} lang="{{ item.language }}"{% endif %}>
   {% with heading=heading_tag|default:"h4" %}<{{ heading }}><a href="{% pageurl event %}"{% if item.language %} hreflang="{{ item.language }}"{% endif %}>{{ event.title }}</a></{{ heading }}>{% endwith %}
   <p class="event-meta"{% if item.language %} lang="{{ page_language }}"{% endif %}>
     {% if event.all_day %}

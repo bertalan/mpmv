@@ -1,0 +1,30 @@
+{% load i18n %}{% comment %}
+The map of an event page (EVT.15, spec 15 "Maps"), only with both coordinates. The text address
+is in the facts above it. Order: a skip link, the map region, then the directions links (the
+skip link's target). The container holds the no-JavaScript fallback (the place, the address and
+the attribution); `events/map.js` replaces it with the map. The map is supplementary: all its
+information is in the text. Context: `map` (see `listing.map_context`).
+{% endcomment %}
+{% with point=map.point %}
+<div class="event-map">
+  <p class="event-map__skip-wrap"><a class="event-map__skip" href="#event-map-end">{% translate "Skip map" %}</a></p>
+  <div class="event-map__canvas" id="event-map" data-event-map role="region"
+      aria-label="{% blocktranslate with name=point.label %}Map: {{ name }}{% endblocktranslate %}"
+      data-lat="{{ point.lat }}" data-lng="{{ point.lng }}" data-zoom="{{ point.zoom }}"
+      data-label="{{ point.label }}" data-address="{{ point.address }}"
+      data-tile-url="{{ map.tile_url }}" data-attribution="{{ map.attribution }}"
+      data-attribution-url="{{ map.attribution_url }}">
+    <p class="event-map__fallback">
+      <strong>{{ point.label }}</strong>{% for line in map.address_lines %}<br>{{ line }}{% endfor %}
+    </p>
+    <p class="event-map__attribution" data-map-attribution>{% if map.attribution_url %}<a href="{{ map.attribution_url }}">{{ map.attribution }}</a>{% else %}{{ map.attribution }}{% endif %}</p>
+  </div>
+  <div id="event-map-end" class="event-map__links" tabindex="-1">
+    <ul>
+      <li><a href="{{ map.directions.google }}" rel="noopener">{% translate "Directions on Google Maps" %}</a></li>
+      <li><a href="{{ map.directions.osm }}" rel="noopener">{% translate "Directions on OpenStreetMap" %}</a></li>
+      <li><a href="{{ map.directions.geo }}">{% translate "Open in a maps app" %}</a></li>
+    </ul>
+  </div>
+</div>
+{% endwith %}

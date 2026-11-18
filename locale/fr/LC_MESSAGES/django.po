@@ -1059,6 +1059,14 @@ msgid "An extra amount added to the price of the band, without VAT. Use 0 for no
 msgstr ""
 "Un montant supplémentaire ajouté au prix de la tranche, hors TVA. Utilisez 0 s'il n'y en a pas."
 
+#: apps/catalog/templates/catalog/admin/orphan_images_old_versions.html
+msgid ""
+"An image that is only in an old version of a page may be listed here. If you delete it, going back"
+" to that version would show a missing image."
+msgstr ""
+"Une image présente uniquement dans une ancienne version d'une page peut apparaître dans cette "
+"liste. Si vous la supprimez, revenir à cette version afficherait une image manquante."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "An introduction shown on the category page, for example what you find in it. Basic formatting is "
@@ -2336,6 +2344,14 @@ msgstr "Développement et système"
 #: apps/manager/templates/manager/platform/user_sessions.html
 msgid "Device"
 msgstr "Appareil"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Directions on Google Maps"
+msgstr "Itinéraire sur Google Maps"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Directions on OpenStreetMap"
+msgstr "Itinéraire sur OpenStreetMap"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Discard the draft"
@@ -3859,6 +3875,14 @@ msgstr "Espace boutique du Manager : %(vendor)s"
 msgid "manufacturer"
 msgstr "fabricant"
 
+#: apps/events/templates/events/_index_map.html
+msgid "Map of the listed events"
+msgstr "Carte des événements listés"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Map: %(name)s"
+msgstr "Carte : %(name)s"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Mark as delivered"
 msgstr "Marquer comme livré"
@@ -4654,6 +4678,14 @@ msgstr "Un préavis ne peut être donné qu'à des vendeurs actifs ou suspendus.
 #: apps/events/admin_views.py
 msgid "Only when the event is hidden after a notice."
 msgstr "Uniquement lorsque l'événement est masqué à la suite d'un signalement."
+
+#: apps/events/templates/events/_event_map.html
+msgid "Open in a maps app"
+msgstr "Ouvrir dans une application de cartes"
+
+#: apps/events/templates/events/event_page.html
+msgid "Open in maps"
+msgstr "Ouvrir dans les cartes"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 #: apps/accounts/templates/accounts/levels/prompt.html
@@ -6284,6 +6316,10 @@ msgstr "site"
 #: apps/cms/templatetags/cms_tags.py apps/seo/templates/seo/site_links.html
 msgid "Site links"
 msgstr "Liens du site"
+
+#: apps/events/templates/events/_event_map.html apps/events/templates/events/_index_map.html
+msgid "Skip map"
+msgstr "Passer la carte"
 
 #: themes/base/templates/components/skip_link.html
 msgid "Skip to main content"

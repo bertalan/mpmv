@@ -27,7 +27,7 @@ from apps.core import images as core_images
 from apps.core import rendition_monitor as monitor
 from apps.core import tasks as core_tasks
 from apps.core.audit import AuditContext
-from apps.core.models import AuditLog, MediaImage
+from apps.core.models import AuditLog, MediaImage, OutboxEmail
 from apps.core.tasks import PermanentJobError, render_image
 from apps.core.templatetags.responsive_images import responsive_image
 from apps.core.tests.factories import MediaImageFactory
@@ -318,3 +318,117 @@ def test_a_customer_and_an_editor_without_change_permission_are_refused(client: 
     post = other.post(reverse(URL_NAME), {"image": image.pk, "group": "hero"})
     assert post.status_code in (302, 403)
     assert not AuditLog.objects.filter(action=monitor.RETRIED).exists()
+
+
+# --- follow-ups: query limit, aggregated alert, retry limits -------------------------------------
+
+
+def test_the_failed_list_limit_is_pushed_into_the_query() -> None:
+    images = [old_image() for _ in range(10)]
+    for image in images:
+        fail_job(job_id_of(image, "hero"))
+    fail_job(job_id_of(images[0], "card"))  # a second group of one image
+
+    with CaptureQueriesContext(connection) as few:
+        failed = monitor.failed_jobs(limit=3)
+    with CaptureQueriesContext(connection) as many:
+        monitor.failed_jobs(limit=100)
+
+    assert len(failed) == 3
+    assert [f.image.pk for f in failed] == [images[9].pk, images[8].pk, images[7].pk]
+    assert any("LIMIT" in q["sql"].upper() and "procrastinate_jobs" in q["sql"] for q in few)
+    assert len(few) == len(many)
+
+
+def test_the_failed_list_keeps_the_latest_job_per_image_and_group() -> None:
+    image = old_image()
+    fail_job(job_id_of(image, "hero"))
+    monitor.retry_render(image.pk, "hero", ctx=CTX)
+    newest = max(
+        job.id
+        for job in core_tasks.list_jobs(JOB, status="todo")
+        if job.task_kwargs.get("image_id") == image.pk
+    )
+    fail_job(newest)
+
+    failed = monitor.failed_jobs()
+
+    assert [(f.image.pk, f.group, f.job_id) for f in failed] == [(image.pk, "hero", newest)]
+
+
+def test_corrupt_uploads_in_one_window_share_one_alert(settings: Any, sink: AlertSink) -> None:
+    settings.OPS_ALERT_EMAIL = "ops@example.com"
+    from apps.core import alerts
+
+    sink_calls = sink.alerts
+    count = 4
+    images = [MediaImageFactory.create() for _ in range(count)]
+    for image in images:
+        corrupt(image)
+    for image in images:
+        with pytest.raises(PermanentJobError):
+            render_image(context(0), image_id=image.pk, group="hero")
+
+    assert len({alert.key for alert in sink_calls}) == 1
+    assert sink_calls[-1].key == "renditions:decode"
+    assert sink_calls[-1].details["images"] == str(count)
+    assert AuditLog.objects.filter(action=monitor.FAILED).count() == count
+    assert {row.target_key for row in AuditLog.objects.filter(action=monitor.FAILED)} == {
+        f"{image.pk}:hero" for image in images
+    }
+    del alerts
+
+
+def test_corrupt_uploads_send_one_mail_per_window(settings: Any) -> None:
+    settings.OPS_ALERT_EMAIL = "ops@example.com"
+    images = [MediaImageFactory.create() for _ in range(4)]
+    for image in images:
+        corrupt(image)
+    for image in images:
+        with pytest.raises(PermanentJobError):
+            render_image(context(0), image_id=image.pk, group="hero")
+    for image in images:  # a second group of the same images: still the same mail
+        with pytest.raises(PermanentJobError):
+            render_image(context(0), image_id=image.pk, group="card")
+
+    mails = OutboxEmail.objects.filter(idempotency_key__startswith="ops:alert:renditions:decode")
+    assert mails.count() == 1
+
+
+def test_a_retry_of_something_not_listed_is_refused() -> None:
+    done = old_image()
+    render_image(image_id=done.pk)
+    with pytest.raises(monitor.NotListed):
+        monitor.retry_render(done.pk, "hero", ctx=CTX)
+    assert not AuditLog.objects.filter(action=monitor.RETRIED).exists()
+
+
+def test_the_retry_button_refuses_an_image_that_is_not_listed(client: Client) -> None:
+    done = old_image()
+    render_image(image_id=done.pk)
+    verified_login(client, staff("add_image", "change_image"))
+    todo = len(core_tasks.list_jobs(JOB, status="todo"))
+
+    response = client.post(reverse(URL_NAME), {"image": done.pk, "group": "hero"})
+    junk = client.post(reverse(URL_NAME), {"image": "x", "group": "hero"})
+
+    assert response.status_code == 404
+    assert junk.status_code == 400
+    assert len(core_tasks.list_jobs(JOB, status="todo")) == todo
+
+
+def test_the_retry_button_has_a_bulk_cap_per_user(client: Client) -> None:
+    from apps.catalog import rendition_admin
+
+    rows = [old_image() for _ in range(rendition_admin.RETRY_LIMIT + 2)]
+    for image in rows:
+        fail_job(job_id_of(image, "hero"))
+    verified_login(client, staff("add_image", "change_image"))
+
+    codes = [
+        client.post(reverse(URL_NAME), {"image": image.pk, "group": "hero"}).status_code
+        for image in rows
+    ]
+
+    assert codes[: rendition_admin.RETRY_LIMIT] == [302] * rendition_admin.RETRY_LIMIT
+    assert codes[rendition_admin.RETRY_LIMIT :] == [429, 429]

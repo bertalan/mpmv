@@ -7,21 +7,26 @@ OpenStreetMap tile usage policy limits, is readable and capped without a new mod
 """
 
 import datetime as dt
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import Storage, storages
+from django.db import connection
 from django.utils import timezone
 
 from apps.core.models import Throttle
 from apps.core.services import consume_rate_limit
 
-from . import TileBudgetExceeded, TileKey, TileUpstream, engine
+from . import TileBudgetExceeded, TileBusy, TileKey, TileUpstream, engine
 from .adapters import default_upstream
 
 COUNTER_KEY = "maptiles:upstream:{day}"
 _DAY = dt.timedelta(days=1)
+_LOCK_POLL = 0.05  # seconds between attempts to take a busy tile lock
 
 
 @dataclass(frozen=True)
@@ -74,6 +79,29 @@ def _cached(path: str, now: dt.datetime) -> tuple[bytes, dt.datetime] | None:
     return unpacked
 
 
+@contextmanager
+def _single_flight(path: str, wait: float) -> Iterator[None]:
+    """Hold the PostgreSQL advisory lock of one cache path (session level, on this connection).
+
+    Only requests for the same tile queue; others never see it. Polls `pg_try_advisory_lock` for
+    at most `wait` seconds, then raises `TileBusy`, so a slow upstream never pins a worker. The
+    lock is released on exit and, if the connection dies, by PostgreSQL itself.
+    """
+    deadline = time.monotonic() + wait
+    with connection.cursor() as cursor:
+        while True:
+            cursor.execute("SELECT pg_try_advisory_lock(hashtextextended(%s, 0))", [path])
+            if cursor.fetchone()[0]:
+                break
+            if time.monotonic() >= deadline:
+                raise TileBusy
+            time.sleep(_LOCK_POLL)
+        try:
+            yield
+        finally:
+            cursor.execute("SELECT pg_advisory_unlock(hashtextextended(%s, 0))", [path])
+
+
 def get_tile(
     key: TileKey, *, upstream: TileUpstream | None = None, now: dt.datetime | None = None
 ) -> Tile:
@@ -86,20 +114,25 @@ def get_tile(
     if hit := _cached(path, now):
         body, expires = hit
         return Tile(body, True, min(browser_max_age, int((expires - now).total_seconds())))
-    _count_upstream_request(now)
-    chosen = upstream or default_upstream()
-    answer = chosen.fetch(
-        engine.upstream_url(template, key),
-        user_agent=user_agent(),
-        timeout=settings.MAP_TILE_UPSTREAM_TIMEOUT,
-    )
-    if not engine.is_png(answer.body):
-        from . import TileUpstreamError
+    with _single_flight(path, settings.MAP_TILE_SINGLE_FLIGHT_WAIT):
+        # Another request may have stored the tile while this one waited for the lock.
+        if hit := _cached(path, now):
+            body, expires = hit
+            return Tile(body, True, min(browser_max_age, int((expires - now).total_seconds())))
+        _count_upstream_request(now)
+        chosen = upstream or default_upstream()
+        answer = chosen.fetch(
+            engine.upstream_url(template, key),
+            user_agent=user_agent(),
+            timeout=settings.MAP_TILE_UPSTREAM_TIMEOUT,
+        )
+        if not engine.is_png(answer.body):
+            from . import TileUpstreamError
 
-        raise TileUpstreamError("not a PNG image")
-    expires = now + dt.timedelta(seconds=engine.cache_seconds(dict(answer.headers), now))
-    storage = _storage()
-    if storage.exists(path):
-        storage.delete(path)
-    storage.save(path, ContentFile(engine.pack(answer.body, expires)))
+            raise TileUpstreamError("not a PNG image")
+        expires = now + dt.timedelta(seconds=engine.cache_seconds(dict(answer.headers), now))
+        storage = _storage()
+        if storage.exists(path):
+            storage.delete(path)
+        storage.save(path, ContentFile(engine.pack(answer.body, expires)))
     return Tile(answer.body, False, browser_max_age)

@@ -2,9 +2,7 @@
 {% load i18n wagtailimages_tags %}
 {% block main_content %}
   <p>{% blocktranslate count counter=total %}{{ counter }} image is not used by any product, brand, vendor, page, event or draft, and is more than a day old.{% plural %}{{ counter }} images are not used by any product, brand, vendor, page, event or draft, and are more than a day old.{% endblocktranslate %}</p>
-  {% if total > images|length %}
-    <p>{% blocktranslate with shown=images|length %}Showing the first {{ shown }}. Delete these and reload for the next ones.{% endblocktranslate %}</p>
-  {% endif %}
+  {% include "catalog/admin/orphan_images_old_versions.html" %}
   {% if preview %}
     <div class="help-block help-info" role="status">
       <p>{% blocktranslate count counter=preview.deleted|length %}Preview: {{ counter }} image would be deleted. Nothing has been deleted yet.{% plural %}Preview: {{ counter }} images would be deleted. Nothing has been deleted yet.{% endblocktranslate %}</p>
@@ -14,7 +12,7 @@
     </div>
   {% endif %}
   {% if images %}
-    <form method="post" action="{% url 'catalog_orphan_images' %}">
+    <form method="post" action="{% url 'catalog_orphan_images' %}?p={{ page_obj.number }}">
       {% csrf_token %}
       <table class="listing">
         <thead>
@@ -43,5 +41,8 @@
         <button type="submit" name="mode" value="delete" class="button no">{% translate "Delete selected images" %}</button>
       </p>
     </form>
+    {% if page_obj.paginator.num_pages > 1 %}
+      {% include "wagtailadmin/shared/pagination_nav.html" with items=page_obj linkurl="catalog_orphan_images" %}
+    {% endif %}
   {% endif %}
 {% endblock %}
