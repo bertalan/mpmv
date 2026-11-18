@@ -66,11 +66,17 @@ def stem_to_key(kind: str, stem: str) -> str:
 # --- Placeholders: an explicit allow-list, nothing else is readable from a help file
 
 
-def _operator(field: str) -> Callable[[], str]:
+def _operator(field: str, fallback: str = "") -> Callable[[], str]:
+    """Reads `field` of the current operator; an empty value falls back to the `fallback` field."""
+
     def read() -> str:
         from apps.core.services import current_operator
 
-        return str(getattr(current_operator(), field))
+        operator = current_operator()
+        value = str(getattr(operator, field))
+        if not value and fallback:
+            value = str(getattr(operator, fallback))
+        return value
 
     return read
 
@@ -78,7 +84,7 @@ def _operator(field: str) -> Callable[[], str]:
 PLACEHOLDERS: dict[str, Callable[[], str]] = {
     "operator.legal_name": _operator("legal_name"),
     "operator.support_email": _operator("support_email"),
-    "operator.compliance_email": _operator("compliance_email"),
+    "operator.compliance_email": _operator("compliance_email", fallback="support_email"),
     "settings.site_name": lambda: str(settings.WAGTAIL_SITE_NAME),
 }
 

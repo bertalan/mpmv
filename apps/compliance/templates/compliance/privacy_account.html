@@ -1,10 +1,10 @@
 {% extends "layouts/content.html" %}
 {% load i18n %}
-{% block title %}{% translate "Your data" %} · {{ site_name }}{% endblock %}
+{% block title %}{% translate "Your data" context "customer privacy page" %} · {{ site_name }}{% endblock %}
 {% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 {% block page_content %}
   <article class="privacy-account">
-    <h1>{% translate "Your data" %}</h1>
+    <h1>{% translate "Your data" context "customer privacy page" %}</h1>
     {% if error %}<p role="alert">{{ error }}</p>{% endif %}
     <section>
       <h2>{% translate "Download your data" %}</h2>

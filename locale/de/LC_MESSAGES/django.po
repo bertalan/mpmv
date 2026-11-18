@@ -1458,7 +1458,7 @@ msgstr "Kann nicht mehr geändert werden, sobald die Ebene Knoten hat."
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Cannot scan? Enter this key:"
-msgstr "Scannen nicht möglich? Gib diesen Schlüssel ein:"
+msgstr "Scannen nicht möglich? Geben Sie diesen Schlüssel ein:"
 
 #: apps/manager/event_block_forms.py
 msgid "Caption"
@@ -1701,7 +1701,7 @@ msgstr ""
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
-msgstr "Wähle, wie du nach deinem Passwort bestätigst, dass du es bist."
+msgstr "Wählen Sie, wie Sie nach Ihrem Passwort bestätigen, dass Sie es sind."
 
 #: apps/orders/ui/present.py
 msgid "Choose one of the shipping options."
@@ -2285,6 +2285,11 @@ msgstr "Wiederholt sich nicht"
 msgid "done"
 msgstr "erledigt"
 
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Download"
+msgstr "Herunterladen"
+
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download my data"
 msgstr "Meine Daten herunterladen"
@@ -2292,6 +2297,11 @@ msgstr "Meine Daten herunterladen"
 #: apps/events/templates/events/_subscribe.html
 msgid "Download the calendar (ICS)"
 msgstr "Kalender herunterladen (ICS)"
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Download your data"
+msgstr "Lade deine Daten herunter"
 
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download your shop profile, products and order amounts as a JSON file."
@@ -2331,9 +2341,9 @@ msgid ""
 "Each code signs you in once if you lose your authenticator or passkey. Store them somewhere safe "
 "now: they are shown only this time."
 msgstr ""
-"Mit jedem Code kannst du dich einmal anmelden, falls du deine Authenticator-App oder deinen "
-"Passkey verlierst. Bewahre sie jetzt an einem sicheren Ort auf: Sie werden nur dieses eine Mal "
-"angezeigt."
+"Mit jedem Code können Sie sich einmal anmelden, falls Sie Ihre Authenticator-App oder Ihren "
+"Passkey verlieren. Bewahren Sie sie jetzt an einem sicheren Ort auf: Sie werden nur dieses eine "
+"Mal angezeigt."
 
 #: apps/orders/templates/orders/_legal_recap.html
 msgid ""
@@ -2462,9 +2472,33 @@ msgstr "Geben Sie die Sendungsnummer ein: nur Buchstaben, Ziffern, Leerzeichen u
 msgid "Enter this when you buy for a business, or untick the box."
 msgstr "Fülle dieses Feld aus, wenn du für ein Unternehmen einkaufst, oder entferne das Häkchen."
 
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Erase my account"
+msgstr "Mein Konto löschen"
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Erase your account"
+msgstr "Lösche dein Konto"
+
 #: apps/seo/site_links.py
 msgid "Erase your account (asks for confirmation)"
 msgstr "Ihr Konto löschen (erfordert Bestätigung)"
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid ""
+"Erasing your account blocks your login and deletes your carts and preferences. Order, billing, "
+"shipping and VAT data are kept for %(years)s years from the end of the fiscal year, restricted to "
+"what the law requires (GDPR article 17(3)(b)), and then anonymised. If you have an order still "
+"open, the erasure completes when the last open order closes."
+msgstr ""
+"Das Löschen deines Kontos sperrt deine Anmeldung und entfernt deine Warenkörbe und Einstellungen. "
+"Bestell-, Rechnungs-, Versand- und Umsatzsteuerdaten werden %(years)s Jahre ab Ende des "
+"Geschäftsjahres aufbewahrt, beschränkt auf das gesetzlich Erforderliche (DSGVO Artikel 17 Absatz 3"
+" Buchstabe b), und danach anonymisiert. Wenn du noch eine offene Bestellung hast, wird die "
+"Löschung abgeschlossen, sobald die letzte offene Bestellung abgeschlossen ist."
 
 #: themes/base/templates/components/alert.html
 msgid "Error"
@@ -2729,7 +2763,12 @@ msgstr "Neue Codes generieren"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Generating new codes makes every previous code stop working."
-msgstr "Wenn du neue Codes generierst, funktionieren alle bisherigen Codes nicht mehr."
+msgstr "Wenn Sie neue Codes generieren, funktionieren alle bisherigen Codes nicht mehr."
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Get a copy of the data we hold about you as a JSON file."
+msgstr "Erhalte eine Kopie der Daten, die wir über dich gespeichert haben, als JSON-Datei."
 
 #: apps/manager/event_fields.py
 msgid "Give a number from -%(limit)d to %(limit)d, for example 45.464200."
@@ -3174,6 +3213,11 @@ msgstr ""
 msgid "I specifically approve the onerous clauses listed above, one by one."
 msgstr ""
 "Ich genehmige die oben aufgeführten belastenden Klauseln ausdrücklich, eine nach der anderen."
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "I understand and want to erase my account"
+msgstr "Ich habe verstanden und möchte mein Konto löschen"
 
 #: apps/orders/templates/email/orders/item_unavailable/body.html
 #: apps/orders/templates/email/orders/item_unavailable/body.txt
@@ -4791,7 +4835,8 @@ msgstr "Passkey-Zeitfenster geöffnet: noch %(minutes_left)s Min."
 msgid "Passkeys need JavaScript."
 msgstr "Passkeys benötigen JavaScript."
 
-#: apps/manager/templates/manager/login.html
+#: apps/compliance/templates/compliance/privacy_account.html
+#: apps/manager/templates/manager/login.html themes/ride/templates/compliance/privacy_account.html
 msgid "Password"
 msgstr "Passwort"
 
@@ -5711,8 +5756,8 @@ msgstr ""
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Scan this QR code with your authenticator app, then enter the 6-digit code it shows."
 msgstr ""
-"Scanne diesen QR-Code mit deiner Authenticator-App und gib dann den angezeigten 6-stelligen Code "
-"ein."
+"Scannen Sie diesen QR-Code mit Ihrer Authenticator-App und geben Sie dann den angezeigten "
+"6-stelligen Code ein."
 
 #: apps/cms/models.py
 msgid "Screen (route name)"
@@ -5736,7 +5781,7 @@ msgstr "Sicherheit"
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "See where you are signed in"
-msgstr "Sieh, wo du angemeldet bist"
+msgstr "Sehen Sie, wo Sie angemeldet sind"
 
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/rest_cancelled/body.html
@@ -9892,7 +9937,7 @@ msgstr "Wiederherstellungscode verwenden"
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Use this device's screen lock or a security key."
-msgstr "Verwende die Bildschirmsperre dieses Geräts oder einen Sicherheitsschlüssel."
+msgstr "Verwenden Sie die Bildschirmsperre dieses Geräts oder einen Sicherheitsschlüssel."
 
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_node.html
 msgid "Used by"
@@ -10930,8 +10975,8 @@ msgstr "Du hast keine Berechtigung, diese Seite zu öffnen."
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "You have %(counter)s unused recovery code."
 msgid_plural "You have %(counter)s unused recovery codes."
-msgstr[0] "Du hast %(counter)s nicht verwendeten Wiederherstellungscode."
-msgstr[1] "Du hast %(counter)s nicht verwendete Wiederherstellungscodes."
+msgstr[0] "Sie haben %(counter)s nicht verwendeten Wiederherstellungscode."
+msgstr[1] "Sie haben %(counter)s nicht verwendete Wiederherstellungscodes."
 
 #: apps/orders/templates/orders/_legal_recap.html
 msgid ""
@@ -10978,6 +11023,11 @@ msgstr ""
 "Sie haben am %(when)s erfasst, dass Ihre Rechnung oder Ihr Beleg für diese Bestellung ausgestellt "
 "ist. Jede spätere Änderung zeigt die Erinnerung, sie zu korrigieren."
 
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "You will be asked to confirm with your second factor."
+msgstr "Du wirst gebeten, mit deinem zweiten Faktor zu bestätigen."
+
 #: apps/accounts/templates/accounts/levels/prompt.html
 #: apps/manager/templates/manager/amendment_passkey.html
 msgid ""
@@ -10989,11 +11039,11 @@ msgstr ""
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your account is protected with a passkey."
-msgstr "Dein Konto ist mit einem Passkey geschützt."
+msgstr "Ihr Konto ist mit einem Passkey geschützt."
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your account is protected with an authenticator app."
-msgstr "Dein Konto ist mit einer Authenticator-App geschützt."
+msgstr "Ihr Konto ist mit einer Authenticator-App geschützt."
 
 #: apps/orders/templates/orders/cart.html
 msgid "Your cart"
@@ -11035,6 +11085,12 @@ msgstr "Ihre Cookie-Auswahl wurde gespeichert."
 msgid "Your data"
 msgstr "Ihre Daten"
 
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgctxt "customer privacy page"
+msgid "Your data"
+msgstr "Deine Daten"
+
 #: apps/orders/templates/orders/checkout.html
 msgid "Your details"
 msgstr "Deine Angaben"
@@ -11075,7 +11131,7 @@ msgstr "Ihre Veranstaltung %(title)s wurde ausgeblendet"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Your factors"
-msgstr "Deine Faktoren"
+msgstr "Ihre Faktoren"
 
 #: apps/vendors/forms.py
 msgid ""
@@ -11168,11 +11224,11 @@ msgstr "Ihr Auszahlungskonto ist aktiv. Kunden können Ihre Produkte online kauf
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your protection"
-msgstr "Dein Schutz"
+msgstr "Ihr Schutz"
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid "Your recovery codes"
-msgstr "Deine Wiederherstellungscodes"
+msgstr "Ihre Wiederherstellungscodes"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Your role"
@@ -11196,7 +11252,7 @@ msgstr ""
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
-msgstr "Deine Rolle erfordert einen zweiten Faktor, bevor du fortfahren kannst."
+msgstr "Ihre Rolle erfordert einen zweiten Faktor, bevor Sie fortfahren können."
 
 #: apps/manager/sales_terms_views.py
 msgid "Your sales terms are published and in force."
