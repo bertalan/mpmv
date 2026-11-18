@@ -4,10 +4,16 @@
 from typing import Any
 
 import pytest
+from django.http import HttpRequest
 from django.test import Client
 
+from apps.api.auth import authenticate_request
+from apps.api.engine import Reason
+from apps.api.services import AuthResult
 from apps.api.tests.factories import ApiClientFactory
+from apps.api.v1 import security
 from apps.cms.services import seed_site
+from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
 from apps.events.models import EventPage
 from apps.vendors.models import Vendor
@@ -163,3 +169,30 @@ def test_a_translation_is_submitted_through_the_existing_submit_endpoint(client:
     page = EventPage.objects.get(public_id=translation_id)
     assert page.live
     assert page.city == "Bolzano"
+
+
+def test_a_vendor_suspended_after_authentication_cannot_add_a_translation(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D-44 / Q-53: the vendor is suspended between authentication and the write (CORE.14)."""
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    headers = _headers(vendor)
+    public_id = _create(client, headers, language="de")
+    target = next(code for code in configured_languages() if code != "de")
+
+    def authenticate_then_suspend(request: HttpRequest, scope: str | None) -> AuthResult:
+        result = authenticate_request(request, scope)
+        Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.SUSPENDED)
+        return result
+
+    monkeypatch.setattr(security, "authenticate_request", authenticate_then_suspend)
+    response = client.post(
+        f"{EVENTS}/{public_id}/translations",
+        {"language": target, "title": "T", "summary": "S"},
+        content_type=JSON,
+        headers=headers,
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == Reason.VENDOR_SUSPENDED
+    assert not EventPage.objects.filter(locale__language_code=target).exists()
+    assert not AuditLog.objects.filter(action="events.event_translation_added").exists()

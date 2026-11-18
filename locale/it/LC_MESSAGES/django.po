@@ -2637,6 +2637,10 @@ msgstr "Nodi di compatibilità"
 msgid "Fitment scheme"
 msgstr "Schema di compatibilità"
 
+#: apps/catalog/templates/catalog/product.html
+msgid "Fits"
+msgstr "Compatibile con"
+
 #: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Footer"
 msgstr "Piè di pagina"
@@ -5642,13 +5646,17 @@ msgstr "Schermata (nome della route)"
 msgid "screen or page type"
 msgstr "schermata o tipo di pagina"
 
-#: themes/ride/templates/components/header.html
+#: apps/seo/page_builders.py themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Cerca"
 
 #: apps/cms/blocks.py
 msgid "Search by name, SKU, brand or vendor, then click the product."
 msgstr "Cerca per nome, SKU, marchio o venditore, poi clicca sul prodotto."
+
+#: apps/seo/page_builders.py
+msgid "Search: %(query)s"
+msgstr "Cerca: %(query)s"
 
 #: apps/accounts/templates/accounts/mfa/setup.html themes/base/templates/components/user_tools.html
 msgid "Security"
@@ -6091,6 +6099,10 @@ msgstr "Indirizzo della fonte"
 #: apps/orders/templates/orders/_legal_boxes.html
 msgid "Specific approval of onerous clauses (articles 1341 and 1342 of the Italian Civil Code)"
 msgstr "Approvazione specifica delle clausole onerose (artt. 1341 e 1342 del codice civile)"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "Specifications"
+msgstr "Specifiche tecniche"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Staff"
@@ -9559,10 +9571,12 @@ msgstr "Fiera o incontro"
 #: apps/manager/templates/manager/shop/event_translate.html
 msgid ""
 "Translate “%(name)s”. Dates, place and products stay the same as in the original: you write the "
-"title, the summary and the venue name, then add the text blocks."
+"title, the summary and the venue name here. Once the translation is saved, add the text blocks in "
+"its edit form."
 msgstr ""
-"Traduci “%(name)s”. Date, luogo e prodotti restano quelli dell’originale: scrivi il titolo, il "
-"riassunto e il nome del luogo, poi aggiungi i blocchi di testo."
+"Traduca “%(name)s”. Date, luogo e prodotti restano quelli dell’originale: qui scrive il titolo, il"
+" riepilogo e il nome del luogo. Dopo aver salvato la traduzione, aggiunga i blocchi di testo nel "
+"suo modulo di modifica."
 
 #: apps/manager/templates/manager/shop/events.html
 msgid "Translation of the %(original)s original"

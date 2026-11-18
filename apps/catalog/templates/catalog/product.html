@@ -71,6 +71,20 @@
       </section>
     {% endif %}
 
+    {% if specifications %}
+      <section class="product-specifications" aria-labelledby="product-specs-heading">
+        <h2 id="product-specs-heading">{% translate "Specifications" %}</h2>
+        {% include "catalog/includes/product_specs.html" %}
+      </section>
+    {% endif %}
+
+    {% if fitment %}
+      <section class="product-fitment-section" aria-labelledby="product-fitment-heading">
+        <h2 id="product-fitment-heading">{% translate "Fits" %}</h2>
+        {% include "catalog/includes/product_fitment.html" %}
+      </section>
+    {% endif %}
+
     {% if page_data.companion %}
       <aside class="product-companion" aria-labelledby="product-companion-heading">
         <h2 id="product-companion-heading">{% translate "Needed with this product" %}</h2>

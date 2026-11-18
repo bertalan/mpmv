@@ -279,6 +279,8 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
     alternates = hreflang_alternates(
         {lang: absolute_url(request, path) for lang, path in page.paths.items()}
     )
+    specifications = product_pages.specifications(page.product, language)
+    fitment = product_pages.fitment(page.product, language)
     context: dict[str, Any] = {
         "page_data": page,
         "currency": CURRENCY,
@@ -289,6 +291,18 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
         "vendor_url": slugs.vendor_path(language, page.vendor.slug, default_language=default),
         "gallery_items": product_pages.gallery_items(page),
         "related": product_pages.related(page, language),
+        "specifications": specifications,
+        "fitment": fitment,
+        # The product page's tabs (ride): the first one with content is the open one.
+        "first_tab": (
+            "description"
+            if page.description
+            else "specs"
+            if specifications
+            else "fitment"
+            if fitment
+            else "details"
+        ),
         "trail": _trail(page.title, location),
     }
     response: HttpResponse = render(request, PRODUCT_TEMPLATE, context)

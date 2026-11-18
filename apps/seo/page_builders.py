@@ -5,8 +5,9 @@ content nodes. The shared nodes (operator, `WebSite`) come from `page_graph`. A 
 is not public (cart, checkout, account, Manager) has no builder and renders no graph.
 """
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import Any
+from urllib.parse import quote
 
 from django.conf import settings
 from django.utils import translation
@@ -39,6 +40,42 @@ def _page_crumbs(ctx: PageContext, *, include_self: bool = True) -> list[pg.Crum
     return crumbs
 
 
+def _is_in_language(path: str, language: str) -> bool:
+    """Whether a site path is one of `language`'s URLs (the prefix of a language that is not
+    the primary one): a list never carries a page of another language (no fallback)."""
+    default = settings.LANGUAGE_CODE
+    if not path.startswith("/"):
+        return True  # an absolute URL (CMS pages carry their own language)
+    others = [f"/{code}/" for code, _name in settings.LANGUAGES if code != default]
+    if language == default:
+        return not any(path.startswith(prefix) for prefix in others)
+    return path.startswith(f"/{language}/")
+
+
+def _absolute(site: str, path: str) -> str:
+    return path if path.startswith("http") else f"{site}{path}"
+
+
+def product_entries(ctx: PageContext, cards: Iterable[Any]) -> list[ge.ListEntry]:
+    """The listed product cards that link to a page in the page language."""
+    return [
+        ge.ListEntry(
+            url=_absolute(ctx.site, card.url),
+            name=str(card.title),
+            kind="Product",
+            image=_absolute(ctx.site, card.image_url) if card.image_url else "",
+        )
+        for card in cards
+        if card.url and _is_in_language(card.url, ctx.language)
+    ]
+
+
+def _items(ctx: PageContext, url: str, name: str, entries: Iterable[ge.ListEntry]) -> Node:
+    return ge.item_list_node(
+        list_id=f"{url}#items", name=name, language=ctx.language, entries=entries
+    )
+
+
 def cms_page_nodes(
     ctx: PageContext,
     kind: str = "WebPage",
@@ -48,8 +85,12 @@ def cms_page_nodes(
     crumbs: Sequence[pg.Crumb] | None = None,
     main_entity_id: str = "",
     extra: Sequence[Node] = (),
+    items: Node | None = None,
 ) -> list[Node]:
-    """The `WebPage`, its breadcrumb (none on the home page), the page's FAQ and `extra` nodes."""
+    """The `WebPage`, its breadcrumb (none on the home page), the page's FAQ, the named lists of
+    its widgets and `extra` nodes. `items` is the page's own main `ItemList` (a collection
+    page's `mainEntity`)."""
+    from apps.cms.blocks import page_graph_nodes
     from apps.cms.engine import faq_questions
 
     page = ctx.obj
@@ -60,6 +101,15 @@ def cms_page_nodes(
     trail = list(crumbs) if crumbs is not None else _page_crumbs(ctx)
     breadcrumb = _breadcrumb(url, trail) if len(trail) > 1 else None
     faq = ge.faq_node(url=url, language=language, questions=faq_questions(page))
+    body = getattr(page, "body", None)
+    widgets: list[Node] = []
+    for number, widget in enumerate(page_graph_nodes(body, ctx.context) if body else [], 1):
+        widgets.append({**widget, "@id": f"{url}#list-{number}", "inLanguage": language})
+    parts = [str(node["@id"]) for node in (faq, *widgets) if node]
+    if items and main_entity_id:
+        parts.append(str(items["@id"]))
+    elif items:
+        main_entity_id = str(items["@id"])
     web = ge.webpage_node(
         kind=kind,
         url=url,
@@ -69,13 +119,15 @@ def cms_page_nodes(
         description=str(getattr(page, "search_description", "") or ""),
         breadcrumb_id=str(breadcrumb["@id"]) if breadcrumb else "",
         main_entity_id=main_entity_id,
-        has_part_ids=[str(faq["@id"])] if faq else (),
+        has_part_ids=parts,
     )
-    return [web, *([breadcrumb] if breadcrumb else []), *([faq] if faq else []), *extra]
+    nodes = [web, *([breadcrumb] if breadcrumb else []), *([faq] if faq else []), *widgets]
+    return [*nodes, *([items] if items else []), *extra]
 
 
 def register_all() -> None:
     from apps.catalog.product_pages import ProductPage
+    from apps.catalog.search_page import SearchGraphPage
     from apps.catalog.services import ListingAnchor
     from apps.cms import models as cms
     from apps.events import models as events
@@ -90,22 +142,37 @@ def register_all() -> None:
         events.EventPage,
     ):
         register(model)(_web_page)
-    register(events.EventIndexPage)(lambda ctx: cms_page_nodes(ctx, "CollectionPage"))
+    register(events.EventIndexPage)(_event_index)
     register(cms.BlogIndexPage)(_blog_index)
     register(cms.BlogPostPage)(_blog_post)
     register(ProductPage)(_product)
     register(ListingAnchor)(_listing)
+    register(SearchGraphPage)(_search)
 
 
 def _web_page(ctx: PageContext) -> list[Node]:
     return cms_page_nodes(ctx)
 
 
+def _post_items(ctx: PageContext, url: str, name: str) -> Node:
+    """The posts of the shown page of the blog (or author) list."""
+    posts = ctx.context.get("posts") or ()
+    entries = [
+        ge.ListEntry(
+            url=post.get_full_url(ctx.request) or "", name=str(post.title), kind="BlogPosting"
+        )
+        for post in posts
+    ]
+    return _items(ctx, url, name, entries)
+
+
 def _blog_index(ctx: PageContext) -> list[Node]:
     blog = ctx.obj
     author = ctx.context.get("author")
     if author is None:
-        return cms_page_nodes(ctx, "CollectionPage")
+        url = blog.get_full_url(ctx.request) or ""
+        items = _post_items(ctx, url, str(blog.title))
+        return cms_page_nodes(ctx, "CollectionPage", items=items)
     url = blog.author_url(author, ctx.request)
     person = blog.person(author, ctx.request)
     crumbs = [*_page_crumbs(ctx), pg.Crumb(str(author.name), url)]
@@ -117,7 +184,25 @@ def _blog_index(ctx: PageContext) -> list[Node]:
         crumbs=crumbs,
         main_entity_id=str(person["@id"]),
         extra=[person],
+        items=_post_items(ctx, url, str(author.name)),
     )
+
+
+def _event_index(ctx: PageContext) -> list[Node]:
+    """The events of the shown list (the live list, the archive or a month), soonest first;
+    an original-language fallback (an event in another language) is left out."""
+    index = ctx.obj
+    url = index.get_full_url(ctx.request) or ""
+    entries = [
+        ge.ListEntry(
+            url=item.page.get_full_url(ctx.request) or "",
+            name=str(item.page.title),
+            kind="Event",
+        )
+        for item in ctx.context.get("items") or ()
+        if not item.language
+    ]
+    return cms_page_nodes(ctx, "CollectionPage", items=_items(ctx, url, str(index.title), entries))
 
 
 def _blog_post(ctx: PageContext) -> list[Node]:
@@ -160,6 +245,7 @@ def _product(ctx: PageContext) -> list[Node]:
 
 def _listing(ctx: PageContext) -> list[Node]:
     from apps.catalog import services as catalog
+    from apps.catalog import slugs as catalog_slugs
     from apps.core import translations
 
     anchor = ctx.obj
@@ -180,6 +266,22 @@ def _listing(ctx: PageContext) -> list[Node]:
     faq_items: Any = ctx.context.get("editorial_faq") or ()
     faq = ge.faq_node(url=url, language=shown, questions=faq_items)
     breadcrumb = _breadcrumb(url, crumbs)
+    items = _items(ctx, url, str(anchor.name), product_entries(ctx, ctx.context.get("cards") or ()))
+    main_entity = str(items["@id"]) if items else ""
+    parts = [str(faq["@id"])] if faq else []
+    vendor = scope.vendor
+    if (
+        vendor is not None
+        and catalog_slugs.vendor_path(shown, vendor.slug, default_language=settings.LANGUAGE_CODE)
+        == path
+    ):
+        organization = pg.organization_node(
+            node_id=f"{url}#organization", name=str(vendor.display_name), url=url
+        )
+        nodes.append(organization)
+        if main_entity:
+            parts.append(main_entity)
+        main_entity = str(organization["@id"])
     web = ge.webpage_node(
         kind=kind,
         url=url,
@@ -187,6 +289,45 @@ def _listing(ctx: PageContext) -> list[Node]:
         name=str(anchor.name),
         language=shown,
         breadcrumb_id=str(breadcrumb["@id"]),
-        has_part_ids=[str(faq["@id"])] if faq else (),
+        main_entity_id=main_entity,
+        has_part_ids=parts,
     )
-    return [web, breadcrumb, *([faq] if faq else []), *nodes]
+    return [web, breadcrumb, *([faq] if faq else []), *([items] if items else []), *nodes]
+
+
+_SEARCH_GROUP_KINDS = {"events": "Event", "articles": "BlogPosting", "vendors": "Organization"}
+
+
+def _search(ctx: PageContext) -> list[Node]:
+    """The results page: a `SearchResultsPage` whose one `ItemList` holds the products of the
+    shown page, then the events, articles and vendors found (each referencing its own page). An
+    item shown in another language than the page's is left out."""
+    from apps.catalog.search_page import SEARCH_PARAMETER
+
+    query = str(ctx.obj.query)
+    language = ctx.language
+    home = "/" if language == settings.LANGUAGE_CODE else f"/{language}/"
+    url = f"{ctx.site}{home}" + (f"?{SEARCH_PARAMETER}={quote(query)}" if query else "")
+    with translation.override(language):
+        label = str(translation.gettext("Search"))
+        name = str(translation.gettext("Search: %(query)s")) % {"query": query} if query else label
+    entries = product_entries(ctx, ctx.context.get("cards") or ())
+    for group in ctx.context.get("groups") or ():
+        kind = _SEARCH_GROUP_KINDS.get(group.key, "")
+        entries += [
+            ge.ListEntry(url=_absolute(ctx.site, item.url), name=str(item.title), kind=kind)
+            for item in group.items
+            if not item.language
+        ]
+    items = _items(ctx, url, name, entries)
+    breadcrumb = _breadcrumb(url, [_home_crumb(ctx.site, language), pg.Crumb(label, url)])
+    web = ge.webpage_node(
+        kind="SearchResultsPage",
+        url=url,
+        site=ctx.site,
+        name=name,
+        language=language,
+        breadcrumb_id=str(breadcrumb["@id"]),
+        main_entity_id=str(items["@id"]) if items else "",
+    )
+    return [web, breadcrumb, *([items] if items else [])]
