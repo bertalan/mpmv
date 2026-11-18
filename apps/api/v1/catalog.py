@@ -100,6 +100,8 @@ class TranslationIn(Schema):
     title: PlainText = Field(min_length=1, max_length=255)
     short_description: PlainText = ""
     description: PlainText = ""
+    material: PlainText = Field("", max_length=120)
+    colour: PlainText = Field("", max_length=80)
 
 
 class ProductAttributeIn(Schema):
@@ -135,6 +137,10 @@ class ProductIn(Schema):
     fiscal_category: Literal["standard", "reduced", "book_art74"] = "standard"
     price_net: Decimal = Field(description="EUR, VAT excluded.")
     weight_kg: Decimal | None = Field(None, ge=0, max_digits=8, decimal_places=3)
+    length_mm: int | None = None
+    width_mm: int | None = None
+    height_mm: int | None = None
+    country_of_origin: str = Field("", max_length=2)
     translations: list[TranslationIn] = Field(default_factory=list)
     attributes: list[ProductAttributeIn] = Field(default_factory=list)
     variants: list[VariantIn] = Field(
@@ -149,8 +155,14 @@ class ProductIn(Schema):
             fiscal_category=self.fiscal_category,
             price_net=self.price_net,
             weight_kg=self.weight_kg,
+            length_mm=self.length_mm,
+            width_mm=self.width_mm,
+            height_mm=self.height_mm,
+            country_of_origin=self.country_of_origin,
             translations=tuple(
-                engine.TranslationIn(t.language, t.title, t.short_description, t.description)
+                engine.TranslationIn(
+                    t.language, t.title, t.short_description, t.description, t.material, t.colour
+                )
                 for t in self.translations
             ),
             attributes=tuple(
