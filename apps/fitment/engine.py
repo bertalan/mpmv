@@ -227,6 +227,21 @@ def _years_overlap(first: Row, second: Row) -> bool:
     return a_low <= b_high and b_low <= a_high
 
 
+def uncovered_exclusions(rows: Sequence[Row]) -> list[Row]:
+    """The exclusions with no include row above them (or at the same node) in overlapping years."""
+    return [
+        row
+        for row in rows
+        if row.is_exclusion
+        and not any(
+            not other.is_exclusion
+            and row.node_path.startswith(other.node_path)
+            and _years_overlap(row, other)
+            for other in rows
+        )
+    ]
+
+
 def declaration_problems(
     mode: str,
     rows: Sequence[Row],
@@ -284,12 +299,7 @@ def declaration_problems(
                 )
     if not errors and mode != UNIVERSAL:
         for number, row in enumerate(rows, start=1):
-            if row.is_exclusion and not any(
-                not other.is_exclusion
-                and row.node_path.startswith(other.node_path)
-                and _years_overlap(row, other)
-                for other in rows
-            ):
+            if row in uncovered_exclusions(rows):
                 problems.warnings.append(
                     f"Row {number}: an exclusion without anything to exclude from."
                 )
