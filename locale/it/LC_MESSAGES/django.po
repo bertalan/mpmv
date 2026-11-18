@@ -411,6 +411,12 @@ msgstr ""
 msgid "A name for the library, for example Our stand 2027. Optional."
 msgstr "Un nome per la libreria, per esempio Il nostro stand 2027. Facoltativo."
 
+#: apps/manager/templates/manager/shop/money.html
+msgid "A negative balance means your shop owes the platform: it is set off against your next sales."
+msgstr ""
+"Un saldo negativo significa che il Suo negozio deve un importo alla piattaforma: viene compensato "
+"con le Sue prossime vendite."
+
 #: apps/ingest/models.py
 msgid "A note on the decision."
 msgstr "Una nota sulla decisione."
@@ -733,6 +739,10 @@ msgstr ""
 "Un breve testo mostrato sopra i prodotti di questa categoria o etichetta. Se non ne aggiungi, la "
 "pagina parte direttamente dai prodotti."
 
+#: apps/manager/money_views.py
+msgid "A statement needs a start and an end date. The current month is shown."
+msgstr "Un rendiconto richiede una data di inizio e una di fine. Viene mostrato il mese corrente."
+
 #: apps/orders/amendment_engine.py
 msgid "a substitute product needs the customer's consent"
 msgstr "un prodotto sostitutivo richiede il consenso del cliente"
@@ -986,6 +996,10 @@ msgstr "Indirizzo"
 msgid "Address, second line"
 msgstr "Indirizzo, seconda riga"
 
+#: apps/manager/money_views.py
+msgid "Adjustment"
+msgstr "Rettifica"
+
 #: apps/manager/templates/manager/amendment.html
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "After"
@@ -1039,6 +1053,7 @@ msgstr "Alias"
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/_money_filters.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Tutti"
@@ -1067,10 +1082,18 @@ msgstr "Tutti i modelli"
 msgid "All nodes"
 msgstr "Tutti i nodi"
 
+#: apps/manager/templates/manager/shop/money.html
+msgid "All payouts"
+msgstr "Tutti i pagamenti ricevuti"
+
 #: apps/catalog/templates/catalog/includes/store_categories.html
 #: themes/ride/templates/catalog/includes/store_categories.html
 msgid "All products"
 msgstr "Tutti i prodotti"
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "All transactions"
+msgstr "Tutti i movimenti"
 
 #: apps/events/templates/events/_filters.html
 msgid "All types"
@@ -1097,6 +1120,10 @@ msgstr "Testo alternativo"
 #: apps/manager/event_block_forms.py
 msgid "Alt text %(number)d"
 msgstr "Testo alternativo %(number)d"
+
+#: apps/manager/templates/manager/shop/_money_table.html
+msgid "Amount (EUR)"
+msgstr "Importo (EUR)"
 
 #: apps/orders/amendment_engine.py
 msgid "an added line needs the customer's acceptance"
@@ -1501,6 +1528,14 @@ msgstr "Torna alle impostazioni della verifica in due passaggi"
 msgid "Bad request"
 msgstr "Richiesta non valida"
 
+#: apps/manager/templates/manager/shop/_money_nav.html
+msgid "Balance"
+msgstr "Saldo"
+
+#: apps/manager/templates/manager/shop/_money_table.html
+msgid "Balance (EUR)"
+msgstr "Saldo (EUR)"
+
 #: apps/manager/templates/manager/amendment.html
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Before"
@@ -1545,6 +1580,14 @@ msgstr "lotti di marchi"
 #: themes/base/templates/components/breadcrumb.html
 msgid "Breadcrumb"
 msgstr "Percorso di navigazione"
+
+#: apps/manager/money_views.py
+msgid "Bundle discount funded by the platform"
+msgstr "Sconto pacchetto a carico della piattaforma"
+
+#: apps/manager/money_views.py
+msgid "Bundle discount funded by you"
+msgstr "Sconto pacchetto a Suo carico"
 
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Business buyers: the court of %(court)s."
@@ -2086,6 +2129,10 @@ msgstr "Chiudi"
 msgid "Close now"
 msgstr "Chiudi ora"
 
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Closing balance"
+msgstr "Saldo finale"
+
 #: apps/manager/fitment_forms.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Code"
 msgstr "Codice"
@@ -2099,9 +2146,17 @@ msgstr "Colore"
 msgid "Comment"
 msgstr "Commento"
 
+#: apps/manager/money_views.py
+msgid "Commission"
+msgstr "Commissione"
+
 #: apps/manager/templates/manager/amendment.html
 msgid "Commission change"
 msgstr "Variazione della commissione"
+
+#: apps/manager/money_views.py
+msgid "Commission given back"
+msgstr "Commissione restituita"
 
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Committed delivery time: %(days)s days."
@@ -2361,6 +2416,14 @@ msgstr "Foro di %(court)s"
 msgid "Credit line"
 msgstr "Riga di credito"
 
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Credits"
+msgstr "Accrediti"
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "Current balance"
+msgstr "Saldo attuale"
+
 #: apps/orders/customer_views.py
 msgid "current step"
 msgstr "passaggio attuale"
@@ -2392,6 +2455,7 @@ msgstr ""
 msgid "Dashboard"
 msgstr "Dashboard"
 
+#: apps/manager/templates/manager/shop/_money_table.html
 #: apps/orders/templates/orders/customer_orders.html
 msgid "Date"
 msgstr "Data"
@@ -2433,6 +2497,10 @@ msgid ""
 msgstr ""
 "Giorni di un evento ripetuto che dura tutto il giorno e che vengono saltati, per esempio un giorno"
 " festivo. Se lo lasci vuoto, non si salta nessun giorno."
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Debits"
+msgstr "Addebiti"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Decided"
@@ -2997,6 +3065,14 @@ msgstr "Deve dichiarare la compatibilità"
 msgid "Explanation"
 msgstr "Spiegazione"
 
+#: apps/manager/templates/manager/shop/money_transactions.html
+msgid "Export"
+msgstr "Esportazione"
+
+#: apps/manager/templates/manager/shop/money_transactions.html
+msgid "Export as CSV"
+msgstr "Esporta in CSV"
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "Extra details to record for each category or tag, written as a list, for example [{\"code\": "
@@ -3036,6 +3112,7 @@ msgstr "File"
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/_money_filters.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filter"
 msgstr "Filtra"
@@ -3048,6 +3125,7 @@ msgstr "Filtra gli eventi"
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/_money_filters.html
 #: apps/manager/templates/manager/shop/orders.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
 msgid "Filters"
@@ -3180,9 +3258,10 @@ msgstr "Domande frequenti"
 msgid "Friday"
 msgstr "Venerdì"
 
+#: apps/manager/templates/manager/shop/_money_filters.html
 #: themes/base/templates/components/price.html
 msgid "From"
-msgstr "Da"
+msgstr "Dal"
 
 #: apps/catalog/templates/catalog/listing.html themes/ride/templates/catalog/listing.html
 msgid "From %(currency)s %(amount)s"
@@ -4043,6 +4122,14 @@ msgstr "ultimo uso il %(used)s"
 msgid "Last used %(used)s"
 msgstr "Ultimo uso %(used)s"
 
+#: apps/manager/templates/manager/shop/money.html
+msgid "Latest payouts"
+msgstr "Ultimi pagamenti ricevuti"
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "Latest transactions"
+msgstr "Ultimi movimenti"
+
 #: apps/manager/fitment_forms.py
 msgid "Latest year, years from now"
 msgstr "Anno più recente, anni da adesso"
@@ -4401,9 +4488,14 @@ msgstr "Moderazione"
 msgid "Monday"
 msgstr "Lunedì"
 
-#: apps/manager/templates/manager/amendment.html
+#: apps/manager/sections.py apps/manager/site_map.py apps/manager/templates/manager/amendment.html
+#: apps/manager/templates/manager/shop/money.html
 msgid "Money"
 msgstr "Denaro"
+
+#: apps/manager/templates/manager/shop/_money_nav.html
+msgid "Money pages"
+msgstr "Pagine dei movimenti economici"
 
 #: apps/events/templates/events/_filters.html
 msgid "Month"
@@ -4608,6 +4700,10 @@ msgstr "Nessun movimento di denaro"
 #: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
 msgid "No money was refunded."
 msgstr "Non è stato rimborsato nessun importo."
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "No movements in this period."
+msgstr "Nessun movimento in questo periodo."
 
 #: apps/manager/templates/manager/platform/orders.html
 msgid "No order has this number."
@@ -4822,6 +4918,7 @@ msgstr "Nessuna candidatura in attesa"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/_money_table.html
 #: apps/manager/templates/manager/shop/fitment_proposals.html
 #: apps/manager/templates/manager/shop/fitment_report.html
 #: apps/manager/templates/manager/shop/orders.html
@@ -5242,6 +5339,10 @@ msgstr "Apri la pagina pubblica"
 msgid "Open the review list"
 msgstr "Apra l'elenco da revisionare"
 
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Opening balance"
+msgstr "Saldo iniziale"
+
 #: apps/seo/templates/seo/consent/preferences.html
 msgid "Optional cookies on:"
 msgstr "Cookie facoltativi attivi:"
@@ -5271,6 +5372,7 @@ msgid "Or browse a category:"
 msgstr "Oppure sfoglia una categoria:"
 
 #: apps/manager/templates/manager/platform/fitment_scheme.html
+#: apps/manager/templates/manager/shop/_money_table.html
 #: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_orders.html
 msgid "Order"
 msgstr "Ordine"
@@ -5608,6 +5710,14 @@ msgstr "Metti in pausa il conto alla rovescia"
 msgid "Pay now"
 msgstr "Paga ora"
 
+#: apps/manager/money_views.py
+msgid "Payment fee"
+msgstr "Costo di incasso"
+
+#: apps/manager/money_views.py
+msgid "Payment fee given back"
+msgstr "Costo di incasso restituito"
+
 #: apps/orders/customer_views.py
 msgid "Payment received"
 msgstr "Pagamento ricevuto"
@@ -5632,9 +5742,18 @@ msgstr "Pagamento ricevuto. Grazie."
 msgid "Payments"
 msgstr "Pagamenti"
 
+#: apps/manager/money_views.py
+msgid "Payout"
+msgstr "Pagamento al venditore"
+
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Payout account of %(vendor)s."
 msgstr "Account per i pagamenti di %(vendor)s."
+
+#: apps/manager/site_map.py apps/manager/templates/manager/shop/_money_nav.html
+#: apps/manager/templates/manager/shop/money_payouts.html
+msgid "Payouts"
+msgstr "Pagamenti ricevuti"
 
 #: apps/themes/styleguide.py
 msgid "PDF or image, 5 MB at most."
@@ -5736,6 +5855,10 @@ msgid ""
 msgstr ""
 "Testo semplice. I titolari e il registro delle modifiche lo conservano: non scrivere dati "
 "personali, come nomi, email o numeri di telefono."
+
+#: apps/manager/money_views.py
+msgid "Plan fee"
+msgstr "Canone del piano"
 
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Plans"
@@ -6301,6 +6424,8 @@ msgid "Recovery codes"
 msgstr "Codici di recupero"
 
 #: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/_money_table.html
+#: apps/manager/templates/manager/shop/money_statement.html
 #: apps/manager/templates/manager/shop/statements.html
 msgid "Reference"
 msgstr "Riferimento"
@@ -6312,6 +6437,14 @@ msgid ""
 msgstr ""
 "Riferimento del permesso scritto conservato, quando la licenza lo richiede. Esempio: "
 "'permission-2026-11-acme.pdf'."
+
+#: apps/manager/money_views.py
+msgid "Refund"
+msgstr "Rimborso"
+
+#: apps/manager/money_views.py
+msgid "Refund fee"
+msgstr "Costo del rimborso"
 
 #: apps/orders/customer_views.py
 msgid "Refunded"
@@ -6597,9 +6730,9 @@ msgstr "Righe in attesa di un elemento non approvato"
 msgid "RSS feed"
 msgstr "Feed RSS"
 
-#: themes/base/templates/components/badge.html
+#: apps/manager/money_views.py themes/base/templates/components/badge.html
 msgid "Sale"
-msgstr "Offerta"
+msgstr "Vendita"
 
 #: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
 msgid "Sales mode"
@@ -6864,7 +6997,7 @@ msgstr "Spedire a:"
 msgid "Shipped"
 msgstr "Spedito"
 
-#: apps/orders/templates/orders/_package.html apps/vendors/services.py
+#: apps/manager/money_views.py apps/orders/templates/orders/_package.html apps/vendors/services.py
 msgid "Shipping"
 msgstr "Spedizione"
 
@@ -7291,9 +7424,18 @@ msgstr "Inizia alle"
 msgid "State"
 msgstr "Stato"
 
+#: apps/manager/site_map.py apps/manager/templates/manager/shop/_money_nav.html
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Statement"
+msgstr "Rendiconto"
+
 #: apps/manager/templates/manager/shop/statements.html
 msgid "Statement of %(date)s"
 msgstr "Motivazione del %(date)s"
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Statement of %(vendor)s from %(first)s to %(last)s."
+msgstr "Rendiconto di %(vendor)s dal %(first)s al %(last)s."
 
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/platform/notice_detail.html
@@ -8249,6 +8391,14 @@ msgid ""
 msgstr ""
 "Gli eventi di %(vendor)s: promozioni, fiere e incontri. Un nuovo evento viene rivisto prima di "
 "andare online."
+
+#: apps/manager/templates/manager/shop/money_transactions.html
+msgid ""
+"The export is a non-fiscal document. It covers the period above, or the current month if you set "
+"no period."
+msgstr ""
+"L'esportazione è un documento non fiscale. Copre il periodo indicato sopra, oppure il mese "
+"corrente se non ha impostato un periodo."
 
 #: apps/compliance/forms.py
 msgid "The facts and circumstances you relied on to decide. The vendor sees this text."
@@ -9888,6 +10038,10 @@ msgstr "Il membro del personale che ha approvato o rifiutato questa versione."
 msgid "The staff member who hid the event. The platform fills it in."
 msgstr "Il membro del personale che ha nascosto l'evento. Lo compila la piattaforma."
 
+#: apps/manager/money_views.py
+msgid "The start date is after the end date. The period filter was ignored."
+msgstr "La data di inizio è successiva alla data di fine. Il filtro del periodo è stato ignorato."
+
 #: apps/ingest/models.py
 msgid "The state as it was at that version."
 msgstr "Lo stato com'era a quella versione."
@@ -10605,6 +10759,10 @@ msgstr ""
 "vendere con noi, che attende ancora la Sua conferma. Per proseguire, apra questo link, confermi il"
 " Suo indirizzo email e scelga una password."
 
+#: apps/manager/templates/manager/shop/money.html
+msgid "This is what the platform owes your shop right now."
+msgstr "È l'importo che la piattaforma deve al Suo negozio in questo momento."
+
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "This is your approved policy."
 msgstr "Questa è la Sua politica approvata."
@@ -11009,6 +11167,10 @@ msgstr "Titolo"
 msgid "title"
 msgstr "titolo"
 
+#: apps/manager/templates/manager/shop/_money_filters.html
+msgid "To"
+msgstr "Al"
+
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid ""
 "To ask to reopen it, write to the platform staff. Staff reopen a closed vendor after a review; it "
@@ -11077,6 +11239,10 @@ msgstr "Livello più alto"
 msgid "Total"
 msgstr "Totale"
 
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Total (EUR)"
+msgstr "Totale (EUR)"
+
 #: apps/manager/templates/manager/amendment.html
 msgid "Total after"
 msgstr "Totale dopo"
@@ -11094,6 +11260,10 @@ msgstr "Totale IVA inclusa"
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Total: %(total)s EUR"
 msgstr "Totale: %(total)s EUR"
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Totals by type"
+msgstr "Totali per tipo"
 
 #: apps/orders/templates/orders/_package.html
 msgid "Totals for this vendor"
@@ -11118,6 +11288,19 @@ msgstr "Numero di tracciamento: %(number)s"
 #: apps/events/models.py
 msgid "Trade fair or meeting"
 msgstr "Fiera o incontro"
+
+#: apps/manager/site_map.py apps/manager/templates/manager/shop/_money_nav.html
+#: apps/manager/templates/manager/shop/money_transactions.html
+msgid "Transactions"
+msgstr "Movimenti"
+
+#: apps/manager/money_views.py
+msgid "Transfer"
+msgstr "Trasferimento"
+
+#: apps/manager/money_views.py
+msgid "Transfer taken back"
+msgstr "Trasferimento stornato"
 
 #: apps/manager/templates/manager/shop/event_translate.html
 msgid ""
@@ -11175,7 +11358,9 @@ msgid "Two-factor settings"
 msgstr "Impostazioni della verifica in due passaggi"
 
 #: apps/events/templates/events/_filters.html apps/events/templates/events/event_page.html
-#: apps/manager/event_forms.py
+#: apps/manager/event_forms.py apps/manager/templates/manager/shop/_money_filters.html
+#: apps/manager/templates/manager/shop/_money_table.html
+#: apps/manager/templates/manager/shop/money_statement.html
 msgid "Type"
 msgstr "Tipo"
 
@@ -11297,6 +11482,10 @@ msgstr "Usa una passkey"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Use an authenticator app"
 msgstr "Usa un'app di autenticazione"
+
+#: apps/manager/money_views.py
+msgid "Use dates like 2026-03-31. The period filter was ignored."
+msgstr "Usi date come 2026-03-31. Il filtro del periodo è stato ignorato."
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Use recovery code"

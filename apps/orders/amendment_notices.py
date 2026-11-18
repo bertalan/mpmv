@@ -172,6 +172,7 @@ def _record(
             template_key=template_key,
             language=language,
             idempotency_key=f"{event_key}:{audience}",
+            order_ref=sub.order.public_id,
             context=values,
         )
     except ValueError as exc:
@@ -180,15 +181,16 @@ def _record(
     created = [c for c in queued.changes if c.op == "create" and c.after]
     if not created or (created[0].after or {}).get("status") != OutboxEmail.Status.QUEUED:
         return None
-    rendered = core_services.render_email(template_key, language, values)
+    # The text kept is the one stored with the outbox row (ORD.26): byte for byte what is mailed.
+    stored = OutboxEmail.objects.get(idempotency_key=f"{event_key}:{audience}")
     return OrderEvent.objects.create(
         order=sub.order,
         vendor_order=sub,
         kind=template_key,
         audience=audience,
         language=language,
-        subject=rendered.subject[:300],
-        text=rendered.text_body,
+        subject=stored.subject[:300],
+        text=stored.text_body,
         wording_version=wording_version(template_key, language, tuple(sorted(variant.items()))),
         terms=_terms(language) if audience == OrderEventAudience.CUSTOMER else {},
         payload={**payload, "wording_approval": WORDING_APPROVAL},
