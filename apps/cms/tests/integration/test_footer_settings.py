@@ -170,3 +170,39 @@ def test_profiles_feed_the_organization_same_as(client: Client) -> None:
     assert "https://video.example/c/shop" in org["sameAs"]
     assert "https://www.wikidata.org/wiki/Q1" in org["sameAs"]
     assert org["@id"].endswith("/#organization")
+
+
+def test_the_model_refuses_a_fifth_column_in_a_language() -> None:
+    footer = FooterSettings(site=Site.objects.get(is_default_site=True))
+    for n in range(5):
+        footer.columns.add(FooterColumn(language=primary_language(), title=f"C{n}"))
+    with pytest.raises(ValidationError) as caught:
+        footer.full_clean()
+    assert "four" in str(caught.value).lower()
+    footer.columns.remove(footer.columns.all()[4])
+    footer.full_clean()
+
+
+def test_the_footer_is_cached_and_an_edit_drops_it(client: Client) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    settings_row = _settings()
+    column = _column(settings_row, primary_language(), "Company", [])
+    url = language_prefix(primary_language()) + "/"
+    url = url if url != "/" else "/"
+    client.get(url)  # fills the cache
+
+    with CaptureQueriesContext(connection) as again:
+        html = client.get(url).content.decode()
+    footer_sql = [
+        q["sql"]
+        for q in again.captured_queries
+        if "cms_footer" in q["sql"].lower() or "cms_socialprofile" in q["sql"].lower()
+    ]
+    assert footer_sql == []
+    assert "Company" in html
+
+    column.title = "Firm"
+    column.save()
+    assert "Firm" in client.get(url).content.decode()

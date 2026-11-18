@@ -7,6 +7,7 @@ from typing import Any
 
 from django import template
 from django.conf import settings
+from django.core.cache import cache
 from django.http import HttpRequest
 from django.urls import NoReverseMatch, reverse
 from django.utils import translation
@@ -23,6 +24,7 @@ from apps.core.i18n import (
 from apps.core.image_licences import Credit
 
 from .. import engine, services
+from ..footer_cache import FOOTER_CACHE_SECONDS, footer_cache_key
 from ..models import FooterSettings, NavigationMenu
 
 register = template.Library()
@@ -90,13 +92,12 @@ def _stream_links(request: HttpRequest | None, stream: Any) -> list[MenuLink]:
 class FooterColumnView:
     title: str
     links: list[MenuLink]
-    text: str = ""
 
 
 @register.simple_tag(takes_context=True)
 def footer_chrome(context: dict[str, Any]) -> dict[str, Any]:
     """The footer's CMS content for the visitor's language (CMS.17), the same for every theme:
-    `widgets` (up to four columns with `title`, `links`, `text`) and `social_links` (`label`,
+    `widgets` (up to four columns with `title`, `links`) and `social_links` (`label`,
     `url`). Empty lists when the site has no footer setting; a column with no title and no
     links is left out, so nothing renders empty."""
     request: HttpRequest | None = context.get("request")
@@ -104,6 +105,15 @@ def footer_chrome(context: dict[str, Any]) -> dict[str, Any]:
     if site is None:
         return {"widgets": [], "social_links": []}
     language = translation.get_language() or settings.LANGUAGE_CODE
+    key = footer_cache_key(site.pk, language)
+    cached: dict[str, Any] | None = cache.get(key)
+    if cached is None:
+        cached = _footer_content(request, site, language)
+        cache.set(key, cached, FOOTER_CACHE_SECONDS)
+    return cached
+
+
+def _footer_content(request: HttpRequest | None, site: Site, language: str) -> dict[str, Any]:
     footer = FooterSettings.objects.filter(site=site).first()
     if footer is None:
         return {"widgets": [], "social_links": []}

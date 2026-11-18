@@ -410,6 +410,16 @@ class FooterSettings(ClusterableModel, BaseSiteSetting):  # type: ignore[misc]  
     def __str__(self) -> str:
         return f"Footer of {self.site}"
 
+    def clean(self) -> None:
+        """At most four widget columns per language (the columns as held on this object, saved
+        or not, so scripts and the API are held to the same limit as the edit form)."""
+        super().clean()
+        for code in engine.too_many_columns(c.language for c in self.columns.all()):
+            raise ValidationError(
+                _("The footer shows at most four widget columns for each language (%(code)s).")
+                % {"code": code}
+            )
+
 
 class FooterColumn(Orderable):  # type: ignore[misc]
     """A footer widget column of one language: a title and a list of page or external links."""

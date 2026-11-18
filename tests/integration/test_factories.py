@@ -19,7 +19,7 @@ pytestmark = pytest.mark.django_db
 
 
 # Factories of a table that holds one row by design (a database constraint): they return it.
-SINGLETON_FACTORIES = {"FitmentSchemeFactory"}
+SINGLETON_FACTORIES = {"FitmentSchemeFactory", "FooterSettingsFactory"}
 
 
 @pytest.mark.parametrize("factory_class", app_factories(), ids=lambda f: f.__name__)

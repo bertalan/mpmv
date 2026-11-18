@@ -118,6 +118,30 @@ class CmsConfig(AppConfig):
         post_delete.connect(
             help_lookup.drop_cache, sender=HelpEntry, dispatch_uid="cms.help_cache_delete"
         )
+        # The cached footer (CMS.17) is dropped when its content or a linked page changes.
+        from wagtail.signals import page_unpublished
+
+        from . import footer_cache
+        from .models import FooterColumn, FooterSettings, SocialProfile
+
+        for model in (FooterSettings, FooterColumn, SocialProfile):
+            label = model.__name__.lower()
+            post_save.connect(
+                footer_cache.drop_footer_cache,
+                sender=model,
+                dispatch_uid=f"cms.footer_cache_save.{label}",
+            )
+            post_delete.connect(
+                footer_cache.drop_footer_cache,
+                sender=model,
+                dispatch_uid=f"cms.footer_cache_delete.{label}",
+            )
+        page_published.connect(
+            footer_cache.drop_footer_cache, dispatch_uid="cms.footer_cache_published"
+        )
+        page_unpublished.connect(
+            footer_cache.drop_footer_cache, dispatch_uid="cms.footer_cache_unpublished"
+        )
         _guard_editor()
 
 
