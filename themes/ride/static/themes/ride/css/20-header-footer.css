@@ -313,7 +313,8 @@
   }
 
   .site-footer a,
-  .site-footer p {
+  .site-footer p,
+  .site-footer__heading {
     color: var(--color-text-inverse);
   }
 

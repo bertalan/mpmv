@@ -56,6 +56,9 @@ class CmsConfig(AppConfig):
         "vendorlandingpage": "Wagtail page: editor content with revisions and action log",
         "editorroleseed": "marker row that a role was seeded once; no security data of its own",
         "navigationmenu": "Wagtail snippet: menu content, logged in Wagtail's action log",
+        "footersettings": "Wagtail setting: footer content (CMS.17), public text and links",
+        "footercolumn": "a column of the footer setting, saved with it",
+        "socialprofile": "a public profile link of the footer setting, saved with it",
         "helpentry": "Wagtail snippet: help text (ARC.32), logged in Wagtail's action log",
         # Installed only for wagtail-localize's editor (I18N.3); its menu is hidden.
         "wagtaildocs.document": "Wagtail document: editor upload, logged in Wagtail's action log",
@@ -114,6 +117,30 @@ class CmsConfig(AppConfig):
         )
         post_delete.connect(
             help_lookup.drop_cache, sender=HelpEntry, dispatch_uid="cms.help_cache_delete"
+        )
+        # The cached footer (CMS.17) is dropped when its content or a linked page changes.
+        from wagtail.signals import page_unpublished
+
+        from . import footer_cache
+        from .models import FooterColumn, FooterSettings, SocialProfile
+
+        for model in (FooterSettings, FooterColumn, SocialProfile):
+            label = model.__name__.lower()
+            post_save.connect(
+                footer_cache.drop_footer_cache,
+                sender=model,
+                dispatch_uid=f"cms.footer_cache_save.{label}",
+            )
+            post_delete.connect(
+                footer_cache.drop_footer_cache,
+                sender=model,
+                dispatch_uid=f"cms.footer_cache_delete.{label}",
+            )
+        page_published.connect(
+            footer_cache.drop_footer_cache, dispatch_uid="cms.footer_cache_published"
+        )
+        page_unpublished.connect(
+            footer_cache.drop_footer_cache, dispatch_uid="cms.footer_cache_unpublished"
         )
         _guard_editor()
 

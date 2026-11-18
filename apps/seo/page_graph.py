@@ -83,6 +83,9 @@ def exemptions() -> dict[type, str]:
 
 
 def _site_nodes(ctx: PageContext) -> list[Node]:
+    from wagtail.models import Site
+
+    from apps.cms.services import footer_profile_urls
     from apps.core.services import NoPlatformOperator, current_operator
 
     from .site_nodes import operator_graph_node, website_graph_node
@@ -91,8 +94,10 @@ def _site_nodes(ctx: PageContext) -> list[Node]:
         operator = current_operator()
     except NoPlatformOperator:
         return [website_graph_node(ctx.request, ctx.site, ctx.language, publisher=False)]
+    site_row = Site.find_for_request(ctx.request)
+    footer_profiles = footer_profile_urls(site_row) if site_row is not None else []
     return [
-        operator_graph_node(operator, ctx.site),
+        operator_graph_node(operator, ctx.site, footer_profiles),
         website_graph_node(
             ctx.request,
             ctx.site,

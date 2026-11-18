@@ -543,6 +543,7 @@ def _filter_values(compat: dict[str, Any], first: int, count: int) -> str:
 
 
 def _queries(client: Client, path: str) -> int:
+    client.get(path)  # warm the per-site caches (the footer, CMS.17) so cold and warm do not differ
     with CaptureQueriesContext(connection) as queries:
         assert client.get(path).status_code == 200
     return len(queries)

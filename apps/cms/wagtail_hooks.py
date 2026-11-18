@@ -33,6 +33,7 @@ from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail.admin.menu import MenuItem
 from wagtail.admin.ui.sidebar import LinkMenuItem as LinkMenuItemComponent
+from wagtail.contrib.settings.registry import register_setting
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 from wagtail.users import wagtail_hooks as wagtail_users_hooks
@@ -51,7 +52,7 @@ from .choosers import (
     term_chooser,
     vendor_chooser,
 )
-from .models import BlogAuthor, NavigationMenu
+from .models import BlogAuthor, FooterSettings, NavigationMenu
 from .services import listing_editorial, search_articles
 
 
@@ -210,3 +211,7 @@ def search_articles_group(
 ) -> SearchGroup | None:
     """The articles below the products of the search results page (CAT.27)."""
     return search_articles(request, query, language, limit)
+
+
+# Footer columns and social profiles (CMS.17): a Wagtail setting, one per site.
+register_setting(FooterSettings, icon="list-ul")

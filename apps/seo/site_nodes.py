@@ -1,5 +1,6 @@
 """The shared nodes of every page's graph, from the operator row (SEO.7)."""
 
+from collections.abc import Sequence
 from typing import Any
 from urllib.parse import urljoin
 
@@ -19,7 +20,10 @@ def _logo_url(operator: Any, site: str) -> str:
         return ""
 
 
-def operator_graph_node(operator: Any, site: str) -> dict[str, Any]:
+def operator_graph_node(
+    operator: Any, site: str, extra_profiles: Sequence[str] = ()
+) -> dict[str, Any]:
+    """`extra_profiles`: the footer's social profile URLs (CMS.17), after the operator's own."""
     from apps.cms.engine import profile_links
 
     return ge.operator_node(
@@ -28,7 +32,7 @@ def operator_graph_node(operator: Any, site: str) -> dict[str, Any]:
         logo_url=_logo_url(operator, site),
         email=str(operator.support_email),
         vat_id=str(operator.vat_number),
-        profiles=profile_links(operator.official_profiles),
+        profiles=profile_links([*operator.official_profiles, *extra_profiles]),
     )
 
 
