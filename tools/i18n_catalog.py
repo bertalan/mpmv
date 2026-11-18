@@ -66,6 +66,11 @@ SCOPES = (
     "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
     "apps/vendors/models.py",
     "apps/vendors/templates/vendors/terms",  # the public sales terms page (VEN.35)
+    "apps/vendors/templates/vendors/apply",  # the vendor application pages (VEN.22), formal
+    "apps/vendors/templates/email/vendors/application_confirm",  # the application emails (VEN.22)
+    "apps/vendors/templates/email/vendors/application_exists",
+    "apps/vendors/templates/email/vendors/application_reminder",
+    "apps/vendors/forms.py",  # the application and confirm forms (VEN.22)
     "themes/base/templates/layouts",
     "themes/ride/templates/components/header.html",  # the Bootstrap navbar and offcanvas (THM.15)
     "themes/ride/templates/components/footer.html",  # social nav label, back to top (THM.15)

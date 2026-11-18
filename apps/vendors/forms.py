@@ -35,7 +35,7 @@ MAX_BODY_BYTES = 8 * 1024  # the four fields fit in well under 2 KB, plus the to
 
 class ApplicationForm(forms.Form):
     full_name = forms.CharField(
-        label="Your full name",
+        label=_("Your full name"),
         help_text=_(
             "Your first and last name. We use it to greet you and to set up your account. "
             "Required: we cannot process the application without it."
@@ -44,7 +44,7 @@ class ApplicationForm(forms.Form):
         widget=forms.TextInput(attrs={"autocomplete": "name"}),
     )
     email = forms.EmailField(
-        label="Email address",
+        label=_("Email address"),
         help_text=_(
             "The address where we send the link to confirm your application. Required: "
             "without a working address you cannot continue."
@@ -53,7 +53,7 @@ class ApplicationForm(forms.Form):
         widget=forms.EmailInput(attrs={"autocomplete": "email"}),
     )
     business_name = forms.CharField(
-        label="Name of your business or shop",
+        label=_("Name of your business or shop"),
         help_text=_(
             "The name of your business or shop, for example 'Rossi Ceramics'. Required: the "
             "application needs it."
@@ -64,7 +64,7 @@ class ApplicationForm(forms.Form):
     # The country of establishment: required by the vendor record, and the only countries
     # offered are those the platform accepts (CMP.13), so nobody applies in vain.
     country = forms.ChoiceField(
-        label="Country where your business is established",
+        label=_("Country where your business is established"),
         help_text=_(
             "The country where your business is established. Only the countries we accept at "
             "the moment are listed. Required: it decides which details we ask you for later."
@@ -87,7 +87,7 @@ class ConfirmForm(forms.Form):
 
     # Not stripped: a password may start or end with a space.
     password = forms.CharField(
-        label="Choose a password",
+        label=_("Choose a password"),
         help_text=_(
             "Pick a password you do not use anywhere else. You will use it with your email "
             "address to log in. Required: without it your account is not created."
@@ -95,6 +95,6 @@ class ConfirmForm(forms.Form):
         max_length=PASSWORD_MAX,
         strip=False,
         widget=forms.PasswordInput(
-            attrs={"autocomplete": "new-password", "data-password-toggle": "Show password"}
+            attrs={"autocomplete": "new-password", "data-password-toggle": _("Show password")}
         ),
     )
