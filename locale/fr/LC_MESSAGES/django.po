@@ -1580,9 +1580,6 @@ msgstr "Lien du bouton"
 msgid "Button text"
 msgstr "Texte du bouton"
 
-#: apps/manager/forms.py
-msgid "By post"
-msgstr "Par courrier"
 #: apps/cms/templates/cms/includes/article_meta.html
 msgid "By %(name)s"
 msgstr "Par %(name)s"
@@ -1590,6 +1587,10 @@ msgstr "Par %(name)s"
 #: apps/cms/templates/cms/includes/article_meta.html
 msgid "By <a href=\"%(url)s\">%(name)s</a>"
 msgstr "Par <a href=\"%(url)s\">%(name)s</a>"
+
+#: apps/manager/forms.py
+msgid "By post"
+msgstr "Par courrier"
 
 #: apps/events/feeds.py
 msgid "By: %(vendor)s"
@@ -1927,14 +1928,16 @@ msgstr ""
 " configurez une application d'authentification. Notre équipe examine ensuite votre candidature."
 
 #: apps/cms/blocks.py
+msgid "Choose a product or a category, not both."
+msgstr "Choisis un produit ou une catégorie, pas les deux."
+
+#: apps/cms/blocks.py
 msgid ""
 "Choose a reusable text. When it is changed and approved, every page that uses it shows the new "
 "text. Nothing is shown while the snippet is not published."
 msgstr ""
 "Choisissez un texte réutilisable. Lorsqu’il est modifié et approuvé, chaque page qui l’utilise "
 "affiche le nouveau texte. Rien n’est affiché tant que l’extrait n’est pas publié."
-msgid "Choose a product or a category, not both."
-msgstr "Choisis un produit ou une catégorie, pas les deux."
 
 #: apps/manager/event_forms.py
 msgid "Choose a time zone such as Europe/Rome."
@@ -6507,7 +6510,6 @@ msgstr "Demander un devis"
 msgid "Require a declaration to publish"
 msgstr "Exiger une déclaration pour publier"
 
-#: themes/base/templates/components/field.html
 #: themes/base/templates/components/field.html themes/ride/templates/components/field.html
 msgid "required"
 msgstr "obligatoire"
@@ -6819,12 +6821,13 @@ msgstr "Vendeur"
 msgid "Selling mode"
 msgstr "Mode de vente"
 
-#: apps/manager/templates/manager/shop/return_policy.html
-msgid "Send for review"
-msgstr "Envoyer pour vérification"
 #: apps/cms/templates/cms/form_page.html
 msgid "Send"
 msgstr "Envoyer"
+
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Send for review"
+msgstr "Envoyer pour vérification"
 
 #: apps/vendors/templates/vendors/apply/form.html
 msgid "Send my application"
@@ -9753,12 +9756,13 @@ msgstr ""
 "marque et une machine. Rien n'est enregistré tant que vous n'avez pas confirmé sur la page "
 "d'aperçu."
 
-#: apps/manager/forms.py apps/vendors/models.py
-msgid "The seller"
-msgstr "Le vendeur"
 #: apps/cms/templates/cms/form_page.html
 msgid "The security check failed. Please try again."
 msgstr "La vérification de sécurité a échoué. Réessaie."
+
+#: apps/manager/forms.py apps/vendors/models.py
+msgid "The seller"
+msgstr "Le vendeur"
 
 #: apps/orders/templates/email/orders/item_unavailable/body.html
 #: apps/orders/templates/email/orders/item_unavailable/body.txt
@@ -12272,6 +12276,10 @@ msgstr ""
 "Où placer cet élément par rapport à celui choisi ci-dessous : à l'intérieur en premier, avant ou "
 "après. Obligatoire."
 
+#: apps/events/feeds.py
+msgid "Where: %(where)s"
+msgstr "Où : %(where)s"
+
 #: apps/ingest/models.py
 msgid "Whether the item has variations."
 msgstr "Si l'article a des variantes."
@@ -12279,9 +12287,6 @@ msgstr "Si l'article a des variantes."
 #: apps/ingest/models.py
 msgid "Whether the last read still listed it."
 msgstr "Si la dernière lecture la listait encore."
-#: apps/events/feeds.py
-msgid "Where: %(where)s"
-msgstr "Où : %(where)s"
 
 #: apps/tax/models.py
 msgid ""

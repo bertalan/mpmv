@@ -1566,9 +1566,6 @@ msgstr "Enlace del botón"
 msgid "Button text"
 msgstr "Texto del botón"
 
-#: apps/manager/forms.py
-msgid "By post"
-msgstr "Por correo"
 #: apps/cms/templates/cms/includes/article_meta.html
 msgid "By %(name)s"
 msgstr "Por %(name)s"
@@ -1576,6 +1573,10 @@ msgstr "Por %(name)s"
 #: apps/cms/templates/cms/includes/article_meta.html
 msgid "By <a href=\"%(url)s\">%(name)s</a>"
 msgstr "Por <a href=\"%(url)s\">%(name)s</a>"
+
+#: apps/manager/forms.py
+msgid "By post"
+msgstr "Por correo"
 
 #: apps/events/feeds.py
 msgid "By: %(vendor)s"
@@ -1910,14 +1911,16 @@ msgstr ""
 " autenticación. Nuestro equipo revisa su solicitud a continuación."
 
 #: apps/cms/blocks.py
+msgid "Choose a product or a category, not both."
+msgstr "Elige un producto o una categoría, no ambos."
+
+#: apps/cms/blocks.py
 msgid ""
 "Choose a reusable text. When it is changed and approved, every page that uses it shows the new "
 "text. Nothing is shown while the snippet is not published."
 msgstr ""
 "Elija un texto reutilizable. Cuando se modifica y se aprueba, cada página que lo usa muestra el "
 "nuevo texto. No se muestra nada mientras el fragmento no esté publicado."
-msgid "Choose a product or a category, not both."
-msgstr "Elige un producto o una categoría, no ambos."
 
 #: apps/manager/event_forms.py
 msgid "Choose a time zone such as Europe/Rome."
@@ -6456,7 +6459,6 @@ msgstr "Solicitar un presupuesto"
 msgid "Require a declaration to publish"
 msgstr "Exigir una declaración para publicar"
 
-#: themes/base/templates/components/field.html
 #: themes/base/templates/components/field.html themes/ride/templates/components/field.html
 msgid "required"
 msgstr "obligatorio"
@@ -6764,12 +6766,13 @@ msgstr "Vendedor"
 msgid "Selling mode"
 msgstr "Modalidad de venta"
 
-#: apps/manager/templates/manager/shop/return_policy.html
-msgid "Send for review"
-msgstr "Enviar para revisión"
 #: apps/cms/templates/cms/form_page.html
 msgid "Send"
 msgstr "Enviar"
+
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Send for review"
+msgstr "Enviar para revisión"
 
 #: apps/vendors/templates/vendors/apply/form.html
 msgid "Send my application"
@@ -9664,12 +9667,13 @@ msgstr ""
 "El esquema indica lo que eligen los clientes: por ejemplo una marca y un modelo, o una marca y una"
 " máquina. No se escribe nada hasta que confirme en la página de vista previa."
 
-#: apps/manager/forms.py apps/vendors/models.py
-msgid "The seller"
-msgstr "El vendedor"
 #: apps/cms/templates/cms/form_page.html
 msgid "The security check failed. Please try again."
 msgstr "La comprobación de seguridad ha fallado. Inténtalo de nuevo."
+
+#: apps/manager/forms.py apps/vendors/models.py
+msgid "The seller"
+msgstr "El vendedor"
 
 #: apps/orders/templates/email/orders/item_unavailable/body.html
 #: apps/orders/templates/email/orders/item_unavailable/body.txt
@@ -12153,6 +12157,10 @@ msgstr ""
 "Dónde colocar este elemento respecto al elegido abajo: dentro de él como primero, antes o después."
 " Obligatorio."
 
+#: apps/events/feeds.py
+msgid "Where: %(where)s"
+msgstr "Dónde: %(where)s"
+
 #: apps/ingest/models.py
 msgid "Whether the item has variations."
 msgstr "Si el artículo tiene variantes."
@@ -12160,9 +12168,6 @@ msgstr "Si el artículo tiene variantes."
 #: apps/ingest/models.py
 msgid "Whether the last read still listed it."
 msgstr "Si la última lectura aún la listaba."
-#: apps/events/feeds.py
-msgid "Where: %(where)s"
-msgstr "Dónde: %(where)s"
 
 #: apps/tax/models.py
 msgid ""
