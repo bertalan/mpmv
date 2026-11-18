@@ -135,19 +135,15 @@ def normalize_name(name: str) -> str:
 
 
 def reveals_person(name: str, person_names: Collection[str]) -> bool:
-    """True when `name` shows a natural person's name: equal to it, containing it as a whole-word
-    sequence ('Ceramiche Mario Rossi'), or equal to it with the spaces removed ('Mariorossi').
-    Conservative on purpose: a doubtful name is treated as the person's name (SEO.15)."""
+    """True when `name` is a natural person's name: equal to it after normalisation (accents,
+    case, punctuation, spacing), or equal to it with the spaces removed ('Mariorossi'). A trading
+    name that merely contains the person's name ('Ceramiche Mario Rossi') is the vendor's chosen
+    shop name and is kept (SEO.15)."""
     shown = normalize_name(name)
     if not shown:
         return False
-    padded = f" {shown} "
     squeezed = shown.replace(" ", "")
-    return any(
-        f" {person} " in padded or squeezed == person.replace(" ", "")
-        for person in person_names
-        if person
-    )
+    return any(squeezed == person.replace(" ", "") for person in person_names if person)
 
 
 def natural_person_names(facts: VendorNameFacts) -> frozenset[str]:

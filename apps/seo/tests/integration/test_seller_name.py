@@ -192,7 +192,7 @@ def test_a_sole_trader_with_only_the_legal_name_is_not_a_search_result_item(
 def test_search_positions_stay_consecutive_when_a_vendor_in_the_middle_is_dropped(
     client: Client,
 ) -> None:
-    sole_trader("Zeta Rossi Ceramics")  # legal name differs: shown as its shop name
+    sole_trader("Zeta Mario Rossi")  # legal name differs: shown as its shop name
     VendorFactory.create(
         status=Vendor.Status.ACTIVE, italian_company=True, display_name="Alpha Rossi S.r.l."
     )
@@ -204,7 +204,7 @@ def test_search_positions_stay_consecutive_when_a_vendor_in_the_middle_is_droppe
     elements = search_items(document)
     names = [e["item"]["name"] for e in elements]
     assert "Mario Rossi" not in names
-    assert names == ["Alpha Rossi S.r.l.", "Omega Rossi S.r.l.", "Zeta Rossi Ceramics"]
+    assert names == ["Alpha Rossi S.r.l.", "Omega Rossi S.r.l.", "Zeta Mario Rossi"]
     assert [e["position"] for e in elements] == [1, 2, 3]
     assert schema_check.rich_result_errors(document, person_names=seller.person_names(person)) == []
 
@@ -215,11 +215,22 @@ def test_a_sole_trader_with_a_shop_name_is_a_search_result_item(client: Client) 
     assert [e["item"]["name"] for e in elements] == ["Rossi Ceramics"]
 
 
-CONTAINING = ("Ceramiche Mario Rossi", "Rossi Mario Shop")
+@pytest.mark.parametrize("shown", ["Ceramiche Mario Rossi", "Rossi Mario Shop"])
+def test_a_trading_name_containing_the_persons_name_is_emitted_as_seller(
+    client: Client, shown: str
+) -> None:
+    vendor = sole_trader(shown)
+    document = graph_of(client, sell(vendor))
+    assert [o["name"] for o in vendor_orgs(document)] == [shown]
+    store = graph_of(client, vendor_url(primary_language(), vendor.slug))
+    assert [o["name"] for o in vendor_orgs(store)] == [shown]
+    found = search_items(search_graph(client, "rossi"))
+    assert [e["item"]["name"] for e in found] == [shown]
+    assert schema_check.rich_result_errors(document, person_names=seller.person_names(vendor)) == []
 
 
-@pytest.mark.parametrize("shown", CONTAINING[:2])
-def test_a_display_name_containing_the_persons_name_has_no_seller_anywhere(
+@pytest.mark.parametrize("shown", ["Rossi Mario", "Mariorossi"])
+def test_a_display_name_equal_to_the_persons_name_has_no_seller_anywhere(
     client: Client, shown: str
 ) -> None:
     vendor = sole_trader(shown)
@@ -227,9 +238,7 @@ def test_a_display_name_containing_the_persons_name_has_no_seller_anywhere(
     assert vendor_orgs(document) == []
     [product] = [n for n in document["@graph"] if n["@type"] == "Product"]
     assert "seller" not in product["offers"]
-    assert "Mario Rossi" not in json.dumps(document)
     store = graph_of(client, vendor_url(primary_language(), vendor.slug))
     assert vendor_orgs(store) == []
     found = search_graph(client, "rossi")
-    assert "Mario Rossi" not in json.dumps(found)
     assert not [n for n in found["@graph"] if n["@type"] == "Organization" and n["name"] == shown]

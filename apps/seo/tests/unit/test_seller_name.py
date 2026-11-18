@@ -74,16 +74,19 @@ def test_accents_are_folded_in_either_field() -> None:
     assert engine.normalize_name("José  Rossi!") == "jose rossi"
 
 
-def test_a_display_name_containing_the_persons_name_is_no_seller() -> None:
+def test_a_display_name_equal_to_the_persons_name_is_no_seller() -> None:
+    for shown in ("Rossi Mario", "Mariorossi", "mario-rossi", "MARIO  rossi"):
+        assert engine.public_seller_name(person(display_name=shown)) is None, shown
+
+
+def test_a_trading_name_containing_the_persons_name_is_emitted() -> None:
     for shown in (
         "Ceramiche Mario Rossi",
         "Mario Rossi Ceramics",
         "Mario Rossi S.a.s.",
         "Rossi Mario Shop",
-        "Mariorossi",
-        "mario-rossi",
     ):
-        assert engine.public_seller_name(person(display_name=shown)) is None, shown
+        assert engine.public_seller_name(person(display_name=shown)) == shown, shown
 
 
 def test_a_display_name_sharing_only_the_surname_is_kept() -> None:
@@ -97,16 +100,16 @@ def test_a_company_name_containing_a_person_like_name_is_untouched() -> None:
 
 
 def test_the_legal_name_alone_protects_a_vendor_with_no_legal_form() -> None:
-    for shown in ("Mario Rossi", "Ceramiche Mario Rossi"):
-        vendor = engine.VendorNameFacts(
-            display_name=shown, legal_name="Mario Rossi", natural_person=True
-        )
-        assert engine.public_seller_name(vendor) is None, shown
+    vendor = engine.VendorNameFacts(
+        display_name="Mario Rossi", legal_name="Mario Rossi", natural_person=True
+    )
+    assert engine.public_seller_name(vendor) is None
 
 
-def test_the_schema_check_flags_a_contained_name() -> None:
+def test_the_schema_check_flags_an_equal_name_only() -> None:
     people = engine.natural_person_names(person())
-    for leaked in ("Ceramiche Mario Rossi", "Rossi Mario Shop", "Mariorossi", "Mário Rossi"):
+    for leaked in ("Rossi Mario", "Mariorossi", "Mário Rossi"):
         errors = schema_check.rich_result_errors(graph(leaked), person_names=people)
         assert any("natural person" in error for error in errors), leaked
-    assert schema_check.rich_result_errors(graph("Rossi Ceramics"), person_names=people) == []
+    for kept in ("Rossi Ceramics", "Ceramiche Mario Rossi"):
+        assert schema_check.rich_result_errors(graph(kept), person_names=people) == [], kept
