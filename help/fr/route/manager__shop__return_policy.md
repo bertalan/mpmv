@@ -4,7 +4,7 @@ last-checked: 2026-11-18
 Cette page est destinée au propriétaire de la boutique. La politique de retour indique aux acheteurs de combien de jours ils disposent pour renvoyer les articles, qui paie les frais de retour et comment ils peuvent les renvoyer.
 
 ## Ce que vous voyez
-- **Ce que voient les acheteurs maintenant** : la politique approuvée ou la politique standard (14 jours, le client paie le retour) si vous n’en avez pas encore défini.
+- **Ce que voient les acheteurs maintenant** : la politique approuvée ou la politique standard (14 jours, la boutique paie les frais de retour) si vous n’en avez pas encore défini.
 - Un avis si votre dernière version est en attente de vérification ou a été refusée.
 - **Versions** : toutes les versions proposées jusqu’à présent.
 

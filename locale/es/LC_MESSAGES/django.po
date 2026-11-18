@@ -11973,8 +11973,8 @@ msgid "You have no orders yet"
 msgstr "Todavía no tienes pedidos"
 
 #: apps/manager/templates/manager/shop/return_policy.html
-msgid "You have not set a policy yet. The standard one applies."
-msgstr "Todavía no ha definido una política. Se aplica la estándar."
+msgid "You have not set a policy yet. The standard one applies: the shop pays the return shipping."
+msgstr "Todavía no ha definido una política. Se aplica la estándar: la tienda paga el envío de la devolución."
 
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "You may also like"
