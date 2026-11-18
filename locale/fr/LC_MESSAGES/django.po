@@ -2268,6 +2268,7 @@ msgstr "pays"
 #: apps/catalog/product_pages.py
 msgid "Country of origin"
 msgstr "Pays d'origine"
+
 #: apps/manager/forms.py
 msgid "Country returns are sent to"
 msgstr "Pays vers lequel les retours sont envoyés"
@@ -5869,13 +5870,14 @@ msgstr "Promotion"
 msgid "Proposals"
 msgstr "Propositions"
 
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Propose a change"
+msgstr "Proposer une modification"
+
 #: apps/manager/site_map.py apps/manager/templates/manager/shop/fitment_list.html
 #: apps/manager/templates/manager/shop/fitment_product.html
 msgid "Propose a missing item"
 msgstr "Proposer un élément manquant"
-#: apps/manager/templates/manager/shop/return_policy.html
-msgid "Propose a change"
-msgstr "Proposer une modification"
 
 #: apps/manager/fitment_forms.py
 msgid "Proposed"
@@ -12086,12 +12088,11 @@ msgstr "Vous n'avez pas encore d'images."
 msgid "You have no orders yet"
 msgstr "Tu n'as pas encore de commandes"
 
-#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "You have not set a policy yet. The standard one applies."
 msgstr "Vous n'avez pas encore défini de politique. La politique standard s'applique."
 
-#: apps/catalog/templates/catalog/product.html
+#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "You may also like"
 msgstr "Tu aimeras aussi"
 
