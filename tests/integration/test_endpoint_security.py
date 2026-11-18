@@ -467,6 +467,11 @@ OWNER_ONLY_WEB = frozenset(
         "manager:shop:profile",  # CORE.9
         "manager:shop:payments",  # VEN.6 (`bank_account`)
         "manager:shop:sales_terms",  # VEN.35 (`profile`)
+        "manager:shop:money",  # VEN.9 (`payouts`)
+        "manager:shop:money_transactions",
+        "manager:shop:money_payouts",
+        "manager:shop:money_statement",
+        "manager:shop:money_export",
         "manager:shop:image_choose",  # VEN.31
         "manager:shop:image_results",
         "manager:shop:image_chosen",
