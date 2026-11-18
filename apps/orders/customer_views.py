@@ -37,7 +37,7 @@ from apps.core.money import CURRENCY
 from apps.core.public_forms import not_anonymous
 
 from . import amendment_engine as am
-from . import amendment_notices, amendments, engine, services, versions
+from . import amendment_notices, amendments, engine, reorder, services, versions
 from .models import Order, OrderLine, VendorOrder
 
 PAGE_SIZE = 20
@@ -73,6 +73,11 @@ STEP_LABEL = {
     "delivered": _("Delivered"),
     "cancelled": _("Cancelled"),
     "refunded": _("Refunded"),
+}
+REORDER_SKIPPED = {
+    engine.REORDER_RETIRED: _("not sold any more"),
+    engine.REORDER_OUT_OF_STOCK: _("out of stock"),
+    engine.REORDER_NOT_DELIVERABLE: _("cannot be delivered to your address"),
 }
 STEP_STATE_LABEL = {
     "done": _("done"),
@@ -259,6 +264,7 @@ def order_detail(request: HttpRequest, public_id: uuid.UUID) -> HttpResponse:
     templates = services.carrier_tracking_templates(sub.carrier for sub in subs)
     context = {
         "number": order.number,
+        "public_id": order.public_id,
         "placed": order.created_at,
         "status": ORDER_STATUS.get(order.state, order.state),
         "total": _money(order.grand_total),
@@ -324,3 +330,56 @@ def keep_rest(request: HttpRequest, public_id: uuid.UUID, package: uuid.UUID) ->
     else:
         messages.success(request, gettext("Thank you. The seller can now ship the rest."))
     return HttpResponseRedirect(reverse("customer_order", args=[public_id]))
+
+
+def _reorder_name(title: str, variant: str) -> str:
+    return f"{title} ({variant})" if variant else title
+
+
+@not_anonymous(
+    reason="signed in: the customer puts their own past order back in their cart",
+    purpose="Order again: refill the cart from a past order",
+    task="ORD.31",
+)
+@require_POST
+@never_cache
+@_signed_in
+def order_again(request: HttpRequest, public_id: uuid.UUID) -> HttpResponse:
+    """Put the still-available items of a past order back in the cart at today's prices (ORD.31).
+    Nothing is placed or paid: the customer goes on to the normal checkout."""
+    user: User = request.user  # type: ignore[assignment]
+    result = reorder.order_again(user, public_id)
+    if result is None:
+        raise Http404
+    if result.added:
+        messages.success(
+            request,
+            gettext("Put back in your cart, at today's prices: %(items)s.")
+            % {"items": ", ".join(_reorder_name(i.title, i.variant_label) for i in result.added)},
+        )
+    for item in result.added:
+        if item.capped:
+            messages.warning(
+                request,
+                gettext(
+                    "%(item)s: only %(quantity)d available, so your cart holds %(quantity)d "
+                    "instead of %(requested)d."
+                )
+                % {
+                    "item": _reorder_name(item.title, item.variant_label),
+                    "quantity": item.quantity,
+                    "requested": item.requested,
+                },
+            )
+    for skipped in result.skipped:
+        messages.warning(
+            request,
+            gettext("Not added: %(item)s, %(reason)s.")
+            % {
+                "item": _reorder_name(skipped.title, skipped.variant_label),
+                "reason": REORDER_SKIPPED[skipped.reason],
+            },
+        )
+    if not result.added and not result.skipped:
+        messages.info(request, gettext("There was nothing to add to your cart."))
+    return HttpResponseRedirect(reverse("orders:cart"))

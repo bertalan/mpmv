@@ -922,6 +922,12 @@ ENDPOINTS: dict[str, Access] = {
         "like the cancel; anything else is a 404 (`test_a_stranger_cannot_cancel_the_rest`).",
         kwargs={"public_id": NIL_UUID, "package": NIL_UUID},
     ),
+    "customer_order_again": NoVendorData(
+        "The signed-in customer puts one of their own past orders back in their cart (ORD.31): "
+        "the order is looked up among the caller's own; anything else is a 404 "
+        "(`test_another_customers_order_is_a_404_also_by_guessing`).",
+        kwargs={"public_id": NIL_UUID},
+    ),
     "privacy_requests": StaffOnly(
         "Erasure requests (CMP.4): platform data listed by public id; needs "
         "compliance.change_erasurerequest, so a vendor member gets 404."
