@@ -27,6 +27,8 @@ from apps.cms.models import (
     BlogIndexPage,
     BlogPostPage,
     EditorRoleSeed,
+    FormField,
+    FormPage,
     HelpEntry,
     HomePage,
     LegalPage,
@@ -401,3 +403,33 @@ def editor_user(*roles: str) -> Any:
     user = UserFactory.create(password=secrets.token_urlsafe(16))
     user.groups.add(*Group.objects.filter(name__in=roles))
     return user
+
+
+class FormPageFactory(_InTree, DjangoModelFactory[FormPage]):
+    """A form page (CMS.13) under the primary language's home; add its fields with
+    `FormFieldFactory`."""
+
+    class Meta:
+        model = FormPage
+
+    title = factory.Sequence(lambda n: f"Form {n}")
+    slug = factory.LazyAttribute(lambda page: slugify(page.title))
+    parent = None
+    intro = ""
+    thank_you_text = ""
+    submit_label = ""
+    retention_days = 90
+
+    @classmethod
+    def _default_parent(cls) -> Page:
+        return _primary_home()
+
+
+class FormFieldFactory(DjangoModelFactory[FormField]):
+    class Meta:
+        model = FormField
+
+    page = factory.SubFactory(FormPageFactory)
+    label = factory.Sequence(lambda n: f"Field {n}")
+    field_type = "singleline"
+    required = False

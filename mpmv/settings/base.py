@@ -99,6 +99,7 @@ INSTALLED_APPS = [
     "wagtail.admin",
     "wagtail.contrib.settings",  # BaseSiteSetting for the per-site theme (THM.1)
     "wagtail.contrib.routable_page",  # `routablepageurl` for the blog's author pages (CMS.3)
+    "wagtail.contrib.forms",  # editor-built form pages and their stored submissions (CMS.13)
     "wagtail",
     "modelcluster",
     "taggit",

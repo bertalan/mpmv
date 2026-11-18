@@ -39,6 +39,15 @@ a one-time signed token (CORE.15), or an allow-list entry with its reason.
 | `email_webhook` | `/webhooks/email/` | `apps.core.views.email_webhook` | Email provider delivery feedback (bounces, complaints) | allow-list: machine to machine: the provider's signature and a replay window are checked first | none: an unsigned request is refused before any work; off (404) with no secret | ARC.16 |
 | `payments_webhook` | `/webhooks/payments/` | `apps.payments.views.payment_webhook` | Payment provider events (payment succeeded) | allow-list: machine to machine: the provider's signature and a timestamp tolerance are checked first; a replayed event id does nothing | none: an unsigned request is refused before any work; off (404) with no provider | PAY.2 |
 
+## Form pages
+
+Wagtail page types an editor builds a form on (CMS.13). Every published page of the type
+takes anonymous POSTs at its own address; the declaration covers all of them.
+
+| Page type | Purpose | Protection | Rate limit | Task |
+|---|---|---|---|---|
+| `apps.cms.forms_pages.FormPage` | Editor-built form pages: any form an editor publishes (contact, request, survey) | captcha | the captcha only (a token is single use) | CMS.13 |
+
 ## Signed in, second factor not verified yet
 
 Steps a user reaches after the password and before the second factor (`mfa_exempt`). The

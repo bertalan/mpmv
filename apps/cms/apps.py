@@ -47,6 +47,8 @@ class CmsConfig(AppConfig):
         "legalpage": "Wagtail page: each published text is an audited LegalPageVersion",
         "vendorrecruitmentpage": "Wagtail page: editor content with revisions and action log",
         "standardpage": "Wagtail page: editor content with revisions and Wagtail's action log",
+        "formpage": "Wagtail page: editor content with revisions and Wagtail's action log",
+        "formfield": "a field of a form page, saved and logged with its page",
         "blogindexpage": "Wagtail page: editor content with revisions and Wagtail's action log",
         "blogpostpage": "Wagtail page: editor content with revisions and Wagtail's action log",
         "blogauthor": "Wagtail snippet: a byline name, logged in Wagtail's action log",

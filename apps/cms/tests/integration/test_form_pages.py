@@ -42,7 +42,8 @@ def a_form(seeded: SeedReport, **kwargs: Any) -> FormPage:
     page = FormPageFactory.create(title="Ask us", **kwargs)
     FormFieldFactory.create(page=page, label="Your question", field_type="multiline", required=True)
     page.save_revision().publish()
-    return FormPage.objects.get(pk=page.pk)
+    published: FormPage = FormPage.objects.get(pk=page.pk)  # reloaded: the published copy
+    return published
 
 
 def submit(client: Client, page: FormPage, token: str | None, text: str = "Hello") -> Any:
@@ -138,6 +139,7 @@ def test_the_purge_deletes_only_submissions_past_their_pages_retention(
     assert {made[("short", 10)], made[("long", 10)], made[("long", 40)]} <= remaining
     assert len(changes.changes) == 1
     entry = AuditLog.objects.get(action=services.FORM_SUBMISSIONS_PURGED)
+    assert entry.after is not None
     assert entry.after["deleted"] == 1
     assert entry.after["retention_days"] == 30
     assert "short" not in str(entry.after)  # counts only, never the content
