@@ -1091,6 +1091,11 @@ ENDPOINTS: dict[str, Access] = {
         "Customer help section (ARC.37): repository text, no vendor data.",
         kwargs={"section": "ordering"},
     ),
+    "vendor_help": NoVendorData("Seller guide index (ARC.37): repository text, no vendor data."),
+    "vendor_help_section": NoVendorData(
+        "Seller guide section (ARC.37): repository text, no vendor data.",
+        kwargs={"section": "getting-started"},
+    ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
     "admin:jsi18n": NoVendorData("Admin JavaScript translation catalog."),
