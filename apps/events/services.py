@@ -48,11 +48,12 @@ from django.db.models import (
     IntegerField,
     Q,
     QuerySet,
+    TextField,
     Value,
     When,
     Window,
 )
-from django.db.models.functions import RowNumber
+from django.db.models.functions import Coalesce, Concat, RowNumber
 from django.http import Http404
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -1626,12 +1627,19 @@ def search_events(
     )
     matched = (
         EventPage.objects.filter(pk__in=shown)
-        .filter(
-            Q(title__icontains=query)
-            | Q(summary__icontains=query)
-            | Q(venue_name__icontains=query)
-            | Q(city__icontains=query)
+        .annotate(
+            haystack=Concat(
+                Coalesce("title", Value("")),
+                Value(" "),
+                Coalesce("summary", Value("")),
+                Value(" "),
+                Coalesce("venue_name", Value("")),
+                Value(" "),
+                Coalesce("city", Value("")),
+                output_field=TextField(),
+            )
         )
+        .filter(haystack__icontains=query)
         .select_related("locale")
         .annotate(starts_sort=start)
         .order_by("starts_sort", "path")

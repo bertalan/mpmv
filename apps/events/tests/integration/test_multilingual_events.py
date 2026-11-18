@@ -613,3 +613,9 @@ def test_search_events_query_count_does_not_grow_with_the_catalogue() -> None:
         group = _search("bolt", limit=3)
     assert len(group.items) == 3
     assert len(large) == len(small)
+
+
+def test_search_events_matches_a_query_spanning_the_title_and_the_summary() -> None:
+    Fixture().create("de", title="Spring fair", summary="opening weekend", city="Bolzano")
+    assert _titles(_search("fair opening")) == ["Spring fair"]
+    assert _titles(_search("weekend messe")) == ["Spring fair"]
