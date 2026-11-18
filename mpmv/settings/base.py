@@ -452,10 +452,13 @@ WAGTAILIMAGES_IMAGE_FORM_BASE = "apps.core.forms.MediaImageForm"
 WAGTAILDOCS_EXTENSIONS = ["pdf"]
 WAGTAILDOCS_MAX_UPLOAD_SIZE = 10 * 1024 * 1024
 WAGTAILDOCS_DOCUMENT_FORM_BASE = "apps.core.document_forms.DocumentForm"
-# No document serve view is mounted: a document's URL is its media path, which Caddy answers
-# with 404 (deploy/caddy/Caddyfile). Without this, the admin's document pages fail on the
-# missing `wagtaildocs_serve` route.
-WAGTAILDOCS_SERVE_METHOD = "direct"
+# Documents are served by Wagtail's view (/documents/<id>/<name>), which checks collection
+# privacy and page restrictions and sends Content-Disposition attachment and nosniff. Caddy keeps
+# answering 404 for /media/documents/ (deploy/caddy/Caddyfile). ARC.15 will switch this to
+# "redirect" with short-lived signed URLs.
+WAGTAILDOCS_SERVE_METHOD = "serve_view"
+# Wagtail shows PDFs inline by default; an empty list makes every document an attachment.
+WAGTAILDOCS_INLINE_CONTENT_TYPES: list[str] = []
 # Renditions without an explicit format-* go to WebP. GIF is left out: Wagtail turns a still GIF
 # into PNG and keeps an animated one as GIF, which WebP conversion would flatten to one frame.
 # Templates ask for AVIF, WebP and JPEG explicitly ({% responsive_image %}, apps.core.images).
