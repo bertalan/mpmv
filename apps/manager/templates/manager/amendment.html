@@ -48,6 +48,9 @@ answers with the passkey prompt. No inline script or style.
   </div>
   {% endif %}
 
+  {% if blocked %}
+    <p><strong data-blocked>{{ blocked }}</strong> <span class="visually-hidden">{% translate "Changes are disabled." %}</span></p>
+  {% endif %}
   {% if not amendable %}
     <p>{% translate "This order can no longer be changed: only a paid order that is waiting for the seller or accepted, and not shipped yet, can be changed." %}</p>
   {% endif %}
@@ -92,6 +95,7 @@ answers with the passkey prompt. No inline script or style.
       </dl>
       {% if draft_mine and draft.state == "draft" %}
         {% if preview.passkey %}<p>{% translate "Applying it asks for your passkey: it moves money or the delivery address." %}</p>{% endif %}
+        <fieldset class="manager-fieldset" {% if blocked %}disabled{% endif %}>
         <div class="manager-actions">
           {% if preview.kind == "minor" %}
           <form method="post" action="{{ apply_url }}" class="manager-form">
@@ -104,6 +108,7 @@ answers with the passkey prompt. No inline script or style.
             {% include "components/button.html" with label=_("Discard the draft") type="submit" variant="secondary" only %}
           </form>
         </div>
+        </fieldset>
       {% endif %}
     </section>
   {% endif %}
@@ -115,6 +120,7 @@ answers with the passkey prompt. No inline script or style.
       {% include "components/error_summary.html" with form=form autofocus=True only %}
       <form method="post" action="{{ form_url }}" class="manager-form" novalidate>
         {% csrf_token %}
+        <fieldset class="manager-fieldset" {% if blocked %}disabled{% endif %}>
         {% for group in form.line_fields %}
           <fieldset class="manager-fieldset">
             <legend>{{ group.line.title }}</legend>
@@ -124,6 +130,7 @@ answers with the passkey prompt. No inline script or style.
         {% for field in form.other_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
         {% for field in form.closing_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
         {% include "components/button.html" with label=_("Compute the change") type="submit" only %}
+        </fieldset>
       </form>
     </section>
   {% endif %}
@@ -135,8 +142,10 @@ answers with the passkey prompt. No inline script or style.
       {% include "components/error_summary.html" with form=cancel_form only %}
       <form method="post" action="{{ cancel_url }}" class="manager-form" novalidate>
         {% csrf_token %}
+        <fieldset class="manager-fieldset" {% if blocked %}disabled{% endif %}>
         {% for field in cancel_form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
         {% include "components/button.html" with label=_("Cancel the package") type="submit" variant="danger" only %}
+        </fieldset>
       </form>
     </section>
   {% endif %}

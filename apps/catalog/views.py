@@ -290,6 +290,7 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
         "robots": listings.ROBOTS_INDEX,
         "vendor_url": slugs.vendor_path(language, page.vendor.slug, default_language=default),
         "gallery_items": product_pages.gallery_items(page),
+        "variant_gallery_items": product_pages.variant_gallery_items(page),
         "related": product_pages.related(page, language),
         "specifications": specifications,
         "fitment": fitment,
