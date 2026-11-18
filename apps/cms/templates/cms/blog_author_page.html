@@ -1,5 +1,5 @@
 {% extends "layouts/content.html" %}
-{% load i18n wagtailcore_tags wagtailimages_tags image_credits cms_tags %}
+{% load i18n wagtailcore_tags responsive_images image_credits cms_tags %}
 {% comment %}
 Author page (CMS.3), `author/<slug>/` under a language's blog: the author's name, photo (with its
 CMS.8 credit), job title and bio in this language (hidden while untranslated, never another
@@ -15,7 +15,7 @@ language's), profile links, then their live articles here, newest first, twelve 
     {% if author.photo %}
       {% image_credit_of author.photo as credit %}
       <figure>
-        {% image author.photo fill-240x240 alt=author.photo_alt_text %}
+        {% responsive_image author.photo "avatar" alt=author.photo_alt_text %}
         {% if credit %}<figcaption>{% include "core/components/image_credit.html" %}</figcaption>{% endif %}
       </figure>
     {% endif %}

@@ -336,6 +336,13 @@ MPMV_VERSION = os.environ.get("MPMV_VERSION", "") or "dev"
 # The vendor guide the help dialog links on vendor-facing screens (ARC.32); empty = no link.
 MPMV_VENDOR_GUIDE_URL = env_str("MPMV_VENDOR_GUIDE_URL", "")
 
+# Origins a video block may embed (THM.14): added to the CSP `frame-src` of a page that renders a
+# video, and the block refuses an address whose embed is elsewhere. Comma separated plain https
+# origins (cms.E003 refuses anything else); an empty value disables video embeds.
+MPMV_VIDEO_EMBED_ORIGINS = env_list(
+    "MPMV_VIDEO_EMBED_ORIGINS", "https://www.youtube-nocookie.com,https://player.vimeo.com"
+)
+
 # Consent provider (SEO.9, D-10): the name of the consent tool in use. `self-hosted` is our own
 # minimal banner; an operator adds another by naming its class in MPMV_CONSENT_PROVIDERS
 # ({name: "dotted.path.Class"}) and selecting the name here (docs/dev/consent-providers.md). An

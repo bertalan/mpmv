@@ -704,9 +704,36 @@ _YOUTUBE_HOSTS = frozenset(
 _VIMEO_HOSTS = frozenset({"vimeo.com", "www.vimeo.com", "player.vimeo.com"})
 
 
-# The only origins a video block ever frames (never a wildcard); the CSP `frame-src` gets them on
-# the responses that render such a block (apps.cms.middleware.VideoEmbedCspMiddleware).
+# The default of the `MPMV_VIDEO_EMBED_ORIGINS` setting: the only origins a video block frames
+# (never a wildcard). The CSP `frame-src` gets the configured origins on the responses that render
+# such a block (apps.cms.middleware.VideoEmbedCspMiddleware), and the block refuses an address
+# whose embed is on any other origin (apps.cms.blocks.validate_video_url).
 VIDEO_EMBED_ORIGINS = ("https://www.youtube-nocookie.com", "https://player.vimeo.com")
+
+
+def video_origin_problem(origin: str) -> str | None:
+    """Why `origin` cannot go in a CSP frame-src list as a video origin, or None when it is a
+    plain `https://host` origin (no wildcard, path, query, fragment, credentials or port)."""
+    if not isinstance(origin, str) or origin != origin.strip() or not origin:
+        return "it is empty or has surrounding spaces"
+    if "*" in origin:
+        return "it has a wildcard"
+    parts = urlsplit(origin)
+    if parts.scheme != "https":
+        return "it is not an https origin"
+    try:
+        port = parts.port
+    except ValueError:
+        return "its port is not valid"
+    if parts.username is not None or parts.password is not None or "@" in parts.netloc:
+        return "it has credentials"
+    if port is not None:
+        return "it has a port"
+    if not parts.hostname or origin != f"https://{parts.hostname}":
+        return "it is not just a scheme and a host (no path, query or fragment)"
+    return None
+
+
 _VIMEO_HASH = re.compile(r"^[0-9a-f]{6,20}$")
 
 
