@@ -35,6 +35,10 @@ class VariantChoice:
     price: Decimal | None
     stock_status: str
     selected: bool
+    gtin: str = ""  # the variant's own, never the product's (CAT.23)
+    mpn: str = ""
+    image: MediaImage | None = None  # the variant's own cover, an existing rendition set
+    image_alt: str = ""
 
 
 @dataclass(frozen=True)
@@ -63,6 +67,10 @@ class ProductPage:
     variants: list[VariantChoice]
     companion: "services.ProductCard | None"
     gallery: list[GalleryImage]
+
+    @property
+    def has_variant_images(self) -> bool:
+        return any(variant.image is not None for variant in self.variants)
 
     @property
     def is_fallback(self) -> bool:
@@ -123,16 +131,29 @@ def _variants(product: Product, language: str, *, on_request: bool) -> list[Vari
     if not rows:
         return []
     chosen = next((row for row in rows if row.is_default), rows[0])
+    covers = [row.cover_image.image for row in rows if row.cover_image is not None]
+    core_images.prefetch_renditions(covers)
     choices = []
     for row in rows:
         text = translations.resolve(row.translations.all(), language).translation
+        cover = row.cover_image
+        cover_text = (
+            translations.resolve(cover.translations.all(), language).translation
+            if cover is not None
+            else None
+        )
+        label = text.label if text is not None else str(row.sku)
         choices.append(
             VariantChoice(
                 sku=str(row.sku),
-                label=text.label if text is not None else str(row.sku),
+                label=label,
                 price=None if on_request else engine.public_variant_price(product, row),
                 stock_status=str(row.stock_status),
                 selected=row is chosen,
+                gtin=row.gtin,
+                mpn=row.mpn,
+                image=cover.image if cover is not None else None,
+                image_alt=((cover_text.alt_text if cover_text is not None else "") or label),
             )
         )
     return choices
@@ -179,7 +200,13 @@ def find(slug: str, language: str) -> ProductPage | None:
 
 
 def _build(product: Product, language: str) -> ProductPage | None:
-    prefetch_related_objects([product], "translations", "variants__translations")
+    prefetch_related_objects(
+        [product],
+        "translations",
+        "variants__translations",
+        "variants__cover_image__image",
+        "variants__cover_image__translations",
+    )
     resolved = translations.resolve(product.translations.all(), language)
     text = resolved.translation
     if text is None or not text.slug or resolved.language is None:

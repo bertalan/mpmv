@@ -125,6 +125,10 @@ class VariantIn(Schema):
     weight_kg_override: Decimal | None = Field(None, ge=0, max_digits=8, decimal_places=3)
     stock_qty: int = Field(0, ge=0)
     is_default: bool = False
+    gtin: PlainText = Field(
+        "", max_length=32, description="8, 12, 13 or 14 digits with the GS1 check digit."
+    )
+    mpn: PlainText = Field("", max_length=engine.MPN_MAX_LENGTH)
 
 
 class ProductIn(Schema):
@@ -177,6 +181,8 @@ class ProductIn(Schema):
                     weight_kg_override=v.weight_kg_override,
                     stock_qty=v.stock_qty,
                     is_default=v.is_default,
+                    gtin=v.gtin,
+                    mpn=v.mpn,
                 )
                 for v in self.variants
             ),
@@ -285,6 +291,8 @@ def _variant_out(variant: Variant, language: str) -> dict[str, Any]:
         "options": {o.attribute.code: o.value.value for o in options},
         "price_net_override": variant.price_net_override,
         "stock_qty": variant.stock_qty,
+        "gtin": variant.gtin,
+        "mpn": variant.mpn,
     }
 
 

@@ -404,4 +404,11 @@ setting clears the registry cache. `SiteFactory` and `ThemeSettingsFactory` are 
   and Vimeo player origins; `cms.E003` refuses `http://`, wildcards, paths and ports). The CSP
   middleware adds them to `frame-src` only on a page that renders a video, and the block refuses
   an address whose embed is on another origin: one list for both.
+- THM.9 part 2: `ride` overrides `seo/consent/banner.html` and `_actions.html` (the consent banner
+  as a Bootstrap alert, `css/52-consent.css`). Same ids, `data-*` hooks, form, texts and button
+  values as `base`; Reject and Accept share the same `btn btn-outline-dark` classes. The banner
+  stays flush with the bottom edge so `--consent-offset` (set by consent.js) is exact: body padding
+  and scroll padding keep every focused element out from under it. The testimonial and blog
+  carousels are the strip block (`components/strip.html`); `tests/e2e/test_ride_components.py`
+  proves the whole set on a CMS page.
 - Not wired to the CMS yet (no block fields); the cta block carries `data-reveal` as the first use.
