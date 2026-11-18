@@ -47,9 +47,16 @@ style, no third-party host.
 
 | Setting | Environment variable | Default |
 |---|---|---|
-| `MAP_TILE_URL` | `MPMV_MAP_TILE_URL` | empty: no tile layer |
+| `MAP_TILE_URL` | `MPMV_MAP_TILE_URL` | `/maps/tiles/{z}/{x}/{y}.png`, the tile proxy (EVT.14) |
 | `MAP_TILE_ATTRIBUTION` | `MPMV_MAP_TILE_ATTRIBUTION` | `© OpenStreetMap contributors` |
 | `MAP_TILE_ATTRIBUTION_URL` | `MPMV_MAP_TILE_ATTRIBUTION_URL` | `https://www.openstreetmap.org/copyright` |
+| `MAP_TILE_UPSTREAM_URL` | `MPMV_MAP_TILE_UPSTREAM_URL` | `https://tile.openstreetmap.org/{z}/{x}/{y}.png`: https template the proxy fetches from |
+| `MAP_TILE_USER_AGENT` | `MPMV_MAP_TILE_USER_AGENT` | empty: product, site URL and geocoding contact |
+| `MAP_TILE_UPSTREAM_DAILY_LIMIT` | `MPMV_MAP_TILE_UPSTREAM_DAILY_LIMIT` | `100000` upstream requests per UTC day, then 503 |
+| `MAP_TILE_MIN_ZOOM`, `MAP_TILE_MAX_ZOOM` | none | `0`, `18` |
+| `MAP_TILE_IP_LIMIT`, `MAP_TILE_IP_WINDOW` | none | `600` tiles per `60` s per client IP |
+| `MAP_TILE_BROWSER_MAX_AGE` | none | 7 days: `Cache-Control` for browsers and the CDN |
+| `MAP_TILE_CACHE_STORAGE` | none | `default`: the `STORAGES` alias (object storage on LIVE) |
 | `MAP_DEFAULT_VIEW` | none | `(48.0, 10.0, 4)`: latitude, longitude, zoom of a map without a point |
 
 `MAP_TILE_URL` is a Leaflet template with `{z}`, `{x}` and `{y}`. The intended value is the
@@ -60,6 +67,22 @@ subdomains); `mpmv.settings.env.map_tile_origin` then adds that one origin to th
 `img-src`. Anything else stops the settings from loading. Never point it at
 `tile.openstreetmap.org` directly in production: the visitor's IP address would reach a third
 party, which is why EVT.14 exists.
+
+## Tile proxy (EVT.14)
+
+`apps/core/maps`: `/maps/tiles/{z}/{x}/{y}.png` on our own domain. `engine.parse_tile` accepts
+canonical ASCII integers only, `MAP_TILE_MIN_ZOOM <= z <= MAP_TILE_MAX_ZOOM` and
+`0 <= x, y < 2**z`; anything else is a 404 before any database or upstream call. Then the per-IP
+limit (429 with `Retry-After`, client IP from `client_ip`), then the cache in object storage
+(`map-tiles/<hash of the upstream template>/z/x/y.tile`, so switching upstream never serves the
+old provider's tiles), kept 7 days or the upstream's `max-age`/`Expires` if longer (at most a
+year). A miss counts one upstream request (a per-day `Throttle` row, read with
+`services.upstream_requests()`; past `MAP_TILE_UPSTREAM_DAILY_LIMIT` the proxy answers 503 and
+sends nothing), fetches through the `TileUpstream` protocol (`HttpTileUpstream`, a fake in tests)
+and caches the PNG. Upstream errors are 502, timeouts 504, a non-PNG answer 502, none cached.
+Responses carry `Cache-Control: public, max-age=604800`; refusals `no-store`. The upstream URL may
+hold a provider key: it is never logged and never part of a cache path. OSM's public tile server
+allows light use only: watch the counter and switch the upstream before traffic grows.
 
 ## Tests
 
@@ -98,5 +121,5 @@ remain. The own module is about 300 lines, runs the same code in the admin, the 
   endpoint already admits vendor members. Render the form's `picked_latitude` and
   `picked_longitude` hidden inputs too. EVT.4's done-when checks the vendor half: a vendor sets
   a point by click, by drag and by typing, and the saved values match.
-- EVT.14: set `MPMV_MAP_TILE_URL=/maps/tiles/{z}/{x}/{y}.png` once the proxy is live.
+- EVT.14 is done: see "Tile proxy" below; `MAP_TILE_URL` now defaults to the proxy.
 - EVT.15: the public maps call `createMap` from the same module.

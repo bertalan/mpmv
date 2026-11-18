@@ -130,3 +130,13 @@ def map_tile_origin(url: str) -> str | None:
     if problem:
         raise ImproperlyConfigured(f"MPMV_MAP_TILE_URL {problem}, got {url!r}")
     return f"https://{urlsplit(url).netloc}"
+
+
+def map_tile_upstream_url(url: str) -> str:
+    """`MPMV_MAP_TILE_UPSTREAM_URL` (EVT.14): the tile proxy's upstream, an https template with
+    `{z}`, `{x}` and `{y}`; anything else stops the settings from loading."""
+    from apps.core.maps.engine import validate_template
+
+    if problem := validate_template(url):
+        raise ImproperlyConfigured(f"MPMV_MAP_TILE_UPSTREAM_URL {problem}")
+    return url
