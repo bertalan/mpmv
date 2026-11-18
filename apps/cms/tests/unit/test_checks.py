@@ -41,3 +41,57 @@ def _registered(*, deploy: bool) -> list[object]:
 def test_the_base_url_is_checked_on_deploy_only() -> None:
     assert check_base_url in _registered(deploy=True)
     assert check_base_url not in _registered(deploy=False)
+
+
+# --- cms.E003: MPMV_VIDEO_EMBED_ORIGINS (THM.14) ---------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://www.youtube-nocookie.com",
+        "*",
+        "https://*",
+        "https://*.example.com",
+        "https://player.example.com/embed",
+        "https://player.example.com/",
+        "https://player.example.com:8443",
+        "https://player.example.com?x=1",
+        "player.example.com",
+        "",
+    ],
+)
+def test_a_video_origin_that_is_not_a_plain_https_origin_fails_the_check(origin: str) -> None:
+    from apps.cms.checks import check_video_embed_origins
+
+    with override_settings(MPMV_VIDEO_EMBED_ORIGINS=["https://player.vimeo.com", origin]):
+        errors = check_video_embed_origins(None)
+    assert [error.id for error in errors] == ["cms.E003"]
+    assert "MPMV_VIDEO_EMBED_ORIGINS" in errors[0].msg
+
+
+@pytest.mark.parametrize(
+    "origins",
+    [
+        ("https://www.youtube-nocookie.com", "https://player.vimeo.com"),
+        ["https://video.example.org"],
+        [],
+    ],
+)
+def test_plain_https_video_origins_pass_the_check(origins: object) -> None:
+    from apps.cms.checks import check_video_embed_origins
+
+    with override_settings(MPMV_VIDEO_EMBED_ORIGINS=origins):
+        assert check_video_embed_origins(None) == []
+
+
+def test_the_video_origins_check_is_registered_and_the_default_is_unchanged() -> None:
+    from django.conf import settings
+
+    from apps.cms.checks import check_video_embed_origins
+
+    assert check_video_embed_origins in _registered(deploy=False)
+    assert list(settings.MPMV_VIDEO_EMBED_ORIGINS) == [
+        "https://www.youtube-nocookie.com",
+        "https://player.vimeo.com",
+    ]

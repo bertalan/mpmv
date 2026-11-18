@@ -37,6 +37,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, ClassVar
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from django import forms
@@ -1145,8 +1146,12 @@ class ProgressBlock(blocks.StructBlock):  # type: ignore[misc]
 
 
 def validate_video_url(url: str) -> None:
-    """Only YouTube and Vimeo addresses (https), so the embed is a known no-tracking origin."""
-    if parse_video_url(url) is None:
+    """Only YouTube and Vimeo addresses (https) whose no-tracking embed origin is in
+    `settings.MPMV_VIDEO_EMBED_ORIGINS`, the same list the CSP `frame-src` is built from."""
+    links = parse_video_url(url)
+    allowed = {o.rstrip("/") for o in settings.MPMV_VIDEO_EMBED_ORIGINS}
+    embed = urlsplit(links.embed_url) if links else None
+    if links is None or f"{embed.scheme}://{embed.netloc}" not in allowed:  # type: ignore[union-attr]
         raise ValidationError(
             _(
                 "Use the address of a YouTube or Vimeo video, starting with https://. "
