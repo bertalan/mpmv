@@ -28,7 +28,7 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Platform: owner-only settings (CMP.13, CMP.11 approvals) | R |  |  |  | E |  |
 | Platform: catalog, categories, attributes, taxonomies, imports |  | E |  | R | R |  |
 | Platform: moderation (vendor events, storefront changes, content) |  | E |  |  | R |  |
-| Platform: products, bulk publish, preview, translation status (CAT.11) |  | E |  |  | R |  |
+| Platform: products, bulk publish, preview, translation status (CAT.11) |  | E |  | R | R |  |
 | Platform: fitment scheme, the levels of the garage (FIT.1) | E |  |  |  | R |  |
 | Platform: categories expected to declare fitment (FIT.1) | E | R |  |  | R |  |
 | Platform: fitment nodes, proposals, merge and retire (FIT.1) |  | E |  | R | R |  |

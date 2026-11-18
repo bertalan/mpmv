@@ -41,7 +41,7 @@ def _no_checks(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.parametrize(
     ("role", "code"),
-    [("catalog", 200), ("owner", 200), ("finance", 404), ("support", 404), ("config", 404)],
+    [("catalog", 200), ("owner", 200), ("finance", 404), ("support", 200), ("config", 404)],
 )
 def test_role_access(client: Client, role: str, code: int) -> None:
     product = ProductFactory.create(languages=["en"])
