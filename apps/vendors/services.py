@@ -118,6 +118,7 @@ VENDOR_FIELDS = (
     "mail_language",
     "sales_mode_default",
     "enquiries_enabled",
+    "default_product_role",
     "legacy_wp_user_id",
 )
 
@@ -2225,6 +2226,40 @@ def _lock_profile_vendor(vendor: Vendor, actor: User) -> Vendor:
     if locked.status in PROFILE_LOCKED:
         raise PermissionDenied("A suspended or closed vendor cannot change its profile.")
     return locked
+
+
+def set_default_product_role(
+    vendor: Vendor,
+    role: str,
+    *,
+    actor: User,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """The vendor owner says whether the shop makes or resells its products (SEO.10).
+
+    `role` is `producer`, `reseller` or empty (unknown). Owner only (`profile`), and not for a
+    suspended or closed vendor (`PermissionDenied`). One `vendor.updated` audit entry holds the
+    value before and after; an unchanged value writes nothing.
+    """
+    if role not in Vendor.ProductRole.values and role != "":
+        raise ValidationError({"default_product_role": "Choose producer, reseller or unknown."})
+    with transaction.atomic():
+        locked = _lock_profile_vendor(vendor, actor)
+        changes = ChangeSet()
+        changes.update(
+            MODEL_LABEL,
+            str(vendor.public_id),
+            {"default_product_role": locked.default_product_role},
+            {"default_product_role": role},
+        )
+        if dry_run or changes.is_empty:
+            return changes
+        Vendor.objects.filter(pk=vendor.pk).update(
+            default_product_role=role, updated_at=timezone.now()
+        )
+        audit_changes(changes, ctx=ctx, action=UPDATED)
+    return changes
 
 
 def save_storefront_profile(

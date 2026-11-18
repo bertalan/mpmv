@@ -107,6 +107,24 @@ class StorefrontProfileForm(forms.Form):
     )
 
 
+class ProductRoleForm(forms.Form):
+    """Whether the shop makes or resells its products (SEO.10; the owner only)."""
+
+    default_product_role = forms.ChoiceField(
+        label=_("What the shop is to its products"),
+        required=False,
+        choices=[
+            ("", _("Not sure")),
+            ("producer", _("Producer: we make the products")),
+            ("reseller", _("Reseller: we buy the products to resell")),
+        ],
+        help_text=_(
+            "Shown to search engines and AI assistants in the product data. If you are not "
+            "sure, we never say that you make the product. A single product can differ."
+        ),
+    )
+
+
 class VendorLogoForm(forms.Form):
     """The logo: a new image (checked by content in the service), its description, or removal."""
 

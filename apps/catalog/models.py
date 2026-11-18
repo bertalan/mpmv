@@ -500,6 +500,15 @@ class Product(BaseModel):
             "IT. Optional."
         ),
     )
+    vendor_role = models.CharField(
+        max_length=16,
+        choices=Vendor.ProductRole.choices,
+        blank=True,
+        help_text=_(
+            "Whether the shop makes this product (producer) or resells it (reseller). Empty: "
+            "use the shop's default."
+        ),
+    )
 
     gtin = models.CharField(
         "GTIN",

@@ -255,3 +255,22 @@ def test_a_fiscal_category_change_is_audited_with_old_and_new_value(client: Clie
     assert row.after is not None
     assert row.before["fiscal_category"] == "standard"
     assert row.after["fiscal_category"] == "reduced"
+
+
+def test_staff_set_the_product_role_override_with_an_audit_entry(client: Client) -> None:
+    product = ProductFactory.create(sales_mode="buy")
+    sign_in(client, "catalog")
+    data = {
+        "sales_mode": product.sales_mode,
+        "fiscal_category": product.fiscal_category,
+        "vendor_role": "reseller",
+        "confirm": "1",
+    }
+    assert client.post(detail(product), data).status_code == 302
+    product.refresh_from_db()
+    assert product.vendor_role == "reseller"
+    entry = AuditLog.objects.get(action="catalog.product.updated")
+    assert entry.after is not None
+    assert entry.after["vendor_role"] == "reseller"
+    data["vendor_role"] = "maker"
+    assert client.post(detail(product), data).status_code == 200  # refused by the form
