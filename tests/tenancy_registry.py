@@ -1080,6 +1080,10 @@ API_OPERATIONS: dict[str, Access] = {
     "GET /api/v1/catalog/products/{public_id}": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor)
     ),
+    # CAT.15
+    "GET /api/v1/catalog/products/{public_id}/other-sellers": VendorScoped(
+        make=lambda vendor: ProductFactory.create(vendor=vendor)
+    ),
     # EVT.5
     "GET /api/v1/events": VendorScopedList(
         make=lambda vendor: EventPageFactory.create(vendor=vendor)

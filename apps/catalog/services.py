@@ -12,6 +12,7 @@ history for the Omnibus rule (CMP.6) can be built from these audit rows.
 import datetime as dt
 import logging
 import re
+import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
@@ -2397,6 +2398,7 @@ class ProductCard:
     fiscal_category: str = "standard"
     # The seller: the price shown is what checkout charges for this vendor (its VAT regime).
     vendor: Vendor | None = None
+    public_id: uuid.UUID | None = None  # the product's API identifier (CAT.15)
 
 
 def product_cards(products: Sequence[Product], language: str) -> list[ProductCard]:
@@ -2437,6 +2439,7 @@ def product_cards(products: Sequence[Product], language: str) -> list[ProductCar
                 image_alt=title,
                 fiscal_category=product.fiscal_category,
                 vendor=product.vendor,
+                public_id=product.public_id,
             )
         )
     return cards

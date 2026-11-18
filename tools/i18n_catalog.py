@@ -83,6 +83,7 @@ SCOPES = (
     "apps/catalog/templates/catalog/product.html",
     "apps/catalog/templates/catalog/includes/stock_status.html",
     "apps/catalog/templates/catalog/includes/product_card.html",
+    "apps/catalog/templates/catalog/includes/other_sellers.html",  # CAT.15
     # The note under every consumer price (TAX.12, owner wording 2026-11-16), in all languages.
     "apps/tax/prices.py",
     # Temporary staff "Site links" page (OPS.12); remove before LIVE.

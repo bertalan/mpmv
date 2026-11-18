@@ -6,6 +6,7 @@ names and value labels in the requested language; `GET /api/v1/catalog/attribute
 platform's attributes so a client knows the codes to send.
 """
 
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -251,3 +252,70 @@ def test_the_attribute_catalogue_lists_codes_kinds_and_labels(
         "name": "Width",
         "values": [],
     }
+
+
+# --- CAT.15: other sellers of a product
+
+
+def _published(vendor: Vendor, title: str, **fields: Any) -> Product:
+    from apps.catalog.tests.factories import ProductTranslationFactory
+    from apps.core.models import TranslationStatus
+
+    product = ProductFactory.create(vendor=vendor, status=Product.Status.PUBLISHED, **fields)
+    ProductTranslationFactory.create(
+        product=product,
+        language=primary_language(),
+        title=title,
+        slug=title.lower().replace(" ", "-"),
+        status=TranslationStatus.PUBLISHED,
+    )
+    return product
+
+
+@pytest.mark.usefixtures("consumer_prices")
+def test_other_sellers_lists_the_same_gtin_of_other_vendors(client: Client) -> None:
+    mine = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    other = VendorFactory.create(
+        status=Vendor.Status.ACTIVE,
+        sells_online=True,
+        display_name="Shop Beta",
+        legal_form=Vendor.LegalForm.SRL,
+    )
+    gtin = "4006381333931"
+    product = _published(mine, "Mug A", gtin=gtin)
+    listed = _published(other, "Mug B", gtin=gtin, price_net=Decimal("10.00"))
+    _published(other, "Mug C", gtin="4006381333948")  # another article
+    _published(mine, "Mug D", gtin=gtin)  # the caller's own vendor
+    response = client.get(
+        f"{PRODUCTS}/{product.public_id}/other-sellers?language={primary_language()}",
+        headers=_headers(mine),
+    )
+    assert response.status_code == 200
+    [row] = response.json()
+    assert row["public_id"] == str(listed.public_id)
+    assert row["title"] == "Mug B"
+    assert row["seller"] == "Shop Beta"
+    assert row["price"] == "12.20"  # the consumer price with VAT (TAX.12), never the net one
+    assert row["url"].endswith("/mug-b/")
+
+
+def test_other_sellers_of_another_vendors_product_is_a_404(client: Client) -> None:
+    mine = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    stranger = _published(VendorFactory.create(status=Vendor.Status.ACTIVE), "Mug A")
+    response = client.get(f"{PRODUCTS}/{stranger.public_id}/other-sellers", headers=_headers(mine))
+    assert response.status_code == 404
+
+
+def test_other_sellers_is_bounded_and_needs_the_read_scope(client: Client) -> None:
+    mine = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    product = _published(mine, "Mug A", gtin="4006381333931")
+    for index in range(3):
+        _published(
+            VendorFactory.create(status=Vendor.Status.ACTIVE),
+            f"Mug N{index}",
+            gtin="4006381333931",
+        )
+    url = f"{PRODUCTS}/{product.public_id}/other-sellers"
+    assert len(client.get(f"{url}?limit=2", headers=_headers(mine)).json()) == 2
+    assert client.get(f"{url}?limit=0", headers=_headers(mine)).status_code == 422
+    assert client.get(url, headers=_headers(mine, ["events:read"])).status_code == 403

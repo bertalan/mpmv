@@ -1137,6 +1137,10 @@ msgstr ""
 "Un altro tuo prodotto pensato per essere comprato insieme a questo, per esempio la batteria di un "
 "giocattolo. Lascialo vuoto se non ce n'è."
 
+#: apps/catalog/templates/catalog/includes/other_sellers.html
+msgid "Another seller"
+msgstr "Un altro venditore"
+
 #: apps/manager/event_block_forms.py
 msgid "Answer %(number)d"
 msgstr "Risposta %(number)d"
@@ -4897,6 +4901,10 @@ msgstr ""
 "Altri prodotti che vuoi suggerire insieme a questo, per esempio un modello migliore. Facoltativo: "
 "lascialo vuoto per non suggerire nulla."
 
+#: apps/catalog/templates/catalog/includes/other_sellers.html
+msgid "Other sellers of this product"
+msgstr "Altri venditori di questo prodotto"
+
 #: apps/ingest/models.py
 msgid "Other ways the supplier writes the same term, as a JSON list."
 msgstr "Altri modi in cui il fornitore scrive lo stesso termine, come elenco JSON."
@@ -6362,6 +6370,10 @@ msgstr "Venduto da"
 #: apps/orders/templates/orders/customer_order.html
 msgid "Sold by %(name)s"
 msgstr "Venduto da %(name)s"
+
+#: apps/catalog/templates/catalog/includes/other_sellers.html
+msgid "Sold by %(seller)s"
+msgstr "Venduto da %(seller)s"
 
 #: apps/orders/templates/orders/_package.html themes/base/templates/components/cart_line.html
 msgid "Sold by %(vendor)s"

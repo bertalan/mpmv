@@ -1,0 +1,19 @@
+{% load i18n seo_seller %}{# Other sellers of this product (CAT.15) of `ride`: Bootstrap cards. Needs `other_sellers` and `currency`. #}{% comment %}
+Copied from the app's includes/other_sellers.html: the same rule (same GTIN, or same brand and
+MPN, page language only), the public seller name (SEO.15) and the same hooks
+(`.product-other-sellers`, `.product-other-seller-name`). The card is the ride product card.
+{% endcomment %}
+{% if other_sellers %}
+  <section class="product-other-sellers mb-4" aria-labelledby="product-other-sellers-heading">
+    <h2 id="product-other-sellers-heading" class="h4">{% translate "Other sellers of this product" %}</h2>
+    <ul class="product-grid row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 list-unstyled">
+      {% for card in other_sellers %}
+        {% seller_name card.vendor as seller %}
+        <li class="col">
+          <p class="product-other-seller-name small text-body-secondary mb-1">{% if seller %}{% blocktranslate %}Sold by {{ seller }}{% endblocktranslate %}{% else %}{% translate "Another seller" %}{% endif %}</p>
+          {% include "catalog/includes/product_card.html" %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}

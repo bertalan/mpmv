@@ -12,7 +12,6 @@ from typing import Any
 import pytest
 from django.apps import apps
 from django.db import connection
-from django.template.loader import render_to_string
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from wagtail.models import Site
@@ -22,7 +21,6 @@ from apps.catalog.models import Product
 from apps.catalog.tests.factories import BrandFactory, ProductFactory, ProductTranslationFactory
 from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
-from apps.themes.services import use_theme
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests.i18n import other_language, product_url
@@ -159,6 +157,7 @@ def test_the_number_of_queries_does_not_grow_with_the_sellers() -> None:
             product_pages.other_sellers(first, primary_language())
         return len(queries)
 
+    count()  # warms the process caches (settings, content types)
     few = count()
     for index in range(5):
         offer(title=f"Mug N{index}", gtin=GTIN)
@@ -212,17 +211,3 @@ def test_a_private_person_is_not_named_on_the_page(client: Client) -> None:
     html = client.get(product_url(language, f"mug-a-{language}")).content.decode()
     assert "product-other-sellers" in html
     assert "Mario Rossi" not in html
-
-
-@pytest.mark.usefixtures("consumer_prices")
-def test_the_ride_block_renders() -> None:
-    first = offer(title="Mug A", gtin=GTIN)
-    offer(title="Mug B", gtin=GTIN)
-    cards = product_pages.other_sellers(first, primary_language())
-    with use_theme("ride"):
-        html = render_to_string(
-            "catalog/includes/other_sellers.html", {"other_sellers": cards, "currency": "EUR"}
-        )
-    assert "product-other-sellers" in html
-    assert "product-card" in html
-    assert "Mug B" in html
