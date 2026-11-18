@@ -8878,7 +8878,9 @@ msgstr "Der Titel der Folie, bis zu 120 Zeichen. Pflichtfeld."
 msgid ""
 "The slug '%(slug)s' is reserved for the site's help pages and cannot be used for a page directly "
 "under the home page. Choose another slug."
-msgstr "Der Slug '%(slug)s' ist für die Hilfeseiten der Website reserviert und kann nicht für eine Seite direkt unter der Startseite verwendet werden. Wähle einen anderen Slug."
+msgstr ""
+"Der Slug '%(slug)s' ist für die Hilfeseiten der Website reserviert und kann nicht für eine Seite "
+"direkt unter der Startseite verwendet werden. Wähle einen anderen Slug."
 
 #: apps/shipping/models.py
 msgid "The special area this treatment is for. A method has one treatment per area."

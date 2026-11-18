@@ -8858,7 +8858,9 @@ msgstr "Le titre de la diapositive, 120 caractères au maximum. Obligatoire."
 msgid ""
 "The slug '%(slug)s' is reserved for the site's help pages and cannot be used for a page directly "
 "under the home page. Choose another slug."
-msgstr "Le slug '%(slug)s' est réservé aux pages d'aide du site et ne peut pas servir à une page placée directement sous la page d'accueil. Choisis un autre slug."
+msgstr ""
+"Le slug '%(slug)s' est réservé aux pages d'aide du site et ne peut pas servir à une page placée "
+"directement sous la page d'accueil. Choisis un autre slug."
 
 #: apps/shipping/models.py
 msgid "The special area this treatment is for. A method has one treatment per area."
