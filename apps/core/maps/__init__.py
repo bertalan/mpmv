@@ -33,6 +33,10 @@ class TileBudgetExceeded(Exception):
     """The daily budget of upstream requests is used up; no further request goes out today."""
 
 
+class TileBusy(Exception):
+    """Another request is fetching this tile and did not finish within the wait."""
+
+
 @dataclass(frozen=True)
 class TileKey:
     z: int

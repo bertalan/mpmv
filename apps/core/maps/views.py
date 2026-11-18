@@ -17,6 +17,7 @@ from apps.core.services import consume_rate_limit
 
 from . import (
     TileBudgetExceeded,
+    TileBusy,
     TileNotAvailable,
     TileUpstreamError,
     TileUpstreamTimeout,
@@ -56,6 +57,8 @@ def tile(request: HttpRequest, z: str, x: str, y: str) -> HttpResponse:
         return _refusal(404, "Not found")
     except TileBudgetExceeded:
         return _refusal(503, "Tile service busy", retry_after=3600)
+    except TileBusy:
+        return _refusal(503, "Tile is being fetched, retry", retry_after=2)
     except TileUpstreamTimeout:
         return _refusal(504, "Tile server timed out")
     except TileUpstreamError:

@@ -54,6 +54,7 @@ style, no third-party host.
 | `MAP_TILE_USER_AGENT` | `MPMV_MAP_TILE_USER_AGENT` | empty: product, site URL and geocoding contact |
 | `MAP_TILE_UPSTREAM_DAILY_LIMIT` | `MPMV_MAP_TILE_UPSTREAM_DAILY_LIMIT` | `100000` upstream requests per UTC day, then 503 |
 | `MAP_TILE_MIN_ZOOM`, `MAP_TILE_MAX_ZOOM` | none | `2`, `18` |
+| `MAP_TILE_SINGLE_FLIGHT_WAIT` | none | `8` seconds a request waits for a concurrent fetch of the same tile, then 503 |
 | `MAP_TILE_IP_LIMIT`, `MAP_TILE_IP_WINDOW` | none | `600` tiles per `60` s per client IP |
 | `MAP_TILE_BROWSER_MAX_AGE` | none | 7 days: `Cache-Control` for browsers and the CDN |
 | `MAP_TILE_CACHE_STORAGE` | none | `default`: the `STORAGES` alias (object storage on LIVE) |
@@ -79,7 +80,13 @@ old provider's tiles), kept 7 days or the upstream's `max-age`/`Expires` if long
 year). A miss counts one upstream request (a per-day `Throttle` row, read with
 `services.upstream_requests()`; past `MAP_TILE_UPSTREAM_DAILY_LIMIT` the proxy answers 503 and
 sends nothing), fetches through the `TileUpstream` protocol (`HttpTileUpstream`, a fake in tests)
-and caches the PNG. Upstream errors are 502, timeouts 504, a non-PNG answer 502, none cached.
+and caches the PNG. A cold tile is single-flight: the miss path takes a PostgreSQL session advisory lock keyed on
+`hashtextextended(cache path)` (`services._single_flight`, polling `pg_try_advisory_lock`), so a
+burst for one tile makes one upstream call and one count; the others wait, re-read the cache and
+answer from it. After `MAP_TILE_SINGLE_FLIGHT_WAIT` seconds a waiter answers 503 with
+`Retry-After: 2` and never calls the upstream. The lock covers only fetch and store (never the
+response stream) and only that tile, so other tiles do not wait. Upstream errors are 502, timeouts 504, a non-PNG answer 502, none
+cached.
 The daily cap counts attempts, failed fetches included. Requests without a client IP share one
 rate-limit bucket (fine behind the configured proxy). `TileResponseNeutralMiddleware` strips
 cookies and `Vary: Accept-Language` from tiles, and `HttpTileUpstream` never follows a redirect
