@@ -3739,7 +3739,7 @@ msgstr ""
 
 #: apps/catalog/templates/catalog/includes/product_returns.html
 msgid "How to return"
-msgstr "So senden Sie zurück"
+msgstr "So schickst du zurück"
 
 #: apps/compliance/models.py
 msgid "How to use, assemble, maintain and dispose of the product safely, in this language."
@@ -6287,6 +6287,10 @@ msgstr "Mehr erfahren und auswählen"
 #: themes/ride/templates/cms/legal_page_version.html
 msgid "Read the current version"
 msgstr "Lies die aktuelle Version"
+
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "Read the returns policy"
+msgstr "Rückgabebedingungen lesen"
 
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt
@@ -12789,7 +12793,7 @@ msgstr "Du zahlst nichts mehr und musst nichts tun."
 
 #: apps/catalog/templates/catalog/includes/product_returns.html
 msgid "You pay the return shipping"
-msgstr "Sie tragen die Rücksendekosten"
+msgstr "Du trägst die Rücksendekosten"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid ""

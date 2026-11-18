@@ -6225,6 +6225,10 @@ msgstr "Scopri di più e scegli"
 msgid "Read the current version"
 msgstr "Leggi la versione attuale"
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "Read the returns policy"
+msgstr "Leggi la politica di reso"
+
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt
 msgid "Read the statement of reasons"
