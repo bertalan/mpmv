@@ -73,6 +73,7 @@ from apps.vendors.services import has_public_storefront
 from . import engine
 from .blocks import (
     RICH_TEXT_FEATURES,
+    AccordionBlock,
     ArticleLinksBlock,
     CallToActionBlock,
     CounterBlock,
@@ -133,6 +134,7 @@ def body_field(
             ("progress", ProgressBlock()),
             ("video_modal", VideoModalBlock()),
             ("download", DownloadBlock()),
+            ("accordion", AccordionBlock()),
             *grid,
             *extra,
             *sections,
@@ -1359,6 +1361,7 @@ class BlogPostPage(Page):  # type: ignore[misc]
             ("progress", ProgressBlock()),
             ("video_modal", VideoModalBlock()),
             ("download", DownloadBlock()),
+            ("accordion", AccordionBlock()),
             ("product_grid", ProductGridBlock()),
             ("product_cards", ProductCardsBlock()),
         ],

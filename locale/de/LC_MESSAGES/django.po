@@ -860,6 +860,10 @@ msgstr ""
 "aufklappt."
 
 #: apps/cms/blocks.py
+msgid "Add at least one section. Each has a title and a text that opens on click."
+msgstr "Fügen Sie mindestens einen Abschnitt hinzu. Jeder hat einen Titel und einen Text, der sich per Klick öffnet."
+
+#: apps/cms/blocks.py
 msgid "Add cards of the same kind: blog posts or pages, vendors, products or testimonials."
 msgstr ""
 "Fügen Sie Karten derselben Art hinzu: Blogbeiträge oder Seiten, Verkäufer, Produkte oder "
@@ -9135,6 +9139,10 @@ msgstr ""
 "Der Text auf der Senden-Schaltfläche, zum Beispiel „Frage senden“. Bleibt er leer, steht dort "
 "„Senden“."
 
+#: apps/cms/blocks.py
+msgid "The text that shows when the visitor opens the section. Required."
+msgstr "Der Text, der erscheint, wenn der Besucher den Abschnitt öffnet. Pflichtfeld."
+
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid ""
 "The text, pictures and other blocks of the event page, in this order. Each change is saved as a "
@@ -9168,6 +9176,10 @@ msgstr ""
 #: apps/cms/blocks.py
 msgid "The title of the section as visitors read it, up to 160 characters. Required."
 msgstr "Der Titel des Abschnitts, wie ihn Besucher lesen, bis zu 160 Zeichen. Pflichtfeld."
+
+#: apps/cms/blocks.py
+msgid "The title of the section, always visible. Required."
+msgstr "Der Titel des Abschnitts, immer sichtbar. Pflichtfeld."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -10002,6 +10014,10 @@ msgid ""
 msgstr ""
 "Setze hier ein Häkchen, um dein Unternehmen und deine USt-IdNr. einzugeben. Eine gültige EU-USt-"
 "IdNr. kann bei einem grenzüberschreitenden Kauf die MwSt. entfallen lassen."
+
+#: apps/cms/blocks.py
+msgid "Tick this to show the first section already open. Otherwise all are closed."
+msgstr "Aktivieren, damit der erste Abschnitt bereits geöffnet ist. Sonst sind alle geschlossen."
 
 #: apps/cms/blocks.py
 msgid "Tick to add a 'See all' link under the products, to the full list."

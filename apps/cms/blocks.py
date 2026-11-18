@@ -579,6 +579,44 @@ class FaqBlock(blocks.StructBlock):  # type: ignore[misc]
         template = "cms/blocks/faq.html"
 
 
+class AccordionSectionBlock(blocks.StructBlock):  # type: ignore[misc]
+    title = blocks.CharBlock(
+        max_length=250,
+        help_text=_("The title of the section, always visible. Required."),
+    )
+    body = blocks.RichTextBlock(
+        features=RICH_TEXT_FEATURES,
+        help_text=_("The text that shows when the visitor opens the section. Required."),
+    )
+
+    class Meta:
+        icon = "list-ul"
+        label = _("Section")
+
+
+class AccordionBlock(blocks.StructBlock):  # type: ignore[misc]
+    """Titled sections that open and close, built on native `<details>` and `<summary>` (D-36,
+    CMS.16): no script, keyboard accessible, closed by default. It is not a FAQ: the page emits
+    no FAQPage data for it (only the `faq` block does)."""
+
+    sections = blocks.ListBlock(
+        AccordionSectionBlock(),
+        min_num=1,
+        label=_("Sections"),
+        help_text=_("Add at least one section. Each has a title and a text that opens on click."),
+    )
+    open_first = blocks.BooleanBlock(
+        required=False,
+        label=_("Open the first section"),
+        help_text=_("Tick this to show the first section already open. Otherwise all are closed."),
+    )
+
+    class Meta:
+        icon = "list-ul"
+        label = _("Accordion")
+        template = "cms/blocks/accordion.html"
+
+
 # --- Cards (part 2/2)
 #
 # The targets of all the cards of a block are resolved in bulk (`_card_targets`): a constant

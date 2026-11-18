@@ -856,6 +856,10 @@ msgstr ""
 "fois."
 
 #: apps/cms/blocks.py
+msgid "Add at least one section. Each has a title and a text that opens on click."
+msgstr "Ajoutez au moins une section. Chacune a un titre et un texte qui s'ouvre d'un clic."
+
+#: apps/cms/blocks.py
 msgid "Add cards of the same kind: blog posts or pages, vendors, products or testimonials."
 msgstr ""
 "Ajoutez des cartes du même type : articles de blog ou pages, vendeurs, produits ou témoignages."
@@ -9106,6 +9110,10 @@ msgstr ""
 "Le texte du bouton d'envoi, par exemple « Envoyer votre question ». Si vous le laissez vide, le "
 "bouton indique « Envoyer »."
 
+#: apps/cms/blocks.py
+msgid "The text that shows when the visitor opens the section. Required."
+msgstr "Le texte qui s'affiche quand le visiteur ouvre la section. Obligatoire."
+
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid ""
 "The text, pictures and other blocks of the event page, in this order. Each change is saved as a "
@@ -9142,6 +9150,10 @@ msgstr ""
 msgid "The title of the section as visitors read it, up to 160 characters. Required."
 msgstr ""
 "Le titre de la section tel que les visiteurs le lisent, 160 caractères au maximum. Obligatoire."
+
+#: apps/cms/blocks.py
+msgid "The title of the section, always visible. Required."
+msgstr "Le titre de la section, toujours visible. Obligatoire."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -9969,6 +9981,10 @@ msgid ""
 msgstr ""
 "Coche cette case pour saisir ton entreprise et ton numéro de TVA. Un numéro de TVA de l'UE valide "
 "peut supprimer la TVA sur un achat transfrontalier."
+
+#: apps/cms/blocks.py
+msgid "Tick this to show the first section already open. Otherwise all are closed."
+msgstr "Cochez pour afficher la première section déjà ouverte. Sinon, toutes sont fermées."
 
 #: apps/cms/blocks.py
 msgid "Tick to add a 'See all' link under the products, to the full list."
