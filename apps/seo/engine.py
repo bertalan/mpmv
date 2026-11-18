@@ -12,9 +12,16 @@ asks again. Consent Mode v2 signals are derived from the granted categories only
 """
 
 import re
-import unicodedata
-from collections.abc import Collection, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
+
+# SEO.15: the seller-name rule lives in `apps.vendors.seller_name` (a layer every public surface
+# may import); the structured data keeps using it through this module.
+from apps.vendors.seller_name import VendorNameFacts as VendorNameFacts
+from apps.vendors.seller_name import natural_person_names as natural_person_names
+from apps.vendors.seller_name import normalize_name as normalize_name
+from apps.vendors.seller_name import public_seller_name as public_seller_name
+from apps.vendors.seller_name import reveals_person as reveals_person
 
 NECESSARY = "necessary"
 PREFERENCES = "preferences"
@@ -110,58 +117,3 @@ def consent_signals(state: ConsentState) -> dict[str, str]:
         signal: GRANTED if allows(state, category) else DENIED
         for signal, category in SIGNAL_CATEGORY.items()
     }
-
-
-# --- Seller name (SEO.15) ---------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class VendorNameFacts:
-    """What decides the public seller name. `natural_person` is true for a sole trader (or an
-    vendor whose legal form is not filled in yet: when in doubt, a person)."""
-
-    display_name: str
-    legal_name: str = ""
-    first_name: str = ""
-    last_name: str = ""
-    natural_person: bool = False
-
-
-def normalize_name(name: str) -> str:
-    """A name compared without case, accent, punctuation or spacing differences."""
-    decomposed = unicodedata.normalize("NFKD", name)
-    bare = "".join(c for c in decomposed if not unicodedata.combining(c))
-    return " ".join(re.sub(r"[^\w\s]", " ", bare.casefold()).split())
-
-
-def reveals_person(name: str, person_names: Collection[str]) -> bool:
-    """True when `name` is a natural person's name: equal to it after normalisation (accents,
-    case, punctuation, spacing), or equal to it with the spaces removed ('Mariorossi'). A trading
-    name that merely contains the person's name ('Ceramiche Mario Rossi') is the vendor's chosen
-    shop name and is kept (SEO.15)."""
-    shown = normalize_name(name)
-    if not shown:
-        return False
-    squeezed = shown.replace(" ", "")
-    return any(squeezed == person.replace(" ", "") for person in person_names if person)
-
-
-def natural_person_names(facts: VendorNameFacts) -> frozenset[str]:
-    """The normalised names a natural person is known by: the legal name and the first and last
-    name in both orders. Empty for a vendor that is not a natural person."""
-    if not facts.natural_person:
-        return frozenset()
-    names = {facts.legal_name}
-    if facts.first_name and facts.last_name:
-        names |= {f"{facts.first_name} {facts.last_name}", f"{facts.last_name} {facts.first_name}"}
-    return frozenset(normalize_name(name) for name in names if name.strip())
-
-
-def public_seller_name(facts: VendorNameFacts) -> str | None:
-    """The name structured data may show for the vendor: its public shop or trading name, never
-    the legal name of a natural person. None when that is the only name there is (the seller
-    node and every reference to it are then left out, no error). One rule for SEO.1 and SEO.7."""
-    name = " ".join(facts.display_name.split())
-    if not name or reveals_person(name, natural_person_names(facts)):
-        return None
-    return name

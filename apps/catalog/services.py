@@ -31,6 +31,7 @@ from django.db.models.functions import Length
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.module_loading import import_string
+from django.utils.translation import gettext_lazy
 
 from apps.core import translations
 from apps.core.audit import AuditContext, record
@@ -44,6 +45,7 @@ from apps.core.text import ascii_int
 from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import VendorScopedQuerySet, is_platform_staff
+from apps.vendors.seller_name import public_name
 from apps.vendors.services import ensure_vendor_can_write, vendors_in_suggestions
 
 from . import engine, listings, publishing, slugs
@@ -2157,6 +2159,10 @@ def vendor_anchor(slug: str, language: str) -> ListingAnchor | None:
     return _vendor_anchor(vendor)
 
 
+# The storefront name when the vendor has no public name (a person's legal name, SEO.15).
+_NO_PUBLIC_NAME = gettext_lazy("Seller")
+
+
 def _vendor_anchor(vendor: Vendor) -> ListingAnchor:
     texts = set(
         vendor.translations.filter(status=translations.PUBLISHED).values_list("language", flat=True)
@@ -2168,7 +2174,7 @@ def _vendor_anchor(vendor: Vendor) -> ListingAnchor:
     }
     return ListingAnchor(
         scope=ListingScope(vendor=vendor),
-        name=str(vendor.display_name),
+        name=public_name(vendor) or str(_NO_PUBLIC_NAME),
         paths=paths,
         published=published or (translations.source_language(),),
     )
@@ -2212,7 +2218,7 @@ def listing_names(scopes: Sequence[ListingScope], language: str) -> list[str]:
         elif scope.brand is not None:
             names.append(str(scope.brand.name))
         elif scope.vendor is not None:
-            names.append(str(scope.vendor.display_name))
+            names.append(public_name(scope.vendor) or str(_NO_PUBLIC_NAME))
         else:
             names.append("")
     return names
@@ -2580,8 +2586,9 @@ def listing_vendor_options(
         Q(pk__in=in_scope) | Q(slug=params.vendor or "")
     )
     return [
-        FilterOption(value=v.slug, label=v.display_name, selected=v.slug == params.vendor)
+        FilterOption(value=v.slug, label=shown, selected=v.slug == params.vendor)
         for v in vendors.order_by("display_name", "pk")
+        if (shown := public_name(v))  # a person's legal name is never a filter label (SEO.15)
     ]
 
 
