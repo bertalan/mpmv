@@ -99,7 +99,13 @@ def _single_flight(path: str, wait: float) -> Iterator[None]:
         try:
             yield
         finally:
-            cursor.execute("SELECT pg_advisory_unlock(hashtextextended(%s, 0))", [path])
+            try:
+                cursor.execute("SELECT pg_advisory_unlock(hashtextextended(%s, 0))", [path])
+            except Exception:
+                # A session lock that cannot be released would pin the tile until the connection
+                # ends: close the connection so PostgreSQL drops the lock.
+                connection.close()
+                raise
 
 
 def get_tile(

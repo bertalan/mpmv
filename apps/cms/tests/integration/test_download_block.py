@@ -108,3 +108,38 @@ def test_the_page_bodies_offer_the_block(model: Any) -> None:
 
 def test_the_shared_body_field_offers_the_block() -> None:
     assert isinstance(body_field().stream_block.child_blocks["download"], DownloadBlock)
+
+
+def test_the_block_links_to_wagtails_document_serve_view() -> None:
+    doc = make_document()
+    html = render("base", value(doc))
+    assert f'href="/documents/{doc.pk}/' in html
+    assert "/media/documents/" not in html
+
+
+def test_the_serve_view_sends_an_attachment_with_nosniff() -> None:
+    from django.test import Client
+
+    doc = make_document()
+    response = Client().get(doc.url)
+    assert response.status_code == 200
+    assert response["Content-Disposition"].startswith("attachment")
+    assert response["X-Content-Type-Options"] == "nosniff"
+    assert b"".join(response.streaming_content).startswith(b"%PDF")  # type: ignore[attr-defined]
+
+
+def test_a_document_in_a_private_collection_is_refused_to_anonymous_visitors() -> None:
+    from django.test import Client
+    from wagtail.models import BaseViewRestriction, Collection, CollectionViewRestriction
+
+    collection = Collection.get_first_root_node().add_child(name="Members only")
+    CollectionViewRestriction.objects.create(
+        collection=collection, restriction_type=BaseViewRestriction.LOGIN
+    )
+    doc = make_document()
+    doc.collection = collection
+    doc.save()
+    response = Client().get(doc.url)
+    assert response.status_code in (302, 403)
+    if response.status_code == 302:
+        assert "login" in response["Location"]
