@@ -4,7 +4,7 @@ last-checked: 2026-11-18
 Questa pagina è per il titolare del negozio. Qui collega l'account che riceve il denaro delle Sue vendite (l'account per i pagamenti).
 
 ## Cosa vede
-- **Stato dell’account** indica se l'account è collegato e attivo.
+- **Stato dell'account** indica se l'account è collegato e attivo.
 - **Modalità di vendita** è **Vendita online** oppure **Su richiesta**.
 - **Ancora necessario** elenca ciò che il fornitore dei pagamenti Le chiede ancora, quando manca qualcosa.
 

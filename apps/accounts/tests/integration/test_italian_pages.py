@@ -36,7 +36,7 @@ def test_the_mfa_setup_and_totp_pages_are_in_italian(client: Client, italian: Us
     assert 'data-text-unsupported="Questo browser non supporta le passkey."' in setup
     verified_login(client, italian)
     totp = client.get(reverse("mfa:totp"), headers=EN).text
-    assert "Configura un\u2019app di autenticazione" in totp
+    assert "Configura un'app di autenticazione" in totp
     assert "Codice di autenticazione" in totp
 
 
