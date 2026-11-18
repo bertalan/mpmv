@@ -122,6 +122,8 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.owner_settings": {CONFIG: R, OWNER: E},
     "platform.catalog": {CATALOG: E, SUPPORT: R, OWNER: R},
     "platform.moderation": {CATALOG: E, OWNER: R},
+    # CAT.11: the product list, bulk publish and the audited fields (Support has no row: 404).
+    "platform.products": {CATALOG: E, OWNER: R},
     # FIT.1 part 2: the fitment scheme and the categories expected to declare fitment (operator
     # settings, Configuration and tax), and the nodes of the scheme (Catalog and moderation).
     "platform.fitment_scheme": {CONFIG: E, OWNER: R},
@@ -153,6 +155,7 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.config": "Platform: configuration and tax (ARC.24)",
     "platform.owner_settings": "Platform: owner-only settings (CMP.13, CMP.11 approvals)",
     "platform.catalog": "Platform: catalog, categories, attributes, taxonomies, imports",
+    "platform.products": "Platform: products, bulk publish, preview, translation status (CAT.11)",
     "platform.moderation": "Platform: moderation (vendor events, storefront changes, content)",
     "platform.fitment_scheme": "Platform: fitment scheme, the levels of the garage (FIT.1)",
     "platform.fitment_categories": "Platform: categories expected to declare fitment (FIT.1)",

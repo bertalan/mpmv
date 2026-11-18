@@ -14,6 +14,7 @@ from . import (
     fitment_views,
     media,
     notice_views,
+    product_views,
     sales_terms_views,
     session_views,
     statement_views,
@@ -250,6 +251,17 @@ platform = (
             "fitment/nodes/<uuid:public_id>/merge/",
             fitment_views.NodeMergeView.as_view(),
             name="fitment_node_merge",
+        ),
+        # CAT.11: the Catalog section (list with bulk actions, product preview and audited fields).
+        path(
+            "catalog/products/",
+            product_views.ProductList.as_view(),
+            name="catalog_products",
+        ),
+        path(
+            "catalog/products/<uuid:public_id>/",
+            product_views.ProductDetailView.as_view(),
+            name="catalog_product",
         ),
     ],
     "platform",
