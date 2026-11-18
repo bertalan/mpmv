@@ -348,6 +348,7 @@ def submit_withdrawal(
             template_key=ACK_TEMPLATE,
             language=order.language,
             idempotency_key=f"withdrawal:{created[0].public_id}:ack",
+            order_ref=order.public_id,
             context={
                 "order_number": order.number,
                 "customer_name": order.customer_name,
@@ -374,6 +375,7 @@ def submit_withdrawal(
                     template_key=VENDOR_TEMPLATE,
                     language=settings.LANGUAGE_CODE,  # vendors have no language of their own yet
                     idempotency_key=f"withdrawal:{statement.public_id}:vendor",
+                    order_ref=order.public_id,
                     context={
                         "order_number": order.number,
                         "reference": str(statement.public_id),

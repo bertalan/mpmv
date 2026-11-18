@@ -59,6 +59,7 @@ class LedgerEntryFactory(DjangoModelFactory[LedgerEntry]):
             ctx=ctx,
             platform_entity=kwargs["platform_entity"],
             vendor_order=kwargs.get("vendor_order"),
+            external_ref=kwargs.get("external_ref", ""),
         )
         return LedgerEntry.objects.get(idempotency_key=kwargs["idempotency_key"])
 

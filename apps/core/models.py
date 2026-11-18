@@ -1205,6 +1205,15 @@ class OutboxEmail(BaseModel):
     template_key = models.CharField(max_length=100)
     language = LanguageField()
     context = EncryptedTextField(blank=True, help_text="JSON snapshot of the template context.")
+    # ORD.26: the message as rendered when it was queued; the send uses these, never a new
+    # render. Encrypted like the context; empty for a suppressed email and for a row queued
+    # before ORD.26 (those still render when sent), and emptied by the order's scrub.
+    subject = EncryptedTextField(blank=True)
+    text_body = EncryptedTextField(blank=True)
+    html_body = EncryptedTextField(blank=True)
+    #: Public id of the order this email is about (ORD.9, ORD.20, withdrawal), so the order's
+    #: retention scrub finds it without `core` importing `orders`. Empty for the rest.
+    order_ref = models.UUIDField(null=True, blank=True, db_index=True)
     idempotency_key = models.CharField(max_length=200, unique=True, null=True, blank=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
     attempts = models.PositiveIntegerField(default=0)

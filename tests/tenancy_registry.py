@@ -21,6 +21,9 @@ The Django admin is classified as a whole: staff only, with the object pages of 
 models tested on Vendor B's objects.
 """
 
+import secrets
+from decimal import Decimal
+
 from django.contrib import admin
 from django.db import models
 from django.test import Client
@@ -416,6 +419,24 @@ def manager_vendor(vendor: Vendor) -> Vendor:
     return vendor
 
 
+def ledger_entry_with_ref(vendor: Vendor) -> LedgerEntry:
+    """A sale with a unique provider reference, the field the VEN.9 pages show (CORE.3)."""
+    return LedgerEntryFactory.create(vendor=vendor, external_ref=f"tr_{secrets.token_hex(8)}")
+
+
+def payout_entry_with_ref(vendor: Vendor) -> LedgerEntry:
+    return LedgerEntryFactory.create(
+        vendor=vendor,
+        kind="payout",
+        amount=Decimal("-1.00"),
+        external_ref=f"po_{secrets.token_hex(8)}",
+    )
+
+
+def external_ref_of(obj: models.Model) -> str:
+    return str(obj.external_ref)  # type: ignore[attr-defined]
+
+
 def vendor_with_pending_termination(vendor: Vendor) -> Vendor:
     """The vendor itself, with a pending notice of termination (CMP.5 part 4) if it has none."""
     if not TerminationNotice.objects.filter(vendor=vendor, status="pending").exists():
@@ -686,6 +707,21 @@ ENDPOINTS: dict[str, Access] = {
     # The statements of reasons of the selected shop (DSA art. 17); another shop's are never listed.
     "manager:shop:statements": VendorScopedList(
         make=lambda vendor: StatementOfReasonsFactory.create(vendor=vendor)
+    ),
+    # VEN.9: the vendor's own ledger; another vendor's entries never show or export (the provider
+    # reference is the visible mark; the statement names the selected shop).
+    "manager:shop:money": VendorScopedList(make=ledger_entry_with_ref, identify=external_ref_of),
+    "manager:shop:money_transactions": VendorScopedList(
+        make=ledger_entry_with_ref, identify=external_ref_of
+    ),
+    "manager:shop:money_payouts": VendorScopedList(
+        make=payout_entry_with_ref, identify=external_ref_of
+    ),
+    "manager:shop:money_statement": VendorScopedList(
+        make=manager_vendor, identify=vendor_display_name
+    ),
+    "manager:shop:money_export": VendorScopedList(
+        make=ledger_entry_with_ref, identify=external_ref_of, methods=("POST",)
     ),
     # The download exists only while a notice is pending: the vendor made here has one.
     "manager:shop:termination_data": VendorScopedList(

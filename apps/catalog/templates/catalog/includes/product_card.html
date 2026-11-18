@@ -1,4 +1,4 @@
-{% load i18n l10n responsive_images consumer_prices %}{# A product card (CAT.8); THM.7 restyles it. Needs `card` and `currency`. #}{% comment %}
+{% load i18n l10n static responsive_images consumer_prices %}{# A product card (CAT.8); THM.7 restyles it. Needs `card` and `currency`. #}{% comment %}
 The price is the consumer price (TAX.12, Directive 98/6/EC): the gross amount at the delivery
 country's rate (an estimated country until the buyer gives one), from the tax app's
 `consumer_price` tag (the catalog never imports tax), with the owner's note under it. A business
@@ -6,7 +6,7 @@ buyer who opted in sees the net amount and "excl. VAT". No public price (`on_req
 `catalog_only`): "Price on request"; no rate: "Price at checkout"; never the net price.
 {% endcomment %}
 <article class="product-card">
-  {% if card.image %}{% responsive_image card.image "card" alt=card.image_alt %}{% elif card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.image_alt }}" loading="lazy">{% endif %}
+  {% if card.image %}{% responsive_image card.image "card" alt=card.image_alt %}{% elif card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.image_alt }}" loading="lazy">{% else %}<img class="product-card-placeholder" src="{% static 'catalog/product-placeholder.svg' %}" alt="" width="400" height="400" loading="lazy">{% endif %}
   <h3 class="product-card-title">{% if card.url %}<a href="{{ card.url }}">{{ card.title }}</a>{% else %}{{ card.title }}{% endif %}</h3>
   <p class="product-card-price">{% if card.price is None %}{% translate "Price on request" %}{% else %}{% consumer_price card.price card.fiscal_category card.vendor as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p>
 </article>

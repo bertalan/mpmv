@@ -34,7 +34,13 @@ from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.models import AuditLog
 from apps.core.money import CENT, CURRENCY
-from apps.core.services import NoPlatformOperator, audit_changes, current_operator, flag_enabled
+from apps.core.services import (
+    NoPlatformOperator,
+    audit_changes,
+    current_operator,
+    flag_enabled,
+    scrub_order_emails,
+)
 from apps.shipping.models import Carrier
 from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
@@ -824,6 +830,9 @@ def _scrub(
                 ).update(shipping_address=engine.ANONYMISED_ORDER_FIELDS["shipping_address"])
                 _scrub_amendments(locked, changeset)
                 _scrub_order_events(locked, changeset)
+                changeset.changes.extend(
+                    scrub_order_emails(locked.public_id, recipient=engine.ANONYMISED_EMAIL).changes
+                )
             _set_scrub_mode("")
             locked.refresh_from_db()
             changeset.update("orders.order", str(locked.public_id), before, _scrub_snapshot(locked))

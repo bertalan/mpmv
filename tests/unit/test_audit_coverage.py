@@ -35,6 +35,8 @@ NOT_SENSITIVE_SERVICES = {
     "apps.core.services.save_image": "image upload outside the admin, validated, CMS content",
     "apps.core.services.enqueue_email": "the outbox is a delivery queue with its own history",
     "apps.core.services.deliver_email": "a delivery attempt, kept in the outbox history",
+    "apps.core.services.scrub_order_emails": "runs inside the order anonymisation, which audits "
+    "the returned ChangeSet in its own transaction",
     # ORD.1: a cart holds display prices only; the order placed from it is audited.
     "apps.cart.services.get_or_create_cart": "a shopper's cart, not a financial or security fact",
     "apps.cart.services.add_to_cart": "a shopper's cart, not a financial or security fact",

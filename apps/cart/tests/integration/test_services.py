@@ -13,8 +13,10 @@ from apps.cart.models import Cart, CartLine
 from apps.cart.tests.factories import CartFactory, CartLineFactory
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, VariantFactory
+from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import primary_language
+from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests.i18n import other_language
@@ -395,3 +397,58 @@ def test_a_users_own_cart_is_not_a_guest_cart() -> None:
     mine = services.get_or_create_cart(user=user)
     with pytest.raises(ValueError, match="guest"):
         services.merge_carts(mine, UserFactory.create())
+
+
+CTX = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
+
+
+def test_add_many_adds_new_lines_and_adds_up_existing_ones() -> None:
+    cart = guest_cart()
+    first, second = sellable(), sellable()
+    services.add_to_cart(cart, first, quantity=2)
+    changes = services.add_many_to_cart(
+        cart, [(first, None, 3), (second, None, 1), (second, None, 1)], ctx=CTX
+    )
+    assert quantities(cart) == {(first.pk, None): 5, (second.pk, None): 2}
+    assert len(changes.changes) == 2
+
+
+def test_add_many_matches_single_adds() -> None:
+    single, many = guest_cart("a"), guest_cart("b")
+    product = sellable()
+    variant_product = sellable()
+    services.add_to_cart(single, product, quantity=2)
+    services.add_to_cart(single, variant_product, quantity=1)
+    services.add_many_to_cart(many, [(product, None, 2), (variant_product, None, 1)], ctx=CTX)
+    assert sorted(quantities(single).values()) == sorted(quantities(many).values())
+
+
+def test_add_many_dry_run_writes_nothing() -> None:
+    cart = guest_cart()
+    changes = services.add_many_to_cart(cart, [(sellable(), None, 1)], ctx=CTX, dry_run=True)
+    assert len(changes.changes) == 1
+    assert not CartLine.objects.filter(cart=cart).exists()
+    assert not AuditLog.objects.filter(action=services.BULK_ADD_ACTION).exists()
+
+
+def test_add_many_is_all_or_nothing() -> None:
+    cart = guest_cart()
+    ok = sellable()
+    over = sellable(stock_qty=1)
+    with pytest.raises(ValidationError):
+        services.add_many_to_cart(cart, [(ok, None, 1), (over, None, 5)], ctx=CTX)
+    assert not CartLine.objects.filter(cart=cart).exists()
+
+
+def test_add_many_writes_one_audit_entry_without_personal_data() -> None:
+    cart = guest_cart()
+    first, second = sellable(), sellable()
+    services.add_many_to_cart(cart, [(first, None, 2), (second, None, 1)], ctx=CTX)
+    entry = AuditLog.objects.get(action=services.BULK_ADD_ACTION)
+    assert entry.target_key == str(cart.public_id)
+    assert entry.after == {
+        "lines": [
+            {"product": str(first.public_id), "variant": None, "quantity": 2},
+            {"product": str(second.public_id), "variant": None, "quantity": 1},
+        ]
+    }
