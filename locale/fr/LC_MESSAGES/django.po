@@ -2989,6 +2989,10 @@ msgstr ""
 "Groupes de pays à ajouter à la zone, avec leurs codes, par exemple 'eu' ou 'europe', séparés par "
 "des virgules."
 
+#: apps/catalog/templates/catalog/product.html
+msgid "GTIN"
+msgstr "GTIN"
+
 #: apps/manager/event_block_forms.py
 msgid "Heading"
 msgstr "Titre"
@@ -3984,6 +3988,10 @@ msgstr "Descendre"
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Move up"
 msgstr "Monter"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "MPN"
+msgstr "MPN"
 
 #: apps/manager/site_map.py apps/orders/templates/orders/customer_orders.html
 msgid "My orders"
@@ -6818,6 +6826,16 @@ msgstr ""
 "Le numéro du code-barres (EAN, UPC ou ISBN), de 8 à 14 chiffres, par exemple 4006381333931. "
 "Laissez vide si le produit n'a pas de code-barres."
 
+#: apps/catalog/models.py
+msgid ""
+"The barcode number of this version only (EAN, UPC or ISBN), 8, 12, 13 or 14 digits with a correct "
+"last digit, for example 4006381333931. Leave it empty if this version has no barcode of its own: "
+"the product's barcode is not used for it."
+msgstr ""
+"Le code-barres de cette version seulement (EAN, UPC ou ISBN), de 8, 12, 13 ou 14 chiffres avec le "
+"dernier chiffre correct, par exemple 4006381333931. Laissez vide si cette version n'a pas de code-"
+"barres propre : celui du produit n'est pas utilisé."
+
 #: apps/compliance/models.py
 msgid ""
 "The batch or serial number of the product, if it has one. Leave it empty when every unit is the "
@@ -8366,6 +8384,14 @@ msgstr ""
 "La référence que le fabricant a attribuée à cet article, 70 caractères au maximum. Avec la marque,"
 " elle permet à la boutique de reconnaître le même article vendu par différents vendeurs."
 
+#: apps/catalog/models.py
+msgid ""
+"The part number the maker gave this version, up to 70 characters. Leave it empty if it has none of"
+" its own."
+msgstr ""
+"La référence que le fabricant a donnée à cette version, jusqu'à 70 caractères. Laissez vide si "
+"elle n'en a pas en propre."
+
 #: apps/accounts/mfa_views.py
 msgid "the passkey could not be registered"
 msgstr "la clé d'accès n'a pas pu être enregistrée"
@@ -8436,6 +8462,14 @@ msgid ""
 msgstr ""
 "L'image affichée à côté de l'événement dans les listes et les calendriers. Si vous la laissez "
 "vide, l'événement est listé sans image."
+
+#: apps/catalog/models.py
+msgid ""
+"The picture shown when a buyer chooses this version. Pick one of this product's own pictures. "
+"Leave it empty to keep the product's gallery."
+msgstr ""
+"L'image affichée quand un acheteur choisit cette version. Choisissez l'une des images de ce "
+"produit. Laissez vide pour conserver la galerie du produit."
 
 #: apps/ingest/models.py
 msgid ""

@@ -30,7 +30,16 @@ from apps.core.audit import audit_context
 from . import attribute_admin as attribute_admin  # registers the CAT.3 admins
 from . import engine
 from . import taxonomy_admin as taxonomy_admin  # registers the CAT.2 admins
-from .models import Brand, Category, Product, ProductTranslation, Term, Variant, VariantTranslation
+from .models import (
+    Brand,
+    Category,
+    Product,
+    ProductImage,
+    ProductTranslation,
+    Term,
+    Variant,
+    VariantTranslation,
+)
 from .redirect_admin import RedirectAdmin as RedirectAdmin  # registers the CAT.6 admin
 from .services import (
     PRODUCT_PRICE_FIELDS,
@@ -348,9 +357,28 @@ class VariantAdmin(admin.ModelAdmin[Variant]):
         "stock_status",
         "price_net_override",
         "weight_kg_override",
+        "gtin",
+        "mpn",
+        "cover_image",
         *TIMESTAMPS,
     )
     inlines = (VariantTranslationInline,)
+
+    def formfield_for_foreignkey(self, db_field: Any, request: HttpRequest, **kwargs: Any) -> Any:
+        """The cover is one of the product's own images (CAT.23): the choice lists only those."""
+        if db_field.name == "cover_image":
+            match = getattr(request, "resolver_match", None)
+            object_id = match.kwargs.get("object_id") if match else None
+            product_id = (
+                Variant.objects.filter(pk=object_id).values_list("product_id", flat=True).first()
+                if object_id
+                else None
+            )
+            images = ProductImage.objects.select_related("image")
+            kwargs["queryset"] = (
+                images.none() if product_id is None else images.filter(product_id=product_id)
+            )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def get_readonly_fields(
         self, request: HttpRequest, obj: Variant | None = None

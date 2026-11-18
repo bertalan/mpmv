@@ -115,6 +115,14 @@ __all__ = [
 gtin_validator = RegexValidator(r"^\d{8,14}$", "A GTIN (EAN, UPC, ISBN) has 8 to 14 digits.")
 
 
+def gtin_check_validator(value: str) -> None:
+    """CAT.23: 8, 12, 13 or 14 digits with the GS1 check digit (the product's `gtin_validator`
+    only checks the digits)."""
+    message = engine.gtin_error(value)
+    if message is not None:
+        raise ValidationError("A GTIN " + message)
+
+
 def _choice(field: str, choices: type[models.TextChoices], name: str) -> models.CheckConstraint:
     return models.CheckConstraint(condition=models.Q(**{f"{field}__in": choices.values}), name=name)
 
@@ -1192,6 +1200,37 @@ class Variant(BaseModel):
             "the product. Leave it empty to use the product's weight."
         ),
     )
+    gtin = models.CharField(
+        "GTIN",
+        max_length=14,
+        blank=True,
+        validators=[gtin_check_validator],
+        help_text=_(
+            "The barcode number of this version only (EAN, UPC or ISBN), 8, 12, 13 or 14 digits "
+            "with a correct last digit, for example 4006381333931. Leave it empty if this version "
+            "has no barcode of its own: the product's barcode is not used for it."
+        ),
+    )
+    mpn = models.CharField(
+        "MPN",
+        max_length=70,
+        blank=True,
+        help_text=_(
+            "The part number the maker gave this version, up to 70 characters. Leave it empty if "
+            "it has none of its own."
+        ),
+    )
+    cover_image = models.ForeignKey(
+        "ProductImage",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="covered_variants",
+        help_text=_(
+            "The picture shown when a buyer chooses this version. Pick one of this product's own "
+            "pictures. Leave it empty to keep the product's gallery."
+        ),
+    )
     stock_qty = models.IntegerField(
         "stock quantity",
         default=0,
@@ -1243,6 +1282,11 @@ class Variant(BaseModel):
                 "weight_kg_override", "weight override", "catalog_variant_weight_not_negative"
             ),
             _not_negative("stock_qty", "stock quantity", "catalog_variant_stock_qty_not_negative"),
+            models.CheckConstraint(
+                condition=models.Q(gtin="") | models.Q(gtin__regex=r"^([0-9]{8}|[0-9]{12,14})$"),
+                name="catalog_variant_gtin_valid",
+                violation_error_message="A GTIN has 8, 12, 13 or 14 digits.",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -1257,6 +1301,8 @@ class Variant(BaseModel):
 
     def clean_fields(self, exclude: Any = None) -> None:
         self._sync_vendor()
+        self.gtin = engine.normalise_identifier(self.gtin)
+        self.mpn = engine.normalise_identifier(self.mpn)
         super().clean_fields(exclude)
 
     def clean(self) -> None:
@@ -1267,12 +1313,25 @@ class Variant(BaseModel):
         kind = Product.objects.filter(pk=self.product_id).values_list("kind", flat=True).first()
         if kind is not None and kind != ProductKind.VARIABLE:
             raise ValidationError({"product": "Only a variable product can have variants."})
+        # CAT.23: the cover is one of this product's own images, never another product's.
+        if self.cover_image_id is not None:
+            owner = (
+                ProductImage.objects.filter(pk=self.cover_image_id)
+                .values_list("product_id", flat=True)
+                .first()
+            )
+            if owner != self.product_id:
+                raise ValidationError(
+                    {"cover_image": "The cover must be one of this product's own images."}
+                )
         # `vendor` and `sku_key` are not form fields, so forms skip the (vendor, sku_key)
         # constraint, and no constraint spans products and variants: check here.
         _check_sku(self)
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         self._sync_vendor()
+        self.gtin = engine.normalise_identifier(self.gtin)
+        self.mpn = engine.normalise_identifier(self.mpn)
         _with_sku_key(self, kwargs)
         update_fields = kwargs.get("update_fields")
         if update_fields is not None:

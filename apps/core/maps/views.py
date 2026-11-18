@@ -10,7 +10,7 @@ import math
 
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_safe
 
 from apps.core.http import client_ip
 from apps.core.services import consume_rate_limit
@@ -36,7 +36,7 @@ def _refusal(status: int, text: str, *, retry_after: int | None = None) -> HttpR
     return response
 
 
-@require_GET
+@require_safe
 def tile(request: HttpRequest, z: str, x: str, y: str) -> HttpResponse:
     key = engine.parse_tile(
         z, x, y, min_zoom=settings.MAP_TILE_MIN_ZOOM, max_zoom=settings.MAP_TILE_MAX_ZOOM

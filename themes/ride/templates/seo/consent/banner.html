@@ -1,0 +1,19 @@
+{% load i18n static %}{% comment %}
+The consent banner of the `ride` theme (THM.9 part 2): the markup and contract of `base`
+(seo/consent/banner.html: same ids, `data-*` hooks, form and texts; SEO.5, SEO.9) in a Bootstrap
+alert. It stays `hidden` until consent.js finds no valid choice, is not a modal and never traps
+the focus. While it shows, consent.js sets `--consent-offset` to its height and the page keeps
+that space (padding and scroll padding), so a focused element is never behind it. Reject and
+Accept carry the same Bootstrap button classes, so neither is pushed.
+{% endcomment %}<section class="consent-banner alert alert-light border shadow" id="consent-banner" aria-labelledby="consent-banner-title" data-consent-banner data-script="{% static 'themes/base/js/lazy/consent.js' %}" data-version="{{ banner_version }}" data-cookie="{{ cookie_name }}" data-signals="{{ signal_map }}" data-saved="{% translate 'Your cookie choice was saved.' %}" hidden>
+  <form method="post" action="{{ action_url }}" data-consent-form>
+    <h2 id="consent-banner-title" class="consent-banner__title alert-heading fs-5">{% translate "Cookies and your privacy" %}</h2>
+    <p>{% translate "We always use the cookies the site needs to work. We only use the others if you say yes, and saying no costs you nothing." %} <a href="{{ preferences_url }}">{% translate "Read more and choose" %}</a></p>
+    <details class="consent-banner__details">
+      <summary>{% translate "Choose categories" %}</summary>
+      {% include "seo/consent/_categories.html" with categories=categories granted=None idp="banner" only %}
+      <button type="submit" class="btn btn-outline-dark" name="action" value="custom">{% translate "Save my choices" %}</button>
+    </details>
+    {% include "seo/consent/_actions.html" %}
+  </form>
+</section>
