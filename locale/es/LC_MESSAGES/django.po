@@ -99,6 +99,7 @@ msgid ""
 msgstr ""
 "%(item)s: solo hay %(quantity)d disponibles, así que tu carrito tiene %(quantity)d en lugar de "
 "%(requested)d."
+
 #: themes/base/templates/components/gallery.html themes/ride/templates/components/gallery.html
 msgid "%(label)s, image %(count)s of %(total)s"
 msgstr "%(label)s, imagen %(count)s de %(total)s"
@@ -2943,6 +2944,7 @@ msgstr "Compatible con"
 #: apps/manager/fitment_shop_forms.py
 msgid "Fits everything"
 msgstr "Sirve para todo"
+
 #: apps/catalog/templates/catalog/includes/product_fitment.html
 msgid "Fits everything."
 msgstr "Compatible con todo."
@@ -2987,9 +2989,6 @@ msgstr "Formulario caducado"
 msgid "Friday"
 msgstr "Viernes"
 
-#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
-msgid "From year"
-msgstr "Desde el año"
 #: apps/catalog/templates/catalog/listing.html themes/ride/templates/catalog/listing.html
 msgid "From %(currency)s %(amount)s"
 msgstr "Desde %(currency)s %(amount)s"
@@ -2997,6 +2996,10 @@ msgstr "Desde %(currency)s %(amount)s"
 #: apps/fitment/product_summary.py
 msgid "from %(year)s"
 msgstr "desde %(year)s"
+
+#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "From year"
+msgstr "Desde el año"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Frozen orders and payouts"
@@ -3545,7 +3548,7 @@ msgstr "Imagen %(number)d"
 msgid "Images"
 msgstr "Imágenes"
 
-#: apps/catalog/templates/catalog/product.html
+#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Images of %(label)s"
 msgstr "Imágenes de %(label)s"
 
@@ -6268,9 +6271,8 @@ msgstr "Pantalla (nombre de la ruta)"
 msgid "screen or page type"
 msgstr "pantalla o tipo de página"
 
-#: apps/manager/fitment_shop_views.py apps/manager/product_views.py apps/seo/page_builders.py
-#: apps/catalog/templates/catalog/search.html apps/manager/product_views.py
-#: apps/seo/page_builders.py themes/ride/templates/catalog/search.html
+#: apps/catalog/templates/catalog/search.html apps/manager/fitment_shop_views.py
+#: apps/manager/product_views.py apps/seo/page_builders.py themes/ride/templates/catalog/search.html
 #: themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Buscar"
@@ -6672,9 +6674,6 @@ msgstr "Saltar al contenido principal"
 
 #: apps/catalog/templates/catalog/product.html apps/manager/fitment_shop_views.py
 #: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
-#: apps/manager/templates/manager/shop/order.html
-#: apps/catalog/templates/catalog/product.html apps/manager/product_views.py
-#: apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/shop/order.html themes/ride/templates/catalog/product.html
 msgid "SKU"
 msgstr "SKU"
@@ -6796,7 +6795,6 @@ msgstr ""
 msgid "Specific items"
 msgstr "Artículos concretos"
 
-#: apps/catalog/templates/catalog/product.html
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Specifications"
 msgstr "Especificaciones"

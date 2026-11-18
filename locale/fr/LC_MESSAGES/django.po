@@ -100,6 +100,7 @@ msgid ""
 msgstr ""
 "%(item)s : seulement %(quantity)d disponibles, ton panier en contient donc %(quantity)d au lieu de"
 " %(requested)d."
+
 #: themes/base/templates/components/gallery.html themes/ride/templates/components/gallery.html
 msgid "%(label)s, image %(count)s of %(total)s"
 msgstr "%(label)s, image %(count)s sur %(total)s"
@@ -2970,6 +2971,7 @@ msgstr "Compatible avec"
 #: apps/manager/fitment_shop_forms.py
 msgid "Fits everything"
 msgstr "Convient à tout"
+
 #: apps/catalog/templates/catalog/includes/product_fitment.html
 msgid "Fits everything."
 msgstr "Convient à tout."
@@ -3014,9 +3016,6 @@ msgstr "Formulaire expiré"
 msgid "Friday"
 msgstr "Vendredi"
 
-#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
-msgid "From year"
-msgstr "De l'année"
 #: apps/catalog/templates/catalog/listing.html themes/ride/templates/catalog/listing.html
 msgid "From %(currency)s %(amount)s"
 msgstr "À partir de %(currency)s %(amount)s"
@@ -3024,6 +3023,10 @@ msgstr "À partir de %(currency)s %(amount)s"
 #: apps/fitment/product_summary.py
 msgid "from %(year)s"
 msgstr "à partir de %(year)s"
+
+#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "From year"
+msgstr "De l'année"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Frozen orders and payouts"
@@ -3582,7 +3585,7 @@ msgstr "Image %(number)d"
 msgid "Images"
 msgstr "Images"
 
-#: apps/catalog/templates/catalog/product.html
+#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Images of %(label)s"
 msgstr "Images de %(label)s"
 
@@ -6319,9 +6322,8 @@ msgstr "Écran (nom de la route)"
 msgid "screen or page type"
 msgstr "écran ou type de page"
 
-#: apps/manager/fitment_shop_views.py apps/manager/product_views.py apps/seo/page_builders.py
-#: apps/catalog/templates/catalog/search.html apps/manager/product_views.py
-#: apps/seo/page_builders.py themes/ride/templates/catalog/search.html
+#: apps/catalog/templates/catalog/search.html apps/manager/fitment_shop_views.py
+#: apps/manager/product_views.py apps/seo/page_builders.py themes/ride/templates/catalog/search.html
 #: themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Rechercher"
@@ -6722,9 +6724,6 @@ msgstr "Aller au contenu principal"
 
 #: apps/catalog/templates/catalog/product.html apps/manager/fitment_shop_views.py
 #: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
-#: apps/manager/templates/manager/shop/order.html
-#: apps/catalog/templates/catalog/product.html apps/manager/product_views.py
-#: apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/shop/order.html themes/ride/templates/catalog/product.html
 msgid "SKU"
 msgstr "SKU"
@@ -6846,7 +6845,6 @@ msgstr "Approbation expresse des clauses onéreuses (articles 1341 et 1342 du Co
 msgid "Specific items"
 msgstr "Articles précis"
 
-#: apps/catalog/templates/catalog/product.html
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Specifications"
 msgstr "Caractéristiques techniques"

@@ -98,6 +98,7 @@ msgid ""
 msgstr ""
 "%(item)s: ne sono disponibili solo %(quantity)d, quindi nel carrello ne hai %(quantity)d invece di"
 " %(requested)d."
+
 #: themes/base/templates/components/gallery.html themes/ride/templates/components/gallery.html
 msgid "%(label)s, image %(count)s of %(total)s"
 msgstr "%(label)s, immagine %(count)s di %(total)s"
@@ -2937,6 +2938,7 @@ msgstr "Compatibile con"
 #: apps/manager/fitment_shop_forms.py
 msgid "Fits everything"
 msgstr "Si adatta a tutto"
+
 #: apps/catalog/templates/catalog/includes/product_fitment.html
 msgid "Fits everything."
 msgstr "Adatto a tutto."
@@ -2981,9 +2983,6 @@ msgstr "Modulo scaduto"
 msgid "Friday"
 msgstr "Venerdì"
 
-#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
-msgid "From year"
-msgstr "Dall'anno"
 #: apps/catalog/templates/catalog/listing.html themes/ride/templates/catalog/listing.html
 msgid "From %(currency)s %(amount)s"
 msgstr "Da %(currency)s %(amount)s"
@@ -2991,6 +2990,10 @@ msgstr "Da %(currency)s %(amount)s"
 #: apps/fitment/product_summary.py
 msgid "from %(year)s"
 msgstr "dal %(year)s"
+
+#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "From year"
+msgstr "Dall'anno"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Frozen orders and payouts"
@@ -3543,7 +3546,7 @@ msgstr "Immagine %(number)d"
 msgid "Images"
 msgstr "Immagini"
 
-#: apps/catalog/templates/catalog/product.html
+#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Images of %(label)s"
 msgstr "Immagini di %(label)s"
 
@@ -6262,9 +6265,8 @@ msgstr "Schermata (nome della route)"
 msgid "screen or page type"
 msgstr "schermata o tipo di pagina"
 
-#: apps/manager/fitment_shop_views.py apps/manager/product_views.py apps/seo/page_builders.py
-#: apps/catalog/templates/catalog/search.html apps/manager/product_views.py
-#: apps/seo/page_builders.py themes/ride/templates/catalog/search.html
+#: apps/catalog/templates/catalog/search.html apps/manager/fitment_shop_views.py
+#: apps/manager/product_views.py apps/seo/page_builders.py themes/ride/templates/catalog/search.html
 #: themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Cerca"
@@ -6665,9 +6667,6 @@ msgstr "Vai al contenuto principale"
 
 #: apps/catalog/templates/catalog/product.html apps/manager/fitment_shop_views.py
 #: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
-#: apps/manager/templates/manager/shop/order.html
-#: apps/catalog/templates/catalog/product.html apps/manager/product_views.py
-#: apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/shop/order.html themes/ride/templates/catalog/product.html
 msgid "SKU"
 msgstr "SKU"
@@ -6787,7 +6786,6 @@ msgstr "Approvazione specifica delle clausole onerose (artt. 1341 e 1342 del cod
 msgid "Specific items"
 msgstr "Elementi specifici"
 
-#: apps/catalog/templates/catalog/product.html
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Specifications"
 msgstr "Specifiche tecniche"
