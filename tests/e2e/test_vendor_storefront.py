@@ -78,7 +78,7 @@ def test_the_italian_storefront_shows_bio_policies_and_categories(
     expect(page.get_by_text("La nostra storia.")).to_be_visible()
     page.locator("summary").first.click()
     expect(page.get_by_text("Spedizione in due giorni.")).to_be_visible()
-    nav = page.get_by_role("navigation", name="Store categories")
+    nav = page.get_by_role("navigation", name="Categorie del negozio")
     expect(nav.get_by_role("link", name="Bollitori")).to_be_visible()
     expect(nav.get_by_role("link", name="Padelle")).to_be_visible()
     shot("public-vendor-storefront-it")

@@ -11,11 +11,13 @@ from . import (
     amendment_views,
     event_block_views,
     event_views,
+    fitment_shop_views,
     fitment_views,
     media,
     money_views,
     notice_views,
     product_views,
+    return_policy_views,
     sales_terms_views,
     session_views,
     statement_views,
@@ -41,6 +43,9 @@ shop = (
         path("money/statement/", money_views.StatementView.as_view(), name="money_statement"),
         path("money/export/", money_views.ExportView.as_view(), name="money_export"),
         path("sales-terms/", sales_terms_views.SalesTermsView.as_view(), name="sales_terms"),
+        path(
+            "return-policy/", return_policy_views.ReturnPolicyView.as_view(), name="return_policy"
+        ),
         # EVT.4: the vendor's own events (list, form, submit, cancel).
         path("events/", event_views.EventsView.as_view(), name="events"),
         path("events/new/", event_views.EventFormView.as_view(), name="event_new"),
@@ -122,6 +127,21 @@ shop = (
             "orders/<uuid:public_id>/<slug:action>/",
             views.VendorOrderActionView.as_view(),
             name="order_action",
+        ),
+        # FIT.3: the Fits pages of the shop (list with bulk add, product tab, proposals, report).
+        path("fitment/", fitment_shop_views.FitmentList.as_view(), name="fitment"),
+        path(
+            "fitment/proposals/",
+            fitment_shop_views.FitmentProposalsView.as_view(),
+            name="fitment_proposals",
+        ),
+        path(
+            "fitment/report/", fitment_shop_views.FitmentReportView.as_view(), name="fitment_report"
+        ),
+        path(
+            "fitment/<uuid:public_id>/",
+            fitment_shop_views.FitmentProductView.as_view(),
+            name="fitment_product",
         ),
         path("vendor/", views.VendorPickerView.as_view(), name="vendor"),
         # The 30 days' notice of termination (CMP.5 part 4): the reason, and the data download.
