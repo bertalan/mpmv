@@ -165,6 +165,8 @@ layers = [
   # the apps below and never import each other.
   "apps.api | apps.manager",
   "apps.compliance | apps.seo | apps.ingest",
+  # Trust badges (spec 16): built from orders and reviews (TRU.2), shown by seo and the Manager.
+  "apps.trust",
   "apps.ledger",
   "apps.payments",
   "apps.orders",
@@ -250,6 +252,7 @@ forbidden_modules = [
   "apps.events",
   "apps.seo",
   "apps.compliance",
+  "apps.trust",
   "apps.api",
   "apps.seed",  # the demo seed (ARC.10) writes every app's data through its services
   "apps.mcp",
@@ -276,6 +279,7 @@ source_modules = [
   "apps.events",
   "apps.seo",
   "apps.compliance",
+  "apps.trust",
   "apps.api",
   "apps.seed",  # the demo seed (ARC.10) writes every app's data through its services
   "apps.mcp",
@@ -312,6 +316,21 @@ forbidden_modules = [
   "apps.manager",
   "apps.mcp",
   "apps.seed",
+]
+
+# Spec 16: the trust rules, models and engine need no checkout or money app (the inputs come from
+# `trust.services`, TRU.2, which reads orders; it is the only module allowed to).
+[[tool.importlinter.contracts]]
+name = "Trust engine and models stay off the checkout, tax and money apps (spec 16)"
+type = "forbidden"
+source_modules = ["apps.trust.engine", "apps.trust.models"]
+forbidden_modules = [
+  "apps.tax",
+  "apps.shipping",
+  "apps.cart",
+  "apps.orders",
+  "apps.payments",
+  "apps.ledger",
 ]
 
 # Spec 15: nothing in the checkout reads events. cart and orders sit above events in the

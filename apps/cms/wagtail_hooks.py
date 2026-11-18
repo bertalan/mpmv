@@ -52,7 +52,7 @@ from .choosers import (
     term_chooser,
     vendor_chooser,
 )
-from .models import BlogAuthor, FooterSettings, NavigationMenu
+from .models import BlogAuthor, ContentSnippet, FooterSettings, NavigationMenu
 from .services import listing_editorial, search_articles
 
 
@@ -80,6 +80,22 @@ class BlogAuthorViewSet(SnippetViewSet):  # type: ignore[misc]
 
 
 register_snippet(BlogAuthorViewSet)
+
+
+class ContentSnippetViewSet(SnippetViewSet):  # type: ignore[misc]
+    """The reusable texts (CMS.14): drafts, moderation, translations and a usage screen."""
+
+    model = ContentSnippet
+    icon = "snippet"
+    menu_label = _("Reusable snippets")
+    menu_name = "content-snippets"
+    add_to_admin_menu = True
+    list_display = ("title", "locale", "live")
+    list_filter = ("locale",)
+    search_fields = ("title",)
+
+
+register_snippet(ContentSnippetViewSet)
 
 
 def _withdraw(hook_name: str, registered_by: Callable[[Any], bool]) -> None:

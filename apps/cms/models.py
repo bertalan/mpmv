@@ -61,7 +61,18 @@ from wagtail.contrib.routable_page.models import RoutablePageMixin, path
 from wagtail.contrib.settings.models import BaseSiteSetting
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images import get_image_model_string
-from wagtail.models import Orderable, Page, PageManager, PageQuerySet, TranslatableMixin
+from wagtail.models import (
+    DraftStateMixin,
+    LockableMixin,
+    Orderable,
+    Page,
+    PageManager,
+    PageQuerySet,
+    RevisionMixin,
+    TranslatableMixin,
+    Workflow,
+    WorkflowMixin,
+)
 from wagtail_localize.fields import BaseTranslatableField, SynchronizedField, TranslatableField
 from wagtail_localize.models import Translation
 
@@ -76,6 +87,7 @@ from .blocks import (
     AccordionBlock,
     ArticleLinksBlock,
     CallToActionBlock,
+    ContentSnippetBlock,
     CounterBlock,
     DownloadBlock,
     FaqBlock,
@@ -135,6 +147,7 @@ def body_field(
             ("video_modal", VideoModalBlock()),
             ("download", DownloadBlock()),
             ("accordion", AccordionBlock()),
+            ("content_snippet", ContentSnippetBlock()),
             *grid,
             *extra,
             *sections,
@@ -1037,6 +1050,97 @@ class VendorRecruitmentPage(Page):  # type: ignore[misc]
         return context
 
 
+# --- Reusable content snippet (CMS.14)
+
+CONTENT_SNIPPET_REVIEW = "Content snippet review"
+
+
+class ContentSnippet(
+    WorkflowMixin,  # type: ignore[misc]  # Wagtail is untyped
+    DraftStateMixin,  # type: ignore[misc]
+    LockableMixin,  # type: ignore[misc]
+    RevisionMixin,  # type: ignore[misc]
+    TranslatableMixin,  # type: ignore[misc]
+    models.Model,
+):
+    """A text written once and placed in any page body by the `content_snippet` block (D-36).
+
+    Translatable per language (wagtail-localize), with drafts and revisions, and a moderation
+    workflow: an edit reaches the pages that use it only when it is approved and published.
+    Rich text only: a snippet cannot hold a snippet block, so there is no recursion."""
+
+    title = models.CharField(
+        _("title"),
+        max_length=120,
+        help_text=_(
+            "A name for the editors, for example 'Shipping terms'. Never shown to visitors. "
+            "Up to 120 characters. Required."
+        ),
+    )
+    body = RichTextField(
+        _("text"),
+        features=RICH_TEXT_FEATURES,
+        help_text=_(
+            "The text shown wherever the snippet is placed. If you leave it empty, "
+            "nothing is shown."
+        ),
+    )
+
+    panels: ClassVar[list[Any]] = [FieldPanel("title"), FieldPanel("body")]
+    translatable_fields: ClassVar[list[Any]] = [
+        SynchronizedField("title"),
+        TranslatableField("body"),
+    ]
+
+    class Meta(TranslatableMixin.Meta):  # type: ignore[misc]
+        verbose_name = _("reusable snippet")
+        verbose_name_plural = _("reusable snippets")
+        ordering: ClassVar[list[str]] = ["title"]
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(
+                fields=["locale", "title"], name="cms_content_snippet_title_per_locale"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.title)
+
+    def get_workflow(self) -> Workflow | None:
+        """Every snippet goes through "Content snippet review" (one approval task)."""
+        workflow = content_snippet_workflow()
+        return workflow if workflow is not None and workflow.active else None
+
+    @property
+    def has_workflow(self) -> bool:
+        return self.get_workflow() is not None
+
+
+def content_snippet_workflow(*, create: bool = False) -> Workflow | None:
+    """The "Content snippet review" workflow: one `GroupApprovalTask` for "Snippet publishers".
+
+    Created after every `migrate` (`create=True`), never on a request, so a page view or an
+    editor screen does not write. Never changed once it exists, so staff may edit its task and
+    groups in the admin."""
+    from django.contrib.auth.models import Group
+    from django.db import transaction
+    from wagtail.models import GroupApprovalTask, WorkflowTask
+
+    from . import roles
+
+    workflow: Workflow | None = (
+        Workflow.objects.filter(name=CONTENT_SNIPPET_REVIEW).order_by("pk").first()
+    )
+    if workflow is not None or not create:
+        return workflow
+    with transaction.atomic():
+        group, _created = Group.objects.get_or_create(name=roles.SNIPPET_PUBLISHERS)
+        task = GroupApprovalTask.objects.create(name=CONTENT_SNIPPET_REVIEW)
+        task.groups.add(group)
+        workflow = Workflow.objects.create(name=CONTENT_SNIPPET_REVIEW)
+        WorkflowTask.objects.create(workflow=workflow, task=task, sort_order=0)
+    return workflow
+
+
 # --- Blog (CMS.3)
 
 
@@ -1362,6 +1466,7 @@ class BlogPostPage(Page):  # type: ignore[misc]
             ("video_modal", VideoModalBlock()),
             ("download", DownloadBlock()),
             ("accordion", AccordionBlock()),
+            ("content_snippet", ContentSnippetBlock()),
             ("product_grid", ProductGridBlock()),
             ("product_cards", ProductCardsBlock()),
         ],

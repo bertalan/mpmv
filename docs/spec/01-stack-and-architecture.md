@@ -66,6 +66,7 @@ apps/
   fitment/                # D-38 proposal: fitment scheme and nodes, product fitment, matching engine, garage profiles (spec 17)
   events/                 # EventIndexPage and EventPage (Wagtail), recurrence, moderation, RSS/ICS feeds, maps (spec 15)
   themes/                 # theme registry, theme-aware template loader, design tokens (spec 14); theme files in themes/<slug>/
+  trust/                  # TrustRules, VendorTrustSnapshot, the pure badge engine (spec 16)
   seo/                    # sitemap, JSON-LD, Google/Meta feeds, llms.txt, robots
   compliance/             # DAC7, GPSR, GDPR requests, DSA reports, withdrawal
   api/                    # django-ninja router /api/v1
@@ -107,6 +108,10 @@ flowchart TD
   events --> seo
   events --> compliance
   orders --> compliance
+  vendors --> trust
+  orders --> trust
+  trust --> seo
+  trust -.snapshots.-> manager
   ledger --> compliance
   api -.adapter.-> orders & catalog & ingest & shipping & tax & events
   mcp -.adapter.-> api

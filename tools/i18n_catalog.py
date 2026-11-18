@@ -56,6 +56,7 @@ EVENT_FILES = (
 )
 SCOPES = (
     "apps/manager",
+    "apps/fitment/services.py",  # the publish gate message (FIT.18), shown to vendors and staff
     "apps/accounts",
     "apps/orders/templates",
     "apps/seo",
@@ -386,6 +387,8 @@ SENSITIVE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "apps/vendors/templates/vendors/terms/",
             "apps/manager/templates/manager/shop/sales_terms.html",
             "apps/manager/sales_terms_views.py",
+            "apps/manager/templates/manager/shop/return_policy.html",
+            "apps/manager/return_policy_views.py",
         ),
     ),
     ("price notes and tax", ("apps/tax/",)),

@@ -6,6 +6,7 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, Literal
+from urllib.parse import urlsplit, urlunsplit
 
 from apps.catalog.engine import sku_match_key
 
@@ -152,3 +153,140 @@ def payload_hash(payload: Mapping[str, Any]) -> str:
     """Stable digest of an observation payload (key order does not matter)."""
     text = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(text.encode()).hexdigest()
+
+
+# --- Source state, stock state and change history (ING.2)
+
+SIMPLE: Final = "simple"
+VARIABLE: Final = "variable"
+ITEM_KINDS: Final = (SIMPLE, VARIABLE)
+STOCK_OUT: Final = 0
+STOCK_IN: Final = 1
+
+
+class StateError(ValueError):
+    """A supplier observation is incomplete or incoherent; nothing may be stored from it."""
+
+
+def valid_stock_state(status: object, quantity: object) -> bool:
+    """Explicit supplier availability: out of stock is exactly 0 units, in stock is more than 0.
+
+    Anything else (a missing, boolean, negative or contradictory pair) is not a stock state, so
+    callers fail closed and write no stock from it."""
+    if type(status) is not int or type(quantity) is not int:
+        return False
+    return (status == STOCK_OUT and quantity == 0) or (status == STOCK_IN and quantity > 0)
+
+
+def require_stock_state(status: object, quantity: object) -> tuple[int, int]:
+    if not (
+        valid_stock_state(status, quantity)
+        and isinstance(status, int)
+        and isinstance(quantity, int)
+    ):
+        raise StateError("Availability is missing or incoherent; no stock update.")
+    return status, quantity
+
+
+def normalize_source_url(url: str, *, hosts: Sequence[str], path_prefix: str = "/") -> str:
+    """Canonical identity of a supplier item: https, host from the allowed set, no credentials,
+    port, query or fragment, one trailing slash. The identity is the address, never the SKU."""
+    parts = urlsplit(url)
+    host = parts.hostname or ""
+    if (
+        parts.scheme not in ("http", "https")
+        or host not in hosts
+        or parts.username
+        or parts.password
+        or parts.port
+        or parts.query
+        or not parts.path.startswith(path_prefix)
+    ):
+        raise StateError("Not a valid supplier item address.")
+    return urlunsplit(("https", hosts[0], parts.path.rstrip("/") + "/", "", ""))
+
+
+def canonical_state(state: Mapping[str, Any]) -> dict[str, Any]:
+    """JSON round trip: decimals become exact strings and key order stops mattering."""
+    return json.loads(json.dumps(state, default=str, sort_keys=True))  # type: ignore[no-any-return]
+
+
+def validate_state(state: Mapping[str, Any]) -> dict[str, Any]:
+    """Check a parsed observation and return its canonical form (raises `StateError`).
+
+    A *variable* item has a native id and children, each with its own native id, and carries no
+    stock of its own: stock belongs to the children. A *simple* item has no children and, when it
+    states availability, a coherent pair. Children state availability or stay unknown."""
+    value = canonical_state(state)
+    kind = value.get("kind")
+    native_id = value.get("native_id")
+    children = value.get("variations", {})
+    if kind not in ITEM_KINDS or not value.get("sku") or value["sku"] == "N/D":
+        raise StateError("Item identity is not valid.")
+    if native_id is not None and (type(native_id) is not int or native_id <= 0):
+        raise StateError("Native id is not valid.")
+    if not isinstance(children, dict):
+        raise StateError("Variations must be a mapping.")
+    value["variations"] = children
+    status, quantity = value.get("stock_status"), value.get("stock_quantity")
+    if kind == VARIABLE:
+        if native_id is None or not children or status is not None or quantity is not None:
+            raise StateError("A variable item needs a native id and children, and no own stock.")
+    else:
+        if children:
+            raise StateError("A simple item has no variations.")
+        if (status is not None or quantity is not None) and not valid_stock_state(status, quantity):
+            raise StateError("Availability is incoherent.")
+    seen: set[int] = set()
+    for key, child in children.items():
+        child_id = child.get("native_id")
+        if type(child_id) is not int or child_id <= 0 or key != str(child_id) or child_id in seen:
+            raise StateError("Variation id is not valid or is duplicated.")
+        seen.add(child_id)
+        c_status, c_quantity = child.get("stock_status"), child.get("stock_quantity")
+        if (c_status is not None or c_quantity is not None) and not valid_stock_state(
+            c_status, c_quantity
+        ):
+            raise StateError("Variation availability is incoherent.")
+        child["present"] = True
+    return value
+
+
+def merge_state(old: Mapping[str, Any] | None, new: Mapping[str, Any]) -> dict[str, Any]:
+    """Fold a validated observation into the stored state.
+
+    Children the supplier no longer lists are kept as `present: false` with their last known
+    data (absence is never zero stock), and observed addresses accumulate as evidence."""
+    merged = dict(new)
+    children = dict(new["variations"])
+    urls = set(new.get("source_urls", []))
+    if old:
+        if old.get("native_id") is not None and old["native_id"] != new.get("native_id"):
+            raise StateError("The native id of the parent changed: reconciliation required.")
+        for key, child in old.get("variations", {}).items():
+            if key not in children:
+                children[key] = {**child, "present": False}
+        urls |= set(old.get("source_urls", []))
+    merged["variations"] = children
+    merged["source_urls"] = sorted(urls)
+    return merged
+
+
+def changed_fields(old: Mapping[str, Any] | None, new: Mapping[str, Any]) -> dict[str, Any]:
+    """Top-level fields of `new` that differ from `old`, with their new values."""
+    old = old or {}
+    return {key: value for key, value in new.items() if key not in old or old[key] != value}
+
+
+def latest_field_values(
+    rows: Sequence[tuple[Mapping[str, Any], Mapping[str, Any]]],
+    fields: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """The last value of each field that a change flagged, from `(changed_fields, new_values)`
+    rows in chronological order (version, then id)."""
+    latest: dict[str, Any] = {}
+    for flagged, values in rows:
+        for field, value in values.items():
+            if flagged.get(field) is True and (fields is None or field in fields):
+                latest[field] = value
+    return latest

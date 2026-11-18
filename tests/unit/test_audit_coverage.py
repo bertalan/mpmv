@@ -45,6 +45,8 @@ NOT_SENSITIVE_SERVICES = {
     "apps.payments.services.process_webhook": "builds its own system audit context for the "
     "webhook actor; every write it makes (payment, account status, sales mode) is audited",
     "apps.cart.services.merge_carts": "a shopper's cart, not a financial or security fact",
+    "apps.trust.services.record_snapshot": "appends a computed result (append-only table with a "
+    "database trigger); the audit entries for a badge gained or lost come with TRU.2",
     "apps.seo.services.record_consent": "the visitor's own consent decision, itself the "
     "append-only proof log, with no personal data beyond a random id (SEO.5)",
 }
