@@ -63,6 +63,7 @@ def theme(request: Any, settings: SettingsWrapper) -> str:
 
 def make_product(**fields: Any) -> Product:
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
+    fields.setdefault("weight_kg", None)  # the factory gives every product a weight
     product = ProductFactory.create(
         vendor=vendor, status=Product.Status.PUBLISHED, price_net=Decimal("18.00"), **fields
     )
@@ -95,19 +96,27 @@ def fitment(page: Any) -> list[tuple[str, str]]:
 
 def add_specs(product: Product) -> None:
     colour = AttributeFactory.create(code="finish")
-    AttributeTranslationFactory.create(attribute=colour, language="en", name="Finish")
+    AttributeTranslationFactory.create(
+        attribute=colour, language="en", status=PUBLISHED, name="Finish"
+    )
     glaze = AttributeValueFactory.create(attribute=colour, value="glaze")
-    AttributeValueTranslationFactory.create(value=glaze, language="en", label="Glazed")
+    AttributeValueTranslationFactory.create(
+        value=glaze, language="en", status=PUBLISHED, label="Glazed"
+    )
     ProductAttributeFactory.create(product=product, attribute=colour, position=1).values.set(
         [glaze]
     )
     width = AttributeFactory.create(code="width", kind="number", unit="cm")
-    AttributeTranslationFactory.create(attribute=width, language="en", name="Width")
+    AttributeTranslationFactory.create(
+        attribute=width, language="en", status=PUBLISHED, name="Width"
+    )
     ProductAttributeFactory.create(
         product=product, attribute=width, numeric_value=Decimal("8.500"), position=2
     )
     maker = AttributeFactory.create(code="maker", kind="text")
-    AttributeTranslationFactory.create(attribute=maker, language="en", name="Made by")
+    AttributeTranslationFactory.create(
+        attribute=maker, language="en", status=PUBLISHED, name="Made by"
+    )
     ProductAttributeFactory.create(product=product, attribute=maker, text_value="Anna", position=3)
 
 
@@ -144,7 +153,7 @@ def test_specifications_are_absent_without_data(client: Client, theme: str) -> N
 def test_variant_axes_are_not_specifications(client: Client, theme: str) -> None:
     product = make_product()
     axis = AttributeFactory.create(code="size")
-    AttributeTranslationFactory.create(attribute=axis, language="en", name="Size")
+    AttributeTranslationFactory.create(attribute=axis, language="en", status=PUBLISHED, name="Size")
     ProductAttributeFactory.create(product=product, attribute=axis, is_variant_axis=True)
     assert soup(client).select_one(".product-specs") is None
 
@@ -256,6 +265,7 @@ def test_ride_has_only_the_tabs_that_have_data(client: Client, settings: Setting
 
 
 def test_there_is_no_faq_without_data(client: Client, theme: str) -> None:
+    make_product()
     page = soup(client)
     assert page.select_one(".product-faq") is None
 

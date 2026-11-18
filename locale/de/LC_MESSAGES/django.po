@@ -2640,6 +2640,10 @@ msgstr "Knoten der Fahrzeugzuordnung"
 msgid "Fitment scheme"
 msgstr "Schema der Fahrzeugzuordnung"
 
+#: apps/catalog/templates/catalog/product.html
+msgid "Fits"
+msgstr "Passt zu"
+
 #: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Footer"
 msgstr "Fußzeile"
@@ -6110,6 +6114,10 @@ msgid "Specific approval of onerous clauses (articles 1341 and 1342 of the Itali
 msgstr ""
 "Ausdrückliche Genehmigung belastender Klauseln (Art. 1341 und 1342 des italienischen "
 "Zivilgesetzbuchs)"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "Specifications"
+msgstr "Technische Daten"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Staff"
