@@ -96,8 +96,19 @@ def test_the_accessor_returns_none_without_data_and_effective_falls_back_to_the_
     effective = rs.effective_return_policy(vendor)
     assert effective.is_default is True
     assert effective.return_window_days == 14
-    assert effective.return_shipping_paid_by == "customer"
+    assert effective.return_shipping_paid_by == "vendor"
     assert effective.return_country == "DE"
+
+
+def test_an_approved_version_that_says_the_customer_pays_wins_over_the_default() -> None:
+    vendor = VendorFactory.create(country="DE")
+    rs.propose_return_policy(
+        vendor, values(return_shipping_paid_by="customer"), actor=owner_of(vendor), ctx=CTX
+    )
+    rs.review_return_policy(ReturnPolicyVersion.objects.get(), approve=True, actor=staff(), ctx=CTX)
+    effective = rs.effective_return_policy(vendor)
+    assert effective.is_default is False
+    assert effective.return_shipping_paid_by == "customer"
 
 
 def test_a_new_proposal_withdraws_the_previous_pending_one() -> None:

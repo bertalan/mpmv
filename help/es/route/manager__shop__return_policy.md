@@ -4,7 +4,7 @@ last-checked: 2026-11-18
 Esta página es para el propietario de la tienda. La política de devoluciones indica a los compradores cuántos días tienen para devolver los productos, quién paga el envío de la devolución y cómo pueden devolverlos.
 
 ## Qué ve usted
-- **Lo que ven ahora los compradores**: la política aprobada o la estándar (14 días, el cliente paga la devolución) si usted aún no ha definido una.
+- **Lo que ven ahora los compradores**: la política aprobada o la estándar (14 días, la tienda paga el envío de la devolución) si usted aún no ha definido una.
 - Un aviso si su última versión está pendiente de revisión o fue rechazada.
 - **Versiones**: todas las versiones propuestas hasta ahora.
 

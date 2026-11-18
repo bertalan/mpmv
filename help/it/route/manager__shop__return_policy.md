@@ -4,7 +4,7 @@ last-checked: 2026-11-18
 Questa pagina è per il titolare del negozio. La politica di reso indica agli acquirenti entro quanti giorni possono restituire la merce, chi paga la spedizione del reso e come possono restituirla.
 
 ## Cosa vede
-- **Cosa vedono ora gli acquirenti**: la politica approvata oppure quella standard (14 giorni, il reso è a carico del cliente) se non ne ha ancora impostata una.
+- **Cosa vedono ora gli acquirenti**: la politica approvata oppure quella standard (14 giorni, la spedizione del reso è a carico del negozio) se non ne ha ancora impostata una.
 - Un avviso se la Sua ultima versione è in attesa di verifica o è stata rifiutata.
 - **Versioni**: tutte le versioni proposte finora.
 
