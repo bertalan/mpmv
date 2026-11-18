@@ -1,0 +1,6 @@
+{% comment %}Accordion block of the `ride` theme (CMS.16): Bootstrap's accordion look on native details and summary (copied from base's markup; no script, the browser keeps the state).{% endcomment %}<div class="block block-accordion accordion ride-accordion">
+  {% for section in value.sections %}<details class="accordion-item"{% if forloop.first and value.open_first %} open{% endif %}>
+    <summary class="accordion-button collapsed">{{ section.title }}</summary>
+    <div class="accordion-body">{{ section.body }}</div>
+  </details>{% endfor %}
+</div>

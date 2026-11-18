@@ -346,8 +346,13 @@ class _SlowUpstream(FakeTileUpstream):
     def __init__(self, delay: float, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.delay = delay
+        # Optional: every fetch must meet the others here, so a lock that serialised
+        # different tiles would break the barrier (BrokenBarrierError), with no wall-clock bound.
+        self.rendezvous: threading.Barrier | None = None
 
     def fetch(self, url: str, *, user_agent: str, timeout: float) -> Any:
+        if self.rendezvous is not None:
+            self.rendezvous.wait(timeout=10)
         time.sleep(self.delay)
         return super().fetch(url, user_agent=user_agent, timeout=timeout)
 
@@ -397,12 +402,12 @@ def test_a_burst_for_one_cold_tile_makes_one_upstream_call(slow_upstream: _SlowU
 
 @pytest.mark.django_db(transaction=True)
 def test_different_tiles_do_not_wait_for_each_other(slow_upstream: _SlowUpstream) -> None:
-    started = time.monotonic()
+    slow_upstream.delay = 0
+    slow_upstream.rendezvous = threading.Barrier(4)  # all four fetches must be in flight together
     responses = _burst([(3, 4, 5), (3, 4, 6), (3, 5, 5), (3, 5, 6)])
-    elapsed = time.monotonic() - started
     assert [r.status_code for r in responses] == [200] * 4
     assert len(slow_upstream.calls) == 4
-    assert elapsed < 4 * slow_upstream.delay  # in parallel, not one after the other
+    assert len({call[0] for call in slow_upstream.calls}) == 4  # each tile fetched once
 
 
 @pytest.mark.django_db(transaction=True)

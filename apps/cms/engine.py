@@ -41,6 +41,7 @@ import math
 import re
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 from functools import lru_cache
 from html import escape, unescape
 from html.parser import HTMLParser
@@ -890,3 +891,29 @@ def is_reserved_root_slug(slug: object, parent_depth: int | None) -> bool:
     """True when a page with `slug` under a parent at `parent_depth` would be shadowed by a
     route. Language homes sit at depth 2 of the tree, so their children are the root level."""
     return parent_depth == 2 and isinstance(slug, str) and slug in RESERVED_ROOT_SLUGS
+
+
+# --- Download block (CMS.15)
+
+FILE_SIZE_UNITS = ("B", "KB", "MB", "GB")
+
+
+def file_size_parts(size: int) -> tuple[Decimal, str]:
+    """A file size as a number and a unit, in decimal units (1 KB = 1000 B) like the operating
+    systems' file managers: whole bytes below a kilobyte, one decimal from there. A value that
+    rounds up to 1000 moves to the next unit, so 999 950 bytes read "1.0 MB", not "1000.0 KB"."""
+    if size < 1000:
+        return Decimal(max(size, 0)), FILE_SIZE_UNITS[0]
+    value = Decimal(size)
+    for unit in FILE_SIZE_UNITS[1:]:
+        value /= 1000
+        rounded = value.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+        if rounded < 1000 or unit == FILE_SIZE_UNITS[-1]:
+            return rounded, unit
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
+def file_type_label(name: str) -> str:
+    """The file type shown to visitors: the upper-case extension ("PDF"), "" when there is none."""
+    stem, dot, extension = name.rpartition(".")
+    return extension.upper() if dot and stem else ""
