@@ -154,6 +154,7 @@ from apps.tax.tests.factories import (
 from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
+    ReturnPolicyVersion,
     SalesTermsInForce,
     SalesTermsVersion,
     SelfCertification,
@@ -166,6 +167,7 @@ from apps.vendors.models import (
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
     CrossVendorConsentFactory,
+    ReturnPolicyVersionFactory,
     SalesTermsInForceFactory,
     SalesTermsVersionFactory,
     SelfCertificationFactory,
@@ -212,6 +214,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ),
     SelfCertification: lambda vendor: SelfCertificationFactory.create(vendor=vendor),
     # VEN.35: a published version of the seller's sales terms and the pointer to the one in force.
+    ReturnPolicyVersion: lambda vendor: ReturnPolicyVersionFactory.create(vendor=vendor),
     SalesTermsVersion: lambda vendor: SalesTermsVersionFactory.create(vendor=vendor),
     SalesTermsInForce: lambda vendor: SalesTermsInForceFactory.create(version__vendor=vendor),
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
@@ -643,6 +646,9 @@ ENDPOINTS: dict[str, Access] = {
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # CMP.5 part 4: the notice of termination and the data download show the selected vendor only.
     "manager:shop:sales_terms": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:return_policy": VendorScopedList(
+        make=manager_vendor, identify=vendor_display_name
+    ),
     "manager:shop:termination": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # The statements of reasons of the selected shop (DSA art. 17); another shop's are never listed.
     "manager:shop:statements": VendorScopedList(

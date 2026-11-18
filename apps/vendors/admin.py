@@ -36,12 +36,14 @@ from apps.core.tasks import business_tz
 from apps.core.text import ascii_int
 
 from . import engine
+from . import return_services as return_policy
 from .models import (
     CommissionRule,
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
     NoTinCountry,
+    ReturnPolicyVersion,
     Vendor,
     VendorClaim,
     VendorContract,
@@ -1254,3 +1256,67 @@ class CrossVendorConsentAdmin(admin.ModelAdmin[CrossVendorConsent]):
         saved = CrossVendorConsent.objects.get(public_id=changes.changes[0].key)
         obj.pk, obj.valid_from, obj.set_by = saved.pk, saved.valid_from, saved.set_by
         obj._state.adding = False
+
+
+@admin.register(ReturnPolicyVersion)
+class ReturnPolicyVersionAdmin(admin.ModelAdmin[ReturnPolicyVersion]):
+    """Staff review of the vendors' return policies (VEN.40). Read-only: the values are the
+    vendor's proposal and never edited here; staff approve or reject a pending version with a
+    list action, through the audited service (which also checks the permission). Only an
+    approved version is public."""
+
+    list_display = (
+        "vendor",
+        "number",
+        "return_window_days",
+        "return_shipping_paid_by",
+        "status",
+        "reviewed_at",
+    )
+    list_filter = ("status",)
+    search_fields = ("vendor__display_name",)
+    actions = ("approve_selected", "reject_selected")
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def has_view_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return _section_allowed(request, "platform.vendors", write=False)
+
+    def _review(
+        self, request: HttpRequest, queryset: QuerySet[ReturnPolicyVersion], approve: bool
+    ) -> None:
+        done = 0
+        for version in queryset.filter(status=ReturnPolicyVersion.Status.PENDING):
+            try:
+                return_policy.review_return_policy(
+                    version,
+                    approve=approve,
+                    actor=cast(User, request.user),
+                    ctx=audit_context(request),
+                )
+            except PermissionDenied:
+                raise
+            except ValidationError as error:
+                self.message_user(request, "; ".join(error.messages), messages.ERROR)
+            else:
+                done += 1
+        self.message_user(request, _("Reviewed: %(count)d.") % {"count": done})
+
+    @admin.action(description=_("Approve the selected pending return policies"))
+    def approve_selected(
+        self, request: HttpRequest, queryset: QuerySet[ReturnPolicyVersion]
+    ) -> None:
+        self._review(request, queryset, True)
+
+    @admin.action(description=_("Reject the selected pending return policies"))
+    def reject_selected(
+        self, request: HttpRequest, queryset: QuerySet[ReturnPolicyVersion]
+    ) -> None:
+        self._review(request, queryset, False)

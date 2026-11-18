@@ -58,6 +58,7 @@ SHOP_PAGES: Final[Pages] = (
     (gettext_noop("Storefront profile"), "manager:shop:profile"),
     (gettext_noop("Payments"), "manager:shop:payments"),
     (gettext_noop("Sales terms"), "manager:shop:sales_terms"),
+    (gettext_noop("Return policy"), "manager:shop:return_policy"),
     (gettext_noop("Orders"), "manager:shop:orders"),
     (gettext_noop("Events"), "manager:shop:events"),
     (gettext_noop("Choose a vendor"), "manager:shop:vendor"),
