@@ -196,7 +196,8 @@ def test_the_tabs_work_with_the_keyboard_only(page: Page, live_server: LiveServe
     expect(details).to_have_attribute("aria-selected", "true")
     expect(page.locator("#product-panel-details")).to_be_visible()
     expect(page.locator("#product-panel-description")).to_be_hidden()
-    page.keyboard.press("ArrowLeft")
+    for _step in range(3):
+        page.keyboard.press("ArrowLeft")
     expect(description).to_have_attribute("aria-selected", "true")
     expect(page.locator("#product-panel-description")).to_be_visible()
 
