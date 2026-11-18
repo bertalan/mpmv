@@ -183,5 +183,13 @@ def test_the_video_modal_injects_no_iframe_before_consent_and_does_after(
     )
     expect(page.locator("[data-video-gate]")).to_be_hidden()
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
+    # The frame may take focus (a cross-origin frame swallows keys), so aim Escape at the modal.
+    page.locator("[data-video] .modal.show").focus()
     page.keyboard.press("Escape")
+    expect(page.locator("[data-video] .modal")).to_be_hidden()
+    expect(page.locator("[data-video] iframe")).to_have_count(0)
+    page.locator(".ride-video__open").click()
+    expect(page.locator("[data-video] iframe")).to_have_count(1)
+    page.locator("[data-video] .modal.show [data-bs-dismiss='modal']").first.click()
+    expect(page.locator("[data-video] .modal")).to_be_hidden()
     expect(page.locator("[data-video] iframe")).to_have_count(0)
