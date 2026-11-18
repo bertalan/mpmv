@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied
+from django.core.files.storage import default_storage
 from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
@@ -24,11 +25,16 @@ from apps.catalog import media_cleanup
 from apps.catalog.tests.factories import (
     BrandFactory,
     ProductImageFactory,
+    VariantFactory,
     brand_logo_image,
 )
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, MediaImage
-from apps.core.tests.factories import MediaImageFactory, PlatformOperatorFactory
+from apps.core.tests.factories import (
+    MediaImageFactory,
+    MediaImageRenditionFactory,
+    PlatformOperatorFactory,
+)
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
@@ -256,3 +262,80 @@ def test_a_post_without_the_delete_permission_changes_nothing(client: Client) ->
 
     assert response.status_code in (302, 403)
     assert MediaImage.objects.filter(pk=image.pk).exists()
+
+
+# --- storage, rendition owners, variants, pagination (follow-up of the CAT.25 review)
+
+
+def test_after_a_delete_the_image_file_its_rendition_files_and_rows_are_gone(
+    django_capture_on_commit_callbacks: Any,
+) -> None:
+    image = old_image()
+    renditions = [MediaImageRenditionFactory.create(image=image) for _ in range(2)]
+    file_names = [image.file.name, *(r.file.name for r in renditions)]
+    assert all(default_storage.exists(name) for name in file_names)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        result = media_cleanup.delete_orphans([image.pk], user=image_admin(), ctx=CTX)
+
+    assert result.deleted == [image.pk]
+    assert not any(default_storage.exists(name) for name in file_names)
+    assert not image.get_rendition_model().objects.filter(image_id=image.pk).exists()
+
+
+def test_an_image_in_a_variant_gallery_is_not_listed_or_deleted() -> None:
+    image = old_image()
+    variant = VariantFactory.create()
+    ProductImageFactory.create(image=image, product=variant.product, variant=variant)
+
+    assert listed(image_admin()) == []
+    result = media_cleanup.delete_orphans([image.pk], user=image_admin(), ctx=CTX)
+    assert result.deleted == []
+    assert result.refused == {image.pk: ["catalog.productimage.image"]}
+
+
+def test_renditions_alone_do_not_count_as_a_use() -> None:
+    image = old_image()
+    MediaImageRenditionFactory.create(image=image)
+
+    assert listed(image_admin()) == [image.pk]
+
+
+def test_the_list_is_paginated_and_every_orphan_is_on_exactly_one_page() -> None:
+    images = [old_image() for _ in range(5)]
+    user = image_admin()
+
+    pages = [media_cleanup.orphan_images(user, page=n, per_page=2) for n in (1, 2, 3)]
+
+    assert [len(p.images) for p in pages] == [2, 2, 1]
+    assert all(p.total == 5 and p.page.paginator.num_pages == 3 for p in pages)
+    assert [i.pk for p in pages for i in p.images] == [i.pk for i in images]
+    clamped = media_cleanup.orphan_images(user, page=99, per_page=2)
+    assert clamped.page.number == 3
+    assert media_cleanup.orphan_images(user, page="x", per_page=2).page.number == 1
+
+
+def test_the_review_list_beyond_one_page_has_working_page_links(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(media_cleanup, "REVIEW_LIMIT", 2)
+    images = [old_image(title=f"Photo {n}") for n in range(3)]
+    verified_login(client, image_admin())
+
+    first = client.get(reverse(URL_NAME))
+    second = client.get(reverse(URL_NAME), {"p": 2})
+
+    assert first.context["total"] == 3
+    assert [i.pk for i in first.context["images"]] == [images[0].pk, images[1].pk]
+    assert [i.pk for i in second.context["images"]] == [images[2].pk]
+    assert "?p=2" in first.content.decode()
+
+
+def test_the_list_warns_that_old_page_versions_may_hold_a_listed_image(client: Client) -> None:
+    old_image()
+    verified_login(client, image_admin())
+
+    page = client.get(reverse(URL_NAME)).content.decode()
+
+    assert "data-orphan-old-versions" in page
+    assert "old version of a page" in page

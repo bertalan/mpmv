@@ -89,6 +89,8 @@ SCOPES = (
     # The customer privacy page (I18N.13 follow-up): informal register, "Your data" has its own context.
     "apps/compliance/templates/compliance/privacy_account.html",
     "themes/ride/templates/compliance/privacy_account.html",
+    # The staff note of the unused-images list (CAT.25): the rest of that page is English admin.
+    "apps/catalog/templates/catalog/admin/orphan_images_old_versions.html",
     # The customer help pages (ARC.37): informal register.
     "apps/cms/templates/cms/help_guide_index.html",
     "apps/cms/templates/cms/help_guide_section.html",

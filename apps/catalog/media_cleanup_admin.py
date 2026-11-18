@@ -35,7 +35,9 @@ class OrphanImagesView(View):
     def _render(
         self, request: HttpRequest, *, preview: Any = None, status: int = 200
     ) -> TemplateResponse:
-        report = media_cleanup.orphan_images(request.user)
+        report = media_cleanup.orphan_images(
+            request.user, page=request.GET.get("p", 1), per_page=media_cleanup.REVIEW_LIMIT
+        )
         response = TemplateResponse(
             request,
             TEMPLATE,
@@ -44,7 +46,10 @@ class OrphanImagesView(View):
                 "header_icon": "image",
                 "images": report.images,
                 "total": report.total,
-                "shown_limit": media_cleanup.REVIEW_LIMIT,
+                "page_obj": report.page,
+                "elided_page_range": list(
+                    report.page.paginator.get_elided_page_range(report.page.number)
+                ),
                 "preview": preview,
             },
             status=status,

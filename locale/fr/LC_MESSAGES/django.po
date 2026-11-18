@@ -1059,6 +1059,14 @@ msgid "An extra amount added to the price of the band, without VAT. Use 0 for no
 msgstr ""
 "Un montant supplémentaire ajouté au prix de la tranche, hors TVA. Utilisez 0 s'il n'y en a pas."
 
+#: apps/catalog/templates/catalog/admin/orphan_images_old_versions.html
+msgid ""
+"An image that is only in an old version of a page may be listed here. If you delete it, going back"
+" to that version would show a missing image."
+msgstr ""
+"Une image présente uniquement dans une ancienne version d'une page peut apparaître dans cette "
+"liste. Si vous la supprimez, revenir à cette version afficherait une image manquante."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "An introduction shown on the category page, for example what you find in it. Basic formatting is "
