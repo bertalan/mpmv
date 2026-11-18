@@ -153,6 +153,7 @@ def test_the_query_count_does_not_grow_with_the_number_of_events(client: Client)
     _storefront(client, vendor)  # warm caches that are not per-event
 
     def count() -> int:
+        _storefront(client, vendor)  # publishing a page drops the cached footer (CMS.17): warm it
         with CaptureQueriesContext(connection) as queries:
             _storefront(client, vendor)
         return len(queries)

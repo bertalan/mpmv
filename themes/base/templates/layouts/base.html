@@ -51,7 +51,8 @@ state; fixed to the bottom of the viewport, last in reading order like in the ta
   <div id="live-region" class="visually-hidden" role="status"></div>
   {% block footer %}
     {% navigation_links "footer" as footer_links %}
-    {% include "components/footer.html" with site_name=site_name links=footer_links %}
+    {% footer_chrome as footer_extra %}
+    {% include "components/footer.html" with site_name=site_name links=footer_links widgets=footer_extra.widgets social_links=footer_extra.social_links %}
   {% endblock %}
   {% block consent %}{% consent_banner %}{% endblock %}
 </body>
