@@ -101,6 +101,12 @@ msgstr "%(country)r no es un país en el que pueda estar la dirección."
 msgid "%(currency)s %(amount)s"
 msgstr "%(currency)s %(amount)s"
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "%(days)s day from delivery"
+msgid_plural "%(days)s days from delivery"
+msgstr[0] "%(days)s día desde la entrega"
+msgstr[1] "%(days)s días desde la entrega"
+
 #: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/present.py
 msgid "%(days)s working days"
 msgstr "%(days)s días laborables"
@@ -1574,7 +1580,7 @@ msgstr "Por %(name)s"
 msgid "By <a href=\"%(url)s\">%(name)s</a>"
 msgstr "Por <a href=\"%(url)s\">%(name)s</a>"
 
-#: apps/manager/forms.py
+#: apps/catalog/product_pages.py apps/manager/forms.py
 msgid "By post"
 msgstr "Por correo"
 
@@ -2691,6 +2697,10 @@ msgstr "Borrador: este texto aún no ha sido revisado por un asesor jurídico y 
 msgid "Drafts"
 msgstr "Borradores"
 
+#: apps/catalog/product_pages.py
+msgid "Drop-off point"
+msgstr "Punto de entrega"
+
 #: apps/manager/site_map.py apps/seo/site_links.py
 msgid "DSA points of contact"
 msgstr "Puntos de contacto DSA"
@@ -3688,6 +3698,10 @@ msgstr ""
 "Cómo se revisan los eventos de esta tienda antes de publicarse: según la regla habitual, siempre, "
 "o nunca porque confía en la tienda. Obligatorio."
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "How to return"
+msgstr "Cómo devolver"
+
 #: apps/compliance/models.py
 msgid "How to use, assemble, maintain and dispose of the product safely, in this language."
 msgstr "Cómo usar, montar, mantener y desechar el producto de forma segura, en este idioma."
@@ -3815,6 +3829,10 @@ msgstr "En persona, en línea o ambos. Obligatorio salvo para una promoción, qu
 #: apps/catalog/templates/catalog/includes/stock_status.html
 msgid "In stock"
 msgstr "Disponible"
+
+#: apps/catalog/product_pages.py
+msgid "In store"
+msgstr "En tienda"
 
 #: apps/shipping/models.py
 msgid ""
@@ -6525,6 +6543,10 @@ msgstr "Información sobre el coste de la devolución"
 msgid "Return policy"
 msgstr "Política de devoluciones"
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "Return shipping"
+msgstr "Gastos de devolución"
+
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "Return shipping is paid by the customer."
 msgstr "El envío de la devolución lo paga el cliente."
@@ -6533,6 +6555,10 @@ msgstr "El envío de la devolución lo paga el cliente."
 msgid "Return shipping is paid by the seller."
 msgstr "El envío de la devolución lo paga el vendedor."
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "Return window"
+msgstr "Plazo de devolución"
+
 #: apps/manager/forms.py
 msgid "Return window in days"
 msgstr "Plazo de devolución en días"
@@ -6540,6 +6566,10 @@ msgstr "Plazo de devolución en días"
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "Return window: %(days)s days"
 msgstr "Plazo de devolución: %(days)s días"
+
+#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
+msgid "Returns"
+msgstr "Devoluciones"
 
 #: apps/vendors/services.py
 msgid "Returns and refunds"
@@ -6552,6 +6582,10 @@ msgstr "Política de devoluciones y reembolsos"
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "Returns go to: %(country)s"
 msgstr "Las devoluciones se envían a: %(country)s"
+
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "Returns page"
+msgstr "Página de devoluciones"
 
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the consumer bears the direct cost of returning the goods."
@@ -11623,6 +11657,10 @@ msgstr ""
 msgid "We have refunded %(refund)s EUR to the payment method you used."
 msgstr "Te hemos reembolsado %(refund)s EUR en el medio de pago que usaste."
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "We pay the return shipping"
+msgstr "Nosotros pagamos los gastos de devolución"
+
 #: apps/orders/templates/email/orders/order_received/subject.txt
 msgid "We received your order %(order_number)s"
 msgstr "Hemos recibido tu pedido %(order_number)s"
@@ -12583,6 +12621,10 @@ msgstr "También te puede gustar"
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 msgid "You pay nothing more, and there is nothing you need to do."
 msgstr "No pagas nada más y no tienes que hacer nada."
+
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "You pay the return shipping"
+msgstr "Usted paga los gastos de devolución"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid ""

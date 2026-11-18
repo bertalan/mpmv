@@ -1,0 +1,19 @@
+{% load i18n %}
+{% comment %}
+  The return terms of a product page (SEO.14): `return_terms` is the vendor's approved policy or
+  the default, the same values the JSON-LD states. Shared by both themes.
+{% endcomment %}
+<dl class="product-returns-terms">
+  <dt>{% translate "Return window" %}</dt>
+  <dd>{% blocktranslate count days=return_terms.days %}{{ days }} day from delivery{% plural %}{{ days }} days from delivery{% endblocktranslate %}</dd>
+  <dt>{% translate "Return shipping" %}</dt>
+  <dd>{% if return_terms.shop_pays %}{% translate "We pay the return shipping" %}{% else %}{% translate "You pay the return shipping" %}{% endif %}</dd>
+  {% if return_terms.methods %}
+    <dt>{% translate "How to return" %}</dt>
+    <dd>{{ return_terms.methods|join:", " }}</dd>
+  {% endif %}
+  {% if return_terms.link %}
+    <dt>{% translate "Returns page" %}</dt>
+    <dd><a href="{{ return_terms.link }}" rel="noopener">{{ return_terms.link }}</a></dd>
+  {% endif %}
+</dl>

@@ -102,6 +102,12 @@ msgstr "%(country)r n'est pas un pays où l'adresse peut se trouver."
 msgid "%(currency)s %(amount)s"
 msgstr "%(currency)s %(amount)s"
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "%(days)s day from delivery"
+msgid_plural "%(days)s days from delivery"
+msgstr[0] "%(days)s jour à compter de la livraison"
+msgstr[1] "%(days)s jours à compter de la livraison"
+
 #: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/present.py
 msgid "%(days)s working days"
 msgstr "%(days)s jours ouvrés"
@@ -1588,7 +1594,7 @@ msgstr "Par %(name)s"
 msgid "By <a href=\"%(url)s\">%(name)s</a>"
 msgstr "Par <a href=\"%(url)s\">%(name)s</a>"
 
-#: apps/manager/forms.py
+#: apps/catalog/product_pages.py apps/manager/forms.py
 msgid "By post"
 msgstr "Par courrier"
 
@@ -2718,6 +2724,10 @@ msgstr ""
 msgid "Drafts"
 msgstr "Brouillons"
 
+#: apps/catalog/product_pages.py
+msgid "Drop-off point"
+msgstr "Point de dépôt"
+
 #: apps/manager/site_map.py apps/seo/site_links.py
 msgid "DSA points of contact"
 msgstr "Points de contact DSA"
@@ -3725,6 +3735,10 @@ msgstr ""
 "Comment les événements de cette boutique sont vérifiés avant leur mise en ligne : selon la règle "
 "habituelle, toujours, ou jamais parce que vous faites confiance à la boutique. Obligatoire."
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "How to return"
+msgstr "Comment retourner"
+
 #: apps/compliance/models.py
 msgid "How to use, assemble, maintain and dispose of the product safely, in this language."
 msgstr ""
@@ -3857,6 +3871,10 @@ msgstr ""
 #: apps/catalog/templates/catalog/includes/stock_status.html
 msgid "In stock"
 msgstr "En stock"
+
+#: apps/catalog/product_pages.py
+msgid "In store"
+msgstr "En magasin"
 
 #: apps/shipping/models.py
 msgid ""
@@ -6577,6 +6595,10 @@ msgstr "Informations sur le coût du retour"
 msgid "Return policy"
 msgstr "Politique de retour"
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "Return shipping"
+msgstr "Frais de retour"
+
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "Return shipping is paid by the customer."
 msgstr "Les frais de retour sont à la charge du client."
@@ -6585,6 +6607,10 @@ msgstr "Les frais de retour sont à la charge du client."
 msgid "Return shipping is paid by the seller."
 msgstr "Les frais de retour sont à la charge du vendeur."
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "Return window"
+msgstr "Délai de retour"
+
 #: apps/manager/forms.py
 msgid "Return window in days"
 msgstr "Délai de retour en jours"
@@ -6592,6 +6618,10 @@ msgstr "Délai de retour en jours"
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "Return window: %(days)s days"
 msgstr "Délai de retour : %(days)s jours"
+
+#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
+msgid "Returns"
+msgstr "Retours"
 
 #: apps/vendors/services.py
 msgid "Returns and refunds"
@@ -6604,6 +6634,10 @@ msgstr "Politique de retour et de remboursement"
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "Returns go to: %(country)s"
 msgstr "Les retours sont envoyés à : %(country)s"
+
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "Returns page"
+msgstr "Page des retours"
 
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the consumer bears the direct cost of returning the goods."
@@ -11732,6 +11766,10 @@ msgstr ""
 msgid "We have refunded %(refund)s EUR to the payment method you used."
 msgstr "Nous t’avons remboursé %(refund)s EUR sur le moyen de paiement que tu as utilisé."
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "We pay the return shipping"
+msgstr "Nous prenons en charge les frais de retour"
+
 #: apps/orders/templates/email/orders/order_received/subject.txt
 msgid "We received your order %(order_number)s"
 msgstr "Nous avons bien reçu ta commande %(order_number)s"
@@ -12703,6 +12741,10 @@ msgstr "Tu aimeras aussi"
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 msgid "You pay nothing more, and there is nothing you need to do."
 msgstr "Tu ne paies rien de plus et tu n’as rien à faire."
+
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "You pay the return shipping"
+msgstr "Les frais de retour sont à votre charge"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid ""
