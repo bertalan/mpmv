@@ -1,5 +1,7 @@
 """CAT.11: the Catalog section of the Manager platform space."""
 
+from datetime import UTC, datetime
+
 import pytest
 from django.test import Client
 
@@ -15,6 +17,7 @@ from apps.catalog.tests.factories import (
 )
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
+from apps.core.tests.factories import PlatformOperatorFactory
 from apps.vendors.tests.factories import VendorFactory
 from tests.i18n import other_language
 
@@ -204,3 +207,51 @@ def test_staff_edit_audited_fields_with_dry_run_then_confirm(client: Client) -> 
     product.refresh_from_db()
     assert product.sales_mode == "catalog_only"
     assert AuditLog.objects.filter(action="catalog.product.updated").exists()
+
+
+def test_the_detail_edit_needs_the_session_level(client: Client) -> None:
+    """`catalogue_edit` is an everyday action by default; once the operator makes it sensitive,
+    a session with no passkey window is refused and nothing changes."""
+    PlatformOperatorFactory.create(
+        open_ended=True,
+        valid_from=datetime(2020, 1, 1, tzinfo=UTC),
+        session_policy={"actions": {"sensitive": ["catalogue_edit"]}},
+    )
+    product = ProductFactory.create(sales_mode="buy")
+    sign_in(client, "catalog", level=levels.NO_WINDOW)
+    data = {
+        "sales_mode": "catalog_only",
+        "fiscal_category": product.fiscal_category,
+        "confirm": "1",
+    }
+    assert client.post(detail(product), data).status_code == 403
+    product.refresh_from_db()
+    assert product.sales_mode == "buy"
+    assert not AuditLog.objects.filter(action="catalog.product.updated").exists()
+
+
+def test_the_owner_cannot_post_on_the_detail_page(client: Client) -> None:
+    product = ProductFactory.create(sales_mode="buy")
+    sign_in(client, "owner")
+    data = {
+        "sales_mode": "catalog_only",
+        "fiscal_category": product.fiscal_category,
+        "confirm": "1",
+    }
+    assert client.post(detail(product), data).status_code == 404
+    product.refresh_from_db()
+    assert product.sales_mode == "buy"
+
+
+def test_a_fiscal_category_change_is_audited_with_old_and_new_value(client: Client) -> None:
+    product = ProductFactory.create(fiscal_category="standard")
+    sign_in(client, "catalog")
+    data = {"sales_mode": product.sales_mode, "fiscal_category": "reduced", "confirm": "1"}
+    assert client.post(detail(product), data).status_code == 302
+    product.refresh_from_db()
+    assert product.fiscal_category == "reduced"
+    row = AuditLog.objects.get(action="catalog.product.updated")
+    assert row.before is not None
+    assert row.after is not None
+    assert row.before["fiscal_category"] == "standard"
+    assert row.after["fiscal_category"] == "reduced"

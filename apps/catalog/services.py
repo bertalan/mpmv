@@ -394,6 +394,7 @@ def set_products_status(
     One ChangeSet entry and one AuditLog row per product that really changes; products already
     in `status` are skipped. Publishing runs the publication checks (`publishing`) on each
     product: a ValidationError refuses the whole batch and nothing is written. Also on dry-run.
+    Retired is not a final state here: retired -> draft/published is allowed (spec 03 §3.2).
     """
     if status not in ProductStatus.values:
         raise ValueError(f"Unknown product status: {status!r}")
