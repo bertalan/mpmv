@@ -1,0 +1,90 @@
+{% extends "layouts/base.html" %}
+{% load i18n %}
+{% comment %}
+  Public search results page of `ride` (THM.17): the app template's structure (copied from
+  catalog/search.html, CAT.27: same blocks, parameters `s`, `in` and `page`, `robots`, prev/next
+  links, groups and ids) on Bootstrap 5.3. The page banner holds the only h1; the product
+  count follows the form; the search form is a Bootstrap input group; the products come first as the cards of
+  THM.7 with the filters in a column from 62rem; events, articles and vendors are list groups
+  with a "see all" link; the numbered pagination is Bootstrap's `.pagination`. No inline script
+  or style (the CSP has no 'unsafe-inline'): a plain GET form. Always `noindex, follow`.
+{% endcomment %}
+{% block title %}{% if query %}{% blocktranslate with query=query %}Search: {{ query }}{% endblocktranslate %}{% else %}{% translate "Search" %}{% endif %}{% if window.page > 1 %} · {% blocktranslate with page=window.page %}Page {{ page }}{% endblocktranslate %}{% endif %}{% if current_site.site_name %} · {{ current_site.site_name }}{% endif %}{% endblock %}
+{% block head %}{{ block.super }}
+  {% robots_meta robots %}
+  {% if previous_url %}<link rel="prev" href="{{ previous_url }}">{% endif %}
+  {% if next_url %}<link rel="next" href="{{ next_url }}">{% endif %}
+{% endblock %}
+{% block content %}
+  <div class="listing search-page">
+    {% translate "Search" as search_title %}
+    {% if searched and window and not only %}{% blocktranslate asvar count_text count counter=window.total %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktranslate %}{% endif %}
+    {% include "components/page_banner.html" with title=search_title only %}
+
+    <form class="search-form-page mb-4" role="search" action="{{ location }}" method="get">
+      <label class="form-label" for="search-page-input">{% translate "Search the shop" %}</label>
+      <div class="input-group">
+        <input class="form-control" type="search" name="s" id="search-page-input" value="{{ query|default:'' }}" autocomplete="off" enterkeyhint="search">
+        <button class="btn btn-primary" type="submit">{% translate "Search" %}</button>
+      </div>
+    </form>
+    {% if count_text %}<p class="listing-count text-body-secondary" role="status">{{ count_text }}</p>{% endif %}
+
+    {% if searched and not only %}
+      <div class="row g-4">
+        <div class="col-lg-3">{% include "catalog/includes/listing_filters.html" %}</div>
+        <section class="listing-results col-lg-9" aria-labelledby="search-products-heading">
+          <h2 id="search-products-heading">{% translate "Products" %}</h2>
+          {% if cards %}
+            <ul class="product-grid row row-cols-1 row-cols-sm-2 row-cols-xl-3 g-3 list-unstyled">
+              {% for card in cards %}<li class="col">{% include "catalog/includes/product_card.html" %}</li>{% endfor %}
+            </ul>
+          {% else %}
+            <p class="alert alert-secondary">{% translate "No products match your search." %}</p>
+          {% endif %}
+          {% if page_links %}
+            <nav class="mt-4" aria-label="{% translate 'Pagination' %}">
+              <ul class="pagination flex-wrap justify-content-center">
+                {% if previous_url %}<li class="page-item"><a class="page-link" href="{{ previous_url }}" rel="prev">{% translate "Previous" %}</a></li>{% endif %}
+                {% for link in page_links %}
+                  <li class="page-item{% if link.current %} active{% elif link.number is None %} disabled{% endif %}">{% if link.number is None %}<span class="page-link" aria-hidden="true">…</span>{% elif link.current %}<a class="page-link" href="{{ link.url }}" aria-current="page">{{ link.number }}</a>{% else %}<a class="page-link" href="{{ link.url }}">{{ link.number }}</a>{% endif %}</li>
+                {% endfor %}
+                {% if next_url %}<li class="page-item"><a class="page-link" href="{{ next_url }}" rel="next">{% translate "Next" %}</a></li>{% endif %}
+              </ul>
+            </nav>
+          {% endif %}
+        </section>
+      </div>
+    {% endif %}
+
+    {% for group in groups %}
+      <section class="search-group mt-5" aria-labelledby="search-group-{{ group.key }}">
+        <h2 id="search-group-{{ group.key }}">{{ group.title }}</h2>
+        <ul class="search-group-items list-group">
+          {% for item in group.items %}
+            <li class="list-group-item">
+              <a class="stretched-link" href="{{ item.url }}"{% if item.language %} lang="{{ item.language }}" hreflang="{{ item.language }}"{% endif %}>{{ item.title }}</a>
+              {% if item.summary %}<p class="mb-0 text-body-secondary">{{ item.summary }}</p>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        {% if group.see_all_url %}<p class="mt-2"><a class="btn btn-outline-secondary" href="{{ group.see_all_url }}">{% blocktranslate with title=group.title %}See all: {{ title }}{% endblocktranslate %}</a></p>{% endif %}
+      </section>
+    {% endfor %}
+
+    {% if only %}<p class="mt-4"><a class="btn btn-outline-secondary" href="{{ location }}?s={{ query|urlencode }}">{% translate "Back to all results" %}</a></p>{% endif %}
+
+    {% if searched and not cards and not groups %}
+      <section class="search-suggestions mt-4" aria-labelledby="search-suggestions-heading">
+        <h2 id="search-suggestions-heading">{% translate "Nothing found" %}</h2>
+        <p>{% translate "Check the spelling, try fewer words or a part of the product code." %}</p>
+        {% if suggestions %}
+          <p id="search-suggestions-categories">{% translate "Or browse a category:" %}</p>
+          <ul class="list-group" aria-labelledby="search-suggestions-categories">
+            {% for item in suggestions %}<li class="list-group-item"><a class="stretched-link" href="{{ item.url }}">{{ item.title }}</a></li>{% endfor %}
+          </ul>
+        {% endif %}
+      </section>
+    {% endif %}
+  </div>
+{% endblock %}
