@@ -135,3 +135,20 @@ def test_a_changed_wording_between_queueing_and_sending_does_not_change_the_mail
     core_services.deliver_email(row.public_id)
     out = sender.sent[-1]
     assert (out.subject, out.text_body, out.html_body) == stored
+
+
+def test_the_scrub_dry_run_reports_the_change_and_writes_nothing() -> None:
+    order = place(created=OLD)
+    row = queue_for(order)
+    before = OutboxEmail.objects.get(pk=row.pk)
+    changeset = core_services.scrub_order_emails(
+        order.public_id, recipient=engine.ANONYMISED_EMAIL, dry_run=True
+    )
+    assert not changeset.is_empty
+    after = OutboxEmail.objects.get(pk=row.pk)
+    assert (after.status, after.recipient, after.subject) == (
+        before.status,
+        before.recipient,
+        before.subject,
+    )
+    assert not OutboxEmailEvent.objects.filter(email=row, detail="order anonymised").exists()

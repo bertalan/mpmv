@@ -1002,13 +1002,15 @@ def deliver_email(email_id: str | uuid.UUID, *, dry_run: bool = False) -> Change
     return changeset
 
 
-def scrub_order_emails(order_ref: uuid.UUID | str, *, recipient: str) -> ChangeSet:
+def scrub_order_emails(
+    order_ref: uuid.UUID | str, *, recipient: str, dry_run: bool = False
+) -> ChangeSet:
     """Forget the personal content of the emails of one order (ORD.26, D-29): the recipient
     becomes `recipient` (a placeholder), the context and the stored subject and bodies are
     emptied, and an email still waiting is cancelled (`suppressed`, with a history entry). The
     template key, language, status and dates stay. Idempotent. The caller (the order's
     anonymisation) runs it in its transaction and audits the returned ChangeSet, which holds
-    no address and no content."""
+    no address and no content. With `dry_run` it reports the same ChangeSet and writes nothing."""
     changeset = ChangeSet()
     for row in OutboxEmail.objects.select_for_update().filter(order_ref=uuid.UUID(str(order_ref))):
         if (
@@ -1018,12 +1020,13 @@ def scrub_order_emails(order_ref: uuid.UUID | str, *, recipient: str) -> ChangeS
         ):
             continue
         flags = {"template_key": row.template_key, "language": row.language}
-        if row.status not in OutboxEmail.FINAL:
-            row.status, row.next_attempt_at = OutboxEmail.Status.SUPPRESSED, None
-            _email_event(row, row.status, "order anonymised")
-        row.recipient = recipient
-        row.context = row.subject = row.text_body = row.html_body = row.last_error = ""
-        row.save()
+        if not dry_run:
+            if row.status not in OutboxEmail.FINAL:
+                row.status, row.next_attempt_at = OutboxEmail.Status.SUPPRESSED, None
+                _email_event(row, row.status, "order anonymised")
+            row.recipient = recipient
+            row.context = row.subject = row.text_body = row.html_body = row.last_error = ""
+            row.save()
         changeset.update(
             EMAIL_MODEL,
             str(row.public_id),
