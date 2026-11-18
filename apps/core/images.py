@@ -107,16 +107,39 @@ def all_specs() -> list[str]:
     return sorted(specs)
 
 
-def render_all(image: Any) -> None:
-    """Make every rendition the pages can use for `image`: all presets, in the formats that can
-    be encoded here (an SVG: its resized operations), and `EXTRA_OPERATIONS`. Idempotent:
-    Wagtail reuses a rendition that exists."""
-    svg = bool(image.is_svg())
+#: The render job's groups in the order they are queued: the hero is the LCP image, so it comes
+#: first; the carousel and blog operations (`EXTRA_OPERATIONS`) come last. Each value lists
+#: preset names; "extras" is not a preset.
+RENDER_GROUPS: dict[str, tuple[str, ...]] = {
+    "hero": ("hero",),
+    "content": ("content", "gallery"),
+    "card": ("card",),
+    "logo": ("logo",),
+    "extras": (),
+}
+
+
+def group_specs(group: str, *, svg: bool = False) -> list[str]:
+    """The rendition specs of one render group (an SVG: its resized operations)."""
+    if group not in RENDER_GROUPS:
+        raise ValueError(f"unknown render group {group!r}")
     formats = picture_formats()
-    specs: set[str] = set(EXTRA_OPERATIONS)
-    for name in PRESETS:
+    specs: set[str] = set(EXTRA_OPERATIONS) if group == "extras" else set()
+    for name in RENDER_GROUPS[group]:
         specs.update(picture_specs(name, formats=formats, svg=svg))
-    image.get_renditions(*sorted(specs))
+    return sorted(specs)
+
+
+def render_group(image: Any, group: str) -> None:
+    """Make the renditions of one render group. Idempotent: Wagtail reuses a rendition that
+    exists."""
+    image.get_renditions(*group_specs(group, svg=bool(image.is_svg())))
+
+
+def render_all(image: Any) -> None:
+    """Make every rendition the pages can use for `image`: all groups, one after the other."""
+    for group in RENDER_GROUPS:
+        render_group(image, group)
 
 
 def rendition_or_original(image: Any, spec: str) -> tuple[str, int | None, int | None]:

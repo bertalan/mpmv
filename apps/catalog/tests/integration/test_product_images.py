@@ -69,7 +69,9 @@ def test_an_upload_returns_without_renditions_and_queues_the_job(licence: ImageL
     row = upload(product, licence)
     assert row.image.collection.name == vendor_collection_name(str(product.vendor.public_id))
     assert not MediaImageRendition.objects.filter(image=row.image).exists()
-    assert len(core_tasks.list_jobs("core.render_image", status="todo")) == 1
+    assert len(core_tasks.list_jobs("core.render_image", status="todo")) == len(
+        core_images.RENDER_GROUPS
+    )
     assert AuditLog.objects.filter(action="catalog.product_image.created").count() == 1
 
 
