@@ -93,6 +93,7 @@ SCOPES = (
 EXTRA_FILES = (
     "apps/vendors/services.py",
     "apps/cms/templatetags/cms_tags.py",  # the header's "Site links" item (OPS.12)
+    "apps/cms/slugs.py",  # the reserved-slug error of the page form (ARC.37)
 )
 # Single Python modules scanned in full: customer-facing messages of apps that are not in SCOPES.
 FILES = (

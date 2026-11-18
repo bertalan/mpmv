@@ -5,6 +5,10 @@ from django.urls import path
 from . import help_views
 
 urlpatterns = [
-    path("help/", help_views.customer_help, name="customer_help"),
-    path("help/<slug:section>/", help_views.customer_help_section, name="customer_help_section"),
+    path("help-centre/", help_views.customer_help, name="customer_help"),
+    path(
+        "help-centre/<slug:section>/",
+        help_views.customer_help_section,
+        name="customer_help_section",
+    ),
 ]

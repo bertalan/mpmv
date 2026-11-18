@@ -1,4 +1,4 @@
-"""ARC.37: the footer help link of both themes opens the customer help centre (`/help/`)."""
+"""ARC.37: the footer help link of both themes opens the customer help centre (`/help-centre/`)."""
 
 import pytest
 from django.template.loader import render_to_string
@@ -14,11 +14,11 @@ def test_the_footer_of_both_themes_links_the_help_centre(settings: object) -> No
     settings.MPMV_HELP_URL = ""  # type: ignore[attr-defined]
     request = RequestFactory().get("/")
     ctx = theme_context(request)
-    assert ctx["help_url"] == "/help/"
+    assert ctx["help_url"] == "/help-centre/"
     for slug in ("base", "ride"):
         with use_theme(slug):
             html = render_to_string("components/footer.html", {"site_name": "X", **ctx})
-        assert '<a class="help-link" href="/help/">' in html, slug
+        assert '<a class="help-link" href="/help-centre/">' in html, slug
 
 
 def test_a_configured_help_address_wins(settings: object) -> None:

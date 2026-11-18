@@ -132,7 +132,7 @@ def test_without_a_help_url_the_help_link_opens_the_customer_help(
 ) -> None:
     settings.MPMV_HELP_URL = ""
     html, _ = render(client, "/")
-    assert '<a class="help-link" href="/help/">' in html
+    assert '<a class="help-link" href="/help-centre/">' in html
 
 
 def test_htmx_is_configured_for_the_strict_csp(rendered_page: tuple[str, list[str]]) -> None:

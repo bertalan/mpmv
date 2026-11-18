@@ -830,3 +830,14 @@ def guide_key_valid(key: object) -> bool:
         return False
     audience, _sep, section = key.partition(":")
     return section in GUIDE_SECTIONS.get(audience, ())
+
+
+# Slugs a CMS page directly under a language home cannot use: the route of an app is matched
+# before the Wagtail catch-all, so such a page would never be reached (ARC.37 `help-centre`).
+RESERVED_ROOT_SLUGS: frozenset[str] = frozenset({"help-centre"})
+
+
+def is_reserved_root_slug(slug: object, parent_depth: int | None) -> bool:
+    """True when a page with `slug` under a parent at `parent_depth` would be shadowed by a
+    route. Language homes sit at depth 2 of the tree, so their children are the root level."""
+    return parent_depth == 2 and isinstance(slug, str) and slug in RESERVED_ROOT_SLUGS

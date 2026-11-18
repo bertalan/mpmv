@@ -210,7 +210,7 @@ def test_a_fallback_page_is_canonical_to_the_primary_page(settings: SettingsWrap
     html = Client().get(url).content.decode()
     canonical = re.search(r'<link rel="canonical" href="([^"]+)"', html)
     assert canonical
-    assert canonical.group(1).endswith("/help/payment/")
+    assert canonical.group(1).endswith("/help-centre/payment/")
     assert f'hreflang="{other}"' not in html
 
 

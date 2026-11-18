@@ -20,7 +20,9 @@ def _synced(live_server: LiveServer, _cms_site: None) -> None:
 
 @pytest.mark.parametrize("theme", ["base", "ride"])
 @pytest.mark.parametrize("width", [360, 768, 1280])
-@pytest.mark.parametrize("path", ["/help/", "/help/withdrawal/", "/it/help/shipping/"])
+@pytest.mark.parametrize(
+    "path", ["/help-centre/", "/help-centre/withdrawal/", "/it/help-centre/shipping/"]
+)
 def test_the_help_pages_pass_the_gates(
     theme: str,
     width: int,
@@ -44,4 +46,4 @@ def test_the_help_pages_pass_the_gates(
     assert violations == [], format_violations(violations)
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
     link = page.locator("footer .help-link")
-    expect(link).to_have_attribute("href", path.split("help")[0] + "help/")
+    expect(link).to_have_attribute("href", path.split("help-centre")[0] + "help-centre/")

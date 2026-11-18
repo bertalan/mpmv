@@ -8513,6 +8513,12 @@ msgstr "Il sito a cui si applica questo tema. Ogni sito ha un solo tema."
 msgid "The slide's title, up to 120 characters. Required."
 msgstr "Il titolo della slide, fino a 120 caratteri. Obbligatorio."
 
+#: apps/cms/slugs.py
+msgid ""
+"The slug '%(slug)s' is reserved for the site's help pages and cannot be used for a page directly "
+"under the home page. Choose another slug."
+msgstr "Lo slug '%(slug)s' è riservato alle pagine di aiuto del sito e non può essere usato per una pagina direttamente sotto la home page. Scegli un altro slug."
+
 #: apps/shipping/models.py
 msgid "The special area this treatment is for. A method has one treatment per area."
 msgstr ""

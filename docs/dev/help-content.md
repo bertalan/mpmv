@@ -57,10 +57,11 @@ win, idempotent, dry-run aware, read-only in the admin). The pages are read-only
 rows (`apps/cms/help_guide.py`, `apps/cms/guide_urls.py`), served from the repository files and
 not from the Wagtail page tree, so there is nothing to edit or publish in the admin:
 
-- the customer help is `/help/` (index) and `/help/<section>/`, with the language prefix of the
-  site (`/it/help/shipping/`), public and cached for five minutes;
+- the customer help is `/help-centre/` (index) and `/help-centre/<section>/`, with the language prefix of the
+  site (`/it/help-centre/shipping/`), public and cached for five minutes;
+- the slug `help-centre` is reserved (`engine.RESERVED_ROOT_SLUGS`, enforced by `apps/cms/slugs.py`): no CMS page directly under a language home can use it, as the guide route is matched before the CMS catch-all; check `cms.E004` flags an existing page that does;
 - the sections, in order, are ordering, payment, shipping, changes, withdrawal, account;
-- the footer and header "Help" link (both themes) opens `/help/` unless `MPMV_HELP_URL` is set;
+- the footer and header "Help" link (both themes) opens `/help-centre/` unless `MPMV_HELP_URL` is set;
 - `ROUTE_GUIDE` in `apps/cms/engine.py` maps a screen to its guide page: its dialog then shows "More help" (a test checks every key is a real section and route file);
 - a new audience (the vendor guide) adds its sections to `GUIDE_SECTIONS`, its files under
   `guide/`, and its URL and template next to `customer_help*`; nothing else in sync changes.
