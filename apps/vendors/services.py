@@ -2055,6 +2055,34 @@ def submit_claim_as_account(link: ActionLinkCheck, user: User, *, ctx: AuditCont
     return claim
 
 
+VENDOR_APPROVAL_SECTION = "platform.vendor_approval"
+
+
+def may_approve_claims(user: AbstractBaseUser | AnonymousUser) -> bool:
+    """Whether `user` holds the matrix cell "approve or suspend a vendor" (CORE.18).
+
+    The check lives in the Manager app, above this one in the dependency graph, so it is reached
+    through `settings.PLATFORM_SECTION_CHECK`."""
+    check = import_string(settings.PLATFORM_SECTION_CHECK)
+    return bool(check(user, VENDOR_APPROVAL_SECTION, write=True))
+
+
+def _require_approval_permission(ctx: AuditContext) -> None:
+    """A context that names a user (an adapter acting for staff) needs the approval section.
+    Contexts without a user (system, management commands) are internal and not checked here."""
+    if ctx.actor_id is None:
+        return
+    actor = User.objects.filter(pk=ctx.actor_id).first()
+    if actor is None or not may_approve_claims(actor):
+        raise PermissionDenied(APPROVAL_DENIED)
+
+
+APPROVAL_DENIED = (
+    "Granting the owner role needs the vendor approval permission "
+    "(Catalog and moderation, or the platform owner)."
+)
+
+
 def _decide(
     claim: VendorClaim,
     status: str,
@@ -2067,6 +2095,8 @@ def _decide(
 ) -> ChangeSet:
     version = claim.version if reviewed_version is None else reviewed_version
     claimant_id = claim.claimant_id if reviewed_claimant_id is None else reviewed_claimant_id
+    if status == VendorClaim.Status.APPROVED:
+        _require_approval_permission(ctx)
     with transaction.atomic():
         locked = (
             VendorClaim.objects.select_for_update(of=("self",))
@@ -2130,6 +2160,9 @@ def approve_claim(
     may change its legal identity, tax profile and payout data. Raises `engine.ClaimError`
     when no claim waits for approval, the vendor meanwhile got an account holder, or the
     claimant's email is no longer the legal email of record (or the account is inactive).
+
+    Raises `PermissionDenied` when `ctx` names a user without the vendor approval section
+    (CORE.18); nothing is granted or audited.
 
     The decision is bound to the claim staff reviewed: `reviewed_version` and
     `reviewed_claimant_id` (by default those of `claim` as loaded) must still match under the
