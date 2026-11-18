@@ -96,7 +96,7 @@
     margin: 0;
   }
 
-  @media (max-width: 36rem) {
+  @media (max-width: 40rem) {
     .product-specs {
       grid-template-columns: 1fr;
       gap: 0;
