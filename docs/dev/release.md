@@ -30,9 +30,12 @@ Before every coherence check, the lane running it first clears the **backlog of 
 - ready-to-merge PRs the train keeps skipping;
 - tracker follow-ups with no owner;
 - unanswered asks on the Lane board;
-- owner questions not yet asked.
+- owner questions not yet asked. By day they go to the owner. At night (and whenever the owner
+  is away) nobody asks: the question goes to the owner-question register, the slice that needs
+  it is parked, and the work moves on to the next item, so a morning answer never stalls the
+  night.
 
-Each one is fixed, assigned or asked about before the check starts.
+Each one is fixed, assigned, asked about or parked before the check starts.
 
 Every coherence check also includes a **stale-items sweep** (owner rule 2026-11-18). Each item
 is either fixed in the same PR or listed with a follow-up:
