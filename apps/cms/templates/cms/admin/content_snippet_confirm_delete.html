@@ -1,0 +1,17 @@
+{% extends "wagtailadmin/generic/confirm_delete.html" %}
+{% load i18n %}
+
+{% block usage_summary %}
+    {{ block.super }}
+    {% if usage_count %}
+        <div class="help-block help-warning" role="alert">
+            <p>
+                {% blocktrans trimmed count counter=usage_count %}
+                    Warning: this snippet is still used by {{ counter }} page. If you delete it, that page will stop showing this text.
+                {% plural %}
+                    Warning: this snippet is still used by {{ counter }} pages. If you delete it, those pages will stop showing this text.
+                {% endblocktrans %}
+            </p>
+        </div>
+    {% endif %}
+{% endblock %}

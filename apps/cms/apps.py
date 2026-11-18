@@ -86,6 +86,7 @@ class CmsConfig(AppConfig):
         from .checks import (
             check_base_url,
             check_reserved_root_slugs,
+            check_snippet_workflow,
             check_vendor_guide_url,
             check_video_embed_origins,
         )
@@ -96,6 +97,7 @@ class CmsConfig(AppConfig):
         checks.register(check_vendor_guide_url)
         checks.register(check_video_embed_origins)
         checks.register(check_reserved_root_slugs, checks.Tags.database)
+        checks.register(check_snippet_workflow, checks.Tags.database)
         from . import slugs
 
         slugs.install()  # no root-level page called like a route (ARC.37)
