@@ -344,3 +344,15 @@ def test_a_tampered_or_superseded_link_gives_no_pdf() -> None:
     assert client.get(reverse("vendor_terms:pdf", args=[token + "x"])).status_code == 404
     ts.publish_sales_terms(vendor, values(body="New text"), actor=owner_of(vendor), ctx=CTX)
     assert client.get(reverse("vendor_terms:pdf", args=[token])).status_code == 404
+
+
+def test_the_pdf_of_an_old_version_still_downloads_through_the_accepted_terms_link() -> None:
+    vendor, old, _ = _published("Old text")
+    old_link = ts.accepted_terms_url(old)
+    ts.publish_sales_terms(vendor, values(body="New text"), actor=owner_of(vendor), ctx=CTX)
+    assert current(vendor).pk != old.pk
+    response = Client().get(ts.accepted_terms_pdf_url(old))
+    assert response.status_code == 200
+    assert response.content.startswith(b"%PDF")
+    assert f"-v{old.number}.pdf" in response["Content-Disposition"]
+    assert ts.accepted_terms_pdf_url(old).startswith(old_link.rstrip("/") + "/pdf")

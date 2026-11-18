@@ -17,7 +17,6 @@ from pathlib import Path
 import pytest
 
 from apps.core import pdf, pdf_render
-from apps.orders import documents
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -183,7 +182,7 @@ def _python_files() -> list[Path]:
 
 
 def test_weasyprint_is_only_called_through_the_fetcher() -> None:
-    """The fetcher is the only way the renderer is called: no code outside `documents.py`
+    """The fetcher is the only way the renderer is called: no code outside `pdf.py`
     imports WeasyPrint, and its one `HTML(...)` call passes `url_fetcher=`."""
     importers = []
     for path in _python_files():
@@ -250,7 +249,7 @@ def test_output_over_the_size_cap_is_refused(monkeypatch: pytest.MonkeyPatch) ->
     from apps.core.services import AttachmentUnavailable
 
     monkeypatch.setattr(
-        documents,
+        pdf,
         "_renderer_command",
         lambda: _child("import sys; sys.stdout.buffer.write(b'%PDF' + b'x' * 5000)"),
     )

@@ -5,8 +5,9 @@ A publish never edits a stored version: it adds the next one and moves the point
 signed, expiring, multi-use link, and every read is logged; a superseded version is not public
 (it stays readable through an order snapshot once ORD.17 stores one).
 
-Deferred to the rows that own them: the VEN.32 private document store (PDF of a version), the
-ORD.17 checkout snapshot, the VEN.35 settings per shipping class (SHP.4).
+Deferred to the row that owns it: the ORD.17 checkout snapshot. The PDF of a version is VEN.36
+(`terms_views.download`, the same signed links); the per shipping class flag lives in
+`apps.shipping.services.methods_missing_return_estimate`.
 """
 
 from collections.abc import Mapping
@@ -161,6 +162,12 @@ def accepted_terms_url(version: SalesTermsVersion) -> str:
     """The link to the exact version a buyer accepted, readable also once it is superseded."""
     token = signing.dumps(str(version.public_id), salt=ARCHIVE_SALT)
     return reverse("vendor_terms:read", args=[token])
+
+
+def accepted_terms_pdf_url(version: SalesTermsVersion) -> str:
+    """The PDF of the exact version a buyer accepted, also once it is superseded (VEN.36)."""
+    token = signing.dumps(str(version.public_id), salt=ARCHIVE_SALT)
+    return reverse("vendor_terms:pdf", args=[token])
 
 
 def _candidate(token: str) -> tuple[SalesTermsVersion | None, bool]:
