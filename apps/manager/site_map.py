@@ -77,6 +77,7 @@ PLATFORM_PAGES: Final[Pages] = (
     (gettext_noop("Fitment categories"), "manager:platform:fitment_categories"),
     (gettext_noop("Fitment nodes"), "manager:platform:fitment_nodes"),
     (gettext_noop("Proposed nodes"), "manager:platform:fitment_proposals"),
+    (gettext_noop("Products"), "manager:platform:catalog_products"),
     (gettext_noop("Order changes"), "manager:platform:orders"),
     (gettext_noop("Order change settings"), "manager:platform:amendment_settings"),
 )
@@ -125,6 +126,7 @@ NOT_LISTED: Final = frozenset(
         "manager:platform:notice",
         "manager:platform:termination",
         "manager:platform:user_sessions_find",
+        "manager:platform:catalog_product",
         "manager:platform:fitment_node_new",
         "manager:platform:fitment_node",
         "manager:platform:fitment_node_merge",
