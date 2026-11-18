@@ -10817,10 +10817,10 @@ msgstr ""
 "eigenen MwSt.-Regeln."
 
 #: apps/ingest/models.py
-msgid "What kind of term this is: category, taxonomy term, colour, material, brand or other."
-msgstr ""
-"Um welche Art von Begriff es sich handelt: Kategorie, Taxonomiebegriff, Farbe, Material, Marke "
-"oder anderes."
+msgid ""
+"What kind of term this is: category, taxonomy term, colour, material, brand, product type, country"
+" or other."
+msgstr "Um welche Art von Begriff es sich handelt: Kategorie, Taxonomiebegriff, Farbe, Material, Marke, Produkttyp, Land oder Sonstiges."
 
 #: apps/shipping/models.py
 msgid "What pickup costs, without VAT. Use 0 for free pickup."

@@ -10665,8 +10665,10 @@ msgid "What kind of area it is: an island, a remote area or a territory with its
 msgstr "Qué tipo de área es: una isla, una zona remota o un territorio con normas de IVA propias."
 
 #: apps/ingest/models.py
-msgid "What kind of term this is: category, taxonomy term, colour, material, brand or other."
-msgstr "Qué tipo de término es: categoría, término de taxonomía, color, material, marca u otro."
+msgid ""
+"What kind of term this is: category, taxonomy term, colour, material, brand, product type, country"
+" or other."
+msgstr "Qué tipo de término es: categoría, término de taxonomía, color, material, marca, tipo de producto, país u otro."
 
 #: apps/shipping/models.py
 msgid "What pickup costs, without VAT. Use 0 for free pickup."
