@@ -81,6 +81,9 @@ SCOPES = (
     # Temporary staff "Site links" page (OPS.12); remove before LIVE.
     "apps/seo/site_links.py",
     "apps/seo/templates/seo/site_links.html",
+    # The customer privacy page (I18N.13 follow-up): informal register, "Your data" has its own context.
+    "apps/compliance/templates/compliance/privacy_account.html",
+    "themes/ride/templates/compliance/privacy_account.html",
     *EVENT_FILES,  # the public event pages (EVT.6)
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
