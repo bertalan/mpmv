@@ -107,7 +107,7 @@ class SourceStateFactory(DjangoModelFactory[SourceState]):
     source = factory.SelfAttribute("item.source")
     kind = SourceState.Kind.SIMPLE
     native_id = factory.Sequence(lambda n: n + 1)
-    state = factory.LazyFunction(dict)
+    state = factory.LazyAttribute(lambda o: {"kind": o.kind})
     version = 1
     observed_at = factory.LazyFunction(timezone.now)
 
@@ -118,7 +118,7 @@ class SourceStateVersionFactory(DjangoModelFactory[SourceStateVersion]):
 
     item = factory.SubFactory(SourceItemFactory)
     version = 1
-    state = factory.LazyFunction(dict)
+    state = factory.LazyAttribute(lambda o: {"version": o.version})
     observed_at = factory.LazyFunction(timezone.now)
 
 
@@ -129,7 +129,7 @@ class SourceVariationFactory(DjangoModelFactory[SourceVariation]):
     item = factory.SubFactory(SourceItemFactory)
     source = factory.SelfAttribute("item.source")
     native_id = factory.Sequence(lambda n: n + 1)
-    state = factory.LazyFunction(dict)
+    state = factory.LazyAttribute(lambda o: {"native_id": o.native_id})
     present = True
     observed_at = factory.LazyFunction(timezone.now)
     last_seen_at = factory.LazyFunction(timezone.now)

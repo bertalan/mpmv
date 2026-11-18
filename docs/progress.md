@@ -251,6 +251,15 @@ part of the done-when still open) · `not started`.
 | ORD.22 | partial: staff tools (#577) | #577 | Platform space "Order changes" for Support and the platform owner only (service check, other roles refused): carrier at the same or a lower price, address on the customer's request, cancelling a package with a full refund whose cause (vendor fault, customer request, platform error) decides the refund fee (`customer_requested_cancellation` or the L-10 flag) and the restock; mandatory note and `order_amend_cancel` passkey. 3b-1: the vendor's email for every staff change and staff cancellation (subject "platform support changed order"), and on the "Order changes" page the package cancellations of the last 90 days per shop and cause, the shop's own "the customer asked" (no refund fee) first and marked. The per-vendor price-increase metric waits for ORD.21 |
 | TAX.12 | partial: cards, tiles, product page, variants, cart, checkout and shipping options; JSON-LD `offers` (SEO.1), a business opt-in toggle and a geolocation header are open | #565 | Consumer prices include VAT: `apps/tax/prices.py` (`consumer_price`, `gross_amount`), the vendor's real rate at the delivery or estimated country (OSS vendor: destination; domestic-only: own country; exempt: none), the owner's note under every consumer price, `consumer_prices` tag so the catalog never imports tax (new import contract), checkout summaries "VAT included", `book_art74` alias fix. Tax code, needs human review |
 | CORE.32, CORE.33 | spec only | #556 | Customer sign-up and password reset pages (CORE.32 names the privacy notice, the customer terms and a separate marketing consent). No code |
+| CAT.23 | done | #714 | Variant identifiers (GTIN with check digit, MPN) and variant cover image |
+| CMS.15 | done | #719 | Download block: file type and size, documents served through Wagtail's serve view as attachments with `nosniff`, collection privacy kept |
+| CMS.16 | done | #724 | Accordion block on native `details` and `summary` |
+| CMS.17 | done | #708 | Footer columns and social profiles edited in the CMS, footer fragment cache |
+| EVT.15 | done | #702 | Public event maps on the EVT.14 tile proxy (regression cases 21 to 23) |
+| I18N.6 | done | #563 | hreflang, canonical and per-language sitemaps without fallback copies |
+| SEO.1 | done | #561 | Product structured data, breadcrumb, return and shipping nodes, canonical; the offer is the TAX.12 consumer price |
+| SEO.2 | done | #575 | Per-type sitemaps and generated `llms.txt` |
+| THM.10 | done | #722 | Visual regression baselines for `base` and `ride`, browser clock frozen |
 | TRU.1 to TRU.13 | spec only | #457 | Owner and counsel answers to Q-T1 to Q-T13 recorded in spec 16 and D-37 (no rating badge on cards, "Business purchase" label, labelled machine translation). No code |
 | VEN.34, CMP.2, CMP.5, CMP.34, ARC.35 | spec only | #508 | D-46 (tax adviser answers, owner decisions of 2026-11-15): platform regime and fee VAT, statement content and wordings, vendor clauses (j) and (k), RF19 thresholds (CMP.34), takeover runbook (ARC.35); VEN.34 moves to P1. No code. Tax and legal wording needs counsel (CMP.24) |
 | VEN.39, CORE.31 | spec only | #505 | Owner decisions of 2026-11-15: audit of every vendor text (Q-36), D-44 API keys of inactive vendors pinned with regression tests (Q-53); I18N.4 moves to P2. No code |
@@ -1179,6 +1188,12 @@ Compliance, security and content:
 | #691 | SEO.15 | Seller name is never a natural person |
 | #700 | CAT.22 | Product physical and origin data (`catalog/0017`) |
 | #704 | CAT.24 | Image rendition monitoring: staff view, retry, alert |
+| #702 | EVT.15 | Public event maps on the tile proxy |
+| #708 | CMS.17 | Footer columns and social profiles in the CMS |
+| #714 | CAT.23 | Variant identifiers and cover image |
+| #719 | CMS.15 | Download block |
+| #722 | THM.10 | Visual regression baselines |
+| #724 | CMS.16 | Accordion block |
 | (this PR) | none | Coherence check 41 |
 
 ## Coherence checks

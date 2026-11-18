@@ -89,8 +89,10 @@ class VendorOrderInput:
     vendor: Vendor
     lines: Sequence[LineInput]
     shipping_net: Decimal = Decimal("0.00")
-    shipping_tax_rate: Decimal = Decimal("0")
-    shipping_tax_reason: str = ""
+    # None (with `shipping_tax_reason` None) = the shipping is split across rates (ORD.29): the
+    # portions in `shipping_choice["tax_portions"]` are then checked and summed.
+    shipping_tax_rate: Decimal | None = Decimal("0")
+    shipping_tax_reason: str | None = ""
     shipping_vat_nature_code: str = ""
     state: str = "pending"  # anything else only for a legacy order (MIG.4)
     shipping_choice: dict[str, Any] = field(default_factory=dict)
@@ -170,7 +172,7 @@ def _order_snapshot(order: Order) -> dict[str, Any]:
 
 
 def _vendor_order_snapshot(sub: VendorOrder) -> dict[str, Any]:
-    return {
+    snapshot: dict[str, Any] = {
         VENDOR_FIELD: str(sub.vendor.public_id),
         "order": sub.order.number,
         "state": sub.state,
@@ -185,6 +187,12 @@ def _vendor_order_snapshot(sub: VendorOrder) -> dict[str, Any]:
         "shipped_at": sub.shipped_at,
         "delivered_at": sub.delivered_at,
     }
+    if sub.shipping_tax_rate is None:  # ORD.29: split across rates, the audit keeps the portions
+        snapshot["shipping_tax_portions"] = [
+            {"net": net, "rate": rate, "tax": tax}
+            for net, rate, tax in engine.stored_shipping_portions(sub.shipping_choice)
+        ]
+    return snapshot
 
 
 def _line_snapshot(line: OrderLine) -> dict[str, Any]:
@@ -243,7 +251,13 @@ def _build_vendor_order(
             raise ValueError("the unit price must be above zero")
         if entry.unit_price_net != entry.unit_price_net.quantize(CENT):
             raise ValueError("the unit price must be in cents")
-    shipping_tax = engine.shipping_tax(item.shipping_net, item.shipping_tax_rate)
+    if item.shipping_tax_rate is None:
+        # ORD.29: split across rates, the shipping VAT is the sum of the checked portions.
+        shipping_tax = engine.check_shipping_portions(
+            item.shipping_net, engine.stored_shipping_portions(item.shipping_choice)
+        )
+    else:
+        shipping_tax = engine.shipping_tax(item.shipping_net, item.shipping_tax_rate)
     amounts = [
         engine.line_amounts(
             entry.unit_price_net, entry.quantity, entry.discount_net, entry.tax_rate
@@ -260,7 +274,7 @@ def _build_vendor_order(
         gross_total=sub_totals.grand_total,
         shipping_tax_rate=item.shipping_tax_rate,
         shipping_tax_amount=shipping_tax,
-        shipping_tax_reason=item.shipping_tax_reason,
+        shipping_tax_reason=None if item.shipping_tax_rate is None else item.shipping_tax_reason,
         shipping_vat_nature_code=item.shipping_vat_nature_code,
         state=item.state,
         vendor_snapshot=_vendor_identity(item.vendor),
@@ -887,8 +901,21 @@ class PlaceLine:
     discount_net: Decimal = Decimal("0.00")
 
 
+class ShippingPortion(TaxOutcome, Protocol):
+    """One part of the shipping under one goods decision (`apps.tax.engine.TaxPortion`)."""
+
+    @property
+    def net(self) -> Decimal: ...
+    @property
+    def tax(self) -> Decimal: ...
+
+
 @dataclass(frozen=True)
 class PlaceVendor:
+    """`shipping_portions` is what `resolve_shipping_tax` returned (shipping follows the goods,
+    TAX.17); with more than one, the order keeps them and no single rate (ORD.29). A single
+    decision may come as `shipping_tax` alone."""
+
     vendor: Vendor
     lines: Sequence[PlaceLine]
     shipping_net: Decimal = Decimal("0.00")
@@ -896,9 +923,10 @@ class PlaceVendor:
     shipping_choice: dict[str, Any] = field(default_factory=dict)
     commission_snapshot: dict[str, Any] = field(default_factory=dict)
     tax_profile_snapshot: dict[str, Any] = field(default_factory=dict)
+    shipping_portions: Sequence[ShippingPortion] = ()
 
     def __post_init__(self) -> None:
-        if self.shipping_net > 0 and self.shipping_tax is None:
+        if self.shipping_net > 0 and self.shipping_tax is None and not self.shipping_portions:
             raise ValueError("shipping needs a tax decision (shipping_tax)")
 
 
@@ -1134,12 +1162,7 @@ def place_order(
                     _line_input(entry, products[entry.product.pk], variants) for entry in item.lines
                 ],
                 shipping_net=item.shipping_net,
-                shipping_tax_rate=item.shipping_tax.rate if item.shipping_tax else Decimal("0"),
-                shipping_tax_reason=_reason(item.shipping_tax),
-                shipping_vat_nature_code=(item.shipping_tax.nature_code or "")
-                if item.shipping_tax
-                else "",
-                shipping_choice=item.shipping_choice,
+                **_shipping_tax_fields(item),
                 commission_snapshot=item.commission_snapshot,
                 tax_profile_snapshot=item.tax_profile_snapshot,
             )
@@ -1424,6 +1447,42 @@ def unit_weight(product: Product, variant: Variant | None) -> Decimal | None:
     if variant is not None and variant.weight_kg_override is not None:
         return variant.weight_kg_override
     return product.weight_kg
+
+
+def _portion_json(portion: ShippingPortion) -> dict[str, Any]:
+    return {
+        "net": str(portion.net),
+        "tax": str(portion.tax),
+        "rate": str(portion.rate),
+        "reason": _reason(portion),
+        "nature_code": portion.nature_code or "",
+        "legal_note_key": portion.legal_note_key or "",
+    }
+
+
+def _shipping_tax_fields(item: PlaceVendor) -> dict[str, Any]:
+    """The shipping VAT fields of the vendor order from the checkout's tax outcome.
+
+    The portions go with the shipping choice (the source v1 reads). More than one portion means
+    the shipping is split across rates (ORD.29): no single rate, reason or nature code is
+    stored, and `create_order` checks and sums the portions."""
+    choice = dict(item.shipping_choice)
+    if item.shipping_portions:
+        choice["tax_portions"] = [_portion_json(p) for p in item.shipping_portions]
+    if len(item.shipping_portions) > 1:
+        return {
+            "shipping_tax_rate": None,
+            "shipping_tax_reason": None,
+            "shipping_vat_nature_code": "",
+            "shipping_choice": choice,
+        }
+    tax = item.shipping_portions[0] if item.shipping_portions else item.shipping_tax
+    return {
+        "shipping_tax_rate": tax.rate if tax else Decimal("0"),
+        "shipping_tax_reason": _reason(tax),
+        "shipping_vat_nature_code": (tax.nature_code or "") if tax else "",
+        "shipping_choice": choice,
+    }
 
 
 def _reason(tax: TaxOutcome | None) -> str:

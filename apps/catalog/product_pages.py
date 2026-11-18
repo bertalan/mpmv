@@ -9,7 +9,7 @@ the other sellers of the same product are CAT.15 (`related`).
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
@@ -25,7 +25,7 @@ from apps.vendors import services as vendors
 from apps.vendors.models import Vendor
 
 from . import engine, services, slugs
-from .models import Product, ProductStatus, ProductTranslation, SalesMode
+from .models import Product, ProductImage, ProductStatus, ProductTranslation, SalesMode
 
 
 @dataclass(frozen=True)
@@ -50,6 +50,16 @@ class GalleryImage:
 
 
 @dataclass(frozen=True)
+class VariantGallery:
+    """The gallery shown when a variant is selected (CAT.26): its own images first, then the
+    product's. Only a variant with images of its own (in the page language) has one."""
+
+    sku: str
+    label: str
+    images: list[GalleryImage]
+
+
+@dataclass(frozen=True)
 class ProductPage:
     product: Product
     vendor: Vendor
@@ -67,10 +77,11 @@ class ProductPage:
     variants: list[VariantChoice]
     companion: "services.ProductCard | None"
     gallery: list[GalleryImage]
+    variant_galleries: list[VariantGallery] = field(default_factory=list)
 
     @property
-    def has_variant_images(self) -> bool:
-        return any(variant.image is not None for variant in self.variants)
+    def gallery_skus(self) -> set[str]:
+        return {entry.sku for entry in self.variant_galleries}
 
     @property
     def is_fallback(self) -> bool:
@@ -97,33 +108,72 @@ def _paths(product: Product) -> dict[str, str]:
     }
 
 
+def _gallery_image(row: ProductImage, language: str, fallback: str) -> GalleryImage:
+    text = translations.resolve(row.translations.all(), language).translation
+    return GalleryImage(
+        image=row.image,
+        alt=(text.alt_text if text is not None else "") or fallback,
+        caption=text.caption if text is not None else "",
+        is_cover=row.is_cover,
+    )
+
+
+def _product_title(product: Product, language: str) -> str:
+    # An image with no alt text of its own is described by the product title (D-18 fallback to
+    # the source language comes first, in `resolve`): a content image never has an empty alt.
+    named = translations.resolve(product.translations.all(), language).translation
+    return named.title if named is not None and named.title else str(product.sku)
+
+
+def _image_rows(product: Product) -> list[ProductImage]:
+    """Every image row of the product, its variants' included, in two queries (never the
+    prefetch cache: an image edited since is shown at once)."""
+    return list(product.images.select_related("image").prefetch_related("translations"))
+
+
 def gallery(product: Product, language: str) -> list[GalleryImage]:
     """The product's images shown in `language` (D-18: a language with dedicated images shows
     only those, the others the neutral ones), the cover first, with alt text and caption in
     `language`, or in the source language when it has no published text."""
-    rows = list(
-        product.images.filter(variant__isnull=True)
-        .select_related("image")
-        .prefetch_related("translations")
-    )
-    # An image with no alt text of its own is described by the product title (D-18 fallback to
-    # the source language comes first, in `resolve`): a content image never has an empty alt.
-    named = translations.resolve(product.translations.all(), language).translation
-    fallback = named.title if named is not None and named.title else str(product.sku)
+    rows = [row for row in _image_rows(product) if row.variant_id is None]
+    fallback = _product_title(product, language)
     selected = engine.gallery_selection(rows, language)
     core_images.prefetch_renditions(row.image for row in selected)
-    shown = []
-    for row in selected:
-        text = translations.resolve(row.translations.all(), language).translation
-        shown.append(
-            GalleryImage(
-                image=row.image,
-                alt=(text.alt_text if text is not None else "") or fallback,
-                caption=text.caption if text is not None else "",
-                is_cover=row.is_cover,
-            )
+    return [_gallery_image(row, language, fallback) for row in selected]
+
+
+def variant_galleries(
+    product: Product, variants: Sequence[VariantChoice], language: str
+) -> list[VariantGallery]:
+    """The gallery of each variant that has images of its own in `language` (CAT.26): its own
+    images, its cover leading, then the product's gallery, all under the D-18 language rule.
+    A variant without any shows the product gallery (no entry). Existing renditions only."""
+    if not variants:
+        return []
+    rows = _image_rows(product)
+    shared = [row for row in rows if row.variant_id is None]
+    own: dict[Any, list[ProductImage]] = {}
+    for row in rows:
+        if row.variant_id is not None:
+            own.setdefault(row.variant_id, []).append(row)
+    labels = {choice.sku: choice.label for choice in variants}
+    found: list[tuple[str, list[ProductImage]]] = []
+    for variant in product.variants.all():
+        selected = engine.variant_gallery(
+            own.get(variant.pk, []), shared, variant.cover_image, language
         )
-    return shown
+        if selected:
+            found.append((str(variant.sku), selected))
+    core_images.prefetch_renditions(row.image for _sku, selected in found for row in selected)
+    title = _product_title(product, language)
+    return [
+        VariantGallery(
+            sku=sku,
+            label=labels.get(sku, sku),
+            images=[_gallery_image(row, language, labels.get(sku) or title) for row in selected],
+        )
+        for sku, selected in found
+    ]
 
 
 def _variants(product: Product, language: str, *, on_request: bool) -> list[VariantChoice]:
@@ -215,6 +265,7 @@ def _build(product: Product, language: str) -> ProductPage | None:
     # The vendor's on-request mode (chosen, or forced by D-19) overrides the product (VEN.6).
     on_request = vendors.effective_sales_mode(product) != SalesMode.BUY
     retired = product.status == ProductStatus.RETIRED
+    variants = _variants(product, language, on_request=on_request)
     return ProductPage(
         product=product,
         vendor=product.vendor,
@@ -229,9 +280,10 @@ def _build(product: Product, language: str) -> ProductPage | None:
         purchasable=not on_request and not retired,
         retired=retired,
         stock_status=str(product.stock_status),
-        variants=_variants(product, language, on_request=on_request),
+        variants=variants,
         companion=_companion(product, language),
         gallery=gallery(product, language),
+        variant_galleries=variant_galleries(product, variants, language),
     )
 
 
@@ -263,19 +315,28 @@ def related(page: ProductPage, language: str | None = None) -> Sequence["service
     return [card for card in cards if card.url]
 
 
+def _items(images: Sequence[GalleryImage]) -> list[dict[str, Any]]:
+    return [{"image": item.image, "alt": item.alt, "caption": item.caption} for item in images]
+
+
 def gallery_items(page: ProductPage) -> list[dict[str, Any]]:
     """The gallery as the `components/gallery.html` context: the `image` renders as a
     `<picture>` (AVIF, WebP, JPEG). No rendition is looked up or created here."""
-    items: list[dict[str, Any]] = []
-    for item in page.gallery:
-        items.append(
-            {
-                "image": item.image,
-                "alt": item.alt,
-                "caption": item.caption,
-            }
-        )
-    return items
+    return _items(page.gallery)
+
+
+def variant_gallery_items(page: ProductPage) -> list[dict[str, Any]]:
+    """The variant galleries for the template (CAT.26): `sku`, `label`, an `id` prefix unique on
+    the page and the `images` in the `components/gallery.html` context."""
+    return [
+        {
+            "sku": entry.sku,
+            "label": entry.label,
+            "id": f"variant-images-{number}",
+            "images": _items(entry.images),
+        }
+        for number, entry in enumerate(page.variant_galleries, start=1)
+    ]
 
 
 # --- Specifications (THM.7 part 3): what the product's data says, as label and value rows

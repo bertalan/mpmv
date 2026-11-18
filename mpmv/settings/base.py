@@ -257,6 +257,11 @@ ORDER_FREEZE_HOOKS: list[str] = ["apps.compliance.services.orders_frozen"]
 # ORD.20: a consumer withdrawal registered on a vendor order (CMP.6) blocks new amendments; each
 # hook takes the vendor order and returns True when one is registered.
 ORDER_WITHDRAWAL_HOOKS: list[str] = ["apps.compliance.withdrawal.has_withdrawal"]
+# ORD.30: the same two rules for a page of packages at once (constant queries): the freeze hook
+# takes the vendors and returns the ids of the frozen ones, the withdrawal hook takes vendor order
+# ids and returns those with a registered withdrawal.
+ORDER_FREEZE_BATCH_HOOKS: list[str] = ["apps.compliance.services.frozen_vendor_ids"]
+ORDER_WITHDRAWAL_BATCH_HOOKS: list[str] = ["apps.compliance.withdrawal.withdrawn_vendor_order_ids"]
 # ORD.20: the ledger carries out the PAY.4 refund of an amendment's decrease and of a cancel of
 # the rest, in the transaction of the change (orders cannot import the ledger).
 ORDER_AMENDMENT_REFUND_HOOK = "apps.ledger.refunds.refund_amendment"
@@ -452,10 +457,13 @@ WAGTAILIMAGES_IMAGE_FORM_BASE = "apps.core.forms.MediaImageForm"
 WAGTAILDOCS_EXTENSIONS = ["pdf"]
 WAGTAILDOCS_MAX_UPLOAD_SIZE = 10 * 1024 * 1024
 WAGTAILDOCS_DOCUMENT_FORM_BASE = "apps.core.document_forms.DocumentForm"
-# No document serve view is mounted: a document's URL is its media path, which Caddy answers
-# with 404 (deploy/caddy/Caddyfile). Without this, the admin's document pages fail on the
-# missing `wagtaildocs_serve` route.
-WAGTAILDOCS_SERVE_METHOD = "direct"
+# Documents are served by Wagtail's view (/documents/<id>/<name>), which checks collection
+# privacy and page restrictions and sends Content-Disposition attachment and nosniff. Caddy keeps
+# answering 404 for /media/documents/ (deploy/caddy/Caddyfile). ARC.15 will switch this to
+# "redirect" with short-lived signed URLs.
+WAGTAILDOCS_SERVE_METHOD = "serve_view"
+# Wagtail shows PDFs inline by default; an empty list makes every document an attachment.
+WAGTAILDOCS_INLINE_CONTENT_TYPES: list[str] = []
 # Renditions without an explicit format-* go to WebP. GIF is left out: Wagtail turns a still GIF
 # into PNG and keeps an animated one as GIF, which WebP conversion would flatten to one frame.
 # Templates ask for AVIF, WebP and JPEG explicitly ({% responsive_image %}, apps.core.images).

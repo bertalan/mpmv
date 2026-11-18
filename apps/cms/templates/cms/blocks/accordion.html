@@ -1,0 +1,6 @@
+{% comment %}The accordion block (CMS.16): native disclosures, so it opens with Enter or Space and works without scripts. The rich text is sanitised at the model boundary (CMS.12); the title is escaped.{% endcomment %}<div class="block block-accordion accordion">
+  {% for section in value.sections %}<details class="accordion__item"{% if forloop.first and value.open_first %} open{% endif %}>
+    <summary class="accordion__summary">{{ section.title }}</summary>
+    <div class="accordion__content">{{ section.body }}</div>
+  </details>{% endfor %}
+</div>

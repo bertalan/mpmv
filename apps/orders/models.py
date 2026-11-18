@@ -310,11 +310,23 @@ class VendorOrder(_StateGuarded):
     shipping_net = MoneyField()
     tax_total = MoneyField()
     gross_total = MoneyField()
+    # ORD.29: NULL rate and reason = the shipping is split across several VAT rates (it follows
+    # the goods, TAX.17); the portions in `shipping_choice["tax_portions"]` and in v1 are then the
+    # only source of truth, and `shipping_tax_amount` is their sum. Never group VAT by this rate.
     shipping_tax_rate = models.DecimalField(
-        max_digits=6, decimal_places=3, default=0, help_text="Snapshot: VAT rate on the shipping."
+        max_digits=6,
+        decimal_places=3,
+        default=0,
+        null=True,
+        blank=True,
+        help_text="Snapshot: VAT rate on the shipping; empty when split across rates (portions).",
     )
-    shipping_tax_amount = MoneyField(default=0, help_text="Snapshot: VAT on the shipping.")
-    shipping_tax_reason = models.CharField(max_length=64, blank=True)
+    shipping_tax_amount = MoneyField(
+        default=0, help_text="Snapshot: VAT on the shipping (the sum of its portions)."
+    )
+    shipping_tax_reason = models.CharField(  # noqa: DJ001 (NULL = mixed, spec 07 ORD.29)
+        max_length=64, blank=True, null=True
+    )
     shipping_vat_nature_code = models.CharField(
         max_length=16, blank=True, help_text="N-code when the shipping is not taxed (TAX.3)."
     )
@@ -402,7 +414,8 @@ class VendorOrder(_StateGuarded):
                 name="orders_vendororder_shipping_tax_rate_not_negative",
             ),
             models.CheckConstraint(
-                condition=models.Q(
+                condition=models.Q(shipping_tax_rate__isnull=True)
+                | models.Q(
                     shipping_tax_amount=Round(
                         models.F("shipping_net") * models.F("shipping_tax_rate") / 100, 2
                     )

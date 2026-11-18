@@ -246,6 +246,28 @@ def test_a_withdrawn_package_cannot_be_amended(settings: Any) -> None:
     )
 
 
+def test_revising_a_draft_on_a_withdrawn_package_is_refused_as_withdrawn(settings: Any) -> None:
+    """ORD.30 regression: revise checks the withdrawal before anything about the draft (the draft
+    is left open here, as a withdrawal hook that does not close it would leave it)."""
+    sub = seed()
+    actor = owner_of(sub)
+    amendment, _ = draft(sub, am.RemoveLine(key_of(sub, "SKU-B")), actor=actor)
+    assert amendment is not None
+    settings.ORDER_WITHDRAWAL_HOOKS = [
+        "apps.orders.tests.integration.test_amendments_apply.always_withdrawn"
+    ]
+    refusal = gettext(
+        "The customer has withdrawn from this package, so it can no longer be changed: "
+        "the withdrawal and its refund run on the current version."
+    )
+    with pytest.raises(amendments.AmendmentRefused, match=re.escape(refusal)):
+        amendments.revise_amendment(
+            amendment, [am.RemoveLine(key_of(sub, "SKU-A"))], actor=actor, ctx=CTX, now=NOW
+        )
+    amendment.refresh_from_db()
+    assert amendment.revision == 1
+
+
 def always_withdrawn(vendor_order: VendorOrder) -> bool:
     return True
 

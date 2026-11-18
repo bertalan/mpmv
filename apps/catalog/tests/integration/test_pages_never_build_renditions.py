@@ -1,5 +1,5 @@
 """CAT.4 follow-up: a page render never creates a rendition (the job
-`catalog.render_product_image` does); a missing rendition falls back to the original image."""
+`core.render_image` does); a missing rendition falls back to the original image."""
 
 import re
 

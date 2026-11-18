@@ -16,7 +16,15 @@ from apps.ingest.models import (
     SourceStateVersion,
     SourceVariation,
 )
-from apps.ingest.tests.factories import SourceItemFactory, SupplierSourceFactory
+from apps.ingest.tests.factories import (
+    ItemChangeFactory,
+    SourceItemFactory,
+    SourceMissingFactory,
+    SourceStateFactory,
+    SourceStateVersionFactory,
+    SourceVariationFactory,
+    SupplierSourceFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -297,3 +305,15 @@ def test_an_item_change_version_is_unique_per_item() -> None:
         ItemChange.objects.create(
             item=item, version=1, changed_fields={}, new_values={}, recorded_at=T0
         )
+
+
+def test_the_state_factories_make_valid_rows_of_one_vendor() -> None:
+    state = SourceStateFactory.create()
+    variation = SourceVariationFactory.create(item=state.item)
+    version = SourceStateVersionFactory.create(item=state.item)
+    missing = SourceMissingFactory.create(item=state.item)
+    change = ItemChangeFactory.create(item=state.item)
+    for row in (state, variation, version, missing, change):
+        row.full_clean(validate_unique=False)
+        assert row.item.vendor_id == state.item.vendor_id
+    assert state.source_id == state.item.source_id
