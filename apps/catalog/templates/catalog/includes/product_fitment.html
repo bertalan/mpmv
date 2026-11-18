@@ -1,0 +1,24 @@
+{% load i18n %}
+{% comment %}
+  What the product fits (THM.7 part 3, the summary list of FIT.9): `fitment` is a
+  `FitmentSummary`. Shared by both themes; the caller supplies the heading. Groups are headed by
+  the make. Past the visible entries a native <details> holds the rest, so it works without
+  JavaScript and the whole list stays in the page. No inline style or script.
+{% endcomment %}
+<div class="product-fitment">
+  {% if fitment.universal %}
+    <p class="fitment-universal">{% translate "Fits everything." %}</p>
+  {% else %}
+    {% for group in fitment.visible %}
+      {% include "catalog/includes/fitment_group.html" %}
+    {% endfor %}
+    {% if fitment.more %}
+      <details class="product-fitment-more">
+        <summary>{% blocktranslate count count=fitment.more_count %}Show {{ count }} more{% plural %}Show {{ count }} more{% endblocktranslate %}</summary>
+        {% for group in fitment.more %}
+          {% include "catalog/includes/fitment_group.html" %}
+        {% endfor %}
+      </details>
+    {% endif %}
+  {% endif %}
+</div>

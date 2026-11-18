@@ -25,7 +25,6 @@ from apps.core.services import consume_rate_limit, rate_limit_wait
 from apps.core.throttling import ip_bucket
 
 from .csp import nonce_picker_scripts
-from .engine import VIDEO_EMBED_ORIGINS
 from .help_admin import strip_assets
 
 
@@ -154,7 +153,8 @@ class VideoEmbedCspMiddleware:
     """Allow the video embed origins in `frame-src`, only on a response that rendered a video.
 
     The video block marks the request (`request.mpmv_video_embed`). The two no-tracking origins
-    of `VIDEO_EMBED_ORIGINS` (never a wildcard) are added to the policy of that response alone;
+    of `settings.MPMV_VIDEO_EMBED_ORIGINS` (https origins, checked by cms.E003, never a wildcard)
+    are added to the policy of that response alone;
     every other page keeps the site policy. Listed after Django's ContentSecurityPolicyMiddleware,
     so it runs first on the way out and the policy it leaves is the one written. The frame itself
     still appears only after consent to `marketing` (js/video.js).
@@ -169,6 +169,9 @@ class VideoEmbedCspMiddleware:
             policy = dict(settings.SECURE_CSP)
             current = policy.get("frame-src")
             sources = list(current) if isinstance(current, list) else [CSP.SELF]
-            policy["frame-src"] = [*sources, *(o for o in VIDEO_EMBED_ORIGINS if o not in sources)]
+            policy["frame-src"] = [
+                *sources,
+                *(o for o in settings.MPMV_VIDEO_EMBED_ORIGINS if o not in sources),
+            ]
             response._csp_config = policy  # type: ignore[attr-defined]
         return response

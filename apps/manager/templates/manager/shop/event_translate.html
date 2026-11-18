@@ -8,7 +8,7 @@ No inline script or style.
 {% block manager_content %}
   <h1>{{ title }}</h1>
   <p><a href="{{ list_url }}">{% translate "Back to the events" %}</a></p>
-  <p>{% blocktranslate with name=event.title %}Translate “{{ name }}”. Dates, place and products stay the same as in the original: you write the title, the summary and the venue name, then add the text blocks.{% endblocktranslate %}</p>
+  <p>{% blocktranslate with name=event.title %}Translate “{{ name }}”. Dates, place and products stay the same as in the original: you write the title, the summary and the venue name here. Once the translation is saved, add the text blocks in its edit form.{% endblocktranslate %}</p>
   {% include "components/error_summary.html" with form=form autofocus=True only %}
   <form method="post" class="manager-form" novalidate>
     {% csrf_token %}

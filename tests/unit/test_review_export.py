@@ -114,3 +114,27 @@ def test_a_cell_that_could_be_a_formula_is_neutralised(lead: str) -> None:
 def test_an_ordinary_cell_is_left_alone() -> None:
     assert catalog._safe_cell("Dear customer") == "Dear customer"
     assert catalog._safe_cell("") == ""
+
+
+@pytest.mark.parametrize("lang", ["de", "fr", "es"])
+@pytest.mark.parametrize(
+    ("msgid", "group"),
+    [
+        ("The platform has sent no statement of reasons for your shop.", "DSA statements"),
+        ("Facts and circumstances", "DSA statements"),
+        (
+            "Platform staff hid your event %(title)s: it is no longer shown on the ",
+            "event moderation emails",
+        ),
+        ("Your event %(title)s was hidden", "event moderation emails"),
+        ("Read the statement of reasons", "event moderation emails"),
+        ("Changes requested on your event %(title)s", "event moderation emails"),
+    ],
+)
+def test_evt11_statements_and_moderation_mails_are_in_the_sensitive_export(
+    lang: str, msgid: str, group: str
+) -> None:
+    rows = {r[0]: r for r in catalog.review_rows(lang)}
+    key = next(k for k in rows if k.startswith(msgid))
+    assert group in rows[key][5]
+    assert rows[key][5] != "other"
