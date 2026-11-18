@@ -3031,7 +3031,8 @@ msgstr "Masqué par la plateforme."
 msgid "Hidden by the platform: %(reason)s"
 msgstr "Masqué par la plateforme : %(reason)s"
 
-#: apps/manager/site_map.py apps/seo/page_builders.py apps/seo/product_jsonld.py
+#: apps/cms/templatetags/cms_tags.py apps/manager/site_map.py apps/seo/page_builders.py
+#: apps/seo/product_jsonld.py
 msgid "Home"
 msgstr "Accueil"
 
