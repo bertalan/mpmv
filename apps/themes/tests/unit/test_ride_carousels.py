@@ -40,6 +40,11 @@ HERO_SLIDES = [
 IMAGES = [{"url": f"/g{n}.png", "alt": f"View {n}"} for n in range(1, 4)]
 
 
+def _said(code: str, text: str) -> str:
+    with translation.override(code):
+        return gettext(text)
+
+
 def render(name: str, /, **context: Any) -> str:
     with use_theme("ride"):
         return render_to_string(f"components/{name}.html", context).strip()
@@ -80,9 +85,9 @@ class TestEveryCarousel:
                 rf'<button type="button"[^>]*data-bs-slide="{control}"[^>]*hidden', html
             ), control
         assert re.search(r"<button type=\"button\"[^>]*data-ride-toggle[^>]*hidden", html)
-        with translation.override(settings.LANGUAGE_CODE):  # the language the params render in
-            assert gettext("Pause") in html
-            assert gettext("Play") in html
+        # The params render at collection time, in a language this test does not control.
+        for label in ("Pause", "Play"):
+            assert any(_said(code, label) in html for code, _name in settings.LANGUAGES), label
 
     def test_indicators_are_labelled_buttons_and_the_first_is_current(self, html: str) -> None:
         buttons = re.findall(r"<button[^>]*data-bs-slide-to=[^>]*>", html)
