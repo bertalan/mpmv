@@ -218,3 +218,36 @@ def test_a_page_without_a_video_keeps_the_site_frame_src(client: Any) -> None:
     seed_site()
     response = client.get("/")
     assert not set(VIDEO_ORIGINS) & set(_frame_src(response))
+
+
+def _publish_video_home() -> None:
+    seed_site()
+    home = HomePage.objects.get(locale__language_code=primary_language())
+    home.body = [("video_modal", {"title": "Tour", "url": YOUTUBE})]
+    home.save_revision().publish()
+
+
+def test_a_custom_video_origins_setting_changes_the_frame_src(client: Any) -> None:
+    _publish_video_home()
+    with override_settings(MPMV_VIDEO_EMBED_ORIGINS=["https://video.example.org"]):
+        sources = _frame_src(client.get("/"))
+    assert "https://video.example.org" in sources
+    assert not set(VIDEO_ORIGINS) & set(sources)
+
+
+def test_a_page_without_a_video_gets_no_custom_frame_src(client: Any) -> None:
+    seed_site()
+    with override_settings(MPMV_VIDEO_EMBED_ORIGINS=["https://video.example.org"]):
+        assert "https://video.example.org" not in _frame_src(client.get("/"))
+
+
+def test_the_video_block_refuses_an_address_whose_embed_origin_is_not_allowed() -> None:
+    block = VideoModalBlock()
+    value = block.to_python({"title": "Tour", "url": YOUTUBE})
+    block.clean(value)  # the default origins allow YouTube
+    with override_settings(MPMV_VIDEO_EMBED_ORIGINS=["https://player.vimeo.com"]):
+        with pytest.raises(ValidationError):
+            block.clean(value)
+        block.clean(block.to_python({"title": "Tour", "url": "https://vimeo.com/123456789"}))
+    with override_settings(MPMV_VIDEO_EMBED_ORIGINS=[]), pytest.raises(ValidationError):
+        block.clean(value)
