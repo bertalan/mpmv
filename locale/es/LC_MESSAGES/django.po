@@ -85,7 +85,9 @@ msgstr "%(days)s días laborables"
 #: apps/orders/customer_views.py
 msgid ""
 "%(item)s: only %(quantity)d available, so your cart holds %(quantity)d instead of %(requested)d."
-msgstr "%(item)s: solo hay %(quantity)d disponibles, así que tu carrito tiene %(quantity)d en lugar de %(requested)d."
+msgstr ""
+"%(item)s: solo hay %(quantity)d disponibles, así que tu carrito tiene %(quantity)d en lugar de "
+"%(requested)d."
 
 #: apps/orders/ui/present.py
 msgid "%(low)s to %(high)s working days"
@@ -5542,7 +5544,9 @@ msgstr "Vuelven a tu carrito, a los precios de hoy: %(items)s."
 msgid ""
 "Puts the items that are still on sale back in your cart, at today's prices. Nothing is ordered or "
 "paid until you check out."
-msgstr "Vuelve a poner en tu carrito los artículos que aún están a la venta, a los precios de hoy. No se pide ni se paga nada hasta que finalices la compra."
+msgstr ""
+"Vuelve a poner en tu carrito los artículos que aún están a la venta, a los precios de hoy. No se "
+"pide ni se paga nada hasta que finalices la compra."
 
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/shop/order.html
 #: apps/orders/templates/orders/customer_order.html

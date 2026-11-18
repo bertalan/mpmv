@@ -86,7 +86,9 @@ msgstr "%(days)s jours ouvrés"
 #: apps/orders/customer_views.py
 msgid ""
 "%(item)s: only %(quantity)d available, so your cart holds %(quantity)d instead of %(requested)d."
-msgstr "%(item)s : seulement %(quantity)d disponibles, ton panier en contient donc %(quantity)d au lieu de %(requested)d."
+msgstr ""
+"%(item)s : seulement %(quantity)d disponibles, ton panier en contient donc %(quantity)d au lieu de"
+" %(requested)d."
 
 #: apps/orders/ui/present.py
 msgid "%(low)s to %(high)s working days"
@@ -5588,7 +5590,9 @@ msgstr "Remis dans ton panier, aux prix d’aujourd’hui : %(items)s."
 msgid ""
 "Puts the items that are still on sale back in your cart, at today's prices. Nothing is ordered or "
 "paid until you check out."
-msgstr "Remet dans ton panier les articles encore en vente, aux prix d’aujourd’hui. Rien n’est commandé ni payé tant que tu ne passes pas à la caisse."
+msgstr ""
+"Remet dans ton panier les articles encore en vente, aux prix d’aujourd’hui. Rien n’est commandé ni"
+" payé tant que tu ne passes pas à la caisse."
 
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/shop/order.html
 #: apps/orders/templates/orders/customer_order.html
