@@ -101,7 +101,11 @@ entry (keep Poedit's translator comments).
 ## Tone
 
 Customer emails use the informal form of address: tu (Italian), du (German), tu (French), tú
-(Spanish), owner decision. The Read me says so; the import cannot check it.
+(Spanish), owner decision. The Read me says so; the import cannot check it. The second-factor
+screens (`apps/accounts/templates/accounts/mfa/`) are shared by customers, vendors and staff and
+use the formal register (Lei, Sie, vous, usted). A msgid shared by a customer page and a formal page
+cannot have two registers: the customer page gets its own gettext context (for example
+"Your data" with context "customer privacy page"). Catalog tests check both registers.
 
 ## Adding a Read me language
 

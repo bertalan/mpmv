@@ -2268,6 +2268,11 @@ msgstr "Ne se répète pas"
 msgid "done"
 msgstr "terminé"
 
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Download"
+msgstr "Télécharger"
+
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download my data"
 msgstr "Télécharger mes données"
@@ -2275,6 +2280,11 @@ msgstr "Télécharger mes données"
 #: apps/events/templates/events/_subscribe.html
 msgid "Download the calendar (ICS)"
 msgstr "Télécharger le calendrier (ICS)"
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Download your data"
+msgstr "Télécharge tes données"
 
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download your shop profile, products and order amounts as a JSON file."
@@ -2442,9 +2452,33 @@ msgstr "Saisissez le numéro de suivi : uniquement des lettres, des chiffres, de
 msgid "Enter this when you buy for a business, or untick the box."
 msgstr "Renseigne ce champ si tu achètes pour une entreprise, ou décoche la case."
 
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Erase my account"
+msgstr "Supprimer mon compte"
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Erase your account"
+msgstr "Supprime ton compte"
+
 #: apps/seo/site_links.py
 msgid "Erase your account (asks for confirmation)"
 msgstr "Supprimer votre compte (demande une confirmation)"
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid ""
+"Erasing your account blocks your login and deletes your carts and preferences. Order, billing, "
+"shipping and VAT data are kept for %(years)s years from the end of the fiscal year, restricted to "
+"what the law requires (GDPR article 17(3)(b)), and then anonymised. If you have an order still "
+"open, the erasure completes when the last open order closes."
+msgstr ""
+"La suppression de ton compte bloque ta connexion et efface tes paniers et tes préférences. Les "
+"données de commande, de facturation, d'expédition et de TVA sont conservées %(years)s ans à "
+"compter de la fin de l'exercice fiscal, limitées à ce que la loi exige (RGPD article 17(3)(b)), "
+"puis anonymisées. Si tu as encore une commande ouverte, la suppression se termine à la clôture de "
+"la dernière commande ouverte."
 
 #: themes/base/templates/components/alert.html
 msgid "Error"
@@ -2703,6 +2737,11 @@ msgstr "Générer de nouveaux codes"
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Generating new codes makes every previous code stop working."
 msgstr "La génération de nouveaux codes rend tous les codes précédents inutilisables."
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Get a copy of the data we hold about you as a JSON file."
+msgstr "Obtiens une copie des données que nous conservons à ton sujet sous forme de fichier JSON."
 
 #: apps/manager/event_fields.py
 msgid "Give a number from -%(limit)d to %(limit)d, for example 45.464200."
@@ -3149,6 +3188,11 @@ msgstr ""
 #: apps/orders/templates/orders/_legal_boxes.html
 msgid "I specifically approve the onerous clauses listed above, one by one."
 msgstr "J'approuve expressément, une par une, les clauses onéreuses listées ci-dessus."
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "I understand and want to erase my account"
+msgstr "J'ai compris et je veux supprimer mon compte"
 
 #: apps/orders/templates/email/orders/item_unavailable/body.html
 #: apps/orders/templates/email/orders/item_unavailable/body.txt
@@ -4738,7 +4782,8 @@ msgstr "Fenêtre de clé d'accès ouverte : encore %(minutes_left)s min"
 msgid "Passkeys need JavaScript."
 msgstr "Les clés d'accès nécessitent JavaScript."
 
-#: apps/manager/templates/manager/login.html
+#: apps/compliance/templates/compliance/privacy_account.html
+#: apps/manager/templates/manager/login.html themes/ride/templates/compliance/privacy_account.html
 msgid "Password"
 msgstr "Mot de passe"
 
@@ -10851,6 +10896,11 @@ msgstr ""
 "Vous avez enregistré le %(when)s que votre facture ou votre justificatif pour cette commande est "
 "émis. Chaque modification ultérieure affiche le rappel de le corriger."
 
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "You will be asked to confirm with your second factor."
+msgstr "Il te sera demandé de confirmer avec ton second facteur."
+
 #: apps/accounts/templates/accounts/levels/prompt.html
 #: apps/manager/templates/manager/amendment_passkey.html
 msgid ""
@@ -10907,6 +10957,12 @@ msgstr "Votre choix concernant les cookies a été enregistré."
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Your data"
 msgstr "Vos données"
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgctxt "customer privacy page"
+msgid "Your data"
+msgstr "Tes données"
 
 #: apps/orders/templates/orders/checkout.html
 msgid "Your details"

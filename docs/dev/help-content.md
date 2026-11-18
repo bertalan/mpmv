@@ -48,7 +48,8 @@ Plain Markdown. Short sentences for a non-technical reader.
 Operator-specific facts (names, e-mail addresses, fees, windows) are never typed in a file. Use a
 placeholder: `{{ operator.support_email }}`. The allow-list is `PLACEHOLDERS` in
 `apps/cms/help_files.py`: `operator.legal_name`, `operator.support_email`,
-`operator.compliance_email`, `settings.site_name`. Values are read from `current_operator()` and
+`operator.compliance_email` (falls back to the support address when empty, like the compliance
+alerts), `settings.site_name`. Values are read from `current_operator()` and
 settings when the dialog is shown (never cached), HTML-escaped. An unknown placeholder fails
 `sync_help` and the test suite. To add one, add it to the list in a reviewed PR.
 
