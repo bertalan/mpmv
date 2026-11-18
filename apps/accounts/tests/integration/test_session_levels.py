@@ -619,9 +619,10 @@ WIRED = {
     "bulk_edit",
     "sessions_end_user",  # CORE.24
     "sessions_end_all",  # CORE.24
+    "export",  # VEN.9: the shop's CSV ledger extract
 }
 # Actions whose web view does not exist yet: nothing to decorate (follow-ups in the PR).
-NOT_BUILT = {"tax_in_clear", "export", "backup", "impersonation"}
+NOT_BUILT = {"tax_in_clear", "backup", "impersonation"}
 # Actions that are not web views: `manage.py bootstrap_platform_owner` runs with shell access on
 # the server, outside any browser session, so session levels cannot apply to it.
 NO_SESSION = {"bootstrap_platform_owner"}
