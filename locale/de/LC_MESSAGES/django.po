@@ -5887,8 +5887,8 @@ msgstr "Bildschirm (Routenname)"
 msgid "screen or page type"
 msgstr "bildschirm oder seitentyp"
 
-#: apps/seo/page_builders.py themes/ride/templates/components/header.html
-#: apps/manager/product_views.py themes/ride/templates/components/header.html
+#: apps/manager/product_views.py apps/seo/page_builders.py
+#: themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Suchen"
 

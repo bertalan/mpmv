@@ -5828,8 +5828,8 @@ msgstr "Pantalla (nombre de la ruta)"
 msgid "screen or page type"
 msgstr "pantalla o tipo de página"
 
-#: apps/seo/page_builders.py themes/ride/templates/components/header.html
-#: apps/manager/product_views.py themes/ride/templates/components/header.html
+#: apps/manager/product_views.py apps/seo/page_builders.py
+#: themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Buscar"
 
