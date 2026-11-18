@@ -2386,6 +2386,10 @@ msgstr "Décidé"
 msgid "Declaration"
 msgstr "Déclaration"
 
+#: apps/manager/fitment_views.py
+msgid "Declaration required to publish"
+msgstr "Déclaration requise pour publier"
+
 #: themes/base/templates/components/quantity_stepper.html
 msgid "Decrease quantity"
 msgstr "Diminuer la quantité"
@@ -2564,6 +2568,10 @@ msgstr "Le faire une seule fois"
 #: apps/manager/fitment_views.py
 msgid "Do not expect fitment"
 msgstr "Ne pas exiger de compatibilité"
+
+#: apps/manager/fitment_views.py
+msgid "Do not require a declaration to publish"
+msgstr "Ne pas exiger de déclaration pour publier"
 
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
@@ -5681,6 +5689,14 @@ msgid_plural "Please correct the errors below."
 msgstr[0] "Veuillez corriger l'erreur ci-dessous."
 msgstr[1] "Veuillez corriger les erreurs ci-dessous."
 
+#: apps/fitment/services.py
+msgid ""
+"Please declare what this product fits before you publish it: choose the items it fits on the Fits "
+"tab, or state that it fits everything."
+msgstr ""
+"Indiquez à quoi ce produit convient avant de le publier : choisissez les articles compatibles dans"
+" l'onglet Compatibilité ou déclarez qu'il convient à tout."
+
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
 msgstr "Libellé au pluriel"
@@ -6227,6 +6243,10 @@ msgstr "Fichier du dépôt"
 #: apps/orders/templates/orders/_package.html
 msgid "Request a quote"
 msgstr "Demander un devis"
+
+#: apps/manager/fitment_views.py
+msgid "Require a declaration to publish"
+msgstr "Exiger une déclaration pour publier"
 
 #: themes/base/templates/components/field.html
 msgid "required"
