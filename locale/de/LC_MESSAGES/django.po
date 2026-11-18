@@ -382,6 +382,14 @@ msgstr ""
 "Ein Moderator hat Änderungen an Ihrer Veranstaltung %(title)s verlangt, bevor sie veröffentlicht "
 "werden kann."
 
+#: apps/cms/models.py
+msgid ""
+"A name for the editors, for example 'Shipping terms'. Never shown to visitors. Up to 120 "
+"characters. Required."
+msgstr ""
+"Ein Name für die Redaktion, zum Beispiel 'Versandbedingungen'. Er wird Besuchern nie angezeigt. "
+"Bis zu 120 Zeichen. Pflichtfeld."
+
 #: apps/manager/event_image_form.py
 msgid "A name for the library, for example Our stand 2027. Optional."
 msgstr "Ein Name für die Bibliothek, zum Beispiel Unser Messestand 2027. Optional."
@@ -1827,6 +1835,15 @@ msgid ""
 msgstr ""
 "Wählen Sie ein Passwort, um Ihr Konto zu aktivieren. Danach melden Sie sich damit an und richten "
 "eine Authenticator-App ein. Unser Team prüft anschließend Ihre Bewerbung."
+
+#: apps/cms/blocks.py
+msgid ""
+"Choose a reusable text. When it is changed and approved, every page that uses it shows the new "
+"text. Nothing is shown while the snippet is not published."
+msgstr ""
+"Wählen Sie einen wiederverwendbaren Text. Wird er geändert und freigegeben, zeigt jede Seite, die "
+"ihn verwendet, den neuen Text. Solange der Baustein nicht veröffentlicht ist, wird nichts "
+"angezeigt."
 
 #: apps/manager/event_forms.py
 msgid "Choose a time zone such as Europe/Rome."
@@ -9575,6 +9592,12 @@ msgid ""
 msgstr ""
 "Der Text auf der Senden-Schaltfläche, zum Beispiel „Frage senden“. Bleibt er leer, steht dort "
 "„Senden“."
+
+#: apps/cms/models.py
+msgid "The text shown wherever the snippet is placed. If you leave it empty, nothing is shown."
+msgstr ""
+"Der Text, der überall angezeigt wird, wo der Baustein eingefügt ist. Wenn Sie ihn leer lassen, "
+"wird nichts angezeigt."
 
 #: apps/cms/blocks.py
 msgid "The text that shows when the visitor opens the section. Required."

@@ -379,6 +379,14 @@ msgstr ""
 msgid "A moderator asked for changes to your event %(title)s before it can be published."
 msgstr "Un moderador ha solicitado cambios en su evento %(title)s antes de que pueda publicarse."
 
+#: apps/cms/models.py
+msgid ""
+"A name for the editors, for example 'Shipping terms'. Never shown to visitors. Up to 120 "
+"characters. Required."
+msgstr ""
+"Un nombre para los editores, por ejemplo «Condiciones de envío». Nunca se muestra a los "
+"visitantes. Hasta 120 caracteres. Obligatorio."
+
 #: apps/manager/event_image_form.py
 msgid "A name for the library, for example Our stand 2027. Optional."
 msgstr "Un nombre para la biblioteca, por ejemplo Nuestro stand 2027. Opcional."
@@ -1805,6 +1813,14 @@ msgid ""
 msgstr ""
 "Elija una contraseña para activar su cuenta. Después inicia sesión con ella y configura una app de"
 " autenticación. Nuestro equipo revisa su solicitud a continuación."
+
+#: apps/cms/blocks.py
+msgid ""
+"Choose a reusable text. When it is changed and approved, every page that uses it shows the new "
+"text. Nothing is shown while the snippet is not published."
+msgstr ""
+"Elija un texto reutilizable. Cuando se modifica y se aprueba, cada página que lo usa muestra el "
+"nuevo texto. No se muestra nada mientras el fragmento no esté publicado."
 
 #: apps/manager/event_forms.py
 msgid "Choose a time zone such as Europe/Rome."
@@ -9461,6 +9477,11 @@ msgid ""
 msgstr ""
 "El texto del botón de envío, por ejemplo «Enviar su pregunta». Si lo deja vacío, el botón dice "
 "«Enviar»."
+
+#: apps/cms/models.py
+msgid "The text shown wherever the snippet is placed. If you leave it empty, nothing is shown."
+msgstr ""
+"El texto que se muestra allí donde se coloca el fragmento. Si lo deja vacío, no se muestra nada."
 
 #: apps/cms/blocks.py
 msgid "The text that shows when the visitor opens the section. Required."

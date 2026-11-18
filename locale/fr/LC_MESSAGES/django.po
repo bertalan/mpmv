@@ -383,6 +383,14 @@ msgid "A moderator asked for changes to your event %(title)s before it can be pu
 msgstr ""
 "Un modérateur a demandé des modifications de votre événement %(title)s avant sa publication."
 
+#: apps/cms/models.py
+msgid ""
+"A name for the editors, for example 'Shipping terms'. Never shown to visitors. Up to 120 "
+"characters. Required."
+msgstr ""
+"Un nom pour les rédacteurs, par exemple « Conditions d’expédition ». Il n’est jamais montré aux "
+"visiteurs. 120 caractères au maximum. Obligatoire."
+
 #: apps/manager/event_image_form.py
 msgid "A name for the library, for example Our stand 2027. Optional."
 msgstr "Un nom pour la bibliothèque, par exemple Notre stand 2027. Facultatif."
@@ -1822,6 +1830,14 @@ msgid ""
 msgstr ""
 "Choisissez un mot de passe pour activer votre compte. Vous vous connectez ensuite avec celui-ci et"
 " configurez une application d'authentification. Notre équipe examine ensuite votre candidature."
+
+#: apps/cms/blocks.py
+msgid ""
+"Choose a reusable text. When it is changed and approved, every page that uses it shows the new "
+"text. Nothing is shown while the snippet is not published."
+msgstr ""
+"Choisissez un texte réutilisable. Lorsqu’il est modifié et approuvé, chaque page qui l’utilise "
+"affiche le nouveau texte. Rien n’est affiché tant que l’extrait n’est pas publié."
 
 #: apps/manager/event_forms.py
 msgid "Choose a time zone such as Europe/Rome."
@@ -9544,6 +9560,11 @@ msgid ""
 msgstr ""
 "Le texte du bouton d'envoi, par exemple « Envoyer votre question ». Si vous le laissez vide, le "
 "bouton indique « Envoyer »."
+
+#: apps/cms/models.py
+msgid "The text shown wherever the snippet is placed. If you leave it empty, nothing is shown."
+msgstr ""
+"Le texte affiché partout où l’extrait est placé. Si vous le laissez vide, rien n’est affiché."
 
 #: apps/cms/blocks.py
 msgid "The text that shows when the visitor opens the section. Required."

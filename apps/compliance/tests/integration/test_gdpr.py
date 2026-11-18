@@ -450,6 +450,8 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
         ]
     }
     handled |= {
+        "cms.contentsnippet": "staff editor reference (lock owner), not the customer's data; "
+        "the lock is released on erasure (SET_NULL), the text stays (CMS.14)",
         "events.eventindexpage": "staff page owner (Wagtail), not the customer's data",
         "ingest.reviewitem": "staff or vendor reviewer (resolved_by), not the customer's data",
     }
