@@ -152,6 +152,13 @@ def _purchase_limit(product: Product, variant: Variant | None) -> int:
     return engine.line_limit(available)
 
 
+def item_limit(product: Product, variant: Variant | None) -> int:
+    """The most units of the item a cart line may hold today; ValidationError when it cannot be
+    bought (not for sale, vendor paused, on request). 0 means out of stock (ORD.31)."""
+    product = Product.objects.select_related(_VENDOR_ACCOUNT).get(pk=product.pk)
+    return _purchase_limit(product, variant)
+
+
 def _unit_price(product: Product, variant: Variant | None) -> Decimal | None:
     override = variant.price_net_override if variant is not None else None
     return engine.display_unit_price(
