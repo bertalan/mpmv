@@ -4,8 +4,8 @@ Thin adapters over `apps.catalog.services` (`set_products_status` for the bulk p
 unpublish, `save_product` for the audited fields) and `apps.catalog.engine` (the per-language
 translation state). The list filters by vendor, status, category, translation status and a text
 search; a bulk action shows its dry-run ChangeSet first and writes only on confirmation, behind the
-session level of CORE.25. Finance and Support are not in the matrix row (404); the platform owner
-reads.
+session level of CORE.25. Finance is not in the matrix row (404); Support and the platform owner
+read (CAT.30: the write actions stay with Catalog and moderation).
 """
 
 from collections.abc import Sequence
