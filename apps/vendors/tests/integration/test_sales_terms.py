@@ -4,10 +4,11 @@ import secrets
 from typing import Any
 
 import pytest
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import DatabaseError, connection, transaction
 from django.test import Client
-from django.urls import reverse
+from django.urls import resolve, reverse
 
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
@@ -355,4 +356,9 @@ def test_the_pdf_of_an_old_version_still_downloads_through_the_accepted_terms_li
     assert response.status_code == 200
     assert response.content.startswith(b"%PDF")
     assert f"-v{old.number}.pdf" in response["Content-Disposition"]
-    assert ts.accepted_terms_pdf_url(old).startswith(old_link.rstrip("/") + "/pdf")
+    pdf_match = resolve(ts.accepted_terms_pdf_url(old))
+    read_match = resolve(old_link)
+    assert pdf_match.url_name == "pdf"
+    assert signing.loads(pdf_match.kwargs["token"], salt=ts.ARCHIVE_SALT) == signing.loads(
+        read_match.kwargs["token"], salt=ts.ARCHIVE_SALT
+    )
