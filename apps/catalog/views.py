@@ -292,6 +292,7 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
         "gallery_items": product_pages.gallery_items(page),
         "variant_gallery_items": product_pages.variant_gallery_items(page),
         "related": product_pages.related(page, language),
+        "other_sellers": product_pages.other_sellers(page.product, language),
         "specifications": specifications,
         "fitment": fitment,
         # The product page's tabs (ride): the first one with content is the open one.

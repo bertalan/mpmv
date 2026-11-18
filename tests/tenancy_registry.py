@@ -596,6 +596,12 @@ ENDPOINTS: dict[str, Access] = {
         "is logged.",
         kwargs={"token": "not-a-token"},
     ),
+    "vendor_terms:pdf": NoVendorData(
+        "PDF of the sales terms in force of any seller (VEN.36): public by design behind the same "
+        "signed, expiring link; a superseded version and a tampered link are a 404 (an accepted-"
+        "terms link opens its own version), every read is logged.",
+        kwargs={"token": "not-a-token"},
+    ),
     "vendor_claim:claim": NoVendorData(
         "Vendor claim page (VEN.24): without a claim link opened in the session for that vendor "
         "it shows only the generic 'link not valid' page, whoever is signed in.",
@@ -1137,6 +1143,10 @@ API_OPERATIONS: dict[str, Access] = {
         "404. Shows only the ChangeSet of what it creates."
     ),
     "GET /api/v1/catalog/products/{public_id}": VendorScoped(
+        make=lambda vendor: ProductFactory.create(vendor=vendor)
+    ),
+    # CAT.15
+    "GET /api/v1/catalog/products/{public_id}/other-sellers": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor)
     ),
     # EVT.5

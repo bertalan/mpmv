@@ -294,7 +294,7 @@ def test_release_doc_has_the_security_schedule() -> None:
         "LIVE_SCAN_URL",
         "ALLOW_LIVE_SCAN",
         "workflow_dispatch",
-        "#86",
+        "#726",
     ):
         assert needle in section, needle
 

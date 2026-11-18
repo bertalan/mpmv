@@ -18,6 +18,7 @@
   <div class="sales-terms__body">{{ version.body|linebreaks }}</div>
   <h2>{% translate "Clauses for approval by business buyers (art. 1341 Civil Code)" %}</h2>
   <ul>{% for clause in version.clauses %}<li>{{ clause.article }}: {{ clause.title }}</li>{% endfor %}</ul>
-  <p><button type="button" data-print>{% translate "Print" %}</button></p>
+  <p><button type="button" data-print>{% translate "Print" %}</button>
+    <a class="button" href="{% url 'vendor_terms:pdf' token %}" download>{% translate "Download PDF" %}</a></p>
 </article>
 {% endblock %}

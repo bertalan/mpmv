@@ -1217,6 +1217,11 @@ msgstr ""
 "Un altro tuo prodotto pensato per essere comprato insieme a questo, per esempio la batteria di un "
 "giocattolo. Lascialo vuoto se non ce n'è."
 
+#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: themes/ride/templates/catalog/includes/other_sellers.html
+msgid "Another seller"
+msgstr "Un altro venditore"
+
 #: apps/manager/event_block_forms.py
 msgid "Answer %(number)d"
 msgstr "Risposta %(number)d"
@@ -2566,6 +2571,11 @@ msgstr "Scarica"
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download my data"
 msgstr "Scarica i miei dati"
+
+#: apps/manager/templates/manager/shop/sales_terms.html
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Download PDF"
+msgstr "Scarica il PDF"
 
 #: apps/events/templates/events/_subscribe.html
 msgid "Download the calendar (ICS)"
@@ -5244,6 +5254,11 @@ msgstr ""
 "Altri prodotti che vuoi suggerire insieme a questo, per esempio un modello migliore. Facoltativo: "
 "lascialo vuoto per non suggerire nulla."
 
+#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: themes/ride/templates/catalog/includes/other_sellers.html
+msgid "Other sellers of this product"
+msgstr "Altri venditori di questo prodotto"
+
 #: apps/ingest/models.py
 msgid "Other ways the supplier writes the same term, as a JSON list."
 msgstr "Altri modi in cui il fornitore scrive lo stesso termine, come elenco JSON."
@@ -6854,6 +6869,11 @@ msgstr "Venduto da"
 #: apps/orders/templates/orders/customer_order.html
 msgid "Sold by %(name)s"
 msgstr "Venduto da %(name)s"
+
+#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: themes/ride/templates/catalog/includes/other_sellers.html
+msgid "Sold by %(seller)s"
+msgstr "Venduto da %(seller)s"
 
 #: apps/orders/templates/orders/_package.html themes/base/templates/components/cart_line.html
 msgid "Sold by %(vendor)s"
@@ -9424,6 +9444,15 @@ msgstr ""
 "Il gruppo di categorie o etichette a cui appartiene questa, per esempio 'stagione'. Obbligatorio. "
 "Non si può cambiare dopo."
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid ""
+"The shipping method %(key)s (%(zone)s) is for goods that cannot be returned by post and has no "
+"maximum return-cost estimate. Add one in the return-cost information below, or you pay the return."
+msgstr ""
+"Il metodo di spedizione %(key)s (%(zone)s) è per merci che non si possono restituire per posta e "
+"non ha una stima del costo massimo di restituzione. La inserisca nelle informazioni sul costo di "
+"restituzione qui sotto, altrimenti la restituzione è a suo carico."
+
 #: apps/orders/amendments.py
 msgid "The shipping method %(method)r is not offered for this package."
 msgstr "Il metodo di spedizione %(method)r non è offerto per questo pacco."
@@ -10474,6 +10503,15 @@ msgstr ""
 msgid "Tick it for an event with no set hours. Then give the first and last day."
 msgstr "Spuntalo per un evento senza orari fissi. Poi indica il primo e l'ultimo giorno."
 
+#: apps/shipping/models.py
+msgid ""
+"Tick it for bulky goods that cannot be sent back by post, such as a pallet. You must then state a "
+"maximum return-cost estimate in your sales terms."
+msgstr ""
+"Selezioni questa opzione per le merci ingombranti che non si possono restituire per posta, come un"
+" bancale. Dovrà poi indicare una stima del costo massimo di restituzione nelle sue condizioni di "
+"vendita."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "Tick it if categories or tags in this set can sit inside others, for example maker and then model."
@@ -11316,8 +11354,12 @@ msgid "What kind of area it is: an island, a remote area or a territory with its
 msgstr "Che tipo di area è: un'isola, una zona remota o un territorio con regole IVA proprie."
 
 #: apps/ingest/models.py
-msgid "What kind of term this is: category, taxonomy term, colour, material, brand or other."
-msgstr "Che tipo di termine è: categoria, termine di tassonomia, colore, materiale, marca o altro."
+msgid ""
+"What kind of term this is: category, taxonomy term, colour, material, brand, product type, country"
+" or other."
+msgstr ""
+"Che tipo di termine è: categoria, termine di tassonomia, colore, materiale, marca, tipo di "
+"prodotto, paese o altro."
 
 #: apps/shipping/models.py
 msgid "What pickup costs, without VAT. Use 0 for free pickup."
