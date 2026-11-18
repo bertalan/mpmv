@@ -5470,6 +5470,10 @@ msgstr "Diese Veranstaltung melden"
 msgid "Reported"
 msgstr "Gemeldet"
 
+#: apps/cms/models.py
+msgid "Repository file"
+msgstr "Repository-Datei"
+
 #: apps/orders/templates/orders/_package.html
 msgid "Request a quote"
 msgstr "Angebot anfordern"
@@ -6097,7 +6101,7 @@ msgstr "Behebe die obigen Punkte, um die Bestellung aufzugeben."
 msgid "Something went wrong"
 msgstr "Etwas ist schiefgelaufen"
 
-#: apps/catalog/taxonomy.py
+#: apps/catalog/taxonomy.py apps/cms/models.py
 msgid "source"
 msgstr "quelle"
 
@@ -10603,6 +10607,14 @@ msgstr ""
 "Sie die vier Herstellerfelder gemeinsam aus: Ein Produkt, bei dem alle vier leer bleiben, "
 "verwendet die Standardwerte seines Verkäufers."
 
+#: apps/cms/models.py
+msgid ""
+"Who owns the text. A text that comes from a repository file is read-only here: change the file and"
+" the next deploy updates it."
+msgstr ""
+"Wer den Text pflegt. Ein Text aus einer Repository-Datei ist hier schreibgeschützt: Ändern Sie die"
+" Datei, die nächste Freigabe aktualisiert ihn."
+
 #: apps/vendors/models.py
 msgid ""
 "Who pays the direct cost of sending goods back after a withdrawal. Empty means you pay. The "
@@ -10762,6 +10774,10 @@ msgid ""
 msgstr ""
 "Schreiben Sie hier Ihren Text. Verwenden Sie die Symbolleiste für Überschriften, Fett, Listen und "
 "Links. Eine Überschrift macht die Seite leichter überfliegbar."
+
+#: apps/cms/models.py
+msgid "Written in the admin"
+msgstr "Im Admin-Bereich geschrieben"
 
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Yes"

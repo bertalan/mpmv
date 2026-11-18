@@ -8,7 +8,7 @@ no entry at all the answer is None: callers show a polite empty message, never a
 """
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from django.conf import settings
@@ -16,7 +16,7 @@ from django.core.cache import cache
 from django.db.models import Q
 from wagtail.rich_text import expand_db_html
 
-from . import engine
+from . import engine, help_files
 from .models import HELP_FEATURES, HelpEntry
 
 GENERATION_KEY = "cms:help:generation"
@@ -75,6 +75,16 @@ def _known_keys() -> frozenset[tuple[str, str]]:
     return known
 
 
+def _filled(content: HelpContent) -> HelpContent:
+    """The cached text with the operator's placeholders filled now (ARC.36): the cache keeps the
+    template, so a changed operator value shows at once."""
+    return replace(
+        content,
+        title=help_files.render_placeholders(content.title),
+        html=help_files.render_placeholders(content.html),
+    )
+
+
 def help_for(route_name: str, page_type: str, language: str) -> HelpContent | None:
     """The help that answers a screen in `language`, or None when nothing is configured."""
     known = _known_keys()
@@ -87,7 +97,7 @@ def help_for(route_name: str, page_type: str, language: str) -> HelpContent | No
     key = f"cms:help:{_generation()}:{language}:{digest}"
     cached = cache.get(key)
     if cached is not None:
-        return None if cached == _MISSING else cached
+        return None if cached == _MISSING else _filled(cached)
     pairs = _rows(candidates, {language, primary})
     row = engine.pick_help_row((r for r, _e in pairs), candidates, language, primary)
     content = (
@@ -103,4 +113,4 @@ def help_for(route_name: str, page_type: str, language: str) -> HelpContent | No
         )
     )
     cache.set(key, _MISSING if content is None else content, TIMEOUT)
-    return content
+    return None if content is None else _filled(content)
