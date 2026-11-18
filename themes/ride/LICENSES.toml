@@ -47,8 +47,8 @@ source = "https://github.com/bertalan/mpmv"
 author = "MPMV project"
 license = "CC0-1.0"
 # Our own work: simple vector shapes, no photograph. Shown behind the hero until an editor
-# chooses a hero image.
-files = ["images/hero-placeholder.svg"]
+# chooses a hero image; the product placeholder fills the card of a product with no image (THM.18).
+files = ["images/hero-placeholder.svg", "images/product-placeholder.svg"]
 
 [[asset]]
 name = "Bootstrap"
