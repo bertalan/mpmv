@@ -407,7 +407,8 @@ def test_the_part_2_storefront_entries_are_translated(lang: str) -> None:
 @pytest.mark.parametrize("lang", ["de", "fr", "es"])
 def test_the_part_2_storefront_uses_the_informal_register(lang: str) -> None:
     for entry in _po(lang):
-        if _any_in(entry, PART2_STOREFRONT):
+        # The form page module also holds the editor's help texts, which keep the formal register.
+        if _any_in(entry, PART2_STOREFRONT) and not _only_in(entry, "apps/cms/forms_pages.py"):
             assert not FORMAL[lang].search(_texts(entry)), entry.msgid
 
 

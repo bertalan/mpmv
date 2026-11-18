@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import Client
+from django.utils.translation import gettext
 from wagtail.models import Locale
 
 from apps.cms.models import BlogAuthor, BlogIndexPage, BlogPostPage, HomePage
@@ -145,7 +146,7 @@ def test_an_author_without_articles_gets_the_bio_and_an_empty_state(
     page = _html("/blog/author/ada-example/")
     assert page.find("b", string="bowls") is not None
     assert not page.select("article.post-summary")
-    assert "No articles by this author yet." in page.get_text()
+    assert gettext("No articles by this author yet.") in page.get_text()
 
 
 def test_an_unknown_author_is_not_found(blog: BlogIndexPage) -> None:
