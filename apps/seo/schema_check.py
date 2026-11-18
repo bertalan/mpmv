@@ -5,8 +5,10 @@ BreadcrumbList, Article, ProfilePage and Event); `dangling_references` lists eve
 reference that resolves to no node of the same graph.
 """
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Collection, Iterator, Mapping
 from typing import Any
+
+from . import engine
 
 
 def _nodes(document: Mapping[str, Any]) -> list[Mapping[str, Any]]:
@@ -46,8 +48,7 @@ def _offer_errors(label: str, offer: Mapping[str, Any]) -> list[str]:
         errors.append(f"{label}: offers.priceSpecification is missing or has another price")
     elif spec.get("priceCurrency") != offer.get("priceCurrency"):
         errors.append(f"{label}: offers.priceSpecification has another currency")
-    if not offer.get("seller"):
-        errors.append(f"{label}: offers.seller is missing")
+    # No `seller` is not an error: SEO.15 omits it when the vendor has no public name.
     return errors
 
 
@@ -76,8 +77,22 @@ def rich_result_warnings(document: Mapping[str, Any]) -> list[str]:
     ]
 
 
-def rich_result_errors(document: Mapping[str, Any]) -> list[str]:
-    errors: list[str] = []
+def _person_errors(document: Mapping[str, Any], person_names: Collection[str]) -> list[str]:
+    """SEO.15: an `Organization` (the seller) named like a natural person's legal name."""
+    return [
+        f"Organization {node.get('@id')}: the name is a natural person's legal name"
+        for node in _nodes(document)
+        if node.get("@type") == "Organization"
+        and engine.normalize_name(str(node.get("name") or "")) in person_names
+    ]
+
+
+def rich_result_errors(
+    document: Mapping[str, Any], *, person_names: Collection[str] = ()
+) -> list[str]:
+    """`person_names` are the normalised names of the natural persons the document is about
+    (`engine.natural_person_names`): no `Organization` may carry one (SEO.15)."""
+    errors: list[str] = _person_errors(document, person_names) if person_names else []
     for node in _nodes(document):
         kind = node.get("@type")
         if kind in {"Product", "ProductGroup"}:

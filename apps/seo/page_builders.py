@@ -14,6 +14,7 @@ from django.utils import translation
 
 from . import graph_engine as ge
 from . import product_graph as pg
+from . import seller as seller_name
 from .page_graph import Node, PageContext, register
 
 
@@ -256,7 +257,6 @@ def _listing(ctx: PageContext) -> list[Node]:
         return []
     url = f"{ctx.site}{path}"
     scope = anchor.scope
-    kind = "ProfilePage" if scope.vendor is not None else "CollectionPage"
     crumbs = [_home_crumb(ctx.site, shown), pg.Crumb(str(anchor.name), url)]
     nodes: list[Node] = []
     if scope.brand is not None:
@@ -270,13 +270,16 @@ def _listing(ctx: PageContext) -> list[Node]:
     main_entity = str(items["@id"]) if items else ""
     parts = [str(faq["@id"])] if faq else []
     vendor = scope.vendor
+    public_name = seller_name.public_name(vendor) if vendor is not None else None
+    kind = "ProfilePage" if public_name else "CollectionPage"
     if (
         vendor is not None
+        and public_name
         and catalog_slugs.vendor_path(shown, vendor.slug, default_language=settings.LANGUAGE_CODE)
         == path
     ):
         organization = pg.organization_node(
-            node_id=f"{url}#organization", name=str(vendor.display_name), url=url
+            node_id=f"{url}#organization", name=public_name, url=url
         )
         nodes.append(organization)
         if main_entity:

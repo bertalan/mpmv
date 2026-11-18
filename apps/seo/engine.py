@@ -109,3 +109,44 @@ def consent_signals(state: ConsentState) -> dict[str, str]:
         signal: GRANTED if allows(state, category) else DENIED
         for signal, category in SIGNAL_CATEGORY.items()
     }
+
+
+# --- Seller name (SEO.15) ---------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class VendorNameFacts:
+    """What decides the public seller name. `natural_person` is true for a sole trader (or an
+    individual whose legal form is not filled in yet but whose first and last name are)."""
+
+    display_name: str
+    legal_name: str = ""
+    first_name: str = ""
+    last_name: str = ""
+    natural_person: bool = False
+
+
+def normalize_name(name: str) -> str:
+    """A name compared without case, accents' case, punctuation or spacing differences."""
+    return " ".join(re.sub(r"[^\w\s]", " ", name.casefold()).split())
+
+
+def natural_person_names(facts: VendorNameFacts) -> frozenset[str]:
+    """The normalised names a natural person is known by: the legal name and the first and last
+    name in both orders. Empty for a vendor that is not a natural person."""
+    if not facts.natural_person:
+        return frozenset()
+    names = {facts.legal_name}
+    if facts.first_name and facts.last_name:
+        names |= {f"{facts.first_name} {facts.last_name}", f"{facts.last_name} {facts.first_name}"}
+    return frozenset(normalize_name(name) for name in names if name.strip())
+
+
+def public_seller_name(facts: VendorNameFacts) -> str | None:
+    """The name structured data may show for the vendor: its public shop or trading name, never
+    the legal name of a natural person. None when that is the only name there is (the seller
+    node and every reference to it are then left out, no error). One rule for SEO.1 and SEO.7."""
+    name = " ".join(facts.display_name.split())
+    if not name or normalize_name(name) in natural_person_names(facts):
+        return None
+    return name
