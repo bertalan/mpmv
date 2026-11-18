@@ -108,3 +108,89 @@ def test_vendor_order_emails_use_the_formal_register(lang: str) -> None:
             continue
         text = " ".join([entry.msgstr, *entry.msgstr_plural.values()])
         assert not informal.search(text), entry.msgid
+
+
+# I18N.13 follow-up: the customer privacy page (`privacy_account`) is informal, like every
+# customer page; the second-factor screens (`accounts/mfa/`, shared by customers, vendors and
+# staff) are formal. A string shared with another page keeps one register, so the customer page
+# uses its own gettext context where it shares a msgid with a vendor page ("Your data").
+PRIVACY_PAGES = ("compliance/privacy_account.html",)
+MFA_PAGES = "accounts/mfa/"
+
+INFORMAL = {
+    "it": re.compile(
+        r"\b(tu|tuo|tua|tuoi|tue|ti|hai|riesci|scegli|scansiona|inserisci|guarda)\b",
+        re.IGNORECASE,
+    ),
+    "de": re.compile(
+        r"\b(du|dein\w*|dir|dich|gib|wähle|scanne|sieh|bewahre|verwende)\b", re.IGNORECASE
+    ),
+    "fr": re.compile(r"\b(tu|ton|ta|tes|toi|te)\b", re.IGNORECASE),
+    "es": re.compile(
+        r"\b(tú|tu|tus|ti|contigo|tienes|puedes|elige|escanea|introduce|guárdalos)\b",
+        re.IGNORECASE,
+    ),
+}
+
+
+def _texts(entry: polib.POEntry) -> str:
+    return " ".join([entry.msgstr, *entry.msgstr_plural.values()])
+
+
+def _only_in(entry: polib.POEntry, marker: str) -> bool:
+    paths = [p for p, _l in entry.occurrences]
+    return bool(paths) and all(marker in p for p in paths)
+
+
+def _any_in(entry: polib.POEntry, markers: tuple[str, ...]) -> bool:
+    return any(m in p for p, _l in entry.occurrences for m in markers)
+
+
+@pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
+def test_customer_privacy_page_uses_the_informal_register(lang: str) -> None:
+    entries = [e for e in _po(lang) if _any_in(e, PRIVACY_PAGES)]
+    assert {e.msgid for e in entries} >= {"Your data", "Erase your account"}
+    for entry in entries:
+        assert entry.msgstr, entry.msgid
+        if lang in FORMAL:
+            assert not FORMAL[lang].search(_texts(entry)), entry.msgid
+
+
+@pytest.mark.parametrize(
+    ("lang", "expected"),
+    [("it", "I tuoi dati"), ("de", "Deine Daten"), ("fr", "Tes données"), ("es", "Tus datos")],
+)
+def test_your_data_has_a_customer_context_and_the_vendor_page_stays_formal(
+    lang: str, expected: str
+) -> None:
+    entries = [e for e in _po(lang) if e.msgid == "Your data"]
+    by_ctx = {e.msgctxt: e for e in entries}
+    customer = [e for c, e in by_ctx.items() if c and _any_in(e, PRIVACY_PAGES)]
+    assert len(customer) == 1
+    assert customer[0].msgstr == expected
+    vendor = by_ctx[None]
+    assert not _any_in(vendor, PRIVACY_PAGES)
+    assert _any_in(vendor, ("manager/shop/termination.html",))
+    if lang != "it":
+        assert vendor.msgstr != expected
+
+
+@pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
+def test_second_factor_pages_use_the_formal_register(lang: str) -> None:
+    for entry in _po(lang):
+        if not _only_in(entry, MFA_PAGES):
+            continue
+        assert not INFORMAL[lang].search(_texts(entry)), (entry.msgid, _texts(entry))
+
+
+@pytest.mark.parametrize(
+    ("lang", "expected"),
+    [
+        ("it", "Verifichi la Sua identità"),
+        ("es", "Verifique su identidad"),
+        ("fr", "Vérifiez votre identité"),
+    ],
+)
+def test_the_second_factor_verify_title_is_formal(lang: str, expected: str) -> None:
+    entries = {e.msgid: e.msgstr for e in _po(lang)}
+    assert entries["Verify it is you"] == expected

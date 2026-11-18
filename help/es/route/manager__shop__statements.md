@@ -12,4 +12,4 @@ Esta página enumera las exposiciones de motivos que la plataforma ha enviado a 
 
 La exposición no indica quién envió la notificación.
 
-Si la página está vacía, la plataforma no ha enviado ninguna exposición para su tienda. Para preguntas sobre una exposición, escriba a {{ operator.support_email }}.
+Si la página está vacía, la plataforma no ha enviado ninguna exposición para su tienda. Para preguntas sobre una exposición, escriba a {{ operator.compliance_email }}.
