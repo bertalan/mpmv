@@ -1,0 +1,29 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}Add fitment rows to the selected products (FIT.3): the rows, then the dry-run preview.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p class="manager-lead">{% blocktranslate count n=count %}{{ n }} product selected.{% plural %}{{ n }} products selected.{% endblocktranslate %}</p>
+  {% if error %}{% include "components/alert.html" with level="danger" message=error live="assertive" only %}{% endif %}
+  {% if changes %}
+    <p class="manager-lead">{% translate "Nothing has changed yet. Check the changes below, then confirm." %}</p>
+    <ul class="manager-changes">
+      {% for change in changes %}<li><strong>{{ change.op }}</strong> {{ change.model }} <code>{{ change.key }}</code></li>{% endfor %}
+    </ul>
+    <form method="post" class="manager-confirm">
+      {% csrf_token %}
+      {% for key, value in echo %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+      {% include "components/button.html" with label=_("Confirm") type="submit" name="confirm" value="1" only %}
+      {% include "components/button.html" with label=_("Cancel") url=list_url variant="ghost" only %}
+    </form>
+  {% else %}
+    <form method="post" class="manager-form" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="{{ action }}">
+      {% for id in selected %}<input type="hidden" name="selected" value="{{ id }}">{% endfor %}
+      {% include "manager/shop/_fitment_rows.html" %}
+      {% include "components/button.html" with label=_("Preview") type="submit" only %}
+      {% include "components/button.html" with label=_("Cancel") url=list_url variant="ghost" only %}
+    </form>
+  {% endif %}
+{% endblock %}
