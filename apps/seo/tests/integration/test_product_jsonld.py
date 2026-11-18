@@ -638,3 +638,30 @@ def test_the_attributes_add_no_queries(client: Client) -> None:
     with CaptureQueriesContext(connection) as full:
         client.get(MUG)
     assert len(full) <= len(bare)
+
+
+def test_each_variant_carries_its_own_identifiers_and_image(client: Client) -> None:
+    from apps.catalog.tests.factories import ProductImageFactory
+
+    product = live(
+        kind=Product.Kind.VARIABLE, price_net=Decimal("10.00"), gtin="4006381333931", mpn="MUG-77"
+    )
+    own = VariantFactory.create(
+        product=product,
+        gtin="96385074",
+        mpn="MUG-77-B",
+        cover_image=ProductImageFactory.create(product=product),
+    )
+    bare = VariantFactory.create(product=product, gtin="", mpn="")
+    for variant in (own, bare):
+        for language in configured_languages():
+            VariantTranslationFactory.create(variant=variant, language=language, label="V")
+    _html, document = graph_of(client)
+    group = node(document, "ProductGroup")
+    by_sku = {v["sku"]: v for v in group["hasVariant"]}
+    assert by_sku[str(own.sku)]["gtin8"] == "96385074"
+    assert by_sku[str(own.sku)]["mpn"] == "MUG-77-B"
+    assert by_sku[str(own.sku)]["image"][0]["contentUrl"].startswith("http")
+    # never the product's identifiers, and nothing blank
+    for key in ("gtin8", "gtin13", "mpn", "image"):
+        assert key not in by_sku[str(bare.sku)]

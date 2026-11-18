@@ -17,8 +17,8 @@ Rules (spec 10 "Product node"):
   own window is not modelled yet), the customer paying the return shipping and a lack of
   conformity free.
 - Variants: `variesBy` from the attributes the variants take a value on, a `@id` per variant;
-  no variant URL (the page picks a variant in a form, no URL selects one), and no per-variant
-  gtin, mpn or image (the variant model has none yet).
+  no variant URL (the page picks a variant in a form, no URL selects one); a variant states its
+  own gtin, mpn and cover image (CAT.23, SEO.13), never the product's.
 - Attributes (SEO.13): width, height and depth (the product's length) as `QuantitativeValue` in
   millimetres (`MMT`), `material` and `color` from the page-language text, `countryOfOrigin` as a
   `Country`; each only when stored.
@@ -274,6 +274,13 @@ def build_graph(
                 node_id=f"{url}#offer-{quote(choice.sku, safe='')}",
                 refs=refs,
                 request=request,
+            ),
+            gtin=choice.gtin,
+            mpn=choice.mpn,
+            images=(
+                (_image(GalleryImage(choice.image, choice.image_alt), site),)
+                if choice.image is not None
+                else ()
             ),
         )
         for choice in page.variants
