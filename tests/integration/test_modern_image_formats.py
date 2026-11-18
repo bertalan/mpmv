@@ -41,7 +41,7 @@ def seeded(db: None) -> SeedReport:
 def _photo(
     name: str = "lake", width: int = 2000, height: int = 1500, presets: tuple[str, ...] = ()
 ) -> MediaImage:
-    """A photo; `presets` are rendered up front, as the `catalog.render_product_image` job does:
+    """A photo; `presets` are rendered up front, as the `core.render_image` job does:
     a page only uses renditions that exist (CAT.4)."""
     from apps.core import images
 
