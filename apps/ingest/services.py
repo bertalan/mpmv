@@ -4,7 +4,8 @@ Every mutating service takes `ctx` (who acts) and `dry_run`, returns the `Change
 what it applies. Rows are changed in place so the caller keeps using the instance.
 """
 
-from collections.abc import Mapping
+import datetime as dt
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from django.core.exceptions import ValidationError
@@ -21,7 +22,18 @@ from apps.vendors.models import Vendor
 
 from . import engine
 from .catalog_loader import CatalogLoader, LoadReport
-from .models import ImportRun, MappingTable, ReviewItem, SourceItem, SupplierSource
+from .models import (
+    ImportRun,
+    ItemChange,
+    MappingTable,
+    ReviewItem,
+    SourceItem,
+    SourceMissing,
+    SourceState,
+    SourceStateVersion,
+    SourceVariation,
+    SupplierSource,
+)
 
 RUN_CREATED = "ingest.run.created"
 RUN_STATUS_CHANGED = "ingest.run.status_changed"
@@ -407,3 +419,222 @@ def load_legacy_catalog(
         {"dry_run": dry_run, "include_unpublished": include_unpublished, **report.summary()},
     )
     return report
+
+
+# --- Source state, missing evidence and change history (ING.2)
+
+
+class StateConflict(Exception):
+    """A native id is already owned by another item of the feed: a person must reconcile."""
+
+
+def state_snapshot(state: SourceState) -> dict[str, Any]:
+    return {
+        "item": str(state.item.public_id),
+        "kind": state.kind,
+        "native_id": state.native_id,
+        "version": state.version,
+        "stock_status": state.stock_status,
+        "stock_quantity": state.stock_quantity,
+        "state_hash": engine.payload_hash(state.state),
+    }
+
+
+def missing_snapshot(row: SourceMissing) -> dict[str, Any]:
+    return {"item": str(row.item.public_id), "url": row.url, "http_status": row.http_status}
+
+
+def record_source_state(
+    item: SourceItem,
+    observation: Mapping[str, Any],
+    *,
+    ctx: AuditContext,
+    now: dt.datetime | None = None,
+    dry_run: bool = False,
+) -> tuple[bool, ChangeSet]:
+    """Store a fully parsed observation of `item`; return whether its state changed.
+
+    The observation is validated (`engine.StateError` leaves everything untouched) and merged
+    with the stored state: variations no longer listed stay with their last data and `present`
+    off. Only a semantic change raises `version` and appends a `SourceStateVersion`; a repeat
+    only moves `observed_at`. A native id owned by another item of the feed raises
+    `StateConflict` and rolls everything back. A successful read also clears missing evidence.
+    """
+    now = now or timezone.now()
+    new = engine.validate_state(observation)
+    changes = ChangeSet()
+    with transaction.atomic():
+        locked = SourceItem.objects.select_for_update().select_related("source").get(pk=item.pk)
+        stored = SourceState.objects.select_for_update().filter(item=locked).first()
+        merged = engine.merge_state(stored.state if stored else None, new)
+        if stored and stored.kind != merged["kind"]:
+            raise engine.StateError("The kind of the item changed: reconciliation required.")
+        owner_ids = [merged["native_id"]] if merged["native_id"] is not None else []
+        if (
+            SourceState.objects.filter(source_id=locked.source_id, native_id__in=owner_ids)
+            .exclude(item=locked)
+            .exists()
+        ):
+            raise StateConflict("The native id belongs to another item of the feed.")
+        child_ids = [child["native_id"] for child in merged["variations"].values()]
+        if (
+            SourceVariation.objects.filter(source_id=locked.source_id, native_id__in=child_ids)
+            .exclude(item=locked)
+            .exists()
+        ):
+            raise StateConflict("A variation id belongs to another item of the feed.")
+
+        changed = stored is None or stored.state != merged
+        row = stored or SourceState(item=locked, source=locked.source)
+        row.kind, row.native_id, row.state = merged["kind"], merged["native_id"], merged
+        row.stock_status = merged.get("stock_status")
+        row.stock_quantity = merged.get("stock_quantity")
+        row.observed_at = now
+        row.version = (stored.version if stored else 0) + int(changed)
+        key = str(locked.public_id)
+        if changed and stored:
+            changes.update("ingest.sourcestate", key, state_snapshot(stored), state_snapshot(row))
+        elif changed:
+            changes.create("ingest.sourcestate", key, state_snapshot(row))
+        missing = SourceMissing.objects.filter(item=locked).first()
+        if missing:
+            changes.delete("ingest.sourcemissing", key, missing_snapshot(missing))
+        if dry_run:
+            return changed, changes
+        row.save()
+        for child in merged["variations"].values():
+            present = bool(child["present"])
+            variation = SourceVariation.objects.filter(
+                source_id=locked.source_id, native_id=child["native_id"]
+            ).first() or SourceVariation(
+                item=locked, source=locked.source, native_id=child["native_id"], last_seen_at=now
+            )
+            variation.state = child
+            variation.stock_status = child.get("stock_status")
+            variation.stock_quantity = child.get("stock_quantity")
+            variation.present = present
+            variation.observed_at = now
+            if present:
+                variation.last_seen_at = now
+            variation.save()
+        if changed:
+            SourceStateVersion.objects.create(
+                item=locked, version=row.version, state=merged, observed_at=now
+            )
+        if missing:
+            missing.delete()
+    return changed, changes
+
+
+def record_missing(
+    item: SourceItem,
+    url: str,
+    http_status: int,
+    *,
+    ctx: AuditContext,
+    now: dt.datetime | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Record that the supplier's page for `item` answered an error (404): evidence for the
+    rule "the supplier is master of stock". Repeats only move `last_seen_at`."""
+    now = now or timezone.now()
+    changes = ChangeSet()
+    with transaction.atomic():
+        locked = SourceItem.objects.select_for_update().get(pk=item.pk)
+        row = SourceMissing.objects.filter(item=locked).first()
+        new = SourceMissing(
+            item=locked,
+            url=url,
+            http_status=http_status,
+            first_seen_at=row.first_seen_at if row else now,
+            last_seen_at=now,
+        )
+        new.full_clean(exclude=["item"], validate_unique=False)
+        key = str(locked.public_id)
+        if row:
+            changes.update(
+                "ingest.sourcemissing", key, missing_snapshot(row), missing_snapshot(new)
+            )
+        else:
+            changes.create("ingest.sourcemissing", key, missing_snapshot(new))
+        if dry_run:
+            return changes
+        if row:
+            row.url, row.http_status, row.last_seen_at = url, http_status, now
+            row.save()
+        else:
+            new.save()
+    return changes
+
+
+def clear_missing(item: SourceItem, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    changes = ChangeSet()
+    row = SourceMissing.objects.filter(item=item).first()
+    if row is None:
+        return changes
+    changes.delete("ingest.sourcemissing", str(item.public_id), missing_snapshot(row))
+    if not dry_run:
+        row.delete()
+    return changes
+
+
+def missing_since(item_ids: Sequence[int]) -> dict[int, dt.datetime]:
+    """`{item id: when it was last found missing}` for the items whose page is missing."""
+    return dict(
+        SourceMissing.objects.filter(item_id__in=set(item_ids)).values_list(
+            "item_id", "last_seen_at"
+        )
+    )
+
+
+def record_item_change(
+    item: SourceItem,
+    values: Mapping[str, Any],
+    *,
+    ctx: AuditContext,
+    now: dt.datetime | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Append a change with the fields of `values` that differ from their effective value.
+
+    Nothing is appended when nothing differs. The history is never edited or deleted."""
+    now = now or timezone.now()
+    changes = ChangeSet()
+    with transaction.atomic():
+        locked = SourceItem.objects.select_for_update().get(pk=item.pk)
+        current = latest_changes([locked.pk]).get(locked.pk, {})
+        diff = engine.changed_fields(current, engine.canonical_state(values))
+        if not diff:
+            return changes
+        last = ItemChange.objects.filter(item=locked).order_by("-version").first()
+        row = ItemChange(
+            item=locked,
+            version=(last.version if last else 0) + 1,
+            changed_fields=dict.fromkeys(diff, True),
+            new_values=diff,
+            recorded_at=now,
+        )
+        changes.create(
+            "ingest.itemchange",
+            str(locked.public_id),
+            {"item": str(locked.public_id), "version": row.version, "fields": sorted(diff)},
+        )
+        if dry_run:
+            return changes
+        row.save()
+    return changes
+
+
+def latest_changes(
+    item_ids: Sequence[int], fields: Sequence[str] | None = None
+) -> dict[int, dict[str, Any]]:
+    """`{item id: {field: last flagged value}}`, read from the history only."""
+    rows: dict[int, list[tuple[Mapping[str, Any], Mapping[str, Any]]]] = {}
+    history = (
+        ItemChange.objects.filter(item_id__in=set(item_ids))
+        .order_by("item_id", "version", "id")
+        .values_list("item_id", "changed_fields", "new_values")
+    )
+    for item_id, flagged, values in history:
+        rows.setdefault(item_id, []).append((flagged, values))
+    return {item_id: engine.latest_field_values(r, fields) for item_id, r in rows.items()}
