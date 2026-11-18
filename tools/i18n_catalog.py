@@ -89,6 +89,8 @@ SCOPES = (
     # The customer privacy page (I18N.13 follow-up): informal register, "Your data" has its own context.
     "apps/compliance/templates/compliance/privacy_account.html",
     "themes/ride/templates/compliance/privacy_account.html",
+    # The staff note of the unused-images list (CAT.25): the rest of that page is English admin.
+    "apps/catalog/templates/catalog/admin/orphan_images_old_versions.html",
     *EVENT_FILES,  # the public event pages (EVT.6)
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).

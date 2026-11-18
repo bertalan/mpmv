@@ -1053,6 +1053,12 @@ msgstr ""
 "Ein Zuschlag, der zum Preis der Stufe addiert wird, ohne MwSt. Verwenden Sie 0, wenn es keinen "
 "gibt."
 
+#: apps/catalog/templates/catalog/admin/orphan_images_old_versions.html
+msgid ""
+"An image that is only in an old version of a page may be listed here. If you delete it, going back"
+" to that version would show a missing image."
+msgstr "Ein Bild, das nur in einer alten Version einer Seite vorkommt, kann hier aufgeführt sein. Wenn Sie es löschen, würde beim Zurückkehren zu dieser Version ein fehlendes Bild angezeigt."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "An introduction shown on the category page, for example what you find in it. Basic formatting is "
