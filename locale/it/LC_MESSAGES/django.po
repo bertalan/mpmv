@@ -9173,6 +9173,7 @@ msgstr "Il membro del personale che ha nascosto l'evento. Lo compila la piattafo
 #: apps/manager/money_views.py
 msgid "The start date is after the end date. The period filter was ignored."
 msgstr "La data di inizio è successiva alla data di fine. Il filtro del periodo è stato ignorato."
+
 #: apps/ingest/models.py
 msgid "The state as it was at that version."
 msgstr "Lo stato com'era a quella versione."
