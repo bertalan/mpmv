@@ -1,0 +1,205 @@
+"""CAT.11: the Catalog section of the Manager platform space."""
+
+import pytest
+from django.test import Client
+
+from apps.accounts import levels
+from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.mfa import verified_login
+from apps.catalog import publishing
+from apps.catalog.models import Product
+from apps.catalog.tests.factories import (
+    CategoryFactory,
+    ProductFactory,
+    ProductTranslationFactory,
+)
+from apps.core.models import AuditLog
+from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
+
+pytestmark = pytest.mark.django_db
+
+LIST = "/manager/platform/catalog/products/"
+
+
+def sign_in(client: Client, role: str, **kwargs: object) -> None:
+    verified_login(client, UserFactory.create(platform_role=role), **kwargs)  # type: ignore[arg-type]
+
+
+def detail(product: Product) -> str:
+    return f"{LIST}{product.public_id}/"
+
+
+@pytest.fixture(autouse=True)
+def _no_checks(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(publishing, "_CHECKS", {})
+
+
+@pytest.mark.parametrize(
+    ("role", "code"),
+    [("catalog", 200), ("owner", 200), ("finance", 404), ("support", 404), ("config", 404)],
+)
+def test_role_access(client: Client, role: str, code: int) -> None:
+    product = ProductFactory.create(languages=["en"])
+    sign_in(client, role)
+    assert client.get(LIST).status_code == code
+    assert client.get(detail(product)).status_code == code
+
+
+def test_finance_and_support_cannot_change_a_product(client: Client) -> None:
+    product = ProductFactory.create()
+    for role in ("finance", "support"):
+        sign_in(client, role)
+        assert (
+            client.post(
+                LIST, {"action": "publish", "selected": [str(product.public_id)], "confirm": "1"}
+            ).status_code
+            == 404
+        )
+        assert (
+            client.post(detail(product), {"sales_mode": "catalog_only", "confirm": "1"}).status_code
+            == 404
+        )
+    product.refresh_from_db()
+    assert product.status == "draft"
+
+
+def test_the_owner_reads_but_cannot_write(client: Client) -> None:
+    product = ProductFactory.create()
+    sign_in(client, "owner")
+    response = client.post(LIST, {"action": "publish", "selected": [str(product.public_id)]})
+    assert response.status_code == 404
+
+
+def test_filters(client: Client) -> None:
+    a, b = VendorFactory.create(), VendorFactory.create()
+    cat = CategoryFactory.create()
+    p1 = ProductFactory.create(vendor=a, sku="ALPHA-1", category=cat, languages=["en"])
+    p2 = ProductFactory.create(vendor=b, sku="BETA-2", status="published", languages=["en"])
+    sign_in(client, "catalog")
+    both = client.get(LIST).text
+    assert "ALPHA-1" in both
+    assert "BETA-2" in both
+    by_vendor = client.get(LIST, {"vendor": str(a.public_id)}).text
+    assert "ALPHA-1" in by_vendor
+    assert "BETA-2" not in by_vendor
+    by_status = client.get(LIST, {"status": "published"}).text
+    assert "BETA-2" in by_status
+    assert "ALPHA-1" not in by_status
+    by_cat = client.get(LIST, {"category": str(cat.public_id)}).text
+    assert "ALPHA-1" in by_cat
+    assert "BETA-2" not in by_cat
+    by_q = client.get(LIST, {"q": "beta"}).text
+    assert "BETA-2" in by_q
+    assert "ALPHA-1" not in by_q
+    assert p1
+    assert p2
+
+
+def test_translation_status_is_correct_and_filterable(client: Client) -> None:
+    other = other_language()
+    done = ProductFactory.create(sku="DONE-1")
+    ProductTranslationFactory.create(product=done, language="en", status="published")
+    ProductTranslationFactory.create(product=done, language=other, status="published")
+    partial = ProductFactory.create(sku="PART-1", languages=["en"])
+    sign_in(client, "catalog")
+    complete = client.get(LIST, {"translation": "complete"}).text
+    assert "DONE-1" in complete
+    assert "PART-1" not in complete
+    incomplete = client.get(LIST, {"translation": "incomplete"}).text
+    assert "PART-1" in incomplete
+    assert "DONE-1" not in incomplete
+    missing = client.get(LIST, {"translation": f"missing:{other}"}).text
+    assert "PART-1" in missing
+    assert "DONE-1" not in missing
+    assert partial
+
+
+def test_the_list_query_count_does_not_grow_with_rows(
+    client: Client, django_assert_max_num_queries: object
+) -> None:
+    ProductFactory.create_batch(3, languages=["en"])
+    sign_in(client, "catalog")
+    client.get(LIST)  # warm caches
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    with CaptureQueriesContext(connection) as few:
+        client.get(LIST)
+    ProductFactory.create_batch(15, languages=["en"])
+    with CaptureQueriesContext(connection) as many:
+        client.get(LIST)
+    assert len(many) <= len(few) + 1
+    assert len(many) <= 30
+
+
+def test_bulk_publish_previews_then_applies_with_audit(client: Client) -> None:
+    products = ProductFactory.create_batch(2)
+    ids = [str(p.public_id) for p in products]
+    sign_in(client, "catalog")
+    preview = client.post(LIST, {"action": "publish", "selected": ids})
+    assert preview.status_code == 200
+    assert 'name="confirm"' in preview.text
+    assert set(Product.objects.values_list("status", flat=True)) == {"draft"}
+    assert not AuditLog.objects.filter(action="catalog.product.status_changed").exists()
+    done = client.post(LIST, {"action": "publish", "selected": ids, "confirm": "1"})
+    assert done.status_code == 302
+    assert set(Product.objects.values_list("status", flat=True)) == {"published"}
+    assert AuditLog.objects.filter(action="catalog.product.status_changed").count() == 2
+
+
+@pytest.mark.parametrize(("action", "status"), [("unpublish", "draft"), ("retire", "retired")])
+def test_other_bulk_actions(client: Client, action: str, status: str) -> None:
+    product = ProductFactory.create(status="published")
+    sign_in(client, "catalog")
+    client.post(LIST, {"action": action, "selected": [str(product.public_id)], "confirm": "1"})
+    product.refresh_from_db()
+    assert product.status == status
+
+
+def test_a_blocked_publication_is_shown_and_changes_nothing(client: Client) -> None:
+    publishing.register_publication_check("t", lambda p: ["blocked"])
+    product = ProductFactory.create()
+    sign_in(client, "catalog")
+    response = client.post(
+        LIST, {"action": "publish", "selected": [str(product.public_id)], "confirm": "1"}
+    )
+    assert response.status_code == 302
+    product.refresh_from_db()
+    assert product.status == "draft"
+
+
+def test_bulk_writes_need_the_session_level(client: Client) -> None:
+    product = ProductFactory.create()
+    sign_in(client, "catalog", level=levels.NO_WINDOW)
+    response = client.post(
+        LIST, {"action": "publish", "selected": [str(product.public_id)], "confirm": "1"}
+    )
+    assert response.status_code == 403
+    product.refresh_from_db()
+    assert product.status == "draft"
+
+
+def test_the_preview_shows_translation_status_per_language(client: Client) -> None:
+    product = ProductFactory.create(languages=["en"])
+    sign_in(client, "catalog")
+    response = client.get(detail(product))
+    assert response.status_code == 200
+    assert product.sku in response.text
+    assert other_language() in response.text
+
+
+def test_staff_edit_audited_fields_with_dry_run_then_confirm(client: Client) -> None:
+    product = ProductFactory.create(sales_mode="buy")
+    sign_in(client, "catalog")
+    data = {"sales_mode": "catalog_only", "fiscal_category": product.fiscal_category}
+    preview = client.post(detail(product), data)
+    assert preview.status_code == 200
+    assert 'name="confirm"' in preview.text
+    product.refresh_from_db()
+    assert product.sales_mode == "buy"
+    done = client.post(detail(product), {**data, "confirm": "1"})
+    assert done.status_code == 302
+    product.refresh_from_db()
+    assert product.sales_mode == "catalog_only"
+    assert AuditLog.objects.filter(action="catalog.product.updated").exists()
