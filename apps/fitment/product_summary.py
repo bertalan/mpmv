@@ -15,7 +15,7 @@ from apps.catalog.product_pages import FitmentEntry, FitmentGroup, FitmentSummar
 from apps.core import translations
 
 from .engine import STEP_LENGTH
-from .models import FitmentNode, ProductFitment, ProductFitmentState
+from .models import FitmentNode, NodeStatus, ProductFitment, ProductFitmentState
 
 
 def _name(node: FitmentNode, language: str) -> str:
@@ -50,6 +50,28 @@ def summary(product: Product, language: str) -> FitmentSummary | None:
         .prefetch_related("node__translations", "note__translations")
         .order_by("node_path", "id")
     )
+    if not rows:
+        return None
+    # Only ACTIVE nodes are public (spec 17.2.4): a row is hidden when its node or any ancestor
+    # (the make included) is proposed or retired. One query over every prefix of every path.
+    prefixes = {
+        row.node_path[:end]
+        for row in rows
+        for end in range(STEP_LENGTH, len(row.node_path) + 1, STEP_LENGTH)
+    }
+    hidden = set(
+        FitmentNode.objects.filter(path__in=prefixes)
+        .exclude(status=NodeStatus.ACTIVE)
+        .values_list("path", flat=True)
+    )
+    rows = [
+        row
+        for row in rows
+        if not any(
+            row.node_path[:end] in hidden
+            for end in range(STEP_LENGTH, len(row.node_path) + 1, STEP_LENGTH)
+        )
+    ]
     if not rows:
         return None
     roots = {row.node_path[:STEP_LENGTH] for row in rows}

@@ -129,6 +129,34 @@ def add_fitment(product: Product, models_per_make: int = 2, makes: int = 1) -> N
             ProductFitmentFactory.create(product=product, node=node)
 
 
+@pytest.mark.parametrize("status", ["proposed", "retired"])
+def test_only_active_nodes_are_public(client: Client, theme: str, status: str) -> None:
+    """Spec 17.2.4: a node that is not active, or sits under one, never shows (merged nodes are
+    deleted and their rows moved to the target, so they cannot appear)."""
+    product = make_product()
+    ProductFitmentStateFactory.create(product=product, mode=ProductFitmentState.Mode.SPECIFIC)
+    make = FitmentNodeFactory.create(name="Shown make")
+    good = FitmentNodeFactory.create(parent=make, name="Shown model")
+    bad = FitmentNodeFactory.create(parent=make, name="Hidden model", status=status)
+    under_bad = FitmentNodeFactory.create(parent=bad, name="Under hidden")
+    hidden_make = FitmentNodeFactory.create(name="Hidden make", status=status)
+    under_make = FitmentNodeFactory.create(parent=hidden_make, name="Under hidden make")
+    for node in (good, bad, under_bad, under_make):
+        ProductFitmentFactory.create(product=product, node=node)
+    assert fitment(soup(client)) == [("Shown make", "Shown model")]
+
+
+def test_a_product_with_only_unapproved_fitment_shows_no_fitment(
+    client: Client, theme: str
+) -> None:
+    product = make_product()
+    ProductFitmentStateFactory.create(product=product, mode=ProductFitmentState.Mode.SPECIFIC)
+    make = FitmentNodeFactory.create(name="M")
+    node = FitmentNodeFactory.create(parent=make, name="N", status="proposed")
+    ProductFitmentFactory.create(product=product, node=node)
+    assert soup(client).select_one(".product-fitment") is None
+
+
 def test_specifications_show_the_product_data(client: Client, theme: str) -> None:
     product = make_product(
         weight_kg=Decimal("0.350"), gtin="4006381333931", mpn="MUG-1", length_cm=Decimal("10")
