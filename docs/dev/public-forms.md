@@ -46,7 +46,7 @@ takes anonymous POSTs at its own address; the declaration covers all of them.
 
 | Page type | Purpose | Protection | Rate limit | Task |
 |---|---|---|---|---|
-| `apps.cms.forms_pages.FormPage` | Editor-built form pages: any form an editor publishes (contact, request, survey) | captcha | the captcha only (a token is single use) | CMS.13 |
+| `apps.cms.forms_pages.FormPage` | Editor-built form pages: any form an editor publishes (contact, request, survey) | captcha | per client IP (settings.FORM_PAGE_RATE_LIMIT per 15 minutes), then the captcha | CMS.13 |
 
 ## Signed in, second factor not verified yet
 

@@ -15,7 +15,9 @@ from django.utils import timezone
 from wagtail.contrib.forms.models import FormSubmission
 
 from apps.accounts.captcha import TOKEN_FIELD
+from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
+from apps.accounts.tests.mfa import verified_login
 from apps.cms import services
 from apps.cms.forms_pages import MAX_RETENTION_DAYS
 from apps.cms.models import FormPage
@@ -183,3 +185,126 @@ def test_the_form_page_type_is_listed_in_the_register_without_a_manual_step() ->
     row = next(r for r in report.pages if r.page_class is FormPage)
     assert row.spec.protection is public_forms.Protection.CAPTCHA
     assert "FormPage" in public_forms.render_register(report)
+
+
+# --- Review round: rate limit, size limits, hostile content, who sees the submissions
+
+HOSTILE = '<script>alert("x")</script><img src=x onerror=alert(1)>'
+
+
+def test_a_client_over_the_rate_limit_gets_429_and_nothing_is_stored(
+    client: Client, seeded: SeedReport, settings: Any
+) -> None:
+    settings.FORM_PAGE_RATE_LIMIT = 2
+    page = a_form(seeded)
+    for _ in range(2):
+        assert submit(client, page, FakeCaptchaVerifier.VALID_TOKEN).status_code == 200
+    response = submit(client, page, FakeCaptchaVerifier.VALID_TOKEN)
+    assert response.status_code == 429
+    assert int(response["Retry-After"]) >= 1
+    assert FormSubmission.objects.count() == 2
+    assert client.get(page.url).status_code == 200  # reading is not limited
+
+
+def test_the_rate_limit_is_per_client_address(
+    client: Client, seeded: SeedReport, settings: Any
+) -> None:
+    settings.FORM_PAGE_RATE_LIMIT = 1
+    page = a_form(seeded)
+    assert submit(client, page, FakeCaptchaVerifier.VALID_TOKEN).status_code == 200
+    assert submit(client, page, FakeCaptchaVerifier.VALID_TOKEN).status_code == 429
+    other = Client(REMOTE_ADDR="203.0.113.77")
+    assert submit(other, page, FakeCaptchaVerifier.VALID_TOKEN).status_code == 200
+
+
+def test_an_oversize_value_is_refused_per_field_and_not_stored(
+    client: Client, seeded: SeedReport
+) -> None:
+    from apps.cms.forms_pages import FIELD_MAX_LENGTH
+
+    page = a_form(seeded)  # a multiline field
+    too_long = "a" * (FIELD_MAX_LENGTH["multiline"] + 1)
+    response = submit(client, page, FakeCaptchaVerifier.VALID_TOKEN, too_long)
+    assert response.status_code == 200  # shown again with its error
+    assert not FormSubmission.objects.exists()
+    ok = submit(client, page, FakeCaptchaVerifier.VALID_TOKEN, "a" * FIELD_MAX_LENGTH["multiline"])
+    assert ok.status_code == 200
+    assert FormSubmission.objects.count() == 1
+
+
+@pytest.mark.parametrize("field_type", ["singleline", "email", "url"])
+def test_every_text_field_type_has_a_max_length(field_type: str, seeded: SeedReport) -> None:
+    from apps.cms.forms_pages import FIELD_MAX_LENGTH
+
+    page = FormPageFactory.create(title="Types")
+    FormFieldFactory.create(page=page, label="Thing", field_type=field_type)
+    form = page.get_form()
+    assert form.fields["thing"].max_length == FIELD_MAX_LENGTH[field_type]
+
+
+def test_an_oversize_submission_is_refused_with_400_and_not_stored(
+    client: Client, seeded: SeedReport, settings: Any
+) -> None:
+    settings.FORM_PAGE_MAX_SUBMISSION_BYTES = 1024
+    page = a_form(seeded)
+    response = client.post(
+        page.url,
+        {
+            "your_question": "ok",
+            "padding": "x" * 2000,
+            TOKEN_FIELD: FakeCaptchaVerifier.VALID_TOKEN,
+        },
+    )
+    assert response.status_code == 400
+    assert not FormSubmission.objects.exists()
+
+
+def test_hostile_labels_and_values_are_escaped_everywhere(
+    client: Client, seeded: SeedReport
+) -> None:
+    page = FormPageFactory.create(title="Hostile")
+    FormFieldFactory.create(page=page, label=HOSTILE, field_type="multiline", required=True)
+    page.save_revision().publish()
+    page = FormPage.objects.get(pk=page.pk)
+    name = page.form_fields.get().clean_name
+
+    html = client.get(page.url).content.decode()
+    assert "<script>alert" not in html
+    assert "<img src=x" not in html
+
+    # The value comes back escaped in the redisplayed form (invalid: too long) and the landing page.
+    sent = client.post(page.url, {name: HOSTILE, TOKEN_FIELD: FakeCaptchaVerifier.VALID_TOKEN})
+    assert sent.status_code == 200
+    assert "<script>alert" not in sent.content.decode()
+    assert "<img src=x" not in sent.content.decode()
+    assert FormSubmission.objects.get().get_data()[name] == HOSTILE  # stored as typed
+
+    # The admin list of submissions escapes both the label (column) and the value.
+    from django.urls import reverse
+
+    verified_login(client, UserFactory.create(superuser=True))
+    listing = client.get(reverse("wagtailforms:list_submissions", args=(page.pk,)))
+    assert listing.status_code == 200
+    body = listing.content.decode()
+    assert "<script>alert" not in body
+    assert "<img src=x" not in body
+    assert "&lt;script&gt;" in body
+
+
+def test_a_user_without_page_rights_cannot_see_the_submissions(
+    client: Client, seeded: SeedReport
+) -> None:
+    from django.urls import reverse
+
+    page = a_form(seeded)
+    FormSubmission.objects.create(page=page, form_data={"your_question": "private words"})
+    url = reverse("wagtailforms:list_submissions", args=(page.pk,))
+
+    anonymous = client.get(url)
+    assert anonymous.status_code in (302, 403, 404)
+    assert "private words" not in anonymous.content.decode()
+
+    verified_login(client, UserFactory.create())  # no group, no page rights
+    plain = client.get(url)
+    assert plain.status_code in (302, 403, 404)
+    assert "private words" not in plain.content.decode()
