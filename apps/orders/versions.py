@@ -17,6 +17,7 @@ from apps.core.audit import VENDOR_FIELD
 from apps.tax.engine import NORTHERN_IRELAND_CODE, is_northern_ireland
 
 from . import amendment_engine as am
+from . import engine
 from .models import OrderLine, VendorOrder, VendorOrderVersion
 from .tz import business_tz
 
@@ -101,24 +102,45 @@ def version_one_snapshot(sub: VendorOrder, lines: Sequence[OrderLine]) -> am.Ver
 def _shipping_portions(
     sub: VendorOrder, lines: Sequence[am.VersionLine], choice: dict[str, Any], on: dt.date
 ) -> tuple[am.VersionPortion, ...]:
+    stored = choice.get("tax_portions") or []
+    if sub.shipping_tax_rate is None:
+        # ORD.29: split across rates. The portions are the only source of truth, so a vendor
+        # order without them, or whose shipping VAT or net is not their sum, is refused here
+        # instead of falling back to a single rate.
+        engine.check_shipping_portions(
+            sub.shipping_net,
+            engine.stored_shipping_portions(choice),
+            shipping_tax=sub.shipping_tax_amount,
+        )
     if sub.shipping_net == 0:
         return ()
-    stored = choice.get("tax_portions") or []
     raw = [
-        (Decimal(str(p["net"])), Decimal(str(p["tax"])), Decimal(str(p["rate"])), str(p["reason"]))
+        (
+            Decimal(str(p["net"])),
+            Decimal(str(p["tax"])),
+            Decimal(str(p["rate"])),
+            str(p["reason"]),
+            p.get("nature_code") or None,
+            p.get("legal_note_key") or None,
+        )
         for p in stored
     ]
-    if not raw:  # one portion on the vendor order's own fields
+    if not raw:  # one portion on the vendor order's own fields (a single rate)
+        single = sub.shipping_tax_rate
+        if single is None:  # unreachable: checked above
+            raise engine.ShippingPortionsMismatch("shipping split across rates needs its portions")
         raw = [
             (
                 sub.shipping_net,
                 sub.shipping_tax_amount,
-                sub.shipping_tax_rate,
-                sub.shipping_tax_reason,
+                single,
+                sub.shipping_tax_reason or "",
+                sub.shipping_vat_nature_code or None,
+                None,
             )
         ]
     portions = []
-    for net, tax, rate, reason in raw:
+    for net, tax, rate, reason, nature_code, legal_note_key in raw:
         # The decision the shipping followed is the one of its goods (TAX.17).
         goods = next(
             (
@@ -138,10 +160,9 @@ def _shipping_portions(
                 country_of_taxation=(
                     goods.country_of_taxation if goods else _country_of_taxation(rate, reason, sub)
                 ),
-                legal_note_key=goods.legal_note_key if goods else None,
-                nature_code=(
-                    goods.nature_code if goods else (sub.shipping_vat_nature_code or None)
-                ),
+                legal_note_key=legal_note_key or (goods.legal_note_key if goods else None),
+                nature_code=nature_code
+                or (goods.nature_code if goods else (sub.shipping_vat_nature_code or None)),
             )
         )
     return tuple(portions)

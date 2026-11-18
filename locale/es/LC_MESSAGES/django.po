@@ -6130,14 +6130,6 @@ msgstr "Método de envío"
 msgid "Shipping method changed to %(method)s"
 msgstr "Método de envío cambiado a %(method)s"
 
-#: apps/orders/ui/present.py
-msgid ""
-"Shipping on a package with different VAT rates cannot be ordered yet. Order these items in "
-"separate orders."
-msgstr ""
-"Todavía no se puede pedir el envío de un paquete con tipos de IVA diferentes. Pide estos artículos"
-" en pedidos separados."
-
 #: apps/manager/forms.py
 msgid "Shipping policy"
 msgstr "Condiciones de envío"
