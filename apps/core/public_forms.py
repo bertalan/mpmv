@@ -43,7 +43,7 @@ import enum
 import inspect
 import re
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from django.conf import settings
@@ -167,6 +167,15 @@ class Report:
     not_anonymous: list[Row]
     errors: list[tuple[str, str]]  # (check id, message)
     warnings: list[tuple[str, str]]
+    pages: list["PageRow"] = field(default_factory=list)  # page types that carry a form (CMS.13)
+
+
+@dataclass(frozen=True)
+class PageRow:
+    """A Wagtail page type declared with `public_form`: every page of the type is a form."""
+
+    page_class: type
+    spec: FormSpec
 
 
 def _pattern_text(pattern: Any) -> str:
@@ -307,6 +316,11 @@ def _spec_problems(leaf: Leaf, spec: FormSpec) -> list[str]:
     return problems
 
 
+def _page_spec_problems(spec: FormSpec) -> list[str]:
+    """The declaration of a page type is checked like the one of a route."""
+    return _spec_problems(Leaf("", "", lambda request: None), spec)
+
+
 def settings_problems() -> list[str]:
     """Wagtail features that add an anonymous form stay off unless the form is declared."""
     problems = []
@@ -384,6 +398,18 @@ def page_problems(classes: Iterable[type] | None = None) -> list[str]:
     return problems
 
 
+def page_rows(classes: Iterable[type] | None = None) -> list[PageRow]:
+    """The page types declared with `public_form`, so an editor-built form page (CMS.13) is in
+    the register with no manual step. A page type is declared on its own class, never inherited
+    from a parent page type."""
+    rows = []
+    for cls in classes if classes is not None else _page_classes():
+        spec = vars(cls).get(SPEC_ATTR)
+        if isinstance(spec, FormSpec) and cls.__module__.startswith("apps."):
+            rows.append(PageRow(cls, spec))
+    return sorted(rows, key=lambda r: f"{r.page_class.__module__}.{r.page_class.__qualname__}")
+
+
 def public_form_report(urlconf: UrlConf = None) -> Report:
     rows: dict[Kind, list[Row]] = {kind: [] for kind in Kind}
     errors: list[tuple[str, str]] = []
@@ -416,7 +442,13 @@ def public_form_report(urlconf: UrlConf = None) -> Report:
         errors += [("core.E704", message) for message in page_problems()]
     for kind_rows in rows.values():
         kind_rows.sort(key=lambda row: row.leaf.path)
-    return Report(rows[Kind.PUBLIC], rows[Kind.PRE_MFA], rows[Kind.NOT_ANONYMOUS], errors, warnings)
+    pages = page_rows() if urlconf is None else []
+    for page in pages:
+        for problem in _page_spec_problems(page.spec):
+            errors.append(("core.E702", f"{page.page_class.__qualname__}: {problem}"))
+    return Report(
+        rows[Kind.PUBLIC], rows[Kind.PRE_MFA], rows[Kind.NOT_ANONYMOUS], errors, warnings, pages
+    )
 
 
 # --- The register (docs/dev/public-forms.md), built by tools/build_public_forms.py -------------
@@ -476,6 +508,31 @@ def render_register(report: Report) -> str:
                     _protection_text(spec),
                     rate,
                     spec.task,
+                )
+            )
+            + " |"
+        )
+    lines += [
+        "",
+        "## Form pages",
+        "",
+        "Wagtail page types an editor builds a form on (CMS.13). Every published page of the type",
+        "takes anonymous POSTs at its own address; the declaration covers all of them.",
+        "",
+        "| Page type | Purpose | Protection | Rate limit | Task |",
+        "|---|---|---|---|---|",
+    ]
+    for page in report.pages:
+        lines.append(
+            "| "
+            + " | ".join(
+                _cell(c)
+                for c in (
+                    f"`{page.page_class.__module__}.{page.page_class.__qualname__}`",
+                    page.spec.purpose,
+                    _protection_text(page.spec),
+                    page.spec.rate_limit,
+                    page.spec.task,
                 )
             )
             + " |"

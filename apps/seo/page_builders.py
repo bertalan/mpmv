@@ -139,6 +139,7 @@ def register_all() -> None:
         cms.VendorRecruitmentPage,
         cms.TermLandingPage,
         cms.VendorLandingPage,
+        cms.FormPage,
         events.EventPage,
     ):
         register(model)(_web_page)

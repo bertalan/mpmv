@@ -648,6 +648,14 @@ msgstr ""
 "Un breve resumen que se muestra en la lista del blog, de hasta 300 caracteres. Si lo deja vacío, "
 "la lista no muestra ningún resumen."
 
+#: apps/cms/forms_pages.py
+msgid ""
+"A short text above the form. Say who reads the answers and what you do with them. If you leave it "
+"empty, the form starts right under the title."
+msgstr ""
+"Un texto breve sobre el formulario. Diga quién lee las respuestas y qué hace con ellas. Si lo deja"
+" vacío, el formulario empieza justo debajo del título."
+
 #: apps/cms/models.py
 msgid ""
 "A short text shown above the products of this category or tag. If you add none, the page starts "
@@ -3072,6 +3080,14 @@ msgid ""
 msgstr ""
 "Durante cuántos días un evento cancelado permanece en los calendarios, marcado como cancelado, "
 "para que los calendarios de las personas lo sepan. Ejemplo: 30. Obligatorio."
+
+#: apps/cms/forms_pages.py
+msgid ""
+"How many days each submission is kept before it is deleted for good, from 1 to 365. Keep it as "
+"short as your work allows. The default is 90 days."
+msgstr ""
+"Cuántos días se conserva cada envío antes de eliminarse definitivamente, de 1 a 365. Elija el "
+"plazo más corto que su trabajo permita. El valor predeterminado es 90 días."
 
 #: apps/manager/amendment_views.py
 msgid ""
@@ -6144,6 +6160,11 @@ msgstr "Mostrar los productos más recientes de esta tienda."
 msgid "Showing %(vendor)s only."
 msgstr "Solo %(vendor)s."
 
+#: apps/cms/forms_pages.py
+msgid ""
+"Shown after a successful submission. If you leave it empty, a short standard message is shown."
+msgstr "Se muestra tras un envío correcto. Si lo deja vacío, aparece un breve mensaje estándar."
+
 #: apps/cms/models.py
 msgid "Shown on the article; a migrated article keeps its original date."
 msgstr "Se muestra en el artículo. Un artículo importado mantiene su fecha original."
@@ -8910,6 +8931,14 @@ msgstr ""
 "El texto de la página de la marca, solo en este idioma: un idioma sin texto no muestra ninguna "
 "descripción, nunca la de otro idioma. Se conserva el formato básico. Ejemplo: «Yunques y "
 "herramientas de forja fabricados en Bérgamo desde 1949.»"
+
+#: apps/cms/forms_pages.py
+msgid ""
+"The text on the send button, for example 'Send your question'. If you leave it empty, the button "
+"says 'Send'."
+msgstr ""
+"El texto del botón de envío, por ejemplo «Enviar su pregunta». Si lo deja vacío, el botón dice "
+"«Enviar»."
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid ""
