@@ -20,6 +20,7 @@ from urllib.parse import urlencode, urlsplit
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.postgres.search import SearchQuery, SearchRank, TrigramStrictWordSimilarity
@@ -348,6 +349,40 @@ def _validate(instance: Product | Variant) -> None:
     instance.full_clean(validate_unique=False)
 
 
+CATALOG_EDITOR_PERMISSIONS = ("manager.platform_catalog", "core.platform_owner")
+# Every platform role: Configuration holds no platform-wide vendor read, so is_platform_staff()
+# alone would miss it.
+PLATFORM_ROLE_PERMISSIONS = (
+    "manager.platform_config",
+    "manager.platform_finance",
+    "manager.platform_support",
+    *CATALOG_EDITOR_PERMISSIONS,
+)
+
+
+def may_edit_catalog(ctx: AuditContext) -> bool:
+    """Whether the actor of `ctx` may write to the platform catalog (CAT.30, CORE.18).
+
+    Platform staff must hold the Catalog and moderation role or the owner role (or be a technical
+    superuser): Support reads the catalog section (MQ-52) and Finance and Configuration do not
+    write it. Anyone else passes: a vendor member (scoped elsewhere), a command or a pipeline
+    without a user."""
+    if ctx.actor_id is None:
+        return True
+    user = get_user_model().objects.filter(pk=ctx.actor_id).first()
+    if user is None or not (
+        is_platform_staff(user) or holds_permission(user, *PLATFORM_ROLE_PERMISSIONS)
+    ):
+        return True
+    return bool(user.is_superuser) or holds_permission(user, *CATALOG_EDITOR_PERMISSIONS)
+
+
+def require_catalog_editor(ctx: AuditContext) -> None:
+    """Raise PermissionDenied before any write when the actor may not edit the catalog."""
+    if not may_edit_catalog(ctx):
+        raise PermissionDenied("Your role may read the catalog but not change it.")
+
+
 def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Create or update `product`, auditing its sales mode, fiscal category, weight and size.
 
@@ -357,6 +392,7 @@ def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) 
     publication check fails (`publishing.check_publishable`, GPSR: CMP.3), or an edit of a
     published product adds a blocker (`publishing.check_still_publishable`), also on dry-run.
     """
+    require_catalog_editor(ctx)
     _validate(product)
     changes = ChangeSet()
     key = str(product.public_id)
@@ -404,6 +440,7 @@ def set_products_status(
     product: a ValidationError refuses the whole batch and nothing is written. Also on dry-run.
     Retired is not a final state here: retired -> draft/published is allowed (spec 03 §3.2).
     """
+    require_catalog_editor(ctx)
     if status not in ProductStatus.values:
         raise ValueError(f"Unknown product status: {status!r}")
     changes = ChangeSet()
@@ -445,6 +482,7 @@ def _allow_history_delete() -> None:
 def delete_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Delete `product` with its variants and translations, auditing the product and each
     variant. A product that others require as their companion is protected (ProtectedError)."""
+    require_catalog_editor(ctx)
     product_changes, variant_changes = ChangeSet(), ChangeSet()
     with transaction.atomic():
         stored = (
@@ -549,6 +587,7 @@ def save_variant(variant: Variant, *, ctx: AuditContext, dry_run: bool = False) 
 
 def delete_variant(variant: Variant, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Delete `variant` and its translations, audited."""
+    require_catalog_editor(ctx)
     changes = ChangeSet()
     with transaction.atomic():
         stored = (
@@ -3399,6 +3438,7 @@ def _change_status(
     dry_run: bool,
     reason: str = "",
 ) -> StatusReport:
+    require_catalog_editor(ctx)
     report = StatusReport()
     with transaction.atomic():
         locked = list(

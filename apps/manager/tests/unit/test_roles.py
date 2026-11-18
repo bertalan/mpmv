@@ -93,3 +93,9 @@ def test_only_the_owner_manages_staff_roles() -> None:
 def test_the_generated_doc_is_current() -> None:
     doc = Path(__file__).parents[4] / "docs" / "dev" / "platform-roles.md"
     assert doc.read_text() == roles.render_matrix_doc()
+
+
+def test_support_reads_but_never_writes_the_products_section_cat30() -> None:
+    assert roles.allows("platform.products", [roles.SUPPORT])
+    assert not roles.allows("platform.products", [roles.SUPPORT], write=True)
+    assert not roles.allows("platform.products", [roles.FINANCE])
