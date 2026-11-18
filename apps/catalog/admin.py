@@ -34,17 +34,20 @@ from .models import Brand, Category, Product, ProductTranslation, Term, Variant,
 from .redirect_admin import RedirectAdmin as RedirectAdmin  # registers the CAT.6 admin
 from .services import (
     PRODUCT_PRICE_FIELDS,
+    TRANSLATION_FACT_FIELDS,
     VARIANT_PRICE_FIELDS,
     check_upsells,
     delete_product,
     delete_variant,
     record_relations_change,
+    record_translation_facts_change,
     relations_snapshot,
     save_product,
     save_variant,
     set_product_price,
     set_variant_price,
     sync_product_slug,
+    translation_facts_snapshot,
 )
 
 TIMESTAMPS = ("public_id", "created_at", "updated_at")
@@ -87,6 +90,8 @@ class ProductTranslationInline(admin.StackedInline[ProductTranslation, Product])
         "title",
         "short_description",
         "description",
+        "material",
+        "colour",
         "slug",
         "seo_title",
         "seo_description",
@@ -172,7 +177,21 @@ class ProductAdmin(admin.ModelAdmin[Product]):
             },
         ),
         ("Stock", {"fields": ("stock_policy", "stock_qty", "stock_status")}),
-        ("Shipping", {"fields": ("weight_kg", "length_cm", "width_cm", "height_cm")}),
+        (
+            "Shipping",
+            {
+                "fields": (
+                    "weight_kg",
+                    "length_cm",
+                    "width_cm",
+                    "height_cm",
+                    "length_mm",
+                    "width_mm",
+                    "height_mm",
+                    "country_of_origin",
+                )
+            },
+        ),
         (
             "Classification",
             {"fields": ("category", "secondary_categories", "brand", "terms")},
@@ -278,8 +297,27 @@ class ProductAdmin(admin.ModelAdmin[Product]):
             and translation_form.has_changed()
             and ("title" in translation_form.changed_data or not translation_form.instance.slug)
         ]
+        # The forms' instances already hold the new text: read the stored rows for "before".
+        edited = [
+            translation_form.instance.pk
+            for translation_form in formset.forms
+            if translation_form.instance.pk is not None
+            and translation_form not in formset.deleted_forms
+            and translation_form.has_changed()
+            and set(translation_form.changed_data) & set(TRANSLATION_FACT_FIELDS)
+        ]
+        facts_before = {
+            row.pk: translation_facts_snapshot(row)
+            for row in ProductTranslation.objects.filter(pk__in=edited).select_related(
+                "product__vendor"
+            )
+        }
         super().save_formset(request, form, formset, change)
         ctx = audit_context(request)
+        for translation_form in formset.forms:
+            before = facts_before.get(translation_form.instance.pk)
+            if before is not None:
+                record_translation_facts_change(translation_form.instance, before, ctx=ctx)
         for translation in retitled:
             if translation.pk is not None:
                 sync_product_slug(translation, ctx=ctx)

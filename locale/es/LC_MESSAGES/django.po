@@ -7435,6 +7435,13 @@ msgstr "El paquete más pesado del tramo, en kg, incluido. Déjelo vacío si no 
 msgid "The height of the packed product in centimetres, for example 10. Optional."
 msgstr "La altura del producto embalado en centímetros, por ejemplo 10. Opcional."
 
+#: apps/catalog/models.py
+msgid ""
+"The height of the product in millimetres, for example 100. Optional: leave it empty if you do not "
+"know it."
+msgstr ""
+"La altura del producto en milímetros, por ejemplo 100. Opcional: déjalo vacío si no la conoces."
+
 #: themes/base/templates/components/user_tools.html
 msgid "The help text could not be loaded. Try again."
 msgstr "No se ha podido cargar el texto de ayuda. Inténtelo de nuevo."
@@ -7762,11 +7769,23 @@ msgstr "El lado más largo del producto embalado en centímetros, por ejemplo 30
 
 #: apps/catalog/models.py
 msgid ""
+"The longest side of the product in millimetres, for example 300. Optional: leave it empty if you "
+"do not know it."
+msgstr ""
+"El lado más largo del producto en milímetros, por ejemplo 300. Opcional: déjalo vacío si no lo "
+"conoces."
+
+#: apps/catalog/models.py
+msgid ""
 "The main category of the product. It shows in the path above the product, so buyers can find it. "
 "You can leave it empty while the product is a draft."
 msgstr ""
 "La categoría principal del producto. Aparece en la ruta sobre el producto, para que los "
 "compradores lo encuentren. Puede dejarla vacía mientras el producto sea un borrador."
+
+#: apps/catalog/models.py
+msgid "The main colour in this language, for example 'Matt black'. Optional."
+msgstr "El color principal en este idioma, por ejemplo 'Negro mate'. Opcional."
 
 #: apps/catalog/models.py
 msgid "The main image of the gallery."
@@ -9215,6 +9234,13 @@ msgstr ""
 msgid "The width of the packed product in centimetres, for example 20. Optional."
 msgstr "La anchura del producto embalado en centímetros, por ejemplo 20. Opcional."
 
+#: apps/catalog/models.py
+msgid ""
+"The width of the product in millimetres, for example 200. Optional: leave it empty if you do not "
+"know it."
+msgstr ""
+"El ancho del producto en milímetros, por ejemplo 200. Opcional: déjalo vacío si no lo conoces."
+
 #: apps/catalog/attributes.py
 msgid ""
 "The word buyers see for this value in this language, for example 'Red'. Required: without it the "
@@ -10521,6 +10547,10 @@ msgstr ""
 "Qué incluye el plan, una línea breve por cada elemento, por ejemplo «Su propia página de tienda». "
 "Si no añade ninguno, no se muestra ninguna lista."
 
+#: apps/catalog/models.py
+msgid "What the product is made of, in this language, for example 'Glazed ceramic'. Optional."
+msgstr "De qué está hecho el producto, en este idioma, por ejemplo 'Cerámica esmaltada'. Opcional."
+
 #: apps/shipping/models.py
 msgid ""
 "What the rate calculation does for this method in this area: an estimated cost that needs a quote,"
@@ -10778,6 +10808,13 @@ msgid "Where the logo comes from; some licences require it. Example: the brand's
 msgstr ""
 "De dónde procede el logotipo; algunas licencias lo requieren. Ejemplo: la página de prensa de la "
 "marca."
+
+#: apps/catalog/models.py
+msgid ""
+"Where the product was made, as a two-letter upper-case country code, for example IT. Optional."
+msgstr ""
+"Dónde se fabricó el producto, como código de país de dos letras mayúsculas, por ejemplo IT. "
+"Opcional."
 
 #: apps/tax/models.py
 msgid ""

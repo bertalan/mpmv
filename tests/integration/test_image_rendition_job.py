@@ -10,7 +10,7 @@ from apps.core import images as core_images
 from apps.core import tasks as core_tasks
 from apps.core.audit import AuditContext
 from apps.core.models import MediaImage, MediaImageRendition
-from apps.core.tasks import render_image
+from apps.core.tasks import PermanentJobError, render_image
 from apps.core.tests.factories import MediaImageFactory
 from apps.vendors.services import set_vendor_logo
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
@@ -197,8 +197,8 @@ def test_a_corrupt_file_is_logged_and_not_retried(caplog: pytest.LogCaptureFixtu
 
     default_storage.delete(image.file.name)
     default_storage.save(image.file.name, SimpleUploadedFile("x.png", b"not an image"))
-    with caplog.at_level("WARNING"):
-        render_image(image_id=image.pk)  # no exception: nothing to retry
+    with caplog.at_level("WARNING"), pytest.raises(PermanentJobError):  # fails at once, no retry
+        render_image(image_id=image.pk)
     assert any("core.render_image" in r.getMessage() for r in caplog.records)
 
 
@@ -279,7 +279,7 @@ def test_a_corrupt_file_in_a_group_job_is_logged_and_not_retried(
     image = MediaImageFactory.create()
     default_storage.delete(image.file.name)
     default_storage.save(image.file.name, SimpleUploadedFile("x.png", b"not an image"))
-    with caplog.at_level("WARNING"):
+    with caplog.at_level("WARNING"), pytest.raises(PermanentJobError):
         render_image(image_id=image.pk, group="hero")
     assert any("core.render_image" in r.getMessage() for r in caplog.records)
 
