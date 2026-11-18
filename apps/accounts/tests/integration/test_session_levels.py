@@ -739,6 +739,30 @@ def test_every_manager_view_that_can_change_state_has_a_session_gate() -> None:
     assert not ungated, f"Manager views accepting POST/PUT/PATCH/DELETE with no gate: {ungated}"
 
 
+def test_every_manager_side_snippet_view_class_that_can_change_state_has_a_session_gate() -> None:
+    """The snippet admin views of a Manager-side SnippetViewSet are not in the manager URL
+    namespace, so read the view classes the registered viewsets actually use."""
+    from wagtail.admin.viewsets import viewsets as registry
+    from wagtail.snippets.views.snippets import SnippetViewSet
+
+    # Found through Wagtail's registry, not an import: accounts may not import apps.manager.
+    ours = [
+        type(v)
+        for v in registry.viewsets
+        if isinstance(v, SnippetViewSet) and type(v).__module__.startswith("apps.manager")
+    ]
+    assert ours, "no Manager-side snippet viewset is registered"
+    bad = []
+    for viewset in ours:
+        for attr in ("add_view_class", "edit_view_class", "delete_view_class", "copy_view_class"):
+            cls = getattr(viewset, attr)
+            for method in MUTATING:
+                handler = getattr(cls, method, None)
+                if handler is not None and getattr(handler, "session_action", None) is None:
+                    bad.append(f"{viewset.__name__}.{attr}.{method}")
+    assert not bad, f"snippet views accepting POST/PUT/DELETE with no gate: {bad}"
+
+
 def test_the_ungated_list_has_no_stale_entries() -> None:
     views = _manager_views()
     bad = _ungated_mutating(views)

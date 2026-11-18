@@ -6,6 +6,8 @@ technical superuser (break-glass) holds none without a role. The check asks `rol
 role membership, never `has_perm`.
 """
 
+from typing import Any
+
 import pytest
 from django.contrib.auth.models import Group
 from django.test import Client
@@ -133,3 +135,86 @@ def test_the_snippet_list_is_refused_to_a_role_the_matrix_denies_even_with_admin
     client = Client()
     verified_login(client, user)
     assert client.get("/admin/snippets/cms/helpentry/").status_code != 200
+
+
+# --- ARC.36: a row that comes from a repository file is read-only for everyone
+
+BASE = "/admin/snippets/cms/helpentry/"
+
+
+def _file_row() -> HelpEntry:
+    from apps.cms import help_sync
+
+    help_sync.sync_help()
+    return HelpEntry.objects.get(kind="general", locale__language_code="en", source="file")
+
+
+def _staff_row() -> HelpEntry:
+    from wagtail.models import Locale
+
+    return HelpEntry.objects.create(
+        locale=Locale.objects.get(language_code="en"), kind="route", key="x:y", title="Mine"
+    )
+
+
+def _login(who: str) -> Client:
+    """`catalog`: the role. `superuser`: a superuser who also holds the catalog role group."""
+    if who == "catalog":
+        user = _with_role("catalog")
+    else:
+        user = UserFactory.create(superuser=True, staff=True)
+        user.groups.add(Group.objects.get(name=roles.role("catalog").group))
+        user = User.objects.get(pk=user.pk)
+    client = Client()
+    verified_login(client, user)
+    return client
+
+
+def _refused(response: Any) -> bool:
+    """Wagtail answers a PermissionDenied in the admin with a redirect home (or a plain 403)."""
+    return bool(
+        response.status_code == 403
+        or (response.status_code == 302 and response["Location"] == "/admin/")
+    )
+
+
+def test_the_policy_refuses_writes_on_a_file_row_and_allows_a_staff_row() -> None:
+    user = _with_role("catalog")
+    file_row, staff_row = _file_row(), _staff_row()
+    for action in ("change", "delete", "add"):
+        assert not POLICY.user_has_permission_for_instance(user, action, file_row), action
+    assert POLICY.user_has_permission_for_instance(user, "view", file_row)
+    for action in ("change", "delete"):
+        assert POLICY.user_has_permission_for_instance(user, action, staff_row), action
+
+
+@pytest.mark.parametrize("who", ["catalog", "superuser"])
+def test_edit_and_delete_on_a_file_row_are_refused_and_change_nothing(who: str) -> None:
+    row = _file_row()
+    before = (row.title, row.body)
+    client = _login(who)
+    assert _refused(client.get(f"{BASE}edit/{row.pk}/"))
+    edit = client.post(f"{BASE}edit/{row.pk}/", {"title": "HACK", "body": "x", "key": ""})
+    assert _refused(edit)
+    assert _refused(client.get(f"{BASE}delete/{row.pk}/"))
+    assert _refused(client.post(f"{BASE}delete/{row.pk}/"))
+    assert _refused(client.get(f"{BASE}copy/{row.pk}/"))
+    client.post(f"/admin/snippets/bulk/cms/helpentry/delete/?id={row.pk}", {"id": row.pk})
+    row.refresh_from_db()  # still exists
+    assert (row.title, row.body, row.source) == (*before, "file")
+
+
+def test_a_staff_row_stays_editable_and_deletable() -> None:
+    row = _staff_row()
+    client = _login("catalog")
+    assert client.get(f"{BASE}edit/{row.pk}/").status_code == 200
+    assert client.get(f"{BASE}delete/{row.pk}/").status_code == 200
+    client.post(f"{BASE}delete/{row.pk}/")
+    assert not HelpEntry.objects.filter(pk=row.pk).exists()
+
+
+def test_the_add_view_refuses_a_session_below_the_gate_level() -> None:
+    from apps.manager.wagtail_hooks import HelpEntryCreateView
+
+    assert getattr(HelpEntryCreateView.post, "session_action", None) is not None
+    assert getattr(HelpEntryCreateView.put, "session_action", None) is not None
