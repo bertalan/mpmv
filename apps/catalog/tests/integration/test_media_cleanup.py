@@ -9,13 +9,14 @@ import datetime as dt
 from typing import Any
 
 import pytest
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
+from wagtail.models import Collection, GroupCollectionPermission
 
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
@@ -26,8 +27,8 @@ from apps.catalog.tests.factories import (
     brand_logo_image,
 )
 from apps.core.audit import AuditContext
-from apps.core.models import AuditLog, MediaImage, PlatformOperator
-from apps.core.tests.factories import MediaImageFactory
+from apps.core.models import AuditLog, MediaImage
+from apps.core.tests.factories import MediaImageFactory, PlatformOperatorFactory
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
@@ -45,15 +46,27 @@ def old_image(**fields: Any) -> MediaImage:
 
 
 def editor(*codenames: str) -> Any:
+    """Admin access plus the named image permissions on the root collection (Wagtail grants
+    image permissions to groups, per collection)."""
     user = UserFactory.create(staff=True)
+    user.user_permissions.add(Permission.objects.get(codename="access_admin"))
+    group = Group.objects.create(name=f"images-{user.pk}")
+    user.groups.add(group)
+    root = Collection.get_first_root_node() or Collection.add_root(name="Root")
     for codename in codenames:
-        user.user_permissions.add(Permission.objects.get(codename=codename))
+        GroupCollectionPermission.objects.create(
+            group=group,
+            collection=root,
+            permission=Permission.objects.get(
+                content_type__app_label="wagtailimages", codename=codename
+            ),
+        )
     return user
 
 
 def image_admin() -> Any:
-    """A person who may use the Wagtail admin and delete any image."""
-    return editor("access_admin", "add_mediaimage", "change_mediaimage", "delete_mediaimage")
+    """A person who may use the Wagtail admin and change (so delete) any image."""
+    return editor("add_image", "change_image")
 
 
 def listed(user: Any) -> list[int]:
@@ -78,9 +91,7 @@ def test_a_vendor_logo_a_brand_logo_and_the_platform_logo_are_not_listed() -> No
     vendor_logo, brand_logo, platform_logo = old_image(), old_image(), old_image()
     VendorFactory.create(logo=vendor_logo)
     BrandFactory.create(logo=brand_logo)
-    operator = PlatformOperator.objects.order_by("-pk").first()
-    assert operator is not None
-    PlatformOperator.objects.filter(pk=operator.pk).update(logo=platform_logo)
+    PlatformOperatorFactory.create(logo=platform_logo)
 
     assert listed(image_admin()) == []
 
@@ -153,7 +164,7 @@ def test_a_fresh_image_is_not_deleted_even_when_asked() -> None:
 
 def test_a_person_without_the_delete_permission_is_refused() -> None:
     image = old_image()
-    user = editor("access_admin", "add_mediaimage", "change_mediaimage")
+    user = editor("choose_image")
 
     with pytest.raises(PermissionDenied):
         media_cleanup.delete_orphans([image.pk], user=user, ctx=CTX)
@@ -199,9 +210,13 @@ def test_a_customer_cannot_open_the_review_list(client: Client) -> None:
 
 
 def test_an_editor_without_the_delete_permission_gets_403(client: Client) -> None:
-    verified_login(client, editor("access_admin", "add_mediaimage", "change_mediaimage"))
+    verified_login(client, editor("choose_image"))
 
-    assert client.get(reverse(URL_NAME)).status_code == 403
+    response = client.get(reverse(URL_NAME))
+
+    # Wagtail's admin turns a refusal into its "no permission" redirect to the dashboard.
+    assert response.status_code in (302, 403)
+    assert response.status_code == 403 or response["Location"] == "/admin/"
 
 
 def test_the_preview_button_deletes_nothing(client: Client) -> None:
@@ -235,9 +250,9 @@ def test_the_delete_button_removes_the_orphan_and_audits_it(client: Client) -> N
 
 def test_a_post_without_the_delete_permission_changes_nothing(client: Client) -> None:
     image = old_image()
-    verified_login(client, editor("access_admin", "add_mediaimage", "change_mediaimage"))
+    verified_login(client, editor("choose_image"))
 
     response = client.post(reverse(URL_NAME), {"image": [image.pk], "mode": "delete"})
 
-    assert response.status_code == 403
+    assert response.status_code in (302, 403)
     assert MediaImage.objects.filter(pk=image.pk).exists()

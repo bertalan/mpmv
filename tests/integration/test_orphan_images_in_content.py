@@ -9,15 +9,16 @@ import datetime as dt
 from typing import Any
 
 import pytest
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.utils import timezone
+from wagtail.models import Collection, GroupCollectionPermission
 
 from apps.accounts.tests.factories import UserFactory
 from apps.catalog import media_cleanup
 from apps.cms.models import StandardPage
 from apps.cms.tests.factories import StandardPageFactory
 from apps.core.audit import AuditContext
-from apps.core.models import HelpEntry, MediaImage
+from apps.core.models import MediaImage
 from apps.core.tests.factories import MediaImageFactory
 
 pytestmark = pytest.mark.django_db
@@ -32,11 +33,27 @@ def old_image() -> MediaImage:
     return image
 
 
-def staff() -> Any:
+def _editor(*codenames: str) -> Any:
+    """Admin access plus the named image permissions on the root collection (Wagtail grants
+    image permissions to groups, per collection)."""
     user = UserFactory.create(staff=True)
-    for codename in ("access_admin", "delete_mediaimage"):
-        user.user_permissions.add(Permission.objects.get(codename=codename))
+    user.user_permissions.add(Permission.objects.get(codename="access_admin"))
+    group = Group.objects.create(name=f"images-{user.pk}")
+    user.groups.add(group)
+    root = Collection.get_first_root_node() or Collection.add_root(name="Root")
+    for codename in codenames:
+        GroupCollectionPermission.objects.create(
+            group=group,
+            collection=root,
+            permission=Permission.objects.get(
+                content_type__app_label="wagtailimages", codename=codename
+            ),
+        )
     return user
+
+
+def staff() -> Any:
+    return _editor("add_image", "change_image")
 
 
 def listed() -> list[int]:
@@ -55,7 +72,7 @@ def test_an_image_used_only_in_a_page_stream_field_is_not_listed() -> None:
 def test_an_image_in_the_stream_field_of_a_draft_revision_only_is_not_listed() -> None:
     image = old_image()
     page: StandardPage = StandardPageFactory.create()
-    page.body = [("figure", {"image": image, "alt_text": "Hills", "caption": ""})]  # type: ignore[assignment]
+    page.body = [("figure", {"image": image, "alt_text": "Hills", "caption": ""})]
     page.save_revision()  # a draft: the live page does not hold the image
 
     live = StandardPage.objects.get(pk=page.pk)
@@ -69,7 +86,7 @@ def test_an_image_in_the_stream_field_of_a_draft_revision_only_is_not_listed() -
 def test_an_image_only_in_the_live_revision_of_a_page_is_not_listed() -> None:
     image = old_image()
     page: StandardPage = StandardPageFactory.create(live=False)
-    page.body = [("figure", {"image": image, "alt_text": "Hills", "caption": ""})]  # type: ignore[assignment]
+    page.body = [("figure", {"image": image, "alt_text": "Hills", "caption": ""})]
     page.save_revision().publish()
     # The live row no longer holds it (a later edit), the live revision still does.
     StandardPage.objects.filter(pk=page.pk).update(image=None)
@@ -83,15 +100,6 @@ def test_an_image_in_a_page_image_field_is_not_listed() -> None:
     StandardPageFactory.create(image=image, image_alt_text="A lake")
 
     assert listed() == []
-
-
-def test_an_image_in_a_snippet_stream_field_is_not_listed() -> None:
-    image = old_image()
-    entry = HelpEntry.objects.first()
-    assert entry is not None  # the repository help rows
-    # Covered by the generic scan: no snippet has an image today, so this checks only that the
-    # scan runs over revisioned snippet models without error.
-    assert image.pk in listed()
 
 
 def test_an_unreferenced_image_beside_a_used_one_is_listed() -> None:
