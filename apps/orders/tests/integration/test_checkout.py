@@ -128,7 +128,7 @@ def test_mixed_basket_two_vendors_mixed_vat_quote_and_on_request() -> None:
     assert [p.vendor_id for p in result.packages] == [a.pk, b.pk, heavy.pk, request_only.pk]
 
     a_pkg = by_vendor[a.pk]  # two rates: 30.00 at 22%, 20.00 at 10%, shipping 9.90 pro rata
-    assert a_pkg.state == engine.BLOCKED  # priced, but the order cannot keep two shipping rates
+    assert a_pkg.state == engine.READY  # the order keeps both shipping portions (ORD.29)
     assert a_pkg.totals is not None
     assert [(p.net, p.rate) for p in a_pkg.shipping_portions] == [
         (D("5.94"), D("22.0000")),
@@ -136,7 +136,7 @@ def test_mixed_basket_two_vendors_mixed_vat_quote_and_on_request() -> None:
     ]
     assert a_pkg.totals.goods_net == D("50.00")
     assert a_pkg.totals.tax_total == D("6.60") + D("2.00") + D("1.31") + D("0.40")
-    assert [b.code for b in a_pkg.blocks] == [engine.SHIPPING_VAT_SPLIT]
+    assert not a_pkg.blocks
 
     b_pkg = by_vendor[b.pk]
     assert b_pkg.state == engine.READY
@@ -151,9 +151,11 @@ def test_mixed_basket_two_vendors_mixed_vat_quote_and_on_request() -> None:
     assert not result.placeable
     assert result.needs_quote
     codes = {x.code for x in result.blocks}
-    assert codes == {engine.SHIPPING_VAT_SPLIT, engine.NEEDS_QUOTE, engine.ON_REQUEST}
-    assert result.totals == b_pkg.totals  # only the ready package is added up
-    assert [p.vendor for p in result.vendors] == [b]
+    assert codes == {engine.NEEDS_QUOTE, engine.ON_REQUEST}
+    assert a_pkg.totals.grand_total == D("50.00") + D("9.90") + D("10.31")
+    assert result.totals is not None  # only the ready packages are added up
+    assert result.totals.grand_total == a_pkg.totals.grand_total + b_pkg.totals.grand_total
+    assert [p.vendor for p in result.vendors] == [a, b]
 
 
 @pytest.mark.parametrize(
