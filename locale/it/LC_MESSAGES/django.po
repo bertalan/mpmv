@@ -6676,6 +6676,10 @@ msgstr "Salvi prima l'evento: poi potrà aggiungere testo, immagini e altri bloc
 msgid "Save the name"
 msgstr "Salva il nome"
 
+#: apps/manager/templates/manager/shop/profile.html
+msgid "Save the product role"
+msgstr "Salva il ruolo del prodotto"
+
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
 msgstr "Salvi prima le modifiche: viene inviata l'ultima bozza salvata."

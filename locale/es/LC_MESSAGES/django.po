@@ -6681,6 +6681,10 @@ msgstr "Guarde primero el evento: después podrá añadir texto, imágenes y otr
 msgid "Save the name"
 msgstr "Guardar el nombre"
 
+#: apps/manager/templates/manager/shop/profile.html
+msgid "Save the product role"
+msgstr "Guardar la función del producto"
+
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
 msgstr "Guarde primero los cambios: se envía el último borrador guardado."
