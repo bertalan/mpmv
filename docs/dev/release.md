@@ -23,6 +23,16 @@ released.
 3. A major finding that the PR does not fix blocks the tag until lane-a decides. If anything
    else merges after the check, the next tag needs a new check.
 
+Every coherence check also includes a **stale-items sweep** (owner rule 2026-11-18). Each item
+is either fixed in the same PR or listed with a follow-up:
+
+- unfinished work: backlog rows marked done whose Done-when is not fully met, `TODO` and `FIXME`
+  without a task ID, open follow-up items on the tracker issue older than a week;
+- old files: unused templates, static files, fixtures, scripts and settings, dead code no test
+  reaches, docs that describe removed behaviour;
+- leftovers from the lanes: branches already merged or abandoned, and old worktrees. These are
+  listed only. Deleting a branch is the owner's decision.
+
 ## What the release workflow does
 
 `release.yml` runs on the tag. On each architecture (amd64 and arm64, native runners) it builds
