@@ -10,7 +10,7 @@ Cette page s'adresse au titulaire de la boutique. Elle contient les textes et le
 
 Sous **Logo**, choisissez une **Image du logo**, décrivez-la dans **Description du logo** et appuyez sur **Enregistrer le logo**. La description est destinée aux personnes qui ne peuvent pas voir l'image.
 
-Sous **Producteur ou revendeur**, choisissez **Ce que la boutique est pour ses produits** : producteur, revendeur ou pas sûr. Les moteurs de recherche et les assistants IA le voient dans les données du produit. Si vous n'êtes pas sûr, nous ne dirons jamais que vous fabriquez le produit. Cliquez sur **Enregistrer**.
+Sous **Producteur ou revendeur**, choisissez **Ce que la boutique est pour ses produits** : producteur, revendeur ou pas sûr. Les moteurs de recherche et les assistants IA le voient dans les données du produit. Si vous n'êtes pas sûr, nous ne dirons jamais que vous fabriquez le produit. Cliquez sur **Enregistrer le rôle du produit**.
 
 ## Bon à savoir
 - Un texte signalé comme brouillon automatique n'est pas public tant que vous ne l'avez pas modifié et enregistré.

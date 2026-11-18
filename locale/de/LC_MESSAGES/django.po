@@ -6743,6 +6743,10 @@ msgstr ""
 msgid "Save the name"
 msgstr "Namen speichern"
 
+#: apps/manager/templates/manager/shop/profile.html
+msgid "Save the product role"
+msgstr "Produktrolle speichern"
+
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
 msgstr "Speichern Sie zuerst Ihre Änderungen: Es wird der zuletzt gespeicherte Entwurf eingereicht."
