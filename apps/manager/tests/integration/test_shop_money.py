@@ -21,6 +21,7 @@ from django.conf import settings
 from django.test import Client
 from django.utils import timezone, translation
 
+from apps.accounts import levels
 from apps.accounts.models import User
 from apps.accounts.tests.mfa import verified_login
 from apps.core.audit import AuditContext
@@ -36,6 +37,7 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorMemberFactory
 
 from .conftest import SHOP
+from .test_shop_owner_passkey import _do_it_once, _enrol_passkey, _open_window
 
 pytestmark = pytest.mark.django_db
 
@@ -328,6 +330,42 @@ def test_the_pages_write_nothing_to_the_ledger(client: Client, owner: User, vend
     for tail in PAGES:
         assert client.get(f"{MONEY}{tail}").status_code == 200
     assert list(LedgerEntry.objects.values_list("id", "amount", "balance_after")) == before
+
+
+# The export is a sensitive action (CORE.25 group 2, `export`): the shop owner confirms it with
+# its passkey, once or in a window scoped to its shop. `verified_login`'s default window hides
+# the gate, so these tests sign in as a real login does (no window).
+
+
+def test_after_a_real_login_the_export_asks_for_a_passkey_and_exports_nothing(
+    client: Client, owner: User, vendor: Vendor
+) -> None:
+    add(vendor, "sale", "1.00", ref="tr_gated")
+    _enrol_passkey(owner)
+    verified_login(client, owner, level=levels.NO_WINDOW)
+    refused = client.post(f"{MONEY}export/")
+    assert refused.status_code == 403
+    assert refused["Content-Type"].startswith("text/html")
+    assert refused.context["action"] == "export"
+    assert "Do it once" in refused.content.decode()
+    assert "tr_gated" not in refused.content.decode()
+    assert not AuditLog.objects.filter(action=services.EXPORT_CSV).exists()
+
+
+def test_do_it_once_exports_once_and_a_shop_window_exports_again(
+    client: Client, owner: User, vendor: Vendor
+) -> None:
+    add(vendor, "sale", "1.00", ref="tr_gated")
+    authenticator = _enrol_passkey(owner)
+    verified_login(client, owner, level=levels.NO_WINDOW)
+    refused = client.post(f"{MONEY}export/")
+    assert _do_it_once(client, authenticator, refused).status_code == 200
+    assert "tr_gated" in str(export(client))
+    assert client.post(f"{MONEY}export/").status_code == 403  # once means once
+    assert _open_window(client, authenticator).status_code == 200
+    assert "tr_gated" in str(export(client))
+    assert "tr_gated" in str(export(client))  # repeated inside the window
+    assert AuditLog.objects.filter(action=services.EXPORT_CSV).count() == 3
 
 
 # Regression (review of #743): 00:30 in Rome on 1 March is 23:30 UTC on 28 February. The

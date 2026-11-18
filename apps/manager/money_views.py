@@ -27,6 +27,7 @@ from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext import StrOrPromise
 
+from apps.accounts.decorators import requires_level_method
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
 from apps.ledger import engine
@@ -263,6 +264,9 @@ class ExportView(MoneyView):
 
     http_method_names = ["post", "options"]
 
+    # Group 2 (CORE.25, spec 02: CSV exports are sensitive); the shop owner confirms it with its
+    # passkey, once or in a window scoped to its shop (D-32 amendment).
+    @requires_level_method("export", shop=lambda view, request: view.manager.vendor)
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         vendor = self.vendor()
         filters = Filters(request.POST, default_month=True, closed=True)
