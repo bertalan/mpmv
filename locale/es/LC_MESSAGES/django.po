@@ -82,6 +82,13 @@ msgstr "%(country)r no es un país en el que pueda estar la dirección."
 msgid "%(days)s working days"
 msgstr "%(days)s días laborables"
 
+#: apps/orders/customer_views.py
+msgid ""
+"%(item)s: only %(quantity)d available, so your cart holds %(quantity)d instead of %(requested)d."
+msgstr ""
+"%(item)s: solo hay %(quantity)d disponibles, así que tu carrito tiene %(quantity)d en lugar de "
+"%(requested)d."
+
 #: apps/orders/ui/present.py
 msgid "%(low)s to %(high)s working days"
 msgstr "de %(low)s a %(high)s días laborables"
@@ -1542,6 +1549,10 @@ msgid ""
 msgstr ""
 "La cancelación del paquete reembolsa al cliente el importe íntegro y por ello necesita una nueva "
 "confirmación con passkey (una ventana de passkey abierta no la cubre)."
+
+#: apps/orders/customer_views.py
+msgid "cannot be delivered to your address"
+msgstr "no se puede entregar en tu dirección"
 
 #: apps/manager/fitment_forms.py
 msgid "Cannot change once the level has nodes."
@@ -4301,6 +4312,10 @@ msgstr "Nodos"
 msgid "None."
 msgstr "Ninguno."
 
+#: apps/orders/customer_views.py
+msgid "Not added: %(item)s, %(reason)s."
+msgstr "No añadido: %(item)s, %(reason)s."
+
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Not connected"
 msgstr "No conectado"
@@ -4312,6 +4327,10 @@ msgstr "No exigida"
 #: apps/manager/amendment_views.py
 msgid "not in the order"
 msgstr "no está en el pedido"
+
+#: apps/orders/customer_views.py
+msgid "not sold any more"
+msgstr "ya no está a la venta"
 
 #: apps/shipping/models.py
 msgid ""
@@ -4918,6 +4937,10 @@ msgstr "Pedido %(order_number)s: se ha cancelado el resto de tu pedido, reembols
 msgid "Order %(order_number)s: your order from %(vendor_name)s was changed"
 msgstr "Pedido %(order_number)s: tu pedido con %(vendor_name)s ha sido modificado"
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Order again"
+msgstr "Pedir de nuevo"
+
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/platform/amendment_settings.html
 msgid "Order change settings"
@@ -5034,6 +5057,10 @@ msgstr ""
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Out of stock"
 msgstr "Agotado"
+
+#: apps/orders/customer_views.py
+msgid "out of stock"
+msgstr "agotado"
 
 #: apps/manager/product_views.py
 msgid "outdated"
@@ -5646,6 +5673,18 @@ msgid ""
 msgstr ""
 "La publicación añade una nueva versión y la pone en vigor. Los pedidos ya realizados conservan la "
 "versión con la que se hicieron."
+
+#: apps/orders/customer_views.py
+msgid "Put back in your cart, at today's prices: %(items)s."
+msgstr "Vuelven a tu carrito, a los precios de hoy: %(items)s."
+
+#: apps/orders/templates/orders/customer_order.html
+msgid ""
+"Puts the items that are still on sale back in your cart, at today's prices. Nothing is ordered or "
+"paid until you check out."
+msgstr ""
+"Vuelve a poner en tu carrito los artículos que aún están a la venta, a los precios de hoy. No se "
+"pide ni se paga nada hasta que finalices la compra."
 
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/shop/order.html
 #: apps/orders/templates/orders/customer_order.html
@@ -9725,6 +9764,10 @@ msgstr ""
 #: apps/manager/templates/manager/shop/termination.html
 msgid "There is no termination notice for your shop."
 msgstr "No hay ningún preaviso de baja para su tienda."
+
+#: apps/orders/customer_views.py
+msgid "There was nothing to add to your cart."
+msgstr "No había nada que añadir a tu carrito."
 
 #: apps/accounts/session_views.py
 msgid "There were no other sessions."
