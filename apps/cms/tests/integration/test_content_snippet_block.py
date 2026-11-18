@@ -32,11 +32,12 @@ from apps.cms.models import (
     body_field,
     content_snippet_workflow,
 )
+from apps.cms.services import SeedReport
 from apps.cms.tests.factories import ContentSnippetFactory, StandardPageFactory, editor_user
 from apps.core.i18n import primary_language
 from tests.i18n import other_language
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("english_interface")]
+pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture(autouse=True)
@@ -47,7 +48,7 @@ def _commit_hooks_run_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _review_workflow() -> None:
+def _review_workflow(seeded: SeedReport) -> None:
     content_snippet_workflow(create=True)
 
 
