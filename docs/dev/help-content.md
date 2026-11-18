@@ -11,7 +11,7 @@ backfill of the per-screen files is ARC.37.
 | Part | Values |
 | --- | --- |
 | `lang` | `en`, `it`, `de`, `fr`, `es` |
-| `kind` | `route` (a screen), `page_type` (a CMS page class), `general` (the fallback) |
+| `kind` | `route` (a screen), `page_type` (a CMS page class), `general` (the fallback), `guide` (a page of the public help, see below; no admin form choice) |
 | `stem` | the key with `:` written as `__` |
 
 Examples: `help/en/route/manager__shop__orders.md` (route `manager:shop:orders`),
@@ -47,13 +47,38 @@ Plain Markdown. Short sentences for a non-technical reader.
   catalog shows in English on the screen (for example "Find coordinates", "Event review"), so the
   help quotes it in English too, and the missing msgid is a catalog follow-up.
 
+## Guide pages (ARC.37)
+
+A `guide` file is a page of the public help, not a dialog text: `help/<lang>/guide/<audience>__<section>.md`
+(`customer__shipping.md` is key `customer:shipping`). The audiences and their sections, in page
+order, are `GUIDE_SECTIONS` in `apps/cms/engine.py`; a file outside it fails `sync_help` and the
+tests. `sync_help` makes one `HelpEntry` of kind `guide` per file like for any other kind (files
+win, idempotent, dry-run aware, read-only in the admin). The pages are read-only views over those
+rows (`apps/cms/help_guide.py`, `apps/cms/guide_urls.py`), served from the repository files and
+not from the Wagtail page tree, so there is nothing to edit or publish in the admin:
+
+- the customer help is `/help-centre/` (index) and `/help-centre/<section>/`, with the language prefix of the
+  site (`/it/help-centre/shipping/`), public and cached for five minutes;
+- the slug `help-centre` is reserved (`engine.RESERVED_ROOT_SLUGS`, enforced by `apps/cms/slugs.py`): no CMS page directly under a language home can use it, as the guide route is matched before the CMS catch-all; check `cms.E004` flags an existing page that does;
+- the sections, in order, are ordering, payment, shipping, changes, withdrawal, account;
+- the footer and header "Help" link (both themes) opens `/help-centre/` unless `MPMV_HELP_URL` is set;
+- `ROUTE_GUIDE` in `apps/cms/engine.py` maps a screen to its guide page: its dialog then shows "More help" (a test checks every key is a real section and route file);
+- a new audience (the vendor guide) adds its sections to `GUIDE_SECTIONS`, its files under
+  `guide/`, and its URL and template next to `customer_help*`; nothing else in sync changes.
+
+Tone and content: short plain texts for a non-technical customer, informal in IT, DE, FR and ES.
+Each statement is compared with the spec and the code; a guide never paraphrases legal or tax
+wording: it points to the legal pages (`{{link.consumer_information}}`, the terms in the footer).
+
 ## Placeholders
 
 Operator-specific facts (names, e-mail addresses, fees, windows) are never typed in a file. Use a
 placeholder: `{{ operator.support_email }}`. The allow-list is `PLACEHOLDERS` in
 `apps/cms/help_files.py`: `operator.legal_name`, `operator.support_email`,
 `operator.compliance_email` (falls back to the support address when empty, like the compliance
-alerts), `settings.site_name`. Values are read from `current_operator()` and
+alerts), `settings.site_name`, and the links `link.help`, `link.withdrawal`, `link.consumer_information`,
+`link.orders`, `link.privacy` (the address of that public page, in the language shown; write
+them without spaces in a Markdown link: `[text]({{link.withdrawal}})`). Values are read from `current_operator()` and
 settings when the dialog is shown (never cached), HTML-escaped. An unknown placeholder fails
 `sync_help` and the test suite. To add one, add it to the list in a reviewed PR.
 

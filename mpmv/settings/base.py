@@ -100,6 +100,7 @@ INSTALLED_APPS = [
     "wagtail.admin",
     "wagtail.contrib.settings",  # BaseSiteSetting for the per-site theme (THM.1)
     "wagtail.contrib.routable_page",  # `routablepageurl` for the blog's author pages (CMS.3)
+    "wagtail.contrib.forms",  # editor-built form pages and their stored submissions (CMS.13)
     "wagtail",
     "modelcluster",
     "taggit",
@@ -220,6 +221,10 @@ VENDOR_APPLICATION_RATE_LIMIT = 20
 # Public search page (CAT.27): searches allowed per client IP per minute (the query is not
 # counted when empty); a client over it gets a 429.
 SEARCH_RATE_LIMIT = 30
+# Editor-built form pages (CMS.13): submissions allowed per client IP every 15 minutes (over it
+# a 429), and the largest POST body accepted (over it a 400); neither stores anything.
+FORM_PAGE_RATE_LIMIT = 10
+FORM_PAGE_MAX_SUBMISSION_BYTES = 32 * 1024
 # Unconfirmed applications (owner decision D-24, VEN.22): the account and its applicant vendor
 # are deleted this many days after the request, and one reminder goes out after this many hours.
 VENDOR_APPLICATION_RETENTION_DAYS = 3
