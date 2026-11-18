@@ -24,24 +24,28 @@ from django.db.backends.postgresql.psycopg_any import NumericRange
 from django.db.models import Count
 from django.http import HttpRequest
 from django.utils import timezone
+from django.utils.translation import gettext as _
 
-from apps.catalog.models import Category, Product
+from apps.catalog.models import Category, Product, SalesMode
 from apps.core import translations
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.models import AuditLog, TranslationStatus
 from apps.core.services import run_mutation
 from apps.vendors import services as vendors_services
+from apps.vendors.models import Vendor
 from apps.vendors.scoping import is_platform_staff
 
 from . import engine, garage, references
 from .models import (
+    DeclarationMode,
     FitmentCategory,
     FitmentLevel,
     FitmentLevelTranslation,
     FitmentNode,
     FitmentNodeAlias,
     FitmentNodeMerge,
+    FitmentNodeProposal,
     FitmentNodeTranslation,
     FitmentNote,
     FitmentScheme,
@@ -64,6 +68,7 @@ NODE_DELETED = "fitment.node.deleted"
 ALIAS_CREATED = "fitment.alias.created"
 ALIAS_DELETED = "fitment.alias.deleted"
 CATEGORY_RELEVANCE_CHANGED = "fitment.category.relevance_changed"
+CATEGORY_PUBLISH_GATE_CHANGED = "fitment.category.publish_gate_changed"
 PRODUCT_FITMENT_SET = "fitment.product.fitment_set"
 
 SCHEME_FIELDS = (
@@ -521,6 +526,7 @@ def refuse_node(
         if dry_run:
             return changeset
         key, before = str(node.public_id), _node_snapshot(node)
+        FitmentNodeProposal.objects.filter(node__in=subtree).delete()
         node.delete()
         record(ctx, NODE_REFUSED, "fitment.fitmentnode", key, before, {"reason": reason.strip()})
         return changeset
@@ -559,7 +565,12 @@ def delete_node(node: FitmentNode, *, ctx: AuditContext, dry_run: bool = False) 
             raise FitmentError("Something still refers to this node: merge it instead.")
         changeset = ChangeSet()
         changeset.delete("fitment.fitmentnode", str(node.public_id), _node_snapshot(node))
-        return run_mutation(changeset, node.delete, ctx=ctx, action=NODE_DELETED, dry_run=dry_run)
+
+        def apply() -> None:
+            FitmentNodeProposal.objects.filter(node=node).delete()
+            node.delete()
+
+        return run_mutation(changeset, apply, ctx=ctx, action=NODE_DELETED, dry_run=dry_run)
 
 
 def rename_node(
@@ -777,6 +788,77 @@ def set_fitment_relevant(
         return run_mutation(
             changeset, apply, ctx=ctx, action=CATEGORY_RELEVANCE_CHANGED, dry_run=dry_run
         )
+
+
+def set_fitment_publish_gate(
+    categories: Iterable[Category], required: bool, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Turn the publish gate of categories on or off (FIT.18); any number at once.
+
+    On: a `buy` product whose main category is one of them cannot be published while its
+    declaration is `undeclared`. Turning it on also marks a category as expected to declare
+    fitment (the gate has no meaning otherwise); turning it off leaves it expected.
+    """
+    chosen = list(categories)
+    with transaction.atomic():
+        rows = {
+            row.category_id: row
+            for row in FitmentCategory.objects.select_for_update().filter(category__in=chosen)
+        }
+        changeset = ChangeSet()
+        todo: list[Category] = []
+        for category in chosen:
+            row = rows.get(category.pk)
+            if (row is not None and row.require_declaration) == required:
+                continue
+            todo.append(category)
+            key = str(category.public_id)
+            changeset.update(
+                "fitment.fitmentcategory",
+                key,
+                {"category": key, "require_declaration": not required},
+                {"category": key, "require_declaration": required},
+            )
+
+        def apply() -> None:
+            for category in todo:
+                FitmentCategory.objects.update_or_create(
+                    category=category, defaults={"require_declaration": required}
+                )
+            _refresh_always_visible(categories=todo)
+
+        return run_mutation(
+            changeset, apply, ctx=ctx, action=CATEGORY_PUBLISH_GATE_CHANGED, dry_run=dry_run
+        )
+
+
+def publish_gate_messages(product: Product) -> list[str]:
+    """The publication check registered with `apps.catalog.publishing` (FIT.18).
+
+    A `buy` product in a category whose gate is on needs a declaration before it goes live:
+    `specific` or `universal`, never `undeclared` (spec 17 §17.2.4).
+    """
+    if product.sales_mode != SalesMode.BUY or product.category_id is None:
+        return []
+    if not FitmentCategory.objects.filter(
+        category_id=product.category_id, require_declaration=True
+    ).exists():
+        return []
+    mode = (
+        ProductFitmentState.objects.filter(product_id=product.pk)
+        .values_list("mode", flat=True)
+        .first()
+    )
+    if mode in (DeclarationMode.SPECIFIC, DeclarationMode.UNIVERSAL):
+        return []
+    return [
+        str(
+            _(
+                "Please declare what this product fits before you publish it: choose the items "
+                "it fits on the Fits tab, or state that it fits everything."
+            )
+        )
+    ]
 
 
 # --- Anonymous garage cookie (FIT.6) ------------------------------------------------------------
@@ -1124,3 +1206,169 @@ def set_product_fitment(
             snapshot_of(mode, after_rows),
         )
         return changeset
+
+
+# --- What a shop does in its own space (FIT.3) ----------------------------------------------------
+
+NODE_PROPOSED = "fitment.node.proposed"
+DEFAULT_MAX_PENDING_PROPOSALS = 20
+
+
+def max_pending_proposals() -> int:
+    return int(getattr(settings, "FITMENT_MAX_PENDING_PROPOSALS", DEFAULT_MAX_PENDING_PROPOSALS))
+
+
+def pending_proposals(vendor: Vendor) -> int:
+    """The proposals of `vendor` that still wait for review."""
+    return FitmentNodeProposal.objects.filter(
+        vendor=vendor, node__status=NodeStatus.PROPOSED
+    ).count()
+
+
+def _check_member(vendor: Vendor, ctx: AuditContext) -> None:
+    """The actor is platform staff or a member of `vendor` with the products right."""
+    if ctx.actor_id is None:
+        if ctx.source in _SYSTEM_SOURCES:
+            return
+        raise PermissionDenied("A user action needs a signed-in actor.")
+    user = get_user_model().objects.filter(pk=ctx.actor_id).first()
+    if user is None or not user.is_active:
+        raise PermissionDenied("The actor does not exist or is inactive.")
+    if is_platform_staff(user):
+        return
+    if not vendors_services.has_vendor_permission(user, vendor, "products"):
+        raise PermissionDenied("The actor may not propose nodes for this shop.")
+
+
+def propose_node_for_vendor(
+    vendor: Vendor,
+    *,
+    name: str,
+    parent: FitmentNode | None = None,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> Applied[FitmentNode]:
+    """A shop proposes a node it cannot find (spec 17 §17.3.2).
+
+    The node is `proposed`: invisible to pickers and to customers until staff approve it. A shop
+    has at most `max_pending_proposals()` (default 20) proposals waiting; the next is refused.
+    The parent must be an approved node (or none, for the top level).
+    """
+    _check_member(vendor, ctx)
+    with transaction.atomic():
+        Vendor.objects.select_for_update().filter(pk=vendor.pk).first()  # one proposal at a time
+        if pending_proposals(vendor) >= max_pending_proposals():
+            raise FitmentError(
+                f"At most {max_pending_proposals()} proposals can wait for review: "
+                "wait for the platform to review them."
+            )
+        if parent is not None:
+            parent.refresh_from_db()
+            if parent.status != NodeStatus.ACTIVE:
+                raise FitmentError("Choose an approved node as the parent.")
+        applied = propose_node(name=name, parent=parent, ctx=ctx, dry_run=dry_run)
+        if not dry_run and applied.obj is not None:
+            FitmentNodeProposal.objects.create(vendor=vendor, node=applied.obj)
+            record(
+                ctx,
+                NODE_PROPOSED,
+                "fitment.fitmentnodeproposal",
+                str(applied.obj.public_id),
+                None,
+                {"vendor": str(vendor.public_id), "name": applied.obj.name},
+            )
+        return applied
+
+
+def _existing_inputs(product: Product) -> tuple[str, list[RowInput]]:
+    state = ProductFitmentState.objects.filter(product=product).first()
+    rows = [
+        RowInput(r.node, r.year_from, r.year_to, r.is_exclusion, r.note)
+        for r in ProductFitment.objects.filter(product=product).select_related("node", "note")
+    ]
+    return (state.mode if state else engine.UNDECLARED), rows
+
+
+def _row_key(row: RowInput) -> tuple[int, int | None, int | None, bool]:
+    return (row.node.pk, row.year_from, row.year_to, row.is_exclusion)
+
+
+def add_product_fitment(
+    products: Iterable[Product],
+    rows: Iterable[RowInput],
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Add `rows` to what each product already declares (the bulk action of spec 17 §17.3.1).
+
+    All or nothing: one refusal (an item that fits everything, a rule broken) cancels the whole
+    selection. Rows a product already has are not repeated.
+    """
+    wanted = list(rows)
+    if not wanted:
+        raise FitmentError("Add at least one row.")
+    changeset = ChangeSet()
+    with transaction.atomic():
+        for product in products:
+            mode, current = _existing_inputs(product)
+            if mode == engine.UNIVERSAL:
+                raise FitmentError(f"{product.sku} fits everything: it takes no extra rows.")
+            have = {_row_key(r) for r in current}
+            merged = current + [r for r in wanted if _row_key(r) not in have]
+            result = set_product_fitment(
+                product,
+                engine.SPECIFIC,
+                merged,
+                ProductFitment.Source.MANUAL,
+                ctx=ctx,
+                dry_run=dry_run,
+            )
+            changeset.changes.extend(result.changes)
+    return changeset
+
+
+def copy_product_fitment(
+    source: Product, target: Product, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Make `target` declare what `source` declares (both of the same shop)."""
+    if source.vendor_id != target.vendor_id:
+        raise FitmentError("Copy only between products of the same shop.")
+    mode, rows = _existing_inputs(source)
+    return set_product_fitment(
+        target, mode, rows, ProductFitment.Source.MANUAL, ctx=ctx, dry_run=dry_run
+    )
+
+
+@dataclass(frozen=True)
+class QualityReport:
+    undeclared: list[Product]
+    pending_rows: list[Product]
+    suspicious: list[Product]
+
+
+def vendor_quality_report(vendor: Vendor) -> QualityReport:
+    """The shop's data-quality report: items in relevant categories still undeclared, items with
+    rows on a node that is not approved, items with an exclusion that has nothing to exclude
+    from. A fixed number of queries whatever the catalogue size."""
+    products = Product.objects.filter(vendor=vendor).exclude(status="retired")
+    undeclared = list(
+        products.filter(category_id__in=relevant_category_ids())
+        .exclude(fitment_state__mode__in=[engine.SPECIFIC, engine.UNIVERSAL])
+        .order_by("sku")
+    )
+    pending = list(
+        products.filter(fitments__node__status__in=[NodeStatus.PROPOSED, NodeStatus.RETIRED])
+        .distinct()
+        .order_by("sku")
+    )
+    by_product: dict[int, list[engine.Row]] = {}
+    for item in ProductFitment.objects.filter(
+        product__in=products.filter(fitments__is_exclusion=True)
+    ):
+        by_product.setdefault(item.product_id, []).append(
+            engine.Row(item.node_path, item.is_exclusion, item.year_from, item.year_to)
+        )
+    flagged = {pk for pk, found in by_product.items() if engine.uncovered_exclusions(found)}
+    suspicious = list(products.filter(pk__in=flagged).order_by("sku"))
+    return QualityReport(undeclared, pending, suspicious)

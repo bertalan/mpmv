@@ -5,7 +5,7 @@ online, spec 03 Rules) of an active vendor, its published texts, its public pric
 stored price of an on-request product) and its published companion. The view is a thin adapter.
 
 The gallery is the product's `ProductImage` rows (CAT.4, `gallery`); related products and
-the other sellers of the same product are CAT.15 (`related`).
+related products are `related`, the other sellers of the same article `other_sellers` (CAT.15).
 """
 
 from collections.abc import Sequence
@@ -14,7 +14,7 @@ from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
-from django.db.models import Count, Q, prefetch_related_objects
+from django.db.models import Case, Count, F, OuterRef, Q, Subquery, When, prefetch_related_objects
 from django.utils.translation import gettext as _
 from wagtail import hooks
 
@@ -293,8 +293,8 @@ RELATED_LIMIT = 4
 def related(page: ProductPage, language: str | None = None) -> Sequence["services.ProductCard"]:
     """Up to four products sharing the most terms with the page's product (spec 03 §3.1), then
     in random order. Never the product itself, its upsells, its companion, a product that is
-    not published or of a vendor that is not active. The other sellers of the same product
-    are CAT.15 (not here)."""
+    not published or of a vendor that is not active. The other sellers of the same article
+    are `other_sellers`."""
     product = page.product
     term_ids = list(product.terms.values_list("pk", flat=True))
     if not term_ids:
@@ -313,6 +313,47 @@ def related(page: ProductPage, language: str | None = None) -> Sequence["service
     )
     cards = services.product_cards(chosen, language or page.requested)
     return [card for card in cards if card.url]
+
+
+OTHER_SELLERS_LIMIT = 6
+
+
+def other_sellers(
+    product: Product, language: str, limit: int = OTHER_SELLERS_LIMIT
+) -> list["services.ProductCard"]:
+    """The other vendors' offers of the same article (CAT.15, owner decision Q-33), as cards.
+
+    The same article is the same GTIN, or the same brand and MPN (the brand is one shared entity,
+    CAT.20, so spelling variants are one row; an MPN without a brand, or with another brand, is
+    not a match, and neither is an empty identifier). Only published products of active vendors
+    other than the product's own, with a published text and slug in `language` (no fallback to
+    another language, I18N rules). Cheapest first (the public net price; products without one
+    last), then by title. At most `limit` cards, in two queries plus the card texts, whatever
+    the number of sellers."""
+    match = Q()
+    gtin = engine.normalise_identifier(product.gtin)
+    mpn = engine.normalise_identifier(product.mpn)
+    if gtin:
+        match |= Q(gtin=gtin)
+    if mpn and product.brand_id is not None:
+        match |= Q(brand_id=product.brand_id, mpn=mpn)
+    if not match or limit < 1:
+        return []
+    text = ProductTranslation.objects.filter(
+        product=OuterRef("pk"), language=language, status=translations.PUBLISHED
+    ).exclude(slug="")
+    chosen = list(
+        services.listed_products()
+        .filter(match)
+        .exclude(Q(pk=product.pk) | Q(vendor_id=product.vendor_id))
+        .annotate(
+            _title=Subquery(text.values("title")[:1]),
+            _price=Case(When(sales_mode=SalesMode.BUY, then=F("price_net"))),
+        )
+        .filter(_title__isnull=False)
+        .order_by(F("_price").asc(nulls_last=True), "_title", "pk")[:limit]
+    )
+    return [card for card in services.product_cards(chosen, language) if card.url]
 
 
 def _items(images: Sequence[GalleryImage]) -> list[dict[str, Any]]:

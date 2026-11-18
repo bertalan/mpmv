@@ -260,6 +260,13 @@ class RelevanceFilter(ListFilter):
         return rows
 
 
+def _set_gate(value: bool) -> BulkRun:
+    def run(objects: list[Category], *, ctx: Any, dry_run: bool) -> ChangeSet:
+        return services.set_fitment_publish_gate(objects, value, ctx=ctx, dry_run=dry_run)
+
+    return run
+
+
 def _set_relevant(value: bool) -> BulkRun:
     def run(objects: list[Category], *, ctx: Any, dry_run: bool) -> ChangeSet:
         return services.set_fitment_relevant(objects, value, ctx=ctx, dry_run=dry_run)
@@ -280,6 +287,10 @@ class CategoryList(ManagerListView):
         Column(
             gettext_lazy("Expected to declare fitment"),
             lambda category: _("Yes") if category.is_relevant else _("No"),
+        ),
+        Column(
+            gettext_lazy("Declaration required to publish"),
+            lambda category: _("Yes") if category.gate_on else _("No"),
         ),
     )
     filters = (
@@ -303,12 +314,31 @@ class CategoryList(ManagerListView):
             _set_relevant(False),
             allowed=writer(CATEGORIES_SECTION),
         ),
+        BulkAction(
+            "require_declaration",
+            gettext_lazy("Require a declaration to publish"),
+            _set_gate(True),
+            allowed=writer(CATEGORIES_SECTION),
+        ),
+        BulkAction(
+            "no_declaration",
+            gettext_lazy("Do not require a declaration to publish"),
+            _set_gate(False),
+            allowed=writer(CATEGORIES_SECTION),
+        ),
     )
 
     def get_queryset(self) -> QuerySet[Category]:
         return (
             Category.objects.prefetch_related("translations")
-            .annotate(is_relevant=Exists(FitmentCategory.objects.filter(category=OuterRef("pk"))))
+            .annotate(
+                is_relevant=Exists(FitmentCategory.objects.filter(category=OuterRef("pk"))),
+                gate_on=Exists(
+                    FitmentCategory.objects.filter(
+                        category=OuterRef("pk"), require_declaration=True
+                    )
+                ),
+            )
             .order_by("path")
         )
 

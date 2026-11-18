@@ -21,6 +21,7 @@ class VendorsConfig(AppConfig):
         "commissionrule",
         "salestermsversion",
         "salestermsinforce",
+        "returnpolicyversion",
         "notincountry",
     )
     unaudited_models = {

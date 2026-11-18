@@ -1,0 +1,26 @@
+{% load i18n %}
+{% comment %}The rows of a fitment table (FIT.3): native selects, so it works without a script.{% endcomment %}
+{{ formset.management_form }}
+<div class="table-scroll" role="region" aria-labelledby="fitment-rows-caption" tabindex="0">
+  <table class="table">
+    <caption id="fitment-rows-caption">{% translate "What it fits" %}</caption>
+    <thead><tr>
+      <th scope="col">{% translate "Item" %}</th>
+      <th scope="col">{% translate "From year" %}</th>
+      <th scope="col">{% translate "To year" %}</th>
+      <th scope="col">{% translate "Excludes" %}</th>
+      <th scope="col">{% translate "Note" %}</th>
+      {% if formset.can_delete %}<th scope="col">{% translate "Remove" %}</th>{% endif %}
+    </tr></thead>
+    <tbody>
+      {% for form in formset %}<tr>
+        <td>{{ form.node }}{% for error in form.node.errors %}<p class="field__error">{{ error }}</p>{% endfor %}{% for error in form.year_from.errors %}<p class="field__error">{{ error }}</p>{% endfor %}{% for error in form.year_to.errors %}<p class="field__error">{{ error }}</p>{% endfor %}</td>
+        <td>{{ form.year_from }}</td>
+        <td>{{ form.year_to }}</td>
+        <td>{{ form.is_exclusion }}</td>
+        <td>{{ form.note }}</td>
+        {% if formset.can_delete %}<td>{{ form.DELETE }}</td>{% endif %}
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+</div>

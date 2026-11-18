@@ -20,8 +20,10 @@ from pydantic import Field, field_validator
 
 from apps.api.auth import api_client_of
 from apps.api.v1.errors import ApiProblem
-from apps.catalog import engine, services
+from apps.catalog import engine, product_pages, services
 from apps.catalog.models import Product, ProductAttribute, Variant
+from apps.seo import seller
+from apps.tax.prices import PriceUnavailable, consumer_price
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import get_for_actor_or_404
 
@@ -320,3 +322,70 @@ def get_product(
             _variant_out(variant, language) for variant in product.variants.order_by("position")
         ],
     }
+
+
+# --- Other sellers of a product (CAT.15)
+
+OTHER_SELLERS_MAX = 24
+
+
+class OtherSellersQuery(LanguageQuery):
+    limit: int = Field(
+        product_pages.OTHER_SELLERS_LIMIT,
+        ge=1,
+        le=OTHER_SELLERS_MAX,
+        description="At most this many offers (cheapest first, then by title).",
+    )
+
+
+class OtherSellerOut(Schema):
+    public_id: uuid.UUID
+    title: str
+    url: str = Field(description="Path of the offer's product page, in `language`.")
+    seller: str | None = Field(
+        description="The vendor's public seller name; null when it has none that may be shown."
+    )
+    price: Decimal | None = Field(
+        description="The consumer price as the shop shows it (VAT included at the destination "
+        "rate, TAX.12); null for a product on request or when no price can be shown."
+    )
+    price_note: str = ""
+
+
+@router.get(
+    "/products/{public_id}/other-sellers",
+    response=list[OtherSellerOut],
+    auth=ApiKey(READ),
+    summary="Other sellers of a product",
+)
+def other_sellers(
+    request: HttpRequest, public_id: uuid.UUID, query: Annotated[OtherSellersQuery, Query()]
+) -> list[dict[str, Any]]:
+    """Other vendors' published products with the same GTIN, or the same brand and MPN (owner
+    decision Q-33): never the caller's own vendor, an unpublished product, an inactive vendor or
+    a product without a published text in `language`. The caller reaches only a product it may
+    read; the offers listed are public data."""
+    product = get_for_actor_or_404(
+        Product.objects.select_related("vendor"), api_client_of(request), public_id=public_id
+    )
+    out: list[dict[str, Any]] = []
+    for card in product_pages.other_sellers(product, query.language, query.limit):
+        price = None
+        if card.price is not None and card.vendor is not None:
+            try:
+                price = consumer_price(
+                    card.price, card.fiscal_category, vendor=card.vendor, request=request
+                )
+            except PriceUnavailable:
+                price = None
+        out.append(
+            {
+                "public_id": card.public_id,
+                "title": card.title,
+                "url": card.url,
+                "seller": seller.public_name(card.vendor) if card.vendor is not None else None,
+                "price": None if price is None else price.amount,
+                "price_note": "" if price is None else price.note,
+            }
+        )
+    return out

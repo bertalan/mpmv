@@ -1,0 +1,1 @@
+{% load wagtailcore_tags %}{% comment %}The reusable snippet block (CMS.14): the live text in the page's language; nothing without one. The rich text is sanitised at the model boundary (CMS.12).{% endcomment %}{% if content_snippet and content_snippet.body %}<div class="block block-content-snippet">{{ content_snippet.body|richtext }}</div>{% endif %}
