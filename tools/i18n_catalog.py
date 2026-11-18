@@ -81,6 +81,9 @@ SCOPES = (
     # Temporary staff "Site links" page (OPS.12); remove before LIVE.
     "apps/seo/site_links.py",
     "apps/seo/templates/seo/site_links.html",
+    # The customer privacy page (I18N.13 follow-up): informal register, "Your data" has its own context.
+    "apps/compliance/templates/compliance/privacy_account.html",
+    "themes/ride/templates/compliance/privacy_account.html",
     *EVENT_FILES,  # the public event pages (EVT.6)
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
@@ -343,6 +346,17 @@ SENSITIVE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         ("apps/orders/templates/email/", "apps/orders/templates/documents/"),
     ),
     ("compliance forms", ("apps/compliance/",)),
+    (
+        "DSA statements of reasons (EVT.11)",
+        (
+            "apps/manager/templates/manager/shop/statements.html",
+            "apps/manager/statement_views.py",
+        ),
+    ),
+    (
+        "event moderation emails (EVT.11)",
+        ("apps/events/templates/email/events/", "apps/events/notifications.py"),
+    ),
     (
         "sales terms",
         (

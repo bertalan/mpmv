@@ -12,4 +12,4 @@ Diese Seite listet die Begründungen auf, die die Plattform an Ihren Shop gesend
 
 Die Begründung nennt nicht, wer die Meldung gesendet hat.
 
-Ist die Seite leer, hat die Plattform keine Begründung für Ihren Shop gesendet. Fragen zu einer Begründung richten Sie bitte an {{ operator.support_email }}.
+Ist die Seite leer, hat die Plattform keine Begründung für Ihren Shop gesendet. Fragen zu einer Begründung richten Sie bitte an {{ operator.compliance_email }}.

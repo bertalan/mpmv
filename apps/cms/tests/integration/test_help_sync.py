@@ -103,6 +103,39 @@ def test_a_placeholder_renders_the_operators_current_value() -> None:
     assert "{{" not in content.html
 
 
+def test_the_compliance_placeholder_falls_back_to_the_support_address() -> None:
+    cache.clear()
+    PlatformOperatorFactory.create(
+        support_email="help@operator.example",
+        compliance_email="",
+        open_ended=True,
+        valid_from=dt.datetime(2020, 1, 1, tzinfo=dt.UTC),
+    )
+    assert help_files.render_placeholders("{{ operator.compliance_email }}") == (
+        "help@operator.example"
+    )
+
+
+def test_the_compliance_placeholder_prefers_the_compliance_address() -> None:
+    cache.clear()
+    PlatformOperatorFactory.create(
+        support_email="help@operator.example",
+        compliance_email="dsa@operator.example",
+        open_ended=True,
+        valid_from=dt.datetime(2020, 1, 1, tzinfo=dt.UTC),
+    )
+    assert help_files.render_placeholders("{{ operator.compliance_email }}") == (
+        "dsa@operator.example"
+    )
+
+
+def test_the_statements_help_points_to_the_compliance_contact_in_every_language() -> None:
+    for lang in ("en", "it", "de", "fr", "es"):
+        text = Path(f"help/{lang}/route/manager__shop__statements.md").read_text()
+        assert "{{ operator.compliance_email }}" in text, lang
+        assert "operator.support_email" not in text, lang
+
+
 def test_the_modal_of_a_covered_route_shows_that_files_text_in_the_users_language(
     tmp_path: Path,
 ) -> None:

@@ -42,13 +42,18 @@ Plain Markdown. Short sentences for a non-technical reader.
   customer screens. DE, FR and ES are AI drafts until the translator's review (I18N.19).
   The general entry is the exception: every role sees it, vendors and staff included, so it is
   written in the formal register in all of DE (Sie), FR (vous), ES (usted) and IT (Lei).
+- Name a button, field or menu item exactly as the screen shows it in that language: the msgstr
+  of our catalog (`locale/`), else Wagtail's or Django's own. A label with no translation in any
+  catalog shows in English on the screen (for example "Find coordinates", "Event review"), so the
+  help quotes it in English too, and the missing msgid is a catalog follow-up.
 
 ## Placeholders
 
 Operator-specific facts (names, e-mail addresses, fees, windows) are never typed in a file. Use a
 placeholder: `{{ operator.support_email }}`. The allow-list is `PLACEHOLDERS` in
 `apps/cms/help_files.py`: `operator.legal_name`, `operator.support_email`,
-`operator.compliance_email`, `settings.site_name`. Values are read from `current_operator()` and
+`operator.compliance_email` (falls back to the support address when empty, like the compliance
+alerts), `settings.site_name`. Values are read from `current_operator()` and
 settings when the dialog is shown (never cached), HTML-escaped. An unknown placeholder fails
 `sync_help` and the test suite. To add one, add it to the list in a reviewed PR.
 
