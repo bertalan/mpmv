@@ -16,6 +16,7 @@ from . import (
     media,
     notice_views,
     product_views,
+    return_policy_views,
     sales_terms_views,
     session_views,
     statement_views,
@@ -31,6 +32,9 @@ shop = (
         path("profile/", views.StorefrontProfileView.as_view(), name="profile"),
         path("payments/", views.PaymentsView.as_view(), name="payments"),
         path("sales-terms/", sales_terms_views.SalesTermsView.as_view(), name="sales_terms"),
+        path(
+            "return-policy/", return_policy_views.ReturnPolicyView.as_view(), name="return_policy"
+        ),
         # EVT.4: the vendor's own events (list, form, submit, cancel).
         path("events/", event_views.EventsView.as_view(), name="events"),
         path("events/new/", event_views.EventFormView.as_view(), name="event_new"),

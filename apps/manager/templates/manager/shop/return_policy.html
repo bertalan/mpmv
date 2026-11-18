@@ -1,0 +1,31 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Return policy (VEN.40, owner only): propose a version; staff review it before it is public.
+No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Return policy" %}</h1>
+  <p class="manager-lead">{% blocktranslate with vendor=manager.vendor.display_name %}How buyers can return goods bought from {{ vendor }}. Staff review every change before it is shown to buyers.{% endblocktranslate %}</p>
+  <h2>{% translate "What buyers see now" %}</h2>
+  <p>{% if public.is_default %}{% translate "You have not set a policy yet. The standard one applies." %}{% else %}{% translate "This is your approved policy." %}{% endif %}</p>
+  <ul>
+    <li>{% blocktranslate with days=public.return_window_days %}Return window: {{ days }} days{% endblocktranslate %}</li>
+    <li>{% if public.return_shipping_paid_by == "vendor" %}{% translate "Return shipping is paid by the seller." %}{% else %}{% translate "Return shipping is paid by the customer." %}{% endif %}</li>
+    <li>{% blocktranslate with country=public.return_country %}Returns go to: {{ country }}{% endblocktranslate %}</li>
+  </ul>
+  {% if latest and latest.status != "approved" %}
+    <p>{% if latest.status == "pending" %}{% blocktranslate with number=latest.number %}Version {{ number }} is waiting for review. It is not shown to buyers yet.{% endblocktranslate %}{% elif latest.status == "rejected" %}{% blocktranslate with number=latest.number note=latest.review_note %}Version {{ number }} was rejected. {{ note }}{% endblocktranslate %}{% endif %}</p>
+  {% endif %}
+  <h2>{% translate "Propose a change" %}</h2>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" action="{% url 'manager:shop:return_policy' %}" class="manager-form" novalidate>
+    {% csrf_token %}
+    {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% include "components/button.html" with label=_("Send for review") type="submit" only %}
+  </form>
+  <h2>{% translate "Versions" %}</h2>
+  <ul>
+    {% for version in versions %}<li>{% blocktranslate with number=version.number status=version.get_status_display %}Version {{ number }}: {{ status }}{% endblocktranslate %}</li>{% endfor %}
+  </ul>
+{% endblock %}

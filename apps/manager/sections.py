@@ -20,6 +20,7 @@ from .navigation import Registry, Section, anyone, platform_role, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
 from .product_views import SECTION as PRODUCTS_SECTION
+from .return_policy_views import SECTION as RETURN_POLICY_SECTION
 from .sales_terms_views import SECTION as SALES_TERMS_SECTION
 from .session_views import PANIC_SECTION, USER_SESSIONS_SECTION
 from .spaces import Space
@@ -58,6 +59,15 @@ BUILT_IN = (
         _("Sales terms"),
         "manager:shop:sales_terms",
         order=22,
+        allowed=vendor_action("profile"),
+    ),
+    # The seller's return policy (VEN.40): owners only, like the sales terms.
+    Section(
+        RETURN_POLICY_SECTION,
+        Space.SHOP,
+        _("Return policy"),
+        "manager:shop:return_policy",
+        order=23,
         allowed=vendor_action("profile"),
     ),
     # The vendor's own events (EVT.4): owners and staff, by the `events` action of the matrix.
