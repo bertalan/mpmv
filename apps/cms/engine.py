@@ -605,6 +605,12 @@ def sanitise_rich_text(html: str, features: Sequence[str] | None) -> str:
 HELP_ROUTE = "route"
 HELP_PAGE_TYPE = "page_type"
 HELP_GENERAL = "general"
+HELP_GUIDE = "guide"
+# The guide pages generated from the help files (ARC.37): audience -> sections, in page order.
+# A guide entry's key is `<audience>:<section>`; its file is `guide/<audience>__<section>.md`.
+GUIDE_SECTIONS: dict[str, tuple[str, ...]] = {
+    "customer": ("ordering", "payment", "shipping", "changes", "withdrawal", "account"),
+}
 _HELP_KEY_RE = re.compile(r"[A-Za-z0-9_.:-]{1,120}")
 # The CMS catch-all names no screen: such a request is told apart by its page type instead.
 _HELP_ANONYMOUS_ROUTES = ("wagtail_serve",)
@@ -769,3 +775,31 @@ def parse_video_url(url: str) -> VideoLinks | None:
             embed += f"h={unlisted_hash}&dnt=1" if unlisted_hash else "dnt=1"
             return VideoLinks(watch, embed)
     return None
+
+
+# The guide page a screen's help dialog links as "More help" (route name -> guide key).
+ROUTE_GUIDE: dict[str, str] = {
+    "orders:cart": "customer:ordering",
+    "orders:checkout": "customer:ordering",
+    "orders:review": "customer:ordering",
+    "orders:confirmation": "customer:payment",
+    "orders:shipping": "customer:shipping",
+    "customer_order": "customer:changes",
+    "customer_orders": "customer:account",
+    "withdrawal": "customer:withdrawal",
+    "withdrawal_confirm": "customer:withdrawal",
+    "privacy_account": "customer:account",
+    "privacy_requests": "customer:account",
+}
+
+
+def guide_key(audience: str, section: str) -> str:
+    return f"{audience}:{section}"
+
+
+def guide_key_valid(key: object) -> bool:
+    """Whether `key` is `<audience>:<section>` of a registered guide section."""
+    if not isinstance(key, str) or ":" not in key:
+        return False
+    audience, _sep, section = key.partition(":")
+    return section in GUIDE_SECTIONS.get(audience, ())

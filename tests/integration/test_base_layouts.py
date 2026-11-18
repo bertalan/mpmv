@@ -127,12 +127,12 @@ def test_the_help_link_sits_in_the_header_and_the_footer(
         assert re.search(rf'<a class="help-link" href="{HELP_URL}">', part)
 
 
-def test_without_a_help_url_no_empty_help_link_is_rendered(
+def test_without_a_help_url_the_help_link_opens_the_customer_help(
     client: Client, settings: SettingsWrapper
 ) -> None:
     settings.MPMV_HELP_URL = ""
     html, _ = render(client, "/")
-    assert 'class="help-link"' not in html
+    assert '<a class="help-link" href="/help/">' in html
 
 
 def test_htmx_is_configured_for_the_strict_csp(rendered_page: tuple[str, list[str]]) -> None:

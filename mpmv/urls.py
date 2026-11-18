@@ -81,6 +81,7 @@ urlpatterns = [
         path("", include("apps.seo.consent_urls")),  # cookie settings page (SEO.5)
         path("", include("apps.fitment.urls")),  # anonymous garage cookie (FIT.6)
         path("", include("apps.events.urls")),  # `calendar.ics` of an event (EVT.6)
+        path("", include("apps.cms.guide_urls")),  # customer help pages (ARC.37)
         path("", include("apps.cms.urls")),
         prefix_default_language=False,
     ),

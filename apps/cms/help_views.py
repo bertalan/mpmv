@@ -6,15 +6,16 @@ stored by a browser or a shared cache.
 """
 
 from django.conf import settings
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils import translation
 from django.utils.cache import add_never_cache_headers, patch_cache_control
+from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_GET
 
 from apps.core.i18n import configured_languages
 
-from . import engine
+from . import engine, help_guide
 from . import help as help_lookup
 
 
@@ -44,6 +45,34 @@ def help_entry(request: HttpRequest) -> HttpResponse:
             {
                 "help": content,
                 "vendor_guide_url": guide_url,
+                "guide_url": help_guide.section_url(engine.ROUTE_GUIDE.get(route, "")),
             },
         )
     return _no_store(response)
+
+
+@require_GET
+@cache_control(public=True, max_age=300)
+def customer_help(request: HttpRequest) -> HttpResponse:
+    """The customer help centre: the sections, in order (ARC.37)."""
+    language = translation.get_language() or settings.LANGUAGE_CODE
+    return render(
+        request,
+        "cms/help_guide_index.html",
+        {"sections": help_guide.sections("customer", language)},
+    )
+
+
+@require_GET
+@cache_control(public=True, max_age=300)
+def customer_help_section(request: HttpRequest, section: str) -> HttpResponse:
+    """One section of the customer help (ARC.37), from its help file."""
+    language = translation.get_language() or settings.LANGUAGE_CODE
+    page = help_guide.section("customer", section, language)
+    if page is None:
+        raise Http404("No such help section")
+    return render(
+        request,
+        "cms/help_guide_section.html",
+        {"guide": page, "sections": help_guide.sections("customer", language)},
+    )

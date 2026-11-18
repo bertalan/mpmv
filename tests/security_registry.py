@@ -133,6 +133,14 @@ PUBLIC: dict[str, str] = {
         "Pre-contractual information (CMP.6, directive 2011/83/EU art. 49): the same legal text "
         "for every visitor, public by law."
     ),
+    "customer_help": (
+        "Customer help index (ARC.37): the same repository-file text for every visitor, "
+        "read-only, public by design."
+    ),
+    "customer_help_section": (
+        "Customer help section (ARC.37): the same repository-file text for every visitor, "
+        "read-only, public by design."
+    ),
     "subprocessors": (
         "Sub-processor register (CMP.4): static reviewed data, read-only, public by design "
         "(GDPR art. 13 and 28)."
@@ -212,6 +220,11 @@ SITEMAP = (
 )
 
 IDOR_REVIEWED: dict[str, str] = {
+    "customer_help_section": (
+        "Public by design (ARC.37): the slug names a fixed section of the repository help text, "
+        "the same for every visitor; an unknown slug is a 404 "
+        "(`test_an_unknown_section_is_a_404`)."
+    ),
     "events_resource": (
         "Public by design (EVT.6, EVT.9): the path names a published event's calendar file or a "
         "feed, the same for every visitor; a hidden event and an unknown path are a 404 "
