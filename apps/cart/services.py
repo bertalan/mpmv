@@ -7,7 +7,7 @@ the order placed from it is audited and snapshotted (ORD.2, ORD.4). Request hand
 belongs to this visitor) is in `session.py`.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Literal, overload
@@ -219,6 +219,72 @@ def add_to_cart(
             changeset.update(LINE_MODEL, str(line.public_id), before, _line_snapshot(line))
         if not dry_run:
             line.save()
+            _touch(cart.pk)
+    return changeset
+
+
+def add_many_to_cart(
+    cart: Cart,
+    items: Sequence[tuple[Product, Variant | None, int]],
+    *,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Add several items at once: `(product, variant, quantity)` each, one cart lock.
+
+    The same rules and result as `add_to_cart` per item (quantities of an item listed twice are
+    added up), but the products, variants and existing lines are read in one query each and the
+    lines are written in bulk, so the query count does not grow with the number of items (ORD.31).
+    All or nothing: one refused item raises ValidationError and nothing is written."""
+    if any(quantity < 1 for _, _, quantity in items):
+        raise ValidationError({"quantity": "The quantity must be at least 1."})
+    wanted: dict[tuple[int, int | None], int] = {}
+    for product, variant, quantity in items:
+        key = (product.pk, None if variant is None else variant.pk)
+        wanted[key] = wanted.get(key, 0) + quantity
+    changeset = ChangeSet()
+    if not wanted:
+        return changeset
+    with transaction.atomic():
+        Cart.objects.select_for_update().get(pk=cart.pk)  # one change at a time per cart
+        products = Product.objects.select_related(_VENDOR_ACCOUNT).in_bulk(
+            {product_id for product_id, _ in wanted}
+        )
+        variants = Variant.objects.in_bulk({vid for _, vid in wanted if vid is not None})
+        existing = {
+            (line.product_id, line.variant_id): line for line in CartLine.objects.filter(cart=cart)
+        }
+        for old in existing.values():
+            old.cart = cart  # the snapshot reads it: no query per line
+        created: list[CartLine] = []
+        updated: list[CartLine] = []
+        for (product_id, variant_id), quantity in wanted.items():
+            product = products[product_id]
+            variant = None if variant_id is None else variants[variant_id]
+            limit = _purchase_limit(product, variant)
+            price = _unit_price(product, variant)
+            line = existing.get((product_id, variant_id))
+            if line is None:
+                line = CartLine(
+                    cart=cart,
+                    product=product,
+                    variant=variant,
+                    quantity=quantity,
+                    added_price_net=price,
+                )
+                _check_quantity(line.quantity, limit)
+                changeset.create(LINE_MODEL, str(line.public_id), _line_snapshot(line))
+                created.append(line)
+            else:
+                before = _line_snapshot(line)
+                line.quantity += quantity
+                line.added_price_net = price
+                line.updated_at = timezone.now()
+                _check_quantity(line.quantity, limit)
+                changeset.update(LINE_MODEL, str(line.public_id), before, _line_snapshot(line))
+                updated.append(line)
+        if not dry_run:
+            CartLine.objects.bulk_create(created)
+            CartLine.objects.bulk_update(updated, ["quantity", "added_price_net", "updated_at"])
             _touch(cart.pk)
     return changeset
 

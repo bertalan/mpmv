@@ -229,7 +229,8 @@ def test_a_dry_run_writes_nothing() -> None:
 def test_the_number_of_queries_does_not_grow_with_the_lines(
     django_assert_max_num_queries: Any,
 ) -> None:
-    """Products, variants and vendors are read in bulk (no N+1) while planning."""
+    """Products, variants and vendors are read in bulk (no N+1) while planning, and the cart
+    lines are written in bulk under one lock."""
     from django.db import connection
     from django.test.utils import CaptureQueriesContext
 
@@ -244,4 +245,26 @@ def test_the_number_of_queries_does_not_grow_with_the_lines(
         return len(ctx)
 
     run(1)  # warms the process caches (operator settings)
+    assert run(8) <= run(2)
+
+
+def test_the_number_of_queries_does_not_grow_with_the_added_lines() -> None:
+    """The cart writes too: new lines and lines already in the cart (ORD.31)."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    _, user = signed_in()
+    v = vendor()
+
+    def run(count: int) -> int:
+        items = [(product(v), 1) for _ in range(count)]
+        order = order_of(user, items)
+        with CaptureQueriesContext(connection) as ctx:
+            result = reorder.order_again(user, order.public_id)
+        assert result is not None
+        assert len(result.added) == count
+        return len(ctx)
+
+    run(1)  # warms the process caches and creates the cart
+    run(2)  # the second time around the lines are added to an existing cart
     assert run(8) <= run(2)
