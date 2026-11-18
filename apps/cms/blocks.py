@@ -37,6 +37,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, ClassVar
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from django import forms
@@ -68,6 +69,7 @@ from apps.catalog.services import (
     product_grid,
 )
 from apps.core import translations
+from apps.core.images import rendition_or_original
 from apps.core.money import CURRENCY
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.services import has_public_storefront
@@ -158,15 +160,17 @@ class GalleryImageBlock(FigureBlock):
 def _gallery_slide(item: Mapping[str, Any]) -> dict[str, Any]:
     """A gallery image as the context of the theme's gallery carousel."""
     image = item["image"]
-    shown = image.get_rendition("width-800")
-    large = image.get_rendition("width-1600")
+    # A page never builds a rendition (CAT.4): the `core.render_image` job did; until it ran, the
+    # original file is shown.
+    url, width, height = rendition_or_original(image, "width-800")
+    large_url, _, _ = rendition_or_original(image, "width-1600")
     return {
-        "url": shown.url,
-        "large_url": large.url,
+        "url": url,
+        "large_url": large_url,
         "alt": item.get("alt_text") or "",
         "caption": item.get("caption") or "",
-        "width": shown.width,
-        "height": shown.height,
+        "width": width,
+        "height": height,
     }
 
 
@@ -1142,8 +1146,12 @@ class ProgressBlock(blocks.StructBlock):  # type: ignore[misc]
 
 
 def validate_video_url(url: str) -> None:
-    """Only YouTube and Vimeo addresses (https), so the embed is a known no-tracking origin."""
-    if parse_video_url(url) is None:
+    """Only YouTube and Vimeo addresses (https) whose no-tracking embed origin is in
+    `settings.MPMV_VIDEO_EMBED_ORIGINS`, the same list the CSP `frame-src` is built from."""
+    links = parse_video_url(url)
+    allowed = {o.rstrip("/") for o in settings.MPMV_VIDEO_EMBED_ORIGINS}
+    embed = urlsplit(links.embed_url) if links else None
+    if links is None or f"{embed.scheme}://{embed.netloc}" not in allowed:  # type: ignore[union-attr]
         raise ValidationError(
             _(
                 "Use the address of a YouTube or Vimeo video, starting with https://. "

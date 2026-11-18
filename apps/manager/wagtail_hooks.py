@@ -11,12 +11,20 @@ holds none without a role (break-glass). The check is role membership from `role
 from collections.abc import Collection
 from typing import Any
 
+from django.core.exceptions import PermissionDenied
 from django.utils.translation import gettext_lazy as _
 from wagtail.permission_policies.base import BasePermissionPolicy
 from wagtail.permissions import register_permission_policy
 from wagtail.snippets.models import register_snippet
-from wagtail.snippets.views.snippets import SnippetViewSet
+from wagtail.snippets.views.snippets import (
+    CopyView,
+    CreateView,
+    DeleteView,
+    EditView,
+    SnippetViewSet,
+)
 
+from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
 from apps.cms.models import HelpEntry
 
@@ -25,6 +33,7 @@ from .role_groups import user_roles
 
 HELP_SECTION = "platform.moderation"
 READ_ACTIONS = frozenset({"view"})
+GATE_ACTION = "content_edit"  # the session level of every state change here (CORE.25)
 
 
 class HelpEntryPermissionPolicy(BasePermissionPolicy):  # type: ignore[misc]  # Wagtail is untyped
@@ -32,6 +41,14 @@ class HelpEntryPermissionPolicy(BasePermissionPolicy):  # type: ignore[misc]  # 
 
     def user_has_permission(self, user: Any, action: str) -> bool:
         return roles.allows(HELP_SECTION, user_roles(user), write=action not in READ_ACTIONS)
+
+    def user_has_permission_for_instance(self, user: Any, action: str, instance: Any) -> bool:
+        """A row that comes from a repository file (ARC.36) is read-only for everyone, the
+        superuser included: the file wins and the next sync would overwrite an edit. Edit, delete,
+        copy and bulk delete all ask this check. Rows staff made follow the matrix."""
+        if action not in READ_ACTIONS and getattr(instance, "source", "") == "file":
+            return False
+        return self.user_has_permission(user, action)
 
     def user_has_any_permission(self, user: Any, actions: Collection[str]) -> bool:
         return any(self.user_has_permission(user, action) for action in actions)
@@ -47,12 +64,68 @@ class HelpEntryPermissionPolicy(BasePermissionPolicy):  # type: ignore[misc]  # 
 register_permission_policy(HelpEntry, HelpEntryPermissionPolicy(HelpEntry))
 
 
+class _FileRowGuard:
+    """The generic snippet views check the class-level permission only, so the edit, delete and
+    copy views refuse a file-backed row here (403, GET and POST alike). Bulk delete asks the
+    instance check of the policy."""
+
+    def get_object(self, queryset: Any = None) -> Any:
+        obj = super().get_object(queryset)  # type: ignore[misc]
+        if getattr(obj, "source", "") == "file":
+            raise PermissionDenied("This help text comes from a repository file: edit the file.")
+        return obj
+
+
+class HelpEntryCreateView(CreateView):  # type: ignore[misc]
+    @requires_level_method(GATE_ACTION)
+    def post(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().post(request, *args, **kwargs)
+
+    @requires_level_method(GATE_ACTION)
+    def put(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().put(request, *args, **kwargs)
+
+
+class HelpEntryEditView(_FileRowGuard, EditView):  # type: ignore[misc]  # Wagtail is untyped
+    @requires_level_method(GATE_ACTION)
+    def post(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().post(request, *args, **kwargs)
+
+    @requires_level_method(GATE_ACTION)
+    def put(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().put(request, *args, **kwargs)
+
+
+class HelpEntryDeleteView(_FileRowGuard, DeleteView):  # type: ignore[misc]
+    @requires_level_method(GATE_ACTION)
+    def post(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().post(request, *args, **kwargs)
+
+    @requires_level_method(GATE_ACTION)
+    def delete(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().delete(request, *args, **kwargs)
+
+
+class HelpEntryCopyView(_FileRowGuard, CopyView):  # type: ignore[misc]
+    @requires_level_method(GATE_ACTION)
+    def post(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().post(request, *args, **kwargs)
+
+    @requires_level_method(GATE_ACTION)
+    def put(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().put(request, *args, **kwargs)
+
+
 class HelpEntryViewSet(SnippetViewSet):  # type: ignore[misc]  # Wagtail is untyped
     model = HelpEntry
+    add_view_class = HelpEntryCreateView
+    edit_view_class = HelpEntryEditView
+    delete_view_class = HelpEntryDeleteView
+    copy_view_class = HelpEntryCopyView
     icon = "help"
     menu_label = _("Help texts")
     add_to_admin_menu = True
-    list_display = ("title", "kind", "key", "locale")
+    list_display = ("title", "kind", "key", "locale", "source")
     list_filter = ("kind", "locale")
     search_fields = ("title", "key")
 

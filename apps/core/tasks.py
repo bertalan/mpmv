@@ -285,18 +285,34 @@ def schedules() -> list[Schedule]:
 # --- Queueing and inspecting jobs -----------------------------------------------------------
 
 
-def enqueue(job: Job, /, *, schedule_at: dt.datetime | None = None, **kwargs: Any) -> int | None:
+def enqueue(
+    job: Job,
+    /,
+    *,
+    schedule_at: dt.datetime | None = None,
+    queueing_lock: str | None = None,
+    **kwargs: Any,
+) -> int | None:
     """Queue `job` with keyword arguments; return the job id.
 
     The row is written in the caller's transaction, so a rollback drops the job too. Returns
-    None, without breaking the transaction, when a `locked` job with the same key is waiting.
+    None, without breaking the transaction, when a job with the same queueing lock is waiting:
+    the one of a `locked` job, or `queueing_lock` (e.g. one key per object, so that the same
+    object is never queued twice while its job is still todo).
     """
-    deferrer = job.configure(schedule_at=schedule_at)
+    if queueing_lock is None:
+        deferrer = job.configure(schedule_at=schedule_at)
+    else:
+        deferrer = job.configure(schedule_at=schedule_at, queueing_lock=queueing_lock)
     try:
         with transaction.atomic():
             return deferrer.defer(**kwargs)
     except AlreadyEnqueued:
-        logger.info("%s not queued: a job with lock %r is waiting", job.name, job.queueing_lock)
+        logger.info(
+            "%s not queued: a job with lock %r is waiting",
+            job.name,
+            queueing_lock or job.queueing_lock,
+        )
         return None
 
 
@@ -381,6 +397,35 @@ def run_worker(
 
 
 # --- Jobs of the core app -------------------------------------------------------------------
+
+
+@task("core.render_image")
+def render_image(image_id: int) -> None:
+    """Make the renditions of every preset of one `MediaImage` (CAT.4 review).
+
+    Queued by the `post_save` receiver of `apps.core.signals` when the file is new or replaced
+    (one waiting job per image). Safe to run twice: a rendition that exists is reused; a deleted
+    image is skipped. A file that cannot be decoded (corrupt, a decompression bomb, missing) is
+    logged and dropped: retrying cannot fix it.
+    """
+    from PIL import UnidentifiedImageError
+    from PIL.Image import DecompressionBombError
+
+    from . import images
+    from .models import MediaImage
+
+    image = MediaImage.objects.filter(pk=image_id).first()
+    if image is None:
+        return
+    try:
+        images.render_all(image)
+    except (DecompressionBombError, UnidentifiedImageError, OSError) as error:
+        logger.warning(
+            "core.render_image image %s skipped, its file cannot be rendered: %s: %s",
+            image_id,
+            type(error).__name__,
+            error,
+        )
 
 
 @periodic("*/5 * * * *")

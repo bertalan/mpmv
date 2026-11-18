@@ -42,6 +42,9 @@ Not covered, still bumped by hand: the Caddy image in `deploy/quadlet/mpmv-caddy
 service image in CI and `make db`, the pre-commit hook revisions (`uv run pre-commit autoupdate`)
 and the Python minor version.
 
+These manual bumps are temporary: OPS.15 (owner decision Q-82, 2026-11-18) automates them, and
+OPS.16 adds the image vulnerability scan and the signed SBOM attestation.
+
 ### Why Dependabot and not Renovate
 
 Dependabot is built into GitHub: no app to install, no token to manage and no extra service with
