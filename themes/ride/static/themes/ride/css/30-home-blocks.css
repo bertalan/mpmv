@@ -251,4 +251,27 @@
       max-inline-size: 56rem;
     }
   }
+
+  /* --- Download block (CMS.15): the file's type and size sit next to its title, as text. */
+
+  .ride-download__link {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-m);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--card-radius);
+    background: var(--color-surface-raised);
+    color: var(--color-heading);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .ride-download__link:hover {
+    border-color: var(--color-accent);
+  }
+
+  .ride-download .block-download__details {
+    font-weight: 400;
+  }
 }

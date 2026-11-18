@@ -500,6 +500,11 @@ ENDPOINTS: dict[str, Access] = {
         "Public image files (THM.12): published images and their renditions, no vendor data.",
         kwargs={"path": "images/missing.webp"},
     ),
+    "wagtaildocs_serve": NoVendorData(
+        "Wagtail document serve view (CMS.15): library documents are not vendor data; a private "
+        "collection or restricted page refuses anonymous visitors.",
+        path="/documents/0/missing.pdf",
+    ),
     "home": NoVendorData("Public home page."),
     "catalog:category": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "product-category"}),
     "catalog:product": NoVendorData(

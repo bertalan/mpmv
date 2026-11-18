@@ -12,9 +12,10 @@ page lookup.
 from django.conf.urls.i18n import i18n_patterns
 from django.contrib import admin
 from django.http import HttpRequest, JsonResponse
-from django.urls import include, path
+from django.urls import include, path, re_path
 from django.views.decorators.http import require_safe
 from wagtail.admin import urls as wagtailadmin_urls
+from wagtail.documents.views.serve import serve as serve_document
 
 from apps.accounts.views import switch_language
 from apps.core.media import serve_media
@@ -53,6 +54,10 @@ urlpatterns = [
     path("admin/", include("apps.cms.admin_urls")),  # replaces Wagtail's account page (CMS.1)
     path("admin/", include("apps.core.admin_urls")),  # collection moves keep SVG (THM.12)
     path("admin/", include(wagtailadmin_urls)),  # editors' admin (Wagtail, CMS.1)
+    # Wagtail's document serve view (CMS.15): collection and page restrictions apply. Its password
+    # form is not mounted (a password restriction needs captcha and a rate limit first), so only
+    # login and group restrictions are supported.
+    re_path(r"^documents/(\d+)/(.*)$", serve_document, name="wagtaildocs_serve"),
     path("i18n/switch/", switch_language, name="switch_language"),
     path("", include("apps.seo.save_urls")),  # cookie consent choice (SEO.5)
     path("", include("apps.seo.sitemap_urls")),  # sitemap index and per-language sitemaps (I18N.6)

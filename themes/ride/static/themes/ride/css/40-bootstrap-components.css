@@ -368,6 +368,46 @@
     --bs-accordion-active-bg: var(--color-accent-tint);
   }
 
+  /* CMS.16 accordion block: Bootstrap's accordion look on native details and summary. The
+     summary always carries `.collapsed` (Bootstrap's closed look); the open state is the
+     `open` attribute, so nothing needs a script. */
+
+  .ride-accordion .accordion-item:first-child {
+    border-start-start-radius: var(--bs-accordion-border-radius);
+    border-start-end-radius: var(--bs-accordion-border-radius);
+  }
+
+  .ride-accordion .accordion-item:last-child {
+    border-end-start-radius: var(--bs-accordion-border-radius);
+    border-end-end-radius: var(--bs-accordion-border-radius);
+  }
+
+  .ride-accordion .accordion-button {
+    min-block-size: var(--target-primary);
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .ride-accordion .accordion-button::-webkit-details-marker {
+    display: none;
+  }
+
+  .ride-accordion details[open] > .accordion-button {
+    color: var(--bs-accordion-active-color);
+    background-color: var(--bs-accordion-active-bg);
+  }
+
+  .ride-accordion details[open] > .accordion-button::after {
+    background-image: var(--bs-accordion-btn-active-icon);
+    transform: var(--bs-accordion-btn-icon-transform);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ride-accordion .accordion-button::after {
+      transition: none;
+    }
+  }
+
   .breadcrumb {
     --bs-breadcrumb-divider-color: var(--color-text-muted);
     --bs-breadcrumb-item-active-color: var(--color-text-muted);

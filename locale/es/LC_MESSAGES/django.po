@@ -867,6 +867,10 @@ msgid "Add at least one question. They show as a list that opens one answer at a
 msgstr "Añada al menos una pregunta. Se muestran como una lista que abre una respuesta cada vez."
 
 #: apps/cms/blocks.py
+msgid "Add at least one section. Each has a title and a text that opens on click."
+msgstr "Añada al menos una sección. Cada una tiene un título y un texto que se abre con un clic."
+
+#: apps/cms/blocks.py
 msgid "Add cards of the same kind: blog posts or pages, vendors, products or testimonials."
 msgstr ""
 "Añada tarjetas del mismo tipo: entradas o páginas del blog, vendedores, productos o testimonios."
@@ -964,6 +968,7 @@ msgid "Aliases"
 msgstr "Alias"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
@@ -1391,6 +1396,10 @@ msgstr "Pertenece a"
 msgid "block %(number)s, %(label)s"
 msgstr "bloque %(number)s, %(label)s"
 
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Blocked"
+msgstr "Bloqueado"
+
 #: apps/events/templates/events/event_page.html
 msgid "Booth %(booth)s"
 msgstr "Stand %(booth)s"
@@ -1632,6 +1641,10 @@ msgstr "Modificar el pedido"
 msgid "Change this order"
 msgstr "Modificar este pedido"
 
+#: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/platform/orders.html
+msgid "Changes are disabled."
+msgstr "Los cambios están desactivados."
+
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid ""
 "Changes owners made to their storefront texts, policies and logo. They are live at once; revert "
@@ -1699,6 +1712,14 @@ msgstr ""
 #: apps/manager/event_forms.py
 msgid "Choose a day from 1 to 31, or the last day."
 msgstr "Elija un día del 1 al 31, o el último día."
+
+#: apps/cms/blocks.py
+msgid ""
+"Choose a file from the media library, or upload a new one. Its type and size are shown next to the"
+" link by themselves."
+msgstr ""
+"Elija un archivo de la biblioteca multimedia o suba uno nuevo. Su tipo y tamaño se muestran solos "
+"junto al enlace."
 
 #: apps/manager/event_image_form.py
 msgid "Choose a licence"
@@ -2754,6 +2775,7 @@ msgid "File"
 msgstr "Archivo"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filter"
@@ -2764,6 +2786,7 @@ msgid "Filter events"
 msgstr "Filtrar los eventos"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filters"
@@ -3425,6 +3448,10 @@ msgstr "Imagen %(number)d"
 #: apps/manager/event_block_views.py apps/manager/sections.py
 msgid "Images"
 msgstr "Imágenes"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "Images of %(label)s"
+msgstr "Imágenes de %(label)s"
 
 #: apps/catalog/taxonomy.py
 msgid "import batch"
@@ -4182,6 +4209,10 @@ msgid "No order has this number."
 msgstr "Ningún pedido tiene este número."
 
 #: apps/manager/templates/manager/platform/orders.html
+msgid "No package waits for a change."
+msgstr "Ningún paquete espera un cambio."
+
+#: apps/manager/templates/manager/platform/orders.html
 msgid "No package was cancelled in this period."
 msgstr "En este período no se canceló ningún paquete."
 
@@ -4735,6 +4766,10 @@ msgstr "El preaviso solo se puede dar a vendedores activos o suspendidos."
 msgid "Only when the event is hidden after a notice."
 msgstr "Solo cuando el evento se oculta a raíz de un aviso."
 
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Open change"
+msgstr "Cambio abierto"
+
 #: apps/events/templates/events/_event_map.html
 msgid "Open in a maps app"
 msgstr "Abrir en una aplicación de mapas"
@@ -5000,6 +5035,10 @@ msgstr "Paquete cancelado"
 msgid "Packages of order %(number)s"
 msgstr "Paquetes del pedido %(number)s"
 
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Packages you can still change"
+msgstr "Paquetes aún modificables"
+
 #: themes/base/templates/components/pagination.html
 msgid "Page %(number)s"
 msgstr "Página %(number)s"
@@ -5023,6 +5062,14 @@ msgstr "Paginación"
 #: apps/orders/customer_views.py
 msgid "Paid"
 msgstr "Pagado"
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid ""
+"Paid packages that have not shipped, oldest first. Shipped and closed packages are found by their "
+"order number above."
+msgstr ""
+"Paquetes pagados y aún no enviados, del más antiguo al más reciente. Los paquetes enviados o "
+"cerrados se encuentran con el número de pedido de arriba."
 
 #: apps/orders/customer_views.py
 msgid "Partly refunded"
@@ -5173,13 +5220,22 @@ msgstr "Pista del selector"
 msgid "Pictures for the event page come from"
 msgstr "Las imágenes de la página del evento proceden de"
 
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
 msgstr "Realizado el"
 
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Placed from"
+msgstr "Realizado desde el"
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "Placed on"
 msgstr "Realizado el"
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Placed until"
+msgstr "Realizado hasta el"
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -6231,6 +6287,10 @@ msgstr "Envío: %(shipping)s EUR"
 #: apps/manager/templates/manager/platform/product.html
 msgid "Shop"
 msgstr "Tienda"
+
+#: apps/manager/amendment_views.py
+msgid "Shop frozen"
+msgstr "Tienda congelada"
 
 #: apps/seo/site_links.py
 msgid "Shop space: choose the shop"
@@ -9176,6 +9236,10 @@ msgstr ""
 "El texto del botón de envío, por ejemplo «Enviar su pregunta». Si lo deja vacío, el botón dice "
 "«Enviar»."
 
+#: apps/cms/blocks.py
+msgid "The text that shows when the visitor opens the section. Required."
+msgstr "El texto que aparece cuando el visitante abre la sección. Obligatorio."
+
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid ""
 "The text, pictures and other blocks of the event page, in this order. Each change is saved as a "
@@ -9210,6 +9274,10 @@ msgstr ""
 msgid "The title of the section as visitors read it, up to 160 characters. Required."
 msgstr ""
 "El título de la sección tal como lo leen los visitantes, de hasta 160 caracteres. Obligatorio."
+
+#: apps/cms/blocks.py
+msgid "The title of the section, always visible. Required."
+msgstr "El título de la sección, siempre visible. Obligatorio."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -9459,6 +9527,14 @@ msgid ""
 msgstr ""
 "Las palabras en las que hacen clic los compradores. Si lo deja vacío, se usan las palabras que "
 "haya seleccionado o, si no ha seleccionado nada, la propia dirección."
+
+#: apps/cms/blocks.py
+msgid ""
+"The words of the link, for example 'Terms of sale'. Up to 120 characters. If you leave it empty, "
+"the title of the file is used."
+msgstr ""
+"Las palabras del enlace, por ejemplo «Condiciones de venta». Máximo 120 caracteres. Si lo deja "
+"vacío, se usa el título del archivo."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -10020,6 +10096,10 @@ msgid ""
 msgstr ""
 "Marca esta casilla para introducir tu empresa y tu número de IVA. Un número de IVA de la UE válido"
 " puede eliminar el IVA en una compra entre países."
+
+#: apps/cms/blocks.py
+msgid "Tick this to show the first section already open. Otherwise all are closed."
+msgstr "Marque para mostrar la primera sección ya abierta. Si no, todas están cerradas."
 
 #: apps/cms/blocks.py
 msgid "Tick to add a 'See all' link under the products, to the full list."
@@ -11280,6 +11360,10 @@ msgstr "Retirar el preaviso"
 #: apps/manager/site_map.py apps/orders/templates/orders/_legal_recap.html
 msgid "Withdrawal"
 msgstr "Desistimiento"
+
+#: apps/manager/amendment_views.py
+msgid "Withdrawal registered"
+msgstr "Desistimiento registrado"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Withdrawn"

@@ -1277,6 +1277,23 @@ def gallery_selection[R: GalleryRow](rows: Iterable[R], language: str) -> list[R
     return [cover, *(row for row in ordered if row is not cover)]
 
 
+def variant_gallery[R: GalleryRow](
+    own: Iterable[R], shared: Iterable[R], cover: R | None, language: str
+) -> list[R]:
+    """The gallery shown when a variant is selected (CAT.26): the variant's own images first
+    (the D-18 rule applied to them), its cover leading them, then the product's gallery in the
+    same language rule. Empty when the variant has nothing of its own in `language`: the page
+    then keeps the product gallery. An image dedicated to another language never shows, cover
+    included."""
+    shown = gallery_selection(own, language)
+    usable_cover = cover if cover is not None and cover.language in (None, language) else None
+    if usable_cover is not None:
+        shown = [usable_cover, *(row for row in shown if row != usable_cover)]
+    if not shown:
+        return []
+    return [*shown, *(row for row in gallery_selection(shared, language) if row not in shown)]
+
+
 # --- Translation state of a product (CAT.11)
 
 STALE = "stale"
