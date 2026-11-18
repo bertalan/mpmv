@@ -103,7 +103,7 @@ def test_a_three_line_order_refills_the_cart_with_the_two_on_sale_and_lists_the_
     assert response.status_code == 302
     assert response["Location"] == reverse("orders:cart")
     assert quantities(user) == {a.pk: 2, b.pk: 1}
-    result = reorder.order_again(user, order.public_id)
+    result = reorder.order_again(user, order.public_id, ctx=CTX)
     assert result is not None
     assert [s.reason for s in result.skipped] == ["retired"]
     page = client.get(reverse("orders:cart")).content.decode()
@@ -126,7 +126,7 @@ def test_an_out_of_stock_item_is_skipped_with_the_reason() -> None:
     _, user = signed_in()
     p = product(vendor(), stock=0)
     order = order_of(user, [(p, 1)])
-    result = reorder.order_again(user, order.public_id)
+    result = reorder.order_again(user, order.public_id, ctx=CTX)
     assert result is not None
     assert [s.reason for s in result.skipped] == ["out_of_stock"]
     assert not Cart.objects.get(user=user).lines.exists()
@@ -176,7 +176,7 @@ def test_an_item_the_vendor_cannot_ship_to_the_current_address_is_skipped(
     monkeypatch.setattr(
         reorder, "quote_shipping", lambda *a, **k: shipping_engine.Blocked("zone", "No")
     )
-    result = reorder.order_again(user, order.public_id)
+    result = reorder.order_again(user, order.public_id, ctx=CTX)
     assert result is not None
     assert [s.reason for s in result.skipped] == ["not_deliverable"]
 
@@ -220,7 +220,7 @@ def test_the_order_page_has_the_button() -> None:
 def test_a_dry_run_writes_nothing() -> None:
     _, user = signed_in()
     order = order_of(user, [(product(vendor()), 1)])
-    result = reorder.order_again(user, order.public_id, dry_run=True)
+    result = reorder.order_again(user, order.public_id, ctx=CTX, dry_run=True)
     assert result is not None
     assert len(result.added) == 1
     assert not Cart.objects.filter(user=user).exists()
@@ -241,7 +241,7 @@ def test_the_number_of_queries_does_not_grow_with_the_lines(
         items = [(product(v, stock=0), 1) for _ in range(count)]  # all skipped: no cart writes
         order = order_of(user, items)
         with CaptureQueriesContext(connection) as ctx:
-            reorder.order_again(user, order.public_id)
+            reorder.order_again(user, order.public_id, ctx=CTX)
         return len(ctx)
 
     run(1)  # warms the process caches (operator settings)
@@ -260,7 +260,7 @@ def test_the_number_of_queries_does_not_grow_with_the_added_lines() -> None:
         items = [(product(v), 1) for _ in range(count)]
         order = order_of(user, items)
         with CaptureQueriesContext(connection) as ctx:
-            result = reorder.order_again(user, order.public_id)
+            result = reorder.order_again(user, order.public_id, ctx=CTX)
         assert result is not None
         assert len(result.added) == count
         return len(ctx)

@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.catalog.models import Product, Variant
+from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.vendors import services as vendors
 
@@ -27,6 +28,7 @@ from .models import Cart, CartLine
 
 CART_MODEL = "cart.cart"
 LINE_MODEL = "cart.cartline"
+BULK_ADD_ACTION = "cart.lines_added_in_bulk"
 
 
 def _cart_snapshot(cart: Cart) -> dict[str, Any]:
@@ -227,6 +229,7 @@ def add_many_to_cart(
     cart: Cart,
     items: Sequence[tuple[Product, Variant | None, int]],
     *,
+    ctx: AuditContext,
     dry_run: bool = False,
 ) -> ChangeSet:
     """Add several items at once: `(product, variant, quantity)` each, one cart lock.
@@ -234,7 +237,9 @@ def add_many_to_cart(
     The same rules and result as `add_to_cart` per item (quantities of an item listed twice are
     added up), but the products, variants and existing lines are read in one query each and the
     lines are written in bulk, so the query count does not grow with the number of items (ORD.31).
-    All or nothing: one refused item raises ValidationError and nothing is written."""
+    All or nothing: one refused item raises ValidationError and nothing is written. A real call
+    writes one AuditLog entry (`BULK_ADD_ACTION`) with the product and variant public ids and the
+    quantities added, no personal data; a dry run writes none."""
     if any(quantity < 1 for _, _, quantity in items):
         raise ValidationError({"quantity": "The quantity must be at least 1."})
     wanted: dict[tuple[int, int | None], int] = {}
@@ -286,6 +291,23 @@ def add_many_to_cart(
             CartLine.objects.bulk_create(created)
             CartLine.objects.bulk_update(updated, ["quantity", "added_price_net", "updated_at"])
             _touch(cart.pk)
+            record(
+                ctx,
+                BULK_ADD_ACTION,
+                CART_MODEL,
+                str(cart.public_id),
+                None,
+                {
+                    "lines": [
+                        {
+                            "product": str(products[product_id].public_id),
+                            "variant": None if vid is None else str(variants[vid].public_id),
+                            "quantity": quantity,
+                        }
+                        for (product_id, vid), quantity in wanted.items()
+                    ]
+                },
+            )
     return changeset
 
 
