@@ -12062,6 +12062,10 @@ msgstr ""
 msgid "You can read the scheme but not change it."
 msgstr "Può leggere lo schema ma non modificarlo."
 
+#: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/product.html
+msgid "You can view this section; changes need the Catalog role."
+msgstr "Può consultare questa sezione; per le modifiche serve il ruolo Catalogo."
+
 #: apps/manager/event_block_views.py
 msgid "You cannot add images for this shop."
 msgstr "Non puoi aggiungere immagini per questo negozio."
