@@ -41,7 +41,7 @@ lane board.
 - **Migration number collisions.** When two open PRs add the same migration number in one app,
   the PR merged later renumbers: merge main in, regenerate or rename its migration to the next
   free number, and point its dependencies at the migration that merged first (no merge
-  migration). When the merge order is not obvious, lane-a names it on the Lane board (#86).
+  migration). When the merge order is not obvious, lane-a names it on the Lane board (#726; #86 until it reached GitHub's 2500-comment limit on 2026-11-18).
 - **Help files (ARC.36).** A PR that adds a signed-in screen or a page type adds its help files in the five languages under `help/`; `tests/integration/test_help_coverage.py` fails on a new key without them and the baseline only shrinks. Format: [help-content.md](help-content.md).
 - **Do not edit `docs/progress.md`.** List follow-ups in the PR under "Follow-ups"; lane-a records them.
 - The repository is public. CLAUDE.md's redaction rules apply to PR bodies, comments and the lane
