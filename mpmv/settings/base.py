@@ -640,6 +640,7 @@ MAP_TILE_USER_AGENT = env_str("MPMV_MAP_TILE_USER_AGENT", "")
 MAP_TILE_MIN_ZOOM = 2  # spec 15: tiles from zoom 2 to 18
 MAP_TILE_MAX_ZOOM = 18
 MAP_TILE_UPSTREAM_TIMEOUT = 5.0  # seconds
+MAP_TILE_SINGLE_FLIGHT_WAIT = 8.0  # seconds a request waits for a concurrent fetch of its tile
 MAP_TILE_UPSTREAM_DAILY_LIMIT = env_int("MPMV_MAP_TILE_UPSTREAM_DAILY_LIMIT", 100_000)
 MAP_TILE_IP_LIMIT = 600  # tiles per IP and window (one map view loads about 20)
 MAP_TILE_IP_WINDOW = 60  # seconds

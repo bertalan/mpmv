@@ -12,7 +12,7 @@ This module tells staff where that happens:
   queue's error text can be kept) and raises one alert through `apps.core.alerts`.
 
 An alert is raised once per failed job: after the last retry, or at once for a file that cannot be
-decoded (the job is not retried).
+decoded (the job is not retried). All decode failures of one window share one alert key.
 """
 
 import datetime as dt
@@ -33,6 +33,8 @@ IMAGE_MODEL = "core.mediaimage"
 FAILED = "core.media_image.render_failed"
 RETRIED = "core.media_image.render_retried"
 
+SUMMARY = "Image renditions could not be made"
+DECODE_KEY = "renditions:decode"  # one alert per window for any number of corrupt files
 SCAN_LIMIT = 2000  # newest images checked for missing renditions
 FAILED_LIMIT = 200  # newest failed jobs shown
 CHUNK = 500  # images per renditions query
@@ -62,6 +64,10 @@ class FailedJob:
     attempts: int
     error: str
     requeued: bool  # staff queued it again and it has not failed since
+
+
+class NotListed(LookupError):
+    """The image does not exist, or the group has all its renditions: nothing to retry."""
 
 
 def _key(image_id: int, group: str | None) -> str:
@@ -108,17 +114,15 @@ def images_missing_renditions(
 def failed_jobs(*, limit: int = FAILED_LIMIT) -> list[FailedJob]:
     """The newest failed or aborted render jobs, one per image and group. A job whose image is
     gone, or whose group has its renditions now, is left out: nothing is left to fix."""
-    jobs = [
-        *tasks.list_jobs(JOB, status="failed"),
-        *tasks.list_jobs(JOB, status="aborted"),
-    ]
-    jobs.sort(key=lambda job: job.id, reverse=True)
+    jobs = tasks.latest_jobs(
+        JOB, statuses=("failed", "aborted"), group_by=("image_id", "group"), limit=limit
+    )
     latest: dict[tuple[int, str | None], tasks.JobInfo] = {}
     for job in jobs:
         image_id = job.task_kwargs.get("image_id")
         if isinstance(image_id, int):
             latest.setdefault((image_id, job.task_kwargs.get("group")), job)
-    chosen = list(latest.items())[:limit]
+    chosen = list(latest.items())
     ids = sorted({image_id for (image_id, _group), _job in chosen})
     by_pk = {image.pk: image for image in MediaImage.objects.filter(pk__in=ids)}
     existing = _existing_specs(list(by_pk))
@@ -173,20 +177,42 @@ def report_failure(
         None,
         {"error": name, "message": message, "retryable": retryable},
     )
+    if retryable:
+        key, summary, extra, dedup = f"renditions:{image_id}:{group or 'all'}", SUMMARY, {}, ""
+        extra = {"image": str(image_id), "group": group or "all"}
+    else:
+        # A bulk of corrupt files is one alert per window: a shared key, the number of images
+        # in the details, and a new mail only when that number reaches 10, 100, ...
+        affected = _decode_failures_in_window()
+        key, summary, dedup = DECODE_KEY, SUMMARY, f":{len(str(affected))}"
+        extra = {"images": str(affected)}
     alerts.raise_alert(
         Alert(
-            f"renditions:{image_id}:{group or 'all'}",
-            "Image renditions could not be made",
+            key,
+            summary,
             {
                 "area": "renditions",
-                "image": str(image_id),
-                "group": group or "all",
+                **extra,
                 "exception": name,
                 "retried": "yes" if retryable else "no",
             },
         ),
         exc=error,
+        dedup=dedup,
     )
+
+
+def _decode_failures_in_window() -> int:
+    """Images with a decode failure recorded in the current alert window (this one included)."""
+    from django.conf import settings
+
+    window = int(getattr(settings, "OPS_ALERT_REPEAT_HOURS", 6)) * 3600
+    now = timezone.now()
+    start = dt.datetime.fromtimestamp(int(now.timestamp()) // window * window, tz=dt.UTC)
+    rows = AuditLog.objects.filter(
+        action=FAILED, target_model=IMAGE_MODEL, created_at__gte=start, after__retryable=False
+    )
+    return len({row.target_key.split(":")[0] for row in rows})
 
 
 def retry_render(
@@ -196,8 +222,11 @@ def retry_render(
     change set is empty, when a job for it already waits (queueing lock)."""
     if group not in images.RENDER_GROUPS:
         raise ValueError(f"unknown render group {group!r}")
-    if not MediaImage.objects.filter(pk=image_id).exists():
-        raise LookupError(f"no image {image_id}")
+    image = MediaImage.objects.filter(pk=image_id).first()
+    if image is None:
+        raise NotListed(f"no image {image_id}")
+    if not _missing_groups(image, _existing_specs([image_id])[image_id], (group,)):
+        raise NotListed(f"image {image_id} has all its {group} renditions")
     changes = ChangeSet()
     snapshot = {"render": to_jsonable("queued")}
     changes.update(IMAGE_MODEL, _key(image_id, group), {"render": "not made"}, snapshot)

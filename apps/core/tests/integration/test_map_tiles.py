@@ -1,11 +1,16 @@
 """EVT.14: the tile proxy view with a fake upstream; no test reaches the network."""
 
 import datetime as dt
+import threading
+import time
+from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
 import pytest
 from django.core.cache import cache
+from django.db import connection
 from django.test import Client
 from django.urls import reverse
 
@@ -281,3 +286,99 @@ def test_a_redirect_from_the_upstream_is_an_error_and_not_cached(monkeypatch: An
     with pytest.raises(TileUpstreamError):
         adapters.HttpTileUpstream().fetch("https://t.invalid/1.png", user_agent="x", timeout=1)
     assert handler.calls == ["https://t.invalid/1.png"]
+
+
+# --- single-flight for a cold tile (EVT.14 follow-up) ---
+
+
+class _SlowUpstream(FakeTileUpstream):
+    """Holds every fetch for `delay` seconds, so concurrent requests overlap."""
+
+    def __init__(self, delay: float, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.delay = delay
+
+    def fetch(self, url: str, *, user_agent: str, timeout: float) -> Any:
+        time.sleep(self.delay)
+        return super().fetch(url, user_agent=user_agent, timeout=timeout)
+
+
+def _burst(coordinates: list[tuple[int, int, int]]) -> list[Any]:
+    """One request per entry, all started together, each thread on its own DB connection."""
+    barrier = threading.Barrier(len(coordinates))
+
+    def one(coordinate: tuple[int, int, int]) -> Any:
+        try:
+            barrier.wait(timeout=10)
+            return _get(Client(), *coordinate)
+        finally:
+            connection.close()
+
+    with ThreadPoolExecutor(max_workers=len(coordinates)) as pool:
+        return list(pool.map(one, coordinates))
+
+
+@pytest.fixture
+def slow_upstream(
+    monkeypatch: pytest.MonkeyPatch, settings: Any, tmp_path: Path
+) -> Iterator[_SlowUpstream]:
+    settings.STORAGES = {
+        **settings.STORAGES,
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+            "OPTIONS": {"location": str(tmp_path)},
+        },
+    }
+    cache.clear()
+    fake = _SlowUpstream(0.6)
+    monkeypatch.setattr(services, "default_upstream", lambda: fake)
+    yield fake
+    cache.clear()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_burst_for_one_cold_tile_makes_one_upstream_call(slow_upstream: _SlowUpstream) -> None:
+    responses = _burst([(3, 4, 5)] * 6)
+    assert [r.status_code for r in responses] == [200] * 6
+    assert {r.content for r in responses} == {slow_upstream.body}
+    assert len(slow_upstream.calls) == 1
+    assert sorted(r["X-Tile-Cache"] for r in responses) == ["hit"] * 5 + ["miss"]
+    assert services.upstream_requests() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_different_tiles_do_not_wait_for_each_other(slow_upstream: _SlowUpstream) -> None:
+    started = time.monotonic()
+    responses = _burst([(3, 4, 5), (3, 4, 6), (3, 5, 5), (3, 5, 6)])
+    elapsed = time.monotonic() - started
+    assert [r.status_code for r in responses] == [200] * 4
+    assert len(slow_upstream.calls) == 4
+    assert elapsed < 4 * slow_upstream.delay  # in parallel, not one after the other
+
+
+@pytest.mark.django_db(transaction=True)
+def test_waiters_get_503_when_the_upstream_is_slower_than_the_wait(
+    slow_upstream: _SlowUpstream, settings: Any
+) -> None:
+    settings.MAP_TILE_SINGLE_FLIGHT_WAIT = 0.2
+    slow_upstream.delay = 1.2
+    responses = _burst([(3, 4, 5)] * 4)
+    by_status = sorted(r.status_code for r in responses)
+    assert by_status == [200, 503, 503, 503]
+    for busy in (r for r in responses if r.status_code == 503):
+        assert busy["Retry-After"] == "2"
+        assert busy["Cache-Control"] == "no-store"
+    assert len(slow_upstream.calls) == 1
+    assert services.upstream_requests() == 1
+    assert _get(Client()).status_code == 200  # the tile is cached afterwards
+    assert len(slow_upstream.calls) == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_lock_is_released_after_a_failed_fetch(slow_upstream: _SlowUpstream) -> None:
+    slow_upstream.error = TileUpstreamError("boom")
+    slow_upstream.delay = 0
+    assert _get(Client()).status_code == 502
+    slow_upstream.error = None
+    assert _get(Client()).status_code == 200
+    assert len(slow_upstream.calls) == 2

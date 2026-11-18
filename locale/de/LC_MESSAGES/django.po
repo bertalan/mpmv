@@ -1065,6 +1065,14 @@ msgstr ""
 "Ein Zuschlag, der zum Preis der Stufe addiert wird, ohne MwSt. Verwenden Sie 0, wenn es keinen "
 "gibt."
 
+#: apps/catalog/templates/catalog/admin/orphan_images_old_versions.html
+msgid ""
+"An image that is only in an old version of a page may be listed here. If you delete it, going back"
+" to that version would show a missing image."
+msgstr ""
+"Ein Bild, das nur in einer alten Version einer Seite vorkommt, kann hier aufgeführt sein. Wenn Sie"
+" es löschen, würde beim Zurückkehren zu dieser Version ein fehlendes Bild angezeigt."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "An introduction shown on the category page, for example what you find in it. Basic formatting is "
@@ -2350,6 +2358,14 @@ msgstr "Entwicklung und System"
 #: apps/manager/templates/manager/platform/user_sessions.html
 msgid "Device"
 msgstr "Gerät"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Directions on Google Maps"
+msgstr "Route in Google Maps"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Directions on OpenStreetMap"
+msgstr "Route auf OpenStreetMap"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Discard the draft"
@@ -3872,6 +3888,14 @@ msgstr "Manager-Shopbereich: %(vendor)s"
 msgid "manufacturer"
 msgstr "hersteller"
 
+#: apps/events/templates/events/_index_map.html
+msgid "Map of the listed events"
+msgstr "Karte der aufgelisteten Veranstaltungen"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Map: %(name)s"
+msgstr "Karte: %(name)s"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Mark as delivered"
 msgstr "Als zugestellt markieren"
@@ -4666,6 +4690,14 @@ msgstr "Nur aktiven oder gesperrten Verkäufern kann gekündigt werden."
 #: apps/events/admin_views.py
 msgid "Only when the event is hidden after a notice."
 msgstr "Nur, wenn die Veranstaltung nach einer Meldung ausgeblendet wird."
+
+#: apps/events/templates/events/_event_map.html
+msgid "Open in a maps app"
+msgstr "In einer Karten-App öffnen"
+
+#: apps/events/templates/events/event_page.html
+msgid "Open in maps"
+msgstr "In Karten öffnen"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 #: apps/accounts/templates/accounts/levels/prompt.html
@@ -6305,6 +6337,10 @@ msgstr "website"
 #: apps/cms/templatetags/cms_tags.py apps/seo/templates/seo/site_links.html
 msgid "Site links"
 msgstr "Website-Links"
+
+#: apps/events/templates/events/_event_map.html apps/events/templates/events/_index_map.html
+msgid "Skip map"
+msgstr "Karte überspringen"
 
 #: themes/base/templates/components/skip_link.html
 msgid "Skip to main content"

@@ -21,7 +21,7 @@ import datetime as dt
 import functools
 import json
 import logging
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, ParamSpec, TypeVar
 from zoneinfo import ZoneInfo
@@ -376,6 +376,43 @@ def _job_info(row: _QueueRow) -> JobInfo:
 def list_jobs(task_name: str | None = None, *, status: str | None = None) -> list[JobInfo]:
     rows = _ready_app().job_manager.list_jobs(task=task_name, status=status)
     return sorted((_job_info(row) for row in rows), key=lambda info: info.id)
+
+
+def latest_jobs(
+    task_name: str, *, statuses: Sequence[str], group_by: Sequence[str], limit: int
+) -> list[JobInfo]:
+    """The newest `limit` jobs of `task_name` in one of `statuses`, newest first, keeping only the
+    newest job for each distinct value of the argument names in `group_by`. Ordering and limit are
+    done by the database, so the cost does not grow with the number of old jobs."""
+    from django.db import connection
+
+    if not group_by:
+        raise ValueError("group_by needs at least one argument name")
+    distinct = ", ".join(["args ->> %s"] * len(group_by))
+    sql = (
+        "SELECT id, task_name, queue_name, status, attempts, scheduled_at, lock, args FROM ("  # noqa: S608 - only "%s" placeholders
+        f"SELECT DISTINCT ON ({distinct}) id, task_name, queue_name, status, attempts, "
+        "scheduled_at, lock, args FROM procrastinate_jobs "
+        "WHERE task_name = %s AND status = ANY(%s) "
+        f"ORDER BY {distinct}, id DESC) latest ORDER BY id DESC LIMIT %s"
+    )
+    params: list[Any] = [*group_by, task_name, list(statuses), *group_by, limit]
+    with connection.cursor() as cursor:
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+    return [
+        JobInfo(
+            id=row[0],
+            task_name=row[1],
+            queue=row[2],
+            status=row[3],
+            attempts=row[4],
+            scheduled_at=row[5],
+            lock=row[6],
+            task_kwargs=_kwargs(row[7]),
+        )
+        for row in rows
+    ]
 
 
 def get_job(job_id: int) -> JobInfo:
