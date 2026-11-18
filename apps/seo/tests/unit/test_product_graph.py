@@ -385,3 +385,24 @@ def test_the_product_graph_stays_under_the_budget() -> None:
         for i in range(6)
     )
     assert len(pg.graph_text(graph(product=product(images=many))).encode()) < 30 * 1024
+
+
+@pytest.mark.parametrize(
+    ("role", "brand", "maker", "expected"),
+    [
+        ("producer", "", "", ("V", "V")),
+        ("producer", "B", "", ("B", "V")),
+        ("producer", "B", "M", ("B", "M")),
+        ("reseller", "B", "", ("B", "")),
+        ("reseller", "", "", ("", "")),
+        ("reseller", "B", "M", ("B", "M")),
+        ("", "", "", ("", "")),
+        ("", "B", "M", ("B", "M")),
+    ],
+)
+def test_vendor_role_refs(role: str, brand: str, maker: str, expected: tuple[str, str]) -> None:
+    assert pg.vendor_role_refs(role, brand_id=brand, maker_id=maker, vendor_id="V") == expected
+
+
+def test_a_producer_without_a_public_vendor_node_claims_nothing() -> None:
+    assert pg.vendor_role_refs("producer", brand_id="", maker_id="", vendor_id="") == ("", "")
