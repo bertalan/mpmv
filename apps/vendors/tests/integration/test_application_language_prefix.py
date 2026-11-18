@@ -85,3 +85,20 @@ def test_the_prefixed_confirm_page_works_in_the_same_session(client: Client) -> 
         ).status_code
         == 200
     )
+
+
+@pytest.mark.parametrize(
+    ("code", "button"),
+    [
+        ("it", "Invia la mia candidatura"),
+        ("de", "Meine Bewerbung senden"),
+        ("fr", "Envoyer ma candidature"),
+        ("es", "Enviar mi solicitud"),
+    ],
+)
+def test_the_apply_form_button_is_translated(client: Client, code: str, button: str) -> None:
+    with translation.override(code):
+        url = reverse("vendors:apply")
+    html = client.get(url).content.decode()
+    assert button in html
+    assert "Send my application" not in html
