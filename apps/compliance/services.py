@@ -2019,6 +2019,18 @@ def orders_frozen(vendor: Vendor) -> bool:
     return payouts_frozen(vendor)
 
 
+def frozen_vendor_ids(vendors: Iterable[Vendor]) -> set[int]:
+    """The ids of the given vendors for which `orders_frozen` holds, in one query (ORD.30)."""
+    return set(
+        TerminationNotice.objects.filter(
+            vendor__in=list(vendors),
+            status=TerminationNotice.Status.APPLIED,
+            frozen_at__isnull=False,
+            freeze_reviewed_at__isnull=True,
+        ).values_list("vendor_id", flat=True)
+    )
+
+
 def review_termination_freeze(
     staff: Any,
     public_id: Any,
