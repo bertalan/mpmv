@@ -7,11 +7,11 @@ from typing import Any
 import pytest
 from pypdf import PdfReader
 
-from apps.core import mail
+from apps.core import mail, pdf, pdf_render
 from apps.core import services as core_services
 from apps.core.i18n import primary_language
 from apps.core.models import OutboxEmail, OutboxEmailEvent
-from apps.orders import documents, notifications, pdf_render, services
+from apps.orders import documents, notifications, services
 from apps.orders.models import Order, PrivacyStatus, VendorOrder
 from apps.orders.tests.integration.test_notifications import BANNED, LANGS, two_vendor_order
 from apps.orders.tests.integration.test_services import CTX, line_input, pay, place, vendor_input
@@ -116,7 +116,7 @@ def test_hostile_names_are_inert_and_shown_as_text(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(
         documents,
         "render_html",
-        lambda html: pdf_render.render_pdf(html, [str(r) for r in documents.static_roots()]),
+        lambda html: pdf_render.render_pdf(html, [str(r) for r in pdf.static_roots()]),
     )
     hostile = "<img src=x onerror=alert(1)> url(http://169.254.169.254/x) </style><p>"
     vendor = VendorFactory.create(display_name=hostile)
@@ -235,7 +235,7 @@ def test_a_failed_render_sends_the_email_without_the_pdf(
 def test_a_pdf_over_the_size_cap_is_left_out(
     sender: mail.MemoryEmailSender, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(documents, "MAX_PDF_BYTES", 100)
+    monkeypatch.setattr(pdf, "MAX_PDF_BYTES", 100)
     pay(two_vendor_order())
     email = confirmations()[0]
     core_services.deliver_email(email.public_id)
@@ -246,7 +246,7 @@ def test_a_pdf_over_the_size_cap_is_left_out(
 def test_a_render_over_the_time_cap_is_left_out(
     sender: mail.MemoryEmailSender, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(documents, "MAX_RENDER_SECONDS", 0.0)
+    monkeypatch.setattr(pdf, "MAX_RENDER_SECONDS", 0.0)
     pay(two_vendor_order())
     email = confirmations()[0]
     core_services.deliver_email(email.public_id)

@@ -308,3 +308,39 @@ def test_an_accepted_terms_link_opens_a_superseded_version_and_never_a_forged_on
     assert client.get(ts.terms_url(old)).status_code == 404  # the 24-hour link stays in-force only
     token = link.rstrip("/").rsplit("/", 1)[1]
     assert client.get(reverse("vendor_terms:read", args=[token + "x"])).status_code == 404
+
+
+def _published(body: str = "Download text") -> tuple[Vendor, SalesTermsVersion, str]:
+    vendor = VendorFactory.create()
+    ts.publish_sales_terms(vendor, values(body=body), actor=owner_of(vendor), ctx=CTX)
+    version = current(vendor)
+    return vendor, version, ts.terms_url(version).rstrip("/").rsplit("/", 1)[1]
+
+
+def test_the_terms_page_links_the_pdf_of_the_same_signed_link() -> None:
+    _, _, token = _published()
+    response = Client().get(reverse("vendor_terms:read", args=[token]))
+    assert response.status_code == 200
+    assert reverse("vendor_terms:pdf", args=[token]) in response.content.decode()
+
+
+def test_the_pdf_of_the_version_in_force_downloads_as_an_attachment() -> None:
+    vendor, version, token = _published()
+    response = Client().get(reverse("vendor_terms:pdf", args=[token]))
+    assert response.status_code == 200
+    assert response["Content-Type"] == "application/pdf"
+    assert response.content.startswith(b"%PDF")
+    assert response["Content-Disposition"] == (
+        f'attachment; filename="sales-terms-{vendor.slug}-v{version.number}.pdf"'
+    )
+    assert response["X-Robots-Tag"] == "noindex, nofollow"
+    entry = AuditLog.objects.filter(action=ts.READ).latest("pk")
+    assert (entry.after or {})["format"] == "pdf"
+
+
+def test_a_tampered_or_superseded_link_gives_no_pdf() -> None:
+    vendor, _, token = _published("Old text")
+    client = Client()
+    assert client.get(reverse("vendor_terms:pdf", args=[token + "x"])).status_code == 404
+    ts.publish_sales_terms(vendor, values(body="New text"), actor=owner_of(vendor), ctx=CTX)
+    assert client.get(reverse("vendor_terms:pdf", args=[token])).status_code == 404

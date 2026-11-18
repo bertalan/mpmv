@@ -16,7 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from apps.orders import documents, pdf_render
+from apps.core import pdf, pdf_render
+from apps.orders import documents
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -105,7 +106,7 @@ def test_a_file_url_with_a_remote_host_is_refused(
 
 
 def test_the_default_roots_are_the_static_directories() -> None:
-    roots = documents.static_roots()
+    roots = pdf.static_roots()
     assert roots
     assert all(root.is_absolute() for root in roots)
     assert Path("/") not in roots
@@ -195,9 +196,9 @@ def test_weasyprint_is_only_called_through_the_fetcher() -> None:
                 names = [node.module or ""]
             if any(name == "weasyprint" or name.startswith("weasyprint.") for name in names):
                 importers.append(path.relative_to(ROOT).as_posix())
-    assert set(importers) == {"apps/orders/pdf_render.py"}
+    assert set(importers) == {"apps/core/pdf_render.py"}
 
-    tree = ast.parse((ROOT / "apps/orders/pdf_render.py").read_text())
+    tree = ast.parse((ROOT / "apps/core/pdf_render.py").read_text())
     calls = [
         node
         for node in ast.walk(tree)
@@ -224,11 +225,11 @@ def test_a_renderer_that_hangs_is_killed_at_the_timeout(
 
     pid_file = tmp_path / "pid"
     code = f"import os, time; open({str(pid_file)!r}, 'w').write(str(os.getpid())); time.sleep(120)"
-    monkeypatch.setattr(documents, "_renderer_command", lambda: _child(code))
-    monkeypatch.setattr(documents, "MAX_RENDER_SECONDS", 1.5)
+    monkeypatch.setattr(pdf, "_renderer_command", lambda: _child(code))
+    monkeypatch.setattr(pdf, "MAX_RENDER_SECONDS", 1.5)
     started = time.monotonic()
     with pytest.raises(AttachmentUnavailable, match="timed out"):
-        documents.render_html("<p>x</p>")
+        pdf.render_html("<p>x</p>")
     assert time.monotonic() - started < 20
     pid = int(pid_file.read_text())
     with pytest.raises(ProcessLookupError):
@@ -240,9 +241,9 @@ def test_a_renderer_that_fails_is_an_unavailable_attachment(
 ) -> None:
     from apps.core.services import AttachmentUnavailable
 
-    monkeypatch.setattr(documents, "_renderer_command", lambda: _child("import sys; sys.exit(3)"))
+    monkeypatch.setattr(pdf, "_renderer_command", lambda: _child("import sys; sys.exit(3)"))
     with pytest.raises(AttachmentUnavailable, match="failed"):
-        documents.render_html("<p>x</p>")
+        pdf.render_html("<p>x</p>")
 
 
 def test_output_over_the_size_cap_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -253,9 +254,9 @@ def test_output_over_the_size_cap_is_refused(monkeypatch: pytest.MonkeyPatch) ->
         "_renderer_command",
         lambda: _child("import sys; sys.stdout.buffer.write(b'%PDF' + b'x' * 5000)"),
     )
-    monkeypatch.setattr(documents, "MAX_PDF_BYTES", 1000)
+    monkeypatch.setattr(pdf, "MAX_PDF_BYTES", 1000)
     with pytest.raises(AttachmentUnavailable, match="cap"):
-        documents.render_html("<p>x</p>")
+        pdf.render_html("<p>x</p>")
 
 
 def test_the_renderer_child_gets_no_application_secrets(
@@ -263,7 +264,7 @@ def test_the_renderer_child_gets_no_application_secrets(
 ) -> None:
     monkeypatch.setenv("DJANGO_SECRET_KEY", "not-for-the-child")
     monkeypatch.setenv("DATABASE_URL", "postgres://not-for-the-child")
-    env = documents._renderer_env()
+    env = pdf._renderer_env()
     assert "DJANGO_SECRET_KEY" not in env
     assert "DATABASE_URL" not in env
     assert "PATH" in env
@@ -279,11 +280,11 @@ def test_output_over_the_cap_stops_the_read_early_and_kills_the_child(
         f"import os, sys, time; open({str(pid_file)!r}, 'w').write(str(os.getpid()))\n"
         "sys.stdout.buffer.write(b'x' * 5000); sys.stdout.flush(); time.sleep(120)"
     )
-    monkeypatch.setattr(documents, "_renderer_command", lambda: _child(code))
-    monkeypatch.setattr(documents, "MAX_PDF_BYTES", 1000)
+    monkeypatch.setattr(pdf, "_renderer_command", lambda: _child(code))
+    monkeypatch.setattr(pdf, "MAX_PDF_BYTES", 1000)
     started = time.monotonic()
     with pytest.raises(AttachmentUnavailable, match="cap"):
-        documents.render_html("<p>x</p>")
+        pdf.render_html("<p>x</p>")
     assert time.monotonic() - started < 20  # did not wait for the child to finish
     with pytest.raises(ProcessLookupError):
         os.kill(int(pid_file.read_text()), 0)
@@ -301,10 +302,10 @@ def test_the_whole_process_group_is_killed_on_timeout(
         f"open({str(pid_file)!r}, 'w').write(str(g.pid))\n"
         "time.sleep(120)"
     )
-    monkeypatch.setattr(documents, "_renderer_command", lambda: _child(code))
-    monkeypatch.setattr(documents, "MAX_RENDER_SECONDS", 1.5)
+    monkeypatch.setattr(pdf, "_renderer_command", lambda: _child(code))
+    monkeypatch.setattr(pdf, "MAX_RENDER_SECONDS", 1.5)
     with pytest.raises(AttachmentUnavailable, match="timed out"):
-        documents.render_html("<p>x</p>")
+        pdf.render_html("<p>x</p>")
     time.sleep(0.5)
     with pytest.raises(ProcessLookupError):
         os.kill(int(pid_file.read_text()), 0)
@@ -312,7 +313,7 @@ def test_the_whole_process_group_is_killed_on_timeout(
 
 def _run_limited(body: str) -> int:
     code = (
-        "from apps.orders import pdf_render\n"
+        "from apps.core import pdf_render\n"
         "pdf_render.apply_limits(memory_bytes=100_000_000, cpu_seconds=1)\n" + body
     )
     return subprocess.run(  # noqa: S603 (this interpreter and a fixed code string)
@@ -354,4 +355,4 @@ def test_a_cpu_hog_is_stopped_by_the_cpu_limit() -> None:
 
 def test_the_documented_limits_are_sane() -> None:
     assert pdf_render.MEMORY_LIMIT_BYTES == 1 << 30
-    assert documents.cpu_limit_seconds() > documents.MAX_RENDER_SECONDS
+    assert pdf.cpu_limit_seconds() > pdf.MAX_RENDER_SECONDS

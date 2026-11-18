@@ -179,7 +179,7 @@ def _candidate(token: str) -> tuple[SalesTermsVersion | None, bool]:
     return None, False
 
 
-def read_terms(token: str, *, ctx: AuditContext) -> SalesTermsVersion | None:
+def read_terms(token: str, *, ctx: AuditContext, fmt: str = "html") -> SalesTermsVersion | None:
     """The version a link names, if it is valid and, for a 24-hour link, still in force (an
     accepted-terms link opens its version also when superseded); every attempt is logged.
 
@@ -205,6 +205,7 @@ def read_terms(token: str, *, ctx: AuditContext) -> SalesTermsVersion | None:
                 "result": "ok",
                 "vendor": str(version.vendor.public_id),
                 "content_hash": version.content_hash,
+                **({"format": fmt} if fmt != "html" else {}),
             },
         )
     return version
