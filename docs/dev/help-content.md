@@ -67,7 +67,8 @@ not from the Wagtail page tree, so there is nothing to edit or publish in the ad
 - a new audience adds its sections to `GUIDE_SECTIONS`, its files under
   `guide/`, and its URL and template next to `customer_help*`; nothing else in sync changes.
 
-Tone and content: short plain texts for a non-technical customer, informal in IT, DE, FR and ES.
+Tone and content: short plain texts for a non-technical customer, informal in IT, DE, FR and ES for customers; the seller guide uses the formal register
+(Lei, Sie, vous, usted) and quotes screen labels exactly as the shipped catalog spells them.
 Each statement is compared with the spec and the code; a guide never paraphrases legal or tax
 wording: it points to the legal pages (`{{link.consumer_information}}`, the terms in the footer).
 
