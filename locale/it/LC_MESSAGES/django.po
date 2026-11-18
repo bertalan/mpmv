@@ -3183,13 +3183,12 @@ msgstr ""
 "Gruppi di paesi da aggiungere alla zona, con i loro codici, per esempio 'eu' o 'europe', separati "
 "da virgole."
 
-#: apps/catalog/product_pages.py apps/catalog/templates/catalog/product.html
-#: themes/ride/templates/catalog/product.html
 #: apps/ingest/models.py
 msgid "Grows by one at every change of the state."
 msgstr "Aumenta di uno a ogni modifica dello stato."
 
-#: apps/catalog/templates/catalog/product.html
+#: apps/catalog/product_pages.py apps/catalog/templates/catalog/product.html
+#: themes/ride/templates/catalog/product.html
 msgid "GTIN"
 msgstr "GTIN"
 

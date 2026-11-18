@@ -3224,13 +3224,12 @@ msgstr ""
 "Ländergruppen, die der Zone hinzugefügt werden, mit ihren Codes, zum Beispiel 'eu' oder 'europe', "
 "durch Kommas getrennt."
 
-#: apps/catalog/product_pages.py apps/catalog/templates/catalog/product.html
-#: themes/ride/templates/catalog/product.html
 #: apps/ingest/models.py
 msgid "Grows by one at every change of the state."
 msgstr "Steigt bei jeder Änderung des Zustands um eins."
 
-#: apps/catalog/templates/catalog/product.html
+#: apps/catalog/product_pages.py apps/catalog/templates/catalog/product.html
+#: themes/ride/templates/catalog/product.html
 msgid "GTIN"
 msgstr "GTIN"
 
