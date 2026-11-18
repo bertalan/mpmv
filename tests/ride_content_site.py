@@ -21,7 +21,7 @@ from apps.cms.tests.factories import (
 )
 from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
-from apps.core.tests.factories import PlatformOperatorFactory
+from apps.core.tests.factories import MediaImageFactory, PlatformOperatorFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -32,9 +32,9 @@ def _publish(page: Page) -> Page:
     return page
 
 
-def build_content_site(*, posts: int = 3) -> dict[str, str]:
+def build_content_site(*, posts: int = 3, images: bool = False) -> dict[str, str]:
     """Paths by page type: standard, blog, post, author, legal, legal_version, vendor,
-    recruitment, contact."""
+    recruitment, contact. With `images`, the first post has a main image and the author a photo."""
     seed_site()
     PlatformOperatorFactory.create(
         open_ended=True,
@@ -50,6 +50,10 @@ def build_content_site(*, posts: int = 3) -> dict[str, str]:
     blog: BlogIndexPage = BlogIndexPageFactory.create(live=False)
     _publish(blog)
     author = BlogAuthorFactory.create(name="Ada Example")
+    if images:
+        author.photo = MediaImageFactory.create(file__width=2000, file__height=1500)
+        author.photo_alt_text = "Ada at the wheel"
+        author.save()
     for number in range(posts):
         post = BlogPostPageFactory.create(
             title=f"Workshop visit {number}",
@@ -58,6 +62,14 @@ def build_content_site(*, posts: int = 3) -> dict[str, str]:
             author=author,
             date=dt.date(2026, 3, 1 + number),
             live=False,
+            **(
+                {
+                    "image": MediaImageFactory.create(file__width=2000, file__height=1500),
+                    "image_alt_text": "A workshop bench",
+                }
+                if images and number == 0
+                else {}
+            ),
         )
         _publish(post)
     legal: LegalPage = LegalPageFactory.create(title="Terms of sale", live=False)

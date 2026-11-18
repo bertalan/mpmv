@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 from django.test import Client, RequestFactory
 from pytest_django.fixtures import Settings as SettingsWrapper
 
+from apps.core.models import MediaImageRendition
 from apps.themes import views
 from tests.ride_content_site import build_content_site
 
@@ -141,6 +142,25 @@ def test_the_blog_uses_bootstrap_cards_and_pagination(
     second = soup(client, f"{paths['blog']}?page=2", "ride", settings)
     assert second.select_one("a.page-link[rel=prev]") is not None
     assert second.select_one("a[rel=next]") is None
+
+
+def test_post_and_author_images_use_the_presets_without_building_renditions(
+    client: Client, settings: SettingsWrapper
+) -> None:
+    settings.MPMV_THEME_DEFAULT = "ride"
+    paths = build_content_site(images=True)
+    before = MediaImageRendition.objects.count()
+    for kind, alt in (("post", "A workshop bench"), ("author", "Ada at the wheel")):
+        page = soup(client, paths[kind], "ride", settings)
+        figure = page.select_one("main figure")
+        assert figure is not None, kind
+        assert figure.find("picture") is not None, kind
+        img = figure.find("img")
+        assert img is not None, kind
+        # No rendition exists yet: the original is the fallback.
+        assert (img["alt"], img["width"], img["height"]) == (alt, "2000", "1500"), kind
+        assert img["src"], kind
+    assert MediaImageRendition.objects.count() == before
 
 
 def test_the_recruitment_plans_are_cards_and_the_call_to_action_a_button(

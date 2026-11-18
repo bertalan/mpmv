@@ -56,7 +56,7 @@ def site(
     settings: SettingsWrapper, live_server: LiveServer, site_allows_indexing: None
 ) -> dict[str, str]:
     settings.MPMV_THEME_DEFAULT = "ride"
-    return build_content_site()
+    return build_content_site(images=True)
 
 
 def open_page(page: Page, live_server: LiveServer, site: dict[str, str], kind: str) -> None:
