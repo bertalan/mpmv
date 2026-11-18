@@ -85,7 +85,9 @@ def test_a_pending_policy_is_not_shown(client: Client, theme: str) -> None:
     ReturnPolicyVersionFactory.create(
         vendor=product.vendor, status="pending", return_window_days=60
     )
-    assert "60" not in _returns(client)
+    text = _returns(client)
+    assert "60" not in text
+    assert "14" in text
 
 
 def test_a_product_on_request_has_no_returns_block(client: Client, theme: str) -> None:

@@ -6230,6 +6230,10 @@ msgstr "Más información y elegir"
 msgid "Read the current version"
 msgstr "Lee la versión actual"
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "Read the returns policy"
+msgstr "Lee la política de devoluciones"
+
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt
 msgid "Read the statement of reasons"
@@ -12624,7 +12628,7 @@ msgstr "No pagas nada más y no tienes que hacer nada."
 
 #: apps/catalog/templates/catalog/includes/product_returns.html
 msgid "You pay the return shipping"
-msgstr "Usted paga los gastos de devolución"
+msgstr "Pagas tú los gastos de devolución"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid ""

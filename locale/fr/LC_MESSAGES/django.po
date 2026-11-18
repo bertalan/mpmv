@@ -6280,6 +6280,10 @@ msgstr "En savoir plus et choisir"
 msgid "Read the current version"
 msgstr "Lis la version actuelle"
 
+#: apps/catalog/templates/catalog/includes/product_returns.html
+msgid "Read the returns policy"
+msgstr "Lire la politique de retour"
+
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt
 msgid "Read the statement of reasons"
@@ -12744,7 +12748,7 @@ msgstr "Tu ne paies rien de plus et tu n’as rien à faire."
 
 #: apps/catalog/templates/catalog/includes/product_returns.html
 msgid "You pay the return shipping"
-msgstr "Les frais de retour sont à votre charge"
+msgstr "Les frais de retour sont à ta charge"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid ""
