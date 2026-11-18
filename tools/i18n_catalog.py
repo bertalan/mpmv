@@ -347,6 +347,17 @@ SENSITIVE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     ("compliance forms", ("apps/compliance/",)),
     (
+        "DSA statements of reasons (EVT.11)",
+        (
+            "apps/manager/templates/manager/shop/statements.html",
+            "apps/manager/statement_views.py",
+        ),
+    ),
+    (
+        "event moderation emails (EVT.11)",
+        ("apps/events/templates/email/events/", "apps/events/notifications.py"),
+    ),
+    (
         "sales terms",
         (
             "apps/vendors/templates/vendors/terms/",
