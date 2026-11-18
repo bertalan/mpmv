@@ -19,6 +19,7 @@ from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from wagtail.models import Site
 
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import MediaImageFactory
 from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
@@ -84,7 +85,7 @@ def test_an_offline_event_with_address_and_coordinates() -> None:
     assert node["endDate"] == "2027-03-10T17:00:00+01:00"
     assert node["eventStatus"] == "https://schema.org/EventScheduled"
     assert node["eventAttendanceMode"] == "https://schema.org/OfflineEventAttendanceMode"
-    assert node["inLanguage"] == "en"
+    assert node["inLanguage"] == primary_language()
     assert node["location"] == {
         "@type": "Place",
         "name": "Exhibition centre",
@@ -281,3 +282,17 @@ def test_the_node_is_in_the_page_language_only() -> None:
     assert node["url"] == f"http://localhost/de/events/{page.slug}/"
     assert node["description"] == "Treffen Sie die Hersteller."
     assert Client().get(f"/it/events/{page.slug}/").status_code == 404
+
+
+def test_hostile_text_cannot_break_out_of_the_json_ld_script() -> None:
+    payload = "</script><script>alert(1)</script>"
+    page = create(located=True, title=payload, summary=payload, venue_name=payload)
+    html = Client().get(page.url).content.decode()
+    [block] = SCRIPT.findall(html)
+    assert "</script" not in block.lower()
+    assert "<script" not in block.lower()
+    document = json.loads(block)
+    [node] = [n for n in document["@graph"] if n["@type"] == "Event"]
+    assert node["name"] == payload
+    assert node["description"] == payload
+    assert node["location"]["name"] == payload
