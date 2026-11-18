@@ -1,6 +1,7 @@
 """System checks of the CMS (CMS.1), registered in `CmsConfig.ready`.
 
 - cms.E002: MPMV_VENDOR_GUIDE_URL is empty or an absolute https URL (ARC.32).
+- cms.E004: no live root-level page uses a reserved slug (ARC.37).
 - cms.E003: MPMV_VIDEO_EMBED_ORIGINS holds plain https origins only (THM.14).
 - cms.E001 (deploy): WAGTAILADMIN_BASE_URL is the public address of the site. Wagtail puts it in
   the links of its admin emails and previews; the settings fall back to localhost when
@@ -81,3 +82,33 @@ def check_video_embed_origins(
                 )
             )
     return errors
+
+
+def check_reserved_root_slugs(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """cms.E004: no page directly under a language home has a reserved slug (`help-centre`),
+    as an app route is matched first and the page would never be reached. Skipped while the
+    database is unavailable or not migrated."""
+    from django.db import DatabaseError
+    from wagtail.models import Page
+
+    from . import engine
+
+    try:
+        clashing = list(
+            Page.objects.filter(depth=3, slug__in=engine.RESERVED_ROOT_SLUGS).values_list(
+                "slug", "locale__language_code"
+            )
+        )
+    except DatabaseError:
+        return []
+    return [
+        checks.Error(
+            f"A page with the reserved slug {slug!r} ({language}) sits directly under a home "
+            "page, so a route shadows it.",
+            hint="Rename the page: its URL is used by the help pages.",
+            id="cms.E004",
+        )
+        for slug, language in clashing
+    ]
