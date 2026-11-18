@@ -2298,6 +2298,14 @@ msgstr "Sviluppo e sistema"
 msgid "Device"
 msgstr "Dispositivo"
 
+#: apps/events/templates/events/_event_map.html
+msgid "Directions on Google Maps"
+msgstr "Indicazioni su Google Maps"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Directions on OpenStreetMap"
+msgstr "Indicazioni su OpenStreetMap"
+
 #: apps/manager/templates/manager/amendment.html
 msgid "Discard the draft"
 msgstr "Scarta la bozza"
@@ -3791,6 +3799,14 @@ msgstr "Spazio negozio del Manager: %(vendor)s"
 msgid "manufacturer"
 msgstr "produttore"
 
+#: apps/events/templates/events/_index_map.html
+msgid "Map of the listed events"
+msgstr "Mappa degli eventi in elenco"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Map: %(name)s"
+msgstr "Mappa: %(name)s"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Mark as delivered"
 msgstr "Segna come consegnato"
@@ -4575,6 +4591,14 @@ msgstr "Il preavviso si può dare solo a venditori attivi o sospesi."
 #: apps/events/admin_views.py
 msgid "Only when the event is hidden after a notice."
 msgstr "Solo quando l'evento viene nascosto in seguito a una segnalazione."
+
+#: apps/events/templates/events/_event_map.html
+msgid "Open in a maps app"
+msgstr "Apri in un'app di mappe"
+
+#: apps/events/templates/events/event_page.html
+msgid "Open in maps"
+msgstr "Apri nelle mappe"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 #: apps/accounts/templates/accounts/levels/prompt.html
@@ -6187,6 +6211,10 @@ msgstr "sito"
 #: apps/cms/templatetags/cms_tags.py apps/seo/templates/seo/site_links.html
 msgid "Site links"
 msgstr "Link del sito"
+
+#: apps/events/templates/events/_event_map.html apps/events/templates/events/_index_map.html
+msgid "Skip map"
+msgstr "Salta la mappa"
 
 #: themes/base/templates/components/skip_link.html
 msgid "Skip to main content"

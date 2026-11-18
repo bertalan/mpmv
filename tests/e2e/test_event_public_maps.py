@@ -9,6 +9,7 @@ mock, so no test reaches the network.
 """
 
 import datetime as dt
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -120,7 +121,7 @@ def test_wheel_zoom_is_off_until_the_map_has_focus(
     expect(container).to_have_attribute("data-wheel-zoom", "off")
     container.focus()
     expect(container).to_have_attribute("data-wheel-zoom", "on")
-    page.locator("h1").focus()
+    page.locator("h1").click()
     expect(container).to_have_attribute("data-wheel-zoom", "off")
 
 
@@ -132,11 +133,11 @@ def test_no_zoom_animation_under_reduced_motion(
     page.goto(f"{live_server.url}{event}")
     container = page.locator("[data-event-map]")
     expect(container.locator(".leaflet-marker-icon")).to_be_visible()
-    expect(container).not_to_have_class(r"/leaflet-zoom-anim\b/")
+    expect(container).not_to_have_class(re.compile(r"\bleaflet-fade-anim\b"))
     page.emulate_media(reduced_motion="no-preference")
     page.goto(f"{live_server.url}{event}")
     expect(page.locator("[data-event-map] .leaflet-marker-icon")).to_be_visible()
-    expect(page.locator("[data-event-map]")).to_have_class(r"/leaflet-zoom-anim\b/")
+    expect(page.locator("[data-event-map]")).to_have_class(re.compile(r"\bleaflet-fade-anim\b"))
 
 
 def test_the_skip_link_moves_focus_past_the_map(

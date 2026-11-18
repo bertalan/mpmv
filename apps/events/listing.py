@@ -23,6 +23,7 @@ from apps.catalog import slugs
 from apps.cms import services as cms_services
 from apps.core.i18n import configured_languages, primary_language
 from apps.events import engine, services
+from apps.events.panels import map_settings
 
 if TYPE_CHECKING:
     from apps.events.models import EventIndexPage, EventPage
@@ -243,9 +244,12 @@ def render_list(index: "EventIndexPage", request: HttpRequest) -> HttpResponse:
     options = filter_options(upcoming(events, now))
     shown = apply_filters(every, filters)
     paged = _paged(request, shown, index.url or "", filters)
+    plotted = sum(1 for item in paged["items"] if item.page.latitude is not None)
     context = {
         **_common(index, filters),
         **paged,
+        "plotted": plotted,
+        "map": map_settings() if plotted else None,
         "groups": _groups(paged["items"]),
         "options": options,
         "robots": NOINDEX if filters.active() or paged["page_number"] > 1 else "",
@@ -320,12 +324,52 @@ def render_calendar(
 # --- One event
 
 
+EVENT_MAP_ZOOM = 15
+
+
+def address_lines(page: "EventPage") -> list[str]:
+    """The street, the postcode and city, and the country: the address as text lines."""
+    place = " ".join(part for part in (page.postcode, page.city) if part)
+    country = str(page.country or "")
+    return [line for line in (page.street, place, country) if line]
+
+
+def map_context(page: "EventPage") -> dict[str, Any]:
+    """The map and the map links of an event page (EVT.15, spec 15 "Maps").
+
+    With both coordinates: the map container's values and the three directions links. With an
+    address only: a plain "Open in maps" search link. With neither: nothing.
+    """
+    lines = address_lines(page)
+    if page.latitude is not None and page.longitude is not None:
+        return {
+            "point": {
+                "lat": engine.plain_coordinate(page.latitude),
+                "lng": engine.plain_coordinate(page.longitude),
+                "zoom": EVENT_MAP_ZOOM,
+                "label": page.venue_name or page.title,
+                "address": ", ".join(lines),
+            },
+            "directions": engine.directions_links(page.latitude, page.longitude),
+            "address_lines": lines,
+            "search_url": None,
+            **map_settings(),
+        }
+    return {
+        "point": None,
+        "directions": None,
+        "search_url": engine.search_url(lines or [page.venue_name]),
+    }
+
+
 def event_context(page: "EventPage", request: HttpRequest) -> dict[str, Any]:
-    """What the event template needs beyond the page: robots, links to the ICS and the report."""
+    """What the event template needs beyond the page: robots, links to the ICS and the report,
+    and the map."""
     event_url = page.get_full_url(request) or ""
     vendor = page.vendor
     return {
         **_language_links(page, request),
+        "map": map_context(page),
         "robots": NOINDEX if page.is_noindex() else "",
         "event_url": event_url,
         "ics_url": f"{url}{engine.ICS_PATH}" if (url := page.get_url(request)) else "",
