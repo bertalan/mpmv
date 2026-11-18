@@ -6,15 +6,15 @@
 
 ## Summary
 
-- Micro-tasks: **451** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3546 h** (P1 2622 h · P2 833 h · P3 91 h)
+- Micro-tasks: **452** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3550 h** (P1 2622 h · P2 833 h · P3 95 h)
 - P1 critical path (schedule lower bound with full parallelism): **197 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → PAY.7 → ORD.20 → ORD.21 → ORD.22 → ORD.23
 
 ## By macro area
 
 | Macro | Area | Tasks | P1 h | P2 h | P3 h | Total h |
 |---|---|---:|---:|---:|---:|---:|
-| ARC | Architecture and foundations | 35 | 232 | 52 | 0 | 284 |
+| ARC | Architecture and foundations | 36 | 232 | 52 | 4 | 288 |
 | CORE | Identity, permissions, API, backoffice | 32 | 224 | 4 | 6 | 234 |
 | CAT | Product catalog | 29 | 162 | 83 | 3 | 248 |
 | VEN | Vendors, commissions, ledger | 40 | 298 | 35 | 0 | 333 |
@@ -36,7 +36,7 @@
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 16 | 25 | 48 | 8 | 81 |
 | MIG | Migration and cutover | 22 | 141 | 29 | 0 | 170 |
-| **Total** | | **451** | **2622** | **833** | **91** | **3546** |
+| **Total** | | **452** | **2622** | **833** | **95** | **3550** |
 
 ## By phase
 
@@ -515,10 +515,11 @@
 | MIG.19 | Coupons are not migrated (D-17; coupons as a feature belong to D-39, issue #243 and the promotions spec 18, still under review): the extractor reports the coupon posts that exist, and the historical coupon lines of migrated orders are kept as read-only order lines | P2 | 1 | MIG.4 | A migrated order with a coupon line shows it unchanged and read-only; the run report lists the unmigrated coupons; no coupon is created in the new system by the migration (the listing of still-valid coupons for the pre-cutover expiry announcement is a MIG.9 step) |
 | MIG.21 | Store reviews and product enquiries export (owner decision 2026-11-11, relayed by lane-a, #86): store reviews and enquiries (marketplace tables) are not migrated into MPMV; the extractor exports each vendor's own to a file for that vendor | P2 | 2 | MIG.1, MIG.16 | Each vendor gets a file with only its own store reviews and enquiries; none is created in the new system; another vendor's data never appears in a file |
 
-### F7 — Later evolution (P3) (11 tasks, 91 h)
+### F7 — Later evolution (P3) (12 tasks, 95 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
+| ARC.38 | Demo seed follows the operator's languages (follow-up of the I18N.15 review, 2026-11-18): `apps/seed` writes its demo content in the primary language and every other enabled language of `MPMV_LANGUAGES` instead of the fixed English and Italian pair (`SOURCE_LANGUAGE`, the `("en", "it")` loops and the `slug["en"]` lookups); a language with no demo text falls back to a marked placeholder copy only for the demo, never on LIVE; `seed --reset` still removes exactly what the seed created | P3 | 4 | ARC.10, I18N.15 | With `MPMV_LANGUAGES=it,de` the seed creates the demo pages and products with Italian as the source and a German version, and no English page; with the default set it creates the same content as today; a test fails if seed code names a language literal outside its demo text tables; `seed --reset` leaves no seeded row in any language |
 | CORE.22 | Optional four-eyes rule for publishers (follow-up of CORE.18; the owner decides whether it is wanted, so no work starts before that decision is recorded in spec 92): a setting under which a page or product publication by one publisher needs approval from a second person with the publisher role, with an `AuditLog` entry for both | P3 | 6 | CORE.18, SEC.4 | With the rule on, a single publisher cannot publish alone and both people appear in the audit log; with the rule off, behaviour is unchanged |
 | CAT.28 | Database-side filter in `events.services.search_events` (follow-up of the CAT.27 review, 2026-11-17): the search results page loads every public event and filters in Python; filter title, summary, venue and city in the database, keeping the EVT.8 language fallback, and bound the rows read | P3 | 3 | CAT.27, EVT.8 | A search on a catalogue of 500 public events reads a bounded number of rows; the results and their order are the same as before; hidden, draft and suspended-vendor events still never appear |
 | PAY.6 | Non-split payment methods (proposed by lane-b on the owner's request for ideas, D-09, 2026-11-11; spec only, no code now, waits for the owner to schedule it; D-08 decided, adviser opinion 2026-11-11): allowed **only when the customer pays the vendor directly**, never with customer money collected on the operator's bank account; for such a method the platform fee becomes the platform's own receivable on the vendor, netted from the vendor's next Stripe payout; when the balance does not cover it, a vendor SEPA direct-debit mandate (signed in the Manager, audited, revocable) is the fallback; unpaid receivables are listed for staff and block nothing at checkout until the owner sets a ceiling; refunds of such orders reverse the receivable | P3 | 16 | PAY.5, PAY.4, VEN.4 | Owner schedules the build (counsel's D-08 answer is in); then: a non-split order is possible only with the vendor as the payee of the customer's payment (a test refuses a configuration where the operator receives it); it creates a receivable equal to the platform fee; the next payout is reduced by it; with too little balance a debit is requested under the mandate; a refund reverses the receivable; the ledger stays append-only and sums to the order |
