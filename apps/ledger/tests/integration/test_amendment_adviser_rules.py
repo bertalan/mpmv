@@ -15,6 +15,7 @@ ledger and the Stripe double; the substantial ones (AM4 to AM8) are drafted, and
 what the second payment collects (ORD.21 applies it on the payment date, passed here as `now`).
 """
 
+import dataclasses
 import datetime as dt
 import secrets
 from decimal import Decimal
@@ -61,16 +62,28 @@ __all__ = ["stripe"]  # the Stripe double fixture, used by name
 pytestmark = pytest.mark.django_db
 
 D = Decimal
+ZERO = D("0.00")
 REDUCED_4 = FakeTax(rate=D("4"), reason=tax.REASON_DOMESTIC_VENDOR_COUNTRY)
-# The vendor order keeps one shipping rate (database check), and the checkout blocks a package
-# with two shipping VAT rates until the order keeps the portions (ORD.3 follow-up). The seed
-# stores the 1.30 of the split as a 13 % figure on the vendor order and the split itself in the
-# shipping choice, which is what version 1 reads (`versions.version_one_snapshot`).
-BLENDED_13 = FakeTax(rate=D("13"), reason=tax.REASON_DOMESTIC_VENDOR_COUNTRY)
-SPLIT = [
-    {"net": "5.00", "tax": "1.10", "rate": "22", "reason": tax.REASON_DOMESTIC_VENDOR_COUNTRY},
-    {"net": "5.00", "tax": "0.20", "rate": "4", "reason": tax.REASON_DOMESTIC_VENDOR_COUNTRY},
-]
+
+
+@dataclasses.dataclass(frozen=True)
+class FakePortion(FakeTax):
+    """The shape of a TaxPortion: one part of the shipping under one goods decision."""
+
+    net: Decimal = ZERO
+    tax: Decimal = ZERO
+
+
+# Seed M's shipping as `resolve_shipping_tax` splits it; the vendor order keeps both portions and
+# no single rate (ORD.29), and version 1 reads them (`versions.version_one_snapshot`).
+SPLIT = (
+    FakePortion(
+        rate=D("22"), reason=tax.REASON_DOMESTIC_VENDOR_COUNTRY, net=D("5.00"), tax=D("1.10")
+    ),
+    FakePortion(
+        rate=D("4"), reason=tax.REASON_DOMESTIC_VENDOR_COUNTRY, net=D("5.00"), tax=D("0.20")
+    ),
+)
 BOOK = "book_art74"  # the catalog's book category, at the 4 % books rate in Italy
 MILAN = {"line1": "3 Via Nuova", "city": "Milano", "postcode": "20121", "country": "IT"}
 
@@ -132,14 +145,14 @@ def place(stripe: FakeStripeClient, owner: Vendor, *, mixed: bool) -> VendorOrde
     if mixed:
         p4 = product(owner, BOOK)
         lines.append(line(p4, 1, title="P4", tax=REDUCED_4))
-        choice["tax_portions"] = SPLIT
     order, _ = place_order(
         preview(
             vendor_of(
                 p22,
                 *lines,
                 shipping_net=D("10.00"),
-                shipping_tax=BLENDED_13 if mixed else DOMESTIC,
+                shipping_tax=None if mixed else DOMESTIC,
+                shipping_portions=SPLIT if mixed else (),
                 shipping_choice=choice,
                 commission_snapshot=RULE,
             ),
@@ -158,6 +171,7 @@ def place(stripe: FakeStripeClient, owner: Vendor, *, mixed: bool) -> VendorOrde
     assert webhook(stripe, order, order.payment_intent_ref, event).status_code == 200
     settlement.transfer_payment(Payment.objects.get(provider_ref=order.payment_intent_ref))
     sub = order.vendor_orders.get()
+    assert (sub.shipping_tax_rate is None) is mixed, "a split shipping keeps no single rate"
     assert sub.current_version is not None
     assert sub.current_version.gross_total == expected
     return sub

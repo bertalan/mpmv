@@ -136,9 +136,8 @@ def _choose(
     return next((r for r in rates if r.key == key), None)
 
 
-def _shipping_choice(
-    rate: shipping_engine.ShippingRate, portions: Sequence[tax_engine.TaxPortion]
-) -> dict[str, Any]:
+def _shipping_choice(rate: shipping_engine.ShippingRate) -> dict[str, Any]:
+    """The chosen rate; `place_order` adds the VAT portions (`tax_portions`) to it."""
     return {
         "key": rate.key,
         "kind": rate.kind,
@@ -150,10 +149,6 @@ def _shipping_choice(
         "min_days": rate.min_days,
         "max_days": rate.max_days,
         "free_shipping": rate.free_shipping,
-        "tax_portions": [
-            {"net": str(p.net), "tax": str(p.tax), "rate": str(p.rate), "reason": str(p.reason)}
-            for p in portions
-        ],
     }
 
 
@@ -414,22 +409,12 @@ def _package(
             shipping_options=_options(outcome.rates, ctx, goods),
         )
 
+    # A package with goods at several VAT rates splits its shipping across them (TAX.17); the
+    # order keeps the portions (ORD.29).
     amounts = engine.price_package(ctx, inputs, rate.net)
-    extra: list[engine.Block] = []
-    if len(amounts.shipping_portions) > 1:
-        # The order stores one shipping VAT rate per vendor order (database check), so a package
-        # with two VAT rates is priced and shown here but cannot be placed until the order keeps
-        # the portions (follow-up of ORD.3).
-        extra.append(
-            _block(
-                engine.SHIPPING_VAT_SPLIT,
-                "Shipping on a package with different VAT rates cannot be placed yet.",
-                vid,
-            )
-        )
     summary = engine.PackageSummary(
         vendor_id=vid,
-        state=engine.BLOCKED if extra else engine.READY,
+        state=engine.READY,
         lines=tuple(
             engine.SummaryLine(
                 product_id=b.product_id,
@@ -443,14 +428,12 @@ def _package(
             )
             for b, p in zip(bare, amounts.lines, strict=True)
         ),
-        blocks=tuple(extra),
+        blocks=(),
         shipping_options=_options(outcome.rates, ctx, goods),
         selected_shipping=rate.key,
         shipping_portions=amounts.shipping_portions,
         totals=amounts.totals,
     )
-    if extra:
-        return summary, None, ctx
     first = amounts.shipping_portions[0] if amounts.shipping_portions else None
     place = PlaceVendor(
         vendor=vendor,
@@ -471,7 +454,8 @@ def _package(
         ],
         shipping_net=rate.net,
         shipping_tax=first,
-        shipping_choice=_shipping_choice(rate, amounts.shipping_portions),
+        shipping_portions=amounts.shipping_portions,
+        shipping_choice=_shipping_choice(rate),
         commission_snapshot=commission,
         tax_profile_snapshot=_profile_snapshot(vendor, now),
     )

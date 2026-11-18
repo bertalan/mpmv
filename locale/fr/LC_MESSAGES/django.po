@@ -6123,14 +6123,6 @@ msgstr "Mode d’expédition"
 msgid "Shipping method changed to %(method)s"
 msgstr "Mode d’expédition modifié en %(method)s"
 
-#: apps/orders/ui/present.py
-msgid ""
-"Shipping on a package with different VAT rates cannot be ordered yet. Order these items in "
-"separate orders."
-msgstr ""
-"L'expédition d'un colis comportant des taux de TVA différents ne peut pas encore être commandée. "
-"Commandez ces articles dans des commandes séparées."
-
 #: apps/manager/forms.py
 msgid "Shipping policy"
 msgstr "Conditions d'expédition"

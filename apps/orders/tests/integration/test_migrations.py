@@ -1,9 +1,34 @@
-"""ORD.2: the order guard migrations reverse cleanly, leaving working triggers."""
+"""ORD.2: the order guard migrations reverse cleanly, leaving working triggers. ORD.29: the
+split-shipping migration keeps an existing order exactly."""
+
+from decimal import Decimal
 
 import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.loader import MigrationLoader
+
+from apps.core.audit import AuditContext
+from apps.core.models import AuditLog
+from apps.orders import services
+from apps.orders.services import LineInput, VendorOrderInput
+from apps.vendors.tests.factories import VendorFactory
+
+SPLIT_SHIPPING = "0021_ord29_split_shipping_vat"
+BEFORE_SPLIT = "0020_ord20_order_events"
+TOTALS = (
+    "SELECT goods_net, shipping_net, tax_total, gross_total, shipping_tax_rate,"
+    " shipping_tax_amount, shipping_tax_reason FROM orders_vendororder ORDER BY id"
+)
+COMMISSION = {
+    "rule_id": "default",
+    "version": 1,
+    "percent": "10.00",
+    "base": "goods",
+    "fee_percent": "0",
+    "fee_fixed": "0",
+    "fee_base": "gross",
+}
 
 
 def _orders_leaf() -> str:
@@ -34,5 +59,68 @@ def test_migrating_back_to_0003_leaves_working_guards_and_forward_again_works() 
             cursor.execute("UPDATE orders_order SET state = 'awaiting_payment'")
             cursor.execute("SELECT count(*) FROM orders_order")
             assert cursor.fetchone() == (1,)
+    finally:
+        migrate(latest)
+
+
+def _totals() -> list[tuple[object, ...]]:
+    with connection.cursor() as cursor:
+        cursor.execute(TOTALS)
+        return list(cursor.fetchall())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_split_shipping_migration_keeps_an_existing_order_exactly() -> None:
+    """ORD.29: the migration only relaxes two columns and one check. An order placed before it
+    keeps its single rate, its shipping VAT and its totals to the cent (no backfill: every
+    existing row is single-rate)."""
+    latest = _orders_leaf()
+    assert latest == SPLIT_SHIPPING, f"update this test for the new orders leaf {latest}"
+    line = LineInput(
+        None,
+        "SKU-1",
+        "Cup",
+        Decimal("50.00"),
+        2,
+        Decimal("22"),
+        "domestic",
+    )
+    try:
+        migrate(BEFORE_SPLIT)
+        order, _ = services.create_order(
+            email="buyer@example.com",
+            language="en",
+            billing_address={},
+            billing_country="IT",
+            shipping_address={},
+            shipping_country="IT",
+            vendor_orders=[
+                VendorOrderInput(
+                    vendor=VendorFactory.create(),
+                    lines=[line],
+                    shipping_net=Decimal("9.90"),
+                    shipping_tax_rate=Decimal("22"),
+                    shipping_tax_reason="domestic",
+                    commission_snapshot=COMMISSION,
+                )
+            ],
+            ctx=AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM),
+        )
+        assert order is not None
+        before = _totals()
+        migrate(SPLIT_SHIPPING)
+        after = _totals()
+        assert before == [
+            (
+                Decimal("100.00"),
+                Decimal("9.90"),
+                Decimal("24.18"),
+                Decimal("134.08"),
+                Decimal("22.000"),
+                Decimal("2.18"),
+                "domestic",
+            )
+        ]
+        assert after == before, f"the migration changed an existing order: {before} -> {after}"
     finally:
         migrate(latest)
