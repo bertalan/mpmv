@@ -1,9 +1,11 @@
-"""TRU.1: the pure trust engine, badges 1 to 7 (spec 16 §16.4, §16.11 cases 4, 6 and 7). No database."""
+"""TRU.1: the pure trust engine, badges 1 to 7 (spec 16 §16.11 cases 4, 6 and 7). No database."""
 
 import datetime as dt
 from decimal import Decimal
 
 import pytest
+
+from apps.trust import engine
 from apps.trust.engine import (
     DeliveredOrder,
     Dispatch,
@@ -13,8 +15,6 @@ from apps.trust.engine import (
     VendorTrustInputs,
     compute_vendor_trust,
 )
-
-from apps.trust import engine
 
 AS_OF = dt.datetime(2027, 3, 2, 12, 0, tzinfo=dt.UTC)
 RULES = TrustRulesData(version=1)
@@ -144,8 +144,10 @@ def test_review_count_from_one_and_stars_from_five() -> None:
         return badge(compute_vendor_trust(inputs(reviews=reviews), RULES), 2)
 
     assert not run(0).earned
-    assert run(1).earned and not run(1).figures["stars_shown"]
-    assert run(4).figures["mean"] == "4.00" and not run(4).figures["stars_shown"]
+    assert run(1).earned
+    assert not run(1).figures["stars_shown"]
+    assert run(4).figures["mean"] == "4.00"
+    assert not run(4).figures["stars_shown"]
     assert run(5).figures["stars_shown"]
 
 
@@ -189,7 +191,8 @@ def test_dispatch_needs_ten_orders_in_the_last_90_days() -> None:
 def test_orders_tiers_and_the_withdrawal_window() -> None:
     assert badge(compute_vendor_trust(inputs(delivered_orders=delivered(9)), RULES), 1).tier is None
     result = compute_vendor_trust(inputs(delivered_orders=delivered(10)), RULES)
-    assert badge(result, 1).earned and badge(result, 1).tier == 10
+    assert badge(result, 1).earned
+    assert badge(result, 1).tier == 10
     assert badge(compute_vendor_trust(inputs(delivered_orders=delivered(60)), RULES), 1).tier == 50
     # Delivered 13 days ago: the withdrawal window is still open.
     recent = delivered(10, delivered_days=13)
@@ -292,17 +295,20 @@ def test_repeat_customers_need_two_orders_seven_days_apart_and_show_from_three()
 
     orders = (*pair("a", 7), *pair("b", 30), *pair("c", 6))
     result = badge(compute_vendor_trust(inputs(delivered_orders=orders), RULES), 4)
-    assert result.figures["count"] == 2 and not result.earned
+    assert result.figures["count"] == 2
+    assert not result.earned
     result = badge(
         compute_vendor_trust(inputs(delivered_orders=(*orders, *pair("d", 9))), RULES), 4
     )
-    assert result.figures["count"] == 3 and result.earned
+    assert result.figures["count"] == 3
+    assert result.earned
 
 
 def test_on_mpmv_since_is_the_activation_year() -> None:
     first = dt.datetime(2026, 5, 1, tzinfo=dt.UTC)
     result = compute_vendor_trust(inputs(first_activated_at=first), RULES)
-    assert badge(result, 7).earned and badge(result, 7).figures["since"] == 2026
+    assert badge(result, 7).earned
+    assert badge(result, 7).figures["since"] == 2026
     assert not badge(compute_vendor_trust(inputs(), RULES), 7).earned
 
 
@@ -313,7 +319,8 @@ def test_the_result_carries_the_rules_version_and_is_json_safe() -> None:
     import json
 
     result = compute_vendor_trust(inputs(delivered_orders=delivered(12)), TrustRulesData(version=7))
-    assert result.rules_version == 7 and result.as_of == AS_OF
+    assert result.rules_version == 7
+    assert result.as_of == AS_OF
     assert [b.number for b in result.badges] == [1, 2, 3, 4, 5, 6, 7]
     json.dumps(result.to_json())
 

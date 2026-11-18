@@ -1,12 +1,10 @@
-"""TRU.1: versioned TrustRules, append-only VendorTrustSnapshot, audit and dry run (real PostgreSQL)."""
+"""TRU.1: versioned TrustRules, append-only VendorTrustSnapshot, audit, dry run (PostgreSQL)."""
 
 import datetime as dt
 from decimal import Decimal
 from typing import Any
 
 import pytest
-from apps.trust.models import TrustRules, VendorTrustSnapshot
-from apps.trust.tests.factories import TrustRulesFactory, VendorTrustSnapshotFactory
 from django.core.exceptions import ValidationError
 from django.db import InternalError, ProgrammingError, connection, transaction
 from django.utils import timezone
@@ -15,6 +13,8 @@ from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.core.validity import NoValidRow
 from apps.trust import engine, services
+from apps.trust.models import TrustRules, VendorTrustSnapshot
+from apps.trust.tests.factories import TrustRulesFactory, VendorTrustSnapshotFactory
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
@@ -47,7 +47,8 @@ def test_the_first_version_is_1_and_a_change_closes_the_open_one() -> None:
     services.add_trust_rules(params(orders_tiers=[20, 50]), valid_from=later, ctx=CTX)
     first, second = TrustRules.objects.order_by("version")
     assert (first.version, second.version) == (1, 2)
-    assert first.valid_to == later and second.valid_to is None
+    assert first.valid_to == later
+    assert second.valid_to is None
     assert services.rules_in_force(at=now + dt.timedelta(days=1)).version == 1
     assert services.rules_in_force(at=later).version == 2
 
@@ -69,6 +70,8 @@ def test_a_rules_change_writes_audit_rows_with_before_and_after() -> None:
     )
     assert entries.count() == 3  # create v1, close v1, create v2
     created = entries.filter(after__version=2).get()
+    assert created.before is not None
+    assert created.after is not None
     assert created.before["version"] == 1
     assert created.after["params"]["min_order_value"] == "9.00"
     assert created.after["note"] == "raise floor"
@@ -129,16 +132,22 @@ def test_a_start_in_the_past_is_refused() -> None:
 
 
 def test_a_rules_row_is_never_edited_or_deleted() -> None:
-    rules = TrustRulesFactory(valid_to=None)
+    rules = TrustRulesFactory.create(valid_to=None)
     rules.note = "changed"
     with pytest.raises(PermissionError):
         rules.save()
-    with pytest.raises((ProgrammingError, InternalError)), transaction.atomic():
-        with connection.cursor() as cursor:
-            cursor.execute("UPDATE trust_trustrules SET note = 'x'")
-    with pytest.raises((ProgrammingError, InternalError)), transaction.atomic():
-        with connection.cursor() as cursor:
-            cursor.execute("DELETE FROM trust_trustrules")
+    with (
+        pytest.raises((ProgrammingError, InternalError)),
+        transaction.atomic(),
+        connection.cursor() as cursor,
+    ):
+        cursor.execute("UPDATE trust_trustrules SET note = 'x'")
+    with (
+        pytest.raises((ProgrammingError, InternalError)),
+        transaction.atomic(),
+        connection.cursor() as cursor,
+    ):
+        cursor.execute("DELETE FROM trust_trustrules")
     assert TrustRules.objects.count() == 1
 
 
@@ -146,32 +155,38 @@ def test_rules_periods_cannot_overlap() -> None:
     from django.db import IntegrityError
 
     now = timezone.now()
-    TrustRulesFactory(version=1, valid_from=now, valid_to=None)
+    TrustRulesFactory.create(version=1, valid_from=now, valid_to=None)
     with pytest.raises(IntegrityError), transaction.atomic():
-        TrustRulesFactory(version=2, valid_from=now + dt.timedelta(days=1), valid_to=None)
+        TrustRulesFactory.create(version=2, valid_from=now + dt.timedelta(days=1), valid_to=None)
 
 
 def test_a_snapshot_is_append_only() -> None:
-    snapshot = VendorTrustSnapshotFactory()
+    snapshot = VendorTrustSnapshotFactory.create()
     snapshot.metrics = {"changed": True}
     with pytest.raises(PermissionError):
         snapshot.save()
     with pytest.raises(PermissionError):
         snapshot.delete()
-    with pytest.raises((ProgrammingError, InternalError)), transaction.atomic():
-        with connection.cursor() as cursor:
-            cursor.execute("UPDATE trust_vendortrustsnapshot SET metrics = '{}'")
+    with (
+        pytest.raises((ProgrammingError, InternalError)),
+        transaction.atomic(),
+        connection.cursor() as cursor,
+    ):
+        cursor.execute("UPDATE trust_vendortrustsnapshot SET metrics = '{}'")
     with pytest.raises((ProgrammingError, InternalError)), transaction.atomic():
         VendorTrustSnapshot.objects.all().delete()
-    with pytest.raises((ProgrammingError, InternalError)), transaction.atomic():
-        with connection.cursor() as cursor:
-            cursor.execute("DELETE FROM trust_vendortrustsnapshot")
+    with (
+        pytest.raises((ProgrammingError, InternalError)),
+        transaction.atomic(),
+        connection.cursor() as cursor,
+    ):
+        cursor.execute("DELETE FROM trust_vendortrustsnapshot")
     assert VendorTrustSnapshot.objects.count() == 1
 
 
 def test_a_new_rules_version_changes_a_result_and_the_old_snapshot_keeps_its_version() -> None:
     now = timezone.now()
-    vendor = VendorFactory()
+    vendor = VendorFactory.create()
     services.add_trust_rules(params(), valid_from=now, ctx=CTX)
     data = engine.VendorTrustInputs(
         vendor_ref=str(vendor.public_id), as_of=AS_OF, delivered_orders=orders(10)
@@ -187,10 +202,13 @@ def test_a_new_rules_version_changes_a_result_and_the_old_snapshot_keeps_its_ver
     )
     services.record_snapshot(vendor, second)
 
-    assert first.badges[0].earned and not second.badges[0].earned
+    assert first.badges[0].earned
+    assert not second.badges[0].earned
     old, new = VendorTrustSnapshot.objects.filter(vendor=vendor).order_by("id")
-    assert old.rules_version == 1 and new.rules_version == 2
-    assert old.rules.version == 1 and new.rules.version == 2
+    assert old.rules_version == 1
+    assert new.rules_version == 2
+    assert old.rules.version == 1
+    assert new.rules.version == 2
     assert old.badges[0]["earned"] is True  # the old snapshot is untouched
     assert services.latest_snapshot(vendor) == new
 
@@ -198,7 +216,7 @@ def test_a_new_rules_version_changes_a_result_and_the_old_snapshot_keeps_its_ver
 def test_record_snapshot_dry_run_writes_nothing() -> None:
     now = timezone.now()
     services.add_trust_rules(params(), valid_from=now, ctx=CTX)
-    vendor = VendorFactory()
+    vendor = VendorFactory.create()
     result = engine.compute_vendor_trust(
         engine.VendorTrustInputs(vendor_ref="x", as_of=AS_OF),
         services.rules_data(services.rules_in_force(at=now)),
@@ -209,12 +227,12 @@ def test_record_snapshot_dry_run_writes_nothing() -> None:
 
 
 def test_the_public_pages_read_only_the_latest_snapshot() -> None:
-    vendor = VendorFactory()
-    VendorTrustSnapshotFactory(vendor=vendor, as_of=AS_OF - dt.timedelta(days=1))
-    newest = VendorTrustSnapshotFactory(vendor=vendor, as_of=AS_OF)
-    VendorTrustSnapshotFactory(as_of=AS_OF + dt.timedelta(days=5))  # another vendor
+    vendor = VendorFactory.create()
+    VendorTrustSnapshotFactory.create(vendor=vendor, as_of=AS_OF - dt.timedelta(days=1))
+    newest = VendorTrustSnapshotFactory.create(vendor=vendor, as_of=AS_OF)
+    VendorTrustSnapshotFactory.create(as_of=AS_OF + dt.timedelta(days=5))  # another vendor
     assert services.latest_snapshot(vendor) == newest
-    assert services.latest_snapshot(VendorFactory()) is None
+    assert services.latest_snapshot(VendorFactory.create()) is None
 
 
 def test_ensure_default_rules_creates_version_1_once() -> None:
