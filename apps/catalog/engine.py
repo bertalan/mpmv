@@ -15,6 +15,7 @@ from typing import Any, Protocol, cast
 from urllib.parse import unquote_to_bytes, urlsplit
 from zoneinfo import ZoneInfo
 
+from apps.core.countries import ISO_3166_ALPHA2
 from apps.core.money import CENT, to_decimal
 
 SKU_MAX_LENGTH = 64
@@ -359,6 +360,33 @@ class TranslationIn:
     title: str
     short_description: str = ""
     description: str = ""
+    material: str = ""
+    colour: str = ""
+
+
+MAX_DIMENSION_MM = 2_147_483_647  # the largest value the integer column stores
+
+
+def dimension_error(value: object) -> str | None:
+    """Why `value` is not a valid size in mm (None: no size), or None; ends with a period."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        return "needs a whole number of millimetres."
+    if value <= 0:
+        return "must be above 0; leave it empty instead."
+    if value > MAX_DIMENSION_MM:
+        return "is too large."
+    return None
+
+
+def country_error(value: object) -> str | None:
+    """Why `value` is not an upper-case ISO 3166-1 alpha-2 code ("" means none), or None."""
+    if value == "":
+        return None
+    if not isinstance(value, str) or value not in ISO_3166_ALPHA2:
+        return "needs an upper-case ISO 3166-1 alpha-2 country code, for example IT."
+    return None
 
 
 @dataclass(frozen=True)
@@ -371,6 +399,10 @@ class ProductIn:
     sales_mode: str = "buy"
     fiscal_category: str = "standard"
     weight_kg: Decimal | None = None
+    length_mm: int | None = None
+    width_mm: int | None = None
+    height_mm: int | None = None
+    country_of_origin: str = ""
     translations: tuple[TranslationIn, ...] = ()
     attributes: tuple[AttributeIn, ...] = ()
     variants: tuple[VariantIn, ...] = field(default=())

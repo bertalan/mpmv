@@ -15,6 +15,8 @@ def test_product_translation_follows_the_translation_contract() -> None:
         "description",
         "seo_title",
         "seo_description",
+        "material",
+        "colour",
     )
     assert check_translation_model(ProductTranslation) == []
 

@@ -300,7 +300,13 @@ PRODUCT_EDIT_FIELDS = (
     "length_cm",
     "width_cm",
     "height_cm",
+    "length_mm",
+    "width_mm",
+    "height_mm",
+    "country_of_origin",
 )
+TRANSLATION_MODEL = "catalog.producttranslation"
+TRANSLATION_FACT_FIELDS = ("material", "colour")  # CAT.22: audited like the product facts
 VARIANT_EDIT_FIELDS = ("weight_kg_override",)
 PRODUCT_RELATIONS = ("secondary_categories", "terms", "upsells")
 
@@ -412,6 +418,31 @@ def delete_product(product: Product, *, ctx: AuditContext, dry_run: bool = False
             audit_changes(variant_changes, ctx=ctx, action=VARIANT_DELETED)
             bump_sitemap_version()  # I18N.16
     return ChangeSet([*product_changes.changes, *variant_changes.changes])
+
+
+def translation_facts_snapshot(translation: ProductTranslation) -> dict[str, Any]:
+    return {
+        "vendor": str(translation.product.vendor.public_id),
+        "product": str(translation.product.public_id),
+        "language": translation.language,
+        **{name: getattr(translation, name) for name in TRANSLATION_FACT_FIELDS},
+    }
+
+
+def record_translation_facts_change(
+    translation: ProductTranslation, before: dict[str, Any], *, ctx: AuditContext
+) -> ChangeSet:
+    """Audit the material and colour a form has just saved on `translation` (CAT.22), when they
+    differ from `before` (`translation_facts_snapshot`, taken before the save)."""
+    changes = ChangeSet()
+    changes.update(
+        TRANSLATION_MODEL,
+        str(translation.public_id),
+        before,
+        translation_facts_snapshot(translation),
+    )
+    audit_changes(changes, ctx=ctx, action=PRODUCT_UPDATED)
+    return changes
 
 
 def relations_snapshot(product: Product) -> dict[str, Any]:
@@ -976,6 +1007,13 @@ def _product_errors(
     weight_error = engine.weight_error(data.weight_kg)
     if weight_error is not None:
         _add_error(errors, "weight_kg", f"The weight {weight_error}")
+    for name in ("length_mm", "width_mm", "height_mm"):
+        size_error = engine.dimension_error(getattr(data, name))
+        if size_error is not None:
+            _add_error(errors, name, f"The {name.split('_')[0]} {size_error}")
+    origin_error = engine.country_error(data.country_of_origin)
+    if origin_error is not None:
+        _add_error(errors, "country_of_origin", f"The country of origin {origin_error}")
     _check_choice(errors, "kind", data.kind, list(ProductKind.values))
     _check_choice(errors, "sales_mode", data.sales_mode, list(SalesMode.values))
     _check_choice(errors, "fiscal_category", data.fiscal_category, list(FiscalCategory.values))
@@ -1085,6 +1123,10 @@ def create_product(
         fiscal_category=data.fiscal_category,
         price_net=engine.to_price(data.price_net),
         weight_kg=_stored(data.weight_kg, engine.WEIGHT_DECIMALS),
+        length_mm=data.length_mm,
+        width_mm=data.width_mm,
+        height_mm=data.height_mm,
+        country_of_origin=data.country_of_origin,
     )
     product_key = str(product.public_id)
     changes = ChangeSet()
@@ -1099,6 +1141,10 @@ def create_product(
             "fiscal_category": product.fiscal_category,
             "price_net": product.price_net,
             "weight_kg": product.weight_kg,
+            "length_mm": product.length_mm,
+            "width_mm": product.width_mm,
+            "height_mm": product.height_mm,
+            "country_of_origin": product.country_of_origin,
         },
     )
 
@@ -1109,6 +1155,8 @@ def create_product(
             title=text.title,
             short_description=text.short_description,
             description=text.description,
+            material=text.material,
+            colour=text.colour,
         )
         for text in data.translations
     ]
@@ -1126,6 +1174,8 @@ def create_product(
                 "language": text.language,
                 "title": text.title,
                 "slug": text.slug,
+                "material": text.material,
+                "colour": text.colour,
             },
         )
 
