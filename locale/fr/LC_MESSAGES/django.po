@@ -1408,7 +1408,7 @@ msgstr "lot de marques"
 msgid "brand batches"
 msgstr "lots de marques"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Business buyers: the court of %(court)s."
 msgstr "Acheteurs professionnels : le tribunal de %(court)s."
 
@@ -1870,7 +1870,7 @@ msgstr ""
 msgid "City"
 msgstr "Ville"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Clauses for approval by business buyers (art. 1341 Civil Code)"
 msgstr "Clauses à approuver par les acheteurs professionnels (art. 1341 du Code civil)"
 
@@ -1899,7 +1899,7 @@ msgstr "Commentaire"
 msgid "Commission change"
 msgstr "Variation de la commission"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Committed delivery time: %(days)s days."
 msgstr "Délai de livraison garanti : %(days)s jours."
 
@@ -2053,7 +2053,7 @@ msgstr ""
 "qu'entreprise, tu n'as pas de droit de rétractation, sauf si les conditions du vendeur le "
 "prévoient."
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Consumers: disputes go to the court of the consumer's own residence."
 msgstr "Consommateurs : les litiges relèvent du tribunal du lieu de résidence du consommateur."
 
@@ -2270,7 +2270,7 @@ msgstr "Délai de livraison"
 msgid "Delivery time in days"
 msgstr "Délai de livraison en jours"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Delivery, returns and law"
 msgstr "Livraison, retours et droit applicable"
 
@@ -2810,7 +2810,7 @@ msgstr "Rechercher le compte"
 msgid "Find the order"
 msgstr "Rechercher la commande"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Fingerprint %(hash)s."
 msgstr "Empreinte %(hash)s."
 
@@ -2990,7 +2990,7 @@ msgstr "Marchandises, TVA incluse"
 msgid "Governing law"
 msgstr "Droit applicable"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Governing law: %(country)s."
 msgstr "Droit applicable : %(country)s."
 
@@ -5908,11 +5908,11 @@ msgstr "Retours et remboursements"
 msgid "Returns and refunds policy"
 msgstr "Politique de retour et de remboursement"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the consumer bears the direct cost of returning the goods."
 msgstr "Retours : le coût direct du renvoi des biens est à la charge du consommateur."
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the seller bears the cost of returning the goods."
 msgstr "Retours : le coût du renvoi des biens est à la charge du vendeur."
 
@@ -5971,11 +5971,11 @@ msgstr "Mode de vente"
 
 #: apps/manager/forms.py apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/sales_terms.html
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Sales terms"
 msgstr "Conditions de vente"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Sales terms of %(name)s"
 msgstr "Conditions de vente de %(name)s"
 
@@ -6779,8 +6779,7 @@ msgstr "Préavis de résiliation"
 msgid "Terminations"
 msgstr "Résiliations"
 
-#: apps/orders/templates/orders/_legal_boxes.html apps/vendors/templates/vendors/terms/print.html
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/orders/templates/orders/_legal_boxes.html apps/vendors/templates/vendors/terms/read.html
 msgid "Terms"
 msgstr "Conditions"
 
@@ -10551,7 +10550,7 @@ msgstr "La version %(number)s est en vigueur depuis le %(date)s."
 msgid "Version %(number)s, %(date)s"
 msgstr "Version %(number)s, %(date)s"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Version %(number)s, in force from %(date)s."
 msgstr "Version %(number)s, en vigueur depuis le %(date)s."
 

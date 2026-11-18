@@ -1394,7 +1394,7 @@ msgstr "lote de marcas"
 msgid "brand batches"
 msgstr "lotes de marcas"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Business buyers: the court of %(court)s."
 msgstr "Compradores profesionales: los tribunales de %(court)s."
 
@@ -1852,7 +1852,7 @@ msgstr ""
 msgid "City"
 msgstr "Ciudad"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Clauses for approval by business buyers (art. 1341 Civil Code)"
 msgstr ""
 "Cláusulas que deben aprobar los compradores profesionales (art. 1341 del Código Civil italiano)"
@@ -1882,7 +1882,7 @@ msgstr "Comentario"
 msgid "Commission change"
 msgstr "Variación de la comisión"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Committed delivery time: %(days)s days."
 msgstr "Plazo de entrega garantizado: %(days)s días."
 
@@ -2034,7 +2034,7 @@ msgstr ""
 "Los consumidores disponen de 14 días desde la entrega para desistir. Como empresa no tienes "
 "derecho de desistimiento, salvo que las condiciones del vendedor lo prevean."
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Consumers: disputes go to the court of the consumer's own residence."
 msgstr ""
 "Consumidores: las controversias corresponden a los tribunales del lugar de residencia del "
@@ -2248,7 +2248,7 @@ msgstr "Plazo de entrega"
 msgid "Delivery time in days"
 msgstr "Plazo de entrega en días"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Delivery, returns and law"
 msgstr "Entrega, devoluciones y legislación"
 
@@ -2783,7 +2783,7 @@ msgstr "Buscar la cuenta"
 msgid "Find the order"
 msgstr "Buscar el pedido"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Fingerprint %(hash)s."
 msgstr "Huella digital %(hash)s."
 
@@ -2961,7 +2961,7 @@ msgstr "Mercancía, IVA incluido"
 msgid "Governing law"
 msgstr "Legislación aplicable"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Governing law: %(country)s."
 msgstr "Legislación aplicable: %(country)s."
 
@@ -5860,11 +5860,11 @@ msgstr "Devoluciones y reembolsos"
 msgid "Returns and refunds policy"
 msgstr "Política de devoluciones y reembolsos"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the consumer bears the direct cost of returning the goods."
 msgstr "Devoluciones: el coste directo de devolver los bienes corre a cargo del consumidor."
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the seller bears the cost of returning the goods."
 msgstr "Devoluciones: el coste de devolver los bienes corre a cargo del vendedor."
 
@@ -5923,11 +5923,11 @@ msgstr "Modo de venta"
 
 #: apps/manager/forms.py apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/sales_terms.html
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Sales terms"
 msgstr "Condiciones de venta"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Sales terms of %(name)s"
 msgstr "Condiciones de venta de %(name)s"
 
@@ -6728,8 +6728,7 @@ msgstr "Preaviso de baja"
 msgid "Terminations"
 msgstr "Bajas"
 
-#: apps/orders/templates/orders/_legal_boxes.html apps/vendors/templates/vendors/terms/print.html
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/orders/templates/orders/_legal_boxes.html apps/vendors/templates/vendors/terms/read.html
 msgid "Terms"
 msgstr "Condiciones"
 
@@ -10451,7 +10450,7 @@ msgstr "La versión %(number)s está en vigor desde el %(date)s."
 msgid "Version %(number)s, %(date)s"
 msgstr "Versión %(number)s, %(date)s"
 
-#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Version %(number)s, in force from %(date)s."
 msgstr "Versión %(number)s, en vigor desde el %(date)s."
 

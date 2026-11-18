@@ -50,7 +50,9 @@ def download(request: HttpRequest, token: str) -> HttpResponse:
     )
     if version is None:
         raise Http404("These terms are not available.")
-    html = render_to_string("vendors/terms/print.html", _context(version, token), request=request)
+    html = render_to_string(
+        "documents/vendors/sales_terms.html", _context(version, token), request=request
+    )
     try:
         pdf = render_html(html)
     except AttachmentUnavailable:
