@@ -225,7 +225,12 @@ def test_a_hostile_product_name_is_inert_in_the_one_block() -> None:
             slug=f"mug-{language}",
             status=TranslationStatus.PUBLISHED,
         )
-    html = Client().get("/product/mug-en/").content.decode()
+    from django.conf import settings
+
+    from tests.i18n import product_url
+
+    primary = settings.LANGUAGE_CODE  # the primary language may not be English (I18N.15)
+    html = Client().get(product_url(primary, f"mug-{primary}")).content.decode()
     assert "<img src=x" not in html
     [block] = SCRIPT.findall(html)
     assert hostile in [n.get("name") for n in json.loads(block)["@graph"]]

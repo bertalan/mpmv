@@ -78,6 +78,13 @@ class SearchGroup:
 
 
 @dataclass(frozen=True)
+class SearchGraphPage:
+    """The subject of the results page's schema.org graph (SEO.7): the query it answers."""
+
+    query: str
+
+
+@dataclass(frozen=True)
 class ProductResults:
     products: list[Product]
     window: listings.PageWindow
@@ -235,6 +242,7 @@ def search_view(request: HttpRequest) -> HttpResponseBase:
     filter_groups = services.listing_filter_groups(services.NO_SCOPE, params, language)
     context: dict[str, Any] = {
         "query": query,
+        "graph_object": SearchGraphPage(query),
         "location": path,
         "only": only,
         "cards": services.product_cards(results.products, language) if results else [],
