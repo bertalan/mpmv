@@ -2993,6 +2993,7 @@ msgstr "Venerdì"
 #: apps/manager/templates/manager/shop/_money_filters.html
 msgid "From"
 msgstr "Dal"
+
 #: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "From year"
 msgstr "Dall'anno"

@@ -3026,6 +3026,7 @@ msgstr "Vendredi"
 #: apps/manager/templates/manager/shop/_money_filters.html
 msgid "From"
 msgstr "Du"
+
 #: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "From year"
 msgstr "De l'année"
