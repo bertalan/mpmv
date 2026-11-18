@@ -200,6 +200,9 @@ vendor-specific shipping zone or commission rule also puts `"vendor"` in its sna
   in detecting abuse, and article 17(3)(e) for legal claims). It is not erased with the account.
   A retention period for it (null the column after N months) is a CMP.4 2/2 / CMP.29 decision.
 - `before` and `after` of the GDPR actions hold public ids, flags and counts only.
+- ORD.26: the anonymisation of an order scrubs the outbox rows of its emails (`order_ref`): the
+  entry is `orders.anonymise` with target `core.outboxemail`, `before` and `after` hold the
+  template key, language and a `personal_data` flag, never an address or content.
 - `OutboxEmailEvent` rows are append-only too. The erasure writes the detail `account erased`;
   provider feedback text in older rows may quote an address and is a documented residual.
 - A lockout entry's target key (`login:account:<keyed hash>`) never holds the address; the same

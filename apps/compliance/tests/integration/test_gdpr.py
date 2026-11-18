@@ -493,3 +493,19 @@ def test_a_pending_request_row_completes_on_the_next_run() -> None:
     request.refresh_from_db()
     assert request.completed_at is not None
     assert gdpr.is_anonymised(request.user)
+
+
+def test_erasure_also_empties_the_stored_message_of_every_row() -> None:
+    """ORD.26: the rendered subject and bodies go with the context."""
+    mail = OutboxEmail.objects.create(
+        recipient="gone@example.com",
+        template_key="tests.reminder",
+        language="en",
+        context="{}",
+        subject="Hello Gone",
+        text_body="Hello Gone\n",
+        html_body="<p>Hello Gone</p>",
+    )
+    gdpr._erase_outbox("gone@example.com", "erased@anonymised.invalid")
+    mail.refresh_from_db()
+    assert (mail.subject, mail.text_body, mail.html_body, mail.context) == ("", "", "", "")
