@@ -90,6 +90,8 @@ from .blocks import (
     paragraph_block,
 )
 from .choosers import term_chooser, vendor_chooser
+from .forms_pages import FormField as FormField  # re-exported: models live in their own module
+from .forms_pages import FormPage as FormPage
 
 
 def body_field(

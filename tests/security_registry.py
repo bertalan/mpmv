@@ -38,6 +38,12 @@ MEDIA = (
     "an object a caller could swap for another tenant's; anything outside them is a 404 "
     "(tests/integration/test_modern_image_formats.py)."
 )
+TILE = (
+    "Map tile proxy (EVT.14, apps.core.maps): the path is three validated integers, never an "
+    "object; a tile is the same for everyone and carries no user or tenant data. An invalid "
+    "tile is a 404 before any database or upstream call (`apps/core/tests/integration/"
+    "test_map_tiles.py`)."
+)
 SIGN_IN = "Sign-in page: must answer before the visitor is signed in."
 PASSWORD_RESET = "Password reset flow of the editors' admin: answers before sign-in."
 
@@ -53,6 +59,7 @@ PUBLIC: dict[str, str] = {
     ),
     "home": "Public home page.",
     "media": MEDIA,
+    "map_tile": TILE,
     "catalog:category": PUBLIC_CATALOG,
     "catalog:product": PUBLIC_CATALOG,
     "catalog:brand": PUBLIC_CATALOG,
@@ -133,6 +140,14 @@ PUBLIC: dict[str, str] = {
         "Pre-contractual information (CMP.6, directive 2011/83/EU art. 49): the same legal text "
         "for every visitor, public by law."
     ),
+    "customer_help": (
+        "Customer help index (ARC.37): the same repository-file text for every visitor, "
+        "read-only, public by design."
+    ),
+    "customer_help_section": (
+        "Customer help section (ARC.37): the same repository-file text for every visitor, "
+        "read-only, public by design."
+    ),
     "subprocessors": (
         "Sub-processor register (CMP.4): static reviewed data, read-only, public by design "
         "(GDPR art. 13 and 28)."
@@ -212,12 +227,18 @@ SITEMAP = (
 )
 
 IDOR_REVIEWED: dict[str, str] = {
+    "customer_help_section": (
+        "Public by design (ARC.37): the slug names a fixed section of the repository help text, "
+        "the same for every visitor; an unknown slug is a 404 "
+        "(`test_an_unknown_section_is_a_404`)."
+    ),
     "events_resource": (
         "Public by design (EVT.6, EVT.9): the path names a published event's calendar file or a "
         "feed, the same for every visitor; a hidden event and an unknown path are a 404 "
         "(`test_pending_draft_and_hidden_events_are_404_to_visitors`)."
     ),
     "media": MEDIA,
+    "map_tile": TILE,
     "sitemap_section": SITEMAP,
     "llms_language": SITEMAP,
     "sitemap_part": SITEMAP,
@@ -319,6 +340,7 @@ PLACEHOLDER_404: dict[str, str] = {
         "superseded token is a 404 for everyone, and the route shows only the terms in force."
     ),
     "media": MEDIA,
+    "map_tile": TILE,
     "wagtailadmin_password_reset_confirm": (
         "Password reset confirmation of the editors' admin, public by design (PUBLIC): the uid "
         "and token in the URL are the credential, not a reference to an object a caller could "

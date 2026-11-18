@@ -88,3 +88,11 @@ def test_the_image_library_in_this_environment_encodes_avif_and_webp() -> None:
     # The wheels in uv.lock (and so the container image) bundle libavif and libwebp.
     assert images.avif_supported()
     assert images.webp_supported()
+
+
+def test_every_preset_belongs_to_exactly_one_render_group() -> None:
+    grouped = [name for names in images.RENDER_GROUPS.values() for name in names]
+    assert sorted(grouped) == sorted(images.PRESETS)
+    assert len(grouped) == len(set(grouped))
+    assert images.RENDER_GROUPS["content"] == ("content", "article", "gallery")
+    assert "avatar" in images.RENDER_GROUPS["card"]

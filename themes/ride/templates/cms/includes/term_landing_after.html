@@ -1,0 +1,21 @@
+{% load i18n cms_tags image_credits %}{% comment %}
+A term landing page's related articles and its image credits on `ride` (THM.9 part 1; CMS.4,
+CMS.8): the app's include, with the related articles as Bootstrap cards. Cards to pages that
+are not live are left out.
+{% endcomment %}{% if related %}
+<section class="term-landing-related mt-4" aria-labelledby="term-landing-related-heading">
+  <h2 id="term-landing-related-heading">{% translate "Related articles" %}</h2>
+  <ul class="cards row row-cols-1 row-cols-md-2 g-3 list-unstyled">
+    {% for card in related %}
+      <li class="col">
+        <div class="card h-100">
+          <div class="card-body">
+            <a class="card-title h5 stretched-link" href="{{ card.href }}">{{ card.label }}</a>
+            {% if card.text %}<p class="card-text mt-2">{{ card.text|linebreaksbr }}</p>{% endif %}
+          </div>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}{% page_image_credits page as image_credits %}{% image_credits_disclosure image_credits %}
