@@ -35,6 +35,7 @@ CANDIDATE_DIR = ROOT / "build" / "e2e" / "baselines"  # uploaded by CI as an art
 ACTUAL_DIR = ROOT / "build" / "e2e" / "visual"
 DIFF_DIR = ROOT / "build" / "e2e" / "diffs"
 WIDTHS = (360, 768, 1280)
+MAX_HEIGHT = 1800  # CSS px kept from the top of a page: the image set stays small (public repo)
 CHANNEL_THRESHOLD = 32  # a pixel counts as changed when a channel moves more than this (0-255)
 TOLERANCE = 0.001  # share of changed pixels that still matches (anti-aliasing noise)
 DIFF_COLOUR = (255, 0, 255)
@@ -154,20 +155,28 @@ def check_screenshot(
 
 
 def assert_matches_baseline(page: Page, *, theme: str, name: str, width: int) -> None:
-    """Screenshot the full page at `width` and compare it with its baseline (see the module)."""
+    """Screenshot the page at `width` (the top `MAX_HEIGHT` px at most) and compare it with its
+    baseline (see the module)."""
     mode = require_visual_mode()
     page.set_viewport_size({"width": width, "height": 900})
     page.wait_for_timeout(100)  # the layout settles after the resize
     page.evaluate("() => document.fonts.ready")
     actual = ACTUAL_DIR / theme / f"{name}-{width}.png"
     actual.parent.mkdir(parents=True, exist_ok=True)
+    page_height = page.evaluate("() => document.documentElement.scrollHeight")
     page.screenshot(
         path=str(actual),
         full_page=True,
+        clip={"x": 0, "y": 0, "width": width, "height": min(page_height, MAX_HEIGHT)},
         animations="disabled",
         caret="hide",
-        # Dynamic regions: the launch countdown depends on the current time.
-        mask=[page.locator("[data-countdown]")],
+        # Dynamic regions: the launch countdown depends on the current time; a copy-to-clipboard
+        # field holds an absolute URL with the test server's random port; the footer year.
+        # The footer's copyright year (`{% now "Y" %}`, server side) changes on 1 January.
+        mask=[
+            page.locator("[data-countdown], #event-subscribe-url"),
+            page.locator("footer p", has_text="\u00a9"),
+        ],
     )
     baseline = baseline_path(theme, name, width)
     candidate = CANDIDATE_DIR / theme / baseline.name

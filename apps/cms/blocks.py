@@ -43,11 +43,13 @@ from zoneinfo import ZoneInfo
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.utils import timezone
+from django.utils import timezone, translation
+from django.utils.formats import number_format
 from django.utils.translation import get_language
 from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
 from wagtail.blocks import StructBlockValidationError
+from wagtail.documents.blocks import DocumentChooserBlock
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Page
 
@@ -86,6 +88,8 @@ from .engine import (
     PRODUCT_GRID_DEFAULT,
     PRODUCT_GRID_MAX,
     countdown_state,
+    file_size_parts,
+    file_type_label,
     gallery_for_language,
     grid_limit,
     link_language,
@@ -573,6 +577,44 @@ class FaqBlock(blocks.StructBlock):  # type: ignore[misc]
         icon = "help"
         label = _("FAQ")
         template = "cms/blocks/faq.html"
+
+
+class AccordionSectionBlock(blocks.StructBlock):  # type: ignore[misc]
+    title = blocks.CharBlock(
+        max_length=250,
+        help_text=_("The title of the section, always visible. Required."),
+    )
+    body = blocks.RichTextBlock(
+        features=RICH_TEXT_FEATURES,
+        help_text=_("The text that shows when the visitor opens the section. Required."),
+    )
+
+    class Meta:
+        icon = "list-ul"
+        label = _("Section")
+
+
+class AccordionBlock(blocks.StructBlock):  # type: ignore[misc]
+    """Titled sections that open and close, built on native `<details>` and `<summary>` (D-36,
+    CMS.16): no script, keyboard accessible, closed by default. It is not a FAQ: the page emits
+    no FAQPage data for it (only the `faq` block does)."""
+
+    sections = blocks.ListBlock(
+        AccordionSectionBlock(),
+        min_num=1,
+        label=_("Sections"),
+        help_text=_("Add at least one section. Each has a title and a text that opens on click."),
+    )
+    open_first = blocks.BooleanBlock(
+        required=False,
+        label=_("Open the first section"),
+        help_text=_("Tick this to show the first section already open. Otherwise all are closed."),
+    )
+
+    class Meta:
+        icon = "list-ul"
+        label = _("Accordion")
+        template = "cms/blocks/accordion.html"
 
 
 # --- Cards (part 2/2)
@@ -1218,6 +1260,79 @@ class VideoModalBlock(blocks.StructBlock):  # type: ignore[misc]
             request.mpmv_video_embed = True  # the CSP middleware adds the frame origins
         context["video"] = links
         context["video_id"] = _unique_id(parent_context, "video", value)
+        return context
+
+
+# --- Download (CMS.15)
+
+
+@dataclass(frozen=True)
+class Download:
+    """What the download template shows: the link and the words that go with it."""
+
+    url: str
+    title: str
+    type_label: str
+    size_label: str
+
+    @property
+    def details(self) -> str:
+        """ "PDF, 1.2 MB": the type and size, in text, before the click."""
+        return ", ".join(part for part in (self.type_label, self.size_label) if part)
+
+
+def download_for(document: Any, title: str, language: str) -> Download | None:
+    """The download of `document` with its size in `language`'s number format, or None when the
+    document or its file is missing (the block is then hidden, never a broken link)."""
+    if document is None:
+        return None
+    try:
+        size = int(document.file.size)
+        url = str(document.url)
+    except (OSError, ValueError):  # the file is gone from the storage
+        return None
+    value, unit = file_size_parts(size)
+    with translation.override(language):
+        number = number_format(value, decimal_pos=0 if unit == "B" else 1, use_l10n=True)
+    return Download(
+        url=url,
+        title=(title or "").strip() or str(document.title),
+        type_label=file_type_label(str(document.filename)),
+        size_label=f"{number} {unit}",
+    )
+
+
+class DownloadBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A link to a file of the media library that shows its type and size before the click
+    (D-36, CMS.15). Type and size are read from the file, so an editor cannot get them wrong; if
+    the document is deleted or its file is gone, nothing is shown."""
+
+    document = DocumentChooserBlock(
+        label=_("File"),
+        help_text=_(
+            "Choose a file from the media library, or upload a new one. Its type and size are "
+            "shown next to the link by themselves."
+        ),
+    )
+    title = blocks.CharBlock(
+        required=False,
+        max_length=120,
+        help_text=_(
+            "The words of the link, for example 'Terms of sale'. Up to 120 characters. "
+            "If you leave it empty, the title of the file is used."
+        ),
+    )
+
+    class Meta:
+        icon = "doc-full-inverse"
+        label = _("Download")
+        template = "cms/blocks/download.html"
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        context["download"] = download_for(
+            value.get("document"), value.get("title", ""), _page_language(parent_context)
+        )
         return context
 
 

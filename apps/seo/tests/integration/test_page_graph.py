@@ -235,3 +235,22 @@ def test_a_hostile_product_name_is_inert_in_the_one_block() -> None:
     [block] = SCRIPT.findall(html)
     assert hostile in [n.get("name") for n in json.loads(block)["@graph"]]
     assert "Product" in types(json.loads(block)["@graph"])
+
+
+def test_an_accordion_block_adds_no_faqpage_to_the_page_graph() -> None:
+    """CMS.16: an accordion is not a FAQ; only the `faq` block feeds the FAQPage."""
+    page = StandardPageFactory.create(
+        title="Help",
+        body=[
+            (
+                "accordion",
+                {
+                    "sections": [{"title": "Do you ship?", "body": "<p>Yes.</p>"}],
+                    "open_first": False,
+                },
+            )
+        ],
+    )
+    published(page)
+    graph = graph_of(page.url)
+    assert [node for node in graph if node.get("@type") == "FAQPage"] == []

@@ -849,6 +849,10 @@ msgid "Add at least one question. They show as a list that opens one answer at a
 msgstr "Añada al menos una pregunta. Se muestran como una lista que abre una respuesta cada vez."
 
 #: apps/cms/blocks.py
+msgid "Add at least one section. Each has a title and a text that opens on click."
+msgstr "Añada al menos una sección. Cada una tiene un título y un texto que se abre con un clic."
+
+#: apps/cms/blocks.py
 msgid "Add cards of the same kind: blog posts or pages, vendors, products or testimonials."
 msgstr ""
 "Añada tarjetas del mismo tipo: entradas o páginas del blog, vendedores, productos o testimonios."
@@ -1668,6 +1672,14 @@ msgstr ""
 #: apps/manager/event_forms.py
 msgid "Choose a day from 1 to 31, or the last day."
 msgstr "Elija un día del 1 al 31, o el último día."
+
+#: apps/cms/blocks.py
+msgid ""
+"Choose a file from the media library, or upload a new one. Its type and size are shown next to the"
+" link by themselves."
+msgstr ""
+"Elija un archivo de la biblioteca multimedia o suba uno nuevo. Su tipo y tamaño se muestran solos "
+"junto al enlace."
 
 #: apps/manager/event_image_form.py
 msgid "Choose a licence"
@@ -9049,6 +9061,10 @@ msgstr ""
 "El texto del botón de envío, por ejemplo «Enviar su pregunta». Si lo deja vacío, el botón dice "
 "«Enviar»."
 
+#: apps/cms/blocks.py
+msgid "The text that shows when the visitor opens the section. Required."
+msgstr "El texto que aparece cuando el visitante abre la sección. Obligatorio."
+
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid ""
 "The text, pictures and other blocks of the event page, in this order. Each change is saved as a "
@@ -9083,6 +9099,10 @@ msgstr ""
 msgid "The title of the section as visitors read it, up to 160 characters. Required."
 msgstr ""
 "El título de la sección tal como lo leen los visitantes, de hasta 160 caracteres. Obligatorio."
+
+#: apps/cms/blocks.py
+msgid "The title of the section, always visible. Required."
+msgstr "El título de la sección, siempre visible. Obligatorio."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -9332,6 +9352,14 @@ msgid ""
 msgstr ""
 "Las palabras en las que hacen clic los compradores. Si lo deja vacío, se usan las palabras que "
 "haya seleccionado o, si no ha seleccionado nada, la propia dirección."
+
+#: apps/cms/blocks.py
+msgid ""
+"The words of the link, for example 'Terms of sale'. Up to 120 characters. If you leave it empty, "
+"the title of the file is used."
+msgstr ""
+"Las palabras del enlace, por ejemplo «Condiciones de venta». Máximo 120 caracteres. Si lo deja "
+"vacío, se usa el título del archivo."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -9892,6 +9920,10 @@ msgid ""
 msgstr ""
 "Marca esta casilla para introducir tu empresa y tu número de IVA. Un número de IVA de la UE válido"
 " puede eliminar el IVA en una compra entre países."
+
+#: apps/cms/blocks.py
+msgid "Tick this to show the first section already open. Otherwise all are closed."
+msgstr "Marque para mostrar la primera sección ya abierta. Si no, todas están cerradas."
 
 #: apps/cms/blocks.py
 msgid "Tick to add a 'See all' link under the products, to the full list."
