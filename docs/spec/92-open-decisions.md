@@ -183,3 +183,16 @@ TAX.20 and TAX.21. The owner answered the open questions of the register sweep t
 |---|---|---|---|
 | MQ-46 | Analytics | Analytics is provider-neutral (an `AnalyticsProvider` interface like `ConsentProvider`; none, one or several providers enabled per environment; built-in Matomo and Google Analytics 4). Matomo is the default for today's operator, replacing Google Analytics: the operator's own instance on a separate domain, cookieless, IP anonymised, first-party proxy by default, strict CSP. D-10 stands for the consent banner. ⚖️ Open legal point: counsel confirms whether such analytics may run without consent under the Garante cookie guidelines (2021); until then it runs only after analytics consent. Consent Mode v2 applies to GA4 and any remaining Google advertising or Merchant tags | SEO.5, SEO.9 |
 | MQ-47 | Cutover | Domains, mail and TLS at cutover: DNS inventory, mail moved off the legacy web server, SPF, DKIM and DMARC, TTL 300 s at T-7, certificates before the switch, legacy site kept on an internal hostname behind basic auth and `noindex`, staged HSTS | MIG.22, spec 13 §13.4 |
+
+## Owner decisions of 2026-11-18 (evening)
+
+| ID | Area | Decision | Recorded in |
+|---|---|---|---|
+| MQ-48 | Vendors, SEO | Without an approved vendor return policy the shop pays the return shipping (Directive 2011/83/EU art. 6(1)(i) and 14(1)); the structured data emits no return fees without an approved policy | [04](04-vendors-commissions-ledger.md) (VEN.40), [10](10-content-seo-ai.md) (SEO.14) |
+| MQ-49 | Sessions, vendors | D-32 amendment: the shop owner may run the money CSV export for their own shop after a passkey step-up (`export`, scoped to the shop) | [02](02-core-identity-permissions.md), [04](04-vendors-commissions-ledger.md) (VEN.9) |
+| MQ-50 | Events | LIVE keeps OpenStreetMap's public tiles through the platform's cached proxy (7-day cache) within the daily upstream limit; no paid provider for now; the `TileProvider` switch stays documented | [15](15-events.md) (EVT.14) |
+| MQ-51 | CMS, privacy | Form submissions are readable by all platform staff with access to Forms; retention per form page 1 to 365 days, default 90, nightly purge | [10](10-content-seo-ai.md) (CMS.13) |
+| MQ-52 | Catalog, roles | Staff "hide" returns a product to draft; the Support role gets read-only access to the staff Catalog section (it was 404), all writes stay refused | [03](03-catalog.md) (CAT.11, CAT.30) |
+| MQ-53 | SEO | A sole trader's shop name goes into the structured data even when it contains their personal name; the bare personal name never does | [10](10-content-seo-ai.md) (SEO.15) |
+| MQ-54 | CMS | Page revisions: keep the last 12 months plus the last 10 per page, delete the rest nightly | [10](10-content-seo-ai.md) (CMS.18) |
+| MQ-55 | Contracts | The vendor contract text in the platform language of the operator's country (`current_operator()`) prevails; translations are courtesy copies | [04](04-vendors-commissions-ledger.md) (VEN.16) |
