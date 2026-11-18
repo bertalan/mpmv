@@ -1,6 +1,7 @@
 """System checks of the CMS (CMS.1), registered in `CmsConfig.ready`.
 
 - cms.E002: MPMV_VENDOR_GUIDE_URL is empty or an absolute https URL (ARC.32).
+- cms.E003: MPMV_VIDEO_EMBED_ORIGINS holds plain https origins only (THM.14).
 - cms.E001 (deploy): WAGTAILADMIN_BASE_URL is the public address of the site. Wagtail puts it in
   the links of its admin emails and previews; the settings fall back to localhost when
   MPMV_BASE_URL is unset, which is right on a developer machine only.
@@ -58,3 +59,25 @@ def check_vendor_guide_url(
             id="cms.E002",
         )
     ]
+
+
+def check_video_embed_origins(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """cms.E003: every MPMV_VIDEO_EMBED_ORIGINS entry is a plain `https://host` origin. The list
+    goes into the CSP `frame-src`, so a `*`, a wildcard host, `http://` or a path is refused."""
+    from . import engine
+
+    errors: list[checks.CheckMessage] = []
+    for origin in getattr(settings, "MPMV_VIDEO_EMBED_ORIGINS", ()):
+        problem = engine.video_origin_problem(origin)
+        if problem:
+            errors.append(
+                checks.Error(
+                    f"MPMV_VIDEO_EMBED_ORIGINS entry {origin!r} is refused: {problem}.",
+                    hint="List plain https origins, e.g. https://player.vimeo.com, "
+                    "separated by commas.",
+                    id="cms.E003",
+                )
+            )
+    return errors

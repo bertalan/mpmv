@@ -397,6 +397,9 @@ setting clears the registry cache. `SiteFactory` and `ThemeSettingsFactory` are 
 - `video_modal.html` is a plain link to the video first. With JavaScript it opens a Bootstrap
   modal; `js/video.js` creates the `<iframe>` only when `window.mpmvConsent.allows("marketing")`,
   else the modal shows a placeholder with a link to the cookie settings. No request goes to the
-  video site before consent. The provider's origin must be added to the CSP `frame-src` by a
-  reviewed setting (none is added here); until then the browser blocks the frame.
+  video site before consent. The allowed origins are the setting
+  `MPMV_VIDEO_EMBED_ORIGINS` (comma separated plain https origins; default the YouTube no-cookie
+  and Vimeo player origins; `cms.E003` refuses `http://`, wildcards, paths and ports). The CSP
+  middleware adds them to `frame-src` only on a page that renders a video, and the block refuses
+  an address whose embed is on another origin: one list for both.
 - Not wired to the CMS yet (no block fields); the cta block carries `data-reveal` as the first use.
