@@ -116,8 +116,8 @@ def all_specs() -> list[str]:
 #: preset names; "extras" is not a preset.
 RENDER_GROUPS: dict[str, tuple[str, ...]] = {
     "hero": ("hero",),
-    "content": ("content", "gallery"),
-    "card": ("card",),
+    "content": ("content", "article", "gallery"),
+    "card": ("card", "avatar"),
     "logo": ("logo",),
     "extras": (),
 }
