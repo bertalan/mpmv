@@ -1,0 +1,23 @@
+{% extends "layouts/content.html" %}
+{% load i18n wagtailcore_tags captcha %}
+{% block head %}{% captcha_script %}{% endblock %}
+{% block page_content %}
+  <article class="form-page">
+    <h1>{{ page.title }}</h1>
+    {% if page.intro %}<div class="form-page__intro">{{ page.intro|richtext }}</div>{% endif %}
+    {% if captcha_failed %}
+      <p class="form-page__error" role="alert">{% translate "The security check failed. Please try again." %}</p>
+    {% endif %}
+    {% include "components/error_summary.html" with form=form autofocus=True only %}
+    <form action="{% pageurl page %}" method="post" novalidate>
+      {% csrf_token %}
+      {% for field in form %}{% include "components/field.html" with field=field only %}{% endfor %}
+      {% captcha_widget %}
+      {% if page.submit_label %}
+        {% include "components/button.html" with label=page.submit_label type="submit" only %}
+      {% else %}
+        {% include "components/button.html" with label=_("Send") type="submit" only %}
+      {% endif %}
+    </form>
+  </article>
+{% endblock %}

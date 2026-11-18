@@ -440,6 +440,7 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
         for name in [
             "blogindexpage",
             "blogpostpage",
+            "formpage",
             "homepage",
             "legalpage",
             "standardpage",

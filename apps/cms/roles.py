@@ -138,6 +138,7 @@ ADMIN_MENU_ALLOWED: frozenset[str] = frozenset(
         "settings",
         "help",
         "events",
+        "forms",  # the stored submissions of form pages (CMS.13)
         "images-to-classify",
     }
 )
