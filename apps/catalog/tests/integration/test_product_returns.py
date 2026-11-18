@@ -6,6 +6,8 @@ from typing import Any
 
 import pytest
 from django.test import Client
+from django.utils import translation
+from django.utils.translation import gettext
 
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
@@ -14,6 +16,13 @@ from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import ReturnPolicyVersionFactory, VendorFactory
 from tests.i18n import product_url
+
+
+def _t(message: str) -> str:
+    """The page is served in the primary language, whatever MPMV_LANGUAGES is."""
+    with translation.override(primary_language()):
+        return gettext(message)
+
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
@@ -56,7 +65,7 @@ def test_a_vendor_without_a_policy_shows_the_floor_and_the_shop_paying(
     _product()
     text = _returns(client)
     assert "14" in text
-    assert "We pay the return shipping" in text
+    assert _t("We pay the return shipping") in text
 
 
 def test_an_approved_policy_is_shown_with_window_payer_methods_and_link(
@@ -74,9 +83,9 @@ def test_an_approved_policy_is_shown_with_window_payer_methods_and_link(
     html = client.get(MUG).content.decode()
     text = _returns(client)
     assert "30" in text
-    assert "You pay the return shipping" in text
-    assert "By post" in text
-    assert "In store" in text
+    assert _t("You pay the return shipping") in text
+    assert _t("By post") in text
+    assert _t("In store") in text
     assert 'href="https://shop.example/returns"' in html
 
 
