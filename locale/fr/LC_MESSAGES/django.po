@@ -1091,13 +1091,14 @@ msgstr "Tous les nœuds"
 msgid "All payouts"
 msgstr "Tous les versements"
 
-#: apps/manager/templates/manager/shop/money.html
-msgid "All transactions"
-msgstr "Tous les mouvements"
 #: apps/catalog/templates/catalog/includes/store_categories.html
 #: themes/ride/templates/catalog/includes/store_categories.html
 msgid "All products"
 msgstr "Tous les produits"
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "All transactions"
+msgstr "Tous les mouvements"
 
 #: apps/events/templates/events/_filters.html
 msgid "All types"
@@ -1593,6 +1594,7 @@ msgstr "lots de marques"
 #: themes/base/templates/components/breadcrumb.html
 msgid "Breadcrumb"
 msgstr "Fil d'Ariane"
+
 #: apps/manager/money_views.py
 msgid "Bundle discount funded by the platform"
 msgstr "Remise sur lot financée par la plateforme"
@@ -3291,13 +3293,11 @@ msgstr "Questions fréquentes"
 msgid "Friday"
 msgstr "Vendredi"
 
+#: apps/manager/templates/manager/shop/_money_filters.html
 #: themes/base/templates/components/price.html
 msgid "From"
-msgstr "À partir de"
-
-#: apps/manager/templates/manager/shop/_money_filters.html
-msgid "From"
 msgstr "Du"
+
 #: apps/catalog/templates/catalog/listing.html themes/ride/templates/catalog/listing.html
 msgid "From %(currency)s %(amount)s"
 msgstr "À partir de %(currency)s %(amount)s"
@@ -5908,12 +5908,13 @@ msgstr ""
 "Texte brut. Les titulaires et la piste d'audit le conservent : n'écrivez pas de données "
 "personnelles, comme des noms, des e-mails ou des numéros de téléphone."
 
-#: themes/ride/templates/cms/vendor_recruitment_page.html
-msgid "Plans"
-msgstr "Formules"
 #: apps/manager/money_views.py
 msgid "Plan fee"
 msgstr "Frais d'abonnement"
+
+#: themes/ride/templates/cms/vendor_recruitment_page.html
+msgid "Plans"
+msgstr "Formules"
 
 #: apps/manager/templates/manager/layout.html
 msgid "Platform"
@@ -6786,10 +6787,7 @@ msgstr "Lignes en attente d'un article non approuvé"
 msgid "RSS feed"
 msgstr "Flux RSS"
 
-#: themes/base/templates/components/badge.html
-msgid "Sale"
-msgstr "Promo"
-#: apps/manager/money_views.py
+#: apps/manager/money_views.py themes/base/templates/components/badge.html
 msgid "Sale"
 msgstr "Vente"
 
@@ -10127,6 +10125,7 @@ msgstr "Le membre du personnel qui a masqué l'événement. Renseigné par la pl
 #: apps/manager/money_views.py
 msgid "The start date is after the end date. The period filter was ignored."
 msgstr "La date de début est postérieure à la date de fin. Le filtre de période a été ignoré."
+
 #: apps/ingest/models.py
 msgid "The state as it was at that version."
 msgstr "L'état tel qu'il était à cette version."
@@ -10856,6 +10855,7 @@ msgstr ""
 #: apps/manager/templates/manager/shop/money.html
 msgid "This is what the platform owes your shop right now."
 msgstr "C'est le montant que la plateforme doit actuellement à votre boutique."
+
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "This is your approved policy."
 msgstr "Voici votre politique approuvée."
