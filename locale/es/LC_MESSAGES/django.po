@@ -2643,6 +2643,10 @@ msgstr "Nodos de compatibilidad"
 msgid "Fitment scheme"
 msgstr "Esquema de compatibilidad"
 
+#: apps/catalog/templates/catalog/product.html
+msgid "Fits"
+msgstr "Compatible con"
+
 #: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Footer"
 msgstr "Pie de página"
@@ -6102,6 +6106,10 @@ msgstr "Dirección de la fuente"
 msgid "Specific approval of onerous clauses (articles 1341 and 1342 of the Italian Civil Code)"
 msgstr ""
 "Aprobación específica de las cláusulas onerosas (artículos 1341 y 1342 del Código Civil italiano)"
+
+#: apps/catalog/templates/catalog/product.html
+msgid "Specifications"
+msgstr "Especificaciones"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Staff"
@@ -9565,10 +9573,12 @@ msgstr "Feria o encuentro"
 #: apps/manager/templates/manager/shop/event_translate.html
 msgid ""
 "Translate “%(name)s”. Dates, place and products stay the same as in the original: you write the "
-"title, the summary and the venue name, then add the text blocks."
+"title, the summary and the venue name here. Once the translation is saved, add the text blocks in "
+"its edit form."
 msgstr ""
-"Traducir «%(name)s». Las fechas, el lugar y los productos son los del original: usted escribe el "
-"título, el resumen y el nombre del lugar, y después añade los bloques de texto."
+"Traducir «%(name)s». Las fechas, el lugar y los productos siguen siendo los del original: aquí "
+"escribe el título, el resumen y el nombre del lugar. Una vez guardada la traducción, añada los "
+"bloques de texto en su formulario de edición."
 
 #: apps/manager/templates/manager/shop/events.html
 msgid "Translation of the %(original)s original"

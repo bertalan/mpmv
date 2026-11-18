@@ -15,6 +15,8 @@ from typing import Any
 
 from django.conf import settings
 from django.db.models import Count, Q, prefetch_related_objects
+from django.utils.translation import gettext as _
+from wagtail import hooks
 
 from apps.core import images as core_images
 from apps.core import translations
@@ -247,3 +249,129 @@ def gallery_items(page: ProductPage) -> list[dict[str, Any]]:
             }
         )
     return items
+
+
+# --- Specifications (THM.7 part 3): what the product's data says, as label and value rows
+
+
+@dataclass(frozen=True)
+class SpecRow:
+    label: str
+    value: str
+
+
+def _number(value: Decimal) -> str:
+    """A measure without trailing zeros: 8.500 shows as 8.5, 10.000 as 10."""
+    return format(value.normalize(), "f")
+
+
+def _attribute_row(row: Any, language: str) -> SpecRow | None:
+    attribute = row.attribute
+    name = translations.resolve(attribute.translations.all(), language).translation
+    label = name.name if name is not None else str(attribute.code)
+    if row.numeric_value is not None:
+        value = _number(row.numeric_value)
+        if attribute.unit:
+            value = f"{value} {attribute.unit}"
+    elif row.text_value:
+        value = row.text_value
+    else:
+        labels = []
+        for choice in row.values.all():
+            text = translations.resolve(choice.translations.all(), language).translation
+            labels.append(text.label if text is not None else str(choice.value))
+        value = ", ".join(labels)
+    return SpecRow(label, value) if value else None
+
+
+def specifications(product: Product, language: str) -> list[SpecRow]:
+    """The specification rows of `product`: its attributes (not the variant axes, which the
+    buy box offers), then weight, dimensions, GTIN and MPN. Empty when it has none of them."""
+    rows: list[SpecRow] = []
+    attributes = product.attributes.filter(is_variant_axis=False).prefetch_related(
+        "attribute__translations", "values__translations"
+    )
+    for row in attributes.select_related("attribute"):
+        found = _attribute_row(row, language)
+        if found is not None:
+            rows.append(found)
+    if product.weight_kg is not None:
+        rows.append(SpecRow(_("Weight"), f"{_number(product.weight_kg)} kg"))
+    for label, value in (
+        (_("Length"), product.length_cm),
+        (_("Width"), product.width_cm),
+        (_("Height"), product.height_cm),
+    ):
+        if value is not None:
+            rows.append(SpecRow(label, f"{_number(value)} cm"))
+    if product.gtin:
+        rows.append(SpecRow(_("GTIN"), product.gtin))
+    if product.mpn:
+        rows.append(SpecRow(_("MPN"), product.mpn))
+    return rows
+
+
+# --- Fitment (THM.7 part 3): the vehicles or applications the product fits (FIT.2)
+
+# The Wagtail hook the fitment app registers: `fn(product, language)` returns a
+# `FitmentSummary` or None. A hook keeps the dependency one way (fitment reads catalog).
+FITMENT_HOOK = "catalog_product_fitment"
+FITMENT_VISIBLE = 12  # entries shown before the "show all" disclosure
+
+
+@dataclass(frozen=True)
+class FitmentEntry:
+    label: str  # the model or variant, or "All models" for a make row
+    years: str = ""
+    note: str = ""
+    excluded: bool = False
+
+
+@dataclass(frozen=True)
+class FitmentGroup:
+    label: str  # the make
+    entries: tuple[FitmentEntry, ...]
+
+
+@dataclass(frozen=True)
+class FitmentSummary:
+    universal: bool = False
+    groups: tuple[FitmentGroup, ...] = ()
+
+    @property
+    def visible(self) -> tuple[FitmentGroup, ...]:
+        return _split(self.groups)[0]
+
+    @property
+    def more(self) -> tuple[FitmentGroup, ...]:
+        return _split(self.groups)[1]
+
+    @property
+    def more_count(self) -> int:
+        return sum(len(group.entries) for group in self.more)
+
+
+def _split(
+    groups: tuple[FitmentGroup, ...],
+) -> tuple[tuple[FitmentGroup, ...], tuple[FitmentGroup, ...]]:
+    """The groups cut after `FITMENT_VISIBLE` entries; a group may continue in the rest."""
+    visible: list[FitmentGroup] = []
+    more: list[FitmentGroup] = []
+    room = FITMENT_VISIBLE
+    for group in groups:
+        head, tail = group.entries[:room], group.entries[room:]
+        room -= len(head)
+        if head:
+            visible.append(FitmentGroup(group.label, head))
+        if tail:
+            more.append(FitmentGroup(group.label, tail))
+    return tuple(visible), tuple(more)
+
+
+def fitment(product: Product, language: str) -> FitmentSummary | None:
+    """What the product declares it fits, from the registered hook; None when nothing."""
+    for provider in hooks.get_hooks(FITMENT_HOOK):
+        summary: FitmentSummary | None = provider(product, language)
+        if summary is not None and (summary.universal or summary.groups):
+            return summary
+    return None

@@ -74,16 +74,30 @@
 
     <div class="product-info mb-4">
       <ul class="nav nav-tabs" role="tablist">
-        {% if page_data.description %}<li class="nav-item" role="presentation"><button type="button" class="nav-link active" id="product-tab-description" data-bs-toggle="tab" data-bs-target="#product-panel-description" role="tab" aria-controls="product-panel-description" aria-selected="true">{% translate "Description" %}</button></li>{% endif %}
-        <li class="nav-item" role="presentation"><button type="button" class="nav-link{% if not page_data.description %} active{% endif %}" id="product-tab-details" data-bs-toggle="tab" data-bs-target="#product-panel-details" role="tab" aria-controls="product-panel-details" aria-selected="{% if page_data.description %}false{% else %}true{% endif %}"{% if page_data.description %} tabindex="-1"{% endif %}>{% translate "Details" %}</button></li>
+        {% if page_data.description %}<li class="nav-item" role="presentation"><button type="button" class="nav-link{% if first_tab == "description" %} active{% endif %}" id="product-tab-description" data-bs-toggle="tab" data-bs-target="#product-panel-description" role="tab" aria-controls="product-panel-description" aria-selected="{% if first_tab == "description" %}true{% else %}false{% endif %}"{% if first_tab != "description" %} tabindex="-1"{% endif %}>{% translate "Description" %}</button></li>{% endif %}
+        {% if specifications %}<li class="nav-item" role="presentation"><button type="button" class="nav-link{% if first_tab == "specs" %} active{% endif %}" id="product-tab-specs" data-bs-toggle="tab" data-bs-target="#product-panel-specs" role="tab" aria-controls="product-panel-specs" aria-selected="{% if first_tab == "specs" %}true{% else %}false{% endif %}"{% if first_tab != "specs" %} tabindex="-1"{% endif %}>{% translate "Specifications" %}</button></li>{% endif %}
+        {% if fitment %}<li class="nav-item" role="presentation"><button type="button" class="nav-link{% if first_tab == "fitment" %} active{% endif %}" id="product-tab-fitment" data-bs-toggle="tab" data-bs-target="#product-panel-fitment" role="tab" aria-controls="product-panel-fitment" aria-selected="{% if first_tab == "fitment" %}true{% else %}false{% endif %}"{% if first_tab != "fitment" %} tabindex="-1"{% endif %}>{% translate "Fits" %}</button></li>{% endif %}
+        <li class="nav-item" role="presentation"><button type="button" class="nav-link{% if first_tab == "details" %} active{% endif %}" id="product-tab-details" data-bs-toggle="tab" data-bs-target="#product-panel-details" role="tab" aria-controls="product-panel-details" aria-selected="{% if first_tab == "details" %}true{% else %}false{% endif %}"{% if first_tab != "details" %} tabindex="-1"{% endif %}>{% translate "Details" %}</button></li>
       </ul>
       <div class="tab-content border border-top-0 p-3">
         {% if page_data.description %}
-          <div class="tab-pane fade show active product-description" id="product-panel-description" role="tabpanel" aria-labelledby="product-tab-description" tabindex="0"{% if page_data.is_fallback %} lang="{{ page_data.shown }}"{% endif %}>
+          <div class="tab-pane fade{% if first_tab == "description" %} show active{% endif %} product-description" id="product-panel-description" role="tabpanel" aria-labelledby="product-tab-description" tabindex="0"{% if page_data.is_fallback %} lang="{{ page_data.shown }}"{% endif %}>
             {{ page_data.description|richtext }}
           </div>
         {% endif %}
-        <div class="tab-pane fade{% if not page_data.description %} show active{% endif %} product-details" id="product-panel-details" role="tabpanel" aria-labelledby="product-tab-details" tabindex="0">
+        {% if specifications %}
+          <div class="tab-pane fade{% if first_tab == "specs" %} show active{% endif %} product-specifications" id="product-panel-specs" role="tabpanel" aria-labelledby="product-tab-specs" tabindex="0">
+            <h2 class="visually-hidden">{% translate "Specifications" %}</h2>
+            {% include "catalog/includes/product_specs.html" %}
+          </div>
+        {% endif %}
+        {% if fitment %}
+          <div class="tab-pane fade{% if first_tab == "fitment" %} show active{% endif %} product-fitment-section" id="product-panel-fitment" role="tabpanel" aria-labelledby="product-tab-fitment" tabindex="0">
+            <h2 class="visually-hidden">{% translate "Fits" %}</h2>
+            {% include "catalog/includes/product_fitment.html" %}
+          </div>
+        {% endif %}
+        <div class="tab-pane fade{% if first_tab == "details" %} show active{% endif %} product-details" id="product-panel-details" role="tabpanel" aria-labelledby="product-tab-details" tabindex="0">
           <dl class="row mb-0">
             <dt class="col-sm-3">{% translate "SKU" %}</dt><dd class="col-sm-9">{{ page_data.product.sku }}</dd>
             <dt class="col-sm-3">{% translate "Sold by" %}</dt><dd class="col-sm-9 mb-0"><a href="{{ vendor_url }}">{{ page_data.vendor.display_name }}</a></dd>

@@ -1,0 +1,10 @@
+{% comment %}
+  The specification rows of a product page (THM.7 part 3): `specifications` is a list of
+  label and value rows. Shared by both themes; the caller supplies the heading.
+{% endcomment %}
+<dl class="product-specs">
+  {% for row in specifications %}
+    <dt>{{ row.label }}</dt>
+    <dd>{{ row.value }}</dd>
+  {% endfor %}
+</dl>
