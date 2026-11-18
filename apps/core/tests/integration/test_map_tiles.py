@@ -66,7 +66,17 @@ def test_other_tiles_are_other_upstream_calls(client: Client, upstream: FakeTile
 
 @pytest.mark.parametrize(
     ("z", "x", "y"),
-    [(19, 0, 0), (-1, 0, 0), (3, -1, 0), (3, 8, 0), ("a", 0, 0), (3, "1.5", 0), (3, "0x1", 0)],
+    [
+        (19, 0, 0),
+        (1, 0, 0),
+        (0, 0, 0),
+        (-1, 0, 0),
+        (3, -1, 0),
+        (3, 8, 0),
+        ("a", 0, 0),
+        (3, "1.5", 0),
+        (3, "0x1", 0),
+    ],
 )
 def test_invalid_tiles_are_404_without_an_upstream_call(
     client: Client, upstream: FakeTileUpstream, z: object, x: object, y: object

@@ -53,7 +53,7 @@ style, no third-party host.
 | `MAP_TILE_UPSTREAM_URL` | `MPMV_MAP_TILE_UPSTREAM_URL` | `https://tile.openstreetmap.org/{z}/{x}/{y}.png`: https template the proxy fetches from |
 | `MAP_TILE_USER_AGENT` | `MPMV_MAP_TILE_USER_AGENT` | empty: product, site URL and geocoding contact |
 | `MAP_TILE_UPSTREAM_DAILY_LIMIT` | `MPMV_MAP_TILE_UPSTREAM_DAILY_LIMIT` | `100000` upstream requests per UTC day, then 503 |
-| `MAP_TILE_MIN_ZOOM`, `MAP_TILE_MAX_ZOOM` | none | `0`, `18` |
+| `MAP_TILE_MIN_ZOOM`, `MAP_TILE_MAX_ZOOM` | none | `2`, `18` |
 | `MAP_TILE_IP_LIMIT`, `MAP_TILE_IP_WINDOW` | none | `600` tiles per `60` s per client IP |
 | `MAP_TILE_BROWSER_MAX_AGE` | none | 7 days: `Cache-Control` for browsers and the CDN |
 | `MAP_TILE_CACHE_STORAGE` | none | `default`: the `STORAGES` alias (object storage on LIVE) |

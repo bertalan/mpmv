@@ -623,7 +623,7 @@ MAP_TILE_UPSTREAM_URL = map_tile_upstream_url(
 )
 MAP_TILE_UPSTREAM = "apps.core.maps.adapters.HttpTileUpstream"
 MAP_TILE_USER_AGENT = env_str("MPMV_MAP_TILE_USER_AGENT", "")
-MAP_TILE_MIN_ZOOM = 0
+MAP_TILE_MIN_ZOOM = 2  # spec 15: tiles from zoom 2 to 18
 MAP_TILE_MAX_ZOOM = 18
 MAP_TILE_UPSTREAM_TIMEOUT = 5.0  # seconds
 MAP_TILE_UPSTREAM_DAILY_LIMIT = env_int("MPMV_MAP_TILE_UPSTREAM_DAILY_LIMIT", 100_000)
