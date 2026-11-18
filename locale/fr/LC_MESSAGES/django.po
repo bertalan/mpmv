@@ -9608,10 +9608,12 @@ msgstr "Salon ou rencontre"
 #: apps/manager/templates/manager/shop/event_translate.html
 msgid ""
 "Translate “%(name)s”. Dates, place and products stay the same as in the original: you write the "
-"title, the summary and the venue name, then add the text blocks."
+"title, the summary and the venue name here. Once the translation is saved, add the text blocks in "
+"its edit form."
 msgstr ""
-"Traduire « %(name)s ». Les dates, le lieu et les produits restent ceux de l'original : vous "
-"rédigez le titre, le résumé et le nom du lieu, puis ajoutez les blocs de texte."
+"Traduire « %(name)s ». Les dates, le lieu et les produits restent ceux de l’original : vous "
+"saisissez ici le titre, le résumé et le nom du lieu. Une fois la traduction enregistrée, ajoutez "
+"les blocs de texte dans son formulaire de modification."
 
 #: apps/manager/templates/manager/shop/events.html
 msgid "Translation of the %(original)s original"
