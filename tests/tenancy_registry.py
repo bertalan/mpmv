@@ -156,6 +156,8 @@ from apps.tax.tests.factories import (
     VendorTaxProfileFactory,
     VendorTaxProfileTranslationFactory,
 )
+from apps.trust.models import VendorTrustSnapshot
+from apps.trust.tests.factories import VendorTrustSnapshotFactory
 from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
@@ -216,6 +218,8 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         vendor=vendor, certified=False
     ),
     SelfCertification: lambda vendor: SelfCertificationFactory.create(vendor=vendor),
+    # TRU.1: a vendor's computed trust result; the Manager shows a vendor its own (TRU.2).
+    VendorTrustSnapshot: lambda vendor: VendorTrustSnapshotFactory.create(vendor=vendor),
     # VEN.35: a published version of the seller's sales terms and the pointer to the one in force.
     SalesTermsVersion: lambda vendor: SalesTermsVersionFactory.create(vendor=vendor),
     SalesTermsInForce: lambda vendor: SalesTermsInForceFactory.create(version__vendor=vendor),
