@@ -681,8 +681,10 @@ def _banded_method(product: Product, *, name: str = "Courier") -> Any:
         vendor=product.vendor, zone=ShippingZoneFactory.create(countries=["IT", "DE"])
     )
     for language in configured_languages():
-        ShippingMethodTranslationFactory.create(method=method, language=language, name=name)
-    for low, high, cost in (("0", "1", "6.90"), ("1", "5", "9.90"), ("5", None, "14.90")):
+        ShippingMethodTranslationFactory.create(
+            method=method, language=language, name=name, status=TranslationStatus.PUBLISHED
+        )
+    for low, high, cost in (("0", "1", "6.90"), ("1", "5", "9.90"), ("5", "20", "14.90")):
         WeightBandFactory.create(
             method=method, from_kg=Decimal(low), to_kg=high and Decimal(high), cost_net=cost
         )
@@ -706,7 +708,10 @@ def test_each_shipping_node_names_its_service_and_other_weight_bands_follow(
         if n not in own
     }
     assert banded["1.000"]["shippingRate"]["value"] == "12.08"  # 9.90 net + 22 % VAT
-    assert "maxValue" not in banded["5.000"]["hasShippingService"]["shippingConditions"]["weight"]
+    assert (
+        banded["5.000"]["hasShippingService"]["shippingConditions"]["weight"]["maxValue"]
+        == "20.000"
+    )
     offer = node(document, "Product")["offers"]
     assert len(offer["shippingDetails"]) == 3
     assert schema_check.dangling_references(document) == []
@@ -721,7 +726,7 @@ def test_the_banded_shipping_nodes_cost_no_query_per_band(client: Client, theme:
         client.get(MUG)
     from apps.shipping.tests.factories import WeightBandFactory
 
-    method = product.vendor.shippingmethod_set.first()
+    method = product.vendor.shipping_methods.first()
     WeightBandFactory.create(method=method, from_kg=Decimal("20"), to_kg=None, cost_net="30")
     with CaptureQueriesContext(connection) as more:
         client.get(MUG)
@@ -729,7 +734,7 @@ def test_the_banded_shipping_nodes_cost_no_query_per_band(client: Client, theme:
 
 
 def test_a_product_without_weight_gets_no_banded_nodes(client: Client, theme: str) -> None:
-    product = live(price_net=Decimal("12.50"))
+    product = live(price_net=Decimal("12.50"), weight_kg=None)
     _banded_method(product)
     _html, document = graph_of(client)
     assert [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"] == []
