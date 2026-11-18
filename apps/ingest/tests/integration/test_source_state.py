@@ -281,3 +281,19 @@ def test_state_rows_follow_their_item_when_it_goes() -> None:
     item.delete()
     assert not SourceState.objects.exists()
     assert not SourceVariation.objects.exists()
+
+
+def test_state_and_variation_source_mirror_the_item_source() -> None:
+    item = SourceItemFactory.create()
+    services.record_source_state(item, variable(), ctx=CTX, now=T0)
+    assert SourceState.objects.get(item=item).source_id == item.source_id
+    assert {v.source_id for v in item.variations.all()} == {item.source_id}
+
+
+def test_an_item_change_version_is_unique_per_item() -> None:
+    item = SourceItemFactory.create()
+    services.record_item_change(item, {"price": "1"}, ctx=CTX, now=T0)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        ItemChange.objects.create(
+            item=item, version=1, changed_fields={}, new_values={}, recorded_at=T0
+        )

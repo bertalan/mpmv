@@ -320,6 +320,8 @@ class SourceState(BaseModel):
         related_name="state",
         help_text=_("The supplier item this state belongs to."),
     )
+    # Mirrors item.source (no DB rule ties them); services set it from the locked item, and a
+    # test keeps them equal. Kept here so the (source, native_id) uniqueness is a DB constraint.
     source = models.ForeignKey(
         SupplierSource,
         on_delete=models.CASCADE,
@@ -414,6 +416,8 @@ class SourceVariation(BaseModel):
         related_name="variations",
         help_text=_("The variable item this variation belongs to."),
     )
+    # Mirrors item.source (no DB rule ties them); services set it from the locked item, and a
+    # test keeps them equal. Kept here so the (source, native_id) uniqueness is a DB constraint.
     source = models.ForeignKey(
         SupplierSource,
         on_delete=models.CASCADE,
@@ -507,7 +511,9 @@ class ItemChange(BaseModel):
 
     class Meta:
         ordering = ["item", "version", "id"]
-        indexes = [models.Index(fields=["item", "version"], name="ingest_change_item_version")]
+        constraints = [
+            models.UniqueConstraint(fields=["item", "version"], name="ingest_change_item_version")
+        ]
 
     def __str__(self) -> str:
         return f"{self.item} change v{self.version}"

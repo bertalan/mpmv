@@ -11,11 +11,16 @@ from apps.catalog import engine as catalog_engine
 from apps.ingest import engine
 from apps.ingest.models import (
     ImportRun,
+    ItemChange,
     MappingTable,
     ProductDraft,
     ReviewItem,
     SourceItem,
+    SourceMissing,
     SourceObservation,
+    SourceState,
+    SourceStateVersion,
+    SourceVariation,
     SupplierSource,
 )
 from apps.vendors.tests.factories import VendorFactory
@@ -92,6 +97,64 @@ class MappingTableFactory(DjangoModelFactory[MappingTable]):
     def _adjust_kwargs(cls, **kwargs: Any) -> dict[str, Any]:
         kwargs.setdefault("aliases", [])
         return kwargs
+
+
+class SourceStateFactory(DjangoModelFactory[SourceState]):
+    class Meta:
+        model = SourceState
+
+    item = factory.SubFactory(SourceItemFactory)
+    source = factory.SelfAttribute("item.source")
+    kind = SourceState.Kind.SIMPLE
+    native_id = factory.Sequence(lambda n: n + 1)
+    state = factory.LazyFunction(dict)
+    version = 1
+    observed_at = factory.LazyFunction(timezone.now)
+
+
+class SourceStateVersionFactory(DjangoModelFactory[SourceStateVersion]):
+    class Meta:
+        model = SourceStateVersion
+
+    item = factory.SubFactory(SourceItemFactory)
+    version = 1
+    state = factory.LazyFunction(dict)
+    observed_at = factory.LazyFunction(timezone.now)
+
+
+class SourceVariationFactory(DjangoModelFactory[SourceVariation]):
+    class Meta:
+        model = SourceVariation
+
+    item = factory.SubFactory(SourceItemFactory)
+    source = factory.SelfAttribute("item.source")
+    native_id = factory.Sequence(lambda n: n + 1)
+    state = factory.LazyFunction(dict)
+    present = True
+    observed_at = factory.LazyFunction(timezone.now)
+    last_seen_at = factory.LazyFunction(timezone.now)
+
+
+class SourceMissingFactory(DjangoModelFactory[SourceMissing]):
+    class Meta:
+        model = SourceMissing
+
+    item = factory.SubFactory(SourceItemFactory)
+    url = factory.Sequence(lambda n: f"https://supplier.example/gone/{n}")
+    http_status = 404
+    first_seen_at = factory.LazyFunction(timezone.now)
+    last_seen_at = factory.LazyFunction(timezone.now)
+
+
+class ItemChangeFactory(DjangoModelFactory[ItemChange]):
+    class Meta:
+        model = ItemChange
+
+    item = factory.SubFactory(SourceItemFactory)
+    version = 1
+    changed_fields = factory.LazyFunction(lambda: {"price": True})
+    new_values = factory.LazyFunction(lambda: {"price": "9.90"})
+    recorded_at = factory.LazyFunction(timezone.now)
 
 
 def make_stale(item: SourceItem, days: int = 3) -> SourceItem:
