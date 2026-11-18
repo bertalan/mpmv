@@ -226,8 +226,6 @@ def _claim_admin_action(
     name: str, description: str, action: ClaimAction, *, level: str | None = None
 ) -> ClaimAction:
     action.__name__ = name
-    # TODO(CORE.18): granting the owner role (approve) needs its own permission from the
-    # staff role matrix, not just `vendors.change_vendor`.
     guarded = step_up_action(action)
     if level is not None:  # D-32: a per-action passkey on top of the second factor
         guarded = level_gated_action(level)(guarded)
@@ -252,6 +250,7 @@ def send_claim_link_action(
         modeladmin.message_user(request, f"{vendor}: {done}", messages.SUCCESS)
 
 
+VENDOR_APPROVAL_SECTION = "platform.vendor_approval"
 CLAIM_DECISION_TEMPLATE = "admin/vendors/vendor/claim_decision.html"
 DECISIONS = {
     "approve_claim": (approve_claim, "Approve", "claim approved: the claimant is now the owner."),
@@ -312,6 +311,18 @@ def decision_action(name: str) -> ClaimAction:
     def action(
         modeladmin: admin.ModelAdmin[Vendor], request: HttpRequest, queryset: QuerySet[Vendor]
     ) -> HttpResponse | None:
+        if name == "approve_claim" and not _section_allowed(
+            request, VENDOR_APPROVAL_SECTION, write=True
+        ):
+            # Granting the owner role is the matrix cell "approve or suspend a vendor"
+            # (CORE.18), not just `vendors.change_vendor`; checked before anything is shown.
+            modeladmin.message_user(
+                request,
+                "Granting the owner role needs the vendor approval permission "
+                "(Catalog and moderation, or the platform owner).",
+                messages.ERROR,
+            )
+            return None
         if request.POST.get("post") != "yes":
             return _review_page(modeladmin, request, queryset, name)
         decide, _verb, done = DECISIONS[name]
