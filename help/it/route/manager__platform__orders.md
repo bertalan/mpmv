@@ -9,6 +9,11 @@ Questa pagina serve a trovare un ordine pagato e a controllare quanto spesso i n
 
 La ricerca non scrive nulla. Le modifiche si fanno nella pagina del pacco, con una nota e, dove richiesto, la Sua passkey.
 
+## Pacchi ancora modificabili
+Sotto la ricerca, la tabella Pacchi ancora modificabili elenca i pacchi pagati non ancora spediti, dal più vecchio, con numero d'ordine, negozio, stato, data, totale ed eventuale modifica aperta. La restringa con Negozio, Stato, Effettuato dal ed Effettuato fino al, poi scelga Filtra. Scelga un numero d'ordine per aprire la pagina del pacco.
+
+I pacchi spediti, consegnati, annullati e chiusi non compaiono: li trova con il numero d'ordine.
+
 ## Annullamenti per negozio
 La tabella Pacchi annullati per negozio mostra gli annullamenti recenti di ciascun negozio per causa. Un valore sotto Negozio: l'ha chiesto il cliente (senza costo) è contrassegnato da verificare: il negozio ha dichiarato da sé quella causa e non paga la commissione di rimborso, quindi controlli i negozi con molti casi.
 

@@ -9,6 +9,11 @@ Mit dieser Seite finden Sie eine bezahlte Bestellung und sehen, wie oft Shops Pa
 
 Die Suche schreibt nichts. Änderungen erfolgen auf der Paketseite, mit einer Notiz und, wo verlangt, Ihrem Passkey.
 
+## Noch änderbare Pakete
+Unter der Suche listet die Tabelle Noch änderbare Pakete die bezahlten, noch nicht versandten Pakete, die ältesten zuerst, mit Bestellnummer, Shop, Status, Datum, Gesamt und einer eventuellen offenen Änderung. Grenzen Sie sie mit Shop, Status, Aufgegeben ab und Aufgegeben bis ein und wählen Sie dann Filtern. Wählen Sie eine Bestellnummer, um die Paketseite zu öffnen.
+
+Versandte, zugestellte, stornierte und abgeschlossene Pakete erscheinen nicht: Sie finden sie über die Bestellnummer.
+
 ## Stornierungen je Shop
 Die Tabelle Paketstornierungen nach Shop zeigt die jüngsten Stornierungen jedes Shops nach Ursache. Ein Wert unter Shop: Kunde hat es gewünscht (keine Gebühr) ist mit prüfen markiert: Der Shop hat diese Ursache selbst angegeben und zahlt keine Erstattungsgebühr; prüfen Sie Shops mit vielen Fällen.
 
