@@ -154,6 +154,14 @@ PUBLIC: dict[str, str] = {
         "Customer help section (ARC.37): the same repository-file text for every visitor, "
         "read-only, public by design."
     ),
+    "vendor_help": (
+        "Seller guide index (ARC.37): the same repository-file text for every visitor, "
+        "read-only, public by design."
+    ),
+    "vendor_help_section": (
+        "Seller guide section (ARC.37): the same repository-file text for every visitor, "
+        "read-only, public by design."
+    ),
     "subprocessors": (
         "Sub-processor register (CMP.4): static reviewed data, read-only, public by design "
         "(GDPR art. 13 and 28)."
@@ -238,6 +246,10 @@ IDOR_REVIEWED: dict[str, str] = {
         "Public by design (ARC.37): the slug names a fixed section of the repository help text, "
         "the same for every visitor; an unknown slug is a 404 "
         "(`test_an_unknown_section_is_a_404`)."
+    ),
+    "vendor_help_section": (
+        "Public by design (ARC.37): the slug names a fixed section of the repository seller "
+        "guide, the same for every visitor; an unknown slug is a 404."
     ),
     "events_resource": (
         "Public by design (EVT.6, EVT.9): the path names a published event's calendar file or a "
