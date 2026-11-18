@@ -30,7 +30,7 @@ from . import engine
 from .models import HELP_FEATURES
 
 HELP_ROOT = Path(settings.BASE_DIR) / "help"
-KINDS = (engine.HELP_ROUTE, engine.HELP_PAGE_TYPE, engine.HELP_GENERAL)
+KINDS = (engine.HELP_ROUTE, engine.HELP_PAGE_TYPE, engine.HELP_GENERAL, engine.HELP_GUIDE)
 GENERAL_STEM = "general"
 _SEP = "__"
 _PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z0-9_.]*)\s*\}\}")
@@ -81,11 +81,26 @@ def _operator(field: str, fallback: str = "") -> Callable[[], str]:
     return read
 
 
+def _link(url_name: str) -> Callable[[], str]:
+    def read() -> str:
+        from django.urls import reverse
+
+        return reverse(url_name)
+
+    return read
+
+
 PLACEHOLDERS: dict[str, Callable[[], str]] = {
     "operator.legal_name": _operator("legal_name"),
     "operator.support_email": _operator("support_email"),
     "operator.compliance_email": _operator("compliance_email", fallback="support_email"),
     "settings.site_name": lambda: str(settings.WAGTAIL_SITE_NAME),
+    # Links to public pages, resolved in the language shown (the pages carry a language prefix).
+    "link.help": _link("customer_help"),
+    "link.withdrawal": _link("withdrawal"),
+    "link.consumer_information": _link("consumer_information"),
+    "link.orders": _link("customer_orders"),
+    "link.privacy": _link("privacy_account"),
 }
 
 
@@ -127,7 +142,10 @@ def parse(path: Path, root: Path = HELP_ROOT) -> HelpFile:
     if kind == engine.HELP_GENERAL and stem != GENERAL_STEM:
         raise HelpFileError(f"{rel}: the general entry is general/general.md")
     key = stem_to_key(kind, stem)
-    if kind != engine.HELP_GENERAL and not engine.help_key_valid(key):
+    if kind == engine.HELP_GUIDE:
+        if not engine.guide_key_valid(key):
+            raise HelpFileError(f"{rel}: {key!r} is not a registered guide section")
+    elif kind != engine.HELP_GENERAL and not engine.help_key_valid(key):
         raise HelpFileError(f"{rel}: {key!r} is not a valid route name or page type")
     lines = path.read_text(encoding="utf-8").splitlines()
     title = _TITLE.fullmatch(lines[0]) if lines else None

@@ -166,8 +166,15 @@ audit: ## Scan pinned dependencies for known vulnerabilities (pip-audit)
 	@mkdir -p build
 	uv export --frozen --no-emit-project --format requirements-txt > build/requirements.txt
 	uv run python tools/audit_ignores.py > build/pip-audit-ignores.txt
-	uvx pip-audit@$(PIP_AUDIT_VERSION) --strict --disable-pip --require-hashes \
-		-r build/requirements.txt $$(cat build/pip-audit-ignores.txt)
+	@# A network timeout reading the index is retried (3 tries in all); a finding fails at once.
+	@for try in 1 2 3; do \
+		if uvx pip-audit@$(PIP_AUDIT_VERSION) --strict --disable-pip --require-hashes --timeout 60 \
+			-r build/requirements.txt $$(cat build/pip-audit-ignores.txt) > build/pip-audit.log 2>&1; \
+		then cat build/pip-audit.log; exit 0; fi; \
+		cat build/pip-audit.log; \
+		grep -qE 'ReadTimeoutError|ConnectTimeoutError|timed out' build/pip-audit.log || exit 1; \
+		echo "pip-audit: network timeout, try $$try of 3"; sleep 20; \
+	done; exit 1
 
 # OPS.4: the image SBOM comes from syft in CI (docs/dev/dependency-updates.md).
 sbom: ## CycloneDX SBOM of the production Python environment (no dev group) in build/sbom/

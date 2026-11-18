@@ -48,7 +48,7 @@ from wagtail_localize.operations import TranslationCreator
 from apps.catalog import listings, search_page, slugs
 from apps.catalog import services as catalog
 from apps.catalog.models import Category, Term
-from apps.core.audit import AuditContext
+from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages, hreflang_alternates
 from apps.core.image_licences import Credit
@@ -1233,3 +1233,35 @@ def search_articles(
     return search_page.SearchGroup(
         "articles", str(_("Articles")), items, order=20, more=len(pages) > limit
     )
+
+
+# --- Form pages (CMS.13): retention of the stored submissions
+
+FORM_SUBMISSIONS_PURGED = "cms.form_submissions_purged"
+
+
+def purge_expired_form_submissions(
+    *, ctx: AuditContext, now: dt.datetime | None = None, dry_run: bool = False
+) -> ChangeSet:
+    """Delete the submissions of every form page that are older than the page's own
+    `retention_days` (default 90, at most 365). Idempotent: a second run finds nothing. One
+    `cms.form_submissions_purged` audit entry per page that lost rows, with counts only (never
+    the answers, which are personal data); `dry_run` changes nothing and writes nothing."""
+    from wagtail.contrib.forms.models import FormSubmission
+
+    from .models import FormPage
+
+    now = now or timezone.now()
+    changes = ChangeSet()
+    for page_id, days in FormPage.objects.order_by("pk").values_list("pk", "retention_days"):
+        cutoff = now - dt.timedelta(days=days)
+        expired = FormSubmission.objects.filter(page_id=page_id, submit_time__lt=cutoff)
+        with transaction.atomic():
+            deleted = expired.count() if dry_run else expired.delete()[0]
+            if not deleted:
+                continue
+            snapshot = {"deleted": deleted, "retention_days": days}
+            changes.delete("wagtailforms.formsubmission", f"page:{page_id}", snapshot)
+            if not dry_run:
+                record(ctx, FORM_SUBMISSIONS_PURGED, "cms.formpage", str(page_id), None, snapshot)
+    return changes

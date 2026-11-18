@@ -33,7 +33,7 @@ import re
 import subprocess
 import warnings
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from pathlib import Path
 
 import pytest
@@ -148,6 +148,25 @@ def missing_keys(
     return {f"{kind} {key}" for kind, key in wanted if not need <= have.get((kind, key), set())}
 
 
+def missing_guide_sections(
+    root: Path = help_files.HELP_ROOT,
+    sections: Mapping[str, tuple[str, ...]] | None = None,
+    languages: Iterable[str] | None = None,
+) -> set[str]:
+    """`audience:section` of every registered guide section (ARC.37) lacking its file in an
+    enabled language. The pages are generated from the files, so a registry entry without one
+    would be a hole in the help centre."""
+    registry = engine.GUIDE_SECTIONS if sections is None else sections
+    have = _have(root)
+    need = set(enabled_languages() if languages is None else languages)
+    return {
+        engine.guide_key(audience, name)
+        for audience, names in registry.items()
+        for name in names
+        if not need <= have.get((engine.HELP_GUIDE, engine.guide_key(audience, name)), set())
+    }
+
+
 def stale_files(
     root: Path = help_files.HELP_ROOT,
     routes: Iterable[str] | None = None,
@@ -244,6 +263,10 @@ def test_no_new_route_or_page_type_is_missing_its_help_files() -> None:
     )
 
 
+def test_every_guide_section_has_a_file_in_every_enabled_language() -> None:
+    assert missing_guide_sections() == set()
+
+
 def test_the_baseline_only_shrinks() -> None:
     """Local gate: no line that has files or names a gone route; the count line is honest. The
     comparison with the version on `origin/main` is a warning below (git may be absent in CI)."""
@@ -308,6 +331,25 @@ def test_a_new_route_is_missing_until_its_files_exist(tmp_path: Path) -> None:
     assert missing_keys(tmp_path, routes, [], langs) == {"route manager:shop:new"}  # one language
     _write(tmp_path, "it", "route", "manager__shop__new")
     assert missing_keys(tmp_path, routes, [], langs) == set()
+
+
+def test_a_guide_section_without_a_file_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = {"customer": ("ordering", "extra")}
+    monkeypatch.setattr(engine, "GUIDE_SECTIONS", registry)  # the parser checks the registry
+    langs = ("en", "it")
+    assert missing_guide_sections(tmp_path, registry, langs) == {
+        "customer:ordering",
+        "customer:extra",
+    }
+    for lang in langs:
+        _write(tmp_path, lang, "guide", "customer__ordering")
+    assert missing_guide_sections(tmp_path, registry, langs) == {"customer:extra"}
+    _write(tmp_path, "en", "guide", "customer__extra")  # one language only
+    assert missing_guide_sections(tmp_path, registry, langs) == {"customer:extra"}
+    _write(tmp_path, "it", "guide", "customer__extra")
+    assert missing_guide_sections(tmp_path, registry, langs) == set()
 
 
 def test_a_page_type_without_files_is_missing(tmp_path: Path) -> None:
