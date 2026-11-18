@@ -66,24 +66,29 @@ class _Item:
 
 
 def _items(lines: list[OrderLine]) -> list[_Item]:
-    """The order's lines, one entry per product and variant, quantities added up."""
+    """The order's lines, one entry per product and variant, quantities added up. Products
+    (with their vendor and its payout account) and variants are read in one query each."""
+    products = Product.objects.select_related("vendor__connected_account").in_bulk(
+        {line.product_id for line in lines if line.product_id}
+    )
+    variants = Variant.objects.in_bulk({line.variant_id for line in lines if line.variant_id})
     found: dict[ItemKey, _Item] = {}
     for line in lines:
-        if line.product is None:  # the product was deleted: nothing to put back
+        product = products.get(line.product_id) if line.product_id else None
+        if product is None:  # the product was deleted: nothing to put back
             found[(-line.pk, None)] = _Item(
                 (-line.pk, None), line.title, line.variant_label, line.quantity, None, None
             )
             continue
-        key = (line.product.pk, line.variant_id)
+        key = (product.pk, line.variant_id)
         if key in found:
             found[key].quantity += line.quantity
             continue
-        variant = Variant.objects.filter(pk=line.variant_id).first() if line.variant_id else None
+        variant = variants.get(line.variant_id) if line.variant_id else None
+        gone = bool(line.variant_id) and variant is None  # the variant was deleted
         found[key] = _Item(
-            key, line.title, line.variant_label, line.quantity, line.product, variant
+            key, line.title, line.variant_label, line.quantity, None if gone else product, variant
         )
-        if line.variant_id and variant is None:  # the variant is gone
-            found[key].product = None
     return list(found.values())
 
 

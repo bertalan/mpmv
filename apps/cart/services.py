@@ -154,8 +154,8 @@ def _purchase_limit(product: Product, variant: Variant | None) -> int:
 
 def item_limit(product: Product, variant: Variant | None) -> int:
     """The most units of the item a cart line may hold today; ValidationError when it cannot be
-    bought (not for sale, vendor paused, on request). 0 means out of stock (ORD.31)."""
-    product = Product.objects.select_related(_VENDOR_ACCOUNT).get(pk=product.pk)
+    bought (not for sale, vendor paused, on request). 0 means out of stock (ORD.31). The caller
+    loads the product with `select_related("vendor__connected_account")`."""
     return _purchase_limit(product, variant)
 
 

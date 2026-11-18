@@ -224,3 +224,24 @@ def test_a_dry_run_writes_nothing() -> None:
     assert result is not None
     assert len(result.added) == 1
     assert not Cart.objects.filter(user=user).exists()
+
+
+def test_the_number_of_queries_does_not_grow_with_the_lines(
+    django_assert_max_num_queries: Any,
+) -> None:
+    """Products, variants and vendors are read in bulk (no N+1) while planning."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    _, user = signed_in()
+    v = vendor()
+
+    def run(count: int) -> int:
+        items = [(product(v, stock=0), 1) for _ in range(count)]  # all skipped: no cart writes
+        order = order_of(user, items)
+        with CaptureQueriesContext(connection) as ctx:
+            reorder.order_again(user, order.public_id)
+        return len(ctx)
+
+    run(1)  # warms the process caches (operator settings)
+    assert run(8) <= run(2)
