@@ -866,6 +866,14 @@ ENDPOINTS: dict[str, Access] = {
         "first; a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
+    "manager:platform:catalog_products": StaffOnly(
+        "Product list of the platform (CAT.11): Catalog and moderation writes, the owner reads, "
+        "Finance, Support and a vendor member get 404; rows come from for_actor."
+    ),
+    "manager:platform:catalog_product": StaffOnly(
+        "One product, preview and audited fields (CAT.11): same roles as the list.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
     "subprocessors": NoVendorData(
         "Sub-processor register (CMP.4): static reviewed data, the same for every visitor."
     ),
