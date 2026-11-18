@@ -1610,7 +1610,7 @@ msgstr "Modifica l'ordine"
 msgid "Change this order"
 msgstr "Modifica questo ordine"
 
-#: apps/manager/templates/manager/platform/orders.html
+#: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/platform/orders.html
 msgid "Changes are disabled."
 msgstr "Le modifiche sono disattivate."
 

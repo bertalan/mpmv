@@ -1610,7 +1610,7 @@ msgstr "Modificar el pedido"
 msgid "Change this order"
 msgstr "Modificar este pedido"
 
-#: apps/manager/templates/manager/platform/orders.html
+#: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/platform/orders.html
 msgid "Changes are disabled."
 msgstr "Los cambios están desactivados."
 
