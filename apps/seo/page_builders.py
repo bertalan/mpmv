@@ -12,6 +12,8 @@ from urllib.parse import quote
 from django.conf import settings
 from django.utils import translation
 
+from apps.vendors.models import Vendor
+
 from . import graph_engine as ge
 from . import product_graph as pg
 from . import seller as seller_name
@@ -301,6 +303,12 @@ def _listing(ctx: PageContext) -> list[Node]:
 _SEARCH_GROUP_KINDS = {"events": "Event", "articles": "BlogPosting", "vendors": "Organization"}
 
 
+def _vendor_names(items: Iterable[Any]) -> dict[int | None, str | None]:
+    """The public seller name (SEO.15) of the vendors behind the search hits, by primary key."""
+    pks = [item.ref for item in items if item.ref is not None]
+    return {v.pk: seller_name.public_name(v) for v in Vendor.objects.filter(pk__in=pks)}
+
+
 def _search(ctx: PageContext) -> list[Node]:
     """The results page: a `SearchResultsPage` whose one `ItemList` holds the products of the
     shown page, then the events, articles and vendors found (each referencing its own page). An
@@ -317,11 +325,17 @@ def _search(ctx: PageContext) -> list[Node]:
     entries = product_entries(ctx, ctx.context.get("cards") or ())
     for group in ctx.context.get("groups") or ():
         kind = _SEARCH_GROUP_KINDS.get(group.key, "")
-        entries += [
-            ge.ListEntry(url=_absolute(ctx.site, item.url), name=str(item.title), kind=kind)
-            for item in group.items
-            if not item.language
-        ]
+        names = _vendor_names(group.items) if group.key == "vendors" else {}
+        for item in group.items:
+            if item.language:
+                continue
+            title = str(item.title)
+            if group.key == "vendors":
+                # SEO.15: the Organization carries the public seller name, or is left out.
+                title = names.get(item.ref) or ""
+                if not title:
+                    continue
+            entries.append(ge.ListEntry(url=_absolute(ctx.site, item.url), name=title, kind=kind))
     items = _items(ctx, url, name, entries)
     breadcrumb = _breadcrumb(url, [_home_crumb(ctx.site, language), pg.Crumb(label, url)])
     web = ge.webpage_node(

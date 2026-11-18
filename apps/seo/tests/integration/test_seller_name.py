@@ -149,3 +149,67 @@ def test_a_company_keeps_its_name(client: Client) -> None:
     document = graph_of(client, sell(vendor))
     [org] = vendor_orgs(document)
     assert org["name"] == "Rossi Ceramics S.r.l."
+
+
+# --- Search results (SEO.7 part 2): vendor hits are Organization items too
+
+
+def search_graph(client: Client, query: str) -> dict[str, Any]:
+    from tests.i18n import language_prefix
+
+    return graph_of(client, f"{language_prefix(primary_language())}/?s={query}")
+
+
+def search_items(document: dict[str, Any]) -> list[dict[str, Any]]:
+    [items] = [n for n in document["@graph"] if n["@type"] == "ItemList"]
+    elements: list[dict[str, Any]] = items["itemListElement"]
+    return elements
+
+
+def test_a_sole_trader_with_only_the_legal_name_is_not_a_search_result_item(
+    client: Client,
+) -> None:
+    person = sole_trader("Mario Rossi")
+    company = VendorFactory.create(
+        status=Vendor.Status.ACTIVE,
+        italian_company=True,
+        legal_name="Rossi Ceramics S.r.l.",
+        display_name="Rossi Ceramics S.r.l.",
+    )
+    document = search_graph(client, "rossi")
+    elements = search_items(document)
+    assert [e["item"]["name"] for e in elements] == ["Rossi Ceramics S.r.l."]
+    assert [e["item"]["@type"] for e in elements] == ["Organization"]
+    assert [e["position"] for e in elements] == [1]
+    assert "Mario Rossi" not in json.dumps(document)
+    people = seller.person_names(person) | seller.person_names(company)
+    assert schema_check.rich_result_errors(document, person_names=people) == []
+    # The visible results list is unchanged: the shop is still shown to visitors.
+    html = client.get("/?s=rossi").content.decode()
+    assert "Mario Rossi" in html
+
+
+def test_search_positions_stay_consecutive_when_a_vendor_in_the_middle_is_dropped(
+    client: Client,
+) -> None:
+    sole_trader("Zeta Mario Rossi")  # legal name differs: shown as its shop name
+    VendorFactory.create(
+        status=Vendor.Status.ACTIVE, italian_company=True, display_name="Alpha Rossi S.r.l."
+    )
+    person = sole_trader("Mario Rossi")
+    VendorFactory.create(
+        status=Vendor.Status.ACTIVE, italian_company=True, display_name="Omega Rossi S.r.l."
+    )
+    document = search_graph(client, "rossi")
+    elements = search_items(document)
+    names = [e["item"]["name"] for e in elements]
+    assert "Mario Rossi" not in names
+    assert names == ["Alpha Rossi S.r.l.", "Omega Rossi S.r.l.", "Zeta Mario Rossi"]
+    assert [e["position"] for e in elements] == [1, 2, 3]
+    assert schema_check.rich_result_errors(document, person_names=seller.person_names(person)) == []
+
+
+def test_a_sole_trader_with_a_shop_name_is_a_search_result_item(client: Client) -> None:
+    sole_trader("Rossi Ceramics")
+    elements = search_items(search_graph(client, "ceramics"))
+    assert [e["item"]["name"] for e in elements] == ["Rossi Ceramics"]
