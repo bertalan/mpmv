@@ -1,0 +1,41 @@
+/* Ride: consent banner as a Bootstrap alert (THM.9 part 2). The base rules keep the banner fixed
+   to the bottom and make room for it (--consent-offset: padding and scroll padding), so a focused
+   element is never behind it. Here it becomes a card flush with the bottom edge (so the offset stays exact), with the
+   alert look, on tokens only. Under 40rem it spans the width; it may scroll within 70vh. */
+@layer overrides {
+  .consent-banner.alert {
+    --bs-alert-bg: var(--color-surface);
+    --bs-alert-color: var(--color-text);
+    --bs-alert-border-color: var(--color-border);
+    inset-inline: var(--space-s);
+    inset-block-end: 0;
+    max-block-size: 70vh;
+    margin: 0;
+    padding: var(--space-m);
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  .consent-banner.alert[hidden] {
+    display: none;
+  }
+
+  @media (min-width: 40rem) {
+    .consent-banner.alert {
+      inset-inline: 50% auto;
+      inline-size: min(60rem, calc(100% - 2 * var(--space-m)));
+      transform: translateX(-50%);
+    }
+  }
+
+  .consent-banner.alert .consent-banner__title {
+    margin-block-end: 0;
+    color: inherit;
+  }
+
+  .consent-banner.alert .consent-actions .btn {
+    min-block-size: 44px;
+    min-inline-size: 8rem;
+  }
+}
