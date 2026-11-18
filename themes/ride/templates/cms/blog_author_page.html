@@ -1,10 +1,10 @@
 {% extends "layouts/base.html" %}
-{% load i18n wagtailcore_tags wagtailimages_tags image_credits cms_tags %}
+{% load i18n wagtailcore_tags responsive_images image_credits cms_tags %}
 {% comment %}
 Author page of `ride` (THM.9 part 1): the app template's content (name, photo with its CMS.8
 credit, job title, bio in this language, profile links, then their articles) under the page
 banner (the only h1; the trail is Home, the blog, the author). `page` is the blog index; the
-page graph (SEO.7) holds the ProfilePage. The `{% image %}` tag is the app's (CAT.29).
+page graph (SEO.7) holds the ProfilePage. The image presets "article" and "avatar" come from CAT.29 (#671).
 {% endcomment %}
 {% block title %}{{ author.name }} · {{ page.title }} · {{ site_name }}{% endblock %}
 {% block description %}{% endblock %}
@@ -16,7 +16,7 @@ page graph (SEO.7) holds the ProfilePage. The `{% image %}` tag is the app's (CA
       {% if author.photo %}
         {% image_credit_of author.photo as credit %}
         <figure class="col-sm-auto figure">
-          {% image author.photo fill-240x240 alt=author.photo_alt_text %}
+          {% responsive_image author.photo "avatar" alt=author.photo_alt_text %}
           {% if credit %}<figcaption class="figure-caption">{% include "core/components/image_credit.html" %}</figcaption>{% endif %}
         </figure>
       {% endif %}

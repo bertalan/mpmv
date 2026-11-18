@@ -1,9 +1,9 @@
 {% extends "layouts/base.html" %}
-{% load wagtailcore_tags wagtailimages_tags image_credits cms_tags %}
+{% load wagtailcore_tags responsive_images image_credits cms_tags %}
 {% comment %}
 Blog article of `ride` (THM.9 part 1): the app template's content (date and author, main image,
 body) under the page banner (the only h1, the breadcrumb). The layout head carries the
-BlogPosting in the page graph (SEO.7). The `{% image %}` tag is the app's (CAT.29 changes it).
+BlogPosting in the page graph (SEO.7). The image presets "article" and "avatar" come from CAT.29 (#671).
 {% endcomment %}
 {% block content %}
   <article class="blog-post">
@@ -14,7 +14,7 @@ BlogPosting in the page graph (SEO.7). The `{% image %}` tag is the app's (CAT.2
       {% if page.image %}
         {% image_credit_of page.image as credit %}
         <figure class="figure d-block">
-          {% image page.image width-1200 alt=page.image_alt_text %}
+          {% responsive_image page.image "article" alt=page.image_alt_text %}
           {% if page.image_caption or credit %}<figcaption class="figure-caption">{{ page.image_caption }}{% if credit %} {% include "core/components/image_credit.html" %}{% endif %}</figcaption>{% endif %}
         </figure>
       {% endif %}
