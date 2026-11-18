@@ -840,6 +840,42 @@ tests with intelligible answers":
   asks for a new one. The SHP.9 `QuoteLink` and its 168-hour expiry play no part after payment;
   the amendment's own deadlines apply.
 
+### Orders API for shops (owner decisions MQ-56, MQ-57, 2026-11-18)
+
+The owner wants a shop to manage its orders from its own systems as fully as from the Manager,
+as a paid feature. The API and the management commands are thin adapters over the same services
+the Manager uses: every rule (the state machines, the D-47 customer consent, the ORD.32 link
+rules, tax and ledger) is enforced in the service and tested there, never only in a route.
+
+- **Who.** Vendor API keys only, scoped to the key's vendor, with two new vendor-grantable
+  scopes, `orders:read` and `orders:write`. The platform operator uses management commands over
+  the same services, at no cost.
+- **Paid (MQ-56).** The scopes work only while the vendor's plan grants the `orders_api`
+  entitlement (`plan_allows`, VEN.19), checked on every call like the vendor status. Without it
+  the call gets 403 with a problem type that names the missing entitlement, and no data is
+  lost. Higher plans include it. Until plan fees ship (D-04, P2) staff assign the plan by hand.
+  In v2 the same code is packaged as a separately sold add-on module (ARC.33), with a download
+  and integration instructions (ORD.39).
+- **Operations, one slice each:**
+  - read: a list with a `changed_since` cursor, and a detail;
+  - status and shipping: accept, and mark as shipped with tracking, exactly as the Manager allows;
+  - drafts with a payment link: the ORD.32 rules, applied to the vendor's own customers, with
+    the recipient only ever the customer's email on file;
+  - amendment proposals: D-47, where minor changes apply at once and substantial ones wait for
+    the customer's acceptance;
+  - external orders (MQ-57).
+- **External orders (MQ-57, record-only).** An order paid outside the platform (a fair, the
+  phone, another channel) can be imported with `channel="external"` and a channel label. It
+  updates stock, the customer's history, shipping and documents. It carries no commission and
+  no platform payment, and creates no payout or ledger entry. It stays out of DAC7 platform
+  sales and the platform statements. The vendor issues the invoice, as always. Prices and VAT
+  are stored as the vendor sends them (a snapshot) and are checked for consistency: line totals,
+  and VAT rates valid in the vendor's country. They are never turned into platform tax lines.
+  The import is idempotent on the vendor's external reference. It needs human review (tax, DAC7).
+- **Common rules.** Every mutating call takes `?dry_run=true`, needs an idempotency key, answers
+  errors in RFC 9457, is audited with the key id, and is counted on its own scope limit
+  (`API_RATE_LIMIT_SCOPES`).
+
 ## 7.3 Tasks
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
@@ -883,3 +919,10 @@ tests with intelligible answers":
 | ORD.30 | Platform list of packages staff can still act on (owner decision 2026-11-18): `/manager/platform/orders/` lists, besides the search by order number, only the packages on which an ORD.22 action is still possible (paid, not shipped, not delivered, not cancelled or closed), decided by one predicate `staff_actionable(vendor_order)` in the ORD.22 amendments service and used by both the list and the actions, oldest first, with order number, shop, state, date, total and any open amendment; filters by shop, state and placed date; paginated; each row opens the platform order page with the ORD.22 actions; shipped and closed packages stay reachable only through the number search; scoped by the CORE.18 matrix (Support and the platform owner on "orders and customers"); buyer contact data masked as on the order page | P2 | 5 | ORD.22, CORE.18 | A paid unshipped package is listed and a shipped, delivered, cancelled or closed one is not; the list and the ORD.22 service agree on what is actionable (one predicate, tested on every state); filters by shop, state and date narrow the list; a Catalog or Finance role member gets 404 (Manager convention); the query count does not grow with the number of rows; the page shows no unmasked buyer contact data |
 | ORD.31 | "Order again" for the customer (owner decision 2026-11-18): on a past order in the customer area, one button puts the order's still-available items back into the cart at today's prices, availability and shipping (no snapshot is reused); items no longer sold, out of stock or not deliverable to the current address are listed as skipped with the reason; the cart then goes through the normal checkout (ORD.3, ORD.4, the button solution); nothing is placed or paid by the button itself | P2 | 4 | ORD.1, ORD.4 | A past order with three lines refills the cart with the two still on sale at today's price and lists the retired one as skipped; a price change since the order shows the new price in the cart; an existing cart is merged, not replaced: an item already in the cart gets the quantities added, capped at the stock available, and the cap is shown; another customer's order cannot be reordered (404, also by guessing the ID); no order or payment is created until checkout |
 | ORD.32 | Staff draft from a past order with a payment link (owner decision 2026-11-18): Support or the platform owner copies a past order into a draft cart for the same customer (account or the guest's email), at today's prices, availability and shipping, may remove lines or change quantities up to the stock available (never prices; the customer confirms everything at checkout), and sends a one-time link only to the email of the original order's account or guest, at most 3 sends per draft per day; the draft is not an order and binds nobody: the customer opens the link, reviews the cart, sees the full pre-contractual information and pays through the normal checkout (ORD.3, ORD.4, PAY.1, the button solution), and only then is an order placed; the link is POST-confirmed, single use, expires (default 7 days, an operator setting), carries no personal data and is invalidated when the draft changes; staff never place or pay an order for the customer and never impersonate (ORD.22); every draft, change and send is audited with role and note; the CORE.18 matrix gains the action; the PR is flagged for human review (orders, payments, consumer law) | P2 | 8 | ORD.4, PAY.1, CORE.18, ORD.31 | A draft from a past order holds today's prices and skips unavailable lines with the reason; staff cannot change a price (service test); the link opens the draft for that customer only, a second use or an expired link is refused, and a GET changes nothing; the link cannot be sent to any other address and a fourth send in a day is refused; paying through the link places one normal order with the usual snapshots, and an unpaid draft creates no order, no stock reservation and no ledger line; a Catalog or Finance role member cannot create a draft; every step writes an `AuditLog` entry with role and note |
+| ORD.33 | Orders API 1/6, the gate and reading (MQ-56; §Orders API for shops): the vendor-grantable scopes `orders:read` and `orders:write`; the `orders_api` plan entitlement, checked on every call; `GET /orders` (vendor orders of the key's vendor, `changed_since` cursor, paginated) and `GET /orders/{id}` (`public_id`), with privacy masking as in ORD.14 | P2 | 5 | CORE.6, VEN.19, ORD.14 | A key without the entitlement gets 403 with the entitlement problem type; another vendor's order gives 404; the cursor returns each change once |
+| ORD.34 | Orders API 2/6, status and shipping: accept and mark as shipped with carrier and tracking, through the same state-machine services as the Manager; dry run, idempotency key, audit with the key id | P2 | 4 | ORD.33 | A transition the Manager refuses is refused with the same reason; the same request twice gives the same state |
+| ORD.35 | Orders API 3/6, drafts with a payment link: create a draft for one of the vendor's own customers and send the link, with the ORD.32 rules (today's prices, never a price from the request, recipient only the customer's email on file, the send limit, a single-use expiring link) | P2 | 4 | ORD.33, ORD.32 | A price in the request is rejected; a recipient address in the request is rejected; nothing is ordered before the customer pays |
+| ORD.36 | Orders API 4/6, amendment proposals: minor amendments apply at once and substantial ones go to the customer for acceptance (D-47, ORD.20 to ORD.24), through the amendment services | P2 | 4 | ORD.33, ORD.21 | A substantial amendment through the API waits for the customer exactly as from the Manager; no route changes a paid order without that path |
+| ORD.37 | Orders API 5/6, external orders, record-only (MQ-57; needs human review: tax, DAC7): `POST /orders/external` with `channel="external"`, a channel label and the vendor's external reference (idempotent on it); stock, customer history, shipping and documents are updated; no commission, payment, payout or ledger entry; excluded from DAC7 platform sales and the platform statements; prices and VAT are stored as sent, checked for consistent line totals and rates valid in the vendor's country, and never turned into platform tax lines | P2 | 6 | ORD.33, CMP.1 | An external order adds no ledger row and no DAC7 amount; the same external reference twice creates one order; an inconsistent total is rejected with the line named |
+| ORD.38 | Orders API 6/6, operator commands and docs: management commands over the same services for the platform operator (no entitlement needed); the API reference and an integration guide in the developer docs; help files for the Manager API key screen listing the new scopes | P2 | 3 | ORD.34, ORD.35, ORD.36, ORD.37 | Every route has a documented example; a command and the matching API call produce the same audit action |
+| ORD.39 | Orders API as a sold add-on, v2 (MQ-56): the orders API code is packaged as an ARC.33 module that is installed separately, with a download, a version range and integration instructions; the `orders_api` entitlement stays the switch | P3 | 5 | ORD.38, ARC.33 | A platform without the module has no order write routes; installing it adds them, and its entitlement check still applies |

@@ -264,7 +264,7 @@ month plus 5%).
 ### Plan entitlements and plan fees (VEN.19, P2)
 
 Plans are data (VEN.2), and their `features` keys are the **entitlements**: what a plan allows
-beyond commission and product limits (for example `vendor_branding`, spec 14 §14.12, and `accounting_connector`, the paid accounting module of D-48 (a), spec 11). Code never
+beyond commission and product limits (for example `vendor_branding`, spec 14 §14.12, `accounting_connector`, the paid accounting module of D-48 (a), spec 11, and `orders_api`, the paid orders API of MQ-56, spec 07). Code never
 tests a plan code; it asks `plan_allows(vendor, feature) -> bool` in `apps/vendors/services.py`,
 backed by a pure `engine.plan_allows(plan_features, feature)`. A plan change has an effective date
 and is audited; losing an entitlement hides the feature and keeps its data.
