@@ -15,6 +15,7 @@ from .amendment_views import PLATFORM_SECTION as ORDER_CHANGES_SECTION
 from .amendment_views import SETTINGS_SECTION as AMENDMENT_SETTINGS_SECTION
 from .event_views import SECTION as EVENTS_SECTION
 from .fitment_views import CATEGORIES_SECTION, NODES_SECTION, SCHEME_SECTION
+from .money_views import SECTION as MONEY_SECTION
 from .navigation import Registry, Section, anyone, platform_role, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
@@ -76,6 +77,16 @@ BUILT_IN = (
         "manager:shop:payments",
         order=40,
         allowed=vendor_action("bank_account"),
+    ),
+    # Balance, transactions, payouts, statement and CSV extract (VEN.9): `payouts` is an owner
+    # right in the role matrix, so staff get no menu entry and a 404.
+    Section(
+        MONEY_SECTION,
+        Space.SHOP,
+        _("Money"),
+        "manager:shop:money",
+        order=45,
+        allowed=vendor_action("payouts"),
     ),
     # The image chooser of the storefront editor (VEN.31): a modal, not a page, so not in the
     # menu. Owners only, like the profile it serves.

@@ -13,6 +13,7 @@ from . import (
     event_views,
     fitment_views,
     media,
+    money_views,
     notice_views,
     product_views,
     sales_terms_views,
@@ -29,6 +30,16 @@ shop = (
         path("", views.ShopDashboardView.as_view(), name="dashboard"),
         path("profile/", views.StorefrontProfileView.as_view(), name="profile"),
         path("payments/", views.PaymentsView.as_view(), name="payments"),
+        # VEN.9: the vendor's own money, read only (the export is a POST, audited).
+        path("money/", money_views.MoneyOverviewView.as_view(), name="money"),
+        path(
+            "money/transactions/",
+            money_views.TransactionListView.as_view(),
+            name="money_transactions",
+        ),
+        path("money/payouts/", money_views.PayoutListView.as_view(), name="money_payouts"),
+        path("money/statement/", money_views.StatementView.as_view(), name="money_statement"),
+        path("money/export/", money_views.ExportView.as_view(), name="money_export"),
         path("sales-terms/", sales_terms_views.SalesTermsView.as_view(), name="sales_terms"),
         # EVT.4: the vendor's own events (list, form, submit, cancel).
         path("events/", event_views.EventsView.as_view(), name="events"),
