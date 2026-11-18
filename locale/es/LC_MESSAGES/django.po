@@ -3604,6 +3604,10 @@ msgid ""
 msgstr ""
 "Déjelo vacío para la fecha más próxima permitida. Sin excepción, no puede ser inferior a 30 días."
 
+#: apps/cms/models.py
+msgid "Leave empty to show the profile in every language."
+msgstr "Deja vacío para mostrar el perfil en todos los idiomas."
+
 #: apps/manager/amendment_forms.py
 msgid "Leave it as it is to keep the current method."
 msgstr "Déjelo como está para mantener el método actual."
@@ -6241,7 +6245,7 @@ msgstr ""
 "Solo carrusel con cambio automático: cuánto tiempo permanece una diapositiva, en milisegundos, "
 "entre 3000 y 20000. Ejemplo: 6000 son seis segundos."
 
-#: themes/ride/templates/components/footer.html
+#: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Social"
 msgstr "Redes sociales"
 
@@ -7333,6 +7337,10 @@ msgstr ""
 "La dirección completa de la página que se abrirá, que empieza por https://, por ejemplo "
 "https://www.example.com/guide. Obligatorio: sin ella el enlace no lleva a ninguna parte."
 
+#: apps/cms/models.py
+msgid "The full address of the profile. It must start with https://."
+msgstr "La dirección completa del perfil. Debe empezar por https://."
+
 #: apps/events/models.py
 msgid ""
 "The full description of the event, built from blocks: text, pictures, questions and a countdown. "
@@ -7393,6 +7401,10 @@ msgstr ""
 #: apps/cms/models.py
 msgid "The general text has no screen or page type."
 msgstr "El texto general no tiene pantalla ni tipo de página."
+
+#: apps/cms/models.py
+msgid "The heading of the column, for example 'Company'."
+msgstr "El título de la columna, por ejemplo «Empresa»."
 
 #: apps/cms/blocks.py
 msgid "The heading of the section, up to 120 characters. Required."
@@ -7511,6 +7523,10 @@ msgstr "El idioma del texto que se mostró en el momento de aceptar el contrato.
 #: apps/manager/event_forms.py
 msgid "The language of the translation. Required."
 msgstr "El idioma de la traducción. Obligatorio."
+
+#: apps/cms/models.py
+msgid "The language of the visitors who see this column. Up to four per language."
+msgstr "El idioma de los visitantes que ven esta columna. Hasta cuatro por idioma."
 
 #: apps/core/translation_fields.py
 msgid "The language of this translation. Each language has one row for the same item."
@@ -7710,6 +7726,10 @@ msgid ""
 msgstr ""
 "El enlace funciona una sola vez y caduca el %(expires)s (UTC). Después nuestro equipo revisa su "
 "solicitud. Si no confirma, la solicitud se elimina pasados unos días."
+
+#: apps/cms/models.py
+msgid "The links of the column, in the order shown: a page of this site or another website."
+msgstr "Los enlaces de la columna, en el orden mostrado: una página de este sitio u otro sitio web."
 
 #: apps/cms/models.py
 msgid ""

@@ -56,6 +56,9 @@ class CmsConfig(AppConfig):
         "vendorlandingpage": "Wagtail page: editor content with revisions and action log",
         "editorroleseed": "marker row that a role was seeded once; no security data of its own",
         "navigationmenu": "Wagtail snippet: menu content, logged in Wagtail's action log",
+        "footersettings": "Wagtail setting: footer content (CMS.17), public text and links",
+        "footercolumn": "a column of the footer setting, saved with it",
+        "socialprofile": "a public profile link of the footer setting, saved with it",
         "helpentry": "Wagtail snippet: help text (ARC.32), logged in Wagtail's action log",
         # Installed only for wagtail-localize's editor (I18N.3); its menu is hidden.
         "wagtaildocs.document": "Wagtail document: editor upload, logged in Wagtail's action log",

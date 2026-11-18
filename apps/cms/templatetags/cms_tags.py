@@ -11,7 +11,7 @@ from django.http import HttpRequest
 from django.urls import NoReverseMatch, reverse
 from django.utils import translation
 from django.utils.translation import gettext
-from wagtail.models import Locale, Page
+from wagtail.models import Locale, Page, Site
 
 from apps.core.i18n import (
     LanguageLink,
@@ -23,7 +23,7 @@ from apps.core.i18n import (
 from apps.core.image_licences import Credit
 
 from .. import engine, services
-from ..models import NavigationMenu
+from ..models import FooterSettings, NavigationMenu
 
 register = template.Library()
 
@@ -67,10 +67,12 @@ def _site_links_item() -> list[MenuLink]:
 
 
 def _menu_links(request: HttpRequest | None, menu: NavigationMenu | None) -> list[MenuLink]:
+    return _stream_links(request, menu.links) if menu is not None else []
+
+
+def _stream_links(request: HttpRequest | None, stream: Any) -> list[MenuLink]:
     links: list[MenuLink] = []
-    if menu is None:
-        return links
-    for block in menu.links:
+    for block in stream:
         value = block.value
         if block.block_type == "external":
             links.append(MenuLink(label=value["label"], url=value["url"]))
@@ -82,6 +84,39 @@ def _menu_links(request: HttpRequest | None, menu: NavigationMenu | None) -> lis
         if page.live:
             links.append(MenuLink(label=value["label"] or page.title, url=page.get_url(request)))
     return links
+
+
+@dataclass(frozen=True)
+class FooterColumnView:
+    title: str
+    links: list[MenuLink]
+    text: str = ""
+
+
+@register.simple_tag(takes_context=True)
+def footer_chrome(context: dict[str, Any]) -> dict[str, Any]:
+    """The footer's CMS content for the visitor's language (CMS.17), the same for every theme:
+    `widgets` (up to four columns with `title`, `links`, `text`) and `social_links` (`label`,
+    `url`). Empty lists when the site has no footer setting; a column with no title and no
+    links is left out, so nothing renders empty."""
+    request: HttpRequest | None = context.get("request")
+    site = Site.find_for_request(request) if request is not None else None
+    if site is None:
+        return {"widgets": [], "social_links": []}
+    language = translation.get_language() or settings.LANGUAGE_CODE
+    footer = FooterSettings.objects.filter(site=site).first()
+    if footer is None:
+        return {"widgets": [], "social_links": []}
+    widgets = []
+    for column in engine.footer_columns(((c.language, c) for c in footer.columns.all()), language):
+        view = FooterColumnView(title=column.title, links=_stream_links(request, column.links))
+        if view.title or view.links:
+            widgets.append(view)
+    profiles = engine.footer_profiles(((p.language, p) for p in footer.profiles.all()), language)
+    return {
+        "widgets": widgets,
+        "social_links": [MenuLink(label=p.label, url=p.url) for p in profiles],
+    }
 
 
 def _home(code: str, suffix: str = "") -> str:

@@ -20,13 +20,15 @@ from django.db.models import Model
 from django.utils import timezone
 from django.utils.text import slugify
 from factory.django import DjangoModelFactory
-from wagtail.models import Locale, Page
+from wagtail.models import Locale, Page, Site
 
 from apps.cms.models import (
     BlogAuthor,
     BlogIndexPage,
     BlogPostPage,
     EditorRoleSeed,
+    FooterColumn,
+    FooterSettings,
     FormField,
     FormPage,
     HelpEntry,
@@ -35,12 +37,13 @@ from apps.cms.models import (
     LegalPageReview,
     LegalPageVersion,
     NavigationMenu,
+    SocialProfile,
     StandardPage,
     TermLandingPage,
     VendorLandingPage,
     VendorRecruitmentPage,
 )
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, primary_language
 from apps.vendors.models import Vendor
 
 
@@ -433,3 +436,35 @@ class FormFieldFactory(DjangoModelFactory[FormField]):
     label = factory.Sequence(lambda n: f"Field {n}")
     field_type = "singleline"
     required = False
+
+
+class FooterSettingsFactory(DjangoModelFactory[FooterSettings]):
+    """The footer setting of the default site (CMS.17), one per site."""
+
+    class Meta:
+        model = FooterSettings
+        django_get_or_create = ("site",)
+
+    site = factory.LazyFunction(lambda: Site.objects.get(is_default_site=True))
+
+
+class FooterColumnFactory(DjangoModelFactory[FooterColumn]):
+    class Meta:
+        model = FooterColumn
+
+    settings = factory.SubFactory(FooterSettingsFactory)
+    language = factory.LazyFunction(primary_language)
+    title = factory.Sequence(lambda n: f"Column {n}")
+    links = factory.LazyFunction(
+        lambda: [("external", {"url": "https://example.com/help/", "label": "Help"})]
+    )
+
+
+class SocialProfileFactory(DjangoModelFactory[SocialProfile]):
+    class Meta:
+        model = SocialProfile
+
+    settings = factory.SubFactory(FooterSettingsFactory)
+    network = "mastodon"
+    url = factory.Sequence(lambda n: f"https://social.example/@shop{n}")
+    language = ""

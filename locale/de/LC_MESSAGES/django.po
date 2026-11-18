@@ -3644,6 +3644,10 @@ msgstr ""
 "Lassen Sie das Feld leer für das früheste zulässige Datum. Ohne Ausnahme darf es nicht weniger als"
 " 30 Tage in der Zukunft liegen."
 
+#: apps/cms/models.py
+msgid "Leave empty to show the profile in every language."
+msgstr "Leer lassen, um das Profil in jeder Sprache anzuzeigen."
+
 #: apps/manager/amendment_forms.py
 msgid "Leave it as it is to keep the current method."
 msgstr "Lassen Sie das Feld unverändert, um die aktuelle Methode beizubehalten."
@@ -6304,7 +6308,7 @@ msgstr ""
 "Nur für den Slider mit automatischem Wechsel: wie lange eine Folie stehen bleibt, in "
 "Millisekunden, zwischen 3000 und 20000. Beispiel: 6000 sind sechs Sekunden."
 
-#: themes/ride/templates/components/footer.html
+#: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Social"
 msgstr "Soziale Netzwerke"
 
@@ -7418,6 +7422,10 @@ msgstr ""
 "Die vollständige Adresse der zu öffnenden Seite, beginnend mit https://, zum Beispiel "
 "https://www.example.com/guide. Pflichtfeld: Ohne sie führt der Link nirgendwohin."
 
+#: apps/cms/models.py
+msgid "The full address of the profile. It must start with https://."
+msgstr "Die vollständige Adresse des Profils. Sie muss mit https:// beginnen."
+
 #: apps/events/models.py
 msgid ""
 "The full description of the event, built from blocks: text, pictures, questions and a countdown. "
@@ -7478,6 +7486,10 @@ msgstr ""
 #: apps/cms/models.py
 msgid "The general text has no screen or page type."
 msgstr "Der allgemeine Text hat keinen Bildschirm- oder Seitentyp."
+
+#: apps/cms/models.py
+msgid "The heading of the column, for example 'Company'."
+msgstr "Die Überschrift der Spalte, zum Beispiel „Unternehmen“."
 
 #: apps/cms/blocks.py
 msgid "The heading of the section, up to 120 characters. Required."
@@ -7598,6 +7610,10 @@ msgstr "Die Sprache des Textes, der bei der Annahme des Vertrags angezeigt wurde
 #: apps/manager/event_forms.py
 msgid "The language of the translation. Required."
 msgstr "Die Sprache der Übersetzung. Pflichtfeld."
+
+#: apps/cms/models.py
+msgid "The language of the visitors who see this column. Up to four per language."
+msgstr "Die Sprache der Besucher, die diese Spalte sehen. Bis zu vier pro Sprache."
 
 #: apps/core/translation_fields.py
 msgid "The language of this translation. Each language has one row for the same item."
@@ -7806,6 +7822,12 @@ msgid ""
 msgstr ""
 "Der Link funktioniert nur einmal und läuft am %(expires)s (UTC) ab. Unser Team prüft anschließend "
 "Ihre Bewerbung. Wenn Sie nicht bestätigen, wird die Bewerbung nach einigen Tagen gelöscht."
+
+#: apps/cms/models.py
+msgid "The links of the column, in the order shown: a page of this site or another website."
+msgstr ""
+"Die Links der Spalte in der angezeigten Reihenfolge: eine Seite dieser Website oder eine andere "
+"Website."
 
 #: apps/cms/models.py
 msgid ""

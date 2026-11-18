@@ -53,15 +53,19 @@ from django.utils import timezone
 from django.utils.cache import get_max_age, patch_cache_control
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
 from wagtail import blocks
-from wagtail.admin.panels import FieldPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtail.contrib.routable_page.models import RoutablePageMixin, path
+from wagtail.contrib.settings.models import BaseSiteSetting
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images import get_image_model_string
-from wagtail.models import Page, PageManager, PageQuerySet, TranslatableMixin
+from wagtail.models import Orderable, Page, PageManager, PageQuerySet, TranslatableMixin
 from wagtail_localize.fields import BaseTranslatableField, SynchronizedField, TranslatableField
 from wagtail_localize.models import Translation
 
+from apps.core.fields import LanguageField
 from apps.core.images import rendition_or_original
 from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
 from apps.vendors.services import has_public_storefront
@@ -90,6 +94,7 @@ from .blocks import (
     paragraph_block,
 )
 from .choosers import term_chooser, vendor_chooser
+from .footer_forms import FooterSettingsForm
 from .forms_pages import FormField as FormField  # re-exported: models live in their own module
 from .forms_pages import FormPage as FormPage
 
@@ -381,6 +386,113 @@ class NavigationMenu(TranslatableMixin, models.Model):  # type: ignore[misc]
 
     def __str__(self) -> str:
         return f"{self.get_location_display()} ({self.locale})"
+
+
+# --- Footer columns and social profiles (CMS.17)
+
+
+class FooterSettings(ClusterableModel, BaseSiteSetting):  # type: ignore[misc]  # untyped
+    """The footer content of one Wagtail Site: up to four widget columns per language and the
+    social profile links. One row per site; each column and profile says which language it is
+    for (a profile with no language shows in every language). With no column and no profile
+    the footer shows nothing extra."""
+
+    base_form_class = FooterSettingsForm
+    panels: ClassVar[list[Any]] = [
+        InlinePanel("columns", label=_("Widget column"), heading=_("Widget columns")),
+        InlinePanel("profiles", label=_("Social profile"), heading=_("Social profiles")),
+    ]
+
+    class Meta:
+        verbose_name = _("footer")
+        verbose_name_plural = _("footer")
+
+    def __str__(self) -> str:
+        return f"Footer of {self.site}"
+
+
+class FooterColumn(Orderable):  # type: ignore[misc]
+    """A footer widget column of one language: a title and a list of page or external links."""
+
+    settings = ParentalKey(FooterSettings, on_delete=models.CASCADE, related_name="columns")
+    language = LanguageField(
+        _("language"),
+        help_text=_("The language of the visitors who see this column. Up to four per language."),
+    )
+    title = models.CharField(
+        _("title"),
+        max_length=100,
+        blank=True,
+        help_text=_("The heading of the column, for example 'Company'."),
+    )
+    links = StreamField(
+        [("page", PageLinkBlock()), ("external", ExternalLinkBlock())],
+        blank=True,
+        verbose_name=_("links"),
+        help_text=_(
+            "The links of the column, in the order shown: a page of this site or another website."
+        ),
+    )
+
+    panels: ClassVar[list[Any]] = [
+        FieldPanel("language"),
+        FieldPanel("title"),
+        FieldPanel("links"),
+    ]
+
+    class Meta(Orderable.Meta):  # type: ignore[misc]
+        verbose_name = _("footer column")
+
+    def __str__(self) -> str:
+        return f"{self.language}: {self.title}"
+
+
+class SocialProfile(Orderable):  # type: ignore[misc]
+    """A social profile link of the footer. The visible label is the network's name."""
+
+    settings = ParentalKey(FooterSettings, on_delete=models.CASCADE, related_name="profiles")
+    network = models.CharField(
+        _("network"),
+        max_length=16,
+        choices=[(code, name) for code, name in engine.SOCIAL_NETWORKS.items()],
+    )
+    url = models.URLField(
+        _("address"),
+        max_length=300,
+        help_text=_("The full address of the profile. It must start with https://."),
+    )
+    language = LanguageField(
+        _("language"),
+        blank=True,
+        help_text=_("Leave empty to show the profile in every language."),
+    )
+
+    panels: ClassVar[list[Any]] = [
+        FieldPanel("network"),
+        FieldPanel("url"),
+        FieldPanel("language"),
+    ]
+
+    class Meta(Orderable.Meta):  # type: ignore[misc]
+        verbose_name = _("social profile")
+
+    def __str__(self) -> str:
+        return f"{self.network}: {self.url}"
+
+    @property
+    def label(self) -> str:
+        return engine.SOCIAL_NETWORKS.get(self.network, self.network)
+
+    def clean(self) -> None:
+        super().clean()
+        if engine.social_url_error(self.url):
+            raise ValidationError(
+                {
+                    "url": _(
+                        "Enter an absolute address that starts with https:// and has no user name."
+                    )
+                }
+            )
 
 
 # --- Contextual help (ARC.32)

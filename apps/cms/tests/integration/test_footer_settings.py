@@ -1,18 +1,26 @@
 """CMS.17: footer columns and social profiles from the per-site, per-language settings."""
 
+import datetime as dt
 import json
 import re
+from typing import Any
 
 import pytest
 from django.core.exceptions import ValidationError
 from django.test import Client
+from pytest_django.fixtures import Settings as SettingsWrapper
+from wagtail.admin.panels import get_edit_handler
 from wagtail.models import Site
 
 from apps.cms.models import FooterColumn, FooterSettings, SocialProfile
-from apps.cms.tests.factories import StandardPageFactory
+from apps.cms.tests.factories import (
+    FooterColumnFactory,
+    FooterSettingsFactory,
+    SocialProfileFactory,
+    StandardPageFactory,
+)
 from apps.core.i18n import primary_language
 from apps.core.tests.factories import PlatformOperatorFactory
-from apps.themes.services import use_theme
 from tests.i18n import language_prefix, other_language
 
 pytestmark = pytest.mark.django_db
@@ -25,25 +33,27 @@ def _footer(html: str) -> str:
 
 
 def _settings() -> FooterSettings:
-    return FooterSettings.objects.get_or_create(site=Site.objects.get(is_default_site=True))[0]
+    return FooterSettingsFactory.create()
 
 
-def _column(settings: FooterSettings, language: str, title: str, links: list) -> FooterColumn:
-    return FooterColumn.objects.create(
+def _column(settings: FooterSettings, language: str, title: str, links: list[Any]) -> FooterColumn:
+    return FooterColumnFactory.create(
         settings=settings, language=language, title=title, links=links
     )
 
 
-def _profile(settings: FooterSettings, url: str, network: str = "mastodon", language: str = ""):
-    return SocialProfile.objects.create(
+def _profile(
+    settings: FooterSettings, url: str, network: str = "mastodon", language: str = ""
+) -> SocialProfile:
+    return SocialProfileFactory.create(
         settings=settings, network=network, url=url, language=language
     )
 
 
 @pytest.fixture(params=["base", "ride"])
-def theme(request: pytest.FixtureRequest):  # type: ignore[no-untyped-def]
-    with use_theme(request.param):
-        yield request.param
+def theme(request: pytest.FixtureRequest, settings: SettingsWrapper) -> str:
+    settings.MPMV_THEME_DEFAULT = request.param
+    return str(request.param)
 
 
 def test_columns_and_profiles_show_in_each_language_in_both_themes(
@@ -113,7 +123,7 @@ def test_the_network_comes_from_a_closed_list() -> None:
 
 
 def test_the_footer_form_refuses_a_fifth_column_in_a_language() -> None:
-    form_class = FooterSettings.get_edit_handler().get_form_class()
+    form_class = get_edit_handler(FooterSettings).get_form_class()
 
     def data(count: int) -> dict[str, str]:
         out = {
@@ -143,7 +153,11 @@ def test_the_footer_form_refuses_a_fifth_column_in_a_language() -> None:
 
 
 def test_profiles_feed_the_organization_same_as(client: Client) -> None:
-    PlatformOperatorFactory.create(official_profiles=["https://www.wikidata.org/wiki/Q1"])
+    PlatformOperatorFactory.create(
+        open_ended=True,
+        valid_from=dt.datetime(2020, 1, 1, tzinfo=dt.UTC),
+        official_profiles=["https://www.wikidata.org/wiki/Q1"],
+    )
     s = _settings()
     _profile(s, "https://social.example/@shop")
     _profile(s, "https://video.example/c/shop", "youtube", other_language())
