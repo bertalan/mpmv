@@ -868,3 +868,109 @@ class OrderEvent(BaseModel):
 
     def delete(self, *args: Any, **kwargs: Any) -> Any:
         raise PermissionError("An order event is append-only")
+
+
+class StaffDraftState(models.TextChoices):
+    OPEN = "open", "Open: staff may change it and send the link"
+    OPENED = "opened", "Opened: the customer put it in their cart"
+
+
+class StaffDraft(BaseModel):
+    """ORD.32: a cart that Support or the platform owner prepared from a past order, for the same
+    customer, waiting for the customer to open its one-time link.
+
+    It is not an order and binds nobody: it holds what was bought (product, variant, quantity)
+    and never a price, reserves no stock and writes no ledger line. The customer opens the link,
+    the lines go into their own cart at today's prices, and the normal checkout follows. The
+    customer is the source order's account or, for a guest order, its email: neither is copied
+    here, both are read from the order when the link is sent.
+
+    The link token is never stored: only its SHA-256 digest, with the draft version it was issued
+    for, its expiry and the send times (at most 3 a day). A change of the draft bumps `version`
+    and clears the digest, so an older link stops working.
+    """
+
+    source_order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="staff_drafts")
+    customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="staff_drafts",
+        help_text="The source order's account; empty for a guest order.",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="The staff member who prepared the draft.",
+    )
+    state = models.CharField(
+        max_length=16, choices=StaffDraftState.choices, default=StaffDraftState.OPEN
+    )
+    version = models.PositiveIntegerField(default=1)
+    skipped = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Items of the order left out when the draft was made, with the reason.",
+    )
+    link_digest = models.CharField(
+        max_length=64, blank=True, db_index=True, help_text="SHA-256 of the link token."
+    )
+    link_version = models.PositiveIntegerField(null=True, blank=True)
+    link_expires_at = models.DateTimeField(null=True, blank=True)
+    send_times = models.JSONField(
+        default=list, blank=True, help_text="When the link was sent (ISO times, most recent last)."
+    )
+    opened_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(state__in=StaffDraftState.values),
+                name="orders_staffdraft_state_valid",
+            ),
+            models.UniqueConstraint(
+                fields=["source_order"],
+                condition=models.Q(state="open"),
+                name="orders_staffdraft_one_open_per_order",
+                violation_error_message="This order already has an open draft.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Staff draft {self.public_id} from order {self.source_order_id}"
+
+
+class StaffDraftLine(BaseModel):
+    """One item of a staff draft: what and how many, never a price (ORD.32). Platform staff data,
+    not vendor-scoped: no shop sees or lists drafts (`tests.tenancy_registry.NOT_VENDOR_OWNED`)."""
+
+    draft = models.ForeignKey(StaffDraft, on_delete=models.CASCADE, related_name="lines")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="+")
+    variant = models.ForeignKey(
+        "catalog.Variant", on_delete=models.CASCADE, null=True, blank=True, related_name="+"
+    )
+    title = models.CharField(max_length=300, help_text="The item's name on the source order.")
+    variant_label = models.CharField(max_length=300, blank=True)
+    quantity = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["draft", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["draft", "product", "variant"],
+                nulls_distinct=False,
+                name="orders_staffdraftline_one_per_item",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(quantity__gte=1),
+                name="orders_staffdraftline_quantity_positive",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.quantity} x {self.title}"

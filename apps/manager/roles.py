@@ -138,6 +138,9 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.vendor_closure": {OWNER: E},
     "platform.orders_customers": {FINANCE: R, SUPPORT: RA, OWNER: R},
     "platform.support_actions": {SUPPORT: A, OWNER: A},
+    # ORD.32: a cart prepared from a past order and its one-time link (no Catalog, Finance or
+    # Configuration: 404, the Manager convention).
+    "platform.order_drafts": {SUPPORT: A, OWNER: A},
     "platform.user_sessions": {SUPPORT: A, OWNER: A},  # CORE.24: end one user's sessions
     "platform.sessions_panic": {OWNER: E},  # CORE.24: the "End every session" panic button
     "platform.activation": {SUPPORT: A, OWNER: E},
@@ -168,6 +171,7 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.vendor_closure": "Platform: close a vendor definitively",
     "platform.orders_customers": "Platform: orders and customers",
     "platform.support_actions": "Platform: support actions (unlock, resend link)",
+    "platform.order_drafts": "Platform: carts prepared from a past order, one-time link (ORD.32)",
     "platform.user_sessions": "Platform: a user's sessions, end them (CORE.24)",
     "platform.sessions_panic": "Platform: end every session, the panic button (CORE.24)",
     "platform.activation": "Platform: account activation and service messages (CORE.19)",

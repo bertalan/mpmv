@@ -1,0 +1,21 @@
+{% extends "layouts/account.html" %}
+{% load i18n %}
+{% comment %}
+ORD.32: the emailed link of a cart prepared by support. A GET shows this page and changes
+nothing; the button POSTs the token. No order, item or personal data is shown here.
+{% endcomment %}
+{% block title %}{% translate "Your prepared cart" %} · MPMV{% endblock %}
+{% block account_content %}
+<h1>{% translate "Your prepared cart" %}</h1>
+{% if refusal %}
+<p role="alert">{{ refusal }}</p>
+{% else %}
+<p>{% translate "Our support team prepared a cart for you from one of your orders. Open it to put the items in your cart, at today's prices." %}</p>
+<p>{% translate "Nothing is ordered or paid now: you check the cart, read the order details at checkout and pay yourself. The link works once." %}</p>
+<form method="post" action="{% url 'staff_draft_link_continue' %}">
+  {% csrf_token %}
+  <input type="hidden" name="token" value="{{ token }}">
+  <button type="submit">{% translate "Open the cart" %}</button>
+</form>
+{% endif %}
+{% endblock %}

@@ -22,6 +22,7 @@ from .product_views import SECTION as PRODUCTS_SECTION
 from .sales_terms_views import SECTION as SALES_TERMS_SECTION
 from .session_views import PANIC_SECTION, USER_SESSIONS_SECTION
 from .spaces import Space
+from .staff_draft_views import SECTION as ORDER_DRAFTS_SECTION
 from .statement_views import SECTION as STATEMENTS_SECTION
 from .termination_views import PLATFORM_SECTION as TERMINATIONS_SECTION
 from .termination_views import SHOP_SECTION as TERMINATION_SECTION
@@ -211,6 +212,15 @@ BUILT_IN = (
         "manager:platform:orders",
         order=50,
         allowed=platform_role(ORDER_CHANGES_SECTION),
+    ),
+    # ORD.32: carts prepared from a past order with a one-time link (Support, platform owner).
+    Section(
+        ORDER_DRAFTS_SECTION,
+        Space.PLATFORM,
+        _("Prepared carts"),
+        "manager:platform:order_drafts",
+        order=51,
+        allowed=platform_role(ORDER_DRAFTS_SECTION),
     ),
     # ORD.20 part 3: the three amendment settings in force (configuration role and the owner).
     Section(

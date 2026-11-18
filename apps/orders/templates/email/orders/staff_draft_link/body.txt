@@ -1,0 +1,12 @@
+{% load i18n %}{% if customer_name %}{% blocktranslate %}Hello {{ customer_name }},{% endblocktranslate %}{% else %}{% translate "Hello," %}{% endif %}
+
+{% blocktranslate %}Our support team prepared a cart for you from your order {{ order_number }}:{% endblocktranslate %}
+{% for item in items %}
+- {{ item.quantity }} x {{ item.title }}{% if item.variant %} ({{ item.variant }}){% endif %}{% endfor %}
+
+{% translate "Open the cart with this link:" %}
+{{ link }}
+
+{% translate "The prices, availability and shipping costs are today's, not those of your earlier order. Check everything in the cart and at checkout: nothing is ordered or paid until you place the order and pay yourself." %}
+
+{% blocktranslate %}The link works once and expires on {{ expires }}.{% endblocktranslate %} {% translate "If you did not ask for this cart, ignore this email: nothing happens." %}

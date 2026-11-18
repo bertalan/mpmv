@@ -35,6 +35,7 @@ from .models import (
     DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS,
     DEFAULT_AMENDMENT_COMPARABLE_DELAY_DAYS,
     DEFAULT_REFUND_FEE_SURCHARGE,
+    DEFAULT_STAFF_DRAFT_LINK_DAYS,
     PLATFORM_REFUND_CASE_CHOICES,
     AuditLog,
     FeatureFlag,
@@ -59,6 +60,7 @@ AMENDMENT_DEFAULTS: dict[str, int] = {
     "amendment_answer_hours": DEFAULT_AMENDMENT_ANSWER_HOURS,
     "amendment_comparable_delay_days": DEFAULT_AMENDMENT_COMPARABLE_DELAY_DAYS,
     "amendment_cancel_hold_hours": DEFAULT_AMENDMENT_CANCEL_HOLD_HOURS,
+    "staff_draft_link_days": DEFAULT_STAFF_DRAFT_LINK_DAYS,  # ORD.32
 }
 
 
@@ -114,6 +116,7 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             "amendment_answer_hours",
             "amendment_comparable_delay_days",
             "amendment_cancel_hold_hours",
+            "staff_draft_link_days",
             "valid_from",
         )
 
@@ -148,6 +151,9 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
 
     def clean_amendment_cancel_hold_hours(self) -> int:
         return self._amendment_setting("amendment_cancel_hold_hours")
+
+    def clean_staff_draft_link_days(self) -> int:
+        return self._amendment_setting("staff_draft_link_days")
 
     def clean_refund_fee_surcharge(self) -> Decimal:
         value: Decimal | None = self.cleaned_data.get("refund_fee_surcharge")

@@ -440,6 +440,9 @@ MAX_AMENDMENT_CANCEL_HOLD_HOURS = 168
 # Counsel (2026-11-17, A2): the customer has at least this long after the notice to cancel the
 # rest before the seller may ship; `apps.orders.amendments` refuses a shorter hold too.
 MIN_AMENDMENT_CANCEL_HOLD_HOURS = 24
+# ORD.32 (owner 2026-11-18): how many days a staff draft's payment link stays usable.
+DEFAULT_STAFF_DRAFT_LINK_DAYS = 7
+MAX_STAFF_DRAFT_LINK_DAYS = 30
 PLATFORM_ERROR = "platform_error"
 VENDOR_DEFAULT = "vendor_default"
 PLATFORM_REFUND_CASES = (PLATFORM_ERROR, VENDOR_DEFAULT)
@@ -683,6 +686,15 @@ class PlatformOperator(Versioned):
         help_text=_(
             "After an item is removed as unavailable, how many hours the seller must wait "
             "before shipping, so the customer can cancel the rest of the package."
+        ),
+    )
+    # ORD.32: the life of the one-time link of a staff draft (`apps.orders.staff_drafts`).
+    staff_draft_link_days = models.PositiveSmallIntegerField(
+        default=DEFAULT_STAFF_DRAFT_LINK_DAYS,
+        validators=[MinValueValidator(1), MaxValueValidator(MAX_STAFF_DRAFT_LINK_DAYS)],
+        help_text=_(
+            "How many days the link of a cart prepared by support stays usable. The customer "
+            "opens it once; after that, or after these days, it no longer works."
         ),
     )
     allowed_vendor_countries = ArrayField(

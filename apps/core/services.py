@@ -143,6 +143,7 @@ OPERATOR_FIELDS = (
     "amendment_answer_hours",
     "amendment_comparable_delay_days",
     "amendment_cancel_hold_hours",
+    "staff_draft_link_days",
     "allowed_vendor_countries",
     "valid_from",
     "valid_to",

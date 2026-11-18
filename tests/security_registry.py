@@ -108,6 +108,14 @@ PUBLIC: dict[str, str] = {
     ),
     "action_link:open": "Secure action link (CORE.15): the signed token is the credential.",
     "action_link:continue": "Secure action link (CORE.15): the signed token is the credential.",
+    "staff_draft_link": (
+        "Link of a cart prepared by support (ORD.32): the one-time random token is the "
+        "credential; a GET shows a Continue page and changes nothing."
+    ),
+    "staff_draft_link_continue": (
+        "Link of a cart prepared by support (ORD.32): the token in the POST body is the "
+        "credential, rate limited per IP; an account's cart needs that account signed in."
+    ),
     "garage_save": (
         "Anonymous garage cookie control (FIT.6, Q-G1): a POST that only writes or clears the "
         "visitor's own technical cookie, CSRF-checked, nothing stored or logged on the server."
@@ -279,6 +287,15 @@ IDOR_REVIEWED: dict[str, str] = {
     "action_link:open": (
         "The signed token is bound to one user and one object (CORE.15); a token of another "
         "user or object is refused (apps/accounts/tests/integration/test_action_links.py)."
+    ),
+    "staff_draft_link": (
+        "The random token names one draft by its digest (ORD.32); a guessed token is refused, "
+        "and opening a draft of another account is refused "
+        "(`test_an_account_draft_opens_for_that_account_only`)."
+    ),
+    "manager:platform:order_draft": (
+        "Platform space, Support and the platform owner only (CORE.18 row platform.order_drafts); "
+        "a prepared cart spans shops by design and shows no contact data of the customer."
     ),
     "manager:platform:profile_confirm": (
         "Platform space, for staff holding the revert permission only (a vendor member gets 403 "

@@ -40,6 +40,7 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Platform: close a vendor definitively |  |  |  |  | E |  |
 | Platform: orders and customers |  |  | R | R+A | R |  |
 | Platform: support actions (unlock, resend link) |  |  |  | A | A |  |
+| Platform: carts prepared from a past order, one-time link (ORD.32) |  |  |  | A | A |  |
 | Platform: a user's sessions, end them (CORE.24) |  |  |  | A | A |  |
 | Platform: end every session, the panic button (CORE.24) |  |  |  |  | E |  |
 | Platform: account activation and service messages (CORE.19) |  |  |  | A | E |  |
