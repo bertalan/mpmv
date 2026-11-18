@@ -27,9 +27,15 @@ _AVAILABILITY: Final = {
 }
 _GTIN_KEYS: Final = {8: "gtin8", 12: "gtin12", 13: "gtin13", 14: "gtin14"}
 FINITE_WINDOW: Final = f"{SCHEMA}/MerchantReturnFiniteReturnWindow"
-# The customer pays the return shipping (a withdrawal); a lack of conformity is free by law.
+# A lack of conformity is free by law; who pays a withdrawal return is stated only when the
+# vendor's approved policy says so (SEO.11).
 CUSTOMER_PAYS_RETURN: Final = f"{SCHEMA}/ReturnShippingFees"
 FREE_RETURN: Final = f"{SCHEMA}/FreeReturn"
+_RETURN_METHODS: Final = {
+    "post": "ReturnByMail",
+    "drop_off": "ReturnAtKiosk",
+    "in_store": "ReturnInStore",
+}
 
 
 @dataclass(frozen=True)
@@ -217,11 +223,20 @@ def organization_node(*, node_id: str, name: str, url: str) -> dict[str, Any]:
 
 
 def return_policy_node(
-    *, node_id: str, countries: Sequence[str], return_country: str, days: int, link: str = ""
+    *,
+    node_id: str,
+    countries: Sequence[str],
+    return_country: str,
+    days: int,
+    link: str = "",
+    paid_by: str = "",
+    methods: Sequence[str] = (),
 ) -> dict[str, Any]:
-    """A consumer return policy: `days` is the 14-day withdrawal floor, the customer pays the
-    return shipping, and a lack of conformity (`itemDefectReturnFees`) is free. Nothing is
-    promised to business buyers beyond the terms."""
+    """A consumer return policy: `days` is the vendor's approved window or the 14-day floor,
+    and a lack of conformity (`itemDefectReturnFees`) is free. `paid_by` ("vendor" or
+    "customer") sets `returnFees` only when the vendor's approved policy says it; empty states
+    nothing. Nothing is promised to business buyers beyond the terms."""
+    fees = {"vendor": FREE_RETURN, "customer": CUSTOMER_PAYS_RETURN}.get(paid_by, "")
     return _clean(
         {
             "@type": "MerchantReturnPolicy",
@@ -230,9 +245,12 @@ def return_policy_node(
             "returnPolicyCountry": return_country,
             "returnPolicyCategory": FINITE_WINDOW,
             "merchantReturnDays": days,
-            "returnFees": CUSTOMER_PAYS_RETURN,
+            "returnFees": fees,
             "itemDefectReturnFees": FREE_RETURN,
             "merchantReturnLink": link,
+            "returnMethod": [
+                f"{SCHEMA}/{_RETURN_METHODS[m]}" for m in methods if m in _RETURN_METHODS
+            ],
         }
     )
 
