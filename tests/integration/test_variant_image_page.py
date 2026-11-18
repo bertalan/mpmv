@@ -1,8 +1,8 @@
 """CAT.23: the product page shows a variant's own identifiers and cover image, in both themes.
 
-A variant with its own image carries it in the variant list and in the panel the selection script
-uses; a variant with no GTIN has none (the product's GTIN is not repeated on it); the page builds
-no rendition. The browser behaviour is in tests/e2e/test_variant_image.py.
+A variant with its own image carries it in the variant list and as the lead of its gallery
+(CAT.26); a variant with no GTIN has none (the product's GTIN is not repeated on it); the
+page builds no rendition. The browser behaviour is in tests/e2e/test_variant_image.py.
 """
 
 import io
@@ -113,9 +113,9 @@ def test_a_variant_with_its_own_image_shows_it_and_one_without_has_none(
     assert PRODUCT_GTIN not in picker.group(0)
     assert "PROD-1" not in picker.group(0)
     assert GOOD in picker.group(0)  # the variant's own barcode is listed
-    # The image is in the page for the selection script and in the variant list (no JS).
+    # The cover is in the variant list (no JS) and leads the variant's gallery (CAT.26).
     assert html.count("<picture") >= 2
-    assert "data-variant-image-panel" in html
+    assert 'data-variant-gallery-for="MUG-G"' in html
     assert 'alt="A green mug"' in html
 
 
