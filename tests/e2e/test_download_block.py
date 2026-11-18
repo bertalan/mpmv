@@ -7,6 +7,7 @@ from playwright.sync_api import Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 from wagtail.documents import get_document_model
+from wagtail.models import Collection
 
 from apps.cms.models import HomePage
 from tests.e2e.axe import format_violations, run_axe
@@ -17,6 +18,8 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 @pytest.fixture
 def _download_home(live_server: LiveServer, _cms_site: None) -> None:
+    if not Collection.objects.exists():  # a transactional test starts without the root collection
+        Collection.add_root(name="Root")
     doc = get_document_model()(title="Terms of sale")
     doc.file.save("terms.pdf", ContentFile(b"%PDF-1.4\n" + b"0" * 1_199_991), save=False)
     doc.save()
