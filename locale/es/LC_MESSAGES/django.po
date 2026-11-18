@@ -1661,6 +1661,14 @@ msgstr ""
 msgid "Choose a day from 1 to 31, or the last day."
 msgstr "Elija un día del 1 al 31, o el último día."
 
+#: apps/cms/blocks.py
+msgid ""
+"Choose a file from the media library, or upload a new one. Its type and size are shown next to the"
+" link by themselves."
+msgstr ""
+"Elija un archivo de la biblioteca multimedia o suba uno nuevo. Su tipo y tamaño se muestran solos "
+"junto al enlace."
+
 #: apps/manager/event_image_form.py
 msgid "Choose a licence"
 msgstr "Elija una licencia"
@@ -9262,6 +9270,14 @@ msgid ""
 msgstr ""
 "Las palabras en las que hacen clic los compradores. Si lo deja vacío, se usan las palabras que "
 "haya seleccionado o, si no ha seleccionado nada, la propia dirección."
+
+#: apps/cms/blocks.py
+msgid ""
+"The words of the link, for example 'Terms of sale'. Up to 120 characters. If you leave it empty, "
+"the title of the file is used."
+msgstr ""
+"Las palabras del enlace, por ejemplo «Condiciones de venta». Máximo 120 caracteres. Si lo deja "
+"vacío, se usa el título del archivo."
 
 #: apps/cms/blocks.py
 msgid ""

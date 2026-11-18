@@ -14,7 +14,7 @@ from wagtail.documents import get_document_model
 from wagtail.documents.blocks import DocumentChooserBlock
 
 from apps.cms.blocks import DownloadBlock
-from apps.cms.models import ArticlePage, HomePage, StandardPage, body_field
+from apps.cms.models import BlogPostPage, HomePage, StandardPage, body_field
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("english_interface")]
 
@@ -101,7 +101,7 @@ def test_the_size_uses_the_decimal_separator_of_the_page_language(theme: str) ->
     assert "PDF, 1,2 MB" in html
 
 
-@pytest.mark.parametrize("model", [HomePage, StandardPage, ArticlePage])
+@pytest.mark.parametrize("model", [HomePage, StandardPage, BlogPostPage])
 def test_the_page_bodies_offer_the_block(model: Any) -> None:
     assert "download" in model._meta.get_field("body").stream_block.child_blocks
 
