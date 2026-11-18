@@ -1,0 +1,9 @@
+{% load i18n %}
+<div class="fitment-group">
+  <h3 class="fitment-make">{{ group.label }}</h3>
+  <ul class="fitment-entries">
+    {% for entry in group.entries %}
+      <li{% if entry.excluded %} class="is-excluded"{% endif %}>{% if entry.excluded %}{% translate "Not for" %} {% endif %}{{ entry.label }}{% if entry.years %} <span class="fitment-years">({{ entry.years }})</span>{% endif %}{% if entry.note %} <span class="fitment-note">{{ entry.note }}</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</div>
