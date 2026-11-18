@@ -12,10 +12,10 @@ keeps the filters. A bulk action POSTs the selection and first shows its dry-run
       {% for filter in filters %}
         <div class="field">
           <label for="filter-{{ filter.name }}">{{ filter.label }}</label>
-          <select id="filter-{{ filter.name }}" name="{{ filter.name }}">
+          {% if filter.text %}<input type="search" id="filter-{{ filter.name }}" name="{{ filter.name }}" value="{{ filter.value }}">{% else %}<select id="filter-{{ filter.name }}" name="{{ filter.name }}">
             <option value="">{% translate "All" %}</option>
             {% for value, label in filter.choices %}<option value="{{ value }}"{% if value == filter.value %} selected{% endif %}>{{ label }}</option>{% endfor %}
-          </select>
+          </select>{% endif %}
         </div>
       {% endfor %}
       {% include "components/button.html" with label=_("Filter") type="submit" variant="secondary" only %}
