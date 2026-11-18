@@ -111,6 +111,54 @@ def shipping_tax(shipping_net: Decimal, rate: Decimal) -> Decimal:
     return round_line(shipping_net * rate / HUNDRED)
 
 
+def stored_shipping_portions(
+    shipping_choice: Mapping[str, Any] | None,
+) -> list[tuple[Decimal, Decimal, Decimal]]:
+    """`(net, rate, tax)` of each shipping VAT portion kept with the shipping choice."""
+    stored = (shipping_choice or {}).get("tax_portions") or []
+    return [
+        (Decimal(str(p["net"])), Decimal(str(p["rate"])), Decimal(str(p["tax"]))) for p in stored
+    ]
+
+
+class ShippingPortionsMismatch(ValueError):
+    """The shipping VAT portions of a vendor order do not add up (ORD.29)."""
+
+
+def check_shipping_portions(
+    shipping_net: Decimal,
+    portions: Sequence[tuple[Decimal, Decimal, Decimal]],
+    *,
+    shipping_tax: Decimal | None = None,
+) -> Decimal:
+    """The shipping VAT of a vendor order split across rates: the sum of its portions.
+
+    `portions` are `(net, rate, tax)`. The invariant of a vendor order without a single shipping
+    rate (ORD.29): at least one portion, each portion's VAT is its net at its rate rounded half up
+    (TAX.17 rounds per portion), the nets add up to `shipping_net` and, when given, the stored
+    `shipping_tax` is the sum of the portions' VAT. Raises `ShippingPortionsMismatch` otherwise.
+    """
+    if not portions:
+        raise ShippingPortionsMismatch("shipping split across rates needs its VAT portions")
+    for net, rate, tax in portions:
+        expected = round_line(net * rate / HUNDRED)
+        if net < 0 or tax != expected:
+            raise ShippingPortionsMismatch(
+                f"shipping portion {net} at {rate}% must carry {expected} VAT, not {tax}"
+            )
+    nets = sum((net for net, _, _ in portions), start=Decimal("0.00"))
+    if nets != shipping_net:
+        raise ShippingPortionsMismatch(
+            f"shipping portions add up to {nets}, not to the shipping net {shipping_net}"
+        )
+    total = sum((tax for _, _, tax in portions), start=Decimal("0.00"))
+    if shipping_tax is not None and total != shipping_tax:
+        raise ShippingPortionsMismatch(
+            f"shipping VAT {shipping_tax} is not the sum of its portions ({total})"
+        )
+    return total
+
+
 # --- checkout preview (ORD.3, SHP.4) ---------------------------------------------------------
 
 # Blocking messages of the checkout. `needs_quote` is not a failure: the package goes the quote
@@ -126,7 +174,6 @@ SHIPPING_BLOCKED = "shipping_blocked"
 SHIPPING_CHOICE_INVALID = "shipping_choice_invalid"
 TAX_BLOCKED = "tax_blocked"
 NO_PRICE = "no_price"
-SHIPPING_VAT_SPLIT = "shipping_vat_split"
 
 READY = "ready"
 QUOTE = "quote"

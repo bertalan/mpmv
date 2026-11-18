@@ -513,3 +513,109 @@ def _approve(page: EventPage) -> None:
     assert task is not None
     moderator = UserFactory.create(is_staff=True, is_superuser=True)
     task.approve(user=moderator)
+
+
+# --- CAT.28: the search page filters events in the database
+
+
+def _search(query: str, language: str = "it", limit: int = 5) -> Any:
+    from django.test import RequestFactory
+
+    return services.search_events(RequestFactory().get("/"), query, language, limit)
+
+
+def _titles(group: Any) -> list[str]:
+    return [item.title for item in group.items]
+
+
+def test_search_events_never_loads_the_whole_catalogue(monkeypatch: pytest.MonkeyPatch) -> None:
+    Fixture().create("de", title="Herbstmesse")
+
+    def refused(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("search_events must filter in the database")
+
+    monkeypatch.setattr(services, "events_for_locale", refused)
+    assert _titles(_search("herbst")) == ["Herbstmesse"]
+
+
+def test_search_events_matches_title_summary_venue_and_city_case_insensitively() -> None:
+    fixture = Fixture()
+    fixture.create("de", title="Alpha", summary="needle in summary")
+    fixture.create("de", title="NEEDLE title")
+    fixture.create("de", title="Gamma", venue_name="The Needle Hall")
+    fixture.create("de", title="Delta", city="Needleton")
+    fixture.create("de", title="Epsilon")
+    group = _search("nEeDlE", limit=10)
+    assert sorted(_titles(group)) == ["Alpha", "Delta", "Gamma", "NEEDLE title"]
+    assert group.more is False
+
+
+def test_search_events_orders_soonest_first_and_bounds_the_rows() -> None:
+    fixture = Fixture()
+    start = timezone.now() + dt.timedelta(days=5)
+    for number in (3, 1, 2):
+        fixture.create(
+            "de",
+            title=f"Bolt {number}",
+            starts_at=start + dt.timedelta(days=number),
+            ends_at=start + dt.timedelta(days=number, hours=2),
+        )
+    group = _search("bolt", limit=2)
+    assert _titles(group) == ["Bolt 1", "Bolt 2"]
+    assert group.more is True
+
+
+def test_search_events_follows_the_language_rule() -> None:
+    fixture = Fixture()
+    both = fixture.create("de", title="Frühlingsmesse zebra")
+    fixture.translate(both, "it", title="Fiera di primavera", summary="Incontra gli artigiani.")
+    fixture.create("de", title="Herbstmesse zebra")
+    # The match is on the text shown in the language of the page.
+    assert _titles(_search("primavera")) == ["Fiera di primavera"]
+    assert _titles(_search("frühling")) == []
+    group = _search("zebra")
+    assert _titles(group) == ["Herbstmesse zebra"]
+    assert [item.language for item in group.items] == ["de"]
+    assert _titles(_search("frühling", "de")) == ["Frühlingsmesse zebra"]
+
+
+def test_search_events_never_returns_hidden_draft_or_suspended_vendor_events() -> None:
+    from apps.accounts.tests.factories import UserFactory
+
+    fixture = Fixture()
+    fixture.create("de", title="Zebra open")
+    hidden = fixture.create("de", title="Zebra hidden")
+    services.hide_event(UserFactory.create(is_staff=True, is_superuser=True), hidden, "spam")
+    draft = services.save_event_draft(
+        fixture.user, _data(title="Zebra draft"), vendor=fixture.vendor, locale=_locale("de")
+    ).page
+    assert draft is not None
+    other = Fixture()
+    other.create("de", title="Zebra suspended")
+    Vendor.objects.filter(pk=other.vendor.pk).update(status=Vendor.Status.SUSPENDED)
+    assert _titles(_search("zebra", "de")) == ["Zebra open"]
+
+
+def test_search_events_query_count_does_not_grow_with_the_catalogue() -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    fixture = Fixture()
+    for number in range(3):
+        fixture.create("de", title=f"Bolt {number}")
+    with CaptureQueriesContext(connection) as small:
+        _search("bolt", limit=3)
+    for number in range(3, 30):
+        page = fixture.create("de", title=f"Bolt {number}")
+        if number % 3 == 0:
+            fixture.translate(page, "it", title=f"Bullone {number}")
+    with CaptureQueriesContext(connection) as large:
+        group = _search("bolt", limit=3)
+    assert len(group.items) == 3
+    assert len(large) == len(small)
+
+
+def test_search_events_matches_a_query_spanning_the_title_and_the_summary() -> None:
+    Fixture().create("de", title="Spring fair", summary="opening weekend", city="Bolzano")
+    assert _titles(_search("fair opening")) == ["Spring fair"]
+    assert _titles(_search("weekend messe")) == ["Spring fair"]

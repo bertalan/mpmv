@@ -16,7 +16,6 @@ from PIL import Image
 
 from apps.accounts.tests.factories import UserFactory
 from apps.catalog import media, product_pages
-from apps.catalog import tasks as catalog_tasks
 from apps.catalog.models import ProductImage, ProductImageTranslation
 from apps.catalog.tests.factories import (
     ProductFactory,
@@ -95,12 +94,6 @@ def test_the_job_makes_the_renditions_in_every_format_and_can_run_twice(
         == specs
     )
     core_tasks.render_image(image_id=row.image_id + 999)  # a vanished image: no error
-
-
-def test_the_old_job_name_still_runs_jobs_queued_before_the_move(licence: ImageLicence) -> None:
-    row = upload(ProductFactory.create(), licence)
-    catalog_tasks.render_product_image(image_id=row.image_id)
-    assert MediaImageRendition.objects.filter(image=row.image).exists()
 
 
 def test_a_rolled_back_upload_queues_no_job(licence: ImageLicence) -> None:

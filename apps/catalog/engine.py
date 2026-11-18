@@ -1277,6 +1277,23 @@ def gallery_selection[R: GalleryRow](rows: Iterable[R], language: str) -> list[R
     return [cover, *(row for row in ordered if row is not cover)]
 
 
+def variant_gallery[R: GalleryRow](
+    own: Iterable[R], shared: Iterable[R], cover: R | None, language: str
+) -> list[R]:
+    """The gallery shown when a variant is selected (CAT.26): the variant's own images first
+    (the D-18 rule applied to them), its cover leading them, then the product's gallery in the
+    same language rule. Empty when the variant has nothing of its own in `language`: the page
+    then keeps the product gallery. An image dedicated to another language never shows, cover
+    included."""
+    shown = gallery_selection(own, language)
+    usable_cover = cover if cover is not None and cover.language in (None, language) else None
+    if usable_cover is not None:
+        shown = [usable_cover, *(row for row in shown if row != usable_cover)]
+    if not shown:
+        return []
+    return [*shown, *(row for row in gallery_selection(shared, language) if row not in shown)]
+
+
 # --- Translation state of a product (CAT.11)
 
 STALE = "stale"
@@ -1305,3 +1322,122 @@ def translation_states(
 def translations_complete(states: Mapping[str, str]) -> bool:
     """True when every language is published and none is stale or missing."""
     return all(state == "published" for state in states.values())
+
+
+# --- Upsert and publishing rules (CAT.10): pure planning, no ORM.
+
+UPSERT_PRODUCT_FIELDS = (
+    "sales_mode",
+    "fiscal_category",
+    "weight_kg",
+    "length_mm",
+    "width_mm",
+    "height_mm",
+    "country_of_origin",
+)
+UPSERT_TEXT_FIELDS = ("title", "short_description", "description", "material", "colour")
+UPSERT_VARIANT_FIELDS = (
+    "price_net_override",
+    "weight_kg_override",
+    "stock_qty",
+    "is_default",
+    "gtin",
+    "mpn",
+)
+
+
+def product_field_changes(stored: Mapping[str, Any], data: ProductIn) -> dict[str, Any]:
+    """The product fields `data` sets to another value than `stored` holds (price excluded)."""
+    return {
+        name: getattr(data, name)
+        for name in UPSERT_PRODUCT_FIELDS
+        if stored[name] != getattr(data, name)
+    }
+
+
+def translation_plan(
+    stored: Mapping[str, Mapping[str, str]], given: Sequence[TranslationIn]
+) -> tuple[list[TranslationIn], dict[str, dict[str, str]]]:
+    """Split `given` texts into new languages and, per existing language, the changed fields.
+    Languages the payload does not mention are left alone."""
+    new: list[TranslationIn] = []
+    changed: dict[str, dict[str, str]] = {}
+    for text in given:
+        current = stored.get(text.language)
+        if current is None:
+            new.append(text)
+            continue
+        fields = {
+            name: getattr(text, name)
+            for name in UPSERT_TEXT_FIELDS
+            if current[name] != getattr(text, name)
+        }
+        if fields:
+            changed[text.language] = fields
+    return new, changed
+
+
+def variant_plan(
+    stored: Mapping[str, Mapping[str, Any]], given: Sequence[VariantIn]
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Per stored variant (by SKU match key) the fields `given` changes, and the SKUs of the
+    variants that do not exist yet. Prices are compared as given."""
+    changes: dict[str, dict[str, Any]] = {}
+    unknown: list[str] = []
+    for variant in given:
+        key = sku_match_key(variant.sku)
+        current = stored.get(key)
+        if current is None:
+            unknown.append(variant.sku)
+            continue
+        fields: dict[str, Any] = {}
+        for name in UPSERT_VARIANT_FIELDS:
+            wanted = getattr(variant, name)
+            if name in ("gtin", "mpn"):
+                wanted = normalise_identifier(wanted)
+            if current[name] != wanted:
+                fields[name] = wanted
+        if fields:
+            changes[key] = fields
+    return changes, unknown
+
+
+def structure_mismatch(
+    stored_attributes: Mapping[str, tuple[tuple[str, ...], Decimal | None, str, bool]],
+    stored_options: Mapping[str, Mapping[str, str]],
+    data: ProductIn,
+) -> list[str]:
+    """Why `data` would change the attributes, axes or variant options of an existing product;
+    the upsert does not do that (it refuses the row). `stored_attributes` maps a code to
+    (sorted value codes, number, text, axis); `stored_options` a variant match key to its
+    options."""
+    given = {a.code: (tuple(sorted(a.values)), a.number, a.text, a.axis) for a in data.attributes}
+    errors: list[str] = []
+    if given != dict(stored_attributes):
+        errors.append("The attributes of an existing product cannot be changed by an upsert.")
+    for variant in data.variants:
+        current = stored_options.get(sku_match_key(variant.sku))
+        if current is not None and dict(variant.options) != dict(current):
+            errors.append(f"Variant {variant.sku}: its options cannot be changed by an upsert.")
+    return errors
+
+
+def publication_errors(
+    sales_mode: str,
+    price_net: Decimal | None,
+    weight_kg: Decimal | None,
+    languages: Iterable[str],
+    primary: str,
+) -> list[str]:
+    """Why a product cannot go live (spec 03 §3.2 Rules), apart from the checks other apps
+    register: a `buy` product needs a weight above 0 and a price above 0; every product needs
+    the primary-language text."""
+    errors: list[str] = []
+    if sales_mode == "buy":
+        if weight_kg is None or weight_kg <= 0:
+            errors.append("A product for sale needs a weight above 0.")
+        if price_net is None or price_net <= 0:
+            errors.append("A product for sale needs a price above 0.")
+    if primary not in set(languages):
+        errors.append(f"The {primary.upper()} translation is missing.")
+    return errors

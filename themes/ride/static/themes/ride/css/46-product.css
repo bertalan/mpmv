@@ -64,16 +64,11 @@
     flex: none;
   }
 
-  /* CAT.23: the variant's own picture, in the list and in place of the gallery */
+  /* CAT.23: the variant's own picture in the list (CAT.26: its gallery replaces the product's) */
   .variant-thumb {
     max-inline-size: 4rem;
     block-size: auto;
     vertical-align: middle;
-  }
-
-  .product-variant-image img {
-    max-inline-size: 100%;
-    block-size: auto;
   }
 
   .store-categories .nav-link {
