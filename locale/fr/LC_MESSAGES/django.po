@@ -11465,8 +11465,12 @@ msgstr ""
 "Le type de zone : une île, une zone isolée ou un territoire ayant ses propres règles de TVA."
 
 #: apps/ingest/models.py
-msgid "What kind of term this is: category, taxonomy term, colour, material, brand or other."
-msgstr "Le type de terme : catégorie, terme de taxonomie, couleur, matière, marque ou autre."
+msgid ""
+"What kind of term this is: category, taxonomy term, colour, material, brand, product type, country"
+" or other."
+msgstr ""
+"Le type de terme : catégorie, terme de taxonomie, couleur, matière, marque, type de produit, pays "
+"ou autre."
 
 #: apps/shipping/models.py
 msgid "What pickup costs, without VAT. Use 0 for free pickup."

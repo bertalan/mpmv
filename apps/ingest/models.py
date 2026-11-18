@@ -92,6 +92,8 @@ class MappingKind(models.TextChoices):
     COLOR = "color", "Colour"
     MATERIAL = "material", "Material"
     BRAND = "brand", "Brand"
+    PRODUCT_TYPE = "product_type", "Product type"
+    COUNTRY = "country", "Country"
     OTHER = "other", "Other"
 
 
@@ -741,7 +743,8 @@ class MappingTable(BaseModel):
         max_length=20,
         choices=Kind,
         help_text=_(
-            "What kind of term this is: category, taxonomy term, colour, material, brand or other."
+            "What kind of term this is: category, taxonomy term, colour, material, brand, "
+            "product type, country or other."
         ),
     )
     key = models.CharField(
