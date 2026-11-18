@@ -179,16 +179,19 @@ def filter_entries(
     return entries.select_related("vendor_order__order").order_by("-id")
 
 
-def csv_rows(entries: Iterable[LedgerEntry], *, reference: str) -> Iterator[list[str]]:
+def csv_rows(
+    entries: Iterable[LedgerEntry], *, reference: str, tz: dt.tzinfo
+) -> Iterator[list[str]]:
     """The ledger extract as CSV rows: the non-fiscal label with the extract's reference, the
-    header, then one row per entry. Text cells are formula-safe; amounts are plain signed
-    numbers with a dot, never floats."""
+    header, then one row per entry. Dates are written in `tz` (the zone the period was cut in,
+    with its offset); text cells are formula-safe; amounts are plain signed numbers with a dot,
+    never floats."""
     yield [engine.NON_FISCAL_LABEL, engine.csv_safe(reference)]
     yield list(CSV_HEADER)
     for entry in entries:
         order = entry.vendor_order.order.number if entry.vendor_order else ""
         yield [
-            entry.created_at.isoformat(timespec="seconds"),
+            entry.created_at.astimezone(tz).isoformat(timespec="seconds"),
             entry.kind,
             engine.signed(entry.amount),
             entry.currency,

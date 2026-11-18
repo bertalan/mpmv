@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n tz %}
 {% comment %}Ledger rows (VEN.9): signed amounts and the running balance; never the entry's memo. Partial; no script or style.{% endcomment %}
 <div class="table-scroll" role="region" aria-labelledby="{{ caption_id }}" tabindex="0">
   <table class="table">
@@ -13,7 +13,8 @@
     </tr></thead>
     <tbody>
       {% for row in rows %}<tr>
-        <th scope="row"><time datetime="{{ row.when|date:'c' }}">{{ row.when|date:"SHORT_DATETIME_FORMAT" }}</time></th>
+        {# `when` is already in the business time zone: no conversion to the request's zone. #}
+        <th scope="row">{% localtime off %}<time datetime="{{ row.when|date:'c' }}">{{ row.when|date:"SHORT_DATETIME_FORMAT" }}</time>{% endlocaltime %}</th>
         <td>{{ row.kind }}</td>
         <td>{% if row.order_url %}<a href="{{ row.order_url }}">{{ row.order }}</a>{% endif %}</td>
         <td>{{ row.reference }}</td>

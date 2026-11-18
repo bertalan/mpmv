@@ -14,8 +14,10 @@ import secrets
 from collections.abc import Iterator
 from contextlib import contextmanager
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import pytest
+from django.conf import settings
 from django.test import Client
 from django.utils import timezone, translation
 
@@ -40,6 +42,8 @@ pytestmark = pytest.mark.django_db
 MONEY = f"{SHOP}money/"
 PAGES = ("", "transactions/", "payouts/", "statement/")
 CTX = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
+# Periods are cut in the business time zone (settings.BUSINESS_TIME_ZONE), not in UTC.
+ROME = ZoneInfo(settings.BUSINESS_TIME_ZONE)
 
 
 def add(
@@ -197,7 +201,7 @@ def test_transactions_are_paginated_and_filtered_by_kind(
 def test_transactions_and_payouts_are_filtered_by_period(
     client: Client, owner: User, vendor: Vendor, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    tz = timezone.get_current_timezone()
+    tz = ROME
     with at(monkeypatch, dt.datetime(2026, 1, 15, 12, tzinfo=tz)):
         add(vendor, "sale", "10.00", ref="jan-sale")
         add(vendor, "payout", "-10.00", ref="jan-payout")
@@ -220,7 +224,7 @@ def test_transactions_and_payouts_are_filtered_by_period(
 def test_the_statement_uses_the_ledger_statement_with_label_and_reference(
     client: Client, owner: User, vendor: Vendor, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    tz = timezone.get_current_timezone()
+    tz = ROME
     with at(monkeypatch, dt.datetime(2026, 1, 15, 12, tzinfo=tz)):
         add(vendor, "sale", "10.00")
     with at(monkeypatch, dt.datetime(2026, 2, 15, 12, tzinfo=tz)):
@@ -257,7 +261,7 @@ def test_the_statement_defaults_to_the_current_month(
 def test_the_export_is_a_safe_bounded_audited_non_fiscal_csv(
     client: Client, owner: User, vendor: Vendor, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    tz = timezone.get_current_timezone()
+    tz = ROME
     sub = VendorOrderFactory.create(vendor=vendor)
     with at(monkeypatch, dt.datetime(2026, 1, 15, 12, tzinfo=tz)):
         add(vendor, "sale", "1.00", ref="jan-only")
@@ -324,3 +328,57 @@ def test_the_pages_write_nothing_to_the_ledger(client: Client, owner: User, vend
     for tail in PAGES:
         assert client.get(f"{MONEY}{tail}").status_code == 200
     assert list(LedgerEntry.objects.values_list("id", "amount", "balance_after")) == before
+
+
+# Regression (review of #743): 00:30 in Rome on 1 March is 23:30 UTC on 28 February. The
+# periods are the vendor's (business) calendar days, so the entry belongs to March everywhere.
+LATE_FEB_UTC = dt.datetime(2026, 2, 28, 23, 30, tzinfo=dt.UTC)
+MARCH = {"from": "2026-03-01", "to": "2026-03-31"}
+FEBRUARY = {"from": "2026-02-01", "to": "2026-02-28"}
+
+
+def test_an_entry_at_half_past_midnight_in_rome_on_the_1st_is_in_that_month(
+    client: Client, owner: User, vendor: Vendor, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with at(monkeypatch, dt.datetime(2026, 2, 10, 12, tzinfo=dt.UTC)):
+        add(vendor, "sale", "10.00", ref="feb-sale")
+    with at(monkeypatch, LATE_FEB_UTC):
+        add(vendor, "sale", "5.00", ref="march-first-sale")
+    verified_login(client, owner)
+
+    march = client.get(f"{MONEY}statement/", MARCH).context["statement"]
+    assert (march.opening, march.credits, march.closing) == (
+        Decimal("10.00"),
+        Decimal("5.00"),
+        Decimal("15.00"),
+    )
+    february = client.get(f"{MONEY}statement/", FEBRUARY).context["statement"]
+    assert (february.opening, february.credits, february.closing) == (
+        Decimal("0.00"),
+        Decimal("10.00"),
+        Decimal("10.00"),
+    )
+
+    def refs(period: dict[str, str]) -> list[str]:
+        rows = client.get(f"{MONEY}transactions/", period).context["rows"]
+        return [r["reference"] for r in rows]
+
+    assert refs(MARCH) == ["march-first-sale"]
+    assert refs(FEBRUARY) == ["feb-sale"]
+
+    rows = export(client, **MARCH)
+    assert [(r[0], r[6]) for r in rows[2:]] == [("2026-03-01T00:30:00+01:00", "march-first-sale")]
+    assert "feb-sale" not in str(export(client, **MARCH))
+    assert "march-first-sale" not in str(export(client, **FEBRUARY))
+
+    page = client.get(f"{MONEY}transactions/", MARCH).text
+    assert 'datetime="2026-03-01T00:30:00+01:00"' in page
+
+
+def test_the_default_month_is_the_business_month(
+    client: Client, owner: User, vendor: Vendor, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    verified_login(client, owner)
+    with at(monkeypatch, LATE_FEB_UTC):  # already 1 March in Rome
+        filters = client.get(f"{MONEY}statement/").context["filters"]
+    assert (filters.first, filters.last) == (dt.date(2026, 3, 1), dt.date(2026, 3, 31))

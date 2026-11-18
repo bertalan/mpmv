@@ -15,7 +15,9 @@ import csv
 import datetime as dt
 from dataclasses import replace
 from typing import Any
+from zoneinfo import ZoneInfo
 
+from django.conf import settings
 from django.core.paginator import Paginator
 from django.db.models import QuerySet
 from django.http import Http404, HttpRequest, HttpResponse
@@ -76,6 +78,12 @@ def kind_label(kind: str) -> str:
     return str(KIND_LABELS.get(kind, kind))
 
 
+def business_tz() -> ZoneInfo:
+    """The zone of the vendor's calendar days: periods, "this month" and the dates shown and
+    exported are cut there, not in the server's UTC (like `termination_views._effective_at`)."""
+    return ZoneInfo(settings.BUSINESS_TIME_ZONE)
+
+
 class Filters:
     """The period and kind read from the query string (or the export form)."""
 
@@ -83,7 +91,7 @@ class Filters:
         self.period = engine.read_period(
             str(data.get("from", "")),
             str(data.get("to", "")),
-            today=timezone.localdate(),
+            today=timezone.localdate(timezone=business_tz()),
             default_month=default_month,
             closed=closed,
         )
@@ -104,7 +112,7 @@ class Filters:
 
     @property
     def bounds(self) -> tuple[dt.datetime | None, dt.datetime | None]:
-        return engine.period_bounds(self.first, self.last, timezone.get_current_timezone())
+        return engine.period_bounds(self.first, self.last, business_tz())
 
     @property
     def kinds(self) -> list[str] | None:
@@ -123,7 +131,7 @@ def entry_row(entry: LedgerEntry) -> dict[str, Any]:
     """What the vendor sees of one entry (never its memo or other platform working fields)."""
     sub = entry.vendor_order
     return {
-        "when": entry.created_at,
+        "when": timezone.localtime(entry.created_at, business_tz()),
         "kind": kind_label(entry.kind),
         "amount": entry.amount,
         "balance_after": entry.balance_after,
@@ -261,7 +269,8 @@ class ExportView(MoneyView):
         start, end = filters.bounds
         reference = engine.extract_reference(str(vendor.public_id), filters.first, filters.last)
         entries = filter_entries(self.entries(), start=start, end=end, kinds=filters.kinds)
-        lines = list(csv_rows(entries.iterator(), reference=reference))
+        # A list for the audited row count; the period is always closed (a month by default).
+        lines = list(csv_rows(entries.iterator(), reference=reference, tz=business_tz()))
         record_export(
             vendor,
             ctx=replace(audit_context(request), source=AuditLog.Source.VENDOR),
