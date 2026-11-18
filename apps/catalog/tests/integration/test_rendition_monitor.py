@@ -14,6 +14,7 @@ from django.contrib.auth.models import Group, Permission
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
+from django.template import Context
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -110,7 +111,7 @@ def test_a_page_shows_the_original_size_fallback_while_a_rendition_is_missing() 
     image = MediaImageFactory.create(file__width=2000, file__height=1500)
     before = image.get_rendition_model().objects.count()
 
-    html = str(responsive_image({}, image, "card", alt="x"))
+    html = str(responsive_image(Context(), image, "card", alt="x"))
 
     assert image.file.url in html
     assert 'width="2000"' in html
@@ -131,7 +132,7 @@ def test_a_failing_job_alerts_once_after_the_retry_limit(
         raise RuntimeError("storage unavailable")
 
     monkeypatch.setattr(core_images, "render_group", boom)
-    limit = render_image.retry_strategy.policy.max_attempts
+    limit = core_tasks.retry_policy(render_image).max_attempts
 
     for attempts in range(limit):  # retries still to come: no alert yet
         with pytest.raises(RuntimeError):
@@ -145,6 +146,7 @@ def test_a_failing_job_alerts_once_after_the_retry_limit(
     assert sink.alerts[0].key == f"renditions:{image.pk}:hero"
     row = AuditLog.objects.get(action=monitor.FAILED)
     assert row.target_key == f"{image.pk}:hero"
+    assert row.after is not None
     assert row.after["error"] == "RuntimeError"
 
 
@@ -157,7 +159,8 @@ def test_a_decode_error_is_not_retried_and_alerts_once(sink: AlertSink) -> None:
 
     assert len(sink.alerts) == 1
     assert AuditLog.objects.filter(action=monitor.FAILED).count() == 1
-    decision = render_image.retry_strategy.get_retry_decision(
+    strategy: Any = core_tasks._BackoffStrategy(core_tasks.DEFAULT_RETRY)
+    decision = strategy.get_retry_decision(
         exception=PermanentJobError("x"), job=SimpleNamespace(attempts=0)
     )
     assert decision is None
