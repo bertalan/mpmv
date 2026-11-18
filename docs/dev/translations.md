@@ -101,7 +101,11 @@ entry (keep Poedit's translator comments).
 ## Tone
 
 Customer emails use the informal form of address: tu (Italian), du (German), tu (French), tú
-(Spanish), owner decision. The Read me says so; the import cannot check it.
+(Spanish), owner decision. The Read me says so; the import cannot check it. The second-factor
+screens (`apps/accounts/templates/accounts/mfa/`) are shared by customers, vendors and staff and
+use the formal register (Lei, Sie, vous, usted). A msgid shared by a customer page and a formal page
+cannot have two registers: the customer page gets its own gettext context (for example
+"Your data" with context "customer privacy page"). Catalog tests check both registers.
 
 ## Adding a Read me language
 
@@ -120,7 +124,7 @@ refuses a LIVE deploy that lists them). Staff preview them on STAGE with
 python tools/i18n_catalog.py review-export <lang> [--all] [--pending] [--out FILE]
 ```
 
-writes the entries in `SENSITIVE_GROUPS` (order emails and documents, compliance forms, terms,
+writes the entries in `SENSITIVE_GROUPS` (order emails and documents, compliance forms, DSA statements of reasons and event moderation emails (EVT.11), terms,
 price notes, cart and order components, order-change pages) as a CSV for the translator.
 A reviewed entry carries the translator comment `# reviewed` in the `.po`. The per-language gate
 checks, the staff preview switch and the counsel sign-off mark are not built yet (I18N.19).

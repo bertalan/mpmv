@@ -47,6 +47,10 @@ PRESETS: dict[str, Preset] = {
     "hero": Preset((640, 960, 1280, 1600, 1920), "100vw"),
     # An image in the content column (lead image, figure).
     "content": Preset((480, 800, 1200, 1600), "(min-width: 75rem) 72rem, 100vw"),
+    # The main image of a blog article (CAT.29), in the content column.
+    "article": Preset((800, 1200, 1600), "(min-width: 75rem) 72rem, 100vw"),
+    # The photo on a blog author page (CAT.29): a square crop, shown about 240 px wide.
+    "avatar": Preset((240, 480), "240px", op="fill", ratio=(1, 1)),
     # Gallery tiles: cropped 4:3.
     "gallery": Preset((480, 960), "(min-width: 48rem) 33vw, 100vw", op="fill", ratio=(4, 3)),
     # Product cards and tiles in a grid.

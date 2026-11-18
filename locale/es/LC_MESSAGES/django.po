@@ -1434,7 +1434,7 @@ msgstr "No se puede cambiar cuando el nivel ya tiene nodos."
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Cannot scan? Enter this key:"
-msgstr "¿No puedes escanearlo? Introduce esta clave:"
+msgstr "¿No puede escanearlo? Introduzca esta clave:"
 
 #: apps/manager/event_block_forms.py
 msgid "Caption"
@@ -1674,7 +1674,7 @@ msgstr "Elija cómo se repite el evento. Los campos de abajo dependen de la elec
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
-msgstr "Elige cómo confirmarás tu identidad después de la contraseña."
+msgstr "Elija cómo confirmará su identidad después de la contraseña."
 
 #: apps/orders/ui/present.py
 msgid "Choose one of the shipping options."
@@ -2245,6 +2245,11 @@ msgstr "No se repite"
 msgid "done"
 msgstr "completado"
 
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Download"
+msgstr "Descargar"
+
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download my data"
 msgstr "Descargar mis datos"
@@ -2252,6 +2257,11 @@ msgstr "Descargar mis datos"
 #: apps/events/templates/events/_subscribe.html
 msgid "Download the calendar (ICS)"
 msgstr "Descargar el calendario (ICS)"
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Download your data"
+msgstr "Descarga tus datos"
 
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download your shop profile, products and order amounts as a JSON file."
@@ -2287,8 +2297,8 @@ msgid ""
 "Each code signs you in once if you lose your authenticator or passkey. Store them somewhere safe "
 "now: they are shown only this time."
 msgstr ""
-"Cada código te permite iniciar sesión una sola vez si pierdes tu app de autenticación o tu clave "
-"de acceso (passkey). Guárdalos ahora en un lugar seguro: solo se muestran esta vez."
+"Cada código le permite iniciar sesión una sola vez si pierde su app de autenticación o su clave de"
+" acceso (passkey). Guárdelos ahora en un lugar seguro: solo se muestran esta vez."
 
 #: apps/orders/templates/orders/_legal_recap.html
 msgid ""
@@ -2418,9 +2428,32 @@ msgstr "Introduzca el número de seguimiento: solo letras, dígitos, espacios y 
 msgid "Enter this when you buy for a business, or untick the box."
 msgstr "Rellena este campo si compras para una empresa, o desmarca la casilla."
 
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Erase my account"
+msgstr "Eliminar mi cuenta"
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Erase your account"
+msgstr "Elimina tu cuenta"
+
 #: apps/seo/site_links.py
 msgid "Erase your account (asks for confirmation)"
 msgstr "Eliminar su cuenta (pide confirmación)"
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid ""
+"Erasing your account blocks your login and deletes your carts and preferences. Order, billing, "
+"shipping and VAT data are kept for %(years)s years from the end of the fiscal year, restricted to "
+"what the law requires (GDPR article 17(3)(b)), and then anonymised. If you have an order still "
+"open, the erasure completes when the last open order closes."
+msgstr ""
+"Eliminar tu cuenta bloquea tu acceso y borra tus carritos y preferencias. Los datos de pedidos, "
+"facturación, envío e IVA se conservan durante %(years)s años desde el final del ejercicio fiscal, "
+"limitados a lo que exige la ley (RGPD artículo 17(3)(b)), y después se anonimizan. Si tienes un "
+"pedido aún abierto, la eliminación se completa cuando se cierra el último pedido abierto."
 
 #: themes/base/templates/components/alert.html
 msgid "Error"
@@ -2677,6 +2710,11 @@ msgstr "Generar nuevos códigos"
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Generating new codes makes every previous code stop working."
 msgstr "Al generar nuevos códigos, todos los códigos anteriores dejan de funcionar."
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "Get a copy of the data we hold about you as a JSON file."
+msgstr "Obtén una copia de los datos que conservamos sobre ti como archivo JSON."
 
 #: apps/manager/event_fields.py
 msgid "Give a number from -%(limit)d to %(limit)d, for example 45.464200."
@@ -3115,6 +3153,11 @@ msgstr ""
 #: apps/orders/templates/orders/_legal_boxes.html
 msgid "I specifically approve the onerous clauses listed above, one by one."
 msgstr "Apruebo específicamente, una por una, las cláusulas onerosas enumeradas arriba."
+
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "I understand and want to erase my account"
+msgstr "Entiendo y quiero eliminar mi cuenta"
 
 #: apps/orders/templates/email/orders/item_unavailable/body.html
 #: apps/orders/templates/email/orders/item_unavailable/body.txt
@@ -3580,7 +3623,7 @@ msgstr "Longitud"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Lost your device?"
-msgstr "¿Has perdido tu dispositivo?"
+msgstr "¿Ha perdido su dispositivo?"
 
 #: apps/manager/fitment_forms.py
 msgid "Lower case letters, digits, - and _. It cannot change later."
@@ -4696,7 +4739,8 @@ msgstr "Ventana de clave de acceso (passkey) abierta: quedan %(minutes_left)s mi
 msgid "Passkeys need JavaScript."
 msgstr "Las claves de acceso (passkeys) requieren JavaScript."
 
-#: apps/manager/templates/manager/login.html
+#: apps/compliance/templates/compliance/privacy_account.html
+#: apps/manager/templates/manager/login.html themes/ride/templates/compliance/privacy_account.html
 msgid "Password"
 msgstr "Contraseña"
 
@@ -5592,8 +5636,8 @@ msgstr "Indique si el contenido es ilegal o solo contraviene las condiciones de 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Scan this QR code with your authenticator app, then enter the 6-digit code it shows."
 msgstr ""
-"Escanea este código QR con tu app de autenticación y después introduce el código de 6 dígitos que "
-"muestra."
+"Escanee este código QR con su app de autenticación y después introduzca el código de 6 dígitos que"
+" muestra."
 
 #: apps/cms/models.py
 msgid "Screen (route name)"
@@ -5603,13 +5647,17 @@ msgstr "Pantalla (nombre de la ruta)"
 msgid "screen or page type"
 msgstr "pantalla o tipo de página"
 
-#: themes/ride/templates/components/header.html
+#: apps/seo/page_builders.py themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Buscar"
 
 #: apps/cms/blocks.py
 msgid "Search by name, SKU, brand or vendor, then click the product."
 msgstr "Busque por nombre, SKU, marca o vendedor y después haga clic en el producto."
+
+#: apps/seo/page_builders.py
+msgid "Search: %(query)s"
+msgstr "Buscar: %(query)s"
 
 #: apps/accounts/templates/accounts/mfa/setup.html themes/base/templates/components/user_tools.html
 msgid "Security"
@@ -9766,7 +9814,7 @@ msgstr "Verificar"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Verify it is you"
-msgstr "Verifica tu identidad"
+msgstr "Verifique su identidad"
 
 #: apps/manager/templates/manager/layout.html themes/base/templates/components/user_tools.html
 msgid "Version"
@@ -10698,8 +10746,8 @@ msgstr "No tienes permiso para abrir esta página."
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "You have %(counter)s unused recovery code."
 msgid_plural "You have %(counter)s unused recovery codes."
-msgstr[0] "Tienes %(counter)s código de recuperación sin usar."
-msgstr[1] "Tienes %(counter)s códigos de recuperación sin usar."
+msgstr[0] "Tiene %(counter)s código de recuperación sin usar."
+msgstr[1] "Tiene %(counter)s códigos de recuperación sin usar."
 
 #: apps/orders/templates/orders/_legal_recap.html
 msgid ""
@@ -10746,6 +10794,11 @@ msgstr ""
 "Registró el %(when)s que su factura o comprobante de este pedido está emitido. Cada cambio "
 "posterior muestra el recordatorio de corregirlo."
 
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgid "You will be asked to confirm with your second factor."
+msgstr "Se te pedirá que confirmes con tu segundo factor."
+
 #: apps/accounts/templates/accounts/levels/prompt.html
 #: apps/manager/templates/manager/amendment_passkey.html
 msgid ""
@@ -10757,11 +10810,11 @@ msgstr ""
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your account is protected with a passkey."
-msgstr "Tu cuenta está protegida con una clave de acceso (passkey)."
+msgstr "Su cuenta está protegida con una clave de acceso (passkey)."
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your account is protected with an authenticator app."
-msgstr "Tu cuenta está protegida con una app de autenticación."
+msgstr "Su cuenta está protegida con una app de autenticación."
 
 #: apps/orders/templates/orders/cart.html
 msgid "Your cart"
@@ -10803,6 +10856,12 @@ msgstr "Su elección sobre las cookies se ha guardado."
 msgid "Your data"
 msgstr "Sus datos"
 
+#: apps/compliance/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html
+msgctxt "customer privacy page"
+msgid "Your data"
+msgstr "Tus datos"
+
 #: apps/orders/templates/orders/checkout.html
 msgid "Your details"
 msgstr "Tus datos"
@@ -10843,7 +10902,7 @@ msgstr "Su evento %(title)s ha sido ocultado"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Your factors"
-msgstr "Tus factores"
+msgstr "Sus factores"
 
 #: apps/vendors/forms.py
 msgid ""
@@ -10933,11 +10992,11 @@ msgstr "Su cuenta de cobros está activa. Los clientes pueden comprar sus produc
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your protection"
-msgstr "Tu protección"
+msgstr "Su protección"
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid "Your recovery codes"
-msgstr "Tus códigos de recuperación"
+msgstr "Sus códigos de recuperación"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Your role"

@@ -1,19 +1,6 @@
-# count: 72
+# count: 36
 # Routes and page types without help files in every enabled language (ARC.36).
 # Only shrinks: delete a line when its files exist (ARC.37 fills them).
-page_type cms.BlogIndexPage
-page_type cms.BlogPostPage
-page_type cms.HomePage
-page_type cms.LegalPage
-page_type cms.StandardPage
-page_type cms.TermLandingPage
-page_type cms.VendorLandingPage
-page_type cms.VendorRecruitmentPage
-page_type events.EventIndexPage
-page_type events.EventPage
-route admin:index
-route customer_order
-route customer_orders
 route manager:platform:amendment_settings
 route manager:platform:dashboard
 route manager:platform:fitment_categories
@@ -50,26 +37,3 @@ route manager:shop:profile
 route manager:shop:sales_terms
 route manager:shop:termination
 route manager:shop:vendor
-route mfa:overview
-route mfa:recovery_codes
-route mfa:setup
-route mfa:totp
-route mfa:verify
-route orders:cart
-route orders:checkout
-route orders:confirmation
-route orders:review
-route orders:shipping
-route privacy_account
-route privacy_requests
-route vendors:apply
-route wagtailadmin_explore
-route wagtailadmin_explore_root
-route wagtailadmin_home
-route wagtailadmin_pages:add
-route wagtailadmin_pages:edit
-route wagtaildocs:index
-route wagtailimages:index
-route wagtailsnippets_cms_helpentry:list
-route withdrawal
-route withdrawal_confirm
