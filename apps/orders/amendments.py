@@ -35,6 +35,7 @@ from typing import Any
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
+from django.db.models import QuerySet
 from django.http import Http404
 from django.utils import timezone
 from django.utils.module_loading import import_string
@@ -607,6 +608,25 @@ def _check_customer_request(
     return {key: str(request[key]) for key in CUSTOMER_REQUEST_KEYS}
 
 
+def staff_actionable(vendor_order: VendorOrder) -> bool:
+    """ORD.30: whether platform staff can still act on a package (ORD.22): the order is paid and
+    the package has not shipped (pending or accepted; so not delivered, cancelled or closed).
+    The one rule behind `_lock_amendable` (the actions) and `staff_actionable_packages` (the staff
+    list), so the list and the actions cannot drift."""
+    return (
+        vendor_order.order.state in PAID_OR_LATER
+        and vendor_order.state in am.AMENDABLE_VENDOR_ORDER_STATES
+    )
+
+
+def staff_actionable_packages(rows: QuerySet[VendorOrder]) -> QuerySet[VendorOrder]:
+    """`rows` narrowed to the packages for which `staff_actionable` holds (same rule, in SQL)."""
+    return rows.filter(
+        order__state__in=sorted(PAID_OR_LATER),
+        state__in=sorted(am.AMENDABLE_VENDOR_ORDER_STATES),
+    )
+
+
 def _lock_amendable(sub: VendorOrder) -> VendorOrder:
     """Lock the Order, then the VendorOrder (only its own row, `of=("self",)`): the order of
     `transition_vendor_order` and `ledger.refunds._lock`, so an amendment, a refund and a
@@ -624,13 +644,14 @@ def _lock_amendable(sub: VendorOrder) -> VendorOrder:
                 "The shop's open orders are frozen pending staff review, so they cannot be amended."
             )
         )
-    if locked.order.state not in PAID_OR_LATER:
-        raise AmendmentRefused(
-            gettext(
-                "This order is not paid yet: change it through the checkout or the quote instead."
+    if not staff_actionable(locked):
+        if locked.order.state not in PAID_OR_LATER:
+            raise AmendmentRefused(
+                gettext(
+                    "This order is not paid yet: change it through the checkout or the quote "
+                    "instead."
+                )
             )
-        )
-    if locked.state not in am.AMENDABLE_VENDOR_ORDER_STATES:
         raise AmendmentRefused(
             gettext(
                 "This package is %(state)s: an order can be amended only before shipping, while "

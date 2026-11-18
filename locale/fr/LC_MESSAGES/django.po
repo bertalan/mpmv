@@ -949,6 +949,7 @@ msgid "Aliases"
 msgstr "Alias"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
@@ -2728,6 +2729,7 @@ msgid "File"
 msgstr "Fichier"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filter"
@@ -2738,6 +2740,7 @@ msgid "Filter events"
 msgstr "Filtrer les événements"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filters"
@@ -4130,6 +4133,10 @@ msgid "No order has this number."
 msgstr "Aucune commande ne porte ce numéro."
 
 #: apps/manager/templates/manager/platform/orders.html
+msgid "No package waits for a change."
+msgstr "Aucun colis n'attend de modification."
+
+#: apps/manager/templates/manager/platform/orders.html
 msgid "No package was cancelled in this period."
 msgstr "Aucun colis n'a été annulé sur cette période."
 
@@ -4675,6 +4682,10 @@ msgstr "Un préavis ne peut être donné qu'à des vendeurs actifs ou suspendus.
 msgid "Only when the event is hidden after a notice."
 msgstr "Uniquement lorsque l'événement est masqué à la suite d'un signalement."
 
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Open change"
+msgstr "Modification ouverte"
+
 #: apps/events/templates/events/_event_map.html
 msgid "Open in a maps app"
 msgstr "Ouvrir dans une application de cartes"
@@ -4943,6 +4954,10 @@ msgstr "Colis annulé"
 msgid "Packages of order %(number)s"
 msgstr "Colis de la commande %(number)s"
 
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Packages you can still change"
+msgstr "Colis encore modifiables"
+
 #: themes/base/templates/components/pagination.html
 msgid "Page %(number)s"
 msgstr "Page %(number)s"
@@ -4966,6 +4981,14 @@ msgstr "Pagination"
 #: apps/orders/customer_views.py
 msgid "Paid"
 msgstr "Payé"
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid ""
+"Paid packages that have not shipped, oldest first. Shipped and closed packages are found by their "
+"order number above."
+msgstr ""
+"Colis payés et pas encore expédiés, du plus ancien au plus récent. Les colis expédiés ou clos se "
+"retrouvent avec le numéro de commande ci-dessus."
 
 #: apps/orders/customer_views.py
 msgid "Partly refunded"
@@ -5115,13 +5138,22 @@ msgstr "Indication du sélecteur"
 msgid "Pictures for the event page come from"
 msgstr "Les images de la page de l'événement proviennent de"
 
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
 msgstr "Passée le"
 
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Placed from"
+msgstr "Passée à partir du"
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "Placed on"
 msgstr "Passée le"
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Placed until"
+msgstr "Passée jusqu'au"
 
 #: apps/catalog/taxonomy.py
 msgid ""

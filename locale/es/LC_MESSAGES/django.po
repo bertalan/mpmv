@@ -942,6 +942,7 @@ msgid "Aliases"
 msgstr "Alias"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
@@ -2701,6 +2702,7 @@ msgid "File"
 msgstr "Archivo"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filter"
@@ -2711,6 +2713,7 @@ msgid "Filter events"
 msgstr "Filtrar los eventos"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filters"
@@ -4093,6 +4096,10 @@ msgid "No order has this number."
 msgstr "Ningún pedido tiene este número."
 
 #: apps/manager/templates/manager/platform/orders.html
+msgid "No package waits for a change."
+msgstr "Ningún paquete espera un cambio."
+
+#: apps/manager/templates/manager/platform/orders.html
 msgid "No package was cancelled in this period."
 msgstr "En este período no se canceló ningún paquete."
 
@@ -4634,6 +4641,10 @@ msgstr "El preaviso solo se puede dar a vendedores activos o suspendidos."
 msgid "Only when the event is hidden after a notice."
 msgstr "Solo cuando el evento se oculta a raíz de un aviso."
 
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Open change"
+msgstr "Cambio abierto"
+
 #: apps/events/templates/events/_event_map.html
 msgid "Open in a maps app"
 msgstr "Abrir en una aplicación de mapas"
@@ -4899,6 +4910,10 @@ msgstr "Paquete cancelado"
 msgid "Packages of order %(number)s"
 msgstr "Paquetes del pedido %(number)s"
 
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Packages you can still change"
+msgstr "Paquetes aún modificables"
+
 #: themes/base/templates/components/pagination.html
 msgid "Page %(number)s"
 msgstr "Página %(number)s"
@@ -4922,6 +4937,14 @@ msgstr "Paginación"
 #: apps/orders/customer_views.py
 msgid "Paid"
 msgstr "Pagado"
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid ""
+"Paid packages that have not shipped, oldest first. Shipped and closed packages are found by their "
+"order number above."
+msgstr ""
+"Paquetes pagados y aún no enviados, del más antiguo al más reciente. Los paquetes enviados o "
+"cerrados se encuentran con el número de pedido de arriba."
 
 #: apps/orders/customer_views.py
 msgid "Partly refunded"
@@ -5072,13 +5095,22 @@ msgstr "Pista del selector"
 msgid "Pictures for the event page come from"
 msgstr "Las imágenes de la página del evento proceden de"
 
+#: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
 msgstr "Realizado el"
 
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Placed from"
+msgstr "Realizado desde el"
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "Placed on"
 msgstr "Realizado el"
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Placed until"
+msgstr "Realizado hasta el"
 
 #: apps/catalog/taxonomy.py
 msgid ""
