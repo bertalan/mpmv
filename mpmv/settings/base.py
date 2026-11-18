@@ -16,6 +16,7 @@ from .env import (
     env_secret_list,
     env_str,
     map_tile_origin,
+    map_tile_upstream_url,
 )
 from .languages import language_settings
 
@@ -99,6 +100,7 @@ INSTALLED_APPS = [
     "wagtail.admin",
     "wagtail.contrib.settings",  # BaseSiteSetting for the per-site theme (THM.1)
     "wagtail.contrib.routable_page",  # `routablepageurl` for the blog's author pages (CMS.3)
+    "wagtail.contrib.forms",  # editor-built form pages and their stored submissions (CMS.13)
     "wagtail",
     "modelcluster",
     "taggit",
@@ -125,6 +127,8 @@ MIDDLEWARE = [
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
+    # EVT.14: no cookie and no `Vary: Accept-Language` on tiles; outside Session and Locale.
+    "apps.core.middleware.TileResponseNeutralMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "apps.core.middleware.LanguageRedirectMiddleware",  # retired language prefixes (I18N.15)
@@ -217,6 +221,10 @@ VENDOR_APPLICATION_RATE_LIMIT = 20
 # Public search page (CAT.27): searches allowed per client IP per minute (the query is not
 # counted when empty); a client over it gets a 429.
 SEARCH_RATE_LIMIT = 30
+# Editor-built form pages (CMS.13): submissions allowed per client IP every 15 minutes (over it
+# a 429), and the largest POST body accepted (over it a 400); neither stores anything.
+FORM_PAGE_RATE_LIMIT = 10
+FORM_PAGE_MAX_SUBMISSION_BYTES = 32 * 1024
 # Unconfirmed applications (owner decision D-24, VEN.22): the account and its applicant vendor
 # are deleted this many days after the request, and one reminder goes out after this many hours.
 VENDOR_APPLICATION_RETENTION_DAYS = 3
@@ -611,15 +619,32 @@ GEOCODING_ACCESS_POLICIES: list[str] = ["apps.vendors.services.is_vendor_member"
 
 # Maps (EVT.13, spec 15 "Maps"): the Leaflet tile URL template, its attribution and the view of
 # a map without a point (latitude, longitude, zoom). The tiles come from the EVT.14 proxy on the
-# site itself (`/maps/tiles/{z}/{x}/{y}.png`) once it exists; until then empty means no tile
-# layer (the picker still works: click, drag and the inputs). An absolute https URL is allowed in
+# site itself (`/maps/tiles/{z}/{x}/{y}.png`, the default). An absolute https URL is allowed in
 # the CSP for that one origin only, and never in tests (no third-party network).
-MAP_TILE_URL = env_str("MPMV_MAP_TILE_URL", "")
+MAP_TILE_URL = env_str("MPMV_MAP_TILE_URL", "") or "/maps/tiles/{z}/{x}/{y}.png"
 MAP_TILE_ATTRIBUTION = env_str("MPMV_MAP_TILE_ATTRIBUTION", "") or "© OpenStreetMap contributors"
 MAP_TILE_ATTRIBUTION_URL = (
     env_str("MPMV_MAP_TILE_ATTRIBUTION_URL", "") or "https://www.openstreetmap.org/copyright"
 )
 MAP_DEFAULT_VIEW = (48.0, 10.0, 4)
+# Tile proxy (EVT.14, apps.core.maps): the upstream URL template (OpenStreetMap's public tile
+# server at launch; a paid EU provider later, by changing this value only), the identifying
+# User-Agent (empty: the product, the site URL and the operator contact), the zoom range, the
+# per-IP limit, the daily cap of upstream requests (OSM tile usage policy: light use only) and
+# the storage alias of the cache. Tiles are cached at least 7 days, longer when the upstream says.
+MAP_TILE_UPSTREAM_URL = map_tile_upstream_url(
+    env_str("MPMV_MAP_TILE_UPSTREAM_URL", "") or "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+)
+MAP_TILE_UPSTREAM = "apps.core.maps.adapters.HttpTileUpstream"
+MAP_TILE_USER_AGENT = env_str("MPMV_MAP_TILE_USER_AGENT", "")
+MAP_TILE_MIN_ZOOM = 2  # spec 15: tiles from zoom 2 to 18
+MAP_TILE_MAX_ZOOM = 18
+MAP_TILE_UPSTREAM_TIMEOUT = 5.0  # seconds
+MAP_TILE_UPSTREAM_DAILY_LIMIT = env_int("MPMV_MAP_TILE_UPSTREAM_DAILY_LIMIT", 100_000)
+MAP_TILE_IP_LIMIT = 600  # tiles per IP and window (one map view loads about 20)
+MAP_TILE_IP_WINDOW = 60  # seconds
+MAP_TILE_BROWSER_MAX_AGE = 7 * 24 * 3600  # Cache-Control max-age for browsers and the CDN
+MAP_TILE_CACHE_STORAGE = "default"
 _MAP_TILE_ORIGIN = map_tile_origin(MAP_TILE_URL)
 if _MAP_TILE_ORIGIN:
     SECURE_CSP = {

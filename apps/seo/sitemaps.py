@@ -23,6 +23,7 @@ from apps.catalog.models import (
     Taxonomy,
     Term,
 )
+from apps.cms import engine, help_guide
 from apps.cms.models import TermLandingPage
 from apps.core import translations
 from apps.core.i18n import primary_language
@@ -69,9 +70,18 @@ def _cms_entries(language: str, request: HttpRequest, *, events: bool) -> Iterat
             yield Entry(url, _date(page.last_published_at), page.title)
 
 
+def _help_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
+    """The customer help pages that have their own file in `language` (ARC.37): a fallback copy
+    is left out, its canonical is the primary-language page."""
+    for slug in engine.GUIDE_SECTIONS["customer"]:
+        if language in help_guide.own_languages("customer", slug):
+            yield Entry(absolute_url(request, help_guide.section_path(slug, language)))
+
+
 def cms_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
-    """The CMS pages other than events."""
-    return _cms_entries(language, request, events=False)
+    """The CMS pages other than events, then the customer help pages."""
+    yield from _cms_entries(language, request, events=False)
+    yield from _help_entries(language, request)
 
 
 def event_entries(language: str, request: HttpRequest) -> Iterator[Entry]:

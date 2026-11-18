@@ -91,12 +91,16 @@ SCOPES = (
     "themes/ride/templates/compliance/privacy_account.html",
     # The staff note of the unused-images list (CAT.25): the rest of that page is English admin.
     "apps/catalog/templates/catalog/admin/orphan_images_old_versions.html",
+    # The customer help pages (ARC.37): informal register.
+    "apps/cms/templates/cms/help_guide_index.html",
+    "apps/cms/templates/cms/help_guide_section.html",
     *EVENT_FILES,  # the public event pages (EVT.6)
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (
     "apps/vendors/services.py",
     "apps/cms/templatetags/cms_tags.py",  # the header's "Site links" item (OPS.12)
+    "apps/cms/slugs.py",  # the reserved-slug error of the page form (ARC.37)
 )
 # Single Python modules scanned in full: customer-facing messages of apps that are not in SCOPES.
 FILES = (

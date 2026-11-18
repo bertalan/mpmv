@@ -1,0 +1,23 @@
+{% extends "layouts/base.html" %}
+{% load i18n cms_tags %}
+{% comment %}
+The editor's preview of a term landing page on `ride` (THM.9 part 1; CMS.4). Visitors never see
+this page: the landing page lives on its term's listing page (D-07), which shows the same parts
+around the listing. The name sits in the page banner (the only h1).
+{% endcomment %}
+{% block head %}{{ block.super }}{% robots_meta "noindex" %}{% endblock %}
+{% block content %}
+  <div class="listing">
+    {% page_trail current=name as trail %}
+    {% include "components/page_banner.html" with title=name items=trail only %}
+    {% include "cms/includes/term_landing_before.html" %}
+    {% if cards %}
+      <section class="listing-results" aria-labelledby="term-landing-products-heading">
+        <h2 id="term-landing-products-heading">{% translate "Products" %}</h2>
+        {% include "cms/includes/product_tiles.html" with request=request cards=cards currency=currency heading_level=3 only %}
+      </section>
+    {% endif %}
+    {% include "cms/includes/term_landing_after.html" %}
+  </div>
+{% endblock %}
+{% block image_credits %}{% endblock %}

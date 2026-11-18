@@ -1,0 +1,20 @@
+{% extends "layouts/error.html" %}
+{% load i18n %}
+{% comment %}
+Error page layout of `ride` (THM.9 part 1): base's error layout (header and footer without the
+database for the 400 and 500 pages, the `noindex` robots meta, `heading` and `message` blocks of
+`400.html`, `403.html`, `403_csrf.html`, `404.html`, `500.html`) with the heading in the page
+banner, the only h1. There is no breadcrumb: an error page has no place in the tree, and the
+button leads home.
+{% endcomment %}
+{% block content %}
+  <div class="error-page">
+    <div class="page-banner full-bleed">
+      <div class="page-banner__content"><h1 class="page-banner__title">{% block heading %}{% endblock %}</h1></div>
+    </div>
+    <div class="page-content">
+      {% block message %}{% endblock %}
+      {% url 'home' as home_url %}<p><a class="btn btn-primary" href="{% firstof home_url '/' %}">{% translate "Go to the home page" %}</a></p>
+    </div>
+  </div>
+{% endblock %}

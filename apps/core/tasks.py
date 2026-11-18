@@ -400,12 +400,15 @@ def run_worker(
 
 
 @task("core.render_image")
-def render_image(image_id: int) -> None:
-    """Make the renditions of every preset of one `MediaImage` (CAT.4 review).
+def render_image(image_id: int, group: str | None = None) -> None:
+    """Make the renditions of one preset group of one `MediaImage` (CAT.4 review).
 
-    Queued by the `post_save` receiver of `apps.core.signals` when the file is new or replaced
-    (one waiting job per image). Safe to run twice: a rendition that exists is reused; a deleted
-    image is skipped. A file that cannot be decoded (corrupt, a decompression bomb, missing) is
+    Queued by the `post_save` receiver of `apps.core.signals` when the file is new or replaced:
+    one job per group of `images.RENDER_GROUPS`, hero first, so a 40 MP original is not
+    decoded and encoded about 46 times in one job (one waiting job per image and group). Without
+    `group` (jobs queued before the split) it renders every group. Safe to run twice: a
+    rendition that exists is reused; a deleted image is skipped.
+    A file that cannot be decoded (corrupt, a decompression bomb, missing) is
     logged and dropped: retrying cannot fix it.
     """
     from PIL import UnidentifiedImageError
@@ -418,11 +421,15 @@ def render_image(image_id: int) -> None:
     if image is None:
         return
     try:
-        images.render_all(image)
+        if group is None:
+            images.render_all(image)
+        else:
+            images.render_group(image, group)
     except (DecompressionBombError, UnidentifiedImageError, OSError) as error:
         logger.warning(
-            "core.render_image image %s skipped, its file cannot be rendered: %s: %s",
+            "core.render_image image %s group %s skipped, its file cannot be rendered: %s: %s",
             image_id,
+            group or "all",
             type(error).__name__,
             error,
         )

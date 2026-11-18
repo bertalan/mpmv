@@ -585,6 +585,10 @@ ENDPOINTS: dict[str, Access] = {
         "Contextual help (ARC.32): the platform's help text for a screen, the same for every "
         "signed-in caller; reads no vendor data."
     ),
+    "map_tile": NoVendorData(
+        "Map tile proxy (EVT.14): a tile image, the same for everyone, no vendor data.",
+        kwargs={"z": "99", "x": "0", "y": "0"},
+    ),
     "geocoding_find": NoVendorData(
         "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
     ),
@@ -966,6 +970,11 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "consumer_information": NoVendorData(
         "Pre-contractual information (CMP.6): platform-wide legal text, no vendor data."
+    ),
+    "customer_help": NoVendorData("Customer help index (ARC.37): repository text, no vendor data."),
+    "customer_help_section": NoVendorData(
+        "Customer help section (ARC.37): repository text, no vendor data.",
+        kwargs={"section": "ordering"},
     ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),

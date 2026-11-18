@@ -69,6 +69,7 @@ urlpatterns = [
     path("vendor/terms/", include("apps.vendors.terms_urls")),  # sales terms in force (VEN.35)
     path("_help/", include("apps.cms.help_urls")),  # contextual help dialog (ARC.32)
     path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
+    path("maps/", include("apps.core.maps.urls")),  # same-origin map tile proxy (EVT.14)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
     path("_styleguide/", include("apps.themes.urls")),
     # Temporary staff "Site links" page for STAGE testing (OPS.12); remove before LIVE.
@@ -81,6 +82,7 @@ urlpatterns = [
         path("", include("apps.seo.consent_urls")),  # cookie settings page (SEO.5)
         path("", include("apps.fitment.urls")),  # anonymous garage cookie (FIT.6)
         path("", include("apps.events.urls")),  # `calendar.ics` of an event (EVT.6)
+        path("", include("apps.cms.guide_urls")),  # customer help pages (ARC.37)
         path("", include("apps.cms.urls")),
         prefix_default_language=False,
     ),

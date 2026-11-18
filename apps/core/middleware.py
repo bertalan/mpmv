@@ -79,6 +79,36 @@ class PrivateCacheForSignedInUsersMiddleware:
         return response
 
 
+class TileResponseNeutralMiddleware:
+    """Keep `/maps/tiles/` responses free of per-visitor state (EVT.14).
+
+    A tile is the same for everyone, in no language. LocaleMiddleware adds `Vary: Accept-Language`
+    and a session or CSRF cookie would make a response unshareable, so the CDN would keep one copy
+    per language and per visitor. Listed before SessionMiddleware, so it runs after both on the
+    way out.
+    """
+
+    PREFIX = "/maps/tiles/"
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        response = self.get_response(request)
+        if request.path_info.startswith(self.PREFIX):
+            response.cookies.clear()
+            kept = [
+                v.strip()
+                for v in response.headers.get("Vary", "").split(",")
+                if v.strip() and v.strip().lower() not in {"accept-language", "cookie"}
+            ]
+            if kept:
+                response.headers["Vary"] = ", ".join(kept)
+            else:
+                del response.headers["Vary"]
+        return response
+
+
 _REQUEST_ID = re.compile(r"[A-Za-z0-9-]{8,64}")
 
 

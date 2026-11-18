@@ -655,6 +655,14 @@ msgstr ""
 "Un court résumé affiché dans la liste du blog, 300 caractères au maximum. Si vous le laissez vide,"
 " la liste n'affiche aucun résumé."
 
+#: apps/cms/forms_pages.py
+msgid ""
+"A short text above the form. Say who reads the answers and what you do with them. If you leave it "
+"empty, the form starts right under the title."
+msgstr ""
+"Un court texte au-dessus du formulaire. Dites qui lit les réponses et ce que vous en faites. Si "
+"vous le laissez vide, le formulaire commence juste sous le titre."
+
 #: apps/cms/models.py
 msgid ""
 "A short text shown above the products of this category or tag. If you add none, the page starts "
@@ -950,6 +958,10 @@ msgstr "Tous"
 msgid "All day"
 msgstr "Toute la journée"
 
+#: apps/cms/templates/cms/help_guide_section.html
+msgid "All help topics"
+msgstr "Tous les sujets d'aide"
+
 #: apps/manager/views.py
 msgid "all languages"
 msgstr "toutes les langues"
@@ -1051,7 +1063,9 @@ msgstr ""
 msgid ""
 "An image that is only in an old version of a page may be listed here. If you delete it, going back"
 " to that version would show a missing image."
-msgstr "Une image présente uniquement dans une ancienne version d'une page peut apparaître dans cette liste. Si vous la supprimez, revenir à cette version afficherait une image manquante."
+msgstr ""
+"Une image présente uniquement dans une ancienne version d'une page peut apparaître dans cette "
+"liste. Si vous la supprimez, revenir à cette version afficherait une image manquante."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -3005,6 +3019,7 @@ msgstr "Bonjour %(customer_name)s,"
 msgid "Hello,"
 msgstr "Bonjour,"
 
+#: apps/cms/templates/cms/help_guide_index.html apps/cms/templates/cms/help_guide_section.html
 #: themes/base/templates/components/user_tools.html
 msgid "Help"
 msgstr "Aide"
@@ -3029,6 +3044,10 @@ msgstr "texte d'aide"
 msgid "Help texts"
 msgstr "Textes d'aide"
 
+#: apps/cms/templates/cms/help_guide_index.html apps/cms/templates/cms/help_guide_section.html
+msgid "Help topics"
+msgstr "Sujets d'aide"
+
 #: apps/manager/event_views.py
 msgid "Hidden by the platform."
 msgstr "Masqué par la plateforme."
@@ -3037,7 +3056,8 @@ msgstr "Masqué par la plateforme."
 msgid "Hidden by the platform: %(reason)s"
 msgstr "Masqué par la plateforme : %(reason)s"
 
-#: apps/manager/site_map.py apps/seo/page_builders.py apps/seo/product_jsonld.py
+#: apps/cms/templatetags/cms_tags.py apps/manager/site_map.py apps/seo/page_builders.py
+#: apps/seo/product_jsonld.py
 msgid "Home"
 msgstr "Accueil"
 
@@ -3098,6 +3118,14 @@ msgid ""
 msgstr ""
 "Pendant combien de jours un événement annulé reste dans les calendriers, marqué comme annulé, afin"
 " que les calendriers des personnes en soient informés. Exemple : 30. Obligatoire."
+
+#: apps/cms/forms_pages.py
+msgid ""
+"How many days each submission is kept before it is deleted for good, from 1 to 365. Keep it as "
+"short as your work allows. The default is 90 days."
+msgstr ""
+"Combien de jours chaque envoi est conservé avant d'être supprimé définitivement, de 1 à 365. "
+"Choisissez la durée la plus courte que votre travail permet. La valeur par défaut est de 90 jours."
 
 #: apps/manager/amendment_views.py
 msgid ""
@@ -3916,6 +3944,10 @@ msgstr "Mois"
 #: apps/events/templates/events/_links.html
 msgid "Month calendar"
 msgstr "Calendrier du mois"
+
+#: themes/base/templates/components/help_entry.html
+msgid "More help"
+msgstr "Plus d'aide"
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Move down"
@@ -6127,6 +6159,10 @@ msgstr "Boutique : à la demande du client (sans frais)"
 msgid "Shops"
 msgstr "Boutiques"
 
+#: apps/cms/templates/cms/help_guide_index.html
+msgid "Short answers to the questions customers ask most. Pick a topic."
+msgstr "Des réponses courtes aux questions les plus fréquentes des clients. Choisis un sujet."
+
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Shorter notice because"
@@ -6179,6 +6215,11 @@ msgstr "Afficher les produits les plus récents de cette boutique."
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Showing %(vendor)s only."
 msgstr "Affichage de %(vendor)s uniquement."
+
+#: apps/cms/forms_pages.py
+msgid ""
+"Shown after a successful submission. If you leave it empty, a short standard message is shown."
+msgstr "Affiché après un envoi réussi. Si vous le laissez vide, un court message standard apparaît."
 
 #: apps/cms/models.py
 msgid "Shown on the article; a migrated article keeps its original date."
@@ -8842,6 +8883,14 @@ msgstr "Le site auquel s'applique ce thème. Chaque site a un seul thème."
 msgid "The slide's title, up to 120 characters. Required."
 msgstr "Le titre de la diapositive, 120 caractères au maximum. Obligatoire."
 
+#: apps/cms/slugs.py
+msgid ""
+"The slug '%(slug)s' is reserved for the site's help pages and cannot be used for a page directly "
+"under the home page. Choose another slug."
+msgstr ""
+"Le slug '%(slug)s' est réservé aux pages d'aide du site et ne peut pas servir à une page placée "
+"directement sous la page d'accueil. Choisis un autre slug."
+
 #: apps/shipping/models.py
 msgid "The special area this treatment is for. A method has one treatment per area."
 msgstr ""
@@ -8972,6 +9021,14 @@ msgstr ""
 "Le texte de la page de la marque, dans cette langue uniquement : une langue sans texte n'affiche "
 "aucune description, jamais celle d'une autre langue. La mise en forme de base est conservée. "
 "Exemple : 'Enclumes et outils de forge fabriqués à Bergame depuis 1949.'"
+
+#: apps/cms/forms_pages.py
+msgid ""
+"The text on the send button, for example 'Send your question'. If you leave it empty, the button "
+"says 'Send'."
+msgstr ""
+"Le texte du bouton d'envoi, par exemple « Envoyer votre question ». Si vous le laissez vide, le "
+"bouton indique « Envoyer »."
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid ""
