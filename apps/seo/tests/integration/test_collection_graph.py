@@ -125,7 +125,7 @@ def test_website_has_a_search_action_pointing_at_the_language_home(language: str
     assert action["@type"] == "SearchAction"
     assert action["target"]["@type"] == "EntryPoint"
     template = action["target"]["urlTemplate"]
-    assert template == f"http://testserver{path}?{services.SEARCH_PARAMETER}={{search_term_string}}"
+    assert template == f"http://localhost{path}?{services.SEARCH_PARAMETER}={{search_term_string}}"
     assert action["query-input"] == "required name=search_term_string"
 
 
@@ -151,9 +151,7 @@ def test_category_listing_is_a_collection_page_with_the_products_of_the_page(
         item = element["item"]
         assert item["@type"] == "Product"
         assert item["@id"] == item["url"]
-        assert (
-            item["url"] == f"http://testserver{product_url(language, item['url'].split('/')[-2])}"
-        )
+        assert item["url"] == f"http://localhost{product_url(language, item['url'].split('/')[-2])}"
         assert "offers" not in item
 
 
@@ -184,7 +182,7 @@ def test_a_product_without_a_text_in_the_page_language_is_not_listed_as_another_
     for items in item_lists(graph):
         for element in items["itemListElement"]:
             assert element["item"]["url"].startswith(
-                f"http://testserver{language_prefix(other_language())}/"
+                f"http://localhost{language_prefix(other_language())}/"
             )
 
 
@@ -197,7 +195,7 @@ def test_vendor_storefront_is_a_profile_page_with_its_products() -> None:
     organization = [
         n for n in graph if n["@type"] == "Organization" and "#organization" in n["@id"]
     ]
-    shop = [n for n in organization if n["@id"] == f"http://testserver{path}#organization"]
+    shop = [n for n in organization if n["@id"] == f"http://localhost{path}#organization"]
     assert len(shop) == 1
     assert web["mainEntity"] == {"@id": shop[0]["@id"]}
     [items] = item_lists(graph)
@@ -294,7 +292,7 @@ def test_search_results_page_is_a_search_results_page_with_mixed_results() -> No
     assert names == ["Zephyr mug", "Zephyr fair", "Zephyr glazing", "Zephyr Pottery"]
     for element in items["itemListElement"]:
         assert element["item"]["@id"] == element["item"]["url"]
-        assert element["item"]["url"].startswith("http://testserver")
+        assert element["item"]["url"].startswith("http://localhost")
 
 
 def test_search_with_no_match_or_no_query_has_no_item_list() -> None:
