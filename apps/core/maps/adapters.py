@@ -2,6 +2,7 @@
 
 import urllib.error
 import urllib.request
+from typing import Any
 
 from django.conf import settings
 from django.utils.module_loading import import_string
@@ -10,6 +11,21 @@ from . import TileNotAvailable, TileUpstream, TileUpstreamError, TileUpstreamTim
 
 MAX_TILE_BYTES = 512 * 1024
 _HEADERS = ("Cache-Control", "Expires")
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A 3xx is an upstream error: never follow it (also not to http:// or another host)."""
+
+    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+
+def _extra_handlers() -> list[urllib.request.BaseHandler]:
+    return []
+
+
+def _opener() -> urllib.request.OpenerDirector:
+    return urllib.request.build_opener(_NoRedirect(), *_extra_handlers())
 
 
 class HttpTileUpstream:
@@ -21,7 +37,7 @@ class HttpTileUpstream:
             url, headers={"User-Agent": user_agent, "Accept": "image/png"}, method="GET"
         )
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 (validated https)
+            with _opener().open(request, timeout=timeout) as response:
                 body = response.read(MAX_TILE_BYTES + 1)
                 headers = {n: response.headers[n] for n in _HEADERS if n in response.headers}
         except urllib.error.HTTPError as exc:

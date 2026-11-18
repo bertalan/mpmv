@@ -239,3 +239,45 @@ def test_a_damaged_cache_entry_is_a_miss(upstream: FakeTileUpstream, settings: A
 def test_the_test_settings_refuse_the_network() -> None:
     with pytest.raises(TileUpstreamError):
         adapters.RefuseNetworkUpstream().fetch("https://x.example/1", user_agent="a", timeout=1)
+
+
+def test_tile_responses_carry_no_cookie_and_no_language_vary(
+    client: Client, upstream: FakeTileUpstream
+) -> None:
+    for _ in range(2):  # a miss, then a hit
+        response = _get(client, HTTP_ACCEPT_LANGUAGE="it")
+        assert response.status_code == 200
+        assert not response.cookies
+        assert "Set-Cookie" not in response
+        vary = {v.strip().lower() for v in response.get("Vary", "").split(",")}
+        assert "accept-language" not in vary
+        assert "cookie" not in vary
+
+
+def test_a_redirect_from_the_upstream_is_an_error_and_not_cached(monkeypatch: Any) -> None:
+    import io
+    import urllib.request
+    import urllib.response
+    from email.message import Message
+
+    from apps.core.maps import TileUpstreamError
+
+    class Handler(urllib.request.BaseHandler):
+        handler_order = 100  # before the real HTTPS handler
+        calls: list[str] = []
+
+        def https_open(self, req: Any) -> Any:
+            self.calls.append(req.full_url)
+            if len(self.calls) == 1:
+                headers = Message()
+                headers["Location"] = "http://elsewhere.invalid/t.png"
+                reply = urllib.response.addinfourl(io.BytesIO(b""), headers, req.full_url, 302)
+                reply.msg = "Found"  # type: ignore[attr-defined]
+                return reply
+            raise AssertionError("the redirect was followed")
+
+    handler = Handler()
+    monkeypatch.setattr(adapters, "_extra_handlers", lambda: [handler])
+    with pytest.raises(TileUpstreamError):
+        adapters.HttpTileUpstream().fetch("https://t.invalid/1.png", user_agent="x", timeout=1)
+    assert handler.calls == ["https://t.invalid/1.png"]

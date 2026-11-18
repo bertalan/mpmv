@@ -80,6 +80,10 @@ year). A miss counts one upstream request (a per-day `Throttle` row, read with
 `services.upstream_requests()`; past `MAP_TILE_UPSTREAM_DAILY_LIMIT` the proxy answers 503 and
 sends nothing), fetches through the `TileUpstream` protocol (`HttpTileUpstream`, a fake in tests)
 and caches the PNG. Upstream errors are 502, timeouts 504, a non-PNG answer 502, none cached.
+The daily cap counts attempts, failed fetches included. Requests without a client IP share one
+rate-limit bucket (fine behind the configured proxy). `TileResponseNeutralMiddleware` strips
+cookies and `Vary: Accept-Language` from tiles, and `HttpTileUpstream` never follows a redirect
+(a 3xx is a 502, not cached).
 Responses carry `Cache-Control: public, max-age=604800`; refusals `no-store`. The upstream URL may
 hold a provider key: it is never logged and never part of a cache path. OSM's public tile server
 allows light use only: watch the counter and switch the upstream before traffic grows.

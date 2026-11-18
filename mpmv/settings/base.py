@@ -126,6 +126,8 @@ MIDDLEWARE = [
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
+    # EVT.14: no cookie and no `Vary: Accept-Language` on tiles; outside Session and Locale.
+    "apps.core.middleware.TileResponseNeutralMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "apps.core.middleware.LanguageRedirectMiddleware",  # retired language prefixes (I18N.15)
