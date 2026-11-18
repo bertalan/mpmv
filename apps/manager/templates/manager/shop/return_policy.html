@@ -8,7 +8,7 @@ No inline script or style.
   <h1>{% translate "Return policy" %}</h1>
   <p class="manager-lead">{% blocktranslate with vendor=manager.vendor.display_name %}How buyers can return goods bought from {{ vendor }}. Staff review every change before it is shown to buyers.{% endblocktranslate %}</p>
   <h2>{% translate "What buyers see now" %}</h2>
-  <p>{% if public.is_default %}{% translate "You have not set a policy yet. The standard one applies." %}{% else %}{% translate "This is your approved policy." %}{% endif %}</p>
+  <p>{% if public.is_default %}{% translate "You have not set a policy yet. The standard one applies: the shop pays the return shipping." %}{% else %}{% translate "This is your approved policy." %}{% endif %}</p>
   <ul>
     <li>{% blocktranslate with days=public.return_window_days %}Return window: {{ days }} days{% endblocktranslate %}</li>
     <li>{% if public.return_shipping_paid_by == "vendor" %}{% translate "Return shipping is paid by the seller." %}{% else %}{% translate "Return shipping is paid by the customer." %}{% endif %}</li>

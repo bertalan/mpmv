@@ -41,6 +41,7 @@ def test_the_owner_sees_the_page_with_the_default_policy(
     response = client.get(URL)
     assert response.status_code == 200
     assert b"14" in response.content
+    assert b"the shop pays the return shipping" in response.content
 
 
 def test_the_owner_proposes_and_nothing_is_public_before_review(
