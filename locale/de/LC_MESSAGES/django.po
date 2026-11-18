@@ -2608,6 +2608,11 @@ msgstr "Herunterladen"
 msgid "Download my data"
 msgstr "Meine Daten herunterladen"
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Download PDF"
+msgstr "PDF herunterladen"
+
 #: apps/events/templates/events/_subscribe.html
 msgid "Download the calendar (ICS)"
 msgstr "Kalender herunterladen (ICS)"
@@ -9548,6 +9553,15 @@ msgstr ""
 "Die Gruppe von Kategorien oder Tags, zu der diese gehört, zum Beispiel 'season'. Pflichtfeld. Sie "
 "kann danach nicht mehr geändert werden."
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid ""
+"The shipping method %(key)s (%(zone)s) is for goods that cannot be returned by post and has no "
+"maximum return-cost estimate. Add one in the return-cost information below, or you pay the return."
+msgstr ""
+"Die Versandart %(key)s (%(zone)s) gilt für Waren, die nicht per Post zurückgesendet werden können,"
+" und hat keine Schätzung der maximalen Rücksendekosten. Tragen Sie sie in den Angaben zu den "
+"Rücksendekosten unten ein, sonst tragen Sie die Rücksendung."
+
 #: apps/orders/amendments.py
 msgid "The shipping method %(method)r is not offered for this package."
 msgstr "Die Versandart %(method)r wird für dieses Paket nicht angeboten."
@@ -10614,6 +10628,15 @@ msgid "Tick it for an event with no set hours. Then give the first and last day.
 msgstr ""
 "Setzen Sie das Häkchen für eine Veranstaltung ohne feste Zeiten. Geben Sie dann den ersten und den"
 " letzten Tag an."
+
+#: apps/shipping/models.py
+msgid ""
+"Tick it for bulky goods that cannot be sent back by post, such as a pallet. You must then state a "
+"maximum return-cost estimate in your sales terms."
+msgstr ""
+"Aktivieren Sie dies für sperrige Waren, die nicht per Post zurückgesendet werden können, etwa eine"
+" Palette. Sie müssen dann in Ihren Verkaufsbedingungen eine Schätzung der maximalen "
+"Rücksendekosten angeben."
 
 #: apps/catalog/taxonomy.py
 msgid ""

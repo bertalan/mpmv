@@ -2572,6 +2572,11 @@ msgstr "Scarica"
 msgid "Download my data"
 msgstr "Scarica i miei dati"
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Download PDF"
+msgstr "Scarica il PDF"
+
 #: apps/events/templates/events/_subscribe.html
 msgid "Download the calendar (ICS)"
 msgstr "Scarica il calendario (ICS)"
@@ -9439,6 +9444,15 @@ msgstr ""
 "Il gruppo di categorie o etichette a cui appartiene questa, per esempio 'stagione'. Obbligatorio. "
 "Non si può cambiare dopo."
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid ""
+"The shipping method %(key)s (%(zone)s) is for goods that cannot be returned by post and has no "
+"maximum return-cost estimate. Add one in the return-cost information below, or you pay the return."
+msgstr ""
+"Il metodo di spedizione %(key)s (%(zone)s) è per merci che non si possono restituire per posta e "
+"non ha una stima del costo massimo di restituzione. La inserisca nelle informazioni sul costo di "
+"restituzione qui sotto, altrimenti la restituzione è a suo carico."
+
 #: apps/orders/amendments.py
 msgid "The shipping method %(method)r is not offered for this package."
 msgstr "Il metodo di spedizione %(method)r non è offerto per questo pacco."
@@ -10488,6 +10502,15 @@ msgstr ""
 #: apps/manager/event_forms.py
 msgid "Tick it for an event with no set hours. Then give the first and last day."
 msgstr "Spuntalo per un evento senza orari fissi. Poi indica il primo e l'ultimo giorno."
+
+#: apps/shipping/models.py
+msgid ""
+"Tick it for bulky goods that cannot be sent back by post, such as a pallet. You must then state a "
+"maximum return-cost estimate in your sales terms."
+msgstr ""
+"Selezioni questa opzione per le merci ingombranti che non si possono restituire per posta, come un"
+" bancale. Dovrà poi indicare una stima del costo massimo di restituzione nelle sue condizioni di "
+"vendita."
 
 #: apps/catalog/taxonomy.py
 msgid ""
