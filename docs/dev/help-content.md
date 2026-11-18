@@ -61,12 +61,14 @@ not from the Wagtail page tree, so there is nothing to edit or publish in the ad
   site (`/it/help-centre/shipping/`), public and cached for five minutes;
 - the slug `help-centre` is reserved (`engine.RESERVED_ROOT_SLUGS`, enforced by `apps/cms/slugs.py`): no CMS page directly under a language home can use it, as the guide route is matched before the CMS catch-all; check `cms.E004` flags an existing page that does;
 - the sections, in order, are ordering, payment, shipping, changes, withdrawal, account;
+- the seller guide is `/help-centre/sellers/` (index) and `/help-centre/sellers/<section>/`, with the sections getting-started, orders, changes, payments, returns, events, security (`GUIDE_SECTIONS["vendor"]`); it is formal in IT, DE, FR and ES, and each Manager screen it covers links to it through `ROUTE_GUIDE`; its pages are in the sitemap like the customer ones;
 - the footer and header "Help" link (both themes) opens `/help-centre/` unless `MPMV_HELP_URL` is set;
 - `ROUTE_GUIDE` in `apps/cms/engine.py` maps a screen to its guide page: its dialog then shows "More help" (a test checks every key is a real section and route file);
-- a new audience (the vendor guide) adds its sections to `GUIDE_SECTIONS`, its files under
+- a new audience adds its sections to `GUIDE_SECTIONS`, its files under
   `guide/`, and its URL and template next to `customer_help*`; nothing else in sync changes.
 
-Tone and content: short plain texts for a non-technical customer, informal in IT, DE, FR and ES.
+Tone and content: short plain texts for a non-technical customer, informal in IT, DE, FR and ES for customers; the seller guide uses the formal register
+(Lei, Sie, vous, usted) and quotes screen labels exactly as the shipped catalog spells them.
 Each statement is compared with the spec and the code; a guide never paraphrases legal or tax
 wording: it points to the legal pages (`{{link.consumer_information}}`, the terms in the footer).
 
