@@ -7,6 +7,8 @@ from typing import Any
 
 import pytest
 from django.test import Client
+from django.utils import translation
+from django.utils.translation import gettext
 
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
@@ -16,6 +18,13 @@ from apps.shipping.tests.factories import ShippingMethodFactory, ShippingZoneFac
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import ReturnPolicyVersionFactory, VendorFactory
 from tests.i18n import product_url
+
+
+def _t(message: str) -> str:
+    """The page is served in the primary language, whatever MPMV_LANGUAGES is."""
+    with translation.override(primary_language()):
+        return gettext(message)
+
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
@@ -75,4 +84,4 @@ def test_the_page_and_the_json_ld_state_the_same_days_and_payer(
     assert policy["merchantReturnDays"] == 45
     assert "45" in text
     assert policy["returnFees"].endswith(fees)
-    assert sentence in text
+    assert _t(sentence) in text
