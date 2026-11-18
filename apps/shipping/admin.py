@@ -175,10 +175,18 @@ class ShippingMethodAdmin(AuditedAdmin[ShippingMethod]):
         "carrier",
         "service_level",
         "is_default",
+        "not_returnable_by_post",
         "tax_treatment",
         "over_max_weight",
     )
-    list_filter = ("carrier", "service_level", "tax_treatment", "is_default", "zone")
+    list_filter = (
+        "carrier",
+        "service_level",
+        "tax_treatment",
+        "is_default",
+        "not_returnable_by_post",
+        "zone",
+    )
     search_fields = ("vendor__display_name", "zone__code", "key")
     list_select_related = ("vendor", "zone", "carrier")
     readonly_fields = ("public_id", "created_at", "updated_at")

@@ -1495,7 +1495,7 @@ msgstr "lote de marcas"
 msgid "brand batches"
 msgstr "lotes de marcas"
 
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Business buyers: the court of %(court)s."
 msgstr "Compradores profesionales: los tribunales de %(court)s."
 
@@ -1984,7 +1984,7 @@ msgstr ""
 msgid "City"
 msgstr "Ciudad"
 
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Clauses for approval by business buyers (art. 1341 Civil Code)"
 msgstr ""
 "Cláusulas que deben aprobar los compradores profesionales (art. 1341 del Código Civil italiano)"
@@ -2023,7 +2023,7 @@ msgstr "Comentario"
 msgid "Commission change"
 msgstr "Variación de la comisión"
 
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Committed delivery time: %(days)s days."
 msgstr "Plazo de entrega garantizado: %(days)s días."
 
@@ -2177,7 +2177,7 @@ msgstr ""
 "Los consumidores disponen de 14 días desde la entrega para desistir. Como empresa no tienes "
 "derecho de desistimiento, salvo que las condiciones del vendedor lo prevean."
 
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Consumers: disputes go to the court of the consumer's own residence."
 msgstr ""
 "Consumidores: las controversias corresponden a los tribunales del lugar de residencia del "
@@ -2415,7 +2415,7 @@ msgstr "Plazo de entrega"
 msgid "Delivery time in days"
 msgstr "Plazo de entrega en días"
 
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Delivery, returns and law"
 msgstr "Entrega, devoluciones y legislación"
 
@@ -2570,6 +2570,11 @@ msgstr "Descargar"
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download my data"
 msgstr "Descargar mis datos"
+
+#: apps/manager/templates/manager/shop/sales_terms.html
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Download PDF"
+msgstr "Descargar el PDF"
 
 #: apps/events/templates/events/_subscribe.html
 msgid "Download the calendar (ICS)"
@@ -2963,7 +2968,7 @@ msgstr "Buscar la cuenta"
 msgid "Find the order"
 msgstr "Buscar el pedido"
 
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Fingerprint %(hash)s."
 msgstr "Huella digital %(hash)s."
 
@@ -3167,7 +3172,7 @@ msgstr "Mercancía, IVA incluido"
 msgid "Governing law"
 msgstr "Legislación aplicable"
 
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Governing law: %(country)s."
 msgstr "Legislación aplicable: %(country)s."
 
@@ -6273,10 +6278,11 @@ msgid "Returns go to: %(country)s"
 msgstr "Las devoluciones se envían a: %(country)s"
 
 #: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the consumer bears the direct cost of returning the goods."
 msgstr "Devoluciones: el coste directo de devolver los bienes corre a cargo del consumidor."
 
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the seller bears the cost of returning the goods."
 msgstr "Devoluciones: el coste de devolver los bienes corre a cargo del vendedor."
 
@@ -6343,11 +6349,11 @@ msgstr "Modo de venta"
 
 #: apps/manager/forms.py apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/sales_terms.html
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Sales terms"
 msgstr "Condiciones de venta"
 
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Sales terms of %(name)s"
 msgstr "Condiciones de venta de %(name)s"
 
@@ -7192,7 +7198,8 @@ msgstr "Preaviso de baja"
 msgid "Terminations"
 msgstr "Bajas"
 
-#: apps/orders/templates/orders/_legal_boxes.html apps/vendors/templates/vendors/terms/read.html
+#: apps/orders/templates/orders/_legal_boxes.html apps/vendors/templates/vendors/terms/print.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Terms"
 msgstr "Condiciones"
 
@@ -9420,6 +9427,15 @@ msgstr ""
 "El grupo de categorías o etiquetas al que pertenece esta, por ejemplo «temporada». Obligatorio. No"
 " se puede cambiar después."
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid ""
+"The shipping method %(key)s (%(zone)s) is for goods that cannot be returned by post and has no "
+"maximum return-cost estimate. Add one in the return-cost information below, or you pay the return."
+msgstr ""
+"El método de envío %(key)s (%(zone)s) es para mercancías que no se pueden devolver por correo y no"
+" tiene una estimación del coste máximo de devolución. Añádala en la información sobre el coste de "
+"devolución más abajo, o la devolución corre de su cuenta."
+
 #: apps/orders/amendments.py
 msgid "The shipping method %(method)r is not offered for this package."
 msgstr "El método de envío %(method)r no se ofrece para este paquete."
@@ -10472,6 +10488,15 @@ msgstr ""
 msgid "Tick it for an event with no set hours. Then give the first and last day."
 msgstr "Márquelo para un evento sin horario fijo. Después indique el primer y el último día."
 
+#: apps/shipping/models.py
+msgid ""
+"Tick it for bulky goods that cannot be sent back by post, such as a pallet. You must then state a "
+"maximum return-cost estimate in your sales terms."
+msgstr ""
+"Marque esta casilla para las mercancías voluminosas que no se pueden devolver por correo, como un "
+"palé. Deberá indicar entonces una estimación del coste máximo de devolución en sus condiciones de "
+"venta."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "Tick it if categories or tags in this set can sit inside others, for example maker and then model."
@@ -11059,7 +11084,7 @@ msgstr "La versión %(number)s fue rechazada. %(note)s"
 msgid "Version %(number)s, %(date)s"
 msgstr "Versión %(number)s, %(date)s"
 
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/print.html apps/vendors/templates/vendors/terms/read.html
 msgid "Version %(number)s, in force from %(date)s."
 msgstr "Versión %(number)s, en vigor desde el %(date)s."
 

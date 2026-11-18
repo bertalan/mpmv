@@ -461,6 +461,13 @@ class ShippingMethod(BaseModel):
             "The most days a delivery takes. It is only an estimate. Not shown to buyers yet."
         ),
     )
+    not_returnable_by_post = models.BooleanField(
+        default=False,
+        help_text=_(
+            "Tick it for bulky goods that cannot be sent back by post, such as a pallet. You must "
+            "then state a maximum return-cost estimate in your sales terms."
+        ),
+    )
     is_default = models.BooleanField(
         default=False,
         help_text=_(
