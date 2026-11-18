@@ -579,3 +579,68 @@ def vehicle_line(snapshot: Mapping[str, str], language: str) -> str:
     if not label:
         return ""
     return _VEHICLE_LINE.get(language, _VEHICLE_LINE["en"]).format(vehicle=label)
+
+
+# --- order again (ORD.31) --------------------------------------------------------------------
+
+# Why a line of a past order was not put back in the cart (the view maps each code to a sentence).
+REORDER_RETIRED = "retired"
+REORDER_OUT_OF_STOCK = "out_of_stock"
+REORDER_NOT_DELIVERABLE = "not_deliverable"
+
+
+@dataclass(frozen=True)
+class ReorderWish:
+    """One item of a past order: the units wanted again and what the cart holds now.
+
+    `limit` is the most units one line may hold today (`cart.engine.line_limit`), or None when
+    the item cannot be bought any more. `undeliverable` is true when shipping to the customer's
+    current address is blocked for the item's vendor."""
+
+    key: object
+    quantity: int
+    in_cart: int
+    limit: int | None
+    undeliverable: bool = False
+
+
+@dataclass(frozen=True)
+class ReorderOutcome:
+    """What happens to one item: `skipped` (a reason code), or `quantity` units in the cart in
+    all, `added` of them new; `capped` when the stock allows fewer than were asked for."""
+
+    key: object
+    skipped: str = ""
+    quantity: int = 0
+    added: int = 0
+    requested: int = 0
+
+    @property
+    def capped(self) -> bool:
+        return not self.skipped and self.quantity < self.requested
+
+
+def plan_reorder(wishes: Sequence[ReorderWish]) -> list[ReorderOutcome]:
+    """Decide, per item of a past order, what goes into the cart (ORD.31). Today's data only.
+
+    An item that cannot be bought any more is skipped as retired, one with no stock as out of
+    stock, one the vendor cannot ship to the current address as not deliverable. Otherwise the
+    units are added to the ones already in the cart, capped at the limit. A line already above
+    the limit is never reduced here (the checkout re-checks it)."""
+    outcomes = []
+    for wish in wishes:
+        requested = wish.in_cart + wish.quantity
+        if wish.limit is None:
+            outcomes.append(ReorderOutcome(wish.key, skipped=REORDER_RETIRED))
+        elif wish.limit <= 0:
+            outcomes.append(ReorderOutcome(wish.key, skipped=REORDER_OUT_OF_STOCK))
+        elif wish.undeliverable:
+            outcomes.append(ReorderOutcome(wish.key, skipped=REORDER_NOT_DELIVERABLE))
+        else:
+            total = max(wish.in_cart, min(requested, wish.limit))
+            outcomes.append(
+                ReorderOutcome(
+                    wish.key, quantity=total, added=total - wish.in_cart, requested=requested
+                )
+            )
+    return outcomes
