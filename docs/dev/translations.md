@@ -120,7 +120,7 @@ refuses a LIVE deploy that lists them). Staff preview them on STAGE with
 python tools/i18n_catalog.py review-export <lang> [--all] [--pending] [--out FILE]
 ```
 
-writes the entries in `SENSITIVE_GROUPS` (order emails and documents, compliance forms, terms,
+writes the entries in `SENSITIVE_GROUPS` (order emails and documents, compliance forms, DSA statements of reasons and event moderation emails (EVT.11), terms,
 price notes, cart and order components, order-change pages) as a CSV for the translator.
 A reviewed entry carries the translator comment `# reviewed` in the `.po`. The per-language gate
 checks, the staff preview switch and the counsel sign-off mark are not built yet (I18N.19).
