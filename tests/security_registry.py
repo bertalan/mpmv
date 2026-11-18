@@ -263,6 +263,11 @@ IDOR_REVIEWED: dict[str, str] = {
         "Looked up like the cancel of the rest (ORD.20): a stranger's order or package answers "
         "404 (`test_a_stranger_cannot_cancel_the_rest`)."
     ),
+    "customer_order_again": (
+        "The order is looked up among the signed-in customer's own (ORD.31); a stranger's order "
+        "or a guessed id answers 404 "
+        "(`test_another_customers_order_is_a_404_also_by_guessing`)."
+    ),
     "mfa:remove_device": (
         "The factor is looked up among the signed-in user's own (CORE.4); another user's factor "
         "answers 404 (`test_a_user_cannot_remove_another_users_second_factor`)."
