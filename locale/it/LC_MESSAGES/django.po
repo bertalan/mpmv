@@ -1301,6 +1301,10 @@ msgstr "Torna alla ricerca degli ordini"
 msgid "Back to the orders"
 msgstr "Torna agli ordini"
 
+#: apps/manager/templates/manager/platform/product.html
+msgid "Back to the products"
+msgstr "Torna ai prodotti"
+
 #: apps/manager/templates/manager/forbidden.html
 msgid "Back to the site"
 msgstr "Torna al sito"
@@ -1376,6 +1380,7 @@ msgstr "Invito all'azione"
 
 #: apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
+#: apps/manager/templates/manager/platform/product.html
 msgid "Cancel"
 msgstr "Annulla"
 
@@ -1524,7 +1529,8 @@ msgstr "Categorie"
 msgid "Categories expected to declare fitment"
 msgstr "Categorie che devono dichiarare la compatibilità"
 
-#: apps/manager/fitment_views.py
+#: apps/manager/fitment_views.py apps/manager/product_views.py
+#: apps/manager/templates/manager/platform/product.html
 msgid "Category"
 msgstr "Categoria"
 
@@ -1877,6 +1883,10 @@ msgstr "Ritardo di consegna comparabile"
 msgid "Competent court"
 msgstr "Foro competente"
 
+#: apps/manager/product_views.py
+msgid "Complete"
+msgstr "Completo"
+
 #: apps/orders/customer_views.py
 msgid "Completed"
 msgstr "Completato"
@@ -1891,6 +1901,7 @@ msgstr "Calcola la modifica"
 
 #: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
+#: apps/manager/templates/manager/platform/product.html
 msgid "Confirm"
 msgstr "Conferma"
 
@@ -2338,6 +2349,10 @@ msgstr "Scarica i tuoi dati"
 msgid "Download your shop profile, products and order amounts as a JSON file."
 msgstr "Scarica il profilo del negozio, i prodotti e gli importi degli ordini in un file JSON."
 
+#: apps/manager/product_views.py
+msgid "draft"
+msgstr "bozza"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Drafts"
 msgstr "Bozze"
@@ -2643,6 +2658,10 @@ msgstr "Campo"
 msgid "Fields on this page"
 msgstr "Campi di questa pagina"
 
+#: apps/manager/templates/manager/platform/product.html
+msgid "Fields staff may change"
+msgstr "Campi che il personale può modificare"
+
 #: apps/manager/event_image_form.py apps/manager/media.py
 msgid "File"
 msgstr "File"
@@ -2698,6 +2717,10 @@ msgstr "Impronta %(hash)s."
 #: apps/manager/event_forms.py
 msgid "First day"
 msgstr "Primo giorno"
+
+#: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
+msgid "Fiscal category"
+msgstr "Categoria fiscale"
 
 #: apps/manager/fitment_views.py
 msgid "Fitment"
@@ -3328,6 +3351,10 @@ msgstr ""
 "Nel calcolo delle tariffe la spedizione è gratuita quando la merce nel pacco vale almeno questo "
 "importo, IVA esclusa. Lascialo vuoto se non vuoi la spedizione gratuita."
 
+#: apps/manager/product_views.py
+msgid "Incomplete"
+msgstr "Incompleto"
+
 #: themes/base/templates/components/quantity_stepper.html
 msgid "Increase quantity"
 msgstr "Aumenta la quantità"
@@ -3495,6 +3522,7 @@ msgstr "Etichetta"
 
 #: apps/manager/event_forms.py apps/manager/fitment_forms.py
 #: apps/manager/templates/manager/platform/fitment_node.html
+#: apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/shop/events.html
 #: themes/base/templates/components/language_switcher.html
 msgid "Language"
@@ -3815,6 +3843,14 @@ msgstr "Messaggi che ti abbiamo inviato su questo pacco"
 #: apps/manager/amendment_views.py
 msgid "Minor change: it applies at once"
 msgstr "Modifica minore: si applica subito"
+
+#: apps/manager/product_views.py
+msgid "missing"
+msgstr "mancante"
+
+#: apps/manager/product_views.py
+msgid "Missing in %(language)s"
+msgstr "Mancante in %(language)s"
 
 #: apps/manager/templates/manager/shop/events.html
 msgid "Moderation"
@@ -4154,6 +4190,7 @@ msgstr "Nessuna modifica: questo testo è ancora una bozza. Modificalo per pubbl
 
 #: apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
+#: apps/manager/templates/manager/platform/product.html
 msgid "Nothing has changed yet. Check the changes below, then confirm."
 msgstr "Non è stato ancora modificato nulla. Controlla le modifiche qui sotto, poi conferma."
 
@@ -4769,6 +4806,14 @@ msgstr ""
 msgid "Out of stock"
 msgstr "Esaurito"
 
+#: apps/manager/product_views.py
+msgid "outdated"
+msgstr "non aggiornata"
+
+#: apps/manager/product_views.py
+msgid "Outdated"
+msgstr "Non aggiornata"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Owner"
 msgstr "Titolare"
@@ -5148,7 +5193,7 @@ msgstr "Preferenze"
 msgid "Prepare a change"
 msgstr "Prepara una modifica"
 
-#: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/product.html
 msgid "Preview"
 msgstr "Anteprima"
 
@@ -5254,7 +5299,8 @@ msgstr "Immagini del prodotto"
 msgid "Product pages are not built yet (CAT.7): products are listed once they are."
 msgstr "Le pagine prodotto non esistono ancora (CAT.7): i prodotti compariranno quando ci saranno."
 
-#: apps/manager/event_block_forms.py apps/manager/event_forms.py
+#: apps/manager/event_block_forms.py apps/manager/event_forms.py apps/manager/product_views.py
+#: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Products"
 msgstr "Prodotti"
@@ -5295,13 +5341,17 @@ msgstr "Nodi proposti"
 msgid "Province or state"
 msgstr "Provincia o stato"
 
-#: apps/manager/templates/manager/shop/sales_terms.html
+#: apps/manager/product_views.py apps/manager/templates/manager/shop/sales_terms.html
 msgid "Publish"
 msgstr "Pubblica"
 
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "Publish a new version"
 msgstr "Pubblica una nuova versione"
+
+#: apps/manager/product_views.py
+msgid "published"
+msgstr "pubblicata"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Published"
@@ -5611,6 +5661,10 @@ msgstr "Ritira"
 msgid "Retire (hide it and its children from pickers)"
 msgstr "Ritira (nascondilo con i suoi figli dai selettori)"
 
+#: apps/manager/product_views.py
+msgid "Retire (page live, not purchasable)"
+msgstr "Ritira (pagina online, non acquistabile)"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Retired"
 msgstr "Ritirati"
@@ -5651,6 +5705,10 @@ msgstr "Annullata"
 msgid "Review and pay"
 msgstr "Riepilogo e pagamento"
 
+#: apps/manager/product_views.py
+msgid "reviewed"
+msgstr "revisionata"
+
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Reviewed"
 msgstr "Verificato il"
@@ -5679,6 +5737,10 @@ msgstr "Riga"
 #: apps/events/templates/events/_subscribe.html
 msgid "RSS feed"
 msgstr "Feed RSS"
+
+#: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
+msgid "Sales mode"
+msgstr "Modalità di vendita"
 
 #: apps/manager/forms.py apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/sales_terms.html
@@ -5763,6 +5825,7 @@ msgid "screen or page type"
 msgstr "schermata o tipo di pagina"
 
 #: apps/seo/page_builders.py themes/ride/templates/components/header.html
+#: apps/manager/product_views.py themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Cerca"
 
@@ -5970,8 +6033,9 @@ msgstr "Spedizione, IVA inclusa"
 msgid "Shipping: %(shipping)s EUR"
 msgstr "Spedizione: %(shipping)s EUR"
 
-#: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/layout.html
-#: apps/manager/templates/manager/platform/orders.html
+#: apps/manager/product_views.py apps/manager/templates/manager/amendment.html
+#: apps/manager/templates/manager/layout.html apps/manager/templates/manager/platform/orders.html
+#: apps/manager/templates/manager/platform/product.html
 msgid "Shop"
 msgstr "Negozio"
 
@@ -6127,7 +6191,9 @@ msgstr "Link del sito"
 msgid "Skip to main content"
 msgstr "Vai al contenuto principale"
 
-#: apps/catalog/templates/catalog/product.html apps/manager/templates/manager/shop/order.html
+#: apps/catalog/templates/catalog/product.html apps/manager/product_views.py
+#: apps/manager/templates/manager/platform/product.html
+#: apps/manager/templates/manager/shop/order.html
 msgid "SKU"
 msgstr "SKU"
 
@@ -6283,6 +6349,10 @@ msgstr "Inizia a fare acquisti"
 msgid "Starts at"
 msgstr "Inizia alle"
 
+#: apps/manager/templates/manager/platform/product.html
+msgid "State"
+msgstr "Stato"
+
 #: apps/manager/templates/manager/shop/statements.html
 msgid "Statement of %(date)s"
 msgstr "Motivazione del %(date)s"
@@ -6296,12 +6366,13 @@ msgstr "Motivazioni"
 msgid "Statistics"
 msgstr "Statistiche"
 
-#: apps/manager/fitment_forms.py apps/manager/fitment_views.py
+#: apps/manager/fitment_forms.py apps/manager/fitment_views.py apps/manager/product_views.py
 #: apps/manager/templates/manager/amendment.html
 #: apps/manager/templates/manager/platform/fitment_node.html
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/orders.html
+#: apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/events.html apps/manager/templates/manager/shop/order.html
@@ -8316,6 +8387,10 @@ msgstr ""
 msgid "The product data the import pulled out of the supplier's data, as JSON."
 msgstr "I dati del prodotto che l'importazione ha ricavato dai dati del fornitore, in JSON."
 
+#: apps/manager/product_views.py
+msgid "The product is updated."
+msgstr "Il prodotto è stato aggiornato."
+
 #: apps/ingest/models.py
 msgid "The product of the catalogue this item is matched to. Empty while it is not matched."
 msgstr "Il prodotto del catalogo a cui è abbinato questo articolo. Vuoto finché non è abbinato."
@@ -9675,6 +9750,7 @@ msgid "Times above are read in this time zone, e.g. Europe/Rome."
 msgstr "Gli orari qui sopra sono letti in questo fuso orario, per esempio Europe/Rome."
 
 #: apps/manager/event_forms.py apps/manager/event_image_form.py apps/manager/media.py
+#: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
 msgid "Title"
 msgstr "Titolo"
 
@@ -9793,6 +9869,10 @@ msgstr ""
 msgid "Translation of the %(original)s original"
 msgstr "Traduzione dell’originale in %(original)s"
 
+#: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
+msgid "Translations"
+msgstr "Traduzioni"
+
 #: apps/manager/templates/manager/shop/events.html
 msgid "Translations: %(languages)s"
 msgstr "Traduzioni: %(languages)s"
@@ -9871,6 +9951,10 @@ msgstr "sconosciuto"
 #: apps/manager/templates/manager/platform/user_sessions.html
 msgid "Unknown device"
 msgstr "Dispositivo sconosciuto"
+
+#: apps/manager/product_views.py
+msgid "Unpublish (back to draft)"
+msgstr "Annulla la pubblicazione (torna in bozza)"
 
 #: apps/vendors/models.py
 msgid "Untick it to stop applying the rule without deleting it."

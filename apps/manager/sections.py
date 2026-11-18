@@ -18,6 +18,7 @@ from .fitment_views import CATEGORIES_SECTION, NODES_SECTION, SCHEME_SECTION
 from .navigation import Registry, Section, anyone, platform_role, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
+from .product_views import SECTION as PRODUCTS_SECTION
 from .sales_terms_views import SECTION as SALES_TERMS_SECTION
 from .session_views import PANIC_SECTION, USER_SESSIONS_SECTION
 from .spaces import Space
@@ -156,6 +157,15 @@ BUILT_IN = (
         "manager:platform:fitment_nodes",
         order=43,
         allowed=platform_role(NODES_SECTION),
+    ),
+    # CAT.11: the products, for Catalog and moderation (the owner reads).
+    Section(
+        PRODUCTS_SECTION,
+        Space.PLATFORM,
+        _("Products"),
+        "manager:platform:catalog_products",
+        order=44,
+        allowed=platform_role(PRODUCTS_SECTION),
     ),
     Section(
         NOTICES_SECTION,

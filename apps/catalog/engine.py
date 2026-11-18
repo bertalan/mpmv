@@ -1201,3 +1201,33 @@ def gallery_selection[R: GalleryRow](rows: Iterable[R], language: str) -> list[R
     if cover is None:
         return ordered
     return [cover, *(row for row in ordered if row is not cover)]
+
+
+# --- Translation state of a product (CAT.11)
+
+STALE = "stale"
+MISSING = "missing"
+
+
+def translation_states(
+    rows: Iterable[tuple[str, str, str]], languages: Sequence[str], source: str
+) -> dict[str, str]:
+    """The state of a product's texts in each language: `missing`, `stale` (made from another
+    source text than the current one) or the row's workflow status (`machine`, `reviewed`,
+    `published`). `rows` are (language, status, source_hash); `source` is the source language."""
+    by_language = {language: (status, digest) for language, status, digest in rows}
+    source_digest = by_language.get(source, ("", ""))[1]
+    states: dict[str, str] = {}
+    for language in languages:
+        if language not in by_language:
+            states[language] = MISSING
+            continue
+        status, digest = by_language[language]
+        stale = language != source and source in by_language and digest != source_digest
+        states[language] = STALE if stale else status
+    return states
+
+
+def translations_complete(states: Mapping[str, str]) -> bool:
+    """True when every language is published and none is stale or missing."""
+    return all(state == "published" for state in states.values())
