@@ -86,8 +86,13 @@ from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
-from apps.fitment.models import ProductFitment, ProductFitmentState
-from apps.fitment.tests.factories import ProductFitmentFactory, ProductFitmentStateFactory
+from apps.fitment.models import FitmentNodeProposal, ProductFitment, ProductFitmentState
+from apps.fitment.tests.factories import (
+    FitmentCategoryFactory,
+    FitmentNodeProposalFactory,
+    ProductFitmentFactory,
+    ProductFitmentStateFactory,
+)
 from apps.ingest.models import (
     ImportRun,
     MappingTable,
@@ -221,6 +226,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
+    FitmentNodeProposal: lambda vendor: FitmentNodeProposalFactory.create(vendor=vendor),
     ProductFitmentState: lambda vendor: ProductFitmentStateFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
@@ -718,6 +724,26 @@ ENDPOINTS: dict[str, Access] = {
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
         sample={"public_id": NIL_UUID},
     ),
+    # FIT.3: the Fits pages of the shop; every product is found through `scoped()`.
+    "manager:shop:fitment": VendorScopedList(
+        make=lambda vendor: ProductFactory.create(vendor=vendor),
+        identify=lambda product: str(product.sku),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:fitment_product": VendorScoped(
+        make=lambda vendor: ProductFactory.create(vendor=vendor),
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:fitment_proposals": VendorScopedList(
+        make=lambda vendor: FitmentNodeProposalFactory.create(vendor=vendor),
+        identify=lambda proposal: str(proposal.node.name),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:fitment_report": VendorScopedList(
+        make=lambda vendor: ProductFactory.create(
+            vendor=vendor, category=FitmentCategoryFactory.create().category
+        ),
+        identify=lambda product: str(product.sku),  # type: ignore[attr-defined]
+    ),
     # EVT.4 part 2: the block editor, the preview and the image library.
     "manager:shop:event_block_add": VendorScoped(
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
@@ -921,6 +947,12 @@ ENDPOINTS: dict[str, Access] = {
         "The signed-in customer keeps the rest of one of their own packages (ORD.20): looked up "
         "like the cancel; anything else is a 404 (`test_a_stranger_cannot_cancel_the_rest`).",
         kwargs={"public_id": NIL_UUID, "package": NIL_UUID},
+    ),
+    "customer_order_again": NoVendorData(
+        "The signed-in customer puts one of their own past orders back in their cart (ORD.31): "
+        "the order is looked up among the caller's own; anything else is a 404 "
+        "(`test_another_customers_order_is_a_404_also_by_guessing`).",
+        kwargs={"public_id": NIL_UUID},
     ),
     "privacy_requests": StaffOnly(
         "Erasure requests (CMP.4): platform data listed by public id; needs "

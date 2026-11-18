@@ -1,0 +1,22 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}Propose a missing fitment item (FIT.3, spec 17 section 17.3.2) and see the proposals.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p><a href="{{ list_url }}">{% translate "Back to the products" %}</a></p>
+  <p class="manager-lead">{% blocktranslate %}A proposed item stays hidden until the platform reviews it. Pending proposals: {{ pending }} of {{ limit }}.{% endblocktranslate %}</p>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" class="manager-form" novalidate>
+    {% csrf_token %}
+    {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% include "components/button.html" with label=_("Send the proposal") type="submit" only %}
+  </form>
+  <div class="table-scroll" role="region" aria-labelledby="fitment-proposals-caption" tabindex="0">
+    <table class="table">
+      <caption id="fitment-proposals-caption">{% translate "Your proposals" %}</caption>
+      <thead><tr><th scope="col">{% translate "Name" %}</th><th scope="col">{% translate "Status" %}</th></tr></thead>
+      <tbody>{% for p in proposals %}<tr><th scope="row">{{ p.name }}</th><td>{{ p.status }}</td></tr>
+      {% empty %}<tr><td colspan="2">{% translate "Nothing to show." %}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+{% endblock %}

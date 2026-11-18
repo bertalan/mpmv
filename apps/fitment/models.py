@@ -21,6 +21,7 @@ from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
 from apps.catalog.models import Category, Product
 from apps.core.fields import LanguageField
 from apps.core.models import BaseModel, TranslationModel
+from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
@@ -492,3 +493,18 @@ class ProductFitment(BaseModel):
     def year_to(self) -> int | None:
         # PostgreSQL stores integer ranges as [lower, upper): the last year is upper - 1.
         return None if self.years is None or self.years.upper is None else self.years.upper - 1
+
+
+class FitmentNodeProposal(BaseModel):
+    """Which shop proposed a node (FIT.3, spec 17 §17.3.2): the anti-flooding limit counts the
+    proposals of a shop that still wait for review. Written only by
+    `services.propose_node_for_vendor`; the node itself stays platform data."""
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="fitment_proposals")
+    node = models.OneToOneField(FitmentNode, on_delete=models.PROTECT, related_name="proposal")
+
+    def __str__(self) -> str:
+        return f"{self.vendor_id}: {self.node_id}"

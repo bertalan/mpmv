@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("fitment", "0002_product_declaration"),
+        ("fitment", "0003_node_proposal"),
     ]
 
     operations = [

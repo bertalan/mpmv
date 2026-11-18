@@ -14,6 +14,11 @@
     <dd>{{ total }}</dd>
   </dl>
   <p>{% translate "This is your order reference, not an invoice. Each seller issues its own invoice." %}</p>
+  <form method="post" action="{% url 'customer_order_again' public_id %}" data-order-again>
+    {% csrf_token %}
+    {% include "components/button.html" with label=_("Order again") type="submit" variant="secondary" only %}
+  </form>
+  <p class="muted">{% translate "Puts the items that are still on sale back in your cart, at today's prices. Nothing is ordered or paid until you check out." %}</p>
   {% for part in parts %}
     <section class="order-part" aria-labelledby="part-{{ forloop.counter }}">
       <h2 id="part-{{ forloop.counter }}">{% blocktranslate with name=part.vendor_name %}Sold by {{ name }}{% endblocktranslate %}</h2>
