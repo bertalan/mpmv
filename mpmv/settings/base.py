@@ -257,6 +257,11 @@ ORDER_FREEZE_HOOKS: list[str] = ["apps.compliance.services.orders_frozen"]
 # ORD.20: a consumer withdrawal registered on a vendor order (CMP.6) blocks new amendments; each
 # hook takes the vendor order and returns True when one is registered.
 ORDER_WITHDRAWAL_HOOKS: list[str] = ["apps.compliance.withdrawal.has_withdrawal"]
+# ORD.30: the same two rules for a page of packages at once (constant queries): the freeze hook
+# takes the vendors and returns the ids of the frozen ones, the withdrawal hook takes vendor order
+# ids and returns those with a registered withdrawal.
+ORDER_FREEZE_BATCH_HOOKS: list[str] = ["apps.compliance.services.frozen_vendor_ids"]
+ORDER_WITHDRAWAL_BATCH_HOOKS: list[str] = ["apps.compliance.withdrawal.withdrawn_vendor_order_ids"]
 # ORD.20: the ledger carries out the PAY.4 refund of an amendment's decrease and of a cancel of
 # the rest, in the transaction of the change (orders cannot import the ledger).
 ORDER_AMENDMENT_REFUND_HOOK = "apps.ledger.refunds.refund_amendment"

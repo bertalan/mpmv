@@ -608,15 +608,72 @@ def _check_customer_request(
     return {key: str(request[key]) for key in CUSTOMER_REQUEST_KEYS}
 
 
-def staff_actionable(vendor_order: VendorOrder) -> bool:
-    """ORD.30: whether platform staff can still act on a package (ORD.22): the order is paid and
-    the package has not shipped (pending or accepted; so not delivered, cancelled or closed).
-    The one rule behind `_lock_amendable` (the actions) and `staff_actionable_packages` (the staff
-    list), so the list and the actions cannot drift."""
+BLOCK_VENDOR_FROZEN = "vendor_frozen"
+BLOCK_WITHDRAWAL = "withdrawal_registered"
+
+
+@dataclass(frozen=True)
+class StaffActionability:
+    """ORD.30: whether the ORD.22 actions are allowed on a package and, when a rule other than
+    the package's state forbids them, why: `block_reason` is `BLOCK_VENDOR_FROZEN` (CMP.5: the
+    shop's open orders are frozen pending staff review), `BLOCK_WITHDRAWAL` (a consumer
+    withdrawal is registered) or None (allowed, or refused only by the package's state)."""
+
+    actionable: bool
+    block_reason: str | None = None
+
+
+def _state_actionable(vendor_order: VendorOrder) -> bool:
     return (
         vendor_order.order.state in PAID_OR_LATER
         and vendor_order.state in am.AMENDABLE_VENDOR_ORDER_STATES
     )
+
+
+def _actionability(state_ok: bool, frozen: bool, withdrawn_: bool) -> StaffActionability:
+    if frozen:
+        return StaffActionability(False, BLOCK_VENDOR_FROZEN)
+    if not state_ok:
+        return StaffActionability(False)
+    if withdrawn_:
+        return StaffActionability(False, BLOCK_WITHDRAWAL)
+    return StaffActionability(True)
+
+
+def staff_actionable(
+    vendor_order: VendorOrder, *, check_withdrawal: bool = True
+) -> StaffActionability:
+    """ORD.30: whether platform staff can act on a package (ORD.22): the order is paid and the
+    package has not shipped (pending or accepted), the shop is not frozen and no withdrawal is
+    registered. The one rule behind `_lock_amendable` (the actions) and the staff list
+    (`staff_actionable_packages` is its state part in SQL, `staff_actionability` its batch form),
+    so the list and the actions cannot drift. `check_withdrawal=False` leaves the withdrawal out
+    (applying a draft supersedes a stale one before it looks at the withdrawal)."""
+    return _actionability(
+        _state_actionable(vendor_order),
+        orders_frozen(vendor_order.vendor),
+        check_withdrawal and withdrawn(vendor_order),
+    )
+
+
+def staff_actionability(rows: Sequence[VendorOrder]) -> dict[int, StaffActionability]:
+    """`staff_actionable` for many packages with a constant number of queries (the batch hooks
+    `settings.ORDER_FREEZE_BATCH_HOOKS` and `ORDER_WITHDRAWAL_BATCH_HOOKS` answer for all of
+    them at once). Keyed by the package's pk."""
+    vendors = list({sub.vendor_id: sub.vendor for sub in rows}.values())
+    frozen: set[int] = set()
+    for path in settings.ORDER_FREEZE_BATCH_HOOKS:
+        frozen |= set(import_string(path)(vendors))
+    ids = [sub.pk for sub in rows]
+    withdrawn_ids: set[int] = set()
+    for path in settings.ORDER_WITHDRAWAL_BATCH_HOOKS:
+        withdrawn_ids |= set(import_string(path)(ids))
+    return {
+        sub.pk: _actionability(
+            _state_actionable(sub), sub.vendor_id in frozen, sub.pk in withdrawn_ids
+        )
+        for sub in rows
+    }
 
 
 def staff_actionable_packages(rows: QuerySet[VendorOrder]) -> QuerySet[VendorOrder]:
@@ -627,7 +684,7 @@ def staff_actionable_packages(rows: QuerySet[VendorOrder]) -> QuerySet[VendorOrd
     )
 
 
-def _lock_amendable(sub: VendorOrder) -> VendorOrder:
+def _lock_amendable(sub: VendorOrder, *, withdrawal: bool = True) -> VendorOrder:
     """Lock the Order, then the VendorOrder (only its own row, `of=("self",)`): the order of
     `transition_vendor_order` and `ledger.refunds._lock`, so an amendment, a refund and a
     fulfilment step never deadlock, and the Vendor row is never locked. CMP.5: a vendor whose open
@@ -638,13 +695,16 @@ def _lock_amendable(sub: VendorOrder) -> VendorOrder:
         .select_related("order", "vendor")
         .get(pk=sub.pk)
     )
-    if orders_frozen(locked.vendor):
+    verdict = staff_actionable(locked, check_withdrawal=withdrawal)
+    if verdict.block_reason == BLOCK_VENDOR_FROZEN:
         raise OrdersFrozen(
             gettext(
                 "The shop's open orders are frozen pending staff review, so they cannot be amended."
             )
         )
-    if not staff_actionable(locked):
+    if verdict.block_reason == BLOCK_WITHDRAWAL:
+        raise _withdrawn_refusal()
+    if not verdict.actionable:
         if locked.order.state not in PAID_OR_LATER:
             raise AmendmentRefused(
                 gettext(
@@ -668,14 +728,18 @@ def withdrawn(sub: VendorOrder) -> bool:
     return any(import_string(path)(sub) for path in settings.ORDER_WITHDRAWAL_HOOKS)
 
 
+def _withdrawn_refusal() -> AmendmentRefused:
+    return AmendmentRefused(
+        gettext(
+            "The customer has withdrawn from this package, so it can no longer be changed: "
+            "the withdrawal and its refund run on the current version."
+        )
+    )
+
+
 def _refuse_withdrawn(sub: VendorOrder) -> None:
     if withdrawn(sub):
-        raise AmendmentRefused(
-            gettext(
-                "The customer has withdrawn from this package, so it can no longer be changed: "
-                "the withdrawal and its refund run on the current version."
-            )
-        )
+        raise _withdrawn_refusal()
 
 
 def draft_amendment(
@@ -718,7 +782,6 @@ def draft_amendment(
     try:
         with transaction.atomic():
             locked = _lock_amendable(sub)
-            _refuse_withdrawn(locked)
             open_one = OrderAmendment.objects.filter(
                 vendor_order=locked, state__in=OPEN_AMENDMENT_STATES
             ).first()
@@ -1048,7 +1111,7 @@ def apply_amendment(
     applied: VendorOrderVersion | None = None
     try:
         with transaction.atomic():
-            locked_sub = _lock_amendable(sub)
+            locked_sub = _lock_amendable(sub, withdrawal=False)
             locked = (
                 OrderAmendment.objects.select_for_update()
                 .select_related("from_version", "vendor_order__vendor", "vendor_order__order")
@@ -1235,8 +1298,7 @@ def revise_amendment(
     superseded = False
     try:
         with transaction.atomic():
-            locked_sub = _lock_amendable(sub)
-            _refuse_withdrawn(locked_sub)
+            locked_sub = _lock_amendable(sub, withdrawal=False)
             locked = (
                 OrderAmendment.objects.select_for_update()
                 .select_related("from_version", "vendor_order__vendor", "vendor_order__order")
@@ -1555,7 +1617,6 @@ def cancel_package(
     try:
         with transaction.atomic():
             locked = _lock_amendable(sub)
-            _refuse_withdrawn(locked)
             if not dry_run:
                 estimate = hook(
                     locked,

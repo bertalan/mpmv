@@ -17,20 +17,25 @@ import pytest
 from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
-from django.utils import timezone
+from django.utils import timezone, translation
+from django.utils.translation import gettext
 
 from apps.accounts import levels
 from apps.accounts.tests.factories import PasskeyDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import verified_login
+from apps.compliance.models import TerminationNotice
+from apps.compliance.tests.factories import TerminationNoticeFactory, WithdrawalStatementFactory
 from apps.orders import amendments
 from apps.orders.engine import ORDER_STATES, ORDER_TRANSITIONS, VENDOR_ORDER_TRANSITIONS
 from apps.orders.models import Order, OrderAmendment, VendorOrder, VendorOrderState
+from apps.orders.services import OrdersFrozen
 from apps.orders.tests.factories import (
     OrderAmendmentFactory,
     OrderFactory,
     OrderLineFactory,
     VendorOrderFactory,
 )
+from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
@@ -117,29 +122,88 @@ def support(client: Client) -> Client:
 # --- the predicate ---------------------------------------------------------------------------
 
 
+def _freeze(vendor: Vendor) -> None:
+    TerminationNoticeFactory.create(
+        vendor=vendor,
+        status=TerminationNotice.Status.APPLIED,
+        frozen_at=timezone.now(),
+        freeze_reviewed_at=None,
+    )
+
+
+def _withdraw(sub: VendorOrder) -> None:
+    WithdrawalStatementFactory.create(vendor_order=sub, order=sub.order)
+
+
+def _service_says(sub: VendorOrder) -> str | None:
+    """What `_lock_amendable` (the ORD.22 actions) answers: None when allowed, else the refusal."""
+    try:
+        amendments._lock_amendable(sub)
+    except OrdersFrozen:
+        return "frozen"
+    except amendments.AmendmentRefused as exc:
+        return "withdrawn" if "withdrawn" in str(exc) else "state"
+    return None
+
+
+@pytest.mark.parametrize("block", [None, "vendor_frozen", "withdrawal_registered"])
 @pytest.mark.parametrize("order_state", sorted(ORDER_STATES))
 @pytest.mark.parametrize("state", PACKAGE_STATES)
-def test_the_predicate_the_query_and_the_service_agree_on_every_state(
-    order_state: str, state: str
+def test_the_list_the_predicate_and_the_service_agree_on_every_state(
+    order_state: str, state: str, block: str | None
 ) -> None:
     sub = package(order_state, state)
-    expected = order_state not in {"checkout", "quote_flow", "awaiting_payment", "cancelled"} and (
+    if block == "vendor_frozen":
+        _freeze(sub.vendor)
+    if block == "withdrawal_registered":
+        _withdraw(sub)
+    state_ok = order_state not in {"checkout", "quote_flow", "awaiting_payment", "cancelled"} and (
         state in {"pending", "accepted"}
     )
-    assert amendments.staff_actionable(sub) is expected
+    expected_reason = (
+        "vendor_frozen"
+        if block == "vendor_frozen"
+        else ("withdrawal_registered" if block and state_ok else None)
+    )
+    expected = state_ok and expected_reason is None
+    verdict = amendments.staff_actionable(sub)
+    assert verdict == amendments.StaffActionability(expected, expected_reason)
+    assert amendments.staff_actionability([sub])[sub.pk] == verdict
     in_list = (
         amendments.staff_actionable_packages(VendorOrder.objects.all()).filter(pk=sub.pk).exists()
     )
-    assert in_list is expected
-    try:
-        amendments._lock_amendable(sub)
-        allowed = True
-    except amendments.AmendmentRefused:
-        allowed = False
-    assert allowed is expected, (
-        f"order {order_state} / package {state}: the ORD.22 service said {allowed}, "
-        f"the list predicate {expected}"
+    assert in_list is state_ok
+    said = _service_says(sub)
+    assert (said is None) is expected, (
+        f"order {order_state} / package {state} / {block}: the ORD.22 service said {said}, "
+        f"the predicate {verdict}"
     )
+    if expected_reason:
+        assert (
+            said
+            == {"vendor_frozen": "frozen", "withdrawal_registered": "withdrawn"}[expected_reason]
+        )
+
+
+def test_a_blocked_package_stays_listed_with_its_reason(support: Client) -> None:
+    frozen, withdrawn_, plain = package(), package(), package()
+    _freeze(frozen.vendor)
+    _withdraw(withdrawn_)
+    text = listed(support)
+    for sub, label in ((frozen, "Shop frozen"), (withdrawn_, "Withdrawal registered")):
+        row = re.search(rf"{sub.order.number}.*?</tr>", text, re.S)
+        assert row, f"{sub.order.number} must stay listed"
+        assert f"data-blocked>{label}<" in row.group(0)
+    row = re.search(rf"{plain.order.number}.*?</tr>", text, re.S)
+    assert row
+    assert "data-blocked" not in row.group(0)
+
+
+@pytest.mark.parametrize("language", ["it", "de", "fr", "es"])
+def test_the_block_badges_are_translated(language: str) -> None:
+    with translation.override(language):
+        for label in ("Shop frozen", "Withdrawal registered", "Changes are disabled."):
+            assert gettext(label) != label
 
 
 # --- the list --------------------------------------------------------------------------------
@@ -236,9 +300,13 @@ def test_the_query_count_does_not_grow_with_the_rows(support: Client) -> None:
     package()
     listed(support)  # warm the caches
     few = count()
-    for _ in range(6):
-        sub = package()
+    for index in range(6):
+        sub = package(vendor=VendorFactory.create())
         OrderAmendmentFactory.create(vendor_order=sub, from_version__vendor_order=sub)
+        if index % 2:
+            _freeze(sub.vendor)
+        else:
+            _withdraw(sub)
     assert count() == few
 
 

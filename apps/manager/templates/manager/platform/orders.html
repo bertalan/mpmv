@@ -67,6 +67,7 @@ request or cancel the package with a full refund. A GET search writes nothing.
         <th scope="col">{% translate "Placed" %}</th>
         <th scope="col" class="numeric">{% translate "Total" %}</th>
         <th scope="col">{% translate "Open change" %}</th>
+        <th scope="col">{% translate "Blocked" %}</th>
       </tr></thead>
       <tbody>
         {% for package in packages %}<tr>
@@ -76,7 +77,8 @@ request or cancel the package with a full refund. A GET search writes nothing.
           <td>{{ package.placed|date:"SHORT_DATE_FORMAT" }}</td>
           <td class="numeric">{{ package.total }}</td>
           <td>{{ package.amendment|default:"-" }}</td>
-        </tr>{% empty %}<tr><td colspan="6">{% translate "No package waits for a change." %}</td></tr>{% endfor %}
+          <td>{% if package.blocked %}<strong data-blocked>{{ package.blocked }}</strong> <span class="visually-hidden">{% translate "Changes are disabled." %}</span>{% else %}-{% endif %}</td>
+        </tr>{% empty %}<tr><td colspan="7">{% translate "No package waits for a change." %}</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>

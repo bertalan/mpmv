@@ -1380,6 +1380,10 @@ msgstr "In Vorbereitung"
 msgid "block %(number)s, %(label)s"
 msgstr "Block %(number)s, %(label)s"
 
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Blocked"
+msgstr "Gesperrt"
+
 #: apps/events/templates/events/event_page.html
 msgid "Booth %(booth)s"
 msgstr "Stand %(booth)s"
@@ -1620,6 +1624,10 @@ msgstr "Bestellung ändern"
 #: apps/manager/templates/manager/shop/order.html
 msgid "Change this order"
 msgstr "Diese Bestellung ändern"
+
+#: apps/manager/templates/manager/platform/orders.html
+msgid "Changes are disabled."
+msgstr "Änderungen sind deaktiviert."
 
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid ""
@@ -6205,6 +6213,10 @@ msgstr "Versand: %(shipping)s EUR"
 #: apps/manager/templates/manager/platform/product.html
 msgid "Shop"
 msgstr "Shop"
+
+#: apps/manager/amendment_views.py
+msgid "Shop frozen"
+msgstr "Shop eingefroren"
 
 #: apps/seo/site_links.py
 msgid "Shop space: choose the shop"
@@ -11309,6 +11321,10 @@ msgstr "Kündigung zurücknehmen"
 #: apps/manager/site_map.py apps/orders/templates/orders/_legal_recap.html
 msgid "Withdrawal"
 msgstr "Widerruf"
+
+#: apps/manager/amendment_views.py
+msgid "Withdrawal registered"
+msgstr "Widerruf erfasst"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Withdrawn"

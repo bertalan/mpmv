@@ -442,6 +442,12 @@ class ShopAmendmentDiscardView(AmendmentDiscardView):
 # --- the platform space ------------------------------------------------------------------------
 
 
+BLOCK_LABELS = {
+    amendments.BLOCK_VENDOR_FROZEN: gettext_lazy("Shop frozen"),
+    amendments.BLOCK_WITHDRAWAL: gettext_lazy("Withdrawal registered"),
+}
+
+
 class PlatformOrdersView(ManagerView):
     """Support and the platform owner find a paid order by its number (any package, shipped or
     closed included) and see, oldest first, the packages on which an ORD.22 action is still
@@ -513,6 +519,8 @@ class PlatformOrdersView(ManagerView):
         page = Paginator(actionable.order_by("order__created_at", "id"), self.paginate_by).get_page(
             self.request.GET.get("page")
         )
+        # A blocked package (frozen shop, registered withdrawal) stays listed with its reason.
+        verdicts = amendments.staff_actionability(list(page.object_list))
         base = urlencode(used)
         lead = f"?{base}&" if base else "?"
         context.update(
@@ -527,6 +535,7 @@ class PlatformOrdersView(ManagerView):
                     "placed": sub.order.created_at,
                     "total": _money(sub.gross_total),
                     "amendment": sub.open[0].get_state_display() if sub.open else "",
+                    "blocked": BLOCK_LABELS.get(verdicts[sub.pk].block_reason or "", ""),
                     "url": reverse("manager:platform:order", args=[sub.public_id]),
                 }
                 for sub in page.object_list

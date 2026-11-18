@@ -27,7 +27,7 @@ Settings: `WITHDRAWAL_PERIOD_DAYS` (default 14, never below 14) and
 import datetime as dt
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -258,6 +258,15 @@ def has_withdrawal(vendor_order: VendorOrder) -> bool:
     """Whether a withdrawal statement is registered on the vendor order. The ORD.20 hook
     (`settings.ORDER_WITHDRAWAL_HOOKS`): such a package can no longer be amended."""
     return WithdrawalStatement.objects.filter(vendor_order_id=vendor_order.pk).exists()
+
+
+def withdrawn_vendor_order_ids(ids: Iterable[int]) -> set[int]:
+    """Of the given vendor order ids, those with a withdrawal statement, in one query (ORD.30)."""
+    return set(
+        WithdrawalStatement.objects.filter(vendor_order_id__in=list(ids)).values_list(
+            "vendor_order_id", flat=True
+        )
+    )
 
 
 def submit_withdrawal(
