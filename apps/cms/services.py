@@ -1265,3 +1265,15 @@ def purge_expired_form_submissions(
             if not dry_run:
                 record(ctx, FORM_SUBMISSIONS_PURGED, "cms.formpage", str(page_id), None, snapshot)
     return changes
+
+
+def footer_profile_urls(site: Any) -> list[str]:
+    """The social profile URLs of `site`'s footer setting, in every language, for the
+    Organization `sameAs` (SEO.7); none when the site has no footer setting."""
+    from .models import SocialProfile
+
+    return list(
+        SocialProfile.objects.filter(settings__site=site)
+        .order_by("sort_order", "pk")
+        .values_list("url", flat=True)
+    )

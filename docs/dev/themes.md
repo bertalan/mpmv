@@ -333,7 +333,9 @@ public spec and a brief: no file derives from a reference template (spec 14 §14
   scrim) is built but no page includes it until THM.7 and THM.9 adopt it. The footer takes optional
   `widgets` (up to four columns) and `social_links`, and ends with a back-to-top link: a plain
   `#top` link, always visible without JavaScript, shown after 400 px of scroll with `ride.js`
-  (`html.is-scrolled`). No CMS setting feeds the widgets or social links yet (CMS.17).
+  (`html.is-scrolled`). CMS.17: the `footer_chrome` tag (`apps/cms/templatetags/cms_tags.py`) reads the
+  site's footer setting (Wagtail Settings > Footer) and gives both themes the same `widgets` and
+  `social_links`; with nothing set nothing is rendered.
 - **Not yet**: catalog, cart, checkout, account and content pages are THM.7 to THM.9. Pages that
   override the `head` block without `{{ block.super }}` lose the font preload only.
 

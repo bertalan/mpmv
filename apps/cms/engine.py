@@ -804,6 +804,55 @@ def parse_video_url(url: str) -> VideoLinks | None:
     return None
 
 
+# --- Footer columns and social profiles (CMS.17, spec 10 §10.2)
+
+MAX_FOOTER_COLUMNS = 4
+
+# The closed list of networks: the value stored, the visible text label (a proper name, the same
+# in every language; the label is always shown, never an icon alone).
+SOCIAL_NETWORKS: dict[str, str] = {
+    "bluesky": "Bluesky",
+    "facebook": "Facebook",
+    "github": "GitHub",
+    "instagram": "Instagram",
+    "linkedin": "LinkedIn",
+    "mastodon": "Mastodon",
+    "pinterest": "Pinterest",
+    "telegram": "Telegram",
+    "threads": "Threads",
+    "tiktok": "TikTok",
+    "wikidata": "Wikidata",
+    "x": "X",
+    "youtube": "YouTube",
+}
+
+
+def social_url_error(url: str) -> str:
+    """Why `url` cannot be a social profile link, or "" when it can: an absolute `https://` URL
+    with a host and no user name or password (so never `javascript:`, `http:` or a path)."""
+    if profile_key(url) is None:
+        return "Enter an absolute address that starts with https:// and has no user name."
+    return ""
+
+
+def footer_columns[T](rows: Iterable[tuple[str, T]], language: str) -> list[T]:
+    """The columns of `language`, in order, at most four (`rows` are (language, column))."""
+    return [column for code, column in rows if code == language][:MAX_FOOTER_COLUMNS]
+
+
+def footer_profiles[T](rows: Iterable[tuple[str, T]], language: str) -> list[T]:
+    """The profiles shown in `language`: those for all languages (blank) and its own."""
+    return [profile for code, profile in rows if code in ("", language)]
+
+
+def too_many_columns(languages: Iterable[str]) -> list[str]:
+    """The languages with more than four columns (`languages` has one entry per column)."""
+    counts: dict[str, int] = {}
+    for code in languages:
+        counts[code] = counts.get(code, 0) + 1
+    return [code for code, total in counts.items() if total > MAX_FOOTER_COLUMNS]
+
+
 # The guide page a screen's help dialog links as "More help" (route name -> guide key).
 ROUTE_GUIDE: dict[str, str] = {
     "orders:cart": "customer:ordering",

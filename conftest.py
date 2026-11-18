@@ -332,3 +332,14 @@ def consumer_prices(db: None) -> "Iterator[None]":
         yield
     finally:
         post_save.disconnect(sender=vendor_model, dispatch_uid="tax12-consumer-prices")
+
+
+@pytest.fixture(autouse=True)
+def _no_footer_cache_leaks_between_tests() -> "Iterator[None]":
+    """The cached footer (CMS.17) is keyed by site id; a rolled-back site or footer row fires no
+    signal, so the next test would read the previous test's footer."""
+    from apps.cms.footer_cache import drop_footer_cache
+
+    drop_footer_cache()
+    yield
+    drop_footer_cache()
