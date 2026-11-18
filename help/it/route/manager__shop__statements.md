@@ -12,4 +12,4 @@ Questa pagina elenca le motivazioni che la piattaforma ha inviato al Suo negozio
 
 La motivazione non indica chi ha inviato la segnalazione.
 
-Se la pagina è vuota, la piattaforma non ha inviato alcuna motivazione per il Suo negozio. Per domande su una motivazione scriva a {{ operator.support_email }}.
+Se la pagina è vuota, la piattaforma non ha inviato alcuna motivazione per il Suo negozio. Per domande su una motivazione scriva a {{ operator.compliance_email }}.
