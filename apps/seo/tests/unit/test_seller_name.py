@@ -60,3 +60,53 @@ def test_the_schema_check_rejects_a_seller_equal_to_a_natural_persons_name() -> 
     assert any("natural person" in error for error in errors)
     assert schema_check.rich_result_errors(graph("Rossi Ceramics"), person_names=people) == []
     assert schema_check.rich_result_errors(graph("Mario Rossi")) == []
+
+
+def person(**kwargs: object) -> engine.VendorNameFacts:
+    base = {"legal_name": "Mario Rossi", "first_name": "Mario", "last_name": "Rossi"}
+    return facts(**base, natural_person=True, **kwargs)
+
+
+def test_accents_are_folded_in_either_field() -> None:
+    for legal, shown in (("José Rossi", "Jose Rossi"), ("Jose Rossi", "José Rossi")):
+        sole = engine.VendorNameFacts(display_name=shown, legal_name=legal, natural_person=True)
+        assert engine.public_seller_name(sole) is None, (legal, shown)
+    assert engine.normalize_name("José  Rossi!") == "jose rossi"
+
+
+def test_a_display_name_containing_the_persons_name_is_no_seller() -> None:
+    for shown in (
+        "Ceramiche Mario Rossi",
+        "Mario Rossi Ceramics",
+        "Mario Rossi S.a.s.",
+        "Rossi Mario Shop",
+        "Mariorossi",
+        "mario-rossi",
+    ):
+        assert engine.public_seller_name(person(display_name=shown)) is None, shown
+
+
+def test_a_display_name_sharing_only_the_surname_is_kept() -> None:
+    for shown in ("Rossi Ceramics", "Mario Rossini Ceramics", "Ceramiche Mario"):
+        assert engine.public_seller_name(person(display_name=shown)) == shown
+
+
+def test_a_company_name_containing_a_person_like_name_is_untouched() -> None:
+    company = facts(display_name="Ceramiche Mario Rossi", legal_name="Mario Rossi S.r.l.")
+    assert engine.public_seller_name(company) == "Ceramiche Mario Rossi"
+
+
+def test_the_legal_name_alone_protects_a_vendor_with_no_legal_form() -> None:
+    for shown in ("Mario Rossi", "Ceramiche Mario Rossi"):
+        vendor = engine.VendorNameFacts(
+            display_name=shown, legal_name="Mario Rossi", natural_person=True
+        )
+        assert engine.public_seller_name(vendor) is None, shown
+
+
+def test_the_schema_check_flags_a_contained_name() -> None:
+    people = engine.natural_person_names(person())
+    for leaked in ("Ceramiche Mario Rossi", "Rossi Mario Shop", "Mariorossi", "Mário Rossi"):
+        errors = schema_check.rich_result_errors(graph(leaked), person_names=people)
+        assert any("natural person" in error for error in errors), leaked
+    assert schema_check.rich_result_errors(graph("Rossi Ceramics"), person_names=people) == []

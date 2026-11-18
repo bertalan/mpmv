@@ -83,7 +83,7 @@ def _person_errors(document: Mapping[str, Any], person_names: Collection[str]) -
         f"Organization {node.get('@id')}: the name is a natural person's legal name"
         for node in _nodes(document)
         if node.get("@type") == "Organization"
-        and engine.normalize_name(str(node.get("name") or "")) in person_names
+        and engine.reveals_person(str(node.get("name") or ""), person_names)
     ]
 
 

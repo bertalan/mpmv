@@ -8,7 +8,7 @@ from . import engine
 
 def name_facts(vendor: Vendor) -> engine.VendorNameFacts:
     sole_trader = vendor.legal_form == Vendor.LegalForm.SOLE_PROPRIETORSHIP
-    unspecified_individual = not vendor.legal_form and bool(vendor.first_name and vendor.last_name)
+    unspecified_individual = not vendor.legal_form  # when in doubt, a person
     return engine.VendorNameFacts(
         display_name=str(vendor.display_name),
         legal_name=str(vendor.legal_name),

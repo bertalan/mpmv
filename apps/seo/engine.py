@@ -12,7 +12,8 @@ asks again. Consent Mode v2 signals are derived from the granted categories only
 """
 
 import re
-from collections.abc import Iterable
+import unicodedata
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 
 NECESSARY = "necessary"
@@ -117,7 +118,7 @@ def consent_signals(state: ConsentState) -> dict[str, str]:
 @dataclass(frozen=True)
 class VendorNameFacts:
     """What decides the public seller name. `natural_person` is true for a sole trader (or an
-    individual whose legal form is not filled in yet but whose first and last name are)."""
+    vendor whose legal form is not filled in yet: when in doubt, a person)."""
 
     display_name: str
     legal_name: str = ""
@@ -127,8 +128,26 @@ class VendorNameFacts:
 
 
 def normalize_name(name: str) -> str:
-    """A name compared without case, accents' case, punctuation or spacing differences."""
-    return " ".join(re.sub(r"[^\w\s]", " ", name.casefold()).split())
+    """A name compared without case, accent, punctuation or spacing differences."""
+    decomposed = unicodedata.normalize("NFKD", name)
+    bare = "".join(c for c in decomposed if not unicodedata.combining(c))
+    return " ".join(re.sub(r"[^\w\s]", " ", bare.casefold()).split())
+
+
+def reveals_person(name: str, person_names: Collection[str]) -> bool:
+    """True when `name` shows a natural person's name: equal to it, containing it as a whole-word
+    sequence ('Ceramiche Mario Rossi'), or equal to it with the spaces removed ('Mariorossi').
+    Conservative on purpose: a doubtful name is treated as the person's name (SEO.15)."""
+    shown = normalize_name(name)
+    if not shown:
+        return False
+    padded = f" {shown} "
+    squeezed = shown.replace(" ", "")
+    return any(
+        f" {person} " in padded or squeezed == person.replace(" ", "")
+        for person in person_names
+        if person
+    )
 
 
 def natural_person_names(facts: VendorNameFacts) -> frozenset[str]:
@@ -147,6 +166,6 @@ def public_seller_name(facts: VendorNameFacts) -> str | None:
     the legal name of a natural person. None when that is the only name there is (the seller
     node and every reference to it are then left out, no error). One rule for SEO.1 and SEO.7."""
     name = " ".join(facts.display_name.split())
-    if not name or normalize_name(name) in natural_person_names(facts):
+    if not name or reveals_person(name, natural_person_names(facts)):
         return None
     return name
