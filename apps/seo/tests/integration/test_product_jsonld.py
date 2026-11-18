@@ -239,10 +239,115 @@ def test_a_product_without_weight_still_has_the_return_policy(client: Client, th
     _html, document = graph_of(client)
     policy = node(document, "MerchantReturnPolicy")
     assert policy["applicableCountry"] == ["IT"]
-    assert policy["returnFees"] == "https://schema.org/ReturnShippingFees"
+    assert policy["returnFees"] == "https://schema.org/FreeReturn"  # Q-105 default
+    assert "merchantReturnLink" not in policy  # the default has no returns page
     assert policy["merchantReturnDays"] == 14
     assert not [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"]
     assert schema_check.dangling_references(document) == []
+
+
+def _sold_product(country: str = "DE") -> Product:
+    from apps.shipping.tests.factories import ShippingMethodFactory, ShippingZoneFactory
+
+    product = live(
+        price_net=Decimal("12.50"),
+        weight_kg=None,
+        vendor=VendorFactory.create(
+            status=Vendor.Status.ACTIVE, sells_online=True, country=country
+        ),
+    )
+    ShippingMethodFactory.create(
+        vendor=product.vendor, zone=ShippingZoneFactory.create(countries=["IT"])
+    )
+    return product
+
+
+def _policy(document: dict[str, Any]) -> dict[str, Any]:
+    assert schema_check.dangling_references(document) == []
+    assert schema_check.rich_result_errors(document) == []
+    return node(document, "MerchantReturnPolicy")
+
+
+def test_an_approved_policy_states_its_window_link_country_methods_and_payer(
+    client: Client, theme: str
+) -> None:
+    from apps.vendors.tests.factories import ReturnPolicyVersionFactory
+
+    product = _sold_product()
+    ReturnPolicyVersionFactory.create(
+        vendor=product.vendor,
+        status="approved",
+        return_window_days=30,
+        return_shipping_paid_by="vendor",
+        return_methods=["post", "in_store"],
+        returns_page_url="https://shop.example/returns",
+        return_country="FR",
+    )
+    _html, document = graph_of(client)
+    policy = _policy(document)
+    assert policy["merchantReturnDays"] == 30
+    assert policy["merchantReturnLink"] == "https://shop.example/returns"
+    assert policy["returnPolicyCountry"] == "FR"
+    assert policy["returnFees"] == "https://schema.org/FreeReturn"
+    assert policy["returnMethod"] == [
+        "https://schema.org/ReturnByMail",
+        "https://schema.org/ReturnInStore",
+    ]
+
+
+def test_a_customer_paid_approved_policy_says_so(client: Client, theme: str) -> None:
+    from apps.vendors.tests.factories import ReturnPolicyVersionFactory
+
+    product = _sold_product()
+    ReturnPolicyVersionFactory.create(
+        vendor=product.vendor, status="approved", return_shipping_paid_by="customer"
+    )
+    _html, document = graph_of(client)
+    assert _policy(document)["returnFees"] == "https://schema.org/ReturnShippingFees"
+
+
+def test_a_pending_policy_is_not_stated(client: Client, theme: str) -> None:
+    from apps.vendors.tests.factories import ReturnPolicyVersionFactory
+
+    product = _sold_product()
+    ReturnPolicyVersionFactory.create(
+        vendor=product.vendor, status="pending", return_window_days=60
+    )
+    _html, document = graph_of(client)
+    policy = _policy(document)
+    assert policy["merchantReturnDays"] == 14
+    assert policy["returnPolicyCountry"] == "DE"
+    assert policy["returnFees"] == "https://schema.org/FreeReturn"  # the default, not the pending
+    for absent in ("merchantReturnLink", "returnMethod"):
+        assert absent not in policy
+
+
+def test_a_vendor_without_a_country_falls_back_to_the_operator_country(
+    client: Client, theme: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from apps.seo import product_jsonld
+
+    # TAX.12 cannot price a vendor without a country; the policy fallback is what is under test.
+    monkeypatch.setattr(product_jsonld, "_offer_price", lambda page, net, request: net)
+    _sold_product(country="")
+    _html, document = graph_of(client)
+    assert _policy(document)["returnPolicyCountry"] == "IT"  # the consumer_prices operator
+
+
+def test_the_policy_read_is_one_query_per_page(client: Client, theme: str) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from apps.vendors.tests.factories import ReturnPolicyVersionFactory
+
+    product = _sold_product()
+    for approved in (False, True):
+        if approved:
+            ReturnPolicyVersionFactory.create(vendor=product.vendor, status="approved")
+        with CaptureQueriesContext(connection) as queries:
+            client.get(MUG)
+        reads = [q for q in queries if "vendors_returnpolicyversion" in q["sql"]]
+        assert len(reads) == 1
 
 
 def test_an_image_carries_the_licence_fields_of_the_real_model() -> None:

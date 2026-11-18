@@ -4,7 +4,7 @@ last-checked: 2026-11-18
 Diese Seite ist für den Inhaber des Shops. Die Rückgaberichtlinie sagt den Käufern, wie lange sie Waren zurücksenden können, wer die Rücksendekosten trägt und wie sie die Waren zurückgeben können.
 
 ## Was Sie sehen
-- **Was Käufer jetzt sehen**: die genehmigte Richtlinie oder die Standardrichtlinie (14 Tage, der Kunde trägt die Rücksendung), wenn Sie noch keine festgelegt haben.
+- **Was Käufer jetzt sehen**: die genehmigte Richtlinie oder die Standardrichtlinie (14 Tage, der Shop trägt die Rücksendekosten), wenn Sie noch keine festgelegt haben.
 - Ein Hinweis, wenn Ihre neueste Version auf Prüfung wartet oder abgelehnt wurde.
 - **Versionen**: alle bisher vorgeschlagenen Versionen.
 

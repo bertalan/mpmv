@@ -255,12 +255,35 @@ def test_the_return_policy_names_its_countries_and_window() -> None:
     assert node["merchantReturnLink"] == f"{SITE}/shop/acme/"
 
 
-def test_the_customer_pays_the_return_shipping_and_a_defect_is_free() -> None:
+def test_no_payer_given_means_no_return_fees_but_a_defect_is_free() -> None:
     node = pg.return_policy_node(node_id=RETURNS, countries=("IT",), return_country="IT", days=14)
-    assert node["returnFees"] == "https://schema.org/ReturnShippingFees"
+    assert "returnFees" not in node
+    assert "merchantReturnLink" not in node
+    assert "returnMethod" not in node
     assert node["itemDefectReturnFees"] == "https://schema.org/FreeReturn"
     assert node["merchantReturnDays"] == 14
     assert "returnShippingFeesAmount" not in node
+
+
+def test_a_stated_payer_sets_the_return_fees_and_the_methods_map_to_schema_org() -> None:
+    customer = pg.return_policy_node(
+        node_id=RETURNS, countries=("IT",), return_country="IT", days=30, paid_by="customer"
+    )
+    assert customer["returnFees"] == "https://schema.org/ReturnShippingFees"
+    shop = pg.return_policy_node(
+        node_id=RETURNS,
+        countries=("IT",),
+        return_country="IT",
+        days=30,
+        paid_by="vendor",
+        methods=("post", "drop_off", "in_store"),
+    )
+    assert shop["returnFees"] == "https://schema.org/FreeReturn"
+    assert shop["returnMethod"] == [
+        "https://schema.org/ReturnByMail",
+        "https://schema.org/ReturnAtKiosk",
+        "https://schema.org/ReturnInStore",
+    ]
 
 
 def test_shipping_details_group_the_countries_in_one_region_per_rate() -> None:

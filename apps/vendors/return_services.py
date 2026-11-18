@@ -4,7 +4,7 @@ The owner proposes a version; it is private until platform staff approve it, so 
 data of SEO.14 never states what the sales terms of VEN.35 do not say. A new proposal never
 changes a stored one: it adds the next version and withdraws the previous pending one. The
 newest approved version is the public one; a vendor with none is on the default of
-`return_engine.default_policy` (the 14-day floor, the customer pays).
+`return_engine.default_policy` (the 14-day floor, the shop pays the return shipping).
 """
 
 from collections.abc import Mapping

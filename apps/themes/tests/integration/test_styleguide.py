@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
+from django.utils.translation import gettext
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.themes.styleguide import COMPONENTS
@@ -227,7 +228,7 @@ def test_the_commerce_components_are_shown_in_every_state(staff_client: Client) 
     html = staff_client.get(URL).content.decode()
     price = section_html(html, "sg-price")
     assert "<del>" in price
-    assert "Lowest price in the last 30 days" in price
+    assert gettext("Lowest price in the last 30 days:").rstrip(":") in price
     assert "Price on request" in price
     rating = section_html(html, "sg-rating")
     assert "out of 5" in rating

@@ -9,6 +9,7 @@ import re
 
 import pytest
 from django.test import Client
+from django.utils.translation import gettext
 
 from apps.cms.models import HomePage, VendorRecruitmentPage
 from apps.cms.services import SeedReport, vendor_application_url
@@ -52,18 +53,21 @@ def test_the_page_links_to_the_application_form(client: Client, seeded: SeedRepo
     assert "Applications open soon." not in html
 
 
-@pytest.mark.parametrize(
-    ("cta_label", "shown"), [("Open your shop", "Open your shop"), ("", "Apply now")]
-)
+@pytest.mark.parametrize(("cta_label", "shown"), [("Open your shop", "Open your shop"), ("", None)])
 def test_with_the_application_form_the_page_links_to_it(
-    client: Client, seeded: SeedReport, monkeypatch: pytest.MonkeyPatch, cta_label: str, shown: str
+    client: Client,
+    seeded: SeedReport,
+    monkeypatch: pytest.MonkeyPatch,
+    cta_label: str,
+    shown: str | None,
 ) -> None:
     # VEN.22's route stands in through the service the page asks for the URL.
     monkeypatch.setattr("apps.cms.services.vendor_application_url", lambda: "/sell/apply/")
     VendorRecruitmentPageFactory.create(title="Sell with us", cta_label=cta_label)
 
     html = client.get("/sell-with-us/").content.decode()
-    assert f'<a class="button" href="/sell/apply/">{shown}</a>' in html
+    label = shown or gettext("Apply now")  # the page's own label when the editor sets none
+    assert f'<a class="button" href="/sell/apply/">{label}</a>' in html
     assert "Applications open soon." not in html
 
 
