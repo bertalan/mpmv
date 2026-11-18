@@ -273,7 +273,25 @@ To add or update baselines after a reviewed, intentional change:
    command on the CI runner and uploads every baseline as the `visual-baselines` artifact.
 2. Commit them under `tests/e2e/baselines/<theme>/` and review them in the pull request like code.
 
-The first baselines for `base` and `ride` are committed by THM.10.
+THM.10 committed the baselines for `base` and `ride`: the styleguide
+(`test_theme_quality_gates.py`) and the key pages (`tests/e2e/test_visual_baselines.py`: home,
+listing, product, search results, event, blog post, legal, cart and 404) at 360, 768 and 1280 px.
+Each image is the top 1800 CSS px of the page, so the set stays small in a public repository.
+The browser asks for reduced motion (no reveal effects, no carousel autoplay: carousels sit on the
+first slide), screenshots disable animations, the data is fixed (factory titles, dates, prices)
+and the launch countdown is masked.
+
+An intentional visual change needs a reviewed baseline update: the pull request that changes the
+look also changes the PNGs, and the reviewer looks at the images in the diff. To update:
+
+```sh
+MPMV_VISUAL=update uv run pytest -m e2e -k visual_baseline   # or: make e2e-baselines
+```
+
+Run it on the CI platform (the **Visual baselines** workflow) and commit only the PNGs that
+changed on purpose; a locally rendered PNG can differ in font anti-aliasing from the CI runner.
+`MPMV_VISUAL=compare` runs the comparison locally, which is how to check that the suite is
+stable and that a CSS change fails it.
 
 ## Bootstrap foundation (THM.13)
 
