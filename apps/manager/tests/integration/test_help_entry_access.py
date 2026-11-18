@@ -211,3 +211,10 @@ def test_a_staff_row_stays_editable_and_deletable() -> None:
     assert client.get(f"{BASE}delete/{row.pk}/").status_code == 200
     client.post(f"{BASE}delete/{row.pk}/")
     assert not HelpEntry.objects.filter(pk=row.pk).exists()
+
+
+def test_the_add_view_refuses_a_session_below_the_gate_level() -> None:
+    from apps.manager.wagtail_hooks import HelpEntryCreateView
+
+    assert getattr(HelpEntryCreateView.post, "session_action", None) is not None
+    assert getattr(HelpEntryCreateView.put, "session_action", None) is not None
