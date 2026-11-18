@@ -4,14 +4,15 @@
 an ORD.22 action is still possible (paid, before shipping), oldest first, with filters, pages and
 the open amendment. The list and the ORD.22 service share ONE predicate
 (`amendments.staff_actionable`). A Catalog or Finance member gets a 404 (the Manager convention for
-a page outside one's role, as the order page does; the spec row says 403: see the PR).
+a page outside one's role, as the order page does). Support and the platform owner are allowed.
 """
 
 import datetime as dt
 import itertools
 import re
 from collections import deque
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from typing import Any
 
 import pytest
 from django.db import connection
@@ -25,7 +26,9 @@ from apps.accounts.tests.factories import PasskeyDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.compliance.models import TerminationNotice
 from apps.compliance.tests.factories import TerminationNoticeFactory, WithdrawalStatementFactory
-from apps.orders import amendments
+from apps.core.audit import AuditContext
+from apps.core.models import AuditLog
+from apps.orders import amendments, versions
 from apps.orders.engine import ORDER_STATES, ORDER_TRANSITIONS, VENDOR_ORDER_TRANSITIONS
 from apps.orders.models import Order, OrderAmendment, VendorOrder, VendorOrderState
 from apps.orders.services import OrdersFrozen
@@ -185,6 +188,65 @@ def test_the_list_the_predicate_and_the_service_agree_on_every_state(
         )
 
 
+@pytest.mark.parametrize("block", ["withdrawn", "frozen"])
+@pytest.mark.parametrize("caller", ["draft", "revise", "apply", "cancel_package"])
+def test_every_amendment_caller_refuses_a_blocked_package_like_the_lock(
+    caller: str, block: str
+) -> None:
+    """Each ORD.22 entry point reports the same refusal as `_lock_amendable` (the one rule)."""
+    sub = package()
+    amendment = OrderAmendmentFactory.create(
+        vendor_order=sub,
+        from_version=versions.current_version(version_for(sub)),
+        initiator="support",
+        staff_note="n",
+    )
+    if block == "frozen":
+        _freeze(sub.vendor)
+    else:
+        _withdraw(sub)
+    actor = UserFactory.create(platform_role="support")
+    ctx = AuditContext(actor_label="t", source=AuditLog.Source.ADMIN)
+    calls: dict[str, Callable[[], object]] = {
+        "draft": lambda: amendments.draft_amendment(
+            sub, [], actor=actor, reason="r", ctx=ctx, staff_note="n"
+        ),
+        "revise": lambda: amendments.revise_amendment(amendment, [], actor=actor, ctx=ctx),
+        "apply": lambda: amendments.apply_amendment(amendment, actor=actor, ctx=ctx),
+        "cancel_package": lambda: amendments.cancel_package(
+            sub, actor=actor, reason="r", ctx=ctx, staff_note="n"
+        ),
+    }
+    expected = _service_says(sub)
+    assert expected == block
+    exception = OrdersFrozen if block == "frozen" else amendments.AmendmentRefused
+    with pytest.raises(exception) as refused:
+        calls[caller]()
+    with pytest.raises(exception, match=re.escape(str(refused.value))):
+        amendments._lock_amendable(sub)
+
+
+def test_a_frozen_package_costs_no_withdrawal_query(settings: Any) -> None:
+    """The withdrawal is looked up only when it can matter: a frozen shop is refused first."""
+    calls: list[int] = []
+
+    def spy(vendor_order: VendorOrder) -> bool:
+        calls.append(vendor_order.pk)
+        return False
+
+    settings.ORDER_WITHDRAWAL_HOOKS = [f"{__name__}.withdrawal_spy"]
+    globals()["withdrawal_spy"] = spy
+    sub = package()
+    _freeze(sub.vendor)
+    assert amendments.staff_actionable(sub) == amendments.StaffActionability(False, "vendor_frozen")
+    assert calls == []
+    shipped = package("paid", "shipped")
+    amendments.staff_actionable(shipped)
+    assert calls == []
+    amendments.staff_actionable(package())
+    assert len(calls) == 1
+
+
 def test_a_blocked_package_stays_listed_with_its_reason(support: Client) -> None:
     frozen, withdrawn_, plain = package(), package(), package()
     _freeze(frozen.vendor)
@@ -328,3 +390,57 @@ def test_a_catalog_or_finance_member_is_refused(role: str) -> None:
     staff_login(other, role)
     assert other.get(PLATFORM).status_code == 404
     assert other.get(f"{PLATFORM}?number=2998-000001").status_code == 404
+
+
+def test_the_platform_owner_is_allowed_in() -> None:
+    sub = package()
+    owner = Client()
+    staff_login(owner, "owner")
+    text = listed(owner)
+    assert sub.order.number in text
+    assert owner.get(f"{PLATFORM}{sub.public_id}/").status_code == 200
+
+
+# --- the order page (ORD.30: the same rule as the list) -------------------------------------
+
+
+def _order_page(sub: VendorOrder, client: Client) -> str:
+    response = client.get(f"{PLATFORM}{sub.public_id}/")
+    assert response.status_code == 200
+    return str(response.text)
+
+
+def version_for(sub: VendorOrder) -> VendorOrder:
+    """Write v1 of the package (every paid package has one) so the order page renders."""
+    versions.create_version_one(sub, list(sub.lines.all()))
+    sub.refresh_from_db()
+    return sub
+
+
+@pytest.mark.parametrize(
+    ("block", "label"), [("frozen", "Shop frozen"), ("withdrawn", "Withdrawal registered")]
+)
+def test_the_order_page_disables_its_forms_with_the_badge(
+    support: Client, block: str, label: str
+) -> None:
+    sub = package()
+    version_for(sub)
+    if block == "frozen":
+        _freeze(sub.vendor)
+    else:
+        _withdraw(sub)
+    text = _order_page(sub, support)
+    assert f"data-blocked>{label}<" in text
+    assert "Changes are disabled." in text
+    assert "<form" in text
+    assert text.count('<fieldset class="manager-fieldset" disabled>') >= 2
+
+
+def test_the_order_page_of_an_actionable_package_has_enabled_forms(support: Client) -> None:
+    sub = package()
+    version_for(sub)
+    text = _order_page(sub, support)
+    assert "data-blocked" not in text
+    assert 'class="manager-fieldset" disabled' not in text
+    assert "Compute the change" in text
+    assert "<form" in text

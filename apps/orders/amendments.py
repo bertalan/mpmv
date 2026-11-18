@@ -30,6 +30,7 @@ import logging
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
+from functools import partial
 from typing import Any
 
 from django.conf import settings
@@ -630,12 +631,16 @@ def _state_actionable(vendor_order: VendorOrder) -> bool:
     )
 
 
-def _actionability(state_ok: bool, frozen: bool, withdrawn_: bool) -> StaffActionability:
+def _actionability(
+    state_ok: bool, frozen: bool, withdrawn_: Callable[[], bool]
+) -> StaffActionability:
+    """`withdrawn_` is called only when the shop is not frozen and the state allows an action, so
+    a package that is refused anyway costs no withdrawal query."""
     if frozen:
         return StaffActionability(False, BLOCK_VENDOR_FROZEN)
     if not state_ok:
         return StaffActionability(False)
-    if withdrawn_:
+    if withdrawn_():
         return StaffActionability(False, BLOCK_WITHDRAWAL)
     return StaffActionability(True)
 
@@ -652,7 +657,7 @@ def staff_actionable(
     return _actionability(
         _state_actionable(vendor_order),
         orders_frozen(vendor_order.vendor),
-        check_withdrawal and withdrawn(vendor_order),
+        lambda: check_withdrawal and withdrawn(vendor_order),
     )
 
 
@@ -670,7 +675,9 @@ def staff_actionability(rows: Sequence[VendorOrder]) -> dict[int, StaffActionabi
         withdrawn_ids |= set(import_string(path)(ids))
     return {
         sub.pk: _actionability(
-            _state_actionable(sub), sub.vendor_id in frozen, sub.pk in withdrawn_ids
+            _state_actionable(sub),
+            sub.vendor_id in frozen,
+            partial(withdrawn_ids.__contains__, sub.pk),
         )
         for sub in rows
     }
@@ -1298,7 +1305,7 @@ def revise_amendment(
     superseded = False
     try:
         with transaction.atomic():
-            locked_sub = _lock_amendable(sub, withdrawal=False)
+            locked_sub = _lock_amendable(sub)
             locked = (
                 OrderAmendment.objects.select_for_update()
                 .select_related("from_version", "vendor_order__vendor", "vendor_order__order")

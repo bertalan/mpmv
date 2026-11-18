@@ -216,13 +216,21 @@ class AmendmentPage(ManagerView):
         order = sub.order
         version = versions.current_version(sub) if sub.current_version_id else None
         draft = amendments.open_amendment(sub)
-        # The same rule as the service (`_lock_amendable`): a paid order, a package pending or
-        # accepted.
-        amendable = (
-            version is not None
-            and sub.state in am.AMENDABLE_VENDOR_ORDER_STATES
-            and order.state in PAID_OR_LATER
-        )
+        # The same rule as the service (`_lock_amendable`): `amendments.staff_actionable`. A
+        # frozen shop or a registered withdrawal leaves the forms on the page, disabled, with the
+        # reason (ORD.30); the other refusals (not paid, shipped) hide them.
+        verdict = amendments.staff_actionable(sub) if self.staff else None
+        if verdict is not None:
+            amendable = version is not None and (
+                verdict.actionable or verdict.block_reason is not None
+            )
+        else:
+            amendable = (
+                version is not None
+                and sub.state in am.AMENDABLE_VENDOR_ORDER_STATES
+                and order.state in PAID_OR_LATER
+            )
+        blocked = verdict.block_reason if verdict is not None else None
         mine = draft is not None and self.draft_side(draft)
         context.update(
             title=_("Change the order"),
@@ -240,6 +248,7 @@ class AmendmentPage(ManagerView):
             show_address=amendable and order.privacy_status == "active",
             address=address_lines(versions.delivery_address(sub, version)) if version else [],
             amendable=amendable,
+            blocked=BLOCK_LABELS.get(blocked, "") if blocked else "",
             hold_until=sub.ship_hold_until,
             draft=draft,
             draft_mine=mine,
