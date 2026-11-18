@@ -434,6 +434,8 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
         "accounts.user_user_permissions": "stripped on erasure",
         "tax.taxregimechangerequest": "vendor side, CMP.4 2/2",
         "core.mediaimage": "staff upload reference (Wagtail owner field)",
+        "vendors.returnpolicyversion": "staff reviewer reference (SET_NULL on erasure), not the "
+        "customer's data; the record stays (VEN.40)",
     }
     handled |= {
         f"cms.{name}": "staff page owner (Wagtail), not the customer's data"
@@ -450,6 +452,8 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
         ]
     }
     handled |= {
+        "cms.contentsnippet": "staff editor reference (lock owner), not the customer's data; "
+        "the lock is released on erasure (SET_NULL), the text stays (CMS.14)",
         "events.eventindexpage": "staff page owner (Wagtail), not the customer's data",
         "ingest.reviewitem": "staff or vendor reviewer (resolved_by), not the customer's data",
     }

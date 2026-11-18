@@ -56,6 +56,7 @@ EVENT_FILES = (
 )
 SCOPES = (
     "apps/manager",
+    "apps/fitment/services.py",  # the publish gate message (FIT.18), shown to vendors and staff
     "apps/accounts",
     "apps/orders/templates",
     "apps/seo",
@@ -83,6 +84,16 @@ SCOPES = (
     "apps/catalog/templates/catalog/product.html",
     "apps/catalog/templates/catalog/includes/stock_status.html",
     "apps/catalog/templates/catalog/includes/product_card.html",
+    # The storefront catalog (I18N.20 part 1): listing, search, the product page includes, the
+    # spec table labels (CAT.22), the fitment summary (FIT.9) and the ride catalog overrides.
+    "apps/catalog/templates/catalog/listing.html",
+    "apps/catalog/templates/catalog/search.html",
+    "apps/catalog/templates/catalog/includes",
+    "apps/catalog/product_pages.py",
+    "apps/fitment/product_summary.py",
+    "themes/ride/templates/catalog",
+    "themes/base/templates/components/gallery.html",  # the product gallery (variant images)
+    "themes/ride/templates/components/gallery.html",
     # The note under every consumer price (TAX.12, owner wording 2026-11-16), in all languages.
     "apps/tax/prices.py",
     # Temporary staff "Site links" page (OPS.12); remove before LIVE.
@@ -376,6 +387,8 @@ SENSITIVE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "apps/vendors/templates/vendors/terms/",
             "apps/manager/templates/manager/shop/sales_terms.html",
             "apps/manager/sales_terms_views.py",
+            "apps/manager/templates/manager/shop/return_policy.html",
+            "apps/manager/return_policy_views.py",
         ),
     ),
     ("price notes and tax", ("apps/tax/",)),

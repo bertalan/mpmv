@@ -16,7 +16,7 @@ How a commit becomes a release and reaches STAGE and LIVE. The mechanics are in
 Owner rule: every STAGE release is preceded by a coherence check on the exact commit being
 released.
 
-1. lane-a announces "release candidate" on the Lane board issue (#86). lane-b runs the
+1. lane-a announces "release candidate" on the Lane board issue (#726). lane-b runs the
    coherence check on current `main` and opens one PR (docs and tests only).
 2. lane-a merges that PR with no other merge in between, then cuts the pre-release from that
    merge commit, named by its full SHA, after green CI.
@@ -274,8 +274,8 @@ How failures are reported: when a scheduled or manual run on `main` fails, the `
 (`tools/security_report.py`, the only job with `issues: write`) opens one issue labelled
 `security` per workflow, titled `[security-nightly] ...` or `[security-stage] ...`, with the job
 results, finding counts and failing test names (no URL, host or address), and posts one line on the
-lane board, issue #86: `to lane-a: security-nightly failed: <run link>`. While that issue stays
-open, later failures update its text and add a comment instead of a new line on #86. The next green
+lane board, issue #726: `to lane-a: security-nightly failed: <run link>`. While that issue stays
+open, later failures update its text and add a comment instead of a new line on #726. The next green
 run comments and closes it. A skipped run (no target secret, or a run off `main`) never closes
 it: if `STAGE_URL` is removed while a `[security-stage]` issue is open, the issue stays open until
 a scan runs again or someone closes it by hand.

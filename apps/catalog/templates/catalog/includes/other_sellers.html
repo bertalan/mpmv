@@ -1,0 +1,20 @@
+{% load i18n seo_seller %}{# Other sellers of this product (CAT.15). Needs `other_sellers` (cards) and `currency`. #}{% comment %}
+The offers of other vendors with the same GTIN, or the same brand and MPN, in the page language
+only. Each card shows the consumer price (TAX.12) and links to that vendor's own product page.
+The seller is named with the public seller name (SEO.15): a natural person's legal name is never
+shown. No offers, no block.
+{% endcomment %}
+{% if other_sellers %}
+  <section class="product-other-sellers" aria-labelledby="product-other-sellers-heading">
+    <h2 id="product-other-sellers-heading">{% translate "Other sellers of this product" %}</h2>
+    <ul class="product-grid">
+      {% for card in other_sellers %}
+        {% seller_name card.vendor as seller %}
+        <li>
+          <p class="product-other-seller-name">{% if seller %}{% blocktranslate %}Sold by {{ seller }}{% endblocktranslate %}{% else %}{% translate "Another seller" %}{% endif %}</p>
+          {% include "catalog/includes/product_card.html" %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}

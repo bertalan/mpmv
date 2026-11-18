@@ -347,3 +347,15 @@ def quote_shipping(
         raise ValueError("The package belongs to another vendor.")
     cfg = shipping_config_snap(vendor, quotes_enabled=quotes_enabled, language=language)
     return engine_quote_shipping(package, dest, cfg)
+
+
+def methods_missing_return_estimate(vendor: Vendor, *, estimate: str) -> list[ShippingMethod]:
+    """The vendor's methods for goods not returnable by post while the sales terms state no
+    maximum return-cost estimate (VEN.36, art. 49(1)(i) Codice del consumo); empty when stated."""
+    if estimate.strip():
+        return []
+    return list(
+        ShippingMethod.objects.filter(vendor=vendor, not_returnable_by_post=True)
+        .select_related("zone")
+        .order_by("zone__code", "key")
+    )

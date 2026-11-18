@@ -41,6 +41,7 @@ LOCAL_APPS = [
     "apps.orders",
     "apps.payments",
     "apps.ledger",
+    "apps.trust",  # vendor trust badges (TRU.1, spec 16): reads vendors; read by seo and manager
     "apps.ingest",
     "apps.fitment",  # scheme and nodes of the garage (FIT.1, spec 17): above catalog, below cms
     "apps.cms",

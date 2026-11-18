@@ -86,24 +86,39 @@ from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
-from apps.fitment.models import ProductFitment, ProductFitmentState
-from apps.fitment.tests.factories import ProductFitmentFactory, ProductFitmentStateFactory
+from apps.fitment.models import FitmentNodeProposal, ProductFitment, ProductFitmentState
+from apps.fitment.tests.factories import (
+    FitmentCategoryFactory,
+    FitmentNodeProposalFactory,
+    ProductFitmentFactory,
+    ProductFitmentStateFactory,
+)
 from apps.ingest.models import (
     ImportRun,
+    ItemChange,
     MappingTable,
     ProductDraft,
     ReviewItem,
     SourceItem,
+    SourceMissing,
     SourceObservation,
+    SourceState,
+    SourceStateVersion,
+    SourceVariation,
     SupplierSource,
 )
 from apps.ingest.tests.factories import (
     ImportRunFactory,
+    ItemChangeFactory,
     MappingTableFactory,
     ProductDraftFactory,
     ReviewItemFactory,
     SourceItemFactory,
+    SourceMissingFactory,
     SourceObservationFactory,
+    SourceStateFactory,
+    SourceStateVersionFactory,
+    SourceVariationFactory,
     SupplierSourceFactory,
 )
 from apps.ledger.models import LedgerEntry, Refund
@@ -151,9 +166,12 @@ from apps.tax.tests.factories import (
     VendorTaxProfileFactory,
     VendorTaxProfileTranslationFactory,
 )
+from apps.trust.models import VendorTrustSnapshot
+from apps.trust.tests.factories import VendorTrustSnapshotFactory
 from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
+    ReturnPolicyVersion,
     SalesTermsInForce,
     SalesTermsVersion,
     SelfCertification,
@@ -166,6 +184,7 @@ from apps.vendors.models import (
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
     CrossVendorConsentFactory,
+    ReturnPolicyVersionFactory,
     SalesTermsInForceFactory,
     SalesTermsVersionFactory,
     SelfCertificationFactory,
@@ -211,7 +230,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         vendor=vendor, certified=False
     ),
     SelfCertification: lambda vendor: SelfCertificationFactory.create(vendor=vendor),
+    # TRU.1: a vendor's computed trust result; the Manager shows a vendor its own (TRU.2).
+    VendorTrustSnapshot: lambda vendor: VendorTrustSnapshotFactory.create(vendor=vendor),
     # VEN.35: a published version of the seller's sales terms and the pointer to the one in force.
+    ReturnPolicyVersion: lambda vendor: ReturnPolicyVersionFactory.create(vendor=vendor),
     SalesTermsVersion: lambda vendor: SalesTermsVersionFactory.create(vendor=vendor),
     SalesTermsInForce: lambda vendor: SalesTermsInForceFactory.create(version__vendor=vendor),
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
@@ -221,6 +243,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
+    FitmentNodeProposal: lambda vendor: FitmentNodeProposalFactory.create(vendor=vendor),
     ProductFitmentState: lambda vendor: ProductFitmentStateFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
@@ -263,6 +286,13 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     SourceItem: lambda vendor: SourceItemFactory.create(source__vendor=vendor),
     SourceObservation: lambda vendor: SourceObservationFactory.create(item__source__vendor=vendor),
     ProductDraft: lambda vendor: ProductDraftFactory.create(item__source__vendor=vendor),
+    SourceState: lambda vendor: SourceStateFactory.create(item__source__vendor=vendor),
+    SourceStateVersion: lambda vendor: SourceStateVersionFactory.create(
+        item__source__vendor=vendor
+    ),
+    SourceVariation: lambda vendor: SourceVariationFactory.create(item__source__vendor=vendor),
+    SourceMissing: lambda vendor: SourceMissingFactory.create(item__source__vendor=vendor),
+    ItemChange: lambda vendor: ItemChangeFactory.create(item__source__vendor=vendor),
     ImportRun: lambda vendor: ImportRunFactory.create(source__vendor=vendor),
     ReviewItem: lambda vendor: ReviewItemFactory.create(run__source__vendor=vendor),
     MappingTable: lambda vendor: MappingTableFactory.create(vendor=vendor),
@@ -566,6 +596,12 @@ ENDPOINTS: dict[str, Access] = {
         "is logged.",
         kwargs={"token": "not-a-token"},
     ),
+    "vendor_terms:pdf": NoVendorData(
+        "PDF of the sales terms in force of any seller (VEN.36): public by design behind the same "
+        "signed, expiring link; a superseded version and a tampered link are a 404 (an accepted-"
+        "terms link opens its own version), every read is logged.",
+        kwargs={"token": "not-a-token"},
+    ),
     "vendor_claim:claim": NoVendorData(
         "Vendor claim page (VEN.24): without a claim link opened in the session for that vendor "
         "it shows only the generic 'link not valid' page, whoever is signed in.",
@@ -643,6 +679,9 @@ ENDPOINTS: dict[str, Access] = {
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # CMP.5 part 4: the notice of termination and the data download show the selected vendor only.
     "manager:shop:sales_terms": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:return_policy": VendorScopedList(
+        make=manager_vendor, identify=vendor_display_name
+    ),
     "manager:shop:termination": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # The statements of reasons of the selected shop (DSA art. 17); another shop's are never listed.
     "manager:shop:statements": VendorScopedList(
@@ -717,6 +756,26 @@ ENDPOINTS: dict[str, Access] = {
     "manager:shop:event_translate": VendorScoped(
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
         sample={"public_id": NIL_UUID},
+    ),
+    # FIT.3: the Fits pages of the shop; every product is found through `scoped()`.
+    "manager:shop:fitment": VendorScopedList(
+        make=lambda vendor: ProductFactory.create(vendor=vendor),
+        identify=lambda product: str(product.sku),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:fitment_product": VendorScoped(
+        make=lambda vendor: ProductFactory.create(vendor=vendor),
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:fitment_proposals": VendorScopedList(
+        make=lambda vendor: FitmentNodeProposalFactory.create(vendor=vendor),
+        identify=lambda proposal: str(proposal.node.name),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:fitment_report": VendorScopedList(
+        make=lambda vendor: ProductFactory.create(
+            vendor=vendor, category=FitmentCategoryFactory.create().category
+        ),
+        identify=lambda product: str(product.sku),  # type: ignore[attr-defined]
     ),
     # EVT.4 part 2: the block editor, the preview and the image library.
     "manager:shop:event_block_add": VendorScoped(
@@ -1084,6 +1143,10 @@ API_OPERATIONS: dict[str, Access] = {
         "404. Shows only the ChangeSet of what it creates."
     ),
     "GET /api/v1/catalog/products/{public_id}": VendorScoped(
+        make=lambda vendor: ProductFactory.create(vendor=vendor)
+    ),
+    # CAT.15
+    "GET /api/v1/catalog/products/{public_id}/other-sellers": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor)
     ),
     # EVT.5

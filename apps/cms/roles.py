@@ -36,6 +36,8 @@ LEGAL_EDITORS = "Legal page editors"
 PAGE_PUBLISHERS = "Page publishers"
 BLOG_PUBLISHERS = "Blog publishers"
 LEGAL_PUBLISHERS = "Legal page publishers"
+SNIPPET_EDITORS = "Snippet editors"
+SNIPPET_PUBLISHERS = "Snippet publishers"
 EVENT_MODERATORS = "Event moderators"  # also the group of the "Event review" workflow (EVT.3)
 
 # Wagtail's default groups, removed by the data migration.
@@ -101,6 +103,32 @@ ROLES: tuple[EditorRole, ...] = (
         images=False,
     ),
     EditorRole(
+        name=SNIPPET_EDITORS,
+        page_models=(),
+        page_permissions=(),
+        model_permissions=(
+            "cms.add_contentsnippet",
+            "cms.change_contentsnippet",
+            "cms.delete_contentsnippet",
+            "cms.view_contentsnippet",
+            "cms.lock_contentsnippet",
+            "cms.unlock_contentsnippet",
+        ),
+    ),
+    EditorRole(
+        name=SNIPPET_PUBLISHERS,
+        page_models=(),
+        page_permissions=(),
+        model_permissions=(
+            "cms.change_contentsnippet",
+            "cms.view_contentsnippet",
+            "cms.publish_contentsnippet",
+            "cms.lock_contentsnippet",
+            "cms.unlock_contentsnippet",
+        ),
+        images=False,
+    ),
+    EditorRole(
         name=EVENT_MODERATORS,
         page_models=("events.EventIndexPage",),
         page_permissions=(CHANGE, PUBLISH),
@@ -133,6 +161,7 @@ ADMIN_MENU_ALLOWED: frozenset[str] = frozenset(
         "images",
         "navigation",
         "blog-authors",
+        "content-snippets",
         "help-texts",
         "reports",
         "settings",
