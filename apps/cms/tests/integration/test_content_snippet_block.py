@@ -20,10 +20,19 @@ from django.utils import translation
 from wagtail.models import Locale, ReferenceIndex, WorkflowState
 from wagtail.snippets.blocks import SnippetChooserBlock
 
-from apps.cms import snippet_cache
+from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.mfa import verified_login
+from apps.cms import roles, snippet_cache
 from apps.cms.blocks import ContentSnippetBlock
-from apps.cms.models import BlogPostPage, ContentSnippet, HomePage, StandardPage, body_field
-from apps.cms.tests.factories import ContentSnippetFactory, StandardPageFactory
+from apps.cms.models import (
+    BlogPostPage,
+    ContentSnippet,
+    HomePage,
+    StandardPage,
+    body_field,
+    content_snippet_workflow,
+)
+from apps.cms.tests.factories import ContentSnippetFactory, StandardPageFactory, editor_user
 from apps.core.i18n import primary_language
 from tests.i18n import other_language
 
@@ -35,6 +44,11 @@ def _commit_hooks_run_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "django.db.transaction.on_commit", lambda func, using=None, robust=False: func()
     )
+
+
+@pytest.fixture(autouse=True)
+def _review_workflow() -> None:
+    content_snippet_workflow(create=True)
 
 
 def _locale(code: str) -> Locale:
@@ -69,8 +83,9 @@ def publish_edit(snippet: ContentSnippet, body: str) -> None:
 
 
 def page_with(snippet: ContentSnippet, **extra: Any) -> StandardPage:
+    extra.setdefault("title", "Shipping")
     page: StandardPage = StandardPageFactory.create(
-        title="Shipping", body=[("content_snippet", {"snippet": snippet.pk})], **extra
+        body=[("content_snippet", {"snippet": snippet})], **extra
     )
     page.save_revision().publish()
     page.refresh_from_db()
@@ -94,7 +109,7 @@ def test_the_block_is_a_required_chooser_of_the_snippet() -> None:
 
 
 @pytest.mark.parametrize("model", [HomePage, StandardPage, BlogPostPage])
-def test_the_block_is_in_every_page_body(model: type) -> None:
+def test_the_block_is_in_every_page_body(model: Any) -> None:
     body = model._meta.get_field("body")
     assert isinstance(body.stream_block.child_blocks["content_snippet"], ContentSnippetBlock)
 
@@ -224,14 +239,14 @@ def test_the_snippet_goes_through_a_moderation_workflow() -> None:
 
 
 def test_a_submission_leaves_the_live_text_alone_until_it_is_approved() -> None:
-    from django.contrib.auth import get_user_model
-
     snippet = ContentSnippetFactory.create(body="<p>Old terms.</p>")
     page = page_with(snippet)
-    user = get_user_model().objects.create_user("editor", "e@example.com", None)
+    user = editor_user(roles.SNIPPET_EDITORS)
     snippet.body = "<p>Proposed terms.</p>"
     revision = snippet.save_revision(user=user)
-    state = snippet.get_workflow().start(snippet, user)
+    workflow = snippet.get_workflow()
+    assert workflow is not None
+    state = workflow.start(snippet, user)
     assert state.status == WorkflowState.STATUS_IN_PROGRESS
     assert "Old terms." in body_of(page.url)
     assert revision.pk
@@ -250,11 +265,14 @@ def test_the_editor_sees_the_pages_that_use_the_snippet() -> None:
     assert str(page.pk) in used_by
 
 
-def test_the_usage_screen_lists_the_page(admin_client: Client) -> None:
+def test_the_usage_screen_lists_the_page() -> None:
     snippet = ContentSnippetFactory.create()
     page_with(snippet, title="Shipping rules")
     url = reverse("wagtailsnippets_cms_contentsnippet:usage", args=[snippet.pk])
-    response = admin_client.get(url)
+    admin = UserFactory.create(is_staff=True, is_superuser=True)
+    client = Client()
+    verified_login(client, admin)
+    response = client.get(url)
     assert response.status_code == 200
     assert "Shipping rules" in response.content.decode()
 
