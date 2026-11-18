@@ -171,8 +171,12 @@ def assert_matches_baseline(page: Page, *, theme: str, name: str, width: int) ->
         animations="disabled",
         caret="hide",
         # Dynamic regions: the launch countdown depends on the current time; a copy-to-clipboard
-        # field holds an absolute URL with the test server's random port.
-        mask=[page.locator("[data-countdown], #event-subscribe-url")],
+        # field holds an absolute URL with the test server's random port; the footer year.
+        # The footer's copyright year (`{% now "Y" %}`, server side) changes on 1 January.
+        mask=[
+            page.locator("[data-countdown], #event-subscribe-url"),
+            page.locator("footer p", has_text="\u00a9"),
+        ],
     )
     baseline = baseline_path(theme, name, width)
     candidate = CANDIDATE_DIR / theme / baseline.name

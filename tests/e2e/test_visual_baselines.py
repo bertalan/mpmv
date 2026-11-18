@@ -4,7 +4,8 @@ Every key page (home, listing, product, search, event, blog post, legal, cart, 4
 with its committed baseline at 360, 768 and 1280 px, in both themes; the styleguide is in
 `test_theme_quality_gates.py`. The data is fixed (factory titles, dates and prices), the
 browser asks for reduced motion (reveal effects and carousel autoplay stay off, carousels sit on
-the first slide), animations are disabled in the screenshot and the countdown is masked. The
+the first slide), animations are disabled in the screenshot, the browser clock is frozen and the
+countdown and the footer year are masked. The event has absolute dates (no "in N days" text). The
 header's search form and mini-cart are part of every page. Baselines and the update procedure:
 docs/dev/themes.md, "Visual baselines" (`tests/e2e/visual.py`).
 """
@@ -92,6 +93,8 @@ def paths(settings: SettingsWrapper, live_server: LiveServer, site_allows_indexi
                 live=True,
                 vendor=seller,
                 booth="B1",
+                starts_at=utc(2027, 3, 10, 8),
+                ends_at=utc(2027, 3, 10, 16),
             ).url
         ).path,
         "blog": urlsplit(BlogPostPageFactory.create(title="Choosing a vase").url).path,
@@ -112,6 +115,7 @@ def test_key_page_matches_its_visual_baseline(
     require_visual_mode()  # skips outside CI before any browser work
     settings.MPMV_THEME_DEFAULT = theme
     page.emulate_media(reduced_motion="reduce")
+    page.clock.set_fixed_time(utc(2026, 11, 18, 10))  # the page's JS sees one fixed "now"
     page.set_viewport_size({"width": 1280, "height": 900})
     if name == "cart":
         page.goto(f"{live_server.url}/product/blue-vase/")
