@@ -958,6 +958,10 @@ msgstr "Tous"
 msgid "All day"
 msgstr "Toute la journée"
 
+#: apps/cms/templates/cms/help_guide_section.html
+msgid "All help topics"
+msgstr "Tous les sujets d'aide"
+
 #: apps/manager/views.py
 msgid "all languages"
 msgstr "toutes les langues"
@@ -3007,6 +3011,7 @@ msgstr "Bonjour %(customer_name)s,"
 msgid "Hello,"
 msgstr "Bonjour,"
 
+#: apps/cms/templates/cms/help_guide_index.html apps/cms/templates/cms/help_guide_section.html
 #: themes/base/templates/components/user_tools.html
 msgid "Help"
 msgstr "Aide"
@@ -3030,6 +3035,10 @@ msgstr "texte d'aide"
 #: apps/manager/wagtail_hooks.py
 msgid "Help texts"
 msgstr "Textes d'aide"
+
+#: apps/cms/templates/cms/help_guide_index.html apps/cms/templates/cms/help_guide_section.html
+msgid "Help topics"
+msgstr "Sujets d'aide"
 
 #: apps/manager/event_views.py
 msgid "Hidden by the platform."
@@ -3931,6 +3940,10 @@ msgstr "Mois"
 #: apps/events/templates/events/_links.html
 msgid "Month calendar"
 msgstr "Calendrier du mois"
+
+#: themes/base/templates/components/help_entry.html
+msgid "More help"
+msgstr "Plus d'aide"
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Move down"
@@ -6141,6 +6154,10 @@ msgstr "Boutique : à la demande du client (sans frais)"
 #: apps/seo/site_links.py
 msgid "Shops"
 msgstr "Boutiques"
+
+#: apps/cms/templates/cms/help_guide_index.html
+msgid "Short answers to the questions customers ask most. Pick a topic."
+msgstr "Des réponses courtes aux questions les plus fréquentes des clients. Choisis un sujet."
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/shop/termination.html
@@ -8877,6 +8894,14 @@ msgstr "Le site auquel s'applique ce thème. Chaque site a un seul thème."
 #: apps/cms/blocks.py
 msgid "The slide's title, up to 120 characters. Required."
 msgstr "Le titre de la diapositive, 120 caractères au maximum. Obligatoire."
+
+#: apps/cms/slugs.py
+msgid ""
+"The slug '%(slug)s' is reserved for the site's help pages and cannot be used for a page directly "
+"under the home page. Choose another slug."
+msgstr ""
+"Le slug '%(slug)s' est réservé aux pages d'aide du site et ne peut pas servir à une page placée "
+"directement sous la page d'accueil. Choisis un autre slug."
 
 #: apps/shipping/models.py
 msgid "The special area this treatment is for. A method has one treatment per area."

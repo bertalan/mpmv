@@ -971,6 +971,11 @@ ENDPOINTS: dict[str, Access] = {
     "consumer_information": NoVendorData(
         "Pre-contractual information (CMP.6): platform-wide legal text, no vendor data."
     ),
+    "customer_help": NoVendorData("Customer help index (ARC.37): repository text, no vendor data."),
+    "customer_help_section": NoVendorData(
+        "Customer help section (ARC.37): repository text, no vendor data.",
+        kwargs={"section": "ordering"},
+    ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
     "admin:jsi18n": NoVendorData("Admin JavaScript translation catalog."),
