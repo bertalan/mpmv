@@ -44,6 +44,7 @@ from apps.tax.prices import PriceUnavailable, consumer_price, estimated_country
 from apps.vendors.models import Vendor
 
 from . import product_graph as pg
+from . import seller as seller_name
 
 logger = logging.getLogger(__name__)
 
@@ -221,8 +222,11 @@ def build_graph(
     vendor_url = _vendor_url(page, site)
     sold = page.price is not None
 
-    seller = pg.organization_node(
-        node_id=f"{vendor_url}#organization", name=vendor.display_name, url=vendor_url
+    public_name = seller_name.public_name(vendor)
+    seller = (
+        pg.organization_node(node_id=f"{vendor_url}#organization", name=public_name, url=vendor_url)
+        if public_name
+        else None
     )
     shipping_nodes: list[dict[str, Any]] = []
     shipping_ids: list[str] = []
@@ -238,7 +242,7 @@ def build_graph(
                 link=vendor_url,
             )
     refs: dict[str, Any] = {
-        "seller_id": str(seller["@id"]),
+        "seller_id": str(seller["@id"]) if seller else "",
         "return_policy_id": str(return_policy["@id"]) if return_policy else "",
         "shipping_ids": tuple(shipping_ids),
     }
@@ -291,13 +295,11 @@ def build_graph(
     has_offer = data.offer is not None or any(v.offer is not None for v in variants)
     if not has_offer:
         # Nothing references the seller, return policy or shipping nodes: no orphans.
-        seller_node, return_policy, shipping_nodes = None, None, []
-    else:
-        seller_node = seller
+        seller, return_policy, shipping_nodes = None, None, []
     return pg.product_graph(
         product=data,
         breadcrumb=pg.breadcrumb_node(page_url=url, items=_crumbs(page, site, url)),
-        seller=seller_node if sold else None,
+        seller=seller if sold else None,
         return_policy=return_policy,
         shipping=shipping_nodes,
         linked=linked,

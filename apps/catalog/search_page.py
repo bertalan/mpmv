@@ -60,6 +60,7 @@ class SearchItem:
     url: str
     summary: str = ""
     language: str = ""  # set when the item is shown in a language other than the page's
+    ref: int | None = None  # the primary key of the row behind the item, where a reader needs it
 
 
 @dataclass(frozen=True)
@@ -173,6 +174,7 @@ def vendors_group(request: HttpRequest, query: str, language: str, limit: int) -
         SearchItem(
             title=str(vendor.display_name),
             url=slugs.vendor_path(language, vendor.slug, default_language=default),
+            ref=vendor.pk,
         )
         for vendor in rows[:limit]
     ]
