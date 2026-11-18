@@ -20,6 +20,12 @@ pytestmark = pytest.mark.django_db
 CTX = AuditContext(actor_label="test", source="test")
 
 
+@pytest.fixture(autouse=True)
+def _only_the_fitment_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Other apps' checks (GPSR, restrictions) are not under test here."""
+    monkeypatch.setattr(publishing, "_CHECKS", {"fitment": publishing._CHECKS["fitment"]})
+
+
 def product_in(category: object, **fields: object) -> Product:
     return ProductFactory.create(category=category, languages=[primary_language()], **fields)
 
@@ -54,7 +60,7 @@ def test_an_undeclared_buy_product_is_refused_with_what_to_declare(
     publish: object, gated: object
 ) -> None:
     product = product_in(gated)
-    with pytest.raises(ValidationError) as caught:
+    with translation.override("en"), pytest.raises(ValidationError) as caught:
         publish(product)  # type: ignore[operator]
     text = " ".join(str(m) for messages in caught.value.message_dict.values() for m in messages)
     assert "fits" in text

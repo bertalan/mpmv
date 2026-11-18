@@ -56,6 +56,7 @@ EVENT_FILES = (
 )
 SCOPES = (
     "apps/manager",
+    "apps/fitment/services.py",  # the publish gate message (FIT.18), shown to vendors and staff
     "apps/accounts",
     "apps/orders/templates",
     "apps/seo",

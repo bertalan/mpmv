@@ -2219,6 +2219,10 @@ msgstr ""
 msgid "Decided"
 msgstr "Entschieden"
 
+#: apps/manager/fitment_views.py
+msgid "Declaration required to publish"
+msgstr "Erklärung zur Veröffentlichung erforderlich"
+
 #: themes/base/templates/components/quantity_stepper.html
 msgid "Decrease quantity"
 msgstr "Menge verringern"
@@ -2397,6 +2401,10 @@ msgstr "Einmal ausführen"
 #: apps/manager/fitment_views.py
 msgid "Do not expect fitment"
 msgstr "Keine Fahrzeugzuordnung erwarten"
+
+#: apps/manager/fitment_views.py
+msgid "Do not require a declaration to publish"
+msgstr "Keine Erklärung zur Veröffentlichung verlangen"
 
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
@@ -5340,6 +5348,14 @@ msgid_plural "Please correct the errors below."
 msgstr[0] "Bitte korrigieren Sie den folgenden Fehler."
 msgstr[1] "Bitte korrigieren Sie die folgenden Fehler."
 
+#: apps/fitment/services.py
+msgid ""
+"Please declare what this product fits before you publish it: choose the items it fits on the Fits "
+"tab, or state that it fits everything."
+msgstr ""
+"Geben Sie vor der Veröffentlichung an, wofür dieses Produkt passt: Wählen Sie im Tab Passform die "
+"passenden Artikel aus oder erklären Sie, dass es für alles passt."
+
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
 msgstr "Pluralbezeichnung"
@@ -5824,6 +5840,10 @@ msgstr "Repository-Datei"
 #: apps/orders/templates/orders/_package.html
 msgid "Request a quote"
 msgstr "Angebot anfordern"
+
+#: apps/manager/fitment_views.py
+msgid "Require a declaration to publish"
+msgstr "Erklärung zur Veröffentlichung verlangen"
 
 #: themes/base/templates/components/field.html
 msgid "required"

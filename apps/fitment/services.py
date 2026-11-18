@@ -24,8 +24,9 @@ from django.db.backends.postgresql.psycopg_any import NumericRange
 from django.db.models import Count
 from django.http import HttpRequest
 from django.utils import timezone
+from django.utils.translation import gettext as _
 
-from apps.catalog.models import Category, Product
+from apps.catalog.models import Category, Product, SalesMode
 from apps.core import translations
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
@@ -36,6 +37,7 @@ from apps.vendors.scoping import is_platform_staff
 
 from . import engine, garage, references
 from .models import (
+    DeclarationMode,
     FitmentCategory,
     FitmentLevel,
     FitmentLevelTranslation,
@@ -64,6 +66,7 @@ NODE_DELETED = "fitment.node.deleted"
 ALIAS_CREATED = "fitment.alias.created"
 ALIAS_DELETED = "fitment.alias.deleted"
 CATEGORY_RELEVANCE_CHANGED = "fitment.category.relevance_changed"
+CATEGORY_PUBLISH_GATE_CHANGED = "fitment.category.publish_gate_changed"
 PRODUCT_FITMENT_SET = "fitment.product.fitment_set"
 
 SCHEME_FIELDS = (
@@ -777,6 +780,77 @@ def set_fitment_relevant(
         return run_mutation(
             changeset, apply, ctx=ctx, action=CATEGORY_RELEVANCE_CHANGED, dry_run=dry_run
         )
+
+
+def set_fitment_publish_gate(
+    categories: Iterable[Category], required: bool, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Turn the publish gate of categories on or off (FIT.18); any number at once.
+
+    On: a `buy` product whose main category is one of them cannot be published while its
+    declaration is `undeclared`. Turning it on also marks a category as expected to declare
+    fitment (the gate has no meaning otherwise); turning it off leaves it expected.
+    """
+    chosen = list(categories)
+    with transaction.atomic():
+        rows = {
+            row.category_id: row
+            for row in FitmentCategory.objects.select_for_update().filter(category__in=chosen)
+        }
+        changeset = ChangeSet()
+        todo: list[Category] = []
+        for category in chosen:
+            row = rows.get(category.pk)
+            if (row is not None and row.require_declaration) == required:
+                continue
+            todo.append(category)
+            key = str(category.public_id)
+            changeset.update(
+                "fitment.fitmentcategory",
+                key,
+                {"category": key, "require_declaration": not required},
+                {"category": key, "require_declaration": required},
+            )
+
+        def apply() -> None:
+            for category in todo:
+                FitmentCategory.objects.update_or_create(
+                    category=category, defaults={"require_declaration": required}
+                )
+            _refresh_always_visible(categories=todo)
+
+        return run_mutation(
+            changeset, apply, ctx=ctx, action=CATEGORY_PUBLISH_GATE_CHANGED, dry_run=dry_run
+        )
+
+
+def publish_gate_messages(product: Product) -> list[str]:
+    """The publication check registered with `apps.catalog.publishing` (FIT.18).
+
+    A `buy` product in a category whose gate is on needs a declaration before it goes live:
+    `specific` or `universal`, never `undeclared` (spec 17 §17.2.4).
+    """
+    if product.sales_mode != SalesMode.BUY or product.category_id is None:
+        return []
+    if not FitmentCategory.objects.filter(
+        category_id=product.category_id, require_declaration=True
+    ).exists():
+        return []
+    mode = (
+        ProductFitmentState.objects.filter(product_id=product.pk)
+        .values_list("mode", flat=True)
+        .first()
+    )
+    if mode in (DeclarationMode.SPECIFIC, DeclarationMode.UNIVERSAL):
+        return []
+    return [
+        str(
+            _(
+                "Please declare what this product fits before you publish it: choose the items "
+                "it fits on the Fits tab, or state that it fits everything."
+            )
+        )
+    ]
 
 
 # --- Anonymous garage cookie (FIT.6) ------------------------------------------------------------

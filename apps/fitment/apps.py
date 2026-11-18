@@ -21,6 +21,13 @@ class FitmentConfig(AppConfig):
 
         checks.register(check_garage_cookie_settings)
 
+        # FIT.18: the catalog cannot import fitment, so the publish gate registers itself here.
+        from apps.catalog.publishing import register_publication_check
+
+        from .services import publish_gate_messages
+
+        register_publication_check("fitment", publish_gate_messages)
+
     audited_models = (
         "fitmentscheme",
         "fitmentlevel",
