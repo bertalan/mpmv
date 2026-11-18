@@ -762,6 +762,11 @@ ENDPOINTS: dict[str, Access] = {
         make=lambda vendor: ProductFactory.create(vendor=vendor),
         identify=lambda product: str(product.sku),  # type: ignore[attr-defined]
     ),
+    "manager:shop:fitment_nodes": NoVendorData(
+        "Picker JSON (FIT.3): the approved fitment nodes, the platform's shared vocabulary with no "
+        "vendor data; members of a shop only, bounded, read-only "
+        "(apps/manager/tests/integration/test_fitment_picker.py)."
+    ),
     "manager:shop:fitment_product": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor),
         methods=("GET", "POST"),
