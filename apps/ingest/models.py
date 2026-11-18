@@ -28,11 +28,17 @@ from . import engine
 
 __all__ = [
     "ImportRun",
+    "ItemChange",
+    "ItemKind",
     "MappingTable",
     "ProductDraft",
     "ReviewItem",
     "SourceItem",
+    "SourceMissing",
     "SourceObservation",
+    "SourceState",
+    "SourceStateVersion",
+    "SourceVariation",
     "SupplierSource",
 ]
 
@@ -270,6 +276,249 @@ class SourceObservation(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.item} @ {self.observed_at:%Y-%m-%d %H:%M}"
+
+
+def _stock_constraint(name: str) -> models.CheckConstraint:
+    """Both stock columns null (unknown) or a coherent pair: out = 0 units, in = more than 0."""
+    return models.CheckConstraint(
+        condition=(
+            models.Q(stock_status__isnull=True, stock_quantity__isnull=True)
+            | models.Q(
+                stock_status=engine.STOCK_OUT,
+                stock_quantity=0,
+                stock_status__isnull=False,
+                stock_quantity__isnull=False,
+            )
+            | models.Q(
+                stock_status=engine.STOCK_IN,
+                stock_quantity__gt=0,
+                stock_status__isnull=False,
+                stock_quantity__isnull=False,
+            )
+        ),
+        name=name,
+    )
+
+
+class ItemKind(models.TextChoices):
+    SIMPLE = engine.SIMPLE, "Simple"
+    VARIABLE = engine.VARIABLE, "Variable"
+
+
+class SourceState(BaseModel):
+    """The current observed state of an item: kind, native id, stock and the full parsed state.
+
+    Written only by `services.record_source_state`. `version` grows with every semantic change;
+    a repeat observation only moves `observed_at`. Stock is null while the supplier has not
+    stated it explicitly (unknown is never zero)."""
+
+    vendor_scope: ClassVar[str] = "item__vendor"
+
+    Kind = ItemKind
+
+    item = models.OneToOneField(
+        SourceItem,
+        on_delete=models.CASCADE,
+        related_name="state",
+        help_text=_("The supplier item this state belongs to."),
+    )
+    # Mirrors item.source (no DB rule ties them); services set it from the locked item, and a
+    # test keeps them equal. Kept here so the (source, native_id) uniqueness is a DB constraint.
+    source = models.ForeignKey(
+        SupplierSource,
+        on_delete=models.CASCADE,
+        related_name="states",
+        help_text=_("The feed of the item; native ids are unique inside it."),
+    )
+    kind = models.CharField(
+        max_length=10, choices=ItemKind.choices, help_text=_("Whether the item has variations.")
+    )
+    native_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text=_("The supplier's own numeric id of the item. Empty when it publishes none."),
+    )
+    state = models.JSONField(help_text=_("The parsed observation, with its variations."))
+    stock_status = models.SmallIntegerField(
+        null=True, blank=True, help_text=_("1 in stock, 0 out of stock, empty if unknown.")
+    )
+    stock_quantity = models.IntegerField(
+        null=True, blank=True, help_text=_("Units the supplier states, empty if unknown.")
+    )
+    version = models.PositiveIntegerField(help_text=_("Grows by one at every change of the state."))
+    observed_at = models.DateTimeField(help_text=_("When the state was last read."))
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        ordering = ["item"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(kind__in=engine.ITEM_KINDS), name="ingest_state_kind"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(kind=engine.SIMPLE) | models.Q(native_id__isnull=False),
+                name="ingest_state_variable_native_id",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(native_id__isnull=True) | models.Q(native_id__gt=0),
+                name="ingest_state_native_id_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(version__gt=0), name="ingest_state_version_positive"
+            ),
+            _stock_constraint("ingest_state_stock_coherent"),
+            models.UniqueConstraint(
+                fields=["source", "native_id"],
+                condition=models.Q(native_id__isnull=False),
+                name="ingest_state_source_native_id",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.item} v{self.version}"
+
+
+class SourceStateVersion(BaseModel):
+    """Append-only history of `SourceState`: one row per semantic change, never edited."""
+
+    vendor_scope: ClassVar[str] = "item__vendor"
+
+    item = models.ForeignKey(
+        SourceItem,
+        on_delete=models.CASCADE,
+        related_name="state_versions",
+        help_text=_("The supplier item."),
+    )
+    version = models.PositiveIntegerField(help_text=_("The version of the state it records."))
+    state = models.JSONField(help_text=_("The state as it was at that version."))
+    observed_at = models.DateTimeField(help_text=_("When that state was read."))
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        ordering = ["item", "version"]
+        constraints = [
+            models.UniqueConstraint(fields=["item", "version"], name="ingest_stateversion_item")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.item} v{self.version}"
+
+
+class SourceVariation(BaseModel):
+    """One variation of a variable item, with its own stock. Never deleted: a variation the
+    supplier stops listing is kept with `present` off and its last known data."""
+
+    vendor_scope: ClassVar[str] = "item__vendor"
+
+    item = models.ForeignKey(
+        SourceItem,
+        on_delete=models.CASCADE,
+        related_name="variations",
+        help_text=_("The variable item this variation belongs to."),
+    )
+    # Mirrors item.source (no DB rule ties them); services set it from the locked item, and a
+    # test keeps them equal. Kept here so the (source, native_id) uniqueness is a DB constraint.
+    source = models.ForeignKey(
+        SupplierSource,
+        on_delete=models.CASCADE,
+        related_name="variations",
+        help_text=_("The feed; a variation id belongs to one item of it."),
+    )
+    native_id = models.BigIntegerField(help_text=_("The supplier's numeric id of the variation."))
+    state = models.JSONField(help_text=_("The parsed variation."))
+    stock_status = models.SmallIntegerField(
+        null=True, blank=True, help_text=_("1 in stock, 0 out of stock, empty if unknown.")
+    )
+    stock_quantity = models.IntegerField(
+        null=True, blank=True, help_text=_("Units the supplier states, empty if unknown.")
+    )
+    present = models.BooleanField(help_text=_("Whether the last read still listed it."))
+    observed_at = models.DateTimeField(help_text=_("When the variation was last written."))
+    last_seen_at = models.DateTimeField(help_text=_("When the supplier last listed it."))
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        ordering = ["item", "native_id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(native_id__gt=0), name="ingest_variation_native_id_positive"
+            ),
+            _stock_constraint("ingest_variation_stock_coherent"),
+            models.UniqueConstraint(
+                fields=["source", "native_id"], name="ingest_variation_source_native_id"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.item} #{self.native_id}"
+
+
+class SourceMissing(BaseModel):
+    """Evidence that the supplier's page for an item is gone (HTTP 404).
+
+    Written when a scan gets the 404 and removed when the same item is read successfully again.
+    Stock rule: the supplier is master, so a missing item has stock 0 and stays published."""
+
+    vendor_scope: ClassVar[str] = "item__vendor"
+
+    item = models.OneToOneField(
+        SourceItem,
+        on_delete=models.CASCADE,
+        related_name="missing",
+        help_text=_("The supplier item whose page is missing."),
+    )
+    url = models.CharField(max_length=500, help_text=_("The address that answered."))
+    http_status = models.PositiveSmallIntegerField(help_text=_("The answer, e.g. 404."))
+    first_seen_at = models.DateTimeField(help_text=_("When it was first found missing."))
+    last_seen_at = models.DateTimeField(help_text=_("When it was last found missing."))
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        ordering = ["item"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(http_status__gte=400, http_status__lt=600),
+                name="ingest_missing_http_error",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.item} ({self.http_status})"
+
+
+class ItemChange(BaseModel):
+    """Append-only change history of an item's fields.
+
+    `changed_fields` flags the fields this change sets (`{"price": true}`), `new_values` holds
+    their values. The effective value of a field is the last one flagged, by version then id."""
+
+    vendor_scope: ClassVar[str] = "item__vendor"
+
+    item = models.ForeignKey(
+        SourceItem,
+        on_delete=models.CASCADE,
+        related_name="changes",
+        help_text=_("The supplier item."),
+    )
+    version = models.PositiveIntegerField(help_text=_("Order of the change for the item."))
+    changed_fields = models.JSONField(help_text=_("The fields this change sets, as true flags."))
+    new_values = models.JSONField(help_text=_("The values of the fields."))
+    recorded_at = models.DateTimeField(help_text=_("When the change was recorded."))
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        ordering = ["item", "version", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["item", "version"], name="ingest_change_item_version")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.item} change v{self.version}"
 
 
 class ProductDraft(BaseModel):

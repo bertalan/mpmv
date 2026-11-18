@@ -1,0 +1,13 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}The shop's fitment data-quality report (FIT.3).{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p><a href="{{ list_url }}">{% translate "Back to the products" %}</a></p>
+  <h2>{% translate "Products still undeclared" %}</h2>
+  <ul>{% for p in undeclared %}<li><a href="{{ p.url }}">{{ p.sku }}</a></li>{% empty %}<li>{% translate "Nothing to show." %}</li>{% endfor %}</ul>
+  <h2>{% translate "Rows waiting on an item that is not approved" %}</h2>
+  <ul>{% for p in pending_rows %}<li><a href="{{ p.url }}">{{ p.sku }}</a></li>{% empty %}<li>{% translate "Nothing to show." %}</li>{% endfor %}</ul>
+  <h2>{% translate "Exclusions with nothing to exclude from" %}</h2>
+  <ul>{% for p in suspicious %}<li><a href="{{ p.url }}">{{ p.sku }}</a></li>{% empty %}<li>{% translate "Nothing to show." %}</li>{% endfor %}</ul>
+{% endblock %}

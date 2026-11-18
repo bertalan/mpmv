@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('contenttypes', '0002_remove_content_type_name'),
-        ('ingest', '0002_field_help_texts'),
+        ('ingest', '0003_source_state'),
         ('vendors', '0034_salestermsversion_append_only'),
     ]
 

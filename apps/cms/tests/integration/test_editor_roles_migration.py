@@ -18,6 +18,10 @@ BEFORE = [("cms", "0012_launch_countdown")]
 CODE = "0013_editor_roles"
 
 
+# The roles of migration 0013; later roles (CMS.14) are seeded by `sync_editor_roles`.
+MIGRATED_ROLES = set(roles.ROLE_NAMES) - {roles.SNIPPET_EDITORS, roles.SNIPPET_PUBLISHERS}
+
+
 def _names(model: type, **filters: object) -> set[str]:
     return set(model.objects.filter(**filters).values_list("name", flat=True))  # type: ignore[attr-defined]
 
@@ -56,7 +60,7 @@ def test_default_group_members_move_to_the_successor_roles_and_back() -> None:
     assert not NewGroup.objects.filter(
         name__in=[roles.DEFAULT_EDITORS, roles.DEFAULT_MODERATORS]
     ).exists()
-    assert set(roles.ROLE_NAMES) <= _names(NewGroup)
+    assert _names(NewGroup) >= MIGRATED_ROLES
     plain_groups = _names(NewGroup, user=NewUser.objects.get(pk=plain_editor.pk))
     assert plain_groups == set(roles.CONTENT_ROLES)
     moderator_groups = _names(NewGroup, user=NewUser.objects.get(pk=moderator.pk))
@@ -101,7 +105,7 @@ def test_the_migration_runs_on_a_database_without_the_default_groups() -> None:
     executor.loader.build_graph()
     executor.migrate(executor.loader.graph.leaf_nodes())
     new = executor.loader.project_state(executor.loader.graph.leaf_nodes()).apps
-    assert set(roles.ROLE_NAMES) <= _names(new.get_model("auth", "Group"))
+    assert _names(new.get_model("auth", "Group")) >= MIGRATED_ROLES
 
 
 @pytest.mark.django_db(transaction=True)
