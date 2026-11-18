@@ -15,6 +15,7 @@ from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.models import StandardPage
 from apps.cms.tests.factories import StandardPageFactory
+from apps.core.images import picture_formats, picture_specs
 from apps.core.models import MediaImage
 from apps.core.tests.factories import MediaImageFactory
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
@@ -26,7 +27,11 @@ def _photo(name: str) -> MediaImage:
     image: MediaImage = MediaImageFactory.create(
         file__filename=f"{name}.png", file__width=1600, file__height=1000, file__color="teal"
     )
-    return image
+    # Pages only use renditions that exist (CAT.4): make them as the upload job does.
+    formats = picture_formats()
+    image.get_renditions(*picture_specs("content", formats=formats))
+    fresh: MediaImage = MediaImage.objects.get(pk=image.pk)
+    return fresh
 
 
 def test_a_page_serves_avif_and_webp_pictures_with_no_csp_violation(

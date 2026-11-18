@@ -1,8 +1,6 @@
-# count: 53
+# count: 36
 # Routes and page types without help files in every enabled language (ARC.36).
 # Only shrinks: delete a line when its files exist (ARC.37 fills them).
-route customer_order
-route customer_orders
 route manager:platform:amendment_settings
 route manager:platform:dashboard
 route manager:platform:fitment_categories
@@ -39,18 +37,3 @@ route manager:shop:profile
 route manager:shop:sales_terms
 route manager:shop:termination
 route manager:shop:vendor
-route mfa:overview
-route mfa:recovery_codes
-route mfa:setup
-route mfa:totp
-route mfa:verify
-route orders:cart
-route orders:checkout
-route orders:confirmation
-route orders:review
-route orders:shipping
-route privacy_account
-route privacy_requests
-route vendors:apply
-route withdrawal
-route withdrawal_confirm
