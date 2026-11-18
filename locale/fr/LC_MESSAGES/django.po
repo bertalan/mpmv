@@ -3140,10 +3140,12 @@ msgstr ""
 "maximum, mise en forme comprise."
 
 #: apps/manager/templates/manager/shop/return_policy.html
-msgid "How buyers can return goods. Staff review every change before it is shown to buyers."
+msgid ""
+"How buyers can return goods bought from %(vendor)s. Staff review every change before it is shown "
+"to buyers."
 msgstr ""
-"Comment les acheteurs peuvent renvoyer les articles. Le personnel vérifie chaque modification "
-"avant qu'elle soit montrée aux acheteurs."
+"Comment les acheteurs peuvent renvoyer les articles achetés auprès de %(vendor)s. Le personnel "
+"vérifie chaque modification avant qu'elle soit montrée aux acheteurs."
 
 #: apps/catalog/models.py
 msgid ""

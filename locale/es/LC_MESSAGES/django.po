@@ -3109,10 +3109,12 @@ msgstr ""
 "deja vacío, la sección no se muestra. Hasta unos 5.000 caracteres, incluido el formato."
 
 #: apps/manager/templates/manager/shop/return_policy.html
-msgid "How buyers can return goods. Staff review every change before it is shown to buyers."
+msgid ""
+"How buyers can return goods bought from %(vendor)s. Staff review every change before it is shown "
+"to buyers."
 msgstr ""
-"Cómo pueden devolver los compradores los productos. El personal revisa cada cambio antes de "
-"mostrarlo a los compradores."
+"Cómo pueden devolver los compradores los productos comprados a %(vendor)s. El personal revisa cada"
+" cambio antes de mostrarlo a los compradores."
 
 #: apps/catalog/models.py
 msgid ""

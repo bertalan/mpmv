@@ -3104,10 +3104,12 @@ msgstr ""
 "formattazione compresa."
 
 #: apps/manager/templates/manager/shop/return_policy.html
-msgid "How buyers can return goods. Staff review every change before it is shown to buyers."
+msgid ""
+"How buyers can return goods bought from %(vendor)s. Staff review every change before it is shown "
+"to buyers."
 msgstr ""
-"Come gli acquirenti possono restituire la merce. Il personale verifica ogni modifica prima che sia"
-" mostrata agli acquirenti."
+"Come gli acquirenti possono restituire la merce acquistata da %(vendor)s. Il personale verifica "
+"ogni modifica prima che sia mostrata agli acquirenti."
 
 #: apps/catalog/models.py
 msgid ""

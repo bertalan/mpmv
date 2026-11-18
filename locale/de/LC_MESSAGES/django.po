@@ -3144,10 +3144,12 @@ msgstr ""
 "Formatierung."
 
 #: apps/manager/templates/manager/shop/return_policy.html
-msgid "How buyers can return goods. Staff review every change before it is shown to buyers."
+msgid ""
+"How buyers can return goods bought from %(vendor)s. Staff review every change before it is shown "
+"to buyers."
 msgstr ""
-"Wie Käufer Waren zurückgeben können. Das Personal prüft jede Änderung, bevor sie Käufern angezeigt"
-" wird."
+"Wie Käufer bei %(vendor)s gekaufte Waren zurückgeben können. Das Personal prüft jede Änderung, "
+"bevor sie Käufern angezeigt wird."
 
 #: apps/catalog/models.py
 msgid ""

@@ -6,7 +6,7 @@ No inline script or style.
 {% endcomment %}
 {% block manager_content %}
   <h1>{% translate "Return policy" %}</h1>
-  <p class="manager-lead">{% translate "How buyers can return goods. Staff review every change before it is shown to buyers." %}</p>
+  <p class="manager-lead">{% blocktranslate with vendor=manager.vendor.display_name %}How buyers can return goods bought from {{ vendor }}. Staff review every change before it is shown to buyers.{% endblocktranslate %}</p>
   <h2>{% translate "What buyers see now" %}</h2>
   <p>{% if public.is_default %}{% translate "You have not set a policy yet. The standard one applies." %}{% else %}{% translate "This is your approved policy." %}{% endif %}</p>
   <ul>
