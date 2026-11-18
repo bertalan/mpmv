@@ -10,7 +10,7 @@ from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 
 pytestmark = pytest.mark.django_db
-CTX = AuditContext(actor=None)
+CTX = AuditContext(actor_label="test", source="test")
 
 
 @pytest.fixture(autouse=True)
@@ -21,7 +21,9 @@ def _no_checks(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_a_dry_run_changes_and_audits_nothing() -> None:
     product = ProductFactory.create()
     changes = services.set_products_status([product], "published", ctx=CTX, dry_run=True)
-    assert changes.changes[0].after["status"] == "published"
+    after = changes.changes[0].after
+    assert after is not None
+    assert after["status"] == "published"
     product.refresh_from_db()
     assert product.status == "draft"
     assert not AuditLog.objects.filter(action=services.PRODUCT_STATUS_CHANGED).exists()
@@ -33,7 +35,10 @@ def test_apply_changes_status_and_writes_one_audit_row_each() -> None:
     assert set(Product.objects.values_list("status", flat=True)) == {"published"}
     rows = AuditLog.objects.filter(action=services.PRODUCT_STATUS_CHANGED)
     assert rows.count() == 2
-    assert rows.first().before["status"] == "draft"  # type: ignore[union-attr]
+    first = rows.first()
+    assert first is not None
+    assert first.before is not None
+    assert first.before["status"] == "draft"
 
 
 def test_a_product_already_in_the_status_is_not_a_change() -> None:

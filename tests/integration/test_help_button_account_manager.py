@@ -24,6 +24,7 @@ from django.utils.translation import gettext
 
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
+from apps.catalog.tests.factories import ProductFactory
 from apps.cms import engine
 from apps.cms.tests.factories import HelpEntryFactory
 from apps.compliance.tests.factories import NoticeFactory, TerminationNoticeFactory
@@ -142,6 +143,8 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:fitment_node_new": "platform",
         "manager:platform:fitment_node": "platform",
         "manager:platform:fitment_node_merge": "platform",
+        "manager:platform:catalog_products": "platform",  # CAT.11
+        "manager:platform:catalog_product": "platform",
         "manager:shop:termination": "shop",
         "manager:shop:statements": "shop",
         "manager:shop:sales_terms": "shop",
@@ -191,6 +194,8 @@ def _open(name: str) -> tuple[Client, str]:
             kwargs = {"public_id": TerminationNoticeFactory.create().public_id}
         if name in ("manager:platform:fitment_node", "manager:platform:fitment_node_merge"):
             kwargs = {"public_id": FitmentNodeFactory.create().public_id}
+        if name == "manager:platform:catalog_product":
+            kwargs = {"public_id": ProductFactory.create().public_id}
         if name == "manager:platform:order":
             kwargs = {"public_id": paid_vendor_order().public_id}
     client = Client()

@@ -288,6 +288,7 @@ def set_variant_price(
 PRODUCT_CREATED = "catalog.product.created"
 PRODUCT_UPDATED = "catalog.product.updated"
 PRODUCT_DELETED = "catalog.product.deleted"
+PRODUCT_STATUS_CHANGED = "catalog.product.status_changed"
 PRODUCT_RELATIONS_CHANGED = "catalog.product.relations_changed"
 VARIANT_CREATED = "catalog.variant.created"
 VARIANT_UPDATED = "catalog.variant.updated"
@@ -381,6 +382,46 @@ def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) 
         if action == PRODUCT_CREATED and product.price_net is not None:
             _record_price_history(product)
         audit_changes(changes, ctx=ctx, action=action)
+        bump_sitemap_version()  # I18N.16: a publish or retire changes what the sitemaps list
+    return changes
+
+
+def set_products_status(
+    products: Iterable[Product], status: str, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Publish, retire or send back to draft every product in `products` (CAT.11 bulk action).
+
+    One ChangeSet entry and one AuditLog row per product that really changes; products already
+    in `status` are skipped. Publishing runs the publication checks (`publishing`) on each
+    product: a ValidationError refuses the whole batch and nothing is written. Also on dry-run.
+    """
+    if status not in ProductStatus.values:
+        raise ValueError(f"Unknown product status: {status!r}")
+    changes = ChangeSet()
+    with transaction.atomic():
+        locked = list(
+            Product.objects.select_for_update(of=("self",))
+            .select_related("vendor")
+            .filter(pk__in=[p.pk for p in products])
+            .order_by("pk")
+        )
+        for stored in locked:
+            if stored.status == status:
+                continue
+            before = {**product_snapshot(stored), "status": stored.status}
+            if status == ProductStatus.PUBLISHED:
+                publishing.check_publishable(stored)
+            changes.update(
+                PRODUCT_MODEL, str(stored.public_id), before, {**before, "status": status}
+            )
+        if dry_run or changes.is_empty:
+            return changes
+        changed = {c.key for c in changes.changes}
+        for stored in locked:
+            if str(stored.public_id) in changed:
+                stored.status = ProductStatus(status)
+                stored.save(update_fields=["status", "updated_at"])
+        audit_changes(changes, ctx=ctx, action=PRODUCT_STATUS_CHANGED)
         bump_sitemap_version()  # I18N.16: a publish or retire changes what the sitemaps list
     return changes
 
