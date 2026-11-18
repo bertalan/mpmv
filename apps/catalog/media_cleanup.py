@@ -12,6 +12,13 @@ An image counts as used when any of these refers to it:
    scheduled publication: a draft may hold an image the live page does not. They are read with
    the same extraction the reference index uses.
 
+Not scanned: older revisions that are neither latest, live nor scheduled. Reading them costs one
+object rebuild per revision, and every page save adds one, so the cost of each list view and
+each delete grows without bound. The review list and the confirm step say so instead
+(the `orphan_images_old_versions.html` note): reverting to such a version after the image
+was deleted shows a missing image. Renditions never count as a use: they belong to their
+image and go with it.
+
 The delete re-checks all of it inside the transaction, with the image rows locked: a gallery
 insert needs a key-share lock on the image row, so it waits for the delete and then fails on the
 foreign key instead of slipping in unseen. The database keeps `ProductImage.image` as PROTECT as
@@ -28,9 +35,11 @@ from typing import Any
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Page
 from django.db import transaction
 from django.db.models import ProtectedError, QuerySet
 from django.utils import timezone
+from wagtail.admin.paginator import WagtailPaginator
 from wagtail.images import get_image_model
 from wagtail.images.models import AbstractRendition
 from wagtail.models import ReferenceIndex, Revision, RevisionMixin
@@ -51,7 +60,7 @@ def image_policy() -> Any:
 
 ORPHAN_DELETED = "catalog.media_image.orphan_deleted"
 IMAGE_MODEL = "core.mediaimage"
-REVIEW_LIMIT = 200  # rows the review page shows at once; the total is counted over all of them
+REVIEW_LIMIT = 200  # rows per page of the review list; the total is counted over all of them
 
 REFERENCE_INDEX = "wagtailcore.referenceindex"
 REVISION_SOURCE = "wagtailcore.revision"
@@ -171,18 +180,28 @@ def _visible_images(user: Any, permission: str = "delete") -> QuerySet[MediaImag
 @dataclass(frozen=True)
 class OrphanReport:
     images: list[MediaImage]
-    total: int  # all orphans, `images` shows the first `REVIEW_LIMIT`
+    total: int  # all orphans; `images` is one page of them
+    page: Page[int]  # the page of ids (`page.paginator.num_pages` pages in all)
 
 
-def orphan_images(user: Any, *, now: Any = None) -> OrphanReport:
+def orphan_images(
+    user: Any, *, page: Any = 1, per_page: int = REVIEW_LIMIT, now: Any = None
+) -> OrphanReport:
     """Library images no reference source uses, past the grace period, that `user` may delete,
-    oldest first. A fixed number of queries per source, whatever the number of images."""
+    oldest first, `per_page` at a time (`page` out of range is clamped). A fixed number of
+    queries per source, whatever the number of images."""
     now = now or timezone.now()
     candidates = _visible_images(user).filter(created_at__lte=now - engine.GRACE)
     ids = list(candidates.order_by("created_at", "pk").values_list("pk", flat=True))
     orphans = engine.orphan_ids(ids, reference_sources(None))
-    shown = candidates.filter(pk__in=orphans[:REVIEW_LIMIT]).select_related("licence", "collection")
-    return OrphanReport(images=sorted(shown, key=lambda i: orphans.index(i.pk)), total=len(orphans))
+    paginator = WagtailPaginator(orphans, per_page)
+    current = paginator.get_page(page)
+    ids_on_page = list(current.object_list)
+    shown = candidates.filter(pk__in=ids_on_page).select_related("licence", "collection")
+    order = {pk: n for n, pk in enumerate(ids_on_page)}
+    return OrphanReport(
+        images=sorted(shown, key=lambda i: order[i.pk]), total=len(orphans), page=current
+    )
 
 
 def image_snapshot(image: MediaImage) -> dict[str, Any]:

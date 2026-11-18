@@ -1050,6 +1050,14 @@ msgstr ""
 msgid "An extra amount added to the price of the band, without VAT. Use 0 for none."
 msgstr "Un importe adicional que se suma al precio del tramo, sin IVA. Use 0 si no hay ninguno."
 
+#: apps/catalog/templates/catalog/admin/orphan_images_old_versions.html
+msgid ""
+"An image that is only in an old version of a page may be listed here. If you delete it, going back"
+" to that version would show a missing image."
+msgstr ""
+"Una imagen que solo está en una versión antigua de una página puede aparecer en esta lista. Si la "
+"elimina, volver a esa versión mostraría una imagen que falta."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "An introduction shown on the category page, for example what you find in it. Basic formatting is "
@@ -2313,6 +2321,14 @@ msgstr "Desarrollo y sistema"
 #: apps/manager/templates/manager/platform/user_sessions.html
 msgid "Device"
 msgstr "Dispositivo"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Directions on Google Maps"
+msgstr "Cómo llegar en Google Maps"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Directions on OpenStreetMap"
+msgstr "Cómo llegar en OpenStreetMap"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Discard the draft"
@@ -3818,6 +3834,14 @@ msgstr "Espacio de tienda del Manager: %(vendor)s"
 msgid "manufacturer"
 msgstr "fabricante"
 
+#: apps/events/templates/events/_index_map.html
+msgid "Map of the listed events"
+msgstr "Mapa de los eventos de la lista"
+
+#: apps/events/templates/events/_event_map.html
+msgid "Map: %(name)s"
+msgstr "Mapa: %(name)s"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Mark as delivered"
 msgstr "Marcar como entregado"
@@ -4609,6 +4633,14 @@ msgstr "El preaviso solo se puede dar a vendedores activos o suspendidos."
 #: apps/events/admin_views.py
 msgid "Only when the event is hidden after a notice."
 msgstr "Solo cuando el evento se oculta a raíz de un aviso."
+
+#: apps/events/templates/events/_event_map.html
+msgid "Open in a maps app"
+msgstr "Abrir en una aplicación de mapas"
+
+#: apps/events/templates/events/event_page.html
+msgid "Open in maps"
+msgstr "Abrir en mapas"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 #: apps/accounts/templates/accounts/levels/prompt.html
@@ -6230,6 +6262,10 @@ msgstr "sitio"
 #: apps/cms/templatetags/cms_tags.py apps/seo/templates/seo/site_links.html
 msgid "Site links"
 msgstr "Enlaces del sitio"
+
+#: apps/events/templates/events/_event_map.html apps/events/templates/events/_index_map.html
+msgid "Skip map"
+msgstr "Saltar el mapa"
 
 #: themes/base/templates/components/skip_link.html
 msgid "Skip to main content"

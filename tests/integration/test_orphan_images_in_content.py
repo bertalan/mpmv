@@ -20,6 +20,7 @@ from apps.cms.tests.factories import StandardPageFactory
 from apps.core.audit import AuditContext
 from apps.core.models import MediaImage
 from apps.core.tests.factories import MediaImageFactory
+from apps.events.tests.factories import EventPageFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -109,3 +110,25 @@ def test_an_unreferenced_image_beside_a_used_one_is_listed() -> None:
     )
 
     assert listed() == [unused.pk]
+
+
+def test_an_event_listing_image_is_not_listed_or_deleted() -> None:
+    image = old_image()
+    EventPageFactory.create(listing_image=image)
+
+    assert listed() == []
+    result = media_cleanup.delete_orphans([image.pk], user=staff(), ctx=CTX)
+    assert result.deleted == []
+    assert MediaImage.objects.filter(pk=image.pk).exists()
+
+
+def test_an_image_only_in_an_old_non_live_non_latest_revision_is_still_listed() -> None:
+    """The documented limit: older versions are not scanned (the list warns about it)."""
+    image = old_image()
+    page: StandardPage = StandardPageFactory.create()
+    page.body = [("figure", {"image": image, "alt_text": "Hills", "caption": ""})]
+    page.save_revision()
+    page.body = []
+    page.save_revision()  # the newest draft no longer holds it; the live page never did
+
+    assert listed() == [image.pk]

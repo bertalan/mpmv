@@ -12,8 +12,10 @@ import unicodedata
 from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from decimal import Decimal
 from html import escape, unescape
 from typing import Any
+from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
 from apps.vendors.engine import vendor_collection_name as vendor_collection_name  # moved (D-34)
@@ -1370,3 +1372,41 @@ def event_hreflang(
     )
     alternates.append(("x-default", urls[default]))
     return alternates
+
+
+# --- Map links (EVT.15, spec 15 "Maps")
+
+
+@dataclass(frozen=True)
+class DirectionsLinks:
+    """Plain external links to a point: Google Maps and OpenStreetMap directions, and a `geo:`
+    URI (RFC 5870) for mobile map apps."""
+
+    google: str
+    osm: str
+    geo: str
+
+
+def plain_coordinate(value: Decimal) -> str:
+    """A coordinate as plain digits with a point, no exponent and no trailing zeros."""
+    text = format(value.normalize(), "f")
+    return "0" if text in ("-0", "") else text
+
+
+def directions_links(latitude: Decimal, longitude: Decimal) -> DirectionsLinks:
+    """The three directions links for a point (only offered when the event has coordinates)."""
+    point = f"{plain_coordinate(latitude)},{plain_coordinate(longitude)}"
+    return DirectionsLinks(
+        google=f"https://www.google.com/maps/dir/?api=1&destination={point}",
+        osm="https://www.openstreetmap.org/directions?"
+        + urlencode({"route": f";{point}"}, safe=";,"),
+        geo=f"geo:{point}",
+    )
+
+
+def search_url(parts: Sequence[str]) -> str | None:
+    """The OpenStreetMap search link for an address, or None without any address text."""
+    text = ", ".join(part.strip() for part in parts if part and part.strip())
+    if not text:
+        return None
+    return "https://www.openstreetmap.org/search?" + urlencode({"query": text}, quote_via=quote)
