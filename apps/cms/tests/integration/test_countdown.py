@@ -19,6 +19,7 @@ from django.http import HttpRequest
 from django.test import Client
 from django.utils import timezone
 from django.utils.cache import get_max_age, patch_cache_control
+from django.utils.translation import gettext
 from wagtail.models import Page
 
 from apps.accounts.tests.factories import UserFactory
@@ -162,7 +163,7 @@ def test_before_the_target_the_page_shows_the_absolute_date_and_the_cta(
     # The counter and the pause button wait for the module; the expired part is hidden.
     assert re.search(r"<button[^>]*data-countdown-pause[^>]*hidden", block)
     assert re.search(r"<[^>]*data-countdown-expired[^>]*hidden", block)
-    assert "Available now" in block
+    assert gettext("Available now") in block
     assert "aria-live" not in block
 
 
