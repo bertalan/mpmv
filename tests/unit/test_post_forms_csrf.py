@@ -22,6 +22,8 @@ CSRF_TOKEN = re.compile(r"{%\s*csrf_token\s*%}")
 ACCEPTED = {
     "apps/seo/templates/seo/consent/banner.html",
     "apps/seo/templates/seo/consent/preferences.html",
+    # The ride theme's banner override posts to the same exempt view, same justification.
+    "themes/ride/templates/seo/consent/banner.html",
 }
 
 
