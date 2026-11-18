@@ -12517,7 +12517,9 @@ msgstr "Non hai ancora ordini"
 
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "You have not set a policy yet. The standard one applies: the shop pays the return shipping."
-msgstr "Non ha ancora impostato una politica. Si applica quella standard: la spedizione del reso è a carico del negozio."
+msgstr ""
+"Non ha ancora impostato una politica. Si applica quella standard: la spedizione del reso è a "
+"carico del negozio."
 
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "You may also like"
