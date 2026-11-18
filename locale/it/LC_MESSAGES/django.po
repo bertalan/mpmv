@@ -771,7 +771,7 @@ msgstr "Sicurezza dell’account"
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Account status"
-msgstr "Stato dell’account"
+msgstr "Stato dell'account"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Act on the content"
@@ -1154,7 +1154,7 @@ msgstr "Si candidi per vendere con noi"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Applying it asks for your passkey: it moves money or the delivery address."
-msgstr "Per applicarla serve la tua passkey: sposta denaro o l'indirizzo di consegna."
+msgstr "Per applicarla serve la Sua passkey: sposta denaro o l'indirizzo di consegna."
 
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_node.html
 msgid "Approve"
@@ -1951,7 +1951,7 @@ msgstr "Conferma"
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Connect your payout account"
-msgstr "Collega il tuo account per i pagamenti"
+msgstr "Colleghi il Suo account per i pagamenti"
 
 #: apps/vendors/models.py
 msgid "Consumer"
@@ -2336,7 +2336,7 @@ msgstr "Scarica i tuoi dati"
 
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download your shop profile, products and order amounts as a JSON file."
-msgstr "Scarica il profilo del negozio, i prodotti e gli importi degli ordini in un file JSON."
+msgstr "Scarichi il profilo del negozio, i prodotti e gli importi degli ordini in un file JSON."
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Drafts"
@@ -2668,7 +2668,7 @@ msgid ""
 "Find an account to see where it is signed in. Ending its sessions signs it out everywhere; it does"
 " not revoke API keys or links sent by email."
 msgstr ""
-"Cerca un account per vedere dove ha effettuato l'accesso. Terminarne le sessioni lo disconnette "
+"Cerchi un account per vedere dove ha effettuato l'accesso. Terminarne le sessioni lo disconnette "
 "ovunque; non revoca le chiavi API né i link inviati per email."
 
 #: apps/manager/templates/manager/platform/orders.html
@@ -2676,8 +2676,8 @@ msgid ""
 "Find an order by its number. Each seller's package of the order is changed on its own page, with a"
 " note and your passkey."
 msgstr ""
-"Cerca un ordine per numero. Il pacco di ciascun venditore si modifica nella sua pagina, con una "
-"nota e la tua passkey."
+"Cerchi un ordine per numero. Il pacco di ciascun venditore si modifica nella sua pagina, con una "
+"nota e la Sua passkey."
 
 #: apps/orders/templates/orders/_cart_body.html
 msgid "Find something you like."
@@ -3781,7 +3781,7 @@ msgstr "Condizioni del marketplace (versione %(number)s)"
 #: apps/manager/templates/manager/platform/dashboard.html
 msgid "Marketplace work across vendors. The menu lists the sections you may open."
 msgstr ""
-"Attività del marketplace che riguardano tutti i venditori. Il menu elenca le sezioni che puoi "
+"Attività del marketplace che riguardano tutti i venditori. Il menu elenca le sezioni che Lei può "
 "aprire."
 
 #: themes/base/templates/components/header.html themes/ride/templates/components/header.html
@@ -4044,9 +4044,8 @@ msgstr "Nessuna modifica al negozio per ora."
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "No version is published yet. Until you publish one, your products are sold on request only."
 msgstr ""
-"Nessuna versione è ancora pubblicata. Finché non ne pubblichi una, i tuoi prodotti si vendono solo"
-" su richiesta.Nessuna versione è ancora pubblicata. Finché non ne pubblichi una, i tuoi prodotti "
-"si vendono solo su richiesta."
+"Nessuna versione è ancora pubblicata. Finché non ne pubblica una, i Suoi prodotti si vendono solo "
+"su richiesta."
 
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Nobody holds a platform role yet."
@@ -4155,7 +4154,7 @@ msgstr "Nessuna modifica: questo testo è ancora una bozza. Modificalo per pubbl
 #: apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
 msgid "Nothing has changed yet. Check the changes below, then confirm."
-msgstr "Non è stato ancora modificato nulla. Controlla le modifiche qui sotto, poi conferma."
+msgstr "Non è stato ancora modificato nulla. Controlli le modifiche qui sotto, poi confermi."
 
 #: apps/vendors/templates/vendors/apply/cancelled.html
 msgid "Nothing is waiting"
@@ -5068,7 +5067,7 @@ msgid ""
 "Platform staff reverted your change to the logo of %(vendor_name)s: it went back to the previous "
 "logo."
 msgstr ""
-"Lo staff della piattaforma ha annullato la tua modifica al logo di %(vendor_name)s: è tornato il "
+"Lo staff della piattaforma ha annullato la Sua modifica al logo di %(vendor_name)s: è tornato il "
 "logo precedente."
 
 #: apps/vendors/templates/email/vendors/profile_reverted/body.html
@@ -5077,7 +5076,7 @@ msgid ""
 "Platform staff reverted your change to the storefront profile of %(vendor_name)s (%(language)s): "
 "%(fields)s went back to the previous text."
 msgstr ""
-"Lo staff della piattaforma ha annullato la tua modifica al profilo vetrina di %(vendor_name)s "
+"Lo staff della piattaforma ha annullato la Sua modifica al profilo vetrina di %(vendor_name)s "
 "(%(language)s): %(fields)s è tornato al testo precedente."
 
 #: apps/manager/amendment_views.py
@@ -5729,8 +5728,7 @@ msgstr "Salva le mie scelte"
 
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save the event first: then you can add text, pictures and other blocks to its page."
-msgstr ""
-"Salva prima l'evento: poi potrai aggiungere testo, immagini e altri blocchi alla sua pagina."
+msgstr "Salvi prima l'evento: poi potrà aggiungere testo, immagini e altri blocchi alla sua pagina."
 
 #: apps/manager/templates/manager/platform/fitment_node.html
 msgid "Save the name"
@@ -5738,7 +5736,7 @@ msgstr "Salva il nome"
 
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
-msgstr "Salva prima le modifiche: viene inviata l'ultima bozza salvata."
+msgstr "Salvi prima le modifiche: viene inviata l'ultima bozza salvata."
 
 #: apps/manager/fitment_views.py
 msgid "Saved."
@@ -5862,7 +5860,7 @@ msgstr "Sessioni"
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Set up an authenticator app"
-msgstr "Configura un’app di autenticazione"
+msgstr "Configura un'app di autenticazione"
 
 #: apps/accounts/templates/accounts/mfa/setup.html apps/seo/site_links.py
 msgid "Set up two-factor authentication"
@@ -5882,7 +5880,7 @@ msgstr "Condiviso con il venditore: è inviato nell'email che dice che il serviz
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Ship the order"
-msgstr "Spedisci l’ordine"
+msgstr "Spedisci l'ordine"
 
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/shop/order.html
 msgid "Ship to"
@@ -6993,7 +6991,7 @@ msgid ""
 "decides who pays the refund fee and whether the units go back to stock. It asks for your passkey."
 msgstr ""
 "Il cliente riceve indietro tutto quanto pagato per questo pacco, entro 14 giorni al massimo. Il "
-"motivo decide chi paga la commissione di rimborso e se le unità tornano in magazzino. Serve la tua"
+"motivo decide chi paga la commissione di rimborso e se le unità tornano in magazzino. Serve la Sua"
 " passkey."
 
 #: apps/orders/amendments.py
@@ -7511,7 +7509,7 @@ msgid ""
 " on its word alone: check the shops with many of them."
 msgstr ""
 "Ultimi %(days)s giorni. Quando un negozio dichiara che il cliente ha chiesto di annullare, non "
-"paga il costo di rimborso sulla sola sua parola: controlla i negozi che ne hanno molti."
+"paga il costo di rimborso sulla sola sua parola: controlli i negozi che ne hanno molti."
 
 #: apps/manager/event_forms.py
 msgid "The last day of an all-day event, included. Same as the first for one day."
@@ -7659,8 +7657,8 @@ msgid ""
 "The Manager is for platform staff and for vendor members. If you need access, ask the platform "
 "staff, or sign in with another account."
 msgstr ""
-"Il Manager è riservato allo staff della piattaforma e ai membri dei venditori. Se ti serve "
-"l’accesso, chiedilo allo staff della piattaforma oppure accedi con un altro account."
+"Il Manager è riservato allo staff della piattaforma e ai membri dei venditori. Se Le serve "
+"l’accesso, lo chieda allo staff della piattaforma oppure acceda con un altro account."
 
 #: apps/compliance/models.py
 msgid "The manufacturer's postal address, with street, town and country."
@@ -8202,8 +8200,8 @@ msgid ""
 "The platform does not issue your invoice. Record here when you have issued it, so every later "
 "change reminds you to correct it."
 msgstr ""
-"La piattaforma non emette la tua fattura. Registra qui quando l’hai emessa, così ogni modifica "
-"successiva ti ricorda di correggerla."
+"La piattaforma non emette la Sua fattura. Registri qui quando l’ha emessa, così ogni modifica "
+"successiva Le ricorda di correggerla."
 
 #: apps/manager/templates/manager/shop/statements.html
 msgid "The platform has sent no statement of reasons for your shop."
@@ -8222,8 +8220,8 @@ msgid ""
 "The platform will end your service on %(date)s. Until then you can keep selling and you can "
 "download your data."
 msgstr ""
-"La piattaforma terminerà il tuo servizio il %(date)s. Fino ad allora puoi continuare a vendere e "
-"puoi scaricare i tuoi dati."
+"La piattaforma terminerà il Suo servizio il %(date)s. Fino ad allora può continuare a vendere e "
+"può scaricare i Suoi dati."
 
 #: apps/vendors/admin.py
 msgid ""
@@ -8287,7 +8285,7 @@ msgid ""
 "change to delete it now."
 msgstr ""
 "Il logo precedente viene conservato fino alla chiusura del periodo di verifica, così un "
-"annullamento può ripristinarlo. Conferma la modifica per eliminarlo subito."
+"annullamento può ripristinarlo. Confermi la modifica per eliminarlo subito."
 
 #: apps/catalog/models.py
 msgid ""
@@ -9172,7 +9170,7 @@ msgstr ""
 
 #: apps/manager/templates/manager/shop/termination.html
 msgid "There is no termination notice for your shop."
-msgstr "Per il tuo negozio non c’è nessun preavviso di cessazione."
+msgstr "Per il Suo negozio non c’è nessun preavviso di cessazione."
 
 #: apps/accounts/session_views.py
 msgid "There were no other sessions."
@@ -9246,8 +9244,8 @@ msgid ""
 "This change of order %(number)s is %(what)s: confirm it with your passkey. The confirmation is for"
 " this change only, once."
 msgstr ""
-"Questa modifica dell'ordine %(number)s è %(what)s: confermala con la tua passkey. La conferma vale"
-" solo per questa modifica, una volta."
+"Questa modifica dell'ordine %(number)s è %(what)s: la confermi con la Sua passkey. La conferma "
+"vale solo per questa modifica, una volta."
 
 #: apps/orders/amendments.py
 msgid ""
@@ -9885,7 +9883,7 @@ msgid ""
 "Until your payout account is active, your products are shown in the catalog and sold on request: "
 "customers cannot add them to the cart."
 msgstr ""
-"Finché il tuo account per i pagamenti non è attivo, i tuoi prodotti compaiono nel catalogo e si "
+"Finché il Suo account per i pagamenti non è attivo, i Suoi prodotti compaiono nel catalogo e si "
 "vendono su richiesta: i clienti non possono aggiungerli al carrello."
 
 #: apps/cms/blocks.py
@@ -9936,7 +9934,7 @@ msgstr "Usa una passkey"
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Use an authenticator app"
-msgstr "Usa un’app di autenticazione"
+msgstr "Usa un'app di autenticazione"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Use recovery code"
@@ -10914,7 +10912,7 @@ msgid ""
 "You are a member of several vendors. Choose the one to work on; you can switch from the header "
 "later."
 msgstr ""
-"Sei membro di più venditori. Scegli quello su cui lavorare; potrai cambiarlo in seguito "
+"È membro di più venditori. Scelga quello su cui lavorare; potrà cambiarlo in seguito "
 "dall’intestazione."
 
 #: apps/accounts/templates/accounts/admin/login.html
@@ -10927,7 +10925,7 @@ msgstr ""
 
 #: apps/manager/templates/manager/forbidden.html
 msgid "You are signed in as %(user)s, and you do not have access to this part of the site."
-msgstr "Hai effettuato l’accesso come %(user)s e non hai accesso a questa parte del sito."
+msgstr "Ha effettuato l’accesso come %(user)s e non ha accesso a questa parte del sito."
 
 #: apps/accounts/session_views.py
 msgid "You are signed out everywhere else."
@@ -10950,13 +10948,13 @@ msgid ""
 "You can challenge this decision with an internal complaint (DSA article 20), out-of-court dispute "
 "settlement (DSA article 21) or a court. The platform terms say how."
 msgstr ""
-"Puoi contestare questa decisione con un reclamo interno (articolo 20 DSA), con la risoluzione "
+"Può contestare questa decisione con un reclamo interno (articolo 20 DSA), con la risoluzione "
 "extragiudiziale delle controversie (articolo 21 DSA) o davanti a un giudice. I termini della "
 "piattaforma spiegano come."
 
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "You can read the scheme but not change it."
-msgstr "Puoi leggere lo schema ma non modificarlo."
+msgstr "Può leggere lo schema ma non modificarlo."
 
 #: apps/manager/event_block_views.py
 msgid "You cannot add images for this shop."
@@ -10994,11 +10992,11 @@ msgstr ""
 
 #: apps/manager/templates/manager/shop/events.html
 msgid "You have no events yet."
-msgstr "Non hai ancora eventi."
+msgstr "Non ha ancora eventi."
 
 #: apps/manager/templates/manager/shop/event_images.html
 msgid "You have no images yet."
-msgstr "Non hai ancora immagini."
+msgstr "Non ha ancora immagini."
 
 #: apps/orders/templates/orders/customer_orders.html
 msgid "You have no orders yet"
@@ -11018,7 +11016,7 @@ msgid ""
 "You recorded on %(when)s that your invoice or receipt for this order is issued. Every later change"
 " shows the reminder to correct it."
 msgstr ""
-"Il %(when)s hai registrato che la fattura o lo scontrino di questo ordine è emesso. Ogni modifica "
+"Il %(when)s ha registrato che la fattura o lo scontrino di questo ordine è emesso. Ogni modifica "
 "successiva mostra il promemoria per correggerlo."
 
 #: apps/compliance/templates/compliance/privacy_account.html
@@ -11089,7 +11087,7 @@ msgstr "La tua scelta sui cookie è stata salvata."
 
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Your data"
-msgstr "I tuoi dati"
+msgstr "I Suoi dati"
 
 #: apps/compliance/templates/compliance/privacy_account.html
 #: themes/ride/templates/compliance/privacy_account.html
@@ -11156,15 +11154,15 @@ msgstr "Il Suo nome e cognome"
 
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "your image library"
-msgstr "la tua libreria immagini"
+msgstr "la Sua libreria immagini"
 
 #: apps/manager/templates/manager/shop/event_images.html
 msgid "Your images"
-msgstr "Le tue immagini"
+msgstr "Le Sue immagini"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Your invoice is already issued"
-msgstr "La tua fattura è già emessa"
+msgstr "La Sua fattura è già emessa"
 
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."
@@ -11231,7 +11229,7 @@ msgstr "I tuoi prodotti, fino a 12. Obbligatorio."
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Your payout account is active. Customers can buy your products online."
 msgstr ""
-"Il tuo account per i pagamenti è attivo. I clienti possono acquistare i tuoi prodotti online."
+"Il Suo account per i pagamenti è attivo. I clienti possono acquistare i Suoi prodotti online."
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your protection"
@@ -11243,7 +11241,7 @@ msgstr "I Suoi codici di recupero"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Your role"
-msgstr "Il tuo ruolo"
+msgstr "Il Suo ruolo"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "Your role cannot open a passkey window."
@@ -11252,7 +11250,7 @@ msgstr "Il tuo ruolo non può aprire una finestra passkey."
 #: apps/manager/templates/manager/amendment_passkey.html
 msgid "Your role may not confirm this change. Ask the shop's owner or a member who handles orders."
 msgstr ""
-"Il tuo ruolo non può confermare questa modifica. Chiedi al titolare del negozio o a un membro che "
+"Il Suo ruolo non può confermare questa modifica. Chieda al titolare del negozio o a un membro che "
 "gestisce gli ordini."
 
 #: apps/accounts/templates/accounts/levels/prompt.html

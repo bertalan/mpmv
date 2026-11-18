@@ -7,7 +7,7 @@ In questa pagina sceglie come confermare la sua identità dopo la password: un'a
 
 ## Cosa può fare
 
-- Scelga Usa un’app di autenticazione, oppure aggiunga una passkey (il blocco schermo di questo dispositivo o una chiave di sicurezza).
+- Scelga Usa un'app di autenticazione, oppure aggiunga una passkey (il blocco schermo di questo dispositivo o una chiave di sicurezza).
 - Se ha già un fattore, può aggiungerne un altro o aprire le impostazioni a due fattori.
 - Apra Sessioni per vedere dove ha effettuato l'accesso.
 
