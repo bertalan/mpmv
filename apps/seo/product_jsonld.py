@@ -43,7 +43,7 @@ from apps.shipping import engine as shipping_engine
 from apps.shipping import services as shipping
 from apps.tax.prices import PriceUnavailable, consumer_price, estimated_country
 from apps.vendors.models import Vendor
-from apps.vendors.return_services import public_return_policy
+from apps.vendors.return_services import effective_return_policy
 
 from . import product_graph as pg
 from . import seller as seller_name
@@ -244,17 +244,17 @@ def build_graph(
     if sold:
         shipping_nodes, shipping_ids, countries = _shipping_nodes(page, url, language, request)
         if countries:
-            stated = public_return_policy(vendor)  # one query; approved versions only
+            stated = effective_return_policy(
+                vendor
+            )  # one query; approved, else the shop-pays default
             return_policy = pg.return_policy_node(
                 node_id=f"{vendor_url}#return-policy",
                 countries=sorted(countries),
-                return_country=(stated.return_country if stated else "")
-                or str(vendor.country or "")
-                or _operator_country(),
-                days=stated.return_window_days if stated else WITHDRAWAL_DAYS,
-                link=stated.returns_page_url if stated else "",
-                paid_by=stated.return_shipping_paid_by if stated else "",
-                methods=stated.return_methods if stated else (),
+                return_country=stated.return_country or _operator_country(),
+                days=stated.return_window_days,
+                link=stated.returns_page_url,
+                paid_by=stated.return_shipping_paid_by,
+                methods=stated.return_methods,
             )
     refs: dict[str, Any] = {
         "seller_id": str(seller["@id"]) if seller else "",

@@ -255,7 +255,7 @@ def test_the_return_policy_names_its_countries_and_window() -> None:
     assert node["merchantReturnLink"] == f"{SITE}/shop/acme/"
 
 
-def test_no_stated_payer_means_no_return_fees_but_a_defect_is_free() -> None:
+def test_no_payer_given_means_no_return_fees_but_a_defect_is_free() -> None:
     node = pg.return_policy_node(node_id=RETURNS, countries=("IT",), return_country="IT", days=14)
     assert "returnFees" not in node
     assert "merchantReturnLink" not in node

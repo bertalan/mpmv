@@ -239,8 +239,8 @@ def test_a_product_without_weight_still_has_the_return_policy(client: Client, th
     _html, document = graph_of(client)
     policy = node(document, "MerchantReturnPolicy")
     assert policy["applicableCountry"] == ["IT"]
-    assert "returnFees" not in policy  # SEO.11: nothing unapproved is stated
-    assert "merchantReturnLink" not in policy
+    assert policy["returnFees"] == "https://schema.org/FreeReturn"  # Q-105 default
+    assert "merchantReturnLink" not in policy  # the default has no returns page
     assert policy["merchantReturnDays"] == 14
     assert not [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"]
     assert schema_check.dangling_references(document) == []
@@ -317,7 +317,8 @@ def test_a_pending_policy_is_not_stated(client: Client, theme: str) -> None:
     policy = _policy(document)
     assert policy["merchantReturnDays"] == 14
     assert policy["returnPolicyCountry"] == "DE"
-    for absent in ("returnFees", "merchantReturnLink", "returnMethod"):
+    assert policy["returnFees"] == "https://schema.org/FreeReturn"  # the default, not the pending
+    for absent in ("merchantReturnLink", "returnMethod"):
         assert absent not in policy
 
 
@@ -340,11 +341,13 @@ def test_the_policy_read_is_one_query_per_page(client: Client, theme: str) -> No
     from apps.vendors.tests.factories import ReturnPolicyVersionFactory
 
     product = _sold_product()
-    ReturnPolicyVersionFactory.create(vendor=product.vendor, status="approved")
-    with CaptureQueriesContext(connection) as queries:
-        client.get(MUG)
-    reads = [q for q in queries if "vendors_returnpolicyversion" in q["sql"]]
-    assert len(reads) == 1
+    for approved in (False, True):
+        if approved:
+            ReturnPolicyVersionFactory.create(vendor=product.vendor, status="approved")
+        with CaptureQueriesContext(connection) as queries:
+            client.get(MUG)
+        reads = [q for q in queries if "vendors_returnpolicyversion" in q["sql"]]
+        assert len(reads) == 1
 
 
 def test_an_image_carries_the_licence_fields_of_the_real_model() -> None:
