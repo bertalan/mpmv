@@ -360,6 +360,60 @@ def test_the_italian_labels_quoted_by_the_help_use_the_ascii_apostrophe() -> Non
     assert all("\u2019" not in text for text in found.values()), found
 
 
+# I18N.20 part 1: the storefront catalog (listing, search, product page includes, the
+# specification labels, the fitment summary, the ride catalog overrides) is in the catalogs,
+# in the informal customer register.
+CATALOG_STOREFRONT = (
+    "apps/catalog/templates/catalog/listing.html",
+    "apps/catalog/templates/catalog/search.html",
+    "apps/catalog/templates/catalog/includes/listing_filters.html",
+    "apps/catalog/templates/catalog/includes/product_specs.html",
+    "apps/catalog/templates/catalog/includes/product_fitment.html",
+    "apps/catalog/templates/catalog/includes/fitment_group.html",
+    "apps/catalog/product_pages.py",
+    "apps/fitment/product_summary.py",
+    "themes/ride/templates/catalog/listing.html",
+    "themes/ride/templates/catalog/search.html",
+    "themes/ride/templates/catalog/product.html",
+    "themes/base/templates/components/gallery.html",
+)
+
+
+def test_the_catalog_storefront_is_in_scope() -> None:
+    found = catalog.collect()
+    places = {p for _k, (_pl, ps) in found.items() for p in ps}
+    for path in CATALOG_STOREFRONT:
+        assert path in places or not (ROOT / path).read_text().count("trans"), path
+    for msgid in ("Weight", "Country of origin", "Fits everything.", "Not for", "Search the shop"):
+        assert (msgid, None) in found, msgid
+
+
+@pytest.mark.parametrize("lang", list(LANGS))
+def test_the_catalog_storefront_entries_are_translated(lang: str) -> None:
+    entries = [e for e in _po(lang) if _any_in(e, CATALOG_STOREFRONT)]
+    assert len(entries) >= 30
+    for entry in entries:
+        assert entry.msgstr or all(entry.msgstr_plural.values()), entry.msgid
+
+
+@pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
+def test_the_catalog_storefront_uses_the_informal_register(lang: str) -> None:
+    for entry in _po(lang):
+        if not _any_in(entry, CATALOG_STOREFRONT):
+            continue
+        text = _texts(entry)
+        if lang in FORMAL:
+            assert not FORMAL[lang].search(text), entry.msgid
+    checks = {e.msgid: _texts(e) for e in _po(lang)}
+    expected = {
+        "it": "Nessun prodotto corrisponde alla tua ricerca.",
+        "de": "Keine Produkte entsprechen deiner Suche.",
+        "fr": "Aucun produit ne correspond à ta recherche.",
+        "es": "Ningún producto coincide con tu búsqueda.",
+    }[lang]
+    assert checks["No products match your search."] == expected
+
+
 # I18N.20 part 2: the public event pages and feeds, the blog, the CMS blocks, the footer and the
 # form page (base and ride) are in the catalogs, in the informal customer register.
 PART2_STOREFRONT = (

@@ -30,6 +30,7 @@ class FitmentConfig(AppConfig):
         "fitmentcategory",
         "productfitmentstate",
         "productfitment",
+        "fitmentnodeproposal",
     )
     unaudited_models = {
         "fitmentleveltranslation": "level labels: audited with the level they belong to",
