@@ -23,6 +23,17 @@ released.
 3. A major finding that the PR does not fix blocks the tag until lane-a decides. If anything
    else merges after the check, the next tag needs a new check.
 
+Before every coherence check, the lane running it first clears the **backlog of pending work**
+(owner rule 2026-11-18):
+
+- open PRs with red CI, a conflict with `main` or a review waiting;
+- ready-to-merge PRs the train keeps skipping;
+- tracker follow-ups with no owner;
+- unanswered asks on the Lane board;
+- owner questions not yet asked.
+
+Each one is fixed, assigned or asked about before the check starts.
+
 Every coherence check also includes a **stale-items sweep** (owner rule 2026-11-18). Each item
 is either fixed in the same PR or listed with a follow-up:
 
