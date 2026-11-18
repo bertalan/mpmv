@@ -29,6 +29,7 @@ from apps.vendors.models import (
     CrossVendorConsent,
     LegalFieldRequirement,
     NoTinCountry,
+    ReturnPolicyVersion,
     SalesTermsInForce,
     SalesTermsVersion,
     SelfCertification,
@@ -521,3 +522,25 @@ class SalesTermsInForceFactory(DjangoModelFactory[SalesTermsInForce]):
 
     version = factory.SubFactory(SalesTermsVersionFactory, in_force=False)
     vendor = factory.SelfAttribute("version.vendor")
+
+
+class ReturnPolicyVersionFactory(DjangoModelFactory[ReturnPolicyVersion]):
+    """A proposed (pending) version of a vendor's return policy (VEN.40)."""
+
+    class Meta:
+        model = ReturnPolicyVersion
+
+    vendor = factory.SubFactory(VendorFactory)
+    number = factory.LazyAttribute(
+        lambda o: (
+            1
+            if o.vendor.pk is None
+            else ReturnPolicyVersion.objects.filter(vendor=o.vendor).count() + 1
+        )
+    )
+    return_window_days = 30
+    return_shipping_paid_by = "customer"
+    return_methods = factory.LazyFunction(lambda: ["post"])
+    returns_page_url = "https://shop.example/returns"
+    return_country = "IT"
+    status = "pending"

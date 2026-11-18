@@ -383,6 +383,14 @@ msgid "A moderator asked for changes to your event %(title)s before it can be pu
 msgstr ""
 "Un modérateur a demandé des modifications de votre événement %(title)s avant sa publication."
 
+#: apps/cms/models.py
+msgid ""
+"A name for the editors, for example 'Shipping terms'. Never shown to visitors. Up to 120 "
+"characters. Required."
+msgstr ""
+"Un nom pour les rédacteurs, par exemple « Conditions d’expédition ». Il n’est jamais montré aux "
+"visiteurs. 120 caractères au maximum. Obligatoire."
+
 #: apps/manager/event_image_form.py
 msgid "A name for the library, for example Our stand 2027. Optional."
 msgstr "Un nom pour la bibliothèque, par exemple Notre stand 2027. Facultatif."
@@ -816,6 +824,10 @@ msgstr "Accepter la commande"
 #: apps/orders/customer_views.py
 msgid "Accepted by the seller"
 msgstr "Accepté par le vendeur"
+
+#: apps/manager/forms.py
+msgid "Accepted return methods"
+msgstr "Modes de retour acceptés"
 
 #: themes/base/templates/403.html
 msgid "Access denied"
@@ -1276,11 +1288,15 @@ msgstr "Approuver"
 msgid "Approve all brands of the selected batches"
 msgstr "Approuver toutes les marques des lots sélectionnés"
 
+#: apps/vendors/admin.py
+msgid "Approve the selected pending return policies"
+msgstr "Approuver les politiques de retour en attente sélectionnées"
+
 #: apps/catalog/taxonomy_admin.py
 msgid "Approve the selected proposals"
 msgstr "Approuver les propositions sélectionnées"
 
-#: apps/catalog/taxonomy.py
+#: apps/catalog/taxonomy.py apps/vendors/models.py
 msgid "Approved"
 msgstr "Approuvée"
 
@@ -1316,6 +1332,10 @@ msgstr ""
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Ask %(vendor)s about this product: it is not sold online."
 msgstr "Interrogez %(vendor)s au sujet de ce produit : il n'est pas vendu en ligne."
+
+#: apps/manager/forms.py
+msgid "At a drop-off point"
+msgstr "Dans un point de dépôt"
 
 #: apps/orders/amendment_engine.py
 msgid "at the new address %(why)s"
@@ -1496,6 +1516,10 @@ msgstr "Achat pour une entreprise"
 #: apps/manager/event_block_forms.py
 msgid "Button text"
 msgstr "Texte du bouton"
+
+#: apps/manager/forms.py
+msgid "By post"
+msgstr "Par courrier"
 
 #: apps/events/templates/events/_subscribe.html
 msgid "Calendar address to copy"
@@ -1823,6 +1847,14 @@ msgstr ""
 "Choisissez un mot de passe pour activer votre compte. Vous vous connectez ensuite avec celui-ci et"
 " configurez une application d'authentification. Notre équipe examine ensuite votre candidature."
 
+#: apps/cms/blocks.py
+msgid ""
+"Choose a reusable text. When it is changed and approved, every page that uses it shows the new "
+"text. Nothing is shown while the snippet is not published."
+msgstr ""
+"Choisissez un texte réutilisable. Lorsqu’il est modifié et approuvé, chaque page qui l’utilise "
+"affiche le nouveau texte. Rien n’est affiché tant que l’extrait n’est pas publié."
+
 #: apps/manager/event_forms.py
 msgid "Choose a time zone such as Europe/Rome."
 msgstr "Choisissez un fuseau horaire, par exemple Europe/Rome."
@@ -1920,6 +1952,15 @@ msgid "Choose the product the card leads to. A card to a product that is not on 
 msgstr ""
 "Choisissez le produit vers lequel mène la carte. Une carte vers un produit qui n'est pas en vente "
 "est omise."
+
+#: apps/manager/forms.py
+msgid ""
+"Choose the seller if returns are free for the buyer. Choose the customer if the buyer pays the "
+"cost of sending goods back. It must match your sales terms. Required."
+msgstr ""
+"Choisissez le vendeur si les retours sont gratuits pour l'acheteur. Choisissez le client si "
+"l'acheteur paie les frais de retour. Cela doit correspondre à vos conditions de vente. "
+"Obligatoire."
 
 #: apps/cms/blocks.py
 msgid "Choose the shop the card leads to. A card to a shop that is not open is left out."
@@ -2228,6 +2269,10 @@ msgstr "pays"
 msgid "Country of origin"
 msgstr "Pays d'origine"
 
+#: apps/manager/forms.py
+msgid "Country returns are sent to"
+msgstr "Pays vers lequel les retours sont envoyés"
+
 #: apps/vendors/forms.py
 msgid "Country where your business is established"
 msgstr "Pays dans lequel votre entreprise est établie"
@@ -2311,6 +2356,11 @@ msgstr ""
 #: apps/manager/event_forms.py
 msgid "Day of the month"
 msgstr "Jour du mois"
+
+#: apps/vendors/models.py
+msgid "Days a consumer has to send goods back. Never fewer than 14."
+msgstr ""
+"Nombre de jours dont le consommateur dispose pour renvoyer les articles. Jamais moins de 14."
 
 #: apps/shipping/models.py
 msgid "Days added to the method's estimated delivery time in this area."
@@ -3271,6 +3321,14 @@ msgstr ""
 "votre boutique. Laissez vide et la section n'est pas affichée. Environ 5 000 caractères au "
 "maximum, mise en forme comprise."
 
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid ""
+"How buyers can return goods bought from %(vendor)s. Staff review every change before it is shown "
+"to buyers."
+msgstr ""
+"Comment les acheteurs peuvent renvoyer les articles achetés auprès de %(vendor)s. Le personnel "
+"vérifie chaque modification avant qu'elle soit montrée aux acheteurs."
+
 #: apps/catalog/models.py
 msgid ""
 "How buyers get this product. Buy: they order and pay on the site, so it needs a price. Catalog "
@@ -3296,6 +3354,11 @@ msgstr "Où il en est. Il ne peut pas dépasser le maximum ci-dessous."
 msgid "How fast or how costly the service is: standard, express, economy or other."
 msgstr "Rapidité ou coût du service : standard, express, économique ou autre."
 
+#: apps/vendors/models.py
+msgid "How goods can be returned: by post, at a drop-off point or in the store."
+msgstr ""
+"Comment les articles peuvent être renvoyés : par courrier, dans un point de dépôt ou en magasin."
+
 #: apps/manager/amendment_views.py
 msgid ""
 "How long the customer has to accept or decline a proposed change; after that the order stays as it"
@@ -3319,6 +3382,15 @@ msgid ""
 msgstr ""
 "Pendant combien de jours un événement annulé reste dans les calendriers, marqué comme annulé, afin"
 " que les calendriers des personnes en soient informés. Exemple : 30. Obligatoire."
+
+#: apps/manager/forms.py
+msgid ""
+"How many days a consumer has to send goods back after receiving them. The law sets a minimum of 14"
+" days for sales to consumers, so a lower number is refused. Required."
+msgstr ""
+"Nombre de jours dont le consommateur dispose pour renvoyer les articles après les avoir reçus. La "
+"loi fixe un minimum de 14 jours pour les ventes aux consommateurs : un nombre inférieur est "
+"refusé. Obligatoire."
 
 #: apps/cms/forms_pages.py
 msgid ""
@@ -3628,6 +3700,10 @@ msgid ""
 msgstr ""
 "Dans le calcul des tarifs, l'expédition est gratuite lorsque les marchandises du colis valent au "
 "moins ce montant, hors TVA. Laissez vide pour ne pas proposer d'expédition gratuite."
+
+#: apps/manager/forms.py
+msgid "In the store"
+msgstr "En magasin"
 
 #: apps/manager/product_views.py
 msgid "Incomplete"
@@ -5794,6 +5870,10 @@ msgstr "Promotion"
 msgid "Proposals"
 msgstr "Propositions"
 
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Propose a change"
+msgstr "Proposer une modification"
+
 #: apps/manager/site_map.py apps/manager/templates/manager/shop/fitment_list.html
 #: apps/manager/templates/manager/shop/fitment_product.html
 msgid "Propose a missing item"
@@ -5814,6 +5894,10 @@ msgstr "Nœuds proposés"
 #: apps/manager/amendment_forms.py apps/orders/ui/forms.py
 msgid "Province or state"
 msgstr "Province ou État"
+
+#: apps/manager/forms.py
+msgid "Public returns page"
+msgstr "Page publique des retours"
 
 #: apps/manager/product_views.py apps/manager/templates/manager/shop/sales_terms.html
 msgid "Publish"
@@ -6029,11 +6113,15 @@ msgstr "Tout refuser"
 msgid "Reject all brands of the selected batches"
 msgstr "Rejeter toutes les marques des lots sélectionnés"
 
+#: apps/vendors/admin.py
+msgid "Reject the selected pending return policies"
+msgstr "Refuser les politiques de retour en attente sélectionnées"
+
 #: apps/catalog/taxonomy_admin.py
 msgid "Reject the selected proposals"
 msgstr "Rejeter les propositions sélectionnées"
 
-#: apps/catalog/taxonomy.py
+#: apps/catalog/taxonomy.py apps/vendors/models.py
 msgid "Rejected"
 msgstr "Rejetée"
 
@@ -6098,6 +6186,10 @@ msgstr "Se répète"
 #: apps/manager/event_forms.py
 msgid "Repetition"
 msgstr "Récurrence"
+
+#: apps/vendors/models.py
+msgid "Replaced by a newer proposal"
+msgstr "Remplacée par une proposition plus récente"
 
 #: apps/manager/site_map.py
 msgid "Report illegal content"
@@ -6165,6 +6257,27 @@ msgstr "Retirés"
 msgid "Return cost information"
 msgstr "Informations sur le coût du retour"
 
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Return policy"
+msgstr "Politique de retour"
+
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Return shipping is paid by the customer."
+msgstr "Les frais de retour sont à la charge du client."
+
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Return shipping is paid by the seller."
+msgstr "Les frais de retour sont à la charge du vendeur."
+
+#: apps/manager/forms.py
+msgid "Return window in days"
+msgstr "Délai de retour en jours"
+
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Return window: %(days)s days"
+msgstr "Délai de retour : %(days)s jours"
+
 #: apps/vendors/services.py
 msgid "Returns and refunds"
 msgstr "Retours et remboursements"
@@ -6172,6 +6285,10 @@ msgstr "Retours et remboursements"
 #: apps/manager/forms.py
 msgid "Returns and refunds policy"
 msgstr "Politique de retour et de remboursement"
+
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Returns go to: %(country)s"
+msgstr "Les retours sont envoyés à : %(country)s"
 
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the consumer bears the direct cost of returning the goods."
@@ -6204,6 +6321,10 @@ msgstr "relue"
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Reviewed"
 msgstr "Vérifié le"
+
+#: apps/vendors/admin.py
+msgid "Reviewed: %(count)d."
+msgstr "Vérifiées : %(count)d."
 
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Revoke %(role)s"
@@ -6381,6 +6502,10 @@ msgstr "Vendeur"
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Selling mode"
 msgstr "Mode de vente"
+
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Send for review"
+msgstr "Envoyer pour vérification"
 
 #: apps/vendors/templates/vendors/apply/form.html
 msgid "Send my application"
@@ -7124,6 +7249,18 @@ msgstr ""
 "dans le champ PEC ; XXXXXXX est destiné aux entreprises établies hors d'Italie. Votre comptable ou"
 " votre logiciel de facturation peut vous communiquer ce code."
 
+#: apps/vendors/models.py
+msgid "The address (https only) of your public page that explains returns."
+msgstr "L'adresse (https uniquement) de votre page publique qui explique les retours."
+
+#: apps/manager/forms.py
+msgid ""
+"The address of a public page on your own site that explains how returns work. It must start with "
+"https://. Optional: leave it empty if you have no such page."
+msgstr ""
+"L'adresse d'une page publique de votre site qui explique le fonctionnement des retours. Elle doit "
+"commencer par https://. Facultatif : laissez le champ vide si vous n'avez pas une telle page."
+
 #: apps/cms/blocks.py
 msgid ""
 "The address of a YouTube or Vimeo video, starting with https://. Other sites are not accepted."
@@ -7506,6 +7643,10 @@ msgstr ""
 "Les pays où s'appliquent les codes postaux et les provinces ci-dessous : codes pays à deux "
 "lettres, comme 'IT' ou 'DE', séparés par des virgules."
 
+#: apps/vendors/models.py
+msgid "The country goods are returned to."
+msgstr "Le pays vers lequel les articles sont renvoyés."
+
 #: apps/manager/event_forms.py
 msgid "The country of the place, as a two-letter code, for example IT."
 msgstr "Le pays du lieu, sous forme de code à deux lettres, par exemple IT."
@@ -7567,6 +7708,13 @@ msgstr ""
 "Le pays où vous avez votre résidence fiscale. Il est demandé pour l'obligation de déclaration "
 "annuelle DAC7 de la plateforme. Vous avez un doute ? Demandez à votre comptable."
 
+#: apps/manager/forms.py
+msgid ""
+"The country where you receive returned goods, as a two-letter code, for example IT. Required."
+msgstr ""
+"Le pays où vous recevez les articles renvoyés, sous forme de code à deux lettres, par exemple IT. "
+"Obligatoire."
+
 #: apps/vendors/models.py
 msgid ""
 "The country where your business is established, as in the company register. It decides which legal"
@@ -7601,6 +7749,10 @@ msgstr ""
 #: apps/orders/templates/orders/_legal_recap.html
 msgid "The court for any dispute is the one of your own place of residence."
 msgstr "Pour tout litige, le tribunal compétent est celui de ton propre lieu de résidence."
+
+#: apps/manager/forms.py apps/vendors/models.py
+msgid "The customer"
+msgstr "Le client"
 
 #: apps/manager/amendment_forms.py
 msgid "The customer asked to cancel: no refund fee for the shop"
@@ -9224,6 +9376,10 @@ msgstr ""
 "marque et une machine. Rien n'est enregistré tant que vous n'avez pas confirmé sur la page "
 "d'aperçu."
 
+#: apps/manager/forms.py apps/vendors/models.py
+msgid "The seller"
+msgstr "Le vendeur"
+
 #: apps/orders/templates/email/orders/item_unavailable/body.html
 #: apps/orders/templates/email/orders/item_unavailable/body.txt
 msgctxt "(L)"
@@ -9256,6 +9412,10 @@ msgstr ""
 #: apps/vendors/models.py
 msgid "The seller these terms belong to."
 msgstr "Le vendeur auquel appartiennent ces conditions."
+
+#: apps/vendors/models.py
+msgid "The seller this return policy belongs to."
+msgstr "Le vendeur auquel appartient cette politique de retour."
 
 #: apps/orders/templates/orders/customer_order.html
 msgid "The seller will not ship it before %(when)s."
@@ -9411,6 +9571,10 @@ msgid "The special area this treatment is for. A method has one treatment per ar
 msgstr ""
 "La zone spéciale à laquelle s'applique ce traitement. Une méthode a un seul traitement par zone."
 
+#: apps/vendors/models.py
+msgid "The staff member who approved or rejected this version."
+msgstr "Le membre du personnel qui a approuvé ou refusé cette version."
+
 #: apps/events/models.py
 msgid "The staff member who hid the event. The platform fills it in."
 msgstr "Le membre du personnel qui a masqué l'événement. Renseigné par la plateforme."
@@ -9544,6 +9708,11 @@ msgid ""
 msgstr ""
 "Le texte du bouton d'envoi, par exemple « Envoyer votre question ». Si vous le laissez vide, le "
 "bouton indique « Envoyer »."
+
+#: apps/cms/models.py
+msgid "The text shown wherever the snippet is placed. If you leave it empty, nothing is shown."
+msgstr ""
+"Le texte affiché partout où l’extrait est placé. Si vous le laissez vide, rien n’est affiché."
 
 #: apps/cms/blocks.py
 msgid "The text that shows when the visitor opens the section. Required."
@@ -9773,6 +9942,10 @@ msgstr "La version appartient à un autre vendeur."
 #: apps/vendors/models.py
 msgid "The version number of these terms for this seller: 1, 2, 3 and so on."
 msgstr "Le numéro de version de ces conditions pour ce vendeur : 1, 2, 3, etc."
+
+#: apps/vendors/models.py
+msgid "The version number of this policy for this seller: 1, 2, 3 and so on."
+msgstr "Le numéro de version de cette politique pour ce vendeur : 1, 2, 3 et ainsi de suite."
 
 #: apps/vendors/models.py
 msgid "The version of the seller's sales terms that is in force."
@@ -10091,6 +10264,10 @@ msgstr ""
 "e-mail et attend toujours votre confirmation. Pour continuer, ouvrez ce lien, confirmez votre "
 "adresse e-mail et choisissez un mot de passe."
 
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "This is your approved policy."
+msgstr "Voici votre politique approuvée."
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "This is your order reference, not an invoice. Each seller issues its own invoice."
 msgstr ""
@@ -10269,6 +10446,12 @@ msgstr ""
 #: apps/manager/event_forms.py
 msgid "Thursday"
 msgstr "Jeudi"
+
+#: apps/manager/forms.py
+msgid "Tick every way a buyer can send goods back. Choose at least one. Required."
+msgstr ""
+"Cochez chaque façon dont un acheteur peut renvoyer les articles. Choisissez-en au moins une. "
+"Obligatoire."
 
 #: apps/manager/forms.py
 msgid ""
@@ -10866,6 +11049,15 @@ msgstr "version %(number)s"
 msgid "Version %(number)s is in force since %(date)s."
 msgstr "La version %(number)s est en vigueur depuis le %(date)s."
 
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Version %(number)s is waiting for review. It is not shown to buyers yet."
+msgstr ""
+"La version %(number)s est en attente de vérification. Elle n'est pas encore montrée aux acheteurs."
+
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Version %(number)s was rejected. %(note)s"
+msgstr "La version %(number)s a été refusée. %(note)s"
+
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "Version %(number)s, %(date)s"
 msgstr "Version %(number)s, %(date)s"
@@ -10874,6 +11066,11 @@ msgstr "Version %(number)s, %(date)s"
 msgid "Version %(number)s, in force from %(date)s."
 msgstr "Version %(number)s, en vigueur depuis le %(date)s."
 
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "Version %(number)s: %(status)s"
+msgstr "Version %(number)s : %(status)s"
+
+#: apps/manager/templates/manager/shop/return_policy.html
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "Versions"
 msgstr "Versions"
@@ -10895,6 +11092,10 @@ msgstr[1] "Voir ton panier : %(counter)s articles"
 #: apps/orders/customer_views.py
 msgid "Waiting for payment"
 msgstr "En attente de paiement"
+
+#: apps/vendors/models.py
+msgid "Waiting for review"
+msgstr "En attente de vérification"
 
 #: apps/orders/customer_views.py
 msgid "Waiting for the seller"
@@ -11085,6 +11286,10 @@ msgstr ""
 msgid "What buyers see for this version: in stock, out of stock or on backorder."
 msgstr ""
 "Ce que les acheteurs voient pour cette version : en stock, en rupture de stock ou sur commande."
+
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "What buyers see now"
+msgstr "Ce que voient les acheteurs maintenant"
 
 #: apps/catalog/models.py
 msgid ""
@@ -11350,6 +11555,10 @@ msgstr "Quand la position a été trouvée à partir de l'adresse. Renseigné po
 msgid "When the repetition stops. Fill in the field that belongs to your choice."
 msgstr "Quand la récurrence s'arrête. Renseignez le champ correspondant à votre choix."
 
+#: apps/vendors/models.py
+msgid "When the review happened."
+msgstr "Quand la vérification a eu lieu."
+
 #: apps/ingest/models.py
 msgid "When the run ended, whatever the result."
 msgstr "Quand l'exécution s'est terminée, quel que soit le résultat."
@@ -11507,6 +11716,12 @@ msgstr ""
 " vérifié, 'Relu' est vérifié, 'Publié' est affiché aux visiteurs. Seuls les textes publiés sont "
 "affichés."
 
+#: apps/vendors/models.py
+msgid "Where this version is in the staff review. Only approved ones are public."
+msgstr ""
+"Où en est cette version dans la vérification par le personnel. Seules les versions approuvées sont"
+" publiques."
+
 #: apps/manager/event_forms.py
 msgid "Where to find you at a fair, for example Hall 3, stand B12. Optional."
 msgstr "Où vous trouver lors d'un salon, par exemple Hall 3, stand B12. Facultatif."
@@ -11589,6 +11804,10 @@ msgstr ""
 "fichier, la prochaine mise en ligne le met à jour."
 
 #: apps/vendors/models.py
+msgid "Who pays the cost of sending goods back."
+msgstr "Qui paie le coût de l'envoi du retour."
+
+#: apps/vendors/models.py
 msgid ""
 "Who pays the direct cost of sending goods back after a withdrawal. Empty means you pay. The "
 "consumer pays only if you choose it here and explain it below."
@@ -11609,6 +11828,10 @@ msgstr ""
 #: apps/manager/forms.py
 msgid "Who pays the return"
 msgstr "Qui paie le retour"
+
+#: apps/manager/forms.py
+msgid "Who pays the return shipping"
+msgstr "Qui paie les frais de retour"
 
 #: apps/cms/blocks.py
 msgid "Who said it, for example 'Ada'. Required."
@@ -11652,6 +11875,10 @@ msgid "Why it was switched, for example the incident or request reference. Up to
 msgstr ""
 "Pourquoi il a été modifié, par exemple la référence de l'incident ou de la demande. 200 caractères"
 " au maximum."
+
+#: apps/vendors/models.py
+msgid "Why staff rejected it, shown to the seller."
+msgstr "Pourquoi le personnel l'a refusée, montré au vendeur."
 
 #: apps/events/models.py
 msgid "Why the event was hidden. The vendor can read it. The platform fills it in."
@@ -11860,6 +12087,10 @@ msgstr "Vous n'avez pas encore d'images."
 #: apps/orders/templates/orders/customer_orders.html
 msgid "You have no orders yet"
 msgstr "Tu n'as pas encore de commandes"
+
+#: apps/manager/templates/manager/shop/return_policy.html
+msgid "You have not set a policy yet. The standard one applies."
+msgstr "Vous n'avez pas encore défini de politique. La politique standard s'applique."
 
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "You may also like"
@@ -12106,6 +12337,10 @@ msgstr "Votre protection"
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid "Your recovery codes"
 msgstr "Vos codes de récupération"
+
+#: apps/manager/return_policy_views.py
+msgid "Your return policy is sent for review."
+msgstr "Votre politique de retour a été envoyée pour vérification."
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Your role"
