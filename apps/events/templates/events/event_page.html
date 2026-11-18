@@ -5,10 +5,12 @@ Event page (EVT.1 part 2/2, spec 15 "Public pages"): a minimal page on the base 
 Dates are in the page's language and the event's own time zone, with machine-readable
 `<time datetime>` values; the type is text. No inline script or style (CSP, spec 14 §14.5).
 EVT.6 adds the ICS and report links and the robots rule (cancelled or long-past events are
-noindex); the linked products come with EVT.8/EVT.15, the map with EVT.15.
+noindex). EVT.15 adds the map with its directions links, or an "Open in maps" search link
+when the event has an address and no coordinates.
 {% endcomment %}
 {% block head %}{% if robots %}{% robots_meta robots %}{% endif %}
-  {% event_feed_alternates vendor=page.vendor.slug %}{% endblock %}
+  {% event_feed_alternates vendor=page.vendor.slug %}
+  {% if map.point %}{% include "events/_map_assets.html" %}{% endif %}{% endblock %}
 {% block page_content %}
   <article class="event">
     <header>
@@ -49,6 +51,7 @@ noindex); the linked products come with EVT.8/EVT.15, the map with EVT.15.
             {% if page.postcode or page.city %}{{ page.postcode }} {{ page.city }}{% if page.region %} ({{ page.region }}){% endif %}<br>{% endif %}
             {% if page.country %}{{ page.country }}{% endif %}
           </address>
+          {% if map.search_url %}<p><a data-map-search href="{{ map.search_url }}" rel="noopener">{% translate "Open in maps" %}</a></p>{% endif %}
           {% if page.booth %}<p>{% blocktranslate with booth=page.booth %}Booth {{ booth }}{% endblocktranslate %}</p>{% endif %}
         </dd>
       {% endif %}
@@ -57,6 +60,7 @@ noindex); the linked products come with EVT.8/EVT.15, the map with EVT.15.
         <dd><a href="{{ page.online_url }}" rel="noopener">{% translate "Join online" %}</a></dd>
       {% endif %}
     </dl>
+    {% if map.point %}{% include "events/_event_map.html" %}{% endif %}
     {% for block in page.body %}{% include_block block %}{% endfor %}
     <p class="event-actions">
       <a href="{{ ics_url }}" type="text/calendar" download>{% translate "Add to calendar" %}</a>

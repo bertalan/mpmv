@@ -41,6 +41,8 @@ EVENT_FILES = (
         f"apps/events/templates/events/{name}.html"
         for name in (
             "event_calendar",
+            "_event_map",
+            "_index_map",
             "event_index_page",
             "event_page",
             "event_past",

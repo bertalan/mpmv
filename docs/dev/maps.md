@@ -117,6 +117,30 @@ Using it would mean replacing its media, its geocoder and its storage, so little
 remain. The own module is about 300 lines, runs the same code in the admin, the vendor area
 (EVT.4) and the public maps (EVT.15), and keeps the dependency list shorter.
 
+## Public maps (EVT.15)
+
+`events/map.js` also builds the public maps: `initEventMap` for `[data-event-map]` on the event
+page and `initIndexMap` for `[data-events-map]` on `/events/`. Templates: `_event_map.html`,
+`_index_map.html`, `_map_assets.html` (Leaflet and the module, only on a page with a map). The
+context comes from `listing.map_context` and the pure `engine.directions_links` / `search_url`.
+
+- Event page: a map only with both coordinates. Order in the markup: the facts (with the text
+  address), a "Skip map" link, the labelled region (`role="region"`, `aria-label`), then the
+  directions links (Google Maps, OpenStreetMap, `geo:`), which are also the skip link's target.
+  The region holds the server-rendered fallback (place, address, attribution) until the module
+  replaces it. With an address and no coordinates the "Where" row gets one "Open in maps" search
+  link (`data-map-search`) and no map; with neither, nothing.
+- The marker is keyboard focusable (title = venue name, Enter opens the popup). Scroll-wheel
+  zoom is off until the map has focus (`data-wheel-zoom` shows the state). Under
+  `prefers-reduced-motion: reduce` the zoom, fade and marker animations are off.
+- Index: the map is an enhancement, hidden without JavaScript and not rendered when no listed
+  event has coordinates. It reads `data-lat`/`data-lng` from the listed items (the current page
+  of results, after the filter); events without coordinates stay in the list only.
+- Tiles come from `MAP_TILE_URL` (the EVT.14 proxy). Leaflet cancels dropped tiles with a
+  `data:` GIF, which `img-src 'self'` blocks; `map.js` replaces two methods of its tile layer
+  so no `data:` URL is used and the vendored file stays unchanged.
+- Strings: `_event_map.html` and `_index_map.html` are in the I18N.7 catalog scope.
+
 ## Follow-ups
 
 - EVT.4: the vendor-area event form uses the same picker: render
@@ -126,4 +150,3 @@ remain. The own module is about 300 lines, runs the same code in the admin, the 
   `picked_longitude` hidden inputs too. EVT.4's done-when checks the vendor half: a vendor sets
   a point by click, by drag and by typing, and the saved values match.
 - EVT.14 is done: see "Tile proxy" below; `MAP_TILE_URL` now defaults to the proxy.
-- EVT.15: the public maps call `createMap` from the same module.
