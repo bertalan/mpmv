@@ -14,6 +14,7 @@ from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_GET
 
 from apps.core.i18n import configured_languages
+from apps.core.site_url import absolute_url
 
 from . import engine, help_guide
 from . import help as help_lookup
@@ -59,7 +60,11 @@ def customer_help(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "cms/help_guide_index.html",
-        {"sections": help_guide.sections("customer", language)},
+        {
+            "sections": help_guide.sections("customer", language),
+            "canonical_url": absolute_url(request, request.path),
+            "alternates": [],
+        },
     )
 
 
@@ -71,8 +76,14 @@ def customer_help_section(request: HttpRequest, section: str) -> HttpResponse:
     page = help_guide.section("customer", section, language)
     if page is None:
         raise Http404("No such help section")
+    canonical, alternates = help_guide.section_links(section, language, request)
     return render(
         request,
         "cms/help_guide_section.html",
-        {"guide": page, "sections": help_guide.sections("customer", language)},
+        {
+            "guide": page,
+            "sections": help_guide.sections("customer", language),
+            "canonical_url": canonical,
+            "alternates": alternates,
+        },
     )

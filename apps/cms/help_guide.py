@@ -11,9 +11,13 @@ Operator facts and links are filled from the placeholder allow-list when the pag
 from dataclasses import dataclass
 
 from django.conf import settings
+from django.http import HttpRequest
 from django.urls import reverse
 from django.utils import translation
 from wagtail.rich_text import expand_db_html
+
+from apps.core.i18n import configured_languages, hreflang_alternates, primary_language
+from apps.core.site_url import absolute_url
 
 from . import engine, help_files
 from .models import HELP_FEATURES, HelpEntry
@@ -69,3 +73,33 @@ def section_url(guide_key: str) -> str:
     if audience != "customer" or not engine.guide_key_valid(guide_key):
         return ""
     return reverse("customer_help_section", args=[slug])
+
+
+def own_languages(audience: str, slug: str) -> list[str]:
+    """The configured languages whose page for this section has its own file, in the configured
+    order. A language without one shows the primary-language text (never listed, never indexed)."""
+    have = set(
+        HelpEntry.objects.filter(
+            kind=engine.HELP_GUIDE, key=engine.guide_key(audience, slug)
+        ).values_list("locale__language_code", flat=True)
+    )
+    return [code for code in configured_languages() if code in have]
+
+
+def section_path(slug: str, language: str) -> str:
+    with translation.override(language):
+        return reverse("customer_help_section", args=[slug])
+
+
+def section_links(
+    slug: str, language: str, request: HttpRequest
+) -> tuple[str, list[tuple[str, str]]]:
+    """The canonical URL and the `hreflang` set of a customer help page. A language without its
+    own file shows the primary text, so its canonical is the primary page (no duplicate); the
+    alternates list only the languages that have their own file."""
+    own = own_languages("customer", slug)
+    primary = primary_language()
+    found = {code: absolute_url(request, section_path(slug, code)) for code in own}
+    shown = language if language in own else primary
+    canonical = found.get(shown) or absolute_url(request, section_path(slug, shown))
+    return canonical, hreflang_alternates(found)

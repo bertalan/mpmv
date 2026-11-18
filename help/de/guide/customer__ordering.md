@@ -8,7 +8,7 @@ Alles, was du für eine Bestellung brauchst, Schritt für Schritt.
 1. Lege Artikel in den Warenkorb. Die Artikel sind nach Verkäufer gruppiert, denn jeder Verkäufer ist ein eigener Verkauf.
 2. Drücke Weiter zur Kasse und gib deine Lieferadresse und deine E-Mail-Adresse an. Du brauchst kein Konto, um zu bestellen.
 3. Prüfe die Bestellung: Wähle für jeden Verkäufer eine Versandart und kontrolliere die Summe.
-4. Gib die Bestellung auf und bezahle im nächsten Schritt.
+4. Drücke Bestellung bestätigen und jetzt bezahlen. Du bezahlst im nächsten Schritt.
 
 ## Gut zu wissen
 

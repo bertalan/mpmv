@@ -6,9 +6,9 @@ Todo lo que necesitas para hacer un pedido, paso a paso.
 ## Cómo funciona
 
 1. Añade artículos a tu carrito. Los artículos se agrupan por vendedor, porque cada vendedor es una venta aparte.
-2. Pulsa Continuar al pago e indica tu dirección de entrega y tu correo electrónico. No necesitas una cuenta para pedir.
+2. Pulsa Ir a finalizar la compra e indica tu dirección de entrega y tu correo electrónico. No necesitas una cuenta para pedir.
 3. Revisa el pedido: elige una opción de envío para cada vendedor y comprueba el total.
-4. Haz el pedido y paga en el paso siguiente.
+4. Pulsa Confirmar pedido y pagar ahora. Pagas en el paso siguiente.
 
 ## Conviene saber
 

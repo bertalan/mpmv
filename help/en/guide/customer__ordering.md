@@ -8,7 +8,7 @@ Everything you need to place an order, step by step.
 1. Add items to your cart. Items are grouped by seller, because each seller is a separate sale.
 2. Press Continue to checkout and give your delivery address and your e-mail address. You do not need an account to order.
 3. Review the order: choose a shipping option for each seller and check the total.
-4. Place the order, then pay in the next step.
+4. Press Confirm order and pay now. You pay in the next step.
 
 ## Good to know
 

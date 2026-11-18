@@ -12,4 +12,4 @@ Chi spedisce il tuo ordine, quanto costa e come seguirlo.
 ## Segui il tuo ordine
 
 - Apri l'ordine da [I miei ordini]({{link.orders}}) per vedere gli stati di ogni pacco. Se hai ordinato senza account, usa il link nell'e-mail dell'ordine.
-- Quando il venditore ha aggiunto un link di tracciamento, nell'ordine vedi Traccia il pacco.
+- Quando il venditore ha aggiunto un link di tracciamento, nell'ordine vedi Segui il pacco.
