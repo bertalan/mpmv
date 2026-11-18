@@ -252,8 +252,7 @@ Three groups of actions (platform defaults; a vendor may only make them stricter
   Critical actions add a prompt only for rare actions.
 - **Shop owners (D-32 amendment, owner 2026-11-14).** A vendor owner holds no `elevate`, yet the
   shop space gates some of its own actions. For the shop owner actions (`payout_details`, the
-  Manager payments page, VEN.6; `sales_terms_publish`, VEN.35; `export`, the shop's own CSV
-  ledger extract, VEN.9, lane-a 2026-11-18, to confirm) and only on a shop they own, a
+  Manager payments page, VEN.6; `sales_terms_publish`, VEN.35; `export`, the money CSV export of VEN.9, owner decision 2026-11-18) and only on a shop they own, a
   vendor owner with an enrolled passkey may "Do it once" and may open a passkey window **scoped to
   that shop**. The scoped window covers only those actions of that shop: never a platform action,
   never another shop. The server re-checks ownership on every covered action and when a "Do it

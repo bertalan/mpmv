@@ -98,20 +98,30 @@ from apps.fitment.tests.factories import (
 )
 from apps.ingest.models import (
     ImportRun,
+    ItemChange,
     MappingTable,
     ProductDraft,
     ReviewItem,
     SourceItem,
+    SourceMissing,
     SourceObservation,
+    SourceState,
+    SourceStateVersion,
+    SourceVariation,
     SupplierSource,
 )
 from apps.ingest.tests.factories import (
     ImportRunFactory,
+    ItemChangeFactory,
     MappingTableFactory,
     ProductDraftFactory,
     ReviewItemFactory,
     SourceItemFactory,
+    SourceMissingFactory,
     SourceObservationFactory,
+    SourceStateFactory,
+    SourceStateVersionFactory,
+    SourceVariationFactory,
     SupplierSourceFactory,
 )
 from apps.ledger.models import LedgerEntry, Refund
@@ -279,6 +289,13 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     SourceItem: lambda vendor: SourceItemFactory.create(source__vendor=vendor),
     SourceObservation: lambda vendor: SourceObservationFactory.create(item__source__vendor=vendor),
     ProductDraft: lambda vendor: ProductDraftFactory.create(item__source__vendor=vendor),
+    SourceState: lambda vendor: SourceStateFactory.create(item__source__vendor=vendor),
+    SourceStateVersion: lambda vendor: SourceStateVersionFactory.create(
+        item__source__vendor=vendor
+    ),
+    SourceVariation: lambda vendor: SourceVariationFactory.create(item__source__vendor=vendor),
+    SourceMissing: lambda vendor: SourceMissingFactory.create(item__source__vendor=vendor),
+    ItemChange: lambda vendor: ItemChangeFactory.create(item__source__vendor=vendor),
     ImportRun: lambda vendor: ImportRunFactory.create(source__vendor=vendor),
     ReviewItem: lambda vendor: ReviewItemFactory.create(run__source__vendor=vendor),
     MappingTable: lambda vendor: MappingTableFactory.create(vendor=vendor),
@@ -598,6 +615,12 @@ ENDPOINTS: dict[str, Access] = {
         "Sales terms in force of any seller (VEN.35, VEN.32 exception): public by design, behind "
         "a signed, expiring link; a superseded version and a tampered link are a 404, every read "
         "is logged.",
+        kwargs={"token": "not-a-token"},
+    ),
+    "vendor_terms:pdf": NoVendorData(
+        "PDF of the sales terms in force of any seller (VEN.36): public by design behind the same "
+        "signed, expiring link; a superseded version and a tampered link are a 404 (an accepted-"
+        "terms link opens its own version), every read is logged.",
         kwargs={"token": "not-a-token"},
     ),
     "vendor_claim:claim": NoVendorData(
@@ -1156,6 +1179,10 @@ API_OPERATIONS: dict[str, Access] = {
         "404. Shows only the ChangeSet of what it creates."
     ),
     "GET /api/v1/catalog/products/{public_id}": VendorScoped(
+        make=lambda vendor: ProductFactory.create(vendor=vendor)
+    ),
+    # CAT.15
+    "GET /api/v1/catalog/products/{public_id}/other-sellers": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor)
     ),
     # EVT.5

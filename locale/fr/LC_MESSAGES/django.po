@@ -231,6 +231,10 @@ msgstr "-- racine --"
 msgid "0 means this year."
 msgstr "0 signifie cette année."
 
+#: apps/ingest/models.py
+msgid "1 in stock, 0 out of stock, empty if unknown."
+msgstr "1 en stock, 0 épuisé, vide si inconnu."
+
 #: apps/manager/event_forms.py
 msgid "1 repeats every time, 2 every second time, up to 12. Empty means 1."
 msgstr "1 se répète à chaque fois, 2 une fois sur deux, jusqu'à 12. Vide équivaut à 1."
@@ -1250,6 +1254,11 @@ msgid ""
 msgstr ""
 "Un autre de vos produits conçu pour être acheté avec celui-ci, par exemple la pile d'un jouet. "
 "Laissez vide s'il n'y en a pas."
+
+#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: themes/ride/templates/catalog/includes/other_sellers.html
+msgid "Another seller"
+msgstr "Un autre vendeur"
 
 #: apps/manager/event_block_forms.py
 msgid "Answer %(number)d"
@@ -2449,6 +2458,10 @@ msgstr "Décidé"
 msgid "Declaration"
 msgstr "Déclaration"
 
+#: apps/manager/fitment_views.py
+msgid "Declaration required to publish"
+msgstr "Déclaration requise pour publier"
+
 #: themes/base/templates/components/quantity_stepper.html
 msgid "Decrease quantity"
 msgstr "Diminuer la quantité"
@@ -2628,6 +2641,10 @@ msgstr "Le faire une seule fois"
 msgid "Do not expect fitment"
 msgstr "Ne pas exiger de compatibilité"
 
+#: apps/manager/fitment_views.py
+msgid "Do not require a declaration to publish"
+msgstr "Ne pas exiger de déclaration pour publier"
+
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
 msgid "Do not ship these items:"
@@ -2649,6 +2666,11 @@ msgstr "Télécharger"
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Download my data"
 msgstr "Télécharger mes données"
+
+#: apps/manager/templates/manager/shop/sales_terms.html
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Download PDF"
+msgstr "Télécharger le PDF"
 
 #: apps/events/templates/events/_subscribe.html
 msgid "Download the calendar (ICS)"
@@ -3294,6 +3316,10 @@ msgid ""
 msgstr ""
 "Groupes de pays à ajouter à la zone, avec leurs codes, par exemple 'eu' ou 'europe', séparés par "
 "des virgules."
+
+#: apps/ingest/models.py
+msgid "Grows by one at every change of the state."
+msgstr "Augmente de un à chaque changement de l'état."
 
 #: apps/catalog/product_pages.py apps/catalog/templates/catalog/product.html
 #: themes/ride/templates/catalog/product.html
@@ -5308,6 +5334,10 @@ msgstr "Modifications de commande"
 msgid "Order number"
 msgstr "Numéro de commande"
 
+#: apps/ingest/models.py
+msgid "Order of the change for the item."
+msgstr "Ordre de la modification pour l'article."
+
 #: apps/orders/customer_views.py
 msgid "Order placed"
 msgstr "Commande passée"
@@ -5376,6 +5406,11 @@ msgid ""
 msgstr ""
 "Autres produits que vous souhaitez suggérer avec celui-ci, par exemple un meilleur modèle. "
 "Facultatif : laissez vide pour ne rien suggérer."
+
+#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: themes/ride/templates/catalog/includes/other_sellers.html
+msgid "Other sellers of this product"
+msgstr "Autres vendeurs de ce produit"
 
 #: apps/ingest/models.py
 msgid "Other ways the supplier writes the same term, as a JSON list."
@@ -5792,6 +5827,14 @@ msgid "Please correct the error below."
 msgid_plural "Please correct the errors below."
 msgstr[0] "Veuillez corriger l'erreur ci-dessous."
 msgstr[1] "Veuillez corriger les erreurs ci-dessous."
+
+#: apps/fitment/services.py
+msgid ""
+"Please declare what this product fits before you publish it: choose the items it fits on the Fits "
+"tab, or state that it fits everything."
+msgstr ""
+"Indiquez à quoi ce produit convient avant de le publier : choisissez les articles compatibles dans"
+" l'onglet Compatibilité ou déclarez qu'il convient à tout."
 
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
@@ -6349,6 +6392,10 @@ msgstr "Fichier du dépôt"
 #: apps/orders/templates/orders/_package.html
 msgid "Request a quote"
 msgstr "Demander un devis"
+
+#: apps/manager/fitment_views.py
+msgid "Require a declaration to publish"
+msgstr "Exiger une déclaration pour publier"
 
 #: themes/base/templates/components/field.html
 msgid "required"
@@ -7021,6 +7068,11 @@ msgstr "Vendu par"
 msgid "Sold by %(name)s"
 msgstr "Vendu par %(name)s"
 
+#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: themes/ride/templates/catalog/includes/other_sellers.html
+msgid "Sold by %(seller)s"
+msgstr "Vendu par %(seller)s"
+
 #: apps/orders/templates/orders/_package.html themes/base/templates/components/cart_line.html
 msgid "Sold by %(vendor)s"
 msgstr "Vendu par %(vendor)s"
@@ -7419,6 +7471,10 @@ msgstr ""
 msgid "The address of the item in the supplier's feed. It identifies the item in that feed."
 msgstr "L'adresse de l'article dans le flux du fournisseur. Elle identifie l'article dans ce flux."
 
+#: apps/ingest/models.py
+msgid "The address that answered."
+msgstr "L'adresse qui a répondu."
+
 #: apps/accounts/models.py
 msgid "The address this person signs in with. It must be unique: two accounts cannot share it."
 msgstr ""
@@ -7454,6 +7510,10 @@ msgid ""
 msgstr ""
 "L'adresse que vous avez indiquée lors de votre commande. Elle prouve que la commande est la vôtre,"
 " et la confirmation de votre rétractation y est envoyée. Obligatoire."
+
+#: apps/ingest/models.py
+msgid "The answer, e.g. 404."
+msgstr "La réponse, par exemple 404."
 
 #: apps/catalog/taxonomy_admin.py
 msgid ""
@@ -8120,11 +8180,23 @@ msgstr "Les éléments du cas, en JSON."
 msgid "The feature to switch on or off for this vendor."
 msgstr "La fonctionnalité à activer ou à désactiver pour ce vendeur."
 
+#: apps/ingest/models.py
+msgid "The feed of the item; native ids are unique inside it."
+msgstr "Le flux de l'article ; les ids natifs y sont uniques."
+
+#: apps/ingest/models.py
+msgid "The feed; a variation id belongs to one item of it."
+msgstr "Le flux ; un id de variante appartient à un seul article."
+
 #: apps/shipping/models.py
 msgid "The fewest days a delivery takes. It is only an estimate. Not shown to buyers yet."
 msgstr ""
 "Le nombre minimal de jours d'une livraison. Ce n'est qu'une estimation. Pas encore affiché aux "
 "acheteurs."
+
+#: apps/ingest/models.py
+msgid "The fields this change sets, as true flags."
+msgstr "Les champs que cette modification définit, sous forme d'indicateurs vrais."
 
 #: apps/manager/event_forms.py
 msgid "The first day of an all-day event."
@@ -9088,6 +9160,14 @@ msgstr ""
 msgid "The page you asked for does not exist or has moved."
 msgstr "La page demandée n'existe pas ou a été déplacée."
 
+#: apps/ingest/models.py
+msgid "The parsed observation, with its variations."
+msgstr "L'observation lue, avec ses variantes."
+
+#: apps/ingest/models.py
+msgid "The parsed variation."
+msgstr "La variante lue."
+
 #: apps/catalog/models.py
 msgid ""
 "The part number the maker gave this article, up to 70 characters. Together with the brand it lets "
@@ -9602,6 +9682,15 @@ msgstr ""
 "L'ensemble de catégories ou de tags auquel appartient celui-ci, par exemple 'saison'. Obligatoire."
 " Il ne peut pas être modifié ensuite."
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid ""
+"The shipping method %(key)s (%(zone)s) is for goods that cannot be returned by post and has no "
+"maximum return-cost estimate. Add one in the return-cost information below, or you pay the return."
+msgstr ""
+"Le mode d'expédition %(key)s (%(zone)s) concerne des marchandises qui ne peuvent pas être "
+"renvoyées par la poste et n'a pas d'estimation du coût maximal de retour. Ajoutez-la dans les "
+"informations sur le coût de retour ci-dessous, sinon le retour est à votre charge."
+
 #: apps/orders/amendments.py
 msgid "The shipping method %(method)r is not offered for this package."
 msgstr "Le mode d'expédition %(method)r n'est pas proposé pour ce colis."
@@ -9737,6 +9826,9 @@ msgstr "Le membre du personnel qui a masqué l'événement. Renseigné par la pl
 #: apps/manager/money_views.py
 msgid "The start date is after the end date. The period filter was ignored."
 msgstr "La date de début est postérieure à la date de fin. Le filtre de période a été ignoré."
+#: apps/ingest/models.py
+msgid "The state as it was at that version."
+msgstr "L'état tel qu'il était à cette version."
 
 #: apps/cms/models.py
 msgid ""
@@ -9790,9 +9882,29 @@ msgstr ""
 "L'article du fournisseur à partir duquel ce brouillon a été créé. Un article a un seul brouillon."
 
 #: apps/ingest/models.py
+msgid "The supplier item this state belongs to."
+msgstr "L'article du fournisseur auquel appartient cet état."
+
+#: apps/ingest/models.py
+msgid "The supplier item whose page is missing."
+msgstr "L'article du fournisseur dont la page est absente."
+
+#: apps/ingest/models.py
+msgid "The supplier item."
+msgstr "L'article du fournisseur."
+
+#: apps/ingest/models.py
 msgid "The supplier's code for the item. It is used to match the item to a product of the vendor."
 msgstr ""
 "Le code de l'article chez le fournisseur. Il sert à associer l'article à un produit du vendeur."
+
+#: apps/ingest/models.py
+msgid "The supplier's numeric id of the variation."
+msgstr "L'id numérique de la variante chez le fournisseur."
+
+#: apps/ingest/models.py
+msgid "The supplier's own numeric id of the item. Empty when it publishes none."
+msgstr "L'id numérique propre de l'article chez le fournisseur. Vide s'il n'en publie pas."
 
 #: apps/ingest/models.py
 msgid "The supplier's term, as the supplier writes it. Upper and lower case do not matter."
@@ -9987,6 +10099,14 @@ msgstr ""
 "code et de valeur, par exemple {\"model_year\": 2020}. Laissez vide si l'ensemble n'en demande "
 "pas."
 
+#: apps/ingest/models.py
+msgid "The values of the fields."
+msgstr "Les valeurs des champs."
+
+#: apps/ingest/models.py
+msgid "The variable item this variation belongs to."
+msgstr "L'article variable auquel appartient cette variante."
+
 #: apps/catalog/models.py
 msgid ""
 "The variable product this version belongs to. Required: a variant cannot exist without its "
@@ -10109,6 +10229,10 @@ msgstr "Le numéro de version de cette politique pour ce vendeur : 1, 2, 3 et ai
 #: apps/vendors/models.py
 msgid "The version of the seller's sales terms that is in force."
 msgstr "La version des conditions de vente du vendeur qui est en vigueur."
+
+#: apps/ingest/models.py
+msgid "The version of the state it records."
+msgstr "La version de l'état qu'elle enregistre."
 
 #: apps/compliance/models.py
 msgid ""
@@ -10636,6 +10760,15 @@ msgid "Tick it for an event with no set hours. Then give the first and last day.
 msgstr ""
 "Cochez-la pour un événement sans horaires fixes. Indiquez ensuite le premier et le dernier jour."
 
+#: apps/shipping/models.py
+msgid ""
+"Tick it for bulky goods that cannot be sent back by post, such as a pallet. You must then state a "
+"maximum return-cost estimate in your sales terms."
+msgstr ""
+"Cochez cette case pour les marchandises volumineuses qui ne peuvent pas être renvoyées par la "
+"poste, comme une palette. Vous devez alors indiquer une estimation du coût maximal de retour dans "
+"vos conditions de vente."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "Tick it if categories or tags in this set can sit inside others, for example maker and then model."
@@ -11032,6 +11165,10 @@ msgstr ""
 #: apps/manager/templates/manager/amendment.html
 msgid "Unit price net"
 msgstr "Prix unitaire net"
+
+#: apps/ingest/models.py
+msgid "Units the supplier states, empty if unknown."
+msgstr "Unités indiquées par le fournisseur, vide si inconnues."
 
 #: apps/orders/amendment_engine.py
 msgid "unknown"
@@ -11520,8 +11657,12 @@ msgstr ""
 "Le type de zone : une île, une zone isolée ou un territoire ayant ses propres règles de TVA."
 
 #: apps/ingest/models.py
-msgid "What kind of term this is: category, taxonomy term, colour, material, brand or other."
-msgstr "Le type de terme : catégorie, terme de taxonomie, couleur, matière, marque ou autre."
+msgid ""
+"What kind of term this is: category, taxonomy term, colour, material, brand, product type, country"
+" or other."
+msgstr ""
+"Le type de terme : catégorie, terme de taxonomie, couleur, matière, marque, type de produit, pays "
+"ou autre."
 
 #: apps/shipping/models.py
 msgid "What pickup costs, without VAT. Use 0 for free pickup."
@@ -11668,6 +11809,14 @@ msgstr ""
 "5 000 caractères au maximum, mise en forme comprise. Si vous avez un doute sur ce qu'exige la loi,"
 " demandez à un conseiller juridique."
 
+#: apps/ingest/models.py
+msgid "When it was first found missing."
+msgstr "Quand il a été trouvé absent pour la première fois."
+
+#: apps/ingest/models.py
+msgid "When it was last found missing."
+msgstr "Quand il a été trouvé absent pour la dernière fois."
+
 #: apps/core/models.py
 msgid ""
 "When on, a refund the seller makes through the platform gives the commission and the collection "
@@ -11699,8 +11848,16 @@ msgstr ""
 "Laissez-la désactivée tant que vos vendeurs n'ont pas eu le temps de publier leurs conditions."
 
 #: apps/ingest/models.py
+msgid "When that state was read."
+msgstr "Quand cet état a été lu."
+
+#: apps/ingest/models.py
 msgid "When the case was decided."
 msgstr "Quand le cas a été tranché."
+
+#: apps/ingest/models.py
+msgid "When the change was recorded."
+msgstr "Quand la modification a été enregistrée."
 
 #: apps/vendors/models.py
 msgid "When the contract was accepted."
@@ -11761,8 +11918,20 @@ msgid "When the run started."
 msgstr "Quand l'exécution a démarré."
 
 #: apps/ingest/models.py
+msgid "When the state was last read."
+msgstr "Quand l'état a été lu pour la dernière fois."
+
+#: apps/ingest/models.py
+msgid "When the supplier last listed it."
+msgstr "Quand le fournisseur l'a listée pour la dernière fois."
+
+#: apps/ingest/models.py
 msgid "When the supplier's data was read."
 msgstr "Quand les données du fournisseur ont été lues."
+
+#: apps/ingest/models.py
+msgid "When the variation was last written."
+msgstr "Quand la variante a été écrite pour la dernière fois."
 
 #: apps/vendors/models.py
 msgid ""
@@ -11934,6 +12103,14 @@ msgid ""
 msgstr ""
 "Où placer cet élément par rapport à celui choisi ci-dessous : à l'intérieur en premier, avant ou "
 "après. Obligatoire."
+
+#: apps/ingest/models.py
+msgid "Whether the item has variations."
+msgstr "Si l'article a des variantes."
+
+#: apps/ingest/models.py
+msgid "Whether the last read still listed it."
+msgstr "Si la dernière lecture la listait encore."
 
 #: apps/tax/models.py
 msgid ""
