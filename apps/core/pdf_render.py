@@ -1,7 +1,7 @@
 """The WeasyPrint side of the confirmation PDF (ORD.9 3/3, ADR-0010).
 
-This module imports no Django: it runs in a child process started by `documents.render_html`
-(`python -m apps.orders.pdf_render`), which reads `{"html": ..., "roots": [...]}` as JSON on
+This module imports no Django: it runs in a child process started by `pdf.render_html`
+(`python -m apps.core.pdf_render`), which reads `{"html": ..., "roots": [...]}` as JSON on
 stdin and writes the PDF on stdout. A hard timeout in the parent kills it, so a pathological
 layout cannot hang the worker, and the child gets no application secrets.
 

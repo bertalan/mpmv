@@ -2,7 +2,7 @@
 """Report a scheduled security run on GitHub issues (SEC.5).
 
 A failing run opens one issue labelled `security` per workflow (title prefix `[<workflow>]`), or
-updates the open one, and posts one line on the lane board (#86) when the issue is opened. A green
+updates the open one, and posts one line on the lane board (#726) when the issue is opened. A green
 run closes the open issue with a comment. The text holds counts, job results and test names only:
 never a URL other than the run link, a host, an address or a secret, because the repository is
 public.
@@ -26,7 +26,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 LABEL = "security"
-LANE_BOARD = "86"
+LANE_BOARD = "726"
 MAX_NAMES = 20
 MAX_NAME_LENGTH = 160
 PYTHON_ROOTS = ("tests.", "apps.", "mpmv.")

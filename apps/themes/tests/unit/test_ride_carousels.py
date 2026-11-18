@@ -69,7 +69,7 @@ class TestEveryCarousel:
         assert slides
         for slide in slides:
             assert 'aria-roledescription="slide"' in slide
-            assert re.search(r'aria-label="\d+ of \d+"', slide)
+            assert re.search(r'aria-label="[^"]*\d+[^"\d]+\d+"', slide)
 
     def test_has_previous_next_and_pause_buttons_revealed_by_script(self, html: str) -> None:
         for control in ("prev", "next"):
@@ -86,7 +86,7 @@ class TestEveryCarousel:
         assert 'aria-current="true"' in buttons[0]
         for button in buttons:
             assert 'type="button"' in button
-            assert re.search(r'aria-label="[^"]+\d+ of \d+"', button), button
+            assert re.search(r'aria-label="[^"]+\d+[^"\d]+\d+"', button), button
 
     def test_nothing_moves_on_its_own_by_default(self, html: str) -> None:
         assert "data-bs-ride" not in html

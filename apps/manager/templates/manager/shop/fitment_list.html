@@ -1,0 +1,8 @@
+{% extends "manager/list.html" %}
+{% load i18n %}
+{% comment %}The shop's products and their declaration (FIT.3), with the links to the other pages.{% endcomment %}
+{% block manager_content %}
+  <p><a href="{% url 'manager:shop:fitment_report' %}">{% translate "Fitment report" %}</a> ·
+  <a href="{% url 'manager:shop:fitment_proposals' %}">{% translate "Propose a missing item" %}</a></p>
+  {{ block.super }}
+{% endblock %}

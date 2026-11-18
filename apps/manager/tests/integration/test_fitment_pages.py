@@ -442,3 +442,32 @@ def test_an_unknown_node_is_a_404(client: Client) -> None:
     nil = "00000000-0000-0000-0000-000000000000"
     assert client.get(f"{NODES}{nil}/").status_code == 404
     assert client.get(f"{NODES}{nil}/merge/").status_code == 404
+
+
+def test_the_publish_gate_is_set_in_bulk_with_a_preview_and_an_audit_entry(
+    client: Client,
+) -> None:
+    category = CategoryFactory.create()
+    sign_in(client, "config")
+    data = {"action": "require_declaration", "selected": [str(category.public_id)]}
+    assert client.post(CATEGORIES, data).status_code == 200
+    assert not FitmentCategory.objects.exists()
+    assert client.post(CATEGORIES, {**data, "confirm": "1"}).status_code == 302
+    assert FitmentCategory.objects.get(category=category).require_declaration is True
+    assert AuditLog.objects.filter(action=services.CATEGORY_PUBLISH_GATE_CHANGED).count() == 1
+    client.post(
+        CATEGORIES,
+        {"action": "no_declaration", "selected": [str(category.public_id)], "confirm": "1"},
+    )
+    assert FitmentCategory.objects.get(category=category).require_declaration is False
+
+
+def test_the_catalog_role_cannot_set_the_publish_gate(client: Client) -> None:
+    category = CategoryFactory.create()
+    sign_in(client, "catalog")
+    response = client.post(
+        CATEGORIES,
+        {"action": "require_declaration", "selected": [str(category.public_id)], "confirm": "1"},
+    )
+    assert response.status_code == 404
+    assert not FitmentCategory.objects.exists()
