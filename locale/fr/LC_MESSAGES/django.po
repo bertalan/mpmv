@@ -99,6 +99,13 @@ msgstr "%(currency)s %(amount)s"
 msgid "%(days)s working days"
 msgstr "%(days)s jours ouvrés"
 
+#: apps/orders/customer_views.py
+msgid ""
+"%(item)s: only %(quantity)d available, so your cart holds %(quantity)d instead of %(requested)d."
+msgstr ""
+"%(item)s : seulement %(quantity)d disponibles, ton panier en contient donc %(quantity)d au lieu de"
+" %(requested)d."
+
 #: themes/base/templates/components/gallery.html themes/ride/templates/components/gallery.html
 msgid "%(label)s, image %(count)s of %(total)s"
 msgstr "%(label)s, image %(count)s sur %(total)s"
@@ -1589,6 +1596,10 @@ msgid ""
 msgstr ""
 "L'annulation du colis rembourse le client intégralement et nécessite donc une nouvelle "
 "confirmation par passkey (une fenêtre passkey ouverte ne la couvre pas)."
+
+#: apps/orders/customer_views.py
+msgid "cannot be delivered to your address"
+msgstr "ne peut pas être livré à ton adresse"
 
 #: apps/manager/fitment_forms.py
 msgid "Cannot change once the level has nodes."
@@ -4433,6 +4444,10 @@ msgstr "Nœuds"
 msgid "None."
 msgstr "Aucun."
 
+#: apps/orders/customer_views.py
+msgid "Not added: %(item)s, %(reason)s."
+msgstr "Non ajouté : %(item)s, %(reason)s."
+
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Not connected"
 msgstr "Non connecté"
@@ -4444,6 +4459,10 @@ msgstr "Non attendu"
 #: apps/manager/amendment_views.py
 msgid "not in the order"
 msgstr "pas dans la commande"
+
+#: apps/orders/customer_views.py
+msgid "not sold any more"
+msgstr "n’est plus en vente"
 
 #: apps/shipping/models.py
 msgid ""
@@ -5053,6 +5072,10 @@ msgstr "Commande %(order_number)s : le reste de ta commande a été annulé, rem
 msgid "Order %(order_number)s: your order from %(vendor_name)s was changed"
 msgstr "Commande %(order_number)s : ta commande auprès de %(vendor_name)s a été modifiée"
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Order again"
+msgstr "Commander à nouveau"
+
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/platform/amendment_settings.html
 msgid "Order change settings"
@@ -5168,6 +5191,10 @@ msgstr ""
 #: apps/manager/templates/manager/shop/dashboard.html themes/base/templates/components/badge.html
 msgid "Out of stock"
 msgstr "Rupture de stock"
+
+#: apps/orders/customer_views.py
+msgid "out of stock"
+msgstr "en rupture de stock"
 
 #: apps/manager/product_views.py
 msgid "outdated"
@@ -5801,6 +5828,18 @@ msgid ""
 msgstr ""
 "La publication ajoute une nouvelle version et la met en vigueur. Les commandes déjà passées "
 "conservent la version sous laquelle elles ont été passées."
+
+#: apps/orders/customer_views.py
+msgid "Put back in your cart, at today's prices: %(items)s."
+msgstr "Remis dans ton panier, aux prix d’aujourd’hui : %(items)s."
+
+#: apps/orders/templates/orders/customer_order.html
+msgid ""
+"Puts the items that are still on sale back in your cart, at today's prices. Nothing is ordered or "
+"paid until you check out."
+msgstr ""
+"Remet dans ton panier les articles encore en vente, aux prix d’aujourd’hui. Rien n’est commandé ni"
+" payé tant que tu ne passes pas à la caisse."
 
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/shop/order.html
 #: apps/orders/templates/orders/customer_order.html
@@ -9900,6 +9939,10 @@ msgstr ""
 #: apps/manager/templates/manager/shop/termination.html
 msgid "There is no termination notice for your shop."
 msgstr "Il n'y a aucun préavis de résiliation pour votre boutique."
+
+#: apps/orders/customer_views.py
+msgid "There was nothing to add to your cart."
+msgstr "Il n’y avait rien à ajouter à ton panier."
 
 #: apps/accounts/session_views.py
 msgid "There were no other sessions."
