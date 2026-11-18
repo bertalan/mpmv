@@ -471,3 +471,98 @@ def test_the_part_2_labels_differ_from_the_english_source(lang: str) -> None:
     checks = {e.msgid: _texts(e) for e in _po(lang)}
     for msgid in ("Send", "Time left:", "No articles by this author yet.", "Pause countdown"):
         assert checks[msgid] != msgid, msgid
+
+
+# I18N.20 part 3: the template scope guard. Every template that carries translation tags is in the
+# catalog scope (`tools/i18n_catalog.py` SCOPES) or in EXCLUDED below, with a reason. A new template
+# with `{% translate %}` therefore fails here until somebody decides where it belongs.
+# The entries below are the storefront and staff templates still English-only; each one is
+# tracked by the named follow-up slice and leaves this set when it joins SCOPES.
+EXCLUDED = {
+    # Editor, admin and Wagtail screens: formal register, own slice.
+    "apps/catalog/templates/admin/": "admin-only, I18N.20 part 3b",
+    "apps/catalog/templates/catalog/admin/": "admin-only, I18N.20 part 3b",
+    "apps/cms/templates/cms/admin/": "editor-only, I18N.20 part 3b",
+    "apps/cms/templates/wagtail_localize/": "editor-only, I18N.20 part 3b",
+    "apps/core/templates/admin/": "admin-only, I18N.20 part 3b",
+    "apps/events/templates/events/admin/": "admin-only, I18N.20 part 3b",
+    "apps/vendors/templates/admin/": "admin-only, I18N.20 part 3b",
+    "themes/ride/templates/manager/": "Manager override, I18N.20 part 3b",
+    "themes/ride/templates/layouts/": "layout override, I18N.20 part 3b",
+    "themes/base/templates/styleguide.html": "developer style guide, not shown to customers",
+    "themes/ride/templates/styleguide": "developer style guide, not shown to customers",
+    # Email templates: their own scope (one language per recipient), I18N.20 part 3c.
+    "apps/catalog/templates/email/": "email templates, own scope, I18N.20 part 3c",
+    "apps/compliance/templates/email/": "email templates, own scope, I18N.20 part 3c",
+    "apps/core/templates/email/": "email templates, own scope, I18N.20 part 3c",
+    "apps/vendors/templates/email/": "email templates, own scope, I18N.20 part 3c",
+    # Customer-facing pages not yet translated: informal register, I18N.20 part 3b.
+    "apps/cms/templates/cms/": "legal and landing pages, I18N.20 part 3b",
+    "apps/compliance/templates/compliance/": "consumer information and withdrawal, I18N.20 part 3b",
+    "apps/core/templates/core/components/": "image credits, I18N.20 part 3b",
+    "apps/fitment/templates/fitment/": "garage saver, I18N.20 part 3b",
+    "themes/ride/templates/accounts/": "ride account overrides, I18N.20 part 3b",
+    "themes/ride/templates/compliance/": "ride compliance overrides, I18N.20 part 3b",
+    "themes/ride/templates/orders/": "ride order overrides, I18N.20 part 3b",
+    "themes/ride/templates/seo/": "ride consent banner, I18N.20 part 3b",
+}
+_TRANSLATION_TAG = re.compile(r"\{%-?\s*(?:translate|trans|blocktranslate|blocktrans)\b")
+
+
+def _templates_with_translation_tags() -> list[str]:
+    found = []
+    for pattern in ("apps/*/templates", "themes/*/templates"):
+        for base in sorted(ROOT.glob(pattern)):
+            for path in sorted(base.rglob("*.*")):
+                if path.suffix not in {".html", ".txt"}:
+                    continue
+                if _TRANSLATION_TAG.search(path.read_text(encoding="utf-8")):
+                    found.append(str(path.relative_to(ROOT)))
+    return found
+
+
+def test_every_translatable_template_is_in_scope_or_excluded() -> None:
+    covered = {str(p.relative_to(ROOT)) for p in catalog._files()}
+    offenders = [
+        t
+        for t in _templates_with_translation_tags()
+        if t not in covered and not t.startswith(tuple(EXCLUDED))
+    ]
+    assert offenders == [], f"add to SCOPES or to EXCLUDED with a reason: {offenders}"
+
+
+def test_the_exclusions_have_reasons_and_are_not_stale() -> None:
+    assert all(EXCLUDED.values())
+    for prefix in EXCLUDED:
+        assert any(t.startswith(prefix) for t in _templates_with_translation_tags()), prefix
+
+
+# Part 2 minors: the form page module mixes the editor's labels and help texts (formal) with two
+# public refusals (customer text, informal). Each public string is pinned by msgid, so a new one
+# in that module has to be placed on purpose.
+FORM_PAGE_PUBLIC = ("Too many submissions, try again shortly.", "This submission is too large.")
+FORM_PAGE_EDITOR_LABELS = (
+    "introduction",
+    "thank-you text",
+    "button label",
+    "Form fields",
+    "form page",
+    "keep submissions for (days)",
+)
+
+
+@pytest.mark.parametrize("lang", ["de", "fr", "es"])
+def test_the_form_page_module_has_a_register_per_string(lang: str) -> None:
+    entries = {e.msgid: e for e in _po(lang) if _only_in(e, "apps/cms/forms_pages.py")}
+    for msgid in FORM_PAGE_PUBLIC:
+        assert not FORMAL[lang].search(_texts(entries[msgid])), msgid
+    for msgid in entries:
+        if msgid not in FORM_PAGE_PUBLIC:
+            assert msgid in FORM_PAGE_EDITOR_LABELS or len(msgid) > 40, msgid  # help texts: formal
+
+
+def test_the_spanish_apply_now_is_informal_and_the_german_author_line_is_short() -> None:
+    es = {e.msgid: e.msgstr for e in _po("es")}
+    de = {e.msgid: e.msgstr for e in _po("de")}
+    assert es["Apply now"] == "Solicita ahora"
+    assert de["No articles by this author yet."] == "Von dieser Person gibt es noch keine Artikel."
