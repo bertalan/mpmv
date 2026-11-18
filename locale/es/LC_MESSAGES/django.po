@@ -3382,6 +3382,10 @@ msgstr "Imagen %(number)d"
 msgid "Images"
 msgstr "Imágenes"
 
+#: apps/catalog/templates/catalog/product.html
+msgid "Images of %(label)s"
+msgstr "Imágenes de %(label)s"
+
 #: apps/catalog/taxonomy.py
 msgid "import batch"
 msgstr "lote de importación"
