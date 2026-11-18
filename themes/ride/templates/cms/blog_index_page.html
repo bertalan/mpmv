@@ -1,0 +1,16 @@
+{% extends "layouts/base.html" %}
+{% load i18n wagtailcore_tags cms_tags %}
+{% comment %}
+Blog index of `ride` (THM.9 part 1): the app template's content (live articles of this language,
+newest first, twelve per page) under the page banner (the only h1, the breadcrumb). The list is
+Bootstrap cards with Bootstrap pagination (cms/includes/post_list.html).
+{% endcomment %}
+{% block content %}
+  {% page_trail page as trail %}
+  {% include "components/page_banner.html" with title=page.title items=trail only %}
+  <div class="page-content">
+    {% if page.intro %}{{ page.intro|richtext }}{% endif %}
+    {% translate "No articles have been published yet." as empty %}
+    {% include "cms/includes/post_list.html" with empty=empty %}
+  </div>
+{% endblock %}

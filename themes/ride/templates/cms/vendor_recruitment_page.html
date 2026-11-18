@@ -1,0 +1,55 @@
+{% extends "layouts/base.html" %}
+{% load i18n wagtailcore_tags cms_tags %}
+{% comment %}
+Vendor recruitment page of `ride` (THM.9 part 1): the app template's content (intro, plans, FAQ,
+call to action) under the page banner. Plans are Bootstrap cards, the highlighted one with an
+accent border; the call to action is a button.
+{% endcomment %}
+{% block content %}
+  <article class="recruitment">
+    {% page_trail page as trail %}
+    {% include "components/page_banner.html" with title=page.title items=trail only %}
+    <div class="page-content">
+      {% for block in page.intro %}{% include_block block %}{% endfor %}
+    </div>
+    {% if page.plans %}
+      <section class="plans mt-4" aria-labelledby="plans-heading">
+        <h2 id="plans-heading">{% translate "Plans" %}</h2>
+        <div class="plan-list row row-cols-1 row-cols-md-2 g-4">
+          {% for block in page.plans %}
+            {% with plan=block.value %}
+              <div class="col">
+                <article class="plan card h-100{% if plan.highlighted %} plan--highlighted border-primary border-2{% endif %}">
+                  <div class="card-body">
+                    <h3 class="card-title h4">{{ plan.name }}</h3>
+                    {% if plan.price %}<p class="plan-price fw-bold">{{ plan.price }}</p>{% endif %}
+                    {% if plan.summary %}<p>{{ plan.summary }}</p>{% endif %}
+                    {% if plan.features %}
+                      <ul>{% for feature in plan.features %}<li>{{ feature }}</li>{% endfor %}</ul>
+                    {% endif %}
+                  </div>
+                </article>
+              </div>
+            {% endwith %}
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+    {% if page.faq %}
+      <section class="faq page-content mt-4" aria-labelledby="faq-heading">
+        <h2 id="faq-heading">{% translate "Frequently asked questions" %}</h2>
+        {% for block in page.faq %}
+          <h3 class="h5">{{ block.value.question }}</h3>
+          {{ block.value.answer|richtext }}
+        {% endfor %}
+      </section>
+    {% endif %}
+    <div class="recruitment-cta mt-4">
+      {% if application_url %}
+        <a class="button btn btn-primary btn-lg" href="{{ application_url }}">{% firstof page.cta_label _("Apply now") %}</a>
+      {% else %}
+        <p class="alert alert-secondary">{% translate "Applications open soon." %}</p>
+      {% endif %}
+    </div>
+  </article>
+{% endblock %}

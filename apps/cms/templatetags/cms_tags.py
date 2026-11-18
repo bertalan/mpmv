@@ -141,6 +141,32 @@ def page_image_credits(page: Page) -> list[Credit]:
     return services.page_image_credits(page)
 
 
+@register.simple_tag(takes_context=True)
+def page_trail(
+    context: dict[str, Any], page: Page | None = None, current: str = ""
+) -> list[dict[str, str]]:
+    """The breadcrumb of a content page (THM.9): Home, the page's live public ancestors below
+    its language's home, then the page itself, last, as the current page.
+
+    `current` names a deeper current page that is not in the tree (an author, an archived
+    version, a system page): the page then becomes a link before it. Without `page` the trail is
+    Home and `current`. The labels match the `BreadcrumbList` of the page graph (`seo`).
+    """
+    request: HttpRequest | None = context.get("request")
+    try:
+        home = reverse("home")
+    except NoReverseMatch:  # a URLconf without the public routes
+        home = "/"
+    trail = [{"label": str(gettext("Home")), "url": home}]
+    if page is not None:
+        for ancestor in page.get_ancestors().filter(depth__gte=3).live().public():
+            trail.append({"label": str(ancestor.title), "url": ancestor.get_url(request) or ""})
+        trail.append({"label": str(page.title), "url": page.get_url(request) or ""})
+    if current:
+        trail.append({"label": current, "url": ""})
+    return trail
+
+
 # --- Contextual help (ARC.32)
 
 

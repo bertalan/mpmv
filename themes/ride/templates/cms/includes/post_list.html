@@ -1,0 +1,25 @@
+{% load i18n wagtailcore_tags theme_tags %}{% comment %}
+A page of blog articles on Bootstrap (THM.9 part 1): the context and data of the app's
+cms/includes/post_list.html (one `<article>` each with its date, author and summary, a
+`posts` paginator page, `blog`, `request`, `previous_url`, `next_url`, `empty`), as cards, then
+Bootstrap's `.pagination` with the previous and next links (`rel`) and the page status.
+{% endcomment %}{% for post in posts %}
+  <article class="post-summary card mb-3">
+    <div class="card-body">
+      <h2 class="card-title h4"><a href="{% pageurl post %}">{{ post.title }}</a></h2>
+      {% include "cms/includes/article_meta.html" with post=post blog=blog request=request only %}
+      {% if post.summary %}<p class="card-text">{{ post.summary }}</p>{% endif %}
+    </div>
+  </article>
+{% empty %}
+  <p class="alert alert-secondary">{{ empty }}</p>
+{% endfor %}
+{% with previous_url=previous_url|safe_href next_url=next_url|safe_href count=posts.paginator.num_pages %}{% if count > 1 %}
+  <nav class="mt-4" aria-label="{% translate 'Pagination' %}">
+    <ul class="pagination flex-wrap justify-content-center">
+      <li class="page-item{% if not previous_url %} disabled{% endif %}">{% if previous_url %}<a class="page-link" href="{{ previous_url }}" rel="prev">{% translate "Previous" %}</a>{% else %}<span class="page-link">{% translate "Previous" %}</span>{% endif %}</li>
+      <li class="page-item disabled"><span class="page-link">{% blocktranslate with page=posts.number %}Page {{ page }} of {{ count }}{% endblocktranslate %}</span></li>
+      <li class="page-item{% if not next_url %} disabled{% endif %}">{% if next_url %}<a class="page-link" href="{{ next_url }}" rel="next">{% translate "Next" %}</a>{% else %}<span class="page-link">{% translate "Next" %}</span>{% endif %}</li>
+    </ul>
+  </nav>
+{% endif %}{% endwith %}
