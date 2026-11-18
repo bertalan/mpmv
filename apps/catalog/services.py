@@ -308,7 +308,7 @@ PRODUCT_EDIT_FIELDS = (
 )
 TRANSLATION_MODEL = "catalog.producttranslation"
 TRANSLATION_FACT_FIELDS = ("material", "colour")  # CAT.22: audited like the product facts
-VARIANT_EDIT_FIELDS = ("weight_kg_override",)
+VARIANT_EDIT_FIELDS = ("weight_kg_override", "gtin", "mpn")  # and the cover image (CAT.23)
 PRODUCT_RELATIONS = ("secondary_categories", "terms", "upsells")
 
 VENDOR_NEVER_CHANGES = (
@@ -331,6 +331,7 @@ def variant_snapshot(variant: Variant) -> dict[str, Any]:
         "product": str(variant.product.public_id),
         "vendor": str(variant.product.vendor.public_id),
         **{name: getattr(variant, name) for name in VARIANT_EDIT_FIELDS},
+        "cover_image": None if variant.cover_image is None else str(variant.cover_image.public_id),
     }
 
 
@@ -1083,6 +1084,12 @@ def _product_errors(
         weight_error = engine.weight_error(variant.weight_kg_override)
         if weight_error is not None:
             _add_error(errors, "variants", f"{variant.sku}: the weight override {weight_error}")
+        for name, found in (
+            ("GTIN", engine.gtin_error(engine.normalise_identifier(variant.gtin))),
+            ("MPN", engine.mpn_error(engine.normalise_identifier(variant.mpn))),
+        ):
+            if found is not None:
+                _add_error(errors, "variants", f"{variant.sku}: the {name} {found}")
         if variant.stock_qty < 0:
             _add_error(errors, "variants", f"{variant.sku}: the stock cannot be negative.")
         elif variant.stock_qty > engine.MAX_STOCK:
@@ -1262,6 +1269,8 @@ def create_product(
             weight_kg_override=_stored(given_variant.weight_kg_override, engine.WEIGHT_DECIMALS),
             stock_qty=given_variant.stock_qty,
             is_default=given_variant.is_default,
+            gtin=engine.normalise_identifier(given_variant.gtin),
+            mpn=engine.normalise_identifier(given_variant.mpn),
             position=position,
         )
         options = [catalogue[code][1][given_variant.options[code]] for code in axes]
@@ -1278,6 +1287,8 @@ def create_product(
                 "is_default": variant.is_default,
                 "price_net_override": variant.price_net_override,
                 "weight_kg_override": variant.weight_kg_override,
+                "gtin": variant.gtin,
+                "mpn": variant.mpn,
                 "stock_qty": variant.stock_qty,
             },
         )

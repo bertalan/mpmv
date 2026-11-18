@@ -28,7 +28,7 @@ reports stay on the runner. This page records the alerts we fixed and the ones w
   design. Pages are served from a shared cache, so they cannot carry a per-visitor token; the view
   refuses cross-site requests, is rate-limited per IP and only stores the visitor's own consent
   cookie. ZAP cannot scope an ignore to a URL or a form, so `tests/unit/test_post_forms_csrf.py`
-  holds the line: it fails if any other template posts a form without `{% csrf_token %}`.
+  holds the line (the ride theme's banner override is listed beside the base banner): it fails if any other template posts a form without `{% csrf_token %}`.
 
 The first two ids cover only these cases: 90004 is also raised for CORP, which is fixed above, and a
 regression would be hidden by the ignore. The header tests above are what guards CORP.

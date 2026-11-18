@@ -323,6 +323,46 @@ def weight_error(value: object) -> str | None:
     return None if error is None else f"{error}."
 
 
+GTIN_LENGTHS = (8, 12, 13, 14)
+MPN_MAX_LENGTH = 70
+
+
+def normalise_identifier(value: object) -> str:
+    """A GTIN or MPN as stored (CAT.23): surrounding whitespace removed, None is empty."""
+    return value.strip() if isinstance(value, str) else ""
+
+
+def gtin_check_digit_ok(digits: str) -> bool:
+    """The GS1 check digit: the digits right to left, from the one before the check digit,
+    weighted 3, 1, 3, 1..., add up to a number whose ten's complement is the last digit."""
+    body = digits[:-1]
+    total = sum(int(d) * (3 if i % 2 == 0 else 1) for i, d in enumerate(reversed(body)))
+    return (10 - total % 10) % 10 == int(digits[-1])
+
+
+def gtin_error(value: object) -> str | None:
+    """Why `value` is not a GTIN (8, 12, 13 or 14 digits, GS1 check digit; "" means none), or
+    None; ends with a period."""
+    if value == "":
+        return None
+    if not isinstance(value, str) or not value.isascii() or not value.isdigit():
+        return "needs digits only."
+    if len(value) not in GTIN_LENGTHS:
+        return "needs 8, 12, 13 or 14 digits."
+    if not gtin_check_digit_ok(value):
+        return "has a wrong check digit: check the last digit."
+    return None
+
+
+def mpn_error(value: object) -> str | None:
+    """Why `value` is not a usable MPN (at most 70 characters), or None; ends with a period."""
+    if not isinstance(value, str):
+        return "needs text."
+    if len(value) > MPN_MAX_LENGTH:
+        return f"is too long: at most {MPN_MAX_LENGTH} characters."
+    return None
+
+
 @dataclass(frozen=True)
 class AttributeSpec:
     """What the platform knows of an attribute: its kind and, for a choice, its value codes."""
@@ -352,6 +392,8 @@ class VariantIn:
     weight_kg_override: Decimal | None = None
     stock_qty: int = 0
     is_default: bool = False
+    gtin: str = ""
+    mpn: str = ""
 
 
 @dataclass(frozen=True)
