@@ -49,16 +49,11 @@
   padding-inline-start: 0.75rem;
 }
 
-/* CAT.23: the variant's own picture in the variant list and in place of the gallery */
+/* CAT.23: the variant's own picture in the variant list; CAT.26: its gallery replaces the product's */
 .variant-thumb {
   max-width: 4rem;
   height: auto;
   vertical-align: middle;
-}
-
-.product-variant-image img {
-  max-width: 100%;
-  height: auto;
 }
 
 .gallery[hidden] {

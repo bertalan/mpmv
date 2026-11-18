@@ -26,10 +26,14 @@
         {% if gallery_items %}
           {% include "components/gallery.html" with id="product-images" label=_("Product images") images=gallery_items only %}
         {% endif %}
-        {% if page_data.has_variant_images %}
-          <div class="product-variant-images" data-variant-image-panel aria-label="{% translate "Product images" %}" hidden>
-            {% for variant in page_data.variants %}{% if variant.image %}<div class="product-variant-image" data-variant-image-for="{{ variant.sku }}" hidden>{% responsive_image variant.image "content" alt=variant.image_alt %}</div>{% endif %}{% endfor %}
-          </div>
+        {% if variant_gallery_items %}
+        <div class="product-variant-galleries" data-variant-galleries>
+          {% for entry in variant_gallery_items %}{% blocktranslate asvar gallery_label with label=entry.label %}Images of {{ label }}{% endblocktranslate %}
+          <section class="product-variant-gallery" data-variant-gallery-for="{{ entry.sku }}" aria-labelledby="{{ entry.id }}-title">
+            <h2 class="product-variant-gallery__title" id="{{ entry.id }}-title" data-variant-gallery-title>{{ gallery_label }}</h2>
+            {% include "components/gallery.html" with id=entry.id label=gallery_label images=entry.images only %}
+          </section>{% endfor %}
+        </div>
         {% endif %}
       </div>
 
@@ -58,7 +62,7 @@
                     <ul class="list-unstyled mb-0">
                       {% for variant in page_data.variants %}
                         <li class="form-check">
-                          <input class="form-check-input" type="radio" name="variant" id="variant-{{ forloop.counter }}" value="{{ variant.sku }}"{% if variant.selected %} checked{% endif %}{% if variant.image %} data-variant-image{% endif %}{% if variant.gtin %} data-gtin="{{ variant.gtin }}"{% endif %}{% if variant.mpn %} data-mpn="{{ variant.mpn }}"{% endif %}>
+                          <input class="form-check-input" type="radio" name="variant" id="variant-{{ forloop.counter }}" value="{{ variant.sku }}"{% if variant.selected %} checked{% endif %}{% if variant.image %} data-variant-image{% endif %}{% if variant.sku in page_data.gallery_skus %} data-variant-gallery{% endif %}{% if variant.gtin %} data-gtin="{{ variant.gtin }}"{% endif %}{% if variant.mpn %} data-mpn="{{ variant.mpn }}"{% endif %}>
                           <label class="form-check-label" for="variant-{{ forloop.counter }}">{% if variant.image %}<span class="variant-image">{% responsive_image variant.image "card" alt=variant.image_alt class="variant-thumb" %}</span> {% endif %}{{ variant.label }}{% if variant.price is not None %}{% consumer_price variant.price page_data.product.fiscal_category page_data.vendor as shown %}{% if shown %} <span class="variant-price"><data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note text-body-secondary">{{ shown.note }}</small></span>{% endif %}{% endif %} <span class="variant-stock">{% include "catalog/includes/stock_status.html" with status=variant.stock_status %}</span> <span class="variant-sku text-body-secondary">({{ variant.sku }})</span>{% if variant.gtin %} <span class="variant-gtin text-body-secondary">{% translate "GTIN" %}: {{ variant.gtin }}</span>{% endif %}{% if variant.mpn %} <span class="variant-mpn text-body-secondary">{% translate "MPN" %}: {{ variant.mpn }}</span>{% endif %}</label>
                         </li>
                       {% endfor %}
