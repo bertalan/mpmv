@@ -1,7 +1,7 @@
 # Productos
 last-checked: 2026-11-18
 
-Esta página enumera los productos de todas las tiendas, para el rol Catálogo y moderación. El propietario de la plataforma puede leerla, pero no puede cambiar nada.
+Esta página enumera los productos de todas las tiendas, para el rol Catálogo y moderación. El propietario de la plataforma y el rol Soporte pueden leerla, pero no pueden cambiar nada: para ellos la página muestra un aviso y ningún control de cambio, y cualquier intento de cambiar un producto se rechaza (acceso denegado).
 
 ## Encontrar productos
 - **Buscar** consulta el SKU y los títulos en todos los idiomas.

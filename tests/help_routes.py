@@ -29,6 +29,7 @@ NOT_PAGES = (
     "manager:platform:profile_revert",  # POST only, redirects to the changes page
     "manager:platform:profile_confirm",  # POST only, redirects to the changes page
     "manager:shop:termination_data",  # a JSON file download, not a page
+    "manager:shop:money_export",  # VEN.9: POST only, a CSV file download
     "manager:platform:user_sessions_find",  # POST only, redirects to the sessions page
     # ORD.20 part 3: POST only, they redirect to the amendment page (or show the passkey prompt).
     "manager:shop:amendment_apply",
