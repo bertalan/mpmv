@@ -2542,14 +2542,11 @@ msgstr "Panel de control"
 msgid "Data"
 msgstr "Datos"
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
 #: apps/manager/templates/manager/shop/_money_table.html
 #: apps/orders/templates/orders/customer_orders.html
 msgid "Date"
 msgstr "Fecha"
-
-#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
-msgid "Date of the form"
-msgstr "Fecha del formulario"
 
 #: apps/events/models.py
 msgid ""
@@ -4032,9 +4029,9 @@ msgid ""
 " and indicated by you, acquire physical possession of the last good."
 msgstr ""
 "Si usted encarga varios bienes en un único pedido y se entregan por separado, el plazo de "
-"desistimiento expirará a los %(days)s días del día en que usted o un tercero, que no sea el "
-"transportista y haya sido designado por usted, adquiera la posesión material del último de los "
-"bienes."
+"desistimiento expirará a los %(days)s días naturales del día en que usted o un tercero, que no sea"
+" el transportista y haya sido designado por usted, adquiera la posesión material del último de los"
+" bienes."
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
@@ -4049,11 +4046,11 @@ msgstr ""
 "En caso de desistimiento por su parte, le devolveremos todos los pagos recibidos de usted, "
 "incluidos los gastos de entrega (con la excepción de los gastos adicionales resultantes de su "
 "elección de una modalidad de entrega diferente a la modalidad menos costosa de entrega ordinaria "
-"que ofrecemos) sin ninguna demora indebida y, en cualquier caso, a más tardar 14 días a partir de "
-"la fecha en que recibamos la comunicación de su decisión de desistir del presente contrato. "
-"Procederemos a efectuar dicho reembolso utilizando el mismo medio de pago empleado por usted para "
-"la transacción inicial, a no ser que haya dispuesto expresamente lo contrario; en todo caso, no "
-"incurrirá en ningún gasto como consecuencia del reembolso."
+"que ofrecemos) sin ninguna demora indebida y, en cualquier caso, a más tardar 14 días naturales a "
+"partir de la fecha en que recibamos la comunicación de su decisión de desistir del presente "
+"contrato. Procederemos a efectuar dicho reembolso utilizando el mismo medio de pago empleado por "
+"usted para la transacción inicial, a no ser que haya dispuesto expresamente lo contrario; en todo "
+"caso, no incurrirá en ningún gasto como consecuencia del reembolso."
 
 #: apps/manager/event_block_forms.py
 msgid "Image"
@@ -4125,10 +4122,10 @@ msgstr "En la tienda"
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
-"In this information, 'we' means the seller of your order. Each seller in your order is a separate "
-"contract, so everything below applies to each seller separately."
+"In this information, 'we' means the seller. A separate contract is concluded with each seller in "
+"your order, so everything below applies to each seller separately."
 msgstr ""
-"En esta información, «nosotros» significa el vendedor de su pedido. Cada vendedor de su pedido es "
+"En esta información, «nosotros» significa el vendedor. Con cada vendedor de su pedido se celebra "
 "un contrato distinto, por lo que todo lo siguiente se aplica a cada vendedor por separado."
 
 #: apps/manager/product_views.py
@@ -7168,7 +7165,6 @@ msgstr "Reseñas"
 msgid "Revoke %(role)s"
 msgstr "Revocar %(role)s"
 
-#: apps/compliance/templates/compliance/consumer_information.html
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid "Right of withdrawal"
 msgstr "Derecho de desistimiento"
@@ -10314,14 +10310,17 @@ msgstr "La revisión queda registrada y los pagos se desbloquean."
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
-"The right of withdrawal does not apply to goods made to the consumer's specifications or clearly "
-"personalised, to goods liable to deteriorate or expire rapidly, or to sealed goods not suitable "
-"for return for health protection or hygiene reasons that were unsealed after delivery."
+"The right of withdrawal does not apply to goods that are not prefabricated and are made on the "
+"basis of an individual choice or decision of the consumer, or that are clearly tailored to the "
+"consumer's personal needs, to goods liable to deteriorate or expire rapidly, or to sealed goods "
+"not suitable for return for health protection or hygiene reasons that were unsealed after "
+"delivery."
 msgstr ""
-"El derecho de desistimiento no se aplica a los bienes confeccionados conforme a las "
-"especificaciones del consumidor o claramente personalizados, a los bienes que puedan deteriorarse "
-"o caducar con rapidez ni a los bienes precintados que no sean aptos para ser devueltos por razones"
-" de protección de la salud o de higiene y que hayan sido desprecintados tras la entrega."
+"El derecho de desistimiento no se aplica a los bienes que no estén prefabricados y se confeccionen"
+" conforme a las especificaciones del consumidor y usuario o estén claramente personalizados, a los"
+" bienes que puedan deteriorarse o caducar con rapidez ni a los bienes precintados que no sean "
+"aptos para ser devueltos por razones de protección de la salud o de higiene y que hayan sido "
+"desprecintados tras la entrega."
 
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "the right of withdrawal is for consumers; this order was placed as a business."
@@ -11074,8 +11073,9 @@ msgid ""
 "The withdrawal period will expire after %(days)s days from the day on which you, or a third party "
 "other than the carrier and indicated by you, acquire physical possession of the goods."
 msgstr ""
-"El plazo de desistimiento expirará a los %(days)s días del día en que usted o un tercero, que no "
-"sea el transportista y haya sido designado por usted, adquiera la posesión material de los bienes."
+"El plazo de desistimiento expirará a los %(days)s días naturales del día en que usted o un "
+"tercero, que no sea el transportista y haya sido designado por usted, adquiera la posesión "
+"material de los bienes."
 
 #: apps/catalog/attributes.py
 msgid ""
@@ -11819,14 +11819,14 @@ msgstr "Para confirmar, escriba <strong>%(word)s</strong>."
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
-"To exercise the right of withdrawal, you must inform us (name, postal address, telephone number "
-"and email address: see the seller's details in your order confirmation) of your decision to "
-"withdraw from this contract by an unequivocal statement (for example a letter sent by post or an "
-"email). You may use the model withdrawal form below, but it is not obligatory."
+"To exercise the right of withdrawal, you must inform us (name, postal address and email address: "
+"see the seller details shown at checkout, before you place the order) of your decision to withdraw"
+" from this contract by an unequivocal statement (for example a letter sent by post or an email). "
+"You may use the model withdrawal form below, but it is not obligatory."
 msgstr ""
-"Para ejercer el derecho de desistimiento, usted tiene que notificarnos (nombre, dirección postal, "
-"número de teléfono y dirección de correo electrónico: véanse los datos del vendedor en su "
-"confirmación de pedido) su decisión de desistir del contrato a través de una declaración "
+"Para ejercer el derecho de desistimiento, usted tiene que notificarnos (nombre, dirección postal y"
+" dirección de correo electrónico: véanse los datos del vendedor que se muestran al tramitar el "
+"pedido, antes de realizarlo) su decisión de desistir del contrato a través de una declaración "
 "inequívoca (por ejemplo, una carta enviada por correo postal o un correo electrónico). Puede "
 "utilizar el modelo de formulario de desistimiento que figura más abajo, aunque su uso es "
 "voluntario."
@@ -11872,10 +11872,11 @@ msgstr "Hasta el año"
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
 msgid ""
-"To: the seller of the order (name, postal address and email address: see the order confirmation)"
+"To: the seller of the order (name, postal address and email address: see the seller details shown "
+"at checkout, before you place the order)"
 msgstr ""
-"Al vendedor del pedido (nombre, dirección postal y dirección de correo electrónico: véase la "
-"confirmación del pedido)"
+"Al vendedor del pedido (nombre, dirección postal y dirección de correo electrónico: véanse los "
+"datos del vendedor que se muestran al tramitar el pedido, antes de realizarlo)"
 
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py
 msgid "Too many attempts. Please try again later."
@@ -13341,6 +13342,10 @@ msgstr "Retirar el preaviso"
 msgid "Withdrawal"
 msgstr "Desistimiento"
 
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid "Withdrawal information"
+msgstr "Información sobre el desistimiento"
+
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "withdrawal is not available for this part of the order."
 msgstr "el desistimiento no está disponible para esta parte del pedido."
@@ -13529,8 +13534,8 @@ msgstr ""
 msgid ""
 "You have the right to withdraw from this contract within %(days)s days without giving any reason."
 msgstr ""
-"Usted tiene derecho a desistir del presente contrato en un plazo de %(days)s días sin necesidad de"
-" justificación."
+"Usted tiene derecho a desistir del presente contrato en un plazo de %(days)s días naturales sin "
+"necesidad de justificación."
 
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "You may also like"
@@ -13560,9 +13565,9 @@ msgid ""
 " The deadline is met if you send back the goods before the period of 14 days has expired."
 msgstr ""
 "Usted tendrá que devolvernos o entregarnos los bienes sin ninguna demora indebida y, en cualquier "
-"caso, a más tardar en el plazo de 14 días a partir del día en que nos comunique su decisión de "
-"desistimiento del presente contrato. Se considerará cumplido el plazo si usted efectúa la "
-"devolución de los bienes antes de que haya concluido el plazo de 14 días."
+"caso, a más tardar en el plazo de 14 días naturales a partir del día en que nos comunique su "
+"decisión de desistimiento del presente contrato. Se considerará cumplido el plazo si usted efectúa"
+" la devolución de los bienes antes de que haya concluido el plazo de 14 días naturales."
 
 #: apps/compliance/templates/compliance/privacy_account.html
 #: themes/ride/templates/compliance/privacy_account.html

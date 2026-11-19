@@ -2564,14 +2564,11 @@ msgstr "Tableau de bord"
 msgid "Data"
 msgstr "Données"
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
 #: apps/manager/templates/manager/shop/_money_table.html
 #: apps/orders/templates/orders/customer_orders.html
 msgid "Date"
 msgstr "Date"
-
-#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
-msgid "Date of the form"
-msgstr "Date du formulaire"
 
 #: apps/events/models.py
 msgid ""
@@ -4173,11 +4170,11 @@ msgstr "En magasin"
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
-"In this information, 'we' means the seller of your order. Each seller in your order is a separate "
-"contract, so everything below applies to each seller separately."
+"In this information, 'we' means the seller. A separate contract is concluded with each seller in "
+"your order, so everything below applies to each seller separately."
 msgstr ""
-"Dans ces informations, « nous » désigne le vendeur de votre commande. Chaque vendeur de votre "
-"commande est un contrat distinct ; tout ce qui suit s'applique donc à chaque vendeur séparément."
+"Dans ces informations, « nous » désigne le vendeur. Un contrat distinct est conclu avec chaque "
+"vendeur de votre commande ; tout ce qui suit s'applique donc à chaque vendeur séparément."
 
 #: apps/manager/product_views.py
 msgid "Incomplete"
@@ -7227,7 +7224,6 @@ msgstr "Avis"
 msgid "Revoke %(role)s"
 msgstr "Révoquer %(role)s"
 
-#: apps/compliance/templates/compliance/consumer_information.html
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid "Right of withdrawal"
 msgstr "Droit de rétractation"
@@ -10412,14 +10408,17 @@ msgstr "La vérification est enregistrée et les versements sont débloqués."
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
-"The right of withdrawal does not apply to goods made to the consumer's specifications or clearly "
-"personalised, to goods liable to deteriorate or expire rapidly, or to sealed goods not suitable "
-"for return for health protection or hygiene reasons that were unsealed after delivery."
+"The right of withdrawal does not apply to goods that are not prefabricated and are made on the "
+"basis of an individual choice or decision of the consumer, or that are clearly tailored to the "
+"consumer's personal needs, to goods liable to deteriorate or expire rapidly, or to sealed goods "
+"not suitable for return for health protection or hygiene reasons that were unsealed after "
+"delivery."
 msgstr ""
-"Le droit de rétractation ne s'applique pas aux biens confectionnés selon les spécifications du "
-"consommateur ou nettement personnalisés, aux biens susceptibles de se détériorer ou de se périmer "
-"rapidement et aux biens scellés qui ne peuvent être renvoyés pour des raisons de protection de la "
-"santé ou d'hygiène et qui ont été descellés après la livraison."
+"Le droit de rétractation ne s'applique pas aux biens qui ne sont pas préfabriqués et sont "
+"confectionnés selon les spécifications du consommateur ou nettement personnalisés, aux biens "
+"susceptibles de se détériorer ou de se périmer rapidement et aux biens scellés qui ne peuvent être"
+" renvoyés pour des raisons de protection de la santé ou d'hygiène et qui ont été descellés après "
+"la livraison."
 
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "the right of withdrawal is for consumers; this order was placed as a business."
@@ -11933,16 +11932,16 @@ msgstr "Pour confirmer, saisissez <strong>%(word)s</strong>."
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
-"To exercise the right of withdrawal, you must inform us (name, postal address, telephone number "
-"and email address: see the seller's details in your order confirmation) of your decision to "
-"withdraw from this contract by an unequivocal statement (for example a letter sent by post or an "
-"email). You may use the model withdrawal form below, but it is not obligatory."
+"To exercise the right of withdrawal, you must inform us (name, postal address and email address: "
+"see the seller details shown at checkout, before you place the order) of your decision to withdraw"
+" from this contract by an unequivocal statement (for example a letter sent by post or an email). "
+"You may use the model withdrawal form below, but it is not obligatory."
 msgstr ""
-"Pour exercer le droit de rétractation, vous devez nous notifier (nom, adresse postale, numéro de "
-"téléphone et adresse électronique : voir les coordonnées du vendeur dans votre confirmation de "
-"commande) votre décision de rétractation du présent contrat au moyen d'une déclaration dénuée "
-"d'ambiguïté (par exemple, lettre envoyée par la poste ou courrier électronique). Vous pouvez "
-"utiliser le modèle de formulaire de rétractation ci-dessous, mais ce n'est pas obligatoire."
+"Pour exercer le droit de rétractation, vous devez nous notifier (nom, adresse postale et adresse "
+"électronique : voir les coordonnées du vendeur affichées lors de la commande, avant de la passer) "
+"votre décision de rétractation du présent contrat au moyen d'une déclaration dénuée d'ambiguïté "
+"(par exemple, lettre envoyée par la poste ou courrier électronique). Vous pouvez utiliser le "
+"modèle de formulaire de rétractation ci-dessous, mais ce n'est pas obligatoire."
 
 #: apps/shipping/models.py
 msgid ""
@@ -11986,10 +11985,11 @@ msgstr "À l'année"
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
 msgid ""
-"To: the seller of the order (name, postal address and email address: see the order confirmation)"
+"To: the seller of the order (name, postal address and email address: see the seller details shown "
+"at checkout, before you place the order)"
 msgstr ""
-"À l'attention du vendeur de la commande (nom, adresse postale et adresse électronique : voir la "
-"confirmation de commande)"
+"À l'attention du vendeur de la commande (nom, adresse postale et adresse électronique : voir les "
+"coordonnées du vendeur affichées lors de la commande, avant de la passer)"
 
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py
 msgid "Too many attempts. Please try again later."
@@ -13473,6 +13473,10 @@ msgstr "Retirer le préavis"
 #: themes/ride/templates/orders/_legal_recap.html
 msgid "Withdrawal"
 msgstr "Rétractation"
+
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid "Withdrawal information"
+msgstr "Informations relatives à la rétractation"
 
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "withdrawal is not available for this part of the order."

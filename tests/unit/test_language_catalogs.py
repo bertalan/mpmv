@@ -628,7 +628,9 @@ MODEL_FORMAL_DE = {
     "If you withdraw from this contract": "unverzüglich und spätestens binnen vierzehn Tagen",
     "We may withhold": "Nachweis erbracht haben",
     "You shall send back": "Die Frist ist gewahrt",
-    "You are only liable": "Wertverlust",
+    "You are only liable": "zur Prüfung der Beschaffenheit, der Eigenschaften und der Funktionsweise",  # noqa: E501
+    "The right of withdrawal does not apply": "die nicht vorgefertigt sind und für deren Herstellung",  # noqa: E501
+    "In this information": "bezeichnet „wir“ den Verkäufer",
     "Model withdrawal form": "Muster-Widerrufsformular",
     "I/We (*)": "Hiermit widerrufe(n) ich/wir (*)",
     "(*) Delete as appropriate.": "Unzutreffendes streichen.",
@@ -655,3 +657,12 @@ def test_the_model_withdrawal_strings_are_translated_and_in_the_formal_register(
             hits = [t for m, t in texts.items() if m.startswith(prefix)]
             assert len(hits) == 1, prefix
             assert needle in hits[0], prefix
+
+
+def test_german_model_withdrawal_titles_and_form_date_follow_annexes_1_and_2() -> None:
+    de = {e.msgid: e.msgstr for e in _po("de")}
+    assert de["Withdrawal information"] == "Widerrufsbelehrung"
+    assert de["Right of withdrawal"] == "Widerrufsrecht"
+    assert de["Date"] == "Datum"
+    assert "Date of the form" not in de
+    assert "Nach Kundenspezifikation" not in " ".join(de.values())
