@@ -14,11 +14,12 @@ from django.test import Client
 
 from apps.api.tests.factories import ApiClientFactory
 from apps.catalog.models import Attribute, Product, Variant
-from apps.catalog.tests.factories import ProductFactory, clothing_attributes
+from apps.catalog.tests.factories import ProductFactory, attribute_with_values
 from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -28,7 +29,33 @@ SCOPES = ["catalog:read", "catalog:write"]
 
 @pytest.fixture
 def attributes() -> dict[str, Attribute]:
-    return clothing_attributes()
+    """The clothing attributes with texts in the primary language and one other one (I18N.15).
+
+    Names and labels fall back to the primary language, so sizes and the width have a primary
+    text only (a page in the other language falls back to them); colors have both.
+    """
+    first, second = primary_language(), other_language()
+    return {
+        "size": attribute_with_values(
+            "size",
+            {first: "Size", second: "Taglia"},
+            {"s": {first: "S"}, "m": {first: "M"}, "l": {first: "L"}},
+        ),
+        "color": attribute_with_values(
+            "color",
+            {first: "Color", second: "Colore"},
+            {"red": {first: "Red", second: "Rosso"}, "blue": {first: "Blue", second: "Blu"}},
+        ),
+        "material": attribute_with_values(
+            "material",
+            {first: "Material"},
+            {"cotton": {first: "Cotton", second: "Cotone"}, "linen": {first: "Linen"}},
+        ),
+        "bag_width": attribute_with_values(
+            "bag_width", {first: "Width"}, {}, kind=Attribute.Kind.NUMBER, unit="cm"
+        ),
+        "author": attribute_with_values("author", {first: "Author"}, {}, kind=Attribute.Kind.TEXT),
+    }
 
 
 @pytest.fixture
@@ -85,7 +112,9 @@ def test_a_vendor_key_creates_a_size_by_color_product(
     assert product.variants.count() == 4
     assert AuditLog.objects.filter(action="catalog.product.created").exists()
 
-    detail = client.get(f"{PRODUCTS}/{product.public_id}?language=it", headers=headers)
+    detail = client.get(
+        f"{PRODUCTS}/{product.public_id}?language={other_language()}", headers=headers
+    )
     assert detail.status_code == 200, detail.content
     data = detail.json()
     assert data["sku"] == "TEE-1"
@@ -238,7 +267,9 @@ def test_an_unknown_language_is_refused(client: Client, vendor: Vendor) -> None:
 def test_the_attribute_catalogue_lists_codes_kinds_and_labels(
     client: Client, attributes: dict[str, Attribute], vendor: Vendor
 ) -> None:
-    response = client.get("/api/v1/catalog/attributes?language=it", headers=_headers(vendor))
+    response = client.get(
+        f"/api/v1/catalog/attributes?language={other_language()}", headers=_headers(vendor)
+    )
     assert response.status_code == 200, response.content
     by_code = {a["code"]: a for a in response.json()}
     assert by_code["size"]["kind"] == "choice"
