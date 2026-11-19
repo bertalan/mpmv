@@ -70,6 +70,7 @@ from apps.core.services import (
     save_audited,
 )
 from apps.core.sitemap_version import bump_sitemap_version
+from apps.core.text import nfc_deep, nfc_text_fields
 from apps.core.throttling import ip_bucket
 from apps.core.uploads import UploadRefused, check_document
 from apps.core.validity import next_start_error
@@ -254,6 +255,7 @@ def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> 
 def _save_vendor(
     vendor: Vendor, *, ctx: AuditContext, dry_run: bool, action: str | None = None
 ) -> ChangeSet:
+    nfc_text_fields(vendor)  # I18N.10
     vendor.normalize()
     vendor.fill_tin_from_vat()
     vendor.full_clean()
@@ -2328,6 +2330,7 @@ def save_storefront_profile(
     unknown = sorted(set(values) - set(PROFILE_FIELDS))
     if unknown:
         raise ValidationError(f"Not storefront profile fields: {', '.join(unknown)}.")
+    values = nfc_deep(values)  # I18N.10: texts and policies are stored in NFC
     # A bogus image format would make the page fail: refused on the raw text, before the cleaning
     # (which would drop such an embed without a word).
     formats = import_string("apps.cms.engine.image_format_names")()

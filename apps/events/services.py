@@ -84,6 +84,7 @@ from apps.core.geocoding import services as geocoding
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog, ImageLicence, MediaImage
 from apps.core.services import consume_rate_limit, save_audited
+from apps.core.text import nfc_deep
 from apps.vendors.engine import VendorAction
 from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.scoping import is_platform_staff
@@ -650,6 +651,7 @@ def _apply(page: EventPage, data: Mapping[str, Any], *, staff: bool) -> None:
             raise ValidationError(
                 {name: _("At most %(max)d exclusions.") % {"max": engine.MAX_EXDATES}}
             )
+    data = nfc_deep(data)  # I18N.10: texts and the body's rich text are stored in NFC
     for name in EDITABLE_FIELDS:
         if name in data:
             setattr(page, name, data[name])
