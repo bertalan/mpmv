@@ -25,7 +25,9 @@ has no header and no hook for its account menu); the static script and style com
 from collections.abc import Callable
 from typing import Any
 
+from django.contrib import messages
 from django.http import HttpRequest
+from django.shortcuts import redirect
 from django.templatetags.static import static
 from django.urls import URLPattern, path, reverse
 from django.utils.html import format_html
@@ -93,9 +95,27 @@ class ContentSnippetViewSet(SnippetViewSet):  # type: ignore[misc]
     list_display = ("title", "locale", "live")
     list_filter = ("locale",)
     search_fields = ("title",)
+    delete_template_name = "cms/admin/content_snippet_confirm_delete.html"
 
 
 register_snippet(ContentSnippetViewSet)
+
+
+@hooks.register("before_publish")  # type: ignore[untyped-decorator]
+def refuse_unreviewed_snippet_publish(request: Any, obj: Any) -> Any:
+    """Fail closed (CMS.14): a snippet is published only through its active review workflow.
+    If the workflow is missing or switched off, the edit stays a draft."""
+    if not isinstance(obj, ContentSnippet) or obj.get_workflow() is not None:
+        return None
+    messages.error(
+        request,
+        _(
+            'This snippet cannot be published because the "Content snippet review" '
+            "workflow is missing or switched off. Your changes are saved as a draft. "
+            "Ask an administrator to restore the workflow."
+        ),
+    )
+    return redirect("wagtailsnippets_cms_contentsnippet:edit", obj.pk)
 
 
 def _withdraw(hook_name: str, registered_by: Callable[[Any], bool]) -> None:
