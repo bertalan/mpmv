@@ -12,4 +12,5 @@
     <li>{% translate "Date" %}</li>
   </ul>
   <p>{% translate "(*) Delete as appropriate." %}</p>
+  {% if not pdf_view %}<p><a href="{% url 'withdrawal_form_pdf' %}">{% translate "Download the form as PDF" %}</a></p>{% endif %}
 </div>

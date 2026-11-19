@@ -13,5 +13,6 @@ urlpatterns = [
     path("withdrawal/", views.withdrawal_start, name="withdrawal"),
     path("withdrawal/confirm/", views.withdrawal_confirm, name="withdrawal_confirm"),
     path("withdrawal/done/", views.withdrawal_done, name="withdrawal_done"),
+    path("withdrawal/form.pdf", views.withdrawal_form_pdf, name="withdrawal_form_pdf"),
     path("consumer-information/", views.consumer_information, name="consumer_information"),
 ]

@@ -14,11 +14,12 @@ from apps.accounts.captcha import captcha_passes
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
 from apps.core.public_forms import Protection, public_form
-from apps.core.services import NoPlatformOperator
+from apps.core.services import AttachmentUnavailable, NoPlatformOperator
 from apps.orders.models import Order
 
 from . import engine, services, withdrawal
 from . import subprocessors as subprocessors_register
+from .documents import render_model_withdrawal_form_pdf
 from .forms import URL_MAX, NoticeForm, WithdrawalLookupForm
 from .models import Notice, WithdrawalStatement
 
@@ -301,3 +302,18 @@ def consumer_information(request: HttpRequest) -> HttpResponse:
     49(1)(h)), and the legal guarantee. Public and cached: the same for every visitor."""
     info = withdrawal.precontractual(get_language() or "en")
     return render(request, "compliance/consumer_information.html", {"info": info})
+
+
+@require_GET
+@cache_control(public=True, max_age=86400)
+def withdrawal_form_pdf(request: HttpRequest) -> HttpResponse:
+    """The blank model withdrawal form as a PDF in the active language (I18N.20). Public, cached,
+    the same for every visitor: it carries no order or personal data."""
+    language = get_language() or "en"
+    try:
+        pdf = render_model_withdrawal_form_pdf(language)
+    except AttachmentUnavailable:
+        return HttpResponse("The PDF is not available now, try again later.", status=503)
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="withdrawal-form-{language}.pdf"'
+    return response
