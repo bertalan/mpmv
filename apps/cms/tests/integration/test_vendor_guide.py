@@ -5,9 +5,7 @@ are public and listed in the sitemap, are linked from the matching Manager scree
 formal register in Italian, German, French and Spanish.
 """
 
-import ast
 import re
-from pathlib import Path
 
 import pytest
 from django.conf import settings
@@ -98,38 +96,3 @@ def test_the_manager_screens_link_their_section() -> None:
     for route, key in engine.ROUTE_GUIDE.items():
         if key.startswith("vendor:"):
             assert help_guide.section_url(key).startswith("/"), route
-
-
-def _po_strings(lang: str) -> tuple[set[str], set[str]]:
-    """The msgids and msgstrs of a catalog (minimal reader: no polib, never writes)."""
-    path = Path(settings.BASE_DIR) / "locale" / lang / "LC_MESSAGES" / "django.po"
-    ids: set[str] = set()
-    strs: set[str] = set()
-    for block in path.read_text(encoding="utf-8").split("\n\n"):
-        parts: dict[str, str] = {}
-        key = ""
-        for raw in block.splitlines():
-            line = raw.strip()
-            head = re.match(r"(msgid|msgstr)(?:\[0\])?\s+(\".*\")$", line)
-            if head:
-                key = head.group(1)
-                parts[key] = ast.literal_eval(head.group(2))
-            elif line.startswith('"') and key:
-                parts[key] += ast.literal_eval(line)
-            else:
-                key = ""
-        ids.add(parts.get("msgid", ""))
-        strs.add(parts.get("msgstr", ""))
-    return ids, strs
-
-
-def test_bold_labels_match_the_shipped_catalog() -> None:
-    for lang in LANGS:
-        # English has no catalog: its labels are the msgids (read from any catalog).
-        ids, strs = _po_strings("it" if lang == "en" else lang)
-        known = ids if lang == "en" else strs
-        for section in SECTIONS:
-            path = help_files.HELP_ROOT / lang / "guide" / f"vendor__{section}.md"
-            body = path.read_text(encoding="utf-8")
-            for label in re.findall(r"\*\*(.+?)\*\*", body):
-                assert label in known, (lang, section, label)

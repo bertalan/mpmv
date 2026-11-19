@@ -7,7 +7,7 @@ Diese Seite listet die Begründungen auf, die die Plattform an Ihren Shop gesend
 - Die neueste Begründung steht oben.
 - **Referenz** ist die Nummer der Begründung. **Referenz der Meldung** ist die Nummer der Meldung, auf die sie folgt.
 - **Was eingeschränkt ist** nennt das betroffene Angebot, den Inhalt oder die Funktion. **Gültig bis** nennt das Enddatum, falls es eines gibt.
-- **Sachverhalt und Umstände** und **Grund** erklären die Entscheidung.
+- **Tatsachen und Umstände** und **Begründung** erklären die Entscheidung.
 - Ein Schlussabsatz, falls vorhanden, erklärt, wie Sie Widerspruch einlegen oder eine Überprüfung verlangen können.
 
 Die Begründung nennt nicht, wer die Meldung gesendet hat.

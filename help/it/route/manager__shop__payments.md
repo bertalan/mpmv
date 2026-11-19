@@ -11,6 +11,6 @@ Questa pagina è per il titolare del negozio. Qui collega l'account che riceve i
 Finché l'account non è attivo, i Suoi prodotti compaiono nel catalogo e si vendono su richiesta: i clienti non possono aggiungerli al carrello.
 
 ## Cosa fare
-Prema **Collega il tuo account per i pagamenti** per iniziare, oppure **Continua la registrazione** se ha già iniziato. Verrà portato dal fornitore dei pagamenti per completare i passaggi. Al ritorno lo stato viene aggiornato.
+Prema **Colleghi il Suo account per i pagamenti** per iniziare, oppure **Continua la registrazione** se ha già iniziato. Verrà portato dal fornitore dei pagamenti per completare i passaggi. Al ritorno lo stato viene aggiornato.
 
 Non interrompa a metà i passaggi del fornitore: l'account resta inattivo finché non è fatto tutto ciò che viene chiesto.
