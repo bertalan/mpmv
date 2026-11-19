@@ -22,6 +22,7 @@ from apps.api.auth import api_client_of
 from apps.api.v1.errors import ApiProblem
 from apps.catalog import engine, product_pages, services
 from apps.catalog.models import Product, ProductAttribute, Variant
+from apps.core.i18n import primary_language
 from apps.seo import seller
 from apps.tax.prices import PriceUnavailable, consumer_price
 from apps.vendors.models import Vendor
@@ -44,8 +45,13 @@ def _language(value: str) -> str:
 
 
 class LanguageQuery(Schema):
+    # default_factory: resolved per request, as the primary language follows MPMV_LANGUAGES.
     language: str = Field(
-        "en", description="Language of names and labels; EN is the fallback (spec 09)."
+        default_factory=primary_language,
+        description=(
+            "Language of names and labels; the operator's primary language when absent, and "
+            "the primary language is the fallback (spec 09)."
+        ),
     )
 
     @field_validator("language")
