@@ -1,0 +1,11 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% if customer_name %}{% blocktranslate %}Hello {{ customer_name }},{% endblocktranslate %}{% else %}{% translate "Hello," %}{% endif %}</p>
+<p>{% blocktranslate %}Our support team prepared a cart for you from your order {{ order_number }}:{% endblocktranslate %}</p>
+<ul>{% for item in items %}<li>{{ item.quantity }} x {{ item.title }}{% if item.variant %} ({{ item.variant }}){% endif %}</li>{% endfor %}</ul>
+<p><a href="{{ link }}">{% translate "Open the cart" %}</a></p>
+<p>{% translate "The prices, availability and shipping costs are today's, not those of your earlier order. Check everything in the cart and at checkout: nothing is ordered or paid until you place the order and pay yourself." %}</p>
+<p>{% blocktranslate %}The link works once and expires on {{ expires }}.{% endblocktranslate %} {% translate "If you did not ask for this cart, ignore this email: nothing happens." %}</p>
+</body>
+</html>

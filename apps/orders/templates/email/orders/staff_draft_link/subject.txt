@@ -1,0 +1,1 @@
+{% load i18n %}{% blocktranslate %}A cart ready for you, from your order {{ order_number }}{% endblocktranslate %}

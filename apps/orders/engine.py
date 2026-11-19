@@ -5,6 +5,7 @@ Amounts are `Decimal`, rounded half up per line before they are added up (spec 0
 
 import calendar
 import datetime as dt
+import hashlib
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -691,3 +692,50 @@ def plan_reorder(wishes: Sequence[ReorderWish]) -> list[ReorderOutcome]:
                 )
             )
     return outcomes
+
+
+# --- staff draft from a past order (ORD.32) --------------------------------------------------
+
+DRAFT_MAX_SENDS_PER_DAY = 3
+# Why a draft's link does not open (the view maps each code to a sentence).
+DRAFT_LINK_UNKNOWN = "unknown"
+DRAFT_LINK_USED = "used"
+DRAFT_LINK_EXPIRED = "expired"
+DRAFT_LINK_CHANGED = "changed"
+
+
+def draft_token_digest(token: str) -> str:
+    """What is stored of a link token: its SHA-256, so a database read never yields a link."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def draft_link_refusal(
+    *,
+    is_open: bool,
+    issued_version: int | None,
+    version: int,
+    expires_at: dt.datetime | None,
+    now: dt.datetime,
+) -> str | None:
+    """Why the link of a draft found by its digest cannot be used now, or None: the draft was
+    already opened (single use), the link expired, or the draft changed after it was sent."""
+    if not is_open:
+        return DRAFT_LINK_USED
+    if expires_at is None or now >= expires_at:
+        return DRAFT_LINK_EXPIRED
+    if issued_version != version:
+        return DRAFT_LINK_CHANGED
+    return None
+
+
+def draft_sends_today(send_times: Iterable[str], *, now: dt.datetime, tz: dt.tzinfo) -> int:
+    """How many of the ISO `send_times` fall on today's business day (in `tz`)."""
+    today = now.astimezone(tz).date()
+    return sum(
+        1 for value in send_times if dt.datetime.fromisoformat(value).astimezone(tz).date() == today
+    )
+
+
+def draft_sends_left(send_times: Iterable[str], *, now: dt.datetime, tz: dt.tzinfo) -> int:
+    """The sends still allowed today: at most `DRAFT_MAX_SENDS_PER_DAY` per draft and day."""
+    return max(0, DRAFT_MAX_SENDS_PER_DAY - draft_sends_today(send_times, now=now, tz=tz))

@@ -21,7 +21,7 @@ from apps.core.services import run_mutation
 
 from . import return_engine as engine
 from .models import ReturnPolicyVersion, Vendor
-from .services import PROFILE_LOCKED, can_reopen, has_vendor_permission
+from .services import PROFILE_LOCKED, can_approve_return_policy, has_vendor_permission
 
 PROPOSED: Final = "vendor.return_policy.proposed"
 APPROVED: Final = "vendor.return_policy.approved"
@@ -128,10 +128,11 @@ def review_return_policy(
 ) -> ChangeSet:
     """Platform staff approve or reject a pending version (never a vendor member as such).
 
-    Raises `PermissionDenied` (see `vendors.services.can_reopen`: active staff with the vendor
-    change permission) and `ValidationError` for a version that is not pending.
+    Raises `PermissionDenied` (see `vendors.services.can_approve_return_policy`: the CORE.18
+    return-policy cell, Catalog and moderation and the owner) and `ValidationError` for a
+    version that is not pending.
     """
-    if not can_reopen(actor):
+    if not can_approve_return_policy(actor):
         raise PermissionDenied("Only platform staff review a return policy.")
     with transaction.atomic():
         current = ReturnPolicyVersion.objects.select_for_update().get(pk=version.pk)

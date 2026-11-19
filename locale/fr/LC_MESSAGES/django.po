@@ -116,6 +116,14 @@ msgstr[1] "%(days)s jours à compter de la livraison"
 msgid "%(days)s working days"
 msgstr "%(days)s jours ouvrés"
 
+#: apps/orders/staff_drafts.py
+msgid "%(item)s is not for sale any more: remove it."
+msgstr "%(item)s n’est plus en vente : retirez-le."
+
+#: apps/orders/staff_drafts.py
+msgid "%(item)s: only %(limit)d available."
+msgstr "%(item)s : seulement %(limit)d disponibles."
+
 #: apps/orders/customer_views.py
 msgid ""
 "%(item)s: only %(quantity)d available, so your cart holds %(quantity)d instead of %(requested)d."
@@ -293,6 +301,10 @@ msgid "A cancellation the customer asked for needs the request's %(fields)s."
 msgstr ""
 "Une annulation demandée par le client nécessite les éléments suivants de la demande : %(fields)s."
 
+#: apps/orders/templates/email/orders/staff_draft_link/subject.txt
+msgid "A cart ready for you, from your order %(order_number)s"
+msgstr "Un panier prêt pour toi, à partir de ta commande %(order_number)s"
+
 #: apps/cms/models.py
 msgid "A category or tag that has its own pages."
 msgstr "Une catégorie ou un tag qui a ses propres pages."
@@ -398,6 +410,10 @@ msgstr "une quantité plus élevée nécessite l'acceptation du client"
 #: apps/orders/amendment_engine.py
 msgid "A line needs at least one unit; remove the line instead."
 msgstr "Une ligne nécessite au moins une unité ; supprimez plutôt la ligne."
+
+#: apps/orders/staff_drafts.py
+msgid "A line of this cart no longer exists. Reload the page."
+msgstr "Une ligne de ce panier n’existe plus. Rechargez la page."
 
 #: apps/core/models.py
 msgid "A link to the text of the licence. Optional."
@@ -536,6 +552,14 @@ msgstr ""
 #: apps/manager/fitment_forms.py
 msgid "A proposed node waits for review and is not offered in pickers."
 msgstr "Un nœud proposé attend une relecture et n'est pas proposé dans les sélecteurs."
+
+#: apps/orders/staff_drafts.py
+msgid "A quantity cannot be negative."
+msgstr "Une quantité ne peut pas être négative."
+
+#: apps/manager/staff_draft_views.py
+msgid "A quantity must be a whole number."
+msgstr "Une quantité doit être un nombre entier."
 
 #: apps/cms/models.py
 msgid ""
@@ -895,8 +919,8 @@ msgstr "Modes de retour acceptés"
 msgid "Access denied"
 msgstr "Accès refusé"
 
-#: apps/manager/templates/manager/platform/staff_roles.html apps/seo/site_links.py
-#: themes/base/templates/components/user_tools.html
+#: apps/manager/staff_draft_views.py apps/manager/templates/manager/platform/staff_roles.html
+#: apps/seo/site_links.py themes/base/templates/components/user_tools.html
 msgid "Account"
 msgstr "Compte"
 
@@ -1497,6 +1521,10 @@ msgstr ""
 "Changement automatique uniquement : durée d'affichage d'une diapositive, en millisecondes, entre "
 "3000 et 20000. Exemple : 6000 correspond à six secondes."
 
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Available"
+msgstr "Disponible"
+
 #: themes/base/templates/components/launch_countdown.html
 #: themes/ride/templates/components/launch_countdown.html
 msgid "Available from"
@@ -1573,6 +1601,10 @@ msgstr "Retour à la recherche de commandes"
 #: apps/manager/templates/manager/shop/order.html
 msgid "Back to the orders"
 msgstr "Retour aux commandes"
+
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Back to the prepared carts"
+msgstr "Retour aux paniers préparés"
 
 #: apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/shop/fitment_product.html
@@ -1860,6 +1892,14 @@ msgstr "Panier"
 msgid "Cart updated."
 msgstr "Panier mis à jour."
 
+#: apps/manager/templates/manager/platform/order_drafts.html
+msgid ""
+"Carts prepared for a customer from one of their orders, waiting for the customer to open the link."
+" Prepare a new one from the order's page in Order changes."
+msgstr ""
+"Paniers préparés pour un client à partir de l’une de ses commandes, en attente que le client ouvre"
+" le lien. Préparez-en un nouveau depuis la page de la commande dans Modifications de commandes."
+
 #: apps/seo/site_links.py
 msgid "Catalogue: %(taxonomy)s"
 msgstr "Catalogue : %(taxonomy)s"
@@ -1979,6 +2019,13 @@ msgstr "Chat ou message"
 #: apps/manager/templates/manager/platform/orders.html
 msgid "check"
 msgstr "à vérifier"
+
+#: apps/orders/customer_views.py
+msgid ""
+"Check the cart, then go to checkout: nothing is ordered or paid until you place the order and pay."
+msgstr ""
+"Vérifie le panier, puis passe à la caisse : rien n’est commandé ni payé tant que tu ne passes pas "
+"la commande et ne paies pas."
 
 #: apps/manager/event_forms.py
 msgid "Check the rule."
@@ -2500,6 +2547,16 @@ msgstr "Cookies et votre vie privée"
 msgid "Copy from another product"
 msgstr "Copier depuis un autre produit"
 
+#: apps/manager/templates/manager/amendment.html
+msgid ""
+"Copy the whole order into a cart for the same customer, at today's prices and stock, then send "
+"them a one-time link. The customer checks the cart and pays at checkout; nothing is ordered until "
+"then."
+msgstr ""
+"Copiez toute la commande dans un panier pour le même client, aux prix et aux stocks du jour, puis "
+"envoyez-lui un lien à usage unique. Le client vérifie le panier et paie à la caisse ; d’ici là, "
+"rien n’est commandé."
+
 #: apps/manager/amendment_forms.py
 msgid "Correct the delivery address, as the customer asked"
 msgstr "Corriger l’adresse de livraison, comme le client l’a demandé"
@@ -2568,6 +2625,7 @@ msgstr "étape actuelle"
 msgid "Current version"
 msgstr "Version actuelle"
 
+#: apps/manager/templates/manager/platform/order_drafts.html
 #: apps/manager/templates/manager/shop/order.html
 msgid "Customer"
 msgstr "Client"
@@ -3674,6 +3732,10 @@ msgstr "Augmente de un à chaque changement de l'état."
 msgid "GTIN"
 msgstr "GTIN"
 
+#: apps/manager/staff_draft_views.py
+msgid "Guest"
+msgstr "Invité"
+
 #: apps/manager/event_block_forms.py
 msgid "Heading"
 msgstr "Titre"
@@ -3690,6 +3752,8 @@ msgstr "Hauteur"
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/staff_draft_link/body.html
+#: apps/orders/templates/email/orders/staff_draft_link/body.txt
 #: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
 #: apps/orders/templates/email/orders/vendor_order_delivered/body.html
@@ -3715,6 +3779,8 @@ msgstr "Bonjour %(customer_name)s,"
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
 #: apps/orders/templates/email/orders/rest_cancelled/body.html
 #: apps/orders/templates/email/orders/rest_cancelled/body.txt
+#: apps/orders/templates/email/orders/staff_draft_link/body.html
+#: apps/orders/templates/email/orders/staff_draft_link/body.txt
 #: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
 #: apps/orders/templates/email/orders/vendor_order_delivered/body.html
@@ -3875,6 +3941,14 @@ msgstr ""
 "Nombre de jours de plus qu’un nouveau transporteur peut mettre à livrer pour que la modification "
 "soit considérée comme mineure et s’applique immédiatement. Un transporteur plus lent nécessite "
 "l’accord du client."
+
+#: apps/core/models.py
+msgid ""
+"How many days the link of a cart prepared by support stays usable. The customer opens it once; "
+"after that, or after these days, it no longer works."
+msgstr ""
+"Pendant combien de jours le lien d’un panier préparé par le support reste utilisable. Le client "
+"l’ouvre une fois ; ensuite, ou passé ce délai, il ne fonctionne plus."
 
 #: apps/core/models.py
 msgid ""
@@ -4120,6 +4194,11 @@ msgstr ""
 "candidature et le compte créé avec elle, et ne conservons rien. Vous pourrez postuler de nouveau "
 "plus tard si vous le souhaitez."
 
+#: apps/orders/templates/email/orders/staff_draft_link/body.html
+#: apps/orders/templates/email/orders/staff_draft_link/body.txt
+msgid "If you did not ask for this cart, ignore this email: nothing happens."
+msgstr "Si tu n’as pas demandé ce panier, ignore cet e-mail : il ne se passe rien."
+
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
 "If you order several goods in one order and they are delivered separately, the withdrawal period "
@@ -4339,14 +4418,20 @@ msgstr ""
 "Italie : votre codice fiscale, 16 caractères pour une personne ou 11 chiffres pour une société. "
 "Ailleurs : votre numéro d'identification fiscale national (TIN). Il est stocké chiffré."
 
-#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
+#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/platform/order_draft.html
+#: apps/manager/templates/manager/shop/_fitment_rows.html
 #: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Item"
 msgstr "Article"
 
+#: apps/manager/templates/manager/platform/order_draft.html
 #: apps/manager/templates/manager/shop/order.html
 msgid "Items"
 msgstr "Articles"
+
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Items at today's prices (net)"
+msgstr "Articles aux prix du jour (hors taxes)"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Items in the current version"
@@ -4549,6 +4634,10 @@ msgstr ""
 msgid "Leave the slot empty to skip it."
 msgstr "Laissez l'emplacement vide pour l'ignorer."
 
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Left out of the cart"
+msgstr "Laissés hors du panier"
+
 #: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Legal"
 msgstr "Mentions légales"
@@ -4602,6 +4691,15 @@ msgstr "Licence"
 #: themes/ride/templates/orders/_cart_mini.html themes/ride/templates/orders/_package.html
 msgid "Line total"
 msgstr "Total de la ligne"
+
+#: apps/manager/templates/manager/platform/order_drafts.html
+msgid "Lines"
+msgstr "Lignes"
+
+#: apps/manager/templates/manager/platform/order_draft.html
+#: apps/manager/templates/manager/platform/order_drafts.html
+msgid "Link"
+msgstr "Lien"
 
 #: apps/cms/blocks.py
 msgid "Link after the launch"
@@ -5134,6 +5232,10 @@ msgstr "aucune authentification par clé d'accès en cours"
 msgid "no pending passkey registration"
 msgstr "aucun enregistrement de clé d'accès en cours"
 
+#: apps/manager/templates/manager/platform/order_drafts.html
+msgid "No prepared cart is waiting."
+msgstr "Aucun panier préparé n’est en attente."
+
 #: apps/catalog/templates/catalog/listing.html themes/ride/templates/catalog/listing.html
 msgid "No products here yet."
 msgstr "Il n'y a pas encore de produits ici."
@@ -5219,6 +5321,10 @@ msgstr "Non attendu"
 msgid "Not for"
 msgstr "Pas pour"
 
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "not for sale"
+msgstr "pas en vente"
+
 #: apps/manager/templates/manager/platform/trust_rules.html
 #: apps/manager/templates/manager/platform/trust_rules_detail.html
 msgid "Not in force"
@@ -5228,7 +5334,11 @@ msgstr "Pas en vigueur"
 msgid "not in the order"
 msgstr "pas dans la commande"
 
-#: apps/orders/customer_views.py
+#: apps/manager/staff_draft_views.py apps/manager/templates/manager/platform/order_draft.html
+msgid "Not sent, or no longer usable"
+msgstr "Non envoyé, ou plus utilisable"
+
+#: apps/manager/staff_draft_views.py apps/orders/customer_views.py
 msgid "not sold any more"
 msgstr "n’est plus en vente"
 
@@ -5307,7 +5417,7 @@ msgstr ""
 msgid "not yet"
 msgstr "pas encore"
 
-#: apps/manager/fitment_shop_forms.py
+#: apps/manager/fitment_shop_forms.py apps/manager/staff_draft_views.py
 #: apps/manager/templates/manager/platform/trust_rule_preview.html
 #: apps/manager/templates/manager/platform/trust_rules.html
 #: apps/manager/templates/manager/platform/trust_rules_detail.html
@@ -5319,7 +5429,7 @@ msgstr "Note"
 msgid "Nothing arrived after a few minutes? Check your spam folder."
 msgstr "Rien n'est arrivé après quelques minutes ? Vérifiez votre dossier de courrier indésirable."
 
-#: apps/manager/views.py
+#: apps/manager/staff_draft_views.py apps/manager/views.py
 msgid "Nothing changed."
 msgstr "Aucune modification."
 
@@ -5342,6 +5452,14 @@ msgstr "Rien n'a encore été modifié. Vérifiez les modifications ci-dessous, 
 #: apps/manager/templates/manager/platform/trust_rule_preview.html
 msgid "Nothing has changed yet. Check the effect below, then confirm."
 msgstr "Rien n'a encore changé. Vérifiez l'effet ci-dessous, puis confirmez."
+
+#: apps/orders/templates/orders/draft_link.html
+msgid ""
+"Nothing is ordered or paid now: you check the cart, read the order details at checkout and pay "
+"yourself. The link works once."
+msgstr ""
+"Rien n’est commandé ni payé maintenant : tu vérifies le panier, tu lis les détails de la commande "
+"à la caisse et tu paies toi-même. Le lien fonctionne une seule fois."
 
 #: apps/vendors/templates/vendors/apply/cancelled.html
 msgid "Nothing is waiting"
@@ -5706,6 +5824,10 @@ msgstr ""
 "Uniquement à la demande du client, dans le même pays et le même territoire fiscal. Enregistrez "
 "comment et quand le client l’a demandé, ainsi que ses propres mots."
 
+#: apps/orders/staff_drafts.py
+msgid "Only Support or the platform owner may prepare a cart."
+msgstr "Seuls le support ou le propriétaire de la plateforme peuvent préparer un panier."
+
 #: apps/orders/amendments.py
 msgid "Only the customer who placed the order may answer this offer."
 msgstr "Seul le client qui a passé la commande peut répondre à cette offre."
@@ -5763,6 +5885,19 @@ msgstr "Ouvrir dans les cartes"
 msgid "Open passkey window"
 msgstr "Ouvrir la fenêtre de clé d'accès"
 
+#: apps/manager/templates/manager/platform/order_drafts.html
+msgid "Open prepared carts"
+msgstr "Paniers préparés ouverts"
+
+#: apps/orders/templates/email/orders/staff_draft_link/body.html
+#: apps/orders/templates/orders/draft_link.html
+msgid "Open the cart"
+msgstr "Ouvrir le panier"
+
+#: apps/orders/templates/email/orders/staff_draft_link/body.txt
+msgid "Open the cart with this link:"
+msgstr "Ouvre le panier avec ce lien :"
+
 #: apps/events/templates/email/events/event_approved/body.html
 #: apps/events/templates/email/events/event_restored/body.html
 msgid "Open the event"
@@ -5780,6 +5915,14 @@ msgstr "Ouvrir la page publique"
 #: apps/events/templates/email/events/review_digest/body.html
 msgid "Open the review list"
 msgstr "Ouvrir la liste de relecture"
+
+#: apps/manager/staff_draft_views.py
+msgid "Open: you may change it and send the link"
+msgstr "Ouvert : vous pouvez le modifier et envoyer le lien"
+
+#: apps/manager/staff_draft_views.py
+msgid "Opened by the customer: the items are in their cart"
+msgstr "Ouvert par le client : les articles sont dans son panier"
 
 #: apps/manager/templates/manager/shop/money_statement.html
 msgid "Opening balance"
@@ -5931,7 +6074,12 @@ msgstr ""
 "Les données de commande sont conservées %(years)s ans à compter de la fin de l'exercice, comme la "
 "loi l'exige."
 
-#: apps/compliance/forms.py apps/manager/templates/manager/platform/orders.html
+#: apps/manager/site_map.py
+msgid "Order drafts"
+msgstr "Brouillons de commande"
+
+#: apps/compliance/forms.py apps/manager/templates/manager/platform/order_drafts.html
+#: apps/manager/templates/manager/platform/orders.html
 msgid "Order number"
 msgstr "Numéro de commande"
 
@@ -6051,14 +6199,28 @@ msgstr ""
 "Notre équipe d’assistance a modifié ta commande %(order_number)s auprès de %(vendor_name)s avant "
 "son expédition :"
 
+#: apps/orders/templates/orders/draft_link.html
+msgid ""
+"Our support team prepared a cart for you from one of your orders. Open it to put the items in your"
+" cart, at today's prices."
+msgstr ""
+"Notre équipe support a préparé pour toi un panier à partir de l’une de tes commandes. Ouvre-le "
+"pour mettre les articles dans ton panier, aux prix du jour."
+
+#: apps/orders/templates/email/orders/staff_draft_link/body.html
+#: apps/orders/templates/email/orders/staff_draft_link/body.txt
+msgid "Our support team prepared a cart for you from your order %(order_number)s:"
+msgstr ""
+"Notre équipe support a préparé pour toi un panier à partir de ta commande %(order_number)s :"
+
+#: apps/manager/staff_draft_views.py apps/orders/customer_views.py
+msgid "out of stock"
+msgstr "en rupture de stock"
+
 #: apps/catalog/templates/catalog/includes/stock_status.html
 #: apps/manager/templates/manager/shop/dashboard.html themes/base/templates/components/badge.html
 msgid "Out of stock"
 msgstr "Rupture de stock"
-
-#: apps/orders/customer_views.py
-msgid "out of stock"
-msgstr "en rupture de stock"
 
 #: apps/manager/product_views.py
 msgid "outdated"
@@ -6555,8 +6717,33 @@ msgid "Preferences"
 msgstr "Préférences"
 
 #: apps/manager/templates/manager/amendment.html
+msgid "Prepare a cart for the customer"
+msgstr "Préparer un panier pour le client"
+
+#: apps/manager/templates/manager/amendment.html
 msgid "Prepare a change"
 msgstr "Préparer une modification"
+
+#: apps/manager/templates/manager/amendment.html
+msgid "Prepare the cart"
+msgstr "Préparer le panier"
+
+#: apps/manager/templates/manager/platform/order_drafts.html
+msgid "Prepared"
+msgstr "Préparé"
+
+#: apps/manager/staff_draft_views.py
+msgid "Prepared cart"
+msgstr "Panier préparé"
+
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Prepared cart from order %(number)s"
+msgstr "Panier préparé à partir de la commande %(number)s"
+
+#: apps/manager/sections.py apps/manager/staff_draft_views.py
+#: apps/manager/templates/manager/platform/order_drafts.html
+msgid "Prepared carts"
+msgstr "Paniers préparés"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/platform/trust_rule_new.html
@@ -6833,13 +7020,18 @@ msgstr ""
 "Remet dans ton panier les articles encore en vente, aux prix d’aujourd’hui. Rien n’est commandé ni"
 " payé tant que tu ne passes pas à la caisse."
 
-#: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/shop/order.html
-#: apps/orders/templates/orders/customer_order.html
+#: apps/manager/templates/manager/amendment.html
+#: apps/manager/templates/manager/platform/order_draft.html
+#: apps/manager/templates/manager/shop/order.html apps/orders/templates/orders/customer_order.html
 #: themes/base/templates/components/quantity_stepper.html
 #: themes/ride/templates/components/quantity_stepper.html
 #: themes/ride/templates/orders/customer_order.html
 msgid "Quantity"
 msgstr "Quantité"
+
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Quantity of %(item)s"
+msgstr "Quantité de %(item)s"
 
 #: themes/base/templates/components/cart_line.html themes/ride/templates/components/cart_line.html
 msgid "Quantity, %(name)s"
@@ -7191,6 +7383,12 @@ msgid "Required when you give a role to yourself; kept in the audit log."
 msgstr ""
 "Obligatoire lorsque vous vous attribuez un rôle à vous-même ; conservé dans le journal d'audit."
 
+#: apps/manager/staff_draft_views.py
+msgid "Required. Why you do this, for example who asked and how. The customer does not see it."
+msgstr ""
+"Obligatoire. Pourquoi vous le faites, par exemple qui l’a demandé et comment. Le client ne la voit"
+" pas."
+
 #: apps/manager/forms.py
 msgid "Reseller: we buy the products to resell"
 msgstr "Revendeur : nous achetons les produits pour les revendre"
@@ -7441,6 +7639,10 @@ msgstr "Enregistrer le nom"
 msgid "Save the product role"
 msgstr "Enregistrer le rôle du produit"
 
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Save the quantities"
+msgstr "Enregistrer les quantités"
+
 #: apps/fitment/templates/fitment/_garage_saver.html
 msgid "Save this vehicle"
 msgstr "Enregistrer ce véhicule"
@@ -7579,6 +7781,14 @@ msgstr "Envoyer pour vérification"
 msgid "Send my application"
 msgstr "Envoyer ma candidature"
 
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Send the link"
+msgstr "Envoyer le lien"
+
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Send the link to the customer"
+msgstr "Envoyer le lien au client"
+
 #: apps/manager/templates/manager/shop/fitment_proposals.html
 msgid "Send the proposal"
 msgstr "Envoyer la proposition"
@@ -7586,6 +7796,10 @@ msgstr "Envoyer la proposition"
 #: apps/compliance/templates/compliance/notice_form.html
 msgid "Send the report"
 msgstr "Envoyer le signalement"
+
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Sends left today"
+msgstr "Envois restants aujourd’hui"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid ""
@@ -7597,6 +7811,14 @@ msgstr ""
 #: apps/compliance/forms.py
 msgid "Sent to the vendor as the reason for the termination."
 msgstr "Envoyé au vendeur comme motif de la résiliation."
+
+#: apps/manager/staff_draft_views.py
+msgid "Sent, usable"
+msgstr "Envoyé, utilisable"
+
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Sent, usable once until %(date)s"
+msgstr "Envoyé, utilisable une fois jusqu’au %(date)s"
 
 #: apps/seo/wagtail_hooks.py
 msgid "SEO"
@@ -7631,6 +7853,12 @@ msgstr ""
 #: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Sessions"
 msgstr "Sessions"
+
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Set a quantity to 0 to remove the item. A change makes a link already sent stop working."
+msgstr ""
+"Mettez une quantité à 0 pour retirer l’article. Une modification rend inutilisable un lien déjà "
+"envoyé."
 
 #: apps/accounts/templates/accounts/mfa/totp.html themes/ride/templates/accounts/mfa/totp.html
 msgid "Set up an authenticator app"
@@ -8169,6 +8397,7 @@ msgstr "Statistiques"
 #: apps/manager/templates/manager/platform/fitment_node.html
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/platform/order_draft.html
 #: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/platform/termination_detail.html
@@ -8282,6 +8511,12 @@ msgstr "Résumé"
 #: apps/manager/event_forms.py
 msgid "Sunday"
 msgstr "Dimanche"
+
+#: apps/orders/customer_views.py
+msgid "Support changed this cart after sending the link. Use the newest link we emailed you."
+msgstr ""
+"Le support a modifié ce panier après l’envoi du lien. Utilise le lien le plus récent que nous "
+"t’avons envoyé par e-mail."
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Suspected criminal offence (DSA article 18)"
@@ -8625,6 +8860,19 @@ msgstr ""
 "Le nom du transporteur dans cette langue, par exemple 'Transporteur standard'. Les acheteurs le "
 "verront lorsque le paiement utilisera l'expédition."
 
+#: apps/manager/staff_draft_views.py
+msgid "The cart is changed. A link sent before no longer works: send a new one."
+msgstr ""
+"Le panier est modifié. Un lien envoyé auparavant ne fonctionne plus : envoyez-en un nouveau."
+
+#: apps/manager/templates/manager/platform/order_draft.html apps/orders/staff_drafts.py
+msgid "The cart is empty: there is nothing to send."
+msgstr "Le panier est vide : il n’y a rien à envoyer."
+
+#: apps/manager/staff_draft_views.py
+msgid "The cart is prepared. Check it, then send the link."
+msgstr "Le panier est préparé. Vérifiez-le, puis envoyez le lien."
+
 #: apps/core/models.py
 msgid ""
 "The cases where the platform refunds a buyer on its own: its own error, or a seller who defaults "
@@ -8947,6 +9195,14 @@ msgstr ""
 "Le client récupère l’intégralité de ce qu’il a payé pour ce colis, au plus tard sous 14 jours. Le "
 "motif détermine qui paie les frais de remboursement et si les unités retournent en stock. Votre "
 "clé d’accès est requise."
+
+#: apps/orders/staff_drafts.py
+msgid "The customer has already opened this cart: it cannot change."
+msgstr "Le client a déjà ouvert ce panier : il ne peut plus être modifié."
+
+#: apps/orders/staff_drafts.py
+msgid "The customer has no email address to send the link to."
+msgstr "Le client n’a pas d’adresse e-mail à laquelle envoyer le lien."
 
 #: apps/orders/amendments.py
 msgid ""
@@ -9298,6 +9554,10 @@ msgstr ""
 msgid "The general text has no screen or page type."
 msgstr "Le texte général n'a ni écran ni type de page."
 
+#: apps/manager/staff_draft_views.py
+msgid "The guest's email"
+msgstr "L’e-mail de l’invité"
+
 #: apps/cms/models.py
 msgid "The heading of the column, for example 'Company'."
 msgstr "Le titre de la colonne, par exemple « Entreprise »."
@@ -9610,6 +9870,24 @@ msgstr ""
 "sont listées. Nécessaire avec un nouveau fichier. Exemple : 'Œuvre personnelle' pour un logo que "
 "la marque nous a fourni."
 
+#: apps/orders/staff_drafts.py
+msgid "The link could not be emailed to the customer."
+msgstr "Le lien n’a pas pu être envoyé au client par e-mail."
+
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid ""
+"The link goes only to the email of the order's account, or to the guest's email for a guest order."
+" It works once, and at most %(max_sends)s links can be sent per day. A new link replaces the one "
+"sent before."
+msgstr ""
+"Le lien est envoyé uniquement à l’e-mail du compte de la commande, ou à l’e-mail de l’invité pour "
+"une commande d’invité. Il fonctionne une seule fois, et au plus %(max_sends)s liens peuvent être "
+"envoyés par jour. Un nouveau lien remplace celui envoyé auparavant."
+
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "The link goes to"
+msgstr "Le lien est envoyé à"
+
 #: apps/vendors/templates/vendors/apply/invalid.html
 msgid ""
 "The link has expired, was already used, or does not belong to a pending application. Open the link"
@@ -9617,6 +9895,14 @@ msgid ""
 msgstr ""
 "Le lien a expiré, a déjà été utilisé ou n'appartient à aucune candidature en attente. Ouvrez le "
 "lien du dernier e-mail reçu, ou postulez de nouveau."
+
+#: apps/manager/staff_draft_views.py
+msgid "The link is sent to the customer. It works once, until %(date)s."
+msgstr "Le lien est envoyé au client. Il fonctionne une seule fois, jusqu’au %(date)s."
+
+#: apps/orders/staff_drafts.py
+msgid "The link was already sent %(count)d times today. Try again tomorrow."
+msgstr "Le lien a déjà été envoyé %(count)d fois aujourd’hui. Réessayez demain."
 
 #: apps/events/templates/email/events/event_changes_requested/body.html
 #: apps/events/templates/email/events/event_changes_requested/body.txt
@@ -9641,6 +9927,11 @@ msgstr ""
 "Le lien ne fonctionne qu'une seule fois et expire le %(expires)s (UTC). Notre équipe examine "
 "ensuite votre candidature. Si vous ne confirmez pas, la candidature est supprimée après quelques "
 "jours."
+
+#: apps/orders/templates/email/orders/staff_draft_link/body.html
+#: apps/orders/templates/email/orders/staff_draft_link/body.txt
+msgid "The link works once and expires on %(expires)s."
+msgstr "Le lien fonctionne une seule fois et expire le %(expires)s."
 
 #: apps/cms/models.py
 msgid "The links of the column, in the order shown: a page of this site or another website."
@@ -10090,6 +10381,10 @@ msgstr ""
 msgid "The order was updated."
 msgstr "La commande a été mise à jour."
 
+#: apps/manager/staff_draft_views.py
+msgid "The order's account"
+msgstr "Le compte de la commande"
+
 #: apps/orders/amendments.py
 msgid ""
 "The package changed since this draft was made, so the draft was closed as superseded: start a new "
@@ -10369,6 +10664,17 @@ msgid ""
 msgstr ""
 "Le prix en euros hors TVA, par exemple 19,90. Nécessaire pour vendre le produit : avec le mode "
 "Achat, un prix vide est refusé. Il ne peut pas être 0,00 ; laissez-le vide à la place."
+
+#: apps/orders/templates/email/orders/staff_draft_link/body.html
+#: apps/orders/templates/email/orders/staff_draft_link/body.txt
+msgid ""
+"The prices, availability and shipping costs are today's, not those of your earlier order. Check "
+"everything in the cart and at checkout: nothing is ordered or paid until you place the order and "
+"pay yourself."
+msgstr ""
+"Les prix, la disponibilité et les frais d’expédition sont ceux du jour, pas ceux de ta commande "
+"précédente. Vérifie tout dans le panier et à la caisse : rien n’est commandé ni payé tant que tu "
+"ne passes pas la commande et ne paies pas toi-même."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -10725,6 +11031,10 @@ msgstr "Le mode d'expédition %(method)r n'est pas proposé pour ce colis."
 #: apps/shipping/models.py
 msgid "The shipping price for this band, without VAT."
 msgstr "Le prix de l'expédition pour cette tranche, hors TVA."
+
+#: apps/manager/staff_draft_views.py
+msgid "the shop cannot deliver it to the order's country"
+msgstr "la boutique ne peut pas le livrer dans le pays de la commande"
 
 #: apps/vendors/models.py
 msgid ""
@@ -11615,6 +11925,15 @@ msgstr ""
 msgid "This is an archived version."
 msgstr "Ceci est une version archivée."
 
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid ""
+"This is not an order. The customer opens the link, checks the cart and pays at checkout; the "
+"prices are the catalog prices of that moment. You never place or pay the order for the customer."
+msgstr ""
+"Ce n’est pas une commande. Le client ouvre le lien, vérifie le panier et paie à la caisse ; les "
+"prix sont ceux du catalogue à ce moment-là. Vous ne passez ni ne payez jamais la commande à la "
+"place du client."
+
 #: apps/vendors/templates/email/vendors/application_reminder/body.html
 #: apps/vendors/templates/email/vendors/application_reminder/body.txt
 msgid ""
@@ -11657,9 +11976,25 @@ msgstr ""
 msgid "This item is sold on request only. Ask the vendor for a quote."
 msgstr "Cet article n'est vendu que sur demande. Demandez un devis au vendeur."
 
+#: apps/orders/customer_views.py
+msgid "This link has expired. Ask support for a new one."
+msgstr "Ce lien a expiré. Demande-en un nouveau au support."
+
+#: apps/orders/customer_views.py
+msgid "This link is for another customer. Sign out, then open it again."
+msgstr "Ce lien est destiné à un autre client. Déconnecte-toi, puis ouvre-le à nouveau."
+
 #: apps/vendors/templates/vendors/apply/invalid.html
 msgid "This link is not valid"
 msgstr "Ce lien n'est pas valide"
+
+#: apps/orders/customer_views.py
+msgid "This link is not valid. Ask support for a new one."
+msgstr "Ce lien n’est pas valide. Demande-en un nouveau au support."
+
+#: apps/orders/customer_views.py
+msgid "This link was already used. The items are in the cart you opened it in."
+msgstr "Ce lien a déjà été utilisé. Les articles sont dans le panier où tu l’as ouvert."
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "This link was sent to you by email. Press Continue to open the page it leads to."
@@ -11677,12 +12012,24 @@ msgid "This notice is not possible."
 msgstr "Ce préavis n'est pas possible."
 
 #: apps/manager/templates/manager/amendment.html
+msgid "This order already has a prepared cart: open it"
+msgstr "Cette commande a déjà un panier préparé : l’ouvrir"
+
+#: apps/manager/staff_draft_views.py
+msgid "This order already has an open prepared cart: here it is."
+msgstr "Cette commande a déjà un panier préparé ouvert : le voici."
+
+#: apps/manager/templates/manager/amendment.html
 msgid ""
 "This order can no longer be changed: only a paid order that is waiting for the seller or accepted,"
 " and not shipped yet, can be changed."
 msgstr ""
 "Cette commande ne peut plus être modifiée : seule une commande payée, en attente du vendeur ou "
 "acceptée, et pas encore expédiée, peut être modifiée."
+
+#: apps/orders/staff_drafts.py
+msgid "This order cannot be copied into a cart."
+msgstr "Cette commande ne peut pas être copiée dans un panier."
 
 #: apps/manager/templates/manager/amendment.html
 msgid ""
@@ -11703,6 +12050,10 @@ msgstr "Cette commande n’est pas encore payée, elle ne peut donc pas être mo
 #: apps/orders/amendments.py
 msgid "This order is not paid yet: change it through the checkout or the quote instead."
 msgstr "Cette commande n'est pas encore payée : modifiez-la plutôt via le paiement ou le devis."
+
+#: apps/orders/staff_drafts.py
+msgid "This order's customer data is no longer kept."
+msgstr "Les données client de cette commande ne sont plus conservées."
 
 #: apps/orders/amendments.py
 msgid ""
@@ -12099,12 +12450,13 @@ msgid ""
 "statement (for example a letter sent by post or an email). You may use the model withdrawal form "
 "below, but it is not obligatory."
 msgstr ""
-"Pour exercer le droit de rétractation, vous devez nous notifier (nom, adresse postale, numéro de"
-" téléphone et adresse électronique : voir les coordonnées du vendeur dans votre confirmation de "
+"Pour exercer le droit de rétractation, vous devez nous notifier (nom, adresse postale, numéro de "
+"téléphone et adresse électronique : voir les coordonnées du vendeur dans votre confirmation de "
 "commande (page et courrier électronique) et dans le récapitulatif de la commande avant de la "
 "passer) votre décision de rétractation du présent contrat au moyen d'une déclaration dénuée "
 "d'ambiguïté (par exemple, lettre envoyée par la poste ou courrier électronique). Vous pouvez "
 "utiliser le modèle de formulaire de rétractation ci-dessous, mais ce n'est pas obligatoire."
+
 #: apps/shipping/models.py
 msgid ""
 "To limit the zone to some postcodes, list them separated by commas: a prefix such as 'BT*', a "
@@ -12153,7 +12505,8 @@ msgstr ""
 "À l'attention du vendeur de la commande (nom, adresse postale, numéro de téléphone et adresse "
 "électronique : voir les coordonnées du vendeur dans votre confirmation de commande (page et "
 "courrier électronique) et dans le récapitulatif de la commande avant de la passer)"
-#: apps/accounts/action_link_views.py apps/accounts/decorators.py
+
+#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/orders/customer_views.py
 msgid "Too many attempts. Please try again later."
 msgstr "Trop de tentatives. Veuillez réessayer plus tard."
 
@@ -12177,6 +12530,7 @@ msgstr "Trop d'envois, réessaie dans un instant."
 msgid "Top level"
 msgstr "Niveau supérieur"
 
+#: apps/manager/templates/manager/platform/order_draft.html
 #: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_order.html
 #: apps/orders/templates/orders/customer_orders.html
@@ -12351,6 +12705,10 @@ msgstr ""
 #: apps/manager/templates/manager/amendment.html
 msgid "Unit price net"
 msgstr "Prix unitaire net"
+
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Unit price today"
+msgstr "Prix unitaire du jour"
 
 #: apps/ingest/models.py
 msgid "Units the supplier states, empty if unknown."
@@ -13675,6 +14033,18 @@ msgstr "Délai de rétractation"
 msgid "Withdrawn"
 msgstr "Retiré"
 
+#: apps/manager/staff_draft_views.py
+msgid "Write a note for the change."
+msgstr "Écrivez une note pour la modification."
+
+#: apps/manager/staff_draft_views.py
+msgid "Write a note for the send."
+msgstr "Écrivez une note pour l’envoi."
+
+#: apps/manager/staff_draft_views.py apps/orders/staff_drafts.py
+msgid "Write a note: why you prepare this cart, at whose request."
+msgstr "Écrivez une note : pourquoi vous préparez ce panier, à la demande de qui."
+
 #: apps/manager/event_block_forms.py
 msgid ""
 "Write plain text: a blank line starts a new paragraph. You can also use simple HTML (headings h2 "
@@ -14119,6 +14489,10 @@ msgstr "Vos propres produits, 12 au maximum. Obligatoire."
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Your payout account is active. Customers can buy your products online."
 msgstr "Votre compte de versement est actif. Les clients peuvent acheter vos produits en ligne."
+
+#: apps/orders/templates/orders/draft_link.html
+msgid "Your prepared cart"
+msgstr "Ton panier préparé"
 
 #: apps/manager/fitment_shop_views.py
 msgid "Your proposal is sent. It stays hidden until it is reviewed."
