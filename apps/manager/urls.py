@@ -11,6 +11,7 @@ from . import (
     amendment_views,
     event_block_views,
     event_views,
+    fitment_picker,
     fitment_shop_views,
     fitment_views,
     media,
@@ -138,6 +139,7 @@ shop = (
         path(
             "fitment/report/", fitment_shop_views.FitmentReportView.as_view(), name="fitment_report"
         ),
+        path("fitment/nodes/", fitment_picker.FitmentNodeChildren.as_view(), name="fitment_nodes"),
         path(
             "fitment/<uuid:public_id>/",
             fitment_shop_views.FitmentProductView.as_view(),
