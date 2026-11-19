@@ -29,7 +29,7 @@
   {% endif %}
   {% if sellers %}<section class="order-sellers" aria-labelledby="order-sellers-title">
     <h2 id="order-sellers-title">{% translate "Seller details" %}</h2>
-    <p>{% translate "Each seller is a separate contract. These are the details to contact each seller, also to withdraw." %}</p>
+    <p>{% translate "You have a separate contract with each seller. These are the details to contact each seller, also to withdraw." %}</p>
     {% for contact in sellers %}{% include "components/seller_details.html" with contact=contact only %}{% endfor %}
   </section>{% endif %}
 </article>

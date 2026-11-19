@@ -2891,12 +2891,6 @@ msgstr ""
 msgid "Each seller in your order is a separate contract. Choose the parts you withdraw from."
 msgstr "Cada vendedor de tu pedido es un contrato distinto. Elige las partes de las que desistes."
 
-#: apps/orders/templates/orders/confirmation.html
-msgid ""
-"Each seller is a separate contract. These are the details to contact each seller, also to "
-"withdraw."
-msgstr "Cada vendedor es un contrato distinto. Estos son los datos para contactar con cada vendedor, también para desistir."
-
 #: apps/manager/fitment_forms.py
 msgid "Earliest year"
 msgstr "Año más antiguo"
@@ -13376,6 +13370,14 @@ msgid ""
 msgstr ""
 "Dispones de 14 días desde la entrega para desistir, también mediante el botón de desistimiento en "
 "línea. Tú pagas el coste directo de devolver los bienes. %(info)s"
+
+#: apps/orders/templates/orders/confirmation.html
+msgid ""
+"You have a separate contract with each seller. These are the details to contact each seller, also "
+"to withdraw."
+msgstr ""
+"Tienes un contrato distinto con cada vendedor. Estos son los datos para contactar con cada "
+"vendedor, también para desistir."
 
 #: apps/manager/templates/manager/shop/events.html
 msgid "You have no events yet."

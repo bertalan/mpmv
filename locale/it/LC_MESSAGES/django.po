@@ -2888,12 +2888,6 @@ msgstr ""
 msgid "Each seller in your order is a separate contract. Choose the parts you withdraw from."
 msgstr "Ogni venditore del tuo ordine è un contratto distinto. Scegli le parti da cui recedi."
 
-#: apps/orders/templates/orders/confirmation.html
-msgid ""
-"Each seller is a separate contract. These are the details to contact each seller, also to "
-"withdraw."
-msgstr "Ogni venditore è un contratto separato. Questi sono i dati per contattare ciascun venditore, anche per recedere."
-
 #: apps/manager/fitment_forms.py
 msgid "Earliest year"
 msgstr "Anno più remoto"
@@ -13373,6 +13367,14 @@ msgid ""
 msgstr ""
 "Hai 14 giorni dalla consegna per recedere, anche con il pulsante di recesso online. Paghi tu il "
 "costo diretto della restituzione dei beni. %(info)s"
+
+#: apps/orders/templates/orders/confirmation.html
+msgid ""
+"You have a separate contract with each seller. These are the details to contact each seller, also "
+"to withdraw."
+msgstr ""
+"Con ogni venditore hai un contratto separato. Questi sono i dati per contattare ciascun venditore,"
+" anche per recedere."
 
 #: apps/manager/templates/manager/shop/events.html
 msgid "You have no events yet."

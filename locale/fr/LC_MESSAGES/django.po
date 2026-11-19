@@ -2922,12 +2922,6 @@ msgstr ""
 "Chaque vendeur de ta commande correspond à un contrat distinct. Choisis les parties dont tu te "
 "rétractes."
 
-#: apps/orders/templates/orders/confirmation.html
-msgid ""
-"Each seller is a separate contract. These are the details to contact each seller, also to "
-"withdraw."
-msgstr "Chaque vendeur est un contrat distinct. Voici les coordonnées pour contacter chaque vendeur, y compris pour te rétracter."
-
 #: apps/manager/fitment_forms.py
 msgid "Earliest year"
 msgstr "Année la plus ancienne"
@@ -13505,6 +13499,14 @@ msgid ""
 msgstr ""
 "Tu disposes de 14 jours à compter de la livraison pour te rétracter, y compris via le bouton de "
 "rétractation en ligne. Tu paies le coût direct du renvoi des biens. %(info)s"
+
+#: apps/orders/templates/orders/confirmation.html
+msgid ""
+"You have a separate contract with each seller. These are the details to contact each seller, also "
+"to withdraw."
+msgstr ""
+"Tu as un contrat distinct avec chaque vendeur. Voici les coordonnées pour contacter chaque "
+"vendeur, y compris pour te rétracter."
 
 #: apps/manager/templates/manager/shop/events.html
 msgid "You have no events yet."

@@ -2928,12 +2928,6 @@ msgstr ""
 "Jeder Verkäufer in deiner Bestellung ist ein eigener Vertrag. Wähle die Teile, die du widerrufen "
 "möchtest."
 
-#: apps/orders/templates/orders/confirmation.html
-msgid ""
-"Each seller is a separate contract. These are the details to contact each seller, also to "
-"withdraw."
-msgstr "Jeder Verkäufer ist ein eigener Vertrag. Hier findest du die Kontaktdaten jedes Verkäufers, auch für einen Widerruf."
-
 #: apps/manager/fitment_forms.py
 msgid "Earliest year"
 msgstr "Frühestes Jahr"
@@ -13547,6 +13541,14 @@ msgid ""
 msgstr ""
 "Du hast ab Lieferung 14 Tage Zeit für den Widerruf, auch über die Online-Widerrufsschaltfläche. Du"
 " trägst die unmittelbaren Kosten der Rücksendung der Waren. %(info)s"
+
+#: apps/orders/templates/orders/confirmation.html
+msgid ""
+"You have a separate contract with each seller. These are the details to contact each seller, also "
+"to withdraw."
+msgstr ""
+"Mit jedem Verkäufer hast du einen eigenen Vertrag. Hier findest du die Kontaktdaten jedes "
+"Verkäufers, auch für einen Widerruf."
 
 #: apps/manager/templates/manager/shop/events.html
 msgid "You have no events yet."
