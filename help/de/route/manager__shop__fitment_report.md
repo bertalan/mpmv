@@ -9,4 +9,4 @@ Dieser Bericht zeigt, wo Ihre Passform-Daten nachgebessert werden müssen.
 - **Ausschlüsse ohne etwas zum Ausschließen**: ein Ausschluss ohne eine passende Zeile darüber.
 
 ## Gut zu wissen
-Wählen Sie eine SKU, um ihre Seite **Fits** zu öffnen und sie zu korrigieren.
+Wählen Sie eine SKU, um ihre Seite Fits zu öffnen und sie zu korrigieren.

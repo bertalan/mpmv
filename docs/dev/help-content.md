@@ -42,6 +42,7 @@ Plain Markdown. Short sentences for a non-technical reader.
   customer screens. DE, FR and ES are AI drafts until the translator's review (I18N.19).
   The general entry is the exception: every role sees it, vendors and staff included, so it is
   written in the formal register in all of DE (Sie), FR (vous), ES (usted) and IT (Lei).
+- The check `apps/cms/tests/integration/test_help_labels.py` (reader in `tests/help_labels.py`) covers `guide`, `route`, `page_type` and `general` files in every language: each **bold** span must be a msgstr of that language's catalog (English: a msgid). Headings are not checked: they name sections of the help, not screen labels; a heading that quotes a screen label wraps it in bold. Emphasis that is not a label, and page names the screen does not translate (for example "Fits"), are not bold.
 - Name a button, field or menu item exactly as the screen shows it in that language: the msgstr
   of our catalog (`locale/`), else Wagtail's or Django's own. A label with no translation in any
   catalog shows in English on the screen (for example "Find coordinates", "Event review"), so the
