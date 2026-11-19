@@ -10342,7 +10342,10 @@ msgstr "Los textos escritos para el producto, un conjunto por cada idioma, en JS
 msgid ""
 "The thresholds behind the vendor trust badges. A change is a new version from a date; an old "
 "version is never edited, so every stored result stays explainable."
-msgstr "Los umbrales de las insignias de confianza de los vendedores. Un cambio es una versión nueva desde una fecha; una versión antigua nunca se modifica, de modo que cada resultado guardado sigue siendo explicable."
+msgstr ""
+"Los umbrales de las insignias de confianza de los vendedores. Un cambio es una versión nueva desde"
+" una fecha; una versión antigua nunca se modifica, de modo que cada resultado guardado sigue "
+"siendo explicable."
 
 #: apps/events/models.py
 msgid ""

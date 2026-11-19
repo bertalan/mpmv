@@ -10342,7 +10342,9 @@ msgstr "I testi scritti per il prodotto, un gruppo per ogni lingua, in JSON."
 msgid ""
 "The thresholds behind the vendor trust badges. A change is a new version from a date; an old "
 "version is never edited, so every stored result stays explainable."
-msgstr "Le soglie dei badge di fiducia dei venditori. Una modifica è una nuova versione da una data; una versione vecchia non si modifica mai, così ogni risultato salvato resta spiegabile."
+msgstr ""
+"Le soglie dei badge di fiducia dei venditori. Una modifica è una nuova versione da una data; una "
+"versione vecchia non si modifica mai, così ogni risultato salvato resta spiegabile."
 
 #: apps/events/models.py
 msgid ""

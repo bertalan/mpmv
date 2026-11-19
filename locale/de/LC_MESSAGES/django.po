@@ -10460,7 +10460,10 @@ msgstr "Die für das Produkt verfassten Texte, ein Satz pro Sprache, als JSON."
 msgid ""
 "The thresholds behind the vendor trust badges. A change is a new version from a date; an old "
 "version is never edited, so every stored result stays explainable."
-msgstr "Die Schwellenwerte hinter den Vertrauensabzeichen der Verkäufer. Eine Änderung ist eine neue Version ab einem Datum; eine alte Version wird nie geändert, sodass jedes gespeicherte Ergebnis erklärbar bleibt."
+msgstr ""
+"Die Schwellenwerte hinter den Vertrauensabzeichen der Verkäufer. Eine Änderung ist eine neue "
+"Version ab einem Datum; eine alte Version wird nie geändert, sodass jedes gespeicherte Ergebnis "
+"erklärbar bleibt."
 
 #: apps/events/models.py
 msgid ""
