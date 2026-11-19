@@ -312,9 +312,9 @@ def test_an_explicit_language_wins_over_the_primary_one(
 def test_the_language_default_is_not_baked_into_the_schema(client: Client) -> None:
     from apps.api.v1.catalog import LanguageQuery
 
-    assert LanguageQuery(language=None).language == primary_language()
+    assert LanguageQuery().language == primary_language()
     schema = LanguageQuery.model_json_schema()["properties"]["language"]
-    assert "default" not in schema or schema["default"] is None
+    assert "default" not in schema
 
 
 # --- CAT.15: other sellers of a product
