@@ -121,6 +121,7 @@ NOT_LISTED: Final = frozenset(
         "manager:shop:event_block_remove",
         "manager:shop:event_preview",
         "manager:shop:termination_data",
+        "manager:shop:fitment_nodes",
         "manager:shop:money_export",  # VEN.9: POST only, a CSV download
         "manager:shop:image_choose",
         "manager:shop:image_results",

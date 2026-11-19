@@ -2142,6 +2142,10 @@ msgstr ""
 "Choisissez la raison de l'annulation du colis : faute de la boutique, demande du client ou erreur "
 "de la plateforme."
 
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "Choose: {label}"
+msgstr "Choisir : {label}"
+
 #: apps/manager/amendment_forms.py apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "City"
 msgstr "Ville"
@@ -4610,6 +4614,10 @@ msgstr "Calendrier du mois"
 #: themes/base/templates/components/help_entry.html
 msgid "More help"
 msgstr "Plus d'aide"
+
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "More items exist than are shown."
+msgstr "Il existe plus d'éléments que ceux affichés."
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Move down"
@@ -13403,3 +13411,7 @@ msgstr ""
 "Votre numéro de TVA, avec ou sans le préfixe du pays, par exemple IT12345678901. Nous le vérifions"
 " dans le registre européen VIES. Vous ne savez pas si vous en avez un ? Demandez à votre "
 "comptable."
+
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "{n} choices"
+msgstr "{n} choix"

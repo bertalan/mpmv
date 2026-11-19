@@ -2124,6 +2124,10 @@ msgstr ""
 "Scegli perché il pacco viene annullato: causa del negozio, richiesta del cliente o errore della "
 "piattaforma."
 
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "Choose: {label}"
+msgstr "Scegliere: {label}"
+
 #: apps/manager/amendment_forms.py apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "City"
 msgstr "Città"
@@ -4568,6 +4572,10 @@ msgstr "Calendario del mese"
 #: themes/base/templates/components/help_entry.html
 msgid "More help"
 msgstr "Altro aiuto"
+
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "More items exist than are shown."
+msgstr "Esistono più voci di quelle mostrate."
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Move down"
@@ -13278,3 +13286,7 @@ msgid ""
 msgstr ""
 "La tua partita IVA, con o senza il prefisso del paese, per esempio IT12345678901. La verifichiamo "
 "nel registro europeo VIES. Non sai se ne hai una? Chiedi al tuo commercialista."
+
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "{n} choices"
+msgstr "{n} possibilità"
