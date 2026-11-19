@@ -681,10 +681,9 @@ the same CMP.24 approval.
   version in force); its text carries no customer name, and anonymisation replaces it. The
   vendor records `invoice_issued_at` on its order page (once, the shop only). The audit entry of a
   package cancellation names its `kind` (`rest_cancelled` or `package_cancelled`).
-  Limits until ORD.26: the event keeps the text rendered when the email was queued, and the
-  outbox renders again when it sends, so a deploy or a translation fix in between can make the
-  mailed text differ from the kept one; the outbox context of these emails is not yet
-  anonymised with the order. An event is written only when the email was accepted into the
+  The event keeps the text stored with the outbox row when the email was queued (ORD.26): the
+  outbox sends that stored copy and anonymisation scrubs the outbox rows of the order's emails.
+  An event is written only when the email was accepted into the
   outbox (a recipient, not suppressed, not refused), and the vendor's fee line reads the
   ledger's outcome (exclusion reason and platform-error flag), never the cause.
 - Counsel's answer of 2026-11-17 (CMP.24, kept private) approved the notice wording: customer
