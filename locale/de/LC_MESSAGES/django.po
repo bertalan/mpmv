@@ -2919,8 +2919,8 @@ msgstr ""
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "Each seller in your order is a separate contract. Choose the parts you withdraw from."
 msgstr ""
-"Jeder Verkäufer in deiner Bestellung ist ein eigener Vertrag. Wähle die Teile, von denen du "
-"zurücktrittst."
+"Jeder Verkäufer in deiner Bestellung ist ein eigener Vertrag. Wähle die Teile, die du widerrufen "
+"möchtest."
 
 #: apps/manager/fitment_forms.py
 msgid "Earliest year"
@@ -3066,8 +3066,8 @@ msgid ""
 "Enter the number of your order and the email address you used. Next you choose what to withdraw "
 "from and confirm."
 msgstr ""
-"Gib die Nummer deiner Bestellung und die verwendete E-Mail-Adresse ein. Danach wählst du aus, "
-"wovon du zurücktrittst, und bestätigst."
+"Gib die Nummer deiner Bestellung und die verwendete E-Mail-Adresse ein. Danach wählst du aus, was "
+"du widerrufen möchtest, und bestätigst."
 
 #: apps/manager/forms.py
 msgid "Enter the tracking number: letters, digits, spaces and . / _ - only."
@@ -11861,9 +11861,9 @@ msgid ""
 "an acknowledgement by email with the content, the date and the time."
 msgstr ""
 "Um online zu widerrufen, nutze die Schaltfläche unten jederzeit während der Widerrufsfrist. Du "
-"gibst die Bestellnummer und deine E-Mail-Adresse ein, wählst die Teile, von denen du "
-"zurücktrittst, und bestätigst. Per E-Mail erhältst du eine Eingangsbestätigung mit Inhalt, Datum "
-"und Uhrzeit."
+"gibst die Bestellnummer und deine E-Mail-Adresse ein, wählst die Teile, die du widerrufen "
+"möchtest, und bestätigst. Per E-Mail erhältst du eine Eingangsbestätigung mit Inhalt, Datum und "
+"Uhrzeit."
 
 #: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "To year"
@@ -12528,7 +12528,7 @@ msgstr ""
 
 #: apps/compliance/templates/compliance/withdrawal_done.html
 msgid "We received your withdrawal from order %(number)s on %(at)s."
-msgstr "Wir haben deinen Widerruf der Bestellung %(number)s am %(at)s erhalten."
+msgstr "Dein Widerruf zur Bestellung %(number)s ist am %(at)s bei uns eingegangen."
 
 #: apps/themes/styleguide.py
 msgid "We send the order confirmation here."
@@ -13339,7 +13339,7 @@ msgstr "Zurücknehmen und den Verkäufer informieren"
 
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "Withdraw from order %(number)s"
-msgstr "Von Bestellung %(number)s zurücktreten"
+msgstr "Bestellung %(number)s widerrufen"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Withdraw the notice"
@@ -13356,7 +13356,7 @@ msgstr "für diesen Teil der Bestellung ist kein Widerruf möglich."
 
 #: apps/compliance/templates/compliance/withdrawal_done.html
 msgid "Withdrawal received"
-msgstr "Widerruf erhalten"
+msgstr "Widerruf eingegangen"
 
 #: apps/manager/amendment_views.py
 msgid "Withdrawal registered"
@@ -13441,7 +13441,7 @@ msgid ""
 "contact details are in your order confirmation."
 msgstr ""
 "Du kannst auch widerrufen, indem du dem Verkäufer per E-Mail oder Post eine eindeutige Erklärung "
-"schickst, dass du vom Vertrag zurücktrittst, mit deiner Bestellnummer, oder indem du das Muster-"
+"schickst, dass du den Vertrag widerrufst, mit deiner Bestellnummer, oder indem du das Muster-"
 "Widerrufsformular verwendest. Die Kontaktdaten des Verkäufers stehen in deiner Bestellbestätigung."
 
 #: apps/orders/templates/orders/customer_order.html

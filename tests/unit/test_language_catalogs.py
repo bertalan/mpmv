@@ -595,3 +595,16 @@ def test_the_withdrawal_terms_of_art_follow_each_country(lang: str) -> None:
     checks = {e.msgid: _texts(e).lower() for e in _po(lang)}
     assert terms[lang] in checks["Right of withdrawal"].lower()
     assert terms[lang] in checks["Withdrawal received"].lower()
+
+
+def test_german_withdrawal_wording_uses_the_widerruf_family_only() -> None:
+    # Owner decision (#825): `Widerruf`, never `Rücktritt` or `zurücktreten`, for the legal
+    # withdrawal. `Rückgabe` stays in general returns sentences, so only `Rücktritt` is forbidden.
+    entries = [
+        e for e in _po("de") if _any_in(e, CONSUMER_LAW_MARKERS) and "withdraw" in e.msgid.lower()
+    ]
+    assert len(entries) >= 10
+    for entry in entries:
+        text = _texts(entry)
+        assert "widerruf" in text.lower(), entry.msgid
+        assert not re.search(r"zurücktret|rücktritt", text, re.I), entry.msgid
