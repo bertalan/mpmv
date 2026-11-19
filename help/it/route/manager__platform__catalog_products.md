@@ -1,7 +1,7 @@
 # Prodotti
 last-checked: 2026-11-18
 
-Questa pagina elenca i prodotti di tutti i negozi, per il ruolo Catalogo e moderazione. Il titolare della piattaforma può leggerla ma non modificare nulla.
+Questa pagina elenca i prodotti di tutti i negozi, per il ruolo Catalogo e moderazione. Il titolare della piattaforma e il ruolo Assistenza possono leggerla ma non modificare nulla: per loro la pagina mostra un avviso e nessun comando di modifica, e ogni tentativo di modificare un prodotto viene rifiutato (accesso negato).
 
 ## Trovare i prodotti
 - **Cerca** guarda lo SKU e i titoli in ogni lingua.

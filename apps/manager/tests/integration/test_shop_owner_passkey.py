@@ -257,9 +257,12 @@ def test_the_owner_window_never_covers_a_platform_action(
     request.session = client.session
     request.user = owner
     assert levels.window_covers(request, "sales_terms_publish", vendor)
-    for action in ("owner_role_grant", "operator_config", "export", "bulk_edit"):
+    for action in ("owner_role_grant", "operator_config", "bulk_edit"):
         assert not levels.window_covers(request, action, vendor)
         assert not levels.window_covers(request, action, None)
+    # VEN.9: the own shop's export is a shop action; a platform export (no shop) is not covered.
+    assert levels.window_covers(request, "export", vendor)
+    assert not levels.window_covers(request, "export", None)
 
 
 def test_platform_finance_staff_keep_the_full_window(client: Client) -> None:

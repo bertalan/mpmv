@@ -85,15 +85,19 @@ def test_a_shop_staff_member_gets_404(client: Client, vendor: Vendor) -> None:
 def test_another_shops_owner_cannot_touch_this_shops_policy(
     client: Client, owner: User, vendor: Vendor, other_vendor: Vendor
 ) -> None:
-    other = ReturnPolicyVersionFactory.create(vendor=other_vendor, return_window_days=77)
+    # A window no page shows by chance: matching a bare "77" also hit tokens and ids (flaky).
+    window = 173
+    other = ReturnPolicyVersionFactory.create(vendor=other_vendor, return_window_days=window)
     verified_login(client, owner)
     # The owner of shop one cannot select shop two: the picker refuses and nothing leaks.
     assert client.post(PICKER, {"vendor": str(other_vendor.public_id)}).status_code != 500
     response = client.get(URL)
-    assert b"77" not in response.content
+    assert other not in list(response.context["versions"])
+    assert f'value="{window}"'.encode() not in response.content
+    assert f">{window}<".encode() not in response.content
     client.post(URL, DATA)
     other.refresh_from_db()
-    assert other.return_window_days == 77
+    assert other.return_window_days == window
     assert ReturnPolicyVersion.objects.filter(vendor=other_vendor).count() == 1
 
 
