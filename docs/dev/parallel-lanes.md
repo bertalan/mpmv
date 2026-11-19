@@ -88,6 +88,10 @@ Only lane-a has the private owner-question register. lane-b writes its questions
 does not start work that depends on the answer. lane-a moves the question to the register, gets
 the owner's answer and replies on the PR.
 
+At night, and whenever the owner is away, nobody asks the owner: lane-a records the question in
+the register, the slice that needs it is parked, and both lanes move on to the next item
+(owner rule 2026-11-18; see the night rule in [release.md](release.md)).
+
 ## Usage limits
 
 Both lanes stop starting new agents when the plan's weekly usage reaches 80% or the 5-hour window
