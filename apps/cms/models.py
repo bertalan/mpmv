@@ -79,6 +79,7 @@ from wagtail_localize.models import Translation
 
 from apps.core.fields import LanguageField
 from apps.core.images import rendition_or_original
+from apps.core.nfc_forms import NFCModelForm
 from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
 from apps.vendors.services import has_public_storefront
 
@@ -368,6 +369,8 @@ class EditorRoleSeed(models.Model):
 
 class NavigationMenu(TranslatableMixin, models.Model):  # type: ignore[misc]
     """The header or footer links of one language (a snippet editors manage per locale)."""
+
+    base_form_class = NFCModelForm
 
     class Location(models.TextChoices):
         HEADER = "header", _("Header")
@@ -1072,6 +1075,8 @@ class ContentSnippet(
     workflow: an edit reaches the pages that use it only when it is approved and published.
     Rich text only: a snippet cannot hold a snippet block, so there is no recursion."""
 
+    base_form_class = NFCModelForm
+
     title = models.CharField(
         _("title"),
         max_length=120,
@@ -1175,6 +1180,8 @@ class BlogAuthor(TranslatableMixin, models.Model):  # type: ignore[misc]  # Wagt
     """The byline of articles: a name, not a user account (legacy authors have none), with a
     bio, a photo and an author page. A translatable snippet: each language has its own copy, the
     bio and the photo's alt text are translated, the name, slug and photo are the source's."""
+
+    base_form_class = NFCModelForm
 
     name = models.CharField(
         _("name"),

@@ -41,7 +41,7 @@ from apps.core.models import MediaImage
 from apps.core.money import CURRENCY
 from apps.core.services import audit_changes, holds_permission, run_mutation, save_audited
 from apps.core.sitemap_version import bump_sitemap_version
-from apps.core.text import ascii_int
+from apps.core.text import ascii_int, nfc_deep
 from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import VendorScopedQuerySet, is_platform_staff
@@ -1192,6 +1192,28 @@ def _sku_namespace_errors(
             )
 
 
+def nfc_product(data: engine.ProductIn) -> engine.ProductIn:
+    """`data` with the free texts in NFC (I18N.10): the translations and the text attributes.
+
+    The SKU is kept as entered (its match key is NFKC, spec 03); codes are not free text.
+    """
+    return replace(
+        data,
+        translations=tuple(
+            replace(
+                t,
+                title=nfc_deep(t.title),
+                short_description=nfc_deep(t.short_description),
+                description=nfc_deep(t.description),
+                material=nfc_deep(t.material),
+                colour=nfc_deep(t.colour),
+            )
+            for t in data.translations
+        ),
+        attributes=tuple(replace(a, text=nfc_deep(a.text)) for a in data.attributes),
+    )
+
+
 def create_product(
     vendor: Vendor,
     data: engine.ProductIn,
@@ -1214,6 +1236,7 @@ def create_product(
     `VendorCannotWrite` is raised, nothing written, unless the vendor is still active.
     """
     require_catalog_editor(ctx)
+    data = nfc_product(data)
     catalogue = _attribute_catalogue({a.code for a in data.attributes})
     errors = _product_errors(vendor, data, catalogue)
     if errors:
@@ -3379,7 +3402,7 @@ def upsert_products(
     changed row adds its own writes.
     """
     require_catalog_editor(ctx)
-    rows = list(payload)
+    rows = [nfc_product(row) for row in payload]
     matches = match_skus(vendor, (row.sku for row in rows))
     existing = _load_existing(m for m in matches.values() if isinstance(m, Product))
     catalogue = _attribute_catalogue({a.code for row in rows for a in row.attributes})

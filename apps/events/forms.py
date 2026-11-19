@@ -32,6 +32,7 @@ from wagtail.admin.forms import WagtailAdminPageForm
 
 from apps.catalog.models import Product, ProductStatus
 from apps.core.geocoding import AddressQuery, GeocodeResult, engine
+from apps.core.nfc_forms import NFCFormMixin
 from apps.vendors.scoping import is_platform_staff
 
 ADDRESS_QUERY_FIELDS = ("country", "postcode", "city", "street")
@@ -46,7 +47,7 @@ def _zone(name: Any) -> zoneinfo.ZoneInfo | None:
         return None
 
 
-class EventPageForm(WagtailAdminPageForm):  # type: ignore[misc]  # Wagtail is untyped
+class EventPageForm(NFCFormMixin, WagtailAdminPageForm):  # type: ignore[misc]  # Wagtail is untyped
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         instance = self.instance
