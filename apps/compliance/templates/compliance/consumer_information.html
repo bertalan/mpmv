@@ -6,15 +6,10 @@
     <h1>{% translate "Consumer information" %}</h1>
     <section id="withdrawal">
       <h2>{% translate "Right of withdrawal" %}</h2>
-      <p>{% blocktranslate with days=info.withdrawal.period_days %}You may withdraw from a distance contract within {{ days }} days without giving a reason. The period runs from the day you receive the goods. Each seller in your order is a separate contract.{% endblocktranslate %}</p>
-      <p>{% translate "If a seller delivers the goods of your order in several shipments, the period for that seller's contract runs from the day you receive the last item." %}</p>
-      <p>{% translate "To exercise the right of withdrawal, you must inform the seller of your decision by a clear statement, for example by post or email. The period is met if you send the statement before it ends." %}</p>
+      {% include "compliance/includes/model_withdrawal_information.html" with days=info.withdrawal.period_days %}
       <p>{% translate "To withdraw online, use the button below at any time during the withdrawal period. You enter the order number and your email address, choose the parts to withdraw from, and confirm. You receive an acknowledgement by email with the content, the date and the time." %}</p>
-      <h3>{% translate "Effects of withdrawal" %}</h3>
-      <p>{% translate "The seller refunds every payment received for the contract, including the standard delivery costs, without undue delay and at the latest 14 days after learning of your withdrawal. The refund uses the payment method you used. The seller may withhold it until the goods are back or you show proof of sending them. You return the goods without undue delay and at the latest 14 days after your withdrawal. You are liable for any loss of value caused by handling beyond what is needed to check the goods." %}</p>
-      <h3>{% translate "Exclusions and early expiry" %}</h3>
-      <p>{% translate "There is no right of withdrawal for goods made to your specifications or clearly personalised, for goods that spoil quickly, and for sealed goods that are not suitable for return for health or hygiene reasons once you have unsealed them. The right also ends early for goods that, after delivery, were inseparably mixed with other items." %}</p>
       <p><a class="withdrawal-link" href="{{ info.withdrawal.url }}">{{ info.withdrawal.button_label }}</a></p>
+      {% include "compliance/includes/model_withdrawal_form.html" %}
     </section>
     <section id="guarantee">
       <h2>{% translate "Legal guarantee of conformity" %}</h2>

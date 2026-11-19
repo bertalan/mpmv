@@ -240,6 +240,14 @@ msgstr ""
 " è stata controllata da una persona. 'Pubblicata' viene mostrata ai visitatori. Se il testo "
 "inglese cambia, le traduzioni riviste e pubblicate tornano a 'Bozza automatica'."
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "(*) Delete as appropriate."
+msgstr "(*) Cancellare la dicitura inutile."
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "(Complete and return this form only if you wish to withdraw from the contract.)"
+msgstr "(Compilare e restituire il presente modulo solo se si desidera recedere dal contratto.)"
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "(opens the carrier's site)"
 msgstr "(si apre il sito del corriere)"
@@ -1006,6 +1014,10 @@ msgstr "Aggiunto al carrello."
 #: apps/orders/ui/forms.py themes/ride/templates/orders/_legal_recap.html
 msgid "Address"
 msgstr "Indirizzo"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "Address of consumer(s)"
+msgstr "Indirizzo del/dei consumatore(i)"
 
 #: apps/manager/amendment_forms.py apps/orders/ui/forms.py
 msgid "Address, second line"
@@ -2532,6 +2544,10 @@ msgstr "Dati"
 msgid "Date"
 msgstr "Data"
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "Date of the form"
+msgstr "Data del modulo"
+
 #: apps/events/models.py
 msgid ""
 "Dates and times of a repeating event that are skipped, for example a holiday. If you leave it "
@@ -2932,7 +2948,7 @@ msgstr "In vigore dal"
 msgid "effective from"
 msgstr "in vigore dal"
 
-#: apps/compliance/templates/compliance/consumer_information.html
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid "Effects of withdrawal"
 msgstr "Effetti del recesso"
 
@@ -3165,7 +3181,7 @@ msgstr "IVA esclusa"
 msgid "Excludes"
 msgstr "Esclude"
 
-#: apps/compliance/templates/compliance/consumer_information.html
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid "Exclusions and early expiry"
 msgstr "Esclusioni e cessazione anticipata del diritto di recesso"
 
@@ -3958,13 +3974,13 @@ msgstr "Approvo specificamente, una per una, le clausole onerose elencate sopra.
 msgid "I understand and want to erase my account"
 msgstr "Ho capito e voglio cancellare il mio account"
 
-#: apps/compliance/templates/compliance/consumer_information.html
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
 msgid ""
-"If a seller delivers the goods of your order in several shipments, the period for that seller's "
-"contract runs from the day you receive the last item."
+"I/We (*) hereby give notice that I/We (*) withdraw from my/our (*) contract of sale of the "
+"following goods (*)"
 msgstr ""
-"Se un venditore consegna i beni del tuo ordine in più spedizioni, il termine per il contratto con "
-"quel venditore decorre dal giorno in cui ricevi l'ultimo bene."
+"Con la presente io/noi (*) notifico/notifichiamo (*) il mio/nostro (*) recesso dal contratto di "
+"vendita dei seguenti beni (*)"
 
 #: apps/vendors/templates/vendors/apply/sent.html
 msgid ""
@@ -4007,6 +4023,35 @@ msgstr ""
 "Se non ha presentato Lei la candidatura per vendere con noi, annulli qui. Eliminiamo subito la "
 "candidatura e l’account creato con essa e non conserviamo nulla. Potrà candidarsi di nuovo in "
 "seguito, se lo desidera."
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"If you order several goods in one order and they are delivered separately, the withdrawal period "
+"will expire after %(days)s days from the day on which you, or a third party other than the carrier"
+" and indicated by you, acquire physical possession of the last good."
+msgstr ""
+"Se Lei ordina più beni mediante un solo ordine e questi sono consegnati separatamente, il periodo "
+"di recesso scade dopo %(days)s giorni dal giorno in cui Lei o un terzo, diverso dal vettore e da "
+"Lei designato, acquisisce il possesso fisico dell'ultimo bene."
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"If you withdraw from this contract, we shall reimburse to you all payments received from you, "
+"including the costs of delivery (with the exception of the supplementary costs resulting from your"
+" choice of a type of delivery other than the least expensive type of standard delivery offered by "
+"us), without undue delay and in any event not later than 14 days from the day on which we receive "
+"the notice of your decision to withdraw from this contract. We will carry out such reimbursement "
+"using the same means of payment as you used for the initial transaction, unless you have expressly"
+" agreed otherwise; in any event, you will not incur any fees as a result of such reimbursement."
+msgstr ""
+"Se Lei recede dal presente contratto, Le rimborseremo tutti i pagamenti che abbiamo ricevuto da "
+"Lei, compresi i costi di consegna (ad eccezione degli eventuali costi supplementari derivanti "
+"dalla Sua scelta di un tipo di consegna diverso dal tipo meno costoso di consegna standard da noi "
+"offerto), senza indebito ritardo e in ogni caso entro 14 giorni dal giorno in cui riceviamo la "
+"comunicazione della sua decisione di recedere dal presente contratto. Il rimborso sarà effettuato "
+"utilizzando lo stesso mezzo di pagamento da Lei usato per la transazione iniziale, salvo che Lei "
+"abbia espressamente convenuto altrimenti; in ogni caso, non dovrà sostenere alcun costo quale "
+"conseguenza di tale rimborso."
 
 #: apps/manager/event_block_forms.py
 msgid "Image"
@@ -4076,6 +4121,14 @@ msgstr ""
 #: apps/manager/forms.py
 msgid "In the store"
 msgstr "Nel negozio"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"In this information, 'we' means the seller of your order. Each seller in your order is a separate "
+"contract, so everything below applies to each seller separately."
+msgstr ""
+"In queste informazioni «noi» indica il venditore del suo ordine. Ogni venditore del suo ordine è "
+"un contratto distinto, quindi tutto quanto segue vale per ciascun venditore separatamente."
 
 #: apps/manager/product_views.py
 msgid "Incomplete"
@@ -4689,6 +4742,10 @@ msgstr "Mancante in %(language)s"
 msgid "Model or type"
 msgstr "Modello o tipo"
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "Model withdrawal form"
+msgstr "Modulo tipo di recesso"
+
 #: apps/manager/templates/manager/shop/events.html
 msgid "Moderation"
 msgstr "Moderazione"
@@ -4752,6 +4809,10 @@ msgstr "Nome"
 #: apps/catalog/taxonomy.py
 msgid "name"
 msgstr "nome"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "Name of consumer(s)"
+msgstr "Nome del/dei consumatore(i)"
 
 #: apps/manager/fitment_shop_forms.py
 msgid "Name of the missing item"
@@ -5782,6 +5843,10 @@ msgstr "Aggiornamento ordine %(order_number)s — Ordine annullato e rimborso in
 msgctxt "(L)"
 msgid "Order update %(order_number)s: partial refund for an unavailable item"
 msgstr "Aggiornamento ordine %(order_number)s — Rimborso parziale per articolo non disponibile"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "Ordered on (*) / received on (*)"
+msgstr "Ordinato il (*) / ricevuto il (*)"
 
 #: apps/orders/ui/present.py
 msgid "Ordering is not available right now. Please try again later."
@@ -7099,6 +7164,7 @@ msgid "Revoke %(role)s"
 msgstr "Revoca %(role)s"
 
 #: apps/compliance/templates/compliance/consumer_information.html
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid "Right of withdrawal"
 msgstr "Diritto di recesso"
 
@@ -7635,6 +7701,10 @@ msgstr "Esci"
 #: apps/accounts/templates/accounts/sessions/list.html
 msgid "Sign out of this session"
 msgstr "Esci da questa sessione"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "Signature of consumer(s) (only if this form is notified on paper)"
+msgstr "Firma del/dei consumatore(i) (solo se il presente modulo è notificato in formato cartaceo)"
 
 #: apps/manager/templates/manager/platform/user_sessions.html
 msgid "Signed-in sessions"
@@ -10250,6 +10320,17 @@ msgstr ""
 msgid "The review is recorded and the payouts are released."
 msgstr "La verifica è registrata e i pagamenti sono sbloccati."
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"The right of withdrawal does not apply to goods made to the consumer's specifications or clearly "
+"personalised, to goods liable to deteriorate or expire rapidly, or to sealed goods not suitable "
+"for return for health protection or hygiene reasons that were unsealed after delivery."
+msgstr ""
+"Il diritto di recesso non si applica ai beni confezionati su misura del consumatore o chiaramente "
+"personalizzati, ai beni che rischiano di deteriorarsi o scadere rapidamente e ai beni sigillati "
+"che non si prestano a essere restituiti per motivi igienici o di protezione della salute e che "
+"sono stati aperti dopo la consegna."
+
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "the right of withdrawal is for consumers; this order was placed as a business."
 msgstr "il diritto di recesso spetta ai consumatori; questo ordine è stato effettuato come azienda."
@@ -10314,10 +10395,29 @@ msgstr ""
 msgid "The seller (default)"
 msgstr "Il venditore (predefinito)"
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"The seller can state further exclusions for its own products in its terms: see the seller's terms "
+"in your order summary."
+msgstr ""
+"Il venditore può indicare ulteriori esclusioni per i propri prodotti nelle sue condizioni: vedi le"
+" condizioni del venditore nel riepilogo del suo ordine."
+
 #: apps/orders/amendments.py
 msgid "The seller cannot deliver to %(place)s, so the address cannot be changed to it (%(why)s)"
 msgstr ""
 "Il venditore non consegna a %(place)s, quindi l’indirizzo non si può cambiare così (%(why)s)"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"The seller decides who bears the direct cost of returning the goods and may apply different rules "
+"to some products or categories: see the seller's terms in your order summary. If the seller states"
+" nothing, the seller bears the cost of returning the goods."
+msgstr ""
+"Chi sostiene i costi diretti della restituzione dei beni è stabilito dal venditore, che può "
+"applicare regole diverse a singoli prodotti o categorie: vedi le condizioni del venditore nel "
+"riepilogo del suo ordine. Se il venditore non indica nulla, i costi della restituzione dei beni "
+"sono a carico del venditore."
 
 #: apps/orders/amendments.py
 msgid ""
@@ -10326,22 +10426,6 @@ msgid ""
 msgstr ""
 "Il venditore non ha un prezzo di spedizione fisso per %(place)s, quindi l’indirizzo non si può "
 "cambiare così: servirebbe un preventivo di spedizione, che le modifiche non gestiscono ancora."
-
-#: apps/compliance/templates/compliance/consumer_information.html
-msgid ""
-"The seller refunds every payment received for the contract, including the standard delivery costs,"
-" without undue delay and at the latest 14 days after learning of your withdrawal. The refund uses "
-"the payment method you used. The seller may withhold it until the goods are back or you show proof"
-" of sending them. You return the goods without undue delay and at the latest 14 days after your "
-"withdrawal. You are liable for any loss of value caused by handling beyond what is needed to check"
-" the goods."
-msgstr ""
-"Il venditore rimborsa tutti i pagamenti ricevuti per il contratto, comprese le spese di consegna "
-"standard, senza indebito ritardo ed entro 14 giorni dal giorno in cui viene informato del tuo "
-"recesso. Il rimborso avviene con lo stesso mezzo di pagamento che hai usato. Il venditore può "
-"trattenere il rimborso fino al ricevimento dei beni o finché non dimostri di averli spediti. "
-"Restituisci i beni senza indebito ritardo ed entro 14 giorni dal recesso. Rispondi della "
-"diminuzione di valore solo se deriva da una manipolazione dei beni non necessaria per verificarli."
 
 #: apps/vendors/models.py
 msgid "The seller these terms belong to."
@@ -10985,6 +11069,14 @@ msgstr "il termine di recesso è scaduto."
 msgid "The withdrawal period starts when you receive the goods; you can withdraw before then."
 msgstr "Il termine di recesso decorre da quando ricevi i beni; puoi recedere anche prima."
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"The withdrawal period will expire after %(days)s days from the day on which you, or a third party "
+"other than the carrier and indicated by you, acquire physical possession of the goods."
+msgstr ""
+"Il periodo di recesso scade dopo %(days)s giorni dal giorno in cui Lei o un terzo, diverso dal "
+"vettore e da Lei designato, acquisisce il possesso fisico dei beni."
+
 #: apps/catalog/attributes.py
 msgid ""
 "The word buyers see for this value in this language, for example 'Red'. Required: without it the "
@@ -11098,19 +11190,6 @@ msgid ""
 msgstr ""
 "Per questo link non c’è nessuna candidatura in attesa: è stata annullata, confermata o è scaduta. "
 "Non c’è altro da fare."
-
-#: apps/compliance/templates/compliance/consumer_information.html
-msgid ""
-"There is no right of withdrawal for goods made to your specifications or clearly personalised, for"
-" goods that spoil quickly, and for sealed goods that are not suitable for return for health or "
-"hygiene reasons once you have unsealed them. The right also ends early for goods that, after "
-"delivery, were inseparably mixed with other items."
-msgstr ""
-"Il diritto di recesso non si applica ai beni confezionati su misura o chiaramente personalizzati, "
-"ai beni che rischiano di deteriorarsi rapidamente e ai beni sigillati che non si prestano a essere"
-" restituiti per motivi igienici o di protezione della salute, se li hai aperti dopo la consegna. "
-"Il diritto cessa in anticipo anche per i beni che, dopo la consegna, sono stati inscindibilmente "
-"mescolati con altri beni."
 
 #: apps/manager/templates/manager/shop/termination.html
 msgid "There is no termination notice for your shop."
@@ -11737,15 +11816,18 @@ msgstr ""
 msgid "To confirm, type <strong>%(word)s</strong>."
 msgstr "Per confermare, scrivi <strong>%(word)s</strong>."
 
-#: apps/compliance/templates/compliance/consumer_information.html
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
-"To exercise the right of withdrawal, you must inform the seller of your decision by a clear "
-"statement, for example by post or email. The period is met if you send the statement before it "
-"ends."
+"To exercise the right of withdrawal, you must inform us (name, postal address, telephone number "
+"and email address: see the seller's details in your order confirmation) of your decision to "
+"withdraw from this contract by an unequivocal statement (for example a letter sent by post or an "
+"email). You may use the model withdrawal form below, but it is not obligatory."
 msgstr ""
-"Per esercitare il diritto di recesso devi informare il venditore della tua decisione con una "
-"dichiarazione esplicita, ad esempio per posta o e-mail. Il termine è rispettato se invii la "
-"dichiarazione prima della sua scadenza."
+"Per esercitare il diritto di recesso, Lei è tenuto a informarci (nome, indirizzo postale, numero "
+"di telefono e indirizzo e-mail: vedi i dati del venditore nella conferma d'ordine) della sua "
+"decisione di recedere dal presente contratto tramite una dichiarazione esplicita (ad esempio "
+"lettera inviata per posta o e-mail). Lei può utilizzare il modulo tipo di recesso qui sotto, ma "
+"non è obbligatorio."
 
 #: apps/shipping/models.py
 msgid ""
@@ -11763,6 +11845,14 @@ msgstr ""
 "Per limitare la zona ad alcune province o stati, elenca i loro codici separati da virgole, per "
 "esempio 'SS' o 'CA'."
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"To meet the withdrawal deadline, it is sufficient for you to send your communication concerning "
+"your exercise of the right of withdrawal before the withdrawal period has expired."
+msgstr ""
+"Per rispettare il termine di recesso, è sufficiente che Lei invii la comunicazione relativa "
+"all'esercizio del diritto di recesso prima della scadenza del periodo di recesso."
+
 #: apps/compliance/templates/compliance/consumer_information.html
 msgid ""
 "To withdraw online, use the button below at any time during the withdrawal period. You enter the "
@@ -11776,6 +11866,12 @@ msgstr ""
 #: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "To year"
 msgstr "All'anno"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid ""
+"To: the seller of the order (name, postal address and email address: see the order confirmation)"
+msgstr ""
+"Al venditore dell'ordine (nome, indirizzo postale e indirizzo e-mail: vedi la conferma d'ordine)"
 
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py
 msgid "Too many attempts. Please try again later."
@@ -12393,6 +12489,14 @@ msgstr ""
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 msgid "We have refunded %(refund)s EUR to the payment method you used."
 msgstr "Ti abbiamo rimborsato %(refund)s EUR sullo stesso metodo di pagamento che hai usato."
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"We may withhold reimbursement until we have received the goods back or you have supplied evidence "
+"of having sent back the goods, whichever is the earliest."
+msgstr ""
+"Possiamo trattenere il rimborso finché non avremo ricevuto i beni oppure finché Lei non avrà "
+"dimostrato di aver spedito i beni, a seconda di quale situazione si verifichi per prima."
 
 #: apps/catalog/templates/catalog/includes/product_returns.html
 msgid "We pay the return shipping"
@@ -13303,6 +13407,15 @@ msgstr ""
 "Hai effettuato l’accesso come %(username)s, ma non sei autorizzato ad accedere a questa pagina. "
 "Vuoi accedere con un altro account?"
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"You are only liable for any diminished value of the goods resulting from handling other than what "
+"is necessary to establish the nature, characteristics and functioning of the goods."
+msgstr ""
+"Lei è responsabile solo della diminuzione del valore dei beni risultante da una manipolazione "
+"diversa da quella necessaria per stabilire la natura, le caratteristiche e il funzionamento dei "
+"beni."
+
 #: apps/manager/templates/manager/forbidden.html
 msgid "You are signed in as %(user)s, and you do not have access to this part of the site."
 msgstr "Ha effettuato l’accesso come %(user)s e non ha accesso a questa parte del sito."
@@ -13406,18 +13519,16 @@ msgstr ""
 "Non ha ancora impostato una politica. Si applica quella standard: la spedizione del reso è a "
 "carico del negozio."
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"You have the right to withdraw from this contract within %(days)s days without giving any reason."
+msgstr ""
+"Lei ha il diritto di recedere dal presente contratto entro %(days)s giorni senza fornire alcuna "
+"motivazione."
+
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "You may also like"
 msgstr "Potrebbe piacerti anche"
-
-#: apps/compliance/templates/compliance/consumer_information.html
-msgid ""
-"You may withdraw from a distance contract within %(days)s days without giving a reason. The period"
-" runs from the day you receive the goods. Each seller in your order is a separate contract."
-msgstr ""
-"Puoi recedere da un contratto a distanza entro %(days)s giorni senza dover fornire alcuna "
-"motivazione. Il termine decorre dal giorno in cui ricevi i beni. Ogni venditore del tuo ordine è "
-"un contratto distinto."
 
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
@@ -13435,6 +13546,16 @@ msgid ""
 msgstr ""
 "Il %(when)s ha registrato che la fattura o lo scontrino di questo ordine è emesso. Ogni modifica "
 "successiva mostra il promemoria per correggerlo."
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"You shall send back the goods or hand them over to us without undue delay and in any event not "
+"later than 14 days from the day on which you communicate your withdrawal from this contract to us."
+" The deadline is met if you send back the goods before the period of 14 days has expired."
+msgstr ""
+"Lei è tenuto a restituire o consegnare i beni a noi senza indebito ritardo e in ogni caso entro 14"
+" giorni dal giorno in cui ci comunica il recesso dal presente contratto. Il termine è rispettato "
+"se Lei rispedisce i beni prima della scadenza del periodo di 14 giorni."
 
 #: apps/compliance/templates/compliance/privacy_account.html
 #: themes/ride/templates/compliance/privacy_account.html
