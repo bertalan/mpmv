@@ -2100,3 +2100,52 @@ def effective_sales_mode(
     if product_mode != BUY:
         return product_mode
     return vendor_sales_mode(vendor_mode, payout_ready=payout_ready, terms_ok=terms_ok)
+
+
+# --- Trader contact (CMP.41)
+
+
+@dataclasses.dataclass(frozen=True)
+class TraderContact:
+    """Who the consumer contracts with and how to reach them: the name, the geographic address,
+    the telephone and the email the withdrawal information must give per seller (Art. 246a
+    EGBGB Anlage 1, Gestaltungshinweis 2; the model form, Anlage 2). An empty phone means the
+    seller gave none: templates leave the line out and never show a made-up number."""
+
+    shop_name: str
+    legal_name: str
+    address: str
+    phone: str
+    email: str
+
+    def as_dict(self) -> dict[str, str]:
+        """Plain values for an email context (stored as JSON in the outbox)."""
+        return dataclasses.asdict(self)
+
+
+def postal_address(street: str, number: str, postal_code: str, city: str, country: str) -> str:
+    """One line: "street number, postal code city, country", empty parts left out."""
+    first = " ".join(p for p in (street.strip(), number.strip()) if p)
+    town = " ".join(p for p in (postal_code.strip(), city.strip()) if p)
+    return ", ".join(p for p in (first, town, country.strip()) if p)
+
+
+def trader_contact(
+    *,
+    shop_name: str,
+    legal_name: str,
+    street: str,
+    street_number: str,
+    postal_code: str,
+    city: str,
+    country: str,
+    phone: str,
+    email: str,
+) -> TraderContact:
+    return TraderContact(
+        shop_name=shop_name,
+        legal_name=legal_name.strip() or shop_name,
+        address=postal_address(street, street_number, postal_code, city, country),
+        phone=phone.strip(),
+        email=email.strip(),
+    )
