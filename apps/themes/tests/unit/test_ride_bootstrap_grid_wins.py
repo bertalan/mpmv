@@ -42,7 +42,8 @@ def test_a_bootstrap_cart_line_is_not_a_narrow_grid(ride_css: str) -> None:
 
 def test_the_quantity_stepper_fits_two_44px_buttons_and_the_field(ride_css: str) -> None:
     widths = re.findall(r"\.quantity\{max-inline-size:(\d+)rem", ride_css)
-    assert widths and int(widths[-1]) >= 14
+    assert widths
+    assert int(widths[-1]) >= 14
 
 
 @pytest.mark.parametrize("name", ["listing.html", "search.html"])
