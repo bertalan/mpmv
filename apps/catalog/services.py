@@ -31,7 +31,6 @@ from django.db.models.functions import Length
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.module_loading import import_string
-from django.utils.translation import gettext_lazy
 
 from apps.core import translations
 from apps.core.audit import AuditContext, record
@@ -2159,10 +2158,6 @@ def vendor_anchor(slug: str, language: str) -> ListingAnchor | None:
     return _vendor_anchor(vendor)
 
 
-# The storefront name when the vendor has no public name (a person's legal name, SEO.15).
-_NO_PUBLIC_NAME = gettext_lazy("Seller")
-
-
 def _vendor_anchor(vendor: Vendor) -> ListingAnchor:
     texts = set(
         vendor.translations.filter(status=translations.PUBLISHED).values_list("language", flat=True)
@@ -2174,7 +2169,7 @@ def _vendor_anchor(vendor: Vendor) -> ListingAnchor:
     }
     return ListingAnchor(
         scope=ListingScope(vendor=vendor),
-        name=public_name(vendor) or str(_NO_PUBLIC_NAME),
+        name=public_name(vendor) or "",
         paths=paths,
         published=published or (translations.source_language(),),
     )
@@ -2218,7 +2213,7 @@ def listing_names(scopes: Sequence[ListingScope], language: str) -> list[str]:
         elif scope.brand is not None:
             names.append(str(scope.brand.name))
         elif scope.vendor is not None:
-            names.append(public_name(scope.vendor) or str(_NO_PUBLIC_NAME))
+            names.append(public_name(scope.vendor) or "")
         else:
             names.append("")
     return names

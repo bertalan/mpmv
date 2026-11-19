@@ -10,14 +10,17 @@ import datetime as dt
 
 import pytest
 from django.apps import apps
-from django.test import Client
+from django.test import Client, RequestFactory
 from django.utils import timezone
 from wagtail.models import Site
 
 from apps.catalog import listings, services
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
+from apps.cms import services as cms_services
+from apps.cms.blocks import _vendor_targets
 from apps.cms.services import seed_site
+from apps.cms.tests.factories import VendorLandingPageFactory
 from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.events.tests.factories import EventPageFactory, primary_index
@@ -88,9 +91,10 @@ def test_the_storefront_heading_and_title_do_not_name_the_person() -> None:
     assert PERSON not in html
     anchor = services.scope_anchor(services.ListingScope(vendor=vendor), primary_language())
     assert anchor is not None
-    assert anchor.name
-    assert anchor.name != PERSON
-    assert services.listing_names([services.ListingScope(vendor=vendor)], "en") == [anchor.name]
+    assert anchor.name == ""
+    assert services.listing_names([services.ListingScope(vendor=vendor)], primary_language()) == [
+        anchor.name
+    ]
 
 
 def test_the_vendor_filter_does_not_offer_the_person() -> None:
@@ -113,3 +117,48 @@ def test_event_surfaces_do_not_name_the_person() -> None:
     base = str(primary_index().url)
     for path in (f"vendor/{page.vendor.slug}/feed.rss", f"vendor/{page.vendor.slug}/calendar.ics"):
         assert PERSON not in _get(base + path)
+
+
+def test_the_cms_card_and_the_story_link_leave_out_a_person() -> None:
+    person = _person()
+    shop = VendorFactory.create(status=Vendor.Status.ACTIVE, display_name="Quill Shop")
+    assert set(_vendor_targets([person, shop], primary_language())) == {shop.pk}
+    for vendor in (person, shop):
+        VendorLandingPageFactory.create(
+            vendor=vendor, title=f"Story {vendor.pk}"
+        ).save_revision().publish()
+    story = cms_services._vendor_story(RequestFactory().get("/"), person, primary_language())
+    assert story is None
+    shown = cms_services._vendor_story(RequestFactory().get("/"), shop, primary_language())
+    assert shown is not None
+    assert "Quill Shop" in shown.before
+
+
+def test_a_sole_trader_shop_name_is_shown_on_events_and_feeds() -> None:
+    start = (timezone.now() + dt.timedelta(days=10)).replace(minute=0, second=0, microsecond=0)
+    vendor = VendorFactory.create(
+        status=Vendor.Status.ACTIVE,
+        display_name="Quill Ceramics",
+        legal_name=PERSON,
+        first_name="Zorro",
+        last_name="Quillfeather",
+        legal_form=Vendor.LegalForm.SOLE_PROPRIETORSHIP,
+    )
+    page = EventPageFactory.create(
+        vendor=vendor, title="Quill fair", starts_at=start, ends_at=start + dt.timedelta(hours=8)
+    )
+    page.save_revision().publish()
+    page.refresh_from_db()
+    assert "Quill Ceramics" in _get(page.url)
+    feed = _get(str(primary_index().url) + f"vendor/{vendor.slug}/feed.rss")
+    assert "Quill Ceramics" in feed
+    assert PERSON not in feed
+
+
+def test_the_site_links_list_leaves_out_a_person() -> None:
+    from apps.seo import site_links
+
+    _person()
+    VendorFactory.create(status=Vendor.Status.ACTIVE, display_name="Quill Shop")
+    labels = [link.label for link in site_links._shops(primary_language()).links]
+    assert labels == ["Quill Shop"]
