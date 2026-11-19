@@ -251,7 +251,6 @@ msgstr "(*) Cancellare la dicitura inutile."
 msgid "(Complete and return this form only if you wish to withdraw from the contract.)"
 msgstr "(Compilare e restituire il presente modulo solo se si desidera recedere dal contratto.)"
 
-#: apps/orders/templates/orders/customer_order.html
 #: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "(opens the carrier's site)"
 msgstr "(si apre il sito del corriere)"
@@ -7481,7 +7480,7 @@ msgstr "Venditore"
 
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid "Seller details"
 msgstr "Dati del venditore"
 
@@ -13652,7 +13651,7 @@ msgstr ""
 "Hai 14 giorni dalla consegna per recedere, anche con il pulsante di recesso online. Paghi tu il "
 "costo diretto della restituzione dei beni. %(info)s"
 
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid ""
 "You have a separate contract with each seller. These are the details to contact each seller, also "
 "to withdraw."

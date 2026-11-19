@@ -255,7 +255,6 @@ msgstr ""
 "(Veuillez compléter et renvoyer le présent formulaire uniquement si vous souhaitez vous rétracter "
 "du contrat.)"
 
-#: apps/orders/templates/orders/customer_order.html
 #: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "(opens the carrier's site)"
 msgstr "(ouvre le site du transporteur)"
@@ -7548,7 +7547,7 @@ msgstr "Vendeur"
 
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid "Seller details"
 msgstr "Coordonnées du vendeur"
 
@@ -13791,7 +13790,7 @@ msgstr ""
 "Tu disposes de 14 jours à compter de la livraison pour te rétracter, y compris via le bouton de "
 "rétractation en ligne. Tu paies le coût direct du renvoi des biens. %(info)s"
 
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid ""
 "You have a separate contract with each seller. These are the details to contact each seller, also "
 "to withdraw."

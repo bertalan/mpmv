@@ -256,7 +256,6 @@ msgstr ""
 "(Wenn Sie den Vertrag widerrufen wollen, dann füllen Sie bitte dieses Formular aus und senden Sie "
 "es zurück.)"
 
-#: apps/orders/templates/orders/customer_order.html
 #: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "(opens the carrier's site)"
 msgstr "(öffnet die Website des Versanddienstleisters)"
@@ -7554,7 +7553,7 @@ msgstr "Verkäufer"
 
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid "Seller details"
 msgstr "Angaben zum Verkäufer"
 
@@ -13831,7 +13830,7 @@ msgstr ""
 "Du hast ab Lieferung 14 Tage Zeit für den Widerruf, auch über die Online-Widerrufsschaltfläche. Du"
 " trägst die unmittelbaren Kosten der Rücksendung der Waren. %(info)s"
 
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid ""
 "You have a separate contract with each seller. These are the details to contact each seller, also "
 "to withdraw."

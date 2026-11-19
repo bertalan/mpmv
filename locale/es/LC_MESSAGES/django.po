@@ -252,7 +252,6 @@ msgstr "(*) Táchese lo que no proceda."
 msgid "(Complete and return this form only if you wish to withdraw from the contract.)"
 msgstr "(Solo debe cumplimentar y enviar el presente formulario si desea desistir del contrato.)"
 
-#: apps/orders/templates/orders/customer_order.html
 #: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "(opens the carrier's site)"
 msgstr "(abre el sitio del transportista)"
@@ -7486,7 +7485,7 @@ msgstr "Vendedor"
 
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid "Seller details"
 msgstr "Datos del vendedor"
 
@@ -13658,7 +13657,7 @@ msgstr ""
 "Dispones de 14 días desde la entrega para desistir, también mediante el botón de desistimiento en "
 "línea. Tú pagas el coste directo de devolver los bienes. %(info)s"
 
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid ""
 "You have a separate contract with each seller. These are the details to contact each seller, also "
 "to withdraw."
