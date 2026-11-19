@@ -295,6 +295,9 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
         "other_sellers": product_pages.other_sellers(page.product, language),
         "specifications": specifications,
         "fitment": fitment,
+        "return_terms": (
+            product_pages.return_terms(page.vendor) if page.price is not None else None
+        ),
         # The product page's tabs (ride): the first one with content is the open one.
         "first_tab": (
             "description"

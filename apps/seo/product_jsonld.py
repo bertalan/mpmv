@@ -36,14 +36,13 @@ from apps.catalog import engine as catalog_engine
 from apps.catalog import services as catalog
 from apps.catalog import slugs
 from apps.catalog.models import VariantOption
-from apps.catalog.product_pages import GalleryImage, ProductPage
+from apps.catalog.product_pages import GalleryImage, ProductPage, page_return_policy
 from apps.core.money import CURRENCY
 from apps.core.services import NoPlatformOperator, current_operator
 from apps.shipping import engine as shipping_engine
 from apps.shipping import services as shipping
 from apps.tax.prices import PriceUnavailable, consumer_price, estimated_country
 from apps.vendors.models import Vendor
-from apps.vendors.return_services import effective_return_policy
 
 from . import product_graph as pg
 from . import seller as seller_name
@@ -244,9 +243,7 @@ def build_graph(
     if sold:
         shipping_nodes, shipping_ids, countries = _shipping_nodes(page, url, language, request)
         if countries:
-            stated = effective_return_policy(
-                vendor
-            )  # one query; approved, else the shop-pays default
+            stated = page_return_policy(vendor)  # one query; approved, else the shop-pays default
             return_policy = pg.return_policy_node(
                 node_id=f"{vendor_url}#return-policy",
                 countries=sorted(countries),
