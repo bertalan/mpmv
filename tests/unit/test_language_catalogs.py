@@ -654,6 +654,25 @@ def test_the_model_withdrawal_strings_are_translated_and_in_the_formal_register(
             assert needle in hits[0], prefix
 
 
+@pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
+def test_model_withdrawal_contact_line_points_to_the_order_confirmation(lang: str) -> None:
+    # I18N.20 (#832 point 3): name, address, phone and email are in the order confirmation (page
+    # and email) and in the checkout summary, not "only at checkout".
+    entries = [e for e in _po(lang) if _only_in_model_withdrawal(e) and "postal address" in e.msgid]
+    assert len(entries) == 2
+    for entry in entries:
+        assert "see the seller details in your order confirmation" in entry.msgid
+        assert "telephone number" in entry.msgid
+        assert "shown at checkout" not in entry.msgid
+        assert "before you place the order" not in entry.msgid
+        assert _texts(entry).strip()
+    if lang == "de":
+        for entry in entries:
+            assert "Telefonnummer" in entry.msgstr
+            assert "Bestellbestätigung" in entry.msgstr
+            assert "vor Abgabe der Bestellung" not in entry.msgstr
+
+
 def test_german_model_withdrawal_titles_and_form_date_follow_annexes_1_and_2() -> None:
     de = {e.msgid: e.msgstr for e in _po("de")}
     assert de["Withdrawal information"] == "Widerrufsbelehrung"
