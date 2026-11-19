@@ -1,6 +1,7 @@
 """System checks of the CMS (CMS.1), registered in `CmsConfig.ready`.
 
 - cms.E002: MPMV_VENDOR_GUIDE_URL is empty or an absolute https URL (ARC.32).
+- cms.E005: the "Content snippet review" workflow exists and is active (CMS.14).
 - cms.E004: no live root-level page uses a reserved slug (ARC.37).
 - cms.E003: MPMV_VIDEO_EMBED_ORIGINS holds plain https origins only (THM.14).
 - cms.E001 (deploy): WAGTAILADMIN_BASE_URL is the public address of the site. Wagtail puts it in
@@ -111,4 +112,34 @@ def check_reserved_root_slugs(
             id="cms.E004",
         )
         for slug, language in clashing
+    ]
+
+
+def check_snippet_workflow(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """cms.E005: the "Content snippet review" workflow exists and is active (CMS.14). Without it
+    a snippet edit would publish with no review, so publishing is refused and a deploy fails
+    here. Skipped while the database is unavailable or the snippet table is not migrated yet
+    (`migrate` runs its checks first and creates the workflow afterwards)."""
+    from django.db import DatabaseError, connection
+
+    from .models import ContentSnippet, content_snippet_workflow
+
+    try:
+        if ContentSnippet._meta.db_table not in connection.introspection.table_names():
+            return []
+        workflow = content_snippet_workflow()
+    except DatabaseError:
+        return []
+    if workflow is not None and workflow.active:
+        return []
+    state = "is missing" if workflow is None else "is switched off"
+    return [
+        checks.Error(
+            f'The "Content snippet review" workflow {state}, so snippet edits would publish '
+            "without review.",
+            hint="Run `manage.py migrate` to create it, or switch it on in Settings > Workflows.",
+            id="cms.E005",
+        )
     ]

@@ -26,6 +26,7 @@ from apps.catalog.models import Brand, Category, Taxonomy, Term
 from apps.core.services import NoPlatformOperator, current_operator
 from apps.vendors.models import Vendor
 
+from . import seller
 from .site_links_engine import LIMIT, Link, Section, routed_links, section, tree_links
 
 PAGE_LIMIT = 200  # CMS pages per language: the tree is the main thing to test
@@ -119,10 +120,11 @@ def _shops(language: str) -> Section:
     vendors = Vendor.objects.filter(status=Vendor.Status.ACTIVE).order_by("display_name", "id")
     links = [
         Link(
-            label=str(vendor.display_name),
+            label=shown,
             path=reverse("catalog:vendor", kwargs={"segment": segment, "slug": vendor.slug}),
         )
         for vendor in vendors[:LIMIT]
+        if (shown := seller.public_name(vendor))  # a person's legal name is never listed (SEO.15)
     ]
     return section(_("Shops"), links, total=vendors.count())
 

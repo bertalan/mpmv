@@ -1,0 +1,29 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}The versions of the trust rules (TRU.1 part 2): read only, newest first.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p class="manager-lead">{% translate "The thresholds behind the vendor trust badges. A change is a new version from a date; an old version is never edited, so every stored result stays explainable." %}</p>
+  <div class="table-scroll" role="region" aria-labelledby="trust-rules-caption" tabindex="0">
+    <table class="table" data-trust-rules>
+      <caption id="trust-rules-caption">{{ title }}</caption>
+      <thead><tr>
+        <th scope="col">{% translate "Version" %}</th>
+        <th scope="col">{% translate "Valid from" %}</th>
+        <th scope="col">{% translate "Valid to" %}</th>
+        <th scope="col">{% translate "Status" %}</th>
+        <th scope="col">{% translate "Note" %}</th>
+      </tr></thead>
+      <tbody>
+        {% for row in versions %}<tr>
+          <th scope="row"><a href="{% url 'manager:platform:trust_rule' row.rules.version %}">{% blocktranslate with n=row.rules.version %}Version {{ n }}{% endblocktranslate %}</a></th>
+          <td>{{ row.rules.valid_from|date:"SHORT_DATETIME_FORMAT" }}</td>
+          <td>{% if row.rules.valid_to %}{{ row.rules.valid_to|date:"SHORT_DATETIME_FORMAT" }}{% else %}{% translate "Open" %}{% endif %}</td>
+          <td>{% if row.in_force %}<strong>{% translate "In force" %}</strong>{% else %}{% translate "Not in force" %}{% endif %}</td>
+          <td>{{ row.rules.note }}</td>
+        </tr>
+        {% empty %}<tr><td colspan="5">{% translate "Nothing to show." %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

@@ -931,6 +931,15 @@ ENDPOINTS: dict[str, Access] = {
         "The amendment settings in force (ORD.20 part 3): platform configuration, no vendor "
         "data; the configuration role and the platform owner only."
     ),
+    "manager:platform:trust_rules": StaffOnly(
+        "The trust rules versions (TRU.1 part 2): platform configuration, no vendor data; the "
+        "configuration role and the platform owner only."
+    ),
+    "manager:platform:trust_rule": StaffOnly(
+        "One trust rules version (TRU.1 part 2): platform configuration, no vendor data; the "
+        "configuration role and the platform owner only.",
+        kwargs={"version": "1"},
+    ),
     "manager:platform:terminations": StaffOnly(
         "Notices of termination (CMP.5 part 4): platform data; needs the "
         "compliance.review_notices permission, so a vendor member gets 404."

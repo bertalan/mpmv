@@ -29,6 +29,7 @@ from .statement_views import SECTION as STATEMENTS_SECTION
 from .termination_views import PLATFORM_SECTION as TERMINATIONS_SECTION
 from .termination_views import SHOP_SECTION as TERMINATION_SECTION
 from .termination_views import can_give_notice
+from .trust_views import SECTION as TRUST_RULES_SECTION
 
 
 def can_review_profiles_section(ctx: Any) -> bool:
@@ -251,6 +252,15 @@ BUILT_IN = (
         "manager:platform:amendment_settings",
         order=85,
         allowed=platform_role(AMENDMENT_SETTINGS_SECTION),
+    ),
+    # TRU.1 part 2: the trust rules versions (configuration role and the owner).
+    Section(
+        TRUST_RULES_SECTION,
+        Space.PLATFORM,
+        _("Trust rules"),
+        "manager:platform:trust_rules",
+        order=86,
+        allowed=platform_role(TRUST_RULES_SECTION),
     ),
     Section(
         "platform.staff_roles",

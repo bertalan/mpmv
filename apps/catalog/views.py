@@ -129,7 +129,7 @@ def _trail(name: str, location: str) -> list[dict[str, str]]:
     return [
         {"label": str(_("Home")), "url": reverse("home")},
         {"label": name, "url": location},
-    ]
+    ][: 2 if name else 1]
 
 
 def _listing(

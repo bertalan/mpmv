@@ -125,7 +125,11 @@ msgstr "%(label)s, liste"
 msgid "%(low)s to %(high)s working days"
 msgstr "de %(low)s à %(high)s jours ouvrés"
 
-#: apps/manager/amendment_views.py apps/orders/amendment_engine.py
+#: apps/manager/trust_views.py
+msgid "%(n)s characters"
+msgstr "%(n)s caractères"
+
+#: apps/manager/amendment_views.py apps/manager/trust_views.py apps/orders/amendment_engine.py
 msgid "%(n)s days"
 msgstr "%(n)s jours"
 
@@ -1071,6 +1075,10 @@ msgstr "Toute la journée"
 msgid "All events of %(name)s"
 msgstr "Tous les événements de %(name)s"
 
+#: apps/events/templates/events/_storefront.html
+msgid "All events of this seller"
+msgstr "Tous les événements de ce vendeur"
+
 #: apps/cms/templates/cms/help_guide_section.html
 msgid "All help topics"
 msgstr "Tous les sujets d'aide"
@@ -1401,6 +1409,10 @@ msgstr ""
 msgid "Ask %(vendor)s about this product: it is not sold online."
 msgstr "Interrogez %(vendor)s au sujet de ce produit : il n'est pas vendu en ligne."
 
+#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
+msgid "Ask the seller about this product: it is not sold online."
+msgstr "Interrogez le vendeur sur ce produit : il n'est pas vendu en ligne."
+
 #: apps/manager/forms.py
 msgid "At a drop-off point"
 msgstr "Dans un point de dépôt"
@@ -1466,6 +1478,10 @@ msgstr "Retour à la sécurité du compte"
 #: apps/catalog/templates/catalog/search.html themes/ride/templates/catalog/search.html
 msgid "Back to all results"
 msgstr "Retour à tous les résultats"
+
+#: apps/manager/templates/manager/platform/trust_rules_detail.html
+msgid "Back to all versions"
+msgstr "Retour à toutes les versions"
 
 #: apps/orders/templates/orders/customer_order.html
 msgid "Back to my orders"
@@ -1623,6 +1639,10 @@ msgstr "Lien du bouton"
 #: apps/cms/blocks.py apps/manager/event_block_forms.py
 msgid "Button text"
 msgstr "Texte du bouton"
+
+#: apps/manager/trust_views.py
+msgid "Buyers needed per country"
+msgstr "Acheteurs nécessaires par pays"
 
 #: apps/cms/templates/cms/includes/article_meta.html
 msgid "By %(name)s"
@@ -2402,6 +2422,10 @@ msgstr "Corriger l’adresse de livraison, comme le client l’a demandé"
 msgid "Corrected as the customer asked"
 msgstr "Corrigée comme le client l’a demandé"
 
+#: apps/manager/trust_views.py
+msgid "Countries served"
+msgstr "Pays desservis"
+
 #: apps/manager/amendment_forms.py apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "Country"
 msgstr "Pays"
@@ -2723,6 +2747,14 @@ msgstr "Découvre-le"
 msgid "Dismiss"
 msgstr "Fermer"
 
+#: apps/manager/trust_views.py
+msgid "Dispatch on time"
+msgstr "Expédition dans les délais"
+
+#: apps/manager/trust_views.py
+msgid "Disputes"
+msgstr "Litiges"
+
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid "Do it once"
 msgstr "Le faire une seule fois"
@@ -2833,6 +2865,14 @@ msgstr ""
 #: apps/manager/fitment_forms.py
 msgid "Earliest year"
 msgstr "Année la plus ancienne"
+
+#: apps/manager/trust_views.py
+msgid "Earned at"
+msgstr "Obtenu à"
+
+#: apps/manager/trust_views.py
+msgid "Earned at or below"
+msgstr "Obtenu à au plus"
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Edit"
@@ -3923,6 +3963,11 @@ msgstr "lot d'import"
 msgid "Important:"
 msgstr "Important :"
 
+#: apps/manager/templates/manager/platform/trust_rules.html
+#: apps/manager/templates/manager/platform/trust_rules_detail.html
+msgid "In force"
+msgstr "En vigueur"
+
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "in force"
 msgstr "en vigueur"
@@ -4397,6 +4442,14 @@ msgstr "URL source du logo"
 msgid "Longitude"
 msgstr "Longitude"
 
+#: apps/manager/trust_views.py
+msgid "Lost above"
+msgstr "Perdu au-dessus de"
+
+#: apps/manager/trust_views.py
+msgid "Lost below"
+msgstr "Perdu en dessous de"
+
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Lost your device?"
 msgstr "Vous avez perdu votre appareil ?"
@@ -4857,6 +4910,11 @@ msgstr "Non attendu"
 msgid "Not for"
 msgstr "Pas pour"
 
+#: apps/manager/templates/manager/platform/trust_rules.html
+#: apps/manager/templates/manager/platform/trust_rules_detail.html
+msgid "Not in force"
+msgstr "Pas en vigueur"
+
 #: apps/manager/amendment_views.py
 msgid "not in the order"
 msgstr "pas dans la commande"
@@ -4936,7 +4994,9 @@ msgstr ""
 msgid "not yet"
 msgstr "pas encore"
 
-#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
+#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/platform/trust_rules.html
+#: apps/manager/templates/manager/platform/trust_rules_detail.html
+#: apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "Note"
 msgstr "Note"
 
@@ -4970,6 +5030,7 @@ msgstr "Rien n'est en attente"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/platform/trust_rules.html
 #: apps/manager/templates/manager/shop/_money_table.html
 #: apps/manager/templates/manager/shop/fitment_proposals.html
 #: apps/manager/templates/manager/shop/fitment_report.html
@@ -5361,6 +5422,10 @@ msgstr "Un préavis ne peut être donné qu'à des vendeurs actifs ou suspendus.
 msgid "Only when the event is hidden after a notice."
 msgstr "Uniquement lorsque l'événement est masqué à la suite d'un signalement."
 
+#: apps/manager/templates/manager/platform/trust_rules.html
+msgid "Open"
+msgstr "Ouverte"
+
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Open change"
 msgstr "Modification ouverte"
@@ -5528,6 +5593,10 @@ msgstr ""
 msgid "Order changes"
 msgstr "Modifications de commande"
 
+#: apps/manager/trust_views.py
+msgid "Order count tiers"
+msgstr "Paliers du nombre de commandes"
+
 #: apps/compliance/forms.py apps/manager/templates/manager/platform/orders.html
 msgid "Order number"
 msgstr "Numéro de commande"
@@ -5581,6 +5650,22 @@ msgstr "Les commandes ne sont pas encore ouvertes. Ton panier est conservé."
 #: apps/manager/sections.py apps/manager/site_map.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
 msgstr "Commandes"
+
+#: apps/manager/trust_views.py
+msgid "Orders counted per buyer"
+msgstr "Commandes comptées par acheteur"
+
+#: apps/manager/trust_views.py
+msgid "Orders delivered"
+msgstr "Commandes livrées"
+
+#: apps/manager/trust_views.py
+msgid "Orders needed"
+msgstr "Commandes nécessaires"
+
+#: apps/manager/trust_views.py
+msgid "Orders needed per country"
+msgstr "Commandes nécessaires par pays"
 
 #: apps/events/models.py apps/manager/amendment_forms.py
 msgid "Other"
@@ -6609,6 +6694,10 @@ msgstr "supprimé"
 msgid "Rename (the old name becomes an alias)"
 msgstr "Renommer (l'ancien nom devient un alias)"
 
+#: apps/manager/trust_views.py
+msgid "Repeat customers"
+msgstr "Clients fidèles"
+
 #: apps/manager/event_forms.py
 msgid "Repeats"
 msgstr "Se répète"
@@ -6755,6 +6844,10 @@ msgstr "Annulée"
 msgid "Review and pay"
 msgstr "Récapitulatif et paiement"
 
+#: apps/manager/trust_views.py
+msgid "Review excerpt length"
+msgstr "Longueur de l'extrait d'avis"
+
 #: apps/manager/product_views.py
 msgid "reviewed"
 msgstr "relue"
@@ -6766,6 +6859,10 @@ msgstr "Vérifié le"
 #: apps/vendors/admin.py
 msgid "Reviewed: %(count)d."
 msgstr "Vérifiées : %(count)d."
+
+#: apps/manager/trust_views.py
+msgid "Reviews"
+msgstr "Avis"
 
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Revoke %(role)s"
@@ -7245,6 +7342,10 @@ msgid ""
 "Shown after a successful submission. If you leave it empty, a short standard message is shown."
 msgstr "Affiché après un envoi réussi. Si vous le laissez vide, un court message standard apparaît."
 
+#: apps/manager/trust_views.py
+msgid "Shown from this many repeat buyers"
+msgstr "Affiché à partir de ce nombre de clients fidèles"
+
 #: apps/cms/models.py
 msgid "Shown on the article; a migrated article keeps its original date."
 msgstr "Affichée sur l'article ; un article migré conserve sa date d'origine."
@@ -7344,6 +7445,14 @@ msgid ""
 msgstr ""
 "Diaporama à changement automatique uniquement : durée d'affichage d'une diapositive, en "
 "millisecondes, entre 3000 et 20000. Exemple : 6000 correspond à six secondes."
+
+#: apps/manager/trust_views.py
+msgid "Smallest gap between two orders"
+msgstr "Écart minimal entre deux commandes"
+
+#: apps/manager/trust_views.py
+msgid "Smallest order value that counts"
+msgstr "Valeur minimale de commande prise en compte"
 
 #: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Social"
@@ -7481,6 +7590,10 @@ msgstr ""
 msgid "Standard clause on applicable law and court"
 msgstr "Clause type sur le droit applicable et le tribunal compétent"
 
+#: apps/manager/trust_views.py
+msgid "Stars from which a review is shown"
+msgstr "Étoiles à partir desquelles un avis est affiché"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
 msgstr "Démarrer la vérification"
@@ -7528,6 +7641,7 @@ msgstr "Statistiques"
 #: apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/platform/trust_rules.html
 #: apps/manager/templates/manager/shop/events.html
 #: apps/manager/templates/manager/shop/fitment_proposals.html
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
@@ -10320,6 +10434,15 @@ msgstr ""
 msgid "The texts written for the product, one set per language, as JSON."
 msgstr "Les textes rédigés pour le produit, un ensemble par langue, en JSON."
 
+#: apps/manager/templates/manager/platform/trust_rules.html
+msgid ""
+"The thresholds behind the vendor trust badges. A change is a new version from a date; an old "
+"version is never edited, so every stored result stays explainable."
+msgstr ""
+"Les seuils des badges de confiance des vendeurs. Un changement est une nouvelle version à partir "
+"d'une date ; une ancienne version n'est jamais modifiée, si bien que chaque résultat enregistré "
+"reste explicable."
+
 #: apps/events/models.py
 msgid ""
 "The time zone where the event takes place, for example 'Europe/Rome'. The start and end times "
@@ -11286,6 +11409,10 @@ msgstr "titre"
 msgid "To"
 msgstr "Au"
 
+#: apps/manager/templates/manager/platform/trust_rules_detail.html
+msgid "to %(end)s"
+msgstr "jusqu'au %(end)s"
+
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid ""
 "To ask to reopen it, write to the platform staff. Staff reopen a closed vendor after a review; it "
@@ -11438,6 +11565,14 @@ msgstr "Traductions"
 #: apps/manager/templates/manager/shop/events.html
 msgid "Translations: %(languages)s"
 msgstr "Traductions : %(languages)s"
+
+#: apps/manager/sections.py apps/manager/site_map.py
+msgid "Trust rules"
+msgstr "Règles de confiance"
+
+#: apps/manager/trust_views.py
+msgid "Trust rules, version %(n)s"
+msgstr "Règles de confiance, version %(n)s"
 
 #: apps/manager/event_forms.py
 msgid "Tuesday"
@@ -11636,6 +11771,18 @@ msgstr "Sessions des utilisateurs"
 msgid "Uses a year"
 msgstr "Utilise une année"
 
+#: apps/manager/templates/manager/platform/trust_rules.html
+msgid "Valid from"
+msgstr "Valide à partir du"
+
+#: apps/manager/templates/manager/platform/trust_rules_detail.html
+msgid "Valid from %(start)s"
+msgstr "Valide à partir du %(start)s"
+
+#: apps/manager/templates/manager/platform/trust_rules.html
+msgid "Valid to"
+msgstr "Valide jusqu'au"
+
 #: apps/manager/templates/manager/shop/statements.html
 msgid "Valid until"
 msgstr "Valable jusqu'au"
@@ -11705,10 +11852,13 @@ msgstr "Vérifier"
 msgid "Verify it is you"
 msgstr "Vérifiez votre identité"
 
-#: apps/manager/templates/manager/layout.html themes/base/templates/components/user_tools.html
+#: apps/manager/templates/manager/layout.html
+#: apps/manager/templates/manager/platform/trust_rules.html
+#: themes/base/templates/components/user_tools.html
 msgid "Version"
 msgstr "Version"
 
+#: apps/manager/templates/manager/platform/trust_rules.html
 #: apps/orders/templates/orders/customer_order.html
 msgid "Version %(n)s"
 msgstr "Version %(n)s"
@@ -12690,6 +12840,14 @@ msgstr "Wikidata"
 msgid "Wikidata item ID"
 msgstr "ID de l'élément Wikidata"
 
+#: apps/manager/trust_views.py
+msgid "Window"
+msgstr "Période"
+
+#: apps/manager/trust_views.py
+msgid "Window of the per-buyer cap"
+msgstr "Période du plafond par acheteur"
+
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Withdraw and tell the vendor"
 msgstr "Retirer et informer le vendeur"
@@ -12705,6 +12863,10 @@ msgstr "Rétractation"
 #: apps/manager/amendment_views.py
 msgid "Withdrawal registered"
 msgstr "Rétractation enregistrée"
+
+#: apps/manager/trust_views.py
+msgid "Withdrawal window"
+msgstr "Délai de rétractation"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Withdrawn"
