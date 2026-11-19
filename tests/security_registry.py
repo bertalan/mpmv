@@ -146,6 +146,10 @@ PUBLIC: dict[str, str] = {
         "Pre-contractual information (CMP.6, directive 2011/83/EU art. 49): the same legal text "
         "for every visitor, public by law."
     ),
+    "withdrawal_form_pdf": (
+        "Blank model withdrawal form as a PDF (I18N.20): the same legal text for every visitor, "
+        "no order or personal data, public by law."
+    ),
     "customer_help": (
         "Customer help index (ARC.37): the same repository-file text for every visitor, "
         "read-only, public by design."
