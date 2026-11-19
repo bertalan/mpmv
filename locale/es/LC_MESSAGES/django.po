@@ -1001,7 +1001,9 @@ msgid "Added to your cart."
 msgstr "Añadido al carrito."
 
 #: apps/manager/amendment_forms.py apps/orders/templates/orders/_legal_recap.html
-#: apps/orders/ui/forms.py themes/ride/templates/orders/_legal_recap.html
+#: apps/orders/ui/forms.py themes/base/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html
+#: themes/ride/templates/orders/_legal_recap.html
 msgid "Address"
 msgstr "Dirección"
 
@@ -2889,6 +2891,12 @@ msgstr ""
 msgid "Each seller in your order is a separate contract. Choose the parts you withdraw from."
 msgstr "Cada vendedor de tu pedido es un contrato distinto. Elige las partes de las que desistes."
 
+#: apps/orders/templates/orders/confirmation.html
+msgid ""
+"Each seller is a separate contract. These are the details to contact each seller, also to "
+"withdraw."
+msgstr "Cada vendedor es un contrato distinto. Estos son los datos para contactar con cada vendedor, también para desistir."
+
 #: apps/manager/fitment_forms.py
 msgid "Earliest year"
 msgstr "Año más antiguo"
@@ -2944,6 +2952,10 @@ msgid "Either remove the line or change its quantity, not both."
 msgstr "Elimine la línea o cambie su cantidad, pero no ambas cosas."
 
 #: apps/manager/amendment_forms.py apps/manager/templates/manager/login.html
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: themes/base/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html
 msgid "Email"
 msgstr "Correo electrónico"
 
@@ -6056,6 +6068,15 @@ msgstr "Pendiente de revisión"
 msgid "Permission reference"
 msgstr "Referencia del permiso"
 
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: apps/orders/templates/orders/_legal_recap.html
+#: themes/base/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html
+#: themes/ride/templates/orders/_legal_recap.html
+msgid "Phone"
+msgstr "Teléfono"
+
 #: apps/manager/amendment_forms.py
 msgid "Phone call"
 msgstr "Llamada telefónica"
@@ -7298,9 +7319,17 @@ msgid "Sell with us (vendor application)"
 msgstr "Venda con nosotros (solicitud de vendedor)"
 
 #: apps/orders/templates/orders/_legal_recap.html apps/vendors/models.py
+#: themes/base/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html
 #: themes/ride/templates/orders/_legal_recap.html
 msgid "Seller"
 msgstr "Vendedor"
+
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: apps/orders/templates/orders/confirmation.html
+msgid "Seller details"
+msgstr "Datos del vendedor"
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Selling mode"

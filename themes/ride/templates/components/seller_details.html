@@ -1,0 +1,14 @@
+{% load i18n %}{% comment %}
+Seller details of `ride` (THM.16): the `base` contract (CMP.41: name, geographic address, phone,
+email; no phone, no line) as a Bootstrap card with a description list. Context: `contact`.
+{% endcomment %}<section class="seller-details card border-start border-4 border-primary mb-3">
+  <div class="card-body">
+  <h3 class="card-title h6">{{ contact.shop_name }}</h3>
+  <dl class="row mb-0">
+    <dt class="col-sm-4">{% translate "Seller" %}</dt><dd class="col-sm-8">{{ contact.legal_name }}</dd>
+    {% if contact.address %}<dt class="col-sm-4">{% translate "Address" %}</dt><dd class="col-sm-8">{{ contact.address }}</dd>{% endif %}
+    {% if contact.phone %}<dt class="col-sm-4">{% translate "Phone" %}</dt><dd class="col-sm-8">{{ contact.phone }}</dd>{% endif %}
+    {% if contact.email %}<dt class="col-sm-4">{% translate "Email" %}</dt><dd class="col-sm-8">{{ contact.email }}</dd>{% endif %}
+  </dl>
+  </div>
+</section>

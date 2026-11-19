@@ -226,3 +226,29 @@ def test_markup_in_titles_and_addresses_is_escaped_in_html() -> None:
         html = render(mail).html_body
         assert "<script>" not in html
         assert "&lt;script&gt;" in html
+
+
+def test_each_confirmation_gives_the_seller_details_for_the_withdrawal_information() -> None:
+    """CMP.41: the per-vendor confirmation (the durable medium the withdrawal text points to)
+    gives the trader's name, geographic address, telephone and email; no phone, no line."""
+    a = vendor_input(VendorFactory.create(italian_company=True), lines=[line_input()])
+    b = vendor_input(VendorFactory.create(italian_company=True), lines=[line_input(sku="B-1")])
+    order = place(vendor_orders=[a, b])
+    first, second = (sub.vendor for sub in order.vendor_orders.order_by("id"))
+    assert first.phone
+    assert first.registered_city
+    type(second).objects.filter(pk=second.pk).update(phone="")
+    pay(order)
+    for mail in OutboxEmail.objects.filter(template_key="orders.order_confirmation"):
+        shop = VendorOrder.objects.get(public_id=mail.context_data["vendor_order_ref"]).vendor
+        body = core_services.render_email(mail.template_key, "en", mail.context_data)
+        for part in (body.text_body, body.html_body):
+            assert "Seller details" in part
+            assert shop.legal_name in part
+            assert f"{shop.registered_postal_code} {shop.registered_city}" in part
+            assert shop.contact_email in part
+            if shop.pk == first.pk:
+                assert shop.phone in part
+            else:
+                assert "Phone" not in part
+        assert html_violations(body.html_body) == []

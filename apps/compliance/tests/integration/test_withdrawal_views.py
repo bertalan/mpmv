@@ -80,9 +80,15 @@ def _reset_captcha() -> Iterator[None]:
     FakeCaptchaVerifier.reset()
 
 
-def paid_order(**overrides: object) -> Order:
-    a = vendor_input(VendorFactory.create(), lines=[line_input(title="Cup from A")])
-    b = vendor_input(VendorFactory.create(), lines=[line_input(title="Bowl from B", sku="B-1")])
+def paid_order(*, identity: bool = False, **overrides: object) -> Order:
+    """`identity` gives the vendors a full legal identity (address, phone: CMP.41)."""
+    a = vendor_input(
+        VendorFactory.create(italian_company=identity), lines=[line_input(title="Cup from A")]
+    )
+    b = vendor_input(
+        VendorFactory.create(italian_company=identity),
+        lines=[line_input(title="Bowl from B", sku="B-1")],
+    )
     order = place(vendor_orders=[a, b], **overrides)
     pay(order)
     order.refresh_from_db()
@@ -344,6 +350,39 @@ def test_the_done_page_shows_the_vendor_contact_for_other_ways(client: Client) -
     done = client.get(confirm(client, html, sub.public_id)["Location"]).content.decode()
     assert say(OTHER_WAYS) in seen(done.encode())
     assert sub.vendor.contact_email in done
+
+
+def _done_page(client: Client, order: Order) -> tuple[VendorOrder, str]:
+    html = identify(client, order).content.decode()
+    sub = order.vendor_orders.order_by("id")[0]
+    done = client.get(confirm(client, html, sub.public_id)["Location"])
+    return sub, html_lib.unescape(done.content.decode())
+
+
+def test_the_done_page_gives_the_seller_name_address_phone_and_email(client: Client) -> None:
+    """CMP.41: the trader's name, geographic address, telephone and email, per seller."""
+    sub, done = _done_page(client, paid_order(identity=True))
+    shop = sub.vendor
+    assert shop.phone
+    assert shop.registered_city
+    block = done[done.index('class="withdrawal-other-ways"') :]
+    assert shop.legal_name in block
+    assert f"{shop.registered_street} {shop.registered_street_number}" in block
+    assert f"{shop.registered_postal_code} {shop.registered_city}" in block
+    assert shop.phone in block
+    assert shop.contact_email in block
+
+
+def test_a_seller_without_a_phone_shows_no_phone_line(client: Client) -> None:
+    """No number is invented: the phone line is left out, the address and email stay."""
+    order = paid_order(identity=True)
+    sub = order.vendor_orders.order_by("id")[0]
+    type(sub.vendor).objects.filter(pk=sub.vendor_id).update(phone="")
+    _, done = _done_page(client, order)
+    block = done[done.index('class="withdrawal-other-ways"') :]
+    assert say("Phone") not in block.lower()
+    assert sub.vendor.contact_email in block
+    assert sub.vendor.registered_city in block
 
 
 # --- Pre-contractual information (art. 49(1)(h))
