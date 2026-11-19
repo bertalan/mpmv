@@ -123,7 +123,11 @@ msgstr "%(label)s, elenco"
 msgid "%(low)s to %(high)s working days"
 msgstr "da %(low)s a %(high)s giorni lavorativi"
 
-#: apps/manager/amendment_views.py apps/orders/amendment_engine.py
+#: apps/manager/trust_views.py
+msgid "%(n)s characters"
+msgstr "%(n)s caratteri"
+
+#: apps/manager/amendment_views.py apps/manager/trust_views.py apps/orders/amendment_engine.py
 msgid "%(n)s days"
 msgstr "%(n)s giorni"
 
@@ -1453,6 +1457,10 @@ msgstr "Torna alla sicurezza dell'account"
 msgid "Back to all results"
 msgstr "Torna a tutti i risultati"
 
+#: apps/manager/templates/manager/platform/trust_rules_detail.html
+msgid "Back to all versions"
+msgstr "Torna a tutte le versioni"
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "Back to my orders"
 msgstr "Torna ai miei ordini"
@@ -1609,6 +1617,10 @@ msgstr "Link del pulsante"
 #: apps/cms/blocks.py apps/manager/event_block_forms.py
 msgid "Button text"
 msgstr "Testo del pulsante"
+
+#: apps/manager/trust_views.py
+msgid "Buyers needed per country"
+msgstr "Acquirenti necessari per paese"
 
 #: apps/cms/templates/cms/includes/article_meta.html
 msgid "By %(name)s"
@@ -2380,6 +2392,10 @@ msgstr "Correggi l'indirizzo di consegna, come chiesto dal cliente"
 msgid "Corrected as the customer asked"
 msgstr "Corretto come chiesto dal cliente"
 
+#: apps/manager/trust_views.py
+msgid "Countries served"
+msgstr "Paesi serviti"
+
 #: apps/manager/amendment_forms.py apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "Country"
 msgstr "Paese"
@@ -2695,6 +2711,14 @@ msgstr "Scoprilo"
 msgid "Dismiss"
 msgstr "Chiudi"
 
+#: apps/manager/trust_views.py
+msgid "Dispatch on time"
+msgstr "Spedizione puntuale"
+
+#: apps/manager/trust_views.py
+msgid "Disputes"
+msgstr "Controversie"
+
 #: apps/accounts/templates/accounts/levels/prompt.html
 msgid "Do it once"
 msgstr "Fallo una volta"
@@ -2801,6 +2825,14 @@ msgstr ""
 #: apps/manager/fitment_forms.py
 msgid "Earliest year"
 msgstr "Anno più remoto"
+
+#: apps/manager/trust_views.py
+msgid "Earned at"
+msgstr "Ottenuto al"
+
+#: apps/manager/trust_views.py
+msgid "Earned at or below"
+msgstr "Ottenuto al massimo al"
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Edit"
@@ -3881,6 +3913,11 @@ msgstr "lotto di importazione"
 msgid "Important:"
 msgstr "Importante:"
 
+#: apps/manager/templates/manager/platform/trust_rules.html
+#: apps/manager/templates/manager/platform/trust_rules_detail.html
+msgid "In force"
+msgstr "In vigore"
+
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "in force"
 msgstr "in vigore"
@@ -4355,6 +4392,14 @@ msgstr "URL della fonte del logo"
 msgid "Longitude"
 msgstr "Longitudine"
 
+#: apps/manager/trust_views.py
+msgid "Lost above"
+msgstr "Perso sopra"
+
+#: apps/manager/trust_views.py
+msgid "Lost below"
+msgstr "Perso sotto"
+
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Lost your device?"
 msgstr "Ha perso il dispositivo?"
@@ -4815,6 +4860,11 @@ msgstr "Non richiesta"
 msgid "Not for"
 msgstr "Non per"
 
+#: apps/manager/templates/manager/platform/trust_rules.html
+#: apps/manager/templates/manager/platform/trust_rules_detail.html
+msgid "Not in force"
+msgstr "Non in vigore"
+
 #: apps/manager/amendment_views.py
 msgid "not in the order"
 msgstr "non nell'ordine"
@@ -4891,7 +4941,9 @@ msgstr ""
 msgid "not yet"
 msgstr "non ancora"
 
-#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
+#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/platform/trust_rules.html
+#: apps/manager/templates/manager/platform/trust_rules_detail.html
+#: apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "Note"
 msgstr "Nota"
 
@@ -4925,6 +4977,7 @@ msgstr "Nessuna candidatura in attesa"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/platform/trust_rules.html
 #: apps/manager/templates/manager/shop/_money_table.html
 #: apps/manager/templates/manager/shop/fitment_proposals.html
 #: apps/manager/templates/manager/shop/fitment_report.html
@@ -5311,6 +5364,10 @@ msgstr "Il preavviso si può dare solo a venditori attivi o sospesi."
 msgid "Only when the event is hidden after a notice."
 msgstr "Solo quando l'evento viene nascosto in seguito a una segnalazione."
 
+#: apps/manager/templates/manager/platform/trust_rules.html
+msgid "Open"
+msgstr "Aperta"
+
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Open change"
 msgstr "Modifica aperta"
@@ -5479,6 +5536,10 @@ msgstr ""
 msgid "Order changes"
 msgstr "Modifiche agli ordini"
 
+#: apps/manager/trust_views.py
+msgid "Order count tiers"
+msgstr "Soglie del numero di ordini"
+
 #: apps/compliance/forms.py apps/manager/templates/manager/platform/orders.html
 msgid "Order number"
 msgstr "Numero d'ordine"
@@ -5530,6 +5591,22 @@ msgstr "Gli ordini non sono ancora aperti. Il tuo carrello viene conservato."
 #: apps/manager/sections.py apps/manager/site_map.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
 msgstr "Ordini"
+
+#: apps/manager/trust_views.py
+msgid "Orders counted per buyer"
+msgstr "Ordini contati per acquirente"
+
+#: apps/manager/trust_views.py
+msgid "Orders delivered"
+msgstr "Ordini consegnati"
+
+#: apps/manager/trust_views.py
+msgid "Orders needed"
+msgstr "Ordini necessari"
+
+#: apps/manager/trust_views.py
+msgid "Orders needed per country"
+msgstr "Ordini necessari per paese"
 
 #: apps/events/models.py apps/manager/amendment_forms.py
 msgid "Other"
@@ -6553,6 +6630,10 @@ msgstr "rimosso"
 msgid "Rename (the old name becomes an alias)"
 msgstr "Rinomina (il vecchio nome diventa un alias)"
 
+#: apps/manager/trust_views.py
+msgid "Repeat customers"
+msgstr "Clienti ricorrenti"
+
 #: apps/manager/event_forms.py
 msgid "Repeats"
 msgstr "Si ripete"
@@ -6698,6 +6779,10 @@ msgstr "Annullata"
 msgid "Review and pay"
 msgstr "Riepilogo e pagamento"
 
+#: apps/manager/trust_views.py
+msgid "Review excerpt length"
+msgstr "Lunghezza dell'estratto della recensione"
+
 #: apps/manager/product_views.py
 msgid "reviewed"
 msgstr "revisionata"
@@ -6709,6 +6794,10 @@ msgstr "Verificato il"
 #: apps/vendors/admin.py
 msgid "Reviewed: %(count)d."
 msgstr "Verificate: %(count)d."
+
+#: apps/manager/trust_views.py
+msgid "Reviews"
+msgstr "Recensioni"
 
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Revoke %(role)s"
@@ -7186,6 +7275,10 @@ msgid ""
 "Shown after a successful submission. If you leave it empty, a short standard message is shown."
 msgstr "Mostrato dopo un invio riuscito. Se lo lascia vuoto, compare un breve messaggio standard."
 
+#: apps/manager/trust_views.py
+msgid "Shown from this many repeat buyers"
+msgstr "Mostrato da questo numero di acquirenti ricorrenti"
+
 #: apps/cms/models.py
 msgid "Shown on the article; a migrated article keeps its original date."
 msgstr "Mostrata sull'articolo. Un articolo importato mantiene la sua data originale."
@@ -7283,6 +7376,14 @@ msgid ""
 msgstr ""
 "Solo slider con cambio automatico: quanto resta una slide, in millisecondi, tra 3000 e 20000. "
 "Esempio: 6000 sono sei secondi."
+
+#: apps/manager/trust_views.py
+msgid "Smallest gap between two orders"
+msgstr "Intervallo minimo tra due ordini"
+
+#: apps/manager/trust_views.py
+msgid "Smallest order value that counts"
+msgstr "Valore minimo dell'ordine che conta"
 
 #: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Social"
@@ -7419,6 +7520,10 @@ msgstr ""
 msgid "Standard clause on applicable law and court"
 msgstr "Clausola tipo su legge applicabile e foro"
 
+#: apps/manager/trust_views.py
+msgid "Stars from which a review is shown"
+msgstr "Stelle da cui una recensione viene mostrata"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
 msgstr "Avvia la revisione"
@@ -7466,6 +7571,7 @@ msgstr "Statistiche"
 #: apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/platform/trust_rules.html
 #: apps/manager/templates/manager/shop/events.html
 #: apps/manager/templates/manager/shop/fitment_proposals.html
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
@@ -10232,6 +10338,12 @@ msgstr ""
 msgid "The texts written for the product, one set per language, as JSON."
 msgstr "I testi scritti per il prodotto, un gruppo per ogni lingua, in JSON."
 
+#: apps/manager/templates/manager/platform/trust_rules.html
+msgid ""
+"The thresholds behind the vendor trust badges. A change is a new version from a date; an old "
+"version is never edited, so every stored result stays explainable."
+msgstr "Le soglie dei badge di fiducia dei venditori. Una modifica è una nuova versione da una data; una versione vecchia non si modifica mai, così ogni risultato salvato resta spiegabile."
+
 #: apps/events/models.py
 msgid ""
 "The time zone where the event takes place, for example 'Europe/Rome'. The start and end times "
@@ -11184,6 +11296,10 @@ msgstr "titolo"
 msgid "To"
 msgstr "Al"
 
+#: apps/manager/templates/manager/platform/trust_rules_detail.html
+msgid "to %(end)s"
+msgstr "fino al %(end)s"
+
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid ""
 "To ask to reopen it, write to the platform staff. Staff reopen a closed vendor after a review; it "
@@ -11336,6 +11452,14 @@ msgstr "Traduzioni"
 #: apps/manager/templates/manager/shop/events.html
 msgid "Translations: %(languages)s"
 msgstr "Traduzioni: %(languages)s"
+
+#: apps/manager/sections.py apps/manager/site_map.py
+msgid "Trust rules"
+msgstr "Regole di fiducia"
+
+#: apps/manager/trust_views.py
+msgid "Trust rules, version %(n)s"
+msgstr "Regole di fiducia, versione %(n)s"
 
 #: apps/manager/event_forms.py
 msgid "Tuesday"
@@ -11529,6 +11653,18 @@ msgstr "Sessioni utente"
 msgid "Uses a year"
 msgstr "Usa un anno"
 
+#: apps/manager/templates/manager/platform/trust_rules.html
+msgid "Valid from"
+msgstr "Valida dal"
+
+#: apps/manager/templates/manager/platform/trust_rules_detail.html
+msgid "Valid from %(start)s"
+msgstr "Valida dal %(start)s"
+
+#: apps/manager/templates/manager/platform/trust_rules.html
+msgid "Valid to"
+msgstr "Valida fino al"
+
 #: apps/manager/templates/manager/shop/statements.html
 msgid "Valid until"
 msgstr "Valida fino al"
@@ -11598,10 +11734,13 @@ msgstr "Verifica"
 msgid "Verify it is you"
 msgstr "Verifichi la Sua identità"
 
-#: apps/manager/templates/manager/layout.html themes/base/templates/components/user_tools.html
+#: apps/manager/templates/manager/layout.html
+#: apps/manager/templates/manager/platform/trust_rules.html
+#: themes/base/templates/components/user_tools.html
 msgid "Version"
 msgstr "Versione"
 
+#: apps/manager/templates/manager/platform/trust_rules.html
 #: apps/orders/templates/orders/customer_order.html
 msgid "Version %(n)s"
 msgstr "Versione %(n)s"
@@ -12571,6 +12710,14 @@ msgstr "Wikidata"
 msgid "Wikidata item ID"
 msgstr "ID della voce Wikidata"
 
+#: apps/manager/trust_views.py
+msgid "Window"
+msgstr "Periodo"
+
+#: apps/manager/trust_views.py
+msgid "Window of the per-buyer cap"
+msgstr "Periodo del limite per acquirente"
+
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Withdraw and tell the vendor"
 msgstr "Ritira e avvisa il venditore"
@@ -12586,6 +12733,10 @@ msgstr "Recesso"
 #: apps/manager/amendment_views.py
 msgid "Withdrawal registered"
 msgstr "Recesso registrato"
+
+#: apps/manager/trust_views.py
+msgid "Withdrawal window"
+msgstr "Periodo di recesso"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Withdrawn"

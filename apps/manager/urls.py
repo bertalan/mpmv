@@ -22,6 +22,7 @@ from . import (
     session_views,
     statement_views,
     termination_views,
+    trust_views,
     views,
 )
 
@@ -226,6 +227,13 @@ platform = (
         path("notices/", notice_views.NoticeListView.as_view(), name="notices"),
         path("notices/<uuid:public_id>/", notice_views.NoticeDetailView.as_view(), name="notice"),
         path("terminations/", termination_views.TerminationListView.as_view(), name="terminations"),
+        # TRU.1 part 2: the trust rules versions, read only.
+        path("trust-rules/", trust_views.TrustRulesListView.as_view(), name="trust_rules"),
+        path(
+            "trust-rules/<int:version>/",
+            trust_views.TrustRulesDetailView.as_view(),
+            name="trust_rule",
+        ),
         # ORD.20 part 3: the staff tools on a paid order (Support and the platform owner).
         path("orders/", amendment_views.PlatformOrdersView.as_view(), name="orders"),
         path(

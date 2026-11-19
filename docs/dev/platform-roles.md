@@ -26,6 +26,7 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Platform: map of the site (CORE.30) | R | R | R | R | R |  |
 | Platform: configuration and tax (ARC.24) | E |  |  |  | R |  |
 | Platform: owner-only settings (CMP.13, CMP.11 approvals) | R |  |  |  | E |  |
+| Platform: trust rules, the versions of the badge thresholds (TRU.1) | E |  |  |  | E |  |
 | Platform: catalog, categories, attributes, taxonomies, imports |  | E |  | R | R |  |
 | Platform: moderation (vendor events, storefront changes, content) |  | E |  |  | R |  |
 | Platform: products, bulk publish, preview, translation status (CAT.11) |  | E |  | R | R |  |

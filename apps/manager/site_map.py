@@ -88,6 +88,7 @@ PLATFORM_PAGES: Final[Pages] = (
     (gettext_noop("Products"), "manager:platform:catalog_products"),
     (gettext_noop("Order changes"), "manager:platform:orders"),
     (gettext_noop("Order change settings"), "manager:platform:amendment_settings"),
+    (gettext_noop("Trust rules"), "manager:platform:trust_rules"),
 )
 ADMIN_PAGES: Final[Pages] = ((gettext_noop("Editors' admin"), "wagtailadmin_home"),)
 # Listed only once the setup wizard exists and has not been completed (ARC.25).
@@ -135,6 +136,7 @@ NOT_LISTED: Final = frozenset(
         "manager:platform:profile_confirm",
         "manager:platform:notice",
         "manager:platform:termination",
+        "manager:platform:trust_rule",
         "manager:platform:user_sessions_find",
         "manager:platform:catalog_product",
         "manager:platform:fitment_node_new",

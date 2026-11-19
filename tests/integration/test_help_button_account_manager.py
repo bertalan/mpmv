@@ -32,6 +32,7 @@ from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.fitment.tests.factories import FitmentNodeFactory
 from apps.manager.checks import manager_routes
 from apps.orders.tests.factories import paid_vendor_order
+from apps.trust.tests.factories import TrustRulesFactory
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.help_routes import NOT_PAGES
 
@@ -168,6 +169,8 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:orders": "platform",
         "manager:platform:order": "platform",
         "manager:platform:amendment_settings": "platform",
+        "manager:platform:trust_rules": "platform",  # TRU.1 part 2
+        "manager:platform:trust_rule": "platform",
     }
 
 
@@ -207,6 +210,8 @@ def _open(name: str) -> tuple[Client, str]:
             kwargs = {"public_id": FitmentNodeFactory.create().public_id}
         if name == "manager:platform:catalog_product":
             kwargs = {"public_id": ProductFactory.create().public_id}
+        if name == "manager:platform:trust_rule":
+            kwargs = {"version": TrustRulesFactory.create().version}  # type: ignore[dict-item]
         if name == "manager:platform:order":
             kwargs = {"public_id": paid_vendor_order().public_id}
     client = Client()
