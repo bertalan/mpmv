@@ -2883,6 +2883,10 @@ msgstr "Télécharger le PDF"
 msgid "Download the calendar (ICS)"
 msgstr "Télécharger le calendrier (ICS)"
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "Download the form as PDF"
+msgstr "Télécharger le formulaire en PDF"
+
 #: apps/compliance/templates/compliance/privacy_account.html
 #: themes/ride/templates/compliance/privacy_account.html
 msgid "Download your data"

@@ -1096,6 +1096,9 @@ ENDPOINTS: dict[str, Access] = {
     "consumer_information": NoVendorData(
         "Pre-contractual information (CMP.6): platform-wide legal text, no vendor data."
     ),
+    "withdrawal_form_pdf": NoVendorData(
+        "Blank model withdrawal form PDF (I18N.20): platform-wide legal text, no vendor data."
+    ),
     "customer_help": NoVendorData("Customer help index (ARC.37): repository text, no vendor data."),
     "customer_help_section": NoVendorData(
         "Customer help section (ARC.37): repository text, no vendor data.",

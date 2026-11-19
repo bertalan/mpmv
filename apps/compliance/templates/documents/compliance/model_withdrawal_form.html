@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+<meta charset="utf-8">
+<title>{{ title }}</title>
+<style>
+@page { size: A4; margin: 25mm 20mm; }
+body { font-family: "DejaVu Sans", sans-serif; font-size: 11pt; line-height: 1.5; color: #111; }
+h3 { font-size: 16pt; margin: 0 0 8mm 0; }
+ul { padding-left: 5mm; }
+li { margin-bottom: 9mm; }
+</style>
+</head>
+<body>
+{% include "compliance/includes/model_withdrawal_form.html" with pdf_view=True %}
+</body>
+</html>
