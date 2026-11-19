@@ -127,6 +127,15 @@ SCOPES = (
     "themes/ride/templates/cms",
     "themes/base/templates/components",
     "themes/ride/templates/components",
+    # The consumer-law storefront pages (I18N.20 part 3b, slice 1): consumer information,
+    # withdrawal, privacy requests, notices, product safety, the legal pages and the ride
+    # legal recap of the checkout. Informal customer register, legal terms of art per country.
+    "apps/compliance/templates/compliance",
+    "themes/ride/templates/compliance",
+    "apps/cms/templates/cms/legal_page.html",
+    "apps/cms/templates/cms/legal_page_version.html",
+    "themes/ride/templates/orders/_legal_recap.html",
+    "themes/ride/templates/orders/_legal_boxes.html",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (

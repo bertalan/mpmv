@@ -498,11 +498,9 @@ EXCLUDED = {
     "apps/vendors/templates/email/": "email templates, own scope, I18N.20 part 3c",
     # Customer-facing pages not yet translated: informal register, I18N.20 part 3b.
     "apps/cms/templates/cms/": "legal and landing pages, I18N.20 part 3b",
-    "apps/compliance/templates/compliance/": "consumer information and withdrawal, I18N.20 part 3b",
     "apps/core/templates/core/components/": "image credits, I18N.20 part 3b",
     "apps/fitment/templates/fitment/": "garage saver, I18N.20 part 3b",
     "themes/ride/templates/accounts/": "ride account overrides, I18N.20 part 3b",
-    "themes/ride/templates/compliance/": "ride compliance overrides, I18N.20 part 3b",
     "themes/ride/templates/orders/": "ride order overrides, I18N.20 part 3b",
     "themes/ride/templates/seo/": "ride consent banner, I18N.20 part 3b",
 }
@@ -566,3 +564,47 @@ def test_the_spanish_apply_now_is_informal_and_the_german_author_line_is_short()
     de = {e.msgid: e.msgstr for e in _po("de")}
     assert es["Apply now"] == "Solicita ahora"
     assert de["No articles by this author yet."] == "Von dieser Person gibt es noch keine Artikel."
+
+
+# I18N.20 part 3b, slice 1: the consumer-law storefront pages (consumer information, withdrawal,
+# privacy requests, notices, product safety, legal pages, the ride legal recap) are translated
+# in the informal customer register. Legal wording is an AI draft behind I18N.19 and needs
+# human review.
+CONSUMER_LAW_MARKERS = (
+    "apps/compliance/templates/compliance/",
+    "themes/ride/templates/compliance/",
+    "apps/cms/templates/cms/legal_page",
+    "themes/ride/templates/orders/_legal_",
+)
+
+
+@pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
+def test_consumer_law_pages_are_translated_in_the_informal_register(lang: str) -> None:
+    entries = [e for e in _po(lang) if _any_in(e, CONSUMER_LAW_MARKERS)]
+    ids = {e.msgid for e in entries}
+    assert {"Right of withdrawal", "Withdrawal received", "Product safety"} <= ids
+    for entry in entries:
+        assert _texts(entry).strip(), entry.msgid
+        if lang in FORMAL:
+            assert not FORMAL[lang].search(_texts(entry)), entry.msgid
+
+
+@pytest.mark.parametrize("lang", ["de", "fr", "es"])
+def test_the_withdrawal_terms_of_art_follow_each_country(lang: str) -> None:
+    terms = {"de": "widerruf", "fr": "rétractation", "es": "desistimiento"}
+    checks = {e.msgid: _texts(e).lower() for e in _po(lang)}
+    assert terms[lang] in checks["Right of withdrawal"].lower()
+    assert terms[lang] in checks["Withdrawal received"].lower()
+
+
+def test_german_withdrawal_wording_uses_the_widerruf_family_only() -> None:
+    # Owner decision (#825): `Widerruf`, never `Rücktritt` or `zurücktreten`, for the legal
+    # withdrawal. `Rückgabe` stays in general returns sentences, so only `Rücktritt` is forbidden.
+    entries = [
+        e for e in _po("de") if _any_in(e, CONSUMER_LAW_MARKERS) and "withdraw" in e.msgid.lower()
+    ]
+    assert len(entries) >= 10
+    for entry in entries:
+        text = _texts(entry)
+        assert "widerruf" in text.lower(), entry.msgid
+        assert not re.search(r"zurücktret|rücktritt", text, re.I), entry.msgid
