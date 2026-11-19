@@ -108,6 +108,7 @@ msgstr[0] "%(days)s día desde la entrega"
 msgstr[1] "%(days)s días desde la entrega"
 
 #: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/present.py
+#: themes/ride/templates/orders/_legal_recap.html
 msgid "%(days)s working days"
 msgstr "%(days)s días laborables"
 
@@ -264,7 +265,7 @@ msgstr "1 en stock, 0 agotado, vacío si se desconoce."
 msgid "1 repeats every time, 2 every second time, up to 12. Empty means 1."
 msgstr "1 se repite cada vez, 2 una de cada dos veces, hasta 12. Vacío equivale a 1."
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "24 months for consumers."
 msgstr "24 meses para los consumidores."
 
@@ -831,6 +832,10 @@ msgstr ""
 "aplique una de las excepciones indicadas. Hasta entonces el vendedor sigue vendiendo y puede "
 "descargar sus datos."
 
+#: apps/compliance/templates/compliance/withdrawal_choose.html
+msgid "a withdrawal was already recorded."
+msgstr "ya se registró un desistimiento."
+
 #: apps/manager/forms.py
 msgid "About the shop"
 msgstr "Acerca de la tienda"
@@ -996,7 +1001,7 @@ msgid "Added to your cart."
 msgstr "Añadido al carrito."
 
 #: apps/manager/amendment_forms.py apps/orders/templates/orders/_legal_recap.html
-#: apps/orders/ui/forms.py
+#: apps/orders/ui/forms.py themes/ride/templates/orders/_legal_recap.html
 msgid "Address"
 msgstr "Dirección"
 
@@ -1370,7 +1375,7 @@ msgstr "Aprobar las propuestas seleccionadas"
 msgid "Approved"
 msgstr "Aprobada"
 
-#: apps/orders/templates/orders/_legal_boxes.html
+#: apps/orders/templates/orders/_legal_boxes.html themes/ride/templates/orders/_legal_boxes.html
 msgid "Article %(article)s: %(title)s"
 msgstr "Artículo %(article)s: %(title)s"
 
@@ -1562,6 +1567,10 @@ msgstr "Saldo"
 #: apps/manager/templates/manager/shop/_money_table.html
 msgid "Balance (EUR)"
 msgstr "Saldo (EUR)"
+
+#: apps/compliance/templates/compliance/includes/product_safety.html
+msgid "Batch or serial number"
+msgstr "Lote o número de serie"
 
 #: apps/manager/templates/manager/amendment.html
 #: apps/manager/templates/manager/platform/profile_changes.html
@@ -2259,7 +2268,7 @@ msgstr "Razón social"
 msgid "Comparable delivery delay"
 msgstr "Retraso de entrega comparable"
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Competent court"
 msgstr "Tribunal competente"
 
@@ -2267,7 +2276,7 @@ msgstr "Tribunal competente"
 msgid "Complete"
 msgstr "Completo"
 
-#: apps/orders/customer_views.py
+#: apps/compliance/templates/compliance/privacy_requests.html apps/orders/customer_views.py
 msgid "Completed"
 msgstr "Completado"
 
@@ -2353,11 +2362,11 @@ msgstr "Conecte su cuenta de cobros"
 msgid "Consumer"
 msgstr "Consumidor"
 
-#: apps/manager/site_map.py
+#: apps/compliance/templates/compliance/consumer_information.html apps/manager/site_map.py
 msgid "Consumer information"
 msgstr "Información para los consumidores"
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid ""
 "Consumers have 14 days from delivery to withdraw. As a business you have no right of withdrawal "
 "unless the seller's terms say so."
@@ -2372,9 +2381,14 @@ msgstr ""
 "Consumidores: las controversias corresponden a los tribunales del lugar de residencia del "
 "consumidor."
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Contact"
 msgstr "Contacto"
+
+#: apps/compliance/templates/compliance/contact_points.html
+#: themes/ride/templates/compliance/contact_points.html
+msgid "Contact form"
+msgstr "Formulario de contacto"
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
 #: apps/manager/templates/manager/shop/event_form.html
@@ -2384,6 +2398,7 @@ msgstr "Contenido"
 #: apps/accounts/templates/accounts/action_link/continue.html
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
+#: apps/compliance/templates/compliance/withdrawal_start.html
 msgid "Continue"
 msgstr "Continuar"
 
@@ -2468,7 +2483,7 @@ msgstr ""
 msgid "Court for business buyers"
 msgstr "Tribunal para los compradores profesionales"
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Court of %(court)s"
 msgstr "Tribunales de %(court)s"
 
@@ -2514,6 +2529,10 @@ msgstr ""
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Dashboard"
 msgstr "Panel de control"
+
+#: apps/compliance/templates/compliance/subprocessors.html
+msgid "Data"
+msgstr "Datos"
 
 #: apps/manager/templates/manager/shop/_money_table.html
 #: apps/orders/templates/orders/customer_orders.html
@@ -2614,7 +2633,7 @@ msgstr "Dirección de entrega corregida a petición del cliente"
 msgid "Delivery details"
 msgstr "Datos de entrega"
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Delivery time"
 msgstr "Plazo de entrega"
 
@@ -2816,7 +2835,7 @@ msgstr ""
 msgid "draft"
 msgstr "borrador"
 
-#: themes/ride/templates/cms/legal_page.html
+#: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "Draft: this text has not been checked by legal counsel yet and is not final."
 msgstr "Borrador: este texto aún no ha sido revisado por un asesor jurídico y no es definitivo."
 
@@ -2856,7 +2875,7 @@ msgstr ""
 "Cada código le permite iniciar sesión una sola vez si pierde su app de autenticación o su clave de"
 " acceso (passkey). Guárdelos ahora en un lugar seguro: solo se muestran esta vez."
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid ""
 "Each purchase is a contract directly with the seller. The seller is responsible for shipping, "
 "conformity, invoicing, returns and withdrawals. The marketplace provides the service and collects "
@@ -2865,6 +2884,10 @@ msgstr ""
 "Cada compra es un contrato directamente con el vendedor. El vendedor es responsable del envío, la "
 "conformidad, la facturación, las devoluciones y los desistimientos. El marketplace presta el "
 "servicio y cobra el pago."
+
+#: apps/compliance/templates/compliance/withdrawal_choose.html
+msgid "Each seller in your order is a separate contract. Choose the parts you withdraw from."
+msgstr "Cada vendedor de tu pedido es un contrato distinto. Elige las partes de las que desistes."
 
 #: apps/manager/fitment_forms.py
 msgid "Earliest year"
@@ -2907,11 +2930,12 @@ msgstr "Administración editorial"
 msgid "Editors' admin (Wagtail)"
 msgstr "Administración de los redactores (Wagtail)"
 
-#: apps/cms/templates/cms/includes/legal_version_meta.html themes/ride/templates/cms/legal_page.html
+#: apps/cms/templates/cms/includes/legal_version_meta.html apps/cms/templates/cms/legal_page.html
+#: themes/ride/templates/cms/legal_page.html
 msgid "Effective from"
 msgstr "En vigor desde el"
 
-#: themes/ride/templates/cms/legal_page.html
+#: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "effective from"
 msgstr "en vigor desde el"
 
@@ -3005,6 +3029,14 @@ msgstr "Introduzca la dirección correcta."
 msgid "Enter the delivery address to see shipping and VAT."
 msgstr "Introduce la dirección de entrega para ver el envío y el IVA."
 
+#: apps/compliance/templates/compliance/withdrawal_start.html
+msgid ""
+"Enter the number of your order and the email address you used. Next you choose what to withdraw "
+"from and confirm."
+msgstr ""
+"Introduce el número de tu pedido y la dirección de correo electrónico que usaste. Después eliges "
+"de qué desistes y confirmas."
+
 #: apps/manager/forms.py
 msgid "Enter the tracking number: letters, digits, spaces and . / _ - only."
 msgstr "Introduzca el número de seguimiento: solo letras, dígitos, espacios y . / _ -"
@@ -3039,6 +3071,15 @@ msgstr ""
 "facturación, envío e IVA se conservan durante %(years)s años desde el final del ejercicio fiscal, "
 "limitados a lo que exige la ley (RGPD artículo 17(3)(b)), y después se anonimizan. Si tienes un "
 "pedido aún abierto, la eliminación se completa cuando se cierra el último pedido abierto."
+
+#: apps/compliance/templates/compliance/privacy_erased.html
+#: themes/ride/templates/compliance/privacy_erased.html
+msgid "Erasure requested"
+msgstr "Supresión solicitada"
+
+#: apps/compliance/templates/compliance/privacy_requests.html
+msgid "Erasure requests"
+msgstr "Solicitudes de supresión"
 
 #: themes/base/templates/components/alert.html themes/ride/templates/components/alert.html
 #: themes/ride/templates/components/field.html
@@ -3314,9 +3355,19 @@ msgstr "Para un evento que termina tras un cierto número de veces."
 msgid "For an event that ends on a last day."
 msgstr "Para un evento que termina en un último día."
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/compliance/templates/compliance/contact_points.html
+#: themes/ride/templates/compliance/contact_points.html
+msgid "For authorities"
+msgstr "Para las autoridades"
+
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "For disputes with the marketplace operator: %(court)s."
 msgstr "Para las controversias con el gestor del marketplace: %(court)s."
+
+#: apps/compliance/templates/compliance/contact_points.html
+#: themes/ride/templates/compliance/contact_points.html
+msgid "For users of the service"
+msgstr "Para los usuarios del servicio"
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Forgotten your login credentials?"
@@ -3456,6 +3507,15 @@ msgstr "Ir a la diapositiva %(count)s de %(total)s"
 msgid "Go to the home page"
 msgstr "Ir a la página de inicio"
 
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid ""
+"Goods sold to consumers have a legal guarantee of conformity of %(months)s months from delivery. "
+"The seller is liable for a lack of conformity that appears within that period."
+msgstr ""
+"Los bienes vendidos a consumidores tienen una garantía legal de conformidad de %(months)s meses "
+"desde la entrega. El vendedor responde de la falta de conformidad que se manifieste dentro de ese "
+"plazo."
+
 #: apps/orders/ui/present.py apps/orders/ui/views.py
 msgid "Goods, excluding VAT"
 msgstr "Mercancía, sin IVA"
@@ -3504,6 +3564,7 @@ msgid "Grows by one at every change of the state."
 msgstr "Aumenta en uno con cada cambio del estado."
 
 #: apps/catalog/product_pages.py apps/catalog/templates/catalog/product.html
+#: apps/compliance/templates/compliance/includes/product_safety.html
 #: themes/ride/templates/catalog/product.html
 msgid "GTIN"
 msgstr "GTIN"
@@ -3881,13 +3942,13 @@ msgstr "Compro para una empresa"
 msgid "I have issued the invoice or receipt"
 msgstr "He emitido la factura o el comprobante"
 
-#: apps/orders/templates/orders/_legal_boxes.html
+#: apps/orders/templates/orders/_legal_boxes.html themes/ride/templates/orders/_legal_boxes.html
 msgid "I have read and accept the marketplace terms and the sales terms of each seller named above."
 msgstr ""
 "He leído y acepto las condiciones del marketplace y las condiciones de venta de cada vendedor "
 "indicado arriba."
 
-#: apps/orders/templates/orders/_legal_boxes.html
+#: apps/orders/templates/orders/_legal_boxes.html themes/ride/templates/orders/_legal_boxes.html
 msgid "I specifically approve the onerous clauses listed above, one by one."
 msgstr "Apruebo específicamente, una por una, las cláusulas onerosas enumeradas arriba."
 
@@ -3923,6 +3984,10 @@ msgid ""
 msgstr ""
 "Si no ha iniciado sesión, Continuar le permite iniciar sesión una vez con este enlace; antes de "
 "aprobar o rechazar cualquier cosa, deberá confirmar igualmente su identidad con el segundo factor."
+
+#: apps/compliance/templates/compliance/includes/other_ways.html
+msgid "If you cannot reach the seller, write to the platform at %(platform_email)s."
+msgstr "Si no consigues contactar con el vendedor, escribe a la plataforma a %(platform_email)s."
 
 #: apps/vendors/templates/vendors/apply/cancel.html
 msgid ""
@@ -4164,6 +4229,12 @@ msgstr "Conservar el resto"
 msgid "Keep the rule already saved: %(rule)s"
 msgstr "Mantener la regla ya guardada: %(rule)s"
 
+#: apps/compliance/templates/compliance/withdrawal_done.html
+msgid "Keep this page's reference as proof; the confirmation email could not be queued."
+msgstr ""
+"Conserva la referencia de esta página como prueba: no se pudo poner en cola el correo de "
+"confirmación."
+
 #: apps/seo/providers.py
 msgid "Keeps the site working: sign-in, cart and security. Always on."
 msgstr "Hace funcionar el sitio: inicio de sesión, carrito y seguridad. Siempre activas."
@@ -4196,6 +4267,11 @@ msgstr "Idioma de los textos"
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Language: %(language)s. Original language of the event: %(original)s."
 msgstr "Idioma: %(language)s. Idioma original del evento: %(original)s."
+
+#: apps/compliance/templates/compliance/contact_points.html
+#: themes/ride/templates/compliance/contact_points.html
+msgid "Languages:"
+msgstr "Idiomas:"
 
 #: apps/manager/event_forms.py
 msgid "Last day"
@@ -4309,9 +4385,13 @@ msgstr "Deje la casilla vacía para omitirla."
 msgid "Legal"
 msgstr "Aviso legal"
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Legal guarantee"
 msgstr "Garantía legal"
+
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid "Legal guarantee of conformity"
+msgstr "Garantía legal de conformidad"
 
 #: apps/catalog/taxonomy.py
 msgid "legal name"
@@ -4389,6 +4469,10 @@ msgstr "Cargando"
 #: themes/base/templates/components/user_tools.html
 msgid "Loading help…"
 msgstr "Cargando la ayuda…"
+
+#: apps/compliance/templates/compliance/subprocessors.html
+msgid "Location"
+msgstr "Ubicación"
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Log in"
@@ -4498,6 +4582,14 @@ msgstr "Espacio de tienda del Manager: %(vendor)s"
 msgid "manufacturer"
 msgstr "fabricante"
 
+#: apps/compliance/templates/compliance/includes/product_safety.html
+msgid "Manufacturer"
+msgstr "Fabricante"
+
+#: apps/compliance/templates/compliance/includes/product_safety.html
+msgid "Manufacturer part number"
+msgstr "Referencia del fabricante"
+
 #: apps/events/templates/events/_index_map.html
 msgid "Map of the listed events"
 msgstr "Mapa de los eventos de la lista"
@@ -4518,7 +4610,7 @@ msgstr "Marcar como enviado"
 msgid "Marketing"
 msgstr "Marketing"
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Marketplace terms (version %(number)s)"
 msgstr "Condiciones del marketplace (versión %(number)s)"
 
@@ -4581,6 +4673,10 @@ msgstr "falta"
 #: apps/manager/product_views.py
 msgid "Missing in %(language)s"
 msgstr "Falta en %(language)s"
+
+#: apps/compliance/templates/compliance/includes/product_safety.html
+msgid "Model or type"
+msgstr "Modelo o tipo"
 
 #: apps/manager/templates/manager/shop/events.html
 msgid "Moderation"
@@ -4880,7 +4976,7 @@ msgstr "Aún no hay valoraciones"
 msgid "No second factor yet."
 msgstr "Todavía no hay segundo factor."
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "No seller terms published."
 msgstr "El vendedor no ha publicado condiciones de venta."
 
@@ -4917,6 +5013,10 @@ msgstr "Ninguno."
 #: apps/orders/customer_views.py
 msgid "Not added: %(item)s, %(reason)s."
 msgstr "No añadido: %(item)s, %(reason)s."
+
+#: apps/compliance/templates/compliance/includes/product_safety.html
+msgid "Not available in your language: shown in %(name)s."
+msgstr "No disponible en tu idioma: se muestra en %(name)s."
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Not connected"
@@ -5495,6 +5595,11 @@ msgstr "Abrir la lista de revisión"
 msgid "Opening balance"
 msgstr "Saldo inicial"
 
+#: apps/compliance/templates/compliance/contact_points.html
+#: themes/ride/templates/compliance/contact_points.html
+msgid "Operated by %(name)s."
+msgstr "Gestionada por %(name)s."
+
 #: apps/seo/templates/seo/consent/preferences.html
 msgid "Optional cookies on:"
 msgstr "Cookies opcionales activadas:"
@@ -5626,6 +5731,12 @@ msgstr "Cambios de pedidos"
 msgid "Order count tiers"
 msgstr "Tramos del número de pedidos"
 
+#: apps/compliance/templates/compliance/privacy_erased.html
+#: themes/ride/templates/compliance/privacy_erased.html
+msgid "Order data is kept for %(years)s years from the end of the fiscal year, as the law requires."
+msgstr ""
+"Los datos del pedido se conservan %(years)s años desde el cierre del ejercicio, como exige la ley."
+
 #: apps/compliance/forms.py apps/manager/templates/manager/platform/orders.html
 msgid "Order number"
 msgstr "Número de pedido"
@@ -5726,6 +5837,10 @@ msgstr "Otros vendedores de este producto"
 #: apps/ingest/models.py
 msgid "Other ways the supplier writes the same term, as a JSON list."
 msgstr "Otras formas en que el proveedor escribe el mismo término, como lista JSON."
+
+#: apps/compliance/templates/compliance/includes/other_ways.html
+msgid "Other ways to withdraw"
+msgstr "Otras formas de desistir"
 
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
@@ -5928,6 +6043,10 @@ msgstr "Pagos recibidos"
 #: apps/themes/styleguide.py
 msgid "PDF or image, 5 MB at most."
 msgstr "PDF o imagen, 5 MB como máximo."
+
+#: apps/compliance/templates/compliance/privacy_requests.html
+msgid "Pending"
+msgstr "Pendiente"
 
 #: apps/catalog/taxonomy.py
 msgid "Pending review"
@@ -6196,6 +6315,11 @@ msgstr ""
 msgid "Point on the map"
 msgstr "Punto en el mapa"
 
+#: apps/compliance/templates/compliance/contact_points.html
+#: themes/ride/templates/compliance/contact_points.html
+msgid "Points of contact"
+msgstr "Puntos de contacto"
+
 #: apps/catalog/taxonomy_admin.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Position"
 msgstr "Posición"
@@ -6281,7 +6405,7 @@ msgstr "Mes anterior"
 msgid "Previous slide"
 msgstr "Diapositiva anterior"
 
-#: themes/ride/templates/cms/legal_page.html
+#: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "Previous versions"
 msgstr "Versiones anteriores"
 
@@ -6322,7 +6446,7 @@ msgstr "Imprimir"
 msgid "Privacy and your data"
 msgstr "Privacidad y sus datos"
 
-#: apps/orders/templates/orders/_legal_boxes.html
+#: apps/orders/templates/orders/_legal_boxes.html themes/ride/templates/orders/_legal_boxes.html
 msgid "Privacy notice"
 msgstr "Aviso de privacidad"
 
@@ -6333,6 +6457,10 @@ msgstr "Solicitudes de privacidad (personal)"
 #: apps/manager/site_map.py apps/seo/site_links.py
 msgid "Privacy sub-processors"
 msgstr "Subencargados del tratamiento de datos"
+
+#: apps/compliance/templates/compliance/privacy_requests.html
+msgid "Process now"
+msgstr "Procesar ahora"
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Producer or reseller"
@@ -6363,6 +6491,10 @@ msgid "Product pages are not built yet (CAT.7): products are listed once they ar
 msgstr ""
 "Las páginas de producto todavía no existen (CAT.7): los productos aparecerán cuando existan."
 
+#: apps/compliance/templates/compliance/includes/product_safety.html
+msgid "Product safety"
+msgstr "Seguridad del producto"
+
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: apps/manager/event_block_forms.py apps/manager/event_forms.py apps/manager/product_views.py
 #: apps/manager/sections.py apps/manager/site_map.py
@@ -6379,7 +6511,7 @@ msgstr "Productos y categorías"
 msgid "Products still undeclared"
 msgstr "Productos aún sin declarar"
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "professional seller"
 msgstr "vendedor profesional"
 
@@ -6415,6 +6547,10 @@ msgstr "propuesto por"
 #: apps/manager/fitment_views.py apps/manager/site_map.py
 msgid "Proposed nodes"
 msgstr "Nodos propuestos"
+
+#: apps/compliance/templates/compliance/subprocessors.html
+msgid "Provider"
+msgstr "Proveedor"
 
 #: apps/manager/amendment_forms.py apps/orders/ui/forms.py
 msgid "Province or state"
@@ -6455,6 +6591,10 @@ msgid ""
 msgstr ""
 "La publicación añade una nueva versión y la pone en vigor. Los pedidos ya realizados conservan la "
 "versión con la que se hicieron."
+
+#: apps/compliance/templates/compliance/subprocessors.html
+msgid "Purpose"
+msgstr "Finalidad"
 
 #: apps/orders/customer_views.py
 msgid "Put back in your cart, at today's prices: %(items)s."
@@ -6499,13 +6639,17 @@ msgstr "Valorado con %(value)s sobre 5"
 msgid "Read more and choose"
 msgstr "Más información y elegir"
 
-#: themes/ride/templates/cms/legal_page_version.html
+#: apps/cms/templates/cms/legal_page_version.html themes/ride/templates/cms/legal_page_version.html
 msgid "Read the current version"
 msgstr "Lee la versión actual"
 
 #: apps/catalog/templates/catalog/includes/product_returns.html
 msgid "Read the returns policy"
 msgstr "Lee la política de devoluciones"
+
+#: apps/compliance/templates/compliance/includes/destination_notice.html
+msgid "Read the safety warnings in:"
+msgstr "Lee las advertencias de seguridad en:"
 
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt
@@ -6528,6 +6672,7 @@ msgstr "Leer esta versión en línea:"
 msgid "Readiness probe"
 msgstr "Comprobación de disponibilidad"
 
+#: apps/compliance/templates/compliance/privacy_requests.html
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt apps/manager/fitment_forms.py
 #: apps/manager/forms.py apps/manager/templates/email/manager/role_self_assigned/body.html
@@ -6612,12 +6757,17 @@ msgstr "Código de recuperación"
 msgid "Recovery codes"
 msgstr "Códigos de recuperación"
 
+#: apps/compliance/templates/compliance/notice_received.html
 #: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/_money_table.html
 #: apps/manager/templates/manager/shop/money_statement.html
 #: apps/manager/templates/manager/shop/statements.html
 msgid "Reference"
 msgstr "Referencia"
+
+#: apps/compliance/templates/compliance/withdrawal_done.html
+msgid "reference"
+msgstr "referencia"
 
 #: apps/catalog/taxonomy_admin.py
 msgid ""
@@ -6751,13 +6901,17 @@ msgstr "Repetición"
 msgid "Replaced by a newer proposal"
 msgstr "Sustituida por una propuesta más reciente"
 
-#: apps/manager/site_map.py
+#: apps/compliance/templates/compliance/notice_form.html apps/manager/site_map.py
 msgid "Report illegal content"
 msgstr "Denunciar contenidos ilegales"
 
 #: apps/seo/site_links.py
 msgid "Report illegal content (DSA)"
 msgstr "Denunciar contenidos ilegales (DSA)"
+
+#: apps/compliance/templates/compliance/notice_received.html
+msgid "Report received"
+msgstr "Notificación recibida"
 
 #: apps/events/templates/events/event_page.html
 msgid "Report this event"
@@ -6772,9 +6926,17 @@ msgstr "Denunciado"
 msgid "Repository file"
 msgstr "Archivo del repositorio"
 
+#: apps/compliance/templates/compliance/privacy_requests.html
+msgid "Request"
+msgstr "Solicitud"
+
 #: apps/orders/templates/orders/_package.html
 msgid "Request a quote"
 msgstr "Solicitar un presupuesto"
+
+#: apps/compliance/templates/compliance/privacy_requests.html
+msgid "Requested"
+msgstr "Solicitada el"
 
 #: apps/manager/fitment_views.py
 msgid "Require a declaration to publish"
@@ -6795,6 +6957,10 @@ msgstr "Obligatorio cuando se asigna un rol a sí mismo; se conserva en el regis
 #: apps/manager/forms.py
 msgid "Reseller: we buy the products to resell"
 msgstr "Revendedor: compramos los productos para revenderlos"
+
+#: apps/compliance/templates/compliance/includes/product_safety.html
+msgid "Responsible person in the EU"
+msgstr "Persona responsable en la UE"
 
 #: apps/orders/customer_views.py
 msgid "Rest of the package cancelled at your request"
@@ -6928,6 +7094,10 @@ msgstr "Reseñas"
 msgid "Revoke %(role)s"
 msgstr "Revocar %(role)s"
 
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid "Right of withdrawal"
+msgstr "Derecho de desistimiento"
+
 #: apps/seo/site_links.py
 msgid "robots.txt"
 msgstr "robots.txt"
@@ -6953,6 +7123,14 @@ msgstr "Filas a la espera de un elemento no aprobado"
 msgid "RSS feed"
 msgstr "Canal RSS"
 
+#: apps/compliance/templates/compliance/subprocessors.html
+msgid "Safeguard"
+msgstr "Garantía"
+
+#: apps/compliance/templates/compliance/includes/product_safety.html
+msgid "Safety information"
+msgstr "Información de seguridad"
+
 #: apps/manager/money_views.py themes/base/templates/components/badge.html
 msgid "Sale"
 msgstr "Venta"
@@ -6973,7 +7151,7 @@ msgstr "Condiciones de venta"
 msgid "Sales terms of %(name)s"
 msgstr "Condiciones de venta de %(name)s"
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Sales terms of %(name)s (version %(number)s of %(date)s), print or download"
 msgstr "Condiciones de venta de %(name)s (versión %(number)s del %(date)s), imprimir o descargar"
 
@@ -7120,6 +7298,7 @@ msgid "Sell with us (vendor application)"
 msgstr "Venda con nosotros (solicitud de vendedor)"
 
 #: apps/orders/templates/orders/_legal_recap.html apps/vendors/models.py
+#: themes/ride/templates/orders/_legal_recap.html
 msgid "Seller"
 msgstr "Vendedor"
 
@@ -7142,6 +7321,10 @@ msgstr "Enviar mi solicitud"
 #: apps/manager/templates/manager/shop/fitment_proposals.html
 msgid "Send the proposal"
 msgstr "Enviar la propuesta"
+
+#: apps/compliance/templates/compliance/notice_form.html
+msgid "Send the report"
+msgstr "Enviar la notificación"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid ""
@@ -7630,7 +7813,7 @@ msgstr "origen"
 msgid "Source address"
 msgstr "Dirección de la fuente"
 
-#: apps/orders/templates/orders/_legal_boxes.html
+#: apps/orders/templates/orders/_legal_boxes.html themes/ride/templates/orders/_legal_boxes.html
 msgid "Specific approval of onerous clauses (articles 1341 and 1342 of the Italian Civil Code)"
 msgstr ""
 "Aprobación específica de las cláusulas onerosas (artículos 1341 y 1342 del Código Civil italiano)"
@@ -7684,6 +7867,7 @@ msgstr "Empezar a comprar"
 msgid "Starts at"
 msgstr "Empieza a las"
 
+#: apps/compliance/templates/compliance/privacy_requests.html
 #: apps/manager/templates/manager/platform/product.html
 msgid "State"
 msgstr "Estado"
@@ -7789,6 +7973,10 @@ msgstr "Calle y número. Obligatorio: el transportista lo necesita para entregar
 #: apps/seo/site_links.py
 msgid "Styleguide"
 msgstr "Guía de estilo"
+
+#: apps/compliance/templates/compliance/subprocessors.html
+msgid "Sub-processors"
+msgstr "Subencargados del tratamiento"
 
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Submit"
@@ -7899,7 +8087,7 @@ msgstr "Bajas"
 
 #: apps/orders/templates/orders/_legal_boxes.html
 #: apps/vendors/templates/documents/vendors/sales_terms.html
-#: apps/vendors/templates/vendors/terms/read.html
+#: apps/vendors/templates/vendors/terms/read.html themes/ride/templates/orders/_legal_boxes.html
 msgid "Terms"
 msgstr "Condiciones"
 
@@ -7918,6 +8106,10 @@ msgstr "Gracias. El vendedor ya puede enviar el resto."
 #: apps/cms/templates/cms/form_page_landing.html
 msgid "Thank you. We have received your message."
 msgstr "Gracias. Hemos recibido tu mensaje."
+
+#: apps/compliance/templates/compliance/notice_received.html
+msgid "Thank you. We received your report and will review it."
+msgstr "Gracias. Hemos recibido tu notificación y la revisaremos."
 
 #: apps/cms/forms_pages.py
 msgid "thank-you text"
@@ -8447,7 +8639,7 @@ msgstr ""
 "El país cuya legislación rige sus condiciones, con el código de dos letras, por ejemplo IT. "
 "Obligatorio."
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "The court for any dispute is the one of your own place of residence."
 msgstr "Para cualquier controversia, el tribunal competente es el de tu lugar de residencia."
 
@@ -10045,6 +10237,10 @@ msgstr ""
 msgid "The review is recorded and the payouts are released."
 msgstr "La revisión queda registrada y los pagos se desbloquean."
 
+#: apps/compliance/templates/compliance/withdrawal_choose.html
+msgid "the right of withdrawal is for consumers; this order was placed as a business."
+msgstr "el derecho de desistimiento es para consumidores; este pedido se hizo como empresa."
+
 #: apps/manager/views.py
 msgid "The role change is recorded."
 msgstr "El cambio de rol queda registrado."
@@ -10760,6 +10956,14 @@ msgid ""
 msgstr ""
 "El ancho del producto en milímetros, por ejemplo 200. Opcional: déjalo vacío si no lo conoces."
 
+#: apps/compliance/templates/compliance/withdrawal_choose.html
+msgid "the withdrawal period has ended."
+msgstr "el plazo de desistimiento ha terminado."
+
+#: apps/compliance/templates/compliance/withdrawal_choose.html
+msgid "The withdrawal period starts when you receive the goods; you can withdraw before then."
+msgstr "El plazo de desistimiento empieza cuando recibes los bienes; puedes desistir antes."
+
 #: apps/catalog/attributes.py
 msgid ""
 "The word buyers see for this value in this language, for example 'Red'. Required: without it the "
@@ -10895,6 +11099,14 @@ msgstr ""
 "Estos son los navegadores y dispositivos conectados a tu cuenta. Si no reconoces alguno, ciérralo "
 "y cambia tu contraseña."
 
+#: apps/compliance/templates/compliance/subprocessors.html
+msgid ""
+"These providers process personal data on our behalf. Each one is bound by a data processing "
+"agreement."
+msgstr ""
+"Estos proveedores tratan datos personales por cuenta nuestra. Cada uno está vinculado por un "
+"contrato de encargado del tratamiento."
+
 #: apps/manager/templates/manager/platform/amendment_settings.html
 msgid ""
 "These rules apply to every change of a paid order. They are part of the platform configuration: a "
@@ -11009,6 +11221,10 @@ msgstr ""
 msgid "This is a substantial change: it needs the customer's acceptance first."
 msgstr "Este es un cambio sustancial: necesita antes la aceptación del cliente."
 
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid "This is a summary. The harmonised notice on the legal guarantee will replace it."
+msgstr "Esto es un resumen. El aviso armonizado sobre la garantía legal lo sustituirá."
+
 #: apps/manager/templates/manager/shop/event_form.html
 msgid ""
 "This is a translation. Dates, place and products come from the original and are copied when it is "
@@ -11017,7 +11233,7 @@ msgstr ""
 "Esta es una traducción. Las fechas, el lugar y los productos proceden del original y se copian al "
 "publicarla."
 
-#: themes/ride/templates/cms/legal_page_version.html
+#: apps/cms/templates/cms/legal_page_version.html themes/ride/templates/cms/legal_page_version.html
 msgid "This is an archived version."
 msgstr "Esta es una versión archivada."
 
@@ -11159,6 +11375,15 @@ msgstr "Esta página todavía no está disponible en tu idioma."
 msgid "This parent does not exist."
 msgstr "Este padre no existe."
 
+#: apps/compliance/templates/compliance/includes/destination_notice.html
+msgid ""
+"This product cannot be shipped to %(country)s: its safety warnings are not yet available in a "
+"language of that country (%(languages)s). It can still be bought for delivery to other countries."
+msgstr ""
+"Este producto no se puede enviar a %(country)s: sus advertencias de seguridad aún no están "
+"disponibles en un idioma de ese país (%(languages)s). Aun así, puedes comprarlo para su entrega en"
+" otros países."
+
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "This product is no longer available."
 msgstr "Este producto ya no está disponible."
@@ -11199,7 +11424,7 @@ msgstr ""
 "Este vendedor está suspendido o cerrado, por lo que no se puede modificar el perfil de escaparate."
 " Póngase en contacto con el servicio de asistencia para que se reabra."
 
-#: themes/ride/templates/cms/legal_page.html
+#: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "This version comes into effect on %(date)s."
 msgstr "Esta versión entra en vigor el %(date)s."
 
@@ -11494,6 +11719,17 @@ msgid ""
 msgstr ""
 "Para limitar la zona a algunas provincias o estados, enumere sus códigos separados por comas, por "
 "ejemplo «SS» o «CA»."
+
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid ""
+"To withdraw online, use the button below at any time during the withdrawal period. You enter the "
+"order number and your email address, choose the parts to withdraw from, and confirm. You receive "
+"an acknowledgement by email with the content, the date and the time."
+msgstr ""
+"Para desistir en línea, usa el botón de abajo en cualquier momento durante el plazo de "
+"desistimiento. Introduces el número de pedido y tu dirección de correo electrónico, eliges las "
+"partes de las que desistes y confirmas. Recibes por correo electrónico un acuse de recibo con el "
+"contenido, la fecha y la hora."
 
 #: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "To year"
@@ -11862,6 +12098,7 @@ msgid "VAT included in the total"
 msgstr "IVA incluido en el total"
 
 #: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/forms.py
+#: themes/ride/templates/orders/_legal_recap.html
 msgid "VAT number"
 msgstr "Número de IVA"
 
@@ -11930,12 +12167,12 @@ msgstr "Versión %(n)s, válida desde el %(start)s."
 msgid "version %(number)s"
 msgstr "versión %(number)s"
 
-#: apps/cms/templates/cms/includes/legal_version_meta.html themes/ride/templates/cms/legal_page.html
-#: themes/ride/templates/cms/legal_page_version.html
+#: apps/cms/templates/cms/includes/legal_version_meta.html apps/cms/templates/cms/legal_page.html
+#: themes/ride/templates/cms/legal_page.html themes/ride/templates/cms/legal_page_version.html
 msgid "Version %(number)s"
 msgstr "Versión %(number)s"
 
-#: themes/ride/templates/cms/legal_page.html
+#: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "Version %(number)s applies until then."
 msgstr "Hasta entonces se aplica la versión %(number)s."
 
@@ -12014,6 +12251,10 @@ msgstr ""
 "Atención: este texto está pensado para la base de datos de transparencia de la UE (el envío "
 "todavía no existe, por ahora solo se guarda). Máximo 2000 caracteres. No escriba datos personales,"
 " nombres, direcciones de correo electrónico ni direcciones web."
+
+#: apps/compliance/templates/compliance/includes/product_safety.html
+msgid "Warnings"
+msgstr "Advertencias"
 
 #: themes/base/templates/components/product_tile.html
 #: themes/ride/templates/components/product_tile.html
@@ -12138,6 +12379,10 @@ msgstr ""
 "Hemos recibido tu pago de %(total)s EUR por el pedido %(order_number)s. Cada vendedor preparará su"
 " parte y recibirás un mensaje cuando se envíe."
 
+#: apps/compliance/templates/compliance/withdrawal_done.html
+msgid "We received your withdrawal from order %(number)s on %(at)s."
+msgstr "Hemos recibido tu desistimiento del pedido %(number)s el %(at)s."
+
 #: apps/themes/styleguide.py
 msgid "We send the order confirmation here."
 msgstr "Aquí le enviamos la confirmación del pedido."
@@ -12149,7 +12394,13 @@ msgstr ""
 "Enviamos la confirmación del pedido a esta dirección. Obligatorio: sin ella no podemos confirmar "
 "tu pedido."
 
-#: apps/orders/templates/orders/_legal_boxes.html
+#: apps/compliance/templates/compliance/withdrawal_done.html
+msgid "We sent the same confirmation to the email address of the order. Keep it as proof."
+msgstr ""
+"Hemos enviado la misma confirmación a la dirección de correo electrónico del pedido. Consérvala "
+"como prueba."
+
+#: apps/orders/templates/orders/_legal_boxes.html themes/ride/templates/orders/_legal_boxes.html
 msgid "we use your data to carry out this order. Read the notice to know more."
 msgstr "utilizamos tus datos para ejecutar este pedido. Lee el aviso para saber más."
 
@@ -12834,7 +13085,7 @@ msgstr ""
 "Quién escribió el artículo. El nombre aparece bajo el título y enlaza a la página del autor. Si lo"
 " deja vacío, no se muestra ningún autor."
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Who you buy from and on which terms"
 msgstr "A quién compra y en qué condiciones"
 
@@ -12927,13 +13178,26 @@ msgstr "Periodo del límite por comprador"
 msgid "Withdraw and tell the vendor"
 msgstr "Retirar y avisar al vendedor"
 
+#: apps/compliance/templates/compliance/withdrawal_choose.html
+msgid "Withdraw from order %(number)s"
+msgstr "Desistir del pedido %(number)s"
+
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Withdraw the notice"
 msgstr "Retirar el preaviso"
 
 #: apps/manager/site_map.py apps/orders/templates/orders/_legal_recap.html
+#: themes/ride/templates/orders/_legal_recap.html
 msgid "Withdrawal"
 msgstr "Desistimiento"
+
+#: apps/compliance/templates/compliance/withdrawal_choose.html
+msgid "withdrawal is not available for this part of the order."
+msgstr "el desistimiento no está disponible para esta parte del pedido."
+
+#: apps/compliance/templates/compliance/withdrawal_done.html
+msgid "Withdrawal received"
+msgstr "Desistimiento recibido"
 
 #: apps/manager/amendment_views.py
 msgid "Withdrawal registered"
@@ -13011,6 +13275,16 @@ msgstr "Has cerrado todas las demás sesiones."
 msgid "You are working on %(vendor)s."
 msgstr "Está trabajando con %(vendor)s."
 
+#: apps/compliance/templates/compliance/includes/other_ways.html
+msgid ""
+"You can also withdraw by sending a clear statement that you withdraw from the contract, with your "
+"order number, to the seller by email or post, or by using the model withdrawal form. The seller's "
+"contact details are in your order confirmation."
+msgstr ""
+"También puedes desistir enviando al vendedor, por correo electrónico o postal, una declaración "
+"inequívoca de que desistes del contrato, con tu número de pedido, o usando el modelo de formulario"
+" de desistimiento. Los datos de contacto del vendedor figuran en la confirmación de tu pedido."
+
 #: apps/orders/templates/orders/customer_order.html
 msgid ""
 "You can cancel the rest of this package free of charge until it is shipped, and get back "
@@ -13036,6 +13310,10 @@ msgstr "Puede leer el esquema, pero no cambiarlo."
 msgid "You can view this section; changes need the Catalog role."
 msgstr "Puede consultar esta sección; para los cambios se necesita el rol Catálogo."
 
+#: apps/compliance/templates/compliance/withdrawal_choose.html
+msgid "You can withdraw until %(until)s."
+msgstr "Puedes desistir hasta el %(until)s."
+
 #: apps/manager/event_block_views.py
 msgid "You cannot add images for this shop."
 msgstr "No puede añadir imágenes para esta tienda."
@@ -13054,7 +13332,7 @@ msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Tiene %(counter)s código de recuperación sin usar."
 msgstr[1] "Tiene %(counter)s códigos de recuperación sin usar."
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid ""
 "You have 14 days from delivery to withdraw, also through the online withdrawal button. The seller "
 "pays the cost of returning the goods."
@@ -13062,7 +13340,7 @@ msgstr ""
 "Dispones de 14 días desde la entrega para desistir, también mediante el botón de desistimiento en "
 "línea. El vendedor paga el coste de devolver los bienes."
 
-#: apps/orders/templates/orders/_legal_recap.html
+#: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid ""
 "You have 14 days from delivery to withdraw, also through the online withdrawal button. You pay the"
 " direct cost of returning the goods. %(info)s"
@@ -13092,6 +13370,15 @@ msgstr ""
 msgid "You may also like"
 msgstr "También te puede gustar"
 
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid ""
+"You may withdraw from a distance contract within %(days)s days without giving a reason. The period"
+" runs from the day you receive the goods. Each seller in your order is a separate contract."
+msgstr ""
+"Puedes desistir de un contrato a distancia en un plazo de %(days)s días sin necesidad de "
+"justificación. El plazo cuenta desde el día en que recibes los bienes. Cada vendedor de tu pedido "
+"es un contrato distinto."
+
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 msgid "You pay nothing more, and there is nothing you need to do."
@@ -13114,6 +13401,11 @@ msgstr ""
 msgid "You will be asked to confirm with your second factor."
 msgstr "Se te pedirá que confirmes con tu segundo factor."
 
+#: apps/compliance/templates/compliance/privacy_erased.html
+#: themes/ride/templates/compliance/privacy_erased.html
+msgid "Your account has been erased."
+msgstr "Tu cuenta ha sido suprimida."
+
 #: apps/accounts/templates/accounts/levels/prompt.html
 #: apps/manager/templates/manager/amendment_passkey.html
 msgid ""
@@ -13122,6 +13414,14 @@ msgid ""
 msgstr ""
 "Su cuenta todavía no tiene ninguna clave de acceso (passkey). <a href=\"%(overview_url)s\">Añada "
 "una clave de acceso</a> para poder confirmar esta acción."
+
+#: apps/compliance/templates/compliance/privacy_erased.html
+#: themes/ride/templates/compliance/privacy_erased.html
+msgid ""
+"Your account is blocked. The erasure completes automatically when your last open order closes."
+msgstr ""
+"Tu cuenta está bloqueada. La supresión se completa automáticamente cuando se cierra tu último "
+"pedido abierto."
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your account is protected with a passkey."

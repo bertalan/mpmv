@@ -4,7 +4,7 @@ last-checked: 2026-11-18
 Questa è la prima pagina dell'area del Suo negozio. Mostra su quale negozio sta lavorando e che cosa Le è consentito fare. La pagina è di sola lettura.
 
 ## Cosa vede
-- **Venditore** è il negozio su cui sta lavorando. **Il tuo ruolo** è **Titolare** o **Staff**.
+- **Venditore** è il negozio su cui sta lavorando. **Il Suo ruolo** è **Titolare** o **Staff**.
 - Sotto **Prodotti** vede quattro conteggi: **Pubblicati**, **Bozze**, **Ritirati** ed **Esaurito**.
 
 ## Da sapere

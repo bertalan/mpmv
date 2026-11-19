@@ -29,7 +29,7 @@ from apps.vendors.scoping import get_for_actor_or_404
 
 from .mutations import ChangeSetOut, DryRun, audit_context, changeset_out
 from .security import ApiKey
-from .text import PlainText
+from .text import NFCText, PlainText
 
 router = Router(tags=["catalog"])
 
@@ -99,11 +99,11 @@ def list_attributes(
 
 class TranslationIn(Schema):
     language: PlainText
-    title: PlainText = Field(min_length=1, max_length=255)
-    short_description: PlainText = ""
-    description: PlainText = ""
-    material: PlainText = Field("", max_length=120)
-    colour: PlainText = Field("", max_length=80)
+    title: NFCText = Field(min_length=1, max_length=255)
+    short_description: NFCText = ""
+    description: NFCText = ""
+    material: NFCText = Field("", max_length=120)
+    colour: NFCText = Field("", max_length=80)
 
 
 class ProductAttributeIn(Schema):
@@ -112,7 +112,7 @@ class ProductAttributeIn(Schema):
         default_factory=list, description="Value codes (choice attributes)."
     )
     number: Decimal | None = Field(None, description="Number attributes, in the attribute's unit.")
-    text: PlainText = Field("", max_length=255, description="Text attributes (language-neutral).")
+    text: NFCText = Field("", max_length=255, description="Text attributes (language-neutral).")
     variant_axis: bool = Field(
         False, description="The variants vary on it; axes are ordered as listed."
     )
@@ -334,7 +334,7 @@ class OtherSellersQuery(LanguageQuery):
         product_pages.OTHER_SELLERS_LIMIT,
         ge=1,
         le=OTHER_SELLERS_MAX,
-        description="At most this many offers (cheapest first, then by title).",
+        description="At most this many offers (cheapest first by consumer price, then by title).",
     )
 
 
@@ -369,7 +369,7 @@ def other_sellers(
         Product.objects.select_related("vendor"), api_client_of(request), public_id=public_id
     )
     out: list[dict[str, Any]] = []
-    for card in product_pages.other_sellers(product, query.language, query.limit):
+    for card in product_pages.other_sellers(product, query.language, query.limit, request):
         price = None
         if card.price is not None and card.vendor is not None:
             try:

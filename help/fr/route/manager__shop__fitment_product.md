@@ -6,7 +6,7 @@ Vous indiquez ici à quoi ce produit convient : des articles précis, tout, ou r
 ## Ce que vous pouvez faire
 - Choisissez **Déclaration**, puis remplissez les lignes : **Article**, **De l'année**, **À l'année**, **Exclut** et **Note**. Cochez **Retirer** pour supprimer une ligne.
 - Pour choisir un **Article**, sélectionnez la marque, puis le modèle, puis la variante dans les listes qui apparaissent l'une après l'autre. Ou saisissez au moins deux lettres dans **Rechercher par nom** et choisissez un résultat à la souris, ou avec les flèches et Entrée. Échap ferme les résultats. Sans script, une seule liste montre tous les articles approuvés.
-- Sélectionnez **Aperçu** pour voir les changements. Rien n'est écrit tant que vous ne **Confirmez** pas.
+- Sélectionnez **Aperçu** pour voir les changements. Rien n'est écrit tant que vous n'avez pas sélectionné **Confirmer**.
 - Sous **Copier depuis un autre produit**, choisissez l'un de vos produits puis sélectionnez **Aperçu de la copie**.
 - Si un article manque, utilisez **Proposer un élément manquant**.
 

@@ -37,6 +37,7 @@ and lives on that URL; a vendor landing page tells an active vendor's story with
 """
 
 import datetime as dt
+import logging
 import uuid
 from typing import Any, ClassVar
 from urllib.parse import urljoin
@@ -78,6 +79,7 @@ from wagtail_localize.models import Translation
 
 from apps.core.fields import LanguageField
 from apps.core.images import rendition_or_original
+from apps.core.nfc_forms import NFCModelForm
 from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
 from apps.vendors.services import has_public_storefront
 
@@ -367,6 +369,8 @@ class EditorRoleSeed(models.Model):
 
 class NavigationMenu(TranslatableMixin, models.Model):  # type: ignore[misc]
     """The header or footer links of one language (a snippet editors manage per locale)."""
+
+    base_form_class = NFCModelForm
 
     class Location(models.TextChoices):
         HEADER = "header", _("Header")
@@ -1052,6 +1056,8 @@ class VendorRecruitmentPage(Page):  # type: ignore[misc]
 
 # --- Reusable content snippet (CMS.14)
 
+_logger = logging.getLogger(__name__)
+
 CONTENT_SNIPPET_REVIEW = "Content snippet review"
 
 
@@ -1068,6 +1074,8 @@ class ContentSnippet(
     Translatable per language (wagtail-localize), with drafts and revisions, and a moderation
     workflow: an edit reaches the pages that use it only when it is approved and published.
     Rich text only: a snippet cannot hold a snippet block, so there is no recursion."""
+
+    base_form_class = NFCModelForm
 
     title = models.CharField(
         _("title"),
@@ -1114,6 +1122,24 @@ class ContentSnippet(
     def has_workflow(self) -> bool:
         return self.get_workflow() is not None
 
+    def publish(self, revision: Any, *args: Any, **kwargs: Any) -> Any:
+        """Fail closed on every path (admin, API, shell, scheduled job): no active review
+        workflow, no publish. A scheduled go-live is skipped with a warning and stays scheduled,
+        so one refused snippet does not stop `publish_scheduled` for the other objects."""
+        from .snippet_workflow import REFUSED_MESSAGE, SnippetPublishRefused, snippet_can_publish
+
+        if snippet_can_publish(self):
+            return super().publish(revision, *args, **kwargs)
+        if kwargs.get("log_action") == "wagtail.publish.scheduled":
+            _logger.warning(
+                "Scheduled publish of snippet %s (revision %s) skipped: review workflow "
+                "missing or switched off. It stays scheduled.",
+                self.pk,
+                getattr(revision, "pk", None),
+            )
+            return None
+        raise SnippetPublishRefused(str(REFUSED_MESSAGE))
+
 
 def content_snippet_workflow(*, create: bool = False) -> Workflow | None:
     """The "Content snippet review" workflow: one `GroupApprovalTask` for "Snippet publishers".
@@ -1154,6 +1180,8 @@ class BlogAuthor(TranslatableMixin, models.Model):  # type: ignore[misc]  # Wagt
     """The byline of articles: a name, not a user account (legacy authors have none), with a
     bio, a photo and an author page. A translatable snippet: each language has its own copy, the
     bio and the photo's alt text are translated, the name, slug and photo are the source's."""
+
+    base_form_class = NFCModelForm
 
     name = models.CharField(
         _("name"),

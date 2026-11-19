@@ -36,6 +36,7 @@ from wagtail.fields import RichTextField
 
 from apps.accounts.captcha import captcha_passes
 from apps.core.http import client_ip
+from apps.core.nfc_forms import NFCFormMixin
 from apps.core.public_forms import Protection, public_form
 from apps.core.services import consume_rate_limit
 from apps.core.throttling import ip_bucket
@@ -50,6 +51,11 @@ FIELD_MAX_LENGTH = {"singleline": 255, "multiline": 5000, "email": 254, "url": 2
 
 class BoundedFormBuilder(FormBuilder):  # type: ignore[misc]
     """Wagtail's builder with a `max_length` on every text-like field."""
+
+    def get_form_class(self) -> Any:
+        """The submission form stores its text in NFC (I18N.10)."""
+        base = super().get_form_class()
+        return type(base.__name__, (NFCFormMixin, base), {})
 
     def create_singleline_field(self, field: Any, options: dict[str, Any]) -> Any:
         return super().create_singleline_field(

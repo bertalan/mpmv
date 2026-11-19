@@ -14,7 +14,18 @@ from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
-from django.db.models import Case, Count, F, OuterRef, Q, Subquery, When, prefetch_related_objects
+from django.db.models import (
+    Case,
+    Count,
+    Exists,
+    F,
+    OuterRef,
+    Q,
+    Subquery,
+    When,
+    prefetch_related_objects,
+)
+from django.http import HttpRequest
 from django.utils.translation import gettext as _
 from wagtail import hooks
 
@@ -27,7 +38,7 @@ from apps.vendors.return_engine import ReturnPolicy
 from apps.vendors.return_services import effective_return_policy
 
 from . import engine, services, slugs
-from .models import Product, ProductImage, ProductStatus, ProductTranslation, SalesMode
+from .models import Product, ProductImage, ProductStatus, ProductTranslation, SalesMode, Variant
 
 
 @dataclass(frozen=True)
@@ -318,27 +329,65 @@ def related(page: ProductPage, language: str | None = None) -> Sequence["service
 
 
 OTHER_SELLERS_LIMIT = 6
+# The offers priced before the consumer-price order picks `limit` of them: the cheapest by net
+# price, a window wide enough to find a cheaper gross price (an exempt vendor) next to the
+# cheapest net ones. Pricing costs the tax app's reads per vendor, so the window stays small.
+OTHER_SELLERS_CANDIDATES = 12
+# A provider of the consumer price (TAX.12), registered by an app that may import the tax app
+# (the catalog may not, spec 01 graph): `provider(net, fiscal_category, vendor, request)` returns
+# the VAT-inclusive amount a card shows, or None when no price can be decided.
+CONSUMER_PRICE_HOOK = "catalog_consumer_price"
+
+
+def _same_article(product: Product) -> Q:
+    """The products that are the same article as `product`: the same GTIN, or the same brand and
+    MPN, on the product or on any of its variants (CAT.20, CAT.23). An MPN without a brand is
+    no match, and neither is an empty identifier."""
+    own: list[Product | Variant] = [product, *product.variants.all()]
+    gtins = {engine.normalise_identifier(item.gtin) for item in own} - {""}
+    mpns = {engine.normalise_identifier(item.mpn) for item in own} - {""}
+    match = Q()
+    if gtins:
+        match |= Q(gtin__in=gtins) | Q(
+            Exists(Variant.objects.filter(product=OuterRef("pk"), gtin__in=gtins))
+        )
+    if mpns and product.brand_id is not None:
+        match |= Q(brand_id=product.brand_id) & (
+            Q(mpn__in=mpns)
+            | Q(Exists(Variant.objects.filter(product=OuterRef("pk"), mpn__in=mpns)))
+        )
+    return match
+
+
+def _consumer_amount(card: "services.ProductCard", request: HttpRequest | None) -> Decimal | None:
+    """What the card shows for its price: the consumer price, else the public net price."""
+    if card.price is None:
+        return None
+    for provider in hooks.get_hooks(CONSUMER_PRICE_HOOK):
+        amount: Decimal | None = provider(card.price, card.fiscal_category, card.vendor, request)
+        return amount
+    return card.price
 
 
 def other_sellers(
-    product: Product, language: str, limit: int = OTHER_SELLERS_LIMIT
+    product: Product,
+    language: str,
+    limit: int = OTHER_SELLERS_LIMIT,
+    request: HttpRequest | None = None,
 ) -> list["services.ProductCard"]:
     """The other vendors' offers of the same article (CAT.15, owner decision Q-33), as cards.
 
-    The same article is the same GTIN, or the same brand and MPN (the brand is one shared entity,
-    CAT.20, so spelling variants are one row; an MPN without a brand, or with another brand, is
-    not a match, and neither is an empty identifier). Only published products of active vendors
-    other than the product's own, with a published text and slug in `language` (no fallback to
-    another language, I18N rules). Cheapest first (the public net price; products without one
-    last), then by title. At most `limit` cards, in two queries plus the card texts, whatever
-    the number of sellers."""
-    match = Q()
-    gtin = engine.normalise_identifier(product.gtin)
-    mpn = engine.normalise_identifier(product.mpn)
-    if gtin:
-        match |= Q(gtin=gtin)
-    if mpn and product.brand_id is not None:
-        match |= Q(brand_id=product.brand_id, mpn=mpn)
+    The same article is the same GTIN, or the same brand and MPN, on the product or on one of
+    its variants (the brand is one shared entity, CAT.20, so spelling variants are one row; an
+    MPN without a brand, or with another brand, is not a match, and neither is an empty
+    identifier). Only published products of active vendors other than the product's own, with a
+    published text and slug in `language` (no fallback to another language, I18N rules).
+    Cheapest first by the price the card shows, VAT included (TAX.12: a consumer compares what
+    he pays, whatever the vendor's VAT regime; products without a price last), then by title.
+    At most `limit` cards: the cheapest offers by net price are read (a bounded window), ordered by
+    the consumer price, then cut. A fixed number of queries plus the card texts, whatever the
+    number of sellers."""
+    match = _same_article(product)
     if not match or limit < 1:
         return []
     text = ProductTranslation.objects.filter(
@@ -353,9 +402,27 @@ def other_sellers(
             _price=Case(When(sales_mode=SalesMode.BUY, then=F("price_net"))),
         )
         .filter(_title__isnull=False)
-        .order_by(F("_price").asc(nulls_last=True), "_title", "pk")[:limit]
+        .order_by(F("_price").asc(nulls_last=True), "_title", "pk")[
+            : max(limit, OTHER_SELLERS_CANDIDATES)
+        ]
     )
-    return [card for card in services.product_cards(chosen, language) if card.url]
+    cards = [card for card in services.product_cards(chosen, language) if card.url]
+    # One request for every card: the tax reads (rates, profiles) are cached on it.
+    request = request or HttpRequest()
+    amounts = [_consumer_amount(card, request) for card in cards]
+    # No amount (no price, or no consumer price can be decided): last, the net price then orders.
+    order = sorted(
+        range(len(cards)),
+        key=lambda i: (
+            amounts[i] is None,
+            amounts[i] or Decimal(0),
+            cards[i].price is None,
+            cards[i].price or Decimal(0),
+            cards[i].title,
+            i,
+        ),
+    )
+    return [cards[i] for i in order[:limit]]
 
 
 def _items(images: Sequence[GalleryImage]) -> list[dict[str, Any]]:

@@ -13,6 +13,7 @@ from typing import Any
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
+from apps.core.nfc_forms import NFCFormMixin
 from apps.core.services import allowed_vendor_countries
 
 # English names of the EU-27, the go-live allowed countries (CMP.13, D-21). A country staff add
@@ -33,7 +34,7 @@ PASSWORD_MAX = 128
 MAX_BODY_BYTES = 8 * 1024  # the four fields fit in well under 2 KB, plus the tokens
 
 
-class ApplicationForm(forms.Form):
+class ApplicationForm(NFCFormMixin, forms.Form):
     full_name = forms.CharField(
         label=_("Your full name"),
         help_text=_(

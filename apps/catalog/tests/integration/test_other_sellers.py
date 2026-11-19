@@ -162,7 +162,7 @@ def test_the_number_of_queries_does_not_grow_with_the_sellers() -> None:
     for index in range(5):
         offer(title=f"Mug N{index}", gtin=GTIN)
     assert count() == few
-    assert few <= 3
+    assert few <= 4  # one more when the variants are not prefetched (CAT.23 identifiers)
 
 
 @pytest.mark.usefixtures("consumer_prices")
