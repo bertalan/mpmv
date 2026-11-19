@@ -2176,6 +2176,10 @@ msgstr ""
 msgid "Choose: {label}"
 msgstr "Auswählen: {label}"
 
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "Chosen: {name}"
+msgstr "Gewählt: {name}"
+
 #: apps/manager/amendment_forms.py apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "City"
 msgstr "Stadt"
@@ -4845,6 +4849,10 @@ msgstr "Keine Veranstaltungen in diesem Monat."
 msgid "No image"
 msgstr "Kein Bild"
 
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "No item found."
+msgstr "Kein Artikel gefunden."
+
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "No level yet."
 msgstr "Noch keine Ebene."
@@ -7110,6 +7118,10 @@ msgstr "bildschirm oder seitentyp"
 #: themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Suchen"
+
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "Search by name"
+msgstr "Nach Namen suchen"
 
 #: apps/cms/blocks.py
 msgid "Search by name, SKU, brand or vendor, then click the product."
@@ -13589,3 +13601,7 @@ msgstr ""
 #: apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "{n} choices"
 msgstr "{n} Auswahlmöglichkeiten"
+
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "{n} items found"
+msgstr "{n} Artikel gefunden"
