@@ -5,6 +5,8 @@ accounting (spec 04): amounts are signed from the vendor's side, positive for a 
 vendor and negative for a debit, always in EUR, rounded `ROUND_HALF_UP` to the cent.
 """
 
+import datetime as dt
+import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
@@ -122,3 +124,108 @@ def build_statement(opening: Decimal, by_kind: Mapping[str, Decimal]) -> Stateme
         closing=money(opening + credits + debits),
         by_kind=dict(by_kind),
     )
+
+
+# --- Vendor money pages (VEN.9): periods, payout kinds, the extract reference and CSV safety
+
+# What was sent to the vendor: the payouts page lists these kinds.
+PAYOUT_KINDS = (PAYOUT, TRANSFER)
+# Spec 11 §11.2: every ledger extract is a non-fiscal document with a stable reference ID.
+NON_FISCAL_LABEL = "Documento non fiscale / Non-fiscal document"
+# Why a period filter was ignored; the adapter turns the code into a translated message.
+PERIOD_BAD_DATE = "bad_date"
+PERIOD_REVERSED = "reversed"
+PERIOD_INCOMPLETE = "incomplete"
+CSV_APOSTROPHE = "'"
+_FORMULA_SIGNS = ("=", "+", "-", "@")
+_CONTROL_STARTS = ("\t", "\r", "\n", CSV_APOSTROPHE)
+
+
+@dataclass(frozen=True)
+class Period:
+    """An inclusive date range (either side may be open) and why the input was ignored, if so."""
+
+    first: dt.date | None
+    last: dt.date | None
+    error: str = ""
+
+
+def parse_date(text: str) -> dt.date | None:
+    """A `YYYY-MM-DD` date, or None for blank or invalid input."""
+    try:
+        return dt.date.fromisoformat(text.strip()) if text.strip() else None
+    except ValueError:
+        return None
+
+
+def month_bounds(today: dt.date) -> tuple[dt.date, dt.date]:
+    """First and last day of the month of `today`."""
+    first = today.replace(day=1)
+    following = (first + dt.timedelta(days=32)).replace(day=1)
+    return first, following - dt.timedelta(days=1)
+
+
+def read_period(
+    first_text: str,
+    last_text: str,
+    *,
+    today: dt.date,
+    default_month: bool = False,
+    closed: bool = False,
+) -> Period:
+    """The period typed in a filter. An invalid date or a start after the end is ignored, with
+    its reason in `error`. With `default_month` an empty (or ignored) period is the month of
+    `today`; with `closed` a period with one side only is that month too (a statement needs both
+    ends)."""
+    first, last = parse_date(first_text), parse_date(last_text)
+    error = ""
+    if (first_text.strip() and first is None) or (last_text.strip() and last is None):
+        first = last = None
+        error = PERIOD_BAD_DATE
+    elif first and last and first > last:
+        first = last = None
+        error = PERIOD_REVERSED
+    elif closed and (first is None) != (last is None):
+        first = last = None
+        error = PERIOD_INCOMPLETE
+    if default_month and first is None and last is None:
+        first, last = month_bounds(today)
+    return Period(first, last, error)
+
+
+def period_bounds(
+    first: dt.date | None, last: dt.date | None, tz: dt.tzinfo
+) -> tuple[dt.datetime | None, dt.datetime | None]:
+    """Instants for an inclusive date range in `tz`: `start` inclusive, `end` exclusive (the day
+    after `last`). A missing side stays open."""
+    start = dt.datetime.combine(first, dt.time.min, tzinfo=tz) if first else None
+    end = dt.datetime.combine(last + dt.timedelta(days=1), dt.time.min, tzinfo=tz) if last else None
+    return start, end
+
+
+def extract_reference(vendor_public_id: str, first: dt.date | None, last: dt.date | None) -> str:
+    """The stable reference of a ledger extract: the same vendor and period give the same ID, so
+    an outside invoice or a support request can cite it (spec 04, spec 11 §11.2)."""
+    vendor = vendor_public_id.replace("-", "")[:8].upper()
+    start = first.strftime("%Y%m%d") if first else "START"
+    end = last.strftime("%Y%m%d") if last else "END"
+    return f"LX-{vendor}-{start}-{end}"
+
+
+def csv_safe(cell: str) -> str:
+    """A text cell a spreadsheet cannot read as a formula (SEC.5, OWASP "CSV injection"): one that
+    starts with a tab, CR, LF or apostrophe, or (after whitespace, in NFKC form) with `=`, `+`,
+    `-` or `@`, gets a leading apostrophe. Amounts are written by `signed`, never through here."""
+    if not cell:
+        return cell
+    if cell.startswith(_CONTROL_STARTS):
+        return CSV_APOSTROPHE + cell
+    text = cell.lstrip()
+    if text and unicodedata.normalize("NFKC", text[0])[:1] in _FORMULA_SIGNS:
+        return CSV_APOSTROPHE + cell
+    return cell
+
+
+def signed(amount: Decimal) -> str:
+    """`+12.50` / `-3.00`: an amount rounded to the cent with its sign, for the CSV."""
+    return f"{money(amount):+.2f}"

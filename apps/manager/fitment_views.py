@@ -13,6 +13,7 @@ from typing import Any, ClassVar
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Count, Exists, Model, OuterRef, QuerySet
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
@@ -51,7 +52,7 @@ from .fitment_forms import (
 )
 from .lists import BulkAction, BulkRun, Column, ListFilter, ManagerListView
 from .middleware import manager_context
-from .navigation import platform_role
+from .navigation import platform_role, registry
 from .views import ManagerView
 
 SCHEME_SECTION = "platform.fitment_scheme"
@@ -71,11 +72,17 @@ class WriteGate(View):
     role without the row, before any step-up prompt."""
 
     write_section: ClassVar[str]
+    # CAT.30: a section a role can see but not change answers 403; the role without the row
+    # still gets 404. Off by default, so the other sections keep their 404.
+    refuse_read_only: ClassVar[bool] = False
 
     def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
         if request.method == "POST":
             ctx = manager_context(request)
             if ctx is None or not writer(self.write_section)(ctx):
+                section = registry.get(self.write_section)
+                if self.refuse_read_only and ctx is not None and section and section.allows(ctx):
+                    raise PermissionDenied("This section is read-only for your role.")
                 raise Http404("No Manager page here.")
         return super().dispatch(request, *args, **kwargs)
 

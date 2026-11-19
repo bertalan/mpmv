@@ -9,6 +9,7 @@ import pytest
 from django.contrib import admin
 from django.contrib.auth.models import Group
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.test import Client, RequestFactory
 from django.urls import reverse
@@ -478,3 +479,31 @@ def test_a_dialog_error_is_shown_not_raised(staff_client: Client) -> None:
     assert response.status_code == 200
     assert "account holder" in response.content.decode()
     assert not OutboxEmail.objects.exists()
+
+
+@pytest.mark.parametrize("role", [None, "support", "finance", "config"])
+def test_the_service_refuses_an_approval_by_staff_without_the_section(
+    superuser: User, role: str | None
+) -> None:
+    """CORE.18 in the service, so every adapter is covered: nothing granted, nothing audited."""
+    if role is not None:
+        grant_platform_role(superuser, role)
+    vendor = VendorFactory.create(italian_company=True)
+    claim = submitted_claim(vendor)
+    ctx = AuditContext(actor_label="staff:x", source=AuditLog.Source.ADMIN, actor_id=superuser.pk)
+    for dry_run in (True, False):
+        with pytest.raises(PermissionDenied):
+            services.approve_claim(claim, ctx=ctx, dry_run=dry_run)
+    claim.refresh_from_db()
+    assert claim.status == VendorClaim.Status.SUBMITTED
+    assert not VendorMember.objects.filter(vendor=vendor).exists()
+    assert not AuditLog.objects.filter(action=services.CLAIM_APPROVED).exists()
+
+
+def test_the_service_lets_a_staff_member_with_the_section_approve(superuser: User) -> None:
+    grant_platform_role(superuser, "catalog")
+    vendor = VendorFactory.create(italian_company=True)
+    claim = submitted_claim(vendor)
+    ctx = AuditContext(actor_label="staff:x", source=AuditLog.Source.ADMIN, actor_id=superuser.pk)
+    services.approve_claim(claim, ctx=ctx)
+    assert VendorMember.objects.get(vendor=vendor).role == engine.OWNER

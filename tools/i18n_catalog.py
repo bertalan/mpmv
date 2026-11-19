@@ -69,6 +69,7 @@ SCOPES = (
     "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
     "apps/vendors/models.py",
     "apps/vendors/templates/vendors/terms",  # the public sales terms page (VEN.35)
+    "apps/vendors/templates/documents/vendors",  # the sales terms PDF (VEN.36), same strings as the page
     "apps/vendors/templates/vendors/apply",  # the vendor application pages (VEN.22), formal
     "apps/vendors/templates/email/vendors/application_confirm",  # the application emails (VEN.22)
     "apps/vendors/templates/email/vendors/application_exists",

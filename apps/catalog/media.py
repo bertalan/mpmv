@@ -35,6 +35,7 @@ from apps.vendors.scoping import is_platform_staff
 from apps.vendors.services import has_vendor_permission
 
 from .models import Product, ProductImage, ProductImageTranslation, Variant
+from .services import require_catalog_editor
 
 IMAGE_MODEL = "catalog.productimage"
 TEXT_MODEL = "catalog.productimagetranslation"
@@ -96,7 +97,9 @@ def _authorise(vendor: Vendor, ctx: AuditContext) -> None:
     """The actor of `ctx` must be a member of `vendor` allowed to manage products, or platform
     staff; a pipeline (`PIPELINE_SOURCES`, no actor) is trusted. Adapters (the Manager, the
     API, the admin) build `ctx` from the signed-in user and so pass; they still do their own
-    request-level checks. Raises PermissionDenied."""
+    request-level checks. Platform staff also need the catalog write right (CAT.30). Raises
+    PermissionDenied."""
+    require_catalog_editor(ctx)
     if ctx.actor_id is None:
         if ctx.source in PIPELINE_SOURCES:
             return

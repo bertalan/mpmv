@@ -6,6 +6,7 @@ moderation role, the audited fields with a dry-run preview before they are writt
 {% endcomment %}
 {% block manager_content %}
   <h1>{{ title }}</h1>
+  {% if read_only %}{% include "components/alert.html" with level="info" message=_("You can view this section; changes need the Catalog role.") only %}{% endif %}
   <p><a href="{{ list_url }}">{% translate "Back to the products" %}</a></p>
   <dl class="manager-facts">
     <dt>{% translate "SKU" %}</dt><dd>{{ product.sku }}</dd>
