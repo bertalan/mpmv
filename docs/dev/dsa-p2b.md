@@ -10,6 +10,10 @@ Part 1 of CMP.5 covers the points of contact, the platform terms and the ranking
   `legal_section` blocks. The terms need `restrictions`, `moderation_policy`, `complaint_handling`
   (article 20) and `redress` (article 21); the ranking page needs `ranking_parameters`.
   Editors write the wording; code only checks the tags (`apps.compliance.engine.REQUIRED_SECTIONS`).
+  The `ranking_parameters` section lists every rule that orders what a visitor sees. Besides the
+  search and listing rules, the product page's "Other sellers of this product" block (CAT.15)
+  orders the offers by the price the visitor pays, VAT included, then by title; the editor
+  words that line in every language.
 - **Readiness (D-27).** `manage.py golive_readiness` is the one go-live gate: it checks the
   platform terms and ranking pages in every configured language with the native and counsel
   reviews (I18N.9), and runs `compliance.services.dsa_p2b_readiness` (registered through
