@@ -65,6 +65,7 @@ SCOPES = (
     "apps/events/templates/email",  # the event moderation emails (EVT.11)
     "apps/orders/customer_views.py",  # the customer area labels (ORD.7)
     "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
+    "apps/compliance/views.py",  # withdrawal and notice errors, the form PDF 503 (I18N.20)
     "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)
     "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
     "apps/vendors/models.py",

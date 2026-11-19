@@ -230,6 +230,23 @@ MASKED_FIELDS: dict[str, Callable[[Any], str]] = {
 }
 
 
+def trader_contact(vendor: Vendor) -> engine.TraderContact:
+    """The seller's contact for the withdrawal information and the order confirmation (CMP.41):
+    the registered office as the geographic address, the phone and the contact email. Read
+    live, so a buyer who withdraws later writes to where the seller is now."""
+    return engine.trader_contact(
+        shop_name=vendor.display_name,
+        legal_name=vendor.legal_name,
+        street=vendor.registered_street,
+        street_number=vendor.registered_street_number,
+        postal_code=vendor.registered_postal_code,
+        city=vendor.registered_city,
+        country=str(vendor.registered_country or vendor.country or ""),
+        phone=vendor.phone,
+        email=vendor.contact_email,
+    )
+
+
 def vendor_snapshot(vendor: Vendor) -> dict[str, Any]:
     """The audited fields of `vendor`, with the encrypted ones masked (SEC.3)."""
     snapshot = {name: getattr(vendor, name) for name in VENDOR_FIELDS}

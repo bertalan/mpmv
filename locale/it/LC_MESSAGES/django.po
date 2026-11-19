@@ -841,6 +841,10 @@ msgstr ""
 "una delle eccezioni elencate. Fino ad allora il venditore continua a vendere e può scaricare i "
 "propri dati."
 
+#: apps/compliance/views.py
+msgid "A withdrawal for that part was already recorded."
+msgstr "Per quella parte è già stato registrato un recesso."
+
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "a withdrawal was already recorded."
 msgstr "è già stato registrato un recesso."
@@ -1011,7 +1015,9 @@ msgid "Added to your cart."
 msgstr "Aggiunto al carrello."
 
 #: apps/manager/amendment_forms.py apps/orders/templates/orders/_legal_recap.html
-#: apps/orders/ui/forms.py themes/ride/templates/orders/_legal_recap.html
+#: apps/orders/ui/forms.py themes/base/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html
+#: themes/ride/templates/orders/_legal_recap.html
 msgid "Address"
 msgstr "Indirizzo"
 
@@ -2064,6 +2070,10 @@ msgstr "Scegli almeno una modifica."
 msgid "Choose at least one image."
 msgstr "Scegli almeno un'immagine."
 
+#: apps/compliance/views.py
+msgid "Choose at least one part of the order to withdraw from."
+msgstr "Scegli almeno una parte dell'ordine da cui recedere."
+
 #: apps/manager/event_forms.py
 msgid "Choose at least one weekday."
 msgstr "Scegli almeno un giorno della settimana."
@@ -2168,6 +2178,10 @@ msgstr ""
 #: apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "Choose: {label}"
 msgstr "Scegliere: {label}"
+
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "Chosen: {name}"
+msgstr "Scelto: {name}"
 
 #: apps/manager/amendment_forms.py apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "City"
@@ -2958,6 +2972,10 @@ msgid "Either remove the line or change its quantity, not both."
 msgstr "Rimuovi la riga oppure cambia la quantità, non entrambe."
 
 #: apps/manager/amendment_forms.py apps/manager/templates/manager/login.html
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: themes/base/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html
 msgid "Email"
 msgstr "Email"
 
@@ -4971,6 +4989,10 @@ msgstr "Nessun evento questo mese."
 msgid "No image"
 msgstr "Nessuna immagine"
 
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "No item found."
+msgstr "Nessun elemento trovato."
+
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "No level yet."
 msgstr "Nessun livello."
@@ -6127,6 +6149,15 @@ msgstr "In attesa di revisione"
 #: apps/manager/event_image_form.py
 msgid "Permission reference"
 msgstr "Riferimento del permesso"
+
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: apps/orders/templates/orders/_legal_recap.html
+#: themes/base/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html
+#: themes/ride/templates/orders/_legal_recap.html
+msgid "Phone"
+msgstr "Telefono"
 
 #: apps/manager/amendment_forms.py
 msgid "Phone call"
@@ -7303,6 +7334,10 @@ msgstr "schermata o tipo di pagina"
 msgid "Search"
 msgstr "Cerca"
 
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "Search by name"
+msgstr "Cerca per nome"
+
 #: apps/cms/blocks.py
 msgid "Search by name, SKU, brand or vendor, then click the product."
 msgstr "Cerca per nome, SKU, marchio o venditore, poi clicca sul prodotto."
@@ -7364,9 +7399,17 @@ msgid "Sell with us (vendor application)"
 msgstr "Vendi con noi (candidatura venditore)"
 
 #: apps/orders/templates/orders/_legal_recap.html apps/vendors/models.py
+#: themes/base/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html
 #: themes/ride/templates/orders/_legal_recap.html
 msgid "Seller"
 msgstr "Venditore"
+
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: apps/orders/templates/orders/confirmation.html
+msgid "Seller details"
+msgstr "Dati del venditore"
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Selling mode"
@@ -8189,6 +8232,10 @@ msgstr "Quell'account non aveva sessioni da terminare."
 #: apps/manager/termination_views.py
 msgid "That date is too early: the notice is at least 30 days unless an exception applies."
 msgstr "La data è troppo vicina: il preavviso è di almeno 30 giorni, salvo un’eccezione."
+
+#: apps/compliance/views.py
+msgid "That part does not belong to this order."
+msgstr "Quella parte non appartiene a questo ordine."
 
 #: apps/manager/termination_views.py
 msgid "That reason for a shorter notice is not on the list."
@@ -9970,6 +10017,10 @@ msgstr ""
 "La commissione percentuale del fornitore di pagamenti, per esempio 4.00. È ripartita tra i "
 "venditori secondo la base qui sotto."
 
+#: apps/compliance/views.py
+msgid "The PDF is not available right now. Please try again later."
+msgstr "Il PDF non è disponibile in questo momento. Riprova più tardi."
+
 #: apps/compliance/models.py
 msgid ""
 "The person or company in the EU who answers for the product when the manufacturer is outside the "
@@ -11000,7 +11051,7 @@ msgid "The vendor's newest products shown after the story; 0 shows none."
 msgstr ""
 "I prodotti più recenti del venditore mostrati dopo la storia. Con 0 non se ne mostra nessuno."
 
-#: apps/accounts/decorators.py apps/orders/ui/views.py
+#: apps/accounts/decorators.py apps/compliance/views.py apps/orders/ui/views.py
 msgid "The verification failed. Please reload the page and try again."
 msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
 
@@ -11063,6 +11114,10 @@ msgid ""
 msgstr ""
 "La larghezza del prodotto in millimetri, per esempio 200. Facoltativo: lascialo vuoto se non la "
 "conosci."
+
+#: apps/compliance/views.py
+msgid "The withdrawal period for that part has ended."
+msgstr "Il periodo di recesso per quella parte è terminato."
 
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "the withdrawal period has ended."
@@ -11886,6 +11941,10 @@ msgstr "Troppi tentativi. Riprova più tardi."
 msgid "Too many downloads. Try again later."
 msgstr "Troppi download. Riprova più tardi."
 
+#: apps/compliance/views.py
+msgid "Too many reports from this address. Try again later."
+msgstr "Troppe segnalazioni da questo indirizzo. Riprova più tardi."
+
 #: apps/orders/ui/views.py
 msgid "Too many requests from this address. Try again later."
 msgstr "Troppe richieste da questo indirizzo. Riprova più tardi."
@@ -12471,6 +12530,10 @@ msgid "We could not confirm your VAT number with VIES now, so VAT is charged on 
 msgstr ""
 "Ora non riusciamo a confermare la tua partita IVA con VIES, quindi sul tuo ordine viene applicata "
 "l'IVA."
+
+#: apps/compliance/views.py
+msgid "We could not find an order with this number and email address."
+msgstr "Non abbiamo trovato un ordine con questo numero e questo indirizzo email."
 
 #: apps/orders/ui/views.py
 msgid "We could not find this product."
@@ -13510,6 +13573,14 @@ msgstr ""
 "Hai 14 giorni dalla consegna per recedere, anche con il pulsante di recesso online. Paghi tu il "
 "costo diretto della restituzione dei beni. %(info)s"
 
+#: apps/orders/templates/orders/confirmation.html
+msgid ""
+"You have a separate contract with each seller. These are the details to contact each seller, also "
+"to withdraw."
+msgstr ""
+"Con ogni venditore hai un contratto separato. Questi sono i dati per contattare ciascun venditore,"
+" anche per recedere."
+
 #: apps/manager/templates/manager/shop/events.html
 msgid "You have no events yet."
 msgstr "Non ha ancora eventi."
@@ -13897,3 +13968,7 @@ msgstr ""
 #: apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "{n} choices"
 msgstr "{n} possibilità"
+
+#: apps/manager/templates/manager/shop/_fitment_rows.html
+msgid "{n} items found"
+msgstr "{n} elementi trovati"

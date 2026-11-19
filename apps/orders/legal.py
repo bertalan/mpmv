@@ -20,6 +20,7 @@ from django.utils.translation import gettext as _
 from apps.cms import services as cms_services
 from apps.core.countries import normalize_country
 from apps.core.services import NoPlatformOperator, current_operator
+from apps.vendors import services as vendor_services
 from apps.vendors import terms_services
 from apps.vendors.models import SalesTermsVersion, Vendor
 
@@ -36,6 +37,7 @@ class SellerRecap:
     vat_number: str
     contact_email: str
     has_terms: bool
+    phone: str = ""  # CMP.41: empty when the seller gave none
     version_id: int | None = None
     version_number: int = 0
     version_date: dt.date | None = None
@@ -81,24 +83,19 @@ class LegalStep:
         ]
 
 
-def _address(vendor: Vendor) -> str:
-    street = " ".join(p for p in (vendor.registered_street, vendor.registered_street_number) if p)
-    town = " ".join(p for p in (vendor.registered_postal_code, vendor.registered_city) if p)
-    parts = [street, town, str(vendor.registered_country or vendor.country)]
-    return ", ".join(p for p in parts if p)
-
-
 def _established(vendor: Vendor) -> str:
     return str(vendor.registered_country or vendor.country or "")
 
 
 def _seller(vendor: Vendor, *, business: bool) -> tuple[SellerRecap, engine.Party | None]:
+    contact = vendor_services.trader_contact(vendor)
     base: dict[str, Any] = {
         "vendor_id": vendor.pk,
         "public_id": str(vendor.public_id),
         "name": vendor.display_name,
-        "legal_name": vendor.legal_name or vendor.display_name,
-        "address": _address(vendor),
+        "legal_name": contact.legal_name,
+        "address": contact.address,
+        "phone": contact.phone,
         "vat_number": vendor.vat_number,
         "contact_email": vendor.contact_email,
     }

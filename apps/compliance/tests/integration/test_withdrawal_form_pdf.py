@@ -77,3 +77,24 @@ def test_the_consumer_information_page_links_to_the_pdf() -> None:
         link = reverse("withdrawal_form_pdf")
     body = Client().get(page).content.decode()
     assert f'href="{link}"' in body
+
+
+@pytest.mark.django_db
+def test_a_renderer_failure_is_a_translated_uncached_503(monkeypatch: pytest.MonkeyPatch) -> None:
+    from apps.compliance import views
+    from apps.core.services import AttachmentUnavailable
+
+    def broken(language: str) -> bytes:
+        raise AttachmentUnavailable("renderer down")
+
+    monkeypatch.setattr(views, "render_model_withdrawal_form_pdf", broken)
+    lang = configured_languages()[0]
+    with translation.override(lang):
+        url = reverse("withdrawal_form_pdf")
+        expected = translation.gettext(
+            "The PDF is not available right now. Please try again later."
+        )
+    response = Client().get(url)
+    assert response.status_code == 503
+    assert response["Cache-Control"] == "no-store"
+    assert response.content.decode() == expected

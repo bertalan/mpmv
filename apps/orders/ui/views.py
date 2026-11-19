@@ -63,6 +63,7 @@ from apps.tax import engine as tax_engine
 from apps.tax import prices as tax_prices
 from apps.tax import services as tax_services
 from apps.tax.models import VatValidation
+from apps.vendors import services as vendor_services
 from apps.vendors.models import Vendor
 
 from . import present, state
@@ -733,5 +734,10 @@ def confirmation_page(request: HttpRequest) -> HttpResponse:
         "paid": order.state in PAID_OR_LATER,
         "payment_closed": order.state not in PAID_OR_LATER and order.state != "awaiting_payment",
         "payment": _payment_context(request, order),
+        # CMP.41: the withdrawal information points here for each seller's contact details.
+        "sellers": [
+            vendor_services.trader_contact(sub.vendor)
+            for sub in order.vendor_orders.select_related("vendor").order_by("id")
+        ],
     }
     return _page(request, "orders/confirmation.html", context)

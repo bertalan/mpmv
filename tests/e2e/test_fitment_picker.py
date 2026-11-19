@@ -15,7 +15,7 @@ from pytest_django.live_server_helper import LiveServer
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.catalog.tests.factories import ProductFactory
-from apps.fitment.models import ProductFitment
+from apps.fitment.models import FitmentNode, ProductFitment
 from apps.fitment.tests.factories import (
     FitmentLevelFactory,
     FitmentNodeFactory,
@@ -30,9 +30,7 @@ from tests.e2e.login import verify_with_totp
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
-def test_the_vendor_picks_make_then_model_and_saves(
-    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
-) -> None:
+def _open_fits_page(page: Page, live_server: LiveServer) -> tuple[FitmentNode, FitmentNode]:
     sync_role_groups(Group, Permission, ContentType, apps.get_model)
     FitmentSchemeFactory.create()
     FitmentLevelFactory.create(position=1, code="make")
@@ -54,6 +52,14 @@ def test_the_vendor_picks_make_then_model_and_saves(
     page.get_by_role("button", name="Sign in").click()
     verify_with_totp(page, totp_token(device))
     page.goto(f"{live_server.url}/manager/shop/fitment/{product.public_id}/")
+    return make, model
+
+
+def test_the_vendor_picks_make_then_model_and_saves(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    make, model = _open_fits_page(page, live_server)
+    del make
 
     first_row = page.locator("tbody tr").first
     picker = first_row.locator(".fitment-picker")
@@ -73,4 +79,30 @@ def test_the_vendor_picks_make_then_model_and_saves(
     page.get_by_role("button", name="Confirm", exact=True).click()
     expect(page.get_by_text("The fitment of this product is saved.")).to_be_visible()
     assert list(ProductFitment.objects.values_list("node_id", flat=True)) == [model.pk]
+    assert csp_violations(page) == []
+
+
+def test_the_vendor_finds_a_variant_by_typing_and_saves(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    _make, model = _open_fits_page(page, live_server)
+    variant = FitmentNodeFactory.create(name="Variant Sport", parent=model)
+    page.reload()
+    search = page.locator("tbody tr").first.get_by_role("combobox", name="Search by name")
+    search.fill("sport")
+    options = page.locator(".fitment-picker__option")
+    expect(options).to_have_count(1)
+    expect(options.first).to_have_text("Make One > Model A > Variant Sport")
+    expect(page.locator("#fitment-picker-status")).to_contain_text("1")
+    search.press("ArrowDown")
+    shot("fitment-picker-search")
+    search.press("Enter")
+    expect(options.first).to_be_hidden()
+    page.get_by_label("Specific items").check()
+    violations = run_axe(page)
+    assert not violations, format_violations(violations)
+    page.get_by_role("button", name="Preview", exact=True).click()
+    page.get_by_role("button", name="Confirm", exact=True).click()
+    expect(page.get_by_text("The fitment of this product is saved.")).to_be_visible()
+    assert list(ProductFitment.objects.values_list("node_id", flat=True)) == [variant.pk]
     assert csp_violations(page) == []

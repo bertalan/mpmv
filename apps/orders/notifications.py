@@ -23,6 +23,7 @@ from typing import Any
 from django.conf import settings
 
 from apps.core.services import enqueue_email as _enqueue_email
+from apps.vendors import services as vendor_services
 
 from . import engine, legal
 from .models import Order, OrderLine, PrivacyStatus, VendorOrder
@@ -152,6 +153,9 @@ def notify_order_paid(order: Order) -> None:
                 "lines": _lines(sub),
                 "shipping": _money(sub.shipping_net + sub.shipping_tax_amount),
                 "total": _money(sub.gross_total),
+                # CMP.41: the seller's name, address, phone and email; the withdrawal
+                # information points to this confirmation for them.
+                "seller": vendor_services.trader_contact(sub.vendor).as_dict(),
                 # The non-fiscal PDF is built when the email is sent (documents.py), not stored.
                 "attachment": {"kind": CONFIRMATION_PDF_KIND, "ref": str(sub.public_id)},
             },
