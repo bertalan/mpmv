@@ -23,6 +23,36 @@ released.
 3. A major finding that the PR does not fix blocks the tag until lane-a decides. If anything
    else merges after the check, the next tag needs a new check.
 
+Before every coherence check, the lane running it first compiles the **backlog of pending work**
+(owner rule 2026-11-18). Lane-b compiles the pass; each item goes to the lane that owns it, so
+lane-a acts on the merge train, the owner-question register and the Lane board asks
+([parallel-lanes.md](parallel-lanes.md)):
+
+- open PRs with red CI, a conflict with `main` or a review waiting;
+- ready-to-merge PRs the train keeps skipping;
+- follow-ups on the tracker issue (#757) with no owner;
+- unanswered asks on the Lane board;
+- owner questions not yet asked (lane-a asks them; see the night rule below).
+
+Each one is fixed, assigned, asked about or parked before the check starts.
+
+**Night rule.** At night, and whenever the owner is away, nobody asks the owner anything. Lane-a
+records the question in the owner-question register, the slice that needs the answer is parked,
+and the work moves on to the next item, so a morning answer never stalls the night. By day lane-a
+asks. Lane-b never asks the owner directly: it writes the question in its PR under "Owner
+questions" (label `owner-question`) and lane-a relays it.
+
+Every coherence check also includes a **stale-items sweep** (owner rule 2026-11-18). The check PR
+stays docs and tests only (step 1): it lists each item with a follow-up task, and code removals go
+to that follow-up PR.
+
+- unfinished work: backlog rows marked done whose Done-when is not fully met, `TODO` and `FIXME`
+  without a task ID, open follow-up items on the tracker issue (#757) older than a week;
+- old files: unused templates, static files, fixtures, scripts and settings, dead code no test
+  reaches, docs that describe removed behaviour;
+- leftovers from the lanes: branches already merged or abandoned, and old worktrees. These are
+  **listed only, in the coherence PR description**. Deleting a branch is the owner's decision.
+
 ## What the release workflow does
 
 `release.yml` runs on the tag. On each architecture (amd64 and arm64, native runners) it builds

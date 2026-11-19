@@ -42,7 +42,7 @@
         {% endif %}
 
         {% if cards %}
-          <ul class="product-grid row row-cols-1 row-cols-sm-2 row-cols-xl-3 g-3 list-unstyled">
+          <ul class="product-grid row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xxl-4 g-3 list-unstyled">
             {% for card in cards %}<li class="col">{% include "catalog/includes/product_card.html" %}</li>{% endfor %}
           </ul>
         {% else %}
