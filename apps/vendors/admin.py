@@ -1314,12 +1314,14 @@ class ReturnPolicyVersionAdmin(admin.ModelAdmin[ReturnPolicyVersion]):
         self.message_user(request, _("Reviewed: %(count)d.") % {"count": done})
 
     @admin.action(description=_("Approve the selected pending return policies"))
+    @level_gated_action("return_policy_review")  # CORE.25: a passkey window or a fresh passkey
     def approve_selected(
         self, request: HttpRequest, queryset: QuerySet[ReturnPolicyVersion]
     ) -> None:
         self._review(request, queryset, True)
 
     @admin.action(description=_("Reject the selected pending return policies"))
+    @level_gated_action("return_policy_review")  # CORE.25: a passkey window or a fresh passkey
     def reject_selected(
         self, request: HttpRequest, queryset: QuerySet[ReturnPolicyVersion]
     ) -> None:
