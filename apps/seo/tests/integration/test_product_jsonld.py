@@ -8,7 +8,9 @@ from typing import Any
 import pytest
 from django.apps import apps
 from django.conf import settings
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 from wagtail.models import Site
 
 from apps.catalog.models import Product
@@ -666,6 +668,98 @@ def test_each_variant_carries_its_own_identifiers_and_image(client: Client) -> N
     # never the product's identifiers, and nothing blank
     for key in ("gtin8", "gtin13", "mpn", "image"):
         assert key not in by_sku[str(bare.sku)]
+
+
+def _banded_method(product: Product, *, name: str = "Courier") -> Any:
+    from apps.shipping.tests.factories import (
+        ShippingMethodFactory,
+        ShippingMethodTranslationFactory,
+        ShippingZoneFactory,
+        WeightBandFactory,
+    )
+
+    method = ShippingMethodFactory.create(
+        vendor=product.vendor, zone=ShippingZoneFactory.create(countries=["IT", "DE"])
+    )
+    for language in configured_languages():
+        ShippingMethodTranslationFactory.create(
+            method=method, language=language, name=name, status=TranslationStatus.PUBLISHED
+        )
+    for low, high, cost in (("0", "1", "6.90"), ("1", "5", "9.90"), ("5", "20", "14.90")):
+        WeightBandFactory.create(
+            method=method, from_kg=Decimal(low), to_kg=high and Decimal(high), cost_net=cost
+        )
+    return method
+
+
+def test_each_shipping_node_names_its_service_and_other_weight_bands_follow(
+    client: Client, theme: str
+) -> None:
+    product = live(price_net=Decimal("12.50"), weight_kg=Decimal("0.500"))
+    _banded_method(product)
+    _html, document = graph_of(client)
+    nodes = [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"]
+    assert len(nodes) == 3
+    assert {n["name"] for n in nodes} == {"Courier"}
+    own = [n for n in nodes if "hasShippingService" not in n]
+    assert [n["shippingRate"]["value"] for n in own] == ["8.42"]
+    banded = {
+        n["hasShippingService"]["shippingConditions"]["weight"]["minValue"]: n
+        for n in nodes
+        if n not in own
+    }
+    assert banded["1.000"]["shippingRate"]["value"] == "12.08"  # 9.90 net + 22 % VAT
+    assert (
+        banded["5.000"]["hasShippingService"]["shippingConditions"]["weight"]["maxValue"]
+        == "20.000"
+    )
+    offer = node(document, "Product")["offers"]
+    assert len(offer["shippingDetails"]) == 3
+    assert schema_check.dangling_references(document) == []
+    assert schema_check.rich_result_errors(document) == []
+
+
+def test_the_banded_shipping_nodes_cost_no_query_per_band(client: Client, theme: str) -> None:
+    product = live(price_net=Decimal("12.50"), weight_kg=Decimal("0.500"))
+    _banded_method(product)
+    client.get(MUG)  # warm caches
+    with CaptureQueriesContext(connection) as one:
+        client.get(MUG)
+    from apps.shipping.tests.factories import WeightBandFactory
+
+    method = product.vendor.shipping_methods.first()
+    WeightBandFactory.create(method=method, from_kg=Decimal("20"), to_kg=None, cost_net="30")
+    with CaptureQueriesContext(connection) as more:
+        client.get(MUG)
+    assert len(more) <= len(one)
+
+
+def test_more_than_four_extra_bands_emit_exactly_four_ordered_by_weight(
+    client: Client, theme: str
+) -> None:
+    from apps.shipping.tests.factories import WeightBandFactory
+
+    product = live(price_net=Decimal("12.50"), weight_kg=Decimal("0.500"))
+    method = _banded_method(product)
+    method.bands.filter(from_kg__gte=Decimal("5")).delete()
+    for low in range(5, 11):  # six more bands above the 1-5 kg one: seven extra in all
+        WeightBandFactory.create(
+            method=method, from_kg=Decimal(low), to_kg=Decimal(low + 1), cost_net="9.90"
+        )
+    _html, document = graph_of(client)
+    nodes = [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"]
+    extra = [n for n in nodes if "hasShippingService" in n]
+    assert len(extra) == 4
+    lows = [n["hasShippingService"]["shippingConditions"]["weight"]["minValue"] for n in extra]
+    assert lows == ["1.000", "5.000", "6.000", "7.000"]
+    assert schema_check.dangling_references(document) == []
+
+
+def test_a_product_without_weight_gets_no_banded_nodes(client: Client, theme: str) -> None:
+    product = live(price_net=Decimal("12.50"), weight_kg=None)
+    _banded_method(product)
+    _html, document = graph_of(client)
+    assert [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"] == []
 
 
 def _add_variants(product: Product, count: int, start: int = 0) -> None:

@@ -28,7 +28,7 @@ Rules (spec 10 "Product node"):
 
 import logging
 from decimal import Decimal
-from typing import Any
+from typing import Any, Final
 from urllib.parse import quote
 
 from django.conf import settings
@@ -133,6 +133,9 @@ def _home_label(language: str) -> str:
         return str(translation.gettext("Home"))
 
 
+EXTRA_BANDS: Final = 4  # per method: keeps the page graph under its 30 KB budget
+
+
 def _shipping_rate(
     page: ProductPage, net: Decimal, zone: frozenset[str] | set[str], request: HttpRequest | None
 ) -> Decimal | None:
@@ -173,16 +176,29 @@ def _shipping_nodes(
         rate = _shipping_rate(page, band.price, zone, request)
         if rate is None:
             continue  # shippingRate is required by Google: no gross rate, no node
-        nodes.append(
-            pg.shipping_node(
-                node_id=f"{url}#shipping-{method.key}",
-                countries=sorted(listed),
-                rate=rate,
-                currency=CURRENCY,
-                min_days=method.min_delivery_days,
-                max_days=method.max_delivery_days,
+        shared: dict[str, Any] = {
+            "countries": sorted(listed),
+            "currency": CURRENCY,
+            "min_days": method.min_delivery_days,
+            "max_days": method.max_delivery_days,
+            "name": method.name if method.name != method.key else "",
+        }
+        nodes.append(pg.shipping_node(node_id=f"{url}#shipping-{method.key}", rate=rate, **shared))
+        # The other weight bands (SEO.12), read from the one config snapshot: no query per band.
+        others = [b for b in method.bands if b is not band][:EXTRA_BANDS]
+        for index, other in enumerate(others, start=1):
+            other_rate = _shipping_rate(page, other.price, zone, request)
+            if other_rate is None:
+                continue
+            nodes.append(
+                pg.shipping_node(
+                    node_id=f"{url}#shipping-{method.key}-band{index}",
+                    rate=other_rate,
+                    weight_from_kg=other.from_kg,
+                    weight_to_kg=other.to_kg,
+                    **shared,
+                )
             )
-        )
     return nodes, [str(node["@id"]) for node in nodes], countries
 
 

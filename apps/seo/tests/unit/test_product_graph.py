@@ -435,3 +435,48 @@ def test_the_attributes_sit_on_the_group_of_a_product_with_variants() -> None:
     assert node["@type"] == "ProductGroup"
     assert node["width"]["value"] == 200
     assert "width" not in node["hasVariant"][0]
+
+
+def test_a_shipping_node_names_its_service_and_omits_an_empty_name() -> None:
+    named = pg.shipping_node(
+        node_id=SHIPPING, countries=("IT",), rate=Decimal("5"), currency="EUR", name="Courier"
+    )
+    assert named["name"] == "Courier"
+    assert "hasShippingService" not in named  # the product's own band carries no condition
+    blank = pg.shipping_node(node_id=SHIPPING, countries=("IT",), rate=Decimal("5"), currency="EUR")
+    assert "name" not in blank
+
+
+def test_another_weight_band_is_a_shipping_service_with_a_weight_condition() -> None:
+    node = pg.shipping_node(
+        node_id=SHIPPING,
+        countries=("IT",),
+        rate=Decimal("9"),
+        currency="EUR",
+        name="Courier",
+        weight_from_kg=Decimal("5.000"),
+        weight_to_kg=Decimal("10.000"),
+    )
+    assert node["hasShippingService"] == {
+        "@type": "ShippingService",
+        "name": "Courier",
+        "shippingConditions": {
+            "@type": "ShippingConditions",
+            "weight": {
+                "@type": "QuantitativeValue",
+                "minValue": "5.000",
+                "maxValue": "10.000",
+                "unitCode": "KGM",
+            },
+        },
+    }
+    open_ended = pg.shipping_node(
+        node_id=SHIPPING,
+        countries=(),
+        rate=Decimal("9"),
+        currency="EUR",
+        weight_from_kg=Decimal("10.000"),
+    )
+    weight = open_ended["hasShippingService"]["shippingConditions"]["weight"]
+    assert "maxValue" not in weight
+    assert schema_check.rich_result_errors({"@graph": [open_ended]}) == []
