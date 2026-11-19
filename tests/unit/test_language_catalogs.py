@@ -608,3 +608,38 @@ def test_german_withdrawal_wording_uses_the_widerruf_family_only() -> None:
         text = _texts(entry)
         assert "widerruf" in text.lower(), entry.msgid
         assert not re.search(r"zurücktret|rücktritt", text, re.I), entry.msgid
+
+
+# I18N.20: the elements of the model withdrawal information (art. 246a par. 1 sec. 2 EGBGB,
+# Annex 1) that the consumer-information page states. Found by msgid, checked in every language.
+MODEL_WITHDRAWAL_MSGIDS = {
+    "last item": "If a seller delivers the goods of your order in several shipments",
+    "clear statement": "To exercise the right of withdrawal, you must inform the seller",
+    "effects": "Effects of withdrawal",
+    "refund": "The seller refunds every payment received for the contract",
+    "exclusions": "Exclusions and early expiry",
+    "exclusion text": "There is no right of withdrawal for goods made to your specifications",
+}
+
+
+@pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
+def test_the_model_withdrawal_elements_are_translated(lang: str) -> None:
+    entries = {e.msgid: e for e in _po(lang)}
+    for prefix in MODEL_WITHDRAWAL_MSGIDS.values():
+        matches = [e for m, e in entries.items() if m.startswith(prefix)]
+        assert len(matches) == 1, prefix
+        assert _texts(matches[0]).strip(), prefix
+
+
+def test_the_german_model_elements_keep_the_legal_terms() -> None:
+    de = {e.msgid: _texts(e) for e in _po("de")}
+    by_prefix = {
+        k: next(t for m, t in de.items() if m.startswith(p))
+        for k, p in MODEL_WITHDRAWAL_MSGIDS.items()
+    }
+    assert "letzte Ware" in by_prefix["last item"]
+    assert "eindeutige Erklärung" in by_prefix["clear statement"]
+    assert by_prefix["effects"] == "Folgen des Widerrufs"
+    assert "unverzüglich und spätestens binnen 14 Tagen" in by_prefix["refund"]
+    assert "Ausschluss" in by_prefix["exclusions"]
+    assert "Gesundheitsschutzes oder der Hygiene" in by_prefix["exclusion text"]

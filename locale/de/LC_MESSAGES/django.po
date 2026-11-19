@@ -2972,6 +2972,10 @@ msgstr "Gültig ab"
 msgid "effective from"
 msgstr "gültig ab"
 
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid "Effects of withdrawal"
+msgstr "Folgen des Widerrufs"
+
 #: apps/manager/amendment_forms.py
 msgid "Either remove the line or change its quantity, not both."
 msgstr "Entfernen Sie entweder die Position oder ändern Sie ihre Menge, nicht beides."
@@ -3201,6 +3205,10 @@ msgstr "zzgl. MwSt."
 #: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "Excludes"
 msgstr "Schließt aus"
+
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid "Exclusions and early expiry"
+msgstr "Ausschluss und vorzeitiges Erlöschen des Widerrufsrechts"
 
 #: apps/manager/templates/manager/shop/fitment_report.html
 msgid "Exclusions with nothing to exclude from"
@@ -3995,6 +4003,14 @@ msgstr ""
 #: themes/ride/templates/compliance/privacy_account.html
 msgid "I understand and want to erase my account"
 msgstr "Ich habe verstanden und möchte mein Konto löschen"
+
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid ""
+"If a seller delivers the goods of your order in several shipments, the period for that seller's "
+"contract runs from the day you receive the last item."
+msgstr ""
+"Wenn ein Verkäufer die Waren deiner Bestellung in mehreren Sendungen liefert, beginnt die Frist "
+"für den Vertrag mit diesem Verkäufer an dem Tag, an dem du die letzte Ware erhältst."
 
 #: apps/vendors/templates/vendors/apply/sent.html
 msgid ""
@@ -10422,6 +10438,23 @@ msgstr ""
 "geändert werden: Eine solche Änderung würde ein Versandangebot erfordern, was Änderungen noch "
 "nicht unterstützen."
 
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid ""
+"The seller refunds every payment received for the contract, including the standard delivery costs,"
+" without undue delay and at the latest 14 days after learning of your withdrawal. The refund uses "
+"the payment method you used. The seller may withhold it until the goods are back or you show proof"
+" of sending them. You return the goods without undue delay and at the latest 14 days after your "
+"withdrawal. You are liable for any loss of value caused by handling beyond what is needed to check"
+" the goods."
+msgstr ""
+"Der Verkäufer erstattet alle Zahlungen, die er für den Vertrag erhalten hat, einschließlich der "
+"Standardlieferkosten, unverzüglich und spätestens binnen 14 Tagen ab dem Tag, an dem er von deinem"
+" Widerruf erfährt. Für die Erstattung verwendet er dasselbe Zahlungsmittel, das du eingesetzt "
+"hast. Der Verkäufer kann die Erstattung verweigern, bis er die Waren zurückerhalten hat oder du "
+"den Nachweis erbracht hast, dass du die Waren abgesendet hast. Du sendest die Waren unverzüglich "
+"und spätestens binnen 14 Tagen nach deinem Widerruf zurück. Für einen Wertverlust haftest du nur, "
+"wenn er auf einen Umgang mit den Waren zurückzuführen ist, der zur Prüfung nicht notwendig war."
+
 #: apps/vendors/models.py
 msgid "The seller these terms belong to."
 msgstr "Der Verkäufer, zu dem diese Bedingungen gehören."
@@ -11191,6 +11224,20 @@ msgstr ""
 "Für diesen Link gibt es keine offene Bewerbung: Sie wurde storniert, bestätigt oder ist "
 "abgelaufen. Es ist nichts weiter zu tun."
 
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid ""
+"There is no right of withdrawal for goods made to your specifications or clearly personalised, for"
+" goods that spoil quickly, and for sealed goods that are not suitable for return for health or "
+"hygiene reasons once you have unsealed them. The right also ends early for goods that, after "
+"delivery, were inseparably mixed with other items."
+msgstr ""
+"Das Widerrufsrecht besteht nicht bei Waren, die nach deinen Vorgaben angefertigt wurden oder "
+"eindeutig auf deine persönlichen Bedürfnisse zugeschnitten sind, bei Waren, die schnell verderben "
+"können, und bei versiegelten Waren, die aus Gründen des Gesundheitsschutzes oder der Hygiene nicht"
+" zur Rückgabe geeignet sind, wenn du die Versiegelung nach der Lieferung entfernt hast. Das Recht "
+"erlischt auch vorzeitig bei Waren, die nach der Lieferung untrennbar mit anderen Gütern vermischt "
+"wurden."
+
 #: apps/manager/templates/manager/shop/termination.html
 msgid "There is no termination notice for your shop."
 msgstr "Für Ihren Shop liegt keine Kündigung vor."
@@ -11837,6 +11884,16 @@ msgstr ""
 #: apps/manager/templates/manager/platform/sessions_panic.html
 msgid "To confirm, type <strong>%(word)s</strong>."
 msgstr "Geben Sie zur Bestätigung <strong>%(word)s</strong> ein."
+
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid ""
+"To exercise the right of withdrawal, you must inform the seller of your decision by a clear "
+"statement, for example by post or email. The period is met if you send the statement before it "
+"ends."
+msgstr ""
+"Um dein Widerrufsrecht auszuüben, musst du dem Verkäufer deinen Entschluss durch eine eindeutige "
+"Erklärung, zum Beispiel per Post oder E-Mail, mitteilen. Die Frist ist gewahrt, wenn du die "
+"Erklärung vor Ablauf der Frist absendest."
 
 #: apps/shipping/models.py
 msgid ""

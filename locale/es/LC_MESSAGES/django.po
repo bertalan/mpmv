@@ -2935,6 +2935,10 @@ msgstr "En vigor desde el"
 msgid "effective from"
 msgstr "en vigor desde el"
 
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid "Effects of withdrawal"
+msgstr "Efectos del desistimiento"
+
 #: apps/manager/amendment_forms.py
 msgid "Either remove the line or change its quantity, not both."
 msgstr "Elimine la línea o cambie su cantidad, pero no ambas cosas."
@@ -3164,6 +3168,10 @@ msgstr "IVA no incluido"
 #: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "Excludes"
 msgstr "Excluye"
+
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid "Exclusions and early expiry"
+msgstr "Exclusiones y extinción anticipada del derecho de desistimiento"
 
 #: apps/manager/templates/manager/shop/fitment_report.html
 msgid "Exclusions with nothing to exclude from"
@@ -3952,6 +3960,14 @@ msgstr "Apruebo específicamente, una por una, las cláusulas onerosas enumerada
 #: themes/ride/templates/compliance/privacy_account.html
 msgid "I understand and want to erase my account"
 msgstr "Entiendo y quiero eliminar mi cuenta"
+
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid ""
+"If a seller delivers the goods of your order in several shipments, the period for that seller's "
+"contract runs from the day you receive the last item."
+msgstr ""
+"Si un vendedor entrega los bienes de tu pedido en varios envíos, el plazo del contrato con ese "
+"vendedor empieza el día en que recibes el último bien."
 
 #: apps/vendors/templates/vendors/apply/sent.html
 msgid ""
@@ -10305,6 +10321,23 @@ msgstr ""
 "cambiarse a ese destino: un cambio así necesitaría un presupuesto de envío, que las modificaciones"
 " todavía no admiten."
 
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid ""
+"The seller refunds every payment received for the contract, including the standard delivery costs,"
+" without undue delay and at the latest 14 days after learning of your withdrawal. The refund uses "
+"the payment method you used. The seller may withhold it until the goods are back or you show proof"
+" of sending them. You return the goods without undue delay and at the latest 14 days after your "
+"withdrawal. You are liable for any loss of value caused by handling beyond what is needed to check"
+" the goods."
+msgstr ""
+"El vendedor reembolsa todos los pagos recibidos por el contrato, incluidos los gastos de entrega "
+"estándar, sin demora indebida y como máximo 14 días después de tener conocimiento de tu "
+"desistimiento. El reembolso se hace con el mismo medio de pago que utilizaste. El vendedor puede "
+"retener el reembolso hasta recibir los bienes o hasta que demuestres que los has enviado. "
+"Devuelves los bienes sin demora indebida y como máximo 14 días después de tu desistimiento. Solo "
+"respondes de la disminución de valor si se debe a una manipulación de los bienes distinta de la "
+"necesaria para comprobarlos."
+
 #: apps/vendors/models.py
 msgid "The seller these terms belong to."
 msgstr "El vendedor al que pertenecen estas condiciones."
@@ -11067,6 +11100,20 @@ msgstr ""
 "No hay ninguna solicitud pendiente para este enlace: se canceló, se confirmó o ha caducado. No hay"
 " nada más que hacer."
 
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid ""
+"There is no right of withdrawal for goods made to your specifications or clearly personalised, for"
+" goods that spoil quickly, and for sealed goods that are not suitable for return for health or "
+"hygiene reasons once you have unsealed them. The right also ends early for goods that, after "
+"delivery, were inseparably mixed with other items."
+msgstr ""
+"No existe derecho de desistimiento para los bienes confeccionados conforme a tus especificaciones "
+"o claramente personalizados, los bienes que puedan deteriorarse con rapidez y los bienes "
+"precintados que no sean aptos para ser devueltos por razones de protección de la salud o de "
+"higiene, si los has desprecintado tras la entrega. El derecho también se extingue anticipadamente "
+"para los bienes que, después de la entrega, se hayan mezclado de forma indisociable con otros "
+"bienes."
+
 #: apps/manager/templates/manager/shop/termination.html
 msgid "There is no termination notice for your shop."
 msgstr "No hay ningún preaviso de baja para su tienda."
@@ -11691,6 +11738,16 @@ msgstr ""
 #: apps/manager/templates/manager/platform/sessions_panic.html
 msgid "To confirm, type <strong>%(word)s</strong>."
 msgstr "Para confirmar, escriba <strong>%(word)s</strong>."
+
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid ""
+"To exercise the right of withdrawal, you must inform the seller of your decision by a clear "
+"statement, for example by post or email. The period is met if you send the statement before it "
+"ends."
+msgstr ""
+"Para ejercer el derecho de desistimiento, debes informar al vendedor de tu decisión mediante una "
+"declaración inequívoca, por ejemplo por correo postal o electrónico. El plazo se respeta si envías"
+" la declaración antes de que expire."
 
 #: apps/shipping/models.py
 msgid ""
