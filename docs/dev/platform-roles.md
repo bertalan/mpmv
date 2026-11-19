@@ -39,6 +39,7 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Platform: vendors (applications, plans) | R | R | R | R | E |  |
 | Platform: approve or suspend a vendor (step-up, reason) |  | E |  |  | E |  |
 | Platform: close a vendor definitively |  |  |  |  | E |  |
+| Platform: approve or reject a vendor's return policy (VEN.40) |  | E |  |  | E |  |
 | Platform: orders and customers |  |  | R | R+A | R |  |
 | Platform: support actions (unlock, resend link) |  |  |  | A | A |  |
 | Platform: carts prepared from a past order, one-time link (ORD.32) |  |  |  | A | A |  |

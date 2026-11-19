@@ -3,14 +3,17 @@
 from typing import Any
 
 import pytest
+from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
+from django.utils.module_loading import import_string
 
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.vendors import return_services as rs
 from apps.vendors.models import ReturnPolicyVersion
+from apps.vendors.services import can_approve_return_policy, can_reopen
 from apps.vendors.tests.factories import (
     ReturnPolicyVersionFactory,
     VendorFactory,
@@ -37,8 +40,54 @@ def owner_of(vendor: Any) -> Any:
     return VendorMemberFactory.create(vendor=vendor, role="owner").user
 
 
+def role_user(key: str) -> Any:
+    """A staff user in the platform role group of `key` (CORE.18); the Manager is above this app."""
+    group = import_string("apps.manager.roles.role")(key).group
+    user = UserFactory.create(is_staff=True)
+    user.groups.add(Group.objects.get(name=group))
+    return user
+
+
 def staff() -> Any:
-    return UserFactory.create(is_staff=True, permissions=["vendors.change_vendor"])
+    return role_user("catalog")
+
+
+def _pending() -> ReturnPolicyVersion:
+    vendor = VendorFactory.create()
+    rs.propose_return_policy(vendor, values(), actor=owner_of(vendor), ctx=CTX)
+    return ReturnPolicyVersion.objects.get()
+
+
+@pytest.mark.parametrize(
+    ("key", "allowed"),
+    [("catalog", True), ("owner", True), ("config", False), ("finance", False), ("support", False)],
+)
+def test_the_return_policy_cell_of_each_role_ven40(key: str, allowed: bool) -> None:
+    version = _pending()
+    user = role_user(key)
+    assert can_approve_return_policy(user) is allowed
+    if allowed:
+        rs.review_return_policy(version, approve=True, actor=user, ctx=CTX)
+        assert ReturnPolicyVersion.objects.get().status == "approved"
+    else:
+        with pytest.raises(PermissionDenied):
+            rs.review_return_policy(version, approve=True, actor=user, ctx=CTX)
+        assert ReturnPolicyVersion.objects.get().status == "pending"
+
+
+def test_the_profile_reopen_right_does_not_approve_a_return_policy_ven40() -> None:
+    version = _pending()
+    reopener = UserFactory.create(is_staff=True, permissions=["vendors.change_vendor"])
+    assert can_reopen(reopener)
+    assert not can_approve_return_policy(reopener)
+    with pytest.raises(PermissionDenied):
+        rs.review_return_policy(version, approve=True, actor=reopener, ctx=CTX)
+
+
+def test_a_catalog_member_without_the_reopen_right_can_approve_ven40() -> None:
+    user = role_user("catalog")
+    assert not can_reopen(user)
+    assert can_approve_return_policy(user)
 
 
 def test_13_days_is_refused_and_14_is_accepted() -> None:
