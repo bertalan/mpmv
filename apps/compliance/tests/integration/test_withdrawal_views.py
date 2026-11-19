@@ -38,9 +38,8 @@ OTHER_WAYS = (
     "The seller's contact details are in your order confirmation."
 )
 PERIOD = (
-    "You may withdraw from a distance contract within %(days)s days without giving a reason. The "
-    "period runs from the day you receive the goods. Each seller in your order is a separate "
-    "contract."
+    "You have the right to withdraw from this contract within %(days)s days without giving any "
+    "reason."
 )
 GUARANTEE = (
     "Goods sold to consumers have a legal guarantee of conformity of %(months)s months from "

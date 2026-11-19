@@ -241,6 +241,14 @@ msgstr ""
 "«Revisada» ha sido revisada por una persona. «Publicada» se muestra a los visitantes. Si cambia el"
 " texto en inglés, las traducciones revisadas y publicadas vuelven a «Borrador automático»."
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "(*) Delete as appropriate."
+msgstr "(*) Táchese lo que no proceda."
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "(Complete and return this form only if you wish to withdraw from the contract.)"
+msgstr "(Solo debe cumplimentar y enviar el presente formulario si desea desistir del contrato.)"
+
 #: apps/orders/templates/orders/customer_order.html
 msgid "(opens the carrier's site)"
 msgstr "(abre el sitio del transportista)"
@@ -1004,6 +1012,10 @@ msgstr "Añadido al carrito."
 #: apps/orders/ui/forms.py themes/ride/templates/orders/_legal_recap.html
 msgid "Address"
 msgstr "Dirección"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "Address of consumer(s)"
+msgstr "Domicilio del/de los consumidor(es)"
 
 #: apps/manager/amendment_forms.py apps/orders/ui/forms.py
 msgid "Address, second line"
@@ -2534,6 +2546,7 @@ msgstr "Panel de control"
 msgid "Data"
 msgstr "Datos"
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
 #: apps/manager/templates/manager/shop/_money_table.html
 #: apps/orders/templates/orders/customer_orders.html
 msgid "Date"
@@ -2939,6 +2952,10 @@ msgstr "En vigor desde el"
 msgid "effective from"
 msgstr "en vigor desde el"
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid "Effects of withdrawal"
+msgstr "Efectos del desistimiento"
+
 #: apps/manager/amendment_forms.py
 msgid "Either remove the line or change its quantity, not both."
 msgstr "Elimine la línea o cambie su cantidad, pero no ambas cosas."
@@ -3168,6 +3185,10 @@ msgstr "IVA no incluido"
 #: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "Excludes"
 msgstr "Excluye"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid "Exclusions and early expiry"
+msgstr "Exclusiones y extinción anticipada del derecho de desistimiento"
 
 #: apps/manager/templates/manager/shop/fitment_report.html
 msgid "Exclusions with nothing to exclude from"
@@ -3957,6 +3978,14 @@ msgstr "Apruebo específicamente, una por una, las cláusulas onerosas enumerada
 msgid "I understand and want to erase my account"
 msgstr "Entiendo y quiero eliminar mi cuenta"
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid ""
+"I/We (*) hereby give notice that I/We (*) withdraw from my/our (*) contract of sale of the "
+"following goods (*)"
+msgstr ""
+"Por la presente le comunico/comunicamos (*) que desisto/desistimos (*) de mi/nuestro (*) contrato "
+"de venta del siguiente bien (*)"
+
 #: apps/vendors/templates/vendors/apply/sent.html
 msgid ""
 "If the details were valid, we sent you an email. Open the link in it to confirm your address; the "
@@ -3996,6 +4025,36 @@ msgid ""
 msgstr ""
 "Si no solicitó vender con nosotros, cancele aquí. Eliminamos de inmediato la solicitud y la cuenta"
 " creada con ella, y no conservamos nada. Podrá volver a solicitarlo más adelante si lo desea."
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"If you order several goods in one order and they are delivered separately, the withdrawal period "
+"will expire after %(days)s days from the day on which you, or a third party other than the carrier"
+" and indicated by you, acquire physical possession of the last good."
+msgstr ""
+"Si usted encarga varios bienes en un único pedido y se entregan por separado, el plazo de "
+"desistimiento expirará a los %(days)s días naturales del día en que usted o un tercero, que no sea"
+" el transportista y haya sido designado por usted, adquiera la posesión material del último de los"
+" bienes."
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"If you withdraw from this contract, we shall reimburse to you all payments received from you, "
+"including the costs of delivery (with the exception of the supplementary costs resulting from your"
+" choice of a type of delivery other than the least expensive type of standard delivery offered by "
+"us), without undue delay and in any event not later than 14 days from the day on which we receive "
+"the notice of your decision to withdraw from this contract. We will carry out such reimbursement "
+"using the same means of payment as you used for the initial transaction, unless you have expressly"
+" agreed otherwise; in any event, you will not incur any fees as a result of such reimbursement."
+msgstr ""
+"En caso de desistimiento por su parte, le devolveremos todos los pagos recibidos de usted, "
+"incluidos los gastos de entrega (con la excepción de los gastos adicionales resultantes de su "
+"elección de una modalidad de entrega diferente a la modalidad menos costosa de entrega ordinaria "
+"que ofrecemos) sin ninguna demora indebida y, en cualquier caso, a más tardar 14 días naturales a "
+"partir de la fecha en que recibamos la comunicación de su decisión de desistir del presente "
+"contrato. Procederemos a efectuar dicho reembolso utilizando el mismo medio de pago empleado por "
+"usted para la transacción inicial, a no ser que haya dispuesto expresamente lo contrario; en todo "
+"caso, no incurrirá en ningún gasto como consecuencia del reembolso."
 
 #: apps/manager/event_block_forms.py
 msgid "Image"
@@ -4064,6 +4123,14 @@ msgstr ""
 #: apps/manager/forms.py
 msgid "In the store"
 msgstr "En la tienda"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"In this information, 'we' means the seller. A separate contract is concluded with each seller in "
+"your order, so everything below applies to each seller separately."
+msgstr ""
+"En esta información, «nosotros» significa el vendedor. Con cada vendedor de su pedido se celebra "
+"un contrato distinto, por lo que todo lo siguiente se aplica a cada vendedor por separado."
 
 #: apps/manager/product_views.py
 msgid "Incomplete"
@@ -4678,6 +4745,10 @@ msgstr "Falta en %(language)s"
 msgid "Model or type"
 msgstr "Modelo o tipo"
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "Model withdrawal form"
+msgstr "Modelo de formulario de desistimiento"
+
 #: apps/manager/templates/manager/shop/events.html
 msgid "Moderation"
 msgstr "Moderación"
@@ -4741,6 +4812,10 @@ msgstr "Nombre"
 #: apps/catalog/taxonomy.py
 msgid "name"
 msgstr "nombre"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "Name of consumer(s)"
+msgstr "Nombre del/de los consumidor(es)"
 
 #: apps/manager/fitment_shop_forms.py
 msgid "Name of the missing item"
@@ -5776,6 +5851,10 @@ msgstr "Actualización del pedido %(order_number)s — Pedido cancelado y reembo
 msgctxt "(L)"
 msgid "Order update %(order_number)s: partial refund for an unavailable item"
 msgstr "Actualización del pedido %(order_number)s — Reembolso parcial por artículo no disponible"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "Ordered on (*) / received on (*)"
+msgstr "Pedido el (*) / recibido el (*)"
 
 #: apps/orders/ui/present.py
 msgid "Ordering is not available right now. Please try again later."
@@ -7094,7 +7173,7 @@ msgstr "Reseñas"
 msgid "Revoke %(role)s"
 msgstr "Revocar %(role)s"
 
-#: apps/compliance/templates/compliance/consumer_information.html
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid "Right of withdrawal"
 msgstr "Derecho de desistimiento"
 
@@ -7636,6 +7715,10 @@ msgstr "Cerrar sesión"
 #: apps/accounts/templates/accounts/sessions/list.html
 msgid "Sign out of this session"
 msgstr "Cerrar esta sesión"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid "Signature of consumer(s) (only if this form is notified on paper)"
+msgstr "Firma del/de los consumidor(es) (solo si el presente formulario se presenta en papel)"
 
 #: apps/manager/templates/manager/platform/user_sessions.html
 msgid "Signed-in sessions"
@@ -10237,6 +10320,20 @@ msgstr ""
 msgid "The review is recorded and the payouts are released."
 msgstr "La revisión queda registrada y los pagos se desbloquean."
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"The right of withdrawal does not apply to goods that are not prefabricated and are made on the "
+"basis of an individual choice or decision of the consumer, or that are clearly tailored to the "
+"consumer's personal needs, to goods liable to deteriorate or expire rapidly, or to sealed goods "
+"not suitable for return for health protection or hygiene reasons that were unsealed after "
+"delivery."
+msgstr ""
+"El derecho de desistimiento no se aplica a los bienes que no estén prefabricados y se confeccionen"
+" conforme a las especificaciones del consumidor y usuario o estén claramente personalizados, a los"
+" bienes que puedan deteriorarse o caducar con rapidez ni a los bienes precintados que no sean "
+"aptos para ser devueltos por razones de protección de la salud o de higiene y que hayan sido "
+"desprecintados tras la entrega."
+
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "the right of withdrawal is for consumers; this order was placed as a business."
 msgstr "el derecho de desistimiento es para consumidores; este pedido se hizo como empresa."
@@ -10302,11 +10399,30 @@ msgstr ""
 msgid "The seller (default)"
 msgstr "El vendedor (predeterminado)"
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"The seller can state further exclusions for its own products in its terms: see the seller's terms "
+"in your order summary."
+msgstr ""
+"El vendedor puede indicar otras exclusiones para sus propios productos en sus condiciones: véanse "
+"las condiciones del vendedor en el resumen de su pedido."
+
 #: apps/orders/amendments.py
 msgid "The seller cannot deliver to %(place)s, so the address cannot be changed to it (%(why)s)"
 msgstr ""
 "El vendedor no puede entregar en %(place)s, por lo que la dirección no puede cambiarse a ese "
 "destino (%(why)s)"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"The seller decides who bears the direct cost of returning the goods and may apply different rules "
+"to some products or categories: see the seller's terms in your order summary. If the seller states"
+" nothing, the seller bears the cost of returning the goods."
+msgstr ""
+"Quién soporta los costes directos de devolución de los bienes lo establece el vendedor, que puede "
+"aplicar reglas distintas a algunos productos o categorías: véanse las condiciones del vendedor en "
+"el resumen de su pedido. Si el vendedor no indica nada, el vendedor asume los costes de devolución"
+" de los bienes."
 
 #: apps/orders/amendments.py
 msgid ""
@@ -10963,6 +11079,15 @@ msgstr "el plazo de desistimiento ha terminado."
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "The withdrawal period starts when you receive the goods; you can withdraw before then."
 msgstr "El plazo de desistimiento empieza cuando recibes los bienes; puedes desistir antes."
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"The withdrawal period will expire after %(days)s days from the day on which you, or a third party "
+"other than the carrier and indicated by you, acquire physical possession of the goods."
+msgstr ""
+"El plazo de desistimiento expirará a los %(days)s días naturales del día en que usted o un "
+"tercero, que no sea el transportista y haya sido designado por usted, adquiera la posesión "
+"material de los bienes."
 
 #: apps/catalog/attributes.py
 msgid ""
@@ -11704,6 +11829,20 @@ msgstr ""
 msgid "To confirm, type <strong>%(word)s</strong>."
 msgstr "Para confirmar, escriba <strong>%(word)s</strong>."
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"To exercise the right of withdrawal, you must inform us (name, postal address and email address: "
+"see the seller details shown at checkout, before you place the order) of your decision to withdraw"
+" from this contract by an unequivocal statement (for example a letter sent by post or an email). "
+"You may use the model withdrawal form below, but it is not obligatory."
+msgstr ""
+"Para ejercer el derecho de desistimiento, usted tiene que notificarnos (nombre, dirección postal y"
+" dirección de correo electrónico: véanse los datos del vendedor que se muestran al tramitar el "
+"pedido, antes de realizarlo) su decisión de desistir del contrato a través de una declaración "
+"inequívoca (por ejemplo, una carta enviada por correo postal o un correo electrónico). Puede "
+"utilizar el modelo de formulario de desistimiento que figura más abajo, aunque su uso es "
+"voluntario."
+
 #: apps/shipping/models.py
 msgid ""
 "To limit the zone to some postcodes, list them separated by commas: a prefix such as 'BT*', a "
@@ -11720,6 +11859,14 @@ msgstr ""
 "Para limitar la zona a algunas provincias o estados, enumere sus códigos separados por comas, por "
 "ejemplo «SS» o «CA»."
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"To meet the withdrawal deadline, it is sufficient for you to send your communication concerning "
+"your exercise of the right of withdrawal before the withdrawal period has expired."
+msgstr ""
+"Para cumplir el plazo de desistimiento, basta con que la comunicación relativa al ejercicio por su"
+" parte de este derecho sea enviada antes de que venza el plazo correspondiente."
+
 #: apps/compliance/templates/compliance/consumer_information.html
 msgid ""
 "To withdraw online, use the button below at any time during the withdrawal period. You enter the "
@@ -11734,6 +11881,14 @@ msgstr ""
 #: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "To year"
 msgstr "Hasta el año"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
+msgid ""
+"To: the seller of the order (name, postal address and email address: see the seller details shown "
+"at checkout, before you place the order)"
+msgstr ""
+"Al vendedor del pedido (nombre, dirección postal y dirección de correo electrónico: véanse los "
+"datos del vendedor que se muestran al tramitar el pedido, antes de realizarlo)"
 
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py
 msgid "Too many attempts. Please try again later."
@@ -12352,6 +12507,14 @@ msgstr ""
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 msgid "We have refunded %(refund)s EUR to the payment method you used."
 msgstr "Te hemos reembolsado %(refund)s EUR en el medio de pago que usaste."
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"We may withhold reimbursement until we have received the goods back or you have supplied evidence "
+"of having sent back the goods, whichever is the earliest."
+msgstr ""
+"Podremos retener el reembolso hasta haber recibido los bienes, o hasta que usted haya presentado "
+"una prueba de la devolución de los bienes, según qué condición se cumpla primero."
 
 #: apps/catalog/templates/catalog/includes/product_returns.html
 msgid "We pay the return shipping"
@@ -13191,6 +13354,10 @@ msgstr "Retirar el preaviso"
 msgid "Withdrawal"
 msgstr "Desistimiento"
 
+#: apps/compliance/templates/compliance/consumer_information.html
+msgid "Withdrawal information"
+msgstr "Información sobre el desistimiento"
+
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "withdrawal is not available for this part of the order."
 msgstr "el desistimiento no está disponible para esta parte del pedido."
@@ -13262,6 +13429,15 @@ msgid ""
 msgstr ""
 "Has iniciado sesión como %(username)s, pero no tienes autorización para acceder a esta página. "
 "¿Quieres iniciar sesión con otra cuenta?"
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"You are only liable for any diminished value of the goods resulting from handling other than what "
+"is necessary to establish the nature, characteristics and functioning of the goods."
+msgstr ""
+"Usted será responsable únicamente de la disminución de valor de los bienes resultante de una "
+"manipulación distinta a la necesaria para establecer la naturaleza, las características y el "
+"funcionamiento de los bienes."
 
 #: apps/manager/templates/manager/forbidden.html
 msgid "You are signed in as %(user)s, and you do not have access to this part of the site."
@@ -13366,18 +13542,16 @@ msgstr ""
 "Todavía no ha definido una política. Se aplica la estándar: la tienda paga el envío de la "
 "devolución."
 
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"You have the right to withdraw from this contract within %(days)s days without giving any reason."
+msgstr ""
+"Usted tiene derecho a desistir del presente contrato en un plazo de %(days)s días naturales sin "
+"necesidad de justificación."
+
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "You may also like"
 msgstr "También te puede gustar"
-
-#: apps/compliance/templates/compliance/consumer_information.html
-msgid ""
-"You may withdraw from a distance contract within %(days)s days without giving a reason. The period"
-" runs from the day you receive the goods. Each seller in your order is a separate contract."
-msgstr ""
-"Puedes desistir de un contrato a distancia en un plazo de %(days)s días sin necesidad de "
-"justificación. El plazo cuenta desde el día en que recibes los bienes. Cada vendedor de tu pedido "
-"es un contrato distinto."
 
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
@@ -13395,6 +13569,17 @@ msgid ""
 msgstr ""
 "Registró el %(when)s que su factura o comprobante de este pedido está emitido. Cada cambio "
 "posterior muestra el recordatorio de corregirlo."
+
+#: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
+msgid ""
+"You shall send back the goods or hand them over to us without undue delay and in any event not "
+"later than 14 days from the day on which you communicate your withdrawal from this contract to us."
+" The deadline is met if you send back the goods before the period of 14 days has expired."
+msgstr ""
+"Usted tendrá que devolvernos o entregarnos los bienes sin ninguna demora indebida y, en cualquier "
+"caso, a más tardar en el plazo de 14 días naturales a partir del día en que nos comunique su "
+"decisión de desistimiento del presente contrato. Se considerará cumplido el plazo si usted efectúa"
+" la devolución de los bienes antes de que haya concluido el plazo de 14 días naturales."
 
 #: apps/compliance/templates/compliance/privacy_account.html
 #: themes/ride/templates/compliance/privacy_account.html

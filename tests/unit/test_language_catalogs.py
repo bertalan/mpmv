@@ -585,7 +585,7 @@ def test_consumer_law_pages_are_translated_in_the_informal_register(lang: str) -
     assert {"Right of withdrawal", "Withdrawal received", "Product safety"} <= ids
     for entry in entries:
         assert _texts(entry).strip(), entry.msgid
-        if lang in FORMAL:
+        if lang in FORMAL and not _only_in_model_withdrawal(entry):
             assert not FORMAL[lang].search(_texts(entry)), entry.msgid
 
 
@@ -608,3 +608,61 @@ def test_german_withdrawal_wording_uses_the_widerruf_family_only() -> None:
         text = _texts(entry)
         assert "widerruf" in text.lower(), entry.msgid
         assert not re.search(r"zurücktret|rücktritt", text, re.I), entry.msgid
+
+
+# I18N.20 (owner decision, #832): the official model withdrawal information and model withdrawal
+# form (art. 246a par. 1 sec. 2 EGBGB, Annexes 1 and 2) are used in the formal register, because
+# the presumption of compliance needs the model used as published. These two includes are the
+# named exemption from the informal customer register; the rest of the storefront stays informal.
+MODEL_WITHDRAWAL_FILES = (
+    "compliance/includes/model_withdrawal_information.html",
+    "compliance/includes/model_withdrawal_form.html",
+)
+# Entries that appear only in the model files and must be formal in German.
+MODEL_FORMAL_DE = {
+    "You have the right to withdraw": "Sie haben das Recht",
+    "The withdrawal period will expire": "Sie oder ein von Ihnen benannter Dritter",
+    "If you order several goods": "die letzte Ware",
+    "To exercise the right of withdrawal": "eindeutigen Erklärung",
+    "To meet the withdrawal deadline": "Mitteilung über die Ausübung des Widerrufsrechts",
+    "If you withdraw from this contract": "unverzüglich und spätestens binnen vierzehn Tagen",
+    "We may withhold": "Nachweis erbracht haben",
+    "You shall send back": "Die Frist ist gewahrt",
+    "You are only liable": "zur Prüfung der Beschaffenheit, der Eigenschaften und der Funktionsweise",  # noqa: E501
+    "The right of withdrawal does not apply": "die nicht vorgefertigt sind und für deren Herstellung",  # noqa: E501
+    "In this information": "bezeichnet „wir“ den Verkäufer",
+    "Model withdrawal form": "Muster-Widerrufsformular",
+    "I/We (*)": "Hiermit widerrufe(n) ich/wir (*)",
+    "(*) Delete as appropriate.": "Unzutreffendes streichen.",
+}
+
+
+def _only_in_model_withdrawal(entry: polib.POEntry) -> bool:
+    paths = [p for p, _l in entry.occurrences]
+    return bool(paths) and all(any(f in p for f in MODEL_WITHDRAWAL_FILES) for p in paths)
+
+
+@pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
+def test_the_model_withdrawal_strings_are_translated_and_in_the_formal_register(lang: str) -> None:
+    entries = [e for e in _po(lang) if _only_in_model_withdrawal(e)]
+    assert len(entries) >= 18
+    for entry in entries:
+        assert _texts(entry).strip(), entry.msgid
+        assert TOKEN.findall(entry.msgid) == TOKEN.findall(entry.msgstr), entry.msgid
+    if lang == "de":
+        for entry in entries:
+            assert not INFORMAL["de"].search(_texts(entry)), entry.msgid
+        texts = {e.msgid: _texts(e) for e in entries}
+        for prefix, needle in MODEL_FORMAL_DE.items():
+            hits = [t for m, t in texts.items() if m.startswith(prefix)]
+            assert len(hits) == 1, prefix
+            assert needle in hits[0], prefix
+
+
+def test_german_model_withdrawal_titles_and_form_date_follow_annexes_1_and_2() -> None:
+    de = {e.msgid: e.msgstr for e in _po("de")}
+    assert de["Withdrawal information"] == "Widerrufsbelehrung"
+    assert de["Right of withdrawal"] == "Widerrufsrecht"
+    assert de["Date"] == "Datum"
+    assert "Date of the form" not in de
+    assert "Nach Kundenspezifikation" not in " ".join(de.values())
