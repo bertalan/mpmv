@@ -1471,6 +1471,7 @@ msgstr "Volver a la seguridad de la cuenta"
 msgid "Back to all results"
 msgstr "Volver a todos los resultados"
 
+#: apps/manager/templates/manager/platform/trust_rule_new.html
 #: apps/manager/templates/manager/platform/trust_rules_detail.html
 msgid "Back to all versions"
 msgstr "Volver a todas las versiones"
@@ -1549,6 +1550,10 @@ msgstr "Volver a los ajustes de la verificación en dos pasos"
 #: themes/base/templates/400.html
 msgid "Bad request"
 msgstr "Solicitud no válida"
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Badge"
+msgstr "Insignia"
 
 #: apps/manager/templates/manager/shop/_money_nav.html
 msgid "Balance"
@@ -1868,6 +1873,14 @@ msgstr ""
 #: apps/manager/amendment_views.py
 msgid "Change the order"
 msgstr "Modificar el pedido"
+
+#: apps/manager/templates/manager/platform/trust_rule_new.html
+msgid ""
+"Change the thresholds you need. The result is a new version from the date you choose; the version "
+"in force ends then and is never edited. You see the effect before anything is saved."
+msgstr ""
+"Modifique los umbrales que necesite. El resultado es una nueva versión desde la fecha elegida; la "
+"versión en vigor termina entonces y nunca se edita. Verá el efecto antes de guardar nada."
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Change this order"
@@ -2266,6 +2279,7 @@ msgstr "Calcular el cambio"
 #: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
 #: apps/manager/templates/manager/platform/product.html
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
 #: apps/manager/templates/manager/shop/fitment_bulk.html
 #: apps/manager/templates/manager/shop/fitment_product.html
 msgid "Confirm"
@@ -2860,6 +2874,7 @@ msgstr "Se obtiene con"
 msgid "Earned at or below"
 msgstr "Se obtiene con como máximo"
 
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Edit"
 msgstr "Editar"
@@ -4713,9 +4728,21 @@ msgstr "Nuevo total del pedido: %(total)s EUR."
 msgid "New total of this part of your order: %(total)s EUR."
 msgstr "Nuevo total de esta parte de tu pedido: %(total)s EUR."
 
+#: apps/manager/trust_edit_views.py
+msgid "New trust rules version"
+msgstr "Nueva versión de las reglas de confianza"
+
 #: apps/manager/amendment_forms.py
 msgid "New unit price of %(title)s, EUR net of VAT (now %(price)s)"
 msgstr "Nuevo precio unitario de %(title)s, EUR sin IVA (ahora %(price)s)"
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "New value"
+msgstr "Nuevo valor"
+
+#: apps/manager/templates/manager/platform/trust_rules.html
+msgid "New version"
+msgstr "Nueva versión"
 
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/base/templates/components/pagination.html themes/ride/templates/catalog/listing.html
@@ -4857,6 +4884,10 @@ msgstr "Todavía no hay ninguna sesión registrada."
 msgid "No storefront changes yet."
 msgstr "Todavía no hay cambios en la tienda."
 
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "No threshold differs from the version in force."
+msgstr "Ningún umbral difiere de la versión en vigor."
+
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "No version is published yet. Until you publish one, your products are sold on request only."
 msgstr ""
@@ -4981,9 +5012,11 @@ msgstr ""
 msgid "not yet"
 msgstr "todavía no"
 
-#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/platform/trust_rules.html
+#: apps/manager/fitment_shop_forms.py
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+#: apps/manager/templates/manager/platform/trust_rules.html
 #: apps/manager/templates/manager/platform/trust_rules_detail.html
-#: apps/manager/templates/manager/shop/_fitment_rows.html
+#: apps/manager/templates/manager/shop/_fitment_rows.html apps/manager/trust_forms.py
 msgid "Note"
 msgstr "Nota"
 
@@ -5010,6 +5043,10 @@ msgstr "No se ha encontrado nada"
 #: apps/manager/templates/manager/shop/fitment_product.html
 msgid "Nothing has changed yet. Check the changes below, then confirm."
 msgstr "Todavía no se ha modificado nada. Revise los cambios de abajo y después confirme."
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Nothing has changed yet. Check the effect below, then confirm."
+msgstr "Todavía no ha cambiado nada. Compruebe el efecto a continuación y confirme."
 
 #: apps/vendors/templates/vendors/apply/cancelled.html
 msgid "Nothing is waiting"
@@ -6168,6 +6205,7 @@ msgid "Prepare a change"
 msgstr "Preparar un cambio"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/product.html
+#: apps/manager/templates/manager/platform/trust_rule_new.html
 #: apps/manager/templates/manager/shop/fitment_bulk.html
 #: apps/manager/templates/manager/shop/fitment_product.html
 msgid "Preview"
@@ -6180,6 +6218,10 @@ msgstr "Vista previa del cambio"
 #: apps/manager/fitment_views.py
 msgid "Preview of the merge"
 msgstr "Vista previa de la fusión"
+
+#: apps/manager/trust_edit_views.py
+msgid "Preview of the new trust rules version"
+msgstr "Vista previa de la nueva versión de las reglas de confianza"
 
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Preview the change"
@@ -9369,6 +9411,14 @@ msgstr ""
 "el nuevo plazo máximo de entrega (%(after)s) es %(extra)s días más largo que el anterior "
 "(%(before)s), más de los %(allowed)s días que permite un cambio menor"
 
+#: apps/manager/trust_edit_views.py
+msgid "The new trust rules version is saved."
+msgstr "La nueva versión de las reglas de confianza está guardada."
+
+#: apps/manager/trust_forms.py
+msgid "The new version starts then and the one in force ends. Not in the past."
+msgstr "La nueva versión empieza entonces y la que está en vigor termina. No en el pasado."
+
 #: apps/manager/fitment_views.py
 msgid "The node is added."
 msgstr "El nodo se ha añadido."
@@ -11162,6 +11212,14 @@ msgstr ""
 "Esta ventana cubre solo las acciones sensibles de esta tienda que confirma su titular. Nunca cubre"
 " otra tienda."
 
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Threshold"
+msgstr "Umbral"
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Thresholds that differ from the version in force"
+msgstr "Umbrales que difieren de la versión en vigor"
+
 #: apps/manager/event_forms.py
 msgid "Thursday"
 msgstr "Jueves"
@@ -11747,7 +11805,7 @@ msgstr "Sesiones de usuario"
 msgid "Uses a year"
 msgstr "Usa un año"
 
-#: apps/manager/templates/manager/platform/trust_rules.html
+#: apps/manager/templates/manager/platform/trust_rules.html apps/manager/trust_forms.py
 msgid "Valid from"
 msgstr "Válida desde"
 
@@ -11762,6 +11820,10 @@ msgstr "Válida hasta"
 #: apps/manager/templates/manager/shop/statements.html
 msgid "Valid until"
 msgstr "Válido hasta"
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Value in force"
+msgstr "Valor en vigor"
 
 #: apps/orders/ui/present.py apps/orders/ui/views.py
 msgid "VAT"
@@ -11812,6 +11874,14 @@ msgstr "Vendedor cerrado"
 msgid "Vendor guide"
 msgstr "Guía para vendedores"
 
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Vendors checked"
+msgstr "Vendedores comprobados"
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Vendors whose badges would change"
+msgstr "Vendedores cuyas insignias cambiarían"
+
 #: apps/manager/event_forms.py
 msgid "Venue"
 msgstr "Sede"
@@ -11838,6 +11908,10 @@ msgstr "Versión"
 #: apps/orders/templates/orders/customer_order.html
 msgid "Version %(n)s"
 msgstr "Versión %(n)s"
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Version %(n)s, valid from %(start)s."
+msgstr "Versión %(n)s, válida desde el %(start)s."
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
@@ -12876,6 +12950,10 @@ msgstr "Escriba la respuesta."
 #: apps/manager/event_block_forms.py
 msgid "Write the question."
 msgstr "Escriba la pregunta."
+
+#: apps/manager/trust_forms.py
+msgid "Write whole numbers separated by commas."
+msgstr "Escriba números enteros separados por comas."
 
 #: apps/cms/blocks.py
 msgid ""

@@ -1,7 +1,7 @@
 # Vertrauensregeln
-last-checked: 2026-11-18
+last-checked: 2026-11-19
 
-Diese Seite listet jede Version der Schwellenwerte hinter den Vertrauensabzeichen der Verkäufer auf. Sie ist schreibgeschützt.
+Diese Seite listet jede Version der Schwellenwerte hinter den Vertrauensabzeichen der Verkäufer auf. Wählen Sie Neue Version, um eine Änderung vorzubereiten.
 
 ## Was Sie sehen
 Jede Zeile ist eine Version: ihre Nummer, Beginn und Ende, eine Markierung für die gültige Version und der Grund der Änderung.

@@ -1,0 +1,39 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}Dry-run preview of a new trust rules version (TRU.1 part 2): nothing is written until Confirm.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p class="manager-lead">{% translate "Nothing has changed yet. Check the effect below, then confirm." %}</p>
+  <p>{% blocktranslate with n=version start=valid_from|date:"SHORT_DATETIME_FORMAT" %}Version {{ n }}, valid from {{ start }}.{% endblocktranslate %}{% if note %} {% translate "Note" %}: {{ note }}{% endif %}</p>
+  <dl class="manager-facts" data-trust-impact>
+    <dt>{% translate "Vendors checked" %}</dt><dd>{{ checked }}</dd>
+    <dt>{% translate "Vendors whose badges would change" %}</dt><dd>{{ changed }}</dd>
+  </dl>
+  <h2>{% translate "Thresholds that differ from the version in force" %}</h2>
+  {% if diff %}
+    <div class="table-scroll" role="region" aria-labelledby="trust-diff-caption" tabindex="0">
+      <table class="table" data-trust-diff>
+        <caption id="trust-diff-caption">{% translate "Thresholds that differ from the version in force" %}</caption>
+        <thead><tr>
+          <th scope="col">{% translate "Badge" %}</th>
+          <th scope="col">{% translate "Threshold" %}</th>
+          <th scope="col">{% translate "Value in force" %}</th>
+          <th scope="col">{% translate "New value" %}</th>
+        </tr></thead>
+        <tbody>
+          {% for row in diff %}<tr>
+            <td>{{ row.heading }}</td><th scope="row">{{ row.label }}</th><td>{{ row.before }}</td><td>{{ row.after }}</td>
+          </tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    {% include "components/alert.html" with level="info" message=_("No threshold differs from the version in force.") only %}
+  {% endif %}
+  <form method="post" class="manager-confirm">
+    {% csrf_token %}
+    {% for name, value in echo %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+    {% include "components/button.html" with label=_("Confirm") type="submit" name="confirm" value="1" only %}
+    {% include "components/button.html" with label=_("Edit") url=cancel_url variant="ghost" only %}
+  </form>
+{% endblock %}

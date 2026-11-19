@@ -11,6 +11,7 @@ from decimal import Decimal
 from typing import Any, Final
 
 from django.http import Http404
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
@@ -118,6 +119,7 @@ class TrustRulesListView(ManagerView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         now = timezone.now()
+        context["new_url"] = reverse("manager:platform:trust_rule_new")
         context["versions"] = [
             {"rules": rules, "in_force": in_force(rules, now)}
             for rules in TrustRules.objects.order_by("-version")
