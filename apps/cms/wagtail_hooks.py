@@ -56,6 +56,7 @@ from .choosers import (
 )
 from .models import BlogAuthor, ContentSnippet, FooterSettings, NavigationMenu
 from .services import listing_editorial, search_articles
+from .snippet_workflow import REFUSED_MESSAGE, snippet_can_publish
 
 
 class NavigationMenuViewSet(SnippetViewSet):  # type: ignore[misc]  # Wagtail is untyped
@@ -105,16 +106,9 @@ register_snippet(ContentSnippetViewSet)
 def refuse_unreviewed_snippet_publish(request: Any, obj: Any) -> Any:
     """Fail closed (CMS.14): a snippet is published only through its active review workflow.
     If the workflow is missing or switched off, the edit stays a draft."""
-    if not isinstance(obj, ContentSnippet) or obj.get_workflow() is not None:
+    if not isinstance(obj, ContentSnippet) or snippet_can_publish(obj):
         return None
-    messages.error(
-        request,
-        _(
-            'This snippet cannot be published because the "Content snippet review" '
-            "workflow is missing or switched off. Your changes are saved as a draft. "
-            "Ask an administrator to restore the workflow."
-        ),
-    )
+    messages.error(request, REFUSED_MESSAGE)
     return redirect("wagtailsnippets_cms_contentsnippet:edit", obj.pk)
 
 

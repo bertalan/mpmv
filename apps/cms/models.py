@@ -37,6 +37,7 @@ and lives on that URL; a vendor landing page tells an active vendor's story with
 """
 
 import datetime as dt
+import logging
 import uuid
 from typing import Any, ClassVar
 from urllib.parse import urljoin
@@ -1052,6 +1053,8 @@ class VendorRecruitmentPage(Page):  # type: ignore[misc]
 
 # --- Reusable content snippet (CMS.14)
 
+_logger = logging.getLogger(__name__)
+
 CONTENT_SNIPPET_REVIEW = "Content snippet review"
 
 
@@ -1113,6 +1116,24 @@ class ContentSnippet(
     @property
     def has_workflow(self) -> bool:
         return self.get_workflow() is not None
+
+    def publish(self, revision: Any, *args: Any, **kwargs: Any) -> Any:
+        """Fail closed on every path (admin, API, shell, scheduled job): no active review
+        workflow, no publish. A scheduled go-live is skipped with a warning and stays scheduled,
+        so one refused snippet does not stop `publish_scheduled` for the other objects."""
+        from .snippet_workflow import REFUSED_MESSAGE, SnippetPublishRefused, snippet_can_publish
+
+        if snippet_can_publish(self):
+            return super().publish(revision, *args, **kwargs)
+        if kwargs.get("log_action") == "wagtail.publish.scheduled":
+            _logger.warning(
+                "Scheduled publish of snippet %s (revision %s) skipped: review workflow "
+                "missing or switched off. It stays scheduled.",
+                self.pk,
+                getattr(revision, "pk", None),
+            )
+            return None
+        raise SnippetPublishRefused(str(REFUSED_MESSAGE))
 
 
 def content_snippet_workflow(*, create: bool = False) -> Workflow | None:
