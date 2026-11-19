@@ -334,7 +334,7 @@ class OtherSellersQuery(LanguageQuery):
         product_pages.OTHER_SELLERS_LIMIT,
         ge=1,
         le=OTHER_SELLERS_MAX,
-        description="At most this many offers (cheapest first, then by title).",
+        description="At most this many offers (cheapest first by consumer price, then by title).",
     )
 
 
@@ -369,7 +369,7 @@ def other_sellers(
         Product.objects.select_related("vendor"), api_client_of(request), public_id=public_id
     )
     out: list[dict[str, Any]] = []
-    for card in product_pages.other_sellers(product, query.language, query.limit):
+    for card in product_pages.other_sellers(product, query.language, query.limit, request):
         price = None
         if card.price is not None and card.vendor is not None:
             try:
