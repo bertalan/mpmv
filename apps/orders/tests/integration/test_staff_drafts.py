@@ -55,11 +55,12 @@ def staff(role: str = "support") -> User:
     return UserFactory.create(platform_role=role)
 
 
-def manager_client(role: str = "support") -> tuple[Client, User]:
+def manager_client(role: str = "support", *, level: str = levels.NO_WINDOW) -> tuple[Client, User]:
+    """Sending the link is a sensitive action (owner 2026-11-19): pass `levels.PASSKEY_WINDOW`."""
     user = staff(role)
     PasskeyDeviceFactory.create(user=user)
     client = Client()
-    verified_login(client, user, level=levels.NO_WINDOW)
+    verified_login(client, user, level=level)
     return client, user
 
 
@@ -223,7 +224,7 @@ def test_the_link_goes_only_to_the_orders_account_email_whatever_is_posted() -> 
     draft = draft_of(order_of(user, [(make_product(make_vendor()), 1)]))
     assert "recipient" not in inspect.signature(staff_drafts.send_link).parameters
     assert "email" not in inspect.signature(staff_drafts.send_link).parameters
-    client, _ = manager_client()
+    client, _ = manager_client(level=levels.PASSKEY_WINDOW)
     response = client.post(
         reverse("manager:platform:order_draft_send", args=[draft.public_id]),
         {"send-note": NOTE, "email": "someone.else@example.com", "recipient": "x@example.com"},
@@ -246,7 +247,7 @@ def test_a_fourth_send_in_a_day_is_refused() -> None:
     with pytest.raises(staff_drafts.DraftRefused, match="3 times today"):
         staff_drafts.send_link(draft, actor=staff(), note=NOTE, ctx=CTX)
     assert OutboxEmail.objects.filter(template_key=staff_drafts.LINK_EMAIL).count() == 3
-    client, _ = manager_client()
+    client, _ = manager_client(level=levels.PASSKEY_WINDOW)
     response = client.post(
         reverse("manager:platform:order_draft_send", args=[draft.public_id]), {"send-note": NOTE}
     )
@@ -393,7 +394,7 @@ def test_a_catalog_finance_or_configuration_member_cannot_create_a_draft(role: s
 
 @pytest.mark.parametrize(("role", "label"), [("support", "support"), ("owner", "platform_owner")])
 def test_every_step_writes_an_audit_entry_with_role_and_note(role: str, label: str) -> None:
-    client, actor = manager_client(role)
+    client, actor = manager_client(role, level=levels.PASSKEY_WINDOW)
     order = order_of(None, [(make_product(make_vendor()), 2)])
     created = client.post(
         reverse("manager:platform:order_draft_new", args=[order.public_id]), {"note": NOTE}
@@ -425,7 +426,7 @@ def test_every_step_writes_an_audit_entry_with_role_and_note(role: str, label: s
 
 
 def test_a_step_without_a_note_is_refused_on_the_page() -> None:
-    client, _ = manager_client()
+    client, _ = manager_client(level=levels.PASSKEY_WINDOW)
     order = order_of(None, [(make_product(make_vendor()), 1)])
     client.post(reverse("manager:platform:order_draft_new", args=[order.public_id]), {"note": ""})
     assert StaffDraft.objects.count() == 0
@@ -486,3 +487,14 @@ def test_the_token_of_the_link_path_is_redacted_from_logs() -> None:
     assert token not in redact_secret_paths(line)
     assert REDACTED in redact_secret_paths(line)
     assert redact_secret_paths("/account/cart-draft/continue/") == "/account/cart-draft/continue/"
+
+
+def test_sending_the_link_needs_the_passkey_window() -> None:
+    """Owner 2026-11-19: the send is sensitive, so a session with no passkey window is refused
+    and nothing is sent; the other draft steps stay everyday."""
+    _, user = customer()
+    draft = draft_of(order_of(user, [(make_product(make_vendor()), 1)]))
+    client, _ = manager_client()
+    send = reverse("manager:platform:order_draft_send", args=[draft.public_id])
+    assert client.post(send, {"send-note": NOTE}).status_code == 403
+    assert not actions(staff_drafts.ACTION_SENT)

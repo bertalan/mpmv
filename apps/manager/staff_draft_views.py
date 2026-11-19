@@ -286,7 +286,7 @@ class DraftSendView(_DraftAction):
     """POST: email a new one-time link to the order's account or guest email. Any address in
     the request is ignored: the service reads it from the order."""
 
-    @requires_level_method("orders_in_progress")
+    @requires_level_method("order_draft_send")
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         draft = _draft(kwargs["public_id"])
         form = DraftNoteForm(request.POST, prefix="send")
