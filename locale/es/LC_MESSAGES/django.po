@@ -843,6 +843,10 @@ msgstr ""
 "aplique una de las excepciones indicadas. Hasta entonces el vendedor sigue vendiendo y puede "
 "descargar sus datos."
 
+#: apps/compliance/views.py
+msgid "A withdrawal for that part was already recorded."
+msgstr "Ya se registró un desistimiento para esa parte."
+
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "a withdrawal was already recorded."
 msgstr "ya se registró un desistimiento."
@@ -2077,6 +2081,10 @@ msgstr "Elija al menos un cambio."
 #: apps/manager/event_block_forms.py
 msgid "Choose at least one image."
 msgstr "Elija al menos una imagen."
+
+#: apps/compliance/views.py
+msgid "Choose at least one part of the order to withdraw from."
+msgstr "Elige al menos una parte del pedido de la que quieres desistir."
 
 #: apps/manager/event_forms.py
 msgid "Choose at least one weekday."
@@ -8326,6 +8334,10 @@ msgstr ""
 "La fecha es demasiado próxima: el preaviso es de al menos 30 días, salvo que se aplique una "
 "excepción."
 
+#: apps/compliance/views.py
+msgid "That part does not belong to this order."
+msgstr "Esa parte no pertenece a este pedido."
+
 #: apps/manager/termination_views.py
 msgid "That reason for a shorter notice is not on the list."
 msgstr "Este motivo de preaviso más corto no figura en la lista."
@@ -10086,6 +10098,10 @@ msgstr ""
 "La comisión porcentual del proveedor de pagos, por ejemplo 4.00. Se reparte entre los vendedores "
 "según la base de comisión de abajo."
 
+#: apps/compliance/views.py
+msgid "The PDF is not available right now. Please try again later."
+msgstr "El PDF no está disponible en este momento. Inténtalo más tarde."
+
 #: apps/compliance/models.py
 msgid ""
 "The person or company in the EU who answers for the product when the manufacturer is outside the "
@@ -11131,7 +11147,7 @@ msgstr ""
 "Los productos más recientes del vendedor que se muestran después de la historia; con 0 no se "
 "muestra ninguno."
 
-#: apps/accounts/decorators.py apps/orders/ui/views.py
+#: apps/accounts/decorators.py apps/compliance/views.py apps/orders/ui/views.py
 msgid "The verification failed. Please reload the page and try again."
 msgstr "La verificación no se ha completado. Vuelve a cargar la página e inténtalo de nuevo."
 
@@ -11193,6 +11209,10 @@ msgid ""
 "know it."
 msgstr ""
 "El ancho del producto en milímetros, por ejemplo 200. Opcional: déjalo vacío si no lo conoces."
+
+#: apps/compliance/views.py
+msgid "The withdrawal period for that part has ended."
+msgstr "El plazo de desistimiento para esa parte ha terminado."
 
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "the withdrawal period has ended."
@@ -12027,6 +12047,10 @@ msgstr "Demasiados intentos. Inténtelo de nuevo más tarde."
 msgid "Too many downloads. Try again later."
 msgstr "Demasiadas descargas. Inténtelo de nuevo más tarde."
 
+#: apps/compliance/views.py
+msgid "Too many reports from this address. Try again later."
+msgstr "Demasiadas denuncias desde esta dirección. Inténtalo más tarde."
+
 #: apps/orders/ui/views.py
 msgid "Too many requests from this address. Try again later."
 msgstr "Demasiadas solicitudes desde esta dirección. Inténtalo de nuevo más tarde."
@@ -12618,6 +12642,10 @@ msgstr "No hemos podido completar tu solicitud. Inténtalo de nuevo en unos minu
 #: apps/orders/ui/views.py
 msgid "We could not confirm your VAT number with VIES now, so VAT is charged on your order."
 msgstr "Ahora no podemos confirmar tu número de IVA con VIES, por lo que se aplica IVA a tu pedido."
+
+#: apps/compliance/views.py
+msgid "We could not find an order with this number and email address."
+msgstr "No hemos encontrado ningún pedido con este número y esta dirección de correo electrónico."
 
 #: apps/orders/ui/views.py
 msgid "We could not find this product."
