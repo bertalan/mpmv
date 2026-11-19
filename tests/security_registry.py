@@ -154,6 +154,14 @@ PUBLIC: dict[str, str] = {
         "Customer help section (ARC.37): the same repository-file text for every visitor, "
         "read-only, public by design."
     ),
+    "vendor_help": (
+        "Seller guide index (ARC.37): the same repository-file text for every visitor, "
+        "read-only, public by design."
+    ),
+    "vendor_help_section": (
+        "Seller guide section (ARC.37): the same repository-file text for every visitor, "
+        "read-only, public by design."
+    ),
     "subprocessors": (
         "Sub-processor register (CMP.4): static reviewed data, read-only, public by design "
         "(GDPR art. 13 and 28)."
@@ -239,6 +247,10 @@ IDOR_REVIEWED: dict[str, str] = {
         "the same for every visitor; an unknown slug is a 404 "
         "(`test_an_unknown_section_is_a_404`)."
     ),
+    "vendor_help_section": (
+        "Public by design (ARC.37): the slug names a fixed section of the repository seller "
+        "guide, the same for every visitor; an unknown slug is a 404."
+    ),
     "events_resource": (
         "Public by design (EVT.6, EVT.9): the path names a published event's calendar file or a "
         "feed, the same for every visitor; a hidden event and an unknown path are a 404 "
@@ -289,6 +301,11 @@ IDOR_REVIEWED: dict[str, str] = {
         "Platform space, for staff holding the revert permission only (a vendor member gets 403 "
         "from the gate, `test_a_vendor_member_cannot_reach_the_page_or_the_revert`); the entry is "
         "an audit entry of any vendor, which staff may review by design."
+    ),
+    "vendor_terms:pdf": (
+        "Public by design (VEN.36): the same signed link as the page, for the PDF of the version; "
+        "a superseded or tampered link is a 404 and every read is logged "
+        "(`test_a_tampered_or_superseded_link_gives_no_pdf`)."
     ),
     "vendor_terms:read": (
         "Public by design (VEN.35, VEN.32 exception): the signed link names the version in "
@@ -348,6 +365,10 @@ PLACEHOLDER_404: dict[str, str] = {
     "sitemap_section": SITEMAP,
     "llms_language": SITEMAP,
     "sitemap_part": SITEMAP,
+    "vendor_terms:pdf": (
+        "Public by design (VEN.36): the signed token is the credential; a tampered, expired or "
+        "superseded token is a 404 for everyone, and the route shows only the terms in force."
+    ),
     "vendor_terms:read": (
         "Public by design (VEN.35): the signed token is the credential; a tampered, expired or "
         "superseded token is a 404 for everyone, and the route shows only the terms in force."
@@ -364,6 +385,12 @@ PLACEHOLDER_404: dict[str, str] = {
 
 # Tables a GET of one endpoint may also write, with the reason.
 GET_WRITES_BY_ENDPOINT: dict[str, dict[str, str]] = {
+    "vendor_terms:pdf": {
+        "core_auditlog": (
+            "Every download of the sales terms PDF, and every denied attempt, is logged (VEN.36): "
+            "the entry holds the result, the format and the version, never the reader."
+        ),
+    },
     "vendor_terms:read": {
         "core_auditlog": (
             "Every read of the sales terms in force, and every denied attempt, is logged (VEN.35, "

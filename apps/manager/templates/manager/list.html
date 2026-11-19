@@ -7,6 +7,7 @@ keeps the filters. A bulk action POSTs the selection and first shows its dry-run
 {% endcomment %}
 {% block manager_content %}
   <h1>{{ title }}</h1>
+  {% if read_only %}{% include "components/alert.html" with level="info" message=_("You can view this section; changes need the Catalog role.") only %}{% endif %}
   {% if filters %}
     <form method="get" class="manager-filters" role="search" aria-label="{% translate 'Filters' %}">
       {% for filter in filters %}
@@ -22,8 +23,8 @@ keeps the filters. A bulk action POSTs the selection and first shows its dry-run
     </form>
   {% endif %}
 
-  <form method="post" class="manager-bulk">
-    {% csrf_token %}
+  {% if read_only %}<div class="manager-bulk">{% else %}<form method="post" class="manager-bulk">
+    {% csrf_token %}{% endif %}
     {% if selection_error %}{% include "components/alert.html" with level="danger" message=selection_error live="assertive" only %}{% endif %}
     {% if bulk_actions and rows %}
       <div class="manager-bulk__actions">
@@ -50,6 +51,6 @@ keeps the filters. A bulk action POSTs the selection and first shows its dry-run
         </tbody>
       </table>
     </div>
-  </form>
+  {% if read_only %}</div>{% else %}</form>{% endif %}
   {% include "components/pagination.html" with page=page_obj.number page_count=page_obj.paginator.num_pages previous_url=previous_url next_url=next_url only %}
 {% endblock %}

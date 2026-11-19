@@ -37,7 +37,8 @@ msgstr "%(amount)s reembolsados."
 msgid "%(browser)s on %(system)s"
 msgstr "%(browser)s en %(system)s"
 
-#: themes/ride/templates/components/gallery.html
+#: themes/ride/templates/components/gallery.html themes/ride/templates/components/hero_slider.html
+#: themes/ride/templates/components/strip.html
 msgid "%(count)s of %(total)s"
 msgstr "%(count)s de %(total)s"
 
@@ -60,7 +61,7 @@ msgid_plural "%(counter)s events are awaiting review."
 msgstr[0] "%(counter)s evento está pendiente de revisión."
 msgstr[1] "%(counter)s eventos están pendientes de revisión."
 
-#: apps/orders/templates/orders/_cart_mini.html
+#: apps/orders/templates/orders/_cart_mini.html themes/base/templates/components/mini_cart.html
 msgid "%(counter)s item"
 msgid_plural "%(counter)s items"
 msgstr[0] "%(counter)s artículo"
@@ -72,6 +73,12 @@ msgid "%(counter)s product"
 msgid_plural "%(counter)s products"
 msgstr[0] "%(counter)s producto"
 msgstr[1] "%(counter)s productos"
+
+#: themes/base/templates/components/rating.html
+msgid "%(counter)s review"
+msgid_plural "%(counter)s reviews"
+msgstr[0] "%(counter)s valoración"
+msgstr[1] "%(counter)s valoraciones"
 
 #: apps/manager/templates/manager/platform/sessions_panic.html
 msgid "%(counter)s session is open now."
@@ -89,6 +96,11 @@ msgstr[1] "%(counter)s sin usar."
 msgid "%(country)r is not a country the address can be in."
 msgstr "%(country)r no es un país en el que pueda estar la dirección."
 
+#: apps/cms/templates/cms/blocks/product_grid.html
+#: apps/cms/templates/cms/includes/product_tiles.html
+msgid "%(currency)s %(amount)s"
+msgstr "%(currency)s %(amount)s"
+
 #: apps/orders/templates/orders/_legal_recap.html apps/orders/ui/present.py
 msgid "%(days)s working days"
 msgstr "%(days)s días laborables"
@@ -103,6 +115,10 @@ msgstr ""
 #: themes/base/templates/components/gallery.html themes/ride/templates/components/gallery.html
 msgid "%(label)s, image %(count)s of %(total)s"
 msgstr "%(label)s, imagen %(count)s de %(total)s"
+
+#: themes/base/templates/components/carousel.html
+msgid "%(label)s, list"
+msgstr "%(label)s, lista"
 
 #: apps/orders/ui/present.py
 msgid "%(low)s to %(high)s working days"
@@ -154,7 +170,7 @@ msgstr "%(title)s: precio más bajo"
 msgid "%(title)s: quantity changed to %(quantity)s"
 msgstr "%(title)s: cantidad cambiada a %(quantity)s"
 
-#: themes/base/templates/components/cart_line.html
+#: themes/base/templates/components/cart_line.html themes/ride/templates/components/cart_line.html
 msgid "%(unit_price)s each"
 msgstr "%(unit_price)s cada uno"
 
@@ -394,6 +410,12 @@ msgstr ""
 #: apps/manager/event_image_form.py
 msgid "A name for the library, for example Our stand 2027. Optional."
 msgstr "Un nombre para la biblioteca, por ejemplo Nuestro stand 2027. Opcional."
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "A negative balance means your shop owes the platform: it is set off against your next sales."
+msgstr ""
+"Un saldo negativo significa que su tienda debe un importe a la plataforma: se compensa con sus "
+"próximas ventas."
 
 #: apps/ingest/models.py
 msgid "A note on the decision."
@@ -716,6 +738,10 @@ msgstr ""
 "Un texto breve que se muestra encima de los productos de esta categoría o etiqueta. Si no añade "
 "ninguno, la página empieza directamente con los productos."
 
+#: apps/manager/money_views.py
+msgid "A statement needs a start and an end date. The current month is shown."
+msgstr "Un extracto necesita una fecha de inicio y una de fin. Se muestra el mes en curso."
+
 #: apps/orders/amendment_engine.py
 msgid "a substitute product needs the customer's consent"
 msgstr "un producto sustituto requiere el consentimiento del cliente"
@@ -881,6 +907,10 @@ msgstr "Añadir un factor"
 msgid "Add a level"
 msgstr "Añadir un nivel"
 
+#: apps/cms/blocks.py
+msgid "Add a link, or choose a product or a category."
+msgstr "Añade un enlace, o elige un producto o una categoría."
+
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "Add a passkey"
 msgstr "Añadir una clave de acceso (passkey)"
@@ -964,6 +994,10 @@ msgstr "Dirección"
 msgid "Address, second line"
 msgstr "Dirección, segunda línea"
 
+#: apps/manager/money_views.py
+msgid "Adjustment"
+msgstr "Ajuste"
+
 #: apps/manager/templates/manager/amendment.html
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "After"
@@ -1017,6 +1051,7 @@ msgstr "Alias"
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/_money_filters.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Todos"
@@ -1024,6 +1059,10 @@ msgstr "Todos"
 #: apps/manager/event_forms.py
 msgid "All day"
 msgstr "Todo el día"
+
+#: apps/events/templates/events/_storefront.html
+msgid "All events of %(name)s"
+msgstr "Todos los eventos de %(name)s"
 
 #: apps/cms/templates/cms/help_guide_section.html
 msgid "All help topics"
@@ -1041,10 +1080,18 @@ msgstr "Todos los modelos"
 msgid "All nodes"
 msgstr "Todos los nodos"
 
+#: apps/manager/templates/manager/shop/money.html
+msgid "All payouts"
+msgstr "Todos los pagos recibidos"
+
 #: apps/catalog/templates/catalog/includes/store_categories.html
 #: themes/ride/templates/catalog/includes/store_categories.html
 msgid "All products"
 msgstr "Todos los productos"
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "All transactions"
+msgstr "Todos los movimientos"
 
 #: apps/events/templates/events/_filters.html
 msgid "All types"
@@ -1071,6 +1118,10 @@ msgstr "Texto alternativo"
 #: apps/manager/event_block_forms.py
 msgid "Alt text %(number)d"
 msgstr "Texto alternativo %(number)d"
+
+#: apps/manager/templates/manager/shop/_money_table.html
+msgid "Amount (EUR)"
+msgstr "Importe (EUR)"
 
 #: apps/orders/amendment_engine.py
 msgid "an added line needs the customer's acceptance"
@@ -1219,6 +1270,11 @@ msgstr ""
 "Otro producto suyo pensado para comprarse junto con este, por ejemplo la pila de un juguete. "
 "Déjelo vacío si no hay ninguno."
 
+#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: themes/ride/templates/catalog/includes/other_sellers.html
+msgid "Another seller"
+msgstr "Otro vendedor"
+
 #: apps/manager/event_block_forms.py
 msgid "Answer %(number)d"
 msgstr "Respuesta %(number)d"
@@ -1243,6 +1299,10 @@ msgstr "Documentación de la API"
 msgid "Application cancelled"
 msgstr "Solicitud cancelada"
 
+#: themes/ride/templates/cms/vendor_recruitment_page.html
+msgid "Applications open soon."
+msgstr "Las solicitudes se abrirán pronto."
+
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Applied"
 msgstr "Aplicada"
@@ -1259,6 +1319,10 @@ msgstr "se aplica a"
 #: themes/ride/templates/catalog/includes/listing_filters.html
 msgid "Apply filters"
 msgstr "Aplicar filtros"
+
+#: themes/ride/templates/cms/vendor_recruitment_page.html
+msgid "Apply now"
+msgstr "Solicítalo ahora"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Apply the change"
@@ -1367,6 +1431,16 @@ msgstr ""
 "Solo con cambio automático: cuánto tiempo permanece una diapositiva, en milisegundos, entre 3000 y"
 " 20000. Ejemplo: 6000 son seis segundos."
 
+#: themes/base/templates/components/launch_countdown.html
+#: themes/ride/templates/components/launch_countdown.html
+msgid "Available from"
+msgstr "Disponible desde el"
+
+#: apps/cms/blocks.py themes/base/templates/components/launch_countdown.html
+#: themes/ride/templates/components/launch_countdown.html
+msgid "Available now"
+msgstr "Disponible ahora"
+
 #: apps/seo/site_links.py
 msgid "Back office"
 msgstr "Back office"
@@ -1454,6 +1528,14 @@ msgstr "Volver a los ajustes de la verificación en dos pasos"
 msgid "Bad request"
 msgstr "Solicitud no válida"
 
+#: apps/manager/templates/manager/shop/_money_nav.html
+msgid "Balance"
+msgstr "Saldo"
+
+#: apps/manager/templates/manager/shop/_money_table.html
+msgid "Balance (EUR)"
+msgstr "Saldo (EUR)"
+
 #: apps/manager/templates/manager/amendment.html
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Before"
@@ -1495,6 +1577,19 @@ msgstr "lote de marcas"
 msgid "brand batches"
 msgstr "lotes de marcas"
 
+#: themes/base/templates/components/breadcrumb.html
+msgid "Breadcrumb"
+msgstr "Ruta de navegación"
+
+#: apps/manager/money_views.py
+msgid "Bundle discount funded by the platform"
+msgstr "Descuento por paquete a cargo de la plataforma"
+
+#: apps/manager/money_views.py
+msgid "Bundle discount funded by you"
+msgstr "Descuento por paquete a su cargo"
+
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Business buyers: the court of %(court)s."
 msgstr "Compradores profesionales: los tribunales de %(court)s."
@@ -1503,13 +1598,33 @@ msgstr "Compradores profesionales: los tribunales de %(court)s."
 msgid "Business purchase"
 msgstr "Compra para una empresa"
 
-#: apps/manager/event_block_forms.py
+#: apps/cms/forms_pages.py
+msgid "button label"
+msgstr "etiqueta del botón"
+
+#: apps/cms/blocks.py
+msgid "Button link"
+msgstr "Enlace del botón"
+
+#: apps/cms/blocks.py apps/manager/event_block_forms.py
 msgid "Button text"
 msgstr "Texto del botón"
+
+#: apps/cms/templates/cms/includes/article_meta.html
+msgid "By %(name)s"
+msgstr "Por %(name)s"
+
+#: apps/cms/templates/cms/includes/article_meta.html
+msgid "By <a href=\"%(url)s\">%(name)s</a>"
+msgstr "Por <a href=\"%(url)s\">%(name)s</a>"
 
 #: apps/manager/forms.py
 msgid "By post"
 msgstr "Por correo"
+
+#: apps/events/feeds.py
+msgid "By: %(vendor)s"
+msgstr "Por: %(vendor)s"
 
 #: apps/events/templates/events/_subscribe.html
 msgid "Calendar address to copy"
@@ -1602,6 +1717,10 @@ msgstr "Cancelado"
 msgid "Cancelled items:"
 msgstr "Artículos cancelados:"
 
+#: apps/events/feeds.py
+msgid "Cancelled: %(title)s"
+msgstr "Cancelado: %(title)s"
+
 #: apps/orders/amendments.py
 msgid ""
 "Cancelling the package refunds the customer in full, so it needs a fresh passkey confirmation (an "
@@ -1644,7 +1763,7 @@ msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Transportista: %(carrier)s. Número de seguimiento: %(tracking_number)s."
 
 #: apps/manager/site_map.py apps/orders/templates/orders/cart.html apps/orders/ui/views.py
-#: themes/ride/templates/components/header.html
+#: themes/base/templates/components/mini_cart.html themes/ride/templates/components/header.html
 msgid "Cart"
 msgstr "Carrito"
 
@@ -1779,6 +1898,7 @@ msgid "Checkout"
 msgstr "Finalizar compra"
 
 #: themes/base/templates/components/step_indicator.html
+#: themes/ride/templates/components/step_indicator.html
 msgid "Checkout steps"
 msgstr "Fases del pedido"
 
@@ -1833,6 +1953,10 @@ msgid ""
 msgstr ""
 "Elija una contraseña para activar su cuenta. Después inicia sesión con ella y configura una app de"
 " autenticación. Nuestro equipo revisa su solicitud a continuación."
+
+#: apps/cms/blocks.py
+msgid "Choose a product or a category, not both."
+msgstr "Elige un producto o una categoría, no ambos."
 
 #: apps/cms/blocks.py
 msgid ""
@@ -1984,6 +2108,7 @@ msgstr ""
 msgid "City"
 msgstr "Ciudad"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Clauses for approval by business buyers (art. 1341 Civil Code)"
 msgstr ""
@@ -1997,14 +2122,19 @@ msgstr "Quitar todos los filtros"
 msgid "Clear filters"
 msgstr "Quitar los filtros"
 
-#: themes/base/templates/components/gallery.html themes/ride/templates/components/gallery.html
-#: themes/ride/templates/components/header.html
+#: themes/base/templates/components/dialog.html themes/base/templates/components/gallery.html
+#: themes/ride/templates/components/gallery.html themes/ride/templates/components/header.html
+#: themes/ride/templates/components/video_modal.html
 msgid "Close"
 msgstr "Cerrar"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "Close now"
 msgstr "Cerrar ahora"
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Closing balance"
+msgstr "Saldo final"
 
 #: apps/manager/fitment_forms.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Code"
@@ -2019,10 +2149,19 @@ msgstr "Color"
 msgid "Comment"
 msgstr "Comentario"
 
+#: apps/manager/money_views.py
+msgid "Commission"
+msgstr "Comisión"
+
 #: apps/manager/templates/manager/amendment.html
 msgid "Commission change"
 msgstr "Variación de la comisión"
 
+#: apps/manager/money_views.py
+msgid "Commission given back"
+msgstr "Comisión devuelta"
+
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Committed delivery time: %(days)s days."
 msgstr "Plazo de entrega garantizado: %(days)s días."
@@ -2086,6 +2225,7 @@ msgid "Completed"
 msgstr "Completado"
 
 #: themes/base/templates/components/step_indicator.html
+#: themes/ride/templates/components/step_indicator.html
 msgid "completed"
 msgstr "completada"
 
@@ -2177,6 +2317,7 @@ msgstr ""
 "Los consumidores disponen de 14 días desde la entrega para desistir. Como empresa no tienes "
 "derecho de desistimiento, salvo que las condiciones del vendedor lo prevean."
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Consumers: disputes go to the court of the consumer's own residence."
 msgstr ""
@@ -2223,7 +2364,7 @@ msgid "Cookie categories"
 msgstr "Categorías de cookies"
 
 #: apps/manager/site_map.py apps/seo/templates/seo/consent/preferences.html
-#: apps/seo/templatetags/consent.py
+#: apps/seo/templatetags/consent.py themes/ride/templates/components/video_modal.html
 msgid "Cookie settings"
 msgstr "Ajustes de cookies"
 
@@ -2283,6 +2424,14 @@ msgstr "Tribunales de %(court)s"
 msgid "Credit line"
 msgstr "Línea de crédito"
 
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Credits"
+msgstr "Abonos"
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "Current balance"
+msgstr "Saldo actual"
+
 #: apps/orders/customer_views.py
 msgid "current step"
 msgstr "paso actual"
@@ -2314,6 +2463,7 @@ msgstr ""
 msgid "Dashboard"
 msgstr "Panel de control"
 
+#: apps/manager/templates/manager/shop/_money_table.html
 #: apps/orders/templates/orders/customer_orders.html
 msgid "Date"
 msgstr "Fecha"
@@ -2355,6 +2505,10 @@ msgstr ""
 "Días de un evento recurrente de todo el día que se omiten, por ejemplo un día festivo. Si lo deja "
 "vacío, no se omite ningún día."
 
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Debits"
+msgstr "Cargos"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Decided"
 msgstr "Decidido"
@@ -2363,7 +2517,12 @@ msgstr "Decidido"
 msgid "Declaration"
 msgstr "Declaración"
 
+#: apps/manager/fitment_views.py
+msgid "Declaration required to publish"
+msgstr "Declaración obligatoria para publicar"
+
 #: themes/base/templates/components/quantity_stepper.html
+#: themes/ride/templates/components/quantity_stepper.html
 msgid "Decrease quantity"
 msgstr "Disminuir la cantidad"
 
@@ -2411,6 +2570,7 @@ msgstr "Plazo de entrega"
 msgid "Delivery time in days"
 msgstr "Plazo de entrega en días"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Delivery, returns and law"
 msgstr "Entrega, devoluciones y legislación"
@@ -2529,7 +2689,13 @@ msgstr "Cómo llegar en OpenStreetMap"
 msgid "Discard the draft"
 msgstr "Descartar el borrador"
 
-#: themes/base/templates/components/alert.html
+#: themes/base/templates/components/launch_countdown.html
+#: themes/ride/templates/components/launch_countdown.html
+msgid "Discover it"
+msgstr "Descúbrelo"
+
+#: themes/base/templates/components/alert.html themes/base/templates/components/toast.html
+#: themes/ride/templates/components/alert.html
 msgid "Dismiss"
 msgstr "Cerrar"
 
@@ -2540,6 +2706,10 @@ msgstr "Hacerlo una vez"
 #: apps/manager/fitment_views.py
 msgid "Do not expect fitment"
 msgstr "No exigir compatibilidad"
+
+#: apps/manager/fitment_views.py
+msgid "Do not require a declaration to publish"
+msgstr "No exigir una declaración para publicar"
 
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
@@ -2563,6 +2733,11 @@ msgstr "Descargar"
 msgid "Download my data"
 msgstr "Descargar mis datos"
 
+#: apps/manager/templates/manager/shop/sales_terms.html
+#: apps/vendors/templates/vendors/terms/read.html
+msgid "Download PDF"
+msgstr "Descargar el PDF"
+
 #: apps/events/templates/events/_subscribe.html
 msgid "Download the calendar (ICS)"
 msgstr "Descargar el calendario (ICS)"
@@ -2580,6 +2755,10 @@ msgstr ""
 #: apps/manager/product_views.py
 msgid "draft"
 msgstr "borrador"
+
+#: themes/ride/templates/cms/legal_page.html
+msgid "Draft: this text has not been checked by legal counsel yet and is not final."
+msgstr "Borrador: este texto aún no ha sido revisado por un asesor jurídico y no es definitivo."
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Drafts"
@@ -2655,6 +2834,14 @@ msgstr "Administración editorial"
 msgid "Editors' admin (Wagtail)"
 msgstr "Administración de los redactores (Wagtail)"
 
+#: apps/cms/templates/cms/includes/legal_version_meta.html themes/ride/templates/cms/legal_page.html
+msgid "Effective from"
+msgstr "En vigor desde el"
+
+#: themes/ride/templates/cms/legal_page.html
+msgid "effective from"
+msgstr "en vigor desde el"
+
 #: apps/manager/amendment_forms.py
 msgid "Either remove the line or change its quantity, not both."
 msgstr "Elimine la línea o cambie su cantidad, pero no ambas cosas."
@@ -2682,6 +2869,10 @@ msgstr "Idioma de los correos electrónicos"
 #: apps/manager/forms.py
 msgid "Email of the account"
 msgstr "Correo electrónico de la cuenta"
+
+#: themes/base/templates/components/mini_cart.html
+msgid "empty"
+msgstr "vacío"
 
 #: apps/accounts/admin.py
 msgid ""
@@ -2776,7 +2967,8 @@ msgstr ""
 "limitados a lo que exige la ley (RGPD artículo 17(3)(b)), y después se anonimizan. Si tienes un "
 "pedido aún abierto, la eliminación se completa cuando se cierra el último pedido abierto."
 
-#: themes/base/templates/components/alert.html
+#: themes/base/templates/components/alert.html themes/ride/templates/components/alert.html
+#: themes/ride/templates/components/field.html
 msgid "Error"
 msgstr "Error"
 
@@ -2788,14 +2980,22 @@ msgstr "Evento"
 msgid "Event views"
 msgstr "Vistas de los eventos"
 
-#: apps/events/templates/events/_results.html apps/manager/sections.py apps/manager/site_map.py
-#: apps/manager/templates/manager/shop/events.html
+#: apps/events/feeds.py apps/events/templates/events/_results.html apps/manager/sections.py
+#: apps/manager/site_map.py apps/manager/templates/manager/shop/events.html
 msgid "Events"
 msgstr "Eventos"
 
 #: apps/events/templates/events/event_calendar.html
 msgid "Events in %(month)s"
 msgstr "Eventos de %(month)s"
+
+#: apps/events/feeds.py
+msgid "Events of %(vendor)s"
+msgstr "Eventos de %(vendor)s"
+
+#: apps/events/feeds.py
+msgid "Events: %(type)s"
+msgstr "Eventos: %(type)s"
 
 #: apps/manager/templates/manager/platform/map.html
 msgid ""
@@ -2875,6 +3075,14 @@ msgstr "Debe declarar compatibilidad"
 msgid "Explanation"
 msgstr "Explicación"
 
+#: apps/manager/templates/manager/shop/money_transactions.html
+msgid "Export"
+msgstr "Exportación"
+
+#: apps/manager/templates/manager/shop/money_transactions.html
+msgid "Export as CSV"
+msgstr "Exportar en CSV"
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "Extra details to record for each category or tag, written as a list, for example [{\"code\": "
@@ -2890,6 +3098,10 @@ msgstr ""
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Facts and circumstances"
 msgstr "Hechos y circunstancias"
+
+#: themes/ride/templates/cms/vendor_landing_page.html
+msgid "Featured products"
+msgstr "Productos destacados"
 
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Field"
@@ -2910,6 +3122,7 @@ msgstr "Archivo"
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/_money_filters.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filter"
 msgstr "Filtrar"
@@ -2922,6 +3135,7 @@ msgstr "Filtrar los eventos"
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/_money_filters.html
 #: apps/manager/templates/manager/shop/orders.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
 msgid "Filters"
@@ -2955,6 +3169,7 @@ msgstr "Buscar la cuenta"
 msgid "Find the order"
 msgstr "Buscar el pedido"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Fingerprint %(hash)s."
 msgstr "Huella digital %(hash)s."
@@ -3038,9 +3253,26 @@ msgstr "¿Has olvidado tus credenciales de acceso?"
 msgid "Form expired"
 msgstr "Formulario caducado"
 
+#: apps/cms/forms_pages.py
+msgid "Form fields"
+msgstr "Campos del formulario"
+
+#: apps/cms/forms_pages.py
+msgid "form page"
+msgstr "página de formulario"
+
+#: themes/ride/templates/cms/vendor_recruitment_page.html
+msgid "Frequently asked questions"
+msgstr "Preguntas frecuentes"
+
 #: apps/manager/event_forms.py
 msgid "Friday"
 msgstr "Viernes"
+
+#: apps/manager/templates/manager/shop/_money_filters.html
+#: themes/base/templates/components/price.html
+msgid "From"
+msgstr "Desde"
 
 #: apps/catalog/templates/catalog/listing.html themes/ride/templates/catalog/listing.html
 msgid "From %(currency)s %(amount)s"
@@ -3062,7 +3294,7 @@ msgstr "Pedidos y pagos congelados"
 msgid "Full name"
 msgstr "Nombre y apellidos"
 
-#: apps/manager/event_block_forms.py
+#: apps/manager/event_block_forms.py themes/ride/templates/cms/blocks/gallery.html
 msgid "Gallery"
 msgstr "Galería"
 
@@ -3143,6 +3375,10 @@ msgstr "Asignar el rol"
 msgid "Give the screen or page type: letters, digits and . : _ - only."
 msgstr "Indique la pantalla o el tipo de página: solo letras, dígitos y . : _ -"
 
+#: themes/ride/templates/components/hero_slider.html themes/ride/templates/components/strip.html
+msgid "Go to slide %(count)s of %(total)s"
+msgstr "Ir a la diapositiva %(count)s de %(total)s"
+
 #: themes/base/templates/layouts/error.html
 msgid "Go to the home page"
 msgstr "Ir a la página de inicio"
@@ -3159,6 +3395,7 @@ msgstr "Mercancía, IVA incluido"
 msgid "Governing law"
 msgstr "Legislación aplicable"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Governing law: %(country)s."
 msgstr "Legislación aplicable: %(country)s."
@@ -3249,7 +3486,7 @@ msgid "Hello,"
 msgstr "Hola,"
 
 #: apps/cms/templates/cms/help_guide_index.html apps/cms/templates/cms/help_guide_section.html
-#: themes/base/templates/components/user_tools.html
+#: themes/base/templates/components/help_link.html themes/base/templates/components/user_tools.html
 msgid "Help"
 msgstr "Ayuda"
 
@@ -3284,6 +3521,10 @@ msgstr "Oculto por la plataforma."
 #: apps/manager/event_views.py
 msgid "Hidden by the platform: %(reason)s"
 msgstr "Oculto por la plataforma: %(reason)s"
+
+#: themes/ride/templates/cms/blocks/strip.html
+msgid "Highlights"
+msgstr "Destacados"
 
 #: apps/cms/templatetags/cms_tags.py apps/manager/site_map.py apps/seo/page_builders.py
 #: apps/seo/product_jsonld.py
@@ -3678,6 +3919,7 @@ msgid "Incomplete"
 msgstr "Incompleto"
 
 #: themes/base/templates/components/quantity_stepper.html
+#: themes/ride/templates/components/quantity_stepper.html
 msgid "Increase quantity"
 msgstr "Aumentar la cantidad"
 
@@ -3693,7 +3935,7 @@ msgstr ""
 msgid "Indicative price. Final amount at checkout."
 msgstr "Precio orientativo. Importe final al finalizar la compra."
 
-#: themes/base/templates/components/alert.html
+#: themes/base/templates/components/alert.html themes/ride/templates/components/alert.html
 msgid "Information"
 msgstr "Información"
 
@@ -3706,6 +3948,10 @@ msgid "Internal note on what changed in this version. Vendors do not see it. Up 
 msgstr ""
 "Nota interna sobre qué ha cambiado en esta versión. Los vendedores no la ven. Máximo 200 "
 "caracteres."
+
+#: apps/cms/forms_pages.py
+msgid "introduction"
+msgstr "introducción"
 
 #: apps/accounts/mfa_views.py
 msgid "Invalid code. Check the time on your device and try again."
@@ -3816,6 +4062,10 @@ msgstr "Participar en línea"
 msgid "Keep it"
 msgstr "Conservarlo"
 
+#: apps/cms/forms_pages.py
+msgid "keep submissions for (days)"
+msgstr "conservar las respuestas durante (días)"
+
 #: apps/manager/templates/manager/shop/event_cancel.html
 msgid "Keep the event"
 msgstr "Mantener el evento"
@@ -3881,6 +4131,14 @@ msgstr "último uso el %(used)s"
 msgid "Last used %(used)s"
 msgstr "Último uso %(used)s"
 
+#: apps/manager/templates/manager/shop/money.html
+msgid "Latest payouts"
+msgstr "Últimos pagos recibidos"
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "Latest transactions"
+msgstr "Últimos movimientos"
+
 #: apps/manager/fitment_forms.py
 msgid "Latest year, years from now"
 msgstr "Último año, en años a partir de ahora"
@@ -3888,6 +4146,14 @@ msgstr "Último año, en años a partir de ahora"
 #: apps/manager/event_forms.py
 msgid "Latitude"
 msgstr "Latitud"
+
+#: apps/cms/blocks.py
+msgid "Launch countdown"
+msgstr "Cuenta atrás del lanzamiento"
+
+#: apps/cms/blocks.py
+msgid "Launch date and time"
+msgstr "Fecha y hora del lanzamiento"
 
 #: apps/manager/event_block_forms.py
 msgid "Layout"
@@ -3998,9 +4264,13 @@ msgid "Licence"
 msgstr "Licencia"
 
 #: apps/orders/templates/orders/_cart_mini.html apps/orders/templates/orders/_package.html
-#: themes/base/templates/components/cart_line.html
+#: themes/base/templates/components/cart_line.html themes/ride/templates/components/cart_line.html
 msgid "Line total"
 msgstr "Total de la línea"
+
+#: apps/cms/blocks.py
+msgid "Link after the launch"
+msgstr "Enlace tras el lanzamiento"
 
 #: apps/vendors/templates/vendors/apply/invalid.html
 msgid "Link not valid"
@@ -4093,6 +4363,10 @@ msgstr "¿Ha perdido su dispositivo?"
 #: apps/manager/fitment_forms.py
 msgid "Lower case letters, digits, - and _. It cannot change later."
 msgstr "Letras minúsculas, dígitos, - y _. No se puede cambiar después."
+
+#: themes/base/templates/components/price.html
+msgid "Lowest price in the last 30 days:"
+msgstr "Precio más bajo de los últimos 30 días:"
 
 #: apps/catalog/templates/catalog/includes/brand_profile.html
 msgid "Made by %(name)s"
@@ -4222,9 +4496,14 @@ msgstr "Moderación"
 msgid "Monday"
 msgstr "Lunes"
 
-#: apps/manager/templates/manager/amendment.html
+#: apps/manager/sections.py apps/manager/site_map.py apps/manager/templates/manager/amendment.html
+#: apps/manager/templates/manager/shop/money.html
 msgid "Money"
 msgstr "Dinero"
+
+#: apps/manager/templates/manager/shop/_money_nav.html
+msgid "Money pages"
+msgstr "Páginas financieras"
 
 #: apps/events/templates/events/_filters.html
 msgid "Month"
@@ -4309,6 +4588,10 @@ msgstr "Nunca"
 msgid "never used"
 msgstr "nunca usada"
 
+#: themes/base/templates/components/badge.html
+msgid "New"
+msgstr "Novedad"
+
 #: apps/manager/event_views.py apps/manager/templates/manager/shop/events.html
 msgid "New event"
 msgstr "Nuevo evento"
@@ -4357,13 +4640,21 @@ msgstr "Nuevo precio unitario de %(title)s, EUR sin IVA (ahora %(price)s)"
 
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/base/templates/components/pagination.html themes/ride/templates/catalog/listing.html
-#: themes/ride/templates/catalog/search.html
+#: themes/ride/templates/catalog/search.html themes/ride/templates/cms/includes/post_list.html
 msgid "Next"
 msgstr "Siguiente"
+
+#: themes/base/templates/components/carousel.html
+msgid "Next items"
+msgstr "Elementos siguientes"
 
 #: apps/events/templates/events/event_calendar.html
 msgid "Next month"
 msgstr "Mes siguiente"
+
+#: themes/ride/templates/components/carousel_controls.html
+msgid "Next slide"
+msgstr "Diapositiva siguiente"
 
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "No"
@@ -4372,6 +4663,14 @@ msgstr "No"
 #: apps/manager/templates/manager/forbidden.html
 msgid "No access"
 msgstr "Sin acceso"
+
+#: apps/cms/templates/cms/blog_author_page.html themes/ride/templates/cms/blog_author_page.html
+msgid "No articles by this author yet."
+msgstr "Este autor aún no tiene artículos."
+
+#: apps/cms/templates/cms/blog_index_page.html themes/ride/templates/cms/blog_index_page.html
+msgid "No articles have been published yet."
+msgstr "Todavía no se ha publicado ningún artículo."
 
 #: apps/manager/amendment_forms.py
 msgid "No change"
@@ -4409,6 +4708,10 @@ msgstr "No se mueve dinero"
 #: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
 msgid "No money was refunded."
 msgstr "No se ha reembolsado ningún importe."
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "No movements in this period."
+msgstr "No hay movimientos en este periodo."
 
 #: apps/manager/templates/manager/platform/orders.html
 msgid "No order has this number."
@@ -4454,6 +4757,10 @@ msgstr "Ningún producto coincide con tu búsqueda."
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
 msgid "No refund fee is charged to your shop."
 msgstr "No se cobra a su tienda ninguna tarifa de reembolso."
+
+#: themes/base/templates/components/rating.html
+msgid "No reviews yet"
+msgstr "Aún no hay valoraciones"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "No second factor yet."
@@ -4620,6 +4927,7 @@ msgstr "No hay nada pendiente"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/_money_table.html
 #: apps/manager/templates/manager/shop/fitment_proposals.html
 #: apps/manager/templates/manager/shop/fitment_report.html
 #: apps/manager/templates/manager/shop/orders.html
@@ -4659,6 +4967,10 @@ msgstr "Avisos"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Notifier"
 msgstr "Notificante"
+
+#: themes/base/templates/components/price.html
+msgid "Now"
+msgstr "Ahora"
 
 #: apps/manager/event_block_forms.py
 msgid "Number of products"
@@ -4746,7 +5058,7 @@ msgstr "En un último día"
 msgid "On backorder"
 msgstr "Bajo pedido"
 
-#: apps/manager/templates/manager/shop/payments.html
+#: apps/manager/templates/manager/shop/payments.html themes/base/templates/components/badge.html
 msgid "On request"
 msgstr "Bajo petición"
 
@@ -5039,6 +5351,10 @@ msgstr "Abrir la página pública"
 msgid "Open the review list"
 msgstr "Abrir la lista de revisión"
 
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Opening balance"
+msgstr "Saldo inicial"
+
 #: apps/seo/templates/seo/consent/preferences.html
 msgid "Optional cookies on:"
 msgstr "Cookies opcionales activadas:"
@@ -5068,6 +5384,7 @@ msgid "Or browse a category:"
 msgstr "O explora una categoría:"
 
 #: apps/manager/templates/manager/platform/fitment_scheme.html
+#: apps/manager/templates/manager/shop/_money_table.html
 #: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_orders.html
 msgid "Order"
 msgstr "Pedido"
@@ -5186,6 +5503,7 @@ msgid "Order received"
 msgstr "Pedido recibido"
 
 #: themes/base/templates/components/order_summary.html
+#: themes/ride/templates/components/order_summary.html
 msgid "Order summary"
 msgstr "Resumen del pedido"
 
@@ -5240,6 +5558,11 @@ msgstr ""
 "Otros productos que desea sugerir junto con este, por ejemplo un modelo mejor. Opcional: déjelo "
 "vacío para no sugerir nada."
 
+#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: themes/ride/templates/catalog/includes/other_sellers.html
+msgid "Other sellers of this product"
+msgstr "Otros vendedores de este producto"
+
 #: apps/ingest/models.py
 msgid "Other ways the supplier writes the same term, as a JSON list."
 msgstr "Otras formas en que el proveedor escribe el mismo término, como lista JSON."
@@ -5253,7 +5576,7 @@ msgstr ""
 "envío:"
 
 #: apps/catalog/templates/catalog/includes/stock_status.html
-#: apps/manager/templates/manager/shop/dashboard.html
+#: apps/manager/templates/manager/shop/dashboard.html themes/base/templates/components/badge.html
 msgid "Out of stock"
 msgstr "Agotado"
 
@@ -5303,6 +5626,7 @@ msgid "Page %(page)s"
 msgstr "Página %(page)s"
 
 #: themes/base/templates/components/pagination.html
+#: themes/ride/templates/cms/includes/post_list.html
 msgid "Page %(page)s of %(count)s"
 msgstr "Página %(page)s de %(count)s"
 
@@ -5316,7 +5640,7 @@ msgstr "Tipo de página"
 
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/base/templates/components/pagination.html themes/ride/templates/catalog/listing.html
-#: themes/ride/templates/catalog/search.html
+#: themes/ride/templates/catalog/search.html themes/ride/templates/cms/includes/post_list.html
 msgid "Pagination"
 msgstr "Paginación"
 
@@ -5383,9 +5707,26 @@ msgstr "Eventos pasados"
 msgid "Path"
 msgstr "Ruta"
 
+#: themes/ride/templates/components/carousel_controls.html
+msgid "Pause"
+msgstr "Pausa"
+
+#: themes/base/templates/components/launch_countdown.html
+#: themes/ride/templates/components/launch_countdown.html
+msgid "Pause countdown"
+msgstr "Pausar la cuenta atrás"
+
 #: apps/orders/templates/orders/confirmation.html
 msgid "Pay now"
 msgstr "Pagar ahora"
+
+#: apps/manager/money_views.py
+msgid "Payment fee"
+msgstr "Coste de cobro"
+
+#: apps/manager/money_views.py
+msgid "Payment fee given back"
+msgstr "Coste de cobro devuelto"
 
 #: apps/orders/customer_views.py
 msgid "Payment received"
@@ -5411,9 +5752,18 @@ msgstr "Pago recibido. Gracias."
 msgid "Payments"
 msgstr "Pagos"
 
+#: apps/manager/money_views.py
+msgid "Payout"
+msgstr "Pago al vendedor"
+
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Payout account of %(vendor)s."
 msgstr "Cuenta de cobros de %(vendor)s."
+
+#: apps/manager/site_map.py apps/manager/templates/manager/shop/_money_nav.html
+#: apps/manager/templates/manager/shop/money_payouts.html
+msgid "Payouts"
+msgstr "Pagos recibidos"
 
 #: apps/themes/styleguide.py
 msgid "PDF or image, 5 MB at most."
@@ -5517,6 +5867,14 @@ msgid ""
 msgstr ""
 "Texto sin formato. Los titulares y el registro de auditoría lo conservan: no escriba datos "
 "personales, como nombres, correos electrónicos o números de teléfono."
+
+#: apps/manager/money_views.py
+msgid "Plan fee"
+msgstr "Cuota del plan"
+
+#: themes/ride/templates/cms/vendor_recruitment_page.html
+msgid "Plans"
+msgstr "Planes"
 
 #: apps/manager/templates/manager/layout.html
 msgid "Platform"
@@ -5628,11 +5986,27 @@ msgstr ""
 "El soporte de la plataforma ha modificado su pedido %(order_number)s. Ahora es la versión "
 "%(version)s."
 
+#: themes/ride/templates/components/carousel_controls.html
+msgid "Play"
+msgstr "Reproducir"
+
+#: themes/ride/templates/components/video_modal.html
+msgid "Play video"
+msgstr "Reproducir el vídeo"
+
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Please correct the error below."
 msgid_plural "Please correct the errors below."
 msgstr[0] "Corrige el error siguiente."
 msgstr[1] "Corrige los errores siguientes."
+
+#: apps/fitment/services.py
+msgid ""
+"Please declare what this product fits before you publish it: choose the items it fits on the Fits "
+"tab, or state that it fits everything."
+msgstr ""
+"Indique a qué se adapta este producto antes de publicarlo: elija los artículos compatibles en la "
+"pestaña Compatibilidad o declare que se adapta a todo."
 
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
@@ -5726,13 +6100,25 @@ msgstr "Vista previa: %(action)s"
 
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/base/templates/components/pagination.html themes/ride/templates/catalog/listing.html
-#: themes/ride/templates/catalog/search.html
+#: themes/ride/templates/catalog/search.html themes/ride/templates/cms/includes/post_list.html
 msgid "Previous"
 msgstr "Anterior"
+
+#: themes/base/templates/components/carousel.html
+msgid "Previous items"
+msgstr "Elementos anteriores"
 
 #: apps/events/templates/events/event_calendar.html
 msgid "Previous month"
 msgstr "Mes anterior"
+
+#: themes/ride/templates/components/carousel_controls.html
+msgid "Previous slide"
+msgstr "Diapositiva anterior"
+
+#: themes/ride/templates/cms/legal_page.html
+msgid "Previous versions"
+msgstr "Versiones anteriores"
 
 #: apps/catalog/templates/catalog/includes/listing_filters.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
@@ -5744,16 +6130,18 @@ msgid "Price and availability"
 msgstr "Precio y disponibilidad"
 
 #: apps/catalog/templates/catalog/includes/product_card.html
-#: apps/catalog/templates/catalog/product.html apps/orders/ui/present.py
+#: apps/catalog/templates/catalog/product.html apps/cms/templates/cms/blocks/product_grid.html
+#: apps/cms/templates/cms/includes/product_tiles.html apps/orders/ui/present.py
 #: themes/ride/templates/catalog/includes/product_card.html
 #: themes/ride/templates/catalog/product.html
 msgid "Price at checkout"
 msgstr "Precio al finalizar la compra"
 
 #: apps/catalog/templates/catalog/includes/product_card.html
-#: apps/catalog/templates/catalog/product.html
+#: apps/catalog/templates/catalog/product.html themes/base/templates/components/price.html
+#: themes/base/templates/components/product_tile.html
 #: themes/ride/templates/catalog/includes/product_card.html
-#: themes/ride/templates/catalog/product.html
+#: themes/ride/templates/catalog/product.html themes/ride/templates/components/product_tile.html
 msgid "Price on request"
 msgstr "Precio bajo petición"
 
@@ -5806,7 +6194,7 @@ msgstr ""
 #: apps/manager/event_block_forms.py apps/manager/event_forms.py apps/manager/product_views.py
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/dashboard.html themes/ride/templates/catalog/listing.html
-#: themes/ride/templates/catalog/search.html
+#: themes/ride/templates/catalog/search.html themes/ride/templates/cms/term_landing_page.html
 msgid "Products"
 msgstr "Productos"
 
@@ -5910,10 +6298,11 @@ msgstr ""
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/shop/order.html
 #: apps/orders/templates/orders/customer_order.html
 #: themes/base/templates/components/quantity_stepper.html
+#: themes/ride/templates/components/quantity_stepper.html
 msgid "Quantity"
 msgstr "Cantidad"
 
-#: themes/base/templates/components/cart_line.html
+#: themes/base/templates/components/cart_line.html themes/ride/templates/components/cart_line.html
 msgid "Quantity, %(name)s"
 msgstr "Cantidad, %(name)s"
 
@@ -5929,14 +6318,26 @@ msgstr "Preguntas y respuestas"
 msgid "Quote requested"
 msgstr "Presupuesto solicitado"
 
+#: themes/base/templates/components/rating.html
+msgid "Rated %(value)s out of 5"
+msgstr "Valorado con %(value)s sobre 5"
+
 #: apps/seo/templates/seo/consent/banner.html
 msgid "Read more and choose"
 msgstr "Más información y elegir"
+
+#: themes/ride/templates/cms/legal_page_version.html
+msgid "Read the current version"
+msgstr "Lee la versión actual"
 
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt
 msgid "Read the statement of reasons"
 msgstr "Leer la exposición de motivos"
+
+#: apps/cms/templates/cms/includes/vendor_story_link.html
+msgid "Read the story of %(name)s"
+msgstr "Lee la historia de %(name)s"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 msgid "Read this version online"
@@ -6035,6 +6436,8 @@ msgid "Recovery codes"
 msgstr "Códigos de recuperación"
 
 #: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/_money_table.html
+#: apps/manager/templates/manager/shop/money_statement.html
 #: apps/manager/templates/manager/shop/statements.html
 msgid "Reference"
 msgstr "Referencia"
@@ -6046,6 +6449,14 @@ msgid ""
 msgstr ""
 "Referencia del permiso escrito conservado, cuando la licencia lo requiere. Ejemplo: "
 "«permission-2026-11-acme.pdf»."
+
+#: apps/manager/money_views.py
+msgid "Refund"
+msgstr "Reembolso"
+
+#: apps/manager/money_views.py
+msgid "Refund fee"
+msgstr "Coste del reembolso"
 
 #: apps/orders/customer_views.py
 msgid "Refunded"
@@ -6088,6 +6499,11 @@ msgstr "Rechazar las propuestas seleccionadas"
 msgid "Rejected"
 msgstr "Rechazada"
 
+#: apps/cms/templates/cms/includes/term_landing_after.html
+#: themes/ride/templates/cms/includes/term_landing_after.html
+msgid "Related articles"
+msgstr "Artículos relacionados"
+
 #: apps/catalog/taxonomy_admin.py
 msgid "Relative to"
 msgstr "Respecto a"
@@ -6106,11 +6522,11 @@ msgstr "Recordatorio: confirme su dirección de correo electrónico para termina
 #: apps/manager/templates/manager/shop/_event_blocks.html
 #: apps/manager/templates/manager/shop/_fitment_rows.html
 #: apps/manager/templates/manager/shop/event_block_remove.html
-#: themes/base/templates/components/cart_line.html
+#: themes/base/templates/components/cart_line.html themes/ride/templates/components/cart_line.html
 msgid "Remove"
 msgstr "Eliminar"
 
-#: themes/base/templates/components/cart_line.html
+#: themes/base/templates/components/cart_line.html themes/ride/templates/components/cart_line.html
 msgid "Remove %(name)s"
 msgstr "Eliminar %(name)s"
 
@@ -6179,7 +6595,11 @@ msgstr "Archivo del repositorio"
 msgid "Request a quote"
 msgstr "Solicitar un presupuesto"
 
-#: themes/base/templates/components/field.html
+#: apps/manager/fitment_views.py
+msgid "Require a declaration to publish"
+msgstr "Exigir una declaración para publicar"
+
+#: themes/base/templates/components/field.html themes/ride/templates/components/field.html
 msgid "required"
 msgstr "obligatorio"
 
@@ -6198,6 +6618,11 @@ msgstr "Resto del paquete cancelado a petición suya"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Restrict and send the statement of reasons"
 msgstr "Restringir y enviar la exposición de motivos"
+
+#: themes/base/templates/components/launch_countdown.html
+#: themes/ride/templates/components/launch_countdown.html
+msgid "Resume countdown"
+msgstr "Reanudar la cuenta atrás"
 
 #: apps/manager/fitment_views.py
 msgid "Retire"
@@ -6252,10 +6677,12 @@ msgstr "Política de devoluciones y reembolsos"
 msgid "Returns go to: %(country)s"
 msgstr "Las devoluciones se envían a: %(country)s"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the consumer bears the direct cost of returning the goods."
 msgstr "Devoluciones: el coste directo de devolver los bienes corre a cargo del consumidor."
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the seller bears the cost of returning the goods."
 msgstr "Devoluciones: el coste de devolver los bienes corre a cargo del vendedor."
@@ -6317,16 +6744,22 @@ msgstr "Filas a la espera de un elemento no aprobado"
 msgid "RSS feed"
 msgstr "Canal RSS"
 
+#: apps/manager/money_views.py themes/base/templates/components/badge.html
+msgid "Sale"
+msgstr "Venta"
+
 #: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
 msgid "Sales mode"
 msgstr "Modo de venta"
 
 #: apps/manager/forms.py apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/sales_terms.html
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Sales terms"
 msgstr "Condiciones de venta"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Sales terms of %(name)s"
 msgstr "Condiciones de venta de %(name)s"
@@ -6403,7 +6836,8 @@ msgid "screen or page type"
 msgstr "pantalla o tipo de página"
 
 #: apps/catalog/templates/catalog/search.html apps/manager/fitment_shop_views.py
-#: apps/manager/product_views.py apps/seo/page_builders.py themes/ride/templates/catalog/search.html
+#: apps/manager/product_views.py apps/seo/page_builders.py
+#: themes/base/templates/components/search_form.html themes/ride/templates/catalog/search.html
 #: themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Buscar"
@@ -6411,6 +6845,10 @@ msgstr "Buscar"
 #: apps/cms/blocks.py
 msgid "Search by name, SKU, brand or vendor, then click the product."
 msgstr "Busque por nombre, SKU, marca o vendedor y después haga clic en el producto."
+
+#: themes/base/templates/components/search_form.html
+msgid "Search products"
+msgstr "Buscar productos"
 
 #: apps/catalog/templates/catalog/search.html themes/ride/templates/catalog/search.html
 msgid "Search the shop"
@@ -6425,9 +6863,19 @@ msgstr "Buscar: %(query)s"
 msgid "Security"
 msgstr "Seguridad"
 
+#: apps/cms/templates/cms/blocks/product_grid.html
+msgid "See all"
+msgstr "Ver todos"
+
 #: apps/catalog/templates/catalog/search.html themes/ride/templates/catalog/search.html
 msgid "See all: %(title)s"
 msgstr "Ver todo: %(title)s"
+
+#: apps/cms/templates/cms/blocks/product_grid.html
+#: apps/cms/templates/cms/includes/term_landing_before.html
+#: themes/ride/templates/cms/vendor_landing_page.html
+msgid "See all<span class=\"visually-hidden\"> products: %(name)s</span>"
+msgstr "Ver todos<span class=\"visually-hidden\"> los productos: %(name)s</span>"
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "See where you are signed in"
@@ -6461,6 +6909,10 @@ msgstr "Vendedor"
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Selling mode"
 msgstr "Modalidad de venta"
+
+#: apps/cms/templates/cms/form_page.html
+msgid "Send"
+msgstr "Enviar"
 
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "Send for review"
@@ -6564,7 +7016,7 @@ msgstr "Enviar a:"
 msgid "Shipped"
 msgstr "Enviado"
 
-#: apps/orders/templates/orders/_package.html apps/vendors/services.py
+#: apps/manager/money_views.py apps/orders/templates/orders/_package.html apps/vendors/services.py
 msgid "Shipping"
 msgstr "Envío"
 
@@ -6629,6 +7081,10 @@ msgstr "Envío: %(shipping)s EUR"
 msgid "Shop"
 msgstr "Tienda"
 
+#: apps/cms/templates/cms/includes/term_landing_before.html
+msgid "Shop by category"
+msgstr "Comprar por categoría"
+
 #: apps/manager/amendment_views.py
 msgid "Shop frozen"
 msgstr "Tienda congelada"
@@ -6648,6 +7104,10 @@ msgstr "Espacio de tienda: pedidos"
 #: apps/seo/site_links.py
 msgid "Shop space: storefront profile"
 msgstr "Espacio de tienda: perfil de escaparate"
+
+#: apps/events/feeds.py
+msgid "Shop: %(url)s"
+msgstr "Tienda: %(url)s"
 
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Shop: cannot fulfil"
@@ -6842,7 +7302,15 @@ msgstr "Vendido por"
 msgid "Sold by %(name)s"
 msgstr "Vendido por %(name)s"
 
+#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: themes/ride/templates/catalog/includes/other_sellers.html
+msgid "Sold by %(seller)s"
+msgstr "Vendido por %(seller)s"
+
 #: apps/orders/templates/orders/_package.html themes/base/templates/components/cart_line.html
+#: themes/base/templates/components/product_tile.html
+#: themes/ride/templates/components/cart_line.html
+#: themes/ride/templates/components/product_tile.html
 msgid "Sold by %(vendor)s"
 msgstr "Vendido por %(vendor)s"
 
@@ -6975,9 +7443,18 @@ msgstr "Empieza a las"
 msgid "State"
 msgstr "Estado"
 
+#: apps/manager/site_map.py apps/manager/templates/manager/shop/_money_nav.html
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Statement"
+msgstr "Extracto"
+
 #: apps/manager/templates/manager/shop/statements.html
 msgid "Statement of %(date)s"
 msgstr "Exposición de motivos del %(date)s"
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Statement of %(vendor)s from %(first)s to %(last)s."
+msgstr "Extracto de %(vendor)s del %(first)s al %(last)s."
 
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/platform/notice_detail.html
@@ -7002,6 +7479,8 @@ msgstr "Estadísticas"
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 #: apps/orders/templates/orders/customer_order.html
 #: apps/orders/templates/orders/customer_orders.html
+#: themes/base/templates/components/product_tile.html
+#: themes/ride/templates/components/product_tile.html
 msgid "Status"
 msgstr "Estado"
 
@@ -7086,7 +7565,7 @@ msgstr "Suscribirse en tu aplicación de calendario"
 msgid "Substantial change: it needs the customer's acceptance, which is not available yet"
 msgstr "Cambio sustancial: requiere la aceptación del cliente, que aún no está disponible"
 
-#: themes/base/templates/components/alert.html
+#: themes/base/templates/components/alert.html themes/ride/templates/components/alert.html
 msgid "Success"
 msgstr "Operación realizada con éxito"
 
@@ -7172,7 +7651,9 @@ msgstr "Preaviso de baja"
 msgid "Terminations"
 msgstr "Bajas"
 
-#: apps/orders/templates/orders/_legal_boxes.html apps/vendors/templates/vendors/terms/read.html
+#: apps/orders/templates/orders/_legal_boxes.html
+#: apps/vendors/templates/documents/vendors/sales_terms.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Terms"
 msgstr "Condiciones"
 
@@ -7180,9 +7661,21 @@ msgstr "Condiciones"
 msgid "Text"
 msgstr "Texto"
 
+#: apps/cms/blocks.py
+msgid "Text after the launch"
+msgstr "Texto tras el lanzamiento"
+
 #: apps/orders/customer_views.py
 msgid "Thank you. The seller can now ship the rest."
 msgstr "Gracias. El vendedor ya puede enviar el resto."
+
+#: apps/cms/templates/cms/form_page_landing.html
+msgid "Thank you. We have received your message."
+msgstr "Gracias. Hemos recibido tu mensaje."
+
+#: apps/cms/forms_pages.py
+msgid "thank-you text"
+msgstr "texto de agradecimiento"
 
 #: apps/manager/session_views.py
 msgid "That account had no session to end."
@@ -7905,6 +8398,14 @@ msgid ""
 msgstr ""
 "Los eventos de %(vendor)s: promociones, ferias y reuniones. Un evento nuevo se revisa antes de "
 "publicarse."
+
+#: apps/manager/templates/manager/shop/money_transactions.html
+msgid ""
+"The export is a non-fiscal document. It covers the period above, or the current month if you set "
+"no period."
+msgstr ""
+"La exportación es un documento no fiscal. Abarca el periodo indicado arriba, o el mes en curso si "
+"no indica ningún periodo."
 
 #: apps/compliance/forms.py
 msgid "The facts and circumstances you relied on to decide. The vendor sees this text."
@@ -9329,6 +9830,10 @@ msgstr ""
 "El esquema indica lo que eligen los clientes: por ejemplo una marca y un modelo, o una marca y una"
 " máquina. No se escribe nada hasta que confirme en la página de vista previa."
 
+#: apps/cms/templates/cms/form_page.html
+msgid "The security check failed. Please try again."
+msgstr "La comprobación de seguridad ha fallado. Inténtalo de nuevo."
+
 #: apps/manager/forms.py apps/vendors/models.py
 msgid "The seller"
 msgstr "El vendedor"
@@ -9399,6 +9904,15 @@ msgid ""
 msgstr ""
 "El grupo de categorías o etiquetas al que pertenece esta, por ejemplo «temporada». Obligatorio. No"
 " se puede cambiar después."
+
+#: apps/manager/templates/manager/shop/sales_terms.html
+msgid ""
+"The shipping method %(key)s (%(zone)s) is for goods that cannot be returned by post and has no "
+"maximum return-cost estimate. Add one in the return-cost information below, or you pay the return."
+msgstr ""
+"El método de envío %(key)s (%(zone)s) es para mercancías que no se pueden devolver por correo y no"
+" tiene una estimación del coste máximo de devolución. Añádala en la información sobre el coste de "
+"devolución más abajo, o la devolución corre de su cuenta."
 
 #: apps/orders/amendments.py
 msgid "The shipping method %(method)r is not offered for this package."
@@ -9532,6 +10046,10 @@ msgstr "El miembro del personal que aprobó o rechazó esta versión."
 #: apps/events/models.py
 msgid "The staff member who hid the event. The platform fills it in."
 msgstr "El miembro del personal que ocultó el evento. Lo rellena la plataforma."
+
+#: apps/manager/money_views.py
+msgid "The start date is after the end date. The period filter was ignored."
+msgstr "La fecha de inicio es posterior a la fecha de fin. Se ha ignorado el filtro de periodo."
 
 #: apps/ingest/models.py
 msgid "The state as it was at that version."
@@ -10066,6 +10584,7 @@ msgstr ""
 "La zona a la que envía este método. Un vendedor puede ofrecer varios métodos para la misma zona."
 
 #: themes/base/templates/components/error_summary.html
+#: themes/ride/templates/components/error_summary.html
 msgid "There is a problem"
 msgstr "Se ha producido un problema"
 
@@ -10235,6 +10754,10 @@ msgstr ""
 "Esta es una traducción. Las fechas, el lugar y los productos proceden del original y se copian al "
 "publicarla."
 
+#: themes/ride/templates/cms/legal_page_version.html
+msgid "This is an archived version."
+msgstr "Esta es una versión archivada."
+
 #: apps/vendors/templates/email/vendors/application_reminder/body.html
 #: apps/vendors/templates/email/vendors/application_reminder/body.txt
 msgid ""
@@ -10245,6 +10768,10 @@ msgstr ""
 "Este es el único recordatorio: se hizo una solicitud para vender con nosotros con esta dirección "
 "de correo electrónico y sigue esperando su confirmación. Para continuar, abra este enlace, "
 "confirme su dirección de correo electrónico y elija una contraseña."
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "This is what the platform owes your shop right now."
+msgstr "Es el importe que la plataforma debe ahora a su tienda."
 
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "This is your approved policy."
@@ -10385,6 +10912,10 @@ msgstr "Este paso no es posible para el aviso en su estado actual."
 msgid "This step is not possible in the order's current state."
 msgstr "Este paso no es posible en el estado actual del pedido."
 
+#: apps/cms/forms_pages.py
+msgid "This submission is too large."
+msgstr "Este envío es demasiado grande."
+
 #: apps/manager/termination_views.py
 msgid "This vendor already has a notice of termination."
 msgstr "Este vendedor ya tiene un preaviso de baja."
@@ -10404,6 +10935,14 @@ msgid ""
 msgstr ""
 "Este vendedor está suspendido o cerrado, por lo que no se puede modificar el perfil de escaparate."
 " Póngase en contacto con el servicio de asistencia para que se reabra."
+
+#: themes/ride/templates/cms/legal_page.html
+msgid "This version comes into effect on %(date)s."
+msgstr "Esta versión entra en vigor el %(date)s."
+
+#: themes/ride/templates/components/video_modal.html
+msgid "This video is hosted by another site. It loads only if you accept marketing cookies."
+msgstr "Este vídeo está alojado en otro sitio. Solo se carga si aceptas las cookies de marketing."
 
 #: apps/vendors/templates/email/vendors/application_confirm/body.html
 #: apps/vendors/templates/email/vendors/application_confirm/body.txt
@@ -10451,6 +10990,15 @@ msgstr ""
 #: apps/manager/event_forms.py
 msgid "Tick it for an event with no set hours. Then give the first and last day."
 msgstr "Márquelo para un evento sin horario fijo. Después indique el primer y el último día."
+
+#: apps/shipping/models.py
+msgid ""
+"Tick it for bulky goods that cannot be sent back by post, such as a pallet. You must then state a "
+"maximum return-cost estimate in your sales terms."
+msgstr ""
+"Marque esta casilla para las mercancías voluminosas que no se pueden devolver por correo, como un "
+"palé. Deberá indicar entonces una estimación del coste máximo de devolución en sus condiciones de "
+"venta."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -10605,6 +11153,11 @@ msgstr ""
 "Marcado: la función está activada para este vendedor. Sin marcar: está desactivada, sea cual sea "
 "el ajuste de la plataforma. Un interruptor de emergencia aquí solo se puede desactivar."
 
+#: themes/base/templates/components/launch_countdown.html
+#: themes/ride/templates/components/launch_countdown.html
+msgid "Time left:"
+msgstr "Tiempo restante:"
+
 #: apps/manager/amendment_views.py
 msgid "Time to answer a proposed change"
 msgstr "Plazo para responder a un cambio propuesto"
@@ -10626,6 +11179,10 @@ msgstr "Título"
 #: apps/cms/models.py
 msgid "title"
 msgstr "título"
+
+#: apps/manager/templates/manager/shop/_money_filters.html
+msgid "To"
+msgstr "Hasta"
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid ""
@@ -10679,6 +11236,10 @@ msgstr "Demasiadas descargas. Inténtelo de nuevo más tarde."
 msgid "Too many requests from this address. Try again later."
 msgstr "Demasiadas solicitudes desde esta dirección. Inténtalo de nuevo más tarde."
 
+#: apps/cms/forms_pages.py
+msgid "Too many submissions, try again shortly."
+msgstr "Demasiados envíos, inténtalo de nuevo en un momento."
+
 #: apps/manager/fitment_shop_forms.py
 msgid "Top level"
 msgstr "Nivel superior"
@@ -10687,8 +11248,13 @@ msgstr "Nivel superior"
 #: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_order.html
 #: apps/orders/templates/orders/customer_orders.html
 #: themes/base/templates/components/order_summary.html
+#: themes/ride/templates/components/order_summary.html
 msgid "Total"
 msgstr "Total"
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Total (EUR)"
+msgstr "Total (EUR)"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Total after"
@@ -10707,6 +11273,10 @@ msgstr "Total con IVA"
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Total: %(total)s EUR"
 msgstr "Total: %(total)s EUR"
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Totals by type"
+msgstr "Totales por tipo"
 
 #: apps/orders/templates/orders/_package.html
 msgid "Totals for this vendor"
@@ -10731,6 +11301,19 @@ msgstr "Número de seguimiento: %(number)s"
 #: apps/events/models.py
 msgid "Trade fair or meeting"
 msgstr "Feria o encuentro"
+
+#: apps/manager/site_map.py apps/manager/templates/manager/shop/_money_nav.html
+#: apps/manager/templates/manager/shop/money_transactions.html
+msgid "Transactions"
+msgstr "Movimientos"
+
+#: apps/manager/money_views.py
+msgid "Transfer"
+msgstr "Transferencia"
+
+#: apps/manager/money_views.py
+msgid "Transfer taken back"
+msgstr "Transferencia retirada"
 
 #: apps/manager/templates/manager/shop/event_translate.html
 msgid ""
@@ -10788,7 +11371,9 @@ msgid "Two-factor settings"
 msgstr "Ajustes de la verificación en dos pasos"
 
 #: apps/events/templates/events/_filters.html apps/events/templates/events/event_page.html
-#: apps/manager/event_forms.py
+#: apps/manager/event_forms.py apps/manager/templates/manager/shop/_money_filters.html
+#: apps/manager/templates/manager/shop/_money_table.html
+#: apps/manager/templates/manager/shop/money_statement.html
 msgid "Type"
 msgstr "Tipo"
 
@@ -10870,7 +11455,7 @@ msgstr "Hasta dos botones en la diapositiva. Si no añade ninguno, la diapositiv
 msgid "Up to two buttons under the text. If you add none, the banner has no buttons."
 msgstr "Hasta dos botones bajo el texto. Si no añade ninguno, el banner no tiene botones."
 
-#: apps/events/templates/events/_links.html
+#: apps/events/templates/events/_links.html apps/events/templates/events/_storefront.html
 msgid "Upcoming events"
 msgstr "Próximos eventos"
 
@@ -10911,6 +11496,10 @@ msgstr "Usar una clave de acceso (passkey)"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Use an authenticator app"
 msgstr "Usar una app de autenticación"
+
+#: apps/manager/money_views.py
+msgid "Use dates like 2026-03-31. The period filter was ignored."
+msgstr "Use fechas como 2026-03-31. Se ha ignorado el filtro de periodo."
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Use recovery code"
@@ -11023,6 +11612,15 @@ msgstr "Versión %(n)s"
 msgid "version %(number)s"
 msgstr "versión %(number)s"
 
+#: apps/cms/templates/cms/includes/legal_version_meta.html themes/ride/templates/cms/legal_page.html
+#: themes/ride/templates/cms/legal_page_version.html
+msgid "Version %(number)s"
+msgstr "Versión %(number)s"
+
+#: themes/ride/templates/cms/legal_page.html
+msgid "Version %(number)s applies until then."
+msgstr "Hasta entonces se aplica la versión %(number)s."
+
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "Version %(number)s is in force since %(date)s."
 msgstr "La versión %(number)s está en vigor desde el %(date)s."
@@ -11039,6 +11637,7 @@ msgstr "La versión %(number)s fue rechazada. %(note)s"
 msgid "Version %(number)s, %(date)s"
 msgstr "Versión %(number)s, %(date)s"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Version %(number)s, in force from %(date)s."
 msgstr "Versión %(number)s, en vigor desde el %(date)s."
@@ -11055,6 +11654,10 @@ msgstr "Versiones"
 #: apps/orders/ui/views.py
 msgid "VIES says this VAT number is not valid. VAT is charged on your order."
 msgstr "VIES indica que este número de IVA no es válido. Se aplica IVA a tu pedido."
+
+#: themes/ride/templates/components/product_tile.html
+msgid "View"
+msgstr "Ver"
 
 #: apps/orders/templates/orders/_cart_mini.html themes/ride/templates/components/header.html
 msgid "View cart"
@@ -11079,7 +11682,8 @@ msgid "Waiting for the seller"
 msgstr "Pendiente del vendedor"
 
 #: apps/orders/templates/orders/_package.html themes/base/templates/components/alert.html
-#: themes/base/templates/components/cart_line.html
+#: themes/base/templates/components/cart_line.html themes/ride/templates/components/alert.html
+#: themes/ride/templates/components/cart_line.html
 msgid "Warning"
 msgstr "Atención"
 
@@ -11092,6 +11696,19 @@ msgstr ""
 "Atención: este texto está pensado para la base de datos de transparencia de la UE (el envío "
 "todavía no existe, por ahora solo se guarda). Máximo 2000 caracteres. No escriba datos personales,"
 " nombres, direcciones de correo electrónico ni direcciones web."
+
+#: themes/base/templates/components/product_tile.html
+#: themes/ride/templates/components/product_tile.html
+msgid "Was"
+msgstr "Antes"
+
+#: themes/ride/templates/components/video_modal.html
+msgid "Watch on the video site"
+msgstr "Ver en el sitio del vídeo"
+
+#: apps/cms/templates/cms/blocks/video_modal.html
+msgid "Watch the video"
+msgstr "Ver el vídeo"
 
 #: apps/seo/templates/seo/consent/banner.html
 msgid ""
@@ -11298,8 +11915,12 @@ msgid "What kind of area it is: an island, a remote area or a territory with its
 msgstr "Qué tipo de área es: una isla, una zona remota o un territorio con normas de IVA propias."
 
 #: apps/ingest/models.py
-msgid "What kind of term this is: category, taxonomy term, colour, material, brand or other."
-msgstr "Qué tipo de término es: categoría, término de taxonomía, color, material, marca u otro."
+msgid ""
+"What kind of term this is: category, taxonomy term, colour, material, brand, product type, country"
+" or other."
+msgstr ""
+"Qué tipo de término es: categoría, término de taxonomía, color, material, marca, tipo de producto,"
+" país u otro."
 
 #: apps/shipping/models.py
 msgid "What pickup costs, without VAT. Use 0 for free pickup."
@@ -11591,6 +12212,10 @@ msgstr "Cuando compres algo, lo encontrarás aquí con tu estado y tu seguimient
 msgid "When you place the order we hold the items for you. Payment follows in the next step."
 msgstr "Al realizar el pedido, le reservamos los artículos. El pago sigue en el paso siguiente."
 
+#: apps/events/feeds.py
+msgid "When: %(when)s"
+msgstr "Cuándo: %(when)s"
+
 #: apps/events/templates/events/event_page.html apps/manager/event_forms.py
 msgid "Where"
 msgstr "Dónde"
@@ -11734,6 +12359,10 @@ msgid ""
 msgstr ""
 "Dónde colocar este elemento respecto al elegido abajo: dentro de él como primero, antes o después."
 " Obligatorio."
+
+#: apps/events/feeds.py
+msgid "Where: %(where)s"
+msgstr "Dónde: %(where)s"
 
 #: apps/ingest/models.py
 msgid "Whether the item has variations."
@@ -12042,6 +12671,10 @@ msgstr ""
 msgid "You can read the scheme but not change it."
 msgstr "Puede leer el esquema, pero no cambiarlo."
 
+#: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/product.html
+msgid "You can view this section; changes need the Catalog role."
+msgstr "Puede consultar esta sección; para los cambios se necesita el rol Catálogo."
+
 #: apps/manager/event_block_views.py
 msgid "You cannot add images for this shop."
 msgstr "No puede añadir imágenes para esta tienda."
@@ -12089,8 +12722,10 @@ msgid "You have no orders yet"
 msgstr "Todavía no tienes pedidos"
 
 #: apps/manager/templates/manager/shop/return_policy.html
-msgid "You have not set a policy yet. The standard one applies."
-msgstr "Todavía no ha definido una política. Se aplica la estándar."
+msgid "You have not set a policy yet. The standard one applies: the shop pays the return shipping."
+msgstr ""
+"Todavía no ha definido una política. Se aplica la estándar: la tienda paga el envío de la "
+"devolución."
 
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "You may also like"

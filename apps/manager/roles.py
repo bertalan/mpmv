@@ -122,8 +122,9 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.owner_settings": {CONFIG: R, OWNER: E},
     "platform.catalog": {CATALOG: E, SUPPORT: R, OWNER: R},
     "platform.moderation": {CATALOG: E, OWNER: R},
-    # CAT.11: the product list, bulk publish and the audited fields (Support has no row: 404).
-    "platform.products": {CATALOG: E, OWNER: R},
+    # CAT.11: the product list, bulk publish and the audited fields. CAT.30 (MQ-52): Support
+    # reads the section; every write stays with Catalog and moderation (the services refuse too).
+    "platform.products": {CATALOG: E, SUPPORT: R, OWNER: R},
     # FIT.1 part 2: the fitment scheme and the categories expected to declare fitment (operator
     # settings, Configuration and tax), and the nodes of the scheme (Catalog and moderation).
     "platform.fitment_scheme": {CONFIG: E, OWNER: R},

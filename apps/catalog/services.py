@@ -12,6 +12,7 @@ history for the Omnibus rule (CMP.6) can be built from these audit rows.
 import datetime as dt
 import logging
 import re
+import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
@@ -20,6 +21,7 @@ from urllib.parse import urlencode, urlsplit
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.postgres.search import SearchQuery, SearchRank, TrigramStrictWordSimilarity
@@ -206,6 +208,7 @@ def set_product_price(
     Raises ValidationError for negative, sub-cent or inconsistent prices and TypeError for
     floats, also on dry-run.
     """
+    require_catalog_editor(ctx)
     prices = {
         "price_net": _price("price_net", price_net, optional=True),
         "sale_price_net": _price("sale_price_net", sale_price_net, optional=True),
@@ -251,6 +254,7 @@ def set_variant_price(
     dry_run: bool = False,
 ) -> ChangeSet:
     """Set or clear (None) the net price override of `variant`; audited like product prices."""
+    require_catalog_editor(ctx)
     prices = {"price_net_override": _price("price_net_override", price_net_override, optional=True)}
     zero = engine.override_error(prices["price_net_override"])
     if zero is not None:
@@ -348,6 +352,40 @@ def _validate(instance: Product | Variant) -> None:
     instance.full_clean(validate_unique=False)
 
 
+CATALOG_EDITOR_PERMISSIONS = ("manager.platform_catalog", "core.platform_owner")
+# Every platform role: Configuration holds no platform-wide vendor read, so is_platform_staff()
+# alone would miss it.
+PLATFORM_ROLE_PERMISSIONS = (
+    "manager.platform_config",
+    "manager.platform_finance",
+    "manager.platform_support",
+    *CATALOG_EDITOR_PERMISSIONS,
+)
+
+
+def may_edit_catalog(ctx: AuditContext) -> bool:
+    """Whether the actor of `ctx` may write to the platform catalog (CAT.30, CORE.18).
+
+    Platform staff must hold the Catalog and moderation role or the owner role (or be a technical
+    superuser): Support reads the catalog section (MQ-52) and Finance and Configuration do not
+    write it. Anyone else passes: a vendor member (scoped elsewhere), a command or a pipeline
+    without a user."""
+    if ctx.actor_id is None:
+        return True
+    user = get_user_model().objects.filter(pk=ctx.actor_id).first()
+    if user is None or not (
+        is_platform_staff(user) or holds_permission(user, *PLATFORM_ROLE_PERMISSIONS)
+    ):
+        return True
+    return bool(user.is_superuser) or holds_permission(user, *CATALOG_EDITOR_PERMISSIONS)
+
+
+def require_catalog_editor(ctx: AuditContext) -> None:
+    """Raise PermissionDenied before any write when the actor may not edit the catalog."""
+    if not may_edit_catalog(ctx):
+        raise PermissionDenied("Your role may read the catalog but not change it.")
+
+
 def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Create or update `product`, auditing its sales mode, fiscal category, weight and size.
 
@@ -357,6 +395,7 @@ def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) 
     publication check fails (`publishing.check_publishable`, GPSR: CMP.3), or an edit of a
     published product adds a blocker (`publishing.check_still_publishable`), also on dry-run.
     """
+    require_catalog_editor(ctx)
     _validate(product)
     changes = ChangeSet()
     key = str(product.public_id)
@@ -404,6 +443,7 @@ def set_products_status(
     product: a ValidationError refuses the whole batch and nothing is written. Also on dry-run.
     Retired is not a final state here: retired -> draft/published is allowed (spec 03 §3.2).
     """
+    require_catalog_editor(ctx)
     if status not in ProductStatus.values:
         raise ValueError(f"Unknown product status: {status!r}")
     changes = ChangeSet()
@@ -445,6 +485,7 @@ def _allow_history_delete() -> None:
 def delete_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Delete `product` with its variants and translations, auditing the product and each
     variant. A product that others require as their companion is protected (ProtectedError)."""
+    require_catalog_editor(ctx)
     product_changes, variant_changes = ChangeSet(), ChangeSet()
     with transaction.atomic():
         stored = (
@@ -520,6 +561,7 @@ def save_variant(variant: Variant, *, ctx: AuditContext, dry_run: bool = False) 
     A variant belongs to its product's vendor: moving it to a product of another vendor is
     refused, as are price changes (`set_variant_price`).
     """
+    require_catalog_editor(ctx)
     _validate(variant)
     changes = ChangeSet()
     key = str(variant.public_id)
@@ -549,6 +591,7 @@ def save_variant(variant: Variant, *, ctx: AuditContext, dry_run: bool = False) 
 
 def delete_variant(variant: Variant, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Delete `variant` and its translations, audited."""
+    require_catalog_editor(ctx)
     changes = ChangeSet()
     with transaction.atomic():
         stored = (
@@ -640,6 +683,7 @@ def _lock(item: SkuItem) -> SkuItem:
 def _rename(
     item: SkuItem, sku: str, *, model: str, action: str, ctx: AuditContext, dry_run: bool
 ) -> ChangeSet:
+    require_catalog_editor(ctx)
     errors = engine.sku_errors(sku)
     if errors:
         raise ValidationError({"sku": errors})
@@ -753,6 +797,7 @@ def update_by_sku(
     `SKU_ROW_FIELDS` (ValidationError) stops the run before anything is written. Another
     vendor's items are never matched.
     """
+    require_catalog_editor(ctx)
     outside = sorted({name for row in rows for name in row.values} - SKU_ROW_FIELDS)
     if outside:
         raise ValidationError(f"These fields cannot be updated by SKU: {', '.join(outside)}.")
@@ -1166,6 +1211,7 @@ def create_product(
     vendor's status is read again inside the write transaction (`ensure_vendor_can_write`), and
     `VendorCannotWrite` is raised, nothing written, unless the vendor is still active.
     """
+    require_catalog_editor(ctx)
     catalogue = _attribute_catalogue({a.code for a in data.attributes})
     errors = _product_errors(vendor, data, catalogue)
     if errors:
@@ -1439,6 +1485,7 @@ def sync_product_slug(
     product's own old slugs takes it out of the history (no redirect loop). Replacing a slug is
     audited; a first slug is not (no URL changes).
     """
+    require_catalog_editor(ctx)
     with transaction.atomic():
         current = (
             ProductTranslation.objects.select_for_update(of=("self",))
@@ -1506,6 +1553,7 @@ def rebuild_product_slugs(
     run checks each translation against the stored slugs only, so it can miss a `-2` that two
     translations of the same run would need.
     """
+    require_catalog_editor(ctx)
     queryset = ProductTranslation.objects.all() if translations is None else translations
     changes = ChangeSet()
     for translation in queryset.order_by("pk").iterator():
@@ -2405,6 +2453,7 @@ class ProductCard:
     fiscal_category: str = "standard"
     # The seller: the price shown is what checkout charges for this vendor (its VAT regime).
     vendor: Vendor | None = None
+    public_id: uuid.UUID | None = None  # the product's API identifier (CAT.15)
 
 
 def product_cards(products: Sequence[Product], language: str) -> list[ProductCard]:
@@ -2445,6 +2494,7 @@ def product_cards(products: Sequence[Product], language: str) -> list[ProductCar
                 image_alt=title,
                 fiscal_category=product.fiscal_category,
                 vendor=product.vendor,
+                public_id=product.public_id,
             )
         )
     return cards
@@ -2790,6 +2840,7 @@ def validate_redirect(redirect: Redirect) -> None:
 
 def save_redirect(redirect: Redirect, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Add or change a rule, validated and audited."""
+    require_catalog_editor(ctx)
     validate_redirect(redirect)
     return save_audited(
         redirect,
@@ -2803,6 +2854,7 @@ def save_redirect(redirect: Redirect, *, ctx: AuditContext, dry_run: bool = Fals
 
 
 def delete_redirect(redirect: Redirect, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    require_catalog_editor(ctx)
     changes = ChangeSet()
     changes.delete(REDIRECT_MODEL, redirect.source_path, redirect_snapshot(redirect))
     return run_mutation(changes, redirect.delete, ctx=ctx, action=REDIRECT_DELETED, dry_run=dry_run)
@@ -2891,6 +2943,7 @@ def import_redirects(
     (ISO) and `note`. Every row is checked first, loops and chains included: on any error
     nothing is written and the error names each row (numbered from 1, the header excluded).
     """
+    require_catalog_editor(ctx)
     rows = list(rows)
     sources = [
         engine.normalise_redirect_source((row.get("source_path") or "").strip()) for row in rows
@@ -3322,6 +3375,7 @@ def upsert_products(
     holds the ChangeSet of a real run. Reads are fixed per batch (one match, one prefetch); each
     changed row adds its own writes.
     """
+    require_catalog_editor(ctx)
     rows = list(payload)
     matches = match_skus(vendor, (row.sku for row in rows))
     existing = _load_existing(m for m in matches.values() if isinstance(m, Product))
@@ -3399,6 +3453,7 @@ def _change_status(
     dry_run: bool,
     reason: str = "",
 ) -> StatusReport:
+    require_catalog_editor(ctx)
     report = StatusReport()
     with transaction.atomic():
         locked = list(

@@ -1,5 +1,4 @@
-"""Guide pages generated from the help files (ARC.37): the customer help, and the vendor guide
-that can reuse the same mechanism.
+"""Guide pages generated from the help files (ARC.37): the customer help and the seller guide.
 
 A guide page is a `HelpEntry` of kind `guide`, keyed `<audience>:<section>` (the registry is
 `engine.GUIDE_SECTIONS`), made by `sync_help` from `help/<lang>/guide/<audience>__<section>.md`.
@@ -22,6 +21,9 @@ from apps.core.site_url import absolute_url
 from . import engine, help_files
 from .models import HELP_FEATURES, HelpEntry
 
+# The URL name of an audience's section page; the vendor guide lives under `help-centre/sellers/`.
+URL_NAMES = {"customer": "customer_help_section", "vendor": "vendor_help_section"}
+
 
 @dataclass(frozen=True)
 class GuidePage:
@@ -29,6 +31,7 @@ class GuidePage:
     section: str  # the URL slug
     title: str
     html: str
+    url: str = ""
 
 
 def _page(entry: HelpEntry, language: str) -> GuidePage:
@@ -40,6 +43,7 @@ def _page(entry: HelpEntry, language: str) -> GuidePage:
             section=slug,
             title=help_files.render_placeholders(entry.title),
             html=help_files.render_placeholders(html),
+            url=reverse(URL_NAMES[audience], args=[slug]),
         )
 
 
@@ -70,9 +74,9 @@ def section(audience: str, slug: str, language: str) -> GuidePage | None:
 def section_url(guide_key: str) -> str:
     """The address of the page a guide key names, in the active language; "" for none."""
     audience, _sep, slug = guide_key.partition(":")
-    if audience != "customer" or not engine.guide_key_valid(guide_key):
+    if not engine.guide_key_valid(guide_key):
         return ""
-    return reverse("customer_help_section", args=[slug])
+    return reverse(URL_NAMES[audience], args=[slug])
 
 
 def own_languages(audience: str, slug: str) -> list[str]:
@@ -86,20 +90,20 @@ def own_languages(audience: str, slug: str) -> list[str]:
     return [code for code in configured_languages() if code in have]
 
 
-def section_path(slug: str, language: str) -> str:
+def section_path(slug: str, language: str, audience: str = "customer") -> str:
     with translation.override(language):
-        return reverse("customer_help_section", args=[slug])
+        return reverse(URL_NAMES[audience], args=[slug])
 
 
 def section_links(
-    slug: str, language: str, request: HttpRequest
+    slug: str, language: str, request: HttpRequest, audience: str = "customer"
 ) -> tuple[str, list[tuple[str, str]]]:
-    """The canonical URL and the `hreflang` set of a customer help page. A language without its
+    """The canonical URL and the `hreflang` set of a help page. A language without its
     own file shows the primary text, so its canonical is the primary page (no duplicate); the
     alternates list only the languages that have their own file."""
-    own = own_languages("customer", slug)
+    own = own_languages(audience, slug)
     primary = primary_language()
-    found = {code: absolute_url(request, section_path(slug, code)) for code in own}
+    found = {code: absolute_url(request, section_path(slug, code, audience)) for code in own}
     shown = language if language in own else primary
-    canonical = found.get(shown) or absolute_url(request, section_path(slug, shown))
+    canonical = found.get(shown) or absolute_url(request, section_path(slug, shown, audience))
     return canonical, hreflang_alternates(found)

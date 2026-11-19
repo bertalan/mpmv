@@ -38,10 +38,12 @@ from apps.catalog import slugs
 from apps.catalog.models import VariantOption
 from apps.catalog.product_pages import GalleryImage, ProductPage
 from apps.core.money import CURRENCY
+from apps.core.services import NoPlatformOperator, current_operator
 from apps.shipping import engine as shipping_engine
 from apps.shipping import services as shipping
 from apps.tax.prices import PriceUnavailable, consumer_price, estimated_country
 from apps.vendors.models import Vendor
+from apps.vendors.return_services import effective_return_policy
 
 from . import product_graph as pg
 from . import seller as seller_name
@@ -49,6 +51,14 @@ from . import seller as seller_name
 logger = logging.getLogger(__name__)
 
 WITHDRAWAL_DAYS = 14
+
+
+def _operator_country() -> str:
+    """The platform's country (SEO.11), for a vendor that states none; empty if unconfigured."""
+    try:
+        return str(current_operator().country or "")
+    except NoPlatformOperator:
+        return ""
 
 
 VARIES_BY_PROPERTIES = frozenset({"color", "size", "material", "pattern"})
@@ -234,12 +244,17 @@ def build_graph(
     if sold:
         shipping_nodes, shipping_ids, countries = _shipping_nodes(page, url, language, request)
         if countries:
+            stated = effective_return_policy(
+                vendor
+            )  # one query; approved, else the shop-pays default
             return_policy = pg.return_policy_node(
                 node_id=f"{vendor_url}#return-policy",
                 countries=sorted(countries),
-                return_country=str(vendor.country or ""),
-                days=WITHDRAWAL_DAYS,
-                link=vendor_url,
+                return_country=stated.return_country or _operator_country(),
+                days=stated.return_window_days,
+                link=stated.returns_page_url,
+                paid_by=stated.return_shipping_paid_by,
+                methods=stated.return_methods,
             )
     refs: dict[str, Any] = {
         "seller_id": str(seller["@id"]) if seller else "",

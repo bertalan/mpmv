@@ -13,6 +13,9 @@ edited: the next one replaces it as the version in force. No inline script or st
   {% else %}
     <p>{% translate "No version is published yet. Until you publish one, your products are sold on request only." %}</p>
   {% endif %}
+  {% for method in bulky_without_estimate %}
+    <p role="alert">{% blocktranslate with key=method.key zone=method.zone.code %}The shipping method {{ key }} ({{ zone }}) is for goods that cannot be returned by post and has no maximum return-cost estimate. Add one in the return-cost information below, or you pay the return.{% endblocktranslate %}</p>
+  {% endfor %}
   <h2>{% translate "Publish a new version" %}</h2>
   <p>{% translate "Publishing adds a new version and puts it in force. Orders already placed keep the version they were placed under." %}</p>
   {% include "components/error_summary.html" with form=form autofocus=True only %}
@@ -25,6 +28,6 @@ edited: the next one replaces it as the version in force. No inline script or st
   <p>{{ template_clause }}</p>
   <h2>{% translate "Versions" %}</h2>
   <ul>
-    {% for version in versions %}<li>{% blocktranslate with number=version.number date=version.effective_from|date:"Y-m-d" %}Version {{ number }}, {{ date }}{% endblocktranslate %}{% if current and version.pk == current.pk %} ({% translate "in force" %}){% endif %}</li>{% endfor %}
+    {% for version, pdf in versions %}<li>{% blocktranslate with number=version.number date=version.effective_from|date:"Y-m-d" %}Version {{ number }}, {{ date }}{% endblocktranslate %}{% if current and version.pk == current.pk %} ({% translate "in force" %}){% endif %} <a href="{{ pdf }}" download>{% translate "Download PDF" %}</a></li>{% endfor %}
   </ul>
 {% endblock %}

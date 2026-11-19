@@ -8,7 +8,8 @@ import datetime as dt
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from django.core.exceptions import ValidationError
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -20,7 +21,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.services import run_mutation, save_audited
 from apps.vendors.models import Vendor
 
-from . import engine
+from . import engine, extraction
 from .catalog_loader import CatalogLoader, LoadReport
 from .models import (
     ImportRun,
@@ -381,6 +382,142 @@ def delete_mapping(entry: MappingTable, *, ctx: AuditContext, dry_run: bool = Fa
     changes = ChangeSet()
     changes.delete("ingest.mappingtable", str(entry.public_id), mapping_snapshot(entry))
     return run_mutation(changes, entry.delete, ctx=ctx, action=MAPPING_DELETED, dry_run=dry_run)
+
+
+# Catalogue models a mapping import may point at (ING.4).
+MAPPING_TARGET_MODELS = frozenset({"catalog.category", "catalog.term", "catalog.brand"})
+
+
+def _spec_target(spec: Mapping[str, Any]) -> tuple[ContentType | None, int | None, str]:
+    """Resolve a mapping spec's target: a plain `value`, or `target` = model + public_id."""
+    target = spec.get("target")
+    if not target:
+        value = str(spec.get("value", "")).strip()
+        if not value:
+            raise ValidationError(f"Mapping {spec.get('key')!r} needs a value or a target.")
+        return None, None, value
+    label = str(target.get("model", "")).lower()
+    if label not in MAPPING_TARGET_MODELS:
+        raise ValidationError(f"A mapping cannot point at {label!r}.")
+    ctype = ContentType.objects.get_by_natural_key(*label.split("."))
+    model = ctype.model_class()
+    if model is None:
+        raise ValidationError(f"Unknown target model {label!r}.")
+    try:
+        obj = model._default_manager.get(public_id=target.get("public_id"))
+    except (ObjectDoesNotExist, ValidationError) as exc:
+        raise ValidationError(f"Mapping {spec.get('key')!r}: target {label} not found.") from exc
+    return ctype, obj.pk, ""
+
+
+def import_mappings(
+    vendor: Vendor | None,
+    specs: Sequence[Mapping[str, Any]],
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Load a vendor's term mappings (the converted JSON maps of the legacy pipeline, ING.4).
+
+    Each spec: `kind`, `key`, optional `aliases`, and a `value` or a `target` of
+    `{"model": "catalog.term", "public_id": "..."}` (a real foreign key, never a per-language
+    id). Existing entries (same vendor, kind and normalised key) are updated, so a re-run is
+    idempotent. All or nothing; with `dry_run` nothing is written.
+    """
+    valid_kinds = {k.value for k in MappingTable.Kind}
+    changes = ChangeSet()
+    with transaction.atomic():
+        for spec in specs:
+            kind = str(spec.get("kind", ""))
+            if kind not in valid_kinds:
+                raise ValidationError(f"Unknown mapping kind {kind!r}.")
+            key = str(spec.get("key", ""))
+            norm = engine.mapping_key(key)
+            if not norm:
+                raise ValidationError("A mapping key cannot be empty.")
+            ctype, target_id, value = _spec_target(spec)
+            entry = MappingTable.objects.filter(vendor=vendor, kind=kind, key_norm=norm).first()
+            if entry is None:
+                entry = MappingTable(vendor=vendor, kind=kind, key=key)
+            entry.key = key
+            entry.aliases = [str(a) for a in spec.get("aliases", [])]
+            entry.target_type = ctype
+            entry.target_id = target_id
+            entry.target_value = value
+            result = save_mapping(entry, ctx=ctx, dry_run=dry_run)
+            changes.changes.extend(result.changes)
+    return changes
+
+
+def _entry_value(entry: MappingTable) -> str:
+    return entry.target_value or entry.key
+
+
+def _entry_result(entry: MappingTable) -> dict[str, Any]:
+    out: dict[str, Any] = {"key": entry.key}
+    if entry.target_type_id and entry.target_id:
+        target = entry.target
+        out["target"] = f"{entry.target_type.app_label}.{entry.target_type.model}"  # type: ignore[union-attr]
+        out["public_id"] = str(getattr(target, "public_id", ""))
+    else:
+        out["value"] = entry.target_value
+    return out
+
+
+type LoadedRules = tuple[extraction.ExtractionRules, dict[str, MappingTable]]
+
+
+def load_extraction_rules(vendor: Vendor) -> LoadedRules:
+    """The extraction rules of `vendor` (its mappings win over the platform's) and the rows by
+    candidate reference."""
+    kinds = ("color", "material", "product_type", "country")
+    rows = list(
+        MappingTable.objects.filter(
+            Q(vendor=vendor) | Q(vendor__isnull=True), kind__in=kinds
+        ).order_by("pk")
+    )
+    own = {(r.kind, r.key_norm) for r in rows if r.vendor_id}
+    rows = [r for r in rows if r.vendor_id or (r.kind, r.key_norm) not in own]
+    entries = [
+        engine.MappingEntry(
+            vendor_id=r.vendor_id,
+            kind=r.kind,
+            key=r.key,
+            aliases=tuple(str(a) for a in r.aliases),
+            target_type=str(r.target_type or ""),
+            target_id=r.target_id,
+            target_value=r.target_value,
+            ref=r.pk,
+        )
+        for r in rows
+    ]
+    return extraction.build_rules(entries), {str(r.pk): r for r in rows}
+
+
+def extract_product(
+    vendor: Vendor,
+    *,
+    title: str | None,
+    description: str | None,
+    loaded: LoadedRules | None = None,
+) -> dict[str, Any]:
+    """Extract the optional import fields of one product (read only, so no dry run).
+
+    Returns JSON-safe data: `product_type` (mapped), `model`, `materials`, `colors`, the CAT.22
+    fields `length_mm`, `width_mm`, `height_mm`, `material`, `colour`, `country_of_origin`, and
+    the other legacy fields. A field the text does not yield is absent.
+    """
+    rules, by_ref = loaded if loaded is not None else load_extraction_rules(vendor)
+    found = extraction.extract_fields(title, description, rules)
+    out: dict[str, Any] = dict(found)
+    if "product_type" in found:
+        out["product_type"] = _entry_result(by_ref[found["product_type"]])
+    for plural, singular in (("materials", "material"), ("colors", "colour")):
+        if plural in found:
+            values = list(dict.fromkeys(_entry_value(by_ref[r]) for r in found[plural]))
+            out[plural] = values
+            out[singular] = ", ".join(values)
+    return out
 
 
 def load_legacy_catalog(

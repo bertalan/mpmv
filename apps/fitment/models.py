@@ -362,6 +362,14 @@ class FitmentCategory(BaseModel):
         related_name="fitment_setting",
         help_text=_("Items in this category must say which items they fit."),
     )
+    require_declaration = models.BooleanField(
+        _("require a declaration to publish"),
+        default=False,
+        help_text=_(
+            "A product for sale in this category cannot be published until it says which "
+            "items it fits, or that it fits everything (FIT.18)."
+        ),
+    )
 
     class Meta:
         verbose_name_plural = "fitment categories"

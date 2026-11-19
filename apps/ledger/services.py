@@ -6,11 +6,13 @@ anywhere else; the running `balance_after` of each row is set by the database.
 """
 
 import datetime as dt
+from collections.abc import Iterable, Iterator
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
-from django.db.models import Sum
+from django.db.models import QuerySet, Sum
 
+from apps.core import audit
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.models import PlatformOperator
@@ -140,3 +142,87 @@ def vendor_statement(vendor: Vendor, start: dt.datetime, end: dt.datetime) -> en
         .annotate(total=Sum("amount"))
     )
     return engine.build_statement(opening, {row["kind"]: row["total"] for row in rows})
+
+
+# --- Vendor money pages (VEN.9): read-only views of the vendor's own entries
+
+EXPORT_CSV = "ledger.export_csv"
+VENDOR_MODEL = "vendors.vendor"
+# The vendor-facing columns. `memo`, `source_ref`, `gateway_account` and `created_by` are platform
+# working notes and never leave the platform (VEN.9: assumed, to confirm with the owner).
+CSV_HEADER = (
+    "date",
+    "kind",
+    "amount",
+    "currency",
+    "balance_after",
+    "order",
+    "reference",
+)
+
+
+def filter_entries(
+    entries: QuerySet[LedgerEntry],
+    *,
+    start: dt.datetime | None = None,
+    end: dt.datetime | None = None,
+    kinds: Iterable[str] | None = None,
+) -> QuerySet[LedgerEntry]:
+    """`entries` narrowed to a period (`start` inclusive, `end` exclusive) and kinds, newest
+    first. Callers pass a queryset already scoped to the vendor (CORE.3 `for_actor`)."""
+    if start is not None:
+        entries = entries.filter(created_at__gte=start)
+    if end is not None:
+        entries = entries.filter(created_at__lt=end)
+    if kinds is not None:
+        entries = entries.filter(kind__in=list(kinds))
+    return entries.select_related("vendor_order__order").order_by("-id")
+
+
+def csv_rows(
+    entries: Iterable[LedgerEntry], *, reference: str, tz: dt.tzinfo
+) -> Iterator[list[str]]:
+    """The ledger extract as CSV rows: the non-fiscal label with the extract's reference, the
+    header, then one row per entry. Dates are written in `tz` (the zone the period was cut in,
+    with its offset); text cells are formula-safe; amounts are plain signed numbers with a dot,
+    never floats."""
+    yield [engine.NON_FISCAL_LABEL, engine.csv_safe(reference)]
+    yield list(CSV_HEADER)
+    for entry in entries:
+        order = entry.vendor_order.order.number if entry.vendor_order else ""
+        yield [
+            entry.created_at.astimezone(tz).isoformat(timespec="seconds"),
+            entry.kind,
+            engine.signed(entry.amount),
+            entry.currency,
+            engine.signed(entry.balance_after),
+            engine.csv_safe(order),
+            engine.csv_safe(entry.external_ref),
+        ]
+
+
+def record_export(
+    vendor: Vendor,
+    *,
+    ctx: AuditContext,
+    rows: int,
+    reference: str,
+    first: dt.date | None,
+    last: dt.date | None,
+    kinds: Iterable[str] | None,
+) -> None:
+    """Audit one CSV export of the vendor's ledger: counts and filters only, never the rows."""
+    audit.record(
+        ctx,
+        EXPORT_CSV,
+        VENDOR_MODEL,
+        str(vendor.public_id),
+        None,
+        {
+            "reference": reference,
+            "rows": rows,
+            "from": first.isoformat() if first else None,
+            "to": last.isoformat() if last else None,
+            "kinds": sorted(kinds) if kinds else None,
+        },
+    )

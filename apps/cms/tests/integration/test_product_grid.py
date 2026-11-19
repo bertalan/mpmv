@@ -19,6 +19,8 @@ from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import translation
+from django.utils.translation import gettext
 from wagtail_localize.models import StringSegment, TranslationSource
 
 from apps.accounts.models import User
@@ -227,7 +229,14 @@ def test_see_all_names_its_listing_in_the_page_language(seeded: SeedReport, make
     listed("Steel bag").terms.add(maker)
     html = _publish(_home(other_language()), [_grid("term", maker, heading="Scelti per te")])
     see_all = _grid_section(html).find("a", class_="product-grid-all")
-    assert see_all.find(class_="visually-hidden").get_text(strip=True) == "products: Marca"
+    with translation.override(other_language()):
+        template = gettext('See all<span class="visually-hidden"> products: %(name)s</span>')
+    expected = BeautifulSoup(template % {"name": "Marca"}, "html.parser")
+    hidden = expected.find(class_="visually-hidden")
+    assert hidden is not None
+    assert see_all.find(class_="visually-hidden").get_text(strip=True) == hidden.get_text(
+        strip=True
+    )
 
 
 @pytest.mark.parametrize("see_all", [True, False])

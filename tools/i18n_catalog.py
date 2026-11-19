@@ -56,6 +56,7 @@ EVENT_FILES = (
 )
 SCOPES = (
     "apps/manager",
+    "apps/fitment/services.py",  # the publish gate message (FIT.18), shown to vendors and staff
     "apps/accounts",
     "apps/orders/templates",
     "apps/seo",
@@ -68,6 +69,7 @@ SCOPES = (
     "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
     "apps/vendors/models.py",
     "apps/vendors/templates/vendors/terms",  # the public sales terms page (VEN.35)
+    "apps/vendors/templates/documents/vendors",  # the sales terms PDF (VEN.36), same strings as the page
     "apps/vendors/templates/vendors/apply",  # the vendor application pages (VEN.22), formal
     "apps/vendors/templates/email/vendors/application_confirm",  # the application emails (VEN.22)
     "apps/vendors/templates/email/vendors/application_exists",
@@ -107,6 +109,24 @@ SCOPES = (
     "apps/cms/templates/cms/help_guide_index.html",
     "apps/cms/templates/cms/help_guide_section.html",
     *EVENT_FILES,  # the public event pages (EVT.6)
+    # The rest of the public event surface (I18N.20 part 2): the vendor storefront list and the
+    # feed labels (RSS and calendar titles, the text of each calendar entry).
+    "apps/events/templates/events/_storefront.html",
+    "apps/events/feeds.py",
+    # The blog, the CMS blocks, the footer and the form page, in `base` and in `ride`
+    # (I18N.20 part 2); the editor-facing strings of these files join with part 3.
+    "apps/cms/templates/cms/blog_author_page.html",
+    "apps/cms/templates/cms/blog_index_page.html",
+    "apps/cms/templates/cms/blog_post_page.html",
+    "apps/cms/templates/cms/form_page.html",
+    "apps/cms/templates/cms/form_page_landing.html",
+    "apps/cms/templates/cms/blocks",
+    "apps/cms/templates/cms/includes",
+    "apps/cms/forms_pages.py",  # the refusals of the public form page (CMS.13)
+    "apps/cms/blocks.py",  # only the launch countdown: its "Available now" (see ONLY_CLASSES)
+    "themes/ride/templates/cms",
+    "themes/base/templates/components",
+    "themes/ride/templates/components",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (
@@ -174,6 +194,8 @@ ONLY_CLASSES = {
     "apps/compliance/forms.py": ("WithdrawalLookupForm",),
     "apps/cms/models.py": ("HelpEntry",),
     "apps/events/models.py": ("EventType", "Attendance"),  # the labels the pages show
+    "apps/cms/forms_pages.py": ("FormPage",),
+    "apps/cms/blocks.py": ("LaunchCountdownBlock",),
 }
 SKIP_PARTS = {"tests", "migrations", "static", "node_modules"}
 

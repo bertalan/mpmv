@@ -52,38 +52,62 @@ def help_entry(request: HttpRequest) -> HttpResponse:
     return _no_store(response)
 
 
-@require_GET
-@cache_control(public=True, max_age=300)
-def customer_help(request: HttpRequest) -> HttpResponse:
-    """The customer help centre: the sections, in order (ARC.37)."""
+def _index(request: HttpRequest, audience: str) -> HttpResponse:
     language = translation.get_language() or settings.LANGUAGE_CODE
     return render(
         request,
         "cms/help_guide_index.html",
         {
-            "sections": help_guide.sections("customer", language),
+            "audience": audience,
+            "sections": help_guide.sections(audience, language),
             "canonical_url": absolute_url(request, request.path),
             "alternates": [],
         },
     )
 
 
-@require_GET
-@cache_control(public=True, max_age=300)
-def customer_help_section(request: HttpRequest, section: str) -> HttpResponse:
-    """One section of the customer help (ARC.37), from its help file."""
+def _section(request: HttpRequest, audience: str, section: str) -> HttpResponse:
     language = translation.get_language() or settings.LANGUAGE_CODE
-    page = help_guide.section("customer", section, language)
+    page = help_guide.section(audience, section, language)
     if page is None:
         raise Http404("No such help section")
-    canonical, alternates = help_guide.section_links(section, language, request)
+    canonical, alternates = help_guide.section_links(section, language, request, audience)
     return render(
         request,
         "cms/help_guide_section.html",
         {
+            "audience": audience,
             "guide": page,
-            "sections": help_guide.sections("customer", language),
+            "sections": help_guide.sections(audience, language),
             "canonical_url": canonical,
             "alternates": alternates,
         },
     )
+
+
+@require_GET
+@cache_control(public=True, max_age=300)
+def customer_help(request: HttpRequest) -> HttpResponse:
+    """The customer help centre: the sections, in order (ARC.37)."""
+    return _index(request, "customer")
+
+
+@require_GET
+@cache_control(public=True, max_age=300)
+def customer_help_section(request: HttpRequest, section: str) -> HttpResponse:
+    """One section of the customer help (ARC.37), from its help file."""
+    return _section(request, "customer", section)
+
+
+@require_GET
+@cache_control(public=True, max_age=300)
+def vendor_help(request: HttpRequest) -> HttpResponse:
+    """The seller guide: the sections, in order (ARC.37)."""
+    return _index(request, "vendor")
+
+
+@require_GET
+@cache_control(public=True, max_age=300)
+def vendor_help_section(request: HttpRequest, section: str) -> HttpResponse:
+    """One section of the seller guide (ARC.37), from its help file."""
+    return _section(request, "vendor", section)

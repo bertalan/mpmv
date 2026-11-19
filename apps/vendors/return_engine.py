@@ -2,9 +2,10 @@
 
 No ORM. The 14-day floor is the EU withdrawal period for distance and off-premises sales to
 consumers (Directive 2011/83/EU art. 9, art. 52 Codice del consumo), so a window under it is
-refused. A vendor that has set nothing is on the floor with the customer paying the return
-(the default the spec fixes); SEO.14 states exactly the values this module hands out, so the
-structured data and the product page cannot disagree.
+refused. A vendor that has set nothing is on the floor with the shop paying the return
+(owner decision, assumed, to confirm: without a vendor statement the consumer was never told
+that they pay, so the trader bears it, CRD art. 6(1)(i) and 14(1)); SEO.14 states exactly the
+values this module hands out, so the structured data and the product page cannot disagree.
 """
 
 from collections.abc import Mapping, Sequence
@@ -50,10 +51,10 @@ class ReturnPolicy:
 
 
 def default_policy(country: str) -> ReturnPolicy:
-    """The policy of a vendor that has no approved data: the floor, the customer pays."""
+    """The policy of a vendor that has no approved data: the floor, the shop pays."""
     return ReturnPolicy(
         return_window_days=MIN_WINDOW_DAYS,
-        return_shipping_paid_by=CUSTOMER,
+        return_shipping_paid_by=VENDOR,
         return_methods=(),
         returns_page_url="",
         return_country=country,

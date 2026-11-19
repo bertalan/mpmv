@@ -611,7 +611,19 @@ HELP_GUIDE = "guide"
 # A guide entry's key is `<audience>:<section>`; its file is `guide/<audience>__<section>.md`.
 GUIDE_SECTIONS: dict[str, tuple[str, ...]] = {
     "customer": ("ordering", "payment", "shipping", "changes", "withdrawal", "account"),
+    # The seller's guide: only what the shop space, the application and the account screens do.
+    "vendor": (
+        "getting-started",
+        "orders",
+        "changes",
+        "payments",
+        "returns",
+        "events",
+        "security",
+    ),
 }
+# The guide audiences, in the order the help index shows them.
+GUIDE_AUDIENCES: tuple[str, ...] = ("customer", "vendor")
 _HELP_KEY_RE = re.compile(r"[A-Za-z0-9_.:-]{1,120}")
 # The CMS catch-all names no screen: such a request is told apart by its page type instead.
 _HELP_ANONYMOUS_ROUTES = ("wagtail_serve",)
@@ -867,6 +879,21 @@ ROUTE_GUIDE: dict[str, str] = {
     "withdrawal_confirm": "customer:withdrawal",
     "privacy_account": "customer:account",
     "privacy_requests": "customer:account",
+    "vendors:apply": "vendor:getting-started",
+    "manager:shop:orders": "vendor:orders",
+    "manager:shop:order": "vendor:orders",
+    "manager:shop:order_amend": "vendor:changes",
+    "manager:shop:payments": "vendor:payments",
+    "manager:shop:sales_terms": "vendor:returns",
+    "manager:shop:events": "vendor:events",
+    "manager:shop:event_new": "vendor:events",
+    "manager:shop:event_edit": "vendor:events",
+    "manager:shop:event_translate": "vendor:events",
+    "manager:shop:event_cancel": "vendor:events",
+    "manager:shop:dashboard": "vendor:getting-started",
+    "manager:shop:profile": "vendor:getting-started",
+    "manager:shop:statements": "vendor:security",
+    "manager:shop:termination": "vendor:security",
 }
 
 

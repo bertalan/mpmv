@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 from django.template.loader import render_to_string
+from django.utils.translation import gettext
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.themes.build import render_themes
@@ -100,7 +101,7 @@ def test_a_reduced_price_strikes_through_the_lowest_price_of_the_last_30_days() 
     struck = struck_through(html)
     assert len(struck) == 1
     assert "€ 45.00" in struck[0]
-    assert "Lowest price in the last 30 days" in html
+    assert gettext("Lowest price in the last 30 days:").rstrip(":") in html
     assert "price__amount--reduced" in html
 
 

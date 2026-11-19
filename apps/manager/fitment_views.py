@@ -13,6 +13,7 @@ from typing import Any, ClassVar
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Count, Exists, Model, OuterRef, QuerySet
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
@@ -51,7 +52,7 @@ from .fitment_forms import (
 )
 from .lists import BulkAction, BulkRun, Column, ListFilter, ManagerListView
 from .middleware import manager_context
-from .navigation import platform_role
+from .navigation import platform_role, registry
 from .views import ManagerView
 
 SCHEME_SECTION = "platform.fitment_scheme"
@@ -71,11 +72,17 @@ class WriteGate(View):
     role without the row, before any step-up prompt."""
 
     write_section: ClassVar[str]
+    # CAT.30: a section a role can see but not change answers 403; the role without the row
+    # still gets 404. Off by default, so the other sections keep their 404.
+    refuse_read_only: ClassVar[bool] = False
 
     def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
         if request.method == "POST":
             ctx = manager_context(request)
             if ctx is None or not writer(self.write_section)(ctx):
+                section = registry.get(self.write_section)
+                if self.refuse_read_only and ctx is not None and section and section.allows(ctx):
+                    raise PermissionDenied("This section is read-only for your role.")
                 raise Http404("No Manager page here.")
         return super().dispatch(request, *args, **kwargs)
 
@@ -260,6 +267,13 @@ class RelevanceFilter(ListFilter):
         return rows
 
 
+def _set_gate(value: bool) -> BulkRun:
+    def run(objects: list[Category], *, ctx: Any, dry_run: bool) -> ChangeSet:
+        return services.set_fitment_publish_gate(objects, value, ctx=ctx, dry_run=dry_run)
+
+    return run
+
+
 def _set_relevant(value: bool) -> BulkRun:
     def run(objects: list[Category], *, ctx: Any, dry_run: bool) -> ChangeSet:
         return services.set_fitment_relevant(objects, value, ctx=ctx, dry_run=dry_run)
@@ -280,6 +294,10 @@ class CategoryList(ManagerListView):
         Column(
             gettext_lazy("Expected to declare fitment"),
             lambda category: _("Yes") if category.is_relevant else _("No"),
+        ),
+        Column(
+            gettext_lazy("Declaration required to publish"),
+            lambda category: _("Yes") if category.gate_on else _("No"),
         ),
     )
     filters = (
@@ -303,12 +321,31 @@ class CategoryList(ManagerListView):
             _set_relevant(False),
             allowed=writer(CATEGORIES_SECTION),
         ),
+        BulkAction(
+            "require_declaration",
+            gettext_lazy("Require a declaration to publish"),
+            _set_gate(True),
+            allowed=writer(CATEGORIES_SECTION),
+        ),
+        BulkAction(
+            "no_declaration",
+            gettext_lazy("Do not require a declaration to publish"),
+            _set_gate(False),
+            allowed=writer(CATEGORIES_SECTION),
+        ),
     )
 
     def get_queryset(self) -> QuerySet[Category]:
         return (
             Category.objects.prefetch_related("translations")
-            .annotate(is_relevant=Exists(FitmentCategory.objects.filter(category=OuterRef("pk"))))
+            .annotate(
+                is_relevant=Exists(FitmentCategory.objects.filter(category=OuterRef("pk"))),
+                gate_on=Exists(
+                    FitmentCategory.objects.filter(
+                        category=OuterRef("pk"), require_declaration=True
+                    )
+                ),
+            )
             .order_by("path")
         )
 

@@ -412,3 +412,62 @@ def test_the_catalog_storefront_uses_the_informal_register(lang: str) -> None:
         "es": "Ningún producto coincide con tu búsqueda.",
     }[lang]
     assert checks["No products match your search."] == expected
+
+
+# I18N.20 part 2: the public event pages and feeds, the blog, the CMS blocks, the footer and the
+# form page (base and ride) are in the catalogs, in the informal customer register.
+PART2_STOREFRONT = (
+    "apps/events/templates/events/_storefront.html",
+    "apps/events/feeds.py",
+    "apps/cms/templates/cms/blog_author_page.html",
+    "apps/cms/templates/cms/blog_index_page.html",
+    "apps/cms/templates/cms/form_page.html",
+    "apps/cms/templates/cms/form_page_landing.html",
+    "apps/cms/templates/cms/blocks/",
+    "apps/cms/templates/cms/includes/article_meta.html",
+    "apps/cms/forms_pages.py",
+    "themes/ride/templates/cms/",
+    "themes/ride/templates/components/",
+    "themes/base/templates/components/",
+)
+
+
+def test_the_part_2_storefront_is_in_scope() -> None:
+    found = catalog.collect()
+    places = {p for _k, (_pl, ps) in found.items() for p in ps}
+    for path in PART2_STOREFRONT:
+        assert any(p.startswith(path) for p in places), path
+    for msgid in (
+        "All events of %(name)s",
+        "Events of %(vendor)s",
+        "No articles by this author yet.",
+        "Send",
+        "Thank you. We have received your message.",
+        "Time left:",
+        "Available now",
+        "Too many submissions, try again shortly.",
+    ):
+        assert (msgid, None) in found, msgid
+
+
+@pytest.mark.parametrize("lang", list(LANGS))
+def test_the_part_2_storefront_entries_are_translated(lang: str) -> None:
+    entries = [e for e in _po(lang) if _any_in(e, PART2_STOREFRONT)]
+    assert len(entries) >= 60
+    for entry in entries:
+        assert entry.msgstr or all(entry.msgstr_plural.values()), entry.msgid
+
+
+@pytest.mark.parametrize("lang", ["de", "fr", "es"])
+def test_the_part_2_storefront_uses_the_informal_register(lang: str) -> None:
+    for entry in _po(lang):
+        # The form page module also holds the editor's help texts, which keep the formal register.
+        if _any_in(entry, PART2_STOREFRONT) and not _only_in(entry, "apps/cms/forms_pages.py"):
+            assert not FORMAL[lang].search(_texts(entry)), entry.msgid
+
+
+@pytest.mark.parametrize("lang", list(LANGS))
+def test_the_part_2_labels_differ_from_the_english_source(lang: str) -> None:
+    checks = {e.msgid: _texts(e) for e in _po(lang)}
+    for msgid in ("Send", "Time left:", "No articles by this author yet.", "Pause countdown"):
+        assert checks[msgid] != msgid, msgid
