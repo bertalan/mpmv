@@ -9,4 +9,4 @@ Ce rapport montre où vos données de compatibilité doivent être complétées.
 - **Exclusions sans rien à exclure** : une exclusion sans ligne de compatibilité au-dessus.
 
 ## Bon à savoir
-Sélectionnez un SKU pour ouvrir sa page **Fits** et le corriger.
+Sélectionnez un SKU pour ouvrir sa page Fits et le corriger.
