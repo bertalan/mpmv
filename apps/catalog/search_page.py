@@ -164,17 +164,32 @@ def category_suggestions(language: str) -> list[SearchItem]:
 # --- Vendors
 
 
-def vendors_group(request: HttpRequest, query: str, language: str, limit: int) -> SearchGroup:
-    # A natural person's legal name is neither shown nor matched (SEO.15): the vendors are
-    # filtered on their public name, so the rows are checked before the limit is applied.
+def _public_vendor_matches(query: str, limit: int) -> list[tuple[Any, str]]:
+    """Up to `limit` active vendors whose public name contains `query`, with that name.
+
+    A natural person's legal name is neither shown nor matched (SEO.15). The database does the
+    filtering, the ordering and the cut: `icontains` narrows to the candidates, which are streamed
+    in the final order, and the rule of `seller_name.public_name` (a Unicode normalisation that
+    SQL cannot express exactly) is applied to each one until `limit` are found. No row is read
+    past the last match, and the work does not grow with the number of vendors."""
     needle = query.casefold()
-    rows = [
-        (vendor, shown)
-        for vendor in vendors_services.storefront_vendors()
+    candidates = (
+        vendors_services.storefront_vendors()
         .filter(display_name__icontains=query)
         .order_by("display_name", "pk")
-        if (shown := public_name(vendor)) and needle in shown.casefold()
-    ][: limit + 1]
+    )
+    rows: list[tuple[Any, str]] = []
+    for vendor in candidates.iterator(chunk_size=limit):
+        shown = public_name(vendor)
+        if shown and needle in shown.casefold():
+            rows.append((vendor, shown))
+            if len(rows) == limit:
+                break
+    return rows
+
+
+def vendors_group(request: HttpRequest, query: str, language: str, limit: int) -> SearchGroup:
+    rows = _public_vendor_matches(query, limit + 1)
     default = settings.LANGUAGE_CODE
     items = [
         SearchItem(
