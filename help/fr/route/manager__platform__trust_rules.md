@@ -1,7 +1,7 @@
 # Règles de confiance
-last-checked: 2026-11-18
+last-checked: 2026-11-19
 
-Cette page liste chaque version des seuils des badges de confiance des vendeurs. Elle est en lecture seule.
+Cette page liste chaque version des seuils des badges de confiance des vendeurs. Choisissez Nouvelle version pour préparer une modification.
 
 ## Ce que vous voyez
 Chaque ligne est une version : son numéro, son début et sa fin, un repère pour la version en vigueur et le motif de la modification.

@@ -22,6 +22,7 @@ from . import (
     session_views,
     statement_views,
     termination_views,
+    trust_edit_views,
     trust_views,
     views,
 )
@@ -229,6 +230,9 @@ platform = (
         path("terminations/", termination_views.TerminationListView.as_view(), name="terminations"),
         # TRU.1 part 2: the trust rules versions, read only.
         path("trust-rules/", trust_views.TrustRulesListView.as_view(), name="trust_rules"),
+        path(
+            "trust-rules/new/", trust_edit_views.TrustRuleNewView.as_view(), name="trust_rule_new"
+        ),
         path(
             "trust-rules/<int:version>/",
             trust_views.TrustRulesDetailView.as_view(),

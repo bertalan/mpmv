@@ -940,6 +940,11 @@ ENDPOINTS: dict[str, Access] = {
         "configuration role and the platform owner only.",
         kwargs={"version": "1"},
     ),
+    "manager:platform:trust_rule_new": StaffOnly(
+        "A new trust rules version with a dry-run preview (TRU.1 part 2): platform configuration, "
+        "no vendor data; the configuration role and the platform owner only; the POST needs the "
+        "operator_config session level."
+    ),
     "manager:platform:terminations": StaffOnly(
         "Notices of termination (CMP.5 part 4): platform data; needs the "
         "compliance.review_notices permission, so a vendor member gets 404."

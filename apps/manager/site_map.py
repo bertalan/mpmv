@@ -137,6 +137,7 @@ NOT_LISTED: Final = frozenset(
         "manager:platform:notice",
         "manager:platform:termination",
         "manager:platform:trust_rule",
+        "manager:platform:trust_rule_new",
         "manager:platform:user_sessions_find",
         "manager:platform:catalog_product",
         "manager:platform:fitment_node_new",
