@@ -205,7 +205,7 @@ class ProductAdmin(admin.ModelAdmin[Product]):
             "Classification",
             {"fields": ("category", "secondary_categories", "brand", "terms")},
         ),
-        ("Identifiers", {"fields": ("gtin", "mpn", "google_category_id")}),
+        ("Identifiers", {"fields": ("gtin", "mpn", "google_category_id", "vendor_role")}),
         ("Related products", {"fields": ("required_companion", "upsells")}),
         ("Migration", {"fields": ("legacy_wp_id_en", "legacy_wp_id_it")}),
         ("Dates", {"fields": ("created_at", "updated_at")}),

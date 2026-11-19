@@ -10,6 +10,8 @@ Diese Seite ist für den Inhaber des Shops. Sie enthält die Texte und Bedingung
 
 Wählen Sie unter **Logo** ein **Logobild**, beschreiben Sie es unter **Beschreibung des Logos** und klicken Sie auf **Logo speichern**. Die Beschreibung ist für Menschen, die das Bild nicht sehen können.
 
+Wählen Sie unter **Hersteller oder Wiederverkäufer** bei **Was der Shop für seine Produkte ist** Hersteller, Wiederverkäufer oder nicht sicher. Suchmaschinen und KI-Assistenten sehen dies in den Produktdaten. Wenn Sie nicht sicher sind, behaupten wir nie, dass Sie das Produkt herstellen. Klicken Sie auf **Produktrolle speichern**.
+
 ## Gut zu wissen
 - Ein Text, der als maschineller Entwurf gekennzeichnet ist, ist erst öffentlich, wenn Sie ihn bearbeiten und speichern.
 - Ist Ihr Shop gesperrt oder geschlossen, kann hier nichts geändert werden.

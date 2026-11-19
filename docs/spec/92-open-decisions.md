@@ -198,3 +198,10 @@ Relayed by lane-a.
 | MQ-53 | SEO | A sole trader's shop name goes into the structured data even when it contains their personal name; the bare personal name never does | [10](10-content-seo-ai.md) (SEO.15) |
 | MQ-54 | CMS | Page revisions: keep the last 12 months plus the last 10 per page, delete the rest nightly | [10](10-content-seo-ai.md) (CMS.18) |
 | MQ-55 | Contracts | The vendor contract text in the platform language of the operator's country (`current_operator()`) prevails; translations are courtesy copies | [04](04-vendors-commissions-ledger.md) (VEN.16) |
+
+## Owner decisions of 2026-11-18 evening (orders API)
+
+| ID | Area | Decision | Recorded in |
+|---|---|---|---|
+| MQ-56 | Orders, API, plans | Shops may create and manage their orders through the API as fully as from the Manager: read, status and shipping, drafts with a payment link, amendment proposals, external orders. It is a paid feature, the `orders_api` plan entitlement included in the higher plans. The platform operator uses management commands at no cost. In v2 the code is sold as a separate add-on module with a download and integration instructions | ORD.33 to ORD.39, spec 07 §Orders API for shops |
+| MQ-57 ⚖️ | Orders, tax, DAC7 | Orders paid outside the platform and imported through the API are record-only: stock, history, shipping and documents, with no commission, payment, payout or ledger entry, and outside DAC7 platform sales; the vendor issues the invoice | ORD.37 |

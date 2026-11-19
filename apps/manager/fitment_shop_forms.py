@@ -74,6 +74,7 @@ class RowForm(forms.Form):
     def __init__(self, *args: Any, nodes: Choices, notes: Choices, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         _choose(self.fields["node"], [("", "—"), *nodes])
+        self.fields["node"].widget.attrs["data-fitment-picker"] = ""
         _choose(self.fields["note"], [("", "—"), *notes])
         for _name, field in self.fields.items():
             field.widget.attrs["aria-label"] = str(field.label)

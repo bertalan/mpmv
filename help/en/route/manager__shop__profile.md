@@ -10,6 +10,8 @@ This page is for the owner of the shop. It holds the texts and policies customer
 
 Under **Logo**, choose a **Logo image**, describe it in **Description of the logo** and press **Save logo**. The description is for people who cannot see the image.
 
+Under **Producer or reseller**, choose **What the shop is to its products**: producer, reseller or not sure. Search engines and AI assistants see it in the product data. If you are not sure, we never say that you make the product. Press **Save the product role**.
+
 ## Good to know
 - A text marked as a machine draft is not public until you edit and save it.
 - If your shop is suspended or closed, nothing can be changed here.
