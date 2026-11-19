@@ -29,6 +29,14 @@
     letter-spacing: 0.03em;
   }
 
+  /* `base` lays `.cart-line` out as a two-column CSS grid (6rem image, details), in a layer above
+     `bootstrap`. The ride line is a list-group item holding one Bootstrap row: as a grid, the whole
+     row would fall into the 6rem column and the total would wrap one character per line. */
+  .cart-line.list-group-item {
+    display: block;
+    max-inline-size: none;
+  }
+
   /* Totals in condensed type. */
 
   .cart-line__total,
@@ -39,8 +47,10 @@
 
   /* Quantity stepper: a field wide enough for three digits. */
 
+  /* Two 44 px step buttons and the field: 11rem was narrower than the stepper, which then ran
+     under the remove button. */
   .quantity {
-    max-inline-size: 11rem;
+    max-inline-size: 14rem;
   }
 
   /* Check boxes and radios keep a 24 px target (WCAG 2.5.8); Bootstrap draws 1 em. */
