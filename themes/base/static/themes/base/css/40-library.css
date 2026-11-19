@@ -523,6 +523,35 @@
     overflow-x: auto;
   }
 
+  /* The typed search of the Fits picker: an in-flow listbox, so the scrolling region never clips it. */
+
+  .fitment-picker__results {
+    max-block-size: 14rem;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+    border: 1px solid currentcolor;
+  }
+
+  .fitment-picker__option,
+  .fitment-picker__none {
+    min-block-size: 44px;
+    padding: var(--space-xs) var(--space-s);
+    display: flex;
+    align-items: center;
+  }
+
+  .fitment-picker__option {
+    cursor: pointer;
+  }
+
+  .fitment-picker__option[aria-selected="true"] {
+    outline: 2px solid currentcolor;
+    outline-offset: -2px;
+    font-weight: 700;
+  }
+
   .table {
     inline-size: 100%;
     border-collapse: collapse;
