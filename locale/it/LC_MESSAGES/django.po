@@ -4881,6 +4881,10 @@ msgstr "non nell'ordine"
 msgid "not sold any more"
 msgstr "non è più in vendita"
 
+#: apps/manager/forms.py
+msgid "Not sure"
+msgstr "Non so"
+
 #: apps/shipping/models.py
 msgid ""
 "Not used yet at checkout: marks the method to preselect once checkout uses shipping rates. A "
@@ -6249,6 +6253,14 @@ msgstr "Richieste privacy (staff)"
 msgid "Privacy sub-processors"
 msgstr "Sub-responsabili del trattamento"
 
+#: apps/manager/templates/manager/shop/profile.html
+msgid "Producer or reseller"
+msgstr "Produttore o rivenditore"
+
+#: apps/manager/forms.py
+msgid "Producer: we make the products"
+msgstr "Produttore: realizziamo i prodotti"
+
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/shop/order.html
 msgid "Product"
 msgstr "Prodotto"
@@ -6695,6 +6707,10 @@ msgstr "Obbligatoria per lo staff della piattaforma. Il cliente non la vede."
 msgid "Required when you give a role to yourself; kept in the audit log."
 msgstr "Obbligatorio quando assegni un ruolo a te stesso; resta nel registro di audit."
 
+#: apps/manager/forms.py
+msgid "Reseller: we buy the products to resell"
+msgstr "Rivenditore: acquistiamo i prodotti per rivenderli"
+
 #: apps/orders/customer_views.py
 msgid "Rest of the package cancelled at your request"
 msgstr "Resto del pacco annullato su tua richiesta"
@@ -6901,11 +6917,15 @@ msgstr "Salvi prima l'evento: poi potrà aggiungere testo, immagini e altri bloc
 msgid "Save the name"
 msgstr "Salva il nome"
 
+#: apps/manager/templates/manager/shop/profile.html
+msgid "Save the product role"
+msgstr "Salva il ruolo del prodotto"
+
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
 msgstr "Salvi prima le modifiche: viene inviata l'ultima bozza salvata."
 
-#: apps/manager/fitment_views.py
+#: apps/manager/fitment_views.py apps/manager/views.py
 msgid "Saved."
 msgstr "Salvato."
 
@@ -7179,6 +7199,10 @@ msgstr "Acquista per categoria"
 msgid "Shop frozen"
 msgstr "Negozio congelato"
 
+#: apps/manager/product_views.py
+msgid "Shop role for this product"
+msgstr "Ruolo del negozio per questo prodotto"
+
 #: apps/seo/site_links.py
 msgid "Shop space: choose the shop"
 msgstr "Spazio negozio: scegli il negozio"
@@ -7290,6 +7314,14 @@ msgstr "Mostrato da questo numero di acquirenti ricorrenti"
 #: apps/cms/models.py
 msgid "Shown on the article; a migrated article keeps its original date."
 msgstr "Mostrata sull'articolo. Un articolo importato mantiene la sua data originale."
+
+#: apps/manager/forms.py
+msgid ""
+"Shown to search engines and AI assistants in the product data. If you are not sure, we never say "
+"that you make the product. A single product can differ."
+msgstr ""
+"Mostrato ai motori di ricerca e agli assistenti IA nei dati del prodotto. Se non è sicuro, non "
+"diremo mai che realizza il prodotto. Un singolo prodotto può essere diverso."
 
 #: apps/events/admin_views.py
 msgid "Shown to the vendor and kept in the audit log."
@@ -11638,6 +11670,10 @@ msgstr "Usi date come 2026-03-31. Il filtro del periodo è stato ignorato."
 msgid "Use recovery code"
 msgstr "Usa un codice di recupero"
 
+#: apps/manager/product_views.py
+msgid "Use the shop's default"
+msgstr "Usa il valore predefinito del negozio"
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Use this device's screen lock or a security key."
 msgstr "Usi il blocco schermo di questo dispositivo o una chiave di sicurezza."
@@ -12165,6 +12201,10 @@ msgstr ""
 msgid "What the run does: scrape, stock, price, images or publish."
 msgstr "Che cosa fa l'esecuzione: lettura del sito, giacenze, prezzi, immagini o pubblicazione."
 
+#: apps/manager/forms.py
+msgid "What the shop is to its products"
+msgstr "Che cosa è il negozio per i suoi prodotti"
+
 #: apps/ingest/models.py
 msgid "What the supplier published for the item, as it was read."
 msgstr "Quello che il fornitore ha pubblicato per l'articolo, così come è stato letto."
@@ -12521,6 +12561,14 @@ msgstr "Se l'articolo ha varianti."
 msgid "Whether the last read still listed it."
 msgstr "Se l'ultima lettura la elencava ancora."
 
+#: apps/catalog/models.py
+msgid ""
+"Whether the shop makes this product (producer) or resells it (reseller). Empty: use the shop's "
+"default."
+msgstr ""
+"Indica se il negozio realizza questo prodotto (produttore) o lo rivende (rivenditore). Vuoto: si "
+"usa il valore predefinito del negozio."
+
 #: apps/tax/models.py
 msgid ""
 "Whether the territory is outside the EU VAT area, inside it with rates of its own, or special and "
@@ -12536,6 +12584,16 @@ msgid ""
 msgstr ""
 "Se l'IVA viene aggiunta alle commissioni e ai costi della piattaforma. Se non sei sicuro, chiedi "
 "al tuo commercialista."
+
+#: apps/vendors/models.py
+msgid ""
+"Whether you make the products you sell (producer) or buy them to resell (reseller). Search engines"
+" and AI assistants see it in the product data. Leave it empty if you are not sure: we then never "
+"say that you make the product. A single product can override it."
+msgstr ""
+"Indica se realizza i prodotti che vende (produttore) o li acquista per rivenderli (rivenditore). I"
+" motori di ricerca e gli assistenti IA lo vedono nei dati del prodotto. Lo lasci vuoto se non è "
+"sicuro: non diremo mai che realizza il prodotto. Un singolo prodotto può avere un valore diverso."
 
 #: apps/tax/models.py
 msgid "Which kind of goods the rate is for: standard, reduced, super-reduced, zero or books."

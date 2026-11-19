@@ -209,3 +209,29 @@ def test_a_nul_byte_posted_to_the_page_is_a_form_error(client: Client, owner: Us
     response = client.post(PROFILE, {"language": primary_language(), "tagline": "a\x00b"})
     assert response.status_code == 200
     assert 'class="error-summary"' in response.text
+
+
+def test_the_owner_sets_the_product_role_and_staff_cannot(
+    client: Client, owner: User, vendor: Vendor, staff_member: User
+) -> None:
+    verified_login(client, staff_member)
+    assert (
+        client.post(PROFILE, {"action": "role", "default_product_role": "producer"}).status_code
+        == 404
+    )
+    client.logout()
+    verified_login(client, owner)
+    assert 'name="default_product_role"' in client.get(PROFILE).text
+    response = client.post(PROFILE, {"action": "role", "default_product_role": "producer"})
+    assert response.status_code == 302
+    vendor.refresh_from_db()
+    assert vendor.default_product_role == "producer"
+    assert AuditLog.objects.filter(action="vendor.updated", actor_id=owner.pk).exists()
+
+
+def test_a_bad_product_role_is_refused(client: Client, owner: User, vendor: Vendor) -> None:
+    verified_login(client, owner)
+    response = client.post(PROFILE, {"action": "role", "default_product_role": "maker"})
+    assert response.status_code == 200
+    vendor.refresh_from_db()
+    assert vendor.default_product_role == ""

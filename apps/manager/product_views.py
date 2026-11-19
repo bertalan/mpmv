@@ -228,6 +228,11 @@ class StaffFieldsForm(forms.Form):
     fiscal_category = forms.ChoiceField(
         choices=Product.FiscalCategory.choices, label=gettext_lazy("Fiscal category")
     )
+    vendor_role = forms.ChoiceField(
+        required=False,
+        choices=[("", gettext_lazy("Use the shop's default")), *Vendor.ProductRole.choices],
+        label=gettext_lazy("Shop role for this product"),
+    )
 
 
 class ProductDetailView(WriteGate, ManagerView):
@@ -248,7 +253,11 @@ class ProductDetailView(WriteGate, ManagerView):
         context = super().get_context_data(**kwargs)
         product = self.product()
         form = kwargs.get("form") or StaffFieldsForm(
-            initial={"sales_mode": product.sales_mode, "fiscal_category": product.fiscal_category}
+            initial={
+                "sales_mode": product.sales_mode,
+                "fiscal_category": product.fiscal_category,
+                "vendor_role": product.vendor_role,
+            }
         )
         titles = {t.language: t.title for t in product.translations.all()}
         context.update(

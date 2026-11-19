@@ -311,6 +311,7 @@ PRODUCT_EDIT_FIELDS = (
     "width_mm",
     "height_mm",
     "country_of_origin",
+    "vendor_role",
 )
 TRANSLATION_MODEL = "catalog.producttranslation"
 TRANSLATION_FACT_FIELDS = ("material", "colour")  # CAT.22: audited like the product facts

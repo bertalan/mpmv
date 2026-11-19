@@ -66,6 +66,13 @@ class VendorSalesMode(models.TextChoices):
     ON_REQUEST = "on_request", "On request"
 
 
+class ProductRole(models.TextChoices):
+    """What the vendor is to its products, for structured data (SEO.10). Blank means unknown."""
+
+    PRODUCER = "producer", "Producer"
+    RESELLER = "reseller", "Reseller"
+
+
 class LegalForm(models.TextChoices):
     SOLE_PROPRIETORSHIP = engine.SOLE_PROPRIETORSHIP, "Sole proprietorship (ditta individuale)"
     PARTNERSHIP = engine.PARTNERSHIP, "Partnership (S.n.c., S.a.s.)"
@@ -126,6 +133,7 @@ PROVINCE_CHOICES = [(code, code) for code in sorted(engine.PROVINCE_CODES)]
 class Vendor(BaseModel):
     Status = VendorStatus
     SalesMode = VendorSalesMode
+    ProductRole = ProductRole
     LegalForm = LegalForm
     FiscalRegime = FiscalRegime
     ViesStatus = ViesStatus
@@ -217,6 +225,17 @@ class Vendor(BaseModel):
         help_text=_(
             "Tick it if you want to accept enquiries from buyers about your products. "
             "Unticked: you do not take enquiries."
+        ),
+    )
+    default_product_role = models.CharField(
+        max_length=16,
+        choices=ProductRole.choices,
+        blank=True,
+        help_text=_(
+            "Whether you make the products you sell (producer) or buy them to resell "
+            "(reseller). Search engines and AI assistants see it in the product data. Leave it "
+            "empty if you are not sure: we then never say that you make the product. A single "
+            "product can override it."
         ),
     )
     legacy_wp_user_id = models.PositiveBigIntegerField(

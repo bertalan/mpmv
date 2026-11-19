@@ -25,6 +25,25 @@ _SKU_SLASHES = frozenset("/\\")
 _SKU_QUOTES = frozenset("'\"`\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u00b4")
 
 
+class _HasRole(Protocol):
+    vendor_role: str
+
+    @property
+    def vendor(self) -> Any: ...
+
+
+def effective_vendor_role(product: _HasRole) -> str:
+    """What the vendor is to this product (SEO.10): `"producer"`, `"reseller"` or `""` (unknown).
+
+    The product's own role wins; a blank one falls back to the vendor's default, and an unknown
+    value is never promoted to a role (the structured data stays conservative).
+    """
+    for role in (product.vendor_role, product.vendor.default_product_role):
+        if role in ("producer", "reseller"):
+            return str(role)
+    return ""
+
+
 def sku_match_key(raw: str) -> str:
     """The key a vendor SKU is matched on: NFKC, trimmed, inner whitespace collapsed to one
     space, case-folded. Never raises; an empty key means an unusable SKU (`sku_errors`)."""
