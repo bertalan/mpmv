@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **453** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3553 h** (P1 2622 h · P2 840 h · P3 91 h)
+- Micro-tasks: **454** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3554 h** (P1 2622 h · P2 841 h · P3 91 h)
 - P1 critical path (schedule lower bound with full parallelism): **197 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → PAY.7 → ORD.20 → ORD.21 → ORD.22 → ORD.23
 
 ## By macro area
@@ -29,14 +29,14 @@
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
 | TRU | Trust, reviews and community (D-37 proposal) | 11 | 0 | 70 | 16 | 86 |
 | FIT | Garage and fitment (D-38) | 18 | 174 | 0 | 14 | 188 |
-| THM | Frontend themes | 17 | 118 | 15 | 0 | 133 |
+| THM | Frontend themes | 18 | 118 | 16 | 0 | 134 |
 | SEO | SEO, feeds, analytics | 15 | 58 | 31 | 0 | 89 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
 | CMP | Compliance | 40 | 250 | 88 | 0 | 338 |
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 16 | 25 | 48 | 8 | 81 |
 | MIG | Migration and cutover | 22 | 141 | 29 | 0 | 170 |
-| **Total** | | **453** | **2622** | **840** | **91** | **3553** |
+| **Total** | | **454** | **2622** | **841** | **91** | **3554** |
 
 ## By phase
 
@@ -379,7 +379,7 @@
 | MIG.20 | Refunds migration (owner decision 2026-11-11, relayed by lane-a, #86): refund child orders and marketplace refund requests are stored inside the historical order (refunded amount, date, reason); there is no separate refund model for legacy data; no new ledger entry and no tax recalculation | P1 | 4 | MIG.4 | A migrated order shows its refunded amount, date and reason; the MIG.5 parity report reconciles order total minus refunds against the legacy figures; a refund amount that does not parse as `Decimal` is rejected with a report; the migration writes no ledger entry for a refund (MIG.8 covers balances); no refund model or table exists for legacy data |
 | MIG.22 | Domains, mail and TLS at cutover (owner decision 2026-11-16, §13.4): DNS inventory exported from the registrar into private storage, a dedicated mail host record and the MX moved to it before the switch when mail is self-managed on the legacy server (a dedicated mail service is a recommended follow-up, and a precondition for shutting the legacy server down), SPF, DKIM and DMARC for the transactional provider (ARC.16), TTL 300 s from T−7, production certificates issued before the switch (ACME DNS-01), legacy site on an internal hostname behind basic auth and `noindex`, Stripe webhook URLs and domain verification updated, staged HSTS | P1 | 6 | MIG.9 | Runbook checklist: the inventory file is in private storage; a mail test send and receive passes after the MX change, before the switch; the TTL check shows 300 s on the switched records; certificates are valid before the switch; the legacy host answers 401 over valid HTTPS without credentials (HSTS `includeSubDomains` applies to it) and carries `noindex`; rollback by DNS was rehearsed in a dress rehearsal |
 
-### F6 — After go-live (P2) (133 tasks, 954 h)
+### F6 — After go-live (P2) (134 tasks, 955 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -481,6 +481,7 @@
 | FIT.18 | Publish gate for undeclared products (D-38 §17.2.4): the per-category setting (default off) and the check in the publish path, wired through a registered hook so the catalog never imports fitment: a `buy` product in a fitment-relevant category cannot be published with `mode=undeclared`, the refusal says what to declare | P1 | 4 | FIT.2, CAT.19 | With the setting on, publishing an undeclared `buy` product in a relevant category is refused and a declared one publishes; with it off, nothing changes; the catalog has no `fitment` import |
 | THM.11 | Vendor branding (paid plan option): `BrandPalette` and `VendorBranding` in `vendors` with explicit foreground per role, the nine presets (operator palette included) seeded by a data migration, every preset editable, `derive_palette`, `check_brand_palette` over every registered theme's surface, `nearest_compliant` and `suggest_foreground` offered in one click, logo and banner (CMS.8 images), `render_brand_css` to a hashed same-origin file, storefront and product page hooks gated by `plan_allows`, preview, audit | P2 | 12 | VEN.19, THM.4, VEN.10, CAT.7, CMS.8 | The §14.12 unit tests pass (nine presets valid, `#C65D00` fixed close to `#BE5900`, fixed point unchanged, white on `#FBA926` gives None and `#1A1A1A` as foreground); a custom palette with a 3:1 pair is rejected with its ratio and a one-click fix; a branded vendor's storefront and product pages load its stylesheet with no CSP violation and pass axe; listings and checkout never load it; a vendor whose plan loses the entitlement renders with the theme only and keeps its stored branding |
 | THM.17 | `ride` search results page (follow-up of THM.7 part 2 and CAT.27, coherence check 39): a `catalog/search.html` override in the ride theme, copied from the current base template (same form, `name="s"`, group ids, `noindex` head block, pagination, 429 page), with the page banner and breadcrumb, Bootstrap cards for the product, event, article and vendor groups, 44 px targets; no logic change | P2 | 3 | THM.7, CAT.27 | Under ride the results page, the empty and the no-match states pass the THM.5 gates (axe `wcag22aa`, CSP, budgets) at 360, 768 and 1280 px in both schemes; a render test under `use_theme("ride")` proves the form, the groups and `noindex, follow`; works without JavaScript |
+| THM.18 | Product card image placeholder (owner request 2026-11-18, product page "You may also like"): a product with no image shows a neutral placeholder in its card, so every card in a grid keeps the same square image area; the `ride` theme ships `images/product-placeholder.svg` (own work, CC0, listed in `LICENSES.toml`) and the base card falls back to a static one; the placeholder is decorative (`alt=""`), gets no rendition and is never written to the product | P2 | 1 | THM.7, CAT.8 | A card without an image renders the placeholder with an empty alt and the same image class as a real image, under ride and the base theme; a card with an image never shows it |
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget; cacheability rules taken from wagtail-cache (owner decision D-36; the list below is the minimum and the spike checks it against the package): only anonymous `GET` and `HEAD` with a 200 answer are cached, nothing with a session, cart, consent or CSRF cookie or a `Vary: Cookie`, nothing in the Manager or admin, the key includes the locale and the host, a publish or unpublish purges the page and the pages that list it (when vendor storefronts are cached, the event services of EVT.7, publish, cancel and hide, purge the storefront too, because its "Upcoming events" section is read live today); **a cached page never carries a per-request CSP nonce** (replaying one nonce to every visitor defeats it), so a page that needs a nonce is not cacheable; package or mirror decided at a short spike inside this row | P2 | 6 | THM.3 | LCP < 2.5 s on product page; tests: a cacheable public response has no `nonce` attribute and its CSP has no nonce source, a page that needs a nonce is served uncached; a cart, consent, Manager or logged-in request is never cached; a locale change and a publish purge the right entries |
 | SEO.9 | `ConsentProvider` interface and docs (owner decision D-10, 2026-11-11): the consent banner is one provider behind an interface (state of each category, gating of tags and e-commerce events, consent log, change of choice); the self-hosted one of SEO.5 is the default and an operator who prefers an external certified CMP plugs it in through a setting, not a fork; `docs/dev/consent-providers.md` "how to add a consent provider" lists what a provider must do (block before consent, signal state, keep proof, CSP and script allow-list per the §14 rule) | P2 | 4 | SEO.5 | The doc exists; the setting selects the provider and an unknown value fails a system check; a test provider replaces the default without changing the tag-gating code; no tag fires before consent with either provider |

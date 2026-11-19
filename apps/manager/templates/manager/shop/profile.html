@@ -54,7 +54,7 @@ the top with links to the fields and set `aria-invalid` on them. The language li
         {% csrf_token %}
         <input type="hidden" name="action" value="role">
         {% for field in role_form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
-        {% include "components/button.html" with label=_("Save") type="submit" only %}
+        {% include "components/button.html" with label=_("Save the product role") type="submit" only %}
       </form>
     </section>
   {% endif %}

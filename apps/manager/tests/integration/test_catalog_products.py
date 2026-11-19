@@ -41,7 +41,7 @@ def _no_checks(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.parametrize(
     ("role", "code"),
-    [("catalog", 200), ("owner", 200), ("finance", 404), ("support", 404), ("config", 404)],
+    [("catalog", 200), ("owner", 200), ("finance", 404), ("support", 200), ("config", 404)],
 )
 def test_role_access(client: Client, role: str, code: int) -> None:
     product = ProductFactory.create(languages=["en"])
@@ -54,16 +54,12 @@ def test_finance_and_support_cannot_change_a_product(client: Client) -> None:
     product = ProductFactory.create()
     for role in ("finance", "support"):
         sign_in(client, role)
-        assert (
-            client.post(
-                LIST, {"action": "publish", "selected": [str(product.public_id)], "confirm": "1"}
-            ).status_code
-            == 404
-        )
-        assert (
-            client.post(detail(product), {"sales_mode": "catalog_only", "confirm": "1"}).status_code
-            == 404
-        )
+        assert client.post(
+            LIST, {"action": "publish", "selected": [str(product.public_id)], "confirm": "1"}
+        ).status_code == (403 if role == "support" else 404)
+        assert client.post(
+            detail(product), {"sales_mode": "catalog_only", "confirm": "1"}
+        ).status_code == (403 if role == "support" else 404)
     product.refresh_from_db()
     assert product.status == "draft"
 
@@ -72,7 +68,7 @@ def test_the_owner_reads_but_cannot_write(client: Client) -> None:
     product = ProductFactory.create()
     sign_in(client, "owner")
     response = client.post(LIST, {"action": "publish", "selected": [str(product.public_id)]})
-    assert response.status_code == 404
+    assert response.status_code == 403
 
 
 def test_filters(client: Client) -> None:
@@ -238,7 +234,7 @@ def test_the_owner_cannot_post_on_the_detail_page(client: Client) -> None:
         "fiscal_category": product.fiscal_category,
         "confirm": "1",
     }
-    assert client.post(detail(product), data).status_code == 404
+    assert client.post(detail(product), data).status_code == 403
     product.refresh_from_db()
     assert product.sales_mode == "buy"
 
@@ -274,3 +270,61 @@ def test_staff_set_the_product_role_override_with_an_audit_entry(client: Client)
     assert entry.after["vendor_role"] == "reseller"
     data["vendor_role"] = "maker"
     assert client.post(detail(product), data).status_code == 200  # refused by the form
+
+
+NOTICE = "You can view this section; changes need the Catalog role."
+WRITE_CONTROLS = (
+    'name="selected"',
+    'name="action"',
+    'name="confirm"',
+    'name="sales_mode"',
+    'name="fiscal_category"',
+    '<form method="post" class="manager-bulk"',
+    "Preview",
+)
+
+
+@pytest.mark.parametrize("role", ["support", "owner"])
+def test_a_read_only_role_sees_no_write_controls(client: Client, role: str) -> None:
+    product = ProductFactory.create(languages=["en"])
+    sign_in(client, role)
+    for url in (LIST, detail(product)):
+        html = client.get(url).content.decode()
+        assert NOTICE in html
+        for control in WRITE_CONTROLS:
+            assert control not in html, (url, control)
+    assert product.sku in client.get(LIST).content.decode()
+
+
+def test_the_catalog_role_keeps_its_controls_and_has_no_notice(client: Client) -> None:
+    product = ProductFactory.create(languages=["en"])
+    sign_in(client, "catalog")
+    listing = client.get(LIST).content.decode()
+    page = client.get(detail(product)).content.decode()
+    assert NOTICE not in listing + page
+    assert 'name="selected"' in listing
+    assert "Preview" in page
+
+
+@pytest.mark.parametrize("role", ["support", "owner"])
+def test_a_read_only_role_gets_403_on_every_write_route(client: Client, role: str) -> None:
+    product = ProductFactory.create(sales_mode="buy")
+    sign_in(client, role)
+    bulk = {"action": "publish", "selected": [str(product.public_id)], "confirm": "1"}
+    assert client.post(LIST, bulk).status_code == 403
+    assert client.post(LIST, {**bulk, "action": "retire"}).status_code == 403
+    assert client.post(LIST, {"action": "nope"}).status_code == 403
+    fields = {"sales_mode": "catalog_only", "fiscal_category": product.fiscal_category}
+    assert client.post(detail(product), {**fields, "confirm": "1"}).status_code == 403
+    assert client.post(detail(product), fields).status_code == 403
+    product.refresh_from_db()
+    assert (product.status, product.sales_mode) == ("draft", "buy")
+    assert not AuditLog.objects.filter(action__startswith="catalog.").exists()
+
+
+def test_finance_still_gets_404_on_the_section(client: Client) -> None:
+    product = ProductFactory.create()
+    sign_in(client, "finance")
+    assert client.get(LIST).status_code == 404
+    assert client.post(LIST, {"action": "publish"}).status_code == 404
+    assert client.post(detail(product), {"confirm": "1"}).status_code == 404

@@ -126,6 +126,10 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:orders": "shop",
         "manager:shop:order": "shop",
         "manager:shop:payments": "shop",
+        "manager:shop:money": "shop",  # VEN.9
+        "manager:shop:money_transactions": "shop",
+        "manager:shop:money_payouts": "shop",
+        "manager:shop:money_statement": "shop",
         "manager:platform:dashboard": "platform",
         "manager:platform:map": "platform",
         "manager:platform:notices": "platform",

@@ -71,11 +71,14 @@ def _cms_entries(language: str, request: HttpRequest, *, events: bool) -> Iterat
 
 
 def _help_entries(language: str, request: HttpRequest) -> Iterator[Entry]:
-    """The customer help pages that have their own file in `language` (ARC.37): a fallback copy
-    is left out, its canonical is the primary-language page."""
-    for slug in engine.GUIDE_SECTIONS["customer"]:
-        if language in help_guide.own_languages("customer", slug):
-            yield Entry(absolute_url(request, help_guide.section_path(slug, language)))
+    """The help pages (customers and sellers) with their own file in `language` (ARC.37): a
+    fallback copy is left out, its canonical is the primary-language page."""
+    for audience in engine.GUIDE_AUDIENCES:
+        for slug in engine.GUIDE_SECTIONS[audience]:
+            if language in help_guide.own_languages(audience, slug):
+                yield Entry(
+                    absolute_url(request, help_guide.section_path(slug, language, audience))
+                )
 
 
 def cms_entries(language: str, request: HttpRequest) -> Iterator[Entry]:

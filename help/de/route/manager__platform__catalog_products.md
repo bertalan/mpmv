@@ -1,7 +1,7 @@
 # Produkte
 last-checked: 2026-11-18
 
-Diese Seite listet die Produkte aller Shops für die Rolle Katalog und Moderation. Der Plattform-Inhaber kann sie lesen, aber nichts ändern.
+Diese Seite listet die Produkte aller Shops für die Rolle Katalog und Moderation. Der Plattform-Inhaber und die Rolle Support können sie lesen, aber nichts ändern: Für sie zeigt die Seite einen Hinweis und keine Bedienelemente zum Ändern, und jeder Versuch, ein Produkt zu ändern, wird abgelehnt (Zugriff verweigert).
 
 ## Produkte finden
 - **Suchen** sucht in der SKU und in den Titeln aller Sprachen.
