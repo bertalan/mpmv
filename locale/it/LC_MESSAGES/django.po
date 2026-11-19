@@ -4146,6 +4146,11 @@ msgstr ""
 "candidatura e l’account creato con essa e non conserviamo nulla. Potrà candidarsi di nuovo in "
 "seguito, se lo desidera."
 
+#: apps/orders/templates/email/orders/staff_draft_link/body.html
+#: apps/orders/templates/email/orders/staff_draft_link/body.txt
+msgid "If you did not ask for this cart, ignore this email: nothing happens."
+msgstr "Se non hai chiesto questo carrello, ignora questa email: non succede nulla."
+
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
 "If you order several goods in one order and they are delivered separately, the withdrawal period "
@@ -4174,10 +4179,6 @@ msgstr ""
 "utilizzando lo stesso mezzo di pagamento da Lei usato per la transazione iniziale, salvo che Lei "
 "abbia espressamente convenuto altrimenti; in ogni caso, non dovrà sostenere alcun costo quale "
 "conseguenza di tale rimborso."
-#: apps/orders/templates/email/orders/staff_draft_link/body.html
-#: apps/orders/templates/email/orders/staff_draft_link/body.txt
-msgid "If you did not ask for this cart, ignore this email: nothing happens."
-msgstr "Se non hai chiesto questo carrello, ignora questa email: non succede nulla."
 
 #: apps/manager/event_block_forms.py
 msgid "Image"
@@ -4369,11 +4370,9 @@ msgstr ""
 "Italia: il tuo codice fiscale, 16 caratteri per una persona o 11 cifre per una società. Altrove: "
 "il tuo numero di identificazione fiscale nazionale (TIN). Viene conservato cifrato."
 
-#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
-#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 #: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/platform/order_draft.html
 #: apps/manager/templates/manager/shop/_fitment_rows.html
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Item"
 msgstr "Articolo"
 
@@ -6019,7 +6018,6 @@ msgstr ""
 "I dati dell'ordine sono conservati per %(years)s anni dalla fine dell'esercizio, come richiede la "
 "legge."
 
-#: apps/compliance/forms.py apps/manager/templates/manager/platform/orders.html
 #: apps/manager/site_map.py
 msgid "Order drafts"
 msgstr "Bozze d'ordine"
@@ -7572,6 +7570,10 @@ msgstr "Salva il nome"
 msgid "Save the product role"
 msgstr "Salva il ruolo del prodotto"
 
+#: apps/manager/templates/manager/platform/order_draft.html
+msgid "Save the quantities"
+msgstr "Salva le quantità"
+
 #: apps/fitment/templates/fitment/_garage_saver.html
 msgid "Save this vehicle"
 msgstr "Salva questo veicolo"
@@ -7581,9 +7583,6 @@ msgid "Save this vehicle on this browser for your next visits (you can remove it
 msgstr ""
 "Salva questo veicolo su questo browser per le prossime visite (puoi rimuoverlo in qualsiasi "
 "momento)"
-#: apps/manager/templates/manager/platform/order_draft.html
-msgid "Save the quantities"
-msgstr "Salva le quantità"
 
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
@@ -7727,6 +7726,7 @@ msgstr "Invia la proposta"
 #: apps/compliance/templates/compliance/notice_form.html
 msgid "Send the report"
 msgstr "Invia la segnalazione"
+
 #: apps/manager/templates/manager/platform/order_draft.html
 msgid "Sends left today"
 msgstr "Invii rimasti oggi"
@@ -7784,14 +7784,13 @@ msgstr ""
 msgid "Sessions"
 msgstr "Sessioni"
 
-#: apps/accounts/templates/accounts/mfa/totp.html themes/ride/templates/accounts/mfa/totp.html
 #: apps/manager/templates/manager/platform/order_draft.html
 msgid "Set a quantity to 0 to remove the item. A change makes a link already sent stop working."
 msgstr ""
 "Imposti la quantità a 0 per rimuovere l'articolo. Una modifica rende inutilizzabile il link già "
 "inviato."
 
-#: apps/accounts/templates/accounts/mfa/totp.html
+#: apps/accounts/templates/accounts/mfa/totp.html themes/ride/templates/accounts/mfa/totp.html
 msgid "Set up an authenticator app"
 msgstr "Configura un'app di autenticazione"
 
@@ -12383,7 +12382,6 @@ msgstr ""
 "Al venditore dell'ordine (nome, indirizzo postale e indirizzo e-mail: vedi i dati del venditore "
 "mostrati al momento dell'acquisto, prima di effettuare l'ordine)"
 
-#: apps/accounts/action_link_views.py apps/accounts/decorators.py
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/orders/customer_views.py
 msgid "Too many attempts. Please try again later."
 msgstr "Troppi tentativi. Riprova più tardi."
