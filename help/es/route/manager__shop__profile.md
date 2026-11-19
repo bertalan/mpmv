@@ -10,7 +10,7 @@ Esta página es para el titular de la tienda. Contiene los textos y las condicio
 
 Bajo **Logotipo**, elija una **Imagen del logotipo**, descríbala en **Descripción del logotipo** y pulse **Guardar logotipo**. La descripción es para las personas que no pueden ver la imagen.
 
-En **Productor o revendedor**, elija **Qué es la tienda para sus productos**: productor, revendedor o no estoy seguro. Los motores de búsqueda y los asistentes de IA lo ven en los datos del producto. Si no está seguro, nunca diremos que usted fabrica el producto. Pulse **Guardar**.
+En **Productor o revendedor**, elija **Qué es la tienda para sus productos**: productor, revendedor o no estoy seguro. Los motores de búsqueda y los asistentes de IA lo ven en los datos del producto. Si no está seguro, nunca diremos que usted fabrica el producto. Pulse **Guardar la función del producto**.
 
 ## Conviene saber
 - Un texto marcado como borrador automático no es público hasta que lo edite y lo guarde.

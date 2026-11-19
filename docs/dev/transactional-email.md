@@ -24,6 +24,15 @@ services.enqueue_email(
 - `context` is a snapshot of plain JSON values (Decimals become strings). It is stored encrypted
   at rest, since it can hold a one-time code or personal data, and it never appears in a
   `ChangeSet` or in the history.
+- The message is rendered once, when the email is queued (ORD.26): subject, text and HTML are
+  stored encrypted on the row and the send, every retry and every resend use that copy, never a
+  new render, so a deploy or a translation fix in between changes nothing. A row queued before
+  ORD.26 (no stored text) still renders when sent. A suppressed email stores no message.
+- `order_ref` (the order's public id) ties an order email to its order. The order's anonymisation
+  (D-29) calls `core.services.scrub_order_emails`: recipient replaced, context and stored
+  message emptied, an email still waiting cancelled; template key, language, status and dates
+  stay. The row stays encrypted at rest while the order is restricted (D-30). Account erasure
+  (`compliance.gdpr`) empties the stored message too.
 - `idempotency_key` is optional. When set, a second call with the same key changes nothing.
 - An address on the suppression list gets a `suppressed` row and no job.
 - `dry_run=True` returns the `ChangeSet` without writing anything.
