@@ -498,11 +498,6 @@ EXCLUDED = {
     "apps/vendors/templates/email/": "email templates, own scope, I18N.20 part 3c",
     # Customer-facing pages not yet translated: informal register, I18N.20 part 3b.
     "apps/cms/templates/cms/": "legal and landing pages, I18N.20 part 3b",
-    "apps/core/templates/core/components/": "image credits, I18N.20 part 3b",
-    "apps/fitment/templates/fitment/": "garage saver, I18N.20 part 3b",
-    "themes/ride/templates/accounts/": "ride account overrides, I18N.20 part 3b",
-    "themes/ride/templates/orders/": "ride order overrides, I18N.20 part 3b",
-    "themes/ride/templates/seo/": "ride consent banner, I18N.20 part 3b",
 }
 _TRANSLATION_TAG = re.compile(r"\{%-?\s*(?:translate|trans|blocktranslate|blocktrans)\b")
 

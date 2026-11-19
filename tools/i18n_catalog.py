@@ -136,6 +136,14 @@ SCOPES = (
     "apps/cms/templates/cms/legal_page_version.html",
     "themes/ride/templates/orders/_legal_recap.html",
     "themes/ride/templates/orders/_legal_boxes.html",
+    # Customer template overrides (I18N.20 part 3b, slice 2): the ride account and order
+    # overrides, the consent banner, the garage saver and the image credits.
+    "themes/ride/templates/accounts",
+    "themes/ride/templates/orders",
+    "themes/ride/templates/seo",
+    "apps/fitment/templates/fitment/_garage_saver.html",
+    "apps/core/templates/core/components/image_credit.html",
+    "apps/core/templates/core/components/image_credits_disclosure.html",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (

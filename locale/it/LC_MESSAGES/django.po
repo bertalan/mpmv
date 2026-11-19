@@ -27,12 +27,13 @@ msgstr "%(amount)s da pagare per il cliente"
 msgid "%(amount)s refunded to the customer"
 msgstr "%(amount)s rimborsati al cliente"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "%(amount)s refunded."
 msgstr "%(amount)s rimborsati."
 
 #: apps/accounts/templates/accounts/sessions/list.html
 #: apps/manager/templates/manager/platform/user_sessions.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid "%(browser)s on %(system)s"
 msgstr "%(browser)s su %(system)s"
 
@@ -61,6 +62,7 @@ msgstr[0] "%(counter)s evento è in attesa di revisione."
 msgstr[1] "%(counter)s eventi sono in attesa di revisione."
 
 #: apps/orders/templates/orders/_cart_mini.html themes/base/templates/components/mini_cart.html
+#: themes/ride/templates/orders/_cart_body.html themes/ride/templates/orders/_cart_mini.html
 msgid "%(counter)s item"
 msgid_plural "%(counter)s items"
 msgstr[0] "%(counter)s articolo"
@@ -86,6 +88,7 @@ msgstr[0] "%(counter)s sessione è aperta ora."
 msgstr[1] "%(counter)s sessioni sono aperte ora."
 
 #: apps/accounts/templates/accounts/mfa/overview.html
+#: themes/ride/templates/accounts/mfa/overview.html
 msgid "%(counter)s unused."
 msgid_plural "%(counter)s unused."
 msgstr[0] "%(counter)s non usato."
@@ -156,7 +159,7 @@ msgstr "%(name)s rimosso."
 msgid "%(qty)s x %(unit)s"
 msgstr "%(qty)s x %(unit)s"
 
-#: apps/orders/templates/orders/_package.html
+#: apps/orders/templates/orders/_package.html themes/ride/templates/orders/_package.html
 msgid "%(quantity)s × %(unit_price)s"
 msgstr "%(quantity)s × %(unit_price)s"
 
@@ -249,6 +252,7 @@ msgid "(Complete and return this form only if you wish to withdraw from the cont
 msgstr "(Compilare e restituire il presente modulo solo se si desidera recedere dal contratto.)"
 
 #: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "(opens the carrier's site)"
 msgstr "(si apre il sito del corriere)"
 
@@ -862,7 +866,7 @@ msgstr "Informazioni su questo venditore"
 msgid "About your request to sell with us"
 msgstr "Sulla Sua richiesta di vendere con noi"
 
-#: apps/seo/templates/seo/consent/_actions.html
+#: apps/seo/templates/seo/consent/_actions.html themes/ride/templates/seo/consent/_actions.html
 msgid "Accept all"
 msgstr "Accetta tutti"
 
@@ -887,7 +891,7 @@ msgstr "Accesso negato"
 msgid "Account"
 msgstr "Account"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Account security"
 msgstr "Sicurezza dell’account"
 
@@ -924,6 +928,7 @@ msgid "Add a child"
 msgstr "Aggiungi un figlio"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
+#: themes/ride/templates/accounts/mfa/overview.html
 msgid "Add a factor"
 msgstr "Aggiungi un fattore"
 
@@ -944,6 +949,7 @@ msgid "Add a translation"
 msgstr "Aggiungi una traduzione"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
+#: themes/ride/templates/accounts/mfa/overview.html
 msgid "Add an authenticator app"
 msgstr "Aggiungi un’app di autenticazione"
 
@@ -956,6 +962,7 @@ msgid "Add another factor before removing your last one."
 msgstr "Aggiungi un altro fattore prima di rimuovere l’ultimo."
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
+#: themes/ride/templates/accounts/mfa/_passkey_register_form.html
 msgid "Add another passkey"
 msgstr "Aggiungi un’altra passkey"
 
@@ -1002,7 +1009,7 @@ msgstr "Aggiungi al carrello"
 msgid "Add translation"
 msgstr "Aggiungi traduzione"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "added %(created)s"
 msgstr "aggiunta il %(created)s"
 
@@ -1247,7 +1254,7 @@ msgstr "un articolo"
 msgid "An item is no longer available."
 msgstr "Un articolo non è più disponibile."
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "An item was not available"
 msgstr "Un articolo non era disponibile"
 
@@ -1441,14 +1448,17 @@ msgid "Attendance"
 msgstr "Partecipazione"
 
 #: apps/accounts/templates/accounts/mfa/totp.html apps/accounts/templates/accounts/mfa/verify.html
+#: themes/ride/templates/accounts/mfa/totp.html themes/ride/templates/accounts/mfa/verify.html
 msgid "Authentication code"
 msgstr "Codice di autenticazione"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
+#: themes/ride/templates/accounts/mfa/overview.html
 msgid "authenticator app"
 msgstr "app di autenticazione"
 
 #: apps/accounts/templates/accounts/mfa/setup.html apps/accounts/templates/accounts/mfa/totp.html
+#: themes/ride/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/totp.html
 msgid "Authenticator app"
 msgstr "App di autenticazione"
 
@@ -1483,6 +1493,7 @@ msgid "Back office"
 msgstr "Back office"
 
 #: apps/accounts/templates/accounts/sessions/list.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid "Back to account security"
 msgstr "Torna alla sicurezza dell'account"
 
@@ -1495,11 +1506,12 @@ msgstr "Torna a tutti i risultati"
 msgid "Back to all versions"
 msgstr "Torna a tutte le versioni"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Back to my orders"
 msgstr "Torna ai miei ordini"
 
 #: apps/orders/templates/orders/_review_actions.html
+#: themes/ride/templates/orders/_review_actions.html
 msgid "Back to the cart"
 msgstr "Torna al carrello"
 
@@ -1563,6 +1575,7 @@ msgid "Back to top"
 msgstr "Torna su"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
+#: themes/ride/templates/accounts/mfa/recovery_codes.html
 msgid "Back to two-factor settings"
 msgstr "Torna alle impostazioni della verifica in due passaggi"
 
@@ -1644,7 +1657,7 @@ msgstr "Sconto pacchetto a Suo carico"
 msgid "Business buyers: the court of %(court)s."
 msgstr "Acquirenti professionali: il tribunale di %(court)s."
 
-#: apps/orders/templates/orders/checkout.html
+#: apps/orders/templates/orders/checkout.html themes/ride/templates/orders/checkout.html
 msgid "Business purchase"
 msgstr "Acquisto per un'azienda"
 
@@ -1733,7 +1746,7 @@ msgctxt "(L)"
 msgid "Cancel the rest of the order and refund everything"
 msgstr "Annulla il resto dell’ordine e rimborsa tutto"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Cancel the rest of the order and refund everything"
 msgstr "Annulla il resto dell'ordine e rimborsa tutto"
 
@@ -1791,7 +1804,7 @@ msgstr "non può essere consegnato al tuo indirizzo"
 msgid "Cannot change once the level has nodes."
 msgstr "Non si può cambiare quando il livello ha nodi."
 
-#: apps/accounts/templates/accounts/mfa/totp.html
+#: apps/accounts/templates/accounts/mfa/totp.html themes/ride/templates/accounts/mfa/totp.html
 msgid "Cannot scan? Enter this key:"
 msgstr "Non riesce a scansionare? Inserisca questa chiave:"
 
@@ -1807,7 +1820,7 @@ msgstr "Didascalia %(number)d"
 msgid "Carrier"
 msgstr "Corriere"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Carrier: %(carrier)s"
 msgstr "Corriere: %(carrier)s"
 
@@ -1818,6 +1831,7 @@ msgstr "Corriere: %(carrier)s. Numero di tracking: %(tracking_number)s."
 
 #: apps/manager/site_map.py apps/orders/templates/orders/cart.html apps/orders/ui/views.py
 #: themes/base/templates/components/mini_cart.html themes/ride/templates/components/header.html
+#: themes/ride/templates/orders/cart.html
 msgid "Cart"
 msgstr "Carrello"
 
@@ -1877,7 +1891,7 @@ msgstr "Causa: il negozio non può evadere l’ordine."
 msgid "Change"
 msgstr "Modifica"
 
-#: apps/orders/templates/orders/_review_body.html
+#: apps/orders/templates/orders/_review_body.html themes/ride/templates/orders/_review_body.html
 msgid "Change details"
 msgstr "Modifica i dati"
 
@@ -1932,7 +1946,7 @@ msgstr "Modifiche richieste al Suo evento %(title)s"
 msgid "Changes requested: %(comment)s"
 msgstr "Modifiche richieste: %(comment)s"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Changes to this package"
 msgstr "Modifiche a questo pacco"
 
@@ -1956,7 +1970,7 @@ msgstr "Controlla l'ortografia, prova con meno parole o con una parte del codice
 msgid "Check your email"
 msgstr "Controlli la Sua email"
 
-#: apps/orders/templates/orders/checkout.html
+#: apps/orders/templates/orders/checkout.html themes/ride/templates/orders/checkout.html
 msgid "Checkout"
 msgstr "Cassa"
 
@@ -2074,7 +2088,7 @@ msgstr "Scegli almeno un giorno della settimana."
 msgid "Choose at most 12 products."
 msgstr "Scegli al massimo 12 prodotti."
 
-#: apps/seo/templates/seo/consent/banner.html
+#: apps/seo/templates/seo/consent/banner.html themes/ride/templates/seo/consent/banner.html
 msgid "Choose categories"
 msgstr "Scegli le categorie"
 
@@ -2086,7 +2100,7 @@ msgstr "Scegli come si ripete l'evento."
 msgid "Choose how the event repeats. The fields below belong to the choice."
 msgstr "Scegli come si ripete l'evento. I campi qui sotto dipendono dalla scelta."
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
 msgstr "Scelga come confermare la Sua identità dopo la password."
 
@@ -2309,6 +2323,7 @@ msgstr "Calcola la modifica"
 #: apps/manager/templates/manager/platform/trust_rule_preview.html
 #: apps/manager/templates/manager/shop/fitment_bulk.html
 #: apps/manager/templates/manager/shop/fitment_product.html
+#: themes/ride/templates/accounts/mfa/totp.html
 msgid "Confirm"
 msgstr "Conferma"
 
@@ -2338,12 +2353,14 @@ msgid "Confirm with your passkey"
 msgstr "Conferma con la tua passkey"
 
 #: apps/accounts/templates/accounts/levels/prompt.html
+#: themes/ride/templates/accounts/levels/prompt.html
 msgid "Confirm with your passkey to allow this one action. No passkey window opens."
 msgstr ""
 "Conferma con la tua passkey per consentire solo questa azione. Non si apre nessuna finestra "
 "passkey."
 
 #: apps/accounts/templates/accounts/levels/prompt.html
+#: themes/ride/templates/accounts/levels/prompt.html
 msgid ""
 "Confirm with your passkey to open a passkey window: it covers several sensitive actions in a row. "
 "It closes when you sign out, after a period of inactivity or at a maximum duration."
@@ -2410,6 +2427,8 @@ msgstr "Contenuto"
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
 #: apps/compliance/templates/compliance/withdrawal_start.html
+#: themes/ride/templates/accounts/mfa/_recovery_codes_list.html
+#: themes/ride/templates/accounts/mfa/recovery_codes_new.html
 msgid "Continue"
 msgstr "Continua"
 
@@ -2421,11 +2440,11 @@ msgstr "Continua non ti fa accedere: la pagina che si apre ti chiede di conferma
 msgid "Continue the onboarding"
 msgstr "Continua la registrazione"
 
-#: apps/orders/templates/orders/_cart_body.html
+#: apps/orders/templates/orders/_cart_body.html themes/ride/templates/orders/_cart_body.html
 msgid "Continue to checkout"
 msgstr "Vai alla cassa"
 
-#: apps/orders/templates/orders/checkout.html
+#: apps/orders/templates/orders/checkout.html themes/ride/templates/orders/checkout.html
 msgid "Continue to review"
 msgstr "Vai al riepilogo"
 
@@ -2442,7 +2461,7 @@ msgstr "Categorie di cookie"
 msgid "Cookie settings"
 msgstr "Impostazioni dei cookie"
 
-#: apps/seo/templates/seo/consent/banner.html
+#: apps/seo/templates/seo/consent/banner.html themes/ride/templates/seo/consent/banner.html
 msgid "Cookies and your privacy"
 msgstr "Cookie e la tua privacy"
 
@@ -2548,6 +2567,7 @@ msgstr "Dati"
 #: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
 #: apps/manager/templates/manager/shop/_money_table.html
 #: apps/orders/templates/orders/customer_orders.html
+#: themes/ride/templates/orders/customer_orders.html
 msgid "Date"
 msgstr "Data"
 
@@ -2626,7 +2646,7 @@ msgstr "Elimina %(verbose_name_plural)s selezionati"
 msgid "Delivered"
 msgstr "Consegnato"
 
-#: apps/orders/templates/orders/checkout.html
+#: apps/orders/templates/orders/checkout.html themes/ride/templates/orders/checkout.html
 msgid "Delivery"
 msgstr "Consegna"
 
@@ -2642,7 +2662,7 @@ msgstr "Indirizzo di consegna corretto come hai chiesto"
 msgid "Delivery address corrected at the customer's request"
 msgstr "Indirizzo di consegna corretto su richiesta del cliente"
 
-#: apps/orders/templates/orders/_review_body.html
+#: apps/orders/templates/orders/_review_body.html themes/ride/templates/orders/_review_body.html
 msgid "Delivery details"
 msgstr "Dati di consegna"
 
@@ -2791,6 +2811,7 @@ msgid "Disputes"
 msgstr "Controversie"
 
 #: apps/accounts/templates/accounts/levels/prompt.html
+#: themes/ride/templates/accounts/levels/prompt.html
 msgid "Do it once"
 msgstr "Fallo una volta"
 
@@ -2880,6 +2901,7 @@ msgstr ""
 "lavorativi e comunque entro il termine massimo di legge di 14 giorni). Ci scusiamo per il disagio."
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
+#: themes/ride/templates/accounts/mfa/_recovery_codes_list.html
 msgid ""
 "Each code signs you in once if you lose your authenticator or passkey. Store them somewhere safe "
 "now: they are shown only this time."
@@ -3009,6 +3031,7 @@ msgid "END EVERY SESSION"
 msgstr "TERMINA OGNI SESSIONE"
 
 #: apps/accounts/templates/accounts/sessions/list.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid "End this session"
 msgstr "Termina questa sessione"
 
@@ -3017,6 +3040,7 @@ msgid "End this user's sessions"
 msgstr "Termina le sessioni di questo utente"
 
 #: apps/accounts/templates/accounts/sessions/list.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid "Ending a session does not revoke API keys or links sent by email."
 msgstr "Terminare una sessione non revoca le chiavi API né i link inviati per email."
 
@@ -3294,7 +3318,7 @@ msgstr ""
 "Cerchi un ordine per numero. Il pacco di ciascun venditore si modifica nella sua pagina, con una "
 "nota e la Sua passkey."
 
-#: apps/orders/templates/orders/_cart_body.html
+#: apps/orders/templates/orders/_cart_body.html themes/ride/templates/orders/_cart_body.html
 msgid "Find something you like."
 msgstr "Trova qualcosa che ti piace."
 
@@ -3392,6 +3416,10 @@ msgstr "Per le controversie con il gestore del marketplace: %(court)s."
 msgid "For users of the service"
 msgstr "Per gli utenti del servizio"
 
+#: apps/fitment/templates/fitment/_garage_saver.html
+msgid "Forget my garage"
+msgstr "Dimentica il mio garage"
+
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Forgotten your login credentials?"
 msgstr "Hai dimenticato le credenziali di accesso?"
@@ -3454,10 +3482,12 @@ msgid "General (every other screen)"
 msgstr "Generale (ogni altra schermata)"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
+#: themes/ride/templates/accounts/mfa/recovery_codes.html
 msgid "Generate new codes"
 msgstr "Genera nuovi codici"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
+#: themes/ride/templates/accounts/mfa/recovery_codes.html
 msgid "Generating new codes makes every previous code stop working."
 msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
 
@@ -4068,6 +4098,10 @@ msgstr "Immagine"
 msgid "Image %(number)d"
 msgstr "Immagine %(number)d"
 
+#: apps/core/templates/core/components/image_credits_disclosure.html
+msgid "Image credits"
+msgstr "Crediti delle immagini"
+
 #: apps/manager/event_block_views.py apps/manager/sections.py
 msgid "Images"
 msgstr "Immagini"
@@ -4155,6 +4189,7 @@ msgstr ""
 " e qui non puoi attivare questo interruttore."
 
 #: apps/orders/templates/orders/_cart_body.html apps/tax/prices.py
+#: themes/ride/templates/orders/_cart_body.html
 msgid "Indicative price. Final amount at checkout."
 msgstr "Prezzo indicativo. Importo finale al checkout."
 
@@ -4206,6 +4241,7 @@ msgstr ""
 "comunque entro il termine massimo di legge di 14 giorni."
 
 #: apps/accounts/templates/accounts/levels/prompt.html
+#: themes/ride/templates/accounts/levels/prompt.html
 msgid "It is critical: it asks for a passkey of its own each time, even with a passkey window open."
 msgstr ""
 "È un'azione critica: chiede ogni volta una passkey dedicata, anche con una finestra passkey "
@@ -4245,7 +4281,7 @@ msgstr ""
 "il tuo numero di identificazione fiscale nazionale (TIN). Viene conservato cifrato."
 
 #: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/shop/_fitment_rows.html
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Item"
 msgstr "Articolo"
 
@@ -4292,7 +4328,7 @@ msgstr "conserva le risposte per (giorni)"
 msgid "Keep the event"
 msgstr "Mantieni l'evento"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Keep the rest"
 msgstr "Tieni il resto"
 
@@ -4355,11 +4391,12 @@ msgstr "Ultimo giorno della ripetizione"
 msgid "Last used"
 msgstr "Ultimo uso"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "last used %(used)s"
 msgstr "ultimo uso il %(used)s"
 
 #: apps/accounts/templates/accounts/sessions/list.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid "Last used %(used)s"
 msgstr "Ultimo uso %(used)s"
 
@@ -4502,6 +4539,7 @@ msgstr "Licenza"
 
 #: apps/orders/templates/orders/_cart_mini.html apps/orders/templates/orders/_package.html
 #: themes/base/templates/components/cart_line.html themes/ride/templates/components/cart_line.html
+#: themes/ride/templates/orders/_cart_mini.html themes/ride/templates/orders/_package.html
 msgid "Line total"
 msgstr "Totale riga"
 
@@ -4550,6 +4588,7 @@ msgid "Log in"
 msgstr "Accedi"
 
 #: apps/accounts/templates/accounts/sessions/list.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid "Log out everywhere else"
 msgstr "Esci da tutte le altre sessioni"
 
@@ -4605,7 +4644,7 @@ msgstr "Perso sopra"
 msgid "Lost below"
 msgstr "Perso sotto"
 
-#: apps/accounts/templates/accounts/mfa/verify.html
+#: apps/accounts/templates/accounts/mfa/verify.html themes/ride/templates/accounts/mfa/verify.html
 msgid "Lost your device?"
 msgstr "Ha perso il dispositivo?"
 
@@ -4626,10 +4665,11 @@ msgid "Main"
 msgstr "Principale"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
+#: themes/ride/templates/accounts/mfa/overview.html
 msgid "Manage recovery codes"
 msgstr "Gestisci i codici di recupero"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Manage two-factor settings and recovery codes"
 msgstr "Gestisci la verifica in due passaggi e i codici di recupero"
 
@@ -4800,6 +4840,7 @@ msgid "MPN"
 msgstr "MPN"
 
 #: apps/manager/site_map.py apps/orders/templates/orders/customer_orders.html
+#: themes/ride/templates/orders/customer_orders.html
 msgid "My orders"
 msgstr "I miei ordini"
 
@@ -4850,6 +4891,7 @@ msgid "Network"
 msgstr "Rete"
 
 #: apps/accounts/templates/accounts/sessions/list.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid "Network %(network)s"
 msgstr "Rete %(network)s"
 
@@ -4857,7 +4899,7 @@ msgstr "Rete %(network)s"
 msgid "Never"
 msgstr "Mai"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "never used"
 msgstr "mai usata"
 
@@ -4890,10 +4932,11 @@ msgid "New quantity of %(title)s (now %(quantity)s)"
 msgstr "Nuova quantità di %(title)s (ora %(quantity)s)"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
+#: themes/ride/templates/accounts/mfa/recovery_codes_new.html
 msgid "New recovery codes"
 msgstr "Nuovi codici di recupero"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "New total %(total)s."
 msgstr "Nuovo totale %(total)s."
 
@@ -4926,6 +4969,7 @@ msgstr "Nuova versione"
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/base/templates/components/pagination.html themes/ride/templates/catalog/listing.html
 #: themes/ride/templates/catalog/search.html themes/ride/templates/cms/includes/post_list.html
+#: themes/ride/templates/orders/customer_orders.html
 msgid "Next"
 msgstr "Avanti"
 
@@ -5052,6 +5096,7 @@ msgid "No reviews yet"
 msgstr "Ancora nessuna recensione"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
+#: themes/ride/templates/accounts/mfa/overview.html
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
 
@@ -5060,6 +5105,7 @@ msgid "No seller terms published."
 msgstr "Il venditore non ha pubblicato condizioni di vendita."
 
 #: apps/accounts/templates/accounts/sessions/list.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid "No session is recorded yet."
 msgstr "Nessuna sessione registrata."
 
@@ -5298,7 +5344,7 @@ msgstr "Numero di volte"
 msgid "Of which VAT"
 msgstr "Di cui IVA"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "off"
 msgstr "non attiva"
 
@@ -5360,7 +5406,7 @@ msgstr "URL ufficiale"
 msgid "Official website"
 msgstr "Sito ufficiale"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "on"
 msgstr "attiva"
 
@@ -5448,7 +5494,7 @@ msgstr "Online"
 msgid "Online link"
 msgstr "Link online"
 
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid "Online payment is not available yet. The items stay held for you for a short time."
 msgstr ""
 "Il pagamento online non è ancora disponibile. Gli articoli restano riservati per te per un breve "
@@ -5645,6 +5691,7 @@ msgstr "Apri nelle mappe"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
 #: apps/accounts/templates/accounts/levels/prompt.html
+#: themes/ride/templates/accounts/levels/prompt.html
 msgid "Open passkey window"
 msgstr "Apri la finestra passkey"
 
@@ -5706,10 +5753,12 @@ msgstr "Oppure sfoglia una categoria:"
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 #: apps/manager/templates/manager/shop/_money_table.html
 #: apps/manager/templates/manager/shop/orders.html apps/orders/templates/orders/customer_orders.html
+#: themes/ride/templates/orders/customer_orders.html
 msgid "Order"
 msgstr "Ordine"
 
 #: apps/manager/templates/manager/shop/order.html apps/orders/templates/orders/customer_order.html
+#: themes/ride/templates/orders/customer_order.html
 msgid "Order %(number)s"
 msgstr "Ordine %(number)s"
 
@@ -5831,7 +5880,7 @@ msgstr "Ordine effettuato"
 msgid "Order placed and paid"
 msgstr "Ordine effettuato e pagato"
 
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid "Order received"
 msgstr "Ordine ricevuto"
 
@@ -5841,7 +5890,8 @@ msgid "Order summary"
 msgstr "Riepilogo dell'ordine"
 
 #: apps/orders/templates/orders/_cart_body.html apps/orders/templates/orders/_review_body.html
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/_cart_body.html
+#: themes/ride/templates/orders/_review_body.html themes/ride/templates/orders/confirmation.html
 msgid "Order total"
 msgstr "Totale dell'ordine"
 
@@ -5863,7 +5913,7 @@ msgstr "Ordinato il (*) / ricevuto il (*)"
 msgid "Ordering is not available right now. Please try again later."
 msgstr "In questo momento non è possibile ordinare. Riprova più tardi."
 
-#: apps/orders/templates/orders/_review_body.html
+#: apps/orders/templates/orders/_review_body.html themes/ride/templates/orders/_review_body.html
 msgid "Ordering is not open yet. Your cart is kept."
 msgstr "Gli ordini non sono ancora aperti. Il tuo carrello viene conservato."
 
@@ -5984,6 +6034,7 @@ msgstr "Pagina %(page)s"
 
 #: themes/base/templates/components/pagination.html
 #: themes/ride/templates/cms/includes/post_list.html
+#: themes/ride/templates/orders/customer_orders.html
 msgid "Page %(page)s of %(count)s"
 msgstr "Pagina %(page)s di %(count)s"
 
@@ -5998,6 +6049,7 @@ msgstr "Tipo di pagina"
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/base/templates/components/pagination.html themes/ride/templates/catalog/listing.html
 #: themes/ride/templates/catalog/search.html themes/ride/templates/cms/includes/post_list.html
+#: themes/ride/templates/orders/customer_orders.html
 msgid "Pagination"
 msgstr "Paginazione"
 
@@ -6019,23 +6071,29 @@ msgstr "Rimborsato in parte"
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/setup.html
+#: themes/ride/templates/accounts/mfa/_passkey_register_form.html
+#: themes/ride/templates/accounts/mfa/setup.html
 msgid "Passkey"
 msgstr "Passkey"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/overview.html
+#: themes/ride/templates/accounts/mfa/setup.html
 msgid "passkey"
 msgstr "passkey"
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
+#: themes/ride/templates/accounts/mfa/_passkey_register_form.html
 msgid "Passkey name"
 msgstr "Nome della passkey"
 
 #: apps/accounts/templates/accounts/levels/prompt.html
+#: themes/ride/templates/accounts/levels/prompt.html
 msgid "Passkey needed"
 msgstr "Serve la passkey"
 
 #: apps/accounts/templates/accounts/levels/prompt.html
+#: themes/ride/templates/accounts/levels/prompt.html
 msgid "Passkey window"
 msgstr "Finestra passkey"
 
@@ -6048,6 +6106,9 @@ msgstr "Finestra passkey aperta: ancora %(minutes_left)s min"
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/verify.html
 #: apps/manager/templates/manager/amendment_passkey.html
+#: themes/ride/templates/accounts/levels/prompt.html
+#: themes/ride/templates/accounts/mfa/_passkey_register_form.html
+#: themes/ride/templates/accounts/mfa/verify.html
 msgid "Passkeys need JavaScript."
 msgstr "Le passkey richiedono JavaScript."
 
@@ -6073,7 +6134,7 @@ msgstr "Pausa"
 msgid "Pause countdown"
 msgstr "Metti in pausa il conto alla rovescia"
 
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid "Pay now"
 msgstr "Paga ora"
 
@@ -6208,7 +6269,7 @@ msgstr "Effettuato il"
 msgid "Placed from"
 msgstr "Effettuato dal"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Placed on"
 msgstr "Effettuato il"
 
@@ -6479,6 +6540,7 @@ msgstr "Anteprima: %(action)s"
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/base/templates/components/pagination.html themes/ride/templates/catalog/listing.html
 #: themes/ride/templates/catalog/search.html themes/ride/templates/cms/includes/post_list.html
+#: themes/ride/templates/orders/customer_orders.html
 msgid "Previous"
 msgstr "Indietro"
 
@@ -6524,6 +6586,7 @@ msgid "Price on request"
 msgstr "Prezzo su richiesta"
 
 #: apps/manager/templates/manager/amendment.html apps/orders/templates/orders/customer_order.html
+#: themes/ride/templates/orders/customer_order.html
 msgid "Price with VAT"
 msgstr "Prezzo con IVA"
 
@@ -6701,6 +6764,7 @@ msgstr ""
 #: apps/orders/templates/orders/customer_order.html
 #: themes/base/templates/components/quantity_stepper.html
 #: themes/ride/templates/components/quantity_stepper.html
+#: themes/ride/templates/orders/customer_order.html
 msgid "Quantity"
 msgstr "Quantità"
 
@@ -6724,7 +6788,7 @@ msgstr "Preventivo richiesto"
 msgid "Rated %(value)s out of 5"
 msgstr "Valutazione %(value)s su 5"
 
-#: apps/seo/templates/seo/consent/banner.html
+#: apps/seo/templates/seo/consent/banner.html themes/ride/templates/seo/consent/banner.html
 msgid "Read more and choose"
 msgstr "Scopri di più e scegli"
 
@@ -6836,13 +6900,16 @@ msgstr "Registra la comunicazione"
 msgid "Record the review"
 msgstr "Registra la verifica"
 
-#: apps/accounts/templates/accounts/mfa/verify.html
+#: apps/accounts/templates/accounts/mfa/verify.html themes/ride/templates/accounts/mfa/verify.html
 msgid "Recovery code"
 msgstr "Codice di recupero"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
+#: themes/ride/templates/accounts/mfa/overview.html
+#: themes/ride/templates/accounts/mfa/recovery_codes.html
+#: themes/ride/templates/accounts/mfa/recovery_codes_new.html
 msgid "Recovery codes"
 msgstr "Codici di recupero"
 
@@ -6892,10 +6959,11 @@ msgid "Region"
 msgstr "Regione"
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
+#: themes/ride/templates/accounts/mfa/_passkey_register_form.html
 msgid "Register a passkey"
 msgstr "Registra una passkey"
 
-#: apps/seo/templates/seo/consent/_actions.html
+#: apps/seo/templates/seo/consent/_actions.html themes/ride/templates/seo/consent/_actions.html
 msgid "Reject all"
 msgstr "Rifiuta tutti"
 
@@ -6938,7 +7006,8 @@ msgstr "Promemoria: confermi il Suo indirizzo email per completare la candidatur
 #: apps/manager/templates/manager/shop/_event_blocks.html
 #: apps/manager/templates/manager/shop/_fitment_rows.html
 #: apps/manager/templates/manager/shop/event_block_remove.html
-#: themes/base/templates/components/cart_line.html themes/ride/templates/components/cart_line.html
+#: themes/base/templates/components/cart_line.html themes/ride/templates/accounts/mfa/overview.html
+#: themes/ride/templates/accounts/mfa/setup.html themes/ride/templates/components/cart_line.html
 msgid "Remove"
 msgstr "Rimuovi"
 
@@ -6965,6 +7034,10 @@ msgstr "Rimuovere questo blocco?"
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Remove this level"
 msgstr "Elimina questo livello"
+
+#: apps/fitment/templates/fitment/_garage_saver.html
+msgid "Remove vehicle"
+msgstr "Rimuovi il veicolo"
 
 #: apps/manager/amendment_views.py
 msgid "removed"
@@ -7019,7 +7092,7 @@ msgstr "File del repository"
 msgid "Request"
 msgstr "Richiesta"
 
-#: apps/orders/templates/orders/_package.html
+#: apps/orders/templates/orders/_package.html themes/ride/templates/orders/_package.html
 msgid "Request a quote"
 msgstr "Richiedi un preventivo"
 
@@ -7156,6 +7229,7 @@ msgid "Reverted"
 msgstr "Annullata"
 
 #: apps/orders/templates/orders/review.html apps/orders/ui/views.py
+#: themes/ride/templates/orders/review.html
 msgid "Review and pay"
 msgstr "Riepilogo e pagamento"
 
@@ -7274,6 +7348,7 @@ msgid "Save logo"
 msgstr "Salva logo"
 
 #: apps/seo/templates/seo/consent/banner.html apps/seo/templates/seo/consent/preferences.html
+#: themes/ride/templates/seo/consent/banner.html
 msgid "Save my choices"
 msgstr "Salva le mie scelte"
 
@@ -7289,6 +7364,16 @@ msgstr "Salva il nome"
 msgid "Save the product role"
 msgstr "Salva il ruolo del prodotto"
 
+#: apps/fitment/templates/fitment/_garage_saver.html
+msgid "Save this vehicle"
+msgstr "Salva questo veicolo"
+
+#: apps/fitment/templates/fitment/_garage_saver.html
+msgid "Save this vehicle on this browser for your next visits (you can remove it at any time)"
+msgstr ""
+"Salva questo veicolo su questo browser per le prossime visite (puoi rimuoverlo in qualsiasi "
+"momento)"
+
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
 msgstr "Salvi prima le modifiche: viene inviata l'ultima bozza salvata."
@@ -7301,7 +7386,7 @@ msgstr "Salvato."
 msgid "Say whether the content is illegal or only against the platform terms."
 msgstr "Indica se il contenuto è illegale o va solo contro i termini della piattaforma."
 
-#: apps/accounts/templates/accounts/mfa/totp.html
+#: apps/accounts/templates/accounts/mfa/totp.html themes/ride/templates/accounts/mfa/totp.html
 msgid "Scan this QR code with your authenticator app, then enter the 6-digit code it shows."
 msgstr ""
 "Scansioni questo codice QR con la Sua app di autenticazione, poi inserisca il codice a 6 cifre che"
@@ -7344,6 +7429,7 @@ msgid "Search: %(query)s"
 msgstr "Cerca: %(query)s"
 
 #: apps/accounts/templates/accounts/mfa/setup.html themes/base/templates/components/user_tools.html
+#: themes/ride/templates/accounts/mfa/setup.html
 msgid "Security"
 msgstr "Sicurezza"
 
@@ -7361,7 +7447,7 @@ msgstr "Vedi tutto: %(title)s"
 msgid "See all<span class=\"visually-hidden\"> products: %(name)s</span>"
 msgstr "Vedi tutti<span class=\"visually-hidden\"> i prodotti: %(name)s</span>"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "See where you are signed in"
 msgstr "Veda dove ha effettuato l'accesso"
 
@@ -7464,15 +7550,16 @@ msgstr ""
 "clienti e del personale, i tempi della finestra passkey e gli elenchi di azioni. Lascialo vuoto "
 "per tenere i valori predefiniti. Un valore che non va bene viene rifiutato al salvataggio."
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Sessions"
 msgstr "Sessioni"
 
-#: apps/accounts/templates/accounts/mfa/totp.html
+#: apps/accounts/templates/accounts/mfa/totp.html themes/ride/templates/accounts/mfa/totp.html
 msgid "Set up an authenticator app"
 msgstr "Configura un'app di autenticazione"
 
 #: apps/accounts/templates/accounts/mfa/setup.html apps/seo/site_links.py
+#: themes/ride/templates/accounts/mfa/setup.html
 msgid "Set up two-factor authentication"
 msgstr "Configura la verifica in due passaggi"
 
@@ -7511,6 +7598,7 @@ msgid "Shipped"
 msgstr "Spedito"
 
 #: apps/manager/money_views.py apps/orders/templates/orders/_package.html apps/vendors/services.py
+#: themes/ride/templates/orders/_package.html
 msgid "Shipping"
 msgstr "Spedizione"
 
@@ -7526,7 +7614,7 @@ msgstr "Spedizione bloccata fino al"
 msgid "Shipping hold after an unavailable item"
 msgstr "Blocco della spedizione dopo un articolo non disponibile"
 
-#: apps/orders/templates/orders/_cart_body.html
+#: apps/orders/templates/orders/_cart_body.html themes/ride/templates/orders/_cart_body.html
 msgid "Shipping is worked out at checkout, from your delivery address."
 msgstr "La spedizione viene calcolata al checkout, in base al tuo indirizzo di consegna."
 
@@ -7548,11 +7636,11 @@ msgstr ""
 "La spedizione al tuo indirizzo richiede un preventivo del venditore. Chiedi un preventivo al "
 "venditore."
 
-#: apps/orders/templates/orders/_review_body.html
+#: apps/orders/templates/orders/_review_body.html themes/ride/templates/orders/_review_body.html
 msgid "Shipping updated."
 msgstr "Spedizione aggiornata."
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Shipping with VAT"
 msgstr "Spedizione con IVA"
 
@@ -7730,6 +7818,7 @@ msgid "Sign out"
 msgstr "Esci"
 
 #: apps/accounts/templates/accounts/sessions/list.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid "Sign out of this session"
 msgstr "Esci da questa sessione"
 
@@ -7822,7 +7911,7 @@ msgstr "Social network"
 msgid "Sold by"
 msgstr "Venduto da"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Sold by %(name)s"
 msgstr "Venduto da %(name)s"
 
@@ -7834,7 +7923,7 @@ msgstr "Venduto da %(seller)s"
 #: apps/orders/templates/orders/_package.html themes/base/templates/components/cart_line.html
 #: themes/base/templates/components/product_tile.html
 #: themes/ride/templates/components/cart_line.html
-#: themes/ride/templates/components/product_tile.html
+#: themes/ride/templates/components/product_tile.html themes/ride/templates/orders/_package.html
 msgid "Sold by %(vendor)s"
 msgstr "Venduto da %(vendor)s"
 
@@ -7872,11 +7961,12 @@ msgstr ""
 "Solo ditte individuali: il tuo cognome, come sul documento d'identità. Compare nelle fatture che "
 "ti emettiamo."
 
-#: apps/orders/templates/orders/_cart_body.html
+#: apps/orders/templates/orders/_cart_body.html themes/ride/templates/orders/_cart_body.html
 msgid "Solve the points above to go on."
 msgstr "Risolvi i punti qui sopra per continuare."
 
 #: apps/orders/templates/orders/_review_actions.html
+#: themes/ride/templates/orders/_review_actions.html
 msgid "Solve the points above to place the order."
 msgstr "Risolvi i punti qui sopra per confermare l'ordine."
 
@@ -7904,7 +7994,7 @@ msgstr ""
 msgid "Something went wrong"
 msgstr "Qualcosa è andato storto"
 
-#: apps/catalog/taxonomy.py apps/cms/models.py
+#: apps/catalog/taxonomy.py apps/cms/models.py apps/core/templates/core/components/image_credit.html
 msgid "source"
 msgstr "origine"
 
@@ -7957,7 +8047,7 @@ msgstr "Stelle da cui una recensione viene mostrata"
 msgid "Start review"
 msgstr "Avvia la revisione"
 
-#: apps/orders/templates/orders/_cart_body.html
+#: apps/orders/templates/orders/_cart_body.html themes/ride/templates/orders/_cart_body.html
 msgid "Start shopping"
 msgstr "Inizia a fare acquisti"
 
@@ -8009,6 +8099,8 @@ msgstr "Statistiche"
 #: apps/orders/templates/orders/customer_orders.html
 #: themes/base/templates/components/product_tile.html
 #: themes/ride/templates/components/product_tile.html
+#: themes/ride/templates/orders/customer_order.html
+#: themes/ride/templates/orders/customer_orders.html
 msgid "Status"
 msgstr "Stato"
 
@@ -8016,7 +8108,7 @@ msgstr "Stato"
 msgid "status"
 msgstr "stato"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Status history"
 msgstr "Cronologia dello stato"
 
@@ -9975,6 +10067,8 @@ msgstr "non è stato possibile registrare la passkey"
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/verify.html
+#: themes/ride/templates/accounts/mfa/_passkey_register_form.html
+#: themes/ride/templates/accounts/mfa/verify.html
 msgid "The passkey did not work."
 msgstr "La passkey non ha funzionato."
 
@@ -9982,7 +10076,7 @@ msgstr "La passkey non ha funzionato."
 msgid "the passkey was not accepted"
 msgstr "la passkey non è stata accettata"
 
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid "The payment form could not be loaded. Please reload this page in a moment."
 msgstr "Impossibile caricare il modulo di pagamento. Ricarica la pagina tra un momento."
 
@@ -10332,6 +10426,8 @@ msgstr "Non è stato possibile comprendere la richiesta. Controlla l’indirizzo
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/verify.html
+#: themes/ride/templates/accounts/mfa/_passkey_register_form.html
+#: themes/ride/templates/accounts/mfa/verify.html
 msgid "The request failed."
 msgstr "La richiesta non è riuscita."
 
@@ -10469,7 +10565,7 @@ msgstr "Il venditore a cui appartengono queste condizioni."
 msgid "The seller this return policy belongs to."
 msgstr "Il venditore a cui appartiene questa politica di reso."
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "The seller will not ship it before %(when)s."
 msgstr "Il venditore non lo spedirà prima del %(when)s."
 
@@ -11238,6 +11334,7 @@ msgid "There were no other sessions."
 msgstr "Non c'erano altre sessioni."
 
 #: apps/accounts/templates/accounts/sessions/list.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid ""
 "These are the browsers and devices signed in to your account. If you do not recognise one, end it "
 "and change your password."
@@ -11277,6 +11374,7 @@ msgid "This account is not signed in anywhere."
 msgstr "Questo account non ha sessioni attive."
 
 #: apps/accounts/templates/accounts/levels/prompt.html
+#: themes/ride/templates/accounts/levels/prompt.html
 msgid ""
 "This action (%(action)s) is sensitive: confirm it with your passkey, once or for a few minutes."
 msgstr ""
@@ -11296,6 +11394,8 @@ msgstr "Questa modifica non cambia nulla: righe, spedizione e indirizzo restereb
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/verify.html
+#: themes/ride/templates/accounts/mfa/_passkey_register_form.html
+#: themes/ride/templates/accounts/mfa/verify.html
 msgid "This browser does not support passkeys."
 msgstr "Questo browser non supporta le passkey."
 
@@ -11405,7 +11505,7 @@ msgstr "È l'importo che la piattaforma deve al Suo negozio in questo momento."
 msgid "This is your approved policy."
 msgstr "Questa è la Sua politica approvata."
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "This is your order reference, not an invoice. Each seller issues its own invoice."
 msgstr ""
 "Questo è il riferimento del tuo ordine, non una fattura. Ogni venditore emette la propria fattura."
@@ -11436,6 +11536,7 @@ msgid "This link was sent to you by email. Press Continue to open the page it le
 msgstr "Questo link ti è stato inviato per email. Premi Continua per aprire la pagina a cui porta."
 
 #: apps/accounts/templates/accounts/levels/prompt.html
+#: themes/ride/templates/accounts/levels/prompt.html
 msgid "This needs your passkey"
 msgstr "Serve la tua passkey"
 
@@ -11537,6 +11638,7 @@ msgid "This product is no longer available."
 msgstr "Questo prodotto non è più disponibile."
 
 #: apps/accounts/templates/accounts/sessions/list.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid "this session"
 msgstr "questa sessione"
 
@@ -11591,6 +11693,7 @@ msgstr ""
 "essa."
 
 #: apps/accounts/templates/accounts/levels/prompt.html
+#: themes/ride/templates/accounts/levels/prompt.html
 msgid ""
 "This window covers only the sensitive actions of this shop that its owner confirms. It never "
 "covers another shop."
@@ -11934,6 +12037,8 @@ msgstr "Livello più alto"
 #: apps/orders/templates/orders/customer_orders.html
 #: themes/base/templates/components/order_summary.html
 #: themes/ride/templates/components/order_summary.html
+#: themes/ride/templates/orders/customer_order.html
+#: themes/ride/templates/orders/customer_orders.html
 msgid "Total"
 msgstr "Totale"
 
@@ -11963,15 +12068,15 @@ msgstr "Totale: %(total)s EUR"
 msgid "Totals by type"
 msgstr "Totali per tipo"
 
-#: apps/orders/templates/orders/_package.html
+#: apps/orders/templates/orders/_package.html themes/ride/templates/orders/_package.html
 msgid "Totals for this vendor"
 msgstr "Totali per questo venditore"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Track the parcel"
 msgstr "Segui il pacco"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Tracking"
 msgstr "Tracciamento"
 
@@ -11979,7 +12084,7 @@ msgstr "Tracciamento"
 msgid "Tracking number"
 msgstr "Numero di tracciamento"
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Tracking number: %(number)s"
 msgstr "Numero di tracciamento: %(number)s"
 
@@ -12051,15 +12156,17 @@ msgid "Two letters, for example IT."
 msgstr "Due lettere, per esempio IT."
 
 #: apps/accounts/templates/accounts/mfa/overview.html apps/manager/site_map.py
-#: apps/seo/site_links.py
+#: apps/seo/site_links.py themes/ride/templates/accounts/mfa/overview.html
 msgid "Two-factor authentication"
 msgstr "Verifica in due passaggi"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
+#: themes/ride/templates/accounts/mfa/recovery_codes_new.html
 msgid "Two-factor authentication is on"
 msgstr "La verifica in due passaggi è attiva"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
+#: themes/ride/templates/accounts/mfa/overview.html
 msgid "Two-factor settings"
 msgstr "Impostazioni della verifica in due passaggi"
 
@@ -12108,6 +12215,7 @@ msgstr "sconosciuto"
 
 #: apps/accounts/templates/accounts/sessions/list.html
 #: apps/manager/templates/manager/platform/user_sessions.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid "Unknown device"
 msgstr "Dispositivo sconosciuto"
 
@@ -12151,11 +12259,11 @@ msgstr "Fino a due pulsanti sotto il testo. Se non ne aggiungi, il banner non ha
 msgid "Upcoming events"
 msgstr "Prossimi eventi"
 
-#: apps/orders/templates/orders/_cart_body.html
+#: apps/orders/templates/orders/_cart_body.html themes/ride/templates/orders/_cart_body.html
 msgid "Update cart"
 msgstr "Aggiorna il carrello"
 
-#: apps/orders/templates/orders/_review_body.html
+#: apps/orders/templates/orders/_review_body.html themes/ride/templates/orders/_review_body.html
 msgid "Update shipping"
 msgstr "Aggiorna la spedizione"
 
@@ -12181,11 +12289,11 @@ msgstr "Carica un'immagine"
 msgid "Uploading…"
 msgstr "Caricamento…"
 
-#: apps/accounts/templates/accounts/mfa/verify.html
+#: apps/accounts/templates/accounts/mfa/verify.html themes/ride/templates/accounts/mfa/verify.html
 msgid "Use a passkey"
 msgstr "Usa una passkey"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Use an authenticator app"
 msgstr "Usa un'app di autenticazione"
 
@@ -12193,7 +12301,7 @@ msgstr "Usa un'app di autenticazione"
 msgid "Use dates like 2026-03-31. The period filter was ignored."
 msgstr "Usi date come 2026-03-31. Il filtro del periodo è stato ignorato."
 
-#: apps/accounts/templates/accounts/mfa/verify.html
+#: apps/accounts/templates/accounts/mfa/verify.html themes/ride/templates/accounts/mfa/verify.html
 msgid "Use recovery code"
 msgstr "Usa un codice di recupero"
 
@@ -12201,7 +12309,7 @@ msgstr "Usa un codice di recupero"
 msgid "Use the shop's default"
 msgstr "Usa il valore predefinito del negozio"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Use this device's screen lock or a security key."
 msgstr "Usi il blocco schermo di questo dispositivo o una chiave di sicurezza."
 
@@ -12312,11 +12420,11 @@ msgstr "Sede"
 msgid "Venue name"
 msgstr "Nome del luogo"
 
-#: apps/accounts/templates/accounts/mfa/verify.html
+#: apps/accounts/templates/accounts/mfa/verify.html themes/ride/templates/accounts/mfa/verify.html
 msgid "Verify"
 msgstr "Verifica"
 
-#: apps/accounts/templates/accounts/mfa/verify.html
+#: apps/accounts/templates/accounts/mfa/verify.html themes/ride/templates/accounts/mfa/verify.html
 msgid "Verify it is you"
 msgstr "Verifichi la Sua identità"
 
@@ -12327,7 +12435,7 @@ msgid "Version"
 msgstr "Versione"
 
 #: apps/manager/templates/manager/platform/trust_rules.html
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "Version %(n)s"
 msgstr "Versione %(n)s"
 
@@ -12411,7 +12519,7 @@ msgstr "In attesa del venditore"
 
 #: apps/orders/templates/orders/_package.html themes/base/templates/components/alert.html
 #: themes/base/templates/components/cart_line.html themes/ride/templates/components/alert.html
-#: themes/ride/templates/components/cart_line.html
+#: themes/ride/templates/components/cart_line.html themes/ride/templates/orders/_package.html
 msgid "Warning"
 msgstr "Attenzione"
 
@@ -12442,7 +12550,7 @@ msgstr "Guarda sul sito del video"
 msgid "Watch the video"
 msgstr "Guarda il video"
 
-#: apps/seo/templates/seo/consent/banner.html
+#: apps/seo/templates/seo/consent/banner.html themes/ride/templates/seo/consent/banner.html
 msgid ""
 "We always use the cookies the site needs to work. We only use the others if you say yes, and "
 "saying no costs you nothing."
@@ -12583,7 +12691,7 @@ msgstr "Abbiamo inviato la stessa conferma all'indirizzo email dell'ordine. Cons
 msgid "we use your data to carry out this order. Read the notice to know more."
 msgstr "usiamo i tuoi dati per eseguire questo ordine. Leggi l'informativa per saperne di più."
 
-#: apps/orders/templates/orders/checkout.html
+#: apps/orders/templates/orders/checkout.html themes/ride/templates/orders/checkout.html
 msgid ""
 "We use your details only to deliver your order and to issue the invoices of the vendors you buy "
 "from."
@@ -12793,7 +12901,7 @@ msgstr ""
 "Cosa ottengono i visitatori: 301 li manda a un nuovo indirizzo, 410 dice che la pagina non esiste "
 "più. Un 410 non ha destinazione."
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "What you bought from %(name)s"
 msgstr "Cosa hai acquistato da %(name)s"
 
@@ -12964,10 +13072,12 @@ msgstr ""
 "aggiunge chiude la precedente."
 
 #: apps/orders/templates/orders/customer_orders.html
+#: themes/ride/templates/orders/customer_orders.html
 msgid "When you buy something, you find it here with its status and tracking."
 msgstr "Quando acquisti qualcosa, lo trovi qui con il suo stato e il tracciamento."
 
 #: apps/orders/templates/orders/_review_actions.html
+#: themes/ride/templates/orders/_review_actions.html
 msgid "When you place the order we hold the items for you. Payment follows in the next step."
 msgstr ""
 "Quando confermi l'ordine riserviamo gli articoli per te. Il pagamento segue nel passo successivo."
@@ -13478,7 +13588,7 @@ msgstr ""
 "cui comunichi il recesso dal contratto, indicando il numero dell'ordine, oppure usando il modulo "
 "tipo di recesso. I dati di contatto del venditore sono nella conferma del tuo ordine."
 
-#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid ""
 "You can cancel the rest of this package free of charge until it is shipped, and get back "
 "everything you paid for it."
@@ -13520,6 +13630,7 @@ msgid "You do not have permission to open this page."
 msgstr "Non hai il permesso di aprire questa pagina."
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
+#: themes/ride/templates/accounts/mfa/recovery_codes.html
 msgid "You have %(counter)s unused recovery code."
 msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Ha %(counter)s codice di recupero non usato."
@@ -13558,6 +13669,7 @@ msgid "You have no images yet."
 msgstr "Non ha ancora immagini."
 
 #: apps/orders/templates/orders/customer_orders.html
+#: themes/ride/templates/orders/customer_orders.html
 msgid "You have no orders yet"
 msgstr "Non hai ancora ordini"
 
@@ -13617,6 +13729,7 @@ msgstr "Il tuo account è stato cancellato."
 
 #: apps/accounts/templates/accounts/levels/prompt.html
 #: apps/manager/templates/manager/amendment_passkey.html
+#: themes/ride/templates/accounts/levels/prompt.html
 msgid ""
 "Your account has no passkey yet. <a href=\"%(overview_url)s\">Add a passkey</a> to be able to "
 "confirm this."
@@ -13632,11 +13745,11 @@ msgstr ""
 "Il tuo account è bloccato. La cancellazione si completa automaticamente quando si chiude il tuo "
 "ultimo ordine aperto."
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Your account is protected with a passkey."
 msgstr "Il Suo account è protetto con una passkey."
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Your account is protected with an authenticator app."
 msgstr "Il Suo account è protetto con un’app di autenticazione."
 
@@ -13648,7 +13761,7 @@ msgstr ""
 "La Sua candidatura è in esame presso il nostro team. Acceda con la password che ha scelto: la "
 "prima volta Le verrà chiesto di configurare un’app di autenticazione."
 
-#: apps/orders/templates/orders/cart.html
+#: apps/orders/templates/orders/cart.html themes/ride/templates/orders/cart.html
 msgid "Your cart"
 msgstr "Il tuo carrello"
 
@@ -13661,6 +13774,7 @@ msgstr ""
 "applicata l'IVA. Conferma di nuovo i tuoi dati per verificarla per ogni venditore."
 
 #: apps/orders/templates/orders/_cart_body.html apps/orders/templates/orders/_cart_mini.html
+#: themes/ride/templates/orders/_cart_body.html themes/ride/templates/orders/_cart_mini.html
 msgid "Your cart is empty"
 msgstr "Il tuo carrello è vuoto"
 
@@ -13681,6 +13795,7 @@ msgid "Your choice is saved on this device for six months."
 msgstr "La tua scelta resta salvata su questo dispositivo per sei mesi."
 
 #: apps/seo/templates/seo/consent/banner.html apps/seo/templates/seo/consent/preferences.html
+#: themes/ride/templates/seo/consent/banner.html
 msgid "Your cookie choice was saved."
 msgstr "La tua scelta sui cookie è stata salvata."
 
@@ -13694,7 +13809,7 @@ msgctxt "customer privacy page"
 msgid "Your data"
 msgstr "I tuoi dati"
 
-#: apps/orders/templates/orders/checkout.html
+#: apps/orders/templates/orders/checkout.html themes/ride/templates/orders/checkout.html
 msgid "Your details"
 msgstr "I tuoi dati"
 
@@ -13736,6 +13851,7 @@ msgid "Your event %(title)s was hidden"
 msgstr "Il Suo evento %(title)s è stato nascosto"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
+#: themes/ride/templates/accounts/mfa/overview.html
 msgid "Your factors"
 msgstr "I Suoi fattori"
 
@@ -13778,7 +13894,7 @@ msgctxt "(L)"
 msgid "Your order goes on for the remaining items at the new total of %(total)s EUR."
 msgstr "L’ordine proseguirà per i restanti articoli al nuovo totale di EUR %(total)s."
 
-#: apps/orders/templates/orders/confirmation.html
+#: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid "Your order number is %(number)s. We sent a confirmation to %(email)s."
 msgstr "Il numero del tuo ordine è %(number)s. Abbiamo inviato una conferma a %(email)s."
 
@@ -13800,6 +13916,7 @@ msgstr ""
 "della somma residua."
 
 #: apps/orders/templates/orders/customer_orders.html
+#: themes/ride/templates/orders/customer_orders.html
 msgid "Your orders, newest first"
 msgstr "I tuoi ordini, dal più recente"
 
@@ -13838,11 +13955,12 @@ msgstr "La sua proposta è inviata. Resta nascosta finché non viene verificata.
 msgid "Your proposals"
 msgstr "Le sue proposte"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Your protection"
 msgstr "La Sua protezione"
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
+#: themes/ride/templates/accounts/mfa/_recovery_codes_list.html
 msgid "Your recovery codes"
 msgstr "I Suoi codici di recupero"
 
@@ -13865,12 +13983,13 @@ msgstr ""
 "gestisce gli ordini."
 
 #: apps/accounts/templates/accounts/levels/prompt.html
+#: themes/ride/templates/accounts/levels/prompt.html
 msgid "Your role may not open a passkey window or do this once. Ask a platform owner."
 msgstr ""
 "Il tuo ruolo potrebbe non poter aprire una finestra passkey né fare questa azione una volta. "
 "Chiedi a un titolare della piattaforma."
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
 msgstr "Il Suo ruolo richiede un secondo fattore prima di poter continuare."
 
@@ -13891,6 +14010,7 @@ msgid "Your session reached its maximum length. Please sign in again."
 msgstr "La sessione ha raggiunto la durata massima. Accedi di nuovo."
 
 #: apps/accounts/templates/accounts/sessions/list.html
+#: themes/ride/templates/accounts/sessions/list.html
 msgid "Your sessions"
 msgstr "Le tue sessioni"
 
@@ -13932,6 +14052,10 @@ msgid ""
 msgstr ""
 "La tua partita IVA, con o senza il prefisso del paese, per esempio IT12345678901. La verifichiamo "
 "nel registro europeo VIES. Non sai se ne hai una? Chiedi al tuo commercialista."
+
+#: apps/fitment/templates/fitment/_garage_saver.html
+msgid "Your vehicles"
+msgstr "I tuoi veicoli"
 
 #: apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "{n} choices"
