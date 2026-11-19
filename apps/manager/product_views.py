@@ -127,8 +127,10 @@ def _state_label(state: str) -> str:
     return str(labels.get(state, state))
 
 
-class ProductList(ManagerListView):
+class ProductList(WriteGate, ManagerListView):
     section = SECTION
+    write_section = SECTION
+    refuse_read_only = True
     template_name = "manager/platform/products.html"
     paginate_by = 25
     columns = (
@@ -215,6 +217,7 @@ class ProductList(ManagerListView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context["title"] = _("Products")
+        context["read_only"] = not writer(SECTION)(self.manager)
         return context
 
 
@@ -232,6 +235,7 @@ class ProductDetailView(WriteGate, ManagerView):
 
     section = SECTION
     write_section = SECTION
+    refuse_read_only = True
     template_name = "manager/platform/product.html"
 
     def product(self) -> Product:
@@ -252,6 +256,7 @@ class ProductDetailView(WriteGate, ManagerView):
             title=_title(product) or product.sku,
             form=form,
             can_write=writer(SECTION)(self.manager),
+            read_only=not writer(SECTION)(self.manager),
             languages=[
                 {"code": code, "state": _state_label(state), "title": titles.get(code, "")}
                 for code, state in _states(product).items()
