@@ -11,17 +11,18 @@ by the service (2 decimals, not negative).
 
 import uuid
 from decimal import Decimal
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 
 from django.conf import settings
 from django.http import HttpRequest
 from ninja import Query, Router, Schema, Status
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from apps.api.auth import api_client_of
 from apps.api.v1.errors import ApiProblem
 from apps.catalog import engine, product_pages, services
 from apps.catalog.models import Product, ProductAttribute, Variant
+from apps.core.i18n import primary_language
 from apps.seo import seller
 from apps.tax.prices import PriceUnavailable, consumer_price
 from apps.vendors.models import Vendor
@@ -44,14 +45,25 @@ def _language(value: str) -> str:
 
 
 class LanguageQuery(Schema):
-    language: str = Field(
-        "en", description="Language of names and labels; EN is the fallback (spec 09)."
+    language: str | None = Field(
+        None,
+        description=(
+            "Language of names and labels; the operator's primary language when absent, and "
+            "the primary language is the fallback (spec 09)."
+        ),
     )
 
     @field_validator("language")
     @classmethod
-    def _known(cls, value: str) -> str:
-        return _language(value)
+    def _known(cls, value: str | None) -> str | None:
+        return None if value is None else _language(value)
+
+    @model_validator(mode="after")
+    def _primary_when_absent(self) -> Self:
+        # Resolved per request, not at import: the primary language follows MPMV_LANGUAGES.
+        if self.language is None:
+            self.language = primary_language()
+        return self
 
 
 # --- Attribute catalogue

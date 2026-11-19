@@ -285,6 +285,38 @@ def test_the_attribute_catalogue_lists_codes_kinds_and_labels(
     }
 
 
+def test_without_a_language_the_catalogue_uses_the_primary_language(
+    client: Client, attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    """The default is the operator's primary language, never a literal `en` (I18N.15)."""
+    url = "/api/v1/catalog/attributes"
+    absent = client.get(url, headers=_headers(vendor))
+    primary = client.get(f"{url}?language={primary_language()}", headers=_headers(vendor))
+    other = client.get(f"{url}?language={other_language()}", headers=_headers(vendor))
+    assert absent.status_code == 200, absent.content
+    assert absent.json() == primary.json()
+    names = {a["code"]: a["name"] for a in absent.json()}
+    assert names["size"] == "Size"
+    assert {a["code"]: a["name"] for a in other.json()}["size"] == "Taglia"
+
+
+def test_an_explicit_language_wins_over_the_primary_one(
+    client: Client, attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    response = client.get(
+        f"/api/v1/catalog/attributes?language={other_language()}", headers=_headers(vendor)
+    )
+    assert {a["code"]: a["name"] for a in response.json()}["color"] == "Colore"
+
+
+def test_the_language_default_is_not_baked_into_the_schema(client: Client) -> None:
+    from apps.api.v1.catalog import LanguageQuery
+
+    assert LanguageQuery(language=None).language == primary_language()
+    schema = LanguageQuery.model_json_schema()["properties"]["language"]
+    assert "default" not in schema or schema["default"] is None
+
+
 # --- CAT.15: other sellers of a product
 
 
