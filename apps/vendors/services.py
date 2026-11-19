@@ -2087,6 +2087,18 @@ def may_approve_claims(user: AbstractBaseUser | AnonymousUser) -> bool:
     return bool(check(user, VENDOR_APPROVAL_SECTION, write=True))
 
 
+RETURN_POLICY_SECTION = "platform.return_policy"
+
+
+def can_approve_return_policy(actor: AbstractBaseUser | AnonymousUser) -> bool:
+    """Whether `actor` holds the matrix cell "approve a vendor's return policy" (CORE.18, VEN.40).
+
+    Role membership, not `can_reopen` (the profile reopen right) and never `has_perm`. Reached
+    through `settings.PLATFORM_SECTION_CHECK`, the Manager app being above this one."""
+    check = import_string(settings.PLATFORM_SECTION_CHECK)
+    return bool(check(actor, RETURN_POLICY_SECTION, write=True))
+
+
 def _require_approval_permission(ctx: AuditContext) -> None:
     """A context that names a user (an adapter acting for staff) needs the approval section.
     Contexts without a user (system, management commands) are internal and not checked here."""
