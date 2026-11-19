@@ -7,6 +7,7 @@ through the service (one audit entry, no extra one) behind the `operator_config`
 
 import datetime as dt
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.db import connection
@@ -202,3 +203,32 @@ def test_the_preview_queries_do_not_grow_with_the_vendors(
         response = client.post(reverse(NEW), form())
     assert "50" in response.text
     assert len(many) == len(few)
+
+
+def rome_stamp(moment: dt.datetime) -> str:
+    return moment.astimezone(ZoneInfo("Europe/Rome")).strftime("%Y-%m-%dT%H:%M")
+
+
+def test_the_start_is_read_in_the_business_time_zone(current: Any) -> None:
+    """00:30 in Rome on day D is 23:30 UTC on D-1 (winter, UTC+1)."""
+    day = dt.date(timezone.now().year + 1, 1, 15)
+    client = login("config")
+    response = client.post(
+        reverse(NEW), {**form(valid_from=f"{day:%Y-%m-%d}T00:30"), "confirm": "1"}
+    )
+    assert response.status_code == 302
+    expected = dt.datetime.combine(day - dt.timedelta(days=1), dt.time(23, 30), tzinfo=dt.UTC)
+    assert TrustRules.objects.get(version=2).valid_from == expected
+
+
+def test_the_form_shows_the_start_back_in_rome_and_keeps_the_tolerance(current: Any) -> None:
+    client = login("config")
+    page = client.get(reverse(NEW))
+    default = timezone.now() + dt.timedelta(minutes=5)
+    assert f'value="{rome_stamp(default)}"' in page.text
+    # The current minute, cut to :00, is under a minute old: the service's tolerance accepts it.
+    ok = client.post(reverse(NEW), form(valid_from=rome_stamp(timezone.now())))
+    assert "cannot start in the past" not in ok.text
+    late = rome_stamp(timezone.now() - dt.timedelta(minutes=5))
+    refused = client.post(reverse(NEW), form(valid_from=late))
+    assert "cannot start in the past" in refused.text
