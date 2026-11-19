@@ -67,6 +67,17 @@ def test_the_body_the_law_and_the_delivery_time_are_required() -> None:
     assert {"body", "governing_law", "delivery_days"} <= set(errors)
 
 
+def test_parse_clauses_is_linear_on_a_long_line_without_a_separator() -> None:
+    """SEC.5 (ReDoS): a line of spaces or letters with no separator used to backtrack
+    quadratically; it must finish at once and fall back to an article without a title."""
+    import time
+
+    for line in (" " * 20_000 + "x", "a" * 20_000, "a " * 10_000 + "!"):
+        started = time.perf_counter()
+        assert te.parse_clauses(line) == [{"article": line.strip(), "title": ""}]
+        assert time.perf_counter() - started < 0.5
+
+
 def test_parse_clauses_reads_one_clause_per_line() -> None:
     text = "7 | Limitation of liability\n\n 12 - Court of the seller \n"
     assert te.parse_clauses(text) == [
