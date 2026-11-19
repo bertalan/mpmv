@@ -171,6 +171,7 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:amendment_settings": "platform",
         "manager:platform:trust_rules": "platform",  # TRU.1 part 2
         "manager:platform:trust_rule": "platform",
+        "manager:platform:trust_rule_new": "platform",
     }
 
 

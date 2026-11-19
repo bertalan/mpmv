@@ -24,7 +24,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
-from tests.i18n import localized, other_language, third_language
+from tests.i18n import localized, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -89,21 +89,23 @@ def test_a_language_without_a_text_falls_back_to_the_source_with_a_notice(
     client: Client,
 ) -> None:
     vendor = _vendor()
-    html = client.get(f"{prefix('de')}/shop/{vendor.slug}/").content.decode()
+    vendor.translations.filter(language=other_language()).delete()
+    html = client.get(f"{prefix(other_language())}/shop/{vendor.slug}/").content.decode()
     assert "Our story in English." in html
-    with translation.override("de"):
+    with translation.override(other_language()):
         assert escape(gettext("This page is not available in your language yet.")) in html
 
 
 def test_a_draft_text_never_shows(client: Client) -> None:
     vendor = _vendor()
+    vendor.translations.filter(language=other_language()).delete()
     VendorTranslationFactory.create(
         vendor=vendor,
-        language=third_language(),
+        language=other_language(),
         status=TranslationStatus.MACHINE,
         description="Entwurf nicht veroeffentlichen",
     )
-    html = client.get(f"{prefix('de')}/shop/{vendor.slug}/").content.decode()
+    html = client.get(f"{prefix(other_language())}/shop/{vendor.slug}/").content.decode()
     assert "Entwurf" not in html
 
 

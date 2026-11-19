@@ -1,7 +1,7 @@
 # Regole di fiducia
-last-checked: 2026-11-18
+last-checked: 2026-11-19
 
-Questa pagina elenca ogni versione delle soglie dei badge di fiducia dei venditori. È di sola lettura.
+Questa pagina elenca ogni versione delle soglie dei badge di fiducia dei venditori. Scelga Nuova versione per preparare una modifica.
 
 ## Che cosa vede
 Ogni riga è una versione: il numero, quando inizia e quando finisce, un indicatore per la versione in vigore e il motivo della modifica.

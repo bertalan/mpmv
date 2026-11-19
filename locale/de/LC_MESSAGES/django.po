@@ -1490,6 +1490,7 @@ msgstr "Zurück zur Kontosicherheit"
 msgid "Back to all results"
 msgstr "Zurück zu allen Ergebnissen"
 
+#: apps/manager/templates/manager/platform/trust_rule_new.html
 #: apps/manager/templates/manager/platform/trust_rules_detail.html
 msgid "Back to all versions"
 msgstr "Zurück zu allen Versionen"
@@ -1568,6 +1569,10 @@ msgstr "Zurück zu den Zwei-Faktor-Einstellungen"
 #: themes/base/templates/400.html
 msgid "Bad request"
 msgstr "Ungültige Anfrage"
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Badge"
+msgstr "Abzeichen"
 
 #: apps/manager/templates/manager/shop/_money_nav.html
 msgid "Balance"
@@ -1889,6 +1894,15 @@ msgstr ""
 #: apps/manager/amendment_views.py
 msgid "Change the order"
 msgstr "Bestellung ändern"
+
+#: apps/manager/templates/manager/platform/trust_rule_new.html
+msgid ""
+"Change the thresholds you need. The result is a new version from the date you choose; the version "
+"in force ends then and is never edited. You see the effect before anything is saved."
+msgstr ""
+"Ändern Sie die Schwellenwerte, die Sie brauchen. Das Ergebnis ist eine neue Version ab dem "
+"gewählten Datum; die gültige Version endet dann und wird nie bearbeitet. Sie sehen die Wirkung, "
+"bevor etwas gespeichert wird."
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Change this order"
@@ -2294,6 +2308,7 @@ msgstr "Änderung berechnen"
 #: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
 #: apps/manager/templates/manager/platform/product.html
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
 #: apps/manager/templates/manager/shop/fitment_bulk.html
 #: apps/manager/templates/manager/shop/fitment_product.html
 msgid "Confirm"
@@ -2894,6 +2909,7 @@ msgstr "Erreicht bei"
 msgid "Earned at or below"
 msgstr "Erreicht bei höchstens"
 
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
 #: apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Edit"
 msgstr "Bearbeiten"
@@ -4759,9 +4775,21 @@ msgstr "Neuer Gesamtbetrag der Bestellung: %(total)s EUR."
 msgid "New total of this part of your order: %(total)s EUR."
 msgstr "Neuer Gesamtbetrag dieses Teils deiner Bestellung: %(total)s EUR."
 
+#: apps/manager/trust_edit_views.py
+msgid "New trust rules version"
+msgstr "Neue Version der Vertrauensregeln"
+
 #: apps/manager/amendment_forms.py
 msgid "New unit price of %(title)s, EUR net of VAT (now %(price)s)"
 msgstr "Neuer Stückpreis von %(title)s, EUR netto ohne MwSt. (jetzt %(price)s)"
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "New value"
+msgstr "Neuer Wert"
+
+#: apps/manager/templates/manager/platform/trust_rules.html
+msgid "New version"
+msgstr "Neue Version"
 
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/base/templates/components/pagination.html themes/ride/templates/catalog/listing.html
@@ -4903,6 +4931,10 @@ msgstr "Es ist noch keine Sitzung erfasst."
 msgid "No storefront changes yet."
 msgstr "Noch keine Änderungen am Shop."
 
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "No threshold differs from the version in force."
+msgstr "Kein Schwellenwert weicht von der gültigen Version ab."
+
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "No version is published yet. Until you publish one, your products are sold on request only."
 msgstr ""
@@ -5028,9 +5060,11 @@ msgstr ""
 msgid "not yet"
 msgstr "noch nicht"
 
-#: apps/manager/fitment_shop_forms.py apps/manager/templates/manager/platform/trust_rules.html
+#: apps/manager/fitment_shop_forms.py
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+#: apps/manager/templates/manager/platform/trust_rules.html
 #: apps/manager/templates/manager/platform/trust_rules_detail.html
-#: apps/manager/templates/manager/shop/_fitment_rows.html
+#: apps/manager/templates/manager/shop/_fitment_rows.html apps/manager/trust_forms.py
 msgid "Note"
 msgstr "Hinweis"
 
@@ -5058,6 +5092,10 @@ msgstr "Nichts gefunden"
 #: apps/manager/templates/manager/shop/fitment_product.html
 msgid "Nothing has changed yet. Check the changes below, then confirm."
 msgstr "Es wurde noch nichts geändert. Prüfen Sie die Änderungen unten und bestätigen Sie dann."
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Nothing has changed yet. Check the effect below, then confirm."
+msgstr "Es hat sich noch nichts geändert. Prüfen Sie die Wirkung unten und bestätigen Sie dann."
 
 #: apps/vendors/templates/vendors/apply/cancelled.html
 msgid "Nothing is waiting"
@@ -6226,6 +6264,7 @@ msgid "Prepare a change"
 msgstr "Änderung vorbereiten"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/product.html
+#: apps/manager/templates/manager/platform/trust_rule_new.html
 #: apps/manager/templates/manager/shop/fitment_bulk.html
 #: apps/manager/templates/manager/shop/fitment_product.html
 msgid "Preview"
@@ -6238,6 +6277,10 @@ msgstr "Vorschau der Änderung"
 #: apps/manager/fitment_views.py
 msgid "Preview of the merge"
 msgstr "Vorschau der Zusammenführung"
+
+#: apps/manager/trust_edit_views.py
+msgid "Preview of the new trust rules version"
+msgstr "Vorschau der neuen Version der Vertrauensregeln"
 
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Preview the change"
@@ -9477,6 +9520,14 @@ msgstr ""
 "die neue maximale Lieferzeit (%(after)s) ist %(extra)s Tage länger als die alte (%(before)s), mehr"
 " als die %(allowed)s Tage, die eine geringfügige Änderung erlaubt"
 
+#: apps/manager/trust_edit_views.py
+msgid "The new trust rules version is saved."
+msgstr "Die neue Version der Vertrauensregeln ist gespeichert."
+
+#: apps/manager/trust_forms.py
+msgid "The new version starts then and the one in force ends. Not in the past."
+msgstr "Die neue Version beginnt dann und die gültige endet. Nicht in der Vergangenheit."
+
 #: apps/manager/fitment_views.py
 msgid "The node is added."
 msgstr "Der Knoten wurde hinzugefügt."
@@ -11291,6 +11342,14 @@ msgstr ""
 "Dieses Zeitfenster deckt nur die sensiblen Aktionen dieses Shops ab, die sein Inhaber bestätigt. "
 "Es deckt nie einen anderen Shop ab."
 
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Threshold"
+msgstr "Schwellenwert"
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Thresholds that differ from the version in force"
+msgstr "Schwellenwerte, die von der gültigen Version abweichen"
+
 #: apps/manager/event_forms.py
 msgid "Thursday"
 msgstr "Donnerstag"
@@ -11896,7 +11955,7 @@ msgstr "Nutzersitzungen"
 msgid "Uses a year"
 msgstr "Verwendet ein Jahr"
 
-#: apps/manager/templates/manager/platform/trust_rules.html
+#: apps/manager/templates/manager/platform/trust_rules.html apps/manager/trust_forms.py
 msgid "Valid from"
 msgstr "Gültig ab"
 
@@ -11911,6 +11970,10 @@ msgstr "Gültig bis"
 #: apps/manager/templates/manager/shop/statements.html
 msgid "Valid until"
 msgstr "Gültig bis"
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Value in force"
+msgstr "Gültiger Wert"
 
 #: apps/orders/ui/present.py apps/orders/ui/views.py
 msgid "VAT"
@@ -11961,6 +12024,14 @@ msgstr "Verkäufer geschlossen"
 msgid "Vendor guide"
 msgstr "Verkäuferleitfaden"
 
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Vendors checked"
+msgstr "Geprüfte Verkäufer"
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Vendors whose badges would change"
+msgstr "Verkäufer, deren Abzeichen sich ändern würden"
+
 #: apps/manager/event_forms.py
 msgid "Venue"
 msgstr "Veranstaltungsort"
@@ -11987,6 +12058,10 @@ msgstr "Version"
 #: apps/orders/templates/orders/customer_order.html
 msgid "Version %(n)s"
 msgstr "Version %(n)s"
+
+#: apps/manager/templates/manager/platform/trust_rule_preview.html
+msgid "Version %(n)s, valid from %(start)s."
+msgstr "Version %(n)s, gültig ab %(start)s."
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
@@ -13041,6 +13116,10 @@ msgstr "Schreiben Sie die Antwort."
 #: apps/manager/event_block_forms.py
 msgid "Write the question."
 msgstr "Schreiben Sie die Frage."
+
+#: apps/manager/trust_forms.py
+msgid "Write whole numbers separated by commas."
+msgstr "Schreiben Sie ganze Zahlen, durch Kommas getrennt."
 
 #: apps/cms/blocks.py
 msgid ""

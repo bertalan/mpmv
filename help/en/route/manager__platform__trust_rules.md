@@ -1,7 +1,7 @@
 # Trust rules
-last-checked: 2026-11-18
+last-checked: 2026-11-19
 
-This page lists every version of the thresholds behind the vendor trust badges. It is read only.
+This page lists every version of the thresholds behind the vendor trust badges. Choose New version to prepare a change.
 
 ## What you see
 Each row is one version: its number, when it starts and ends, a marker for the version in force and the reason for the change.
