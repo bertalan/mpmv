@@ -2,6 +2,7 @@
 pre-contractual information page."""
 
 import datetime as dt
+import html as html_lib
 import re
 from collections.abc import Iterator
 from typing import Any
@@ -11,10 +12,12 @@ from django.core import signing
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone, translation
+from django.utils.translation import gettext
 
 from apps.accounts.captcha import TOKEN_FIELD
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
 from apps.compliance import withdrawal
+from apps.compliance.engine import withdrawal_labels
 from apps.compliance.models import WithdrawalStatement
 from apps.core.i18n import primary_language
 from apps.core.models import OutboxEmail, Throttle
@@ -26,6 +29,41 @@ from tests.i18n import language_prefix, other_language
 pytestmark = pytest.mark.django_db
 
 IP = "203.0.113.9"
+
+# The expected texts come from the catalog and the label table under the primary language, so the
+# tests hold for any MPMV_LANGUAGES (CI also runs it,de) and name no language.
+OTHER_WAYS = (
+    "You can also withdraw by sending a clear statement that you withdraw from the contract, with "
+    "your order number, to the seller by email or post, or by using the model withdrawal form. "
+    "The seller's contact details are in your order confirmation."
+)
+PERIOD = (
+    "You may withdraw from a distance contract within %(days)s days without giving a reason. The "
+    "period runs from the day you receive the goods. Each seller in your order is a separate "
+    "contract."
+)
+GUARANTEE = (
+    "Goods sold to consumers have a legal guarantee of conformity of %(months)s months from "
+    "delivery. The seller is liable for a lack of conformity that appears within that period."
+)
+
+
+def say(text: str, **values: object) -> str:
+    """The catalog text in the primary language, lower-cased for comparison with a page."""
+    with translation.override(primary_language()):
+        return (gettext(text) % values if values else gettext(text)).lower()
+
+
+def button() -> str:
+    return withdrawal_labels(primary_language()).button.lower()
+
+
+def confirm_label() -> str:
+    return withdrawal_labels(primary_language()).confirm.lower()
+
+
+def seen(content: bytes) -> str:
+    return html_lib.unescape(content.decode()).lower()
 
 
 @pytest.fixture(autouse=True)
@@ -68,14 +106,14 @@ def token_of(html: str) -> str:
 def test_the_start_page_is_public_and_uses_the_mandated_label_in_english(client: Client) -> None:
     response = client.get(reverse("withdrawal"))
     assert response.status_code == 200
-    assert "withdraw from contract here" in response.content.decode().lower()
+    assert button() in response.content.decode().lower()
     assert response["Cache-Control"] == "no-store"
 
 
 def test_the_start_page_uses_the_italian_labels(client: Client) -> None:
     response = client.get(f"{language_prefix(other_language())}/withdrawal/")
     assert response.status_code == 200
-    assert "recedere dal contratto qui" in response.content.decode().lower()
+    assert withdrawal_labels(other_language()).button.lower() in seen(response.content)
 
 
 def test_the_link_tag_renders_the_label_for_any_page(client: Client) -> None:
@@ -83,7 +121,7 @@ def test_the_link_tag_renders_the_label_for_any_page(client: Client) -> None:
 
     html = Template("{% load compliance_tags %}{% withdrawal_link %}").render(Context({}))
     assert reverse("withdrawal") in html
-    assert "withdraw from contract here" in html.lower()
+    assert button() in html.lower()
 
 
 # --- Step 1: identify the contract
@@ -94,7 +132,7 @@ def test_the_right_number_and_email_show_each_vendor_order_to_choose(client: Cli
     response = identify(client, order)
     assert response.status_code == 200
     html = response.content.decode()
-    assert "confirm withdrawal" in html.lower()
+    assert confirm_label() in html.lower()
     for sub in order.vendor_orders.all():
         assert str(sub.public_id) in html
     assert "Cup from A" in html
@@ -131,7 +169,7 @@ def test_a_closed_vendor_order_is_shown_as_closed_and_cannot_be_chosen(client: C
     assert f'value="{first.public_id}"' not in html  # no checkbox for it
     second = order.vendor_orders.order_by("id")[1]
     assert f'value="{second.public_id}"' in html
-    assert "period has ended" in html.lower()
+    assert say("the withdrawal period has ended.") in seen(html.encode())
 
 
 # --- Step 2: confirm
@@ -237,9 +275,9 @@ def test_the_captcha_is_checked_on_the_identification(client: Client, settings: 
     settings.CAPTCHA_VERIFIER = "apps.accounts.tests.fakes.FakeCaptchaVerifier"
     order = paid_order()
     refused = identify(client, order)
-    assert "confirm withdrawal" not in refused.content.decode().lower()
+    assert confirm_label() not in refused.content.decode().lower()
     accepted = identify(client, order, **{TOKEN_FIELD: FakeCaptchaVerifier.VALID_TOKEN})
-    assert "confirm withdrawal" in accepted.content.decode().lower()
+    assert confirm_label() in accepted.content.decode().lower()
 
 
 def test_lookups_are_rate_limited_per_address(client: Client) -> None:
@@ -274,7 +312,7 @@ def test_wrong_emails_exhaust_only_their_own_bucket_not_the_real_buyers(client: 
     spent = _lookup(client, order.number, "guess@example.com", 99)
     assert "We could not find" in spent.content.decode()
     real = _lookup(client, order.number, order.email, 100)
-    assert "confirm withdrawal" in real.content.decode().lower()
+    assert confirm_label() in real.content.decode().lower()
 
 
 def test_the_pair_bucket_limits_the_real_pair_too(client: Client) -> None:
@@ -296,8 +334,7 @@ def test_the_per_order_backstop_still_triggers(client: Client) -> None:
 
 def test_the_not_found_page_shows_other_ways_to_withdraw(client: Client) -> None:
     html = _lookup(client, "2999-000001", "x@example.com", 1).content.decode()
-    assert "also withdraw" in html
-    assert "model withdrawal form" in html
+    assert say(OTHER_WAYS) in seen(html.encode())
 
 
 def test_the_done_page_shows_the_vendor_contact_for_other_ways(client: Client) -> None:
@@ -305,7 +342,7 @@ def test_the_done_page_shows_the_vendor_contact_for_other_ways(client: Client) -
     html = identify(client, order).content.decode()
     sub = order.vendor_orders.order_by("id")[0]
     done = client.get(confirm(client, html, sub.public_id)["Location"]).content.decode()
-    assert "also withdraw" in done
+    assert say(OTHER_WAYS) in seen(done.encode())
     assert sub.vendor.contact_email in done
 
 
@@ -317,13 +354,14 @@ def test_the_information_page_says_where_the_function_is(client: Client) -> None
     assert response.status_code == 200
     html = response.content.decode()
     assert reverse("withdrawal") in html
-    assert "14 days" in html
-    assert "withdraw from contract here" in html.lower()
+    assert say(PERIOD, days=14) in seen(html.encode())
+    assert button() in html.lower()
 
 
 def test_the_information_page_follows_the_period_setting(client: Client, settings: Any) -> None:
     settings.WITHDRAWAL_PERIOD_DAYS = 30
-    assert "30 days" in client.get(reverse("consumer_information")).content.decode()
+    page = client.get(reverse("consumer_information")).content
+    assert say(PERIOD, days=30) in seen(page)
 
 
 def test_the_information_page_in_italian_uses_the_italian_label(client: Client) -> None:
@@ -332,10 +370,9 @@ def test_the_information_page_in_italian_uses_the_italian_label(client: Client) 
         .content.decode()
         .lower()
     )
-    assert "recedere dal contratto qui" in html
+    assert withdrawal_labels(other_language()).button.lower() in html
 
 
 def test_the_information_page_marks_the_guarantee_notice_as_a_draft(client: Client) -> None:
     html = client.get(reverse("consumer_information")).content.decode().lower()
-    assert "legal guarantee" in html
-    assert "24 months" in html
+    assert say(GUARANTEE, months=24) in seen(html.encode())
