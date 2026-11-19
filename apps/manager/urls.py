@@ -15,6 +15,7 @@ from . import (
     fitment_shop_views,
     fitment_views,
     media,
+    money_views,
     notice_views,
     product_views,
     return_policy_views,
@@ -22,6 +23,7 @@ from . import (
     session_views,
     statement_views,
     termination_views,
+    trust_views,
     views,
 )
 
@@ -32,6 +34,16 @@ shop = (
         path("", views.ShopDashboardView.as_view(), name="dashboard"),
         path("profile/", views.StorefrontProfileView.as_view(), name="profile"),
         path("payments/", views.PaymentsView.as_view(), name="payments"),
+        # VEN.9: the vendor's own money, read only (the export is a POST, audited).
+        path("money/", money_views.MoneyOverviewView.as_view(), name="money"),
+        path(
+            "money/transactions/",
+            money_views.TransactionListView.as_view(),
+            name="money_transactions",
+        ),
+        path("money/payouts/", money_views.PayoutListView.as_view(), name="money_payouts"),
+        path("money/statement/", money_views.StatementView.as_view(), name="money_statement"),
+        path("money/export/", money_views.ExportView.as_view(), name="money_export"),
         path("sales-terms/", sales_terms_views.SalesTermsView.as_view(), name="sales_terms"),
         path(
             "return-policy/", return_policy_views.ReturnPolicyView.as_view(), name="return_policy"
@@ -217,6 +229,13 @@ platform = (
         path("notices/", notice_views.NoticeListView.as_view(), name="notices"),
         path("notices/<uuid:public_id>/", notice_views.NoticeDetailView.as_view(), name="notice"),
         path("terminations/", termination_views.TerminationListView.as_view(), name="terminations"),
+        # TRU.1 part 2: the trust rules versions, read only.
+        path("trust-rules/", trust_views.TrustRulesListView.as_view(), name="trust_rules"),
+        path(
+            "trust-rules/<int:version>/",
+            trust_views.TrustRulesDetailView.as_view(),
+            name="trust_rule",
+        ),
         # ORD.20 part 3: the staff tools on a paid order (Support and the platform owner).
         path("orders/", amendment_views.PlatformOrdersView.as_view(), name="orders"),
         path(

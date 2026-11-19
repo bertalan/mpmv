@@ -75,6 +75,7 @@ from apps.core import translations
 from apps.core.images import rendition_or_original
 from apps.core.money import CURRENCY
 from apps.vendors.models import Vendor, VendorTranslation
+from apps.vendors.seller_name import public_name
 from apps.vendors.services import has_public_storefront
 
 from .choosers import (
@@ -756,9 +757,10 @@ def _vendor_targets(vendors: list[Vendor], language: str) -> dict[int, _Target]:
     for vendor in public:
         shown = translations.resolve(texts.get(vendor.pk, {}).values(), language).translation
         href = storefront_path(vendor.slug, language, primary)
-        targets[vendor.pk] = _Target(
-            vendor.display_name, href, shown.tagline if shown is not None else ""
-        )
+        name = public_name(vendor)
+        if name is None:  # a person's legal name is never a card title (SEO.15)
+            continue
+        targets[vendor.pk] = _Target(name, href, shown.tagline if shown is not None else "")
     return targets
 
 

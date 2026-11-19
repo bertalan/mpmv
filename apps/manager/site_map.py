@@ -57,6 +57,10 @@ SHOP_PAGES: Final[Pages] = (
     (gettext_noop("Dashboard"), "manager:shop:dashboard"),
     (gettext_noop("Storefront profile"), "manager:shop:profile"),
     (gettext_noop("Payments"), "manager:shop:payments"),
+    (gettext_noop("Money"), "manager:shop:money"),
+    (gettext_noop("Transactions"), "manager:shop:money_transactions"),
+    (gettext_noop("Payouts"), "manager:shop:money_payouts"),
+    (gettext_noop("Statement"), "manager:shop:money_statement"),
     (gettext_noop("Sales terms"), "manager:shop:sales_terms"),
     (gettext_noop("Return policy"), "manager:shop:return_policy"),
     (gettext_noop("Orders"), "manager:shop:orders"),
@@ -84,6 +88,7 @@ PLATFORM_PAGES: Final[Pages] = (
     (gettext_noop("Products"), "manager:platform:catalog_products"),
     (gettext_noop("Order changes"), "manager:platform:orders"),
     (gettext_noop("Order change settings"), "manager:platform:amendment_settings"),
+    (gettext_noop("Trust rules"), "manager:platform:trust_rules"),
 )
 ADMIN_PAGES: Final[Pages] = ((gettext_noop("Editors' admin"), "wagtailadmin_home"),)
 # Listed only once the setup wizard exists and has not been completed (ARC.25).
@@ -117,6 +122,7 @@ NOT_LISTED: Final = frozenset(
         "manager:shop:event_preview",
         "manager:shop:termination_data",
         "manager:shop:fitment_nodes",
+        "manager:shop:money_export",  # VEN.9: POST only, a CSV download
         "manager:shop:image_choose",
         "manager:shop:image_results",
         "manager:shop:image_create",
@@ -131,6 +137,7 @@ NOT_LISTED: Final = frozenset(
         "manager:platform:profile_confirm",
         "manager:platform:notice",
         "manager:platform:termination",
+        "manager:platform:trust_rule",
         "manager:platform:user_sessions_find",
         "manager:platform:catalog_product",
         "manager:platform:fitment_node_new",

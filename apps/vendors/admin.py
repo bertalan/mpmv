@@ -55,6 +55,7 @@ from .models import (
     legal_field_label,
 )
 from .services import (
+    APPROVAL_DENIED,
     add_commission_rule,
     add_no_tin_country,
     approve_claim,
@@ -68,6 +69,7 @@ from .services import (
     establishment_flags,
     establishment_warning,
     legal_profile_completeness,
+    may_approve_claims,
     no_tin_impact,
     onboarding_checklist,
     reject_claim,
@@ -250,7 +252,6 @@ def send_claim_link_action(
         modeladmin.message_user(request, f"{vendor}: {done}", messages.SUCCESS)
 
 
-VENDOR_APPROVAL_SECTION = "platform.vendor_approval"
 CLAIM_DECISION_TEMPLATE = "admin/vendors/vendor/claim_decision.html"
 DECISIONS = {
     "approve_claim": (approve_claim, "Approve", "claim approved: the claimant is now the owner."),
@@ -311,17 +312,9 @@ def decision_action(name: str) -> ClaimAction:
     def action(
         modeladmin: admin.ModelAdmin[Vendor], request: HttpRequest, queryset: QuerySet[Vendor]
     ) -> HttpResponse | None:
-        if name == "approve_claim" and not _section_allowed(
-            request, VENDOR_APPROVAL_SECTION, write=True
-        ):
-            # Granting the owner role is the matrix cell "approve or suspend a vendor"
-            # (CORE.18), not just `vendors.change_vendor`; checked before anything is shown.
-            modeladmin.message_user(
-                request,
-                "Granting the owner role needs the vendor approval permission "
-                "(Catalog and moderation, or the platform owner).",
-                messages.ERROR,
-            )
+        if name == "approve_claim" and not may_approve_claims(request.user):
+            # Early, so nothing is shown to staff who cannot decide; the service enforces it too.
+            modeladmin.message_user(request, APPROVAL_DENIED, messages.ERROR)
             return None
         if request.POST.get("post") != "yes":
             return _review_page(modeladmin, request, queryset, name)
@@ -338,7 +331,7 @@ def decision_action(name: str) -> ClaimAction:
             version, claimant_id = reviewed
             try:
                 decide(claim, ctx=ctx, reviewed_version=version, reviewed_claimant_id=claimant_id)
-            except engine.ClaimError as exc:
+            except (engine.ClaimError, PermissionDenied) as exc:
                 modeladmin.message_user(request, f"{vendor}: {exc}", messages.ERROR)
             else:
                 modeladmin.message_user(request, f"{vendor}: {done}", messages.SUCCESS)

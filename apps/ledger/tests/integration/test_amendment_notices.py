@@ -316,3 +316,29 @@ def test_the_guest_a2_names_the_support_address(stripe: FakeStripeClient) -> Non
     kept = event(sub, notices.ITEM_UNAVAILABLE)
     assert "contact support at help@example.test" in kept.text, kept.text
     assert kept.payload["wording_approval"]["approved_on"] == "2026-11-17"
+
+
+def test_a_wording_change_between_queueing_and_sending_does_not_change_the_mailed_text(
+    stripe: FakeStripeClient,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ORD.26: the kept notice is byte for byte what the outbox sends, even when a deploy or a
+    translation fix lands between queueing and sending."""
+    from apps.core import mail as core_mail
+
+    sub = place_seed(stripe, customer=UserFactory.create())
+    remove_b(sub, now=timezone.now())
+    email = mail(notices.ITEM_UNAVAILABLE)
+    kept = event(sub, notices.ITEM_UNAVAILABLE)
+    sender = core_services.email_sender()
+    assert isinstance(sender, core_mail.MemoryEmailSender)
+    sender.clear()
+    monkeypatch.setattr(
+        core_services,
+        "render_email",
+        lambda *a, **k: core_mail.RenderedEmail("changed", "changed\n", "<p>changed</p>"),
+    )
+    core_services.deliver_email(email.public_id)
+    assert [m.text_body for m in sender.sent] == [kept.text], plainly(
+        "the mailed text must equal the kept notice text", [m.text_body for m in sender.sent]
+    )

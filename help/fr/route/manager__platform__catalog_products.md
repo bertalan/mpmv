@@ -1,7 +1,7 @@
 # Produits
 last-checked: 2026-11-18
 
-Cette page liste les produits de toutes les boutiques, pour le rôle Catalogue et modération. Le propriétaire de la plateforme peut la lire mais ne peut rien modifier.
+Cette page liste les produits de toutes les boutiques, pour le rôle Catalogue et modération. Le propriétaire de la plateforme et le rôle Support peuvent la lire mais ne peuvent rien modifier : pour eux, la page affiche un avis et aucune commande de modification, et toute tentative de modifier un produit est refusée (accès refusé).
 
 ## Trouver des produits
 - **Rechercher** parcourt le SKU et les titres dans toutes les langues.

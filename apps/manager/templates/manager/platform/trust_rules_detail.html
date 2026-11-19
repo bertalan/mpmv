@@ -1,0 +1,22 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}One version of the trust rules (TRU.1 part 2): its period and thresholds, read only.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p class="manager-lead">
+    {% blocktranslate with start=rules.valid_from|date:"SHORT_DATETIME_FORMAT" %}Valid from {{ start }}{% endblocktranslate %}{% if rules.valid_to %}
+    {% blocktranslate with end=rules.valid_to|date:"SHORT_DATETIME_FORMAT" %}to {{ end }}{% endblocktranslate %}{% endif %}.
+    {% if in_force %}<strong>{% translate "In force" %}</strong>{% else %}{% translate "Not in force" %}{% endif %}
+  </p>
+  {% if rules.note %}<p>{% translate "Note" %}: {{ rules.note }}</p>{% endif %}
+  {% for group in groups %}
+    <h2>{{ group.heading }}</h2>
+    <dl class="manager-facts" data-trust-group>
+      {% for row in group.rows %}
+        <dt>{{ row.label }}</dt>
+        <dd data-param="{{ row.name }}">{{ row.value }}</dd>
+      {% endfor %}
+    </dl>
+  {% endfor %}
+  <p><a href="{% url 'manager:platform:trust_rules' %}">{% translate "Back to all versions" %}</a></p>
+{% endblock %}

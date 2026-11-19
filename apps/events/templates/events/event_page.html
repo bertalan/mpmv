@@ -1,5 +1,5 @@
 {% extends "layouts/content.html" %}
-{% load i18n tz wagtailcore_tags cms_tags event_feeds %}
+{% load i18n tz wagtailcore_tags cms_tags event_feeds seo_seller %}
 {% comment %}
 Event page (EVT.1 part 2/2, spec 15 "Public pages"): a minimal page on the base theme layout.
 Dates are in the page's language and the event's own time zone, with machine-readable
@@ -34,9 +34,9 @@ when the event has an address and no coordinates.
       </dd>
       <dt>{% translate "Type" %}</dt>
       <dd>{{ page.get_event_type_display }}</dd>
-      {% if page.vendor %}
+      {% seller_name page.vendor as seller %}{% if seller %}
         <dt>{% translate "Vendor" %}</dt>
-        <dd>{% if vendor_href %}<a href="{{ vendor_href }}">{{ page.vendor.display_name }}</a>{% else %}{{ page.vendor.display_name }}{% endif %}</dd>
+        <dd>{% if vendor_href %}<a href="{{ vendor_href }}">{{ seller }}</a>{% else %}{{ seller }}{% endif %}</dd>
       {% endif %}
       {% if page.attendance %}
         <dt>{% translate "Attendance" %}</dt>

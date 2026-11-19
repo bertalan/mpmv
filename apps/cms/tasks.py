@@ -35,3 +35,22 @@ def purge_form_submissions(timestamp: int) -> None:
         ctx=AuditContext(actor_label="system:purge_form_submissions", source=AuditLog.Source.SYSTEM)
     )
     logger.info("cms.purge_form_submissions purged %d form page(s)", len(changes.changes))
+
+
+@periodic("7 4 * * *")
+@locked()
+@task("cms.purge_page_revisions", retry=NO_RETRY)
+def purge_page_revisions(timestamp: int) -> None:
+    """Every night: delete the page revisions older than 12 months beyond each page's latest
+    ten (CMS.18). One audit entry per run, counts only; a second run finds nothing."""
+    from . import retention
+
+    result = retention.purge_page_revisions(
+        ctx=AuditContext(actor_label="system:purge_page_revisions", source=AuditLog.Source.SYSTEM),
+        dry_run=False,
+    )
+    logger.info(
+        "cms.purge_page_revisions deleted %d revision(s) of %d page(s)",
+        result.deleted_total,
+        len(result.deleted),
+    )

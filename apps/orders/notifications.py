@@ -110,6 +110,7 @@ def notify_order_placed(order: Order) -> None:
         template_key=ORDER_RECEIVED,
         language=order.language,
         idempotency_key=f"order:{order.public_id}:received",
+        order_ref=order.public_id,
         context={
             "order_number": order.number,
             "customer_name": order.customer_name,
@@ -133,6 +134,7 @@ def notify_order_paid(order: Order) -> None:
         template_key=PAYMENT_CONFIRMED,
         language=language,
         idempotency_key=f"order:{order.public_id}:paid",
+        order_ref=order.public_id,
         context={**base, "total": _money(order.grand_total)},
     )
     for sub in order.vendor_orders.select_related("vendor").order_by("id"):
@@ -141,6 +143,7 @@ def notify_order_paid(order: Order) -> None:
             template_key=ORDER_CONFIRMATION,
             language=language,
             idempotency_key=f"vendor-order:{sub.public_id}:confirmation",
+            order_ref=order.public_id,
             context={
                 **base,
                 "vendor_order_ref": str(sub.public_id),
@@ -159,6 +162,7 @@ def notify_order_paid(order: Order) -> None:
                 template_key=VENDOR_NEW_ORDER,
                 language=_vendor_language(sub),
                 idempotency_key=f"vendor-order:{sub.public_id}:new",
+                order_ref=order.public_id,
                 context={
                     "order_number": order.number,
                     "vendor_name": _vendor_name(sub),
@@ -180,6 +184,7 @@ def _vendor_event(sub: VendorOrder, kind: str, event: str) -> None:
         template_key=kind,
         language=order.language,
         idempotency_key=f"vendor-order:{sub.public_id}:{event}",
+        order_ref=order.public_id,
         context={
             "order_number": order.number,
             "customer_name": order.customer_name,
@@ -202,6 +207,7 @@ def notify_order_cancelled(order: Order) -> None:
         template_key=ORDER_CANCELLED,
         language=order.language,
         idempotency_key=f"order:{order.public_id}:cancelled",
+        order_ref=order.public_id,
         context={"order_number": order.number, "customer_name": order.customer_name},
     )
 
@@ -217,6 +223,7 @@ def notify_vendor_order_cancelled(sub: VendorOrder) -> None:
             template_key=VENDOR_ORDER_CANCELLED_NOTICE,
             language=_vendor_language(sub),
             idempotency_key=f"vendor-order:{sub.public_id}:cancelled-notice",
+            order_ref=order.public_id,
             context={
                 "order_number": order.number,
                 "vendor_name": _vendor_name(sub),
@@ -238,6 +245,7 @@ def notify_vendor_order_shipped(sub: VendorOrder) -> None:
         template_key=VENDOR_ORDER_SHIPPED,
         language=order.language,
         idempotency_key=f"vendor-order:{sub.public_id}:shipped",
+        order_ref=order.public_id,
         context={
             "order_number": order.number,
             "customer_name": order.customer_name,
