@@ -3,6 +3,22 @@
    Bootstrap classes do the layout; this file maps them on the ride tokens. Colours only through
    tokens. Transitions only when the visitor has no reduced-motion preference. */
 @layer overrides {
+  /* `base` and the home blocks lay `.product-grid` out as a CSS grid, and their layers sit above
+     `bootstrap`. When a ride template builds the grid on Bootstrap's row (`row row-cols-*`), the
+     row must win, or each column takes its share of a grid cell and the cards shrink. */
+  .product-grid.row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    grid-template-columns: none;
+    margin-block: calc(-1 * var(--bs-gutter-y)) 0;
+    margin-inline: calc(-0.5 * var(--bs-gutter-x));
+  }
+
+  .product-grid.row > li {
+    display: block;
+  }
+
   .listing-filters fieldset {
     border: 0;
     padding: 0;
