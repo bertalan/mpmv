@@ -1011,7 +1011,9 @@ msgid "Added to your cart."
 msgstr "Aggiunto al carrello."
 
 #: apps/manager/amendment_forms.py apps/orders/templates/orders/_legal_recap.html
-#: apps/orders/ui/forms.py themes/ride/templates/orders/_legal_recap.html
+#: apps/orders/ui/forms.py themes/base/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html
+#: themes/ride/templates/orders/_legal_recap.html
 msgid "Address"
 msgstr "Indirizzo"
 
@@ -2958,6 +2960,10 @@ msgid "Either remove the line or change its quantity, not both."
 msgstr "Rimuovi la riga oppure cambia la quantità, non entrambe."
 
 #: apps/manager/amendment_forms.py apps/manager/templates/manager/login.html
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: themes/base/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html
 msgid "Email"
 msgstr "Email"
 
@@ -6132,6 +6138,15 @@ msgstr "In attesa di revisione"
 msgid "Permission reference"
 msgstr "Riferimento del permesso"
 
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: apps/orders/templates/orders/_legal_recap.html
+#: themes/base/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html
+#: themes/ride/templates/orders/_legal_recap.html
+msgid "Phone"
+msgstr "Telefono"
+
 #: apps/manager/amendment_forms.py
 msgid "Phone call"
 msgstr "Telefonata"
@@ -7372,9 +7387,17 @@ msgid "Sell with us (vendor application)"
 msgstr "Vendi con noi (candidatura venditore)"
 
 #: apps/orders/templates/orders/_legal_recap.html apps/vendors/models.py
+#: themes/base/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html
 #: themes/ride/templates/orders/_legal_recap.html
 msgid "Seller"
 msgstr "Venditore"
+
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: apps/orders/templates/orders/confirmation.html
+msgid "Seller details"
+msgstr "Dati del venditore"
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Selling mode"
@@ -13517,6 +13540,14 @@ msgid ""
 msgstr ""
 "Hai 14 giorni dalla consegna per recedere, anche con il pulsante di recesso online. Paghi tu il "
 "costo diretto della restituzione dei beni. %(info)s"
+
+#: apps/orders/templates/orders/confirmation.html
+msgid ""
+"You have a separate contract with each seller. These are the details to contact each seller, also "
+"to withdraw."
+msgstr ""
+"Con ogni venditore hai un contratto separato. Questi sono i dati per contattare ciascun venditore,"
+" anche per recedere."
 
 #: apps/manager/templates/manager/shop/events.html
 msgid "You have no events yet."

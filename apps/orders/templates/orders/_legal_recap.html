@@ -13,6 +13,7 @@ the button (_legal_boxes.html).
       <dt>{% translate "Seller" %}</dt><dd>{{ seller.legal_name }} ({% translate "professional seller" %})</dd>
       {% if seller.address %}<dt>{% translate "Address" %}</dt><dd>{{ seller.address }}</dd>{% endif %}
       {% if seller.vat_number %}<dt>{% translate "VAT number" %}</dt><dd>{{ seller.vat_number }}</dd>{% endif %}
+      {% if seller.phone %}<dt>{% translate "Phone" %}</dt><dd>{{ seller.phone }}</dd>{% endif %}
       {% if seller.contact_email %}<dt>{% translate "Contact" %}</dt><dd>{{ seller.contact_email }}</dd>{% endif %}
       {% if seller.has_terms %}
       <dt>{% translate "Delivery time" %}</dt><dd>{% blocktranslate with days=seller.delivery_days %}{{ days }} working days{% endblocktranslate %}</dd>

@@ -16,6 +16,7 @@ from apps.core.http import client_ip
 from apps.core.public_forms import Protection, public_form
 from apps.core.services import NoPlatformOperator
 from apps.orders.models import Order
+from apps.vendors import services as vendor_services
 
 from . import engine, services, withdrawal
 from . import subprocessors as subprocessors_register
@@ -283,10 +284,9 @@ def withdrawal_done(request: HttpRequest) -> HttpResponse:
                 "statements": statements,
                 "submitted_at": withdrawal.display_time(statements[0].submitted_at),
                 "emailed": all(s.acknowledged_at for s in statements),
+                # CMP.41: name, geographic address, phone and email per seller (Anlage 1).
                 "vendor_contacts": [
-                    (s.vendor_order.vendor.display_name, s.vendor_order.vendor.contact_email)
-                    for s in statements
-                    if s.vendor_order.vendor.contact_email
+                    vendor_services.trader_contact(s.vendor_order.vendor) for s in statements
                 ],
                 **_labels_context(),
             },

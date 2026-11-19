@@ -1,0 +1,15 @@
+{% load i18n %}{% comment %}
+Seller details (CMP.41): who the buyer contracts with and how to reach them, one block per
+seller: the name, the geographic address, the telephone and the email the withdrawal information
+must give (Art. 246a EGBGB Anlage 1, Gestaltungshinweis 2). Context: `contact`, a
+`vendors.engine.TraderContact` or its dict. An empty phone means the seller gave none: the line is
+left out, never filled with a made-up number.
+{% endcomment %}<section class="seller-details">
+  <h3>{{ contact.shop_name }}</h3>
+  <dl>
+    <dt>{% translate "Seller" %}</dt><dd>{{ contact.legal_name }}</dd>
+    {% if contact.address %}<dt>{% translate "Address" %}</dt><dd>{{ contact.address }}</dd>{% endif %}
+    {% if contact.phone %}<dt>{% translate "Phone" %}</dt><dd>{{ contact.phone }}</dd>{% endif %}
+    {% if contact.email %}<dt>{% translate "Email" %}</dt><dd>{{ contact.email }}</dd>{% endif %}
+  </dl>
+</section>
