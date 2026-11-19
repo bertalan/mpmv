@@ -158,6 +158,7 @@ FILES = (
     "apps/orders/amendments.py",
     "apps/orders/amendment_engine.py",  # the classification reasons and refusals (ORD.20)
     "apps/orders/amendment_notices.py",
+    "apps/orders/staff_drafts.py",  # the refusals staff read on a prepared cart (ORD.32)
 )
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.

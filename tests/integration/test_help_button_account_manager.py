@@ -31,7 +31,11 @@ from apps.compliance.tests.factories import NoticeFactory, TerminationNoticeFact
 from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.fitment.tests.factories import FitmentNodeFactory
 from apps.manager.checks import manager_routes
-from apps.orders.tests.factories import paid_vendor_order
+from apps.orders.tests.factories import (
+    StaffDraftFactory,
+    StaffDraftLineFactory,
+    paid_vendor_order,
+)
 from apps.trust.tests.factories import TrustRulesFactory
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.help_routes import NOT_PAGES
@@ -168,6 +172,8 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:fitment_report": "shop",
         "manager:platform:orders": "platform",
         "manager:platform:order": "platform",
+        "manager:platform:order_drafts": "platform",  # ORD.32
+        "manager:platform:order_draft": "platform",
         "manager:platform:amendment_settings": "platform",
         "manager:platform:trust_rules": "platform",  # TRU.1 part 2
         "manager:platform:trust_rule": "platform",
@@ -215,6 +221,10 @@ def _open(name: str) -> tuple[Client, str]:
             kwargs = {"version": TrustRulesFactory.create().version}  # type: ignore[dict-item]
         if name == "manager:platform:order":
             kwargs = {"public_id": paid_vendor_order().public_id}
+        if name == "manager:platform:order_draft":
+            draft = StaffDraftFactory.create()
+            StaffDraftLineFactory.create(draft=draft)
+            kwargs = {"public_id": draft.public_id}
     client = Client()
     verified_login(client, user)  # type: ignore[arg-type]
     return client, reverse(name, kwargs=kwargs)

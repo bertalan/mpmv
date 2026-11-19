@@ -373,6 +373,11 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
 # Models with a ForeignKey chain to Vendor that are deliberately not vendor-scoped, by label,
 # with the reason.
 NOT_VENDOR_OWNED: dict[str, str] = {
+    "orders.StaffDraftLine": (
+        "An item of a cart that platform staff prepared from a past order (ORD.32): the product is "
+        "what the customer may buy again, not an owner; only Support and the platform owner see "
+        "drafts, and no vendor endpoint lists them."
+    ),
     "vendors.CommissionRule": (
         "Platform pricing configuration managed by staff only (VEN.2): the optional vendor is "
         "the rule's target, not an owner; no vendor endpoint lists or edits commission rules."
@@ -610,6 +615,15 @@ ENDPOINTS: dict[str, Access] = {
     "action_link:continue": NoVendorData(
         "Secure action link Continue POST (CORE.15): a token of another user or object is "
         "refused before anything is shown."
+    ),
+    "staff_draft_link": NoVendorData(
+        "Link of a cart prepared by support (ORD.32): a Continue page for a one-time token; "
+        "shows no object.",
+        kwargs={"token": "not-a-token"},
+    ),
+    "staff_draft_link_continue": NoVendorData(
+        "Continue POST of a prepared cart's link (ORD.32): an unknown token or another "
+        "customer's draft is refused before anything is shown."
     ),
     "vendor_terms:read": NoVendorData(
         "Sales terms in force of any seller (VEN.35, VEN.32 exception): public by design, behind "
@@ -930,6 +944,29 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:order_cancel": StaffOnly(
         "Cancel a package with a full refund (ORD.20 part 3): Support and the platform owner "
         "only, POST only, with a note and a fresh passkey.",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "manager:platform:order_drafts": StaffOnly(
+        "Prepared carts (ORD.32): Support and the platform owner only; a vendor member gets the "
+        "platform gate's refusal and other roles 404 (test_staff_drafts)."
+    ),
+    "manager:platform:order_draft_new": StaffOnly(
+        "Prepare a cart from an order (ORD.32): Support and the platform owner only, POST only, "
+        "with a note.",
+        kwargs={"order": NIL_UUID},
+    ),
+    "manager:platform:order_draft": StaffOnly(
+        "One prepared cart (ORD.32): Support and the platform owner only.",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "manager:platform:order_draft_lines": StaffOnly(
+        "Change a prepared cart's quantities (ORD.32): Support and the platform owner only, POST "
+        "only, with a note; never a price.",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "manager:platform:order_draft_send": StaffOnly(
+        "Send a prepared cart's one-time link (ORD.32): Support and the platform owner only, POST "
+        "only, to the order's own account or guest email.",
         kwargs={"public_id": NIL_UUID},
     ),
     "manager:platform:amendment_settings": StaffOnly(

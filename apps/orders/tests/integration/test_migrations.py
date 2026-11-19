@@ -16,6 +16,9 @@ from apps.vendors.tests.factories import VendorFactory
 
 SPLIT_SHIPPING = "0021_ord29_split_shipping_vat"
 BEFORE_SPLIT = "0020_ord20_order_events"
+# The leaf this test was last checked against: ORD.32 (0022) only adds the staff draft tables,
+# which `create_order` never writes, so creating an order at 0020 still works.
+CHECKED_LEAF = "0022_ord32_staff_drafts"
 TOTALS = (
     "SELECT goods_net, shipping_net, tax_total, gross_total, shipping_tax_rate,"
     " shipping_tax_amount, shipping_tax_reason FROM orders_vendororder ORDER BY id"
@@ -75,7 +78,7 @@ def test_the_split_shipping_migration_keeps_an_existing_order_exactly() -> None:
     keeps its single rate, its shipping VAT and its totals to the cent (no backfill: every
     existing row is single-rate)."""
     latest = _orders_leaf()
-    assert latest == SPLIT_SHIPPING, f"update this test for the new orders leaf {latest}"
+    assert latest == CHECKED_LEAF, f"update this test for the new orders leaf {latest}"
     line = LineInput(
         None,
         "SKU-1",

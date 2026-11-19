@@ -1,0 +1,23 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Prepared carts (ORD.32, Support and the platform owner): the open drafts made from a past order,
+newest first. No contact data of the customer. A draft is made from a platform order page.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Prepared carts" %}</h1>
+  <p class="manager-lead">{% translate "Carts prepared for a customer from one of their orders, waiting for the customer to open the link. Prepare a new one from the order's page in Order changes." %}</p>
+  {% if drafts %}
+    <div class="table-scroll" role="region" aria-labelledby="drafts-caption" tabindex="0">
+      <table class="table">
+        <caption id="drafts-caption">{% translate "Open prepared carts" %}</caption>
+        <thead><tr><th scope="col">{% translate "Order number" %}</th><th scope="col">{% translate "Customer" %}</th><th scope="col">{% translate "Prepared" %}</th><th scope="col">{% translate "Lines" %}</th><th scope="col">{% translate "Link" %}</th></tr></thead>
+        <tbody>
+          {% for row in drafts %}<tr><th scope="row"><a href="{{ row.url }}">{{ row.number }}</a></th><td>{{ row.customer }}</td><td>{{ row.created|date:"SHORT_DATETIME_FORMAT" }}</td><td>{{ row.lines }}</td><td>{{ row.link }}</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>{% translate "No prepared cart is waiting." %}</p>
+  {% endif %}
+{% endblock %}

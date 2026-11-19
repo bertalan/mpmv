@@ -13,6 +13,8 @@ notes. After an item removed as unavailable, the customer may cancel the rest of
 package (changes, cancellations) are listed with the exact text of their emails.
 """
 
+import datetime as dt
+import math
 import uuid
 from collections.abc import Callable
 from decimal import Decimal
@@ -25,19 +27,27 @@ from django.core.paginator import Paginator
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, resolve_url
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone, translation
+from django.utils.cache import add_never_cache_headers
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.accounts.models import User
-from apps.core.audit import audit_context
+from apps.cart import session as cart_session
+from apps.cart.models import Cart
+from apps.core.audit import AuditContext, audit_context
+from apps.core.http import client_ip
+from apps.core.i18n import language_switch_home
+from apps.core.models import AuditLog
 from apps.core.money import CURRENCY
-from apps.core.public_forms import not_anonymous
+from apps.core.public_forms import Protection, not_anonymous, public_form
+from apps.core.services import consume_rate_limit
+from apps.core.throttling import ip_bucket
 
 from . import amendment_engine as am
-from . import amendment_notices, amendments, engine, reorder, services, versions
+from . import amendment_notices, amendments, engine, reorder, services, staff_drafts, versions
 from .models import Order, OrderLine, VendorOrder
 
 PAGE_SIZE = 20
@@ -336,21 +346,8 @@ def _reorder_name(title: str, variant: str) -> str:
     return f"{title} ({variant})" if variant else title
 
 
-@not_anonymous(
-    reason="signed in: the customer puts their own past order back in their cart",
-    purpose="Order again: refill the cart from a past order",
-    task="ORD.31",
-)
-@require_POST
-@never_cache
-@_signed_in
-def order_again(request: HttpRequest, public_id: uuid.UUID) -> HttpResponse:
-    """Put the still-available items of a past order back in the cart at today's prices (ORD.31).
-    Nothing is placed or paid: the customer goes on to the normal checkout."""
-    user: User = request.user  # type: ignore[assignment]
-    result = reorder.order_again(user, public_id, ctx=audit_context(request))
-    if result is None:
-        raise Http404
+def _reorder_messages(request: HttpRequest, result: reorder.ReorderResult) -> None:
+    """What went into the cart, what was capped and what was left out (ORD.31, ORD.32)."""
     if result.added:
         messages.success(
             request,
@@ -382,4 +379,129 @@ def order_again(request: HttpRequest, public_id: uuid.UUID) -> HttpResponse:
         )
     if not result.added and not result.skipped:
         messages.info(request, gettext("There was nothing to add to your cart."))
+
+
+@not_anonymous(
+    reason="signed in: the customer puts their own past order back in their cart",
+    purpose="Order again: refill the cart from a past order",
+    task="ORD.31",
+)
+@require_POST
+@never_cache
+@_signed_in
+def order_again(request: HttpRequest, public_id: uuid.UUID) -> HttpResponse:
+    """Put the still-available items of a past order back in the cart at today's prices (ORD.31).
+    Nothing is placed or paid: the customer goes on to the normal checkout."""
+    user: User = request.user  # type: ignore[assignment]
+    result = reorder.order_again(user, public_id, ctx=audit_context(request))
+    if result is None:
+        raise Http404
+    _reorder_messages(request, result)
     return HttpResponseRedirect(reverse("orders:cart"))
+
+
+# --- ORD.32: the one-time link of a cart prepared by support -----------------------------------
+
+DRAFT_LINK_REFUSED = {
+    engine.DRAFT_LINK_UNKNOWN: _("This link is not valid. Ask support for a new one."),
+    engine.DRAFT_LINK_USED: _(
+        "This link was already used. The items are in the cart you opened it in."
+    ),
+    engine.DRAFT_LINK_EXPIRED: _("This link has expired. Ask support for a new one."),
+    engine.DRAFT_LINK_CHANGED: _(
+        "Support changed this cart after sending the link. Use the newest link we emailed you."
+    ),
+    staff_drafts.OTHER_ACCOUNT: _(
+        "This link is for another customer. Sign out, then open it again."
+    ),
+}
+DRAFT_RATE_WINDOW = dt.timedelta(minutes=15)
+
+
+def _private(response: HttpResponse) -> HttpResponse:
+    """The link's token is in the path: never sent on in a Referer, never cached or indexed."""
+    response["Referrer-Policy"] = "strict-origin"
+    response["X-Robots-Tag"] = "noindex, nofollow"
+    add_never_cache_headers(response)
+    return response
+
+
+def _customer(request: HttpRequest) -> User | None:
+    user = request.user
+    return user if isinstance(user, User) and user.is_authenticated else None
+
+
+def _refused(request: HttpRequest, refusal: str, status: int) -> HttpResponse:
+    message = DRAFT_LINK_REFUSED.get(refusal, DRAFT_LINK_REFUSED[engine.DRAFT_LINK_UNKNOWN])
+    return _private(render(request, "orders/draft_link.html", {"refusal": message}, status=status))
+
+
+@language_switch_home
+@require_http_methods(["GET", "HEAD"])
+def draft_link(request: HttpRequest, token: str) -> HttpResponse:
+    """The emailed link of a cart prepared by support (ORD.32). A GET or HEAD (a mail scanner's
+    prefetch too) changes nothing: it shows a page whose button POSTs the token."""
+    check = staff_drafts.check_link(token)
+    if check.refusal is not None:
+        return _refused(request, check.refusal, 410)
+    return _private(render(request, "orders/draft_link.html", {"token": token, "refusal": ""}))
+
+
+@public_form(
+    protection=Protection.SIGNED_TOKEN,
+    purpose="Open a cart prepared by support from an emailed one-time link",
+    task="ORD.32",
+    reason="the one-time random token in the POST body is checked before anything else",
+    rate_limit="per IP",
+)
+@require_POST
+def draft_link_continue(request: HttpRequest) -> HttpResponse:
+    """Spend the link: the prepared items go into the customer's cart at today's prices, then the
+    normal checkout. An account's cart needs that account signed in; nobody is signed in here."""
+    bucket = ip_bucket(client_ip(request)) or "unknown"
+    wait = consume_rate_limit(
+        f"staff-draft-link:ip:{bucket}",
+        limit=settings.ACTION_LINK_RATE_LIMIT,
+        window=DRAFT_RATE_WINDOW,
+    )
+    if wait:
+        retry = str(max(1, math.ceil(wait.total_seconds())))
+        return _private(
+            HttpResponse(
+                gettext("Too many attempts. Please try again later."),
+                status=429,
+                headers={"Retry-After": retry},
+            )
+        )
+    token = request.POST.get("token", "")
+    user = _customer(request)
+    ctx = (
+        audit_context(request)
+        if user is not None
+        else AuditContext(actor_label="guest", source=AuditLog.Source.SYSTEM, ip=client_ip(request))
+    )
+
+    def cart_for() -> Cart:
+        cart = cart_session.current_cart(request, create=True)
+        if cart is None:  # pragma: no cover - `create=True` always gives one
+            raise RuntimeError("No cart could be created")
+        return cart
+
+    result = staff_drafts.open_link(token, user=user, cart_for=cart_for, ctx=ctx)
+    if result.refusal == staff_drafts.SIGN_IN:
+        link = reverse("staff_draft_link", args=[token])
+        return _private(redirect_to_login(link, resolve_url(settings.MFA_LOGIN_URL)))
+    if result.refusal is not None or result.filled is None or result.draft is None:
+        status = 403 if result.refusal == staff_drafts.OTHER_ACCOUNT else 410
+        return _refused(request, result.refusal or engine.DRAFT_LINK_UNKNOWN, status)
+    _reorder_messages(request, result.filled)
+    messages.info(
+        request,
+        gettext(
+            "Check the cart, then go to checkout: nothing is ordered or paid until you place the "
+            "order and pay."
+        ),
+    )
+    with translation.override(result.draft.source_order.language):
+        cart_url = reverse("orders:cart")
+    return _private(HttpResponseRedirect(cart_url))

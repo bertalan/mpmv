@@ -99,13 +99,33 @@ def _unit_weight(product: Product, variant: Variant | None) -> Decimal:
     return product.weight_kg if product.weight_kg is not None else Decimal("0")
 
 
-def _undeliverable(items: list[_Item], limits: dict[ItemKey, int], cart: Cart) -> set[ItemKey]:
-    """The items whose vendor cannot ship to the cart's destination country (shipping blocks
-    the package). No destination known: nothing is blocked here, the checkout asks for it."""
-    if not cart.country_hint:
+def item_for(
+    key: ItemKey,
+    title: str,
+    variant_label: str,
+    quantity: int,
+    product: Product | None,
+    variant: Variant | None,
+) -> "_Item":
+    """One item to put in a cart (ORD.32 builds them from a staff draft's lines). Load the
+    product with `select_related("vendor__connected_account")`."""
+    return _Item(key, title, variant_label, quantity, product, variant)
+
+
+def order_items(lines: list[OrderLine]) -> list["_Item"]:
+    """The items of a past order's lines, one per product and variant (ORD.31, ORD.32)."""
+    return _items(lines)
+
+
+def _undeliverable(
+    items: list[_Item], limits: dict[ItemKey, int], country: str, language: str
+) -> set[ItemKey]:
+    """The items whose vendor cannot ship to `country` (shipping blocks the package). No
+    destination known: nothing is blocked here, the checkout asks for it."""
+    if not country:
         return set()
     try:
-        destination = shipping_engine.Destination(cart.country_hint)
+        destination = shipping_engine.Destination(country)
     except InvalidCountry:
         return set()
     by_vendor: dict[int, list[_Item]] = {}
@@ -131,10 +151,82 @@ def _undeliverable(items: list[_Item], limits: dict[ItemKey, int], cart: Cart) -
                 for i in group
             ),
         )
-        outcome = quote_shipping(vendor, package, destination, language=cart.language or "en")
+        outcome = quote_shipping(vendor, package, destination, language=language or "en")
         if isinstance(outcome, shipping_engine.Blocked):
             blocked.update(i.key for i in group)
     return blocked
+
+
+def item_limits(items: list[_Item]) -> dict[ItemKey, int | None]:
+    """The most units each item may have in a cart line today; None when it cannot be bought
+    (retired, not for sale, vendor paused, on request)."""
+    found: dict[ItemKey, int | None] = {}
+    for item in items:
+        if item.product is None:
+            found[item.key] = None
+            continue
+        try:
+            found[item.key] = cart_services.item_limit(item.product, item.variant)
+        except ValidationError:
+            found[item.key] = None
+    return found
+
+
+def plan_items(
+    items: list[_Item], *, in_cart: dict[ItemKey, int], country: str, language: str
+) -> list[engine.ReorderOutcome]:
+    """What of `items` can go into a cart today, with today's stock and shipping to `country`,
+    added to what the cart holds (`in_cart`); one outcome per item, in order."""
+    limits = item_limits(items)
+    known = {key: limit for key, limit in limits.items() if limit is not None}
+    blocked = _undeliverable(items, known, country, language)
+    return engine.plan_reorder(
+        [
+            engine.ReorderWish(
+                key=item.key,
+                quantity=item.quantity,
+                in_cart=in_cart.get(item.key, 0),
+                limit=limits[item.key],
+                undeliverable=item.key in blocked,
+            )
+            for item in items
+        ]
+    )
+
+
+def fill_cart(
+    cart: Cart, items: list[_Item], *, country: str, ctx: AuditContext, dry_run: bool = False
+) -> ReorderResult:
+    """Put `items` in `cart` at today's prices, capped at the stock available, skipping (with
+    the reason) what cannot be bought or shipped to `country` today. An item already in the
+    cart gets the quantities added. With `dry_run=True` nothing is written."""
+    in_cart = (
+        {(ln.product_id, ln.variant_id): ln.quantity for ln in cart.lines.all()} if cart.pk else {}
+    )
+    outcomes = plan_items(items, in_cart=in_cart, country=country, language=cart.language)
+    result = ReorderResult()
+    to_add: list[tuple[Product, Variant | None, int]] = []
+    for item, outcome in zip(items, outcomes, strict=True):
+        if outcome.skipped:
+            result.skipped.append(SkippedItem(item.title, item.variant_label, outcome.skipped))
+            continue
+        if outcome.added > 0 and item.product is not None and cart.pk:
+            to_add.append((item.product, item.variant, outcome.added))
+        result.added.append(
+            ReorderedItem(
+                item.title,
+                item.variant_label,
+                outcome.quantity,
+                outcome.added,
+                outcome.requested,
+                outcome.capped,
+            )
+        )
+    if to_add:  # one lock and a constant number of queries, whatever the number of lines
+        result.changeset.changes.extend(
+            cart_services.add_many_to_cart(cart, to_add, ctx=ctx, dry_run=dry_run).changes
+        )
+    return result
 
 
 def order_again(
@@ -159,54 +251,4 @@ def order_again(
         )
         if cart is None:
             cart = Cart(user=user)  # a dry run before the first cart: nothing in it yet
-        in_cart = (
-            {(ln.product_id, ln.variant_id): ln.quantity for ln in cart.lines.all()}
-            if cart.pk
-            else {}
-        )
-        limits: dict[ItemKey, int] = {}
-        retired: set[ItemKey] = set()
-        for item in items:
-            if item.product is None:
-                retired.add(item.key)
-                continue
-            try:
-                limits[item.key] = cart_services.item_limit(item.product, item.variant)
-            except ValidationError:
-                retired.add(item.key)
-        blocked = _undeliverable(items, limits, cart)
-        outcomes = engine.plan_reorder(
-            [
-                engine.ReorderWish(
-                    key=item.key,
-                    quantity=item.quantity,
-                    in_cart=in_cart.get(item.key, 0),
-                    limit=None if item.key in retired else limits[item.key],
-                    undeliverable=item.key in blocked,
-                )
-                for item in items
-            ]
-        )
-        result = ReorderResult()
-        to_add: list[tuple[Product, Variant | None, int]] = []
-        for item, outcome in zip(items, outcomes, strict=True):
-            if outcome.skipped:
-                result.skipped.append(SkippedItem(item.title, item.variant_label, outcome.skipped))
-                continue
-            if outcome.added > 0 and item.product is not None and cart.pk:
-                to_add.append((item.product, item.variant, outcome.added))
-            result.added.append(
-                ReorderedItem(
-                    item.title,
-                    item.variant_label,
-                    outcome.quantity,
-                    outcome.added,
-                    outcome.requested,
-                    outcome.capped,
-                )
-            )
-        if to_add:  # one lock and a constant number of queries, whatever the number of lines
-            result.changeset.changes.extend(
-                cart_services.add_many_to_cart(cart, to_add, ctx=ctx, dry_run=dry_run).changes
-            )
-    return result
+        return fill_cart(cart, items, country=cart.country_hint, ctx=ctx, dry_run=dry_run)

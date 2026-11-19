@@ -41,6 +41,10 @@ NOT_PAGES = (
     "manager:platform:order_cancel",
     # ORD.20 part 3b-1: POST only, records invoice_issued_at and redirects to the order page.
     "manager:shop:order_invoice_issued",
+    # ORD.32: POST only, they redirect to the prepared cart's page (or show it with the refusal).
+    "manager:platform:order_draft_new",
+    "manager:platform:order_draft_lines",
+    "manager:platform:order_draft_send",
     *MODAL_FRAGMENTS,
 )
 

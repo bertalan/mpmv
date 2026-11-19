@@ -149,4 +149,21 @@ answers with the passkey prompt. No inline script or style.
       </form>
     </section>
   {% endif %}
+
+  {% if staff_draft_url or staff_draft_new_url %}
+    <section aria-labelledby="draft-heading">
+      <h2 id="draft-heading">{% translate "Prepare a cart for the customer" %}</h2>
+      {% if staff_draft_url %}
+        <p><a href="{{ staff_draft_url }}">{% translate "This order already has a prepared cart: open it" %}</a></p>
+      {% else %}
+        <p>{% translate "Copy the whole order into a cart for the same customer, at today's prices and stock, then send them a one-time link. The customer checks the cart and pays at checkout; nothing is ordered until then." %}</p>
+        <form method="post" action="{{ staff_draft_new_url }}" class="manager-form" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="back" value="{{ order_page_url }}">
+          {% for field in staff_draft_form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+          {% include "components/button.html" with label=_("Prepare the cart") type="submit" variant="secondary" only %}
+        </form>
+      {% endif %}
+    </section>
+  {% endif %}
 {% endblock %}
