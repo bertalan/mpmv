@@ -64,6 +64,14 @@ def test_quantity_error_explains_what_is_wrong() -> None:
     assert engine.quantity_error(1, limit=0) == "This item is out of stock."
 
 
+@pytest.mark.parametrize("quantity", [1.5, 2.0, Decimal("2"), True, "2", None])
+def test_a_quantity_must_be_a_whole_number(quantity: object) -> None:
+    """SEC.5: the database would silently truncate 1.5 to 1."""
+    assert not engine.is_whole_quantity(quantity)
+    assert engine.count_error(quantity) == "The quantity must be a whole number."
+    assert engine.count_error(2) is None
+
+
 # --- Purchasability
 
 
