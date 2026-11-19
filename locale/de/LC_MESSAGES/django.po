@@ -1608,6 +1608,7 @@ msgstr "Paketrabatt zulasten der Plattform"
 msgid "Bundle discount funded by you"
 msgstr "Paketrabatt zu Ihren Lasten"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Business buyers: the court of %(court)s."
 msgstr "Gewerbliche Käufer: das Gericht in %(court)s."
@@ -2135,6 +2136,7 @@ msgstr ""
 msgid "City"
 msgstr "Stadt"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Clauses for approval by business buyers (art. 1341 Civil Code)"
 msgstr ""
@@ -2187,6 +2189,7 @@ msgstr "Änderung der Provision"
 msgid "Commission given back"
 msgstr "Erstattete Provision"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Committed delivery time: %(days)s days."
 msgstr "Zugesagte Lieferzeit: %(days)s Tage."
@@ -2342,6 +2345,7 @@ msgstr ""
 "Verbraucher haben ab Lieferung 14 Tage Zeit für den Widerruf. Als Unternehmen hast du kein "
 "Widerrufsrecht, es sei denn, die Bedingungen des Verkäufers sehen es vor."
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Consumers: disputes go to the court of the consumer's own residence."
 msgstr ""
@@ -2597,6 +2601,7 @@ msgstr "Lieferzeit"
 msgid "Delivery time in days"
 msgstr "Lieferzeit in Tagen"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Delivery, returns and law"
 msgstr "Lieferung, Rückgabe und Recht"
@@ -3199,6 +3204,7 @@ msgstr "Konto suchen"
 msgid "Find the order"
 msgstr "Bestellung suchen"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Fingerprint %(hash)s."
 msgstr "Fingerabdruck %(hash)s."
@@ -3425,6 +3431,7 @@ msgstr "Waren, inkl. MwSt."
 msgid "Governing law"
 msgstr "Anwendbares Recht"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Governing law: %(country)s."
 msgstr "Anwendbares Recht: %(country)s."
@@ -6729,10 +6736,12 @@ msgstr "Rückgabe- und Erstattungsbedingungen"
 msgid "Returns go to: %(country)s"
 msgstr "Rücksendungen gehen an: %(country)s"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the consumer bears the direct cost of returning the goods."
 msgstr "Rückgabe: Die unmittelbaren Kosten der Rücksendung der Waren trägt der Verbraucher."
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Returns: the seller bears the cost of returning the goods."
 msgstr "Rückgabe: Die Kosten der Rücksendung der Waren trägt der Verkäufer."
@@ -6804,10 +6813,12 @@ msgstr "Verkaufsmodus"
 
 #: apps/manager/forms.py apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/sales_terms.html
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Sales terms"
 msgstr "Verkaufsbedingungen"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Sales terms of %(name)s"
 msgstr "Verkaufsbedingungen von %(name)s"
@@ -7711,7 +7722,9 @@ msgstr "Kündigung"
 msgid "Terminations"
 msgstr "Kündigungen"
 
-#: apps/orders/templates/orders/_legal_boxes.html apps/vendors/templates/vendors/terms/read.html
+#: apps/orders/templates/orders/_legal_boxes.html
+#: apps/vendors/templates/documents/vendors/sales_terms.html
+#: apps/vendors/templates/vendors/terms/read.html
 msgid "Terms"
 msgstr "Bedingungen"
 
@@ -11773,6 +11786,7 @@ msgstr "Version %(number)s wurde abgelehnt. %(note)s"
 msgid "Version %(number)s, %(date)s"
 msgstr "Version %(number)s, %(date)s"
 
+#: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Version %(number)s, in force from %(date)s."
 msgstr "Version %(number)s, in Kraft ab %(date)s."
