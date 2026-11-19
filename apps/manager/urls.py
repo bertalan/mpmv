@@ -21,6 +21,7 @@ from . import (
     return_policy_views,
     sales_terms_views,
     session_views,
+    staff_draft_views,
     statement_views,
     termination_views,
     trust_edit_views,
@@ -261,6 +262,28 @@ platform = (
             "orders/<uuid:public_id>/cancel/",
             amendment_views.PlatformCancelView.as_view(),
             name="order_cancel",
+        ),
+        # ORD.32: a cart prepared from a past order, with its one-time link (Support, owner).
+        path("order-drafts/", staff_draft_views.DraftListView.as_view(), name="order_drafts"),
+        path(
+            "order-drafts/new/<uuid:order>/",
+            staff_draft_views.DraftCreateView.as_view(),
+            name="order_draft_new",
+        ),
+        path(
+            "order-drafts/<uuid:public_id>/",
+            staff_draft_views.DraftView.as_view(),
+            name="order_draft",
+        ),
+        path(
+            "order-drafts/<uuid:public_id>/lines/",
+            staff_draft_views.DraftLinesView.as_view(),
+            name="order_draft_lines",
+        ),
+        path(
+            "order-drafts/<uuid:public_id>/send/",
+            staff_draft_views.DraftSendView.as_view(),
+            name="order_draft_send",
         ),
         # The three order-amendment settings, read-only (configuration role and the owner).
         path(

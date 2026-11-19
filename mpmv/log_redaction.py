@@ -10,8 +10,11 @@ import re
 from typing import Final
 
 REDACTED: Final = "[redacted]"
-# The segment after /account/link/, except the fixed Continue route, which holds no secret.
-_SECRET_PATH: Final = re.compile(r"(/account/link/)(?!continue(?:[/?#\s\"']|$))[^/?#\s\"']+")
+# The segment after /account/link/ (CORE.15) or /account/cart-draft/ (ORD.32), except the fixed
+# Continue route, which holds no secret.
+_SECRET_PATH: Final = re.compile(
+    r"(/account/(?:link|cart-draft)/)(?!continue(?:[/?#\s\"']|$))[^/?#\s\"']+"
+)
 
 
 def redact_secret_paths(text: str) -> str:

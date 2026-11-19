@@ -23,6 +23,8 @@ from apps.orders.models import (
     OrderEvent,
     OrderLine,
     OrderNumberSequence,
+    StaffDraft,
+    StaffDraftLine,
     StockReservation,
     VendorOrder,
     VendorOrderVersion,
@@ -195,3 +197,25 @@ class StockReservationFactory(DjangoModelFactory[StockReservation]):
     product = factory.SubFactory(ProductFactory)
     quantity = 1
     expires_at = factory.LazyFunction(lambda: dt.datetime(2999, 1, 1, tzinfo=dt.UTC))
+
+
+class StaffDraftFactory(DjangoModelFactory[StaffDraft]):
+    """A cart Support prepared from a past order, no link sent yet (ORD.32)."""
+
+    class Meta:
+        model = StaffDraft
+
+    source_order = factory.SubFactory(OrderFactory)
+    customer = factory.SelfAttribute("source_order.customer")
+
+
+class StaffDraftLineFactory(DjangoModelFactory[StaffDraftLine]):
+    """One item of a staff draft: what and how many, never a price (ORD.32)."""
+
+    class Meta:
+        model = StaffDraftLine
+
+    draft = factory.SubFactory(StaffDraftFactory)
+    product = factory.SubFactory(ProductFactory)
+    title = "Brake pads"
+    quantity = 1

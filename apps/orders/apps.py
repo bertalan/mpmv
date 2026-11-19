@@ -8,8 +8,18 @@ class OrdersConfig(AppConfig):
     # Audit policy (SEC.4, docs/dev/audit-trail.md): orders are written only through
     # `apps.orders.services`, which audits every change (without addresses or e-mail). An
     # amendment and the versions it writes go through `apps.orders.amendments` (ORD.20); v1 is
-    # the placed order, audited with it by `create_order`.
-    audited_models = ("order", "vendororder", "orderline", "vendororderversion", "orderamendment")
+    # the placed order, audited with it by `create_order`. A staff draft (ORD.32) and its lines
+    # are written only through `apps.orders.staff_drafts`, which audits each step with the role
+    # and the note.
+    audited_models = (
+        "order",
+        "vendororder",
+        "orderline",
+        "vendororderversion",
+        "orderamendment",
+        "staffdraft",
+        "staffdraftline",
+    )
     unaudited_models = {
         "ordernumbersequence": "a counter row locked while a number is taken; the number is "
         "audited with the order it belongs to",

@@ -55,6 +55,7 @@ from .amendment_forms import (
     lines_of,
 )
 from .spaces import Space
+from .staff_draft_views import order_page_context
 from .views import ManagerView, address_lines
 
 PLATFORM_SECTION: Final = "platform.support_actions"  # a row of roles.MATRIX: Support, owner
@@ -272,6 +273,8 @@ class AmendmentPage(ManagerView):
         if amendable and "cancel_form" not in context:
             context["cancel_form"] = self.cancel_form()
         context["cancel_url"] = self.url("order_cancel", sub)
+        if self.staff:  # ORD.32: prepare a cart for the customer from this order
+            context.update(order_page_context(order), order_page_url=self.page_url(sub))
         return context
 
     def refused(self, message: str, status: int = 409, **extra: Any) -> HttpResponse:
