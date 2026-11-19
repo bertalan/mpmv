@@ -4757,7 +4757,7 @@ msgstr "Kein Zugriff"
 
 #: apps/cms/templates/cms/blog_author_page.html themes/ride/templates/cms/blog_author_page.html
 msgid "No articles by this author yet."
-msgstr "Von dieser Autorin oder diesem Autor gibt es noch keine Artikel."
+msgstr "Von dieser Person gibt es noch keine Artikel."
 
 #: apps/cms/templates/cms/blog_index_page.html themes/ride/templates/cms/blog_index_page.html
 msgid "No articles have been published yet."

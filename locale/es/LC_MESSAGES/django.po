@@ -1326,7 +1326,7 @@ msgstr "Aplicar filtros"
 
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Apply now"
-msgstr "Solicítalo ahora"
+msgstr "Solicita ahora"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Apply the change"
