@@ -91,6 +91,12 @@ class ProductData:
     manufacturer_id: str = ""
     images: tuple[ImageData, ...] = ()
     weight_kg: Decimal | None = None
+    width_mm: int | None = None
+    height_mm: int | None = None
+    depth_mm: int | None = None
+    material: str = ""
+    color: str = ""
+    country_of_origin: str = ""  # ISO 3166-1 alpha-2
     offer: OfferData | None = None
     variants: tuple[VariantData, ...] = ()
     varies_by: tuple[
@@ -175,6 +181,14 @@ def _variant_node(variant: VariantData, *, product_url: str) -> dict[str, Any]:
     )
 
 
+def _millimetres(value: int | None) -> dict[str, Any] | str:
+    """A dimension as a `QuantitativeValue` in millimetres (UN/CEFACT `MMT`); nothing when
+    unknown or not positive."""
+    if not value or value <= 0:
+        return ""
+    return {"@type": "QuantitativeValue", "value": value, "unitCode": "MMT"}
+
+
 def product_node(data: ProductData) -> dict[str, Any]:
     """The `Product`, or the `ProductGroup` of a product with variants (each variant a
     `Product` with its own offer, Google's variant markup)."""
@@ -194,6 +208,14 @@ def product_node(data: ProductData) -> dict[str, Any]:
             {"@type": "QuantitativeValue", "value": float(data.weight_kg), "unitCode": "KGM"}
             if data.weight_kg is not None
             else ""
+        ),
+        "width": _millimetres(data.width_mm),
+        "height": _millimetres(data.height_mm),
+        "depth": _millimetres(data.depth_mm),
+        "material": data.material,
+        "color": data.color,
+        "countryOfOrigin": (
+            {"@type": "Country", "name": data.country_of_origin} if data.country_of_origin else ""
         ),
     }
     node.update(_identifiers(data.gtin, data.mpn))
@@ -263,9 +285,36 @@ def shipping_node(
     currency: str,
     min_days: int | None = None,
     max_days: int | None = None,
+    name: str = "",
+    weight_from_kg: Decimal | None = None,
+    weight_to_kg: Decimal | None = None,
 ) -> dict[str, Any]:
     """One `OfferShippingDetails` per zone and rate: the countries in one `DefinedRegion`
-    (none for a world zone), not one node per country."""
+    (none for a world zone), not one node per country. `name` is the shipping service's name
+    (SEO.12). `weight_from_kg` set marks a node for another weight band than the product's own
+    (SEO.12): the band goes in a `ShippingService` with its `ShippingConditions.weight`, the
+    upper bound only when the band has one."""
+    band = (
+        _clean(
+            {
+                "@type": "ShippingService",
+                "name": name,
+                "shippingConditions": {
+                    "@type": "ShippingConditions",
+                    "weight": _clean(
+                        {
+                            "@type": "QuantitativeValue",
+                            "minValue": f"{weight_from_kg:f}",
+                            "maxValue": "" if weight_to_kg is None else f"{weight_to_kg:f}",
+                            "unitCode": "KGM",
+                        }
+                    ),
+                },
+            }
+        )
+        if weight_from_kg is not None
+        else ""
+    )
     transit = _clean(
         {
             "@type": "QuantitativeValue",
@@ -279,6 +328,8 @@ def shipping_node(
         {
             "@type": "OfferShippingDetails",
             "@id": node_id,
+            "name": name,
+            "hasShippingService": band,
             "shippingRate": {
                 "@type": "MonetaryAmount",
                 "value": f"{rate:.2f}",

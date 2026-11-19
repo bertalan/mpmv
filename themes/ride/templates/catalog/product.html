@@ -116,6 +116,13 @@
       </div>
     </div>
 
+    {% if return_terms %}
+      <section class="product-returns mb-4" aria-labelledby="product-returns-heading">
+        <h2 id="product-returns-heading" class="h4">{% translate "Returns" %}</h2>
+        {% include "catalog/includes/product_returns.html" %}
+      </section>
+    {% endif %}
+
     {% if page_data.companion %}
       <aside class="product-companion mb-4" aria-labelledby="product-companion-heading">
         <h2 id="product-companion-heading" class="h4">{% translate "Needed with this product" %}</h2>

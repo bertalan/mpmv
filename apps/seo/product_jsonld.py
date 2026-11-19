@@ -17,15 +17,18 @@ Rules (spec 10 "Product node"):
   own window is not modelled yet), the customer paying the return shipping and a lack of
   conformity free.
 - Variants: `variesBy` from the attributes the variants take a value on, a `@id` per variant;
-  no variant URL (the page picks a variant in a form, no URL selects one), and no per-variant
-  gtin, mpn or image (the variant model has none yet).
+  no variant URL (the page picks a variant in a form, no URL selects one); a variant states its
+  own gtin, mpn and cover image (CAT.23, SEO.13), never the product's.
+- Attributes (SEO.13): width, height and depth (the product's length) as `QuantitativeValue` in
+  millimetres (`MMT`), `material` and `color` from the page-language text, `countryOfOrigin` as a
+  `Country`; each only when stored.
 - Brand: the CAT.20 brand graph (Brand and manufacturer nodes) joins the page graph, so the
   `brand` reference resolves.
 """
 
 import logging
 from decimal import Decimal
-from typing import Any
+from typing import Any, Final
 from urllib.parse import quote
 
 from django.conf import settings
@@ -36,14 +39,14 @@ from apps.catalog import engine as catalog_engine
 from apps.catalog import services as catalog
 from apps.catalog import slugs
 from apps.catalog.models import VariantOption
-from apps.catalog.product_pages import GalleryImage, ProductPage
+from apps.catalog.product_pages import GalleryImage, ProductPage, page_return_policy
+from apps.core import translations
 from apps.core.money import CURRENCY
 from apps.core.services import NoPlatformOperator, current_operator
 from apps.shipping import engine as shipping_engine
 from apps.shipping import services as shipping
 from apps.tax.prices import PriceUnavailable, consumer_price, estimated_country
 from apps.vendors.models import Vendor
-from apps.vendors.return_services import effective_return_policy
 
 from . import product_graph as pg
 from . import seller as seller_name
@@ -130,6 +133,9 @@ def _home_label(language: str) -> str:
         return str(translation.gettext("Home"))
 
 
+EXTRA_BANDS: Final = 4  # per method: keeps the page graph under its 30 KB budget
+
+
 def _shipping_rate(
     page: ProductPage, net: Decimal, zone: frozenset[str] | set[str], request: HttpRequest | None
 ) -> Decimal | None:
@@ -170,16 +176,29 @@ def _shipping_nodes(
         rate = _shipping_rate(page, band.price, zone, request)
         if rate is None:
             continue  # shippingRate is required by Google: no gross rate, no node
-        nodes.append(
-            pg.shipping_node(
-                node_id=f"{url}#shipping-{method.key}",
-                countries=sorted(listed),
-                rate=rate,
-                currency=CURRENCY,
-                min_days=method.min_delivery_days,
-                max_days=method.max_delivery_days,
+        shared: dict[str, Any] = {
+            "countries": sorted(listed),
+            "currency": CURRENCY,
+            "min_days": method.min_delivery_days,
+            "max_days": method.max_delivery_days,
+            "name": method.name if method.name != method.key else "",
+        }
+        nodes.append(pg.shipping_node(node_id=f"{url}#shipping-{method.key}", rate=rate, **shared))
+        # The other weight bands (SEO.12), read from the one config snapshot: no query per band.
+        others = [b for b in method.bands if b is not band][:EXTRA_BANDS]
+        for index, other in enumerate(others, start=1):
+            other_rate = _shipping_rate(page, other.price, zone, request)
+            if other_rate is None:
+                continue
+            nodes.append(
+                pg.shipping_node(
+                    node_id=f"{url}#shipping-{method.key}-band{index}",
+                    rate=other_rate,
+                    weight_from_kg=other.from_kg,
+                    weight_to_kg=other.to_kg,
+                    **shared,
+                )
             )
-        )
     return nodes, [str(node["@id"]) for node in nodes], countries
 
 
@@ -244,9 +263,7 @@ def build_graph(
     if sold:
         shipping_nodes, shipping_ids, countries = _shipping_nodes(page, url, language, request)
         if countries:
-            stated = effective_return_policy(
-                vendor
-            )  # one query; approved, else the shop-pays default
+            stated = page_return_policy(vendor)  # one query; approved, else the shop-pays default
             return_policy = pg.return_policy_node(
                 node_id=f"{vendor_url}#return-policy",
                 countries=sorted(countries),
@@ -274,6 +291,13 @@ def build_graph(
                 refs=refs,
                 request=request,
             ),
+            gtin=choice.gtin,
+            mpn=choice.mpn,
+            images=(
+                (_image(GalleryImage(choice.image, choice.image_alt), site),)
+                if choice.image is not None
+                else ()
+            ),
         )
         for choice in page.variants
     )
@@ -296,6 +320,8 @@ def build_graph(
         maker_id=maker_id,
         vendor_id=vendor_id,
     )
+    # The prefetched translation of the page language (no query): material and colour are texts.
+    text = translations.resolve(page.product.translations.all(), language).translation
     names_vendor = bool(vendor_id) and vendor_id in (brand_id, maker_id)
     data = pg.ProductData(
         url=url,
@@ -309,6 +335,12 @@ def build_graph(
         manufacturer_id=maker_id,
         images=tuple(_image(image, site) for image in page.gallery),
         weight_kg=page.product.weight_kg,
+        width_mm=page.product.width_mm,
+        height_mm=page.product.height_mm,
+        depth_mm=page.product.length_mm,
+        material=str(text.material) if text is not None else "",
+        color=str(text.colour) if text is not None else "",
+        country_of_origin=str(page.product.country_of_origin or ""),
         offer=_offer(
             page,
             page.price,

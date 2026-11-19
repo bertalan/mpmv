@@ -23,6 +23,8 @@ from apps.core import translations
 from apps.core.models import MediaImage
 from apps.vendors import services as vendors
 from apps.vendors.models import Vendor
+from apps.vendors.return_engine import ReturnPolicy
+from apps.vendors.return_services import effective_return_policy
 
 from . import engine, services, slugs
 from .models import Product, ProductImage, ProductStatus, ProductTranslation, SalesMode
@@ -381,6 +383,41 @@ def variant_gallery_items(page: ProductPage) -> list[dict[str, Any]]:
 
 
 # --- Specifications (THM.7 part 3): what the product's data says, as label and value rows
+
+
+@dataclass(frozen=True)
+class ReturnTerms:
+    """The return terms the page shows (SEO.14): the very values the JSON-LD states."""
+
+    days: int
+    shop_pays: bool
+    methods: list[str]
+    link: str
+
+
+def page_return_policy(vendor: Vendor) -> ReturnPolicy:
+    """The vendor's effective return policy, read once per vendor instance: the visible terms and
+    the JSON-LD of one page request share the same `page.vendor` and so the same single query."""
+    cached: ReturnPolicy | None = vendor.__dict__.get("_page_return_policy")
+    if cached is None:
+        cached = vendor.__dict__["_page_return_policy"] = effective_return_policy(vendor)
+    return cached
+
+
+def return_terms(vendor: Vendor) -> ReturnTerms:
+    """The vendor's approved return policy, or the default, as visible text data."""
+    stated = page_return_policy(vendor)
+    labels = {
+        "post": _("By post"),
+        "drop_off": _("Drop-off point"),
+        "in_store": _("In store"),
+    }
+    return ReturnTerms(
+        days=stated.return_window_days,
+        shop_pays=stated.return_shipping_paid_by == "vendor",
+        methods=[labels[m] for m in stated.return_methods if m in labels],
+        link=stated.returns_page_url,
+    )
 
 
 @dataclass(frozen=True)
