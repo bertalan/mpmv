@@ -5815,6 +5815,10 @@ msgstr "Bestelländerungen"
 msgid "Order count tiers"
 msgstr "Stufen der Bestellanzahl"
 
+#: apps/manager/site_map.py
+msgid "Order drafts"
+msgstr "Bestellentwürfe"
+
 #: apps/compliance/forms.py apps/manager/templates/manager/platform/order_drafts.html
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Order number"

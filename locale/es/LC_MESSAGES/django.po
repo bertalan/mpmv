@@ -5761,6 +5761,10 @@ msgstr "Cambios de pedidos"
 msgid "Order count tiers"
 msgstr "Tramos del número de pedidos"
 
+#: apps/manager/site_map.py
+msgid "Order drafts"
+msgstr "Borradores de pedido"
+
 #: apps/compliance/forms.py apps/manager/templates/manager/platform/order_drafts.html
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Order number"

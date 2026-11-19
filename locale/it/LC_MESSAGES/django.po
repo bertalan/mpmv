@@ -5759,6 +5759,10 @@ msgstr "Modifiche agli ordini"
 msgid "Order count tiers"
 msgstr "Soglie del numero di ordini"
 
+#: apps/manager/site_map.py
+msgid "Order drafts"
+msgstr "Bozze d'ordine"
+
 #: apps/compliance/forms.py apps/manager/templates/manager/platform/order_drafts.html
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Order number"

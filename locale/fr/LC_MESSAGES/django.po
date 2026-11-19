@@ -5808,6 +5808,10 @@ msgstr "Modifications de commande"
 msgid "Order count tiers"
 msgstr "Paliers du nombre de commandes"
 
+#: apps/manager/site_map.py
+msgid "Order drafts"
+msgstr "Brouillons de commande"
+
 #: apps/compliance/forms.py apps/manager/templates/manager/platform/order_drafts.html
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Order number"

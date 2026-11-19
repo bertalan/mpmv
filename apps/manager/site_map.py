@@ -87,6 +87,7 @@ PLATFORM_PAGES: Final[Pages] = (
     (gettext_noop("Proposed nodes"), "manager:platform:fitment_proposals"),
     (gettext_noop("Products"), "manager:platform:catalog_products"),
     (gettext_noop("Order changes"), "manager:platform:orders"),
+    (gettext_noop("Order drafts"), "manager:platform:order_drafts"),
     (gettext_noop("Order change settings"), "manager:platform:amendment_settings"),
     (gettext_noop("Trust rules"), "manager:platform:trust_rules"),
 )
@@ -106,6 +107,10 @@ NOT_LISTED: Final = frozenset(
         "manager:shop:fitment_product",
         "manager:shop:order_invoice_issued",
         "manager:platform:order",
+        "manager:platform:order_draft",  # ORD.32: needs a draft record
+        "manager:platform:order_draft_new",  # ORD.32: POST only, makes a draft
+        "manager:platform:order_draft_lines",  # ORD.32: POST only, changes the lines
+        "manager:platform:order_draft_send",  # ORD.32: POST only, emails the link
         "manager:platform:amendment_apply",
         "manager:platform:amendment_discard",
         "manager:platform:order_cancel",
