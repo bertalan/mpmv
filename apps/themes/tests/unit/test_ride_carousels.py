@@ -10,7 +10,10 @@ import re
 from typing import Any
 
 import pytest
+from django.conf import settings
 from django.template.loader import render_to_string
+from django.utils import translation
+from django.utils.translation import gettext
 
 from apps.themes.build import read_css_sources
 from apps.themes.services import use_theme
@@ -35,6 +38,11 @@ HERO_SLIDES = [
     for n in range(1, 4)
 ]
 IMAGES = [{"url": f"/g{n}.png", "alt": f"View {n}"} for n in range(1, 4)]
+
+
+def _said(code: str, text: str) -> str:
+    with translation.override(code):
+        return gettext(text)
 
 
 def render(name: str, /, **context: Any) -> str:
@@ -69,7 +77,7 @@ class TestEveryCarousel:
         assert slides
         for slide in slides:
             assert 'aria-roledescription="slide"' in slide
-            assert re.search(r'aria-label="\d+ of \d+"', slide)
+            assert re.search(r'aria-label="[^"]*\d+[^"\d]+\d+"', slide)
 
     def test_has_previous_next_and_pause_buttons_revealed_by_script(self, html: str) -> None:
         for control in ("prev", "next"):
@@ -77,8 +85,9 @@ class TestEveryCarousel:
                 rf'<button type="button"[^>]*data-bs-slide="{control}"[^>]*hidden', html
             ), control
         assert re.search(r"<button type=\"button\"[^>]*data-ride-toggle[^>]*hidden", html)
-        assert "Pause" in html
-        assert "Play" in html
+        # The params render at collection time, in a language this test does not control.
+        for label in ("Pause", "Play"):
+            assert any(_said(code, label) in html for code, _name in settings.LANGUAGES), label
 
     def test_indicators_are_labelled_buttons_and_the_first_is_current(self, html: str) -> None:
         buttons = re.findall(r"<button[^>]*data-bs-slide-to=[^>]*>", html)
@@ -86,7 +95,7 @@ class TestEveryCarousel:
         assert 'aria-current="true"' in buttons[0]
         for button in buttons:
             assert 'type="button"' in button
-            assert re.search(r'aria-label="[^"]+\d+ of \d+"', button), button
+            assert re.search(r'aria-label="[^"]+\d+[^"\d]+\d+"', button), button
 
     def test_nothing_moves_on_its_own_by_default(self, html: str) -> None:
         assert "data-bs-ride" not in html

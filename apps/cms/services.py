@@ -50,12 +50,13 @@ from apps.catalog import services as catalog
 from apps.catalog.models import Category, Term
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
-from apps.core.i18n import configured_languages, hreflang_alternates
+from apps.core.i18n import configured_languages, hreflang_alternates, primary_language
 from apps.core.image_licences import Credit
 from apps.core.money import CURRENCY
 from apps.core.services import run_mutation
 from apps.core.site_url import absolute_url
 from apps.vendors.models import Vendor
+from apps.vendors.seller_name import public_name
 
 from . import engine
 from .blocks import public_cards
@@ -1060,7 +1061,10 @@ def _vendor_story(
     url = page.get_url(request) if page is not None else None
     if not url:
         return None
-    context = {"url": url, "vendor_name": vendor.display_name}
+    name = public_name(vendor)
+    if name is None:  # no public name to put in "Read the story of ..." (SEO.15)
+        return None
+    context = {"url": url, "vendor_name": name}
     return listings.ListingEditorial(
         before=render_to_string("cms/includes/vendor_story_link.html", context, request)
     )
@@ -1277,3 +1281,32 @@ def footer_profile_urls(site: Any) -> list[str]:
         .order_by("sort_order", "pk")
         .values_list("url", flat=True)
     )
+
+
+def live_snippet_copy(snippet: Any, language: str, *, memo: Any = None) -> Any:
+    """The live copy of the chosen snippet to show on a page of `language` (CMS.14): the copy
+    in that language, else the primary language's, else None (nothing is rendered). One query
+    per distinct snippet; `memo` (the page being rendered) keeps the answer for its other
+    placements."""
+    from .models import ContentSnippet
+
+    if snippet is None:
+        return None
+    cache_key = (snippet.translation_key, language)
+    store: dict[Any, Any] | None = None
+    if memo is not None:
+        store = memo.__dict__.setdefault("_content_snippet_memo", {})
+        if cache_key in store:
+            return store[cache_key]
+    copies = {
+        copy.locale.language_code: copy
+        for copy in ContentSnippet.objects.filter(
+            translation_key=snippet.translation_key,
+            live=True,
+            locale__language_code__in={language, primary_language()},
+        ).select_related("locale")
+    }
+    found = copies.get(language) or copies.get(primary_language())
+    if store is not None:
+        store[cache_key] = found
+    return found

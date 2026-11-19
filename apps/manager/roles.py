@@ -120,10 +120,12 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.map": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: R, OWNER: R},  # CORE.30
     "platform.config": {CONFIG: E, OWNER: R},
     "platform.owner_settings": {CONFIG: R, OWNER: E},
+    "platform.trust_rules": {CONFIG: E, OWNER: E},  # TRU.1 part 2: the versions of the trust rules
     "platform.catalog": {CATALOG: E, SUPPORT: R, OWNER: R},
     "platform.moderation": {CATALOG: E, OWNER: R},
-    # CAT.11: the product list, bulk publish and the audited fields (Support has no row: 404).
-    "platform.products": {CATALOG: E, OWNER: R},
+    # CAT.11: the product list, bulk publish and the audited fields. CAT.30 (MQ-52): Support
+    # reads the section; every write stays with Catalog and moderation (the services refuse too).
+    "platform.products": {CATALOG: E, SUPPORT: R, OWNER: R},
     # FIT.1 part 2: the fitment scheme and the categories expected to declare fitment (operator
     # settings, Configuration and tax), and the nodes of the scheme (Catalog and moderation).
     "platform.fitment_scheme": {CONFIG: E, OWNER: R},
@@ -157,6 +159,7 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.map": "Platform: map of the site (CORE.30)",
     "platform.config": "Platform: configuration and tax (ARC.24)",
     "platform.owner_settings": "Platform: owner-only settings (CMP.13, CMP.11 approvals)",
+    "platform.trust_rules": "Platform: trust rules, the versions of the badge thresholds (TRU.1)",
     "platform.catalog": "Platform: catalog, categories, attributes, taxonomies, imports",
     "platform.products": "Platform: products, bulk publish, preview, translation status (CAT.11)",
     "platform.moderation": "Platform: moderation (vendor events, storefront changes, content)",

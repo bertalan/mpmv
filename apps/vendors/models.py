@@ -66,6 +66,13 @@ class VendorSalesMode(models.TextChoices):
     ON_REQUEST = "on_request", "On request"
 
 
+class ProductRole(models.TextChoices):
+    """What the vendor is to its products, for structured data (SEO.10). Blank means unknown."""
+
+    PRODUCER = "producer", "Producer"
+    RESELLER = "reseller", "Reseller"
+
+
 class LegalForm(models.TextChoices):
     SOLE_PROPRIETORSHIP = engine.SOLE_PROPRIETORSHIP, "Sole proprietorship (ditta individuale)"
     PARTNERSHIP = engine.PARTNERSHIP, "Partnership (S.n.c., S.a.s.)"
@@ -126,6 +133,7 @@ PROVINCE_CHOICES = [(code, code) for code in sorted(engine.PROVINCE_CODES)]
 class Vendor(BaseModel):
     Status = VendorStatus
     SalesMode = VendorSalesMode
+    ProductRole = ProductRole
     LegalForm = LegalForm
     FiscalRegime = FiscalRegime
     ViesStatus = ViesStatus
@@ -217,6 +225,17 @@ class Vendor(BaseModel):
         help_text=_(
             "Tick it if you want to accept enquiries from buyers about your products. "
             "Unticked: you do not take enquiries."
+        ),
+    )
+    default_product_role = models.CharField(
+        max_length=16,
+        choices=ProductRole.choices,
+        blank=True,
+        help_text=_(
+            "Whether you make the products you sell (producer) or buy them to resell "
+            "(reseller). Search engines and AI assistants see it in the product data. Leave it "
+            "empty if you are not sure: we then never say that you make the product. A single "
+            "product can override it."
         ),
     )
     legacy_wp_user_id = models.PositiveBigIntegerField(
@@ -1789,3 +1808,113 @@ class SalesTermsInForce(BaseModel):
         super().clean()
         if self.version_id is not None and self.version.vendor_id != self.vendor_id:
             raise ValidationError({"version": _("The version belongs to another seller.")})
+
+
+class ReturnPolicyVersion(BaseModel):
+    """One proposed or approved version of a vendor's return policy (VEN.40).
+
+    The vendor owner proposes; platform staff approve or reject (the structured data of SEO.14
+    must not state what the sales terms of VEN.35 do not say). Only the newest approved version
+    is public. The values never change after the proposal: only the review columns do, and a
+    new proposal is a new row.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Waiting for review")
+        APPROVED = "approved", _("Approved")
+        REJECTED = "rejected", _("Rejected")
+        WITHDRAWN = "withdrawn", _("Replaced by a newer proposal")
+
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.PROTECT,
+        related_name="return_policy_versions",
+        help_text=_("The seller this return policy belongs to."),
+    )
+    number = models.PositiveIntegerField(
+        editable=False,
+        help_text=_("The version number of this policy for this seller: 1, 2, 3 and so on."),
+    )
+    return_window_days = models.PositiveSmallIntegerField(
+        help_text=_("Days a consumer has to send goods back. Never fewer than 14."),
+    )
+    return_shipping_paid_by = models.CharField(
+        max_length=10,
+        choices=[("customer", _("The customer")), ("vendor", _("The seller"))],
+        help_text=_("Who pays the cost of sending goods back."),
+    )
+    return_methods = models.JSONField(
+        default=list,
+        help_text=_("How goods can be returned: by post, at a drop-off point or in the store."),
+    )
+    returns_page_url = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text=_("The address (https only) of your public page that explains returns."),
+    )
+    return_country = CountryField(help_text=_("The country goods are returned to."))
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.PENDING,
+        help_text=_("Where this version is in the staff review. Only approved ones are public."),
+    )
+    reviewed_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text=_("The staff member who approved or rejected this version."),
+    )
+    reviewed_at = models.DateTimeField(
+        null=True, blank=True, help_text=_("When the review happened.")
+    )
+    review_note = models.CharField(
+        max_length=500, blank=True, help_text=_("Why staff rejected it, shown to the seller.")
+    )
+
+    class Meta:
+        ordering = ["vendor_id", "-number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vendor", "number"], name="vendors_returnpolicy_vendor_number_unique"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(return_window_days__gte=14),
+                name="vendors_returnpolicy_window_min_14",
+                violation_error_message="The return window cannot be shorter than 14 days.",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(returns_page_url="")
+                | models.Q(returns_page_url__startswith="https://"),
+                name="vendors_returnpolicy_page_https",
+                violation_error_message="The returns page address must start with https://.",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(return_shipping_paid_by__in=["customer", "vendor"]),
+                name="vendors_returnpolicy_payer_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status__in=["pending", "approved", "rejected", "withdrawn"]),
+                name="vendors_returnpolicy_status_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor_id} return policy v{self.number} ({self.status})"
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "vendor": str(self.vendor.public_id),
+            "number": self.number,
+            "return_window_days": self.return_window_days,
+            "return_shipping_paid_by": self.return_shipping_paid_by,
+            "return_methods": list(self.return_methods),
+            "returns_page_url": self.returns_page_url,
+            "return_country": str(self.return_country),
+            "status": self.status,
+        }

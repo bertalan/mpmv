@@ -21,6 +21,9 @@ The Django admin is classified as a whole: staff only, with the object pages of 
 models tested on Vendor B's objects.
 """
 
+import secrets
+from decimal import Decimal
+
 from django.contrib import admin
 from django.db import models
 from django.test import Client
@@ -86,24 +89,39 @@ from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
-from apps.fitment.models import ProductFitment, ProductFitmentState
-from apps.fitment.tests.factories import ProductFitmentFactory, ProductFitmentStateFactory
+from apps.fitment.models import FitmentNodeProposal, ProductFitment, ProductFitmentState
+from apps.fitment.tests.factories import (
+    FitmentCategoryFactory,
+    FitmentNodeProposalFactory,
+    ProductFitmentFactory,
+    ProductFitmentStateFactory,
+)
 from apps.ingest.models import (
     ImportRun,
+    ItemChange,
     MappingTable,
     ProductDraft,
     ReviewItem,
     SourceItem,
+    SourceMissing,
     SourceObservation,
+    SourceState,
+    SourceStateVersion,
+    SourceVariation,
     SupplierSource,
 )
 from apps.ingest.tests.factories import (
     ImportRunFactory,
+    ItemChangeFactory,
     MappingTableFactory,
     ProductDraftFactory,
     ReviewItemFactory,
     SourceItemFactory,
+    SourceMissingFactory,
     SourceObservationFactory,
+    SourceStateFactory,
+    SourceStateVersionFactory,
+    SourceVariationFactory,
     SupplierSourceFactory,
 )
 from apps.ledger.models import LedgerEntry, Refund
@@ -151,9 +169,12 @@ from apps.tax.tests.factories import (
     VendorTaxProfileFactory,
     VendorTaxProfileTranslationFactory,
 )
+from apps.trust.models import VendorTrustSnapshot
+from apps.trust.tests.factories import VendorTrustSnapshotFactory
 from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
+    ReturnPolicyVersion,
     SalesTermsInForce,
     SalesTermsVersion,
     SelfCertification,
@@ -166,6 +187,7 @@ from apps.vendors.models import (
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
     CrossVendorConsentFactory,
+    ReturnPolicyVersionFactory,
     SalesTermsInForceFactory,
     SalesTermsVersionFactory,
     SelfCertificationFactory,
@@ -211,7 +233,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         vendor=vendor, certified=False
     ),
     SelfCertification: lambda vendor: SelfCertificationFactory.create(vendor=vendor),
+    # TRU.1: a vendor's computed trust result; the Manager shows a vendor its own (TRU.2).
+    VendorTrustSnapshot: lambda vendor: VendorTrustSnapshotFactory.create(vendor=vendor),
     # VEN.35: a published version of the seller's sales terms and the pointer to the one in force.
+    ReturnPolicyVersion: lambda vendor: ReturnPolicyVersionFactory.create(vendor=vendor),
     SalesTermsVersion: lambda vendor: SalesTermsVersionFactory.create(vendor=vendor),
     SalesTermsInForce: lambda vendor: SalesTermsInForceFactory.create(version__vendor=vendor),
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
@@ -221,6 +246,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
+    FitmentNodeProposal: lambda vendor: FitmentNodeProposalFactory.create(vendor=vendor),
     ProductFitmentState: lambda vendor: ProductFitmentStateFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
@@ -263,6 +289,13 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     SourceItem: lambda vendor: SourceItemFactory.create(source__vendor=vendor),
     SourceObservation: lambda vendor: SourceObservationFactory.create(item__source__vendor=vendor),
     ProductDraft: lambda vendor: ProductDraftFactory.create(item__source__vendor=vendor),
+    SourceState: lambda vendor: SourceStateFactory.create(item__source__vendor=vendor),
+    SourceStateVersion: lambda vendor: SourceStateVersionFactory.create(
+        item__source__vendor=vendor
+    ),
+    SourceVariation: lambda vendor: SourceVariationFactory.create(item__source__vendor=vendor),
+    SourceMissing: lambda vendor: SourceMissingFactory.create(item__source__vendor=vendor),
+    ItemChange: lambda vendor: ItemChangeFactory.create(item__source__vendor=vendor),
     ImportRun: lambda vendor: ImportRunFactory.create(source__vendor=vendor),
     ReviewItem: lambda vendor: ReviewItemFactory.create(run__source__vendor=vendor),
     MappingTable: lambda vendor: MappingTableFactory.create(vendor=vendor),
@@ -389,6 +422,24 @@ def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[s
 def manager_vendor(vendor: Vendor) -> Vendor:
     """The Manager's shop pages show the selected vendor itself (CORE.17)."""
     return vendor
+
+
+def ledger_entry_with_ref(vendor: Vendor) -> LedgerEntry:
+    """A sale with a unique provider reference, the field the VEN.9 pages show (CORE.3)."""
+    return LedgerEntryFactory.create(vendor=vendor, external_ref=f"tr_{secrets.token_hex(8)}")
+
+
+def payout_entry_with_ref(vendor: Vendor) -> LedgerEntry:
+    return LedgerEntryFactory.create(
+        vendor=vendor,
+        kind="payout",
+        amount=Decimal("-1.00"),
+        external_ref=f"po_{secrets.token_hex(8)}",
+    )
+
+
+def external_ref_of(obj: models.Model) -> str:
+    return str(obj.external_ref)  # type: ignore[attr-defined]
 
 
 def vendor_with_pending_termination(vendor: Vendor) -> Vendor:
@@ -580,6 +631,12 @@ ENDPOINTS: dict[str, Access] = {
         "is logged.",
         kwargs={"token": "not-a-token"},
     ),
+    "vendor_terms:pdf": NoVendorData(
+        "PDF of the sales terms in force of any seller (VEN.36): public by design behind the same "
+        "signed, expiring link; a superseded version and a tampered link are a 404 (an accepted-"
+        "terms link opens its own version), every read is logged.",
+        kwargs={"token": "not-a-token"},
+    ),
     "vendor_claim:claim": NoVendorData(
         "Vendor claim page (VEN.24): without a claim link opened in the session for that vendor "
         "it shows only the generic 'link not valid' page, whoever is signed in.",
@@ -657,10 +714,28 @@ ENDPOINTS: dict[str, Access] = {
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # CMP.5 part 4: the notice of termination and the data download show the selected vendor only.
     "manager:shop:sales_terms": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:return_policy": VendorScopedList(
+        make=manager_vendor, identify=vendor_display_name
+    ),
     "manager:shop:termination": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # The statements of reasons of the selected shop (DSA art. 17); another shop's are never listed.
     "manager:shop:statements": VendorScopedList(
         make=lambda vendor: StatementOfReasonsFactory.create(vendor=vendor)
+    ),
+    # VEN.9: the vendor's own ledger; another vendor's entries never show or export (the provider
+    # reference is the visible mark; the statement names the selected shop).
+    "manager:shop:money": VendorScopedList(make=ledger_entry_with_ref, identify=external_ref_of),
+    "manager:shop:money_transactions": VendorScopedList(
+        make=ledger_entry_with_ref, identify=external_ref_of
+    ),
+    "manager:shop:money_payouts": VendorScopedList(
+        make=payout_entry_with_ref, identify=external_ref_of
+    ),
+    "manager:shop:money_statement": VendorScopedList(
+        make=manager_vendor, identify=vendor_display_name
+    ),
+    "manager:shop:money_export": VendorScopedList(
+        make=ledger_entry_with_ref, identify=external_ref_of, methods=("POST",)
     ),
     # The download exists only while a notice is pending: the vendor made here has one.
     "manager:shop:termination_data": VendorScopedList(
@@ -731,6 +806,31 @@ ENDPOINTS: dict[str, Access] = {
     "manager:shop:event_translate": VendorScoped(
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
         sample={"public_id": NIL_UUID},
+    ),
+    # FIT.3: the Fits pages of the shop; every product is found through `scoped()`.
+    "manager:shop:fitment": VendorScopedList(
+        make=lambda vendor: ProductFactory.create(vendor=vendor),
+        identify=lambda product: str(product.sku),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:fitment_nodes": NoVendorData(
+        "Picker JSON (FIT.3): the approved fitment nodes, the platform's shared vocabulary with no "
+        "vendor data; members of a shop only, bounded, read-only "
+        "(apps/manager/tests/integration/test_fitment_picker.py)."
+    ),
+    "manager:shop:fitment_product": VendorScoped(
+        make=lambda vendor: ProductFactory.create(vendor=vendor),
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:fitment_proposals": VendorScopedList(
+        make=lambda vendor: FitmentNodeProposalFactory.create(vendor=vendor),
+        identify=lambda proposal: str(proposal.node.name),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:fitment_report": VendorScopedList(
+        make=lambda vendor: ProductFactory.create(
+            vendor=vendor, category=FitmentCategoryFactory.create().category
+        ),
+        identify=lambda product: str(product.sku),  # type: ignore[attr-defined]
     ),
     # EVT.4 part 2: the block editor, the preview and the image library.
     "manager:shop:event_block_add": VendorScoped(
@@ -872,6 +972,20 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:amendment_settings": StaffOnly(
         "The amendment settings in force (ORD.20 part 3): platform configuration, no vendor "
         "data; the configuration role and the platform owner only."
+    ),
+    "manager:platform:trust_rules": StaffOnly(
+        "The trust rules versions (TRU.1 part 2): platform configuration, no vendor data; the "
+        "configuration role and the platform owner only."
+    ),
+    "manager:platform:trust_rule": StaffOnly(
+        "One trust rules version (TRU.1 part 2): platform configuration, no vendor data; the "
+        "configuration role and the platform owner only.",
+        kwargs={"version": "1"},
+    ),
+    "manager:platform:trust_rule_new": StaffOnly(
+        "A new trust rules version with a dry-run preview (TRU.1 part 2): platform configuration, "
+        "no vendor data; the configuration role and the platform owner only; the POST needs the "
+        "operator_config session level."
     ),
     "manager:platform:terminations": StaffOnly(
         "Notices of termination (CMP.5 part 4): platform data; needs the "
@@ -1024,6 +1138,11 @@ ENDPOINTS: dict[str, Access] = {
         "Customer help section (ARC.37): repository text, no vendor data.",
         kwargs={"section": "ordering"},
     ),
+    "vendor_help": NoVendorData("Seller guide index (ARC.37): repository text, no vendor data."),
+    "vendor_help_section": NoVendorData(
+        "Seller guide section (ARC.37): repository text, no vendor data.",
+        kwargs={"section": "getting-started"},
+    ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
     "admin:jsi18n": NoVendorData("Admin JavaScript translation catalog."),
@@ -1121,6 +1240,10 @@ API_OPERATIONS: dict[str, Access] = {
         "404. Shows only the ChangeSet of what it creates."
     ),
     "GET /api/v1/catalog/products/{public_id}": VendorScoped(
+        make=lambda vendor: ProductFactory.create(vendor=vendor)
+    ),
+    # CAT.15
+    "GET /api/v1/catalog/products/{public_id}/other-sellers": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor)
     ),
     # EVT.5

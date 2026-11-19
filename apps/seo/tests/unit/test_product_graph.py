@@ -255,12 +255,35 @@ def test_the_return_policy_names_its_countries_and_window() -> None:
     assert node["merchantReturnLink"] == f"{SITE}/shop/acme/"
 
 
-def test_the_customer_pays_the_return_shipping_and_a_defect_is_free() -> None:
+def test_no_payer_given_means_no_return_fees_but_a_defect_is_free() -> None:
     node = pg.return_policy_node(node_id=RETURNS, countries=("IT",), return_country="IT", days=14)
-    assert node["returnFees"] == "https://schema.org/ReturnShippingFees"
+    assert "returnFees" not in node
+    assert "merchantReturnLink" not in node
+    assert "returnMethod" not in node
     assert node["itemDefectReturnFees"] == "https://schema.org/FreeReturn"
     assert node["merchantReturnDays"] == 14
     assert "returnShippingFeesAmount" not in node
+
+
+def test_a_stated_payer_sets_the_return_fees_and_the_methods_map_to_schema_org() -> None:
+    customer = pg.return_policy_node(
+        node_id=RETURNS, countries=("IT",), return_country="IT", days=30, paid_by="customer"
+    )
+    assert customer["returnFees"] == "https://schema.org/ReturnShippingFees"
+    shop = pg.return_policy_node(
+        node_id=RETURNS,
+        countries=("IT",),
+        return_country="IT",
+        days=30,
+        paid_by="vendor",
+        methods=("post", "drop_off", "in_store"),
+    )
+    assert shop["returnFees"] == "https://schema.org/FreeReturn"
+    assert shop["returnMethod"] == [
+        "https://schema.org/ReturnByMail",
+        "https://schema.org/ReturnAtKiosk",
+        "https://schema.org/ReturnInStore",
+    ]
 
 
 def test_shipping_details_group_the_countries_in_one_region_per_rate() -> None:
@@ -362,3 +385,98 @@ def test_the_product_graph_stays_under_the_budget() -> None:
         for i in range(6)
     )
     assert len(pg.graph_text(graph(product=product(images=many))).encode()) < 30 * 1024
+
+
+@pytest.mark.parametrize(
+    ("role", "brand", "maker", "expected"),
+    [
+        ("producer", "", "", ("V", "V")),
+        ("producer", "B", "", ("B", "V")),
+        ("producer", "B", "M", ("B", "M")),
+        ("reseller", "B", "", ("B", "")),
+        ("reseller", "", "", ("", "")),
+        ("reseller", "B", "M", ("B", "M")),
+        ("", "", "", ("", "")),
+        ("", "B", "M", ("B", "M")),
+    ],
+)
+def test_vendor_role_refs(role: str, brand: str, maker: str, expected: tuple[str, str]) -> None:
+    assert pg.vendor_role_refs(role, brand_id=brand, maker_id=maker, vendor_id="V") == expected
+
+
+def test_a_producer_without_a_public_vendor_node_claims_nothing() -> None:
+    assert pg.vendor_role_refs("producer", brand_id="", maker_id="", vendor_id="") == ("", "")
+
+
+def test_dimensions_are_quantitative_values_in_millimetres() -> None:
+    node = pg.product_node(product(width_mm=200, height_mm=100, depth_mm=300))
+    for key, value in (("width", 200), ("height", 100), ("depth", 300)):
+        assert node[key] == {"@type": "QuantitativeValue", "value": value, "unitCode": "MMT"}
+
+
+def test_material_colour_and_origin_are_stated_when_known() -> None:
+    node = pg.product_node(
+        product(material="Glazed ceramic", color="Matt black", country_of_origin="IT")
+    )
+    assert node["material"] == "Glazed ceramic"
+    assert node["color"] == "Matt black"
+    assert node["countryOfOrigin"] == {"@type": "Country", "name": "IT"}
+
+
+def test_an_unknown_attribute_is_absent_never_blank() -> None:
+    node = pg.product_node(product(width_mm=None, material="", color="", country_of_origin=""))
+    for key in ("width", "height", "depth", "material", "color", "countryOfOrigin"):
+        assert key not in node
+
+
+def test_the_attributes_sit_on_the_group_of_a_product_with_variants() -> None:
+    variant = pg.VariantData(sku="ACME-1-A", name="Mug A")
+    node = pg.product_node(product(variants=(variant,), width_mm=200, material="Steel"))
+    assert node["@type"] == "ProductGroup"
+    assert node["width"]["value"] == 200
+    assert "width" not in node["hasVariant"][0]
+
+
+def test_a_shipping_node_names_its_service_and_omits_an_empty_name() -> None:
+    named = pg.shipping_node(
+        node_id=SHIPPING, countries=("IT",), rate=Decimal("5"), currency="EUR", name="Courier"
+    )
+    assert named["name"] == "Courier"
+    assert "hasShippingService" not in named  # the product's own band carries no condition
+    blank = pg.shipping_node(node_id=SHIPPING, countries=("IT",), rate=Decimal("5"), currency="EUR")
+    assert "name" not in blank
+
+
+def test_another_weight_band_is_a_shipping_service_with_a_weight_condition() -> None:
+    node = pg.shipping_node(
+        node_id=SHIPPING,
+        countries=("IT",),
+        rate=Decimal("9"),
+        currency="EUR",
+        name="Courier",
+        weight_from_kg=Decimal("5.000"),
+        weight_to_kg=Decimal("10.000"),
+    )
+    assert node["hasShippingService"] == {
+        "@type": "ShippingService",
+        "name": "Courier",
+        "shippingConditions": {
+            "@type": "ShippingConditions",
+            "weight": {
+                "@type": "QuantitativeValue",
+                "minValue": "5.000",
+                "maxValue": "10.000",
+                "unitCode": "KGM",
+            },
+        },
+    }
+    open_ended = pg.shipping_node(
+        node_id=SHIPPING,
+        countries=(),
+        rate=Decimal("9"),
+        currency="EUR",
+        weight_from_kg=Decimal("10.000"),
+    )
+    weight = open_ended["hasShippingService"]["shippingConditions"]["weight"]
+    assert "maxValue" not in weight
+    assert schema_check.rich_result_errors({"@graph": [open_ended]}) == []

@@ -20,6 +20,7 @@ from apps.cart import engine as cart_engine
 from apps.cart import services as cart_services
 from apps.cart.models import Cart
 from apps.catalog.models import Product, Variant
+from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.countries import InvalidCountry
 from apps.shipping import engine as shipping_engine
@@ -194,7 +195,7 @@ def plan_items(
 
 
 def fill_cart(
-    cart: Cart, items: list[_Item], *, country: str, dry_run: bool = False
+    cart: Cart, items: list[_Item], *, country: str, ctx: AuditContext, dry_run: bool = False
 ) -> ReorderResult:
     """Put `items` in `cart` at today's prices, capped at the stock available, skipping (with
     the reason) what cannot be bought or shipped to `country` today. An item already in the
@@ -204,20 +205,13 @@ def fill_cart(
     )
     outcomes = plan_items(items, in_cart=in_cart, country=country, language=cart.language)
     result = ReorderResult()
+    to_add: list[tuple[Product, Variant | None, int]] = []
     for item, outcome in zip(items, outcomes, strict=True):
         if outcome.skipped:
             result.skipped.append(SkippedItem(item.title, item.variant_label, outcome.skipped))
             continue
         if outcome.added > 0 and item.product is not None and cart.pk:
-            result.changeset.changes.extend(
-                cart_services.add_to_cart(
-                    cart,
-                    item.product,
-                    variant=item.variant,
-                    quantity=outcome.added,
-                    dry_run=dry_run,
-                ).changes
-            )
+            to_add.append((item.product, item.variant, outcome.added))
         result.added.append(
             ReorderedItem(
                 item.title,
@@ -228,10 +222,16 @@ def fill_cart(
                 outcome.capped,
             )
         )
+    if to_add:  # one lock and a constant number of queries, whatever the number of lines
+        result.changeset.changes.extend(
+            cart_services.add_many_to_cart(cart, to_add, ctx=ctx, dry_run=dry_run).changes
+        )
     return result
 
 
-def order_again(user: User, public_id: uuid.UUID, *, dry_run: bool = False) -> ReorderResult | None:
+def order_again(
+    user: User, public_id: uuid.UUID, *, ctx: AuditContext, dry_run: bool = False
+) -> ReorderResult | None:
     """Put the still-available items of the customer's past order back in their cart.
 
     None when the order is not the user's (the view answers 404, also for a guessed id). Lines
@@ -251,4 +251,4 @@ def order_again(user: User, public_id: uuid.UUID, *, dry_run: bool = False) -> R
         )
         if cart is None:
             cart = Cart(user=user)  # a dry run before the first cart: nothing in it yet
-        return fill_cart(cart, items, country=cart.country_hint, dry_run=dry_run)
+        return fill_cart(cart, items, country=cart.country_hint, ctx=ctx, dry_run=dry_run)

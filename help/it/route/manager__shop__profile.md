@@ -10,6 +10,8 @@ Questa pagina è per il titolare del negozio. Contiene i testi e le condizioni c
 
 Sotto **Logo**, scelga una **Immagine del logo**, la descriva in **Descrizione del logo** e prema **Salva logo**. La descrizione serve a chi non può vedere l'immagine.
 
+Sotto **Produttore o rivenditore**, scelga **Che cosa è il negozio per i suoi prodotti**: produttore, rivenditore oppure non so. I motori di ricerca e gli assistenti IA lo vedono nei dati del prodotto. Se non è sicuro, non diremo mai che realizza il prodotto. Prema **Salva il ruolo del prodotto**.
+
 ## Da sapere
 - Un testo segnalato come bozza automatica non è pubblico finché non lo modifica e lo salva.
 - Se il Suo negozio è sospeso o chiuso, qui non si può cambiare nulla.

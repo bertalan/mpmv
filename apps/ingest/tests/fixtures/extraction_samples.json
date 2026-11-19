@@ -1,0 +1,793 @@
+{
+ "types": {
+  "borse laterali": "double_bag",
+  "borsa laterale": "single_bag",
+  "zaino": "backpack",
+  "telaio": "frame"
+ },
+ "materials": {
+  "PVC": {
+   "it": "PVC",
+   "en": "PVC",
+   "variants": [
+    "pvc",
+    "pvc telato"
+   ]
+  },
+  "Cordura": {
+   "it": "Cordura",
+   "en": "Cordura",
+   "variants": [
+    "cordura"
+   ]
+  },
+  "Pelle": {
+   "it": "Pelle",
+   "en": "Leather",
+   "variants": [
+    "pelle",
+    "pelle liscia"
+   ]
+  },
+  "Acciaio": {
+   "it": "Acciaio",
+   "en": "Steel",
+   "variants": [
+    "acciaio",
+    "acciaio inox"
+   ]
+  }
+ },
+ "colors": {
+  "nero": "black",
+  "bianco": "white",
+  "rosso": "red",
+  "blu": "blue",
+  "verde": "green",
+  "grigio": "gray"
+ },
+ "exclude_words": [
+  "per",
+  "in",
+  "nero",
+  "bianco",
+  "rosso",
+  "blu",
+  "verde",
+  "grigio",
+  "con"
+ ],
+ "samples": [
+  {
+   "title": "Borsa laterale modello Gamma per moto verde",
+   "description": "peso trasportabile kg. 10 Disponibile in bianco.",
+   "expected": {
+    "product_type": "single_bag",
+    "model": "GAMMA",
+    "load_weight_kg": "10",
+    "colors": [
+     "green"
+    ]
+   }
+  },
+  {
+   "title": "Borse laterali modello Alpha",
+   "description": "Materiali: acciaio inox - cordura. Caratteristiche Tecniche: chiusura rapida; ",
+   "expected": {
+    "product_type": "double_bag",
+    "model": "MODELLO ALPHA",
+    "materials_text": "acciaio inox cordura",
+    "materials": [
+     "Cordura",
+     "Acciaio"
+    ],
+    "technical": "chiusura rapida"
+   }
+  },
+  {
+   "title": "Zaino modello Lume X2 per moto blu",
+   "description": "Materiali: acciaio inox - cordura. Caratteristiche Tecniche: chiusura rapida;  Capienza lt. 45",
+   "expected": {
+    "product_type": "backpack",
+    "model": "LUME X2",
+    "materials_text": "acciaio inox cordura",
+    "materials": [
+     "Cordura",
+     "Acciaio"
+    ],
+    "technical": "chiusura rapida",
+    "capacity_l": "45",
+    "colors": [
+     "blue"
+    ]
+   }
+  },
+  {
+   "title": "Telaio modello Eolo per moto nero",
+   "description": "Materiali: pvc. Capienza lt. 45 Disponibile in grigio.",
+   "expected": {
+    "product_type": "frame",
+    "model": "EOLO",
+    "materials_text": "pvc",
+    "materials": [
+     "PVC"
+    ],
+    "capacity_l": "45",
+    "colors": [
+     "black"
+    ]
+   }
+  },
+  {
+   "title": "Borsa laterale modello Delta per moto blu",
+   "description": "Materiali: acciaio inox - cordura. Capienza lt. 30 / 25 peso trasportabile kg. 5 Disponibile in verde.",
+   "expected": {
+    "product_type": "single_bag",
+    "model": "DELTA",
+    "materials_text": "acciaio inox cordura",
+    "materials": [
+     "Cordura",
+     "Acciaio"
+    ],
+    "capacity_l": "30/25",
+    "load_weight_kg": "5",
+    "colors": [
+     "blue"
+    ]
+   }
+  },
+  {
+   "title": "Borsa laterale modello Cirro Pro per moto",
+   "description": "Disponibile in rosso.",
+   "expected": {
+    "product_type": "single_bag",
+    "model": "CIRRO PRO",
+    "colors": [
+     "red"
+    ]
+   }
+  },
+  {
+   "title": "Zaino verde",
+   "description": "Materiali: pvc telato e cordura. Caratteristiche Tecniche: chiusura rapida;  Capienza lt. 30 / 25 peso trasportabile kg. 10",
+   "expected": {
+    "product_type": "backpack",
+    "materials_text": "pvc telato e cordura",
+    "materials": [
+     "PVC",
+     "Cordura"
+    ],
+    "technical": "chiusura rapida",
+    "capacity_l": "30/25",
+    "load_weight_kg": "10",
+    "colors": [
+     "green"
+    ]
+   }
+  },
+  {
+   "title": "Zaino modello Fiore Pro per moto",
+   "description": "Capienza lt. 20 peso trasportabile kg. 5 Disponibile in grigio.",
+   "expected": {
+    "product_type": "backpack",
+    "model": "FIORE PRO",
+    "capacity_l": "20",
+    "load_weight_kg": "5",
+    "colors": [
+     "gray"
+    ]
+   }
+  },
+  {
+   "title": "Borsa laterale modello Cirro per moto rosso",
+   "description": "Caratteristiche Tecniche: chiusura rapida; ",
+   "expected": {
+    "product_type": "single_bag",
+    "model": "CIRRO",
+    "technical": "chiusura rapida",
+    "colors": [
+     "red"
+    ]
+   }
+  },
+  {
+   "title": "Borsa laterale modello Delta per moto blu",
+   "description": "Materiali: pvc. Capienza lt. 20 / 25 peso trasportabile kg. 10 Disponibile in bianco.",
+   "expected": {
+    "product_type": "single_bag",
+    "model": "DELTA",
+    "materials_text": "pvc",
+    "materials": [
+     "PVC"
+    ],
+    "capacity_l": "20/25",
+    "load_weight_kg": "10",
+    "colors": [
+     "blue"
+    ]
+   }
+  },
+  {
+   "title": "Telaio per moto rosso",
+   "description": "Materiali: pvc.",
+   "expected": {
+    "product_type": "frame",
+    "materials_text": "pvc",
+    "materials": [
+     "PVC"
+    ],
+    "colors": [
+     "red"
+    ]
+   }
+  },
+  {
+   "title": "Borse laterali modello Brio bianco",
+   "description": "Materiali: pvc.",
+   "expected": {
+    "product_type": "double_bag",
+    "model": "MODELLO BRIO",
+    "materials_text": "pvc",
+    "materials": [
+     "PVC"
+    ],
+    "colors": [
+     "white"
+    ]
+   }
+  },
+  {
+   "title": "Zaino modello Gamma per moto",
+   "description": "Capienza lt. 45 / 25",
+   "expected": {
+    "product_type": "backpack",
+    "model": "GAMMA",
+    "capacity_l": "45/25"
+   }
+  },
+  {
+   "title": "Borse laterali blu",
+   "description": "Materiali: pvc. Caratteristiche Tecniche: chiusura rapida;  Capienza lt. 20 / 25 Disponibile in blu.",
+   "expected": {
+    "product_type": "double_bag",
+    "materials_text": "pvc",
+    "materials": [
+     "PVC"
+    ],
+    "technical": "chiusura rapida",
+    "capacity_l": "20/25",
+    "colors": [
+     "blue"
+    ]
+   }
+  },
+  {
+   "title": "Borsa laterale modello Delta Plus per moto",
+   "description": "Materiali: pvc. Capienza lt. 20 / 25",
+   "expected": {
+    "product_type": "single_bag",
+    "model": "DELTA PLUS",
+    "materials_text": "pvc",
+    "materials": [
+     "PVC"
+    ],
+    "capacity_l": "20/25"
+   }
+  },
+  {
+   "title": "Zaino modello Cirro Pro nero",
+   "description": "Materiali: acciaio inox - cordura. Capienza lt. 45 peso trasportabile kg. 7,5 Disponibile in blu.",
+   "expected": {
+    "product_type": "backpack",
+    "model": "CIRRO PRO",
+    "materials_text": "acciaio inox cordura",
+    "materials": [
+     "Cordura",
+     "Acciaio"
+    ],
+    "capacity_l": "45",
+    "load_weight_kg": "7.5",
+    "colors": [
+     "black"
+    ]
+   }
+  },
+  {
+   "title": "Telaio modello Brio blu",
+   "description": "Materiali: pvc. Caratteristiche Tecniche: chiusura rapida;  peso trasportabile kg. 7,5",
+   "expected": {
+    "product_type": "frame",
+    "model": "BRIO",
+    "materials_text": "pvc",
+    "materials": [
+     "PVC"
+    ],
+    "technical": "chiusura rapida",
+    "load_weight_kg": "7.5",
+    "colors": [
+     "blue"
+    ]
+   }
+  },
+  {
+   "title": "Telaio modello Iris Pro per moto blu",
+   "description": "Caratteristiche Tecniche: chiusura rapida;  peso trasportabile kg. 5 Disponibile in rosso.",
+   "expected": {
+    "product_type": "frame",
+    "model": "IRIS PRO",
+    "technical": "chiusura rapida",
+    "load_weight_kg": "5",
+    "colors": [
+     "blue"
+    ]
+   }
+  },
+  {
+   "title": "Borse laterali modello Helix verde",
+   "description": "Materiali: acciaio inox - cordura. Caratteristiche Tecniche: chiusura rapida; ",
+   "expected": {
+    "product_type": "double_bag",
+    "model": "MODELLO HELIX",
+    "materials_text": "acciaio inox cordura",
+    "materials": [
+     "Cordura",
+     "Acciaio"
+    ],
+    "technical": "chiusura rapida",
+    "colors": [
+     "green"
+    ]
+   }
+  },
+  {
+   "title": "Borse laterali modello Fiore",
+   "description": "Materiali: pvc. Capienza lt. 20 / 25",
+   "expected": {
+    "product_type": "double_bag",
+    "model": "MODELLO FIORE",
+    "materials_text": "pvc",
+    "materials": [
+     "PVC"
+    ],
+    "capacity_l": "20/25"
+   }
+  },
+  {
+   "title": "Zaino modello Brio",
+   "description": "Materiali: acciaio inox - cordura. Caratteristiche Tecniche: chiusura rapida; ",
+   "expected": {
+    "product_type": "backpack",
+    "model": "BRIO",
+    "materials_text": "acciaio inox cordura",
+    "materials": [
+     "Cordura",
+     "Acciaio"
+    ],
+    "technical": "chiusura rapida"
+   }
+  },
+  {
+   "title": "Borse laterali modello Cirro X2 per moto nero",
+   "description": "Materiali: pvc telato e cordura. Disponibile in verde.",
+   "expected": {
+    "product_type": "double_bag",
+    "model": "MODELLO CIRRO X2",
+    "materials_text": "pvc telato e cordura",
+    "materials": [
+     "PVC",
+     "Cordura"
+    ],
+    "colors": [
+     "black"
+    ]
+   }
+  },
+  {
+   "title": "Telaio modello Brio grigio",
+   "description": "Materiali: pelle liscia. peso trasportabile kg. 10",
+   "expected": {
+    "product_type": "frame",
+    "model": "BRIO",
+    "materials_text": "pelle liscia",
+    "materials": [
+     "Pelle"
+    ],
+    "load_weight_kg": "10",
+    "colors": [
+     "gray"
+    ]
+   }
+  },
+  {
+   "title": "Borsa laterale bianco",
+   "description": "Materiali: pvc. Capienza lt. 30 peso trasportabile kg. 7,5",
+   "expected": {
+    "product_type": "single_bag",
+    "materials_text": "pvc",
+    "materials": [
+     "PVC"
+    ],
+    "capacity_l": "30",
+    "load_weight_kg": "7.5",
+    "colors": [
+     "white"
+    ]
+   }
+  },
+  {
+   "title": "Borse laterali modello Iris per moto",
+   "description": "Materiali: pvc. Capienza lt. 20",
+   "expected": {
+    "product_type": "double_bag",
+    "model": "MODELLO IRIS",
+    "materials_text": "pvc",
+    "materials": [
+     "PVC"
+    ],
+    "capacity_l": "20"
+   }
+  },
+  {
+   "title": "Zaino modello Eolo grigio",
+   "description": "peso trasportabile kg. 5 Disponibile in bianco.",
+   "expected": {
+    "product_type": "backpack",
+    "model": "EOLO",
+    "load_weight_kg": "5",
+    "colors": [
+     "gray"
+    ]
+   }
+  },
+  {
+   "title": "Borse laterali modello Lume per moto",
+   "description": "Materiali: pelle liscia. Caratteristiche Tecniche: chiusura rapida;  Capienza lt. 20 peso trasportabile kg. 7,5 Disponibile in grigio.",
+   "expected": {
+    "product_type": "double_bag",
+    "model": "MODELLO LUME",
+    "materials_text": "pelle liscia",
+    "materials": [
+     "Pelle"
+    ],
+    "technical": "chiusura rapida",
+    "capacity_l": "20",
+    "load_weight_kg": "7.5",
+    "colors": [
+     "gray"
+    ]
+   }
+  },
+  {
+   "title": "Zaino modello Cirro",
+   "description": "",
+   "expected": {
+    "product_type": "backpack",
+    "model": "CIRRO"
+   }
+  },
+  {
+   "title": "Borsa laterale modello Cirro X2 per moto bianco",
+   "description": "Materiali: acciaio inox - cordura. peso trasportabile kg. 7,5 Disponibile in blu.",
+   "expected": {
+    "product_type": "single_bag",
+    "model": "CIRRO X2",
+    "materials_text": "acciaio inox cordura",
+    "materials": [
+     "Cordura",
+     "Acciaio"
+    ],
+    "load_weight_kg": "7.5",
+    "colors": [
+     "white"
+    ]
+   }
+  },
+  {
+   "title": "Borse laterali modello Alpha Plus per moto",
+   "description": "Materiali: pelle liscia. Caratteristiche Tecniche: chiusura rapida;  peso trasportabile kg. 5",
+   "expected": {
+    "product_type": "double_bag",
+    "model": "MODELLO ALPHA PLUS",
+    "materials_text": "pelle liscia",
+    "materials": [
+     "Pelle"
+    ],
+    "technical": "chiusura rapida",
+    "load_weight_kg": "5"
+   }
+  },
+  {
+   "title": "Telaio per moto",
+   "description": "Materiali: pvc. Caratteristiche Tecniche: chiusura rapida;  Capienza lt. 45 peso trasportabile kg. 10",
+   "expected": {
+    "product_type": "frame",
+    "materials_text": "pvc",
+    "materials": [
+     "PVC"
+    ],
+    "technical": "chiusura rapida",
+    "capacity_l": "45",
+    "load_weight_kg": "10"
+   }
+  },
+  {
+   "title": "Zaino modello Gamma per moto",
+   "description": "Materiali: acciaio inox - cordura. Capienza lt. 30 peso trasportabile kg. 5",
+   "expected": {
+    "product_type": "backpack",
+    "model": "GAMMA",
+    "materials_text": "acciaio inox cordura",
+    "materials": [
+     "Cordura",
+     "Acciaio"
+    ],
+    "capacity_l": "30",
+    "load_weight_kg": "5"
+   }
+  },
+  {
+   "title": "Borse laterali modello Alpha per moto",
+   "description": "Materiali: pvc telato e cordura. Caratteristiche Tecniche: chiusura rapida;  Capienza lt. 45 Disponibile in bianco.",
+   "expected": {
+    "product_type": "double_bag",
+    "model": "MODELLO ALPHA",
+    "materials_text": "pvc telato e cordura",
+    "materials": [
+     "PVC",
+     "Cordura"
+    ],
+    "technical": "chiusura rapida",
+    "capacity_l": "45",
+    "colors": [
+     "white"
+    ]
+   }
+  },
+  {
+   "title": "Borse laterali modello Lume verde",
+   "description": "Caratteristiche Tecniche: chiusura rapida;  Capienza lt. 30 peso trasportabile kg. 10",
+   "expected": {
+    "product_type": "double_bag",
+    "model": "MODELLO LUME",
+    "technical": "chiusura rapida",
+    "capacity_l": "30",
+    "load_weight_kg": "10",
+    "colors": [
+     "green"
+    ]
+   }
+  },
+  {
+   "title": "Borse laterali modello Cirro Pro",
+   "description": "Caratteristiche Tecniche: chiusura rapida;  Capienza lt. 45 peso trasportabile kg. 7,5",
+   "expected": {
+    "product_type": "double_bag",
+    "model": "MODELLO CIRRO PRO",
+    "technical": "chiusura rapida",
+    "capacity_l": "45",
+    "load_weight_kg": "7.5"
+   }
+  },
+  {
+   "title": "Zaino modello Eolo bianco",
+   "description": "Materiali: pvc. peso trasportabile kg. 7,5",
+   "expected": {
+    "product_type": "backpack",
+    "model": "EOLO",
+    "materials_text": "pvc",
+    "materials": [
+     "PVC"
+    ],
+    "load_weight_kg": "7.5",
+    "colors": [
+     "white"
+    ]
+   }
+  },
+  {
+   "title": "Telaio modello Lume X2 per moto rosso",
+   "description": "Materiali: pelle liscia. Capienza lt. 20",
+   "expected": {
+    "product_type": "frame",
+    "model": "LUME X2",
+    "materials_text": "pelle liscia",
+    "materials": [
+     "Pelle"
+    ],
+    "capacity_l": "20",
+    "colors": [
+     "red"
+    ]
+   }
+  },
+  {
+   "title": "Zaino modello Helix verde",
+   "description": "Caratteristiche Tecniche: chiusura rapida;  Capienza lt. 20 / 25 Disponibile in verde.",
+   "expected": {
+    "product_type": "backpack",
+    "model": "HELIX",
+    "technical": "chiusura rapida",
+    "capacity_l": "20/25",
+    "colors": [
+     "green"
+    ]
+   }
+  },
+  {
+   "title": "Borsa laterale per moto",
+   "description": "Materiali: pvc telato e cordura. Disponibile in verde.",
+   "expected": {
+    "product_type": "single_bag",
+    "materials_text": "pvc telato e cordura",
+    "materials": [
+     "PVC",
+     "Cordura"
+    ],
+    "colors": [
+     "green"
+    ]
+   }
+  },
+  {
+   "title": "Zaino modello Lume bianco",
+   "description": "Materiali: pvc telato e cordura. Disponibile in rosso.",
+   "expected": {
+    "product_type": "backpack",
+    "model": "LUME",
+    "materials_text": "pvc telato e cordura",
+    "materials": [
+     "PVC",
+     "Cordura"
+    ],
+    "colors": [
+     "white"
+    ]
+   }
+  },
+  {
+   "title": "Telaio modello Delta per moto",
+   "description": "Materiali: acciaio inox - cordura. Caratteristiche Tecniche: chiusura rapida; ",
+   "expected": {
+    "product_type": "frame",
+    "model": "DELTA",
+    "materials_text": "acciaio inox cordura",
+    "materials": [
+     "Cordura",
+     "Acciaio"
+    ],
+    "technical": "chiusura rapida"
+   }
+  },
+  {
+   "title": "Borse laterali modello Fiore Pro per moto",
+   "description": "Capienza lt. 45 Disponibile in rosso.",
+   "expected": {
+    "product_type": "double_bag",
+    "model": "MODELLO FIORE PRO",
+    "capacity_l": "45",
+    "colors": [
+     "red"
+    ]
+   }
+  },
+  {
+   "title": "Borsa laterale per moto bianco",
+   "description": "Materiali: acciaio inox - cordura. Capienza lt. 20",
+   "expected": {
+    "product_type": "single_bag",
+    "materials_text": "acciaio inox cordura",
+    "materials": [
+     "Cordura",
+     "Acciaio"
+    ],
+    "capacity_l": "20",
+    "colors": [
+     "white"
+    ]
+   }
+  },
+  {
+   "title": "Borsa laterale modello Gamma per moto grigio",
+   "description": "Materiali: pvc telato e cordura. Disponibile in rosso.",
+   "expected": {
+    "product_type": "single_bag",
+    "model": "GAMMA",
+    "materials_text": "pvc telato e cordura",
+    "materials": [
+     "PVC",
+     "Cordura"
+    ],
+    "colors": [
+     "gray"
+    ]
+   }
+  },
+  {
+   "title": "Zaino modello Alpha per moto",
+   "description": "Materiali: pelle liscia. Capienza lt. 30 Disponibile in blu.",
+   "expected": {
+    "product_type": "backpack",
+    "model": "ALPHA",
+    "materials_text": "pelle liscia",
+    "materials": [
+     "Pelle"
+    ],
+    "capacity_l": "30",
+    "colors": [
+     "blue"
+    ]
+   }
+  },
+  {
+   "title": "Borsa laterale per moto bianco",
+   "description": "Materiali: pelle liscia. Caratteristiche Tecniche: chiusura rapida;  Capienza lt. 45",
+   "expected": {
+    "product_type": "single_bag",
+    "materials_text": "pelle liscia",
+    "materials": [
+     "Pelle"
+    ],
+    "technical": "chiusura rapida",
+    "capacity_l": "45",
+    "colors": [
+     "white"
+    ]
+   }
+  },
+  {
+   "title": "Zaino modello Fiore per moto verde",
+   "description": "Caratteristiche Tecniche: chiusura rapida;  Capienza lt. 20 / 25 Disponibile in bianco.",
+   "expected": {
+    "product_type": "backpack",
+    "model": "FIORE",
+    "technical": "chiusura rapida",
+    "capacity_l": "20/25",
+    "colors": [
+     "green"
+    ]
+   }
+  },
+  {
+   "title": "Borsa laterale modello Cirro per moto",
+   "description": "Caratteristiche Tecniche: chiusura rapida; ",
+   "expected": {
+    "product_type": "single_bag",
+    "model": "CIRRO",
+    "technical": "chiusura rapida"
+   }
+  },
+  {
+   "title": "Borsa laterale modello Alpha X2 per moto rosso",
+   "description": "Materiali: pvc telato e cordura. Capienza lt. 30 / 25 peso trasportabile kg. 10",
+   "expected": {
+    "product_type": "single_bag",
+    "model": "ALPHA X2",
+    "materials_text": "pvc telato e cordura",
+    "materials": [
+     "PVC",
+     "Cordura"
+    ],
+    "capacity_l": "30/25",
+    "load_weight_kg": "10",
+    "colors": [
+     "red"
+    ]
+   }
+  },
+  {
+   "title": "Zaino modello Gamma",
+   "description": "Materiali: pelle liscia. Disponibile in grigio.",
+   "expected": {
+    "product_type": "backpack",
+    "model": "GAMMA",
+    "materials_text": "pelle liscia",
+    "materials": [
+     "Pelle"
+    ],
+    "colors": [
+     "gray"
+    ]
+   }
+  }
+ ]
+}

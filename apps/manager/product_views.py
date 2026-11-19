@@ -4,8 +4,8 @@ Thin adapters over `apps.catalog.services` (`set_products_status` for the bulk p
 unpublish, `save_product` for the audited fields) and `apps.catalog.engine` (the per-language
 translation state). The list filters by vendor, status, category, translation status and a text
 search; a bulk action shows its dry-run ChangeSet first and writes only on confirmation, behind the
-session level of CORE.25. Finance and Support are not in the matrix row (404); the platform owner
-reads.
+session level of CORE.25. Finance is not in the matrix row (404); Support and the platform owner
+read (CAT.30: the write actions stay with Catalog and moderation).
 """
 
 from collections.abc import Sequence
@@ -127,8 +127,10 @@ def _state_label(state: str) -> str:
     return str(labels.get(state, state))
 
 
-class ProductList(ManagerListView):
+class ProductList(WriteGate, ManagerListView):
     section = SECTION
+    write_section = SECTION
+    refuse_read_only = True
     template_name = "manager/platform/products.html"
     paginate_by = 25
     columns = (
@@ -215,6 +217,7 @@ class ProductList(ManagerListView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context["title"] = _("Products")
+        context["read_only"] = not writer(SECTION)(self.manager)
         return context
 
 
@@ -225,6 +228,11 @@ class StaffFieldsForm(forms.Form):
     fiscal_category = forms.ChoiceField(
         choices=Product.FiscalCategory.choices, label=gettext_lazy("Fiscal category")
     )
+    vendor_role = forms.ChoiceField(
+        required=False,
+        choices=[("", gettext_lazy("Use the shop's default")), *Vendor.ProductRole.choices],
+        label=gettext_lazy("Shop role for this product"),
+    )
 
 
 class ProductDetailView(WriteGate, ManagerView):
@@ -232,6 +240,7 @@ class ProductDetailView(WriteGate, ManagerView):
 
     section = SECTION
     write_section = SECTION
+    refuse_read_only = True
     template_name = "manager/platform/product.html"
 
     def product(self) -> Product:
@@ -244,7 +253,11 @@ class ProductDetailView(WriteGate, ManagerView):
         context = super().get_context_data(**kwargs)
         product = self.product()
         form = kwargs.get("form") or StaffFieldsForm(
-            initial={"sales_mode": product.sales_mode, "fiscal_category": product.fiscal_category}
+            initial={
+                "sales_mode": product.sales_mode,
+                "fiscal_category": product.fiscal_category,
+                "vendor_role": product.vendor_role,
+            }
         )
         titles = {t.language: t.title for t in product.translations.all()}
         context.update(
@@ -252,6 +265,7 @@ class ProductDetailView(WriteGate, ManagerView):
             title=_title(product) or product.sku,
             form=form,
             can_write=writer(SECTION)(self.manager),
+            read_only=not writer(SECTION)(self.manager),
             languages=[
                 {"code": code, "state": _state_label(state), "title": titles.get(code, "")}
                 for code, state in _states(product).items()

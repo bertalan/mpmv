@@ -822,14 +822,19 @@ def enqueue_email(
     language: str,
     context: Mapping[str, Any],
     idempotency_key: str | None = None,
+    order_ref: uuid.UUID | str | None = None,
     dry_run: bool = False,
 ) -> ChangeSet:
     """Put a transactional email in the outbox and queue its send job, in the caller's
     transaction (a rollback drops both).
 
-    `context` is stored as a snapshot (JSON, encrypted at rest), so the email shows the values
-    of the moment it was requested. An email to a suppressed address is stored as `suppressed`
-    and never sent. With `idempotency_key`, a second request with the same key changes nothing.
+    `context` is stored as a snapshot (JSON, encrypted at rest), and so is the message rendered
+    from it (subject, text and HTML, ORD.26): the send uses the stored copy, so a deploy or a
+    translation fix between queueing and sending changes nothing. `order_ref` (the order's
+    public id) ties the row to its order, whose anonymisation scrubs it (`scrub_order_emails`).
+
+    An email to a suppressed address is stored as `suppressed` (no message kept) and never sent.
+    With `idempotency_key`, a second request with the same key changes nothing.
     Raises ValueError for an unknown or incomplete template, and for a recipient that is not one
     plain address (a line break in it would add an email header, SEC.5).
     """
@@ -843,11 +848,16 @@ def enqueue_email(
     if key is not None and OutboxEmail.objects.filter(idempotency_key=key).exists():
         return ChangeSet()
     suppressed = is_suppressed(recipient)
+    rendered = None if suppressed else render_email(template_key, language, json.loads(payload))
     email = OutboxEmail(
         recipient=recipient.strip(),
         template_key=template_key,
         language=language,
         context=payload,
+        subject=rendered.subject if rendered else "",
+        text_body=rendered.text_body if rendered else "",
+        html_body=rendered.html_body if rendered else "",
+        order_ref=uuid.UUID(str(order_ref)) if order_ref else None,
         idempotency_key=key,
         status=OutboxEmail.Status.SUPPRESSED if suppressed else OutboxEmail.Status.QUEUED,
     )
@@ -915,11 +925,14 @@ def _attempt(email: OutboxEmail, *, dry_run: bool) -> str:
     if is_suppressed(email.recipient):
         email.status = status.SUPPRESSED
         return "address suppressed"
-    try:
-        rendered = render_email(email.template_key, email.language, email.context_data)
-    except ValueError as exc:
-        email.status, email.last_error = status.FAILED, str(exc)
-        return email.last_error
+    if email.text_body:  # ORD.26: exactly what was decided when it was queued
+        rendered = mail.RenderedEmail(email.subject, email.text_body, email.html_body)
+    else:  # queued before ORD.26: render from the context
+        try:
+            rendered = render_email(email.template_key, email.language, email.context_data)
+        except ValueError as exc:
+            email.status, email.last_error = status.FAILED, str(exc)
+            return email.last_error
     violations = mail.html_violations(rendered.html_body)
     if violations:
         email.status = status.FAILED
@@ -987,6 +1000,40 @@ def deliver_email(email_id: str | uuid.UUID, *, dry_run: bool = False) -> Change
         _email_event(email, email.status, detail)
     if email.status == OutboxEmail.Status.RETRYING:
         raise EmailRetryScheduled(f"email {email.public_id}: retry at {email.next_attempt_at}")
+    return changeset
+
+
+def scrub_order_emails(
+    order_ref: uuid.UUID | str, *, recipient: str, dry_run: bool = False
+) -> ChangeSet:
+    """Forget the personal content of the emails of one order (ORD.26, D-29): the recipient
+    becomes `recipient` (a placeholder), the context and the stored subject and bodies are
+    emptied, and an email still waiting is cancelled (`suppressed`, with a history entry). The
+    template key, language, status and dates stay. Idempotent. The caller (the order's
+    anonymisation) runs it in its transaction and audits the returned ChangeSet, which holds
+    no address and no content. With `dry_run` it reports the same ChangeSet and writes nothing."""
+    changeset = ChangeSet()
+    for row in OutboxEmail.objects.select_for_update().filter(order_ref=uuid.UUID(str(order_ref))):
+        if (
+            row.status in OutboxEmail.FINAL
+            and row.recipient == recipient
+            and not (row.context or row.subject or row.text_body or row.html_body or row.last_error)
+        ):
+            continue
+        flags = {"template_key": row.template_key, "language": row.language}
+        if not dry_run:
+            if row.status not in OutboxEmail.FINAL:
+                row.status, row.next_attempt_at = OutboxEmail.Status.SUPPRESSED, None
+                _email_event(row, row.status, "order anonymised")
+            row.recipient = recipient
+            row.context = row.subject = row.text_body = row.html_body = row.last_error = ""
+            row.save()
+        changeset.update(
+            EMAIL_MODEL,
+            str(row.public_id),
+            {**flags, "personal_data": True},
+            {**flags, "personal_data": False},
+        )
     return changeset
 
 

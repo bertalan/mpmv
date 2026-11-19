@@ -7,11 +7,13 @@ the end of their retention period".
 
 import datetime as dt
 from collections.abc import Iterator
+from html import unescape
 from typing import Any
 
 import pytest
 from django.test import Client
 from django.utils import timezone
+from django.utils.translation import gettext
 from wagtail.contrib.forms.models import FormSubmission
 
 from apps.accounts.captcha import TOKEN_FIELD
@@ -62,7 +64,9 @@ def test_a_submission_without_a_token_is_refused_and_not_stored(
     for token in (None, "", "a-wrong-token"):
         response = submit(client, page, token)
         assert response.status_code == 400
-        assert "security check" in response.content.decode().lower()
+        assert gettext("The security check failed. Please try again.") in unescape(
+            response.content.decode()
+        )
     assert not FormSubmission.objects.exists()
 
 

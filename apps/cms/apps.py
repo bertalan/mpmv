@@ -16,6 +16,18 @@ def _sync_editor_roles(using: str = DEFAULT_DB_ALIAS, **kwargs: Any) -> None:
     editor_roles.sync_editor_roles(using=using)
 
 
+def _ensure_snippet_workflow(using: str = DEFAULT_DB_ALIAS, **kwargs: Any) -> None:
+    """`post_migrate`: the "Content snippet review" workflow exists (CMS.14)."""
+    from wagtail.models import Workflow
+
+    if using != DEFAULT_DB_ALIAS:
+        return
+    if Workflow._meta.db_table in connections[using].introspection.table_names():
+        from .models import content_snippet_workflow
+
+        content_snippet_workflow(create=True)
+
+
 def _grant_new_page(
     sender: Any, instance: Any, created: bool, raw: bool = False, **kw: Any
 ) -> None:
@@ -55,6 +67,7 @@ class CmsConfig(AppConfig):
         "termlandingpage": "Wagtail page: editor content with revisions and action log",
         "vendorlandingpage": "Wagtail page: editor content with revisions and action log",
         "editorroleseed": "marker row that a role was seeded once; no security data of its own",
+        "contentsnippet": "Wagtail snippet: reusable text (CMS.14), revisions and action log",
         "navigationmenu": "Wagtail snippet: menu content, logged in Wagtail's action log",
         "footersettings": "Wagtail setting: footer content (CMS.17), public text and links",
         "footercolumn": "a column of the footer setting, saved with it",
@@ -73,6 +86,7 @@ class CmsConfig(AppConfig):
         from .checks import (
             check_base_url,
             check_reserved_root_slugs,
+            check_snippet_workflow,
             check_vendor_guide_url,
             check_video_embed_origins,
         )
@@ -83,6 +97,7 @@ class CmsConfig(AppConfig):
         checks.register(check_vendor_guide_url)
         checks.register(check_video_embed_origins)
         checks.register(check_reserved_root_slugs, checks.Tags.database)
+        checks.register(check_snippet_workflow, checks.Tags.database)
         from . import slugs
 
         slugs.install()  # no root-level page called like a route (ARC.37)
@@ -97,6 +112,9 @@ class CmsConfig(AppConfig):
         # Editor roles (CORE.8, Q-58): groups and page grants after every migrate, and a grant
         # for every page created later in a part of the tree a role is bound to.
         post_migrate.connect(_sync_editor_roles, sender=self, dispatch_uid="cms.editor_roles")
+        post_migrate.connect(
+            _ensure_snippet_workflow, sender=self, dispatch_uid="cms.snippet_workflow"
+        )
         from . import workflow
 
         workflow.install()  # nobody approves their own submission
@@ -141,6 +159,28 @@ class CmsConfig(AppConfig):
         )
         page_unpublished.connect(
             footer_cache.drop_footer_cache, dispatch_uid="cms.footer_cache_unpublished"
+        )
+        # Pages and fragments that show a reusable snippet (CMS.14) are dropped when its live
+        # text changes: a publish, an unpublish or a delete, never a draft.
+        from wagtail.signals import published, unpublished
+
+        from . import snippet_cache
+        from .models import ContentSnippet
+
+        published.connect(
+            snippet_cache.drop_snippet_cache,
+            sender=ContentSnippet,
+            dispatch_uid="cms.snippet_cache_published",
+        )
+        unpublished.connect(
+            snippet_cache.drop_snippet_cache,
+            sender=ContentSnippet,
+            dispatch_uid="cms.snippet_cache_unpublished",
+        )
+        post_delete.connect(
+            snippet_cache.drop_snippet_cache,
+            sender=ContentSnippet,
+            dispatch_uid="cms.snippet_cache_delete",
         )
         _guard_editor()
 

@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% load i18n l10n static responsive_images wagtailcore_tags consumer_prices %}
+{% load i18n l10n static responsive_images wagtailcore_tags consumer_prices seo_seller %}
 {% comment %}
   Product page (CAT.7). Semantic and unstyled beyond catalog/product.css; THM.7 restyles it. No
   inline script or style (the CSP has no 'unsafe-inline'). Shows published data only: the
@@ -43,7 +43,7 @@
         <p class="product-retired" role="note">{% translate "This product is no longer available." %}</p>
       {% elif page_data.on_request %}
         <p class="product-price">{% translate "Price on request" %}</p>
-        <p class="product-on-request">{% blocktranslate with vendor=page_data.vendor.display_name %}Ask {{ vendor }} about this product: it is not sold online.{% endblocktranslate %}</p>
+        <p class="product-on-request">{% seller_name page_data.vendor as seller %}{% if seller %}{% blocktranslate with vendor=seller %}Ask {{ vendor }} about this product: it is not sold online.{% endblocktranslate %}{% else %}{% translate "Ask the seller about this product: it is not sold online." %}{% endif %}</p>
       {% else %}
         {% if not page_data.variants %}
           <p class="product-price">{% if page_data.price is not None %}{% consumer_price page_data.price page_data.product.fiscal_category page_data.vendor as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p>
@@ -71,7 +71,7 @@
           <div id="add-to-cart-result"></div>
         </form>
       {% endif %}
-      <p class="product-vendor">{% translate "Sold by" %} <a href="{{ vendor_url }}">{{ page_data.vendor.display_name }}</a></p>
+      {% seller_name page_data.vendor as seller %}{% if seller %}<p class="product-vendor">{% translate "Sold by" %} <a href="{{ vendor_url }}">{{ seller }}</a></p>{% endif %}
     </section>
 
     {% if page_data.description %}
@@ -95,12 +95,21 @@
       </section>
     {% endif %}
 
+    {% if return_terms %}
+      <section class="product-returns" aria-labelledby="product-returns-heading">
+        <h2 id="product-returns-heading">{% translate "Returns" %}</h2>
+        {% include "catalog/includes/product_returns.html" %}
+      </section>
+    {% endif %}
+
     {% if page_data.companion %}
       <aside class="product-companion" aria-labelledby="product-companion-heading">
         <h2 id="product-companion-heading">{% translate "Needed with this product" %}</h2>
         {% include "catalog/includes/product_card.html" with card=page_data.companion %}
       </aside>
     {% endif %}
+
+    {% include "catalog/includes/other_sellers.html" %}
 
     {% if related %}
       <section class="product-related" aria-labelledby="product-related-heading">

@@ -56,6 +56,7 @@ EVENT_FILES = (
 )
 SCOPES = (
     "apps/manager",
+    "apps/fitment/services.py",  # the publish gate message (FIT.18), shown to vendors and staff
     "apps/accounts",
     "apps/orders/templates",
     "apps/seo",
@@ -68,6 +69,7 @@ SCOPES = (
     "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
     "apps/vendors/models.py",
     "apps/vendors/templates/vendors/terms",  # the public sales terms page (VEN.35)
+    "apps/vendors/templates/documents/vendors",  # the sales terms PDF (VEN.36), same strings as the page
     "apps/vendors/templates/vendors/apply",  # the vendor application pages (VEN.22), formal
     "apps/vendors/templates/email/vendors/application_confirm",  # the application emails (VEN.22)
     "apps/vendors/templates/email/vendors/application_exists",
@@ -83,6 +85,16 @@ SCOPES = (
     "apps/catalog/templates/catalog/product.html",
     "apps/catalog/templates/catalog/includes/stock_status.html",
     "apps/catalog/templates/catalog/includes/product_card.html",
+    # The storefront catalog (I18N.20 part 1): listing, search, the product page includes, the
+    # spec table labels (CAT.22), the fitment summary (FIT.9) and the ride catalog overrides.
+    "apps/catalog/templates/catalog/listing.html",
+    "apps/catalog/templates/catalog/search.html",
+    "apps/catalog/templates/catalog/includes",
+    "apps/catalog/product_pages.py",
+    "apps/fitment/product_summary.py",
+    "themes/ride/templates/catalog",
+    "themes/base/templates/components/gallery.html",  # the product gallery (variant images)
+    "themes/ride/templates/components/gallery.html",
     # The note under every consumer price (TAX.12, owner wording 2026-11-16), in all languages.
     "apps/tax/prices.py",
     # Temporary staff "Site links" page (OPS.12); remove before LIVE.
@@ -97,6 +109,24 @@ SCOPES = (
     "apps/cms/templates/cms/help_guide_index.html",
     "apps/cms/templates/cms/help_guide_section.html",
     *EVENT_FILES,  # the public event pages (EVT.6)
+    # The rest of the public event surface (I18N.20 part 2): the vendor storefront list and the
+    # feed labels (RSS and calendar titles, the text of each calendar entry).
+    "apps/events/templates/events/_storefront.html",
+    "apps/events/feeds.py",
+    # The blog, the CMS blocks, the footer and the form page, in `base` and in `ride`
+    # (I18N.20 part 2); the editor-facing strings of these files join with part 3.
+    "apps/cms/templates/cms/blog_author_page.html",
+    "apps/cms/templates/cms/blog_index_page.html",
+    "apps/cms/templates/cms/blog_post_page.html",
+    "apps/cms/templates/cms/form_page.html",
+    "apps/cms/templates/cms/form_page_landing.html",
+    "apps/cms/templates/cms/blocks",
+    "apps/cms/templates/cms/includes",
+    "apps/cms/forms_pages.py",  # the refusals of the public form page (CMS.13)
+    "apps/cms/blocks.py",  # only the launch countdown: its "Available now" (see ONLY_CLASSES)
+    "themes/ride/templates/cms",
+    "themes/base/templates/components",
+    "themes/ride/templates/components",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (
@@ -165,6 +195,8 @@ ONLY_CLASSES = {
     "apps/compliance/forms.py": ("WithdrawalLookupForm",),
     "apps/cms/models.py": ("HelpEntry",),
     "apps/events/models.py": ("EventType", "Attendance"),  # the labels the pages show
+    "apps/cms/forms_pages.py": ("FormPage",),
+    "apps/cms/blocks.py": ("LaunchCountdownBlock",),
 }
 SKIP_PARTS = {"tests", "migrations", "static", "node_modules"}
 
@@ -377,6 +409,8 @@ SENSITIVE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "apps/vendors/templates/vendors/terms/",
             "apps/manager/templates/manager/shop/sales_terms.html",
             "apps/manager/sales_terms_views.py",
+            "apps/manager/templates/manager/shop/return_policy.html",
+            "apps/manager/return_policy_views.py",
         ),
     ),
     ("price notes and tax", ("apps/tax/",)),

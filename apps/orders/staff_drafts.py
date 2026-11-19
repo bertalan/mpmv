@@ -536,7 +536,10 @@ def open_link(
             return OpenResult(refusal, draft)
         cart = cart_for()
         filled = reorder.fill_cart(
-            cart, _items(draft), country=cart.country_hint or draft.source_order.shipping_country
+            cart,
+            _items(draft),
+            country=cart.country_hint or draft.source_order.shipping_country,
+            ctx=ctx,
         )
         before = _snapshot(draft)
         draft.state = StaffDraftState.OPENED  # single use: the same link is refused from now on

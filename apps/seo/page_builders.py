@@ -143,9 +143,9 @@ def register_all() -> None:
         cms.TermLandingPage,
         cms.VendorLandingPage,
         cms.FormPage,
-        events.EventPage,
     ):
         register(model)(_web_page)
+    register(events.EventPage)(_event_page)
     register(events.EventIndexPage)(_event_index)
     register(cms.BlogIndexPage)(_blog_index)
     register(cms.BlogPostPage)(_blog_post)
@@ -168,6 +168,91 @@ def _post_items(ctx: PageContext, url: str, name: str) -> Node:
         for post in posts
     ]
     return _items(ctx, url, name, entries)
+
+
+def _event_organizer(ctx: PageContext, page: Any) -> dict[str, Any] | None:
+    """The vendor as an `Organization` by its public seller name (SEO.15), omitted when it has
+    none; an event of the platform references the operator node."""
+    from apps.core.services import NoPlatformOperator, current_operator
+
+    vendor = page.vendor
+    if vendor is not None:
+        name = seller_name.public_name(vendor)
+        return {"@type": "Organization", "name": name} if name else None
+    try:
+        current_operator()
+    except NoPlatformOperator:
+        return None
+    return {"@id": ge.operator_id(ctx.site)}
+
+
+def _event_image(ctx: PageContext, page: Any) -> str:
+    from apps.cms.models import ARTICLE_IMAGE_FILTER
+    from apps.core.images import rendition_or_original
+
+    image = page.listing_image
+    if image is None or not image.file:
+        return ""
+    return _absolute(ctx.site, rendition_or_original(image, ARTICLE_IMAGE_FILTER)[0])
+
+
+def _event_node(ctx: PageContext, url: str) -> Node:
+    import datetime as dt
+
+    from django.utils import timezone
+
+    from apps.events import engine as events_engine
+
+    from . import event_graph
+
+    page = ctx.obj
+    if not page.is_publicly_visible() or page.event_type == page.EventType.PROMOTION:
+        return {}
+    start: Any = page.starts_at if not page.all_day else page.start_date
+    end: Any = page.ends_at if not page.all_day else page.end_date
+    if page.rrule.strip():
+        now = timezone.now()
+        found = events_engine.expand(page.recurrence_spec(), now, now + dt.timedelta(days=366), 1)
+        start, end = event_graph.occurrence_bounds(found, (start, end))
+    if start is None or end is None:
+        return {}
+    if isinstance(start, dt.datetime):
+        start, end = start.astimezone(page.zone()), end.astimezone(page.zone())
+    latitude = float(page.latitude) if page.latitude is not None else None
+    longitude = float(page.longitude) if page.longitude is not None else None
+    return event_graph.event_node(
+        event_graph.EventFacts(
+            url=url,
+            name=str(page.title),
+            description=str(page.summary),
+            start=start,
+            end=end,
+            language=page.locale.language_code,
+            attendance=str(page.attendance),
+            cancelled=page.cancelled_at is not None,
+            venue_name=str(page.venue_name),
+            street=str(page.street),
+            postcode=str(page.postcode),
+            city=str(page.city),
+            region=str(page.region),
+            country=str(getattr(page.country, "code", page.country) or ""),
+            latitude=latitude if longitude is not None else None,
+            longitude=longitude if latitude is not None else None,
+            online_url=str(page.online_url),
+            image=_event_image(ctx, page),
+            organizer=_event_organizer(ctx, page),
+        )
+    )
+
+
+def _event_page(ctx: PageContext) -> list[Node]:
+    """The event page: its `WebPage` is about the `Event` node (none for a promotion, a hidden
+    event or one with no place and no link)."""
+    url = ctx.obj.get_full_url(ctx.request) or ""
+    event = _event_node(ctx, url) if url else {}
+    if not event:
+        return cms_page_nodes(ctx)
+    return cms_page_nodes(ctx, main_entity_id=str(event["@id"]), extra=[event])
 
 
 def _blog_index(ctx: PageContext) -> list[Node]:

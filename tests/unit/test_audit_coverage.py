@@ -35,6 +35,8 @@ NOT_SENSITIVE_SERVICES = {
     "apps.core.services.save_image": "image upload outside the admin, validated, CMS content",
     "apps.core.services.enqueue_email": "the outbox is a delivery queue with its own history",
     "apps.core.services.deliver_email": "a delivery attempt, kept in the outbox history",
+    "apps.core.services.scrub_order_emails": "runs inside the order anonymisation, which audits "
+    "the returned ChangeSet in its own transaction",
     # ORD.1: a cart holds display prices only; the order placed from it is audited.
     "apps.cart.services.get_or_create_cart": "a shopper's cart, not a financial or security fact",
     "apps.cart.services.add_to_cart": "a shopper's cart, not a financial or security fact",
@@ -45,6 +47,8 @@ NOT_SENSITIVE_SERVICES = {
     "apps.payments.services.process_webhook": "builds its own system audit context for the "
     "webhook actor; every write it makes (payment, account status, sales mode) is audited",
     "apps.cart.services.merge_carts": "a shopper's cart, not a financial or security fact",
+    "apps.trust.services.record_snapshot": "appends a computed result (append-only table with a "
+    "database trigger); the audit entries for a badge gained or lost come with TRU.2",
     "apps.seo.services.record_consent": "the visitor's own consent decision, itself the "
     "append-only proof log, with no personal data beyond a random id (SEO.5)",
 }

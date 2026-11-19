@@ -358,3 +358,211 @@ def test_the_italian_labels_quoted_by_the_help_use_the_ascii_apostrophe() -> Non
     found = {e.msgid: e.msgstr for e in _po("it") if e.msgid in labels}
     assert set(found) == labels
     assert all("\u2019" not in text for text in found.values()), found
+
+
+# I18N.20 part 1: the storefront catalog (listing, search, product page includes, the
+# specification labels, the fitment summary, the ride catalog overrides) is in the catalogs,
+# in the informal customer register.
+CATALOG_STOREFRONT = (
+    "apps/catalog/templates/catalog/listing.html",
+    "apps/catalog/templates/catalog/search.html",
+    "apps/catalog/templates/catalog/includes/listing_filters.html",
+    "apps/catalog/templates/catalog/includes/product_specs.html",
+    "apps/catalog/templates/catalog/includes/product_fitment.html",
+    "apps/catalog/templates/catalog/includes/fitment_group.html",
+    "apps/catalog/product_pages.py",
+    "apps/fitment/product_summary.py",
+    "themes/ride/templates/catalog/listing.html",
+    "themes/ride/templates/catalog/search.html",
+    "themes/ride/templates/catalog/product.html",
+    "themes/base/templates/components/gallery.html",
+)
+
+
+def test_the_catalog_storefront_is_in_scope() -> None:
+    found = catalog.collect()
+    places = {p for _k, (_pl, ps) in found.items() for p in ps}
+    for path in CATALOG_STOREFRONT:
+        assert path in places or not (ROOT / path).read_text().count("trans"), path
+    for msgid in ("Weight", "Country of origin", "Fits everything.", "Not for", "Search the shop"):
+        assert (msgid, None) in found, msgid
+
+
+@pytest.mark.parametrize("lang", list(LANGS))
+def test_the_catalog_storefront_entries_are_translated(lang: str) -> None:
+    entries = [e for e in _po(lang) if _any_in(e, CATALOG_STOREFRONT)]
+    assert len(entries) >= 30
+    for entry in entries:
+        assert entry.msgstr or all(entry.msgstr_plural.values()), entry.msgid
+
+
+@pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
+def test_the_catalog_storefront_uses_the_informal_register(lang: str) -> None:
+    for entry in _po(lang):
+        if not _any_in(entry, CATALOG_STOREFRONT):
+            continue
+        text = _texts(entry)
+        if lang in FORMAL:
+            assert not FORMAL[lang].search(text), entry.msgid
+    checks = {e.msgid: _texts(e) for e in _po(lang)}
+    expected = {
+        "it": "Nessun prodotto corrisponde alla tua ricerca.",
+        "de": "Keine Produkte entsprechen deiner Suche.",
+        "fr": "Aucun produit ne correspond à ta recherche.",
+        "es": "Ningún producto coincide con tu búsqueda.",
+    }[lang]
+    assert checks["No products match your search."] == expected
+
+
+# I18N.20 part 2: the public event pages and feeds, the blog, the CMS blocks, the footer and the
+# form page (base and ride) are in the catalogs, in the informal customer register.
+PART2_STOREFRONT = (
+    "apps/events/templates/events/_storefront.html",
+    "apps/events/feeds.py",
+    "apps/cms/templates/cms/blog_author_page.html",
+    "apps/cms/templates/cms/blog_index_page.html",
+    "apps/cms/templates/cms/form_page.html",
+    "apps/cms/templates/cms/form_page_landing.html",
+    "apps/cms/templates/cms/blocks/",
+    "apps/cms/templates/cms/includes/article_meta.html",
+    "apps/cms/forms_pages.py",
+    "themes/ride/templates/cms/",
+    "themes/ride/templates/components/",
+    "themes/base/templates/components/",
+)
+
+
+def test_the_part_2_storefront_is_in_scope() -> None:
+    found = catalog.collect()
+    places = {p for _k, (_pl, ps) in found.items() for p in ps}
+    for path in PART2_STOREFRONT:
+        assert any(p.startswith(path) for p in places), path
+    for msgid in (
+        "All events of %(name)s",
+        "Events of %(vendor)s",
+        "No articles by this author yet.",
+        "Send",
+        "Thank you. We have received your message.",
+        "Time left:",
+        "Available now",
+        "Too many submissions, try again shortly.",
+    ):
+        assert (msgid, None) in found, msgid
+
+
+@pytest.mark.parametrize("lang", list(LANGS))
+def test_the_part_2_storefront_entries_are_translated(lang: str) -> None:
+    entries = [e for e in _po(lang) if _any_in(e, PART2_STOREFRONT)]
+    assert len(entries) >= 60
+    for entry in entries:
+        assert entry.msgstr or all(entry.msgstr_plural.values()), entry.msgid
+
+
+@pytest.mark.parametrize("lang", ["de", "fr", "es"])
+def test_the_part_2_storefront_uses_the_informal_register(lang: str) -> None:
+    for entry in _po(lang):
+        # The form page module also holds the editor's help texts, which keep the formal register.
+        if _any_in(entry, PART2_STOREFRONT) and not _only_in(entry, "apps/cms/forms_pages.py"):
+            assert not FORMAL[lang].search(_texts(entry)), entry.msgid
+
+
+@pytest.mark.parametrize("lang", list(LANGS))
+def test_the_part_2_labels_differ_from_the_english_source(lang: str) -> None:
+    checks = {e.msgid: _texts(e) for e in _po(lang)}
+    for msgid in ("Send", "Time left:", "No articles by this author yet.", "Pause countdown"):
+        assert checks[msgid] != msgid, msgid
+
+
+# I18N.20 part 3: the template scope guard. Every template that carries translation tags is in the
+# catalog scope (`tools/i18n_catalog.py` SCOPES) or in EXCLUDED below, with a reason. A new template
+# with `{% translate %}` therefore fails here until somebody decides where it belongs.
+# The entries below are the storefront and staff templates still English-only; each one is
+# tracked by the named follow-up slice and leaves this set when it joins SCOPES.
+EXCLUDED = {
+    # Editor, admin and Wagtail screens: formal register, own slice.
+    "apps/catalog/templates/admin/": "admin-only, I18N.20 part 3b",
+    "apps/catalog/templates/catalog/admin/": "admin-only, I18N.20 part 3b",
+    "apps/cms/templates/cms/admin/": "editor-only, I18N.20 part 3b",
+    "apps/cms/templates/wagtail_localize/": "editor-only, I18N.20 part 3b",
+    "apps/core/templates/admin/": "admin-only, I18N.20 part 3b",
+    "apps/events/templates/events/admin/": "admin-only, I18N.20 part 3b",
+    "apps/vendors/templates/admin/": "admin-only, I18N.20 part 3b",
+    "themes/ride/templates/manager/": "Manager override, I18N.20 part 3b",
+    "themes/ride/templates/layouts/": "layout override, I18N.20 part 3b",
+    "themes/base/templates/styleguide.html": "developer style guide, not shown to customers",
+    "themes/ride/templates/styleguide": "developer style guide, not shown to customers",
+    # Email templates: their own scope (one language per recipient), I18N.20 part 3c.
+    "apps/catalog/templates/email/": "email templates, own scope, I18N.20 part 3c",
+    "apps/compliance/templates/email/": "email templates, own scope, I18N.20 part 3c",
+    "apps/core/templates/email/": "email templates, own scope, I18N.20 part 3c",
+    "apps/vendors/templates/email/": "email templates, own scope, I18N.20 part 3c",
+    # Customer-facing pages not yet translated: informal register, I18N.20 part 3b.
+    "apps/cms/templates/cms/": "legal and landing pages, I18N.20 part 3b",
+    "apps/compliance/templates/compliance/": "consumer information and withdrawal, I18N.20 part 3b",
+    "apps/core/templates/core/components/": "image credits, I18N.20 part 3b",
+    "apps/fitment/templates/fitment/": "garage saver, I18N.20 part 3b",
+    "themes/ride/templates/accounts/": "ride account overrides, I18N.20 part 3b",
+    "themes/ride/templates/compliance/": "ride compliance overrides, I18N.20 part 3b",
+    "themes/ride/templates/orders/": "ride order overrides, I18N.20 part 3b",
+    "themes/ride/templates/seo/": "ride consent banner, I18N.20 part 3b",
+}
+_TRANSLATION_TAG = re.compile(r"\{%-?\s*(?:translate|trans|blocktranslate|blocktrans)\b")
+
+
+def _templates_with_translation_tags() -> list[str]:
+    found = []
+    for pattern in ("apps/*/templates", "themes/*/templates"):
+        for base in sorted(ROOT.glob(pattern)):
+            for path in sorted(base.rglob("*.*")):
+                if path.suffix not in {".html", ".txt"}:
+                    continue
+                if _TRANSLATION_TAG.search(path.read_text(encoding="utf-8")):
+                    found.append(str(path.relative_to(ROOT)))
+    return found
+
+
+def test_every_translatable_template_is_in_scope_or_excluded() -> None:
+    covered = {str(p.relative_to(ROOT)) for p in catalog._files()}
+    offenders = [
+        t
+        for t in _templates_with_translation_tags()
+        if t not in covered and not t.startswith(tuple(EXCLUDED))
+    ]
+    assert offenders == [], f"add to SCOPES or to EXCLUDED with a reason: {offenders}"
+
+
+def test_the_exclusions_have_reasons_and_are_not_stale() -> None:
+    assert all(EXCLUDED.values())
+    for prefix in EXCLUDED:
+        assert any(t.startswith(prefix) for t in _templates_with_translation_tags()), prefix
+
+
+# Part 2 minors: the form page module mixes the editor's labels and help texts (formal) with two
+# public refusals (customer text, informal). Each public string is pinned by msgid, so a new one
+# in that module has to be placed on purpose.
+FORM_PAGE_PUBLIC = ("Too many submissions, try again shortly.", "This submission is too large.")
+FORM_PAGE_EDITOR_LABELS = (
+    "introduction",
+    "thank-you text",
+    "button label",
+    "Form fields",
+    "form page",
+    "keep submissions for (days)",
+)
+
+
+@pytest.mark.parametrize("lang", ["de", "fr", "es"])
+def test_the_form_page_module_has_a_register_per_string(lang: str) -> None:
+    entries = {e.msgid: e for e in _po(lang) if _only_in(e, "apps/cms/forms_pages.py")}
+    for msgid in FORM_PAGE_PUBLIC:
+        assert not FORMAL[lang].search(_texts(entries[msgid])), msgid
+    for msgid in entries:
+        if msgid not in FORM_PAGE_PUBLIC:
+            assert msgid in FORM_PAGE_EDITOR_LABELS or len(msgid) > 40, msgid  # help texts: formal
+
+
+def test_the_spanish_apply_now_is_informal_and_the_german_author_line_is_short() -> None:
+    es = {e.msgid: e.msgstr for e in _po("es")}
+    de = {e.msgid: e.msgstr for e in _po("de")}
+    assert es["Apply now"] == "Solicita ahora"
+    assert de["No articles by this author yet."] == "Von dieser Person gibt es noch keine Artikel."

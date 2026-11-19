@@ -250,6 +250,7 @@
   .manager-switcher select,
   .manager-bulk__actions select {
     inline-size: auto;
+    max-inline-size: 100%; /* a long action label must not widen the page on a phone */
   }
 
   .manager-filters {

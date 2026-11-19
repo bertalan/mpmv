@@ -3,5 +3,7 @@ last-checked: 2026-11-18
 
 Diese Seite zeigt ein Produkt: seinen Shop, Status, die Kategorie und den Zustand des Textes in jeder Sprache.
 
+Der Plattform-Inhaber und die Rolle Support sehen diese Seite nur lesend, mit einem Hinweis und ohne das Änderungsformular.
+
 ## Felder, die das Personal ändern darf
-Personal mit der Rolle Katalog und Moderation kann **Verkaufsmodus** und **Steuerkategorie** ändern. Wählen Sie **Vorschau**, um die Änderung zu sehen, und **Bestätigen**, um sie zu speichern. Die Änderung wird im Prüfprotokoll festgehalten. Preise, der zugehörige Shop und die Texte werden hier nicht geändert.
+Personal mit der Rolle Katalog und Moderation kann **Verkaufsmodus** und **Steuerkategorie** ändern. Wählen Sie **Vorschau**, um die Änderung zu sehen, und **Bestätigen**, um sie zu speichern. Die Änderung wird im Prüfprotokoll festgehalten. Preise, der zugehörige Shop und die Texte werden hier nicht geändert. Das Personal kann außerdem **Rolle des Shops für dieses Produkt** setzen; dies gilt nur für dieses Produkt und geht der Wahl des Shops vor. Lassen Sie **Standardwert des Shops verwenden** stehen, um dem Shop zu folgen.

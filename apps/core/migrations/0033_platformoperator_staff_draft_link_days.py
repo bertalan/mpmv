@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0031_amendment_cancel_hold_minimum'),
+        ('core', '0032_outbox_rendered_message'),
     ]
 
     operations = [

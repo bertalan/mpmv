@@ -52,6 +52,7 @@ from wagtail.blocks import StructBlockValidationError
 from wagtail.documents.blocks import DocumentChooserBlock
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Page
+from wagtail.snippets.blocks import SnippetChooserBlock
 
 from apps.catalog.models import (
     Category,
@@ -74,6 +75,7 @@ from apps.core import translations
 from apps.core.images import rendition_or_original
 from apps.core.money import CURRENCY
 from apps.vendors.models import Vendor, VendorTranslation
+from apps.vendors.seller_name import public_name
 from apps.vendors.services import has_public_storefront
 
 from .choosers import (
@@ -755,9 +757,10 @@ def _vendor_targets(vendors: list[Vendor], language: str) -> dict[int, _Target]:
     for vendor in public:
         shown = translations.resolve(texts.get(vendor.pk, {}).values(), language).translation
         href = storefront_path(vendor.slug, language, primary)
-        targets[vendor.pk] = _Target(
-            vendor.display_name, href, shown.tagline if shown is not None else ""
-        )
+        name = public_name(vendor)
+        if name is None:  # a person's legal name is never a card title (SEO.15)
+            continue
+        targets[vendor.pk] = _Target(name, href, shown.tagline if shown is not None else "")
     return targets
 
 
@@ -1332,6 +1335,37 @@ class DownloadBlock(blocks.StructBlock):  # type: ignore[misc]
         context = super().get_context(value, parent_context=parent_context)
         context["download"] = download_for(
             value.get("document"), value.get("title", ""), _page_language(parent_context)
+        )
+        return context
+
+
+class ContentSnippetBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A reusable content snippet placed in a page body (D-36, CMS.14). The text is shown in the
+    page's language: the snippet's own live translation, else the primary language's live copy
+    (spec 09's explicit fallback), never a third language; an unpublished snippet renders
+    nothing. The snippet is rich text only, so it can never contain this block."""
+
+    snippet = SnippetChooserBlock(
+        "cms.ContentSnippet",
+        label=_("Snippet"),
+        help_text=_(
+            "Choose a reusable text. When it is changed and approved, every page that uses it "
+            "shows the new text. Nothing is shown while the snippet is not published."
+        ),
+    )
+
+    class Meta:
+        icon = "snippet"
+        label = _("Reusable snippet")
+        template = "cms/blocks/content_snippet.html"
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        from . import services
+
+        context = super().get_context(value, parent_context=parent_context)
+        page = (parent_context or {}).get("page")
+        context["content_snippet"] = services.live_snippet_copy(
+            value.get("snippet"), _page_language(parent_context), memo=page
         )
         return context
 

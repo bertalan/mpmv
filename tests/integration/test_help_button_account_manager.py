@@ -32,6 +32,7 @@ from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.fitment.tests.factories import FitmentNodeFactory
 from apps.manager.checks import manager_routes
 from apps.orders.tests.factories import paid_vendor_order
+from apps.trust.tests.factories import TrustRulesFactory
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.help_routes import NOT_PAGES
 
@@ -126,6 +127,10 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:orders": "shop",
         "manager:shop:order": "shop",
         "manager:shop:payments": "shop",
+        "manager:shop:money": "shop",  # VEN.9
+        "manager:shop:money_transactions": "shop",
+        "manager:shop:money_payouts": "shop",
+        "manager:shop:money_statement": "shop",
         "manager:platform:dashboard": "platform",
         "manager:platform:map": "platform",
         "manager:platform:notices": "platform",
@@ -148,6 +153,7 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:termination": "shop",
         "manager:shop:statements": "shop",
         "manager:shop:sales_terms": "shop",
+        "manager:shop:return_policy": "shop",
         "manager:shop:events": "shop",  # EVT.4
         "manager:shop:event_new": "shop",
         "manager:shop:event_edit": "shop",
@@ -156,9 +162,16 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:event_block_add": "shop",  # EVT.4 part 2
         "manager:shop:event_images": "shop",
         "manager:shop:order_amend": "shop",  # ORD.20 part 3
+        "manager:shop:fitment": "shop",  # FIT.3
+        "manager:shop:fitment_product": "shop",
+        "manager:shop:fitment_proposals": "shop",
+        "manager:shop:fitment_report": "shop",
         "manager:platform:orders": "platform",
         "manager:platform:order": "platform",
         "manager:platform:amendment_settings": "platform",
+        "manager:platform:trust_rules": "platform",  # TRU.1 part 2
+        "manager:platform:trust_rule": "platform",
+        "manager:platform:trust_rule_new": "platform",
     }
 
 
@@ -168,6 +181,8 @@ def _open(name: str) -> tuple[Client, str]:
         kwargs = {}
         if name in ("manager:shop:order", "manager:shop:order_amend"):
             kwargs = {"public_id": paid_vendor_order(vendor).public_id}  # type: ignore[arg-type]
+        if name == "manager:shop:fitment_product":
+            kwargs = {"public_id": ProductFactory.create(vendor=vendor).public_id}
         if name in (
             "manager:shop:event_edit",
             "manager:shop:event_cancel",
@@ -196,6 +211,8 @@ def _open(name: str) -> tuple[Client, str]:
             kwargs = {"public_id": FitmentNodeFactory.create().public_id}
         if name == "manager:platform:catalog_product":
             kwargs = {"public_id": ProductFactory.create().public_id}
+        if name == "manager:platform:trust_rule":
+            kwargs = {"version": TrustRulesFactory.create().version}  # type: ignore[dict-item]
         if name == "manager:platform:order":
             kwargs = {"public_id": paid_vendor_order().public_id}
     client = Client()

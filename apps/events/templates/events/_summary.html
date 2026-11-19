@@ -1,4 +1,4 @@
-{% load i18n l10n tz wagtailcore_tags %}{% get_current_language as page_language %}{% comment %}
+{% load i18n l10n tz wagtailcore_tags seo_seller %}{% get_current_language as page_language %}{% comment %}
 One event in a list (EVT.6): a heading link, the dates as `<time datetime>`, the type as text and
 the vendor, never colour alone. Context: `item` (an `events.listing.Item`). An original-language
 fallback (EVT.8) carries `lang` on the article and `hreflang` on the link, and shows its language
@@ -13,7 +13,7 @@ name; `plot` (the list only) adds `data-lat` and `data-lng` for the map of EVT.1
     {% else %}
       <time datetime="{{ span.start|date:'c' }}">{{ span.start|date:"DATETIME_FORMAT" }}</time>
     {% endif %}
-    · {{ event.get_event_type_display }}{% if event.vendor %} · {{ event.vendor.display_name }}{% endif %}
+    · {{ event.get_event_type_display }}{% seller_name event.vendor as seller %}{% if seller %} · {{ seller }}{% endif %}
     {% if item.language %} · <span class="event-language" lang="{{ item.language }}">{{ item.language_name }}</span>{% endif %}
     {% if event.cancelled_at %} · <span class="event-status">{% translate "Cancelled" %}</span>{% endif %}
   </p>

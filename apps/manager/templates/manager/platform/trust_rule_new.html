@@ -1,0 +1,21 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}A new trust rules version (TRU.1 part 2): the in-force thresholds, a note and a start date. Preview comes next.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p class="manager-lead">{% translate "Change the thresholds you need. The result is a new version from the date you choose; the version in force ends then and is never edited. You see the effect before anything is saved." %}</p>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" class="manager-form" novalidate>
+    {% csrf_token %}
+    {% for heading, fields in groups %}
+      <fieldset>
+        <legend>{{ heading }}</legend>
+        {% for field in fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+      </fieldset>
+    {% endfor %}
+    {% include "components/field.html" with field=form.valid_from only %}
+    {% include "components/field.html" with field=form.note only %}
+    {% include "components/button.html" with label=_("Preview") type="submit" only %}
+  </form>
+  <p><a href="{% url 'manager:platform:trust_rules' %}">{% translate "Back to all versions" %}</a></p>
+{% endblock %}

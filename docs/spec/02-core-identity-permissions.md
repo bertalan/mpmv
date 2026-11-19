@@ -252,7 +252,7 @@ Three groups of actions (platform defaults; a vendor may only make them stricter
   Critical actions add a prompt only for rare actions.
 - **Shop owners (D-32 amendment, owner 2026-11-14).** A vendor owner holds no `elevate`, yet the
   shop space gates some of its own actions. For the shop owner actions (`payout_details`, the
-  Manager payments page, VEN.6; `sales_terms_publish`, VEN.35) and only on a shop they own, a
+  Manager payments page, VEN.6; `sales_terms_publish`, VEN.35; `export`, the money CSV export of VEN.9, owner decision 2026-11-18) and only on a shop they own, a
   vendor owner with an enrolled passkey may "Do it once" and may open a passkey window **scoped to
   that shop**. The scoped window covers only those actions of that shop: never a platform action,
   never another shop. The server re-checks ownership on every covered action and when a "Do it
@@ -403,6 +403,8 @@ The recurring legacy routes are consolidated into a small set of REST resources:
 | `/accounting/vendor-orders/{id}/invoice-references` | the vendor's invoice, credit-note or debit-note reference: create, correct, dry-run, idempotent (scope `accounting:write`; CMP.38) | new |
 | `/accounting/platform/statements` | commission and plan-fee statements for the operator's accountant, platform key only (scope `accounting:platform:read`; CMP.39) | new |
 | `/events` | vendor events (promotions, trade fairs and meetings, other) as `EventPage` drafts in any enabled language, with translations: CRUD, submit, cancel, dry-run ([15](15-events.md)) | new |
+| `/orders`, `/orders/{id}` | the key's vendor orders: list with a `changed_since` cursor, detail, status and shipping, drafts with a payment link, amendment proposals (scopes `orders:read` and `orders:write`, only with the `orders_api` plan entitlement; ORD.33 to ORD.36, [07](07-cart-orders-payments.md)) | new |
+| `/orders/external` | record-only import of orders paid outside the platform, idempotent on the vendor's reference (scope `orders:write`; MQ-57, ORD.37) | new |
 
 Common rules: every mutating POST accepts `?dry_run=true` and returns the diff; bulk operations
 are idempotent (same request twice = same state); errors in RFC 9457 format.

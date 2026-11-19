@@ -17,15 +17,18 @@ Rules (spec 10 "Product node"):
   own window is not modelled yet), the customer paying the return shipping and a lack of
   conformity free.
 - Variants: `variesBy` from the attributes the variants take a value on, a `@id` per variant;
-  no variant URL (the page picks a variant in a form, no URL selects one), and no per-variant
-  gtin, mpn or image (the variant model has none yet).
+  no variant URL (the page picks a variant in a form, no URL selects one); a variant states its
+  own gtin, mpn and cover image (CAT.23, SEO.13), never the product's.
+- Attributes (SEO.13): width, height and depth (the product's length) as `QuantitativeValue` in
+  millimetres (`MMT`), `material` and `color` from the page-language text, `countryOfOrigin` as a
+  `Country`; each only when stored.
 - Brand: the CAT.20 brand graph (Brand and manufacturer nodes) joins the page graph, so the
   `brand` reference resolves.
 """
 
 import logging
 from decimal import Decimal
-from typing import Any
+from typing import Any, Final
 from urllib.parse import quote
 
 from django.conf import settings
@@ -36,8 +39,10 @@ from apps.catalog import engine as catalog_engine
 from apps.catalog import services as catalog
 from apps.catalog import slugs
 from apps.catalog.models import VariantOption
-from apps.catalog.product_pages import GalleryImage, ProductPage
+from apps.catalog.product_pages import GalleryImage, ProductPage, page_return_policy
+from apps.core import translations
 from apps.core.money import CURRENCY
+from apps.core.services import NoPlatformOperator, current_operator
 from apps.shipping import engine as shipping_engine
 from apps.shipping import services as shipping
 from apps.tax.prices import PriceUnavailable, consumer_price, estimated_country
@@ -49,6 +54,14 @@ from . import seller as seller_name
 logger = logging.getLogger(__name__)
 
 WITHDRAWAL_DAYS = 14
+
+
+def _operator_country() -> str:
+    """The platform's country (SEO.11), for a vendor that states none; empty if unconfigured."""
+    try:
+        return str(current_operator().country or "")
+    except NoPlatformOperator:
+        return ""
 
 
 VARIES_BY_PROPERTIES = frozenset({"color", "size", "material", "pattern"})
@@ -120,6 +133,9 @@ def _home_label(language: str) -> str:
         return str(translation.gettext("Home"))
 
 
+EXTRA_BANDS: Final = 4  # per method: keeps the page graph under its 30 KB budget
+
+
 def _shipping_rate(
     page: ProductPage, net: Decimal, zone: frozenset[str] | set[str], request: HttpRequest | None
 ) -> Decimal | None:
@@ -160,16 +176,29 @@ def _shipping_nodes(
         rate = _shipping_rate(page, band.price, zone, request)
         if rate is None:
             continue  # shippingRate is required by Google: no gross rate, no node
-        nodes.append(
-            pg.shipping_node(
-                node_id=f"{url}#shipping-{method.key}",
-                countries=sorted(listed),
-                rate=rate,
-                currency=CURRENCY,
-                min_days=method.min_delivery_days,
-                max_days=method.max_delivery_days,
+        shared: dict[str, Any] = {
+            "countries": sorted(listed),
+            "currency": CURRENCY,
+            "min_days": method.min_delivery_days,
+            "max_days": method.max_delivery_days,
+            "name": method.name if method.name != method.key else "",
+        }
+        nodes.append(pg.shipping_node(node_id=f"{url}#shipping-{method.key}", rate=rate, **shared))
+        # The other weight bands (SEO.12), read from the one config snapshot: no query per band.
+        others = [b for b in method.bands if b is not band][:EXTRA_BANDS]
+        for index, other in enumerate(others, start=1):
+            other_rate = _shipping_rate(page, other.price, zone, request)
+            if other_rate is None:
+                continue
+            nodes.append(
+                pg.shipping_node(
+                    node_id=f"{url}#shipping-{method.key}-band{index}",
+                    rate=other_rate,
+                    weight_from_kg=other.from_kg,
+                    weight_to_kg=other.to_kg,
+                    **shared,
+                )
             )
-        )
     return nodes, [str(node["@id"]) for node in nodes], countries
 
 
@@ -234,12 +263,15 @@ def build_graph(
     if sold:
         shipping_nodes, shipping_ids, countries = _shipping_nodes(page, url, language, request)
         if countries:
+            stated = page_return_policy(vendor)  # one query; approved, else the shop-pays default
             return_policy = pg.return_policy_node(
                 node_id=f"{vendor_url}#return-policy",
                 countries=sorted(countries),
-                return_country=str(vendor.country or ""),
-                days=WITHDRAWAL_DAYS,
-                link=vendor_url,
+                return_country=stated.return_country or _operator_country(),
+                days=stated.return_window_days,
+                link=stated.returns_page_url,
+                paid_by=stated.return_shipping_paid_by,
+                methods=stated.return_methods,
             )
     refs: dict[str, Any] = {
         "seller_id": str(seller["@id"]) if seller else "",
@@ -259,16 +291,38 @@ def build_graph(
                 refs=refs,
                 request=request,
             ),
+            gtin=choice.gtin,
+            mpn=choice.mpn,
+            images=(
+                (_image(GalleryImage(choice.image, choice.image_alt), site),)
+                if choice.image is not None
+                else ()
+            ),
         )
         for choice in page.variants
     )
     brand = page.product.brand
-    brand_id = ""
+    brand_id = maker_id = ""
     linked: list[dict[str, Any]] = []
     if brand is not None and brand.status == brand.Status.APPROVED:
         brand_id = catalog.brand_node_id(brand, site=site)
         if brand_id:
             linked = catalog.brand_graph(brand, language, site=site)["@graph"]
+            maker = brand.manufacturer
+            maker_id = f"{site}/#manufacturer-{maker.public_id}" if maker is not None else ""
+    # SEO.10: a producer vendor fills the brand and manufacturer CAT.20 leaves empty; the vendor
+    # is named by its Organization @id, and only when it has a public seller node (never a person).
+    vendor_id = str(seller["@id"]) if seller else ""
+    role = catalog_engine.effective_vendor_role(page.product)
+    brand_id, maker_id = pg.vendor_role_refs(
+        role,
+        brand_id=brand_id,
+        maker_id=maker_id,
+        vendor_id=vendor_id,
+    )
+    # The prefetched translation of the page language (no query): material and colour are texts.
+    text = translations.resolve(page.product.translations.all(), language).translation
+    names_vendor = bool(vendor_id) and vendor_id in (brand_id, maker_id)
     data = pg.ProductData(
         url=url,
         name=page.title,
@@ -278,8 +332,15 @@ def build_graph(
         gtin=str(page.product.gtin or ""),
         mpn=str(page.product.mpn or ""),
         brand_id=brand_id,
+        manufacturer_id=maker_id,
         images=tuple(_image(image, site) for image in page.gallery),
         weight_kg=page.product.weight_kg,
+        width_mm=page.product.width_mm,
+        height_mm=page.product.height_mm,
+        depth_mm=page.product.length_mm,
+        material=str(text.material) if text is not None else "",
+        color=str(text.colour) if text is not None else "",
+        country_of_origin=str(page.product.country_of_origin or ""),
         offer=_offer(
             page,
             page.price,
@@ -294,12 +355,14 @@ def build_graph(
     )
     has_offer = data.offer is not None or any(v.offer is not None for v in variants)
     if not has_offer:
-        # Nothing references the seller, return policy or shipping nodes: no orphans.
-        seller, return_policy, shipping_nodes = None, None, []
+        # Nothing references the return policy or shipping nodes: no orphans. The seller node
+        # stays only when the brand or manufacturer refers to it (SEO.10).
+        seller = seller if names_vendor else None
+        return_policy, shipping_nodes = None, []
     return pg.product_graph(
         product=data,
         breadcrumb=pg.breadcrumb_node(page_url=url, items=_crumbs(page, site, url)),
-        seller=seller if sold else None,
+        seller=seller if sold or names_vendor else None,
         return_policy=return_policy,
         shipping=shipping_nodes,
         linked=linked,

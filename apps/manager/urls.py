@@ -11,15 +11,21 @@ from . import (
     amendment_views,
     event_block_views,
     event_views,
+    fitment_picker,
+    fitment_shop_views,
     fitment_views,
     media,
+    money_views,
     notice_views,
     product_views,
+    return_policy_views,
     sales_terms_views,
     session_views,
     staff_draft_views,
     statement_views,
     termination_views,
+    trust_edit_views,
+    trust_views,
     views,
 )
 
@@ -30,7 +36,20 @@ shop = (
         path("", views.ShopDashboardView.as_view(), name="dashboard"),
         path("profile/", views.StorefrontProfileView.as_view(), name="profile"),
         path("payments/", views.PaymentsView.as_view(), name="payments"),
+        # VEN.9: the vendor's own money, read only (the export is a POST, audited).
+        path("money/", money_views.MoneyOverviewView.as_view(), name="money"),
+        path(
+            "money/transactions/",
+            money_views.TransactionListView.as_view(),
+            name="money_transactions",
+        ),
+        path("money/payouts/", money_views.PayoutListView.as_view(), name="money_payouts"),
+        path("money/statement/", money_views.StatementView.as_view(), name="money_statement"),
+        path("money/export/", money_views.ExportView.as_view(), name="money_export"),
         path("sales-terms/", sales_terms_views.SalesTermsView.as_view(), name="sales_terms"),
+        path(
+            "return-policy/", return_policy_views.ReturnPolicyView.as_view(), name="return_policy"
+        ),
         # EVT.4: the vendor's own events (list, form, submit, cancel).
         path("events/", event_views.EventsView.as_view(), name="events"),
         path("events/new/", event_views.EventFormView.as_view(), name="event_new"),
@@ -112,6 +131,22 @@ shop = (
             "orders/<uuid:public_id>/<slug:action>/",
             views.VendorOrderActionView.as_view(),
             name="order_action",
+        ),
+        # FIT.3: the Fits pages of the shop (list with bulk add, product tab, proposals, report).
+        path("fitment/", fitment_shop_views.FitmentList.as_view(), name="fitment"),
+        path(
+            "fitment/proposals/",
+            fitment_shop_views.FitmentProposalsView.as_view(),
+            name="fitment_proposals",
+        ),
+        path(
+            "fitment/report/", fitment_shop_views.FitmentReportView.as_view(), name="fitment_report"
+        ),
+        path("fitment/nodes/", fitment_picker.FitmentNodeChildren.as_view(), name="fitment_nodes"),
+        path(
+            "fitment/<uuid:public_id>/",
+            fitment_shop_views.FitmentProductView.as_view(),
+            name="fitment_product",
         ),
         path("vendor/", views.VendorPickerView.as_view(), name="vendor"),
         # The 30 days' notice of termination (CMP.5 part 4): the reason, and the data download.
@@ -196,6 +231,16 @@ platform = (
         path("notices/", notice_views.NoticeListView.as_view(), name="notices"),
         path("notices/<uuid:public_id>/", notice_views.NoticeDetailView.as_view(), name="notice"),
         path("terminations/", termination_views.TerminationListView.as_view(), name="terminations"),
+        # TRU.1 part 2: the trust rules versions, read only.
+        path("trust-rules/", trust_views.TrustRulesListView.as_view(), name="trust_rules"),
+        path(
+            "trust-rules/new/", trust_edit_views.TrustRuleNewView.as_view(), name="trust_rule_new"
+        ),
+        path(
+            "trust-rules/<int:version>/",
+            trust_views.TrustRulesDetailView.as_view(),
+            name="trust_rule",
+        ),
         # ORD.20 part 3: the staff tools on a paid order (Support and the platform owner).
         path("orders/", amendment_views.PlatformOrdersView.as_view(), name="orders"),
         path(

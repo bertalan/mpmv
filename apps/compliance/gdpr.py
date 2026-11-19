@@ -267,7 +267,9 @@ def _erase_outbox(address: str, tombstone: str) -> None:
         OutboxEmailEvent.objects.create(
             email=row, status=OutboxEmailEvent.Kind.SUPPRESSED, detail="account erased"
         )
-    rows.update(recipient=tombstone, context="")
+    rows.update(
+        recipient=tombstone, context="", subject="", text_body="", html_body="", last_error=""
+    )
 
 
 def anonymise_customer(

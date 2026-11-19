@@ -9,6 +9,7 @@ from wagtail.admin.rich_text import DraftailRichTextArea
 from wagtail.rich_text import features as feature_registry
 
 from apps.orders import engine as orders_engine
+from apps.vendors import return_engine
 from apps.vendors.engine import LOGO_ALT_MAX_LENGTH, PROFILE_MAX_LENGTH
 
 # Wagtail's default editor features (D-34), minus the ones whose chooser the Manager does not
@@ -102,6 +103,24 @@ class StorefrontProfileForm(forms.Form):
             "section of your shop page. Leave it empty and the section is not shown. Up to about "
             "5,000 characters including formatting. If you are unsure what the law requires, ask a "
             "legal adviser."
+        ),
+    )
+
+
+class ProductRoleForm(forms.Form):
+    """Whether the shop makes or resells its products (SEO.10; the owner only)."""
+
+    default_product_role = forms.ChoiceField(
+        label=_("What the shop is to its products"),
+        required=False,
+        choices=[
+            ("", _("Not sure")),
+            ("producer", _("Producer: we make the products")),
+            ("reseller", _("Reseller: we buy the products to resell")),
+        ],
+        help_text=_(
+            "Shown to search engines and AI assistants in the product data. If you are not "
+            "sure, we never say that you make the product. A single product can differ."
         ),
     )
 
@@ -259,6 +278,60 @@ class SalesTermsForm(forms.Form):
         max_length=1000,
         required=False,
     )
+
+
+class ReturnPolicyForm(forms.Form):
+    """A proposal of the seller's return policy (VEN.40). The service owns the rules."""
+
+    return_window_days = forms.IntegerField(
+        label=_("Return window in days"),
+        help_text=_(
+            "How many days a consumer has to send goods back after receiving them. The law sets "
+            "a minimum of 14 days for sales to consumers, so a lower number is refused. Required."
+        ),
+        min_value=return_engine.MIN_WINDOW_DAYS,
+        max_value=return_engine.MAX_WINDOW_DAYS,
+    )
+    return_shipping_paid_by = forms.ChoiceField(
+        label=_("Who pays the return shipping"),
+        help_text=_(
+            "Choose the seller if returns are free for the buyer. Choose the customer if the "
+            "buyer pays the cost of sending goods back. It must match your sales terms. Required."
+        ),
+        choices=[("customer", _("The customer")), ("vendor", _("The seller"))],
+    )
+    return_methods = forms.MultipleChoiceField(
+        label=_("Accepted return methods"),
+        help_text=_("Tick every way a buyer can send goods back. Choose at least one. Required."),
+        choices=[
+            (return_engine.POST, _("By post")),
+            (return_engine.DROP_OFF, _("At a drop-off point")),
+            (return_engine.IN_STORE, _("In the store")),
+        ],
+        widget=forms.CheckboxSelectMultiple,
+    )
+    returns_page_url = forms.CharField(
+        label=_("Public returns page"),
+        help_text=_(
+            "The address of a public page on your own site that explains how returns work. It "
+            "must start with https://. Optional: leave it empty if you have no such page."
+        ),
+        max_length=return_engine.URL_MAX,
+        required=False,
+        widget=forms.URLInput(attrs={"autocomplete": "off"}),
+    )
+    return_country = forms.CharField(
+        label=_("Country returns are sent to"),
+        help_text=_(
+            "The country where you receive returned goods, as a two-letter code, for example "
+            "IT. Required."
+        ),
+        min_length=2,
+        max_length=2,
+    )
+
+    def clean_return_country(self) -> str:
+        return str(self.cleaned_data["return_country"]).strip().upper()
 
 
 class UserLookupForm(forms.Form):

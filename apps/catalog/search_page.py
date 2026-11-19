@@ -35,6 +35,7 @@ from apps.core.money import CURRENCY
 from apps.core.services import consume_rate_limit
 from apps.core.throttling import ip_bucket
 from apps.vendors import services as vendors_services
+from apps.vendors.seller_name import public_name
 
 from . import listings, services, slugs
 from .models import CategoryTranslation, Product
@@ -164,19 +165,24 @@ def category_suggestions(language: str) -> list[SearchItem]:
 
 
 def vendors_group(request: HttpRequest, query: str, language: str, limit: int) -> SearchGroup:
-    rows = list(
-        vendors_services.storefront_vendors()
+    # A natural person's legal name is neither shown nor matched (SEO.15): the vendors are
+    # filtered on their public name, so the rows are checked before the limit is applied.
+    needle = query.casefold()
+    rows = [
+        (vendor, shown)
+        for vendor in vendors_services.storefront_vendors()
         .filter(display_name__icontains=query)
-        .order_by("display_name", "pk")[: limit + 1]
-    )
+        .order_by("display_name", "pk")
+        if (shown := public_name(vendor)) and needle in shown.casefold()
+    ][: limit + 1]
     default = settings.LANGUAGE_CODE
     items = [
         SearchItem(
-            title=str(vendor.display_name),
+            title=shown,
             url=slugs.vendor_path(language, vendor.slug, default_language=default),
             ref=vendor.pk,
         )
-        for vendor in rows[:limit]
+        for vendor, shown in rows[:limit]
     ]
     return SearchGroup("vendors", str(_("Vendors")), items, order=30, more=len(rows) > limit)
 

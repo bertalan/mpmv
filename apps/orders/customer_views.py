@@ -393,7 +393,7 @@ def order_again(request: HttpRequest, public_id: uuid.UUID) -> HttpResponse:
     """Put the still-available items of a past order back in the cart at today's prices (ORD.31).
     Nothing is placed or paid: the customer goes on to the normal checkout."""
     user: User = request.user  # type: ignore[assignment]
-    result = reorder.order_again(user, public_id)
+    result = reorder.order_again(user, public_id, ctx=audit_context(request))
     if result is None:
         raise Http404
     _reorder_messages(request, result)
