@@ -1082,6 +1082,10 @@ msgstr "Ganztägig"
 msgid "All events of %(name)s"
 msgstr "Alle Veranstaltungen von %(name)s"
 
+#: apps/events/templates/events/_storefront.html
+msgid "All events of this seller"
+msgstr "Alle Veranstaltungen dieses Verkäufers"
+
 #: apps/cms/templates/cms/help_guide_section.html
 msgid "All help topics"
 msgstr "Alle Hilfethemen"
@@ -1409,6 +1413,10 @@ msgstr ""
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Ask %(vendor)s about this product: it is not sold online."
 msgstr "Frag %(vendor)s nach diesem Produkt: Es wird nicht online verkauft."
+
+#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
+msgid "Ask the seller about this product: it is not sold online."
+msgstr "Frag den Verkäufer nach diesem Produkt: Es wird nicht online verkauft."
 
 #: apps/manager/forms.py
 msgid "At a drop-off point"

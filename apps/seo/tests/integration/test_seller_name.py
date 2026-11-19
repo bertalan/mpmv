@@ -184,9 +184,11 @@ def test_a_sole_trader_with_only_the_legal_name_is_not_a_search_result_item(
     assert "Mario Rossi" not in json.dumps(document)
     people = seller.person_names(person) | seller.person_names(company)
     assert schema_check.rich_result_errors(document, person_names=people) == []
-    # The visible results list is unchanged: the shop is still shown to visitors.
+    # The visible results list follows the same rule: the person is neither shown nor matched.
     html = client.get("/?s=rossi").content.decode()
-    assert "Mario Rossi" in html
+    assert "Mario Rossi" not in html
+    assert "Rossi Ceramics S.r.l." in html
+    assert "Mario Rossi" not in client.get("/?s=mario").content.decode()
 
 
 def test_search_positions_stay_consecutive_when_a_vendor_in_the_middle_is_dropped(

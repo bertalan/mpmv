@@ -56,6 +56,7 @@ from apps.core.money import CURRENCY
 from apps.core.services import run_mutation
 from apps.core.site_url import absolute_url
 from apps.vendors.models import Vendor
+from apps.vendors.seller_name import public_name
 
 from . import engine
 from .blocks import public_cards
@@ -1060,7 +1061,10 @@ def _vendor_story(
     url = page.get_url(request) if page is not None else None
     if not url:
         return None
-    context = {"url": url, "vendor_name": vendor.display_name}
+    name = public_name(vendor)
+    if name is None:  # no public name to put in "Read the story of ..." (SEO.15)
+        return None
+    context = {"url": url, "vendor_name": name}
     return listings.ListingEditorial(
         before=render_to_string("cms/includes/vendor_story_link.html", context, request)
     )

@@ -24,6 +24,7 @@ from apps.cms import services as cms_services
 from apps.core.i18n import configured_languages, primary_language
 from apps.events import engine, services
 from apps.events.panels import map_settings
+from apps.vendors.seller_name import public_name
 
 if TYPE_CHECKING:
     from apps.events.models import EventIndexPage, EventPage
@@ -156,9 +157,9 @@ class Options:
 def filter_options(items: list[Item]) -> Options:
     """The vendors and months that actually have an upcoming event, so no choice is empty."""
     vendors = {
-        item.page.vendor.slug: item.page.vendor.display_name
+        item.page.vendor.slug: shown
         for item in items
-        if item.page.vendor is not None
+        if item.page.vendor is not None and (shown := public_name(item.page.vendor))
     }
     months = {(item.span.start.year, item.span.start.month) for item in items}
     return Options(
