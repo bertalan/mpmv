@@ -91,6 +91,12 @@ class ProductData:
     manufacturer_id: str = ""
     images: tuple[ImageData, ...] = ()
     weight_kg: Decimal | None = None
+    width_mm: int | None = None
+    height_mm: int | None = None
+    depth_mm: int | None = None
+    material: str = ""
+    color: str = ""
+    country_of_origin: str = ""  # ISO 3166-1 alpha-2
     offer: OfferData | None = None
     variants: tuple[VariantData, ...] = ()
     varies_by: tuple[
@@ -175,6 +181,14 @@ def _variant_node(variant: VariantData, *, product_url: str) -> dict[str, Any]:
     )
 
 
+def _millimetres(value: int | None) -> dict[str, Any] | str:
+    """A dimension as a `QuantitativeValue` in millimetres (UN/CEFACT `MMT`); nothing when
+    unknown or not positive."""
+    if not value or value <= 0:
+        return ""
+    return {"@type": "QuantitativeValue", "value": value, "unitCode": "MMT"}
+
+
 def product_node(data: ProductData) -> dict[str, Any]:
     """The `Product`, or the `ProductGroup` of a product with variants (each variant a
     `Product` with its own offer, Google's variant markup)."""
@@ -194,6 +208,14 @@ def product_node(data: ProductData) -> dict[str, Any]:
             {"@type": "QuantitativeValue", "value": float(data.weight_kg), "unitCode": "KGM"}
             if data.weight_kg is not None
             else ""
+        ),
+        "width": _millimetres(data.width_mm),
+        "height": _millimetres(data.height_mm),
+        "depth": _millimetres(data.depth_mm),
+        "material": data.material,
+        "color": data.color,
+        "countryOfOrigin": (
+            {"@type": "Country", "name": data.country_of_origin} if data.country_of_origin else ""
         ),
     }
     node.update(_identifiers(data.gtin, data.mpn))

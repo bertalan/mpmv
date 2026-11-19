@@ -588,3 +588,53 @@ def test_the_vendor_role_adds_no_queries(client: Client) -> None:
     with CaptureQueriesContext(connection) as producer:
         client.get(MUG)
     assert len(producer) <= len(unknown)
+
+
+def test_the_product_states_its_dimensions_material_colour_and_origin(client: Client) -> None:
+    from apps.catalog.models import ProductTranslation
+
+    product = live(
+        price_net=Decimal("10.00"),
+        length_mm=300,
+        width_mm=200,
+        height_mm=100,
+        country_of_origin="IT",
+    )
+    ProductTranslation.objects.filter(product=product).update(
+        material="Glazed ceramic", colour="Matt black"
+    )
+    _html, document = graph_of(client)
+    item = node(document, "Product")
+    assert item["width"] == {"@type": "QuantitativeValue", "value": 200, "unitCode": "MMT"}
+    assert item["height"]["value"] == 100
+    assert item["depth"] == {"@type": "QuantitativeValue", "value": 300, "unitCode": "MMT"}
+    assert item["material"] == "Glazed ceramic"
+    assert item["color"] == "Matt black"
+    assert item["countryOfOrigin"] == {"@type": "Country", "name": "IT"}
+    assert schema_check.dangling_references(document) == []
+
+
+def test_a_product_without_those_fields_has_none_of_them(client: Client) -> None:
+    live(price_net=Decimal("10.00"))
+    _html, document = graph_of(client)
+    item = node(document, "Product")
+    for key in ("width", "height", "depth", "material", "color", "countryOfOrigin"):
+        assert key not in item
+
+
+def test_the_attributes_add_no_queries(client: Client) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from apps.catalog.models import ProductTranslation
+
+    product = live(price_net=Decimal("10.00"))
+    with CaptureQueriesContext(connection) as bare:
+        client.get(MUG)
+    Product.objects.filter(pk=product.pk).update(
+        length_mm=300, width_mm=200, height_mm=100, country_of_origin="IT"
+    )
+    ProductTranslation.objects.filter(product=product).update(material="Steel", colour="Red")
+    with CaptureQueriesContext(connection) as full:
+        client.get(MUG)
+    assert len(full) <= len(bare)
