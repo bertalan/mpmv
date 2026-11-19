@@ -427,3 +427,164 @@ def test_a_shipping_zone_the_visitor_is_not_in_has_no_shipping_node(
     assert "6.90" not in json.dumps(document)
     assert schema_check.dangling_references(document) == []
     assert schema_check.rich_result_errors(document) == []
+
+
+# SEO.10 2/2: the vendor role in the brand and manufacturer references.
+
+
+def _approved_brand(name: str = "Acme", *, with_maker: bool = False) -> Any:
+    from apps.catalog.tests.factories import (
+        BrandFactory,
+        BrandTranslationFactory,
+        ManufacturerFactory,
+    )
+
+    brand = BrandFactory.create(
+        name=name, manufacturer=ManufacturerFactory.create() if with_maker else None
+    )
+    for language in configured_languages():
+        BrandTranslationFactory.create(
+            brand=brand,
+            language=language,
+            slug=f"{name.lower()}-{language}",
+            status=TranslationStatus.PUBLISHED,
+        )
+    return brand
+
+
+def _role_item(client: Client, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    Product.objects.all().delete()
+    vendor = VendorFactory.create(
+        status=Vendor.Status.ACTIVE,
+        sells_online=True,
+        legal_form=Vendor.LegalForm.SRL,
+        default_product_role=kwargs.pop("default_role", ""),
+    )
+    live(price_net=Decimal("10.00"), gtin="4006381333931", vendor=vendor, **kwargs)
+    _html, document = graph_of(client)
+    return document, node(document, "Product")
+
+
+def _org(document: dict[str, Any]) -> dict[str, Any]:
+    org: dict[str, Any]
+    [org] = [
+        n
+        for n in document["@graph"]
+        if n["@type"] == "Organization" and n["@id"].startswith("http://localhost/shop/")
+    ]
+    return org
+
+
+def test_a_producer_without_a_brand_is_the_brand_and_the_manufacturer(client: Client) -> None:
+    document, item = _role_item(client, vendor_role="producer")
+    org = _org(document)
+    assert item["brand"] == {"@id": org["@id"]}
+    assert item["manufacturer"] == {"@id": org["@id"]}
+    assert item["offers"]["seller"] == {"@id": org["@id"]}
+    assert schema_check.dangling_references(document) == []
+    assert schema_check.rich_result_errors(document) == []
+
+
+def test_a_producer_with_a_brand_keeps_the_brand_and_is_the_manufacturer(client: Client) -> None:
+    brand = _approved_brand()
+    document, item = _role_item(client, vendor_role="producer", brand=brand)
+    assert item["brand"] == {"@id": node(document, "Brand")["@id"]}
+    assert item["manufacturer"] == {"@id": _org(document)["@id"]}
+    assert item["offers"]["seller"] == {"@id": _org(document)["@id"]}
+    assert schema_check.dangling_references(document) == []
+
+
+def test_a_cat20_manufacturer_wins_over_a_producer_vendor(client: Client) -> None:
+    brand = _approved_brand(with_maker=True)
+    document, item = _role_item(client, vendor_role="producer", brand=brand)
+    [maker] = [n for n in document["@graph"] if "#manufacturer-" in n["@id"]]
+    assert item["manufacturer"] == {"@id": maker["@id"]}
+    assert schema_check.dangling_references(document) == []
+
+
+def test_a_reseller_names_only_the_cat20_brand(client: Client) -> None:
+    brand = _approved_brand()
+    document, item = _role_item(client, vendor_role="reseller", brand=brand)
+    assert item["brand"] == {"@id": node(document, "Brand")["@id"]}
+    assert "manufacturer" not in item
+    assert item["offers"]["seller"] == {"@id": _org(document)["@id"]}
+
+
+def test_a_reseller_without_a_brand_makes_no_brand_claim(client: Client) -> None:
+    document, item = _role_item(client, vendor_role="reseller")
+    assert "brand" not in item
+    assert "manufacturer" not in item
+    assert item["offers"]["seller"] == {"@id": _org(document)["@id"]}
+
+
+def test_a_reseller_with_a_cat20_manufacturer_names_it(client: Client) -> None:
+    brand = _approved_brand(with_maker=True)
+    document, item = _role_item(client, vendor_role="reseller", brand=brand)
+    [maker] = [n for n in document["@graph"] if "#manufacturer-" in n["@id"]]
+    assert item["manufacturer"] == {"@id": maker["@id"]}
+
+
+def test_an_unknown_role_never_names_the_vendor_as_brand_or_manufacturer(client: Client) -> None:
+    document, item = _role_item(client)
+    assert "brand" not in item
+    assert "manufacturer" not in item
+    brand = _approved_brand()
+    document, item = _role_item(client, brand=brand)
+    assert item["brand"] == {"@id": node(document, "Brand")["@id"]}
+    assert "manufacturer" not in item
+
+
+def test_the_vendor_default_applies_and_the_product_override_wins(client: Client) -> None:
+    _document, item = _role_item(client, default_role="producer")
+    assert "manufacturer" in item
+    _document, item = _role_item(client, default_role="producer", vendor_role="reseller")
+    assert "manufacturer" not in item
+
+
+def test_a_producer_and_a_reseller_of_one_gtin_share_the_brand_id(client: Client) -> None:
+    brand = _approved_brand()
+    _document, producer = _role_item(client, vendor_role="producer", brand=brand)
+    _document, reseller = _role_item(client, vendor_role="reseller", brand=brand)
+    assert producer["brand"] == reseller["brand"]
+
+
+def test_a_person_seller_is_never_the_brand_or_manufacturer(client: Client) -> None:
+    vendor = VendorFactory.create(
+        status=Vendor.Status.ACTIVE,
+        sells_online=True,
+        italian_sole_proprietor=True,
+        first_name="Mario",
+        last_name="Rossi",
+        legal_name="Mario Rossi",
+        display_name="Mario Rossi",
+        default_product_role="producer",
+    )
+    live(price_net=Decimal("10.00"), vendor=vendor)
+    _html, document = graph_of(client)
+    item = node(document, "Product")
+    assert "brand" not in item
+    assert "manufacturer" not in item
+    assert not [n for n in document["@graph"] if n["@type"] == "Person"]
+
+
+def test_an_on_request_producer_page_keeps_the_vendor_node_it_refers_to(client: Client) -> None:
+    document, item = _role_item(
+        client, vendor_role="producer", sales_mode=Product.SalesMode.ON_REQUEST
+    )
+    assert "offers" not in item
+    assert item["brand"] == {"@id": _org(document)["@id"]}
+    assert schema_check.dangling_references(document) == []
+
+
+def test_the_vendor_role_adds_no_queries(client: Client) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    brand = _approved_brand(with_maker=True)
+    product = live(price_net=Decimal("10.00"), brand=brand)
+    with CaptureQueriesContext(connection) as unknown:
+        client.get(MUG)
+    Product.objects.filter(pk=product.pk).update(vendor_role="producer")
+    with CaptureQueriesContext(connection) as producer:
+        client.get(MUG)
+    assert len(producer) <= len(unknown)

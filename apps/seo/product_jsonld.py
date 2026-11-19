@@ -278,12 +278,25 @@ def build_graph(
         for choice in page.variants
     )
     brand = page.product.brand
-    brand_id = ""
+    brand_id = maker_id = ""
     linked: list[dict[str, Any]] = []
     if brand is not None and brand.status == brand.Status.APPROVED:
         brand_id = catalog.brand_node_id(brand, site=site)
         if brand_id:
             linked = catalog.brand_graph(brand, language, site=site)["@graph"]
+            maker = brand.manufacturer
+            maker_id = f"{site}/#manufacturer-{maker.public_id}" if maker is not None else ""
+    # SEO.10: a producer vendor fills the brand and manufacturer CAT.20 leaves empty; the vendor
+    # is named by its Organization @id, and only when it has a public seller node (never a person).
+    vendor_id = str(seller["@id"]) if seller else ""
+    role = catalog_engine.effective_vendor_role(page.product)
+    brand_id, maker_id = pg.vendor_role_refs(
+        role,
+        brand_id=brand_id,
+        maker_id=maker_id,
+        vendor_id=vendor_id,
+    )
+    names_vendor = bool(vendor_id) and vendor_id in (brand_id, maker_id)
     data = pg.ProductData(
         url=url,
         name=page.title,
@@ -293,6 +306,7 @@ def build_graph(
         gtin=str(page.product.gtin or ""),
         mpn=str(page.product.mpn or ""),
         brand_id=brand_id,
+        manufacturer_id=maker_id,
         images=tuple(_image(image, site) for image in page.gallery),
         weight_kg=page.product.weight_kg,
         offer=_offer(
@@ -309,12 +323,14 @@ def build_graph(
     )
     has_offer = data.offer is not None or any(v.offer is not None for v in variants)
     if not has_offer:
-        # Nothing references the seller, return policy or shipping nodes: no orphans.
-        seller, return_policy, shipping_nodes = None, None, []
+        # Nothing references the return policy or shipping nodes: no orphans. The seller node
+        # stays only when the brand or manufacturer refers to it (SEO.10).
+        seller = seller if names_vendor else None
+        return_policy, shipping_nodes = None, []
     return pg.product_graph(
         product=data,
         breadcrumb=pg.breadcrumb_node(page_url=url, items=_crumbs(page, site, url)),
-        seller=seller if sold else None,
+        seller=seller if sold or names_vendor else None,
         return_policy=return_policy,
         shipping=shipping_nodes,
         linked=linked,

@@ -294,6 +294,16 @@ def shipping_node(
     )
 
 
+def vendor_role_refs(role: str, *, brand_id: str, maker_id: str, vendor_id: str) -> tuple[str, str]:
+    """`(brand_id, manufacturer_id)` for the product node (SEO.10). The CAT.20 Brand and
+    Manufacturer come first in every role. Only a producer vendor fills a gap: it is the brand
+    when CAT.20 has none (one GTIN, one brand `@id`) and the manufacturer when CAT.20 names
+    none. A reseller or an unknown role never names the vendor as either (never invented)."""
+    if role == "producer" and vendor_id:
+        return brand_id or vendor_id, maker_id or vendor_id
+    return brand_id, maker_id
+
+
 def product_graph(
     *,
     product: ProductData,
