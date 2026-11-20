@@ -247,7 +247,7 @@ msgid ""
 "withdraw from the contract for your part of the order (reference %(reference)s)."
 msgstr ""
 "%(vendor_name)s: el comprador del pedido %(order_number)s declaró el %(submitted_at)s que desiste "
-"del contrato por su parte del pedido (referencia %(reference)s)."
+"del contrato respecto de su parte del pedido (referencia %(reference)s)."
 
 #: apps/core/models.py
 msgid ""
@@ -413,7 +413,7 @@ msgid ""
 "the staff admin."
 msgstr ""
 "Un caso de seguridad GPSR ha superado su plazo y sigue abierto. Actúe ahora y registre lo que se "
-"hizo en la administración del personal."
+"hizo en el panel de administración."
 
 #: apps/manager/event_block_forms.py
 msgid "A grid, or one row that scrolls sideways."
@@ -1694,7 +1694,7 @@ msgstr "Saldo (EUR)"
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 msgid "Based on a notice"
-msgstr "Basada en un aviso"
+msgstr "Basada en una notificación"
 
 #: apps/compliance/templates/compliance/includes/product_safety.html
 msgid "Batch or serial number"
@@ -5564,7 +5564,7 @@ msgstr "Aviso"
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 msgid "notice"
-msgstr "aviso"
+msgstr "notificación"
 
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
@@ -6280,7 +6280,7 @@ msgstr "Otras formas de desistir"
 
 #: apps/compliance/templates/email/compliance/notice_decision/subject.txt
 msgid "Our decision on your report"
-msgstr "Nuestra decisión sobre su aviso"
+msgstr "Nuestra decisión sobre su notificación"
 
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
@@ -11938,7 +11938,7 @@ msgid ""
 "staff admin."
 msgstr ""
 "A estos productos publicados les faltan los datos GPSR obligatorios. Complete sus datos o anule su"
-" publicación en la administración del personal."
+" publicación en el panel de administración."
 
 #: apps/manager/templates/manager/platform/amendment_settings.html
 msgid ""
@@ -13343,12 +13343,12 @@ msgstr ""
 
 #: apps/compliance/templates/email/compliance/notice_received/subject.txt
 msgid "We received your report"
-msgstr "Hemos recibido su aviso"
+msgstr "Hemos recibido su notificación"
 
 #: apps/compliance/templates/email/compliance/notice_received/body.html
 #: apps/compliance/templates/email/compliance/notice_received/body.txt
 msgid "We received your report and will review it."
-msgstr "Hemos recibido su aviso y lo revisaremos."
+msgstr "Hemos recibido su notificación y la revisaremos."
 
 #: apps/compliance/templates/compliance/withdrawal_done.html
 msgid "We received your withdrawal from order %(number)s on %(at)s."
@@ -13362,7 +13362,7 @@ msgstr "Hemos restringido su contenido o su cuenta. Esta es la exposición de mo
 #: apps/compliance/templates/email/compliance/notice_decision/body.html
 #: apps/compliance/templates/email/compliance/notice_decision/body.txt
 msgid "We reviewed your report and reached a decision."
-msgstr "Hemos revisado su aviso y hemos tomado una decisión."
+msgstr "Hemos revisado su notificación y hemos tomado una decisión."
 
 #: apps/themes/styleguide.py
 msgid "We send the order confirmation here."

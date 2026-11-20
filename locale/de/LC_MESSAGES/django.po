@@ -8236,7 +8236,7 @@ msgstr "Kurze Antworten auf die häufigsten Fragen von Kunden. Wähle ein Thema.
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Shorter notice because"
-msgstr "Kürzere Frist, weil"
+msgstr "Kürzere Frist aufgrund von"
 
 #: apps/catalog/templates/catalog/includes/product_fitment.html
 msgid "Show %(count)s more"
@@ -14943,7 +14943,7 @@ msgstr "Ihr Shop ist noch nicht aktiv, daher können Veranstaltungen nicht geän
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 msgid "Your storefront is suspended"
-msgstr "Ihr Shop ist gesperrt"
+msgstr "Ihr Shop ist ausgesetzt"
 
 #: apps/manager/forms.py
 msgid ""

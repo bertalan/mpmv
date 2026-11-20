@@ -248,7 +248,7 @@ msgid ""
 "withdraw from the contract for your part of the order (reference %(reference)s)."
 msgstr ""
 "%(vendor_name)s : l'acheteur de la commande %(order_number)s a déclaré le %(submitted_at)s qu'il "
-"se rétracte du contrat pour votre partie de la commande (référence %(reference)s)."
+"exerce son droit de rétractation pour votre partie de la commande (référence %(reference)s)."
 
 #: apps/core/models.py
 msgid ""
@@ -418,7 +418,7 @@ msgid ""
 "the staff admin."
 msgstr ""
 "Un dossier de sécurité GPSR a dépassé son délai et reste ouvert. Intervenez maintenant et "
-"consignez ce qui a été fait dans l'administration du personnel."
+"consignez ce qui a été fait dans l'interface d'administration."
 
 #: apps/manager/event_block_forms.py
 msgid "A grid, or one row that scrolls sideways."
@@ -1710,7 +1710,7 @@ msgstr "Solde (EUR)"
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 msgid "Based on a notice"
-msgstr "Fondée sur un signalement"
+msgstr "Fondée sur une notification"
 
 #: apps/compliance/templates/compliance/includes/product_safety.html
 msgid "Batch or serial number"
@@ -5613,7 +5613,7 @@ msgstr "Signalement"
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 msgid "notice"
-msgstr "signalement"
+msgstr "notification"
 
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
@@ -6335,7 +6335,7 @@ msgstr "Autres façons de te rétracter"
 
 #: apps/compliance/templates/email/compliance/notice_decision/subject.txt
 msgid "Our decision on your report"
-msgstr "Notre décision concernant votre signalement"
+msgstr "Notre décision concernant votre notification"
 
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
@@ -7543,7 +7543,7 @@ msgstr "Signalé"
 #: apps/compliance/templates/email/compliance/notice_received/body.html
 #: apps/compliance/templates/email/compliance/notice_received/body.txt
 msgid "Reported location"
-msgstr "Emplacement signalé"
+msgstr "Emplacement notifié"
 
 #: apps/cms/models.py
 msgid "Repository file"
@@ -12042,7 +12042,7 @@ msgid ""
 "staff admin."
 msgstr ""
 "Ces produits publiés n'ont pas les données GPSR obligatoires. Complétez leurs données ou "
-"dépubliez-les dans l'administration du personnel."
+"retirez-les de la publication dans l'interface d'administration."
 
 #: apps/manager/templates/manager/platform/amendment_settings.html
 msgid ""
@@ -12129,7 +12129,7 @@ msgid ""
 "that you withdraw from the contract for the following parts of order %(order_number)s:"
 msgstr ""
 "Nous confirmons que le %(submitted_at)s tu as déclaré, avec la fonction de rétractation de notre "
-"site, te rétracter du contrat pour les parties suivantes de la commande %(order_number)s :"
+"site, exercer ton droit de rétractation pour les parties suivantes de la commande %(order_number)s :"
 
 #: apps/accounts/views.py
 msgid "This content is not available in this language."
@@ -13469,12 +13469,12 @@ msgstr ""
 
 #: apps/compliance/templates/email/compliance/notice_received/subject.txt
 msgid "We received your report"
-msgstr "Nous avons reçu votre signalement"
+msgstr "Nous avons reçu votre notification"
 
 #: apps/compliance/templates/email/compliance/notice_received/body.html
 #: apps/compliance/templates/email/compliance/notice_received/body.txt
 msgid "We received your report and will review it."
-msgstr "Nous avons reçu votre signalement et nous l'examinerons."
+msgstr "Nous avons reçu votre notification et nous l'examinerons."
 
 #: apps/compliance/templates/compliance/withdrawal_done.html
 msgid "We received your withdrawal from order %(number)s on %(at)s."
@@ -13488,7 +13488,7 @@ msgstr "Nous avons restreint votre contenu ou votre compte. Voici l'exposé des 
 #: apps/compliance/templates/email/compliance/notice_decision/body.html
 #: apps/compliance/templates/email/compliance/notice_decision/body.txt
 msgid "We reviewed your report and reached a decision."
-msgstr "Nous avons examiné votre signalement et pris une décision."
+msgstr "Nous avons examiné votre notification et pris une décision."
 
 #: apps/themes/styleguide.py
 msgid "We send the order confirmation here."
