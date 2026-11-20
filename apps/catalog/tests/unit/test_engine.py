@@ -419,3 +419,11 @@ def test_a_weight_is_not_negative_and_fits_the_stored_precision(
     weight: object, message: str | None
 ) -> None:
     assert engine.weight_error(weight) == message
+
+
+@pytest.mark.parametrize(
+    ("status", "prints"),
+    [("published", True), ("draft", True), ("hidden", True), ("retired", False)],
+)
+def test_only_a_retired_product_page_prints_no_hreflang(status: str, prints: bool) -> None:
+    assert engine.prints_hreflang(status) is prints
