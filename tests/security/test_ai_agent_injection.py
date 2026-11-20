@@ -222,6 +222,7 @@ def test_the_rss_keeps_hostile_text_as_text_of_its_element(client: Client, injec
 KEPT = ("\u200e", "\u200f", "\t", "\n", "\r", "\ufe0f")
 EXTRA_HIDDEN = {0x2028, 0x2029, *range(0x180B, 0x180E), *range(0xFE00, 0xFE0F)}
 EXTRA_HIDDEN |= set(range(0xE0100, 0xE01F0))
+EXTRA_HIDDEN |= set(range(0xE0000, 0xE0080))  # tag block, assigned or not (Cn is not Cf)
 
 
 def _should_be_removed(cp: int) -> bool:
