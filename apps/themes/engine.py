@@ -504,7 +504,7 @@ _STRING_OR_COMMENT_RE = re.compile(
     re.DOTALL,
 )
 _SPACE_RE = re.compile(r"\s+")
-_AROUND_RE = re.compile(r"\s*([{};,>])\s*")
+_AROUND_RE = re.compile(r"(?:(?<!\s)\s*)?([{};,>])\s*")  # starts at a run of spaces once
 _AFTER_COLON_RE = re.compile(r":\s+")
 
 
