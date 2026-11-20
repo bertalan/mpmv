@@ -195,10 +195,34 @@ msgstr "%(title)s: quantità cambiata in %(quantity)s"
 msgid "%(unit_price)s each"
 msgstr "%(unit_price)s l'uno"
 
+#: apps/vendors/templates/email/vendors/profile_changed/subject.txt
+msgid "%(vendor_name)s changed its storefront profile"
+msgstr "%(vendor_name)s ha modificato il proprio profilo vetrina"
+
+#: apps/vendors/templates/email/vendors/profile_changed/body.html
+#: apps/vendors/templates/email/vendors/profile_changed/body.txt
+msgid ""
+"%(vendor_name)s changed its storefront profile (%(language)s): %(fields)s. The change is already "
+"live. Review it in the audit log; staff can revert it."
+msgstr ""
+"%(vendor_name)s ha modificato il proprio profilo vetrina (%(language)s): %(fields)s. La modifica è"
+" già online. La verifichi nel registro di controllo; il personale può ripristinarla."
+
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 msgid "%(vendor_name)s changed your order %(order_number)s before shipping it:"
 msgstr "%(vendor_name)s ha modificato il tuo ordine %(order_number)s prima di spedirlo:"
+
+#: apps/vendors/templates/email/vendors/claim_link/body.html
+#: apps/vendors/templates/email/vendors/claim_link/body.txt
+msgid ""
+"%(vendor_name)s has been set up on the platform for you. To claim it, open this link, confirm the "
+"VAT number or TIN of the business, and create your account with a password and an authenticator "
+"app."
+msgstr ""
+"%(vendor_name)s è stato creato per Lei sulla piattaforma. Per rivendicarlo, apra questo link, "
+"confermi la partita IVA o il codice fiscale dell'azienda e crei il Suo account con una password e "
+"un'app di autenticazione."
 
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
@@ -2246,6 +2270,14 @@ msgstr "Scelto: {name}"
 #: apps/manager/amendment_forms.py apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "City"
 msgstr "Città"
+
+#: apps/vendors/templates/email/vendors/claim_link/subject.txt
+msgid "Claim %(vendor_name)s on the platform"
+msgstr "Rivendichi %(vendor_name)s sulla piattaforma"
+
+#: apps/vendors/templates/email/vendors/claim_link/body.html
+msgid "Claim the vendor"
+msgstr "Rivendichi il venditore"
 
 #: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
@@ -9845,6 +9877,16 @@ msgid ""
 msgstr ""
 "Il link funziona una sola volta e scade il %(expires)s (UTC). Il nostro team esamina poi la Sua "
 "candidatura. Se non conferma, la candidatura viene eliminata dopo pochi giorni."
+
+#: apps/vendors/templates/email/vendors/claim_link/body.html
+#: apps/vendors/templates/email/vendors/claim_link/body.txt
+msgid ""
+"The link works once and expires on %(expires)s (UTC). The platform staff review your claim before "
+"you can manage the vendor. If you did not expect this email, ignore it."
+msgstr ""
+"Il link funziona una sola volta e scade il %(expires)s (UTC). Il personale della piattaforma "
+"esamina la Sua richiesta prima che Lei possa gestire il venditore. Se non si aspettava questa "
+"email, la ignori."
 
 #: apps/orders/templates/email/orders/staff_draft_link/body.html
 #: apps/orders/templates/email/orders/staff_draft_link/body.txt
