@@ -204,12 +204,11 @@ def test_retired_and_suspended_products_are_in_no_sitemap_and_no_alternate_set(
     for language in languages:
         html = client.get(product_path(language, live)).content.decode()
         assert not hidden & set(alternates(html).values())
-    # A retired page stays live: its alternates are its own translations and no other product.
-    own = {product_path(language, retired) for language in languages}
+    # A retired page stays live (not purchasable) but prints no hreflang and no x-default.
     for language in languages:
         response = client.get(product_path(language, retired))
         assert response.status_code == 200
-        assert set(alternates(response.content.decode()).values()) <= own
+        assert not alternates(response.content.decode())
 
 
 def test_a_suspended_vendor_product_page_is_not_served(client: Client) -> None:
