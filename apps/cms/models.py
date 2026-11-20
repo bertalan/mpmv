@@ -57,7 +57,7 @@ from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from wagtail import blocks
-from wagtail.admin.panels import FieldPanel, InlinePanel
+from wagtail.admin.panels import FieldPanel
 from wagtail.contrib.routable_page.models import RoutablePageMixin, path
 from wagtail.contrib.settings.models import BaseSiteSetting
 from wagtail.fields import RichTextField, StreamField
@@ -79,7 +79,7 @@ from wagtail_localize.models import Translation
 
 from apps.core.fields import LanguageField
 from apps.core.images import rendition_or_original
-from apps.core.nfc_forms import NFCModelForm, NFCPageForm
+from apps.core.nfc_forms import NFCInlinePanel, NFCModelForm, NFCPageForm
 from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
 from apps.vendors.services import has_public_storefront
 
@@ -424,8 +424,8 @@ class FooterSettings(ClusterableModel, BaseSiteSetting):  # type: ignore[misc]  
 
     base_form_class = FooterSettingsForm
     panels: ClassVar[list[Any]] = [
-        InlinePanel("columns", label=_("Widget column"), heading=_("Widget columns")),
-        InlinePanel("profiles", label=_("Social profile"), heading=_("Social profiles")),
+        NFCInlinePanel("columns", label=_("Widget column"), heading=_("Widget columns")),
+        NFCInlinePanel("profiles", label=_("Social profile"), heading=_("Social profiles")),
     ]
 
     class Meta:
