@@ -337,7 +337,8 @@ def _product(ctx: PageContext) -> list[Node]:
 def _product_widget_lists(ctx: PageContext, url: str) -> list[Node]:
     """The product page's widgets as named `ItemList`s of product ids (spec 10, "Widgets feed
     the graph"): the related products and the other sellers of the same article. A list item
-    references its product page and repeats no offer; an empty widget adds nothing."""
+    references its product page and repeats no offer; an empty widget adds nothing. The graph is
+    printed on noindex pages too (machine readers), as on the search results page."""
     with translation.override(ctx.language):
         widgets = (
             ("related", str(translation.gettext("You may also like"))),

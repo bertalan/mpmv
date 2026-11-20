@@ -7,7 +7,9 @@ from typing import Any
 
 import pytest
 from django.apps import apps
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 from wagtail.models import Site
 
 from apps.catalog.models import Product
@@ -109,6 +111,9 @@ def test_other_sellers_are_a_second_list_with_a_distinct_id() -> None:
     parts = page_of(graph)["hasPart"]
     assert all({"@id": n["@id"]} in parts for n in found)
     assert all(n["numberOfItems"] == 1 for n in found)
+    for node in found:
+        positions = [e["position"] for e in node["itemListElement"]]
+        assert positions == list(range(1, len(positions) + 1))
 
 
 def test_a_product_without_widgets_has_no_list() -> None:
@@ -139,3 +144,46 @@ def test_other_language_items_are_not_listed() -> None:
             assert element["item"]["url"].startswith(
                 f"http://localhost{language_prefix(primary_language())}/"
             )
+
+
+def test_a_suspended_vendor_leaves_both_lists() -> None:
+    term = TermFactory.create()
+    TermTranslationFactory.create(term=term, language=primary_language(), status=PUBLISHED)
+    main = make("main-item", gtin="4006381333931")
+    shut = VendorFactory.create(status=Vendor.Status.SUSPENDED)
+    gone = make("shut-item", vendor=shut, gtin="4006381333931")
+    for product in (main, gone):
+        product.terms.add(term)
+    assert lists(graph_of("main-item")) == []
+
+
+def graph_queries(slug: str) -> int:
+    with CaptureQueriesContext(connection) as captured:
+        graph_of(slug)
+    return len(captured)
+
+
+def test_the_lists_cost_the_same_queries_for_two_items_and_for_six() -> None:
+    term = TermFactory.create()
+    TermTranslationFactory.create(term=term, language=primary_language(), status=PUBLISHED)
+    main = make("main-item", gtin="4006381333931")
+    main.terms.add(term)
+
+    def add(count: int, start: int) -> None:
+        for n in range(start, start + count):
+            make(f"rival-{n}", gtin="4006381333931").terms.add(term)
+
+    add(2, 0)
+    graph_queries("main-item")  # warm caches
+    few = graph_queries("main-item")
+    add(4, 2)
+    assert graph_queries("main-item") == few
+
+
+def test_the_graph_is_also_emitted_on_a_noindex_page() -> None:
+    """Like the search results page (spec 10), a noindex page keeps its graph for machine
+    readers; `seo_links` only drops the canonical and hreflang signals there."""
+    make("main-item")
+    apps.get_model("seo", "SeoSettings").objects.update(allow_indexing=False)
+    html = Client().get(product_url(primary_language(), "main-item")).content.decode()
+    assert len(SCRIPT.findall(html)) == 1
