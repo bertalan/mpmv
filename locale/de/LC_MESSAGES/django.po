@@ -12415,6 +12415,10 @@ msgstr ""
 msgid "This item cannot be bought right now."
 msgstr "Dieser Artikel kann derzeit nicht gekauft werden."
 
+#: apps/catalog/templates/catalog/product.html apps/orders/ui/present.py
+msgid "This item has no price yet, so you can't buy it online."
+msgstr "Dieser Artikel hat noch keinen Preis, daher kannst du ihn nicht online kaufen."
+
 #: apps/orders/ui/present.py
 msgid "This item has no price yet."
 msgstr "Dieser Artikel hat noch keinen Preis."

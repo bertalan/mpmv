@@ -135,6 +135,7 @@ def test_an_on_request_product_shows_no_price(client: Client) -> None:
     assert "Add to cart" not in html
 
 
+@pytest.mark.usefixtures("consumer_prices")  # a buyable item shows a consumer price (#757)
 def test_the_default_variant_is_selected(client: Client) -> None:
     product = live(kind=Product.Kind.VARIABLE)
     for sku, default in (("VAR-A", False), ("VAR-B", True)):

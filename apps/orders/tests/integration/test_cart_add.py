@@ -21,7 +21,8 @@ from apps.catalog.tests.factories import (
 from apps.orders.ui import views
 from apps.vendors.tests.factories import VendorFactory
 
-pytestmark = pytest.mark.django_db
+# A buyable item shows a consumer price (TAX.12); without one it has no button (#757).
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
 HX = {"HX-Request": "true"}
 

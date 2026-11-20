@@ -335,7 +335,14 @@ def _package(
     if found:
         return stop(engine.BLOCKED, *found)
     if destination is None:
-        return stop(engine.BLOCKED)  # the cart-level address message says why
+        # Before the address the buyer sees estimated consumer prices (TAX.12): a line without
+        # one says so and blocks (#757). With the address, the tax engine decides below.
+        unpriced = [
+            _block(engine.NO_PRICE, "This item has no price yet.", vid, product_id=line.product_id)
+            for line in cart_lines
+            if not cart_services.has_price(line.product, line.variant)
+        ]
+        return stop(engine.BLOCKED, *unpriced)  # the cart-level address message says why
 
     # Goods VAT per line (tax engine). A blocking tax error stops this package only.
     try:

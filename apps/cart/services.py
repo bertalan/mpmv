@@ -15,12 +15,14 @@ from typing import Any, Literal, overload
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
+from django.http import HttpRequest
 from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.catalog.models import Product, Variant
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
+from apps.tax import prices as tax_prices
 from apps.vendors import services as vendors
 
 from . import engine
@@ -171,6 +173,27 @@ def _unit_price(product: Product, variant: Variant | None) -> Decimal | None:
 def line_unit_price(line: CartLine) -> Decimal | None:
     """The unit net price shown for a cart line now (None when the product has no online price)."""
     return _unit_price(line.product, line.variant)
+
+
+def has_price(
+    product: Product, variant: Variant | None, *, request: HttpRequest | None = None
+) -> bool:
+    """True when the buyer can see a price for the item (TAX.12): a net price, and the VAT the
+    checkout will charge for this vendor and the visitor's estimated destination can be decided.
+
+    Without one (the vendor has no valid tax profile, no rate for the category) the item shows
+    no amount, so it cannot be added to the cart and its line blocks the checkout (#757). The
+    caller loads the product with its vendor."""
+    net = _unit_price(product, variant)
+    if net is None:
+        return False
+    try:
+        tax_prices.consumer_price(
+            net, product.fiscal_category, vendor=product.vendor, request=request
+        )
+    except tax_prices.PriceUnavailable:
+        return False
+    return True
 
 
 def _check_quantity(quantity: int, limit: int) -> None:

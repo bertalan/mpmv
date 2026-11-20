@@ -326,6 +326,9 @@ def cart_add(request: HttpRequest) -> HttpResponse:
         try:
             if cart is None:
                 raise ValidationError(_("We could not open your cart."))
+            cart_services.item_limit(product, variant)  # why it cannot be bought comes first
+            if not cart_services.has_price(product, variant, request=request):
+                raise ValidationError(str(present.NO_PRICE_TO_BUY))
             cart_services.add_to_cart(cart, product, variant=variant, quantity=quantity)
         except ValidationError as error:
             problems.extend(error.messages)

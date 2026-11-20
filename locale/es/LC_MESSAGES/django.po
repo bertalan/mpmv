@@ -12278,6 +12278,10 @@ msgstr "Esta es la referencia de su pedido, no una factura. Cada vendedor emite 
 msgid "This item cannot be bought right now."
 msgstr "Este artículo no se puede comprar en este momento."
 
+#: apps/catalog/templates/catalog/product.html apps/orders/ui/present.py
+msgid "This item has no price yet, so you can't buy it online."
+msgstr "Este artículo aún no tiene precio, así que no puedes comprarlo en línea."
+
 #: apps/orders/ui/present.py
 msgid "This item has no price yet."
 msgstr "Este artículo todavía no tiene precio."
