@@ -145,6 +145,12 @@ SCOPES = (
     "apps/fitment/templates/fitment/_garage_saver.html",
     "apps/core/templates/core/components/image_credit.html",
     "apps/core/templates/core/components/image_credits_disclosure.html",
+    # The remaining CMS page templates (I18N.20 part 3b, slice 3): landing and recruitment pages.
+    "apps/cms/templates/cms/home_page.html",
+    "apps/cms/templates/cms/standard_page.html",
+    "apps/cms/templates/cms/term_landing_page.html",
+    "apps/cms/templates/cms/vendor_landing_page.html",
+    "apps/cms/templates/cms/vendor_recruitment_page.html",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (

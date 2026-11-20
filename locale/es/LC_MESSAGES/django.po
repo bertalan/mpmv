@@ -1366,6 +1366,7 @@ msgstr "Documentación de la API"
 msgid "Application cancelled"
 msgstr "Solicitud cancelada"
 
+#: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Applications open soon."
 msgstr "Las solicitudes se abrirán pronto."
@@ -1387,6 +1388,7 @@ msgstr "se aplica a"
 msgid "Apply filters"
 msgstr "Aplicar filtros"
 
+#: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Apply now"
 msgstr "Solicita ahora"
@@ -3333,6 +3335,7 @@ msgstr ""
 msgid "Facts and circumstances"
 msgstr "Hechos y circunstancias"
 
+#: apps/cms/templates/cms/vendor_landing_page.html
 #: themes/ride/templates/cms/vendor_landing_page.html
 msgid "Featured products"
 msgstr "Productos destacados"
@@ -3509,6 +3512,7 @@ msgstr "Campos del formulario"
 msgid "form page"
 msgstr "página de formulario"
 
+#: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Frequently asked questions"
 msgstr "Preguntas frecuentes"
@@ -6479,6 +6483,7 @@ msgstr ""
 msgid "Plan fee"
 msgstr "Cuota del plan"
 
+#: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Plans"
 msgstr "Planes"
@@ -6851,10 +6856,11 @@ msgid "Product safety"
 msgstr "Seguridad del producto"
 
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
-#: apps/manager/event_block_forms.py apps/manager/event_forms.py apps/manager/product_views.py
-#: apps/manager/sections.py apps/manager/site_map.py
-#: apps/manager/templates/manager/shop/dashboard.html themes/ride/templates/catalog/listing.html
-#: themes/ride/templates/catalog/search.html themes/ride/templates/cms/term_landing_page.html
+#: apps/cms/templates/cms/term_landing_page.html apps/manager/event_block_forms.py
+#: apps/manager/event_forms.py apps/manager/product_views.py apps/manager/sections.py
+#: apps/manager/site_map.py apps/manager/templates/manager/shop/dashboard.html
+#: themes/ride/templates/catalog/listing.html themes/ride/templates/catalog/search.html
+#: themes/ride/templates/cms/term_landing_page.html
 msgid "Products"
 msgstr "Productos"
 
@@ -7659,6 +7665,7 @@ msgstr "Ver todo: %(title)s"
 
 #: apps/cms/templates/cms/blocks/product_grid.html
 #: apps/cms/templates/cms/includes/term_landing_before.html
+#: apps/cms/templates/cms/vendor_landing_page.html
 #: themes/ride/templates/cms/vendor_landing_page.html
 msgid "See all<span class=\"visually-hidden\"> products: %(name)s</span>"
 msgstr "Ver todos<span class=\"visually-hidden\"> los productos: %(name)s</span>"
