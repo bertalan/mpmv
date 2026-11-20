@@ -24,7 +24,7 @@ go-live.
 | Integrations | `test_integrations.py` | to do |
 | Resource abuse | `test_resource_abuse.py` | present (2a: bodies, JSON depth, uploads, pagination; ReDoS is slice 2b) |
 | Information leaks | `test_information_leaks.py` | to do |
-| AI and agents (SEC.9) | `test_ai_agents.py` | to do |
+| AI and agents (SEC.9) | `test_ai_agent_injection.py` | present (2d: llms.txt, JSON-LD, ICS, RSS; MCP and enricher wait for AI.1 and ING.5) |
 
 ## Cases covered elsewhere
 
