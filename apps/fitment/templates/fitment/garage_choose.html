@@ -1,0 +1,34 @@
+{% extends "layouts/content.html" %}
+{% load i18n %}
+{% block title %}{{ noun }} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% comment %}
+The garage chooser (FIT.7 1/n, spec 17 §17.4.4). A plain form: pick one, press Apply, the server
+redirects back and announces the new state in the polite message region. Works without a script;
+no garage state is ever put in a URL (`next` is only the page to return to).
+{% endcomment %}
+{% block page_content %}
+  <h1>{{ noun }}</h1>
+  {% if options %}
+    <form method="post" action="{% url 'garage_apply' %}" data-garage-chooser>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <fieldset>
+        <legend>{% translate "Choose a vehicle" %}</legend>
+        <p><label><input type="radio" name="choice" value="generic"{% if not active_label %} checked{% endif %}> {% translate "Generic (show all)" %}</label></p>
+        {% for option in options %}
+          <p><label><input type="radio" name="choice" value="{{ option.value }}"{% if option.active %} checked{% endif %}> {{ option.label }}</label></p>
+        {% endfor %}
+      </fieldset>
+      {% include "components/button.html" with label=_("Apply") type="submit" only %}
+      {% include "components/button.html" with label=_("Cancel") url=next variant="ghost" only %}
+    </form>
+    {% if signed_in %}<p><a href="{% url 'garage_account' %}">{% translate "My garage" %}</a></p>{% endif %}
+  {% else %}
+    <div data-garage-empty>
+      {% translate "You have no saved vehicles yet" as empty_title %}
+      {% translate "Choose a vehicle while you browse the shop and save it: the shop then shows what fits it." as empty_text %}
+      {% include "components/empty_state.html" with title=empty_title text=empty_text only %}
+    </div>
+  {% endif %}
+{% endblock %}
