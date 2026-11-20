@@ -75,13 +75,17 @@ def test_a_previous_start_needs_the_postponed_state() -> None:
     _refused(page, "previous_start", previous_start=page.starts_at)
 
 
+def _field_names(panels: Any) -> set[str]:
+    names: set[str] = set()
+    for panel in panels:
+        if getattr(panel, "field_name", None):
+            names.add(panel.field_name)
+        names |= _field_names(getattr(panel, "children", ()))
+    return names
+
+
 def test_the_editor_panels_carry_the_new_fields() -> None:
-    names = {
-        getattr(panel, "field_name", None)
-        for group in EventPage.content_panels
-        for panel in [group, *getattr(group, "children", [])]
-    }
-    assert {"ticket_url", "price", "is_free", "postponed", "previous_start"} <= names
+    assert set(NEW_FIELDS) <= _field_names(EventPage.content_panels)
 
 
 def test_the_services_save_the_new_fields() -> None:

@@ -469,3 +469,28 @@ def test_the_statements_page_shows_no_notifier_identity(signed_in: Client, vendo
     assert str(notice.public_id) in html  # the page does list the statement
     assert "Zelda Notifier" not in html
     assert "zelda.notifier" not in html
+
+
+def test_the_form_saves_the_ticket_link_price_and_postponed_state(
+    signed_in: Client, vendor: Vendor
+) -> None:
+    data = _post_data(
+        ticket_url="https://tickets.example.com/fair",
+        price="12.50",
+        postponed="on",
+        previous_start="2027-09-25T09:00",
+    )
+    assert signed_in.post(reverse(NEW), data).status_code == 302
+    page = EventPage.objects.get(title="Autumn fair")
+    assert page.ticket_url == "https://tickets.example.com/fair"
+    assert str(page.price) == "12.50"
+    assert page.postponed is True
+    assert page.previous_start == dt.datetime(2027, 9, 25, 7, 0, tzinfo=dt.UTC)
+    edit = signed_in.get(reverse("manager:shop:event_edit", args=[page.public_id]))
+    assert b"tickets.example.com/fair" in edit.content
+
+
+def test_a_free_event_with_a_price_is_refused_by_the_form(signed_in: Client) -> None:
+    response = signed_in.post(reverse(NEW), _post_data(is_free="on", price="5.00"))
+    assert response.status_code == 200
+    assert not EventPage.objects.filter(title="Autumn fair").exists()
