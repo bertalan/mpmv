@@ -8703,7 +8703,7 @@ msgstr "Danke. Wir haben deine Nachricht erhalten."
 
 #: apps/compliance/templates/compliance/notice_received.html
 msgid "Thank you. We received your report and will review it."
-msgstr "Danke. Wir haben deine Meldung erhalten und prüfen sie."
+msgstr "Danke. Wir haben Ihre Meldung erhalten und prüfen sie."
 
 #: apps/cms/forms_pages.py
 msgid "thank-you text"
@@ -11669,6 +11669,12 @@ msgstr ""
 #: apps/accounts/decorators.py apps/compliance/views.py apps/orders/ui/views.py
 msgid "The verification failed. Please reload the page and try again."
 msgstr "Die Überprüfung ist fehlgeschlagen. Bitte lade die Seite neu und versuche es erneut."
+
+#: apps/compliance/views.py
+msgctxt "formal"
+msgid "The verification failed. Please reload the page and try again."
+msgstr ""
+"Die Überprüfung ist fehlgeschlagen. Bitte laden Sie die Seite neu und versuchen Sie es erneut."
 
 #: apps/vendors/models.py
 msgid "The version belongs to another seller."

@@ -1437,7 +1437,7 @@ msgstr "Aplicar filtros"
 #: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Apply now"
-msgstr "Solicita ahora"
+msgstr "Solicite ahora"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Apply the change"
@@ -8625,7 +8625,7 @@ msgstr "Gracias. Hemos recibido tu mensaje."
 
 #: apps/compliance/templates/compliance/notice_received.html
 msgid "Thank you. We received your report and will review it."
-msgstr "Gracias. Hemos recibido tu notificación y la revisaremos."
+msgstr "Gracias. Hemos recibido su notificación y la revisaremos."
 
 #: apps/cms/forms_pages.py
 msgid "thank-you text"
@@ -11540,6 +11540,11 @@ msgstr ""
 #: apps/accounts/decorators.py apps/compliance/views.py apps/orders/ui/views.py
 msgid "The verification failed. Please reload the page and try again."
 msgstr "La verificación no se ha completado. Vuelve a cargar la página e inténtalo de nuevo."
+
+#: apps/compliance/views.py
+msgctxt "formal"
+msgid "The verification failed. Please reload the page and try again."
+msgstr "La verificación no se ha completado. Vuelva a cargar la página e inténtelo de nuevo."
 
 #: apps/vendors/models.py
 msgid "The version belongs to another seller."

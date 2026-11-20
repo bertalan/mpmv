@@ -6,7 +6,7 @@ import math
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.cache import patch_cache_control
-from django.utils.translation import get_language
+from django.utils.translation import get_language, pgettext
 from django.utils.translation import gettext as _
 from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_GET, require_POST
@@ -103,7 +103,11 @@ def notice_form(request: HttpRequest) -> HttpResponse:
             if wait:
                 return _too_many(wait)
             form.add_error(
-                None, _("The verification failed. Please reload the page and try again.")
+                None,
+                # The notice page is formal (I18N.20); the withdrawal page keeps the informal text.
+                pgettext(
+                    "formal", "The verification failed. Please reload the page and try again."
+                ),
             )
             return _render_form(request, form)
         wait = services.notice_retry_after(ip)  # counted once the captcha passed
