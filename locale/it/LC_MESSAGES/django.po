@@ -12800,8 +12800,8 @@ msgid ""
 "To keep a saved item, sign in and use it in your garage before that date. Otherwise it is deleted."
 " You can also delete it yourself at any time."
 msgstr ""
-"Per tenere una voce salvata, accedi e usala nel tuo garage prima di quella data. Altrimenti viene"
-" eliminata. Puoi anche eliminarla tu in qualsiasi momento."
+"Per tenere una voce salvata, accedi e usala nel tuo garage prima di quella data. Altrimenti viene "
+"eliminata. Puoi anche eliminarla tu in qualsiasi momento."
 
 #: apps/shipping/models.py
 msgid ""
@@ -14627,8 +14627,8 @@ msgid ""
 "You have not used the items saved in your account garage for almost two years. To keep the data we"
 " hold about you small, we delete them on %(delete_on)s."
 msgstr ""
-"Da quasi due anni non usi le voci salvate nel garage del tuo account. Per limitare i dati che"
-" conserviamo su di te, le eliminiamo il %(delete_on)s."
+"Da quasi due anni non usi le voci salvate nel garage del tuo account. Per limitare i dati che "
+"conserviamo su di te, le eliminiamo il %(delete_on)s."
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""

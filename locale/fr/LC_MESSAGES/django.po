@@ -12921,8 +12921,8 @@ msgid ""
 "To keep a saved item, sign in and use it in your garage before that date. Otherwise it is deleted."
 " You can also delete it yourself at any time."
 msgstr ""
-"Pour garder un élément enregistré, connecte-toi et utilise-le dans ton garage avant cette date."
-" Sinon, il est supprimé. Tu peux aussi le supprimer toi-même à tout moment."
+"Pour garder un élément enregistré, connecte-toi et utilise-le dans ton garage avant cette date. "
+"Sinon, il est supprimé. Tu peux aussi le supprimer toi-même à tout moment."
 
 #: apps/shipping/models.py
 msgid ""
