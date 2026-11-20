@@ -23,6 +23,7 @@ test_hostile_input_outputs.py).
 import datetime as dt
 import json
 import re
+import unicodedata
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -214,37 +215,45 @@ def test_the_rss_keeps_hostile_text_as_text_of_its_element(client: Client, injec
 
 # --- Hidden characters, listed from the Unicode standard (not from `_HIDDEN`)
 
-# Unicode category Cf (format) or Zl/Zp/Cc/Cn-block characters that show nothing on screen,
-# as (first, last) code points. LRM, RLM, TAB, LF and CR are left out on purpose: they stay.
-INVISIBLE_RANGES = (
-    (0x0000, 0x0008),  # C0 controls
-    (0x000B, 0x000C),
-    (0x000E, 0x001F),
-    (0x007F, 0x007F),  # DEL
-    (0x00AD, 0x00AD),  # soft hyphen (Cf)
-    (0x180E, 0x180E),  # Mongolian vowel separator
-    (0x200B, 0x200D),  # zero-width space, ZWNJ, ZWJ
-    (0x2028, 0x2029),  # Zl, Zp
-    (0x202A, 0x202E),  # bidi embeddings and overrides
-    (0x2060, 0x2064),  # word joiner, invisible operators
-    (0x2066, 0x2069),  # bidi isolates
-    (0xFE00, 0xFE0F),  # variation selectors
-    (0xFEFF, 0xFEFF),  # BOM
-    (0xFFF9, 0xFFFB),  # interlinear annotation
-    (0xE0000, 0xE007F),  # tag block
-    (0xE0100, 0xE01EF),  # variation selectors supplement
-)
-KEPT = ("\u200e", "\u200f", "\t", "\n", "\r")
+# Kept on purpose: TAB, LF, CR; LRM and RLM (right-to-left languages need them); VS16 (emoji
+# presentation). Everything else of category Cf or Cc goes, plus Zl, Zp and the other variation
+# selectors (Mn, but a hidden channel). The expectation comes from `unicodedata`, not from the
+# production table.
+KEPT = ("\u200e", "\u200f", "\t", "\n", "\r", "\ufe0f")
+EXTRA_HIDDEN = {0x2028, 0x2029, *range(0x180B, 0x180E), *range(0xFE00, 0xFE0F)}
+EXTRA_HIDDEN |= set(range(0xE0100, 0xE01F0))
 
 
-def _invisible_code_points() -> list[int]:
-    return [cp for first, last in INVISIBLE_RANGES for cp in range(first, last + 1)]
+def _should_be_removed(cp: int) -> bool:
+    if chr(cp) in KEPT:
+        return False
+    return unicodedata.category(chr(cp)) in {"Cf", "Cc"} or cp in EXTRA_HIDDEN
 
 
 @pytest.mark.unit
-def test_strip_hidden_removes_every_listed_invisible_code_point() -> None:
-    survivors = [hex(cp) for cp in _invisible_code_points() if strip_hidden(f"a{chr(cp)}b") != "ab"]
-    assert survivors == []
+def test_strip_hidden_matches_the_unicode_category_sweep_for_every_code_point() -> None:
+    wrong = []
+    for cp in range(0x110000):
+        if 0xD800 <= cp <= 0xDFFF:
+            continue
+        survived = strip_hidden(f"a{chr(cp)}b") == f"a{chr(cp)}b"
+        if survived == _should_be_removed(cp):
+            wrong.append(hex(cp))
+    assert wrong == []
+
+
+@pytest.mark.unit
+def test_strip_hidden_catches_the_characters_the_hand_listed_ranges_missed() -> None:
+    for cp in (0x061C, *range(0x206A, 0x2070), 0xE0001, 0x0085, 0x1D173, 0xFE0E):
+        assert strip_hidden(f"a{chr(cp)}b") == "ab", hex(cp)
+    assert strip_hidden("a\ufe0fb") == "a\ufe0fb"
+
+
+@pytest.mark.unit
+def test_strip_hidden_keeps_emoji_presentation_in_a_zwj_sequence() -> None:
+    # ZWJ is stripped (as in #864); VS16 stays, so each emoji keeps its colour presentation.
+    sequence = "\u2764\ufe0f\u200d\U0001f525"
+    assert strip_hidden(sequence) == "\u2764\ufe0f\U0001f525"
 
 
 @pytest.mark.unit
