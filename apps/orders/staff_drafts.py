@@ -435,6 +435,31 @@ def send_link(
     return SendResult(changeset, left - 1, expires_at)
 
 
+def expire_links_of_customer(
+    user: User, *, now: dt.datetime | None = None, dry_run: bool = False
+) -> ChangeSet:
+    """Account erasure (CMP.4, #757): every link still open of the drafts made for `user` now
+    answers as an expired link, so a one-time link sent before the erasure no longer opens. The
+    draft stays open and keeps its digest. The caller (the erasure) owns the transaction and the
+    audit; the snapshots hold no email, name or token."""
+    stamp = now or timezone.now()
+    changeset = ChangeSet()
+    rows = (
+        StaffDraft.objects.select_related("source_order")
+        .select_for_update(of=("self",))
+        .filter(customer=user, state=StaffDraftState.OPEN, link_expires_at__gt=stamp)
+        .exclude(link_digest="")
+        .order_by("id")
+    )
+    for draft in rows:
+        before = _snapshot(draft)
+        draft.link_expires_at = stamp
+        changeset.update(DRAFT_MODEL, str(draft.public_id), before, _snapshot(draft))
+        if not dry_run:
+            draft.save(update_fields=["link_expires_at", "updated_at"])
+    return changeset
+
+
 def _email_context(
     order: Order, lines: list[StaffDraftLine], token: str, expires_at: dt.datetime
 ) -> dict[str, Any]:
