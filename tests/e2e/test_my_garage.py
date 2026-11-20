@@ -18,6 +18,7 @@ from apps.fitment.models import GarageProfile
 from apps.fitment.tests.factories import (
     FitmentLevelFactory,
     FitmentNodeFactory,
+    FitmentSchemeFactory,
     GarageProfileFactory,
 )
 from tests.e2e.axe import format_violations, run_axe
@@ -35,6 +36,8 @@ def _accessible(page: Page) -> None:
 def test_a_customer_manages_the_garage(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
+    # A transactional test flushes the scheme row the migration seeds (it is order-dependent).
+    FitmentSchemeFactory.create()
     for position, code in enumerate(["make", "model"], start=1):
         FitmentLevelFactory.create(position=position, code=code)
     user = UserFactory.create(password=secrets.token_urlsafe(16))

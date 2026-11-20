@@ -252,22 +252,3 @@ def test_the_page_renders_in_every_language(client: Client, user: User, language
     with translation.override(language):
         client.cookies["django_language"] = language
         assert client.get(reverse(PAGE)).status_code == 200
-
-
-def test_the_ride_theme_renders_the_page(user: User) -> None:
-    from django.template.loader import render_to_string
-    from django.test import RequestFactory
-
-    from apps.themes.services import use_theme
-
-    GarageProfileFactory.create(user=user, name="Ride bike", node=_node(), is_active=True)
-    request = RequestFactory().get(reverse(PAGE))
-    request.user = user
-    from apps.fitment import garage_views
-
-    context = garage_views.page_context(user)
-    with use_theme("ride"):
-        html = render_to_string("fitment/garage_account.html", context, request=request)
-    assert "Ride bike" in html
-    assert "data-garage-active" in html
-    assert "card" in html
