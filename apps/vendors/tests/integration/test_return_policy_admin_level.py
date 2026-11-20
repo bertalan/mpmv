@@ -55,7 +55,7 @@ def test_a_review_without_a_passkey_window_is_refused_and_changes_nothing(action
     assert version.review_note == ""
     # level_gated_action audits the refused attempt as a prompt, and no review row is written
     prompts = AuditLog.objects.filter(action=levels.PROMPT, actor_id=user.pk)
-    assert [row.after["action"] for row in prompts] == ["return_policy_review"]
+    assert [(row.after or {}).get("action") for row in prompts] == ["return_policy_review"]
     assert not AuditLog.objects.filter(action__in=[APPROVED, REJECTED]).exists()
 
 
