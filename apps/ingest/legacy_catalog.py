@@ -42,6 +42,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
+from apps.core.text import nfc_deep
+
 PRODUCT = "product"
 VARIATION = "product_variation"
 
@@ -70,6 +72,58 @@ CENT = Decimal("0.01")
 
 class BadValue(ValueError):
     """A legacy value that cannot be loaded: the record is rejected and reported."""
+
+
+# Free text a person wrote (I18N.10): the only bundle values stored in NFC. Everything else is
+# identity or structure (ids, SKUs, slugs, codes, attribute values and the `attributes` and
+# `options` maps of a post, e-mail, phone, numbers, dates) and stays byte-exact.
+TEXT_KEYS = frozenset(
+    {
+        "display_name",
+        "legal_name",
+        "name",
+        "title",
+        "description",
+        "short_description",
+        "seo_title",
+        "seo_description",
+        "label",
+        "unit",
+        "tagline",
+        "shipping_policy",
+        "refund_policy",
+        "cancellation_policy",
+    }
+)
+# Keys whose value is a map of language to text (or to a map of texts), all of it free text.
+TEXT_MAPS = frozenset({"labels", "translations"})
+SECTIONS = ("vendors", "categories", "brands", "tags", "attributes", "posts")
+
+
+def _nfc_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in row.items():
+        if (key in TEXT_KEYS and isinstance(value, str)) or key in TEXT_MAPS:
+            out[key] = nfc_deep(value)
+        elif key == "values" and isinstance(value, list):
+            out[key] = [_nfc_row(item) if isinstance(item, Mapping) else item for item in value]
+        else:
+            out[key] = value
+    return out
+
+
+def nfc_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
+    """`bundle` with the free-text values of every row in NFC, one place for the whole loader.
+
+    Identity values are never changed, so a source record keeps its identity and a reload finds
+    the rows it loaded before.
+    """
+    out = dict(bundle)
+    for section in SECTIONS:
+        rows = bundle.get(section)
+        if isinstance(rows, list):
+            out[section] = [_nfc_row(row) if isinstance(row, Mapping) else row for row in rows]
+    return out
 
 
 def parse_money(raw: object, *, field: str = "price") -> Decimal | None:

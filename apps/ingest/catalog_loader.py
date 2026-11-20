@@ -131,7 +131,7 @@ class CatalogLoader:
         include_unpublished: bool,
         attribute_aliases: Mapping[str, str],
     ) -> None:
-        self.bundle = bundle
+        self.bundle = rules.nfc_bundle(bundle)  # free text in NFC (I18N.10)
         self.ctx = ctx
         self.include_unpublished = include_unpublished
         self.aliases = {
