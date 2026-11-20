@@ -36,7 +36,7 @@ from apps.core.indexing import robots_txt
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
-from tests.i18n import localized
+from tests.i18n import localized, translated
 
 pytestmark = pytest.mark.django_db
 
@@ -147,4 +147,5 @@ def test_the_storefront_header_links_to_the_page(client: Client) -> None:
     page = StandardPageFactory.create(title="About us")
     html = client.get(page.get_url()).content.decode()
     header = html.split('<header class="site-header">', 1)[1].split("</header>", 1)[0]
-    assert re.search(r'<nav id="site-nav"[^>]*>.*<a href="/_links/">Site links</a>', header, re.S)
+    label = re.escape(translated("Site links"))
+    assert re.search(rf'<nav id="site-nav"[^>]*>.*<a href="/_links/">{label}</a>', header, re.S)

@@ -6,6 +6,7 @@ The suite runs with the default languages and also with another `MPMV_LANGUAGES`
 
 import pytest
 from django.conf import settings
+from django.utils import translation
 
 from apps.catalog import slugs
 from apps.core.i18n import configured_languages, primary_language
@@ -26,6 +27,12 @@ def third_language() -> str:
         if code not in taken:
             return code
     pytest.skip("needs a third configured language")
+
+
+def translated(msgid: str, lang: str | None = None) -> str:
+    """`msgid` translated into `lang` (default: the primary language), as a page in it shows it."""
+    with translation.override(lang or primary_language()):
+        return translation.gettext(msgid)
 
 
 def language_prefix(code: str) -> str:
