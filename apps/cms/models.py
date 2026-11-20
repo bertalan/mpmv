@@ -115,6 +115,23 @@ from .forms_pages import FormField as FormField  # re-exported: models live in t
 from .forms_pages import FormPage as FormPage
 
 
+def seo_image_field() -> "models.ForeignKey[Any, Any]":
+    """The picture search and social previews show for a page (SEO.8 2/2, D-36), optional: the
+    page's main image, the site default and the platform logo follow in that order."""
+    return models.ForeignKey(
+        get_image_model_string(),
+        verbose_name=_("sharing image"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text=_(
+            "The picture shown when this page is shared on social networks. If you leave it "
+            "empty, the main image of the page, the site default or the logo is used."
+        ),
+    )
+
+
 def body_field(
     verbose_name: Any = None,
     *,
@@ -214,8 +231,13 @@ class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is u
     base_form_class = NFCPageForm
 
     body = body_field(countdown=True, products=True)
+    seo_image = seo_image_field()
 
     content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("body")]
+    promote_panels: ClassVar[list[Any]] = [*Page.promote_panels, FieldPanel("seo_image")]
+    override_translatable_fields: ClassVar[list[Any]] = [
+        SynchronizedField("seo_image", overridable=True)
+    ]
     parent_page_types: ClassVar[list[str]] = ["wagtailcore.Page"]
     subpage_types: ClassVar[list[str]] = [
         "cms.StandardPage",
@@ -292,6 +314,7 @@ class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
         ),
     )
     body = body_field(countdown=True, products=True)
+    seo_image = seo_image_field()
 
     content_panels: ClassVar[list[Any]] = [
         *Page.content_panels,
@@ -300,10 +323,15 @@ class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
         FieldPanel("image_caption"),
         FieldPanel("body"),
     ]
-    promote_panels: ClassVar[list[Any]] = [*Page.promote_panels, FieldPanel("noindex")]
+    promote_panels: ClassVar[list[Any]] = [
+        *Page.promote_panels,
+        FieldPanel("seo_image"),
+        FieldPanel("noindex"),
+    ]
     # Spec 10 "Images per locale": the source image until a translator replaces it.
     override_translatable_fields: ClassVar[list[Any]] = [
-        SynchronizedField("image", overridable=True)
+        SynchronizedField("image", overridable=True),
+        SynchronizedField("seo_image", overridable=True),
     ]
     parent_page_types: ClassVar[list[str]] = ["cms.HomePage", "cms.StandardPage"]
     subpage_types: ClassVar[list[str]] = [
@@ -1491,6 +1519,7 @@ class BlogPostPage(Page):  # type: ignore[misc]
             "If you leave it empty, no caption is shown."
         ),
     )
+    seo_image = seo_image_field()
     body = StreamField(
         [
             ("paragraph", paragraph_block()),
@@ -1528,8 +1557,10 @@ class BlogPostPage(Page):  # type: ignore[misc]
         FieldPanel("image_caption"),
         FieldPanel("body"),
     ]
+    promote_panels: ClassVar[list[Any]] = [*Page.promote_panels, FieldPanel("seo_image")]
     override_translatable_fields: ClassVar[list[Any]] = [
-        SynchronizedField("image", overridable=True)
+        SynchronizedField("image", overridable=True),
+        SynchronizedField("seo_image", overridable=True),
     ]
     parent_page_types: ClassVar[list[str]] = ["cms.BlogIndexPage"]
     subpage_types: ClassVar[list[str]] = []

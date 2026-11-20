@@ -1487,7 +1487,7 @@ msgstr "Aplicar filtros"
 #: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Apply now"
-msgstr "Solicita ahora"
+msgstr "Solicite ahora"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Apply the change"
@@ -2841,6 +2841,14 @@ msgstr "Declaración obligatoria para publicar"
 msgid "Decrease quantity"
 msgstr "Disminuir la cantidad"
 
+#: apps/seo/admin_views.py
+msgid "Default sharing image"
+msgstr "Imagen para compartir por defecto"
+
+#: apps/seo/models.py
+msgid "default sharing image"
+msgstr "imagen para compartir por defecto"
+
 #: apps/cms/models.py
 msgid "Defaults to 'Apply now'."
 msgstr "Por defecto es «Solicitar ahora»."
@@ -3951,6 +3959,11 @@ msgstr "Textos de ayuda"
 #: apps/cms/templates/cms/help_guide_index.html apps/cms/templates/cms/help_guide_section.html
 msgid "Help topics"
 msgstr "Temas de ayuda"
+
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid "Hi %(customer_name)s,"
+msgstr "Hola %(customer_name)s,"
 
 #: apps/manager/event_views.py
 msgid "Hidden by the platform."
@@ -8353,6 +8366,14 @@ msgstr ""
 msgid "Shown to the vendor and kept in the audit log."
 msgstr "Se muestra al vendedor y se conserva en el registro de auditoría."
 
+#: apps/seo/admin_views.py apps/seo/models.py
+msgid ""
+"Shown when a page is shared on social networks and the page has no picture of its own. If you "
+"leave it empty, the platform logo is used."
+msgstr ""
+"Se muestra cuando una página se comparte en redes sociales y la página no tiene imagen propia. Si "
+"deja el campo vacío, se usa el logotipo de la plataforma."
+
 #: apps/seo/providers.py
 msgid "Shows us, in aggregate, which pages are used so we can improve the shop."
 msgstr "Nos muestra, de forma agregada, qué páginas se utilizan para que podamos mejorar la tienda."
@@ -8864,7 +8885,7 @@ msgstr "Gracias. Hemos recibido tu mensaje."
 
 #: apps/compliance/templates/compliance/notice_received.html
 msgid "Thank you. We received your report and will review it."
-msgstr "Gracias. Hemos recibido tu notificación y la revisaremos."
+msgstr "Gracias. Hemos recibido su notificación y la revisaremos."
 
 #: apps/cms/forms_pages.py
 msgid "thank-you text"
@@ -10782,6 +10803,14 @@ msgstr ""
 "La imagen que se muestra cuando quien compra elige esta versión. Elige una de las imágenes de este"
 " producto. Déjalo vacío para mantener la galería del producto."
 
+#: apps/cms/models.py
+msgid ""
+"The picture shown when this page is shared on social networks. If you leave it empty, the main "
+"image of the page, the site default or the logo is used."
+msgstr ""
+"La imagen que se muestra cuando esta página se comparte en redes sociales. Si deja el campo vacío,"
+" se usa la imagen principal de la página, la imagen por defecto del sitio o el logotipo."
+
 #: apps/ingest/models.py
 msgid ""
 "The plain value this term stands for, for example a colour name. Use it when there is no catalogue"
@@ -11826,6 +11855,11 @@ msgstr ""
 msgid "The verification failed. Please reload the page and try again."
 msgstr "La verificación no se ha completado. Vuelve a cargar la página e inténtalo de nuevo."
 
+#: apps/compliance/views.py
+msgctxt "formal"
+msgid "The verification failed. Please reload the page and try again."
+msgstr "La verificación no se ha completado. Vuelva a cargar la página e inténtelo de nuevo."
+
 #: apps/vendors/models.py
 msgid "The version belongs to another seller."
 msgstr "La versión pertenece a otro vendedor."
@@ -12761,6 +12795,15 @@ msgstr ""
 " decisión de desistir del contrato a través de una declaración inequívoca (por ejemplo, una carta "
 "enviada por correo postal o un correo electrónico). Puede utilizar el modelo de formulario de "
 "desistimiento que figura más abajo, aunque su uso es voluntario."
+
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid ""
+"To keep a saved item, sign in and use it in your garage before that date. Otherwise it is deleted."
+" You can also delete it yourself at any time."
+msgstr ""
+"Para conservar un elemento guardado, inicia sesión y úsalo en tu garaje antes de esa fecha. Si no,"
+" se elimina. También puedes eliminarlo tú mismo en cualquier momento."
 
 #: apps/shipping/models.py
 msgid ""
@@ -14583,6 +14626,15 @@ msgstr ""
 "Todavía no ha definido una política. Se aplica la estándar: la tienda paga el envío de la "
 "devolución."
 
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid ""
+"You have not used the items saved in your account garage for almost two years. To keep the data we"
+" hold about you small, we delete them on %(delete_on)s."
+msgstr ""
+"Hace casi dos años que no usas los elementos guardados en el garaje de tu cuenta. Para limitar los"
+" datos que conservamos sobre ti, los eliminamos el %(delete_on)s."
+
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
 "You have the right to withdraw from this contract within %(days)s days without giving any reason."
@@ -14905,6 +14957,10 @@ msgstr "Su rol requiere un segundo factor antes de poder continuar."
 #: apps/manager/sales_terms_views.py
 msgid "Your sales terms are published and in force."
 msgstr "Sus condiciones de venta están publicadas y en vigor."
+
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/subject.txt
+msgid "Your saved garage items will be deleted soon"
+msgstr "Los elementos guardados en tu garaje se eliminarán pronto"
 
 #: apps/accounts/lifetimes.py
 msgid "Your session ended because it was not used for a while. Please sign in again."
