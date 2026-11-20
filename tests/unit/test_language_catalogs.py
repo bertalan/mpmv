@@ -493,7 +493,6 @@ EXCLUDED = {
     "themes/ride/templates/styleguide": "developer style guide, not shown to customers",
     # Email templates: their own scope (one language per recipient), I18N.20 part 3c.
     "apps/catalog/templates/email/": "email templates, own scope, I18N.20 part 3c",
-    "apps/compliance/templates/email/": "email templates, own scope, I18N.20 part 3c",
     "apps/core/templates/email/": "email templates, own scope, I18N.20 part 3c",
     "apps/vendors/templates/email/": "email templates, own scope, I18N.20 part 3c",
     # Customer-facing pages not yet translated: informal register, I18N.20 part 3b.

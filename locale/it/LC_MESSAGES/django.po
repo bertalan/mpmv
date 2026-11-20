@@ -75,6 +75,12 @@ msgid_plural "%(counter)s products"
 msgstr[0] "%(counter)s prodotto"
 msgstr[1] "%(counter)s prodotti"
 
+#: apps/compliance/templates/email/compliance/gpsr_published_incomplete/subject.txt
+msgid "%(counter)s published product fails the GPSR check"
+msgid_plural "%(counter)s published products fail the GPSR check"
+msgstr[0] "%(counter)s prodotto pubblicato non supera il controllo GPSR"
+msgstr[1] "%(counter)s prodotti pubblicati non superano il controllo GPSR"
+
 #: themes/base/templates/components/rating.html
 msgid "%(counter)s review"
 msgid_plural "%(counter)s reviews"
@@ -233,6 +239,15 @@ msgstr "%(vendor_name)s: ordine %(order_number)s modificato (versione %(version)
 msgid "%(vendor_name)s: platform support changed order %(order_number)s"
 msgstr "%(vendor_name)s: l’assistenza della piattaforma ha modificato l’ordine %(order_number)s"
 
+#: apps/compliance/templates/email/compliance/withdrawal_vendor_notice/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_vendor_notice/body.txt
+msgid ""
+"%(vendor_name)s: the buyer of order %(order_number)s declared on %(submitted_at)s that they "
+"withdraw from the contract for your part of the order (reference %(reference)s)."
+msgstr ""
+"%(vendor_name)s: l'acquirente dell'ordine %(order_number)s ha dichiarato il %(submitted_at)s di "
+"recedere dal contratto per la Sua parte dell'ordine (riferimento %(reference)s)."
+
 #: apps/core/models.py
 msgid ""
 "'Default' follows the setting of this environment, or the default of the code if there is none. "
@@ -317,6 +332,13 @@ msgid "A clear, short answer. It opens when the visitor clicks the question. Req
 msgstr ""
 "Una risposta chiara e breve. Si apre quando il visitatore clicca sulla domanda. Obbligatoria."
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "A court"
+msgstr "Un tribunale"
+
 #: apps/ingest/models.py
 msgid ""
 "A dry run only shows what would change. A run that writes is possible only if the source allows "
@@ -383,6 +405,15 @@ msgstr ""
 msgid "A fingerprint of the data. The same data is stored once per item."
 msgstr "Un'impronta dei dati. Gli stessi dati vengono salvati una sola volta per articolo."
 
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
+msgid ""
+"A GPSR safety case is past its deadline and still open. Act on it now and record what was done in "
+"the staff admin."
+msgstr ""
+"Un caso di sicurezza GPSR ha superato la scadenza ed è ancora aperto. Intervenga ora e registri "
+"quanto fatto nell'area di amministrazione dello staff."
+
 #: apps/manager/event_block_forms.py
 msgid "A grid, or one row that scrolls sideways."
 msgstr "Una griglia, oppure una sola riga che scorre di lato."
@@ -400,6 +431,11 @@ msgstr "un prezzo più alto richiede l’accettazione del cliente"
 #: apps/orders/amendment_engine.py
 msgid "a higher quantity needs the customer's acceptance"
 msgstr "una quantità più alta richiede l’accettazione del cliente"
+
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "a legal or regulatory obligation"
+msgstr "un obbligo di legge o regolamentare"
 
 #: apps/orders/amendment_engine.py
 msgid "A line needs at least one unit; remove the line instead."
@@ -934,6 +970,11 @@ msgstr "Interveni sul contenuto"
 msgid "Action on the selected rows"
 msgstr "Azione sulle righe selezionate"
 
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+msgid "Action taken"
+msgstr "Misura adottata"
+
 #: apps/manager/templates/manager/shop/events.html
 msgid "Actions"
 msgstr "Azioni"
@@ -1323,6 +1364,11 @@ msgid_plural "And %(counter)s more."
 msgstr[0] "E ancora %(counter)s."
 msgstr[1] "E altri %(counter)s."
 
+#: apps/compliance/templates/email/compliance/gpsr_published_incomplete/body.html
+#: apps/compliance/templates/email/compliance/gpsr_published_incomplete/body.txt
+msgid "And %(more)s more."
+msgstr "E altri %(more)s."
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Anonymous"
 msgstr "Anonimo"
@@ -1497,6 +1543,21 @@ msgstr "Autore"
 msgid "Authorities told: %(authority)s, %(at)s."
 msgstr "Autorità informate: %(authority)s, %(at)s."
 
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
+msgid "Authority"
+msgstr "Autorità"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Automated means used to decide"
+msgstr "Mezzi automatizzati usati per decidere"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Automated means used to detect the content"
+msgstr "Mezzi automatizzati usati per rilevare il contenuto"
+
 #: apps/cms/blocks.py
 msgid ""
 "Automatic change only: how long a slide stays, in milliseconds, between 3000 and 20000. Example: "
@@ -1629,6 +1690,11 @@ msgstr "Saldo"
 #: apps/manager/templates/manager/shop/_money_table.html
 msgid "Balance (EUR)"
 msgstr "Saldo (EUR)"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Based on a notice"
+msgstr "Basata su una segnalazione"
 
 #: apps/compliance/templates/compliance/includes/product_safety.html
 msgid "Batch or serial number"
@@ -1881,6 +1947,11 @@ msgid ""
 msgstr ""
 "Carrelli preparati per un cliente da uno dei suoi ordini, in attesa che il cliente apra il link. "
 "Ne prepari uno nuovo dalla pagina dell'ordine in Modifiche agli ordini."
+
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
+msgid "Case"
+msgstr "Caso"
 
 #: apps/seo/site_links.py
 msgid "Catalogue: %(taxonomy)s"
@@ -2682,6 +2753,11 @@ msgstr "Addebiti"
 msgid "Decided"
 msgstr "Deciso"
 
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+msgid "Decision"
+msgstr "Decisione"
+
 #: apps/manager/fitment_shop_forms.py apps/manager/fitment_shop_views.py
 msgid "Declaration"
 msgstr "Dichiarazione"
@@ -2952,6 +3028,11 @@ msgstr "Punto di consegna"
 #: apps/manager/site_map.py apps/seo/site_links.py
 msgid "DSA points of contact"
 msgstr "Punti di contatto DSA"
+
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
+msgid "Due on"
+msgstr "Scadenza"
 
 #: apps/orders/templates/email/orders/package_cancelled/body.html
 #: apps/orders/templates/email/orders/package_cancelled/body.txt
@@ -3329,6 +3410,13 @@ msgstr ""
 msgid "Facts and circumstances"
 msgstr "Fatti e circostanze"
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "Facts and circumstances relied on"
+msgstr "Fatti e circostanze su cui si fonda la decisione"
+
 #: themes/ride/templates/cms/vendor_landing_page.html
 msgid "Featured products"
 msgstr "Prodotti in evidenza"
@@ -3666,6 +3754,10 @@ msgstr ""
 "La griglia mostra i prodotti in righe e colonne. La riga li mette su una sola linea che il "
 "visitatore può far scorrere di lato."
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/shop/statements.html
 #: apps/manager/templates/manager/shop/termination.html
@@ -3702,6 +3794,8 @@ msgstr "Titolo"
 msgid "Height"
 msgstr "Altezza"
 
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.txt
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
@@ -3721,6 +3815,8 @@ msgstr "Altezza"
 msgid "Hello %(customer_name)s,"
 msgstr "Ciao %(customer_name)s,"
 
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.txt
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 #: apps/orders/templates/email/orders/item_unavailable/body.html
@@ -4046,6 +4142,13 @@ msgstr ""
 "Come vengono controllati gli eventi di questo negozio prima di andare online: con la regola "
 "abituale, sempre, oppure mai perché ti fidi del negozio. Obbligatorio."
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "How to challenge this decision"
+msgstr "Come contestare questa decisione"
+
 #: apps/catalog/templates/catalog/includes/product_returns.html
 msgid "How to return"
 msgstr "Come restituire"
@@ -4180,6 +4283,11 @@ msgstr ""
 "abbia espressamente convenuto altrimenti; in ogni caso, non dovrà sostenere alcun costo quale "
 "conseguenza di tale rimborso."
 
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "illegal content"
+msgstr "contenuti illegali"
+
 #: apps/manager/event_block_forms.py
 msgid "Image"
 msgstr "Immagine"
@@ -4290,6 +4398,13 @@ msgstr "Informazione"
 #: apps/manager/templates/manager/shop/link_dialog.html
 msgid "Insert link"
 msgstr "Inserisci link"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "Internal complaint (DSA article 20)"
+msgstr "Reclamo interno (articolo 20 DSA)"
 
 #: apps/vendors/models.py
 msgid "Internal note on what changed in this version. Vendors do not see it. Up to 200 characters."
@@ -5094,6 +5209,8 @@ msgstr "Mese successivo"
 msgid "Next slide"
 msgstr "Diapositiva successiva"
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "No"
 msgstr "No"
@@ -5101,6 +5218,11 @@ msgstr "No"
 #: apps/manager/templates/manager/forbidden.html
 msgid "No access"
 msgstr "Nessun accesso"
+
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+msgid "No action"
+msgstr "Nessuna misura"
 
 #: apps/cms/templates/cms/blog_author_page.html themes/ride/templates/cms/blog_author_page.html
 msgid "No articles by this author yet."
@@ -5235,6 +5357,11 @@ msgid "No version is published yet. Until you publish one, your products are sol
 msgstr ""
 "Nessuna versione è ancora pubblicata. Finché non ne pubblica una, i Suoi prodotti si vendono solo "
 "su richiesta."
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "No, our own initiative"
+msgstr "No, di nostra iniziativa"
 
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Nobody holds a platform role yet."
@@ -5431,6 +5558,13 @@ msgstr "Ancora niente."
 msgid "Notice"
 msgstr "Segnalazione"
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "notice"
+msgstr "segnalazione"
+
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/termination.html
@@ -5440,6 +5574,10 @@ msgstr "Preavviso dato il"
 #: apps/manager/termination_views.py
 msgid "Notice of termination"
 msgstr "Preavviso di cessazione"
+
+#: apps/compliance/templates/email/compliance/termination_notice/subject.txt
+msgid "Notice of termination of your seller account"
+msgstr "Disdetta del Suo account venditore"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Notice period (days)"
@@ -5974,6 +6112,10 @@ msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
 msgid "Order %(order_number)s: the rest of your order was cancelled, full refund"
 msgstr "Ordine %(order_number)s: il resto del tuo ordine è stato annullato, rimborso integrale"
 
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/subject.txt
+msgid "Order %(order_number)s: we received your withdrawal"
+msgstr "Ordine %(order_number)s: abbiamo ricevuto il tuo recesso"
+
 #: apps/orders/templates/email/orders/amendment_applied/subject.txt
 msgid "Order %(order_number)s: your order from %(vendor_name)s was changed"
 msgstr "Ordine %(order_number)s: il tuo ordine presso %(vendor_name)s è stato modificato"
@@ -6133,6 +6275,10 @@ msgstr "Altri modi in cui il fornitore scrive lo stesso termine, come elenco JSO
 msgid "Other ways to withdraw"
 msgstr "Altri modi per recedere"
 
+#: apps/compliance/templates/email/compliance/notice_decision/subject.txt
+msgid "Our decision on your report"
+msgstr "La nostra decisione sulla Sua segnalazione"
+
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 msgid ""
@@ -6163,6 +6309,13 @@ msgstr "esaurito"
 msgid "Out of stock"
 msgstr "Esaurito"
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "Out-of-court dispute settlement (DSA article 21)"
+msgstr "Risoluzione extragiudiziale delle controversie (articolo 21 DSA)"
+
 #: apps/manager/product_views.py
 msgid "outdated"
 msgstr "non aggiornata"
@@ -6170,6 +6323,10 @@ msgstr "non aggiornata"
 #: apps/manager/product_views.py
 msgid "Outdated"
 msgstr "Non aggiornata"
+
+#: apps/compliance/templates/email/compliance/safety_case_overdue/subject.txt
+msgid "Overdue GPSR safety case: %(kind)s %(reference)s"
+msgstr "Caso di sicurezza GPSR scaduto: %(kind)s %(reference)s"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Owner"
@@ -6843,6 +7000,11 @@ msgstr "Le pagine prodotto non esistono ancora (CAT.7): i prodotti compariranno 
 msgid "Product safety"
 msgstr "Sicurezza del prodotto"
 
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
+msgid "Product SKU"
+msgstr "SKU del prodotto"
+
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: apps/manager/event_block_forms.py apps/manager/event_forms.py apps/manager/product_views.py
 #: apps/manager/sections.py apps/manager/site_map.py
@@ -7028,6 +7190,10 @@ msgid "Readiness probe"
 msgstr "Controllo di prontezza"
 
 #: apps/compliance/templates/compliance/privacy_requests.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+#: apps/compliance/templates/email/compliance/termination_withdrawn/body.html
+#: apps/compliance/templates/email/compliance/termination_withdrawn/body.txt
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt apps/manager/fitment_forms.py
 #: apps/manager/forms.py apps/manager/templates/email/manager/role_self_assigned/body.html
@@ -7069,6 +7235,11 @@ msgstr "Motivo: «%(reason)s»"
 #: apps/manager/templates/manager/platform/notices.html
 msgid "Received"
 msgstr "Ricevuta"
+
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
+msgid "Received on"
+msgstr "Ricevuto il"
 
 #: apps/orders/amendments.py
 msgid ""
@@ -7116,6 +7287,16 @@ msgid "Recovery codes"
 msgstr "Codici di recupero"
 
 #: apps/compliance/templates/compliance/notice_received.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+#: apps/compliance/templates/email/compliance/notice_received/body.html
+#: apps/compliance/templates/email/compliance/notice_received/body.txt
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+#: apps/compliance/templates/email/compliance/termination_withdrawn/body.html
+#: apps/compliance/templates/email/compliance/termination_withdrawn/body.txt
 #: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/_money_table.html
 #: apps/manager/templates/manager/shop/money_statement.html
@@ -7124,6 +7305,8 @@ msgid "Reference"
 msgstr "Riferimento"
 
 #: apps/compliance/templates/compliance/withdrawal_done.html
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.txt
 msgid "reference"
 msgstr "riferimento"
 
@@ -7253,6 +7436,11 @@ msgstr "Rinomina (il vecchio nome diventa un alias)"
 msgid "Repeat customers"
 msgstr "Clienti ricorrenti"
 
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "repeated infringements of the platform terms"
+msgstr "violazioni ripetute dei termini della piattaforma"
+
 #: apps/manager/event_forms.py
 msgid "Repeats"
 msgstr "Si ripete"
@@ -7285,6 +7473,13 @@ msgstr "Segnala questo evento"
 #: apps/manager/templates/manager/platform/notices.html
 msgid "Reported"
 msgstr "Segnalato"
+
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+#: apps/compliance/templates/email/compliance/notice_received/body.html
+#: apps/compliance/templates/email/compliance/notice_received/body.txt
+msgid "Reported location"
+msgstr "Posizione segnalata"
 
 #: apps/cms/models.py
 msgid "Repository file"
@@ -7337,6 +7532,11 @@ msgstr "Resto del pacco annullato su tua richiesta"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Restrict and send the statement of reasons"
 msgstr "Limita e invia la motivazione"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Restriction"
+msgstr "Restrizione"
 
 #: themes/base/templates/components/launch_countdown.html
 #: themes/ride/templates/components/launch_countdown.html
@@ -7601,6 +7801,11 @@ msgid "Scan this QR code with your authenticator app, then enter the 6-digit cod
 msgstr ""
 "Scansioni questo codice QR con la Sua app di autenticazione, poi inserisca il codice a 6 cifre che"
 " mostra."
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Scope"
+msgstr "Ambito"
 
 #: apps/cms/models.py
 msgid "Screen (route name)"
@@ -7948,6 +8153,8 @@ msgstr "Negozi"
 msgid "Short answers to the questions customers ask most. Pick a topic."
 msgstr "Risposte brevi alle domande più frequenti dei clienti. Scegli un argomento."
 
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Shorter notice because"
@@ -8308,6 +8515,10 @@ msgstr "Motivazione del %(date)s"
 #: apps/manager/templates/manager/shop/money_statement.html
 msgid "Statement of %(vendor)s from %(first)s to %(last)s."
 msgstr "Rendiconto di %(vendor)s dal %(first)s al %(last)s."
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/subject.txt
+msgid "Statement of reasons for a restriction on your content"
+msgstr "Motivazione di una restrizione ai Suoi contenuti"
 
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/platform/notice_detail.html
@@ -8958,6 +9169,21 @@ msgstr "Il consumatore"
 msgid "The content could not be restricted: check the notice status and target."
 msgstr ""
 "Non è stato possibile limitare il contenuto: controlla lo stato e il bersaglio della segnalazione."
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "The content is illegal"
+msgstr "Il contenuto è illegale"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "The content is incompatible with the platform terms"
+msgstr "Il contenuto è incompatibile con i termini della piattaforma"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "The content is removed or disabled"
+msgstr "Il contenuto è rimosso o disabilitato"
 
 #: apps/manager/notice_views.py
 msgid "The content is restricted and the vendor is told."
@@ -10169,6 +10395,10 @@ msgstr "La segnalazione è in revisione."
 msgid "The notice is withdrawn and the vendor is told."
 msgstr "Il preavviso è ritirato e il venditore ne viene informato."
 
+#: apps/compliance/templates/email/compliance/termination_withdrawn/subject.txt
+msgid "The notice of termination of your seller account is withdrawn"
+msgstr "La disdetta del Suo account venditore è stata ritirata"
+
 #: apps/manager/notice_views.py
 msgid "The notification to the authorities is recorded."
 msgstr "La comunicazione alle autorità è registrata."
@@ -10716,6 +10946,15 @@ msgstr ""
 "Il riferimento della segnalazione che ha portato a nascondere l'evento, se c'è stata. La compila "
 "la piattaforma."
 
+#: apps/compliance/templates/email/compliance/withdrawal_vendor_notice/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_vendor_notice/body.txt
+msgid ""
+"The refund and return follow your usual returns process. The withdrawal is recorded on the "
+"platform."
+msgstr ""
+"Il rimborso e la restituzione seguono la Sua consueta procedura di reso. Il recesso è "
+"registrato sulla piattaforma."
+
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
 msgid "The refund fee is charged to your shop."
@@ -10890,10 +11129,20 @@ msgstr "Il venditore a cui appartiene questa politica di reso."
 msgid "The seller will not ship it before %(when)s."
 msgstr "Il venditore non lo spedirà prima del %(when)s."
 
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.txt
+msgid ""
+"The seller will tell you how to return the goods. Keep this message as proof of your withdrawal."
+msgstr ""
+"Il venditore ti dirà come restituire la merce. Conserva questo messaggio come prova del tuo "
+"recesso."
+
 #: apps/vendors/models.py
 msgid "The seller."
 msgstr "Il venditore."
 
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/termination.html
@@ -11679,6 +11928,15 @@ msgstr ""
 "Questi fornitori trattano dati personali per nostro conto. Ciascuno è vincolato da un accordo sul "
 "trattamento dei dati."
 
+#: apps/compliance/templates/email/compliance/gpsr_published_incomplete/body.html
+#: apps/compliance/templates/email/compliance/gpsr_published_incomplete/body.txt
+msgid ""
+"These published products lack mandatory GPSR data. Complete their data or unpublish them in the "
+"staff admin."
+msgstr ""
+"Questi prodotti pubblicati non hanno i dati GPSR obbligatori. Completi i dati o li ritiri dalla "
+"pubblicazione nell'area di amministrazione dello staff."
+
 #: apps/manager/templates/manager/platform/amendment_settings.html
 msgid ""
 "These rules apply to every change of a paid order. They are part of the platform configuration: a "
@@ -11755,6 +12013,15 @@ msgstr ""
 "Questa modifica rimborsa denaro al cliente, quindi serve una nuova conferma con la passkey per "
 "questa modifica (una finestra passkey aperta non basta; una conferma data prima di cambiare la "
 "bozza non vale più)."
+
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.txt
+msgid ""
+"This confirms that on %(submitted_at)s you declared, with the withdrawal function of our website, "
+"that you withdraw from the contract for the following parts of order %(order_number)s:"
+msgstr ""
+"Confermiamo che il %(submitted_at)s hai dichiarato, con la funzione di recesso del nostro sito, di"
+" recedere dal contratto per le seguenti parti dell'ordine %(order_number)s:"
 
 #: apps/accounts/views.py
 msgid "This content is not available in this language."
@@ -12612,9 +12879,23 @@ msgstr "Togli la spunta per smettere di applicare la regola senza eliminarla."
 msgid "Untick it to switch the carrier off: an inactive carrier offers no rates at all."
 msgstr "Togli la spunta per spegnere il corriere: un corriere non attivo non offre nessuna tariffa."
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Until"
+msgstr "Fino al"
+
 #: apps/fitment/product_summary.py
 msgid "until %(year)s"
 msgstr "fino al %(year)s"
+
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid ""
+"Until the service ends you can keep selling and you can download your data from the Manager "
+"(Termination notice page)."
+msgstr ""
+"Fino al termine del servizio può continuare a vendere e scaricare i Suoi dati dal Manager "
+"(pagina Disdetta)."
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid ""
@@ -12765,6 +13046,8 @@ msgid "VAT number"
 msgstr "Partita IVA"
 
 #: apps/catalog/templates/catalog/includes/listing_filters.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
 #: apps/events/templates/events/_filters.html apps/events/templates/events/event_page.html
 #: apps/manager/templates/manager/layout.html
 #: apps/manager/templates/manager/platform/terminations.html
@@ -13053,9 +13336,28 @@ msgstr ""
 "Abbiamo ricevuto il tuo pagamento di %(total)s EUR per l’ordine %(order_number)s. Ogni venditore "
 "preparerà la sua parte e riceverai un messaggio quando verrà spedita."
 
+#: apps/compliance/templates/email/compliance/notice_received/subject.txt
+msgid "We received your report"
+msgstr "Abbiamo ricevuto la Sua segnalazione"
+
+#: apps/compliance/templates/email/compliance/notice_received/body.html
+#: apps/compliance/templates/email/compliance/notice_received/body.txt
+msgid "We received your report and will review it."
+msgstr "Abbiamo ricevuto la Sua segnalazione e la esamineremo."
+
 #: apps/compliance/templates/compliance/withdrawal_done.html
 msgid "We received your withdrawal from order %(number)s on %(at)s."
 msgstr "Abbiamo ricevuto il tuo recesso dall'ordine %(number)s il %(at)s."
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "We restricted your content or account. This is the statement of reasons."
+msgstr "Abbiamo limitato i Suoi contenuti o il Suo account. Questa è la motivazione."
+
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+msgid "We reviewed your report and reached a decision."
+msgstr "Abbiamo esaminato la Sua segnalazione e preso una decisione."
 
 #: apps/themes/styleguide.py
 msgid "We send the order confirmation here."
@@ -13091,6 +13393,20 @@ msgid ""
 msgstr ""
 "Usiamo il Suo nome e la Sua email solo per gestire questa candidatura e, se verrà accettata, il "
 "Suo account venditore. Una candidatura che nessuno conferma viene eliminata dopo pochi giorni."
+
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid ""
+"We will end the service of %(vendor_name)s on the platform. This email is the notice of "
+"termination and the statement of reasons."
+msgstr ""
+"Porremo fine al servizio di %(vendor_name)s sulla piattaforma. Questa email è la comunicazione di "
+"disdetta e la motivazione."
+
+#: apps/compliance/templates/email/compliance/termination_withdrawn/body.html
+#: apps/compliance/templates/email/compliance/termination_withdrawn/body.txt
+msgid "We withdrew the notice of termination of %(vendor_name)s. Your service goes on."
+msgstr "Abbiamo ritirato la disdetta di %(vendor_name)s. Il Suo servizio prosegue."
 
 #: apps/manager/event_block_forms.py apps/manager/media.py
 msgid "Web address"
@@ -13866,6 +14182,10 @@ msgstr "Ritira il preavviso"
 msgid "Withdrawal"
 msgstr "Recesso"
 
+#: apps/compliance/templates/email/compliance/withdrawal_vendor_notice/subject.txt
+msgid "Withdrawal from order %(order_number)s"
+msgstr "Recesso dall'ordine %(order_number)s"
+
 #: apps/compliance/templates/compliance/consumer_information.html
 msgid "Withdrawal information"
 msgstr "Informazioni sul recesso"
@@ -13934,6 +14254,8 @@ msgstr ""
 msgid "Written in the admin"
 msgstr "Scritto nell'area di amministrazione"
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Yes"
 msgstr "Sì"
@@ -14424,6 +14746,11 @@ msgstr ""
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."
 msgstr "Il tuo negozio non è ancora attivo, quindi gli eventi non si possono modificare."
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Your storefront is suspended"
+msgstr "La Sua vetrina è sospesa"
 
 #: apps/manager/forms.py
 msgid ""
