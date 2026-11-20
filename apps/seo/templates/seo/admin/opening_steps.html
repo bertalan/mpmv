@@ -1,0 +1,10 @@
+{% load i18n %}
+{% if steps %}
+  <div class="help-block help-warning" role="status">
+    <p><strong>{% translate "Before opening the platform" %}</strong></p>
+    <p>{% translate "These steps are still open. This reminder disappears when search engine indexing is on and every step is done." %}</p>
+    <ul>
+      {% for step in steps %}<li>{{ step }}</li>{% endfor %}
+    </ul>
+  </div>
+{% endif %}

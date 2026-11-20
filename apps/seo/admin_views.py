@@ -99,6 +99,7 @@ def seo_settings(request: HttpRequest) -> HttpResponse:
             "header_icon": "search",
             "form": form,
             "floor": floor,
+            "opening_steps": services.opening_checklist(),
             "submit_label": _("Save"),
         },
     )

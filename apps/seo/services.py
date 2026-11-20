@@ -24,6 +24,7 @@ from django.http import HttpRequest
 from django.utils import timezone
 from wagtail.models import Site
 
+from apps.cms import services as cms_services
 from apps.core.audit import AuditContext, user_context
 from apps.core.changeset import ChangeSet
 from apps.core.indexing import is_noindex_forced
@@ -185,3 +186,13 @@ def golive_indexing_messages(languages: Any = None) -> list[str]:
                 "engines would get an insecure site. Set an https address in Settings > Sites."
             )
     return messages
+
+
+def opening_checklist() -> list[str]:
+    """The steps still open before the platform opens to the public (SEO.8 2/2): every go-live
+    problem (`golive_readiness`: legal pages, DSA and P2B contacts, and the indexing and site
+    address lines above). Empty under the environment floor (STAGE, demo), where none of them is
+    expected, and once everything is done: the reminder then disappears."""
+    if is_noindex_forced():
+        return []
+    return list(cms_services.golive_problems())

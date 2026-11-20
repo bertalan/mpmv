@@ -6,6 +6,7 @@
       <p>{% translate "Indexing is forced off by the server (MPMV_FORCE_NOINDEX or demo mode). Every page is noindex and this switch cannot be turned on here." %}</p>
     </div>
   {% endif %}
+  {% include "seo/admin/opening_steps.html" with steps=opening_steps %}
   {% if form.non_field_errors %}
     <div class="messages" role="alert">
       <ul>
