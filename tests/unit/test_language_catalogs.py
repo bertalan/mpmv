@@ -492,7 +492,6 @@ EXCLUDED = {
     "themes/base/templates/styleguide.html": "developer style guide, not shown to customers",
     "themes/ride/templates/styleguide": "developer style guide, not shown to customers",
     # Email templates: their own scope (one language per recipient), I18N.20 part 3c.
-    "apps/compliance/templates/email/": "email templates, own scope, I18N.20 part 3c",
 }
 _TRANSLATION_TAG = re.compile(r"\{%-?\s*(?:translate|trans|blocktranslate|blocktrans)\b")
 
