@@ -349,6 +349,11 @@ EDITABLE_FIELDS = (
     "exdate_days",
     "attendance",
     "online_url",
+    "ticket_url",
+    "price",
+    "is_free",
+    "postponed",
+    "previous_start",
     "venue_name",
     "street",
     "postcode",
@@ -401,6 +406,11 @@ class EventInput(TypedDict, total=False):
     exdate_days: list[dt.date]
     attendance: str
     online_url: str
+    ticket_url: str
+    price: Decimal | None
+    is_free: bool
+    postponed: bool
+    previous_start: dt.datetime | None
     venue_name: str
     street: str
     postcode: str

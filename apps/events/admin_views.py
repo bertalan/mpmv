@@ -23,6 +23,7 @@ from django.utils.translation import gettext_lazy
 from wagtail.models import Site
 
 from apps.core.audit import audit_context
+from apps.core.nfc_forms import NFCFormMixin
 from apps.vendors.models import Vendor
 
 from . import services
@@ -66,7 +67,7 @@ class PolicyForm(forms.Form):
     )
 
 
-class SettingsForm(forms.Form):
+class SettingsForm(NFCFormMixin, forms.Form):
     site = forms.ModelChoiceField(
         label=gettext_lazy("Site"),
         queryset=Site.objects.all(),

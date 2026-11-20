@@ -76,6 +76,12 @@ msgid_plural "%(counter)s products"
 msgstr[0] "%(counter)s producto"
 msgstr[1] "%(counter)s productos"
 
+#: apps/compliance/templates/email/compliance/gpsr_published_incomplete/subject.txt
+msgid "%(counter)s published product fails the GPSR check"
+msgid_plural "%(counter)s published products fail the GPSR check"
+msgstr[0] "%(counter)s producto publicado no supera la comprobación GPSR"
+msgstr[1] "%(counter)s productos publicados no superan la comprobación GPSR"
+
 #: themes/base/templates/components/rating.html
 msgid "%(counter)s review"
 msgid_plural "%(counter)s reviews"
@@ -258,6 +264,15 @@ msgstr "%(vendor_name)s: pedido %(order_number)s modificado (versión %(version)
 msgid "%(vendor_name)s: platform support changed order %(order_number)s"
 msgstr "%(vendor_name)s: el soporte de la plataforma ha modificado el pedido %(order_number)s"
 
+#: apps/compliance/templates/email/compliance/withdrawal_vendor_notice/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_vendor_notice/body.txt
+msgid ""
+"%(vendor_name)s: the buyer of order %(order_number)s declared on %(submitted_at)s that they "
+"withdraw from the contract for your part of the order (reference %(reference)s)."
+msgstr ""
+"%(vendor_name)s: el comprador del pedido %(order_number)s declaró el %(submitted_at)s que desiste "
+"del contrato respecto de su parte del pedido (referencia %(reference)s)."
+
 #: apps/catalog/templates/email/catalog/brand_rejected/body.html
 #: apps/catalog/templates/email/catalog/brand_rejected/body.txt
 msgid ""
@@ -355,6 +370,13 @@ msgid "A clear, short answer. It opens when the visitor clicks the question. Req
 msgstr ""
 "Una respuesta clara y breve. Se abre cuando el visitante hace clic en la pregunta. Obligatorio."
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "A court"
+msgstr "Un tribunal"
+
 #: apps/ingest/models.py
 msgid ""
 "A dry run only shows what would change. A run that writes is possible only if the source allows "
@@ -420,6 +442,19 @@ msgstr ""
 msgid "A fingerprint of the data. The same data is stored once per item."
 msgstr "Una huella digital de los datos. Los mismos datos se guardan una sola vez por artículo."
 
+#: apps/manager/event_forms.py
+msgid "A free event has no price: leave it empty."
+msgstr "Un evento gratuito no tiene precio: deja el campo vacío."
+
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
+msgid ""
+"A GPSR safety case is past its deadline and still open. Act on it now and record what was done in "
+"the staff admin."
+msgstr ""
+"Un caso de seguridad GPSR ha superado su plazo y sigue abierto. Actúe ahora y registre lo que se "
+"hizo en el panel de administración."
+
 #: apps/manager/event_block_forms.py
 msgid "A grid, or one row that scrolls sideways."
 msgstr "Una cuadrícula, o una sola fila que se desplaza lateralmente."
@@ -437,6 +472,11 @@ msgstr "un precio más alto requiere la aceptación del cliente"
 #: apps/orders/amendment_engine.py
 msgid "a higher quantity needs the customer's acceptance"
 msgstr "una cantidad mayor requiere la aceptación del cliente"
+
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "a legal or regulatory obligation"
+msgstr "una obligación legal o reglamentaria"
 
 #: apps/orders/amendment_engine.py
 msgid "A line needs at least one unit; remove the line instead."
@@ -969,6 +1009,11 @@ msgstr "Intervenir en el contenido"
 msgid "Action on the selected rows"
 msgstr "Acción sobre las filas seleccionadas"
 
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+msgid "Action taken"
+msgstr "Medida adoptada"
+
 #: apps/manager/templates/manager/shop/events.html
 msgid "Actions"
 msgstr "Acciones"
@@ -1371,6 +1416,11 @@ msgid_plural "And %(counter)s more."
 msgstr[0] "Y %(counter)s más."
 msgstr[1] "Y %(counter)s más."
 
+#: apps/compliance/templates/email/compliance/gpsr_published_incomplete/body.html
+#: apps/compliance/templates/email/compliance/gpsr_published_incomplete/body.txt
+msgid "And %(more)s more."
+msgstr "Y %(more)s más."
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Anonymous"
 msgstr "Anónimo"
@@ -1437,7 +1487,7 @@ msgstr "Aplicar filtros"
 #: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Apply now"
-msgstr "Solicita ahora"
+msgstr "Solicite ahora"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Apply the change"
@@ -1544,6 +1594,21 @@ msgstr "Autor"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Authorities told: %(authority)s, %(at)s."
 msgstr "Autoridades informadas: %(authority)s, %(at)s."
+
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
+msgid "Authority"
+msgstr "Autoridad"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Automated means used to decide"
+msgstr "Medios automatizados utilizados para decidir"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Automated means used to detect the content"
+msgstr "Medios automatizados utilizados para detectar el contenido"
 
 #: apps/cms/blocks.py
 msgid ""
@@ -1678,6 +1743,11 @@ msgstr "Saldo"
 msgid "Balance (EUR)"
 msgstr "Saldo (EUR)"
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Based on a notice"
+msgstr "Basada en una notificación"
+
 #: apps/compliance/templates/compliance/includes/product_safety.html
 msgid "Batch or serial number"
 msgstr "Lote o número de serie"
@@ -1690,6 +1760,10 @@ msgstr "Antes"
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Before and after"
 msgstr "Antes y después"
+
+#: apps/seo/templates/seo/admin/opening_steps.html
+msgid "Before opening the platform"
+msgstr "Antes de abrir la plataforma"
 
 #: apps/orders/customer_views.py
 msgid "Being prepared"
@@ -1933,6 +2007,11 @@ msgid ""
 msgstr ""
 "Carritos preparados para un cliente a partir de uno de sus pedidos, a la espera de que el cliente "
 "abra el enlace. Prepare uno nuevo desde la página del pedido en Cambios de pedidos."
+
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
+msgid "Case"
+msgstr "Caso"
 
 #: apps/seo/site_links.py
 msgid "Catalogue: %(taxonomy)s"
@@ -2744,6 +2823,11 @@ msgstr "Cargos"
 msgid "Decided"
 msgstr "Decidido"
 
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+msgid "Decision"
+msgstr "Decisión"
+
 #: apps/manager/fitment_shop_forms.py apps/manager/fitment_shop_views.py
 msgid "Declaration"
 msgstr "Declaración"
@@ -2756,6 +2840,14 @@ msgstr "Declaración obligatoria para publicar"
 #: themes/ride/templates/components/quantity_stepper.html
 msgid "Decrease quantity"
 msgstr "Disminuir la cantidad"
+
+#: apps/seo/admin_views.py
+msgid "Default sharing image"
+msgstr "Imagen para compartir por defecto"
+
+#: apps/seo/models.py
+msgid "default sharing image"
+msgstr "imagen para compartir por defecto"
 
 #: apps/cms/models.py
 msgid "Defaults to 'Apply now'."
@@ -3015,6 +3107,11 @@ msgstr "Punto de entrega"
 #: apps/manager/site_map.py apps/seo/site_links.py
 msgid "DSA points of contact"
 msgstr "Puntos de contacto DSA"
+
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
+msgid "Due on"
+msgstr "Vence el"
 
 #: apps/orders/templates/email/orders/package_cancelled/body.html
 #: apps/orders/templates/email/orders/package_cancelled/body.txt
@@ -3393,6 +3490,13 @@ msgstr ""
 msgid "Facts and circumstances"
 msgstr "Hechos y circunstancias"
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "Facts and circumstances relied on"
+msgstr "Hechos y circunstancias en los que se basa la decisión"
+
 #: apps/cms/templates/cms/vendor_landing_page.html
 #: themes/ride/templates/cms/vendor_landing_page.html
 msgid "Featured products"
@@ -3570,6 +3674,10 @@ msgstr "Campos del formulario"
 msgid "form page"
 msgstr "página de formulario"
 
+#: apps/manager/event_forms.py
+msgid "Free entry"
+msgstr "Entrada gratuita"
+
 #: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Frequently asked questions"
@@ -3733,6 +3841,10 @@ msgstr ""
 "La cuadrícula muestra los productos en filas y columnas. La fila los coloca en una sola línea que "
 "el visitante puede desplazar lateralmente."
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/shop/statements.html
 #: apps/manager/templates/manager/shop/termination.html
@@ -3769,6 +3881,8 @@ msgstr "Título"
 msgid "Height"
 msgstr "Altura"
 
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.txt
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
@@ -3788,6 +3902,8 @@ msgstr "Altura"
 msgid "Hello %(customer_name)s,"
 msgstr "Hola %(customer_name)s,"
 
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.txt
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 #: apps/orders/templates/email/orders/item_unavailable/body.html
@@ -3843,6 +3959,11 @@ msgstr "Textos de ayuda"
 #: apps/cms/templates/cms/help_guide_index.html apps/cms/templates/cms/help_guide_section.html
 msgid "Help topics"
 msgstr "Temas de ayuda"
+
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid "Hi %(customer_name)s,"
+msgstr "Hola %(customer_name)s,"
 
 #: apps/manager/event_views.py
 msgid "Hidden by the platform."
@@ -4112,6 +4233,13 @@ msgstr ""
 "Cómo se revisan los eventos de esta tienda antes de publicarse: según la regla habitual, siempre, "
 "o nunca porque confía en la tienda. Obligatorio."
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "How to challenge this decision"
+msgstr "Cómo impugnar esta decisión"
+
 #: apps/catalog/templates/catalog/includes/product_returns.html
 msgid "How to return"
 msgstr "Cómo devolver"
@@ -4244,6 +4372,11 @@ msgstr ""
 "usted para la transacción inicial, a no ser que haya dispuesto expresamente lo contrario; en todo "
 "caso, no incurrirá en ningún gasto como consecuencia del reembolso."
 
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "illegal content"
+msgstr "contenido ilegal"
+
 #: apps/manager/event_block_forms.py
 msgid "Image"
 msgstr "Imagen"
@@ -4353,6 +4486,13 @@ msgstr "Información"
 #: apps/manager/templates/manager/shop/link_dialog.html
 msgid "Insert link"
 msgstr "Insertar enlace"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "Internal complaint (DSA article 20)"
+msgstr "Reclamación interna (artículo 20 de la DSA)"
 
 #: apps/vendors/models.py
 msgid "Internal note on what changed in this version. Vendors do not see it. Up to 200 characters."
@@ -4640,6 +4780,10 @@ msgid ""
 msgstr ""
 "Déjelo vacío para todas las regiones, o elija UE o fuera de la UE para aplicar la regla a todos "
 "los vendedores establecidos allí."
+
+#: apps/manager/event_forms.py
+msgid "Leave it empty if you do not want to show a price."
+msgstr "Déjalo vacío si no quieres mostrar un precio."
 
 #: apps/compliance/forms.py
 msgid "Leave on the first choice unless one of these applies: it allows a shorter notice."
@@ -5158,6 +5302,8 @@ msgstr "Mes siguiente"
 msgid "Next slide"
 msgstr "Diapositiva siguiente"
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "No"
 msgstr "No"
@@ -5165,6 +5311,11 @@ msgstr "No"
 #: apps/manager/templates/manager/forbidden.html
 msgid "No access"
 msgstr "Sin acceso"
+
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+msgid "No action"
+msgstr "Ninguna medida"
 
 #: apps/cms/templates/cms/blog_author_page.html themes/ride/templates/cms/blog_author_page.html
 msgid "No articles by this author yet."
@@ -5304,6 +5455,11 @@ msgid "No version is published yet. Until you publish one, your products are sol
 msgstr ""
 "Todavía no hay ninguna versión publicada. Hasta que publique una, sus productos se venden solo "
 "bajo petición."
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "No, our own initiative"
+msgstr "No, por iniciativa propia"
 
 #: apps/manager/templates/manager/platform/staff_roles.html
 msgid "Nobody holds a platform role yet."
@@ -5501,6 +5657,13 @@ msgstr "Todavía nada."
 msgid "Notice"
 msgstr "Aviso"
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "notice"
+msgstr "notificación"
+
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/termination.html
@@ -5510,6 +5673,10 @@ msgstr "Preaviso dado el"
 #: apps/manager/termination_views.py
 msgid "Notice of termination"
 msgstr "Preaviso de baja"
+
+#: apps/compliance/templates/email/compliance/termination_notice/subject.txt
+msgid "Notice of termination of your seller account"
+msgstr "Rescisión de su cuenta de vendedor"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Notice period (days)"
@@ -5720,6 +5887,10 @@ msgstr "Solo se puede editar un borrador; este está %(state)s."
 #: apps/manager/termination_views.py
 msgid "Only a pending notice can be withdrawn."
 msgstr "Solo se puede retirar un preaviso en curso."
+
+#: apps/manager/event_forms.py
+msgid "Only a postponed event has a previous start."
+msgstr "Solo un evento aplazado tiene un inicio anterior."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -6049,6 +6220,10 @@ msgstr "Pedido %(order_number)s: una parte de tu pedido se ha cancelado"
 msgid "Order %(order_number)s: the rest of your order was cancelled, full refund"
 msgstr "Pedido %(order_number)s: se ha cancelado el resto de tu pedido, reembolso íntegro"
 
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/subject.txt
+msgid "Order %(order_number)s: we received your withdrawal"
+msgstr "Pedido %(order_number)s: hemos recibido tu desistimiento"
+
 #: apps/orders/templates/email/orders/amendment_applied/subject.txt
 msgid "Order %(order_number)s: your order from %(vendor_name)s was changed"
 msgstr "Pedido %(order_number)s: tu pedido con %(vendor_name)s ha sido modificado"
@@ -6207,6 +6382,10 @@ msgstr "Otras formas en que el proveedor escribe el mismo término, como lista J
 msgid "Other ways to withdraw"
 msgstr "Otras formas de desistir"
 
+#: apps/compliance/templates/email/compliance/notice_decision/subject.txt
+msgid "Our decision on your report"
+msgstr "Nuestra decisión sobre su notificación"
+
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 msgid ""
@@ -6238,6 +6417,13 @@ msgstr "agotado"
 msgid "Out of stock"
 msgstr "Agotado"
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "Out-of-court dispute settlement (DSA article 21)"
+msgstr "Resolución extrajudicial de litigios (artículo 21 de la DSA)"
+
 #: apps/manager/product_views.py
 msgid "outdated"
 msgstr "desactualizada"
@@ -6245,6 +6431,10 @@ msgstr "desactualizada"
 #: apps/manager/product_views.py
 msgid "Outdated"
 msgstr "Desactualizada"
+
+#: apps/compliance/templates/email/compliance/safety_case_overdue/subject.txt
+msgid "Overdue GPSR safety case: %(kind)s %(reference)s"
+msgstr "Caso de seguridad GPSR vencido: %(kind)s %(reference)s"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Owner"
@@ -6728,6 +6918,10 @@ msgstr "Posición"
 msgid "Postcode"
 msgstr "Código postal"
 
+#: apps/manager/event_forms.py
+msgid "Postponed"
+msgstr "Aplazado"
+
 #: apps/seo/providers.py
 msgid "Preferences"
 msgstr "Preferencias"
@@ -6831,6 +7025,10 @@ msgstr "Mes anterior"
 msgid "Previous slide"
 msgstr "Diapositiva anterior"
 
+#: apps/manager/event_forms.py
+msgid "Previous start"
+msgstr "Inicio anterior"
+
 #: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "Previous versions"
 msgstr "Versiones anteriores"
@@ -6921,6 +7119,11 @@ msgstr ""
 #: apps/compliance/templates/compliance/includes/product_safety.html
 msgid "Product safety"
 msgstr "Seguridad del producto"
+
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
+msgid "Product SKU"
+msgstr "SKU del producto"
 
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: apps/cms/templates/cms/term_landing_page.html apps/manager/event_block_forms.py
@@ -7107,6 +7310,10 @@ msgid "Readiness probe"
 msgstr "Comprobación de disponibilidad"
 
 #: apps/compliance/templates/compliance/privacy_requests.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+#: apps/compliance/templates/email/compliance/termination_withdrawn/body.html
+#: apps/compliance/templates/email/compliance/termination_withdrawn/body.txt
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt apps/manager/fitment_forms.py
 #: apps/manager/forms.py apps/manager/templates/email/manager/role_self_assigned/body.html
@@ -7148,6 +7355,11 @@ msgstr "Motivo: «%(reason)s»"
 #: apps/manager/templates/manager/platform/notices.html
 msgid "Received"
 msgstr "Recibido"
+
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
+msgid "Received on"
+msgstr "Recibido el"
 
 #: apps/orders/amendments.py
 msgid ""
@@ -7195,6 +7407,16 @@ msgid "Recovery codes"
 msgstr "Códigos de recuperación"
 
 #: apps/compliance/templates/compliance/notice_received.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+#: apps/compliance/templates/email/compliance/notice_received/body.html
+#: apps/compliance/templates/email/compliance/notice_received/body.txt
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+#: apps/compliance/templates/email/compliance/termination_withdrawn/body.html
+#: apps/compliance/templates/email/compliance/termination_withdrawn/body.txt
 #: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/_money_table.html
 #: apps/manager/templates/manager/shop/money_statement.html
@@ -7203,6 +7425,8 @@ msgid "Reference"
 msgstr "Referencia"
 
 #: apps/compliance/templates/compliance/withdrawal_done.html
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.txt
 msgid "reference"
 msgstr "referencia"
 
@@ -7332,6 +7556,11 @@ msgstr "Renombrar (el nombre anterior pasa a ser un alias)"
 msgid "Repeat customers"
 msgstr "Clientes recurrentes"
 
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid "repeated infringements of the platform terms"
+msgstr "infracciones reiteradas de las condiciones de la plataforma"
+
 #: apps/manager/event_forms.py
 msgid "Repeats"
 msgstr "Se repite"
@@ -7364,6 +7593,13 @@ msgstr "Denunciar este evento"
 #: apps/manager/templates/manager/platform/notices.html
 msgid "Reported"
 msgstr "Denunciado"
+
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+#: apps/compliance/templates/email/compliance/notice_received/body.html
+#: apps/compliance/templates/email/compliance/notice_received/body.txt
+msgid "Reported location"
+msgstr "Ubicación notificada"
 
 #: apps/cms/models.py
 msgid "Repository file"
@@ -7416,6 +7652,11 @@ msgstr "Resto del paquete cancelado a petición suya"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Restrict and send the statement of reasons"
 msgstr "Restringir y enviar la exposición de motivos"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Restriction"
+msgstr "Restricción"
 
 #: themes/base/templates/components/launch_countdown.html
 #: themes/ride/templates/components/launch_countdown.html
@@ -7680,6 +7921,11 @@ msgid "Scan this QR code with your authenticator app, then enter the 6-digit cod
 msgstr ""
 "Escanee este código QR con su app de autenticación y después introduzca el código de 6 dígitos que"
 " muestra."
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Scope"
+msgstr "Alcance"
 
 #: apps/cms/models.py
 msgid "Screen (route name)"
@@ -8030,6 +8276,8 @@ msgstr "Tiendas"
 msgid "Short answers to the questions customers ask most. Pick a topic."
 msgstr "Respuestas breves a las preguntas más frecuentes de los clientes. Elige un tema."
 
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Shorter notice because"
@@ -8117,6 +8365,14 @@ msgstr ""
 #: apps/events/admin_views.py
 msgid "Shown to the vendor and kept in the audit log."
 msgstr "Se muestra al vendedor y se conserva en el registro de auditoría."
+
+#: apps/seo/admin_views.py apps/seo/models.py
+msgid ""
+"Shown when a page is shared on social networks and the page has no picture of its own. If you "
+"leave it empty, the platform logo is used."
+msgstr ""
+"Se muestra cuando una página se comparte en redes sociales y la página no tiene imagen propia. Si "
+"deja el campo vacío, se usa el logotipo de la plataforma."
 
 #: apps/seo/providers.py
 msgid "Shows us, in aggregate, which pages are used so we can improve the shop."
@@ -8392,6 +8648,10 @@ msgstr "Exposición de motivos del %(date)s"
 msgid "Statement of %(vendor)s from %(first)s to %(last)s."
 msgstr "Extracto de %(vendor)s del %(first)s al %(last)s."
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/subject.txt
+msgid "Statement of reasons for a restriction on your content"
+msgstr "Exposición de motivos de una restricción de su contenido"
+
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Statements of reasons"
@@ -8625,7 +8885,7 @@ msgstr "Gracias. Hemos recibido tu mensaje."
 
 #: apps/compliance/templates/compliance/notice_received.html
 msgid "Thank you. We received your report and will review it."
-msgstr "Gracias. Hemos recibido tu notificación y la revisaremos."
+msgstr "Gracias. Hemos recibido su notificación y la revisaremos."
 
 #: apps/cms/forms_pages.py
 msgid "thank-you text"
@@ -9031,6 +9291,21 @@ msgstr "El consumidor"
 #: apps/manager/notice_views.py
 msgid "The content could not be restricted: check the notice status and target."
 msgstr "No se ha podido restringir el contenido: compruebe el estado y el objeto del aviso."
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "The content is illegal"
+msgstr "El contenido es ilegal"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "The content is incompatible with the platform terms"
+msgstr "El contenido es incompatible con las condiciones de la plataforma"
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "The content is removed or disabled"
+msgstr "El contenido se elimina o se inhabilita"
 
 #: apps/manager/notice_views.py
 msgid "The content is restricted and the vendor is told."
@@ -10243,6 +10518,10 @@ msgstr "El aviso está en revisión."
 msgid "The notice is withdrawn and the vendor is told."
 msgstr "El preaviso se ha retirado y se informa al vendedor."
 
+#: apps/compliance/templates/email/compliance/termination_withdrawn/subject.txt
+msgid "The notice of termination of your seller account is withdrawn"
+msgstr "La rescisión de su cuenta de vendedor se ha retirado"
+
 #: apps/manager/notice_views.py
 msgid "The notification to the authorities is recorded."
 msgstr "La comunicación a las autoridades queda registrada."
@@ -10524,6 +10803,14 @@ msgstr ""
 "La imagen que se muestra cuando quien compra elige esta versión. Elige una de las imágenes de este"
 " producto. Déjalo vacío para mantener la galería del producto."
 
+#: apps/cms/models.py
+msgid ""
+"The picture shown when this page is shared on social networks. If you leave it empty, the main "
+"image of the page, the site default or the logo is used."
+msgstr ""
+"La imagen que se muestra cuando esta página se comparte en redes sociales. Si deja el campo vacío,"
+" se usa la imagen principal de la página, la imagen por defecto del sitio o el logotipo."
+
 #: apps/ingest/models.py
 msgid ""
 "The plain value this term stands for, for example a colour name. Use it when there is no catalogue"
@@ -10648,6 +10935,14 @@ msgid ""
 msgstr ""
 "El precio en euros, sin IVA, por ejemplo 19,90. Es necesario para vender el producto: con la "
 "modalidad Compra, se rechaza un precio vacío. No puede ser 0,00: déjelo vacío."
+
+#: apps/events/models.py
+msgid ""
+"The price of a ticket in euro. If you leave it empty, no price is shown. For free entry, tick "
+"'free entry' instead."
+msgstr ""
+"El precio de una entrada en euros. Si lo dejas vacío, no se muestra ningún precio. Para entrada "
+"gratuita, marca en cambio «Entrada gratuita»."
 
 #: apps/orders/templates/email/orders/staff_draft_link/body.html
 #: apps/orders/templates/email/orders/staff_draft_link/body.txt
@@ -10791,6 +11086,15 @@ msgid ""
 "in."
 msgstr ""
 "La referencia de la denuncia que llevó a ocultar el evento, si la hubo. La rellena la plataforma."
+
+#: apps/compliance/templates/email/compliance/withdrawal_vendor_notice/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_vendor_notice/body.txt
+msgid ""
+"The refund and return follow your usual returns process. The withdrawal is recorded on the "
+"platform."
+msgstr ""
+"El reembolso y la devolución siguen su proceso habitual de devoluciones. El desistimiento queda "
+"registrado en la plataforma."
 
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
@@ -10969,10 +11273,20 @@ msgstr "El vendedor al que pertenece esta política de devoluciones."
 msgid "The seller will not ship it before %(when)s."
 msgstr "El vendedor no lo enviará antes del %(when)s."
 
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.txt
+msgid ""
+"The seller will tell you how to return the goods. Keep this message as proof of your withdrawal."
+msgstr ""
+"El vendedor te dirá cómo devolver la mercancía. Conserva este mensaje como prueba de tu "
+"desistimiento."
+
 #: apps/vendors/models.py
 msgid "The seller."
 msgstr "El vendedor."
 
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
 #: apps/manager/templates/manager/platform/termination_detail.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/termination.html
@@ -11541,6 +11855,11 @@ msgstr ""
 msgid "The verification failed. Please reload the page and try again."
 msgstr "La verificación no se ha completado. Vuelve a cargar la página e inténtalo de nuevo."
 
+#: apps/compliance/views.py
+msgctxt "formal"
+msgid "The verification failed. Please reload the page and try again."
+msgstr "La verificación no se ha completado. Vuelva a cargar la página e inténtelo de nuevo."
+
 #: apps/vendors/models.py
 msgid "The version belongs to another seller."
 msgstr "La versión pertenece a otro vendedor."
@@ -11765,6 +12084,15 @@ msgstr ""
 "Estos proveedores tratan datos personales por cuenta nuestra. Cada uno está vinculado por un "
 "contrato de encargado del tratamiento."
 
+#: apps/compliance/templates/email/compliance/gpsr_published_incomplete/body.html
+#: apps/compliance/templates/email/compliance/gpsr_published_incomplete/body.txt
+msgid ""
+"These published products lack mandatory GPSR data. Complete their data or unpublish them in the "
+"staff admin."
+msgstr ""
+"A estos productos publicados les faltan los datos GPSR obligatorios. Complete sus datos o anule su"
+" publicación en el panel de administración."
+
 #: apps/manager/templates/manager/platform/amendment_settings.html
 msgid ""
 "These rules apply to every change of a paid order. They are part of the platform configuration: a "
@@ -11772,6 +12100,14 @@ msgid ""
 msgstr ""
 "Estas reglas se aplican a cada cambio de un pedido pagado. Forman parte de la configuración de la "
 "plataforma: un cambio entra en vigor como una nueva versión de la configuración."
+
+#: apps/seo/templates/seo/admin/opening_steps.html
+msgid ""
+"These steps are still open. This reminder disappears when search engine indexing is on and every "
+"step is done."
+msgstr ""
+"Estos pasos siguen pendientes. Este recordatorio desaparece cuando la indexación en los motores de"
+" búsqueda está activada y cada paso está completado."
 
 #: apps/manager/sales_terms_views.py
 msgid ""
@@ -11839,6 +12175,15 @@ msgstr ""
 "Este cambio reembolsa dinero al cliente y por ello necesita una nueva confirmación con passkey "
 "para esta modificación (una ventana de passkey abierta no la cubre; una confirmación dada antes de"
 " editar el borrador ya no cuenta)."
+
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.html
+#: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.txt
+msgid ""
+"This confirms that on %(submitted_at)s you declared, with the withdrawal function of our website, "
+"that you withdraw from the contract for the following parts of order %(order_number)s:"
+msgstr ""
+"Confirmamos que el %(submitted_at)s declaraste, con la función de desistimiento de nuestro sitio "
+"web, que desistes del contrato respecto de las siguientes partes del pedido %(order_number)s:"
 
 #: apps/accounts/views.py
 msgid "This content is not available in this language."
@@ -12288,6 +12633,10 @@ msgstr ""
 "Márquelo para señalar la versión principal del producto. Solo una versión de un producto puede ser"
 " la predeterminada."
 
+#: apps/events/models.py apps/manager/event_forms.py
+msgid "Tick it when entry costs nothing. Leave the price empty."
+msgstr "Márcalo cuando la entrada no cueste nada. Deja el precio vacío."
+
 #: apps/core/models.py
 msgid "Tick it when images under this licence must show a credit."
 msgstr "Márquelo cuando las imágenes con esta licencia deban mostrar un crédito."
@@ -12303,6 +12652,18 @@ msgstr ""
 msgid "Tick it when images under this licence need the web address they come from."
 msgstr ""
 "Márquelo cuando las imágenes con esta licencia requieran la dirección web de la que proceden."
+
+#: apps/events/models.py
+msgid ""
+"Tick it when the event is moved to another date. Change the date above to the new one and give the"
+" old start below. A cancelled event stays cancelled."
+msgstr ""
+"Márcalo cuando el evento se traslade a otra fecha. Cambia arriba la fecha por la nueva e indica "
+"abajo el inicio anterior. Un evento cancelado sigue cancelado."
+
+#: apps/manager/event_forms.py
+msgid "Tick it when the event is moved: change the date above to the new one."
+msgstr "Márcalo cuando el evento se aplace: cambia arriba la fecha por la nueva."
 
 #: apps/manager/amendment_forms.py
 msgid ""
@@ -12352,6 +12713,18 @@ msgid ""
 msgstr ""
 "Marcado: la función está activada para este vendedor. Sin marcar: está desactivada, sea cual sea "
 "el ajuste de la plataforma. Un interruptor de emergencia aquí solo se puede desactivar."
+
+#: apps/manager/event_forms.py
+msgid "Ticket link"
+msgstr "Enlace de entradas"
+
+#: apps/manager/event_forms.py
+msgid "Ticket price (EUR)"
+msgstr "Precio de la entrada (EUR)"
+
+#: apps/manager/event_forms.py
+msgid "Tickets and changes"
+msgstr "Entradas y cambios"
 
 #: themes/base/templates/components/launch_countdown.html
 #: themes/ride/templates/components/launch_countdown.html
@@ -12422,6 +12795,15 @@ msgstr ""
 " decisión de desistir del contrato a través de una declaración inequívoca (por ejemplo, una carta "
 "enviada por correo postal o un correo electrónico). Puede utilizar el modelo de formulario de "
 "desistimiento que figura más abajo, aunque su uso es voluntario."
+
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid ""
+"To keep a saved item, sign in and use it in your garage before that date. Otherwise it is deleted."
+" You can also delete it yourself at any time."
+msgstr ""
+"Para conservar un elemento guardado, inicia sesión y úsalo en tu garaje antes de esa fecha. Si no,"
+" se elimina. También puedes eliminarlo tú mismo en cualquier momento."
 
 #: apps/shipping/models.py
 msgid ""
@@ -12700,9 +13082,23 @@ msgid "Untick it to switch the carrier off: an inactive carrier offers no rates 
 msgstr ""
 "Desmárquelo para desactivar el transportista: un transportista inactivo no ofrece ninguna tarifa."
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Until"
+msgstr "Hasta"
+
 #: apps/fitment/product_summary.py
 msgid "until %(year)s"
 msgstr "hasta %(year)s"
+
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid ""
+"Until the service ends you can keep selling and you can download your data from the Manager "
+"(Termination notice page)."
+msgstr ""
+"Hasta que termine el servicio puede seguir vendiendo y descargar sus datos desde el Manager "
+"(página Rescisión)."
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid ""
@@ -12853,6 +13249,8 @@ msgid "VAT number"
 msgstr "Número de IVA"
 
 #: apps/catalog/templates/catalog/includes/listing_filters.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
+#: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
 #: apps/events/templates/events/_filters.html apps/events/templates/events/event_page.html
 #: apps/manager/templates/manager/layout.html
 #: apps/manager/templates/manager/platform/terminations.html
@@ -13141,9 +13539,28 @@ msgstr ""
 "Hemos recibido tu pago de %(total)s EUR por el pedido %(order_number)s. Cada vendedor preparará su"
 " parte y recibirás un mensaje cuando se envíe."
 
+#: apps/compliance/templates/email/compliance/notice_received/subject.txt
+msgid "We received your report"
+msgstr "Hemos recibido su notificación"
+
+#: apps/compliance/templates/email/compliance/notice_received/body.html
+#: apps/compliance/templates/email/compliance/notice_received/body.txt
+msgid "We received your report and will review it."
+msgstr "Hemos recibido su notificación y la revisaremos."
+
 #: apps/compliance/templates/compliance/withdrawal_done.html
 msgid "We received your withdrawal from order %(number)s on %(at)s."
 msgstr "Hemos recibido tu desistimiento del pedido %(number)s el %(at)s."
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "We restricted your content or account. This is the statement of reasons."
+msgstr "Hemos restringido su contenido o su cuenta. Esta es la exposición de motivos."
+
+#: apps/compliance/templates/email/compliance/notice_decision/body.html
+#: apps/compliance/templates/email/compliance/notice_decision/body.txt
+msgid "We reviewed your report and reached a decision."
+msgstr "Hemos revisado su notificación y hemos tomado una decisión."
 
 #: apps/themes/styleguide.py
 msgid "We send the order confirmation here."
@@ -13181,6 +13598,20 @@ msgid ""
 msgstr ""
 "Usamos su nombre y su correo electrónico solo para tramitar esta solicitud y, si es aceptada, su "
 "cuenta de vendedor. Una solicitud que nadie confirma se elimina pasados unos días."
+
+#: apps/compliance/templates/email/compliance/termination_notice/body.html
+#: apps/compliance/templates/email/compliance/termination_notice/body.txt
+msgid ""
+"We will end the service of %(vendor_name)s on the platform. This email is the notice of "
+"termination and the statement of reasons."
+msgstr ""
+"Pondremos fin al servicio de %(vendor_name)s en la plataforma. Este correo es la notificación de "
+"rescisión y la exposición de motivos."
+
+#: apps/compliance/templates/email/compliance/termination_withdrawn/body.html
+#: apps/compliance/templates/email/compliance/termination_withdrawn/body.txt
+msgid "We withdrew the notice of termination of %(vendor_name)s. Your service goes on."
+msgstr "Hemos retirado la rescisión de %(vendor_name)s. Su servicio continúa."
 
 #: apps/manager/event_block_forms.py apps/manager/media.py
 msgid "Web address"
@@ -13467,6 +13898,18 @@ msgid ""
 msgstr ""
 "Cuándo se canceló el evento. Vacío para un evento que sigue adelante. Lo rellena la plataforma."
 
+#: apps/events/models.py
+msgid ""
+"When the event was first planned to start. Only for a postponed event; leave it empty if you do "
+"not want to show it."
+msgstr ""
+"Cuándo estaba previsto originalmente que empezara el evento. Solo para un evento aplazado; déjalo "
+"vacío si no quieres mostrarlo."
+
+#: apps/manager/event_forms.py
+msgid "When the event was first planned, in the event's time zone. Optional."
+msgstr "Cuándo estaba previsto el evento originalmente, en la zona horaria del evento. Opcional."
+
 #: apps/cms/blocks.py
 msgid ""
 "When the launch happens, in the platform's local time. Example: 2026-12-01 09:00. Required: the "
@@ -13576,6 +14019,18 @@ msgid ""
 msgstr ""
 "Adónde llegan los avisos de cumplimiento normativo, por ejemplo un caso de seguridad atrasado. "
 "Déjelo vacío para enviarlos a la dirección de asistencia."
+
+#: apps/events/models.py
+msgid ""
+"Where people get tickets or register, starting with https://. If you leave it empty, no ticket "
+"link is shown."
+msgstr ""
+"Dónde conseguir entradas o inscribirse, empezando por https://. Si lo dejas vacío, no se muestra "
+"ningún enlace."
+
+#: apps/manager/event_forms.py
+msgid "Where people get tickets or register, starting with https://. Optional."
+msgstr "Dónde conseguir entradas o inscribirse, empezando por https://. Opcional."
 
 #: apps/manager/event_forms.py
 msgid "Where people join an online event, starting with https://."
@@ -13955,6 +14410,10 @@ msgstr "Retirar el preaviso"
 msgid "Withdrawal"
 msgstr "Desistimiento"
 
+#: apps/compliance/templates/email/compliance/withdrawal_vendor_notice/subject.txt
+msgid "Withdrawal from order %(order_number)s"
+msgstr "Desistimiento del pedido %(order_number)s"
+
 #: apps/compliance/templates/compliance/consumer_information.html
 msgid "Withdrawal information"
 msgstr "Información sobre el desistimiento"
@@ -14023,6 +14482,8 @@ msgstr ""
 msgid "Written in the admin"
 msgstr "Escrito en la administración"
 
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Yes"
 msgstr "Sí"
@@ -14164,6 +14625,15 @@ msgid "You have not set a policy yet. The standard one applies: the shop pays th
 msgstr ""
 "Todavía no ha definido una política. Se aplica la estándar: la tienda paga el envío de la "
 "devolución."
+
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid ""
+"You have not used the items saved in your account garage for almost two years. To keep the data we"
+" hold about you small, we delete them on %(delete_on)s."
+msgstr ""
+"Hace casi dos años que no usas los elementos guardados en el garaje de tu cuenta. Para limitar los"
+" datos que conservamos sobre ti, los eliminamos el %(delete_on)s."
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
@@ -14488,6 +14958,10 @@ msgstr "Su rol requiere un segundo factor antes de poder continuar."
 msgid "Your sales terms are published and in force."
 msgstr "Sus condiciones de venta están publicadas y en vigor."
 
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/subject.txt
+msgid "Your saved garage items will be deleted soon"
+msgstr "Los elementos guardados en tu garaje se eliminarán pronto"
+
 #: apps/accounts/lifetimes.py
 msgid "Your session ended because it was not used for a while. Please sign in again."
 msgstr "Tu sesión ha terminado porque no se ha utilizado durante un tiempo. Inicia sesión de nuevo."
@@ -14514,6 +14988,11 @@ msgstr ""
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."
 msgstr "Su tienda todavía no está activa, por lo que no se pueden modificar los eventos."
+
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
+#: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
+msgid "Your storefront is suspended"
+msgstr "Su tienda está suspendida"
 
 #: apps/manager/forms.py
 msgid ""

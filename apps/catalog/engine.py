@@ -44,6 +44,15 @@ def effective_vendor_role(product: _HasRole) -> str:
     return ""
 
 
+RETIRED_STATUS = "retired"  # `Product.Status.RETIRED`: the page stays live, not purchasable
+
+
+def prints_hreflang(status: str) -> bool:
+    """Whether a product page prints `hreflang` alternates (and `x-default`): a retired product's
+    page stays online but advertises no language set (owner decision 2026-11-20, I18N.17)."""
+    return status != RETIRED_STATUS
+
+
 def sku_match_key(raw: str) -> str:
     """The key a vendor SKU is matched on: NFKC, trimmed, inner whitespace collapsed to one
     space, case-folded. Never raises; an empty key means an unusable SKU (`sku_errors`)."""

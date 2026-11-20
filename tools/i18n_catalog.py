@@ -56,6 +56,7 @@ EVENT_FILES = (
 )
 SCOPES = (
     "apps/manager",
+    "apps/fitment/templates/email",  # the garage inactivity notice (FIT.5 3/3)
     "apps/fitment/services.py",  # the publish gate message (FIT.18), shown to vendors and staff
     "apps/accounts",
     "apps/orders/templates",
@@ -68,6 +69,7 @@ SCOPES = (
     "apps/orders/customer_views.py",  # the customer area labels (ORD.7)
     "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
     "apps/compliance/views.py",  # withdrawal and notice errors, the form PDF 503 (I18N.20)
+    "apps/compliance/templates/email",  # the compliance emails (I18N.20 3c)
     "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)
     "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
     "apps/vendors/models.py",

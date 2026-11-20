@@ -492,7 +492,6 @@ EXCLUDED = {
     "themes/base/templates/styleguide.html": "developer style guide, not shown to customers",
     "themes/ride/templates/styleguide": "developer style guide, not shown to customers",
     # Email templates: their own scope (one language per recipient), I18N.20 part 3c.
-    "apps/compliance/templates/email/": "email templates, own scope, I18N.20 part 3c",
 }
 _TRANSLATION_TAG = re.compile(r"\{%-?\s*(?:translate|trans|blocktranslate|blocktrans)\b")
 
@@ -552,7 +551,7 @@ def test_the_form_page_module_has_a_register_per_string(lang: str) -> None:
 def test_the_spanish_apply_now_is_informal_and_the_german_author_line_is_short() -> None:
     es = {e.msgid: e.msgstr for e in _po("es")}
     de = {e.msgid: e.msgstr for e in _po("de")}
-    assert es["Apply now"] == "Solicita ahora"
+    assert es["Apply now"] == "Solicite ahora"  # I18N.20: the recruitment page is formal
     assert de["No articles by this author yet."] == "Von dieser Person gibt es noch keine Artikel."
 
 
@@ -568,6 +567,11 @@ CONSUMER_LAW_MARKERS = (
 )
 
 
+def _only_in_notice_pages(entry: polib.POEntry) -> bool:
+    paths = [p for p, _l in entry.occurrences]
+    return bool(paths) and all("compliance/notice_" in p for p in paths)
+
+
 @pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
 def test_consumer_law_pages_are_translated_in_the_informal_register(lang: str) -> None:
     entries = [e for e in _po(lang) if _any_in(e, CONSUMER_LAW_MARKERS)]
@@ -575,6 +579,9 @@ def test_consumer_law_pages_are_translated_in_the_informal_register(lang: str) -
     assert {"Right of withdrawal", "Withdrawal received", "Product safety"} <= ids
     for entry in entries:
         assert _texts(entry).strip(), entry.msgid
+        # The notice-submitter pages are formal (I18N.20, owner decision 2026-11-20).
+        if _only_in_notice_pages(entry):
+            continue
         if lang in FORMAL and not _only_in_model_withdrawal(entry):
             assert not FORMAL[lang].search(_texts(entry)), entry.msgid
 
@@ -675,3 +682,59 @@ def test_german_model_withdrawal_titles_and_form_date_follow_annexes_1_and_2() -
     assert de["Date"] == "Datum"
     assert "Date of the form" not in de
     assert "Nach Kundenspezifikation" not in " ".join(de.values())
+
+
+# I18N.20 (owner decision 2026-11-20): the vendor recruitment page and the pages of a DSA notice
+# submitter are formal (Lei / Sie / vous / usted), although the notice pages are public.
+FORMAL_PUBLIC_PAGES = (
+    "cms/vendor_recruitment_page.html",
+    "compliance/notice_form.html",
+    "compliance/notice_received.html",
+)
+NOTICE_FORM_HELP = (
+    "Tell us why you think the content is illegal. Required.",
+    "Choose what you are reporting: a product, an event, a vendor shop or other content of "
+    "the site.",
+    "Your name. Required, except for a report of child sexual abuse material.",
+    "Tick the box to confirm the statement. Without it the report cannot be sent.",
+    "Thank you. We received your report and will review it.",
+    "Apply now",
+)
+
+
+def _formal_public_entries(lang: str) -> list[polib.POEntry]:
+    entries = [e for e in _po(lang) if _any_in(e, FORMAL_PUBLIC_PAGES)]
+    entries += [e for e in _po(lang) if e.msgid in NOTICE_FORM_HELP[:4] and e.msgctxt is None]
+    entries += [e for e in _po(lang) if e.msgctxt == "formal" and "verification failed" in e.msgid]
+    return entries
+
+
+@pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
+def test_recruitment_and_notice_pages_use_the_formal_register(lang: str) -> None:
+    entries = _formal_public_entries(lang)
+    assert len(entries) >= 8
+    for entry in entries:
+        assert _texts(entry).strip(), entry.msgid
+        if lang in ("de", "fr", "es"):
+            assert not INFORMAL[lang].search(_texts(entry)), (entry.msgid, _texts(entry))
+        if lang == "it":
+            assert not INFORMAL["it"].search(_texts(entry)), (entry.msgid, _texts(entry))
+    by_id = {e.msgid: e.msgstr for e in entries if e.msgctxt is None}
+    expected = {
+        "it": "Si candidi ora",
+        "de": "Jetzt bewerben",
+        "fr": "Postulez maintenant",
+        "es": "Solicite ahora",
+    }[lang]
+    assert by_id["Apply now"] == expected
+    received = by_id["Thank you. We received your report and will review it."]
+    assert {"it": "Sua", "de": "Ihre", "fr": "votre", "es": "su"}[lang] in received
+
+
+@pytest.mark.parametrize("lang", ["it", "de", "fr", "es"])
+def test_the_notice_verification_error_is_formal_and_the_withdrawal_one_is_not(lang: str) -> None:
+    entries = [e for e in _po(lang) if e.msgid.startswith("The verification failed.")]
+    by_ctx = {e.msgctxt: e.msgstr for e in entries}
+    assert set(by_ctx) == {None, "formal"}
+    if lang != "fr":  # the French source text was already formal (Veuillez)
+        assert by_ctx["formal"] != by_ctx[None]
