@@ -3914,6 +3914,10 @@ msgstr "GTIN"
 msgid "Guest"
 msgstr "Gast"
 
+#: apps/manager/staff_draft_views.py apps/orders/customer_views.py
+msgid "has no price yet"
+msgstr "hat noch keinen Preis"
+
 #: apps/manager/event_block_forms.py
 msgid "Heading"
 msgstr "Überschrift"

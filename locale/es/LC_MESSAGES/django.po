@@ -3873,6 +3873,10 @@ msgstr "GTIN"
 msgid "Guest"
 msgstr "Invitado"
 
+#: apps/manager/staff_draft_views.py apps/orders/customer_views.py
+msgid "has no price yet"
+msgstr "aún no tiene precio"
+
 #: apps/manager/event_block_forms.py
 msgid "Heading"
 msgstr "Título"

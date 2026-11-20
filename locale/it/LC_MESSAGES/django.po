@@ -3868,6 +3868,10 @@ msgstr "GTIN"
 msgid "Guest"
 msgstr "Ospite"
 
+#: apps/manager/staff_draft_views.py apps/orders/customer_views.py
+msgid "has no price yet"
+msgstr "non ha ancora un prezzo"
+
 #: apps/manager/event_block_forms.py
 msgid "Heading"
 msgstr "Titolo"

@@ -68,6 +68,13 @@ def sellable(**fields: Any) -> Product:
     return ProductFactory.create(**values)
 
 
+@pytest.fixture(autouse=True)
+def _consumer_prices(request: pytest.FixtureRequest) -> None:
+    """Items in a cart need a consumer price (TAX.12, #757): the database tests get one."""
+    if request.node.get_closest_marker("django_db"):
+        request.getfixturevalue("consumer_prices")
+
+
 def guest_cart(key: str = "attacker-session") -> Cart:
     return CartFactory.create(session_key=key)
 
@@ -91,7 +98,6 @@ def test_the_cart_service_takes_no_price_or_vat_from_the_caller(smuggled: str) -
 
 @pytest.mark.parametrize("smuggled", ["price", "price_net", "unit_price", "vat_rate", "total"])
 @pytest.mark.django_db
-@pytest.mark.usefixtures("consumer_prices")  # a buyable item shows a consumer price (#757)
 def test_the_add_to_cart_form_ignores_a_posted_price(client: Client, smuggled: str) -> None:
     product = sellable(price_net=Decimal("80.00"))
     response = add_post(client, product=str(product.public_id), quantity="1", **{smuggled: "0.01"})
@@ -350,7 +356,6 @@ def test_a_cart_with_lines_of_two_vendors_is_split_per_vendor_and_priced_per_lin
 
 
 @pytest.mark.django_db
-@pytest.mark.usefixtures("consumer_prices")  # a buyable item shows a consumer price (#757)
 def test_another_visitors_cart_is_never_adopted_through_the_session(client: Client) -> None:
     """A guest who adds to the cart gets a cart bound to their own session; the cart of
     another session stays untouched."""

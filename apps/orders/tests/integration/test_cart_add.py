@@ -21,8 +21,9 @@ from apps.catalog.tests.factories import (
 from apps.orders.ui import views
 from apps.vendors.tests.factories import VendorFactory
 
+pytestmark = pytest.mark.django_db
 # A buyable item shows a consumer price (TAX.12); without one it has no button (#757).
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
+priced = pytest.mark.usefixtures("consumer_prices")
 
 HX = {"HX-Request": "true"}
 
@@ -43,6 +44,7 @@ def page(client: Client) -> str:
     return client.get("/product/blue-vase/").content.decode()
 
 
+@priced
 def test_the_product_page_has_a_post_form_when_the_vendor_sells_online(client: Client) -> None:
     make_product()
     html = page(client)
@@ -59,6 +61,7 @@ def test_an_on_request_product_has_no_button(client: Client) -> None:
     assert "Add to cart" not in html
 
 
+@priced
 def test_a_plain_post_adds_and_redirects_to_the_cart(client: Client) -> None:
     product = make_product()
     response = client.post(
@@ -69,6 +72,7 @@ def test_a_plain_post_adds_and_redirects_to_the_cart(client: Client) -> None:
     assert Cart.objects.get().lines.get().quantity == 2
 
 
+@priced
 def test_htmx_gets_the_message_and_the_count(client: Client) -> None:
     product = make_product()
     response = client.post(
@@ -83,6 +87,7 @@ def test_htmx_gets_the_message_and_the_count(client: Client) -> None:
     assert 'id="live-region"' in html
 
 
+@priced
 def test_a_variant_is_chosen_by_sku(client: Client) -> None:
     product = make_product(kind=Product.Kind.VARIABLE)
     variant = VariantFactory.create(product=product, stock_qty=5)
@@ -93,6 +98,7 @@ def test_a_variant_is_chosen_by_sku(client: Client) -> None:
     assert Cart.objects.get().lines.get().variant == variant
 
 
+@priced
 def test_errors_are_shown_and_nothing_is_added(client: Client) -> None:
     product = make_product()
     response = client.post(
@@ -134,6 +140,7 @@ def test_csrf_is_enforced() -> None:
     assert strict.post(reverse("orders:cart_add"), {"product": "x"}).status_code == 403
 
 
+@priced
 def test_the_cart_budget_applies(client: Client, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(views, "CART_LIMIT", 1)
     product = make_product()
