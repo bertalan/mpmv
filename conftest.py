@@ -122,6 +122,13 @@ def _in_shard(item: pytest.Item, index: int, total: int) -> bool:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    # SEC.5: `security_slow` cases (the 100 KB ReDoS sweep) run only when `-m` names the marker
+    # (`make test-security-nightly`); the security directory would put them in `make test`.
+    if "security_slow" not in (config.option.markexpr or ""):
+        slow = [item for item in items if item.get_closest_marker("security_slow") is not None]
+        if slow:
+            config.hook.pytest_deselected(items=slow)
+            items[:] = [item for item in items if item not in slow]
     shard = _shard_selector()
     if shard is not None:
         kept = [item for item in items if _in_shard(item, *shard)]

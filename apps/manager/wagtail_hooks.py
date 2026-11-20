@@ -29,7 +29,7 @@ from apps.accounts.models import User
 from apps.cms.models import HelpEntry
 
 from . import roles
-from .role_groups import user_roles
+from .role_groups import effective_roles
 
 HELP_SECTION = "platform.moderation"
 READ_ACTIONS = frozenset({"view"})
@@ -40,7 +40,7 @@ class HelpEntryPermissionPolicy(BasePermissionPolicy):  # type: ignore[misc]  # 
     """Permissions on help entries from the matrix row of `HELP_SECTION`."""
 
     def user_has_permission(self, user: Any, action: str) -> bool:
-        return roles.allows(HELP_SECTION, user_roles(user), write=action not in READ_ACTIONS)
+        return roles.allows(HELP_SECTION, effective_roles(user), write=action not in READ_ACTIONS)
 
     def user_has_permission_for_instance(self, user: Any, action: str, instance: Any) -> bool:
         """A row that comes from a repository file (ARC.36) is read-only for everyone, the

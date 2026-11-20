@@ -196,10 +196,34 @@ msgstr "%(title)s: cantidad cambiada a %(quantity)s"
 msgid "%(unit_price)s each"
 msgstr "%(unit_price)s cada uno"
 
+#: apps/vendors/templates/email/vendors/profile_changed/subject.txt
+msgid "%(vendor_name)s changed its storefront profile"
+msgstr "%(vendor_name)s ha modificado el perfil de su tienda"
+
+#: apps/vendors/templates/email/vendors/profile_changed/body.html
+#: apps/vendors/templates/email/vendors/profile_changed/body.txt
+msgid ""
+"%(vendor_name)s changed its storefront profile (%(language)s): %(fields)s. The change is already "
+"live. Review it in the audit log; staff can revert it."
+msgstr ""
+"%(vendor_name)s ha modificado el perfil de su tienda (%(language)s): %(fields)s. El cambio ya está"
+" en línea. Revíselo en el registro de auditoría; el personal puede revertirlo."
+
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 msgid "%(vendor_name)s changed your order %(order_number)s before shipping it:"
 msgstr "%(vendor_name)s ha modificado tu pedido %(order_number)s antes de enviarlo:"
+
+#: apps/vendors/templates/email/vendors/claim_link/body.html
+#: apps/vendors/templates/email/vendors/claim_link/body.txt
+msgid ""
+"%(vendor_name)s has been set up on the platform for you. To claim it, open this link, confirm the "
+"VAT number or TIN of the business, and create your account with a password and an authenticator "
+"app."
+msgstr ""
+"%(vendor_name)s se ha configurado para usted en la plataforma. Para reclamarlo, abra este enlace, "
+"confirme el NIF o número de IVA de la empresa y cree su cuenta con una contraseña y una app de "
+"autenticación."
 
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
@@ -2245,6 +2269,14 @@ msgstr "Elegido: {name}"
 #: apps/manager/amendment_forms.py apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "City"
 msgstr "Ciudad"
+
+#: apps/vendors/templates/email/vendors/claim_link/subject.txt
+msgid "Claim %(vendor_name)s on the platform"
+msgstr "Reclame %(vendor_name)s en la plataforma"
+
+#: apps/vendors/templates/email/vendors/claim_link/body.html
+msgid "Claim the vendor"
+msgstr "Reclamar el vendedor"
 
 #: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
@@ -9835,6 +9867,15 @@ msgstr ""
 "El enlace funciona una sola vez y caduca el %(expires)s (UTC). Después nuestro equipo revisa su "
 "solicitud. Si no confirma, la solicitud se elimina pasados unos días."
 
+#: apps/vendors/templates/email/vendors/claim_link/body.html
+#: apps/vendors/templates/email/vendors/claim_link/body.txt
+msgid ""
+"The link works once and expires on %(expires)s (UTC). The platform staff review your claim before "
+"you can manage the vendor. If you did not expect this email, ignore it."
+msgstr ""
+"El enlace funciona una sola vez y caduca el %(expires)s (UTC). El personal de la plataforma revisa"
+" su solicitud antes de que pueda gestionar el vendedor. Si no esperaba este correo, ignórelo."
+
 #: apps/orders/templates/email/orders/staff_draft_link/body.html
 #: apps/orders/templates/email/orders/staff_draft_link/body.txt
 msgid "The link works once and expires on %(expires)s."
@@ -12327,17 +12368,18 @@ msgstr "Para confirmar, escriba <strong>%(word)s</strong>."
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
-"To exercise the right of withdrawal, you must inform us (name, postal address and email address: "
-"see the seller details shown at checkout, before you place the order) of your decision to withdraw"
-" from this contract by an unequivocal statement (for example a letter sent by post or an email). "
-"You may use the model withdrawal form below, but it is not obligatory."
+"To exercise the right of withdrawal, you must inform us (name, postal address, telephone number "
+"and email address: see the seller details in your order confirmation (page and email) and in the "
+"order summary at checkout) of your decision to withdraw from this contract by an unequivocal "
+"statement (for example a letter sent by post or an email). You may use the model withdrawal form "
+"below, but it is not obligatory."
 msgstr ""
-"Para ejercer el derecho de desistimiento, usted tiene que notificarnos (nombre, dirección postal y"
-" dirección de correo electrónico: véanse los datos del vendedor que se muestran al tramitar el "
-"pedido, antes de realizarlo) su decisión de desistir del contrato a través de una declaración "
-"inequívoca (por ejemplo, una carta enviada por correo postal o un correo electrónico). Puede "
-"utilizar el modelo de formulario de desistimiento que figura más abajo, aunque su uso es "
-"voluntario."
+"Para ejercer el derecho de desistimiento, usted tiene que notificarnos (nombre, dirección postal, "
+"número de teléfono y dirección de correo electrónico: véanse los datos del vendedor en su "
+"confirmación del pedido (página y correo electrónico) y en el resumen del pedido al tramitarlo) su"
+" decisión de desistir del contrato a través de una declaración inequívoca (por ejemplo, una carta "
+"enviada por correo postal o un correo electrónico). Puede utilizar el modelo de formulario de "
+"desistimiento que figura más abajo, aunque su uso es voluntario."
 
 #: apps/shipping/models.py
 msgid ""
@@ -12380,11 +12422,12 @@ msgstr "Hasta el año"
 
 #: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
 msgid ""
-"To: the seller of the order (name, postal address and email address: see the seller details shown "
-"at checkout, before you place the order)"
+"To: the seller of the order (name, postal address, telephone number and email address: see the "
+"seller details in your order confirmation (page and email) and in the order summary at checkout)"
 msgstr ""
-"Al vendedor del pedido (nombre, dirección postal y dirección de correo electrónico: véanse los "
-"datos del vendedor que se muestran al tramitar el pedido, antes de realizarlo)"
+"Al vendedor del pedido (nombre, dirección postal, número de teléfono y dirección de correo "
+"electrónico: véanse los datos del vendedor en su confirmación del pedido (página y correo "
+"electrónico) y en el resumen del pedido al tramitarlo)"
 
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/orders/customer_views.py
 msgid "Too many attempts. Please try again later."

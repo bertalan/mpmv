@@ -18,6 +18,7 @@ from typing import Any
 from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
+from apps.core.hidden_text import strip_hidden
 from apps.vendors.engine import vendor_collection_name as vendor_collection_name  # moved (D-34)
 
 # Event types (spec 15 "Page models"). There is deliberately no closure type: a vendor's
@@ -1140,7 +1141,7 @@ _ICS_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 def ics_escape(text: str) -> str:
     """TEXT values: backslash, semicolon and comma escaped, line breaks as `\\n` (§3.3.11)."""
     flat = text.replace("\r\n", "\n").replace("\r", "\n")
-    flat = _ICS_CONTROL.sub("", flat)
+    flat = strip_hidden(_ICS_CONTROL.sub("", flat))
     return flat.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
 

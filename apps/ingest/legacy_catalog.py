@@ -24,6 +24,8 @@ Input bundle (every key optional; a missing list is an empty one):
                       "short_description", "description", "seo_title", "seo_description",
                       "type": "simple|variable", "price_net", "sale_price_net", "sale_from",
                       "sale_to", "stock_qty", "stock_status", "weight_kg", "gtin", "mpn",
+                      "length_mm", "width_mm", "height_mm", "country_of_origin",
+                      "material", "colour",
                       "category_ids", "tag_ids", "brand_id", "attributes", "options",
                       "companion_sku", "upsell_skus", "commission_override_percent"}],
     }
@@ -100,6 +102,16 @@ def parse_decimal(raw: object, *, field: str, places: int = 3) -> Decimal | None
     if not value.is_finite() or value < 0:
         raise BadValue(f"{field}: {raw!r} is not a valid measure")
     return value.quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
+
+
+def parse_mm(raw: object, *, field: str) -> int | None:
+    """A CAT.22 dimension in whole millimetres, at least 1; None for empty (ING.4 follow-up)."""
+    value = parse_decimal(raw, field=field, places=0)
+    if value is None:
+        return None
+    if value < 1:
+        raise BadValue(f"{field}: {raw!r} must be at least 1 mm")
+    return int(value)
 
 
 def parse_quantity(raw: object) -> int:
