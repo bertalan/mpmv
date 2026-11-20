@@ -29,7 +29,7 @@ from apps.core.changeset import Change, ChangeSet
 from apps.core.models import AuditLog, OutboxEmail, OutboxEmailEvent
 from apps.core.services import audit_changes
 from apps.fitment import garage_profiles
-from apps.orders import engine
+from apps.orders import engine, staff_drafts
 from apps.orders import services as order_services
 from apps.orders.models import Order
 from apps.vendors.models import ContractAcceptance, SelfCertification, VendorMember
@@ -288,10 +288,11 @@ def anonymise_customer(
     """Erase a customer account (D-29, D-30). Accepted at once, never refused for open orders.
 
     Now: the login is blocked (inactive, unusable password), carts and second factors are
-    deleted, concluded orders go to `restricted_tax_only` (`reason="account_erasure"`, amounts
-    and fiscal fields untouched). When no order is open the profile is anonymised (fixed
-    placeholder email, empty name), the account's outbox rows lose their recipient and context,
-    and the request completes. With an open order the profile waits: call again later.
+    deleted, open staff-draft links expire (ORD.32), concluded orders go to
+    `restricted_tax_only` (`reason="account_erasure"`, amounts and fiscal fields untouched).
+    When no order is open the profile is anonymised (fixed placeholder email, empty name), the
+    account's outbox rows lose their recipient and context, and the request completes. With an
+    open order the profile waits: call again later.
     Idempotent: a repeat changes nothing and writes nothing. Raises `VendorLinkedUser` for an
     account tied to a vendor."""
     if _has_vendor_ties(user):
@@ -327,6 +328,8 @@ def anonymise_customer(
                         ).changes
                     )
             garage_profiles.erase_profiles(locked, own)  # FIT.5: the account garage goes too
+            # ORD.32 (#757): a staff-draft link sent before the erasure no longer opens
+            own.changes.extend(staff_drafts.expire_links_of_customer(locked, now=stamp).changes)
             Cart.objects.filter(user=locked).delete()
             ElevationGrant.objects.filter(user=locked).delete()
             for device in list(devices_for_user(locked, confirmed=None)):
