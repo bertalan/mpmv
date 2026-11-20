@@ -9,7 +9,6 @@ from typing import Any
 
 import pytest
 from django.apps import apps
-from django.conf import settings
 from django.test import Client
 from wagtail.models import Site
 
@@ -28,12 +27,11 @@ from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import language_prefix, localized, other_language
+from tests.i18n import language_prefix, localized, other_language, product_url, translated
 
 pytestmark = pytest.mark.django_db
 
 PUBLISHED = TranslationStatus.PUBLISHED
-SEGMENTS = {primary_language(): "product", other_language(): "prodotto"}
 
 
 @pytest.fixture(autouse=True)
@@ -44,8 +42,12 @@ def _site_allows_indexing() -> None:
 
 
 def path(language: str, slug: str) -> str:
-    prefix = "" if language == settings.LANGUAGE_CODE else f"/{language}"
-    return f"{prefix}/{SEGMENTS.get(language, 'product')}/{slug}/"
+    return product_url(language, slug)
+
+
+def mug_path() -> str:
+    """The page of `live()`'s product in the primary language."""
+    return path(primary_language(), f"mug-{primary_language()}")
 
 
 def live(**kwargs: Any) -> Product:
@@ -82,7 +84,7 @@ def test_a_published_product_answers_200_in_each_language(client: Client, langua
 @pytest.mark.usefixtures("consumer_prices")
 def test_the_page_links_the_vendor_and_shows_the_consumer_price(client: Client) -> None:
     product = live(price_net=Decimal("12.50"))
-    html = client.get(path(primary_language(), "mug-en")).content.decode()
+    html = client.get(mug_path()).content.decode()
     assert f'href="{localized(f"/shop/{product.vendor.slug}/")}"' in html
     assert "15.25" in html  # 12.50 + 22 % (TAX.12)
     assert "12.50" not in html
@@ -91,7 +93,7 @@ def test_the_page_links_the_vendor_and_shows_the_consumer_price(client: Client) 
 @pytest.mark.parametrize("status", [Product.Status.DRAFT])
 def test_a_draft_is_a_404(client: Client, status: str) -> None:
     live(status=status)
-    assert client.get(path(primary_language(), "mug-en")).status_code == 404
+    assert client.get(mug_path()).status_code == 404
 
 
 def test_a_hidden_translation_is_a_404(client: Client) -> None:
@@ -99,7 +101,7 @@ def test_a_hidden_translation_is_a_404(client: Client) -> None:
     product.translations.filter(language=primary_language()).update(
         status=TranslationStatus.MACHINE
     )
-    assert client.get(path(primary_language(), "mug-en")).status_code == 404
+    assert client.get(mug_path()).status_code == 404
 
 
 @pytest.mark.parametrize(
@@ -107,7 +109,7 @@ def test_a_hidden_translation_is_a_404(client: Client) -> None:
 )
 def test_a_product_of_a_vendor_that_is_not_live_is_a_404(client: Client, status: str) -> None:
     live(vendor=VendorFactory.create(status=status))
-    assert client.get(path(primary_language(), "mug-en")).status_code == 404
+    assert client.get(mug_path()).status_code == 404
 
 
 def test_an_old_slug_answers_a_301_to_the_current_one(client: Client) -> None:
@@ -115,24 +117,24 @@ def test_an_old_slug_answers_a_301_to_the_current_one(client: Client) -> None:
     SlugHistoryFactory.create(product=product, language=primary_language(), slug="old-mug")
     response = client.get(path(primary_language(), "old-mug"))
     assert response.status_code == 301
-    assert response["Location"] == path(primary_language(), "mug-en")
+    assert response["Location"] == mug_path()
 
 
 def test_another_segment_spelling_redirects_to_the_page(client: Client) -> None:
     live()
     if slugs.segment_for(slugs.PRODUCT_SEGMENTS, other_language()) == "product":
         pytest.skip("the other language spells the segment the same")
-    response = client.get(f"{language_prefix(other_language())}/product/mug-it/")
+    response = client.get(f"{language_prefix(other_language())}/product/mug-{other_language()}/")
     assert response.status_code == 301
-    assert response["Location"] == path(other_language(), "mug-it")
+    assert response["Location"] == path(other_language(), f"mug-{other_language()}")
 
 
 def test_an_on_request_product_shows_no_price(client: Client) -> None:
     live(sales_mode=Product.SalesMode.ON_REQUEST, price_net=Decimal("120.00"))
-    html = client.get(path(primary_language(), "mug-en")).content.decode()
-    assert "Price on request" in html
+    html = client.get(mug_path()).content.decode()
+    assert translated("Price on request") in html
     assert "120.00" not in html
-    assert "Add to cart" not in html
+    assert translated("Add to cart") not in html
 
 
 def test_the_default_variant_is_selected(client: Client) -> None:
@@ -142,7 +144,7 @@ def test_the_default_variant_is_selected(client: Client) -> None:
         VariantTranslationFactory.create(
             variant=variant, language=primary_language(), label=f"Size {sku}", status=PUBLISHED
         )
-    html = client.get(path(primary_language(), "mug-en")).content.decode()
+    html = client.get(mug_path()).content.decode()
     assert "Size VAR-A" in html
     # Scope to the variant picker: the consent banner has its own locked "necessary" checkbox.
     picker = html.split('<fieldset class="product-variants">', 1)[1].split("</fieldset>", 1)[0]
@@ -160,9 +162,7 @@ def test_a_variant_price_override_shows(client: Client) -> None:
     VariantTranslationFactory.create(
         variant=variant, language=primary_language(), label="Big", status=PUBLISHED
     )
-    assert (
-        "29.28" in client.get(path(primary_language(), "mug-en")).content.decode()
-    )  # 24.00 + 22 %
+    assert "29.28" in client.get(mug_path()).content.decode()  # 24.00 + 22 %
 
 
 def test_a_missing_translation_shows_the_source_text_with_a_notice(client: Client) -> None:
@@ -181,7 +181,9 @@ def test_a_missing_translation_shows_the_source_text_with_a_notice(client: Clien
     assert response.status_code == 200
     html = response.content.decode()
     assert "Only English" in html
-    assert 'rel="canonical" href="http://localhost/product/only-english/"' in html
+    assert (
+        f'rel="canonical" href="http://localhost{path(primary_language(), "only-english")}"' in html
+    )
 
 
 def test_the_required_companion_is_shown_when_published(client: Client) -> None:
@@ -213,18 +215,16 @@ def test_a_draft_companion_is_not_exposed(client: Client) -> None:
 
 def test_a_retired_product_stays_online_but_not_purchasable(client: Client) -> None:
     live(status=Product.Status.RETIRED)
-    html = client.get(path(primary_language(), "mug-en")).content.decode()
-    assert "no longer available" in html
-    assert "Add to cart" not in html
+    html = client.get(mug_path()).content.decode()
+    assert translated("This product is no longer available.") in html
+    assert translated("Add to cart") not in html
 
 
 def test_the_robots_rule_follows_the_site_setting(client: Client) -> None:
     live()
-    assert (
-        'content="index, follow"' in client.get(path(primary_language(), "mug-en")).content.decode()
-    )
+    assert 'content="index, follow"' in client.get(mug_path()).content.decode()
     apps.get_model("seo", "SeoSettings").objects.update(allow_indexing=False)
-    assert "noindex" in client.get(path(primary_language(), "mug-en")).content.decode()
+    assert "noindex" in client.get(mug_path()).content.decode()
 
 
 @pytest.mark.usefixtures("consumer_prices")
@@ -234,7 +234,7 @@ def test_the_structured_data_has_a_product_node_with_the_brand_id(client: Client
         brand=brand, language=primary_language(), slug="acme", status=PUBLISHED
     )
     live(brand=brand)
-    html = client.get(path(primary_language(), "mug-en")).content.decode()
+    html = client.get(mug_path()).content.decode()
     assert '"@type": "Product"' in html
     assert localized("/brand/acme/#brand") in html
     assert '"@type": "Offer"' in html  # SEO.1: a product sold online has its offer
@@ -242,6 +242,6 @@ def test_the_structured_data_has_a_product_node_with_the_brand_id(client: Client
 
 def test_the_page_leaks_no_internal_data(client: Client) -> None:
     product = live(price_net=Decimal("10.00"))
-    html = client.get(path(primary_language(), "mug-en")).content.decode()
+    html = client.get(mug_path()).content.decode()
     assert str(product.staff_ref) not in html
     assert "legal_name" not in html
