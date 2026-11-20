@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from apps.core.services import render_email
 
-_BRAND = {
+_BRAND: dict[str, Any] = {
     "vendor_name": "Shop",
     "brands": [
         {"name": "Acmee", "products": [{"title": "Widget", "sku": "W-1"}]},
         {"name": "Zed", "products": []},
     ],
 }
-_ALERT = {"key": "queue.stuck", "summary": "Queue stuck", "details": {"depth": 12}}
+_ALERT: dict[str, Any] = {"key": "queue.stuck", "summary": "Queue stuck", "details": {"depth": 12}}
 
-_CASES = {
+_CASES: dict[str, tuple[dict[str, Any], tuple[str, ...]]] = {
     "catalog.brand_rejected": (
         _BRAND,
         (
