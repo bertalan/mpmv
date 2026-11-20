@@ -621,6 +621,7 @@ WIRED = {
     "sessions_end_all",  # CORE.24
     "export",  # VEN.9: the shop's CSV ledger extract
     "order_draft_send",  # ORD.32: staff send a draft's payment link (owner 2026-11-19)
+    "return_policy_review",  # VEN.40: staff approve or reject a return policy
 }
 # Actions whose web view does not exist yet: nothing to decorate (follow-ups in the PR).
 NOT_BUILT = {"tax_in_clear", "backup", "impersonation"}
