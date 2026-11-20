@@ -442,6 +442,10 @@ msgstr ""
 msgid "A fingerprint of the data. The same data is stored once per item."
 msgstr "Una huella digital de los datos. Los mismos datos se guardan una sola vez por artículo."
 
+#: apps/manager/event_forms.py
+msgid "A free event has no price: leave it empty."
+msgstr "Un evento gratuito no tiene precio: deja el campo vacío."
+
 #: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
 #: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
 msgid ""
@@ -1756,6 +1760,10 @@ msgstr "Antes"
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Before and after"
 msgstr "Antes y después"
+
+#: apps/seo/templates/seo/admin/opening_steps.html
+msgid "Before opening the platform"
+msgstr "Antes de abrir la plataforma"
 
 #: apps/orders/customer_views.py
 msgid "Being prepared"
@@ -3658,6 +3666,10 @@ msgstr "Campos del formulario"
 msgid "form page"
 msgstr "página de formulario"
 
+#: apps/manager/event_forms.py
+msgid "Free entry"
+msgstr "Entrada gratuita"
+
 #: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Frequently asked questions"
@@ -4755,6 +4767,10 @@ msgid ""
 msgstr ""
 "Déjelo vacío para todas las regiones, o elija UE o fuera de la UE para aplicar la regla a todos "
 "los vendedores establecidos allí."
+
+#: apps/manager/event_forms.py
+msgid "Leave it empty if you do not want to show a price."
+msgstr "Déjalo vacío si no quieres mostrar un precio."
 
 #: apps/compliance/forms.py
 msgid "Leave on the first choice unless one of these applies: it allows a shorter notice."
@@ -5859,6 +5875,10 @@ msgstr "Solo se puede editar un borrador; este está %(state)s."
 msgid "Only a pending notice can be withdrawn."
 msgstr "Solo se puede retirar un preaviso en curso."
 
+#: apps/manager/event_forms.py
+msgid "Only a postponed event has a previous start."
+msgstr "Solo un evento aplazado tiene un inicio anterior."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "Only approved brands have a public page and can be picked by every vendor. Use the approve, reject"
@@ -6885,6 +6905,10 @@ msgstr "Posición"
 msgid "Postcode"
 msgstr "Código postal"
 
+#: apps/manager/event_forms.py
+msgid "Postponed"
+msgstr "Aplazado"
+
 #: apps/seo/providers.py
 msgid "Preferences"
 msgstr "Preferencias"
@@ -6987,6 +7011,10 @@ msgstr "Mes anterior"
 #: themes/ride/templates/components/carousel_controls.html
 msgid "Previous slide"
 msgstr "Diapositiva anterior"
+
+#: apps/manager/event_forms.py
+msgid "Previous start"
+msgstr "Inicio anterior"
 
 #: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "Previous versions"
@@ -10879,6 +10907,14 @@ msgstr ""
 "El precio en euros, sin IVA, por ejemplo 19,90. Es necesario para vender el producto: con la "
 "modalidad Compra, se rechaza un precio vacío. No puede ser 0,00: déjelo vacío."
 
+#: apps/events/models.py
+msgid ""
+"The price of a ticket in euro. If you leave it empty, no price is shown. For free entry, tick "
+"'free entry' instead."
+msgstr ""
+"El precio de una entrada en euros. Si lo dejas vacío, no se muestra ningún precio. Para entrada "
+"gratuita, marca en cambio «Entrada gratuita»."
+
 #: apps/orders/templates/email/orders/staff_draft_link/body.html
 #: apps/orders/templates/email/orders/staff_draft_link/body.txt
 msgid ""
@@ -12031,6 +12067,14 @@ msgstr ""
 "Estas reglas se aplican a cada cambio de un pedido pagado. Forman parte de la configuración de la "
 "plataforma: un cambio entra en vigor como una nueva versión de la configuración."
 
+#: apps/seo/templates/seo/admin/opening_steps.html
+msgid ""
+"These steps are still open. This reminder disappears when search engine indexing is on and every "
+"step is done."
+msgstr ""
+"Estos pasos siguen pendientes. Este recordatorio desaparece cuando la indexación en los motores de"
+" búsqueda está activada y cada paso está completado."
+
 #: apps/manager/sales_terms_views.py
 msgid ""
 "These terms are governed by the law of [country]. Disputes with business buyers are decided by the"
@@ -12555,6 +12599,10 @@ msgstr ""
 "Márquelo para señalar la versión principal del producto. Solo una versión de un producto puede ser"
 " la predeterminada."
 
+#: apps/events/models.py apps/manager/event_forms.py
+msgid "Tick it when entry costs nothing. Leave the price empty."
+msgstr "Márcalo cuando la entrada no cueste nada. Deja el precio vacío."
+
 #: apps/core/models.py
 msgid "Tick it when images under this licence must show a credit."
 msgstr "Márquelo cuando las imágenes con esta licencia deban mostrar un crédito."
@@ -12570,6 +12618,18 @@ msgstr ""
 msgid "Tick it when images under this licence need the web address they come from."
 msgstr ""
 "Márquelo cuando las imágenes con esta licencia requieran la dirección web de la que proceden."
+
+#: apps/events/models.py
+msgid ""
+"Tick it when the event is moved to another date. Change the date above to the new one and give the"
+" old start below. A cancelled event stays cancelled."
+msgstr ""
+"Márcalo cuando el evento se traslade a otra fecha. Cambia arriba la fecha por la nueva e indica "
+"abajo el inicio anterior. Un evento cancelado sigue cancelado."
+
+#: apps/manager/event_forms.py
+msgid "Tick it when the event is moved: change the date above to the new one."
+msgstr "Márcalo cuando el evento se aplace: cambia arriba la fecha por la nueva."
 
 #: apps/manager/amendment_forms.py
 msgid ""
@@ -12619,6 +12679,18 @@ msgid ""
 msgstr ""
 "Marcado: la función está activada para este vendedor. Sin marcar: está desactivada, sea cual sea "
 "el ajuste de la plataforma. Un interruptor de emergencia aquí solo se puede desactivar."
+
+#: apps/manager/event_forms.py
+msgid "Ticket link"
+msgstr "Enlace de entradas"
+
+#: apps/manager/event_forms.py
+msgid "Ticket price (EUR)"
+msgstr "Precio de la entrada (EUR)"
+
+#: apps/manager/event_forms.py
+msgid "Tickets and changes"
+msgstr "Entradas y cambios"
 
 #: themes/base/templates/components/launch_countdown.html
 #: themes/ride/templates/components/launch_countdown.html
@@ -13783,6 +13855,18 @@ msgid ""
 msgstr ""
 "Cuándo se canceló el evento. Vacío para un evento que sigue adelante. Lo rellena la plataforma."
 
+#: apps/events/models.py
+msgid ""
+"When the event was first planned to start. Only for a postponed event; leave it empty if you do "
+"not want to show it."
+msgstr ""
+"Cuándo estaba previsto originalmente que empezara el evento. Solo para un evento aplazado; déjalo "
+"vacío si no quieres mostrarlo."
+
+#: apps/manager/event_forms.py
+msgid "When the event was first planned, in the event's time zone. Optional."
+msgstr "Cuándo estaba previsto el evento originalmente, en la zona horaria del evento. Opcional."
+
 #: apps/cms/blocks.py
 msgid ""
 "When the launch happens, in the platform's local time. Example: 2026-12-01 09:00. Required: the "
@@ -13892,6 +13976,18 @@ msgid ""
 msgstr ""
 "Adónde llegan los avisos de cumplimiento normativo, por ejemplo un caso de seguridad atrasado. "
 "Déjelo vacío para enviarlos a la dirección de asistencia."
+
+#: apps/events/models.py
+msgid ""
+"Where people get tickets or register, starting with https://. If you leave it empty, no ticket "
+"link is shown."
+msgstr ""
+"Dónde conseguir entradas o inscribirse, empezando por https://. Si lo dejas vacío, no se muestra "
+"ningún enlace."
+
+#: apps/manager/event_forms.py
+msgid "Where people get tickets or register, starting with https://. Optional."
+msgstr "Dónde conseguir entradas o inscribirse, empezando por https://. Opcional."
 
 #: apps/manager/event_forms.py
 msgid "Where people join an online event, starting with https://."
