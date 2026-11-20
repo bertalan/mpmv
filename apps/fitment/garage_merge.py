@@ -11,7 +11,7 @@ holds counts only, never a vehicle label (they are the visitor's personal data).
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -20,6 +20,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext, audit_context, record
+from apps.core.changeset import ChangeSet
 
 from . import engine, garage, garage_profiles, services
 from .models import FitmentNode, GarageProfile, NodeStatus
@@ -28,12 +29,14 @@ logger = logging.getLogger(__name__)
 
 SESSION_KEY = "fitment_garage_pending"
 MERGED = "fitment.garage.merged"
+CLEAR_ATTR = "_fitment_clear_garage_cookie"
 
 
 @dataclass(frozen=True)
 class MergeResult:
     added: int
     skipped: int  # already in the account, not in the catalogue any more, or over the limit
+    changes: ChangeSet = field(default_factory=ChangeSet)  # the profiles created (or to create)
 
 
 def _node_for(vehicle: garage.Vehicle) -> FitmentNode | None:
@@ -105,6 +108,28 @@ def dismiss_pending(request: HttpRequest) -> None:
     request.session.pop(SESSION_KEY, None)
 
 
+def flag_sign_out(
+    sender: Any, request: HttpRequest | None, user: AbstractBaseUser | None, **kwargs: Any
+) -> None:
+    """`user_logged_out` receiver (spec 17 §17.4.3): the garage cookie goes with the sign-out only
+    when it was created from the account's active profile, that is when it holds exactly that
+    vehicle (same node and year). The flag is read by `GarageSignOutMiddleware`, which clears the
+    cookie on the response. Holds no identifier. Never raises, never logs the cookie."""
+    if request is None or not isinstance(user, User):
+        return
+    try:
+        profile = GarageProfile.objects.filter(user=user, is_active=True).first()
+        current = services.read_garage(request)
+        if profile is None or len(current.vehicles) != 1:
+            return
+        vehicle = current.vehicles[0]
+        node = _node_for(vehicle)
+        if node is not None and (node.pk, _year_of(vehicle)) == (profile.node_id, profile.year):
+            setattr(request, CLEAR_ATTR, True)
+    except Exception:  # sign-out must succeed: the cookie then simply stays
+        logger.exception("Could not check the garage cookie at sign-out for user %s", user.pk)
+
+
 def clear_cookie(response: HttpResponse) -> HttpResponse:
     response.delete_cookie(garage.COOKIE_NAME, path="/", samesite="Lax")
     return response
@@ -121,42 +146,56 @@ def _unique_name(base: str, taken: list[str]) -> str:
 
 
 def merge_pending(
-    request: HttpRequest, user: User, *, ctx: AuditContext | None = None
+    request: HttpRequest,
+    user: User,
+    *,
+    ctx: AuditContext | None = None,
+    dry_run: bool = False,
 ) -> MergeResult:
     """*Add*: copy the staged vehicles into the account's profiles, within the profile limit. The
     cookie's active vehicle becomes active only when the account has no active profile. The
     caller then clears the cookie (`clear_cookie`). The staged vehicles are re-checked against
-    the cookie, so a stale session entry cannot add what the browser no longer holds."""
+    the cookie, so a stale session entry cannot add what the browser no longer holds.
+
+    `dry_run=True` returns what *Add* would do (`MergeResult.changes`) and writes nothing: no
+    profile, no audit entry, and the session entry stays."""
     ctx = ctx or audit_context(request)
-    request.session.pop(SESSION_KEY, None)
+    if not dry_run:
+        request.session.pop(SESSION_KEY, None)
     fresh = _new_vehicles(request, user)
     total = len(fresh.vehicles)
+    changes = ChangeSet()
     added = 0
     has_active = GarageProfile.objects.filter(user=user, is_active=True).exists()
     maximum = services.current_scheme().max_profiles
+    count = GarageProfile.objects.filter(user=user).count()
+    taken = list(GarageProfile.objects.filter(user=user).values_list("name", flat=True))
     for index, vehicle in enumerate(fresh.vehicles):
         node = _node_for(vehicle)
-        if node is None or GarageProfile.objects.filter(user=user).count() >= maximum:
+        if node is None or count >= maximum:
             continue
         year = _year_of(vehicle)
-        taken = list(GarageProfile.objects.filter(user=user).values_list("name", flat=True))
         name = _unique_name(engine.default_profile_name(garage_profiles._labels(node), year), taken)
         make_active = not has_active and index == fresh.active
         try:
-            garage_profiles.create_profile(
-                user, node, name=name, year=year, activate=make_active, ctx=ctx
+            applied = garage_profiles.create_profile(
+                user, node, name=name, year=year, activate=make_active, ctx=ctx, dry_run=dry_run
             )
         except services.FitmentError:
             continue
+        changes.changes.extend(applied.changes.changes)
         added += 1
+        count += 1
+        taken.append(name)
         has_active = has_active or make_active
-    result = MergeResult(added=added, skipped=total - added)
-    record(
-        ctx,
-        MERGED,
-        garage_profiles.MODEL,
-        str(user.pk),
-        None,
-        {"added": result.added, "skipped": result.skipped, "at": timezone.now().isoformat()},
-    )
+    result = MergeResult(added=added, skipped=total - added, changes=changes)
+    if not dry_run:
+        record(
+            ctx,
+            MERGED,
+            garage_profiles.MODEL,
+            str(user.pk),
+            None,
+            {"added": result.added, "skipped": result.skipped, "at": timezone.now().isoformat()},
+        )
     return result
