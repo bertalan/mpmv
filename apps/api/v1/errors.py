@@ -1,4 +1,4 @@
-"""Exception → RFC 9457 problem mapping for API v1 (400/401/403/404/409/422/429/500).
+"""Exception → RFC 9457 problem mapping for API v1 (400/401/403/404/409/413/422/429/500).
 
 Details never carry exception messages: they may contain SQL, internal ids or submitted values.
 Unexpected exceptions are logged with their traceback and answered with a generic 500.
@@ -8,7 +8,12 @@ import logging
 from collections.abc import Callable
 from typing import Any, cast
 
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.core.exceptions import (
+    ObjectDoesNotExist,
+    PermissionDenied,
+    RequestDataTooBig,
+    SuspiciousOperation,
+)
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from django.http import Http404, HttpRequest, HttpResponse
@@ -106,6 +111,19 @@ def _on_integrity(request: HttpRequest, exc: Exception) -> HttpResponse:
     return _respond(request, problem(409, detail=detail))
 
 
+def _on_too_big(request: HttpRequest, exc: RequestDataTooBig) -> HttpResponse:
+    """A body over DATA_UPLOAD_MAX_MEMORY_SIZE (SEC.5): refused, not an unhandled error."""
+    logger.warning("API request body too large on %s %s", request.method, request.path)
+    detail = "The request body is too large."
+    return _respond(request, problem(413, detail=detail))
+
+
+def _on_suspicious(request: HttpRequest, exc: SuspiciousOperation) -> HttpResponse:
+    """Too many fields or files, and Django's other refusals of a malformed request."""
+    logger.warning("API suspicious request on %s: %s", request.path, type(exc).__name__)
+    return _respond(request, problem(400, detail=_HTTP_ERROR_DETAILS[400]))
+
+
 def _on_problem(request: HttpRequest, exc: ApiProblem) -> HttpResponse:
     return _respond(request, exc.problem)
 
@@ -126,6 +144,8 @@ _HANDLERS: tuple[tuple[type[Exception], Callable[[HttpRequest, Any], HttpRespons
     (VendorCannotWrite, _on_vendor_cannot_write),
     (PermissionDenied, _on_permission_denied),
     (IntegrityError, _on_integrity),
+    (RequestDataTooBig, _on_too_big),
+    (SuspiciousOperation, _on_suspicious),
     (ApiProblem, _on_problem),
     (Exception, _on_unexpected),
 )
