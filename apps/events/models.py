@@ -82,7 +82,7 @@ from apps.cms.blocks import (
     paragraph_block,
 )
 from apps.cms.models import CountdownCacheMixin
-from apps.core.fields import CountryField
+from apps.core.fields import CountryField, MoneyField
 from apps.core.geocoding import GeocodeResult
 from apps.core.models import BaseModel
 from apps.core.nfc_forms import NFCPageForm
@@ -278,6 +278,11 @@ SYNCHRONISED_FIELDS = (
     "exdate_days",
     "attendance",
     "online_url",
+    "ticket_url",
+    "price",
+    "is_free",
+    "postponed",
+    "previous_start",
     "street",
     "postcode",
     "city",
@@ -583,6 +588,46 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
         help_text=_(
             "Where people join an online event, starting with https://. "
             "Only for online or mixed events; leave it empty for the others."
+        ),
+    )
+    ticket_url = models.URLField(
+        _("ticket link"),
+        max_length=500,
+        blank=True,
+        help_text=_(
+            "Where people get tickets or register, starting with https://. "
+            "If you leave it empty, no ticket link is shown."
+        ),
+    )
+    price = MoneyField(
+        _("ticket price"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "The price of a ticket in euro. If you leave it empty, no price is shown. "
+            "For free entry, tick 'free entry' instead."
+        ),
+    )
+    is_free = models.BooleanField(
+        _("free entry"),
+        default=False,
+        help_text=_("Tick it when entry costs nothing. Leave the price empty."),
+    )
+    postponed = models.BooleanField(
+        _("postponed"),
+        default=False,
+        help_text=_(
+            "Tick it when the event is moved to another date. Change the date above to the "
+            "new one and give the old start below. A cancelled event stays cancelled."
+        ),
+    )
+    previous_start = models.DateTimeField(
+        _("previous start"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the event was first planned to start. Only for a postponed event; "
+            "leave it empty if you do not want to show it."
         ),
     )
     venue_name = models.CharField(
@@ -1091,6 +1136,7 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
             errors.setdefault(field, []).append(message)
 
         self._clean_schedule(add)
+        self._clean_offer(add)
         self._clean_location(add)
         self._clean_body(add)
         if errors:
@@ -1116,6 +1162,16 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
                     or (chosen.value is None or chosen.value.pk != self.vendor_id)
                 ):
                     add("body", _("A product grid can show only your own products."))
+
+    def _clean_offer(self, add: Any) -> None:
+        if self.ticket_url and not self.ticket_url.startswith("https://"):
+            add("ticket_url", _("The ticket link must start with https://."))
+        if self.price is not None and self.price < 0:
+            add("price", _("The price cannot be negative."))
+        if self.is_free and self.price is not None:
+            add("price", _("A free event has no price: leave it empty."))
+        if self.previous_start is not None and not self.postponed:
+            add("previous_start", _("Only a postponed event has a previous start."))
 
     def _clean_schedule(self, add: Any) -> None:
         if self.all_day:

@@ -449,6 +449,9 @@ msgid ""
 msgstr ""
 "Un caso di sicurezza GPSR ha superato la scadenza ed è ancora aperto. Intervenga ora e registri "
 "quanto fatto nell'area di amministrazione dello staff."
+#: apps/manager/event_forms.py
+msgid "A free event has no price: leave it empty."
+msgstr "Un evento gratuito non ha prezzo: lascia il campo vuoto."
 
 #: apps/manager/event_block_forms.py
 msgid "A grid, or one row that scrolls sideways."
@@ -3655,6 +3658,10 @@ msgid "form page"
 msgstr "pagina con modulo"
 
 #: apps/cms/templates/cms/vendor_recruitment_page.html
+#: apps/manager/event_forms.py
+msgid "Free entry"
+msgstr "Ingresso gratuito"
+
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Frequently asked questions"
 msgstr "Domande frequenti"
@@ -4753,6 +4760,10 @@ msgid ""
 msgstr ""
 "Lascialo vuoto per tutte le aree, oppure scegli UE o extra UE per applicare la regola a tutti i "
 "venditori con sede lì."
+
+#: apps/manager/event_forms.py
+msgid "Leave it empty if you do not want to show a price."
+msgstr "Lascia vuoto se non vuoi mostrare un prezzo."
 
 #: apps/compliance/forms.py
 msgid "Leave on the first choice unless one of these applies: it allows a shorter notice."
@@ -5854,6 +5865,10 @@ msgstr "Si può modificare solo una bozza; questa è %(state)s."
 msgid "Only a pending notice can be withdrawn."
 msgstr "Si può ritirare solo un preavviso in corso."
 
+#: apps/manager/event_forms.py
+msgid "Only a postponed event has a previous start."
+msgstr "Solo un evento rinviato ha un inizio precedente."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "Only approved brands have a public page and can be picked by every vendor. Use the approve, reject"
@@ -6879,6 +6894,10 @@ msgstr "Posizione"
 msgid "Postcode"
 msgstr "CAP"
 
+#: apps/manager/event_forms.py
+msgid "Postponed"
+msgstr "Rinviato"
+
 #: apps/seo/providers.py
 msgid "Preferences"
 msgstr "Preferenze"
@@ -6981,6 +7000,10 @@ msgstr "Mese precedente"
 #: themes/ride/templates/components/carousel_controls.html
 msgid "Previous slide"
 msgstr "Diapositiva precedente"
+
+#: apps/manager/event_forms.py
+msgid "Previous start"
+msgstr "Inizio precedente"
 
 #: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "Previous versions"
@@ -10890,6 +10913,14 @@ msgstr ""
 "Il prezzo in euro, IVA esclusa, per esempio 19,90. Serve per vendere il prodotto: con la modalità "
 "Acquisto, un prezzo vuoto viene rifiutato. Non può essere 0,00: lascialo vuoto."
 
+#: apps/events/models.py
+msgid ""
+"The price of a ticket in euro. If you leave it empty, no price is shown. For free entry, tick "
+"'free entry' instead."
+msgstr ""
+"Il prezzo di un biglietto in euro. Se lo lasci vuoto, non viene mostrato alcun prezzo. Per "
+"l'ingresso gratuito, spunta invece \"ingresso gratuito\"."
+
 #: apps/orders/templates/email/orders/staff_draft_link/body.html
 #: apps/orders/templates/email/orders/staff_draft_link/body.txt
 msgid ""
@@ -12555,6 +12586,10 @@ msgstr ""
 "Spuntala per segnare la versione principale del prodotto. Solo una versione di un prodotto può "
 "essere quella predefinita."
 
+#: apps/events/models.py apps/manager/event_forms.py
+msgid "Tick it when entry costs nothing. Leave the price empty."
+msgstr "Spuntalo quando l'ingresso è gratuito. Lascia vuoto il prezzo."
+
 #: apps/core/models.py
 msgid "Tick it when images under this licence must show a credit."
 msgstr "Spunta quando le immagini con questa licenza devono mostrare un credito."
@@ -12569,6 +12604,18 @@ msgstr ""
 #: apps/core/models.py
 msgid "Tick it when images under this licence need the web address they come from."
 msgstr "Spunta quando le immagini con questa licenza richiedono l'indirizzo web da cui provengono."
+
+#: apps/events/models.py
+msgid ""
+"Tick it when the event is moved to another date. Change the date above to the new one and give the"
+" old start below. A cancelled event stays cancelled."
+msgstr ""
+"Spuntalo quando l'evento viene spostato a un'altra data. Cambia qui sopra la data con quella nuova"
+" e indica sotto il vecchio inizio. Un evento annullato resta annullato."
+
+#: apps/manager/event_forms.py
+msgid "Tick it when the event is moved: change the date above to the new one."
+msgstr "Spuntalo quando l'evento viene spostato: cambia qui sopra la data con quella nuova."
 
 #: apps/manager/amendment_forms.py
 msgid ""
@@ -12618,6 +12665,18 @@ msgid ""
 msgstr ""
 "Con la spunta la funzione è attiva per questo venditore. Senza spunta è disattivata, qualunque sia"
 " l'impostazione della piattaforma. Un interruttore di emergenza qui si può solo disattivare."
+
+#: apps/manager/event_forms.py
+msgid "Ticket link"
+msgstr "Link ai biglietti"
+
+#: apps/manager/event_forms.py
+msgid "Ticket price (EUR)"
+msgstr "Prezzo del biglietto (EUR)"
+
+#: apps/manager/event_forms.py
+msgid "Tickets and changes"
+msgstr "Biglietti e modifiche"
 
 #: themes/base/templates/components/launch_countdown.html
 #: themes/ride/templates/components/launch_countdown.html
@@ -13780,6 +13839,18 @@ msgid ""
 msgstr ""
 "Quando l'evento è stato annullato. Vuoto per un evento che si svolge. Lo compila la piattaforma."
 
+#: apps/events/models.py
+msgid ""
+"When the event was first planned to start. Only for a postponed event; leave it empty if you do "
+"not want to show it."
+msgstr ""
+"Quando l'evento era stato pianificato in origine. Solo per un evento rinviato; lascia vuoto se non"
+" vuoi mostrarlo."
+
+#: apps/manager/event_forms.py
+msgid "When the event was first planned, in the event's time zone. Optional."
+msgstr "Quando l'evento era stato pianificato in origine, nel fuso orario dell'evento. Facoltativo."
+
 #: apps/cms/blocks.py
 msgid ""
 "When the launch happens, in the platform's local time. Example: 2026-12-01 09:00. Required: the "
@@ -13890,6 +13961,18 @@ msgid ""
 msgstr ""
 "Dove arrivano gli avvisi di conformità, per esempio un caso di sicurezza in ritardo. Lascialo "
 "vuoto per mandarli all'indirizzo di assistenza."
+
+#: apps/events/models.py
+msgid ""
+"Where people get tickets or register, starting with https://. If you leave it empty, no ticket "
+"link is shown."
+msgstr ""
+"Dove si acquistano i biglietti o ci si iscrive, a partire da https://. Se lo lasci vuoto, non "
+"viene mostrato alcun link."
+
+#: apps/manager/event_forms.py
+msgid "Where people get tickets or register, starting with https://. Optional."
+msgstr "Dove si acquistano i biglietti o ci si iscrive, a partire da https://. Facoltativo."
 
 #: apps/manager/event_forms.py
 msgid "Where people join an online event, starting with https://."
