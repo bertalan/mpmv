@@ -257,6 +257,18 @@ msgstr "%(vendor_name)s: ordine %(order_number)s modificato (versione %(version)
 msgid "%(vendor_name)s: platform support changed order %(order_number)s"
 msgstr "%(vendor_name)s: l’assistenza della piattaforma ha modificato l’ordine %(order_number)s"
 
+#: apps/catalog/templates/email/catalog/brand_rejected/body.html
+#: apps/catalog/templates/email/catalog/brand_rejected/body.txt
+msgid ""
+"%(vendor_name)s: the platform team did not approve the brand below. It was removed from your "
+"products listed under it, which stay on sale without a brand. Open each product in your shop area "
+"and pick an existing brand, or propose the brand again with an official link or a Wikidata ID."
+msgstr ""
+"%(vendor_name)s: il team della piattaforma non ha approvato il marchio indicato di seguito. È "
+"stato rimosso dai Suoi prodotti elencati sotto di esso, che restano in vendita senza marchio. Apra"
+" ogni prodotto nella Sua area negozio e scelga un marchio esistente, oppure proponga di nuovo il "
+"marchio con un link ufficiale o un ID Wikidata."
+
 #: apps/core/models.py
 msgid ""
 "'Default' follows the setting of this environment, or the default of the code if there is none. "
@@ -1129,6 +1141,11 @@ msgstr ""
 "Dopo aver confermato l’email, accede e configura un’app di autenticazione: è obbligatoria per ogni"
 " venditore."
 
+#: apps/core/templates/email/core/ops_alert/body.html
+#: apps/core/templates/email/core/ops_alert/body.txt
+msgid "Alert"
+msgstr "Avviso"
+
 #: apps/manager/fitment_forms.py
 msgid "Alias"
 msgstr "Alias"
@@ -1312,6 +1329,11 @@ msgstr "Un articolo non era disponibile"
 #: apps/orders/ui/views.py
 msgid "An item went out of stock."
 msgstr "Un articolo è esaurito."
+
+#: apps/core/templates/email/core/ops_alert/body.html
+#: apps/core/templates/email/core/ops_alert/body.txt
+msgid "An operations alert was raised on the platform."
+msgstr "È stato generato un avviso operativo sulla piattaforma."
 
 #: apps/catalog/models.py
 msgid "An optional line shown with the image."
@@ -1698,6 +1720,10 @@ msgstr "lotto di marchi"
 #: apps/catalog/taxonomy.py
 msgid "brand batches"
 msgstr "lotti di marchi"
+
+#: apps/catalog/templates/email/catalog/brand_rejected/subject.txt
+msgid "Brand not approved: your products need another brand"
+msgstr "Marchio non approvato: i Suoi prodotti richiedono un altro marchio"
 
 #: themes/base/templates/components/breadcrumb.html
 msgid "Breadcrumb"
@@ -5231,6 +5257,11 @@ msgstr "Nessun prodotto corrisponde a questi filtri."
 msgid "No products match your search."
 msgstr "Nessun prodotto corrisponde alla tua ricerca."
 
+#: apps/catalog/templates/email/catalog/brand_rejected/body.html
+#: apps/catalog/templates/email/catalog/brand_rejected/body.txt
+msgid "No products used it."
+msgstr "Nessun prodotto lo utilizzava."
+
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
 msgid "No refund fee is charged to your shop."
@@ -5907,6 +5938,10 @@ msgstr "Saldo iniziale"
 #: themes/ride/templates/compliance/contact_points.html
 msgid "Operated by %(name)s."
 msgstr "Gestita da %(name)s."
+
+#: apps/core/templates/email/core/ops_alert/subject.txt
+msgid "Operations alert: %(summary)s"
+msgstr "Avviso operativo: %(summary)s"
 
 #: apps/seo/templates/seo/consent/preferences.html
 msgid "Optional cookies on:"
