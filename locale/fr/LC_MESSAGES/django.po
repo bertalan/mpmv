@@ -1499,7 +1499,7 @@ msgstr "Appliquer les filtres"
 #: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Apply now"
-msgstr "Postule maintenant"
+msgstr "Postulez maintenant"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Apply the change"
@@ -8946,7 +8946,7 @@ msgstr "Merci. Nous avons bien reçu ton message."
 
 #: apps/compliance/templates/compliance/notice_received.html
 msgid "Thank you. We received your report and will review it."
-msgstr "Merci. Nous avons reçu ton signalement et nous allons l'examiner."
+msgstr "Merci. Nous avons reçu votre signalement et nous allons l'examiner."
 
 #: apps/cms/forms_pages.py
 msgid "thank-you text"
@@ -11951,6 +11951,11 @@ msgid "The vendor's newest products shown after the story; 0 shows none."
 msgstr "Les produits les plus récents du vendeur affichés après l'histoire ; 0 n'en affiche aucun."
 
 #: apps/accounts/decorators.py apps/compliance/views.py apps/orders/ui/views.py
+msgid "The verification failed. Please reload the page and try again."
+msgstr "La vérification a échoué. Veuillez recharger la page et réessayer."
+
+#: apps/compliance/views.py
+msgctxt "formal"
 msgid "The verification failed. Please reload the page and try again."
 msgstr "La vérification a échoué. Veuillez recharger la page et réessayer."
 

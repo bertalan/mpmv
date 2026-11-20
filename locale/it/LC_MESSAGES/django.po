@@ -1485,7 +1485,7 @@ msgstr "Applica i filtri"
 #: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Apply now"
-msgstr "Candidati ora"
+msgstr "Si candidi ora"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "Apply the change"
@@ -2175,7 +2175,7 @@ msgid ""
 "Choose 'Illegal content' for most reports. A report of child sexual abuse material can be sent "
 "without your name and email address."
 msgstr ""
-"Scegli 'Contenuto illegale' per la maggior parte delle segnalazioni. Una segnalazione di materiale"
+"Scelga 'Contenuto illegale' per la maggior parte delle segnalazioni. Una segnalazione di materiale"
 " pedopornografico può essere inviata senza nome e indirizzo email."
 
 #: apps/manager/event_forms.py
@@ -2352,8 +2352,8 @@ msgstr ""
 msgid ""
 "Choose what you are reporting: a product, an event, a vendor shop or other content of the site."
 msgstr ""
-"Scegli che cosa stai segnalando: un prodotto, un evento, il negozio di un venditore o altri "
-"contenuti del sito."
+"Scelga che cosa segnala: un prodotto, un evento, il negozio di un venditore o altri contenuti del "
+"sito."
 
 #: apps/cms/blocks.py
 msgid "Choose where the products come from: one category, tag, brand or shop."
@@ -8837,7 +8837,7 @@ msgstr ""
 
 #: apps/compliance/forms.py
 msgid "Tell us why you think the content is illegal. Required."
-msgstr "Spiegaci perché ritieni che il contenuto sia illegale. Obbligatorio."
+msgstr "Ci spieghi perché ritiene che il contenuto sia illegale. Obbligatorio."
 
 #: apps/manager/sections.py apps/manager/site_map.py
 msgid "Termination notice"
@@ -8871,7 +8871,7 @@ msgstr "Grazie. Abbiamo ricevuto il tuo messaggio."
 
 #: apps/compliance/templates/compliance/notice_received.html
 msgid "Thank you. We received your report and will review it."
-msgstr "Grazie. Abbiamo ricevuto la tua segnalazione e la esamineremo."
+msgstr "Grazie. Abbiamo ricevuto la Sua segnalazione e la esamineremo."
 
 #: apps/cms/forms_pages.py
 msgid "thank-you text"
@@ -11849,6 +11849,11 @@ msgstr ""
 msgid "The verification failed. Please reload the page and try again."
 msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
 
+#: apps/compliance/views.py
+msgctxt "formal"
+msgid "The verification failed. Please reload the page and try again."
+msgstr "La verifica non è riuscita. Ricarichi la pagina e riprovi."
+
 #: apps/vendors/models.py
 msgid "The version belongs to another seller."
 msgstr "La versione appartiene a un altro venditore."
@@ -12665,7 +12670,7 @@ msgstr ""
 #: apps/compliance/forms.py
 msgid "Tick the box to confirm the statement. Without it the report cannot be sent."
 msgstr ""
-"Spunta la casella per confermare la dichiarazione. Senza non si può inviare la segnalazione."
+"Spunti la casella per confermare la dichiarazione. Senza non si può inviare la segnalazione."
 
 #: apps/cms/models.py
 msgid ""
@@ -14741,7 +14746,7 @@ msgid ""
 "Your email address. We confirm that we received the report and tell you our decision there. "
 "Required, except for a report of child sexual abuse material."
 msgstr ""
-"Il tuo indirizzo email. Lì ti confermiamo la ricezione della segnalazione e ti comunichiamo la "
+"Il Suo indirizzo email. Lì Le confermiamo la ricezione della segnalazione e Le comunichiamo la "
 "nostra decisione. Obbligatorio, tranne per una segnalazione di materiale pedopornografico."
 
 #: apps/vendors/templates/vendors/apply/confirmed.html
@@ -14804,7 +14809,7 @@ msgstr "La Sua fattura è già emessa"
 
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."
-msgstr "Il tuo nome. Obbligatorio, tranne per una segnalazione di materiale pedopornografico."
+msgstr "Il Suo nome. Obbligatorio, tranne per una segnalazione di materiale pedopornografico."
 
 #: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
 #: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
