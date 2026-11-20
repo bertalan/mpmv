@@ -1,0 +1,14 @@
+{% load i18n garage_tags %}{% comment %}
+The header garage menu (FIT.7 1/n, spec 17 §17.4.4): a native `<details>` disclosure, so it works
+without a script. The summary names the active vehicle ("Garage: Daily"), "Garage: generic" when
+vehicles are saved but none applies, or "Add your garage". Its links lead to the chooser (the
+page the visitor returns from, as `next`, never any garage state) and, for a signed-in customer,
+to My garage. Nothing changes by opening it. Left out without a garage (the 500 page, a visitor
+whose browser storage is off).
+{% endcomment %}{% garage_menu as garage %}{% if garage %}<details class="user-menu garage-menu" data-garage-menu>
+  <summary class="user-menu__summary">{% if garage.active_label %}{% blocktranslate with noun=garage.noun name=garage.active_label %}{{ noun }}: {{ name }}{% endblocktranslate %}{% elif garage.has_vehicles %}{% blocktranslate with noun=garage.noun %}{{ noun }}: generic{% endblocktranslate %}{% else %}{% translate "Add your garage" %}{% endif %}</summary>
+  <ul class="user-menu__list">
+    <li><a class="user-menu__item" href="{% url 'garage_choose' %}?next={{ request.get_full_path|urlencode }}">{% if garage.has_vehicles %}{% translate "Change vehicle" %}{% else %}{% translate "Choose a vehicle" %}{% endif %}</a></li>
+    {% if garage.signed_in %}<li><a class="user-menu__item" href="{% url 'garage_account' %}">{% translate "My garage" %}</a></li>{% endif %}
+  </ul>
+</details>{% endif %}
