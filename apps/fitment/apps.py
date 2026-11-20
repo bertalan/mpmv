@@ -28,6 +28,13 @@ class FitmentConfig(AppConfig):
 
         register_publication_check("fitment", publish_gate_messages)
 
+        # FIT.6: at sign-in the anonymous garage is staged for the merge notice (never merged).
+        from django.contrib.auth.signals import user_logged_in
+
+        from .garage_merge import stage_on_login
+
+        user_logged_in.connect(stage_on_login, dispatch_uid="fitment.stage_garage_merge")
+
     audited_models = (
         "fitmentscheme",
         "fitmentlevel",
