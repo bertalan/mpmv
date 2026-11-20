@@ -21,7 +21,7 @@ go-live.
 | Accounts | `test_accounts_attacks.py`, `test_passkey_window_attacks.py`, `test_session_lifetime_attacks.py` | present |
 | Request tampering | `test_request_tampering.py` | present |
 | Business logic | `test_business_logic_attacks.py` | present (cart, catalogue API, shipping import; coupons, refunds, payouts: 3a-2) |
-| Integrations | `test_integrations.py` | to do |
+| Integrations | `test_integration_attacks.py` | present (webhook replay, outbound SSRF and redirects, XML and archive guards, CSV formulas) |
 | Resource abuse | `test_resource_abuse.py` | present (2a: bodies, JSON depth, uploads, pagination; ReDoS is slice 2b) |
 | Information leaks | `test_information_leaks.py` | to do |
 | AI and agents (SEC.9) | `test_ai_agent_injection.py` | present (2d: llms.txt, JSON-LD, ICS, RSS; MCP and enricher wait for AI.1 and ING.5) |

@@ -10,6 +10,7 @@ import html
 import re
 import string
 from collections import Counter
+from collections.abc import Iterator
 from enum import StrEnum
 from html.parser import HTMLParser
 
@@ -430,10 +431,11 @@ def row_message(row: int, rule: Rule, reader: str) -> str:
     return f"{label} {row}: {rule_text(rule, reader)}"
 
 
-_TEMPLATE = re.compile(r"\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}", re.DOTALL)
-_PRINTF = re.compile(
-    r"%(?:\([^)]*\))?[#0\- +]*(?:\d+|\*)?(?:\.(?:\d+|\*))?[hlL]?[diouxXeEfFgGcrsa%]"
-)
+_TEMPLATE_START = re.compile(r"\{[{%#]")
+_TEMPLATE_END = {"{": "}}", "%": "%}", "#": "#}"}
+# A printf conversion after its optional `(key)`. Flags absorb every `0`, so the width starts with
+# another digit: one way to split a run of zeros, not a quadratic number of them.
+_PRINTF_TAIL = re.compile(r"[#0\- +]*+(?:(?!0)\d+|\*)?(?:\.(?:\d+|\*))?[hlL]?[diouxXeEfFgGcrsa%]")
 _REST = r"""[^\s"'<>]*"""
 _LINKS = (
     re.compile(
@@ -460,6 +462,65 @@ def _format_fields(text: str, depth: int = 0) -> list[tuple[str, str, str]]:
     return fields
 
 
+def _template_spans(text: str) -> Iterator[tuple[int, int]]:
+    """(start, end) of every Django template tag (`{{ }}`, `{% %}`, `{# #}`), left to right, each
+    closed by the first closer after its opener. An opener with no closer after it, and any later
+    opener of the same kind, matches nothing, so the text is read once."""
+    unclosed: set[str] = set()
+    position = 0
+    while opener := _TEMPLATE_START.search(text, position):
+        kind = text[opener.start() + 1]
+        position = opener.start() + 1
+        if kind in unclosed:
+            continue
+        close = text.find(_TEMPLATE_END[kind], opener.start() + 2)
+        if close == -1:
+            unclosed.add(kind)
+            continue
+        position = close + 2
+        yield opener.start(), position
+
+
+def _printf_spans(text: str) -> Iterator[tuple[int, int]]:
+    """(start, end) of every printf conversion (`%s`, `%(key)05.2f`, `%%`), left to right. A
+    `%(` whose key never closes, or whose closing parenthesis is not followed by a conversion,
+    matches nothing, and neither does any later `%(` sharing that parenthesis."""
+    position = 0
+    close = -1  # the first `)` found for a key, reused by the `%(` that share it
+    failed = -1  # the `)` after which no conversion follows
+    while (start := text.find("%", position)) != -1:
+        position = start + 1
+        tail = start + 1
+        if text.startswith("(", tail):
+            if close < tail:
+                close = text.find(")", tail)
+                if close == -1:
+                    close = len(text)  # no `)` at all: every `%(` fails
+            if close in (failed, len(text)):
+                continue
+            tail = close + 1
+        match = _PRINTF_TAIL.match(text, tail)
+        if match is None:
+            if tail != start + 1:
+                failed = close
+            continue
+        position = match.end()
+        yield start, position
+
+
+def _spans_replaced(text: str, spans: Iterator[tuple[int, int]]) -> tuple[list[str], str]:
+    """The matched pieces of `text` and `text` with each of them replaced by a space."""
+    pieces: list[str] = []
+    rest: list[str] = []
+    copied = 0
+    for start, end in spans:
+        pieces.append(text[start:end])
+        rest += [text[copied:start], " "]
+        copied = end
+    rest.append(text[copied:])
+    return pieces, "".join(rest)
+
+
 def placeholders(text: str) -> Counter[str]:
     """Every placeholder of `text`: Django template syntax, printf and str.format fields.
 
@@ -467,13 +528,14 @@ def placeholders(text: str) -> Counter[str]:
     index access included), so a translation can reorder them but never change or add one."""
     found: Counter[str] = Counter()
 
-    def take(pattern: re.Pattern[str], kind: str, value: str) -> str:
-        for m in pattern.finditer(value):
-            found[f"{kind}:{m.group(0)}"] += 1
-        return pattern.sub(" ", value)
+    def take(spans: Iterator[tuple[int, int]], kind: str, value: str) -> str:
+        pieces, rest = _spans_replaced(value, spans)
+        for piece in pieces:
+            found[f"{kind}:{piece}"] += 1
+        return rest
 
-    rest = take(_TEMPLATE, "tpl", text)
-    rest = take(_PRINTF, "printf", rest)
+    rest = take(_template_spans(text), "tpl", text)
+    rest = take(_printf_spans(rest), "printf", rest)
     try:
         for name, conv, spec in _format_fields(rest):
             found[f"field:{name}!{conv}:{spec}"] += 1

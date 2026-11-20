@@ -257,3 +257,16 @@ def test_a_file_over_the_size_cap_is_refused_before_parsing() -> None:
     big = " " * (fmt.MAX_FILE_BYTES + 1)
     assert not fmt.parse_json(big).ok
     assert not fmt.parse_csv(big).ok
+
+
+def test_names_are_nfc_and_codes_and_patterns_stay_exact() -> None:
+    decomposed = "Café"
+    document = sample_document()
+    document["zones"][0]["name"] = decomposed
+    document["zones"][0]["code"] = decomposed
+    document["zones"][0]["postcode_patterns"] = [decomposed]
+    parsed = fmt.parse_json(json.dumps(document))
+    values = parsed.rows[[row.record for row in parsed.rows].index(fmt.ZONE)].values
+    assert values["name"] == "Café"
+    assert values["code"] == decomposed
+    assert values["postcode_patterns"] == [decomposed]
