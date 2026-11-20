@@ -7,6 +7,8 @@ profiles and the rules of a product's declaration (FIT.2) live here too, as pure
 over node paths: a path starting with another is below it.
 """
 
+import calendar
+import datetime as dt
 import re
 import unicodedata
 from collections.abc import Mapping, Sequence
@@ -358,3 +360,40 @@ def profile_year_error(year: int | None, *, enabled: bool, low: int, high: int) 
 def profile_node_retired(status: str) -> bool:
     """A retired node stays in profiles, shown with a note; matching treats it as before."""
     return status == RETIRED
+
+
+# --- 24-month inactivity cleanup (FIT.5 3/3, spec 17 §17.4.5) ----------------------------------
+
+INACTIVITY_MONTHS = 24
+NOTICE_DAYS = 30
+KEEP = "keep"
+NOTIFY = "notify"
+DELETE = "delete"
+
+
+def add_months(moment: dt.datetime, months: int) -> dt.datetime:
+    """`moment` moved forward by whole calendar months; the day is clamped to the month's end."""
+    index = moment.year * 12 + moment.month - 1 + months
+    year, month = divmod(index, 12)
+    day = min(moment.day, calendar.monthrange(year, month + 1)[1])
+    return moment.replace(year=year, month=month + 1, day=day)
+
+
+def cleanup_action(
+    last_used_at: dt.datetime,
+    notice_sent_at: dt.datetime | None,
+    now: dt.datetime,
+    *,
+    months: int = INACTIVITY_MONTHS,
+    notice_days: int = NOTICE_DAYS,
+) -> str:
+    """What the nightly cleanup does with a profile: `KEEP`, `NOTIFY` (send the service email)
+    or `DELETE`. The notice goes out `notice_days` before the limit (last use plus `months`);
+    deletion needs the limit reached and the full notice period run since the notice, so a late
+    notice still gives the customer the whole period. A notice sent before the last use is void
+    (the customer came back)."""
+    limit = add_months(last_used_at, months)
+    period = dt.timedelta(days=notice_days)
+    if notice_sent_at is not None and notice_sent_at >= last_used_at:
+        return DELETE if now >= limit and now >= notice_sent_at + period else KEEP
+    return NOTIFY if now >= limit - period else KEEP

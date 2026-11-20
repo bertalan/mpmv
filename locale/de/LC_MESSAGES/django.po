@@ -454,6 +454,10 @@ msgstr ""
 msgid "A fingerprint of the data. The same data is stored once per item."
 msgstr "Ein Fingerabdruck der Daten. Dieselben Daten werden pro Artikel nur einmal gespeichert."
 
+#: apps/manager/event_forms.py
+msgid "A free event has no price: leave it empty."
+msgstr "Eine kostenlose Veranstaltung hat keinen Preis: Lass das Feld leer."
+
 #: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
 #: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
 msgid ""
@@ -1795,6 +1799,10 @@ msgstr "Vorher"
 msgid "Before and after"
 msgstr "Vorher und nachher"
 
+#: apps/seo/templates/seo/admin/opening_steps.html
+msgid "Before opening the platform"
+msgstr "Vor der Öffnung der Plattform"
+
 #: apps/orders/customer_views.py
 msgid "Being prepared"
 msgstr "In Vorbereitung"
@@ -2891,6 +2899,14 @@ msgstr "Erklärung zur Veröffentlichung erforderlich"
 msgid "Decrease quantity"
 msgstr "Menge verringern"
 
+#: apps/seo/admin_views.py
+msgid "Default sharing image"
+msgstr "Standard-Vorschaubild"
+
+#: apps/seo/models.py
+msgid "default sharing image"
+msgstr "Standard-Vorschaubild"
+
 #: apps/cms/models.py
 msgid "Defaults to 'Apply now'."
 msgstr "Standardmäßig 'Jetzt bewerben'."
@@ -3736,6 +3752,10 @@ msgstr "Formularfelder"
 msgid "form page"
 msgstr "Formularseite"
 
+#: apps/manager/event_forms.py
+msgid "Free entry"
+msgstr "Freier Eintritt"
+
 #: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Frequently asked questions"
@@ -4017,6 +4037,11 @@ msgstr "Hilfetexte"
 #: apps/cms/templates/cms/help_guide_index.html apps/cms/templates/cms/help_guide_section.html
 msgid "Help topics"
 msgstr "Hilfethemen"
+
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid "Hi %(customer_name)s,"
+msgstr "Hallo %(customer_name)s,"
 
 #: apps/manager/event_views.py
 msgid "Hidden by the platform."
@@ -4841,6 +4866,10 @@ msgid ""
 msgstr ""
 "Lassen Sie das Feld leer für alle Regionen, oder wählen Sie EU oder Nicht-EU, um die Regel auf "
 "alle dort ansässigen Verkäufer anzuwenden."
+
+#: apps/manager/event_forms.py
+msgid "Leave it empty if you do not want to show a price."
+msgstr "Lass das Feld leer, wenn kein Preis angezeigt werden soll."
 
 #: apps/compliance/forms.py
 msgid "Leave on the first choice unless one of these applies: it allows a shorter notice."
@@ -5975,6 +6004,10 @@ msgstr "Nur ein Entwurf kann bearbeitet werden; dieser ist %(state)s."
 msgid "Only a pending notice can be withdrawn."
 msgstr "Nur eine laufende Kündigung kann zurückgenommen werden."
 
+#: apps/manager/event_forms.py
+msgid "Only a postponed event has a previous start."
+msgstr "Nur eine verschobene Veranstaltung hat einen früheren Beginn."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "Only approved brands have a public page and can be picked by every vendor. Use the approve, reject"
@@ -7010,6 +7043,10 @@ msgstr "Position"
 msgid "Postcode"
 msgstr "Postleitzahl"
 
+#: apps/manager/event_forms.py
+msgid "Postponed"
+msgstr "Verschoben"
+
 #: apps/seo/providers.py
 msgid "Preferences"
 msgstr "Einstellungen"
@@ -7112,6 +7149,10 @@ msgstr "Vorheriger Monat"
 #: themes/ride/templates/components/carousel_controls.html
 msgid "Previous slide"
 msgstr "Vorherige Folie"
+
+#: apps/manager/event_forms.py
+msgid "Previous start"
+msgstr "Früherer Beginn"
 
 #: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "Previous versions"
@@ -8481,6 +8522,14 @@ msgstr ""
 msgid "Shown to the vendor and kept in the audit log."
 msgstr "Wird dem Verkäufer angezeigt und im Audit-Protokoll aufbewahrt."
 
+#: apps/seo/admin_views.py apps/seo/models.py
+msgid ""
+"Shown when a page is shared on social networks and the page has no picture of its own. If you "
+"leave it empty, the platform logo is used."
+msgstr ""
+"Wird angezeigt, wenn eine Seite in sozialen Netzwerken geteilt wird und die Seite kein eigenes "
+"Bild hat. Bleibt das Feld leer, wird das Logo der Plattform verwendet."
+
 #: apps/seo/providers.py
 msgid "Shows us, in aggregate, which pages are used so we can improve the shop."
 msgstr ""
@@ -8998,7 +9047,7 @@ msgstr "Danke. Wir haben deine Nachricht erhalten."
 
 #: apps/compliance/templates/compliance/notice_received.html
 msgid "Thank you. We received your report and will review it."
-msgstr "Danke. Wir haben deine Meldung erhalten und prüfen sie."
+msgstr "Danke. Wir haben Ihre Meldung erhalten und prüfen sie."
 
 #: apps/cms/forms_pages.py
 msgid "thank-you text"
@@ -10958,6 +11007,14 @@ msgstr ""
 "Das Bild, das angezeigt wird, wenn Käufer diese Variante wählen. Wählen Sie eines der Bilder "
 "dieses Produkts. Lassen Sie das Feld leer, um die Galerie des Produkts beizubehalten."
 
+#: apps/cms/models.py
+msgid ""
+"The picture shown when this page is shared on social networks. If you leave it empty, the main "
+"image of the page, the site default or the logo is used."
+msgstr ""
+"Das Bild, das angezeigt wird, wenn diese Seite in sozialen Netzwerken geteilt wird. Bleibt das "
+"Feld leer, werden das Hauptbild der Seite, das Standardbild der Website oder das Logo verwendet."
+
 #: apps/ingest/models.py
 msgid ""
 "The plain value this term stands for, for example a colour name. Use it when there is no catalogue"
@@ -11083,6 +11140,14 @@ msgstr ""
 "Der Preis in Euro ohne MwSt., zum Beispiel 19,90. Erforderlich, um das Produkt zu verkaufen: Im "
 "Modus Kauf wird ein leerer Preis abgelehnt. Er darf nicht 0,00 sein; lassen Sie das Feld "
 "stattdessen leer."
+
+#: apps/events/models.py
+msgid ""
+"The price of a ticket in euro. If you leave it empty, no price is shown. For free entry, tick "
+"'free entry' instead."
+msgstr ""
+"Der Preis eines Tickets in Euro. Bleibt das Feld leer, wird kein Preis angezeigt. Für freien "
+"Eintritt hake stattdessen „Freier Eintritt“ an."
 
 #: apps/orders/templates/email/orders/staff_draft_link/body.html
 #: apps/orders/templates/email/orders/staff_draft_link/body.txt
@@ -12011,6 +12076,12 @@ msgstr ""
 msgid "The verification failed. Please reload the page and try again."
 msgstr "Die Überprüfung ist fehlgeschlagen. Bitte lade die Seite neu und versuche es erneut."
 
+#: apps/compliance/views.py
+msgctxt "formal"
+msgid "The verification failed. Please reload the page and try again."
+msgstr ""
+"Die Überprüfung ist fehlgeschlagen. Bitte laden Sie die Seite neu und versuchen Sie es erneut."
+
 #: apps/vendors/models.py
 msgid "The version belongs to another seller."
 msgstr "Die Version gehört zu einem anderen Verkäufer."
@@ -12253,6 +12324,14 @@ msgid ""
 msgstr ""
 "Diese Regeln gelten für jede Änderung einer bezahlten Bestellung. Sie sind Teil der "
 "Plattformkonfiguration: Eine Änderung wird als neue Konfigurationsversion wirksam."
+
+#: apps/seo/templates/seo/admin/opening_steps.html
+msgid ""
+"These steps are still open. This reminder disappears when search engine indexing is on and every "
+"step is done."
+msgstr ""
+"Diese Schritte sind noch offen. Dieser Hinweis verschwindet, sobald die Indexierung durch "
+"Suchmaschinen aktiviert und jeder Schritt erledigt ist."
 
 #: apps/manager/sales_terms_views.py
 msgid ""
@@ -12804,6 +12883,10 @@ msgstr ""
 "Setzen Sie das Häkchen, um die Hauptvariante des Produkts zu markieren. Nur eine Variante eines "
 "Produkts kann die Standardvariante sein."
 
+#: apps/events/models.py apps/manager/event_forms.py
+msgid "Tick it when entry costs nothing. Leave the price empty."
+msgstr "Hake das Feld an, wenn der Eintritt nichts kostet. Lass den Preis leer."
+
 #: apps/core/models.py
 msgid "Tick it when images under this licence must show a credit."
 msgstr "Setzen Sie das Häkchen, wenn Bilder unter dieser Lizenz eine Quellenangabe zeigen müssen."
@@ -12820,6 +12903,20 @@ msgid "Tick it when images under this licence need the web address they come fro
 msgstr ""
 "Setzen Sie das Häkchen, wenn Bilder unter dieser Lizenz die Webadresse benötigen, von der sie "
 "stammen."
+
+#: apps/events/models.py
+msgid ""
+"Tick it when the event is moved to another date. Change the date above to the new one and give the"
+" old start below. A cancelled event stays cancelled."
+msgstr ""
+"Hake das Feld an, wenn die Veranstaltung auf ein anderes Datum verschoben wird. Ändere oben das "
+"Datum auf das neue und gib unten den alten Beginn an. Eine abgesagte Veranstaltung bleibt "
+"abgesagt."
+
+#: apps/manager/event_forms.py
+msgid "Tick it when the event is moved: change the date above to the new one."
+msgstr ""
+"Hake das Feld an, wenn die Veranstaltung verschoben wird: Ändere oben das Datum auf das neue."
 
 #: apps/manager/amendment_forms.py
 msgid ""
@@ -12875,6 +12972,18 @@ msgid ""
 msgstr ""
 "Mit Häkchen: Die Funktion ist für diesen Verkäufer aktiv. Ohne Häkchen: Sie ist deaktiviert, "
 "unabhängig von der Plattformeinstellung. Ein Notfallschalter kann hier nur ausgeschaltet werden."
+
+#: apps/manager/event_forms.py
+msgid "Ticket link"
+msgstr "Ticket-Link"
+
+#: apps/manager/event_forms.py
+msgid "Ticket price (EUR)"
+msgstr "Ticketpreis (EUR)"
+
+#: apps/manager/event_forms.py
+msgid "Tickets and changes"
+msgstr "Tickets und Änderungen"
 
 #: themes/base/templates/components/launch_countdown.html
 #: themes/ride/templates/components/launch_countdown.html
@@ -12945,6 +13054,15 @@ msgstr ""
 "Post versandter Brief oder E-Mail) über Ihren Entschluss, diesen Vertrag zu widerrufen, "
 "informieren. Sie können dafür das beigefügte Muster-Widerrufsformular verwenden, das jedoch nicht "
 "vorgeschrieben ist."
+
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid ""
+"To keep a saved item, sign in and use it in your garage before that date. Otherwise it is deleted."
+" You can also delete it yourself at any time."
+msgstr ""
+"Wenn du einen gespeicherten Eintrag behalten möchtest, melde dich an und nutze ihn vor diesem "
+"Datum in deiner Garage. Andernfalls wird er gelöscht. Du kannst ihn auch jederzeit selbst löschen."
 
 #: apps/shipping/models.py
 msgid ""
@@ -14061,6 +14179,19 @@ msgstr ""
 "Wann die Veranstaltung abgesagt wurde. Leer bei einer Veranstaltung, die stattfindet. Wird von der"
 " Plattform ausgefüllt."
 
+#: apps/events/models.py
+msgid ""
+"When the event was first planned to start. Only for a postponed event; leave it empty if you do "
+"not want to show it."
+msgstr ""
+"Wann die Veranstaltung ursprünglich beginnen sollte. Nur für eine verschobene Veranstaltung; leer "
+"lassen, wenn es nicht angezeigt werden soll."
+
+#: apps/manager/event_forms.py
+msgid "When the event was first planned, in the event's time zone. Optional."
+msgstr ""
+"Wann die Veranstaltung ursprünglich geplant war, in der Zeitzone der Veranstaltung. Optional."
+
 #: apps/cms/blocks.py
 msgid ""
 "When the launch happens, in the platform's local time. Example: 2026-12-01 09:00. Required: the "
@@ -14172,6 +14303,18 @@ msgid ""
 msgstr ""
 "Wohin Compliance-Warnungen gehen, zum Beispiel ein überfälliger Sicherheitsfall. Lassen Sie das "
 "Feld leer, um sie an die Support-Adresse zu senden."
+
+#: apps/events/models.py
+msgid ""
+"Where people get tickets or register, starting with https://. If you leave it empty, no ticket "
+"link is shown."
+msgstr ""
+"Wo man Tickets bekommt oder sich anmeldet, beginnend mit https://. Bleibt das Feld leer, wird kein"
+" Ticket-Link angezeigt."
+
+#: apps/manager/event_forms.py
+msgid "Where people get tickets or register, starting with https://. Optional."
+msgstr "Wo man Tickets bekommt oder sich anmeldet, beginnend mit https://. Optional."
 
 #: apps/manager/event_forms.py
 msgid "Where people join an online event, starting with https://."
@@ -14785,6 +14928,15 @@ msgstr ""
 "Sie haben noch keine Richtlinie festgelegt. Es gilt die Standardrichtlinie: Der Shop trägt die "
 "Rücksendekosten."
 
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid ""
+"You have not used the items saved in your account garage for almost two years. To keep the data we"
+" hold about you small, we delete them on %(delete_on)s."
+msgstr ""
+"Du hast die in der Garage deines Kontos gespeicherten Einträge seit fast zwei Jahren nicht "
+"genutzt. Damit wir möglichst wenige Daten über dich speichern, löschen wir sie am %(delete_on)s."
+
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
 "You have the right to withdraw from this contract within %(days)s days without giving any reason."
@@ -15124,6 +15276,10 @@ msgstr "Ihre Rolle erfordert einen zweiten Faktor, bevor Sie fortfahren können.
 #: apps/manager/sales_terms_views.py
 msgid "Your sales terms are published and in force."
 msgstr "Ihre Verkaufsbedingungen sind veröffentlicht und in Kraft."
+
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/subject.txt
+msgid "Your saved garage items will be deleted soon"
+msgstr "Deine gespeicherten Garagen-Einträge werden bald gelöscht"
 
 #: apps/accounts/lifetimes.py
 msgid "Your session ended because it was not used for a while. Please sign in again."

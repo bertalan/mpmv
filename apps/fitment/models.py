@@ -534,6 +534,11 @@ class GarageProfile(BaseModel):
     year = models.SmallIntegerField(_("year"), null=True, blank=True)
     is_active = models.BooleanField(_("active"), default=False)
     last_used_at = models.DateTimeField(default=timezone.now)
+    inactivity_notice_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When the service email about the 24-month cleanup was queued."),
+    )
 
     class Meta:
         ordering = ["-last_used_at", "id"]

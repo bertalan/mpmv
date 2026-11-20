@@ -24,6 +24,7 @@ from django.http import HttpRequest
 from django.utils import timezone
 from wagtail.models import Site
 
+from apps.cms import services as cms_services
 from apps.core.audit import AuditContext, user_context
 from apps.core.changeset import ChangeSet
 from apps.core.indexing import is_noindex_forced
@@ -36,6 +37,7 @@ from .models import ConsentLog, SeoSettings
 logger = logging.getLogger(__name__)
 
 SEO_SETTINGS_CONFIGURED = "seo.settings.configured"
+KEEP: Any = object()  # "leave this field as it is" for the optional arguments of the setters
 FLOOR_MESSAGE = (
     "Indexing cannot be allowed while MPMV_FORCE_NOINDEX or demo mode is on: "
     "the environment makes every page noindex."
@@ -73,7 +75,11 @@ def may_edit_seo_settings(user: Any) -> bool:
 
 
 def seo_snapshot(setting: SeoSettings) -> dict[str, Any]:
-    return {"site": setting.site_id, "allow_indexing": setting.allow_indexing}
+    return {
+        "site": setting.site_id,
+        "allow_indexing": setting.allow_indexing,
+        "default_image": setting.default_image_id,
+    }
 
 
 def set_site_indexing(
@@ -82,9 +88,11 @@ def set_site_indexing(
     allow: bool,
     *,
     ctx: AuditContext | None,
+    default_image: Any = KEEP,
     dry_run: bool = False,
 ) -> ChangeSet:
-    """Allow or stop search engines indexing `site`, audited.
+    """Allow or stop search engines indexing `site`, audited; `default_image` (an image or None)
+    is the site's fallback sharing image (SEO.8 2/2, D-36) and is left alone when not passed.
 
     Raises PermissionDenied for anyone but platform staff and ValidationError when asked to
     allow indexing under the environment floor (turning it off there is allowed).
@@ -95,6 +103,8 @@ def set_site_indexing(
         raise ValidationError(FLOOR_MESSAGE)
     setting = SeoSettings.objects.filter(site=site).first() or SeoSettings(site=site)
     setting.allow_indexing = allow
+    if default_image is not KEEP:
+        setting.default_image = default_image
     return save_audited(
         setting,
         seo_snapshot,
@@ -185,3 +195,13 @@ def golive_indexing_messages(languages: Any = None) -> list[str]:
                 "engines would get an insecure site. Set an https address in Settings > Sites."
             )
     return messages
+
+
+def opening_checklist() -> list[str]:
+    """The steps still open before the platform opens to the public (SEO.8 2/2): every go-live
+    problem (`golive_readiness`: legal pages, DSA and P2B contacts, and the indexing and site
+    address lines above). Empty under the environment floor (STAGE, demo), where none of them is
+    expected, and once everything is done: the reminder then disappears."""
+    if is_noindex_forced():
+        return []
+    return list(cms_services.golive_problems())

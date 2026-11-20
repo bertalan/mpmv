@@ -229,3 +229,26 @@ def delete_profile(
     changeset = ChangeSet()
     changeset.delete(MODEL, str(profile.public_id), _snapshot(profile))
     return run_mutation(changeset, profile.delete, ctx=ctx, action=PROFILE_DELETED, dry_run=dry_run)
+
+
+def export_profiles(user: User) -> list[dict[str, Any]]:
+    """The customer's profiles for the CMP.4 export (access and portability): the name, the
+    vehicle as its path of labels, the year, the active flag and the last use."""
+    return [
+        {
+            "name": p.name,
+            "vehicle": _labels(p.node),
+            "year": p.year,
+            "is_active": p.is_active,
+            "last_used_at": p.last_used_at.isoformat(),
+        }
+        for p in profiles_of(user)
+    ]
+
+
+def erase_profiles(user: User, changeset: ChangeSet) -> None:
+    """Delete every profile of `user` (CMP.4 erasure). The caller owns the transaction and the
+    audit: each deletion is added to `changeset` with the audit snapshot, no name."""
+    for profile in GarageProfile.objects.filter(user=user).select_related("node"):
+        changeset.delete(MODEL, str(profile.public_id), _snapshot(profile))
+    GarageProfile.objects.filter(user=user).delete()
