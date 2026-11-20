@@ -148,6 +148,11 @@ class ShopDashboardView(ManagerView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context["products"] = product_kpis(self.scoped(Product))
+        # CMP.41 follow-up: a seller to consumers without a phone is told what to do.
+        vendor = self.manager.vendor
+        context["phone_missing"] = vendor is not None and vendors_services.consumer_phone_missing(
+            vendor
+        )
         return context
 
 

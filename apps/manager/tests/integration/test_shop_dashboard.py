@@ -106,3 +106,24 @@ def test_the_dashboard_query_count_does_not_grow_with_the_products(
     for _ in range(8):
         ProductFactory.create(vendor=vendor, status="published", stock_status="out_of_stock")
     assert _dashboard_queries(client) == few
+
+
+# CMP.41 follow-up (owner decision 2026-11-19): a seller to consumers without a phone is told.
+
+
+def test_a_seller_without_a_phone_sees_a_notice_on_the_dashboard(
+    client: Client, owner: User, vendor: Vendor
+) -> None:
+    Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.ACTIVE, phone="")
+    verified_login(client, owner)
+    page = client.get(SHOP).text
+    assert 'id="consumer-phone-notice"' in page
+    assert "phone number" in page
+
+
+def test_a_seller_with_a_phone_sees_no_phone_notice(
+    client: Client, owner: User, vendor: Vendor
+) -> None:
+    Vendor.objects.filter(pk=vendor.pk).update(phone="+44 20 7946 0123")
+    verified_login(client, owner)
+    assert 'id="consumer-phone-notice"' not in client.get(SHOP).text

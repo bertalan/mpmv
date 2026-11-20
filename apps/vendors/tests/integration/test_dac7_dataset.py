@@ -297,7 +297,7 @@ def test_the_admin_saves_other_fields_without_step_up(client: Client, staff: Use
     url = reverse("admin:vendors_vendor_change", args=[vendor.pk])
     response = client.post(url, change_form(vendor, phone="+49 30 1234567"))
     assert response.status_code == 302, response.content.decode()
-    assert Vendor.objects.get(pk=vendor.pk).phone == "+49 30 1234567"
+    assert Vendor.objects.get(pk=vendor.pk).phone == "+49301234567"  # stored normalised
 
 
 def test_the_admin_saves_a_dac7_correction_after_step_up(client: Client, staff: User) -> None:

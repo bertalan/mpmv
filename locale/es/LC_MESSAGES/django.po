@@ -6939,6 +6939,15 @@ msgstr ""
 "Indique a qué se adapta este producto antes de publicarlo: elija los artículos compatibles en la "
 "pestaña Compatibilidad o declare que se adapta a todo."
 
+#: apps/vendors/services.py
+msgid ""
+"Please give us a phone number for your shop before you publish products: sellers who sell to "
+"consumers must show one in the withdrawal information. Send it to the platform staff."
+msgstr ""
+"Facilítenos un número de teléfono de su tienda antes de publicar productos: quien vende a "
+"consumidores debe indicarlo en la información sobre el desistimiento. Envíelo al personal de la "
+"plataforma."
+
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
 msgstr "Etiqueta en plural"
@@ -15115,6 +15124,16 @@ msgstr "Tus sesiones"
 msgid "Your shop cancelled order %(order_number)s and the customer was refunded in full."
 msgstr ""
 "Su tienda ha cancelado el pedido %(order_number)s y se ha reembolsado íntegramente al cliente."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to the platform staff; until "
+"then you cannot publish products."
+msgstr ""
+"Su tienda no tiene número de teléfono. Quien vende a consumidores debe indicar uno: los "
+"compradores lo ven en la información sobre el desistimiento y en la confirmación del pedido. "
+"Envíelo al personal de la plataforma; hasta entonces no puede publicar productos."
 
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."

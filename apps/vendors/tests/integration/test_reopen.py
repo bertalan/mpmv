@@ -291,5 +291,5 @@ def test_saving_a_stale_profile_does_not_undo_a_reopen() -> None:
     save_vendor(stale, ctx=STAFF_CTX)
 
     stored = Vendor.objects.get(pk=member.vendor.pk)
-    assert stored.phone == "+39 06 000000"
+    assert stored.phone == "+3906000000"  # stored normalised
     assert (stored.status, stored.onboarding_round) == (Vendor.Status.ONBOARDING, 2)
