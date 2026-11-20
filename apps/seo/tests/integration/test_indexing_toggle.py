@@ -308,3 +308,10 @@ def test_the_panel_is_in_the_settings_menu(client: Client) -> None:
     verified_login(client, staff())
     response = client.get(reverse("wagtailadmin_home"))
     assert reverse(SETTINGS_URL) in response.content.decode()
+
+
+def test_the_seo_settings_form_is_nfc() -> None:
+    from apps.core.nfc_forms import NFCFormMixin
+    from apps.seo.admin_views import SeoSettingsForm
+
+    assert issubclass(SeoSettingsForm, NFCFormMixin)
