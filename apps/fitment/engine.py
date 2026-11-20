@@ -304,3 +304,57 @@ def declaration_problems(
                     f"Row {number}: an exclusion without anything to exclude from."
                 )
     return problems
+
+
+# --- Account garage profiles (FIT.5, spec 17 §17.4.1)
+
+MAX_PROFILE_NAME = 40
+DEFAULT_MAX_PROFILES = 10
+
+
+def profile_name_error(name: str) -> str | None:
+    cleaned = clean_name(name)
+    if not cleaned:
+        return "A profile needs a name."
+    if len(cleaned) > MAX_PROFILE_NAME:
+        return f"A profile name has at most {MAX_PROFILE_NAME} characters."
+    return None
+
+
+def default_profile_name(labels: Sequence[str], year: int | None) -> str:
+    """ "<make> <model> <year>": the node names from the top down, then the year, cut to fit."""
+    parts = [*labels, *([str(year)] if year is not None else [])]
+    return clean_name(" ".join(parts))[:MAX_PROFILE_NAME].strip()
+
+
+def copy_name(name: str, taken: Sequence[str]) -> str:
+    """ "Car (copy)", then "Car (copy 2)", ...: the first name not in `taken` (compared folded)."""
+    used = {normalize_name(other) for other in taken}
+    number = 1
+    while True:
+        suffix = " (copy)" if number == 1 else f" (copy {number})"
+        candidate = name[: MAX_PROFILE_NAME - len(suffix)].rstrip() + suffix
+        if normalize_name(candidate) not in used:
+            return candidate
+        number += 1
+
+
+def profile_limit_error(count: int, maximum: int) -> str | None:
+    if count >= maximum:
+        return f"A garage holds at most {maximum} profiles: delete one first."
+    return None
+
+
+def profile_year_error(year: int | None, *, enabled: bool, low: int, high: int) -> str | None:
+    if year is None:
+        return None
+    if not enabled:
+        return "This scheme does not use a year."
+    if not low <= year <= high:
+        return f"The year must be between {low} and {high}."
+    return None
+
+
+def profile_node_retired(status: str) -> bool:
+    """A retired node stays in profiles, shown with a note; matching treats it as before."""
+    return status == RETIRED

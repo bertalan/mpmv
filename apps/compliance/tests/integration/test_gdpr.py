@@ -437,6 +437,8 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
         "accounts.user_user_permissions": "stripped on erasure",
         "tax.taxregimechangerequest": "vendor side, CMP.4 2/2",
         "core.mediaimage": "staff upload reference (Wagtail owner field)",
+        "fitment.garageprofile": "the account garage (FIT.5): export and erasure in FIT.5 3/3 "
+        "(until then the rows stay with the user row)",
         "vendors.returnpolicyversion": "staff reviewer reference (SET_NULL on erasure), not the "
         "customer's data; the record stays (VEN.40)",
     }
