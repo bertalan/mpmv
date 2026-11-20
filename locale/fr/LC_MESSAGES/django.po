@@ -447,6 +447,10 @@ msgid "A fingerprint of the data. The same data is stored once per item."
 msgstr ""
 "Une empreinte des données. Les mêmes données ne sont enregistrées qu'une seule fois par article."
 
+#: apps/manager/event_forms.py
+msgid "A free event has no price: leave it empty."
+msgstr "Un événement gratuit n'a pas de prix : laissez le champ vide."
+
 #: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
 #: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
 msgid ""
@@ -455,9 +459,6 @@ msgid ""
 msgstr ""
 "Un dossier de sécurité GPSR a dépassé son délai et reste ouvert. Intervenez maintenant et "
 "consignez ce qui a été fait dans l'interface d'administration."
-#: apps/manager/event_forms.py
-msgid "A free event has no price: leave it empty."
-msgstr "Un événement gratuit n'a pas de prix : laissez le champ vide."
 
 #: apps/manager/event_block_forms.py
 msgid "A grid, or one row that scrolls sideways."
@@ -3696,11 +3697,11 @@ msgstr "Champs du formulaire"
 msgid "form page"
 msgstr "page de formulaire"
 
-#: apps/cms/templates/cms/vendor_recruitment_page.html
 #: apps/manager/event_forms.py
 msgid "Free entry"
 msgstr "Entrée libre"
 
+#: apps/cms/templates/cms/vendor_recruitment_page.html
 #: themes/ride/templates/cms/vendor_recruitment_page.html
 msgid "Frequently asked questions"
 msgstr "Questions fréquentes"
