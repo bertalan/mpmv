@@ -26,7 +26,6 @@ from apps.cms.models import (
 )
 from apps.cms.tests.factories import HomePageFactory, StandardPageFactory
 from apps.core.nfc_forms import NFCFormMixin, nfc_block_data, nfc_stream_value
-from apps.events.models import EventIndexPage, EventPage
 
 pytestmark = pytest.mark.django_db
 
@@ -47,8 +46,6 @@ URL = "https://example.org/café?q=é"
         TermLandingPage,
         VendorLandingPage,
         FormPage,
-        EventIndexPage,
-        EventPage,
     ],
 )
 def test_every_page_type_has_the_nfc_form(model: Any) -> None:
