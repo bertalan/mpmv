@@ -504,7 +504,9 @@ _STRING_OR_COMMENT_RE = re.compile(
     re.DOTALL,
 )
 _SPACE_RE = re.compile(r"\s+")
-_AROUND_RE = re.compile(r"\s*([{};,>])\s*")
+# Starts at the first space of a run only: a run without a delimiter was scanned once, not once
+# per space.
+_AROUND_RE = re.compile(r"(?:(?<!\s)\s*)?([{};,>])\s*")
 _AFTER_COLON_RE = re.compile(r":\s+")
 
 
