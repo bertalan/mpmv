@@ -304,7 +304,7 @@ class CategoryList(ManagerListView):
         RelevanceFilter(
             "relevant",
             gettext_lazy("Fitment"),
-            (("yes", gettext_lazy("Expected")), ("no", gettext_lazy("Not expected"))),  # type: ignore[arg-type]
+            (("yes", gettext_lazy("Expected")), ("no", gettext_lazy("Not expected"))),
             lookup="is_relevant",
         ),
     )
