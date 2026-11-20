@@ -2841,6 +2841,14 @@ msgstr "Declaración obligatoria para publicar"
 msgid "Decrease quantity"
 msgstr "Disminuir la cantidad"
 
+#: apps/seo/admin_views.py
+msgid "Default sharing image"
+msgstr "Imagen para compartir por defecto"
+
+#: apps/seo/models.py
+msgid "default sharing image"
+msgstr "imagen para compartir por defecto"
+
 #: apps/cms/models.py
 msgid "Defaults to 'Apply now'."
 msgstr "Por defecto es «Solicitar ahora»."
@@ -8353,6 +8361,14 @@ msgstr ""
 msgid "Shown to the vendor and kept in the audit log."
 msgstr "Se muestra al vendedor y se conserva en el registro de auditoría."
 
+#: apps/seo/admin_views.py apps/seo/models.py
+msgid ""
+"Shown when a page is shared on social networks and the page has no picture of its own. If you "
+"leave it empty, the platform logo is used."
+msgstr ""
+"Se muestra cuando una página se comparte en redes sociales y la página no tiene imagen propia. Si "
+"deja el campo vacío, se usa el logotipo de la plataforma."
+
 #: apps/seo/providers.py
 msgid "Shows us, in aggregate, which pages are used so we can improve the shop."
 msgstr "Nos muestra, de forma agregada, qué páginas se utilizan para que podamos mejorar la tienda."
@@ -10781,6 +10797,14 @@ msgid ""
 msgstr ""
 "La imagen que se muestra cuando quien compra elige esta versión. Elige una de las imágenes de este"
 " producto. Déjalo vacío para mantener la galería del producto."
+
+#: apps/cms/models.py
+msgid ""
+"The picture shown when this page is shared on social networks. If you leave it empty, the main "
+"image of the page, the site default or the logo is used."
+msgstr ""
+"La imagen que se muestra cuando esta página se comparte en redes sociales. Si deja el campo vacío,"
+" se usa la imagen principal de la página, la imagen por defecto del sitio o el logotipo."
 
 #: apps/ingest/models.py
 msgid ""

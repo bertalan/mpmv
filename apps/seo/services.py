@@ -37,6 +37,7 @@ from .models import ConsentLog, SeoSettings
 logger = logging.getLogger(__name__)
 
 SEO_SETTINGS_CONFIGURED = "seo.settings.configured"
+KEEP: Any = object()  # "leave this field as it is" for the optional arguments of the setters
 FLOOR_MESSAGE = (
     "Indexing cannot be allowed while MPMV_FORCE_NOINDEX or demo mode is on: "
     "the environment makes every page noindex."
@@ -74,7 +75,11 @@ def may_edit_seo_settings(user: Any) -> bool:
 
 
 def seo_snapshot(setting: SeoSettings) -> dict[str, Any]:
-    return {"site": setting.site_id, "allow_indexing": setting.allow_indexing}
+    return {
+        "site": setting.site_id,
+        "allow_indexing": setting.allow_indexing,
+        "default_image": setting.default_image_id,
+    }
 
 
 def set_site_indexing(
@@ -83,9 +88,11 @@ def set_site_indexing(
     allow: bool,
     *,
     ctx: AuditContext | None,
+    default_image: Any = KEEP,
     dry_run: bool = False,
 ) -> ChangeSet:
-    """Allow or stop search engines indexing `site`, audited.
+    """Allow or stop search engines indexing `site`, audited; `default_image` (an image or None)
+    is the site's fallback sharing image (SEO.8 2/2, D-36) and is left alone when not passed.
 
     Raises PermissionDenied for anyone but platform staff and ValidationError when asked to
     allow indexing under the environment floor (turning it off there is allowed).
@@ -96,6 +103,8 @@ def set_site_indexing(
         raise ValidationError(FLOOR_MESSAGE)
     setting = SeoSettings.objects.filter(site=site).first() or SeoSettings(site=site)
     setting.allow_indexing = allow
+    if default_image is not KEEP:
+        setting.default_image = default_image
     return save_audited(
         setting,
         seo_snapshot,

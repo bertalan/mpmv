@@ -2876,6 +2876,14 @@ msgstr "Erklärung zur Veröffentlichung erforderlich"
 msgid "Decrease quantity"
 msgstr "Menge verringern"
 
+#: apps/seo/admin_views.py
+msgid "Default sharing image"
+msgstr "Standard-Vorschaubild"
+
+#: apps/seo/models.py
+msgid "default sharing image"
+msgstr "Standard-Vorschaubild"
+
 #: apps/cms/models.py
 msgid "Defaults to 'Apply now'."
 msgstr "Standardmäßig 'Jetzt bewerben'."
@@ -8425,6 +8433,14 @@ msgstr ""
 msgid "Shown to the vendor and kept in the audit log."
 msgstr "Wird dem Verkäufer angezeigt und im Audit-Protokoll aufbewahrt."
 
+#: apps/seo/admin_views.py apps/seo/models.py
+msgid ""
+"Shown when a page is shared on social networks and the page has no picture of its own. If you "
+"leave it empty, the platform logo is used."
+msgstr ""
+"Wird angezeigt, wenn eine Seite in sozialen Netzwerken geteilt wird und die Seite kein eigenes "
+"Bild hat. Bleibt das Feld leer, wird das Logo der Plattform verwendet."
+
 #: apps/seo/providers.py
 msgid "Shows us, in aggregate, which pages are used so we can improve the shop."
 msgstr ""
@@ -10901,6 +10917,14 @@ msgid ""
 msgstr ""
 "Das Bild, das angezeigt wird, wenn Käufer diese Variante wählen. Wählen Sie eines der Bilder "
 "dieses Produkts. Lassen Sie das Feld leer, um die Galerie des Produkts beizubehalten."
+
+#: apps/cms/models.py
+msgid ""
+"The picture shown when this page is shared on social networks. If you leave it empty, the main "
+"image of the page, the site default or the logo is used."
+msgstr ""
+"Das Bild, das angezeigt wird, wenn diese Seite in sozialen Netzwerken geteilt wird. Bleibt das "
+"Feld leer, werden das Hauptbild der Seite, das Standardbild der Website oder das Logo verwendet."
 
 #: apps/ingest/models.py
 msgid ""
