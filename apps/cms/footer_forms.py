@@ -3,10 +3,12 @@
 from django.utils.translation import gettext as _
 from wagtail.admin.forms import WagtailAdminModelForm
 
+from apps.core.nfc_forms import NFCFormMixin
+
 from . import engine
 
 
-class FooterSettingsForm(WagtailAdminModelForm):  # type: ignore[misc]  # Wagtail is untyped
+class FooterSettingsForm(NFCFormMixin, WagtailAdminModelForm):  # type: ignore[misc]  # Wagtail is untyped
     def is_valid(self) -> bool:
         """The column formset is validated after the form's `clean`, so the count is checked
         once both are valid."""
