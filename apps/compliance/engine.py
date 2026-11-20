@@ -403,7 +403,6 @@ PUBLIC_TEXT_LIMIT: Final = 2000  # the transparency database caps explanations h
 _PUBLIC_PATTERNS: Final = tuple(
     re.compile(pattern, re.IGNORECASE)
     for pattern in (
-        r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+",  # email
         r"(?:https?://|www\.)\S+",  # URL
         r"\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b",  # IBAN
         r"\b(?:\d[ -]?){13,19}\b",  # card number
@@ -412,10 +411,60 @@ _PUBLIC_PATTERNS: Final = tuple(
 )
 
 
+def _is_word(char: str) -> bool:
+    return char.isalnum() or char == "_"
+
+
+def _email_end(text: str, start: int) -> int:
+    """The end of the domain that starts at `start` (word characters and hyphens in labels
+    joined by dots, at least two labels), or -1 when there is none."""
+    size = len(text)
+    end = -1
+    index = start
+    while True:
+        label_end = index
+        while label_end < size and (_is_word(text[label_end]) or text[label_end] == "-"):
+            label_end += 1
+        if label_end == index:
+            return end
+        if index > start:
+            end = label_end
+        if label_end < size and text[label_end] == "." and label_end > start:
+            index = label_end + 1
+        else:
+            return end
+
+
+def _remove_emails(text: str, marker: str) -> str:
+    """Replace every email (local part, `@`, dotted domain) with `marker`, in linear time.
+
+    Done by hand around each `@` instead of one pattern: a pattern that starts with a long
+    character class backtracks quadratically on a long run without an `@`.
+    """
+    parts: list[str] = []
+    done = 0  # end of the last email: nothing before it is looked at again
+    at = text.find("@")
+    while at != -1:
+        start = at
+        while start > done and (_is_word(text[start - 1]) or text[start - 1] in ".+-"):
+            start -= 1
+        end = _email_end(text, at + 1) if start < at else -1
+        if end != -1:
+            parts.append(text[done:start])
+            parts.append(marker)
+            done = end
+            at = text.find("@", end)
+        else:
+            at = text.find("@", at + 1)
+    parts.append(text[done:])
+    return "".join(parts)
+
+
 def scrub_public_text(text: str) -> str:
     """`text` for a public database: emails, URLs, IBANs, card and phone numbers removed, at most
     `PUBLIC_TEXT_LIMIT` characters (art. 24(5): no personal data). Defence in depth: staff write
     this text for the public and are warned that it is published."""
+    text = _remove_emails(text, "[removed]")
     for pattern in _PUBLIC_PATTERNS:
         text = pattern.sub("[removed]", text)
     return text.strip()[:PUBLIC_TEXT_LIMIT]
