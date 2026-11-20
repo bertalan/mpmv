@@ -51,6 +51,7 @@ from dataclasses import dataclass, field
 from typing import Any, Final
 
 from apps.core.changeset import to_jsonable
+from apps.core.text import nfc
 
 from . import engine
 
@@ -138,6 +139,8 @@ TREATMENTS: Final = "area_treatments"
 # The key a method nests each of its parts under.
 PART_KEYS: Final[Mapping[str, str]] = {BAND: BANDS, AREA_TREATMENT: TREATMENTS}
 
+# Free text a person writes (I18N.10): the only values normalised to NFC on import.
+TEXT_FIELDS: Final = ("name", "address")
 LIST_FIELDS: Final = frozenset({"countries", "country_groups", "postcode_patterns", "states"})
 BOOLEAN_FIELDS: Final = frozenset({"is_default"})
 NUMBER_FIELDS: Final = frozenset(
@@ -486,6 +489,10 @@ def _add_row(
     *,
     method: MethodId | None = None,
 ) -> None:
+    # Free text is stored in NFC (I18N.10); codes, keys, patterns and numbers stay as typed.
+    for name in TEXT_FIELDS:
+        if isinstance(values.get(name), str):
+            values[name] = nfc(values[name])
     for name, value in values.items():
         if name not in FIELDS[record]:
             parsed.issue(ref, name, f"Unknown field {name!r} for a {record} row.")

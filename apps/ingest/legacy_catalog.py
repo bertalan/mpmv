@@ -24,6 +24,8 @@ Input bundle (every key optional; a missing list is an empty one):
                       "short_description", "description", "seo_title", "seo_description",
                       "type": "simple|variable", "price_net", "sale_price_net", "sale_from",
                       "sale_to", "stock_qty", "stock_status", "weight_kg", "gtin", "mpn",
+                      "length_mm", "width_mm", "height_mm", "country_of_origin",
+                      "material", "colour",
                       "category_ids", "tag_ids", "brand_id", "attributes", "options",
                       "companion_sku", "upsell_skus", "commission_override_percent"}],
     }
@@ -41,6 +43,8 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
+
+from apps.core.text import nfc_deep
 
 PRODUCT = "product"
 VARIATION = "product_variation"
@@ -72,6 +76,58 @@ class BadValue(ValueError):
     """A legacy value that cannot be loaded: the record is rejected and reported."""
 
 
+# Free text a person wrote (I18N.10): the only bundle values stored in NFC. Everything else is
+# identity or structure (ids, SKUs, slugs, codes, attribute values and the `attributes` and
+# `options` maps of a post, e-mail, phone, numbers, dates) and stays byte-exact.
+TEXT_KEYS = frozenset(
+    {
+        "display_name",
+        "legal_name",
+        "name",
+        "title",
+        "description",
+        "short_description",
+        "seo_title",
+        "seo_description",
+        "label",
+        "unit",
+        "tagline",
+        "shipping_policy",
+        "refund_policy",
+        "cancellation_policy",
+    }
+)
+# Keys whose value is a map of language to text (or to a map of texts), all of it free text.
+TEXT_MAPS = frozenset({"labels", "translations"})
+SECTIONS = ("vendors", "categories", "brands", "tags", "attributes", "posts")
+
+
+def _nfc_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in row.items():
+        if (key in TEXT_KEYS and isinstance(value, str)) or key in TEXT_MAPS:
+            out[key] = nfc_deep(value)
+        elif key == "values" and isinstance(value, list):
+            out[key] = [_nfc_row(item) if isinstance(item, Mapping) else item for item in value]
+        else:
+            out[key] = value
+    return out
+
+
+def nfc_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
+    """`bundle` with the free-text values of every row in NFC, one place for the whole loader.
+
+    Identity values are never changed, so a source record keeps its identity and a reload finds
+    the rows it loaded before.
+    """
+    out = dict(bundle)
+    for section in SECTIONS:
+        rows = bundle.get(section)
+        if isinstance(rows, list):
+            out[section] = [_nfc_row(row) if isinstance(row, Mapping) else row for row in rows]
+    return out
+
+
 def parse_money(raw: object, *, field: str = "price") -> Decimal | None:
     """A legacy money string as a 2-place Decimal (ROUND_HALF_UP); None for empty.
 
@@ -100,6 +156,16 @@ def parse_decimal(raw: object, *, field: str, places: int = 3) -> Decimal | None
     if not value.is_finite() or value < 0:
         raise BadValue(f"{field}: {raw!r} is not a valid measure")
     return value.quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
+
+
+def parse_mm(raw: object, *, field: str) -> int | None:
+    """A CAT.22 dimension in whole millimetres, at least 1; None for empty (ING.4 follow-up)."""
+    value = parse_decimal(raw, field=field, places=0)
+    if value is None:
+        return None
+    if value < 1:
+        raise BadValue(f"{field}: {raw!r} must be at least 1 mm")
+    return int(value)
 
 
 def parse_quantity(raw: object) -> int:

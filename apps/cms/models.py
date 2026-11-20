@@ -79,7 +79,7 @@ from wagtail_localize.models import Translation
 
 from apps.core.fields import LanguageField
 from apps.core.images import rendition_or_original
-from apps.core.nfc_forms import NFCModelForm
+from apps.core.nfc_forms import NFCModelForm, NFCPageForm
 from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
 from apps.vendors.services import has_public_storefront
 
@@ -211,6 +211,8 @@ class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is u
     on every save (the page table holds the locale, so no database constraint can).
     """
 
+    base_form_class = NFCPageForm
+
     body = body_field(countdown=True, products=True)
 
     content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("body")]
@@ -248,6 +250,8 @@ class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is u
 
 class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
     """A static page: about us, contact, FAQ (spec 10 §10.2), with an optional main image."""
+
+    base_form_class = NFCPageForm
 
     image = models.ForeignKey(
         get_image_model_string(),
@@ -676,6 +680,8 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
     URL is not found; nothing serves the EN text in its place (`language_fallback`).
     """
 
+    base_form_class = NFCPageForm
+
     class Kind(models.TextChoices):
         TERMS = "terms", _("Terms of sale")
         PRIVACY = "privacy", _("Privacy policy")
@@ -1003,6 +1009,8 @@ class FAQItemBlock(blocks.StructBlock):  # type: ignore[misc]
 class VendorRecruitmentPage(Page):  # type: ignore[misc]
     """ "Sell with us": the plans, a FAQ and the call to apply (VEN.22's public form)."""
 
+    base_form_class = NFCPageForm
+
     intro = body_field(
         _("introduction"),
         help_text=_(
@@ -1324,6 +1332,8 @@ class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
     articles here, paginated the same way. An author without articles gets an empty list.
     """
 
+    base_form_class = NFCPageForm
+
     PER_PAGE = 12
 
     intro = RichTextField(
@@ -1421,6 +1431,8 @@ class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
 
 class BlogPostPage(Page):  # type: ignore[misc]
     """An article: date, author, summary, main image and body (spec 10 §10.2)."""
+
+    base_form_class = NFCPageForm
 
     date = models.DateField(
         _("publication date"),
@@ -1582,6 +1594,8 @@ class TermLandingPage(Page):  # type: ignore[misc]
     renders the editorial part with the term's newest products.
     """
 
+    base_form_class = NFCPageForm
+
     term = models.ForeignKey(
         "catalog.Term",
         verbose_name=_("term"),
@@ -1694,6 +1708,8 @@ class VendorLandingPage(Page):  # type: ignore[misc]
     products (spec 10 §10.2), linked from the storefront. Shown only while the vendor is
     active: otherwise it has no URL and answers 404. Vendor-owned data (CORE.3 scoping).
     """
+
+    base_form_class = NFCPageForm
 
     vendor_scope: ClassVar[str] = "vendor"
     objects = VendorLandingPageManager()

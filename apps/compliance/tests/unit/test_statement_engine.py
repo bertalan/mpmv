@@ -2,6 +2,9 @@
 transparency database payload."""
 
 import datetime as dt
+import time
+
+import pytest
 
 from apps.compliance import engine
 
@@ -87,3 +90,37 @@ def test_public_text_loses_personal_data_and_is_capped() -> None:
     for leak in ("ada@", "example.org", "https://", "www.", "1234 5678", "IT60X", "4111"):
         assert leak not in clean
     assert len(engine.scrub_public_text("a" * 5000)) == engine.PUBLIC_TEXT_LIMIT
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Mail ada@example.org now", "Mail [removed] now"),
+        ("a.b+c-d_e@sub-d.example.co.uk.", "[removed]."),
+        ("a@b.c+x@d.e", "[removed][removed]"),
+        ("one@a.b two@c.d", "[removed] [removed]"),
+        ("no domain a@b and @x.y and a@.b", "no domain a@b and @x.y and a@.b"),
+        ("a@b.c.@d.e", "[removed][removed]"),
+        ("élève@école.fr", "[removed]"),
+    ],
+)
+def test_public_text_removes_emails_exactly_as_before(text: str, expected: str) -> None:
+    assert engine.scrub_public_text(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "a" * 100_000,
+        "a@" * 50_000,
+        "a@" + "b" * 100_000,
+        "a.a" * 33_000,
+        "a@b." * 25_000 + "!",
+        "@" * 100_000,
+        "a@b" + ".b" * 50_000 + "@",
+    ],
+)
+def test_public_text_scrubbing_is_linear_on_crafted_input(text: str) -> None:
+    started = time.perf_counter()
+    engine.scrub_public_text(text)
+    assert time.perf_counter() - started < 2

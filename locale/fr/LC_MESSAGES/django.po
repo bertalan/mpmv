@@ -203,10 +203,34 @@ msgstr "%(title)s : quantité modifiée à %(quantity)s"
 msgid "%(unit_price)s each"
 msgstr "%(unit_price)s l'unité"
 
+#: apps/vendors/templates/email/vendors/profile_changed/subject.txt
+msgid "%(vendor_name)s changed its storefront profile"
+msgstr "%(vendor_name)s a modifié son profil de vitrine"
+
+#: apps/vendors/templates/email/vendors/profile_changed/body.html
+#: apps/vendors/templates/email/vendors/profile_changed/body.txt
+msgid ""
+"%(vendor_name)s changed its storefront profile (%(language)s): %(fields)s. The change is already "
+"live. Review it in the audit log; staff can revert it."
+msgstr ""
+"%(vendor_name)s a modifié son profil de vitrine (%(language)s) : %(fields)s. La modification est "
+"déjà en ligne. Vérifiez-la dans le journal d'audit ; l'équipe peut la rétablir."
+
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 msgid "%(vendor_name)s changed your order %(order_number)s before shipping it:"
 msgstr "%(vendor_name)s a modifié ta commande %(order_number)s avant de l’expédier :"
+
+#: apps/vendors/templates/email/vendors/claim_link/body.html
+#: apps/vendors/templates/email/vendors/claim_link/body.txt
+msgid ""
+"%(vendor_name)s has been set up on the platform for you. To claim it, open this link, confirm the "
+"VAT number or TIN of the business, and create your account with a password and an authenticator "
+"app."
+msgstr ""
+"%(vendor_name)s a été créé pour vous sur la plateforme. Pour le revendiquer, ouvrez ce lien, "
+"confirmez le numéro de TVA ou l'identifiant fiscal de l'entreprise et créez votre compte avec un "
+"mot de passe et une application d'authentification."
 
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
@@ -249,6 +273,18 @@ msgid ""
 msgstr ""
 "%(vendor_name)s : l'acheteur de la commande %(order_number)s a déclaré le %(submitted_at)s qu'il "
 "exerce son droit de rétractation pour votre partie de la commande (référence %(reference)s)."
+
+#: apps/catalog/templates/email/catalog/brand_rejected/body.html
+#: apps/catalog/templates/email/catalog/brand_rejected/body.txt
+msgid ""
+"%(vendor_name)s: the platform team did not approve the brand below. It was removed from your "
+"products listed under it, which stay on sale without a brand. Open each product in your shop area "
+"and pick an existing brand, or propose the brand again with an official link or a Wikidata ID."
+msgstr ""
+"%(vendor_name)s : l'équipe de la plateforme n'a pas approuvé la marque ci-dessous. Elle a été "
+"retirée de vos produits listés sous cette marque, qui restent en vente sans marque. Ouvrez chaque "
+"produit dans votre espace boutique et choisissez une marque existante, ou proposez à nouveau la "
+"marque avec un lien officiel ou un identifiant Wikidata."
 
 #: apps/core/models.py
 msgid ""
@@ -1153,6 +1189,11 @@ msgstr ""
 "Après avoir confirmé votre adresse e-mail, vous vous connectez et configurez une application "
 "d'authentification : elle est obligatoire pour chaque vendeur."
 
+#: apps/core/templates/email/core/ops_alert/body.html
+#: apps/core/templates/email/core/ops_alert/body.txt
+msgid "Alert"
+msgstr "Alerte"
+
 #: apps/manager/fitment_forms.py
 msgid "Alias"
 msgstr "Alias"
@@ -1343,6 +1384,11 @@ msgstr "Un article n’était pas disponible"
 #: apps/orders/ui/views.py
 msgid "An item went out of stock."
 msgstr "Un article est en rupture de stock."
+
+#: apps/core/templates/email/core/ops_alert/body.html
+#: apps/core/templates/email/core/ops_alert/body.txt
+msgid "An operations alert was raised on the platform."
+msgstr "Une alerte d'exploitation a été déclenchée sur la plateforme."
 
 #: apps/catalog/models.py
 msgid "An optional line shown with the image."
@@ -1756,6 +1802,10 @@ msgstr "lot de marques"
 #: apps/catalog/taxonomy.py
 msgid "brand batches"
 msgstr "lots de marques"
+
+#: apps/catalog/templates/email/catalog/brand_rejected/subject.txt
+msgid "Brand not approved: your products need another brand"
+msgstr "Marque non approuvée : vos produits ont besoin d'une autre marque"
 
 #: themes/base/templates/components/breadcrumb.html
 msgid "Breadcrumb"
@@ -2337,6 +2387,14 @@ msgstr "Choisi : {name}"
 #: apps/manager/amendment_forms.py apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "City"
 msgstr "Ville"
+
+#: apps/vendors/templates/email/vendors/claim_link/subject.txt
+msgid "Claim %(vendor_name)s on the platform"
+msgstr "Revendiquez %(vendor_name)s sur la plateforme"
+
+#: apps/vendors/templates/email/vendors/claim_link/body.html
+msgid "Claim the vendor"
+msgstr "Revendiquer le vendeur"
 
 #: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
@@ -5370,6 +5428,11 @@ msgstr "Aucun produit ne correspond à ces filtres."
 msgid "No products match your search."
 msgstr "Aucun produit ne correspond à ta recherche."
 
+#: apps/catalog/templates/email/catalog/brand_rejected/body.html
+#: apps/catalog/templates/email/catalog/brand_rejected/body.txt
+msgid "No products used it."
+msgstr "Aucun produit ne l'utilisait."
+
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
 msgid "No refund fee is charged to your shop."
@@ -6070,6 +6133,10 @@ msgstr "Solde d'ouverture"
 #: themes/ride/templates/compliance/contact_points.html
 msgid "Operated by %(name)s."
 msgstr "Exploitée par %(name)s."
+
+#: apps/core/templates/email/core/ops_alert/subject.txt
+msgid "Operations alert: %(summary)s"
+msgstr "Alerte d'exploitation : %(summary)s"
 
 #: apps/seo/templates/seo/consent/preferences.html
 msgid "Optional cookies on:"
@@ -10154,6 +10221,16 @@ msgstr ""
 "ensuite votre candidature. Si vous ne confirmez pas, la candidature est supprimée après quelques "
 "jours."
 
+#: apps/vendors/templates/email/vendors/claim_link/body.html
+#: apps/vendors/templates/email/vendors/claim_link/body.txt
+msgid ""
+"The link works once and expires on %(expires)s (UTC). The platform staff review your claim before "
+"you can manage the vendor. If you did not expect this email, ignore it."
+msgstr ""
+"Le lien ne fonctionne qu'une fois et expire le %(expires)s (UTC). L'équipe de la plateforme "
+"examine votre demande avant que vous puissiez gérer le vendeur. Si vous n'attendiez pas cet "
+"e-mail, ignorez-le."
+
 #: apps/orders/templates/email/orders/staff_draft_link/body.html
 #: apps/orders/templates/email/orders/staff_draft_link/body.txt
 msgid "The link works once and expires on %(expires)s."
@@ -12041,8 +12118,8 @@ msgid ""
 "These published products lack mandatory GPSR data. Complete their data or unpublish them in the "
 "staff admin."
 msgstr ""
-"Ces produits publiés n'ont pas les données GPSR obligatoires. Complétez leurs données ou "
-"retirez-les de la publication dans l'interface d'administration."
+"Ces produits publiés n'ont pas les données GPSR obligatoires. Complétez leurs données ou retirez-"
+"les de la publication dans l'interface d'administration."
 
 #: apps/manager/templates/manager/platform/amendment_settings.html
 msgid ""
@@ -12129,7 +12206,8 @@ msgid ""
 "that you withdraw from the contract for the following parts of order %(order_number)s:"
 msgstr ""
 "Nous confirmons que le %(submitted_at)s tu as déclaré, avec la fonction de rétractation de notre "
-"site, exercer ton droit de rétractation pour les parties suivantes de la commande %(order_number)s :"
+"site, exercer ton droit de rétractation pour les parties suivantes de la commande %(order_number)s"
+" :"
 
 #: apps/accounts/views.py
 msgid "This content is not available in this language."

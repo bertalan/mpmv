@@ -21,10 +21,10 @@ go-live.
 | Accounts | `test_accounts_attacks.py`, `test_passkey_window_attacks.py`, `test_session_lifetime_attacks.py` | present |
 | Request tampering | `test_request_tampering.py` | present |
 | Business logic | `test_business_logic_attacks.py` | present (cart, catalogue API, shipping import; coupons, refunds, payouts: 3a-2) |
-| Integrations | `test_integrations.py` | to do |
+| Integrations | `test_integration_attacks.py` | present (webhook replay, outbound SSRF and redirects, XML and archive guards, CSV formulas) |
 | Resource abuse | `test_resource_abuse.py` | present (2a: bodies, JSON depth, uploads, pagination; ReDoS is slice 2b) |
 | Information leaks | `test_information_leaks.py` | to do |
-| AI and agents (SEC.9) | `test_ai_agents.py` | to do |
+| AI and agents (SEC.9) | `test_ai_agent_injection.py` | present (2d: llms.txt, JSON-LD, ICS, RSS; MCP and enricher wait for AI.1 and ING.5) |
 
 ## Cases covered elsewhere
 
@@ -73,6 +73,17 @@ export caps are skipped until CAT.9 and the CMP exports exist.
 
 Findings kept as `xfail(strict=True)`: an oversized API body is a logged 500 instead of a 413
 problem; API request arrays have no `maxItems`; the event `body` schema is free-form JSON.
+
+## Natural-language injection is data
+
+Text that is visible and reads like an instruction ("ignore previous instructions ...") passes
+through `llms.txt`, the feeds and the JSON-LD graph by design. It is data, not instructions: the
+agent-facing surfaces keep it inside its own field (one link text, one RSS element, one JSON-LD
+string) and label it as content, and nothing in them can turn it into structure, a link, markup
+or a hidden character (`test_ai_agent_injection.py`). Telling an agent not to obey it is the
+agent's job; the platform's job is that it can never look like anything but content. `llms.txt`
+also caps titles at 200 and the summary at 500 characters. API v1 serves text as JSON data
+(`apps/api/tests/integration/test_v1_hostile_text.py`).
 
 ## Not testable yet
 

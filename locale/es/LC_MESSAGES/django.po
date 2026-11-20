@@ -202,10 +202,34 @@ msgstr "%(title)s: cantidad cambiada a %(quantity)s"
 msgid "%(unit_price)s each"
 msgstr "%(unit_price)s cada uno"
 
+#: apps/vendors/templates/email/vendors/profile_changed/subject.txt
+msgid "%(vendor_name)s changed its storefront profile"
+msgstr "%(vendor_name)s ha modificado el perfil de su tienda"
+
+#: apps/vendors/templates/email/vendors/profile_changed/body.html
+#: apps/vendors/templates/email/vendors/profile_changed/body.txt
+msgid ""
+"%(vendor_name)s changed its storefront profile (%(language)s): %(fields)s. The change is already "
+"live. Review it in the audit log; staff can revert it."
+msgstr ""
+"%(vendor_name)s ha modificado el perfil de su tienda (%(language)s): %(fields)s. El cambio ya está"
+" en línea. Revíselo en el registro de auditoría; el personal puede revertirlo."
+
 #: apps/orders/templates/email/orders/amendment_applied/body.html
 #: apps/orders/templates/email/orders/amendment_applied/body.txt
 msgid "%(vendor_name)s changed your order %(order_number)s before shipping it:"
 msgstr "%(vendor_name)s ha modificado tu pedido %(order_number)s antes de enviarlo:"
+
+#: apps/vendors/templates/email/vendors/claim_link/body.html
+#: apps/vendors/templates/email/vendors/claim_link/body.txt
+msgid ""
+"%(vendor_name)s has been set up on the platform for you. To claim it, open this link, confirm the "
+"VAT number or TIN of the business, and create your account with a password and an authenticator "
+"app."
+msgstr ""
+"%(vendor_name)s se ha configurado para usted en la plataforma. Para reclamarlo, abra este enlace, "
+"confirme el NIF o número de IVA de la empresa y cree su cuenta con una contraseña y una app de "
+"autenticación."
 
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
@@ -248,6 +272,18 @@ msgid ""
 msgstr ""
 "%(vendor_name)s: el comprador del pedido %(order_number)s declaró el %(submitted_at)s que desiste "
 "del contrato respecto de su parte del pedido (referencia %(reference)s)."
+
+#: apps/catalog/templates/email/catalog/brand_rejected/body.html
+#: apps/catalog/templates/email/catalog/brand_rejected/body.txt
+msgid ""
+"%(vendor_name)s: the platform team did not approve the brand below. It was removed from your "
+"products listed under it, which stay on sale without a brand. Open each product in your shop area "
+"and pick an existing brand, or propose the brand again with an official link or a Wikidata ID."
+msgstr ""
+"%(vendor_name)s: el equipo de la plataforma no ha aprobado la marca indicada a continuación. Se ha"
+" eliminado de sus productos listados bajo ella, que siguen a la venta sin marca. Abra cada "
+"producto en su área de tienda y elija una marca existente, o proponga de nuevo la marca con un "
+"enlace oficial o un ID de Wikidata."
 
 #: apps/core/models.py
 msgid ""
@@ -1144,6 +1180,11 @@ msgstr ""
 "Después de confirmar su correo electrónico, inicia sesión y configura una app de autenticación: es"
 " obligatoria para todos los vendedores."
 
+#: apps/core/templates/email/core/ops_alert/body.html
+#: apps/core/templates/email/core/ops_alert/body.txt
+msgid "Alert"
+msgstr "Alerta"
+
 #: apps/manager/fitment_forms.py
 msgid "Alias"
 msgstr "Alias"
@@ -1332,6 +1373,11 @@ msgstr "Un artículo no estaba disponible"
 #: apps/orders/ui/views.py
 msgid "An item went out of stock."
 msgstr "Un artículo se ha agotado."
+
+#: apps/core/templates/email/core/ops_alert/body.html
+#: apps/core/templates/email/core/ops_alert/body.txt
+msgid "An operations alert was raised on the platform."
+msgstr "Se ha generado una alerta operativa en la plataforma."
 
 #: apps/catalog/models.py
 msgid "An optional line shown with the image."
@@ -1740,6 +1786,10 @@ msgstr "lote de marcas"
 #: apps/catalog/taxonomy.py
 msgid "brand batches"
 msgstr "lotes de marcas"
+
+#: apps/catalog/templates/email/catalog/brand_rejected/subject.txt
+msgid "Brand not approved: your products need another brand"
+msgstr "Marca no aprobada: sus productos necesitan otra marca"
 
 #: themes/base/templates/components/breadcrumb.html
 msgid "Breadcrumb"
@@ -2316,6 +2366,14 @@ msgstr "Elegido: {name}"
 #: apps/manager/amendment_forms.py apps/manager/event_forms.py apps/orders/ui/forms.py
 msgid "City"
 msgstr "Ciudad"
+
+#: apps/vendors/templates/email/vendors/claim_link/subject.txt
+msgid "Claim %(vendor_name)s on the platform"
+msgstr "Reclame %(vendor_name)s en la plataforma"
+
+#: apps/vendors/templates/email/vendors/claim_link/body.html
+msgid "Claim the vendor"
+msgstr "Reclamar el vendedor"
 
 #: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
@@ -5323,6 +5381,11 @@ msgstr "Ningún producto coincide con estos filtros."
 msgid "No products match your search."
 msgstr "Ningún producto coincide con tu búsqueda."
 
+#: apps/catalog/templates/email/catalog/brand_rejected/body.html
+#: apps/catalog/templates/email/catalog/brand_rejected/body.txt
+msgid "No products used it."
+msgstr "Ningún producto la usaba."
+
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
 msgid "No refund fee is charged to your shop."
@@ -6019,6 +6082,10 @@ msgstr "Saldo inicial"
 #: themes/ride/templates/compliance/contact_points.html
 msgid "Operated by %(name)s."
 msgstr "Gestionada por %(name)s."
+
+#: apps/core/templates/email/core/ops_alert/subject.txt
+msgid "Operations alert: %(summary)s"
+msgstr "Alerta operativa: %(summary)s"
 
 #: apps/seo/templates/seo/consent/preferences.html
 msgid "Optional cookies on:"
@@ -10060,6 +10127,15 @@ msgid ""
 msgstr ""
 "El enlace funciona una sola vez y caduca el %(expires)s (UTC). Después nuestro equipo revisa su "
 "solicitud. Si no confirma, la solicitud se elimina pasados unos días."
+
+#: apps/vendors/templates/email/vendors/claim_link/body.html
+#: apps/vendors/templates/email/vendors/claim_link/body.txt
+msgid ""
+"The link works once and expires on %(expires)s (UTC). The platform staff review your claim before "
+"you can manage the vendor. If you did not expect this email, ignore it."
+msgstr ""
+"El enlace funciona una sola vez y caduca el %(expires)s (UTC). El personal de la plataforma revisa"
+" su solicitud antes de que pueda gestionar el vendedor. Si no esperaba este correo, ignórelo."
 
 #: apps/orders/templates/email/orders/staff_draft_link/body.html
 #: apps/orders/templates/email/orders/staff_draft_link/body.txt
