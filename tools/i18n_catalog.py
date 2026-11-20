@@ -142,6 +142,11 @@ SCOPES = (
     "themes/ride/templates/orders",
     "themes/ride/templates/seo",
     "apps/fitment/templates/fitment/_garage_saver.html",
+    # The "My garage" page of the customer area (FIT.5 2/3).
+    "apps/fitment/templates/fitment/garage_account.html",
+    "apps/fitment/templates/fitment/garage_delete.html",
+    "apps/fitment/garage_views.py",
+    "themes/ride/templates/fitment",
     "apps/core/templates/core/components/image_credit.html",
     "apps/core/templates/core/components/image_credits_disclosure.html",
     # The remaining CMS page templates (I18N.20 part 3b, slice 3): landing and recruitment pages.

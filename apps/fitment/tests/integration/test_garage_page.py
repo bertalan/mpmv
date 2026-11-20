@@ -7,6 +7,7 @@ is a 404, the same answer as for an unknown id; an anonymous visitor is sent to 
 import re
 import secrets
 import uuid
+from typing import Any
 
 import pytest
 from django.test import Client
@@ -23,6 +24,8 @@ from apps.fitment.tests.factories import (
     FitmentNodeFactory,
     GarageProfileFactory,
 )
+
+type _TestResponse = Any
 
 pytestmark = pytest.mark.django_db
 
@@ -58,7 +61,7 @@ def _token(client: Client) -> str:
     return re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', page).group(1)  # type: ignore[union-attr]
 
 
-def post(client: Client, name: str, *args: object, **data: str) -> object:
+def post(client: Client, name: str, /, *args: object, **data: str) -> _TestResponse:
     return client.post(reverse(name, args=args), {"csrfmiddlewaretoken": _token(client), **data})
 
 
@@ -136,7 +139,7 @@ def test_rename_changes_the_name(client: Client, user: User) -> None:
 def test_rename_refuses_a_bad_name_and_says_why(client: Client, user: User, bad: str) -> None:
     profile = GarageProfileFactory.create(user=user, name="Keep me", node=_node())
     response = post(client, "garage_profile_rename", profile.public_id, name=bad)
-    assert response.status_code == 302  # type: ignore[attr-defined]
+    assert response.status_code == 302
     profile.refresh_from_db()
     assert profile.name == "Keep me"
     assert "alert" in client.get(reverse(PAGE)).content.decode()
@@ -167,10 +170,10 @@ def test_delete_asks_for_confirmation_first(client: Client, user: User) -> None:
     assert "Doomed" in page.content.decode()
     assert GarageProfile.objects.filter(pk=profile.pk).exists()  # a GET deletes nothing
     refused = post(client, "garage_profile_delete", profile.public_id)  # no confirmation field
-    assert refused.status_code == 200  # type: ignore[attr-defined]
+    assert refused.status_code == 200
     assert GarageProfile.objects.filter(pk=profile.pk).exists()
     done = post(client, "garage_profile_delete", profile.public_id, confirm="yes")
-    assert done.status_code == 302  # type: ignore[attr-defined]
+    assert done.status_code == 302
     assert not GarageProfile.objects.filter(pk=profile.pk).exists()
 
 
