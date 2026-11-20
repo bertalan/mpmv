@@ -67,11 +67,6 @@ def _problem(response: Any, status: int) -> dict[str, Any]:
 
 
 @pytest.mark.django_db
-@pytest.mark.xfail(
-    strict=True,
-    reason="Finding: an API v1 body over DATA_UPLOAD_MAX_MEMORY_SIZE answers a logged 500 instead "
-    "of a 413 problem (RequestDataTooBig is not mapped in apps/api/v1/errors.py; slice 2c)",
-)
 def test_an_oversized_api_body_is_a_413_problem_not_a_500(
     client: Client, api_headers: dict[str, str], caplog: pytest.LogCaptureFixture
 ) -> None:

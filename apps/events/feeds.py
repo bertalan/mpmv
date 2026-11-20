@@ -24,6 +24,7 @@ from django.utils.feedgenerator import Rss201rev2Feed
 from django.utils.http import http_date, quote_etag
 from django.utils.translation import gettext as _
 
+from apps.core.hidden_text import strip_hidden
 from apps.core.http import client_ip
 from apps.core.services import consume_rate_limit
 from apps.core.site_url import absolute_url
@@ -350,9 +351,9 @@ def rss_items(
             point = f"{page.latitude} {page.longitude}"
         items.append(
             {
-                "title": title,
+                "title": strip_hidden(title),
                 "link": absolute_url(request, page.url or ""),
-                "description": _description(found, now),
+                "description": strip_hidden(_description(found, now)),
                 "unique_id": f"urn:uuid:{page.translation_key}",
                 "unique_id_is_permalink": False,
                 "pubdate": page.first_published_at

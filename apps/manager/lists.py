@@ -65,7 +65,7 @@ class ListFilter:
 
     name: str
     label: StrOrPromise
-    choices: Sequence[tuple[str, str]]
+    choices: Sequence[tuple[str, StrOrPromise]]
     lookup: str
     text: bool = False  # a free-text box (`?q=...`) instead of a choice: `apply` decides
 
