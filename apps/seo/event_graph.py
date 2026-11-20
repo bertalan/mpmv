@@ -7,6 +7,7 @@ page. An empty value is left out, never defaulted.
 import datetime as dt
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Final
 
 SCHEMA_URL: Final = "https://schema.org"
@@ -27,6 +28,11 @@ class EventFacts:
     language: str
     attendance: str  # "in_person", "online" or "mixed"
     cancelled: bool = False
+    postponed: bool = False  # cancelled wins over postponed
+    previous_start: dt.datetime | None = None  # only used when postponed
+    ticket_url: str = ""
+    price: Decimal | None = None
+    is_free: bool = False
     venue_name: str = ""
     street: str = ""
     postcode: str = ""
@@ -90,12 +96,37 @@ def _location(facts: EventFacts) -> Any:
     return places[0] if len(places) == 1 else places
 
 
+def _status(facts: EventFacts) -> str:
+    if facts.cancelled:
+        return "EventCancelled"
+    return "EventPostponed" if facts.postponed else "EventScheduled"
+
+
+def _offers(facts: EventFacts) -> dict[str, Any]:
+    """An `Offer` with the ticket link and the price (a string with two places, never a float;
+    "0" for a free event); no `availability` and nothing when there is no data."""
+    price = "0" if facts.is_free else None
+    if price is None and facts.price is not None:
+        price = str(facts.price.quantize(Decimal("0.01")))
+    if price is None and not facts.ticket_url:
+        return {}
+    return _clean(
+        {
+            "@type": "Offer",
+            "url": facts.ticket_url,
+            "price": price,
+            "priceCurrency": "EUR" if price is not None else "",
+        }
+    )
+
+
 def event_node(facts: EventFacts) -> dict[str, Any]:
     """The `Event`, or {} when it has no place and no online link (not a rich-result event)."""
     location = _location(facts)
     if not location or facts.attendance not in ATTENDANCE_MODES:
         return {}
-    status = "EventCancelled" if facts.cancelled else "EventScheduled"
+    status = _status(facts)
+    previous = facts.previous_start if status == "EventPostponed" else None
     return _clean(
         {
             "@type": "Event",
@@ -104,10 +135,12 @@ def event_node(facts: EventFacts) -> dict[str, Any]:
             "name": facts.name,
             "description": facts.description,
             "startDate": facts.start.isoformat(),
+            "previousStartDate": previous.isoformat() if previous else "",
             "endDate": facts.end.isoformat(),
             "eventStatus": f"{SCHEMA_URL}/{status}",
             "eventAttendanceMode": f"{SCHEMA_URL}/{ATTENDANCE_MODES[facts.attendance]}",
             "location": location,
+            "offers": _offers(facts) or "",
             "image": facts.image,
             "organizer": dict(facts.organizer) if facts.organizer else "",
             "inLanguage": facts.language,

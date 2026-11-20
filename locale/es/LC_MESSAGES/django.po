@@ -3513,7 +3513,7 @@ msgstr "Campos del formulario"
 msgid "form page"
 msgstr "página de formulario"
 
-#: apps/manager/event_forms.py
+#: apps/events/templates/events/event_page.html apps/manager/event_forms.py
 msgid "Free entry"
 msgstr "Entrada gratuita"
 
@@ -3576,6 +3576,10 @@ msgstr "Al generar nuevos códigos, todos los códigos anteriores dejan de funci
 #: themes/ride/templates/compliance/privacy_account.html
 msgid "Get a copy of the data we hold about you as a JSON file."
 msgstr "Obtén una copia de los datos que conservamos sobre ti como archivo JSON."
+
+#: apps/events/templates/events/event_page.html
+msgid "Get tickets"
+msgstr "Consigue tus entradas"
 
 #: apps/manager/event_fields.py
 msgid "Give a number from -%(limit)d to %(limit)d, for example 45.464200."
@@ -6672,6 +6676,7 @@ msgstr "Posición"
 msgid "Postcode"
 msgstr "Código postal"
 
+#: apps/events/templates/events/_summary.html apps/events/templates/events/event_page.html
 #: apps/manager/event_forms.py
 msgid "Postponed"
 msgstr "Aplazado"
@@ -6786,6 +6791,10 @@ msgstr "Inicio anterior"
 #: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "Previous versions"
 msgstr "Versiones anteriores"
+
+#: apps/events/templates/events/event_page.html
+msgid "Previously"
+msgstr "Antes"
 
 #: apps/catalog/templates/catalog/includes/listing_filters.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
@@ -12325,6 +12334,10 @@ msgstr "Enlace de entradas"
 #: apps/manager/event_forms.py
 msgid "Ticket price (EUR)"
 msgstr "Precio de la entrada (EUR)"
+
+#: apps/events/templates/events/event_page.html
+msgid "Tickets"
+msgstr "Entradas"
 
 #: apps/manager/event_forms.py
 msgid "Tickets and changes"

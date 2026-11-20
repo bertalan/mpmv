@@ -9,6 +9,7 @@ the map with EVT.15.
 
 import datetime as dt
 import re
+from decimal import Decimal
 
 import pytest
 from django.test import Client
@@ -120,3 +121,56 @@ def test_an_empty_index_says_there_are_no_events(client: Client) -> None:
     html = _html(client, primary_index().url)
     assert "<article" not in html
     assert "No events" in html
+
+
+@pytest.mark.parametrize("theme", ["base", "ride"])
+@pytest.mark.parametrize("which", ["primary", "other"])
+def test_a_postponed_event_shows_a_badge_on_the_page_and_in_the_list(
+    client: Client, theme: str, which: str
+) -> None:
+    from django.utils import timezone, translation
+
+    from apps.core.i18n import primary_language
+    from apps.themes.services import use_theme
+
+    seed_site()
+    code = primary_language() if which == "primary" else other_language()
+    index = EventIndexPage.objects.get(locale=Locale.objects.get(language_code=code))
+    start = timezone.now() + dt.timedelta(days=10)
+    page = _publish(
+        EventPageFactory.create(
+            parent=index,
+            starts_at=start,
+            ends_at=start + dt.timedelta(hours=2),
+            postponed=True,
+            previous_start=start - dt.timedelta(days=30),
+            price=Decimal("5"),
+            ticket_url="https://tickets.example/fair",
+        )
+    )
+    with translation.override(code):
+        word = str(translation.gettext("Postponed"))
+        tickets = str(translation.gettext("Get tickets"))
+    with use_theme(theme):
+        detail = _html(client, page.url)
+        listing = _html(client, index.url)
+    assert f'<p role="status" class="event-status">{word}</p>' in detail
+    assert f'<span class="event-status">{word}</span>' in listing
+    assert tickets in detail
+    assert 'href="https://tickets.example/fair"' in detail
+    assert "Cancelled" not in detail
+
+
+def test_cancelled_wins_over_the_postponed_badge(client: Client) -> None:
+    page = EventPageFactory.create(
+        postponed=True, cancelled_at=dt.datetime(2027, 2, 1, tzinfo=dt.UTC)
+    )
+    html = _html(client, _publish(page).url)
+    assert "Cancelled" in html
+    assert "Postponed" not in html
+
+
+def test_an_event_that_is_not_postponed_has_no_badge_or_tickets_line(client: Client) -> None:
+    html = _html(client, _publish(EventPageFactory.create()).url)
+    assert "Postponed" not in html
+    assert "Get tickets" not in html

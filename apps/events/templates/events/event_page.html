@@ -15,7 +15,7 @@ when the event has an address and no coordinates.
   <article class="event">
     <header>
       <h1>{{ page.title }}</h1>
-      {% if page.cancelled_at %}<p role="status" class="event-status">{% translate "Cancelled" %}</p>{% endif %}
+      {% if page.cancelled_at %}<p role="status" class="event-status">{% translate "Cancelled" %}</p>{% elif page.postponed %}<p role="status" class="event-status">{% translate "Postponed" %}</p>{% endif %}
       <p>{{ page.summary }}</p>
     </header>
     <dl class="event-facts">
@@ -32,6 +32,10 @@ when the event has an address and no coordinates.
           {% endwith %}{% endtimezone %}
         {% endif %}
       </dd>
+      {% if page.postponed and not page.cancelled_at and page.previous_start %}
+        <dt>{% translate "Previously" %}</dt>
+        <dd>{% timezone page.timezone %}<time datetime="{{ page.previous_start|date:'c' }}">{{ page.previous_start|date:"DATETIME_FORMAT" }}</time>{% endtimezone %}</dd>
+      {% endif %}
       <dt>{% translate "Type" %}</dt>
       <dd>{{ page.get_event_type_display }}</dd>
       {% seller_name page.vendor as seller %}{% if seller %}
@@ -53,6 +57,13 @@ when the event has an address and no coordinates.
           </address>
           {% if map.search_url %}<p><a data-map-search href="{{ map.search_url }}" rel="noopener">{% translate "Open in maps" %}</a></p>{% endif %}
           {% if page.booth %}<p>{% blocktranslate with booth=page.booth %}Booth {{ booth }}{% endblocktranslate %}</p>{% endif %}
+        </dd>
+      {% endif %}
+      {% if page.ticket_url or page.price is not None or page.is_free %}
+        <dt>{% translate "Tickets" %}</dt>
+        <dd>
+          {% if page.is_free %}{% translate "Free entry" %}{% elif page.price is not None %}{{ page.price }} €{% endif %}
+          {% if page.ticket_url %}<a href="{{ page.ticket_url }}" rel="noopener">{% translate "Get tickets" %}</a>{% endif %}
         </dd>
       {% endif %}
       {% if page.online_url %}

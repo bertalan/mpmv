@@ -3,6 +3,7 @@
 import datetime as dt
 import zoneinfo
 from dataclasses import replace
+from decimal import Decimal
 
 from apps.seo import event_graph as eg
 
@@ -110,3 +111,58 @@ def test_occurrence_bounds() -> None:
 
     assert eg.occurrence_bounds([Occ()], (8, 9)) == (1, 2)
     assert eg.occurrence_bounds([], (8, 9)) == (8, 9)
+
+
+PREVIOUS = dt.datetime(2027, 2, 10, 9, 0, tzinfo=ROME)
+
+
+def test_scheduled_has_no_offers_and_no_previous_start() -> None:
+    node = eg.event_node(BASE)
+    assert node["eventStatus"] == "https://schema.org/EventScheduled"
+    assert "offers" not in node
+    assert "previousStartDate" not in node
+
+
+def test_postponed_with_previous_start() -> None:
+    node = eg.event_node(replace(BASE, postponed=True, previous_start=PREVIOUS))
+    assert node["eventStatus"] == "https://schema.org/EventPostponed"
+    assert node["previousStartDate"] == "2027-02-10T09:00:00+01:00"
+
+
+def test_postponed_without_previous_start() -> None:
+    node = eg.event_node(replace(BASE, postponed=True))
+    assert node["eventStatus"] == "https://schema.org/EventPostponed"
+    assert "previousStartDate" not in node
+
+
+def test_cancelled_wins_over_postponed() -> None:
+    node = eg.event_node(replace(BASE, cancelled=True, postponed=True, previous_start=PREVIOUS))
+    assert node["eventStatus"] == "https://schema.org/EventCancelled"
+    assert "previousStartDate" not in node
+
+
+def test_previous_start_is_ignored_when_not_postponed() -> None:
+    assert "previousStartDate" not in eg.event_node(replace(BASE, previous_start=PREVIOUS))
+
+
+def test_priced_offer_is_a_two_place_string() -> None:
+    node = eg.event_node(
+        replace(BASE, price=Decimal("12.5"), ticket_url="https://tickets.example/fair")
+    )
+    assert node["offers"] == {
+        "@type": "Offer",
+        "url": "https://tickets.example/fair",
+        "price": "12.50",
+        "priceCurrency": "EUR",
+    }
+    assert "availability" not in node["offers"]
+
+
+def test_free_offer_has_price_zero() -> None:
+    node = eg.event_node(replace(BASE, is_free=True))
+    assert node["offers"] == {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}
+
+
+def test_link_only_offer_has_no_price() -> None:
+    node = eg.event_node(replace(BASE, ticket_url="https://tickets.example/fair"))
+    assert node["offers"] == {"@type": "Offer", "url": "https://tickets.example/fair"}
