@@ -234,7 +234,8 @@ def test_the_csv_export_round_trips_escaped_cells(text: str) -> None:
 
     zone = next(row for row in parsed.rows if row.record == fmt.ZONE)
     method = next(row for row in parsed.rows if row.record == fmt.METHOD)
-    assert zone.values["name"] == text
+    # I18N.10: a zone name is stored NFC; the carrier code stays exact.
+    assert zone.values["name"] == unicodedata.normalize("NFC", text)
     assert method.values["carrier"] == text
 
 
