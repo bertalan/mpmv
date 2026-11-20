@@ -208,12 +208,6 @@ def test_the_editor_opens_rich_text_it_did_not_write() -> None:
     assert "after" in texts
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="F3: text is stored as typed, not NFC (owner: 'non-NFC forms (store NFC)'); "
-    "spec 03 normalises only the SKU match key (NFKC); proposed backlog row I18N.10 in "
-    "PR #166 Follow-ups",
-)
 def test_pasted_text_is_stored_in_nfc(vendor: Vendor) -> None:
     from apps.shipping.models import ShippingZone
 

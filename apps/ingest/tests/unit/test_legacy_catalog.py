@@ -1,6 +1,7 @@
 """MIG.3 part 1: the pure rules of the catalog loader."""
 
 from decimal import Decimal
+from typing import Any
 
 import pytest
 
@@ -51,3 +52,35 @@ def test_group_key_includes_vendor_and_translation_group() -> None:
 def test_missing_languages_lists_the_site_languages_without_a_text() -> None:
     assert rules.missing_languages(["en"], ["en", "it"], "en") == ["it"]
     assert rules.missing_languages(["en", "it"], ["en", "it"], "en") == []
+
+
+def test_nfc_bundle_normalises_free_text_only() -> None:
+    decomposed = "Café"
+    composed = "Café"
+    source: dict[str, Any] = {
+        "brands": [{"term_id": 1, "name": decomposed, "slug": decomposed}],
+        "posts": [
+            {
+                "post_id": 1,
+                "sku": decomposed,
+                "title": decomposed,
+                "attributes": {"pa_x": decomposed},
+            }
+        ],
+        "attributes": [
+            {
+                "code": "c",
+                "labels": {"en": decomposed},
+                "values": [{"value": decomposed, "label": decomposed}],
+            }
+        ],
+    }
+    out = rules.nfc_bundle(source)
+    assert out["brands"][0]["name"] == composed
+    assert out["brands"][0]["slug"] == decomposed
+    assert out["posts"][0]["title"] == composed
+    assert out["posts"][0]["sku"] == decomposed
+    assert out["posts"][0]["attributes"] == {"pa_x": decomposed}
+    assert out["attributes"][0]["labels"] == {"en": composed}
+    assert out["attributes"][0]["values"][0] == {"value": decomposed, "label": composed}
+    assert source["brands"][0]["name"] == decomposed  # the input is not mutated

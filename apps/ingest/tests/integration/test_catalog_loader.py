@@ -503,6 +503,30 @@ def test_invalid_input_is_a_report_not_a_crash() -> None:
     assert any("unknown parent 999" in problem for problem in report.problems)
 
 
+def test_free_text_is_stored_in_nfc_and_identity_stays_exact() -> None:
+    decomposed = "Café"
+    data = bundle()
+    data["brands"][0]["name"] = decomposed
+    data["posts"][0]["title"] = decomposed
+    data["posts"][0]["sku"] = "Á-1"
+    load(data)
+    assert Brand.objects.filter(name="Café").exists()
+    assert not Brand.objects.filter(name=decomposed).exists()
+    translation = ProductTranslation.objects.get(title="Café", language=primary_language())
+    assert translation.title == "Café"
+    assert Product.objects.filter(sku="Á-1").exists()
+
+
+def test_reloading_a_decomposed_source_changes_nothing() -> None:
+    data = bundle()
+    data["brands"][0]["name"] = "Café"
+    data["categories"][0]["name"] = "Café"
+    load(copy.deepcopy(data))
+    second = load(copy.deepcopy(data))
+    assert second.created == {}
+    assert Brand.objects.filter(name="Café").count() == 1
+
+
 # --- ING.4 follow-up: the CAT.22 fields (dimensions, material, colour, origin)
 
 
