@@ -166,3 +166,15 @@ def test_free_offer_has_price_zero() -> None:
 def test_link_only_offer_has_no_price() -> None:
     node = eg.event_node(replace(BASE, ticket_url="https://tickets.example/fair"))
     assert node["offers"] == {"@type": "Offer", "url": "https://tickets.example/fair"}
+
+
+def test_free_event_is_accessible_for_free_and_a_priced_one_is_not_marked() -> None:
+    assert eg.event_node(replace(BASE, is_free=True))["isAccessibleForFree"] is True
+    assert "isAccessibleForFree" not in eg.event_node(replace(BASE, price=Decimal("5")))
+
+
+def test_offer_currency_is_the_platform_currency() -> None:
+    from apps.core.money import CURRENCY
+
+    node = eg.event_node(replace(BASE, price=Decimal("5")))
+    assert node["offers"]["priceCurrency"] == CURRENCY

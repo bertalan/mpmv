@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Final
 
+from apps.core.money import CURRENCY
+
 SCHEMA_URL: Final = "https://schema.org"
 ATTENDANCE_MODES: Final = {
     "in_person": "OfflineEventAttendanceMode",
@@ -104,7 +106,8 @@ def _status(facts: EventFacts) -> str:
 
 def _offers(facts: EventFacts) -> dict[str, Any]:
     """An `Offer` with the ticket link and the price (a string with two places, never a float;
-    "0" for a free event); no `availability` and nothing when there is no data."""
+    "0" for a free event); no `availability` (there is no stock data, by design) and
+    nothing when there is no data."""
     price = "0" if facts.is_free else None
     if price is None and facts.price is not None:
         price = str(facts.price.quantize(Decimal("0.01")))
@@ -115,7 +118,7 @@ def _offers(facts: EventFacts) -> dict[str, Any]:
             "@type": "Offer",
             "url": facts.ticket_url,
             "price": price,
-            "priceCurrency": "EUR" if price is not None else "",
+            "priceCurrency": CURRENCY if price is not None else "",
         }
     )
 
@@ -140,6 +143,7 @@ def event_node(facts: EventFacts) -> dict[str, Any]:
             "eventStatus": f"{SCHEMA_URL}/{status}",
             "eventAttendanceMode": f"{SCHEMA_URL}/{ATTENDANCE_MODES[facts.attendance]}",
             "location": location,
+            "isAccessibleForFree": True if facts.is_free else "",
             "offers": _offers(facts) or "",
             "image": facts.image,
             "organizer": dict(facts.organizer) if facts.organizer else "",

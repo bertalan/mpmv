@@ -174,3 +174,26 @@ def test_an_event_that_is_not_postponed_has_no_badge_or_tickets_line(client: Cli
     html = _html(client, _publish(EventPageFactory.create()).url)
     assert "Postponed" not in html
     assert "Get tickets" not in html
+
+
+def test_ticket_price_is_localised_and_the_link_is_noreferrer(client: Client) -> None:
+    from django.utils import translation
+
+    from apps.core.i18n import primary_language
+    from apps.core.money import CURRENCY
+
+    seed_site()
+    for code in (primary_language(), other_language()):
+        index = EventIndexPage.objects.get(locale=Locale.objects.get(language_code=code))
+        page = _publish(
+            EventPageFactory.create(
+                parent=index, price=Decimal("1234.5"), ticket_url="https://tickets.example/x"
+            )
+        )
+        html = _html(client, page.url)
+        with translation.override(code):
+            from django.utils.formats import number_format
+
+            shown = number_format(Decimal("1234.50"), 2, use_l10n=True)
+        assert f'<data value="1234.50">{CURRENCY} {shown}</data>' in html
+        assert 'rel="noopener noreferrer"' in html

@@ -1,5 +1,5 @@
 {% extends "layouts/content.html" %}
-{% load i18n tz wagtailcore_tags cms_tags event_feeds seo_seller %}
+{% load i18n l10n tz wagtailcore_tags cms_tags event_feeds seo_seller %}
 {% comment %}
 Event page (EVT.1 part 2/2, spec 15 "Public pages"): a minimal page on the base theme layout.
 Dates are in the page's language and the event's own time zone, with machine-readable
@@ -62,8 +62,8 @@ when the event has an address and no coordinates.
       {% if page.ticket_url or page.price is not None or page.is_free %}
         <dt>{% translate "Tickets" %}</dt>
         <dd>
-          {% if page.is_free %}{% translate "Free entry" %}{% elif page.price is not None %}{{ page.price }} €{% endif %}
-          {% if page.ticket_url %}<a href="{{ page.ticket_url }}" rel="noopener">{% translate "Get tickets" %}</a>{% endif %}
+          {% if page.is_free %}{% translate "Free entry" %}{% elif page.price is not None %}<data value="{{ page.price|unlocalize }}">{{ currency }} {{ page.price|floatformat:2 }}</data>{% endif %}
+          {% if page.ticket_url %}<a href="{{ page.ticket_url }}" rel="noopener noreferrer">{% translate "Get tickets" %}</a>{% endif %}
         </dd>
       {% endif %}
       {% if page.online_url %}
