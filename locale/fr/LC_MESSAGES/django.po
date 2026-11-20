@@ -3881,6 +3881,11 @@ msgstr "Textes d'aide"
 msgid "Help topics"
 msgstr "Sujets d'aide"
 
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid "Hi %(customer_name)s,"
+msgstr "Salut %(customer_name)s,"
+
 #: apps/manager/event_views.py
 msgid "Hidden by the platform."
 msgstr "Masqué par la plateforme."
@@ -12541,6 +12546,15 @@ msgstr ""
 "d'ambiguïté (par exemple, lettre envoyée par la poste ou courrier électronique). Vous pouvez "
 "utiliser le modèle de formulaire de rétractation ci-dessous, mais ce n'est pas obligatoire."
 
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid ""
+"To keep a saved item, sign in and use it in your garage before that date. Otherwise it is deleted."
+" You can also delete it yourself at any time."
+msgstr ""
+"Pour garder un élément enregistré, connecte-toi et utilise-le dans ton garage avant cette date."
+" Sinon, il est supprimé. Tu peux aussi le supprimer toi-même à tout moment."
+
 #: apps/shipping/models.py
 msgid ""
 "To limit the zone to some postcodes, list them separated by commas: a prefix such as 'BT*', a "
@@ -14304,6 +14318,15 @@ msgstr ""
 "Vous n'avez pas encore défini de politique. La politique standard s'applique : la boutique paie "
 "les frais de retour."
 
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid ""
+"You have not used the items saved in your account garage for almost two years. To keep the data we"
+" hold about you small, we delete them on %(delete_on)s."
+msgstr ""
+"Tu n'as pas utilisé les éléments enregistrés dans le garage de ton compte depuis presque deux ans."
+" Pour limiter les données que nous conservons sur toi, nous les supprimons le %(delete_on)s."
+
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
 "You have the right to withdraw from this contract within %(days)s days without giving any reason."
@@ -14627,6 +14650,10 @@ msgstr "Votre rôle exige un second facteur avant de pouvoir continuer."
 #: apps/manager/sales_terms_views.py
 msgid "Your sales terms are published and in force."
 msgstr "Vos conditions de vente sont publiées et en vigueur."
+
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/subject.txt
+msgid "Your saved garage items will be deleted soon"
+msgstr "Les éléments enregistrés dans ton garage vont bientôt être supprimés"
 
 #: apps/accounts/lifetimes.py
 msgid "Your session ended because it was not used for a while. Please sign in again."
