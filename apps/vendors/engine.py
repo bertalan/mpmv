@@ -793,7 +793,7 @@ def normalized(identity: LegalIdentity) -> LegalIdentity:
     changes["pec"] = identity.pec.strip()
     changes["place_of_birth"] = identity.place_of_birth.strip()
     changes["business_registration_number"] = identity.business_registration_number.strip()
-    changes["phone"] = normalized_phone(identity.phone)
+    changes["phone"] = identity.phone.strip()  # stored as typed: the pages show it so
     return dataclasses.replace(identity, **changes)
 
 
@@ -806,9 +806,15 @@ _PHONE = re.compile(r"\+?[0-9]{6,15}")
 
 
 def normalized_phone(value: str) -> str:
-    """The phone as stored: no spaces, dots, dashes, slashes or brackets; a leading 00 is +."""
+    """The compact form the format is checked on (the stored value stays as typed): no spaces,
+    dots, dashes, slashes or brackets; a leading 00 is +."""
     phone = _PHONE_SEPARATORS.sub("", value)
     return f"+{phone[2:]}" if phone.startswith("00") else phone
+
+
+def is_valid_phone(value: str) -> bool:
+    """Empty, or 6 to 15 digits with an optional leading + once compacted."""
+    return not value.strip() or bool(_PHONE.fullmatch(normalized_phone(value)))
 
 
 def consumer_phone_missing(phone: str, *, sells_to_consumers: bool) -> bool:
@@ -895,7 +901,7 @@ def identity_errors(identity: LegalIdentity) -> dict[str, list[str]]:
     check("bic", is_valid_bic(ident.bic), "A BIC has 8 or 11 characters, e.g. ABCDITMMXXX.")
     check(
         "phone",
-        bool(_PHONE.fullmatch(ident.phone)),
+        is_valid_phone(ident.phone),
         "A phone number has 6 to 15 digits, with the country prefix, e.g. +39 06 1234 5678.",
     )
     if ident.share_capital is not None and ident.share_capital < 0:

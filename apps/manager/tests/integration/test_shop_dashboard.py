@@ -2,6 +2,7 @@
 staff alike, and never another vendor's numbers (CORE.3, spec 02 §2.2)."""
 
 import re
+from datetime import UTC, datetime
 
 import pytest
 from django.db import connection
@@ -11,6 +12,7 @@ from django.test.utils import CaptureQueriesContext
 from apps.accounts.models import User
 from apps.accounts.tests.mfa import verified_login
 from apps.catalog.tests.factories import ProductFactory
+from apps.core.tests.factories import PlatformOperatorFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorMemberFactory
 
@@ -115,10 +117,16 @@ def test_a_seller_without_a_phone_sees_a_notice_on_the_dashboard(
     client: Client, owner: User, vendor: Vendor
 ) -> None:
     Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.ACTIVE, phone="")
+    PlatformOperatorFactory.create(
+        open_ended=True,
+        valid_from=datetime(2020, 1, 1, tzinfo=UTC),
+        support_email="help@example.com",
+    )
     verified_login(client, owner)
     page = client.get(SHOP).text
     assert 'id="consumer-phone-notice"' in page
     assert "phone number" in page
+    assert "help@example.com" in page  # the operator's support address, never a literal
 
 
 def test_a_seller_with_a_phone_sees_no_phone_notice(

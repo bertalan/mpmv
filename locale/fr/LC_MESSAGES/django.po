@@ -15272,6 +15272,17 @@ msgstr ""
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid ""
 "Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to %(support_email)s; until then"
+" you cannot publish products."
+msgstr ""
+"Votre boutique n’a pas de numéro de téléphone. Les vendeurs qui vendent à des consommateurs "
+"doivent en indiquer un : les acheteurs le voient dans les informations sur la rétractation et dans"
+" la confirmation de commande. Veuillez l’envoyer à %(support_email)s ; d’ici là, vous ne pouvez "
+"pas publier de produits."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
 "withdrawal information and the order confirmation. Please send it to the platform staff; until "
 "then you cannot publish products."
 msgstr ""

@@ -248,9 +248,9 @@ def trader_contact(vendor: Vendor) -> engine.TraderContact:
 
 
 def sells_to_consumers(vendor: Vendor) -> bool:
-    """Whether `vendor` sells to consumers (B2C). Every vendor does: the platform has no
-    business-only seller, and the checkout sells to consumers by default. A business-only flag,
-    when one is added, is read here and nowhere else."""
+    """Whether `vendor` sells to consumers (B2C). True for every vendor: no business-only seller
+    flag exists yet, and the checkout sells to consumers by default. Such a flag, when one is
+    added, is read here and nowhere else."""
     return True
 
 

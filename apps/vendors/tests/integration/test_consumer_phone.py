@@ -1,5 +1,5 @@
 """CMP.41 follow-up (owner decision 2026-11-19): a seller who sells to consumers cannot be
-activated without a phone number, which is stored normalised. Fictional numbers only: the UK
+activated without a phone number, which is stored as typed. Fictional numbers only: the UK
 drama range +44 20 7946 0xxx (Ofcom)."""
 
 import pytest
@@ -55,10 +55,11 @@ def test_the_same_seller_with_a_phone_is_activated() -> None:
     assert Vendor.objects.get(pk=vendor.pk).status == Vendor.Status.ACTIVE
 
 
-def test_the_phone_is_stored_normalised() -> None:
-    vendor = VendorFactory.build(phone="0044 (20) 7946-0123")
+def test_the_phone_is_stored_as_typed_only_trimmed() -> None:
+    vendor = VendorFactory.build(phone=" 0044 (20) 7946-0123 ")
     save_vendor(vendor, ctx=CTX)
-    assert Vendor.objects.get(pk=vendor.pk).phone == "+442079460123"
+    assert Vendor.objects.get(pk=vendor.pk).phone == "0044 (20) 7946-0123"
+    assert trader_contact(vendor).phone == "0044 (20) 7946-0123"  # shown as entered
 
 
 def test_an_implausible_phone_is_refused() -> None:

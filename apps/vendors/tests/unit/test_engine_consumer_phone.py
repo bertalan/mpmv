@@ -1,6 +1,6 @@
 """CMP.41 follow-up (owner decision 2026-11-19): a seller who sells to consumers must give a phone
-number; it is stored normalised and checked for its format. Fictional numbers only: the UK drama
-range +44 20 7946 0xxx (Ofcom)."""
+number; it is stored as typed (trimmed) and checked on its compact form. Fictional numbers only:
+the UK drama range +44 20 7946 0xxx (Ofcom)."""
 
 import pytest
 
@@ -13,7 +13,7 @@ NUMBER = "+442079460123"
     "typed",
     ["+44 20 7946 0123", "+44 (20) 7946-0123", "0044 20 7946.0123", " +44/20/79460123 "],
 )
-def test_a_phone_is_stored_without_separators_and_with_a_plus_for_00(typed: str) -> None:
+def test_the_compact_form_has_no_separators_and_a_plus_for_00(typed: str) -> None:
     assert engine.normalized_phone(typed) == NUMBER
 
 
@@ -29,9 +29,14 @@ def test_an_implausible_phone_is_an_error(typed: str) -> None:
     assert "phone" in engine.identity_errors(identity)
 
 
-def test_normalising_the_identity_compacts_the_phone() -> None:
-    identity = engine.LegalIdentity(country="GB", phone="+44 20 7946 0123")
-    assert engine.normalized(identity).phone == NUMBER
+def test_normalising_the_identity_keeps_the_phone_as_typed_only_trimmed() -> None:
+    identity = engine.LegalIdentity(country="GB", phone=" +44 20 7946 0123 ")
+    assert engine.normalized(identity).phone == "+44 20 7946 0123"
+
+
+@pytest.mark.parametrize(("typed", "valid"), [("", True), ("+44 20 7946 0123", True), ("x", False)])
+def test_is_valid_phone(typed: str, valid: bool) -> None:
+    assert engine.is_valid_phone(typed) is valid
 
 
 @pytest.mark.parametrize(

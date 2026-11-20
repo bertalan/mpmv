@@ -90,7 +90,7 @@ class VendorFactory(DjangoModelFactory[Vendor]):
 
     class Params:
         italian_company = factory.Trait(
-            phone="+390655501234",
+            phone="+39 06 55501234",
             country="IT",
             legal_form=Vendor.LegalForm.SRL,
             vat_number=factory.Sequence(italian_vat),
@@ -119,7 +119,7 @@ class VendorFactory(DjangoModelFactory[Vendor]):
             bank_name="Example Bank",
         )
         italian_sole_proprietor = factory.Trait(
-            phone="+390655501234",
+            phone="+39 06 55501234",
             country="IT",
             legal_form=Vendor.LegalForm.SOLE_PROPRIETORSHIP,
             first_name=factory.Faker("first_name"),
@@ -142,7 +142,7 @@ class VendorFactory(DjangoModelFactory[Vendor]):
             iban=factory.Sequence(lambda n: iban("IT", f"X0300003200{n:012d}")),
         )
         eu_company = factory.Trait(
-            phone="+390655501234",
+            phone="+39 06 55501234",
             country="DE",
             legal_form=Vendor.LegalForm.OTHER,
             legal_name=factory.LazyAttribute(lambda o: f"{o.display_name} GmbH"),
@@ -164,7 +164,7 @@ class VendorFactory(DjangoModelFactory[Vendor]):
             bank_name="Example Bank",
         )
         non_eu_company = factory.Trait(
-            phone="+390655501234",
+            phone="+39 06 55501234",
             country="CH",
             legal_form=Vendor.LegalForm.OTHER,
             legal_name=factory.LazyAttribute(lambda o: f"{o.display_name} AG"),
@@ -209,7 +209,7 @@ class VendorFactory(DjangoModelFactory[Vendor]):
     vat_number = factory.Sequence(lambda n: f"IT{italian_vat(n)}")
     contact_email = factory.LazyAttribute(lambda o: f"{slugify(o.display_name)}@example.com")
     # CMP.41 follow-up: a seller to consumers needs one to publish. Fictional: UK drama range.
-    phone = "+442079460000"  # stored normalised
+    phone = "+44 20 7946 0000"
     status = Vendor.Status.APPLICANT
 
     @factory.post_generation

@@ -40,7 +40,12 @@ from apps.catalog.services import product_kpis
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
 from apps.core.public_forms import Protection, pre_mfa_step, public_form
-from apps.core.services import flag_enabled
+from apps.core.services import (
+    NoPlatformOperator,
+    OverlappingPlatformOperators,
+    current_operator,
+    flag_enabled,
+)
 from apps.orders import amendments as orders_amendments
 from apps.orders import engine as orders_engine
 from apps.orders import versions as orders_versions
@@ -141,6 +146,14 @@ def shell_context(ctx: ManagerContext, current: Section) -> dict[str, Any]:
 # --- Built-in sections (registered in sections.py)
 
 
+def support_email() -> str:
+    """The support address of the operator in force; empty when none is configured."""
+    try:
+        return str(current_operator().support_email or "").strip()
+    except (NoPlatformOperator, OverlappingPlatformOperators):
+        return ""
+
+
 class ShopDashboardView(ManagerView):
     section = "shop.dashboard"
     template_name = "manager/shop/dashboard.html"
@@ -150,9 +163,9 @@ class ShopDashboardView(ManagerView):
         context["products"] = product_kpis(self.scoped(Product))
         # CMP.41 follow-up: a seller to consumers without a phone is told what to do.
         vendor = self.manager.vendor
-        context["phone_missing"] = vendor is not None and vendors_services.consumer_phone_missing(
-            vendor
-        )
+        missing = vendor is not None and vendors_services.consumer_phone_missing(vendor)
+        context["phone_missing"] = missing
+        context["support_email"] = support_email() if missing else ""
         return context
 
 

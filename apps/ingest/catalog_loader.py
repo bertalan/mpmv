@@ -64,6 +64,7 @@ from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.models import TranslationStatus
 from apps.core.services import audit_changes
+from apps.vendors import engine as vendors_engine
 from apps.vendors import services as vendor_services
 from apps.vendors.models import Vendor, VendorTranslation
 
@@ -271,7 +272,7 @@ class CatalogLoader:
             slug=_text(row, "slug"),
             country=_text(row, "country"),
             contact_email=_text(row, "email"),
-            phone=_text(row, "phone"),
+            phone=self._phone(row),
             legacy_wp_user_id=int(row["user_id"]),
         )
         self._merge("vendors.vendor", vendor_services.save_vendor(vendor, ctx=self.ctx))
@@ -292,6 +293,15 @@ class CatalogLoader:
                 },
             )
         return vendor
+
+    def _phone(self, row: Row) -> str:
+        """The legacy phone; a malformed one is left empty and reported, so the vendor still
+        loads and the publish gate holds its products back (CMP.41 follow-up)."""
+        phone = _text(row, "phone").strip()
+        if vendors_engine.is_valid_phone(phone):
+            return phone
+        self.report.problems.append(f"vendor {row['user_id']}: malformed phone left empty")
+        return ""
 
     def _defer_vendor_data(self, row: Row, vendor: Vendor) -> None:
         """Hook: the vendor-level commission (a CommissionRule, VEN.2, loaded by MIG.4) and the

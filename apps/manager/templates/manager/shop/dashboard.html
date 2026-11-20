@@ -8,7 +8,10 @@ with ORD.6 and VEN.9. No inline script or style (strict CSP).
 {% block manager_content %}
   <h1>{% translate "Dashboard" %}</h1>
   <p class="manager-lead">{% blocktranslate with vendor=manager.vendor.display_name %}You are working on {{ vendor }}.{% endblocktranslate %}</p>
-  {% if phone_missing %}
+  {% if phone_missing and support_email %}
+    {% blocktranslate asvar phone_text %}Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the withdrawal information and the order confirmation. Please send it to {{ support_email }}; until then you cannot publish products.{% endblocktranslate %}
+    {% include "components/alert.html" with level="warning" message=phone_text id="consumer-phone-notice" only %}
+  {% elif phone_missing %}
     {% translate "Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the withdrawal information and the order confirmation. Please send it to the platform staff; until then you cannot publish products." as phone_text %}
     {% include "components/alert.html" with level="warning" message=phone_text id="consumer-phone-notice" only %}
   {% endif %}
