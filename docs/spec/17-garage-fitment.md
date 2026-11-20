@@ -397,6 +397,12 @@ grids, blog index, event list) a region labelled "Garage" shows above the result
   an account profile: until the user deletes it, or the account is erased (CMP.4), or **24 months
   without use** (a setting), after a service email 30 days before. The anonymous cookie: 180 days
   from the last change, and removable at any time.
+- **The staged cookie at sign-in (FIT.6).** To offer the merge notice (§17.4.3) the server keeps one
+  entry, `fitment_garage_pending`, in the visitor's server-side session: the make, model and year
+  of the cookie's vehicles (at most three), no identifier. It lives as long as the session and is
+  removed on *Add* or *Not now* (and with the session). Nothing is logged: the `fitment.garage.merged`
+  audit entry holds counts only, and a failure to stage or to check the cookie at sign-out is logged
+  without any vehicle or cookie value.
 - **Rights.** The garage is in the account export (access and portability, art. 15 and 20) and in the
   erasure (art. 17) of CMP.4, with a test. Notice (art. 13): the privacy page names the garage, its
   purposes and its retention (FIT.13).
