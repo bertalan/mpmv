@@ -49,7 +49,7 @@ def test_paragraph_html_is_linear_on_hostile_text(text: str) -> None:
         ("<p>Hi <b>there</b></p>", " Hi  there  "),
         ("a < b > c", "a   c"),
         ("1 < 2", "1 < 2"),
-        ("x <a href='1'>y</a> <br", "x  y   <br"),
+        ("x <a href='1'>y</a> <br", "x  y  <br"),
         ("", ""),
     ],
 )
