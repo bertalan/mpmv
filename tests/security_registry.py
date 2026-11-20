@@ -287,6 +287,26 @@ IDOR_REVIEWED: dict[str, str] = {
         "Looked up like the cancel of the rest (ORD.20): a stranger's order or package answers "
         "404 (`test_a_stranger_cannot_cancel_the_rest`)."
     ),
+    "garage_profile_activate": (
+        "The profile is looked up among the signed-in customer's own (FIT.5); a stranger's "
+        "profile or a guessed id answers 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`)."
+    ),
+    "garage_profile_rename": (
+        "The profile is looked up among the signed-in customer's own (FIT.5); a stranger's "
+        "profile or a guessed id answers 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`)."
+    ),
+    "garage_profile_duplicate": (
+        "The profile is looked up among the signed-in customer's own (FIT.5); a stranger's "
+        "profile or a guessed id answers 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`)."
+    ),
+    "garage_profile_delete": (
+        "The profile is looked up among the signed-in customer's own (FIT.5); a stranger's "
+        "profile or a guessed id answers 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`)."
+    ),
     "customer_order_again": (
         "The order is looked up among the signed-in customer's own (ORD.31); a stranger's order "
         "or a guessed id answers 404 "
