@@ -183,9 +183,12 @@ def test_the_video_modal_injects_no_iframe_before_consent_and_does_after(
     )
     expect(page.locator("[data-video-gate]")).to_be_hidden()
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
-    # The frame may take focus (a cross-origin frame swallows keys), so aim Escape at the modal.
-    page.locator("[data-video] .modal.show").focus()
-    page.keyboard.press("Escape")
+    # A cross-origin frame can take focus at any moment while it loads and swallow a real key
+    # press (the flake seen on main), so send Escape straight to the modal, where Bootstrap
+    # listens for it.
+    page.locator("[data-video] .modal.show").dispatch_event(
+        "keydown", {"key": "Escape", "bubbles": True}
+    )
     expect(page.locator("[data-video] .modal")).to_be_hidden()
     expect(page.locator("[data-video] iframe")).to_have_count(0)
     page.locator(".ride-video__open").click()
