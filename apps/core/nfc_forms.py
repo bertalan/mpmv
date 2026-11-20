@@ -13,8 +13,8 @@ from wagtail.blocks import StreamValue
 
 from .text import nfc
 
-# Form fields whose value is a URL or a slug: kept byte-exact.
-EXACT_FIELDS = (forms.URLField, forms.SlugField)
+# Form fields whose value is a URL: kept byte-exact.
+EXACT_FIELDS = (forms.URLField,)
 TEXT_BLOCKS = (blocks.CharBlock, blocks.TextBlock, blocks.RichTextBlock)
 
 
@@ -60,12 +60,14 @@ def nfc_stream_value(value: StreamValue) -> StreamValue:
 class NFCFormMixin:
     """Every string in the cleaned data is put in NFC; other values are kept.
 
-    Put it first in the bases (`class MyForm(NFCFormMixin, forms.Form)`): a `clean` that calls
-    `super().clean()` then sees NFC values.
+    The text is normalised in `_clean_fields`, after each field's own clean and before the form's
+    `clean`: Wagtail's slug and sibling checks (and any later `clean`) then see NFC values.
+    URLs stay exact; slugs are normalised so a decomposed slug clashes with its composed twin.
     """
 
-    def clean(self) -> dict[str, Any]:
-        cleaned: dict[str, Any] = super().clean() or self.cleaned_data  # type: ignore[misc,attr-defined]
+    def _clean_fields(self) -> None:
+        super()._clean_fields()  # type: ignore[misc]
+        cleaned: dict[str, Any] = self.cleaned_data  # type: ignore[attr-defined]
         fields = getattr(self, "fields", {})
         for name, value in list(cleaned.items()):
             if isinstance(value, str):
@@ -73,7 +75,6 @@ class NFCFormMixin:
                     cleaned[name] = nfc(value)
             elif isinstance(value, StreamValue):
                 cleaned[name] = nfc_stream_value(value)  # StreamField text blocks, one hook
-        return cleaned
 
 
 class NFCModelForm(NFCFormMixin, WagtailAdminModelForm):  # type: ignore[misc]  # Wagtail is untyped
