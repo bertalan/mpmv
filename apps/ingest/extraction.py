@@ -173,7 +173,9 @@ def extract_load_weight(description: str | None) -> str | None:
 _UNIT_MM: Final = {"mm": Decimal(1), "cm": Decimal(10), "m": Decimal(1000)}
 _NUM = r"(\d+(?:[.,]\d+)?)"
 _SEP = r"\s*(?:x|\u00d7|\*)\s*"
-_DIMS = re.compile(rf"{_NUM}{_SEP}{_NUM}(?:{_SEP}{_NUM})?\s*(mm|cm|m)\b", re.IGNORECASE)
+# A match never starts inside a run of digits: the run's first digit has already tried every way
+# to match, and trying each later digit again made a long run quadratic.
+_DIMS = re.compile(rf"(?<!\d){_NUM}{_SEP}{_NUM}(?:{_SEP}{_NUM})?\s*(mm|cm|m)\b", re.IGNORECASE)
 
 
 def _to_mm(value: str, unit: str) -> int | None:
