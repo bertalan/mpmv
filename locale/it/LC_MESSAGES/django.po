@@ -239,7 +239,7 @@ msgid ""
 "%(vendor_name)s: the platform team did not approve the brand below. It was removed from your "
 "products listed under it, which stay on sale without a brand. Open each product in your shop area "
 "and pick an existing brand, or propose the brand again with an official link or a Wikidata ID."
-msgstr "%(vendor_name)s: il team della piattaforma non ha approvato il marchio indicato di seguito. È stato rimosso dai suoi prodotti elencati sotto di esso, che restano in vendita senza marchio. Apra ogni prodotto nella sua area negozio e scelga un marchio esistente, oppure proponga di nuovo il marchio con un link ufficiale o un ID Wikidata."
+msgstr "%(vendor_name)s: il team della piattaforma non ha approvato il marchio indicato di seguito. È stato rimosso dai Suoi prodotti elencati sotto di esso, che restano in vendita senza marchio. Apra ogni prodotto nella Sua area negozio e scelga un marchio esistente, oppure proponga di nuovo il marchio con un link ufficiale o un ID Wikidata."
 
 #: apps/core/models.py
 msgid ""
@@ -1695,7 +1695,7 @@ msgstr "lotti di marchi"
 
 #: apps/catalog/templates/email/catalog/brand_rejected/subject.txt
 msgid "Brand not approved: your products need another brand"
-msgstr "Marchio non approvato: i suoi prodotti richiedono un altro marchio"
+msgstr "Marchio non approvato: i Suoi prodotti richiedono un altro marchio"
 
 #: themes/base/templates/components/breadcrumb.html
 msgid "Breadcrumb"
@@ -5224,7 +5224,7 @@ msgstr "Nessun prodotto corrisponde alla tua ricerca."
 #: apps/catalog/templates/email/catalog/brand_rejected/body.html
 #: apps/catalog/templates/email/catalog/brand_rejected/body.txt
 msgid "No products used it."
-msgstr "Nessun prodotto la utilizzava."
+msgstr "Nessun prodotto lo utilizzava."
 
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
