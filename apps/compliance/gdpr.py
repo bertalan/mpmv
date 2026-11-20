@@ -28,6 +28,7 @@ from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
 from apps.core.models import AuditLog, OutboxEmail, OutboxEmailEvent
 from apps.core.services import audit_changes
+from apps.fitment import garage_profiles
 from apps.orders import engine
 from apps.orders import services as order_services
 from apps.orders.models import Order
@@ -195,11 +196,20 @@ def export_customer_data(user: User, *, ctx: AuditContext) -> dict[str, Any]:
         "vendor_memberships": memberships,
         "emails": emails,
         "devices": devices,
+        "garage_profiles": garage_profiles.export_profiles(user),
         "audit_entries": audit_entries,
     }
     counts = {
         key: len(data[key])
-        for key in ("carts", "orders", "vendor_memberships", "emails", "devices", "audit_entries")
+        for key in (
+            "carts",
+            "orders",
+            "vendor_memberships",
+            "emails",
+            "devices",
+            "garage_profiles",
+            "audit_entries",
+        )
     }
     record(ctx, ACTION_EXPORT, "accounts.user", str(user.public_id), None, counts)
     return data
@@ -316,6 +326,7 @@ def anonymise_customer(
                             order, ctx=ctx, reason="account_erasure", now=stamp
                         ).changes
                     )
+            garage_profiles.erase_profiles(locked, own)  # FIT.5: the account garage goes too
             Cart.objects.filter(user=locked).delete()
             ElevationGrant.objects.filter(user=locked).delete()
             for device in list(devices_for_user(locked, confirmed=None)):

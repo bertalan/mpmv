@@ -4001,6 +4001,11 @@ msgstr "Hilfetexte"
 msgid "Help topics"
 msgstr "Hilfethemen"
 
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid "Hi %(customer_name)s,"
+msgstr "Hallo %(customer_name)s,"
+
 #: apps/manager/event_views.py
 msgid "Hidden by the platform."
 msgstr "Von der Plattform ausgeblendet."
@@ -12950,6 +12955,16 @@ msgstr ""
 "informieren. Sie können dafür das beigefügte Muster-Widerrufsformular verwenden, das jedoch nicht "
 "vorgeschrieben ist."
 
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid ""
+"To keep a saved item, sign in and use it in your garage before that date. Otherwise it is deleted."
+" You can also delete it yourself at any time."
+msgstr ""
+"Wenn du einen gespeicherten Eintrag behalten möchtest, melde dich an und nutze ihn vor diesem"
+" Datum in deiner Garage. Andernfalls wird er gelöscht. Du kannst ihn auch jederzeit selbst"
+" löschen."
+
 #: apps/shipping/models.py
 msgid ""
 "To limit the zone to some postcodes, list them separated by commas: a prefix such as 'BT*', a "
@@ -14798,6 +14813,15 @@ msgstr ""
 "Sie haben noch keine Richtlinie festgelegt. Es gilt die Standardrichtlinie: Der Shop trägt die "
 "Rücksendekosten."
 
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.html
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/body.txt
+msgid ""
+"You have not used the items saved in your account garage for almost two years. To keep the data we"
+" hold about you small, we delete them on %(delete_on)s."
+msgstr ""
+"Du hast die in der Garage deines Kontos gespeicherten Einträge seit fast zwei Jahren nicht"
+" genutzt. Damit wir möglichst wenige Daten über dich speichern, löschen wir sie am %(delete_on)s."
+
 #: apps/compliance/templates/compliance/includes/model_withdrawal_information.html
 msgid ""
 "You have the right to withdraw from this contract within %(days)s days without giving any reason."
@@ -15122,6 +15146,10 @@ msgstr "Ihre Rolle erfordert einen zweiten Faktor, bevor Sie fortfahren können.
 #: apps/manager/sales_terms_views.py
 msgid "Your sales terms are published and in force."
 msgstr "Ihre Verkaufsbedingungen sind veröffentlicht und in Kraft."
+
+#: apps/fitment/templates/email/fitment/garage_inactivity_notice/subject.txt
+msgid "Your saved garage items will be deleted soon"
+msgstr "Deine gespeicherten Garagen-Einträge werden bald gelöscht"
 
 #: apps/accounts/lifetimes.py
 msgid "Your session ended because it was not used for a while. Please sign in again."

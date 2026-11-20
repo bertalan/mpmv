@@ -12,9 +12,11 @@ position. Create and move nodes through `apps.fitment.services`, never by writin
 
 from typing import Any, ClassVar, Self
 
+from django.conf import settings
 from django.contrib.postgres.fields import IntegerRangeField
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
 
@@ -508,3 +510,50 @@ class FitmentNodeProposal(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.vendor_id}: {self.node_id}"
+
+
+class GarageProfile(BaseModel):
+    """A saved item of a customer's account garage (FIT.5, spec 17 §17.4.1).
+
+    Personal data once linked to an account: exported and erased with it (CMP.4). The node is
+    at any depth; a merge moves the profile to the survivor (`references`), a retired node keeps
+    it, marked by `node_retired`. At most one profile per user is active; none active is the
+    generic state. Create and change through `apps.fitment.garage_profiles`.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="garage_profiles"
+    )
+    name = models.CharField(_("name"), max_length=engine.MAX_PROFILE_NAME)
+    node = models.ForeignKey(
+        FitmentNode,
+        on_delete=models.PROTECT,
+        related_name="garage_profiles",
+        help_text=_("Any depth: a make only, or down to a variant."),
+    )
+    year = models.SmallIntegerField(_("year"), null=True, blank=True)
+    is_active = models.BooleanField(_("active"), default=False)
+    last_used_at = models.DateTimeField(default=timezone.now)
+    inactivity_notice_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When the service email about the 24-month cleanup was queued."),
+    )
+
+    class Meta:
+        ordering = ["-last_used_at", "id"]
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(is_active=True),
+                name="fitment_one_active_garage_profile",
+            )
+        ]
+        indexes: ClassVar[list[models.Index]] = [models.Index(fields=["last_used_at"])]
+
+    def __str__(self) -> str:
+        return self.name
+
+    @property
+    def node_retired(self) -> bool:
+        return engine.profile_node_retired(self.node.status)
