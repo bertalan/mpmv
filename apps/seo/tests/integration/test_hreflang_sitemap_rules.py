@@ -62,12 +62,12 @@ def alternates(html: str) -> dict[str, str]:
 
 def sitemap_urls(client: Client, language: str) -> list[str]:
     """Every page path the index lists for `language`, in order, over all its type files."""
-    index = ElementTree.fromstring(client.get(reverse("sitemap")).content)  # noqa: S314
+    index = ElementTree.fromstring(client.get(reverse("sitemap")).content)  # noqa: S314 (our own sitemap XML)
     found: list[str] = []
     for loc in index.findall("s:sitemap/s:loc", NS):
         path = path_of(loc.text or "")
         if path.startswith(f"/sitemap-{language}-"):
-            body = ElementTree.fromstring(client.get(path).content)  # noqa: S314
+            body = ElementTree.fromstring(client.get(path).content)  # noqa: S314 (our own sitemap XML)
             found += [path_of(u.text or "") for u in body.findall("s:url/s:loc", NS)]
     return found
 
