@@ -131,6 +131,10 @@ def display_unit_price(
     return override if override is not None else price_net
 
 
+# Why an item without a price the buyer can see cannot go in a cart (#757, TAX.12).
+NO_PRICE_ERROR = "This item has no price yet, so you can't buy it online."
+
+
 # --- Merge on sign-in
 
 

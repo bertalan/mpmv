@@ -44,6 +44,7 @@ SKIPPED_LABELS = {
     orders_engine.REORDER_NOT_DELIVERABLE: gettext_lazy(
         "the shop cannot deliver it to the order's country"
     ),
+    orders_engine.REORDER_NO_PRICE: gettext_lazy("has no price yet"),
 }
 
 STATE_LABELS: dict[StaffDraftState, Any] = {

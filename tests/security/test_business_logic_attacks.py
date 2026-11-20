@@ -68,6 +68,13 @@ def sellable(**fields: Any) -> Product:
     return ProductFactory.create(**values)
 
 
+@pytest.fixture(autouse=True)
+def _consumer_prices(request: pytest.FixtureRequest) -> None:
+    """Items in a cart need a consumer price (TAX.12, #757): the database tests get one."""
+    if request.node.get_closest_marker("django_db"):
+        request.getfixturevalue("consumer_prices")
+
+
 def guest_cart(key: str = "attacker-session") -> Cart:
     return CartFactory.create(session_key=key)
 
