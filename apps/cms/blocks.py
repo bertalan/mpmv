@@ -912,6 +912,44 @@ class ProductCardBlock(blocks.StructBlock):  # type: ignore[misc]
         value_class = ProductCardValue
 
 
+def _href_in_language(href: str, language: str) -> bool:
+    """Whether a site path is one of `language`'s URLs: a card that falls back to another
+    language's page (a term without a text in the page language) stays out of the graph."""
+    default = settings.LANGUAGE_CODE
+    if not href.startswith("/"):
+        return True
+    others = [f"/{code}/" for code, _name in settings.LANGUAGES if code != default]
+    if language == default:
+        return not any(href.startswith(prefix) for prefix in others)
+    return href.startswith(f"/{language}/")
+
+
+def _cards_item_list(
+    name: str, cards: Iterable[Card], context: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    """One schema.org `ItemList` of the public cards of a featured links block or a strip
+    (SEO.7): each item is the card's target page (`@id` and `url`) with its label, in the page
+    language only. No card, no list."""
+    request = context.get("request")
+    language = _page_language(dict(context))
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for card in cards:
+        if not card.href or not _href_in_language(card.href, language):
+            continue
+        url = request.build_absolute_uri(card.href) if request is not None else card.href
+        if url in seen:
+            continue
+        seen.add(url)
+        item = {"@id": url, "name": card.label, "url": url}
+        items.append({"@type": "ListItem", "position": len(items) + 1, "item": item})
+    if not items:
+        return []
+    return [
+        {"@type": "ItemList", "name": name, "numberOfItems": len(items), "itemListElement": items}
+    ]
+
+
 class FeaturedLinksBlock(blocks.StructBlock):  # type: ignore[misc]
     """A heading and cards to pages, terms and vendors; left out when no card is public."""
 
@@ -942,6 +980,13 @@ class FeaturedLinksBlock(blocks.StructBlock):  # type: ignore[misc]
         cards = (card_value.card(targets) for card_value in values)
         context["cards"] = [card for card in cards if card is not None]
         return context
+
+    def graph_nodes(self, value: Any, context: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """The block's named `ItemList` (SEO.7): its heading, else a generic name."""
+        values = [child.value for child in value["cards"]]
+        targets = _card_targets(values, _page_language(dict(context)), context.get("request"))
+        cards = [card for card in (v.card(targets) for v in values) if card is not None]
+        return _cards_item_list(value.get("heading") or str(_("Featured links")), cards, context)
 
 
 class ArticleLinksBlock(FeaturedLinksBlock):
@@ -1085,6 +1130,13 @@ class StripBlock(blocks.StructBlock):  # type: ignore[misc]
         context["interval"] = value.get("interval") or 6000
         context["carousel_id"] = _unique_id(parent_context, "strip", value)
         return context
+
+    def graph_nodes(self, value: Any, context: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """The strip's named `ItemList` (SEO.7): its cards that lead to a page, not the quotes."""
+        values = [c.value for c in value["cards"] if c.block_type != "testimonial"]
+        targets = _card_targets(values, _page_language(dict(context)), context.get("request"))
+        cards = [card for card in (v.card(targets) for v in values) if card is not None]
+        return _cards_item_list(value.get("heading") or str(_("Featured")), cards, context)
 
 
 class SectionTitleBlock(blocks.StructBlock):  # type: ignore[misc]
