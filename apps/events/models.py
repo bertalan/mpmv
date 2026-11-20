@@ -86,6 +86,7 @@ from apps.core.fields import CountryField, MoneyField
 from apps.core.geocoding import GeocodeResult
 from apps.core.models import BaseModel
 from apps.core.money import CURRENCY
+from apps.core.nfc_forms import NFCPageForm
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
 
@@ -157,6 +158,8 @@ class EventIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]  # Wagtail 
     Routes (EVT.6): the list (default), `calendar/YYYY-MM/` and `past/`. The feeds (EVT.9)
     are file-like routes, the original-language fallback with EVT.8, the map with EVT.15.
     """
+
+    base_form_class = NFCPageForm
 
     intro = RichTextField(
         _("introduction"),

@@ -56,25 +56,26 @@ EVENT_FILES = (
 )
 SCOPES = (
     "apps/manager",
+    "apps/fitment/templates/email",  # the garage inactivity notice (FIT.5 3/3)
     "apps/fitment/services.py",  # the publish gate message (FIT.18), shown to vendors and staff
     "apps/accounts",
     "apps/orders/templates",
     "apps/seo",
     "apps/orders/ui",
-    "apps/vendors/templates/email/vendors/profile_reverted",
+    "apps/vendors/templates/email",  # the vendor emails (I18N.20 3c)
     "apps/events/templates/email",  # the event moderation emails (EVT.11)
+    "apps/catalog/templates/email",  # brand rejected notice to the vendor (I18N.20 3c)
+    "apps/core/templates/email",  # the operations alert to staff (I18N.20 3c)
     "apps/orders/customer_views.py",  # the customer area labels (ORD.7)
     "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
     "apps/compliance/views.py",  # withdrawal and notice errors, the form PDF 503 (I18N.20)
+    "apps/compliance/templates/email",  # the compliance emails (I18N.20 3c)
     "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)
     "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
     "apps/vendors/models.py",
     "apps/vendors/templates/vendors/terms",  # the public sales terms page (VEN.35)
     "apps/vendors/templates/documents/vendors",  # the sales terms PDF (VEN.36), same strings as the page
     "apps/vendors/templates/vendors/apply",  # the vendor application pages (VEN.22), formal
-    "apps/vendors/templates/email/vendors/application_confirm",  # the application emails (VEN.22)
-    "apps/vendors/templates/email/vendors/application_exists",
-    "apps/vendors/templates/email/vendors/application_reminder",
     "apps/vendors/forms.py",  # the application and confirm forms (VEN.22)
     "themes/base/templates/layouts",
     "themes/ride/templates/components/header.html",  # the Bootstrap navbar and offcanvas (THM.15)
@@ -145,6 +146,12 @@ SCOPES = (
     "apps/fitment/templates/fitment/_garage_saver.html",
     "apps/core/templates/core/components/image_credit.html",
     "apps/core/templates/core/components/image_credits_disclosure.html",
+    # The remaining CMS page templates (I18N.20 part 3b, slice 3): landing and recruitment pages.
+    "apps/cms/templates/cms/home_page.html",
+    "apps/cms/templates/cms/standard_page.html",
+    "apps/cms/templates/cms/term_landing_page.html",
+    "apps/cms/templates/cms/vendor_landing_page.html",
+    "apps/cms/templates/cms/vendor_recruitment_page.html",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (

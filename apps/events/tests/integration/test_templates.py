@@ -13,9 +13,13 @@ from decimal import Decimal
 
 import pytest
 from django.test import Client
+from django.utils import translation
+from django.utils.formats import date_format
+from django.utils.translation import gettext
 from wagtail.models import Locale
 
 from apps.cms.services import seed_site
+from apps.core.i18n import primary_language
 from apps.events.models import EventIndexPage, EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
 from tests.i18n import other_language
@@ -57,7 +61,8 @@ def test_the_event_page_shows_title_dates_type_vendor_and_address(client: Client
     # 08:00 UTC is 09:00 in Rome; the machine-readable value keeps the offset.
     assert '<time datetime="2027-03-10T09:00:00+01:00"' in html
     assert "Europe/Rome" in html
-    assert "Trade fair or meeting" in html
+    with translation.override(primary_language()):
+        assert gettext("Trade fair or meeting") in html
     assert page.vendor is not None
     assert page.vendor.display_name in html
     assert "<address" in html
@@ -85,7 +90,8 @@ def test_a_cancelled_event_says_so(client: Client) -> None:
     page = EventPageFactory.create(cancelled_at=dt.datetime(2027, 2, 1, tzinfo=dt.UTC))
     html = _html(client, _publish(page).url)
     assert 'role="status"' in html
-    assert "Cancelled" in html
+    with translation.override(primary_language()):
+        assert gettext("Cancelled") in html
 
 
 def test_dates_are_written_in_the_page_language(client: Client) -> None:
@@ -94,7 +100,9 @@ def test_dates_are_written_in_the_page_language(client: Client) -> None:
     page = _publish(EventPageFactory.create(parent=italian, title="Fiera di primavera"))
     html = _html(client, page.url)
     assert f'<html lang="{other_language()}"' in html
-    assert "marzo" in html.lower()  # 10 March 2027, in Italian
+    with translation.override(other_language()):
+        march = date_format(dt.date(2027, 3, 10), "F")  # the month name in that language
+    assert march.lower() in html.lower()
     assert "Fiera di primavera" in html
 
 
@@ -120,7 +128,8 @@ def test_the_index_lists_live_events_of_its_language_in_date_order(client: Clien
 def test_an_empty_index_says_there_are_no_events(client: Client) -> None:
     html = _html(client, primary_index().url)
     assert "<article" not in html
-    assert "No events" in html
+    with translation.override(primary_language()):
+        assert gettext("No events are planned at the moment.") in html
 
 
 def test_cancelled_wins_over_the_postponed_badge(client: Client) -> None:

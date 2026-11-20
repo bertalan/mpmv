@@ -1,0 +1,11 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}Hi {{ customer_name }},{% endblocktranslate %}</p>
+<p>{% blocktranslate %}You have not used the items saved in your account garage for almost two years. To keep the data we hold about you small, we delete them on {{ delete_on }}.{% endblocktranslate %}</p>
+<ul>
+{% for name in profiles %}<li>{{ name }}</li>
+{% endfor %}</ul>
+<p>{% translate "To keep a saved item, sign in and use it in your garage before that date. Otherwise it is deleted. You can also delete it yourself at any time." %}</p>
+</body>
+</html>

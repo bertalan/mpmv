@@ -5,12 +5,13 @@ what it applies. Rows are changed in place so the caller keeps using the instanc
 """
 
 import datetime as dt
+import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -639,13 +640,27 @@ def record_source_state(
         if dry_run:
             return changed, changes
         row.save()
+        existing = {
+            v.native_id: v
+            for v in SourceVariation.objects.filter(
+                source_id=locked.source_id, native_id__in=child_ids
+            )
+        }
+        to_create: list[SourceVariation] = []
+        to_update: list[SourceVariation] = []
         for child in merged["variations"].values():
             present = bool(child["present"])
-            variation = SourceVariation.objects.filter(
-                source_id=locked.source_id, native_id=child["native_id"]
-            ).first() or SourceVariation(
-                item=locked, source=locked.source, native_id=child["native_id"], last_seen_at=now
-            )
+            variation = existing.get(child["native_id"])
+            if variation is None:
+                variation = SourceVariation(
+                    item=locked,
+                    source=locked.source,
+                    native_id=child["native_id"],
+                    last_seen_at=now,
+                )
+                to_create.append(variation)
+            else:
+                to_update.append(variation)
             variation.state = child
             variation.stock_status = child.get("stock_status")
             variation.stock_quantity = child.get("stock_quantity")
@@ -653,7 +668,20 @@ def record_source_state(
             variation.observed_at = now
             if present:
                 variation.last_seen_at = now
-            variation.save()
+            variation.updated_at = timezone.now()
+        SourceVariation.objects.bulk_create(to_create)
+        SourceVariation.objects.bulk_update(
+            to_update,
+            [
+                "state",
+                "stock_status",
+                "stock_quantity",
+                "present",
+                "observed_at",
+                "last_seen_at",
+                "updated_at",
+            ],
+        )
         if changed:
             SourceStateVersion.objects.create(
                 item=locked, version=row.version, state=merged, observed_at=now
@@ -739,7 +767,7 @@ def record_item_change(
     changes = ChangeSet()
     with transaction.atomic():
         locked = SourceItem.objects.select_for_update().get(pk=item.pk)
-        current = latest_changes([locked.pk]).get(locked.pk, {})
+        current = latest_item_fields(locked.pk)
         diff = engine.changed_fields(current, engine.canonical_state(values))
         if not diff:
             return changes
@@ -775,3 +803,23 @@ def latest_changes(
     for item_id, flagged, values in history:
         rows.setdefault(item_id, []).append((flagged, values))
     return {item_id: engine.latest_field_values(r, fields) for item_id, r in rows.items()}
+
+
+def latest_item_fields(item_id: int, fields: Sequence[str] | None = None) -> dict[str, Any]:
+    """`{field: last flagged value}` of one item in a single query (`DISTINCT ON (field)`).
+
+    Same result as `latest_changes([item_id], fields)`, without reading the whole history."""
+    sql = (
+        "SELECT DISTINCT ON (kv.key) kv.key, kv.value "  # noqa: S608 (model constant, values bound)
+        f"FROM {ItemChange._meta.db_table} c "
+        "CROSS JOIN LATERAL jsonb_each(c.new_values) AS kv "
+        "WHERE c.item_id = %s AND (c.changed_fields -> kv.key) = 'true'::jsonb"
+    )
+    params: list[Any] = [item_id]
+    if fields is not None:
+        sql += " AND kv.key = ANY(%s)"
+        params.append(list(fields))
+    sql += " ORDER BY kv.key, c.version DESC, c.id DESC"
+    with connection.cursor() as cursor:
+        cursor.execute(sql, params)
+        return {key: json.loads(value) for key, value in cursor.fetchall()}

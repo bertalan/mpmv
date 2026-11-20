@@ -11,15 +11,46 @@ import re
 from collections.abc import Mapping
 
 _COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
-_STRING_RE = re.compile(r"\"(?:[^\"\\\n]|\\.)*\"|'(?:[^'\\\n]|\\.)*'")
-_SEGMENT_RE = re.compile(r"[^{};]*[{};]")
+_QUOTE_RE = re.compile(r"[\"']")
+_STRING_RES = {
+    '"': re.compile(r"\"(?:[^\"\\\n]|\\.)*\""),
+    "'": re.compile(r"'(?:[^'\\\n]|\\.)*'"),
+}
+# A segment starts at the beginning or right after a delimiter, never in the middle of one.
+_SEGMENT_RE = re.compile(r"(?<![^{};])[^{};]*[{};]")
 _CLASS_RE = re.compile(r"\.((?:[\w-]|\\.)+)")
 _ESCAPE_RE = re.compile(r"\\(.)")
 
 
+def _blank_strings(text: str) -> str:
+    """`text` with every closed CSS string (`'...'` or `"..."`, escapes, one line) emptied to `""`.
+
+    An unclosed quote is left as it is. If a quote finds no end, no later quote of the same kind
+    on that line has one either, so the scan skips them and every character is read once."""
+    parts: list[str] = []
+    copied = 0
+    position = 0
+    dead = {'"': -1, "'": -1}  # quotes before this index are known to be unclosed
+    while quote := _QUOTE_RE.search(text, position):
+        start = quote.start()
+        kind = text[start]
+        position = start + 1
+        if start < dead[kind]:
+            continue
+        string = _STRING_RES[kind].match(text, start)
+        if string is None:
+            line_end = text.find("\n", start)
+            dead[kind] = len(text) if line_end == -1 else line_end
+            continue
+        parts += [text[copied:start], '""']
+        copied = position = string.end()
+    parts.append(text[copied:])
+    return "".join(parts)
+
+
 def class_names(css: str) -> set[str]:
     """Every class named in the selectors of `css` (rule preludes; at-rule preludes skipped)."""
-    text = _STRING_RE.sub('""', _COMMENT_RE.sub("", css))
+    text = _blank_strings(_COMMENT_RE.sub("", css))
     names: set[str] = set()
     for segment in _SEGMENT_RE.findall(text):
         if not segment.endswith("{"):

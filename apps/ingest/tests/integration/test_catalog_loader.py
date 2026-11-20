@@ -501,3 +501,104 @@ def test_invalid_input_is_a_report_not_a_crash() -> None:
     )
     report = load(data)
     assert any("unknown parent 999" in problem for problem in report.problems)
+
+
+def test_free_text_is_stored_in_nfc_and_identity_stays_exact() -> None:
+    decomposed = "Café"
+    data = bundle()
+    data["brands"][0]["name"] = decomposed
+    data["posts"][0]["title"] = decomposed
+    data["posts"][0]["sku"] = "Á-1"
+    load(data)
+    assert Brand.objects.filter(name="Café").exists()
+    assert not Brand.objects.filter(name=decomposed).exists()
+    translation = ProductTranslation.objects.get(title="Café", language=primary_language())
+    assert translation.title == "Café"
+    assert Product.objects.filter(sku="Á-1").exists()
+
+
+def test_reloading_a_decomposed_source_changes_nothing() -> None:
+    data = bundle()
+    data["brands"][0]["name"] = "Café"
+    data["categories"][0]["name"] = "Café"
+    load(copy.deepcopy(data))
+    second = load(copy.deepcopy(data))
+    assert second.created == {}
+    assert Brand.objects.filter(name="Café").count() == 1
+
+
+# --- ING.4 follow-up: the CAT.22 fields (dimensions, material, colour, origin)
+
+
+def cat22_post(**extra: Any) -> dict[str, Any]:
+    return post(
+        10,
+        primary_language(),
+        1,
+        "PHY-1",
+        length_mm="300",
+        width_mm="200.4",
+        height_mm=100,
+        country_of_origin=" it ",
+        material="Glazed ceramic",
+        colour="Matt black",
+        **extra,
+    )
+
+
+def test_the_cat22_fields_of_a_source_record_land_in_the_product() -> None:
+    data = bundle()
+    data["posts"] = [cat22_post(), post(11, other_language(), 1, "PHY-1", material="Ceramica")]
+    report = load(data)
+    product = Product.objects.get(sku="PHY-1")
+    assert (product.length_mm, product.width_mm, product.height_mm) == (300, 200, 100)
+    assert product.country_of_origin == "IT"
+    en = product.translations.get(language=primary_language())
+    assert (en.material, en.colour) == ("Glazed ceramic", "Matt black")
+    twin = product.translations.get(language=other_language())
+    assert (twin.material, twin.colour) == ("Ceramica", "")
+    assert not [p for p in report.problems if "PHY-1" in p]
+
+
+def test_a_machine_placeholder_text_gets_the_english_material_and_colour() -> None:
+    data = bundle()
+    data["posts"] = [cat22_post(), post(12, other_language(), 2, "OTHER-1")]
+    load(data)
+    placeholder = Product.objects.get(sku="PHY-1").translations.get(language=other_language())
+    assert (placeholder.material, placeholder.colour) == ("Glazed ceramic", "Matt black")
+
+
+def test_invalid_cat22_values_are_reported_and_dropped_not_silent() -> None:
+    data = bundle()
+    data["posts"] = [
+        post(
+            10,
+            primary_language(),
+            1,
+            "PHY-2",
+            length_mm="-5",
+            width_mm="0",
+            height_mm="tall",
+            country_of_origin="ZZ",
+            colour="x" * 81,
+        )
+    ]
+    report = load(data)
+    product = Product.objects.get(sku="PHY-2")
+    assert product.length_mm is None
+    assert product.width_mm is None
+    assert product.height_mm is None
+    assert product.country_of_origin == ""
+    assert product.translations.get(language=primary_language()).colour == ""
+    text = "\n".join(report.problems)
+    for needle in ("length_mm", "width_mm", "height_mm", "country of origin 'ZZ'", "colour"):
+        assert needle in text
+
+
+def test_cat22_values_are_written_by_nothing_on_a_dry_run() -> None:
+    data = bundle()
+    data["posts"] = [cat22_post()]
+    report = services.load_legacy_catalog(data, ctx=CTX)
+    assert not report.changes.is_empty
+    assert not Product.objects.exists()
+    assert not ProductTranslation.objects.exists()

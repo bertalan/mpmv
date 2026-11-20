@@ -95,6 +95,8 @@ def register_builtin_references() -> None:
     if ("fitment.productfitment", "node") not in registered_fields():
         _register_product_rows()
     register_proposal_reference()
+    if ("fitment.garageprofile", "node") not in registered_fields():
+        _register_garage_profiles()
 
 
 def _register_product_rows() -> None:
@@ -137,6 +139,13 @@ def _register_product_rows() -> None:
         move=move,
         field=("fitment.productfitment", "node"),
     )
+
+
+def _register_garage_profiles() -> None:
+    """FIT.5: a customer's profile follows a merge (it keeps its name, year and active flag)."""
+    from .models import GarageProfile
+
+    register_node_reference(GarageProfile, "node")
 
 
 def register_proposal_reference() -> None:

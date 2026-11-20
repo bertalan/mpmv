@@ -29,6 +29,17 @@ INPUT_LIMITS: dict[str, tuple[int, str]] = {
         GUNICORN_REQUEST_LINE,
         "Django's admin shortcut route; a URL path never exceeds the request line limit",
     ),
+    "urlconf:/admin/snippets/cms/contentsnippet/history/(?P<pk>.+)/revisions/compare/"
+    "(?P<revision_id_a>live|earliest|\\d+)\\.\\.\\.(?P<revision_id_b>live|latest|\\d+)/$ "
+    "wagtail.snippets.views.snippets.RevisionsCompareView": (
+        GUNICORN_REQUEST_LINE,
+        "Wagtail's snippet revision compare route (third party, SEC.5); a URL path never "
+        "exceeds the request line limit",
+    ),
+    "apps/core/observability.py:118": (
+        40,
+        "the caller cuts the text before a UUID to its last 40 characters before matching (SEC.5)",
+    ),
     "apps/themes/csp_lint.py:19": (
         FAST_SIZE,
         "trusted input: lints the repository's own templates in CI (THM.3), never a request",

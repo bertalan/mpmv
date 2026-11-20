@@ -57,7 +57,7 @@ from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from wagtail import blocks
-from wagtail.admin.panels import FieldPanel, InlinePanel
+from wagtail.admin.panels import FieldPanel
 from wagtail.contrib.routable_page.models import RoutablePageMixin, path
 from wagtail.contrib.settings.models import BaseSiteSetting
 from wagtail.fields import RichTextField, StreamField
@@ -79,7 +79,7 @@ from wagtail_localize.models import Translation
 
 from apps.core.fields import LanguageField
 from apps.core.images import rendition_or_original
-from apps.core.nfc_forms import NFCModelForm
+from apps.core.nfc_forms import NFCInlinePanel, NFCModelForm, NFCPageForm
 from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
 from apps.vendors.services import has_public_storefront
 
@@ -113,6 +113,23 @@ from .choosers import term_chooser, vendor_chooser
 from .footer_forms import FooterSettingsForm
 from .forms_pages import FormField as FormField  # re-exported: models live in their own module
 from .forms_pages import FormPage as FormPage
+
+
+def seo_image_field() -> "models.ForeignKey[Any, Any]":
+    """The picture search and social previews show for a page (SEO.8 2/2, D-36), optional: the
+    page's main image, the site default and the platform logo follow in that order."""
+    return models.ForeignKey(
+        get_image_model_string(),
+        verbose_name=_("sharing image"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text=_(
+            "The picture shown when this page is shared on social networks. If you leave it "
+            "empty, the main image of the page, the site default or the logo is used."
+        ),
+    )
 
 
 def body_field(
@@ -211,9 +228,16 @@ class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is u
     on every save (the page table holds the locale, so no database constraint can).
     """
 
+    base_form_class = NFCPageForm
+
     body = body_field(countdown=True, products=True)
+    seo_image = seo_image_field()
 
     content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("body")]
+    promote_panels: ClassVar[list[Any]] = [*Page.promote_panels, FieldPanel("seo_image")]
+    override_translatable_fields: ClassVar[list[Any]] = [
+        SynchronizedField("seo_image", overridable=True)
+    ]
     parent_page_types: ClassVar[list[str]] = ["wagtailcore.Page"]
     subpage_types: ClassVar[list[str]] = [
         "cms.StandardPage",
@@ -248,6 +272,8 @@ class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is u
 
 class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
     """A static page: about us, contact, FAQ (spec 10 §10.2), with an optional main image."""
+
+    base_form_class = NFCPageForm
 
     image = models.ForeignKey(
         get_image_model_string(),
@@ -288,6 +314,7 @@ class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
         ),
     )
     body = body_field(countdown=True, products=True)
+    seo_image = seo_image_field()
 
     content_panels: ClassVar[list[Any]] = [
         *Page.content_panels,
@@ -296,10 +323,15 @@ class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
         FieldPanel("image_caption"),
         FieldPanel("body"),
     ]
-    promote_panels: ClassVar[list[Any]] = [*Page.promote_panels, FieldPanel("noindex")]
+    promote_panels: ClassVar[list[Any]] = [
+        *Page.promote_panels,
+        FieldPanel("seo_image"),
+        FieldPanel("noindex"),
+    ]
     # Spec 10 "Images per locale": the source image until a translator replaces it.
     override_translatable_fields: ClassVar[list[Any]] = [
-        SynchronizedField("image", overridable=True)
+        SynchronizedField("image", overridable=True),
+        SynchronizedField("seo_image", overridable=True),
     ]
     parent_page_types: ClassVar[list[str]] = ["cms.HomePage", "cms.StandardPage"]
     subpage_types: ClassVar[list[str]] = [
@@ -420,8 +452,8 @@ class FooterSettings(ClusterableModel, BaseSiteSetting):  # type: ignore[misc]  
 
     base_form_class = FooterSettingsForm
     panels: ClassVar[list[Any]] = [
-        InlinePanel("columns", label=_("Widget column"), heading=_("Widget columns")),
-        InlinePanel("profiles", label=_("Social profile"), heading=_("Social profiles")),
+        NFCInlinePanel("columns", label=_("Widget column"), heading=_("Widget columns")),
+        NFCInlinePanel("profiles", label=_("Social profile"), heading=_("Social profiles")),
     ]
 
     class Meta:
@@ -675,6 +707,8 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
     No EN fallback (Q-42): a language without its own published page has no such page, so the
     URL is not found; nothing serves the EN text in its place (`language_fallback`).
     """
+
+    base_form_class = NFCPageForm
 
     class Kind(models.TextChoices):
         TERMS = "terms", _("Terms of sale")
@@ -1003,6 +1037,8 @@ class FAQItemBlock(blocks.StructBlock):  # type: ignore[misc]
 class VendorRecruitmentPage(Page):  # type: ignore[misc]
     """ "Sell with us": the plans, a FAQ and the call to apply (VEN.22's public form)."""
 
+    base_form_class = NFCPageForm
+
     intro = body_field(
         _("introduction"),
         help_text=_(
@@ -1324,6 +1360,8 @@ class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
     articles here, paginated the same way. An author without articles gets an empty list.
     """
 
+    base_form_class = NFCPageForm
+
     PER_PAGE = 12
 
     intro = RichTextField(
@@ -1422,6 +1460,8 @@ class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
 class BlogPostPage(Page):  # type: ignore[misc]
     """An article: date, author, summary, main image and body (spec 10 §10.2)."""
 
+    base_form_class = NFCPageForm
+
     date = models.DateField(
         _("publication date"),
         default=timezone.localdate,
@@ -1479,6 +1519,7 @@ class BlogPostPage(Page):  # type: ignore[misc]
             "If you leave it empty, no caption is shown."
         ),
     )
+    seo_image = seo_image_field()
     body = StreamField(
         [
             ("paragraph", paragraph_block()),
@@ -1516,8 +1557,10 @@ class BlogPostPage(Page):  # type: ignore[misc]
         FieldPanel("image_caption"),
         FieldPanel("body"),
     ]
+    promote_panels: ClassVar[list[Any]] = [*Page.promote_panels, FieldPanel("seo_image")]
     override_translatable_fields: ClassVar[list[Any]] = [
-        SynchronizedField("image", overridable=True)
+        SynchronizedField("image", overridable=True),
+        SynchronizedField("seo_image", overridable=True),
     ]
     parent_page_types: ClassVar[list[str]] = ["cms.BlogIndexPage"]
     subpage_types: ClassVar[list[str]] = []
@@ -1581,6 +1624,8 @@ class TermLandingPage(Page):  # type: ignore[misc]
     current URL (MIG.11); its place in the page tree answers one 301 there. The editor's preview
     renders the editorial part with the term's newest products.
     """
+
+    base_form_class = NFCPageForm
 
     term = models.ForeignKey(
         "catalog.Term",
@@ -1694,6 +1739,8 @@ class VendorLandingPage(Page):  # type: ignore[misc]
     products (spec 10 §10.2), linked from the storefront. Shown only while the vendor is
     active: otherwise it has no URL and answers 404. Vendor-owned data (CORE.3 scoping).
     """
+
+    base_form_class = NFCPageForm
 
     vendor_scope: ClassVar[str] = "vendor"
     objects = VendorLandingPageManager()

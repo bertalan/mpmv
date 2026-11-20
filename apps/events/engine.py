@@ -18,6 +18,7 @@ from typing import Any
 from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
+from apps.core.hidden_text import strip_hidden
 from apps.vendors.engine import vendor_collection_name as vendor_collection_name  # moved (D-34)
 
 # Event types (spec 15 "Page models"). There is deliberately no closure type: a vendor's
@@ -898,8 +899,32 @@ class BlockNotFound(LookupError):
 
 GALLERY_SLOTS = 6  # image slots of the gallery form
 FAQ_SLOTS = 8  # question slots of the FAQ form
-_TAG = re.compile(r"<\s*/?\s*[a-zA-Z][^>]*>")
+# The start of a tag. Possessive quantifiers keep the scan linear; `_has_tag` then looks for the
+# closing bracket once, instead of every start scanning to the end of the text.
+_TAG_START = re.compile(r"<\s*+(?:/\s*+)?[a-zA-Z]")
 _SIMPLE_PARAGRAPHS = re.compile(r"^(?:<p(?:\s[^>]*)?>.*?</p>)+$", re.DOTALL)
+
+
+def _has_tag(text: str) -> bool:
+    """Whether `text` holds a tag: a `<`, an optional `/`, a letter and, later, a `>`. The first
+    start has the longest tail, so it alone decides."""
+    start = _TAG_START.search(text)
+    return start is not None and text.find(">", start.end()) != -1
+
+
+def _strip_tags(text: str) -> str:
+    """`text` with every tag (start to the first `>` after its letter) replaced by a space. When a
+    start has no `>` after it, no later start has one either, so the scan ends there."""
+    parts: list[str] = []
+    position = 0
+    while start := _TAG_START.search(text, position):
+        close = text.find(">", start.end())
+        if close == -1:
+            break
+        parts += [text[position : start.start()], " "]
+        position = close + 1
+    parts.append(text[position:])
+    return "".join(parts)
 
 
 def paragraph_html(text: str) -> str:
@@ -907,7 +932,7 @@ def paragraph_html(text: str) -> str:
     and the link checks run on it later), plain text becomes paragraphs (a blank line starts a
     new one, a single line break stays one)."""
     text = text.strip()
-    if _TAG.search(text):
+    if _has_tag(text):
         return text
     paragraphs = [part.strip() for part in re.split(r"\n\s*\n", text.replace("\r\n", "\n"))]
     return "".join(
@@ -925,7 +950,7 @@ def paragraph_text(html: str) -> str:
     inner = re.sub(r"<br\s*/?>", "\n", html)
     inner = re.sub(r"</p>\s*<p(?:\s[^>]*)?>", "\n\n", inner)
     inner = re.sub(r"</?p(?:\s[^>]*)?>", "", inner)
-    return html if _TAG.search(inner) else unescape(inner)
+    return html if _has_tag(inner) else unescape(inner)
 
 
 def _find(body: Sequence[Mapping[str, Any]], block_id: str) -> int:
@@ -972,7 +997,7 @@ def remove_block(body: Sequence[Mapping[str, Any]], block_id: str) -> list[dict[
 
 
 def _words(value: str, limit: int = 80) -> str:
-    text = " ".join(unescape(_TAG.sub(" ", value)).split())
+    text = " ".join(unescape(_strip_tags(value)).split())
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
@@ -1140,7 +1165,7 @@ _ICS_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 def ics_escape(text: str) -> str:
     """TEXT values: backslash, semicolon and comma escaped, line breaks as `\\n` (§3.3.11)."""
     flat = text.replace("\r\n", "\n").replace("\r", "\n")
-    flat = _ICS_CONTROL.sub("", flat)
+    flat = strip_hidden(_ICS_CONTROL.sub("", flat))
     return flat.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
 

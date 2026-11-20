@@ -34,7 +34,7 @@ from apps.core.money import CURRENCY
 from apps.core.site_url import absolute_url
 from apps.vendors import services as vendors_services
 
-from . import listings, product_pages, services, slugs
+from . import engine, listings, product_pages, services, slugs
 
 TEMPLATE = "catalog/listing.html"
 PRODUCT_TEMPLATE = "catalog/product.html"
@@ -276,8 +276,12 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
     if request.path_info != location:
         query = request.META.get("QUERY_STRING", "")
         return HttpResponsePermanentRedirect(listings.join_query(location, query))
-    alternates = hreflang_alternates(
-        {lang: absolute_url(request, path) for lang, path in page.paths.items()}
+    alternates = (
+        hreflang_alternates(
+            {lang: absolute_url(request, path) for lang, path in page.paths.items()}
+        )
+        if engine.prints_hreflang(page.product.status)
+        else []
     )
     specifications = product_pages.specifications(page.product, language)
     fitment = product_pages.fitment(page.product, language)
