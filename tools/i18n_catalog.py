@@ -61,7 +61,7 @@ SCOPES = (
     "apps/orders/templates",
     "apps/seo",
     "apps/orders/ui",
-    "apps/vendors/templates/email/vendors/profile_reverted",
+    "apps/vendors/templates/email",  # the vendor emails (I18N.20 3c)
     "apps/events/templates/email",  # the event moderation emails (EVT.11)
     "apps/orders/customer_views.py",  # the customer area labels (ORD.7)
     "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
@@ -72,9 +72,6 @@ SCOPES = (
     "apps/vendors/templates/vendors/terms",  # the public sales terms page (VEN.35)
     "apps/vendors/templates/documents/vendors",  # the sales terms PDF (VEN.36), same strings as the page
     "apps/vendors/templates/vendors/apply",  # the vendor application pages (VEN.22), formal
-    "apps/vendors/templates/email/vendors/application_confirm",  # the application emails (VEN.22)
-    "apps/vendors/templates/email/vendors/application_exists",
-    "apps/vendors/templates/email/vendors/application_reminder",
     "apps/vendors/forms.py",  # the application and confirm forms (VEN.22)
     "themes/base/templates/layouts",
     "themes/ride/templates/components/header.html",  # the Bootstrap navbar and offcanvas (THM.15)

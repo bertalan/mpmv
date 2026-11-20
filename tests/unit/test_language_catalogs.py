@@ -495,7 +495,6 @@ EXCLUDED = {
     "apps/catalog/templates/email/": "email templates, own scope, I18N.20 part 3c",
     "apps/compliance/templates/email/": "email templates, own scope, I18N.20 part 3c",
     "apps/core/templates/email/": "email templates, own scope, I18N.20 part 3c",
-    "apps/vendors/templates/email/": "email templates, own scope, I18N.20 part 3c",
     # Customer-facing pages not yet translated: informal register, I18N.20 part 3b.
     "apps/cms/templates/cms/": "legal and landing pages, I18N.20 part 3b",
 }
