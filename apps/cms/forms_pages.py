@@ -36,7 +36,7 @@ from wagtail.fields import RichTextField
 
 from apps.accounts.captcha import captcha_passes
 from apps.core.http import client_ip
-from apps.core.nfc_forms import NFCFormMixin
+from apps.core.nfc_forms import NFCFormMixin, NFCPageForm
 from apps.core.public_forms import Protection, public_form
 from apps.core.services import consume_rate_limit
 from apps.core.throttling import ip_bucket
@@ -91,6 +91,8 @@ class FormField(AbstractFormField):  # type: ignore[misc]
 )
 class FormPage(AbstractForm):  # type: ignore[misc]
     """A page whose form the editor builds, with a Turnstile check and a retention period."""
+
+    base_form_class = NFCPageForm
 
     intro = RichTextField(
         _("introduction"),
