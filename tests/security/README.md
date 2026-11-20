@@ -22,7 +22,7 @@ go-live.
 | Request tampering | `test_request_tampering.py` | present |
 | Business logic | `test_business_logic.py` | to do |
 | Integrations | `test_integrations.py` | to do |
-| Resource abuse | `test_resource_abuse.py` | to do |
+| Resource abuse | `test_resource_abuse.py` | present (2a: bodies, JSON depth, uploads, pagination; ReDoS is slice 2b) |
 | Information leaks | `test_information_leaks.py` | to do |
 | AI and agents (SEC.9) | `test_ai_agents.py` | to do |
 
@@ -57,6 +57,22 @@ go-live.
 | Action-link emails use `SITE_BASE_URL` | `apps/accounts/tests/integration/test_action_links.py::test_the_email_helper_queues_the_link_through_the_outbox` |
 | Wagtail password reset page closed to a signed-in superuser | `apps/cms/tests/integration/test_cms_admin.py::test_passwords_are_not_changed_from_the_wagtail_admin` |
 | `frame-ancestors 'none'` and `X-Frame-Options: DENY` with the LIVE settings | `tests/integration/test_security_headers.py::test_live_security_headers_are_present`, `test_live_csp_is_strict` |
+
+### Resource abuse
+
+| Case | Covering test |
+|---|---|
+| A page past the last answers 404 | `apps/catalog/tests/integration/test_listing_views.py` (deep and malformed page numbers: `tests/security/test_resource_abuse.py`) |
+| Malformed JSON is a 400 problem | `apps/api/tests/integration/test_v1_errors.py` |
+| Per-key API rate limit | `tests/integration/test_rate_limits.py` |
+
+Scenarios in `test_resource_abuse.py`: body, field-count and file-count limits are set; image byte
+and pixel caps; oversized and over-wide form posts are 400; deeply nested JSON on the catalog and
+events APIs is a 4xx problem, never a 500; deep pagination does no OFFSET scan. Search-query and
+export caps are skipped until CAT.9 and the CMP exports exist.
+
+Findings kept as `xfail(strict=True)`: an oversized API body is a logged 500 instead of a 413
+problem; API request arrays have no `maxItems`; the event `body` schema is free-form JSON.
 
 ## Not testable yet
 
