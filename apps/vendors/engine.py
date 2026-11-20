@@ -7,7 +7,7 @@ import datetime as dt
 import hashlib
 import hmac
 import re
-from collections.abc import Collection, Container, Iterable, Mapping, Sequence
+from collections.abc import Collection, Container, Iterable, Iterator, Mapping, Sequence
 from decimal import Decimal
 from enum import StrEnum
 from html import unescape
@@ -1950,7 +1950,45 @@ def _escape(text: str) -> str:
 
 
 _TAG: Final = re.compile(r"<(embed|a)\b([^>]*)>", re.IGNORECASE)
-_ATTR: Final = re.compile(r"""([a-zA-Z_:][-\w:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>/]+))""")
+_NAME_RUN: Final = re.compile(r"[-\w:.]+")
+_NAME_START: Final = re.compile(r"[a-zA-Z_:]")
+_ATTR_VALUE: Final = re.compile(r"""\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>/]+))""")
+
+
+def _tags(html: str) -> Iterator[tuple[str, str]]:
+    """Every `<embed ..>` and `<a ..>` tag of `html` as (name, raw attributes), left to right.
+
+    A `<` with no `>` after it starts no tag, and neither does any later one, so the scan stops
+    at the last `>` instead of every `<` reading to the end of the text."""
+    last = html.rfind(">")
+    position = html.find("<")
+    while 0 <= position < last:
+        match = _TAG.match(html, position)
+        if match:
+            yield match.group(1), match.group(2)
+            position = html.find("<", match.end())
+        else:
+            position = html.find("<", position + 1)
+
+
+def _attributes(raw: str) -> dict[str, str]:
+    """The `name=value` attributes of a tag body (names lower-cased, the last one wins; a value
+    quoted with `"` or `'`, or bare). Every name is read once: a name that is not followed by `=`
+    starts nothing at its later characters either."""
+    attrs: dict[str, str] = {}
+    position = 0
+    while run := _NAME_RUN.search(raw, position):
+        position = run.end()
+        start = _NAME_START.search(raw, run.start(), run.end())
+        if start is None:
+            continue
+        value = _ATTR_VALUE.match(raw, run.end())
+        if value:
+            attrs[raw[start.start() : run.end()].lower()] = (
+                value.group(1) or value.group(2) or value.group(3) or ""
+            )
+            position = value.end()
+    return attrs
 
 
 def media_references(html: str) -> tuple[list[str], list[str]]:
@@ -1959,8 +1997,8 @@ def media_references(html: str) -> tuple[list[str], list[str]]:
     that is not a number is returned as is and refused by the caller)."""
     images: list[str] = []
     documents: list[str] = []
-    for tag, raw in _TAG.findall(html):
-        attrs = {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}
+    for tag, raw in _tags(html):
+        attrs = _attributes(raw)
         if tag.lower() == "embed" and attrs.get("embedtype", "").lower() == "image":
             images.append(attrs.get("id", ""))
         elif tag.lower() == "a" and attrs.get("linktype", "").lower() == "document":
@@ -1972,12 +2010,8 @@ def has_page_link(html: str) -> bool:
     """Whether a stored rich text links a Wagtail page (`<a linktype="page" id=..>`): such a link
     resolves any page id, a draft or another vendor's page included, so vendors may not use it."""
     return any(
-        tag.lower() == "a"
-        and {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}.get(
-            "linktype", ""
-        ).lower()
-        == "page"
-        for tag, raw in _TAG.findall(html)
+        tag.lower() == "a" and _attributes(raw).get("linktype", "").lower() == "page"
+        for tag, raw in _tags(html)
     )
 
 
@@ -2008,10 +2042,10 @@ def has_unsafe_link(html: str) -> bool:
     links (`linktype="document"`, no href) are refused by `media_problem` until ARC.15. The
     sanitiser lets `http:`, `mailto:`, relative and scheme-relative addresses through, but a
     vendor text may only link out over https (VEN.31), whatever the form posted."""
-    for tag, raw in _TAG.findall(html):
+    for tag, raw in _tags(html):
         if tag.lower() != "a":
             continue
-        attrs = {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}
+        attrs = _attributes(raw)
         if "href" in attrs and not is_https_address(unescape(attrs["href"])):
             return True
     return False
@@ -2020,13 +2054,9 @@ def has_unsafe_link(html: str) -> bool:
 def image_embed_formats(html: str) -> list[str]:
     """The `format` of every image embed of a stored rich text, as written ("" when missing)."""
     return [
-        {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}.get("format", "")
-        for tag, raw in _TAG.findall(html)
-        if tag.lower() == "embed"
-        and {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}.get(
-            "embedtype", ""
-        ).lower()
-        == "image"
+        _attributes(raw).get("format", "")
+        for tag, raw in _tags(html)
+        if tag.lower() == "embed" and _attributes(raw).get("embedtype", "").lower() == "image"
     ]
 
 
