@@ -492,3 +492,10 @@ def test_staff_still_publish_directly(client: Client) -> None:
     page = _draft(_owner())
     html = client.get(_edit_url(page)).content.decode()
     assert 'name="action-publish"' in html
+
+
+def test_the_events_settings_form_is_nfc() -> None:
+    from apps.core.nfc_forms import NFCFormMixin
+    from apps.events.admin_views import SettingsForm
+
+    assert issubclass(SettingsForm, NFCFormMixin)

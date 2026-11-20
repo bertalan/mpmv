@@ -19,12 +19,13 @@ from wagtail.models import Site
 
 from apps.core.audit import audit_context
 from apps.core.indexing import is_noindex_forced
+from apps.core.nfc_forms import NFCFormMixin
 
 from . import services
 from .models import SeoSettings
 
 
-class SeoSettingsForm(forms.Form):
+class SeoSettingsForm(NFCFormMixin, forms.Form):
     site = forms.ModelChoiceField(
         label=gettext_lazy("Site"),
         queryset=Site.objects.all(),
