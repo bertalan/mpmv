@@ -82,3 +82,15 @@ problem; API request arrays have no `maxItems`; the event `body` schema is free-
   the gap visible.
 - Mass assignment of `price` or `status` in customer forms: no customer form (cart, checkout,
   account) exists yet; the API and admin sweeps run today.
+
+## ReDoS sweep (`test_redos.py`, helpers in `redos.py`)
+
+Every regular expression our code can run on user input must stay linear on adversarial input.
+`redos.collect_patterns()` finds them under `apps/`: literal `re.*` calls, `RegexValidator`
+and `re_path` (AST), compiled module and class attributes (runtime), validators on model fields
+and every routed URL pattern. Each is run on pumped, never-matching inputs in a worker process
+with a hard kill. A new regex is swept with no change to the test. A call site whose pattern is
+built at runtime must be listed in `DYNAMIC` with its reason and an expansion; a pattern whose
+input is bounded before it arrives goes in `INPUT_LIMITS` with the bound. Third-party code is not
+scanned (only its URL routes). The 1,000-character sweep runs on every PR; the 100 KB sweep is
+`security_slow` (nightly, `make test-security-nightly`).
