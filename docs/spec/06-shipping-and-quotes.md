@@ -225,16 +225,16 @@ this format and imports it). The parser is `apps.shipping.config_format` (pure);
 templates are `apps.shipping.config_io`; staff use the `shipping_config` management command until
 the SHP.6 editor.
 
-**JSON**: an object with `format` = `"mpmv.shipping-config"`, `version` = `2` and these sections
+**JSON**: an object with `format` = `"mpmv.shipping-config"`, `version` = `3` and these sections
 (lists of objects; a missing optional field takes the model default on create and keeps the stored
 value on update). Version 2 (SHP.14) adds the special areas and the method treatments; version 1
-files are still read (they hold neither), and files are always written in version 2:
+files are still read (they hold neither). Version 3 (VEN.36) adds the method flag `not_returnable_by_post` (bulky goods that cannot be returned by post; a boolean, `false` when absent on create and the stored value kept on update, so version 1 and 2 files still import unchanged). Files are always written in version 3:
 
 | Section | Fields | Named by |
 |---|---|---|
 | `country_groups` | `code`, `countries` | `code` |
 | `zones` | `code`, `name`, `priority`, `countries`, `country_groups`, `postcode_patterns`, `states` | `code` |
-| `methods` | `zone_scope` (`own` default, or `platform`), `zone`, `key`, `carrier` (code), `service_level`, `min_delivery_days`, `max_delivery_days`, `is_default`, `free_shipping_threshold`, `tax_treatment`, `over_max_weight`, `bands` | `zone_scope` + `zone` + `key` |
+| `methods` | `zone_scope` (`own` default, or `platform`), `zone`, `key`, `carrier` (code), `service_level`, `min_delivery_days`, `max_delivery_days`, `is_default`, `free_shipping_threshold`, `tax_treatment`, `over_max_weight`, `not_returnable_by_post` (version 3), `bands` | `zone_scope` + `zone` + `key` |
 | `methods[].bands` | `from_kg`, `to_kg` (`null` = unlimited), `cost_net`, `surcharge_net` | `from_kg` within its method |
 | `methods[].area_treatments` | `area` (code), `mode`, `surcharge_type`, `surcharge`, `extra_days` (version 2) | `area` within its method |
 | `pickup_options` | `key`, `cost_net`, `address` | `key` |
@@ -249,8 +249,8 @@ the format: they stay with the translation workflow.
 countries, country_groups, postcode_patterns, states, zone_scope, zone, key, carrier,
 service_level, min_delivery_days, max_delivery_days, is_default, free_shipping_threshold,
 tax_treatment, over_max_weight, from_kg, to_kg, cost_net, surcharge_net, address, kind,
-territory_code, area, mode, surcharge_type, surcharge, extra_days` (the last seven since version
-2). `record` is `format` (first line, with `code` and `version`), `country_group`, `zone`,
+territory_code, area, mode, surcharge_type, surcharge, extra_days, not_returnable_by_post` (the
+seven before the last since version 2, the last since version 3). `record` is `format` (first line, with `code` and `version`), `country_group`, `zone`,
 `method`, `band`, `area_treatment`, `pickup_option` or `special_area`; a band or an area treatment
 names its method with `zone_scope`, `zone` and `key`, and its method must be in the same file. Lists are separated by `|`; an empty number cell is `null`; booleans are
 `true` / `false`; a cell that does not apply to its record must be empty.
