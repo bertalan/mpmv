@@ -1761,6 +1761,10 @@ msgstr "Antes"
 msgid "Before and after"
 msgstr "Antes y después"
 
+#: apps/seo/templates/seo/admin/opening_steps.html
+msgid "Before opening the platform"
+msgstr "Antes de abrir la plataforma"
+
 #: apps/orders/customer_views.py
 msgid "Being prepared"
 msgstr "En preparación"
@@ -12062,6 +12066,14 @@ msgid ""
 msgstr ""
 "Estas reglas se aplican a cada cambio de un pedido pagado. Forman parte de la configuración de la "
 "plataforma: un cambio entra en vigor como una nueva versión de la configuración."
+
+#: apps/seo/templates/seo/admin/opening_steps.html
+msgid ""
+"These steps are still open. This reminder disappears when search engine indexing is on and every "
+"step is done."
+msgstr ""
+"Estos pasos siguen pendientes. Este recordatorio desaparece cuando la indexación en los motores de"
+" búsqueda está activada y cada paso está completado."
 
 #: apps/manager/sales_terms_views.py
 msgid ""
