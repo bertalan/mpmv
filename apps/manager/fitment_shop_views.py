@@ -131,7 +131,7 @@ class FitmentList(ManagerListView):
         DeclarationFilter(
             "declaration",
             gettext_lazy("Declaration"),
-            tuple((v, str(label)) for v, label in MODE_CHOICES),
+            MODE_CHOICES,  # lazy labels: read per request, not frozen at import
             lookup="",
         ),
     )
