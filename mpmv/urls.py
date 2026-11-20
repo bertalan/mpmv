@@ -68,6 +68,7 @@ urlpatterns = [
     path("account/link/", include("apps.accounts.action_link_urls")),  # CORE.15
     path("account/privacy/", include("apps.compliance.account_urls")),  # CMP.4 self-service
     path("account/orders/", include("apps.orders.account_urls")),  # My orders (ORD.7)
+    path("account/garage/", include("apps.fitment.garage_account_urls")),  # My garage (FIT.5)
     path("account/cart-draft/", include("apps.orders.draft_link_urls")),  # ORD.32
     path("account/", include("apps.manager.account_urls")),  # Manager sign-in (CORE.17)
     path("manager/", include("apps.manager.urls")),  # the Manager's two spaces (CORE.17)

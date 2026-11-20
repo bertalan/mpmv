@@ -1,0 +1,54 @@
+{% extends "layouts/account.html" %}
+{% load i18n %}
+{% block title %}{% translate "My garage" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block account_content %}
+  {% comment %}THM.16: Bootstrap list group; same data, urls and hooks as base.{% endcomment %}
+  <h1>{% translate "My garage" %}</h1>
+  {% if profiles %}
+    <p>{% blocktranslate count total=count with maximum=maximum %}You have {{ total }} saved vehicle, of at most {{ maximum }}.{% plural %}You have {{ total }} saved vehicles, of at most {{ maximum }}.{% endblocktranslate %}</p>
+    {% if full %}<p data-garage-full role="status">{% blocktranslate with maximum=maximum %}Your garage is full: it holds at most {{ maximum }} profiles. Delete one to make room.{% endblocktranslate %}</p>{% endif %}
+    {% if not has_active %}<p class="text-body-secondary">{% translate "No vehicle is active: the shop shows everything." %}</p>{% endif %}
+    <ul class="list-group mb-4">
+      {% for row in profiles %}
+        <li class="list-group-item" data-garage-profile{% if row.profile.is_active %} data-garage-active{% endif %}{% if row.retired %} data-garage-retired{% endif %}>
+          <h2 id="profile-{{ row.profile.public_id }}">{{ row.profile.name }}{% if row.profile.is_active %} {% include "components/badge.html" with kind="new" label=_("Active") only %}{% endif %}</h2>
+          <p>{{ row.path }}</p>
+          {% if row.retired %}<p data-garage-retired-note>{% translate "This item is no longer in the catalogue. Delete this profile and save a new vehicle in its place." %}</p>{% endif %}
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            {% if not row.profile.is_active %}
+              <form method="post" action="{% url 'garage_profile_activate' row.profile.public_id %}">
+                {% csrf_token %}
+                {% include "components/button.html" with label=_("Make active") type="submit" variant="secondary" only %}
+              </form>
+            {% endif %}
+            <form method="post" action="{% url 'garage_profile_duplicate' row.profile.public_id %}">
+              {% csrf_token %}
+              {% include "components/button.html" with label=_("Duplicate") type="submit" variant="secondary" only %}
+            </form>
+            {% include "components/button.html" with label=_("Delete") url=row.delete_url variant="danger" only %}
+          </div>
+          <form method="post" action="{% url 'garage_profile_rename' row.profile.public_id %}" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <label class="form-label" for="rename-{{ row.profile.public_id }}">{% translate "New name" %}</label>
+            <input class="form-control" id="rename-{{ row.profile.public_id }}" type="text" name="name" value="{{ row.profile.name }}" maxlength="40" required autocomplete="off">
+            {% include "components/button.html" with label=_("Rename") type="submit" variant="secondary" only %}
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+    {% if has_active %}
+      <form method="post" action="{% url 'garage_reset' %}">
+        {% csrf_token %}
+        {% include "components/button.html" with label=_("Reset: show everything") type="submit" variant="ghost" only %}
+      </form>
+      <p class="text-body-secondary">{% translate "Reset only switches the active vehicle off. Your profiles are kept." %}</p>
+    {% endif %}
+  {% else %}
+    <div data-garage-empty>
+      {% translate "You have no saved vehicles yet" as empty_title %}
+      {% translate "Choose a vehicle while you browse the shop and save it: the shop then shows what fits it." as empty_text %}
+      {% include "components/empty_state.html" with title=empty_title text=empty_text only %}
+    </div>
+  {% endif %}
+{% endblock %}
