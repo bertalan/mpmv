@@ -74,6 +74,17 @@ export caps are skipped until CAT.9 and the CMP exports exist.
 Findings kept as `xfail(strict=True)`: an oversized API body is a logged 500 instead of a 413
 problem; API request arrays have no `maxItems`; the event `body` schema is free-form JSON.
 
+## Natural-language injection is data
+
+Text that is visible and reads like an instruction ("ignore previous instructions ...") passes
+through `llms.txt`, the feeds and the JSON-LD graph by design. It is data, not instructions: the
+agent-facing surfaces keep it inside its own field (one link text, one RSS element, one JSON-LD
+string) and label it as content, and nothing in them can turn it into structure, a link, markup
+or a hidden character (`test_ai_agent_injection.py`). Telling an agent not to obey it is the
+agent's job; the platform's job is that it can never look like anything but content. `llms.txt`
+also caps titles at 200 and the summary at 500 characters. API v1 serves text as JSON data
+(`apps/api/tests/integration/test_v1_hostile_text.py`).
+
 ## Not testable yet
 
 - Enumeration through registration, password reset and vendor claim: no such page exists yet
