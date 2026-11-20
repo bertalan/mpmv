@@ -308,6 +308,7 @@ TEMPLATES = [
             "builtins": [
                 "apps.seo.templatetags.seo_robots",
                 "apps.seo.templatetags.seo_links",
+                "apps.seo.templatetags.seo_meta",
                 "apps.seo.templatetags.consent",
             ],
             "loaders": [

@@ -15,6 +15,8 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
+from wagtail.images import get_image_model
+from wagtail.images.widgets import AdminImageChooser
 from wagtail.models import Site
 
 from apps.core.audit import audit_context
@@ -41,11 +43,23 @@ class SeoSettingsForm(forms.Form):
         ),
     )
 
+    default_image = forms.ModelChoiceField(
+        label=gettext_lazy("Default sharing image"),
+        queryset=get_image_model().objects.all(),
+        required=False,
+        widget=AdminImageChooser,
+        help_text=gettext_lazy(
+            "Shown when a page is shared on social networks and the page has no picture of its "
+            "own. If you leave it empty, the platform logo is used."
+        ),
+    )
+
     def __init__(self, *args: Any, floor: bool = False, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         if floor:
             # Read-only under the environment floor: the posted value is ignored.
             self.fields["allow_indexing"].disabled = True
+            self.fields["default_image"].disabled = True
 
 
 def _int(value: str | None) -> int | None:
@@ -73,6 +87,7 @@ def seo_settings(request: HttpRequest) -> HttpResponse:
                         site,
                         form.cleaned_data["allow_indexing"],
                         ctx=audit_context(request),
+                        default_image=form.cleaned_data["default_image"],
                     )
                 except ValidationError as exc:
                     form.add_error(None, exc)
@@ -89,6 +104,7 @@ def seo_settings(request: HttpRequest) -> HttpResponse:
             initial = {
                 "site": site.pk,
                 "allow_indexing": SeoSettings.current(site).allow_indexing,
+                "default_image": SeoSettings.current(site).default_image_id,
             }
         form = SeoSettingsForm(initial=initial, floor=floor)
     return TemplateResponse(

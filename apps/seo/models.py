@@ -15,6 +15,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from wagtail.contrib.settings.models import BaseSiteSetting
+from wagtail.images import get_image_model_string
 from wagtail.models import Site
 
 from . import engine
@@ -38,6 +39,19 @@ class SeoSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untyped
             "Off (the default): search engines are told not to index any page of this site. "
             "On: pages can appear in search results. It has no effect while the server "
             "forces noindex (STAGE or demo)."
+        ),
+    )
+
+    default_image = models.ForeignKey(
+        get_image_model_string(),
+        verbose_name=_("default sharing image"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text=_(
+            "Shown when a page is shared on social networks and the page has no picture of its "
+            "own. If you leave it empty, the platform logo is used."
         ),
     )
 
