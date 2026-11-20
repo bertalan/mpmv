@@ -6,6 +6,17 @@ instruction inside a title: it reads as an ordinary word on screen and as a comm
 text. `strip_hidden` drops every Unicode format (Cf) and control (Cc) character, plus a few
 others, from text that is written for machines (`llms.txt`, the event ICS and RSS). It is for
 agent-facing output only, not for text shown to people. LRM, RLM and VS16 stay.
+
+The Unicode tag block U+E0000-U+E007F is always stripped, assigned or not: its unassigned
+code points are category Cn, which the category sweep does not catch, yet they are a hidden
+prompt vector.
+
+Private use (category Co, for example U+E000) is NOT stripped: those characters render
+visibly (icon fonts) and are not invisible.
+
+Dependency: Cf and Cc membership comes from the running Python's `unicodedata` (see
+`unicodedata.unidata_version`). A character can change category between Unicode versions, so
+the stripped set can differ by Python version. Only the explicit `_EXTRA` ranges are fixed.
 """
 
 import unicodedata
@@ -16,7 +27,14 @@ import unicodedata
 # Cc but hide text too, so they are listed.
 _KEPT = frozenset("\t\n\r\u200e\u200f\ufe0f")
 _EXTRA = frozenset(
-    [0x2028, 0x2029, *range(0x180B, 0x180E), *range(0xFE00, 0xFE0F), *range(0xE0100, 0xE01F0)]
+    [
+        0x2028,
+        0x2029,
+        *range(0x180B, 0x180E),
+        *range(0xFE00, 0xFE0F),
+        *range(0xE0000, 0xE0080),
+        *range(0xE0100, 0xE01F0),
+    ]
 )
 
 
