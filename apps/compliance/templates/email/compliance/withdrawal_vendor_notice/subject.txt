@@ -1,1 +1,1 @@
-Withdrawal from order {{ order_number }}
+{% load i18n %}{% blocktranslate %}Withdrawal from order {{ order_number }}{% endblocktranslate %}

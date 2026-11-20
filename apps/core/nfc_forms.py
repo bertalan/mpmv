@@ -9,6 +9,7 @@ from typing import Any
 from django import forms
 from wagtail import blocks
 from wagtail.admin.forms import WagtailAdminModelForm, WagtailAdminPageForm
+from wagtail.admin.panels import InlinePanel
 from wagtail.blocks import StreamValue
 
 from .text import nfc
@@ -83,3 +84,20 @@ class NFCModelForm(NFCFormMixin, WagtailAdminModelForm):  # type: ignore[misc]  
 
 class NFCPageForm(NFCFormMixin, WagtailAdminPageForm):  # type: ignore[misc]  # Wagtail is untyped
     """The Wagtail page form (a page's `base_form_class`) that stores its text in NFC."""
+
+
+class NFCInlinePanel(InlinePanel):  # type: ignore[misc]  # Wagtail is untyped
+    """An `InlinePanel` whose child forms (one per row) store their text in NFC.
+
+    Wagtail builds the child forms from the child model, not from the parent form's base class.
+    """
+
+    def get_form_options(self) -> dict[str, Any]:
+        options: dict[str, Any] = super().get_form_options()
+        for formset in options["formsets"].values():
+            form = formset.get("form")
+            if form is None:
+                formset["form"] = NFCModelForm
+            elif not issubclass(form, NFCFormMixin):
+                formset["form"] = type(form)(form.__name__, (NFCFormMixin, form), {})
+        return options
