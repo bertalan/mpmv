@@ -495,7 +495,6 @@ EXCLUDED = {
     "apps/catalog/templates/email/": "email templates, own scope, I18N.20 part 3c",
     "apps/compliance/templates/email/": "email templates, own scope, I18N.20 part 3c",
     "apps/core/templates/email/": "email templates, own scope, I18N.20 part 3c",
-    "apps/vendors/templates/email/": "email templates, own scope, I18N.20 part 3c",
 }
 _TRANSLATION_TAG = re.compile(r"\{%-?\s*(?:translate|trans|blocktranslate|blocktrans)\b")
 
