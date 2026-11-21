@@ -58,7 +58,10 @@
 
   /* --- Dropdown sub-menus (Bootstrap dropdown): a button next to the link. */
 
-  .site-header {
+  /* On `.dropdown-menu` itself: Bootstrap declares these variables there, so a value set on
+     `.site-header` would never reach the sub-menu (white links on the white default). White on
+     the dark surface and on the hover/focus shade both pass AA 4.5:1. */
+  .site-header .dropdown-menu {
     --bs-dropdown-bg: var(--color-surface-inverse);
     --bs-dropdown-color: var(--color-text-inverse);
     --bs-dropdown-link-color: var(--color-text-inverse);
@@ -104,6 +107,13 @@
     flex-basis: 100%;
     flex-direction: column;
     padding-block: var(--space-xs);
+  }
+
+  .site-header .dropdown-item:hover,
+  .site-header .dropdown-item:focus-visible {
+    background: var(--color-heading);
+    color: var(--color-text-inverse);
+    text-decoration: underline;
   }
 
   .subnav__list .dropdown-item {
@@ -263,6 +273,28 @@
     --bs-modal-color: var(--color-text-inverse);
     --bs-modal-border-width: 0;
     --bs-modal-header-border-width: 0;
+  }
+
+  /* Close buttons of the panels and the search overlay: the X is the sprite icon in currentColor
+     (the CSP blocks Bootstrap's data: URI); base's blue button paint and Bootstrap's dark-theme
+     filter are reset. */
+  .btn-close--sprite {
+    --bs-btn-close-bg: none;
+    --bs-btn-close-opacity: 1;
+    --bs-btn-close-hover-opacity: 1;
+
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    font-size: var(--step-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-round);
+    filter: none;
+  }
+
+  .btn-close--sprite:hover {
+    background: var(--color-heading);
+    color: var(--color-text-inverse);
   }
 
   #search-modal .modal-title,

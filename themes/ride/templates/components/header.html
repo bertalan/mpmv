@@ -22,6 +22,10 @@ into the trigger of a full-screen modal holding base's search form (same action,
 labels). Without JavaScript the link just leads to the search page. Focus moves to the field when
 the modal opens (`ride/js/mini-cart.js`); Escape closes it and focus returns to the icon.
 
+Close buttons (panels and search overlay): `btn-close--sprite` draws the X from the theme's
+same-origin sprite in currentColor; Bootstrap's own X is a data: URI, which the CSP (`img-src
+'self'`) blocks. The `aria-label` names the button.
+
 Mini-cart (THM.15 part 2): the cart icon is a link to the cart page that opens an offcanvas on the
 end side. Its body is filled by HTMX from the small fragment `orders:cart_mini` (count and lines; no
 pricing quote, no flash messages) on load and after every add to cart. `#cart-count` is the
@@ -41,7 +45,7 @@ url, never rendered as a dead link), and the context of the help link.
         <div class="offcanvas offcanvas-end" tabindex="-1" id="site-offcanvas" aria-labelledby="site-offcanvas-title">
           <div class="offcanvas-header">
             <span class="offcanvas-title" id="site-offcanvas-title">{% translate "Menu" %}</span>
-            <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}"></button>
+            <button type="button" class="btn-close btn-close--sprite" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}">{% include "components/icon.html" with name="close" only %}</button>
           </div>
           <div class="offcanvas-body">
             <nav id="site-nav" aria-label="{% translate 'Main' %}">
@@ -85,7 +89,7 @@ url, never rendered as a dead link), and the context of the help link.
             <div class="modal-content">
               <div class="modal-header">
                 <h2 class="modal-title" id="search-modal-title">{% translate "Search" %}</h2>
-                <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                <button type="button" class="btn-close btn-close--sprite" data-bs-theme="dark" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}">{% include "components/icon.html" with name="close" only %}</button>
               </div>
               <div class="modal-body">
                 {% include "components/search_form.html" with id="site-search" action=search_url name="s" query=request.GET.s only %}
@@ -99,7 +103,7 @@ url, never rendered as a dead link), and the context of the help link.
         <div class="offcanvas offcanvas-end" tabindex="-1" id="mini-cart-offcanvas" aria-labelledby="mini-cart-title">
           <div class="offcanvas-header">
             <span class="offcanvas-title" id="mini-cart-title">{% translate "Cart" %}</span>
-            <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}"></button>
+            <button type="button" class="btn-close btn-close--sprite" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}">{% include "components/icon.html" with name="close" only %}</button>
           </div>
           <div class="offcanvas-body">
             <div id="mini-cart-body" hx-get="{% url 'orders:cart_mini' %}" hx-trigger="load, cart-changed from:body" hx-swap="innerHTML" hx-headers='{"X-MPMV-Poll": "1"}'></div>
