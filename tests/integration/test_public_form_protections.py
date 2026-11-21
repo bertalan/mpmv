@@ -16,8 +16,10 @@ from django.urls import reverse
 from apps.accounts.captcha import TOKEN_FIELD
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
+from apps.compliance.engine import withdrawal_labels
 from apps.compliance.models import Notice
 from apps.compliance.tests.integration.test_withdrawal_views import paid_order
+from apps.core.i18n import primary_language
 from apps.core.public_forms import Protection, public_form_report
 from tests.i18n import other_language
 
@@ -89,14 +91,15 @@ def test_the_dsa_notice_form_refuses_a_failed_captcha(client: Client) -> None:
 def test_the_withdrawal_lookup_refuses_a_failed_captcha(client: Client) -> None:
     order = paid_order()
     data = {"order_number": order.number, "email": order.email}
+    confirm = withdrawal_labels(primary_language()).confirm.lower()  # the page's own wording
     refused = client.post(reverse("withdrawal"), {**data, TOKEN_FIELD: "wrong"})
     assert refused.status_code == 200
-    assert "confirm withdrawal" not in refused.content.decode().lower()  # no choice page
+    assert confirm not in refused.content.decode().lower()  # no choice page
     assert FakeCaptchaVerifier.calls  # the verifier was asked
     accepted = client.post(
         reverse("withdrawal"), {**data, TOKEN_FIELD: FakeCaptchaVerifier.VALID_TOKEN}
     )
-    assert "confirm withdrawal" in accepted.content.decode().lower()
+    assert confirm in accepted.content.decode().lower()
 
 
 def test_every_captcha_declaration_is_tested() -> None:
