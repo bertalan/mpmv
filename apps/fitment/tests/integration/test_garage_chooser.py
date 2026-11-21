@@ -145,7 +145,7 @@ def _state_queries(client: Client) -> int:
     from apps.fitment import garage_state
 
     request = client.get("/").wsgi_request
-    del request._garage_state  # the page above already filled the per-request cache
+    delattr(request, "_garage_state")  # the page above already filled the per-request cache
     with CaptureQueriesContext(connection) as queries:
         garage_state.garage_state(request)
         garage_state.garage_state(request)  # a second read in the same request is free
@@ -158,7 +158,7 @@ def test_the_header_menu_costs_a_bounded_number_of_queries_for_a_visitor(
     assert _state_queries(client) <= 1  # no cookie: the scheme row only
     _save(client, "Roadster")
     _save(client, "Tourer")
-    assert _state_queries(client) <= 6  # the scheme and the catalogue check of two vehicles
+    assert _state_queries(client) <= 7  # the scheme, then three lookups per vehicle (at most three)
 
 
 def test_the_header_menu_costs_a_bounded_number_of_queries_when_signed_in(client: Client) -> None:

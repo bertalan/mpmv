@@ -6,11 +6,12 @@ anonymous cookie. Nothing here writes; the choice itself is `views.apply_garage`
 
 from typing import Any
 
+from django.conf import settings
 from django.http import HttpRequest
 from django.utils.translation import gettext
 
 from . import garage, garage_profiles
-from .services import FitmentError, anon_storage_enabled, current_scheme, read_garage
+from .services import FitmentError, current_scheme, validated_garage
 
 
 def vehicle_label(vehicle: garage.Vehicle) -> str:
@@ -54,8 +55,11 @@ def _read(request: HttpRequest) -> dict[str, Any]:
                     "active": profile.is_active,
                 }
             )
-    elif anon_storage_enabled():
-        value = read_garage(request)
+    elif (
+        getattr(settings, "GARAGE_ANON_STORAGE", "exempt") == "exempt"
+        and not scheme.contains_special_category
+    ):  # `anon_storage_enabled` without a second scheme read
+        value = validated_garage(garage.parse(request.COOKIES.get(garage.COOKIE_NAME)))
         for index, vehicle in enumerate(value.vehicles):
             options.append(
                 {
