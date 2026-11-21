@@ -7,6 +7,7 @@ Kept apart from `apps.core.forms` (which imports the core models) so a model can
 from typing import Any
 
 from django import forms
+from django.db.models import Model
 from wagtail import blocks
 from wagtail.admin.forms import WagtailAdminModelForm, WagtailAdminPageForm
 from wagtail.admin.panels import InlinePanel
@@ -64,7 +65,16 @@ class NFCFormMixin:
     The text is normalised in `_clean_fields`, after each field's own clean and before the form's
     `clean`: Wagtail's slug and sibling checks (and any later `clean`) then see NFC values.
     URLs stay exact; slugs are normalised so a decomposed slug clashes with its composed twin.
+    Passwords (a `PasswordInput` widget) and the names in `nfc_exact_fields` (emails, VAT ids,
+    codes matched byte for byte) are kept exactly as typed.
     """
+
+    nfc_exact_fields: tuple[str, ...] = ()
+
+    def _keeps_exact(self, field: Any, name: str) -> bool:
+        if name in self.nfc_exact_fields or isinstance(field, EXACT_FIELDS):
+            return True
+        return isinstance(getattr(field, "widget", None), forms.PasswordInput)
 
     def _clean_fields(self) -> None:
         super()._clean_fields()  # type: ignore[misc]
@@ -72,10 +82,14 @@ class NFCFormMixin:
         fields = getattr(self, "fields", {})
         for name, value in list(cleaned.items()):
             if isinstance(value, str):
-                if not isinstance(fields.get(name), EXACT_FIELDS):
+                if not self._keeps_exact(fields.get(name), name):
                     cleaned[name] = nfc(value)
             elif isinstance(value, StreamValue):
                 cleaned[name] = nfc_stream_value(value)  # StreamField text blocks, one hook
+
+
+class NFCAdminForm[M: Model](NFCFormMixin, forms.ModelForm[M]):
+    """The Django admin model form (a `ModelAdmin.form`) that stores its text in NFC."""
 
 
 class NFCModelForm(NFCFormMixin, WagtailAdminModelForm):  # type: ignore[misc]  # Wagtail is untyped
