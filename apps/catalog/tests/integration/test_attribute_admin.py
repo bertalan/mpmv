@@ -85,10 +85,9 @@ def test_staff_translate_a_value(staff_client: Client) -> None:
     url = reverse("admin:catalog_attributevalue_change", args=[small.pk])
     response = staff_client.post(url, data)
     assert response.status_code == 302, response.content.decode()[:2000]
-    assert (
-        AttributeValue.objects.get(pk=small.pk).translation(other_language()).translation.label
-        == "Klein"
-    )  # type: ignore[union-attr]
+    row = AttributeValue.objects.get(pk=small.pk).translation(other_language()).translation
+    assert row is not None
+    assert row.label == "Klein"
 
 
 def test_the_attribute_admin_pages_load(staff_client: Client) -> None:
