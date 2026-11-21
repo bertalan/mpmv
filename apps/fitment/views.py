@@ -37,6 +37,16 @@ def _declared[T](view: T) -> T:
     )(view)
 
 
+def _declared_fit7[T](view: T, *, purpose: str, reason: str, no_rate_limit: str) -> T:
+    return public_form(
+        protection=Protection.ALLOW,
+        purpose=purpose,
+        task="FIT.7",
+        reason=reason,
+        no_rate_limit=no_rate_limit,
+    )(view)
+
+
 def _back(request: HttpRequest) -> HttpResponseRedirect:
     target = request.POST.get("next", "")
     if not url_has_allowed_host_and_scheme(
@@ -105,7 +115,6 @@ def _safe_next(request: HttpRequest, value: str) -> str:
     return value if allowed else "/"
 
 
-@_declared
 @require_http_methods(["GET", "HEAD"])
 def choose_garage(request: HttpRequest) -> HttpResponse:
     """The chooser (FIT.7): the profiles or cookie vehicles to pick from, with an explicit *Apply*.
@@ -122,7 +131,6 @@ def choose_garage(request: HttpRequest) -> HttpResponse:
     return response
 
 
-@_declared
 @require_POST
 def apply_garage(request: HttpRequest) -> HttpResponse:
     """*Apply*: post, redirect, announce. `choice` is `generic`, `profile:<uuid>` (a signed-in
@@ -163,3 +171,21 @@ def apply_garage(request: HttpRequest) -> HttpResponse:
     else:
         return HttpResponse(status=400)
     return response
+
+
+choose_garage = _declared_fit7(
+    choose_garage,
+    purpose="Garage chooser: list the visitor's vehicles or profiles (a read)",
+    reason="a read of the visitor's own cookie or, signed in, own profiles; it changes nothing",
+    no_rate_limit="no write and no external call: one scheme read and indexed lookups",
+)
+apply_garage = _declared_fit7(
+    apply_garage,
+    purpose="Garage chooser: apply a vehicle (cookie, or an audited profile activation)",
+    reason=(
+        "it writes the visitor's own technical cookie, or, signed in, activates one of that "
+        "customer's own profiles (an audited write through the profile service); nothing else "
+        "is stored and nothing external is called"
+    ),
+    no_rate_limit="no server-side work beyond a cookie write or one audited profile update",
+)

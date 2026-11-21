@@ -136,3 +136,47 @@ def test_a_signed_in_customer_chooses_among_their_profiles(client: Client) -> No
     client.post(reverse(APPLY), {"choice": "generic"})
     assert not GarageProfile.objects.filter(user=user, is_active=True).exists()
     assert GarageProfile.objects.filter(user=user).count() == 2  # profiles are kept
+
+
+def _state_queries(client: Client) -> int:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from apps.fitment import garage_state
+
+    request = client.get("/").wsgi_request
+    del request._garage_state  # the page above already filled the per-request cache
+    with CaptureQueriesContext(connection) as queries:
+        garage_state.garage_state(request)
+        garage_state.garage_state(request)  # a second read in the same request is free
+    return len(queries)
+
+
+def test_the_header_menu_costs_a_bounded_number_of_queries_for_a_visitor(
+    client: Client, vehicles: None
+) -> None:
+    assert _state_queries(client) <= 1  # no cookie: the scheme row only
+    _save(client, "Roadster")
+    _save(client, "Tourer")
+    assert _state_queries(client) <= 6  # the scheme and the catalogue check of two vehicles
+
+
+def test_the_header_menu_costs_a_bounded_number_of_queries_when_signed_in(client: Client) -> None:
+    user = UserFactory.create()
+    for _ in range(5):
+        GarageProfileFactory.create(user=user)
+    client.force_login(user)
+    assert _state_queries(client) <= 3  # scheme and profiles once, whatever their number
+
+
+def test_the_chooser_lists_options_and_marks_the_active_one(client: Client, vehicles: None) -> None:
+    _save(client, "Roadster")
+    _save(client, "Tourer")
+    html = client.get(reverse(CHOOSE), {"next": "/shop/"}).content.decode()
+    assert re.search(r'value="vehicle:1"\s+checked', html)  # the last saved is active
+    assert 'value="generic"' in html
+    assert 'value="generic" checked' not in html
+    assert "Acme, Roadster" in html
+    assert "Acme, Tourer" in html
+    assert 'name="next" value="/shop/"' in html
+    assert 'href="/shop/"' in html  # Cancel returns without a change

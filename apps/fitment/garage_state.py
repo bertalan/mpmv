@@ -23,16 +23,28 @@ def account_garage_on(request: HttpRequest) -> bool:
     return bool(user and user.is_authenticated and not current_scheme().contains_special_category)
 
 
+_CACHE = "_garage_state"
+
+
 def garage_state(request: HttpRequest) -> dict[str, Any]:
     """`noun`, `options` (value, label, active), `active_label`, `signed_in` and `has_vehicles`;
     empty when the garage is off for this visitor (no scheme row, or an anonymous visitor with the
     browser storage off)."""
+    cached: dict[str, Any] | None = getattr(request, _CACHE, None)
+    if cached is None:  # the header runs on every page: read once per request
+        cached = _read(request)
+        setattr(request, _CACHE, cached)
+    return cached
+
+
+def _read(request: HttpRequest) -> dict[str, Any]:
     try:
         scheme = current_scheme()
     except FitmentError:
         return {}
     options: list[dict[str, Any]] = []
-    signed_in = account_garage_on(request)
+    user = getattr(request, "user", None)
+    signed_in = bool(user and user.is_authenticated and not scheme.contains_special_category)
     if signed_in:
         for profile in garage_profiles.profiles_of(request.user):  # type: ignore[arg-type]
             options.append(
