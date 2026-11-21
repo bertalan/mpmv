@@ -295,9 +295,9 @@ def test_the_admin_saves_other_fields_without_step_up(client: Client, staff: Use
     verified_login(client, staff, verified_at=time.time() - 3600)
     vendor = VendorFactory.create(eu_company=True)
     url = reverse("admin:vendors_vendor_change", args=[vendor.pk])
-    response = client.post(url, change_form(vendor, phone="+49 30 1234567"))
+    response = client.post(url, change_form(vendor, phone="+44 20 7946 0123"))
     assert response.status_code == 302, response.content.decode()
-    assert Vendor.objects.get(pk=vendor.pk).phone == "+49 30 1234567"
+    assert Vendor.objects.get(pk=vendor.pk).phone == "+44 20 7946 0123"
 
 
 def test_the_admin_saves_a_dac7_correction_after_step_up(client: Client, staff: User) -> None:
@@ -345,7 +345,7 @@ def test_vies_unavailable_keeps_the_tin_derived_from_a_valid_answer() -> None:
     stored = Vendor.objects.get(pk=vendor.pk)
     assert stored.vies_status == engine.VIES_UNAVAILABLE
     assert (stored.tax_code, stored.tin_country) == (vendor.vat_number, "IT")
-    stored.phone = "+39 06 1234567"
+    stored.phone = "+44 20 7946 0124"
     save_vendor(stored, ctx=CTX)  # a later save keeps it too
     assert Vendor.objects.get(pk=vendor.pk).tax_code == vendor.vat_number
 
