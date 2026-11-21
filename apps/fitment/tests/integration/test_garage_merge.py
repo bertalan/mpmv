@@ -4,7 +4,7 @@ from typing import Any
 from unittest import mock
 
 import pytest
-from django.contrib.auth.signals import user_logged_in
+from django.contrib.auth.signals import user_logged_in, user_logged_out
 from django.contrib.sessions.backends.db import SessionStore
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory
@@ -12,6 +12,7 @@ from django.test import RequestFactory
 from apps.accounts.tests.factories import UserFactory
 from apps.core.models import AuditLog
 from apps.fitment import garage, garage_merge, services
+from apps.fitment.middleware import GarageSignOutMiddleware
 from apps.fitment.models import FitmentNode, FitmentScheme, GarageProfile
 from apps.fitment.tests.factories import (
     FitmentNodeFactory,
@@ -160,3 +161,67 @@ def test_sign_in_succeeds_when_staging_raises(caplog: pytest.LogCaptureFixture) 
         client = sign_in(user, cookie_of("Roadster"))
     assert garage_merge.SESSION_KEY not in client.session
     assert "Could not stage" in caplog.text
+
+
+def test_dry_run_writes_nothing_and_keeps_the_session_entry() -> None:
+    user = UserFactory.create()
+    request = sign_in(user, cookie_of("Roadster", "Tourer"))
+    result = garage_merge.merge_pending(request, user, dry_run=True)
+    assert (result.added, result.skipped) == (2, 0)
+    assert [c.op for c in result.changes.changes].count("create") == 2
+    assert GarageProfile.objects.filter(user=user).count() == 0
+    assert not AuditLog.objects.filter(action=garage_merge.MERGED).exists()
+    assert garage_merge.pending_count(request) == 2
+    # the real run then gives the same count
+    assert merge(request, user).added == 2
+
+
+def test_dry_run_respects_the_profile_limit() -> None:
+    user = UserFactory.create()
+    FitmentScheme.objects.update(max_profiles=1)
+    request = sign_in(user, cookie_of("Roadster", "Tourer"))
+    assert garage_merge.merge_pending(request, user, dry_run=True).added == 1
+
+
+def sign_out(user: Any, value: str | None) -> HttpResponse:
+    """A sign-out request carrying the cookie, through the signal and the middleware."""
+    request = RequestFactory().post("/sign-out/")
+    request.COOKIES = {garage.COOKIE_NAME: value} if value is not None else {}
+
+    def view(request: HttpRequest) -> HttpResponse:
+        user_logged_out.send(sender=type(user), request=request, user=user)
+        return HttpResponse()
+
+    return GarageSignOutMiddleware(view)(request)
+
+
+def test_sign_out_clears_the_cookie_made_from_the_active_profile() -> None:
+    user = UserFactory.create()
+    node = FitmentNode.objects.get(name="Roadster")
+    GarageProfileFactory.create(user=user, node=node, year=None, is_active=True)
+    response = sign_out(user, cookie_of("Roadster"))
+    assert response.cookies[garage.COOKIE_NAME]["max-age"] == 0
+
+
+@pytest.mark.parametrize("models", [("Tourer",), ("Roadster", "Tourer")])
+def test_sign_out_keeps_a_cookie_that_is_not_the_active_profile(models: tuple[str, ...]) -> None:
+    user = UserFactory.create()
+    node = FitmentNode.objects.get(name="Roadster")
+    GarageProfileFactory.create(user=user, node=node, year=None, is_active=True)
+    assert garage.COOKIE_NAME not in sign_out(user, cookie_of(*models)).cookies
+
+
+def test_sign_out_keeps_the_cookie_without_an_active_profile_or_cookie() -> None:
+    user = UserFactory.create()
+    assert garage.COOKIE_NAME not in sign_out(user, cookie_of("Roadster")).cookies
+    assert garage.COOKIE_NAME not in sign_out(user, None).cookies
+
+
+def test_sign_out_succeeds_when_the_check_raises(caplog: pytest.LogCaptureFixture) -> None:
+    user = UserFactory.create()
+    value = cookie_of("Roadster")
+    with mock.patch.object(services, "read_garage", side_effect=RuntimeError("boom")):
+        response = sign_out(user, value)
+    assert response.status_code == 200
+    assert "Could not check" in caplog.text
+    assert value not in caplog.text
