@@ -16,7 +16,7 @@ from pytest_django.live_server_helper import LiveServer
 from apps.seo.models import ConsentLog
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
-from tests.i18n import translated
+from tests.i18n import language_prefix, other_language, translated
 
 pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.consent_banner]
 
@@ -85,15 +85,17 @@ def test_the_banner_shows_to_a_new_visitor_with_equal_choices(
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
 
 
-def test_the_banner_speaks_italian(
+def test_the_banner_speaks_the_page_language(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
-    page.goto(f"{live_server.url}/it/")
+    second = other_language()
+    page.goto(f"{live_server.url}{language_prefix(second)}/")
     banner = page.locator("#consent-banner")
-    expect(banner.get_by_role("heading", name="Cookie e la tua privacy")).to_be_visible()
-    expect(banner.get_by_role("button", name="Rifiuta tutti")).to_be_visible()
-    expect(banner.get_by_role("button", name="Accetta tutti")).to_be_visible()
-    shot("banner-it")
+    heading = translated("Cookies and your privacy", second)
+    expect(banner.get_by_role("heading", name=heading)).to_be_visible()
+    expect(banner.get_by_role("button", name=translated("Reject all", second))).to_be_visible()
+    expect(banner.get_by_role("button", name=translated("Accept all", second))).to_be_visible()
+    shot("banner-second-language")
 
 
 def test_the_keyboard_reaches_the_banner_and_the_banner_never_covers_the_focus(
@@ -116,10 +118,10 @@ def test_the_keyboard_reaches_the_banner_and_the_banner_never_covers_the_focus(
             assert float(info["outline"].removesuffix("px")) >= 2
         else:
             assert info["bottom"] <= banner_top + 1, f"{info['name']!r} sits under the banner"
-        if "Accept all" in reached:
+        if translated("Accept all") in reached:
             break
-    assert "Reject all" in reached
-    assert "Accept all" in reached
+    assert translated("Reject all") in reached
+    assert translated("Accept all") in reached
 
 
 def test_accepting_stores_logs_and_starts_the_held_back_tag(
@@ -189,7 +191,13 @@ def test_rejecting_keeps_the_tag_away_and_the_choice_can_change_later(
 def save_on_settings(page: Page, button: str) -> None:
     consent_script_ready(page)
     with page.expect_response(lambda r: "/consent/" in r.url and r.request.method == "POST"):
-        page.get_by_role("button", name=button).click()
+        page.get_by_role("button", name=translated(button)).click()
+
+
+def optional_on(*categories: str) -> str:
+    """The notice that lists the optional categories on, as the page writes it."""
+    names = ", ".join(translated(category) for category in categories)
+    return f"{translated('Optional cookies on:')} {names}."
 
 
 def consent_cookie_categories(page: Page) -> set[str]:
@@ -221,7 +229,7 @@ def test_the_settings_page_confirms_accept_all_and_reject_all_visibly(
     expect(notice).to_be_visible()
     expect(notice).to_have_attribute("role", "status")
     expect(notice).to_contain_text(translated("Your cookie choice was saved."))
-    expect(notice).to_contain_text("Optional cookies on: Preferences, Statistics, Marketing.")
+    expect(notice).to_contain_text(optional_on("Preferences", "Statistics", "Marketing"))
     for code in ("preferences", "statistics", "marketing"):
         expect(page.locator(f"#prefs-{code}")).to_be_checked()
     assert consent_cookie_categories(page) == {"preferences", "statistics", "marketing"}
@@ -268,7 +276,7 @@ def test_a_custom_save_honours_only_the_ticked_category(
     save_on_settings(page, "Save my choices")
     notice = page.locator("[data-consent-notice]")
     expect(notice).to_be_visible()
-    expect(notice).to_contain_text("Optional cookies on: Statistics.")
+    expect(notice).to_contain_text(optional_on("Statistics"))
     expect(page.locator("#prefs-statistics")).to_be_checked()
     expect(page.locator("#prefs-preferences")).not_to_be_checked()
     expect(page.locator("#prefs-marketing")).not_to_be_checked()

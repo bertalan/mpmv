@@ -15,12 +15,14 @@ from typing import Any
 import pytest
 from django.conf import settings
 from django.contrib.sessions.backends.db import SessionStore
-from playwright.sync_api import Page, expect
+from django.utils import formats, translation
+from playwright.sync_api import Locator, Page, expect
 from pytest_django.live_server_helper import LiveServer
 
 from apps.cart.models import Cart
 from apps.cart.session import GUEST_CART_SESSION_KEY
 from apps.cart.tests.factories import CartFactory
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.orders.models import Order
 from apps.orders.tests.integration.test_checkout_views import add, vendor
@@ -66,6 +68,33 @@ def check_page(page: Page) -> None:
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
 
 
+TERMS = (
+    "I have read and accept the marketplace terms and the sales terms of each seller named above."
+)
+ONEROUS = "I specifically approve the onerous clauses listed above, one by one."
+
+
+def pay_button(page: Page) -> Locator:
+    """The pay button (ORD.17): its name starts with the catalog text before the total."""
+    label = translated("Confirm order and pay now – EUR %(total)s")  # noqa: RUF001
+    return page.get_by_role("button", name=re.compile(re.escape(label.split("%(")[0].strip())))
+
+
+def cart_link_name(count: int) -> str:
+    """The mini-cart link text for `count` items, in the primary language."""
+    with translation.override(primary_language()):
+        text = translation.ngettext(
+            "View your cart: %(counter)s item", "View your cart: %(counter)s items", count
+        )
+    return text % {"counter": count}
+
+
+def amount(value: str) -> str:
+    """A money amount as the page prints it in the primary language (`256,08` in Italian)."""
+    with translation.override(primary_language()):
+        return formats.number_format(Decimal(value), 2, use_l10n=True)
+
+
 def fill_delivery(page: Page, *, country: str = "IT") -> None:
     page.locator("#id_email").fill("buyer@example.com")
     page.locator("#id_full_name").fill("Mario Rossi")
@@ -81,7 +110,11 @@ def test_a_private_buyer_goes_from_the_cart_to_the_confirmation(
     open_with_cart(page, live_server, shop)
     page.goto(f"{live_server.url}/cart/")
     expect(page.get_by_role("heading", level=1)).to_have_text(translated("Your cart"))
-    expect(page.get_by_role("heading", level=2, name="Sold by Rossi Ceramics")).to_be_visible()
+    expect(
+        page.get_by_role(
+            "heading", level=2, name=translated("Sold by %(vendor)s") % {"vendor": "Rossi Ceramics"}
+        )
+    ).to_be_visible()
     shot("1-cart")
     check_page(page)
 
@@ -100,15 +133,17 @@ def test_a_private_buyer_goes_from_the_cart_to_the_confirmation(
 
     expect(page.get_by_role("heading", level=1)).to_have_text(translated("Review and pay"))
     expect(page.get_by_role("radio")).to_be_checked()
-    expect(page.locator(".order-summary").last).to_contain_text("256.08")  # 2 x 100 + 9.90, VAT 22%
+    expect(page.locator(".order-summary").last).to_contain_text(
+        amount("256.08")
+    )  # 2 x 100 + 9.90, VAT 22%
     shot("3-review")
     check_page(page)
     # ORD.17: box 1 is unticked and mandatory; the button names the obligation to pay.
-    pay = page.get_by_role("button", name=re.compile("Confirm order and pay now"))
-    expect(page.get_by_label(re.compile("I have read and accept"))).not_to_be_checked()
-    expect(page.get_by_label(re.compile("specifically approve"))).to_have_count(0)  # a consumer
-    expect(pay).to_contain_text("256.08")
-    page.get_by_label(re.compile("I have read and accept")).check()
+    pay = pay_button(page)
+    expect(page.get_by_label(translated(TERMS))).not_to_be_checked()
+    expect(page.get_by_label(translated(ONEROUS))).to_have_count(0)  # a consumer
+    expect(pay).to_contain_text(amount("256.08"))
+    page.get_by_label(translated(TERMS)).check()
     pay.click()
 
     expect(page.get_by_role("heading", level=1)).to_have_text(translated("Order received"))
@@ -133,7 +168,13 @@ def test_a_business_buyer_enters_company_and_vat_id_and_vies_confirms_it(
     page.get_by_role("button", name=translated("Continue to review")).click()
 
     expect(page.get_by_role("heading", level=1)).to_have_text(translated("Review and pay"))
-    expect(page.get_by_text("Your VAT number is valid")).to_be_visible()
+    expect(
+        page.get_by_text(
+            translated(
+                "Your VAT number is valid. VAT is not charged where the reverse charge applies."
+            )
+        )
+    ).to_be_visible()
     expect(page.get_by_text("Acme GmbH")).to_be_visible()
     shot("2-review-business")
     check_page(page)
@@ -147,10 +188,15 @@ def test_a_blocked_package_explains_itself_and_offers_a_quote(
     page.goto(f"{live_server.url}/checkout/")
     fill_delivery(page)
     page.get_by_role("button", name=translated("Continue to review")).click()
-    expect(page.get_by_text("needs a quote from the vendor")).to_be_visible()
+    expect(
+        page.get_by_text(
+            translated(
+                "Shipping to your address needs a quote from the vendor."
+                " Ask the vendor for a quote."
+            )
+        )
+    ).to_be_visible()
     expect(page.get_by_role("link", name=translated("Request a quote"))).to_be_visible()
-    expect(page.get_by_role("button", name=re.compile("Confirm order and pay now"))).to_have_count(
-        0
-    )
+    expect(pay_button(page)).to_have_count(0)
     shot("blocked-review")
     check_page(page)
