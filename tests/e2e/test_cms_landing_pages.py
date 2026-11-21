@@ -29,13 +29,15 @@ from apps.catalog.tests.factories import (
     TermTranslationFactory,
 )
 from apps.cms.models import HomePage, TermLandingPage, VendorLandingPage
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.login import verify_with_totp
-from tests.e2e.test_cms_home_blocks import _axe_helper_style
+from tests.e2e.test_cms_home_blocks import _axe_helper_style, see_all_products
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import localized, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -67,23 +69,27 @@ def test_an_editor_adds_a_term_landing_page_and_the_term_page_shows_it(
     device = TOTPDeviceFactory.create(user=editor)
     taxonomy = TaxonomyFactory.create(code="occasion", hierarchical=False, has_landing=True)
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="en", name="Occasion", slug="occasion", status=PUBLISHED
+        taxonomy=taxonomy,
+        language=primary_language(),
+        name="Occasion",
+        slug="occasion",
+        status=PUBLISHED,
     )
     term = TermFactory.create(taxonomy=taxonomy)
     TermTranslationFactory.create(
-        term=term, language="en", name="Weddings", slug="weddings", status=PUBLISHED
+        term=term, language=primary_language(), name="Weddings", slug="weddings", status=PUBLISHED
     )
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
     vases, linen = _category("Vases"), _category("Linen")
     _product("Ceramic vase", vendor, vases).terms.add(term)
     _product("Linen napkins", vendor, linen).terms.add(term)
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
     page.goto(f"{live_server.url}/admin/pages/add/cms/termlandingpage/{home.pk}/")
     page.locator("#id_title").fill("Wedding gift guide")
@@ -92,9 +98,9 @@ def test_an_editor_adds_a_term_landing_page_and_the_term_page_shows_it(
     modal.get_by_role("link", name="occasion: Weddings").click()
     expect(modal).to_be_hidden()
     shot("admin-term-landing")
-    page.get_by_role("button", name="More actions").click()
-    page.get_by_role("button", name="Publish").click()
-    expect(page.locator(".messages")).to_contain_text("published")
+    page.get_by_role("button", name=translated("More actions")).click()
+    page.get_by_role("button", name=translated("Publish")).click()
+    expect(page.locator(".messages")).to_contain_text(translated("published"))
     others = [v for v in csp_violations(page) if not _axe_helper_style(v)]
     assert others == [], "\n".join(others)
 
@@ -125,7 +131,7 @@ def test_a_vendor_landing_page_tells_the_story_and_the_storefront_links_it(
         status=Vendor.Status.ACTIVE, sells_online=True, slug="acme", display_name="Acme"
     )
     _product("Copper kettle", vendor)
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     story = VendorLandingPage(
         title="The Acme workshop",
         slug="acme-workshop",
@@ -136,14 +142,15 @@ def test_a_vendor_landing_page_tells_the_story_and_the_storefront_links_it(
     story.save_revision().publish()
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
-    page.goto(f"{live_server.url}/shop/acme/")
-    page.get_by_role("link", name="Read the story of Acme").click()
+    page.goto(f"{live_server.url}{localized('/shop/acme/')}")
+    story_link = translated("Read the story of %(name)s") % {"name": "Acme"}
+    page.get_by_role("link", name=story_link).click()
     expect(page).to_have_url(f"{live_server.url}/acme-workshop/")
     expect(page.get_by_role("heading", level=1, name="The Acme workshop")).to_be_visible()
     expect(page.get_by_text("Three generations of copper work.")).to_be_visible()
     expect(page.get_by_role("link", name="Copper kettle")).to_be_visible()
-    expect(page.get_by_role("link", name="See all products: Acme")).to_have_attribute(
-        "href", "/shop/acme/"
+    expect(page.get_by_role("link", name=see_all_products("Acme"))).to_have_attribute(
+        "href", localized("/shop/acme/")
     )
     shot("public-vendor-landing")
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
