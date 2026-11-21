@@ -74,6 +74,10 @@ Rules:
   from settings at runtime, so a new language needs no migration.
 - Machine (AI) translation as a draft, with human review where required; editorial rule
   unchanged: titles in sentence case.
+- **Content variants (owner decision 2026-11-21):** English site content is written in British
+  English and German content in standard German (Deutsch), for authored texts, the demo seed and
+  machine drafts alike. The language codes stay as configured (`en`, `de`); there is no `en-gb` or
+  `de-at` locale, and the switcher labels are "English" and "Deutsch".
 - Emails and documents in the recipient's language (`Order.language`, `User.preferred_language`).
 - Vendor legal documents are an exception to the rule that new content is English only until after
   go-live (owner decision, 2026-11-07). They exist in every vendor language from the start (IT,
@@ -100,7 +104,7 @@ Rules:
 | I18N.1 | Language configuration, URL prefixes, middleware, language switcher | P1 | 4 | ARC.3, ARC.13 | `/it/`, `/de/`, `/fr/` and `/es/` active on STAGE |
 | I18N.2 | Abstract base `TranslationModel` with status, `source_hash`, fallback | P1 | 6 | ARC.6 | Reused by catalog and vendor |
 | I18N.3 | wagtail-localize for CMS pages: image fields and image blocks overridable per locale, alt text and captions as translatable segments, CMS gallery replacement rule (D-18) | P1 | 6 | CMS.1 | Translated page with sync; a translator replaces one image in one locale only |
-| I18N.4 | Translation queue in admin (by language, vendor, status) + AI draft translation (moved to P2 by the owner on 2026-11-15, Q-49: visitor content stays English at go-live, so the queue is first needed with I18N.8; the legal and checkout pages of I18N.9 use Wagtail's native translation) | P2 | 8 | I18N.2, ING.5 | EN edit → every other language goes back to "needs review" |
+| I18N.4 | Translation queue in admin (by language, vendor, status) + AI draft translation (moved to P2 by the owner on 2026-11-15, Q-49: visitor content stays English at go-live, so the queue is first needed with I18N.8; the legal and checkout pages of I18N.9 use Wagtail's native translation) | P2 | 8 | I18N.2, ING.5 | EN edit → every other language goes back to "needs review"; the AI draft instructions ask for British English and standard German (§9.2 content variants) |
 | I18N.5 | gettext catalogs for templates and emails; tax wording as keys | P1 | 6 | ORD.9 | No hardcoded strings (lint) |
 | I18N.6 | hreflang, canonical, per-language sitemap with fallback excluded | P1 | 4 | SEO.1 | Validation on a sample of URLs: fallback copies have the EN canonical and are absent from hreflang and from the language sitemap |
 | I18N.7 | Interface strings in IT, DE, FR and ES for go-live (D-18): gettext catalogs for templates, emails, notifications, error and validation messages, MFA pages and tax/legal wording keys, including the language-switch notice \"This content is not available in this language.\" (I18N.11); AI draft, human review of checkout, emails and legal/tax wording; coverage report | P1 | 10 | I18N.5 | Coverage report: 100% of interface strings translated in IT, DE, FR and ES; checkout, email and legal/tax wording reviewed by a human |
