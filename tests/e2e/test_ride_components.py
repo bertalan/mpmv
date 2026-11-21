@@ -172,12 +172,13 @@ def open_video_modal(page: Page) -> None:
     page.evaluate(
         """() => {
             const modal = document.querySelector("[data-video] .modal");
-            window.__videoShown = new Promise((r) => modal.addEventListener(
-                "shown.bs.modal", r, {once: true}));
+            window.__videoShown = false;
+            modal.addEventListener("shown.bs.modal", () => { window.__videoShown = true; },
+                {once: true});
         }"""
     )
     page.locator(".ride-video__open").click()
-    page.evaluate("() => window.__videoShown")
+    page.wait_for_function("() => window.__videoShown === true")
 
 
 def close_video_modal(page: Page, *, escape: bool) -> None:
@@ -185,8 +186,9 @@ def close_video_modal(page: Page, *, escape: bool) -> None:
     page.evaluate(
         """() => {
             const modal = document.querySelector("[data-video] .modal");
-            window.__videoHidden = new Promise((r) => modal.addEventListener(
-                "hidden.bs.modal", r, {once: true}));
+            window.__videoHidden = false;
+            modal.addEventListener("hidden.bs.modal", () => { window.__videoHidden = true; },
+                {once: true});
         }"""
     )
     if escape:
@@ -197,7 +199,7 @@ def close_video_modal(page: Page, *, escape: bool) -> None:
         )
     else:
         page.locator("[data-video] .modal.show [data-bs-dismiss='modal']").first.click()
-    page.evaluate("() => window.__videoHidden")
+    page.wait_for_function("() => window.__videoHidden === true")
 
 
 @pytest.mark.usefixtures("_components_home")
