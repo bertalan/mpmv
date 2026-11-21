@@ -6075,6 +6075,10 @@ msgstr ""
 "Solo su richiesta del cliente, nello stesso paese e nello stesso territorio fiscale. Registra come"
 " e quando lo ha chiesto il cliente e le sue parole."
 
+#: apps/payments/stray.py
+msgid "Only Support or the platform owner may close this alert."
+msgstr "Solo l'assistenza o il titolare della piattaforma possono chiudere questo avviso."
+
 #: apps/orders/staff_drafts.py
 msgid "Only Support or the platform owner may prepare a cart."
 msgstr "Solo l'assistenza o il titolare della piattaforma possono preparare un carrello."
@@ -6947,6 +6951,9 @@ msgid ""
 msgstr ""
 "Ci comunichi un numero di telefono del Suo negozio prima di pubblicare prodotti: chi vende a "
 "consumatori deve indicarlo nelle informazioni sul recesso. Lo invii allo staff della piattaforma."
+#: apps/payments/stray.py
+msgid "Please give the reason for closing this alert."
+msgstr "Indichi il motivo per cui chiude questo avviso."
 
 #: apps/manager/fitment_forms.py
 msgid "Plural label"

@@ -58,6 +58,7 @@ SCOPES = (
     "apps/manager",
     "apps/fitment/templates/email",  # the garage inactivity notice (FIT.5 3/3)
     "apps/fitment/services.py",  # the publish gate message (FIT.18), shown to vendors and staff
+    "apps/payments/stray.py",  # closing a stray-payment alert (PAY.4), staff, formal
     "apps/accounts",
     "apps/orders/templates",
     "apps/seo",

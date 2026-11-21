@@ -6137,6 +6137,10 @@ msgstr ""
 "Nur auf Wunsch des Kunden, innerhalb desselben Landes und Steuergebiets. Erfassen Sie, wie und "
 "wann der Kunde angefragt hat, und seine Worte."
 
+#: apps/payments/stray.py
+msgid "Only Support or the platform owner may close this alert."
+msgstr "Nur der Support oder der Plattformbetreiber darf diese Warnung schließen."
+
 #: apps/orders/staff_drafts.py
 msgid "Only Support or the platform owner may prepare a cart."
 msgstr "Nur der Support oder der Plattformbetreiber darf einen Warenkorb vorbereiten."
@@ -7018,6 +7022,9 @@ msgstr ""
 "Bitte teilen Sie uns eine Telefonnummer für Ihren Shop mit, bevor Sie Produkte veröffentlichen: "
 "Wer an Verbraucher verkauft, muss sie in der Widerrufsbelehrung angeben. Senden Sie sie an das "
 "Team der Plattform."
+#: apps/payments/stray.py
+msgid "Please give the reason for closing this alert."
+msgstr "Bitte geben Sie den Grund an, aus dem Sie diese Warnung schließen."
 
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
