@@ -281,6 +281,12 @@ The browser asks for reduced motion (no reveal effects, no carousel autoplay: ca
 first slide), screenshots disable animations, the data is fixed (factory titles, dates, prices)
 and the launch countdown is masked.
 
+THM.31 added `ride-blue/` and `ride-petrol/`: the home page and the product page of `ride` with
+the Blue and Petrol palettes chosen (`test_palette_page_matches_its_visual_baseline` in
+`tests/e2e/test_visual_baselines.py`), at 375 and 1280 px. They are generated like the others,
+with `MPMV_VISUAL=update` on the CI runner; the test first checks that the computed `--color-accent`
+is the palette's primary, so a silent fallback to Red fails before any image is compared.
+
 An intentional visual change needs a reviewed baseline update: the pull request that changes the
 look also changes the PNGs, and the reviewer looks at the images in the diff. To update:
 

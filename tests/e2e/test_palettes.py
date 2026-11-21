@@ -22,7 +22,7 @@ from apps.tax.tests.factories import TaxRateFactory
 from apps.vendors.tests.factories import CommissionRuleFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
-from tests.e2e.palette import PALETTE_LINK, PALETTES, choose_palette
+from tests.e2e.palette import PALETTE_LINK, PALETTES, assert_palette_applied, choose_palette
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -67,6 +67,7 @@ def test_palette_page_has_no_axe_violation(
     assert response.status == 200
     page.wait_for_load_state("load")
     expect(page.locator(PALETTE_LINK)).to_have_count(1)
+    assert_palette_applied(page, palette)
     violations = run_axe(page)
     assert violations == [], format_violations(violations)
 
