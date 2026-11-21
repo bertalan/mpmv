@@ -3,6 +3,7 @@ article 30(1)(e) self-certification)."""
 
 import pytest
 
+from apps.core.i18n import configured_languages
 from apps.vendors import engine
 
 ACTIVATION_RULES = [
@@ -87,6 +88,36 @@ def test_self_certification_text_has_a_stable_hash_per_language() -> None:
     assert engine.SELF_CERTIFICATION_VERSION >= 1
     with pytest.raises(engine.SelfCertificationError):
         engine.self_certification_text("xx")
+
+
+def test_every_configured_language_has_a_self_certification_text() -> None:
+    # I18N.20: a language cannot open to vendors without its own text.
+    assert engine.self_certification_languages_missing(configured_languages()) == ()
+    for code in configured_languages():
+        assert engine.self_certification_text(code).strip()
+    texts = [engine.SELF_CERTIFICATION_TEXTS[code] for code in configured_languages()]
+    assert len(set(texts)) == len(texts)  # no language reuses the text of another
+
+
+@pytest.mark.parametrize("empty", [None, "", "   "])
+def test_a_missing_or_empty_self_certification_text_is_reported(
+    monkeypatch: pytest.MonkeyPatch, empty: str | None
+) -> None:
+    codes = configured_languages()
+    texts = dict(engine.SELF_CERTIFICATION_TEXTS)
+    if empty is None:
+        del texts[codes[-1]]
+    else:
+        texts[codes[-1]] = empty
+    monkeypatch.setattr(engine, "SELF_CERTIFICATION_TEXTS", texts)
+    assert engine.self_certification_languages_missing(codes) == (codes[-1],)
+    with pytest.raises(engine.SelfCertificationError):
+        engine.self_certification_text(codes[-1])
+
+
+def test_the_self_certification_texts_cover_the_go_live_languages() -> None:
+    # D-18: en, it, de, fr, es at go-live, whatever MPMV_LANGUAGES this run uses.
+    assert engine.self_certification_languages_missing(("en", "it", "de", "fr", "es")) == ()
 
 
 def test_the_hash_covers_the_language_code(monkeypatch: pytest.MonkeyPatch) -> None:

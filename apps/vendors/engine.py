@@ -1592,6 +1592,21 @@ SELF_CERTIFICATION_TEXTS: Final[Mapping[str, str]] = {
         "Certifico, a nome del venditore, che offrirà su questo marketplace solo prodotti e "
         "servizi conformi alle norme applicabili del diritto dell'Unione."
     ),
+    # I18N.20: de, fr and es follow the wording of DSA article 30(1)(e) in each language. They
+    # wait for the professional translator (I18N.19) like every sensitive text.
+    "de": (
+        "Ich bescheinige im Namen des Verkäufers, dass er auf diesem Marktplatz nur Produkte und "
+        "Dienstleistungen anbieten wird, die den geltenden Vorschriften des Unionsrechts "
+        "entsprechen."
+    ),
+    "fr": (
+        "Je certifie, au nom du vendeur, qu'il ne proposera sur cette place de marché que des "
+        "produits et services conformes aux règles applicables du droit de l'Union."
+    ),
+    "es": (
+        "Certifico, en nombre del vendedor, que este ofrecerá en este marketplace únicamente "
+        "productos y servicios que cumplan las normas aplicables del Derecho de la Unión."
+    ),
 }
 
 
@@ -1600,12 +1615,15 @@ class SelfCertificationError(ValueError):
 
 
 def self_certification_text(language: str) -> str:
-    try:
-        return SELF_CERTIFICATION_TEXTS[language]
-    except KeyError:
-        raise SelfCertificationError(
-            f"there is no self-certification text in {language!r}"
-        ) from None
+    text = SELF_CERTIFICATION_TEXTS.get(language, "")
+    if not text.strip():  # an empty text is no statement to accept
+        raise SelfCertificationError(f"there is no self-certification text in {language!r}")
+    return text
+
+
+def self_certification_languages_missing(languages: Iterable[str]) -> tuple[str, ...]:
+    """The languages of `languages` with no self-certification text (or an empty one). Pure."""
+    return tuple(code for code in languages if not SELF_CERTIFICATION_TEXTS.get(code, "").strip())
 
 
 def self_certification_hash(language: str) -> str:
