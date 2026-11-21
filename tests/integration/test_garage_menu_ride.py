@@ -105,7 +105,7 @@ def test_the_ride_listing_and_base_blog_carry_the_garage_banner_without_the_page
         with use_theme(theme):
             html = render_to_string("components/garage_banner.html", {}, request=request)
         assert "data-garage-banner" in html
-        assert 'role="status"' in html
+        assert 'role="region"' in html
         assert reverse("garage_choose") in html
         assert "top-secret-marker" not in html
         assert "/shop/" not in html

@@ -3,12 +3,14 @@
 cookie: no server record, no log of its value."""
 
 import uuid
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.utils.cache import add_never_cache_headers
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext, ngettext
@@ -126,6 +128,44 @@ def _safe_next(request: HttpRequest, value: str) -> str:
     return value if allowed else "/"
 
 
+_RETURN_KEY = "fitment_garage_return"
+
+
+def _remember_return(request: HttpRequest) -> None:
+    """Keep the page the visitor came from, server-side, for the chooser's *Apply*: only the path
+    and query of a same-host Referer, in the session. It is never written into the page (the
+    Referer can be a secret-token URL). The chooser's own address is not kept."""
+    referer = request.headers.get("Referer", "")
+    session = getattr(request, "session", None)
+    if session is None or not url_has_allowed_host_and_scheme(
+        referer, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return
+    parts = urlsplit(referer)
+    if parts.path == request.path:
+        return
+    session[_RETURN_KEY] = parts.path + (f"?{parts.query}" if parts.query else "")
+
+
+def _return_target(request: HttpRequest) -> HttpResponseRedirect:
+    """Where *Apply* goes when no `next` is posted: the remembered page when the post comes from
+    the chooser, else the Referer (the banner's *Show all*); `/` as a last resort."""
+    session = getattr(request, "session", None)
+    kept = session.pop(_RETURN_KEY, "") if session is not None else ""
+    referer = request.headers.get("Referer", "")
+    if (
+        kept
+        and urlsplit(referer).path == reverse("garage_choose")
+        and url_has_allowed_host_and_scheme(
+            kept, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+        )
+    ):
+        return HttpResponseRedirect(kept)
+    if urlsplit(referer).path == reverse("garage_choose"):
+        return HttpResponseRedirect("/")  # nothing remembered: not back onto the chooser
+    return _back_to_referer(request)
+
+
 @require_http_methods(["GET", "HEAD"])
 def choose_garage(request: HttpRequest) -> HttpResponse:
     """The chooser (FIT.7): the profiles or cookie vehicles to pick from, with an explicit *Apply*.
@@ -133,10 +173,12 @@ def choose_garage(request: HttpRequest) -> HttpResponse:
     state = garage_state.garage_state(request)
     if not state:
         raise Http404("the garage is off")
+    given = request.GET.get("next", "")
+    _remember_return(request)
     response = render(
         request,
         "fitment/garage_choose.html",
-        {**state, "next": _safe_next(request, request.GET.get("next", ""))},
+        {**state, "next": _safe_next(request, given) if given else ""},
     )
     add_never_cache_headers(response)
     return response
@@ -150,7 +192,7 @@ def apply_garage(request: HttpRequest) -> HttpResponse:
         raise Http404("the garage is off")
     choice = request.POST.get("choice", "")
     # The banner's *Show all* posts no `next` (the page URL can hold a secret): the Referer then.
-    response = _back(request) if request.POST.get("next") else _back_to_referer(request)
+    response = _back(request) if request.POST.get("next") else _return_target(request)
     signed_in = garage_state.account_garage_on(request)
     kind, _, ref = choice.partition(":")
     if choice == "generic":

@@ -4,7 +4,7 @@ names the vehicle the list is for, with *Change* (the chooser) and *Show all* (t
 post with `generic`). Shown only with an active vehicle, never on an error page. Neither control
 carries the page's URL, as it can hold a secret token: *Show all* returns by the Referer, checked on
 the server. The "N of M items" count waits for the filter (FIT.8).
-{% endcomment %}{% garage_banner as banner %}{% if banner %}<section class="garage-banner site-messages" role="status" aria-label="{{ banner.noun }}" data-garage-banner>
+{% endcomment %}{% garage_banner as banner %}{% if banner %}<section class="garage-banner site-messages" role="region" aria-label="{{ banner.noun }}" data-garage-banner>
   <p>{% blocktranslate with label=banner.label %}Showing items for: {{ label }}{% endblocktranslate %}</p>
   {% translate "Change" as change_label %}{% translate "Show all" as all_label %}{% url 'garage_choose' as choose_url %}
   {% include "components/button.html" with label=change_label url=choose_url variant="ghost" only %}
