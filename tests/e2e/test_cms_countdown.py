@@ -21,6 +21,7 @@ from pytest_django.live_server_helper import LiveServer
 from apps.cms.models import HomePage
 from tests.e2e.conftest import SCREENSHOT_DIR
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -86,7 +87,7 @@ def test_the_counter_updates_each_minute_pauses_and_announces_the_launch_once(
 
     block = page.locator(".launch-countdown")
     counter = block.locator("[data-countdown-remaining]")
-    pause = block.get_by_role("button", name="Pause countdown")
+    pause = block.get_by_role("button", name=translated("Pause countdown"))
     expect(counter).to_be_visible()
     expect(counter).to_have_text("3 minutes")
     expect(pause).to_be_visible()
@@ -98,7 +99,7 @@ def test_the_counter_updates_each_minute_pauses_and_announces_the_launch_once(
     expect(counter).to_have_text("2 minutes")
 
     pause.click()
-    resume = block.get_by_role("button", name="Resume countdown")
+    resume = block.get_by_role("button", name=translated("Resume countdown"))
     expect(resume).to_be_visible()
     page.clock.run_for(60_000)
     expect(counter).to_have_text("2 minutes")
@@ -145,8 +146,8 @@ def test_a_paused_countdown_far_from_its_target_does_not_spin(
     page.add_init_script(COUNT_TIMERS)
     page.goto(f"{live_server.url}/")
     block = page.locator(".launch-countdown")
-    block.get_by_role("button", name="Pause countdown").click()
-    expect(block.get_by_role("button", name="Resume countdown")).to_be_visible()
+    block.get_by_role("button", name=translated("Pause countdown")).click()
+    expect(block.get_by_role("button", name=translated("Resume countdown"))).to_be_visible()
     before = page.evaluate("window.__timers")
     page.wait_for_timeout(500)
     assert page.evaluate("window.__timers") - before <= 1

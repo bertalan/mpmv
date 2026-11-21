@@ -16,6 +16,7 @@ from apps.catalog.models import Category, CategoryTranslation, TermTranslation
 from apps.catalog.tests.factories import TaxonomyFactory, TermFactory, TermTranslationFactory
 from tests.e2e.login import admin_login, verify_with_totp
 from tests.e2e.test_admin_csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -48,12 +49,12 @@ def test_staff_build_the_category_tree_with_translations(
     add_category(page, live_server.url, "Bags")
     expect(page.locator("#id_translations-0-slug")).to_have_value("bags")
     shot("root-filled")
-    page.get_by_role("button", name="Save", exact=True).click()
+    page.get_by_role("button", name=translated("Save"), exact=True).click()
     expect(page.locator(".messagelist")).to_contain_text("was added successfully")
 
     add_category(page, live_server.url, "Backpacks", under="Bags")
     shot("child-filled")
-    page.get_by_role("button", name="Save", exact=True).click()
+    page.get_by_role("button", name=translated("Save"), exact=True).click()
     expect(page.locator(".messagelist")).to_contain_text("was added successfully")
     expect(page.locator("#result_list")).to_contain_text("— Backpacks")
     shot("tree")
@@ -88,7 +89,7 @@ def test_staff_place_a_term_under_another_found_by_autocomplete(
     page.locator("#id_translations-0-language").select_option("en")
     page.locator("#id_translations-0-status").select_option("published")
     page.locator("#id_translations-0-name").press_sequentially("Model 1")
-    page.get_by_role("button", name="Save", exact=True).click()
+    page.get_by_role("button", name=translated("Save"), exact=True).click()
     expect(page.locator(".messagelist")).to_contain_text("was added successfully")
     shot("term-placed")
     assert csp_violations(page) == []

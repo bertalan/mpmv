@@ -24,16 +24,18 @@ from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 from tests.upload_corpus import png
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
 def _login(page: Page, base_url: str, email: str, password: str) -> None:
+    """Sign in on the Manager login. By field id, not by label: the labels follow the language."""
     page.goto(f"{base_url}/account/login/")
-    page.get_by_label("Email").fill(email)
-    page.get_by_label("Password").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.locator("#id_username").fill(email)
+    page.locator("#id_password").fill(password)
+    page.locator("form:has(#id_password) [type=submit]").click()
 
 
 # Wagtail's editor bundle (Draftail, D-34) injects `<style>` elements, which the strict CSP blocks
@@ -71,7 +73,7 @@ def test_a_member_of_two_vendors_signs_in_and_switches_vendor(
     verify_with_totp(page, totp_token(device))
 
     expect(page).to_have_url(re.compile(r"/manager/shop/vendor/"))
-    expect(page.get_by_role("heading", name="Choose a vendor")).to_be_visible()
+    expect(page.get_by_role("heading", name=translated("Choose a vendor"))).to_be_visible()
     _accessible(page)
     shot("vendor-picker")
 
@@ -84,8 +86,8 @@ def test_a_member_of_two_vendors_signs_in_and_switches_vendor(
     _accessible(page)
     shot("shop-dashboard")
 
-    page.get_by_label("Vendor", exact=True).select_option(label="Shop South")
-    page.get_by_role("button", name="Switch").click()
+    page.get_by_label(translated("Vendor"), exact=True).select_option(label="Shop South")
+    page.get_by_role("button", name=translated("Switch")).click()
     expect(page).to_have_url(re.compile(r"/manager/shop/$"))
     expect(page.locator("main")).to_contain_text("Shop South")
     expect(page.locator("main")).not_to_contain_text("Shop North")
@@ -99,7 +101,7 @@ def test_a_member_of_two_vendors_signs_in_and_switches_vendor(
 
     page.goto(f"{live_server.url}/manager/shop/")
     page.locator("header .user-menu summary").click()  # sign-out sits in the user menu (ARC.32)
-    page.get_by_role("button", name="Sign out").click()
+    page.get_by_role("button", name=translated("Sign out")).click()
     expect(page).to_have_url(re.compile(r"/account/login/"))
 
 
@@ -121,7 +123,7 @@ def test_platform_staff_land_on_the_platform_space(
     verify_with_totp(page, totp_token(device))
     expect(page).to_have_url(re.compile(r"/manager/platform/$"))
     expect(page.get_by_role("heading", name="Dashboard")).to_be_visible()
-    expect(page.get_by_role("navigation", name="Manager sections")).to_be_visible()
+    expect(page.get_by_role("navigation", name=translated("Manager sections"))).to_be_visible()
     _accessible(page)
     shot("platform-dashboard")
 
@@ -152,59 +154,59 @@ def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
 
     _login(page, live_server.url, "owner@example.com", password)
     verify_with_totp(page, totp_token(device))
-    page.get_by_role("navigation", name="Manager sections").get_by_role(
-        "link", name="Storefront profile"
+    page.get_by_role("navigation", name=translated("Manager sections")).get_by_role(
+        "link", name=translated("Storefront profile")
     ).click()
     expect(page).to_have_url(re.compile(r"/manager/shop/profile/"))
-    expect(page.get_by_role("heading", name="Storefront profile")).to_be_visible()
+    expect(page.get_by_role("heading", name=translated("Storefront profile"))).to_be_visible()
     _accessible(page, editor=True)
     shot("profile-form")
 
     # The browser stops typing at the limit; drop it to reach the server-side check.
-    page.get_by_label("Tagline").evaluate("el => el.removeAttribute('maxlength')")
-    page.get_by_label("Tagline").fill("x" * 201)
-    page.get_by_role("button", name="Save", exact=True).click()
-    expect(page.get_by_role("region", name="There is a problem")).to_be_visible()
-    expect(page.get_by_label("Tagline")).to_have_attribute("aria-invalid", "true")
+    page.get_by_label(translated("Tagline")).evaluate("el => el.removeAttribute('maxlength')")
+    page.get_by_label(translated("Tagline")).fill("x" * 201)
+    page.get_by_role("button", name=translated("Save"), exact=True).click()
+    expect(page.get_by_role("region", name=translated("There is a problem"))).to_be_visible()
+    expect(page.get_by_label(translated("Tagline"))).to_have_attribute("aria-invalid", "true")
     _accessible(page, editor=True)
     shot("profile-error")
 
-    page.get_by_label("Tagline").fill("Hand made in the west")
+    page.get_by_label(translated("Tagline")).fill("Hand made in the west")
     # The policies are rich text (D-34): Wagtail's Draftail editor, here with a bold word.
     refund = page.locator(".Draftail-Editor").nth(2).locator(".public-DraftEditor-content")
     refund.click()
     page.keyboard.type("Send it back within ")
-    page.keyboard.press("Control+b")
+    page.keyboard.press("ControlOrMeta+b")
     page.keyboard.type("30 days")
-    page.keyboard.press("Control+b")
+    page.keyboard.press("ControlOrMeta+b")
     page.keyboard.type(".")
     shot("profile-rich-text")
     # Draftail copies its content into the hidden input a moment after the last key.
     expect(page.locator("#id_refund_policy")).to_have_value(re.compile("30 days"))
-    page.get_by_role("button", name="Save", exact=True).click()
-    expect(page.get_by_text("Storefront profile saved.")).to_be_visible()
-    expect(page.get_by_label("Tagline")).to_have_value("Hand made in the west")
+    page.get_by_role("button", name=translated("Save"), exact=True).click()
+    expect(page.get_by_text(translated("Storefront profile saved."))).to_be_visible()
+    expect(page.get_by_label(translated("Tagline"))).to_have_value("Hand made in the west")
     _accessible(page, editor=True)
     shot("profile-saved")
 
-    page.get_by_role("button", name="Save logo").click()
-    expect(page.get_by_role("region", name="There is a problem")).to_be_visible()
+    page.get_by_role("button", name=translated("Save logo")).click()
+    expect(page.get_by_role("region", name=translated("There is a problem"))).to_be_visible()
     _accessible(page, editor=True)
     shot("logo-error")
 
-    page.get_by_label("Logo image").set_input_files(
+    page.get_by_label(translated("Logo image")).set_input_files(
         {"name": "logo.png", "mimeType": "image/png", "buffer": png((64, 48))}
     )
-    page.get_by_label("Description of the logo").fill("Shop West anvil mark")
-    page.get_by_role("button", name="Save logo").click()
-    expect(page.get_by_text("Logo saved.")).to_be_visible()
+    page.get_by_label(translated("Description of the logo")).fill("Shop West anvil mark")
+    page.get_by_role("button", name=translated("Save logo")).click()
+    expect(page.get_by_text(translated("Logo saved."))).to_be_visible()
     expect(page.get_by_role("img", name="Shop West anvil mark")).to_be_visible()
     _accessible(page, editor=True)
     shot("logo-saved")
 
     page.goto(f"{live_server.url}/shop/{shop.slug}/")
     expect(page.locator(".vendor-profile strong, .vendor-profile b").first).to_have_text("30 days")
-    page.get_by_text("Returns and refunds").click()  # open the accordion item
+    page.get_by_text(translated("Returns and refunds")).click()  # open the accordion item
     shot("vendor-page-formatted-policy")
 
 
@@ -218,7 +220,7 @@ def test_vendor_staff_have_no_storefront_profile(page: Page, live_server: LiveSe
 
     _login(page, live_server.url, "staff@example.com", password)
     verify_with_totp(page, totp_token(device))
-    expect(page.get_by_role("link", name="Storefront profile")).to_have_count(0)
+    expect(page.get_by_role("link", name=translated("Storefront profile"))).to_have_count(0)
     response = page.goto(f"{live_server.url}/manager/shop/profile/")
     assert response is not None
     assert response.status == 404

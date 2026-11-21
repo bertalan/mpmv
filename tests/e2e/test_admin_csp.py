@@ -11,6 +11,7 @@ from pytest_django.live_server_helper import LiveServer
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -40,16 +41,18 @@ def test_admin_works_under_strict_csp(
     assert response is not None
     policy = response.headers["content-security-policy"]
     assert "'unsafe-inline'" not in policy
-    expect(page.get_by_label("Email")).to_be_visible()
+    expect(page.get_by_label(translated("Email"))).to_be_visible()
     assert csp_violations(page) == []
     shot("login")
 
-    page.get_by_label("Email").fill("staff@example.com")
-    page.get_by_label("Password").fill(password)
-    page.get_by_role("button", name="Log in").click()
+    page.get_by_label(translated("Email")).fill("staff@example.com")
+    page.get_by_label(translated("Password")).fill(password)
+    page.get_by_role("button", name=translated("Log in")).click()
     verify_with_totp(page, totp_token(device), window=True)
     expect(
-        page.get_by_role("link", name="Log out").or_(page.get_by_role("button", name="Log out"))
+        page.get_by_role("link", name=translated("Log out")).or_(
+            page.get_by_role("button", name=translated("Log out"))
+        )
     ).to_be_visible()
     assert csp_violations(page) == []
     shot("index")
@@ -61,6 +64,6 @@ def test_admin_works_under_strict_csp(
     shot("changelist")
 
     page.get_by_role("link", name="staff@example.com").click()
-    expect(page.get_by_label("Full name")).to_be_visible()
+    expect(page.get_by_label(translated("Full name"))).to_be_visible()
     assert csp_violations(page) == []
     shot("change-form")

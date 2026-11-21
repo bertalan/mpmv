@@ -14,6 +14,7 @@ from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import csp_violations
 from tests.e2e.test_ride_bootstrap_components import open_ride
 from tests.e2e.test_styleguide import open_styleguide
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -93,14 +94,14 @@ def test_no_autoplay_unless_enabled_and_the_toggle_starts_and_stops_it(
     assert active_label(page, STRIP) == "1 of 3"
     auto = page.locator(AUTO)
     toggle = auto.locator("[data-ride-toggle]")
-    expect(toggle).to_have_text("Pause")
+    expect(toggle).to_have_text(translated("Pause"))
     toggle.focus()  # focus inside holds the rotation
     page.wait_for_timeout(900)  # a slide already moving finishes first
     label = active_label(page, AUTO)
     page.wait_for_timeout(1500)
     assert active_label(page, AUTO) == label
     page.keyboard.press("Enter")
-    expect(toggle).to_have_text("Play")
+    expect(toggle).to_have_text(translated("Play"))
     page.locator("h1, h2").first.focus()
     page.mouse.move(0, 0)
     page.wait_for_timeout(900)

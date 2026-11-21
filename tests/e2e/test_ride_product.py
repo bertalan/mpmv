@@ -43,6 +43,7 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -122,7 +123,7 @@ def _specifications_and_fitment(product: Product) -> None:
     AttributeTranslationFactory.create(attribute=finish, language="en", name="Finish")
     ProductAttributeFactory.create(product=product, attribute=finish, text_value="Glazed")
     width = AttributeFactory.create(code="width", kind="number", unit="cm")
-    AttributeTranslationFactory.create(attribute=width, language="en", name="Width")
+    AttributeTranslationFactory.create(attribute=width, language="en", name=translated("Width"))
     ProductAttributeFactory.create(product=product, attribute=width, numeric_value=Decimal("8.5"))
     ProductFitmentStateFactory.create(product=product)
     make = FitmentNodeFactory.create(name="Acme Motors")
@@ -186,8 +187,8 @@ def test_the_gallery_carousel_works_with_the_keyboard_only(
 
 def test_the_tabs_work_with_the_keyboard_only(page: Page, live_server: LiveServer) -> None:
     page.goto(f"{live_server.url}{PRODUCT}")
-    description = page.get_by_role("tab", name="Description")
-    details = page.get_by_role("tab", name="Details")
+    description = page.get_by_role("tab", name=translated("Description"))
+    details = page.get_by_role("tab", name=translated("Details"))
     expect(description).to_have_attribute("aria-selected", "true")
     description.focus()
     for _step in range(3):  # Description, Specifications, Fits, Details
@@ -206,9 +207,9 @@ def test_the_specifications_and_fitment_tabs_work_with_the_keyboard_only(
     page: Page, live_server: LiveServer
 ) -> None:
     page.goto(f"{live_server.url}{PRODUCT}")
-    specs = page.get_by_role("tab", name="Specifications")
-    fits = page.get_by_role("tab", name="Fits")
-    page.get_by_role("tab", name="Description").focus()
+    specs = page.get_by_role("tab", name=translated("Specifications"))
+    fits = page.get_by_role("tab", name=translated("Fits"))
+    page.get_by_role("tab", name=translated("Description")).focus()
     page.keyboard.press("ArrowRight")
     expect(specs).to_be_focused()
     expect(specs).to_have_attribute("aria-selected", "true")
@@ -229,7 +230,7 @@ def test_the_fitment_disclosure_opens_with_the_keyboard(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     page.goto(f"{live_server.url}{PRODUCT}")
-    page.get_by_role("tab", name="Fits").click()
+    page.get_by_role("tab", name=translated("Fits")).click()
     summary = page.locator(".product-fitment-more > summary")
     expect(summary).to_have_text("Show 3 more")
     box = summary.bounding_box()

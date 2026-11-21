@@ -21,6 +21,7 @@ from apps.core.models import MediaImage
 from apps.core.tests.factories import ImageLicenceFactory, MediaImageFactory
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -54,11 +55,11 @@ def test_an_upload_without_licence_or_author_is_refused_then_accepted_with_them(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
 
     page.goto(f"{live_server.url}/admin/images/add/")
-    page.get_by_label("Title").fill("Lake at dawn")
+    page.get_by_label(translated("Title")).fill("Lake at dawn")
     page.locator("input[type=file][name=file]").set_input_files(upload)
     page.locator("form [type=submit]").last.click()
 
@@ -68,8 +69,8 @@ def test_an_upload_without_licence_or_author_is_refused_then_accepted_with_them(
     shot("upload-refused")
 
     page.locator("input[type=file][name=file]").set_input_files(upload)
-    page.get_by_label("Licence").select_option(label="CC BY 4.0")
-    page.get_by_label("Author").fill("Ada Lovelace")
+    page.get_by_label(translated("Licence")).select_option(label="CC BY 4.0")
+    page.get_by_label(translated("Author")).fill("Ada Lovelace")
     page.get_by_label("Source URL").fill("https://example.com/lake")
     page.locator("form [type=submit]").last.click()
 

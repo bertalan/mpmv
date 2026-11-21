@@ -16,6 +16,7 @@ from apps.accounts.tests.mfa import totp_token
 from apps.events.models import EventIndexPage, EventPage
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -53,7 +54,7 @@ def test_staff_publishes_an_event_and_visitors_see_it(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
 
     index = EventIndexPage.objects.get(locale__language_code="en")
@@ -72,11 +73,11 @@ def test_staff_publishes_an_event_and_visitors_see_it(
     page.locator("#id_country").fill("IT")
     expect(page.locator(".xdsoft_datetimepicker:visible")).to_have_count(0)
     shot("admin-add-event")
-    more_actions = page.get_by_role("button", name="More actions")
+    more_actions = page.get_by_role("button", name=translated("More actions"))
     more_actions.scroll_into_view_if_needed()
     expect(more_actions).to_be_enabled()
     more_actions.click()
-    publish = page.get_by_role("button", name="Publish")
+    publish = page.get_by_role("button", name=translated("Publish"))
     expect(publish).to_be_visible()
     expect(publish).to_be_enabled()
     publish.click()

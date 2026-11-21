@@ -32,6 +32,7 @@ from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -84,7 +85,7 @@ def staff_page(page: Page, live_server: LiveServer, settings: Any) -> Page:
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
     return page
 
@@ -109,7 +110,7 @@ def _open_editor(page: Page, live_server: LiveServer, event: EventPage) -> Locat
 
 
 def _save_draft(page: Page) -> None:
-    page.get_by_role("button", name="Save draft").click()
+    page.get_by_role("button", name=translated("Save draft")).click()
     expect(page.get_by_text("Page 'Autumn fair' has been updated.")).to_be_visible()
 
 

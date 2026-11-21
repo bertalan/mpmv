@@ -24,6 +24,7 @@ from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_cms_home_blocks import _add_block, _axe_helper_style, _label
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -55,7 +56,7 @@ def test_an_editor_searches_the_chooser_and_adds_product_cards(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
     page.goto(f"{live_server.url}/admin/pages/{home.pk}/edit/")
 
@@ -64,16 +65,16 @@ def test_an_editor_searches_the_chooser_and_adds_product_cards(
     cards.get_by_role("button", name="Choose a product").click()
     modal = page.locator(".modal")
     expect(modal.get_by_role("link", name="JUG-1")).to_be_visible()
-    modal.get_by_role("textbox", name="Search term").fill("kiln")
+    modal.get_by_role("textbox", name=translated("Search term")).fill("kiln")
     expect(modal.get_by_role("link", name="BWL-1")).to_be_visible()
     expect(modal.get_by_role("link", name="JUG-1")).to_have_count(0)
     shot("admin-chooser-search")
     modal.get_by_role("link", name="BWL-1").click()
     expect(modal).to_be_hidden()
 
-    page.get_by_role("button", name="More actions").click()
-    page.get_by_role("button", name="Publish").click()
-    expect(page.locator(".messages")).to_contain_text("published")
+    page.get_by_role("button", name=translated("More actions")).click()
+    page.get_by_role("button", name=translated("Publish")).click()
+    expect(page.locator(".messages")).to_contain_text(translated("published"))
 
     page.goto(f"{live_server.url}/")
     expect(page.get_by_role("heading", name="Picked for you")).to_be_visible()

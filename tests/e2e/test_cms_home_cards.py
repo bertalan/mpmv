@@ -29,6 +29,7 @@ from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_cms_home_blocks import _add_block, _axe_helper_style, _label
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -58,7 +59,7 @@ def test_an_editor_adds_a_term_card_and_a_vendor_card_to_the_home_page(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
     page.goto(f"{live_server.url}/admin/pages/{home.pk}/edit/")
 
@@ -75,16 +76,16 @@ def test_an_editor_adds_a_term_card_and_a_vendor_card_to_the_home_page(
     expect(modal).to_be_hidden()
 
     featured.get_by_role("button", name="Insert a block").last.click()
-    page.get_by_role("option", name="Vendor", exact=True).click()
+    page.get_by_role("option", name=translated("Vendor"), exact=True).click()
     expect(cards).to_have_value("2")
-    featured.get_by_role("button", name="Choose a vendor").click()
+    featured.get_by_role("button", name=translated("Choose a vendor")).click()
     modal.get_by_role("link", name="Pottery Studio").click()
     expect(modal).to_be_hidden()
     shot("admin-cards")
 
-    page.get_by_role("button", name="More actions").click()
-    page.get_by_role("button", name="Publish").click()
-    expect(page.locator(".messages")).to_contain_text("published")
+    page.get_by_role("button", name=translated("More actions")).click()
+    page.get_by_role("button", name=translated("Publish")).click()
+    expect(page.locator(".messages")).to_contain_text(translated("published"))
 
     page.goto(f"{live_server.url}/")
     expect(page.get_by_role("heading", name="Start here")).to_be_visible()

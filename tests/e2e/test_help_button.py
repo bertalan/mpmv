@@ -19,6 +19,7 @@ from apps.accounts.tests.factories import UserFactory
 from apps.cms.tests.factories import HelpEntryFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -54,7 +55,7 @@ def test_the_button_opens_the_page_help_and_the_dialog_behaves(
     page.set_viewport_size(DESKTOP)
     sign_in(page, live_server)
     page.goto(f"{live_server.url}/about/")
-    button = page.get_by_role("button", name="Help for this page")
+    button = page.get_by_role("button", name=translated("Help for this page"))
     expect(button).to_be_visible()
     box = button.bounding_box()
     assert box is not None
@@ -73,7 +74,7 @@ def test_the_button_opens_the_page_help_and_the_dialog_behaves(
     expect(dialog).to_be_visible()
     expect(dialog).to_contain_text("About pages")
     expect(dialog).to_contain_text("Read me.")
-    expect(dialog).to_have_accessible_name("Help for this page")
+    expect(dialog).to_have_accessible_name(translated("Help for this page"))
     shot("desktop-open")
 
     violations = run_axe(page)
@@ -164,7 +165,7 @@ def test_a_page_with_a_form_lists_its_fields_with_their_help_texts(
     fields = page.locator("dialog#help-dialog .help-fields")
     expect(fields).to_be_visible()
     expect(page.locator("dialog#help-dialog .help-fields__title")).to_have_text(
-        "Fields on this page"
+        translated("Fields on this page")
     )
     listed = page.locator("dialog#help-dialog .help-fields__name").all_inner_texts()
     assert [name.split(" (required)")[0].strip() for name in listed] == labels

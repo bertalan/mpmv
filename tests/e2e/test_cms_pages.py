@@ -17,6 +17,7 @@ from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.cms.models import NavigationMenu, StandardPage
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -43,10 +44,12 @@ def test_visitor_reads_home_and_static_pages_in_english_and_italian(
 
     page.goto(f"{live_server.url}/")
     expect(page.locator("html")).to_have_attribute("lang", "en")
-    expect(page.get_by_role("heading", level=1)).to_have_text("Home")
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Home"))
     shot("en-home")
 
-    page.get_by_role("navigation", name="Main").get_by_role("link", name="About us").click()
+    page.get_by_role("navigation", name=translated("Main")).get_by_role(
+        "link", name="About us"
+    ).click()
     expect(page).to_have_url(re.compile(r"/about/$"))
     expect(page.get_by_role("heading", level=1)).to_have_text("About us")
     shot("en-about")
@@ -57,7 +60,7 @@ def test_visitor_reads_home_and_static_pages_in_english_and_italian(
     expect(page.get_by_role("heading", level=1)).to_have_text("Chi siamo")
     shot("it-about")
 
-    page.get_by_role("contentinfo").get_by_role("link", name="Home").click()
+    page.get_by_role("contentinfo").get_by_role("link", name=translated("Home")).click()
     expect(page).to_have_url(re.compile(r"/it/$"))
     expect(page.get_by_text("Prodotti di artigiani indipendenti")).to_be_visible()
     shot("it-home")
@@ -78,10 +81,10 @@ def test_editor_opens_the_wagtail_admin_under_strict_csp(
     assert "'unsafe-inline'" not in response.headers["content-security-policy"]
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
     page.goto(f"{live_server.url}/admin/pages/")
-    expect(page.get_by_role("link", name="Home").first).to_be_visible()
+    expect(page.get_by_role("link", name=translated("Home")).first).to_be_visible()
     shot("admin-pages")
 
     # The Italian header menu: a StreamField of links, edited without inline scripts.
@@ -95,7 +98,7 @@ def test_editor_opens_the_wagtail_admin_under_strict_csp(
     about = StandardPage.objects.get(locale__language_code="it")
     page.goto(f"{live_server.url}/admin/pages/{about.pk}/edit/")
     expect(page.locator("#id_title")).to_have_value("Chi siamo")
-    expect(page.get_by_role("button", name="Save draft")).to_be_visible()
+    expect(page.get_by_role("button", name=translated("Save draft"))).to_be_visible()
     shot("admin-it-page")
     # Known: the editor's built-in accessibility checker (axe-core, in Wagtail's vendor.js)
     # adds a helper <style> element, which the CSP blocks; editing is not affected.

@@ -15,6 +15,7 @@ from apps.catalog.models import Product
 from apps.core.models import AuditLog
 from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.login import admin_login, verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -37,7 +38,7 @@ def test_staff_create_a_product_and_change_its_price(
     page.locator("#id_translations-0-language").select_option("en")
     page.locator("#id_translations-0-title").fill("Leather bag")
     shot("filled")
-    page.get_by_role("button", name="Save and continue editing").click()
+    page.get_by_role("button", name=translated("Save and continue editing")).click()
     expect(page.locator(".messagelist")).to_contain_text("was added successfully")
 
     product = Product.objects.get()
@@ -45,7 +46,7 @@ def test_staff_create_a_product_and_change_its_price(
     assert product.translations.get(language="en").title == "Leather bag"
 
     page.locator("#id_price_net").fill("29.00")
-    page.get_by_role("button", name="Save", exact=True).click()
+    page.get_by_role("button", name=translated("Save"), exact=True).click()
     expect(page.locator(".messagelist")).to_contain_text("was changed successfully")
     shot("price-changed")
 

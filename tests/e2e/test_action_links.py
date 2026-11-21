@@ -17,6 +17,7 @@ from apps.accounts.tests.integration.urls import APPROVE_PURPOSE, APPROVED, DOCU
 from apps.accounts.tests.mfa import totp_token
 from apps.core.models import AuditLog
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -50,11 +51,11 @@ def test_link_get_then_continue_post_then_step_up_then_approve(
     page.on("request", remember_referer)
 
     page.goto(f"{live_server.url}{services.action_link_path(token)}")
-    expect(page.get_by_role("button", name="Continue")).to_be_visible()
+    expect(page.get_by_role("button", name=translated("Continue"))).to_be_visible()
     shot("continue-page")
     assert not ActionLinkUse.objects.exists()  # the GET spent nothing
 
-    page.get_by_role("button", name="Continue").click()
+    page.get_by_role("button", name=translated("Continue")).click()
     expect(page).to_have_url(re.compile(r"/account/mfa/verify/"))
     shot("step-up")
     assert ActionLinkUse.objects.count() == 1
@@ -63,7 +64,7 @@ def test_link_get_then_continue_post_then_step_up_then_approve(
     expect(page.get_by_role("heading", name="Approve document doc-1")).to_be_visible()
     shot("action-page")
 
-    page.get_by_role("button", name="Approve").click()
+    page.get_by_role("button", name=translated("Approve")).click()
     expect(page.get_by_text("approved doc-1")).to_be_visible()
     shot("approved")
     assert [("doc-1", user.pk)] == APPROVED
@@ -83,12 +84,12 @@ def test_a_used_link_sends_to_the_normal_login(
     link = f"{live_server.url}{services.action_link_path(token)}"
 
     page.goto(link)
-    page.get_by_role("button", name="Continue").click()
+    page.get_by_role("button", name=translated("Continue")).click()
     expect(page).to_have_url(re.compile(r"/account/mfa/verify/"))
 
     page.context.clear_cookies()
     page.goto(link)
-    page.get_by_role("button", name="Continue").click()
+    page.get_by_role("button", name=translated("Continue")).click()
     expect(page).to_have_url(re.compile(r"/account/login/\?next="))
     shot("used-link-login")
     assert AuditLog.objects.filter(action=services.ACTION_LINK_REFUSED).count() == 1

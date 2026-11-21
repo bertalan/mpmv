@@ -11,6 +11,7 @@ from pytest_django.live_server_helper import LiveServer
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -22,13 +23,15 @@ def test_staff_logs_in_with_email(
     user = UserFactory.create(email="staff@example.com", password=password, superuser=True)
     device = TOTPDeviceFactory.create(user=user)  # staff must verify a second factor (CORE.4)
     page.goto(f"{live_server.url}/django-admin/login/")
-    expect(page.get_by_label("Email")).to_be_visible()
-    page.get_by_label("Email").fill("staff@example.com")
-    page.get_by_label("Password").fill(password)
+    expect(page.get_by_label(translated("Email"))).to_be_visible()
+    page.get_by_label(translated("Email")).fill("staff@example.com")
+    page.get_by_label(translated("Password")).fill(password)
     shot("filled")
-    page.get_by_role("button", name="Log in").click()
+    page.get_by_role("button", name=translated("Log in")).click()
     verify_with_totp(page, totp_token(device))
     expect(
-        page.get_by_role("link", name="Log out").or_(page.get_by_role("button", name="Log out"))
+        page.get_by_role("link", name=translated("Log out")).or_(
+            page.get_by_role("button", name=translated("Log out"))
+        )
     ).to_be_visible()
     shot("logged-in")

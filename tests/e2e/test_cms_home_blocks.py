@@ -20,6 +20,7 @@ from apps.cms.models import HomePage
 from apps.core.tests.factories import MediaImageFactory
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -61,14 +62,14 @@ def test_an_editor_builds_the_home_page_with_hero_cta_and_faq(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
     page.goto(f"{live_server.url}/admin/pages/{home.pk}/edit/")
 
     hero = _add_block(page, "Hero")
     hero.get_by_role("textbox", name=_label("Heading")).fill("Handmade goods")
     hero.get_by_role("textbox", name=_label("Text")).fill("From small workshops.")
-    hero.get_by_role("button", name="Choose an image").click()
+    hero.get_by_role("button", name=translated("Choose an image")).click()
     modal = page.locator(".modal")
     modal.get_by_text("Workshop banner").click()
     expect(modal).to_be_hidden()
@@ -89,9 +90,9 @@ def test_an_editor_builds_the_home_page_with_hero_cta_and_faq(
     expect(faq.locator('input[name$="-value-answer"]')).to_have_value(re.compile("most countries"))
     shot("admin-blocks")
 
-    page.get_by_role("button", name="More actions").click()
-    page.get_by_role("button", name="Publish").click()
-    expect(page.locator(".messages")).to_contain_text("published")
+    page.get_by_role("button", name=translated("More actions")).click()
+    page.get_by_role("button", name=translated("Publish")).click()
+    expect(page.locator(".messages")).to_contain_text(translated("published"))
 
     page.goto(f"{live_server.url}/")
     expect(page.get_by_role("heading", name="Handmade goods")).to_be_visible()

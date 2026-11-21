@@ -22,6 +22,7 @@ from apps.cms.tests.factories import StandardPageFactory
 from apps.core.tests.factories import MediaImageFactory
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -58,7 +59,7 @@ def test_a_translator_replaces_the_main_image_of_the_italian_page_only(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("translator@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
 
     page.goto(f"{live_server.url}/admin/pages/{italian_page.pk}/edit/")
@@ -66,7 +67,7 @@ def test_a_translator_replaces_the_main_image_of_the_italian_page_only(
     expect(page.locator(".preview-image img").first).to_have_attribute("title", "Workshop EN")
     shot("translation-editor")
 
-    page.get_by_role("button", name="Change image").first.click()
+    page.get_by_role("button", name=translated("Change image")).first.click()
     modal = page.locator(".modal")
     expect(modal.get_by_text("Workshop IT")).to_be_visible()
     shot("image-chooser")

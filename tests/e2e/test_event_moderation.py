@@ -29,6 +29,7 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -78,7 +79,7 @@ def test_a_moderator_approves_staff_hide_and_the_vendor_cannot_resubmit(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("moderator@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
 
     # The moderator opens the review list and approves the submitted event.
@@ -89,7 +90,7 @@ def test_a_moderator_approves_staff_hide_and_the_vendor_cannot_resubmit(
     page.get_by_role("link", name="Spring trade fair").click()
     approve = page.get_by_role("button", name="Approve and Publish", exact=True)
     if not approve.is_visible():
-        page.get_by_role("button", name="More actions").click()
+        page.get_by_role("button", name=translated("More actions")).click()
     approve.click()
     expect(page.locator(".messages")).to_contain_text("Spring trade fair")
     event.refresh_from_db()
@@ -98,11 +99,11 @@ def test_a_moderator_approves_staff_hide_and_the_vendor_cannot_resubmit(
 
     # Staff hide it from the page editor, with a reason (an empty one is refused).
     page.goto(f"{live_server.url}/admin/pages/{event.pk}/edit/")
-    page.get_by_role("button", name="More actions").click()
+    page.get_by_role("button", name=translated("More actions")).click()
     page.get_by_role("link", name="Hide event").click()
     page.get_by_role("button", name="Hide event").click()  # the browser asks for the reason
-    expect(page.get_by_label("Reason")).to_be_focused()
-    page.get_by_label("Reason").fill("The offer in the description is misleading.")
+    expect(page.get_by_label(translated("Reason"))).to_be_focused()
+    page.get_by_label(translated("Reason")).fill("The offer in the description is misleading.")
     shot("hide-form")
     assert _admin_violations(page) == [], "\n".join(_admin_violations(page))
     page.get_by_role("button", name="Hide event").click()
@@ -123,8 +124,8 @@ def test_a_moderator_approves_staff_hide_and_the_vendor_cannot_resubmit(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill(owner.email)
     page.locator("input[name=password]").fill(vendor_password)
-    page.get_by_role("button", name="Sign in").click()
-    if page.get_by_label("Authentication code").count():
+    page.get_by_role("button", name=translated("Sign in")).click()
+    if page.get_by_label(translated("Authentication code")).count():
         verify_with_totp(page, totp_token(vendor_device))
     page.goto(f"{live_server.url}/admin/pages/{event.pk}/edit/")
     expect(page.get_by_role("button", name="Submit to Event review")).to_have_count(0)

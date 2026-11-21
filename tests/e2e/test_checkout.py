@@ -29,6 +29,7 @@ from apps.tax.tests.factories import TaxRateFactory
 from apps.vendors.tests.factories import CommissionRuleFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -79,25 +80,25 @@ def test_a_private_buyer_goes_from_the_cart_to_the_confirmation(
 ) -> None:
     open_with_cart(page, live_server, shop)
     page.goto(f"{live_server.url}/cart/")
-    expect(page.get_by_role("heading", level=1)).to_have_text("Your cart")
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Your cart"))
     expect(page.get_by_role("heading", level=2, name="Sold by Rossi Ceramics")).to_be_visible()
     shot("1-cart")
     check_page(page)
 
     page.locator(".quantity input").fill("2")
     page.locator(".quantity input").dispatch_event("change")
-    expect(page.locator("#live-region")).to_have_text("Cart updated.")
+    expect(page.locator("#live-region")).to_have_text(translated("Cart updated."))
     expect(page.locator(".quantity input")).to_have_value("2")
 
-    page.get_by_role("link", name="Continue to checkout").click()
-    expect(page.get_by_role("heading", level=1)).to_have_text("Your details")
+    page.get_by_role("link", name=translated("Continue to checkout")).click()
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Your details"))
     expect(page.locator("#id_company")).to_be_hidden()  # a private buyer sees no business fields
     fill_delivery(page)
     shot("2-details")
     check_page(page)
     page.locator("#id_city").press("Enter")  # submit from the keyboard
 
-    expect(page.get_by_role("heading", level=1)).to_have_text("Review and pay")
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Review and pay"))
     expect(page.get_by_role("radio")).to_be_checked()
     expect(page.locator(".order-summary").last).to_contain_text("256.08")  # 2 x 100 + 9.90, VAT 22%
     shot("3-review")
@@ -110,8 +111,8 @@ def test_a_private_buyer_goes_from_the_cart_to_the_confirmation(
     page.get_by_label(re.compile("I have read and accept")).check()
     pay.click()
 
-    expect(page.get_by_role("heading", level=1)).to_have_text("Order received")
-    expect(page.get_by_role("button", name="Pay now")).to_be_disabled()
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Order received"))
+    expect(page.get_by_role("button", name=translated("Pay now"))).to_be_disabled()
     shot("4-confirmation")
     check_page(page)
     assert Order.objects.get().grand_total == Decimal("256.08")
@@ -129,9 +130,9 @@ def test_a_business_buyer_enters_company_and_vat_id_and_vies_confirms_it(
     page.locator("#id_vat_id").fill("DE123456789")
     shot("1-details-business")
     check_page(page)
-    page.get_by_role("button", name="Continue to review").click()
+    page.get_by_role("button", name=translated("Continue to review")).click()
 
-    expect(page.get_by_role("heading", level=1)).to_have_text("Review and pay")
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Review and pay"))
     expect(page.get_by_text("Your VAT number is valid")).to_be_visible()
     expect(page.get_by_text("Acme GmbH")).to_be_visible()
     shot("2-review-business")
@@ -145,9 +146,9 @@ def test_a_blocked_package_explains_itself_and_offers_a_quote(
     open_with_cart(page, live_server, shop)
     page.goto(f"{live_server.url}/checkout/")
     fill_delivery(page)
-    page.get_by_role("button", name="Continue to review").click()
+    page.get_by_role("button", name=translated("Continue to review")).click()
     expect(page.get_by_text("needs a quote from the vendor")).to_be_visible()
-    expect(page.get_by_role("link", name="Request a quote")).to_be_visible()
+    expect(page.get_by_role("link", name=translated("Request a quote"))).to_be_visible()
     expect(page.get_by_role("button", name=re.compile("Confirm order and pay now"))).to_have_count(
         0
     )

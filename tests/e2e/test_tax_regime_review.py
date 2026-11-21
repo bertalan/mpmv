@@ -15,6 +15,7 @@ from apps.core.tests.factories import utc
 from apps.tax.models import TaxRegimeChangeRequest, VendorTaxProfile
 from apps.tax.tests.factories import TaxRegimeChangeRequestFactory, VendorTaxProfileFactory
 from tests.e2e.login import admin_login, verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -36,10 +37,10 @@ def test_staff_approve_a_tax_regime_change(
     expect(page.locator(".field-profile_history")).to_contain_text("Domestic only")
     shot("request")
 
-    page.get_by_role("link", name="Approve").click()
-    page.get_by_label("Reason").fill("OSS registration checked.")
+    page.get_by_role("link", name=translated("Approve")).click()
+    page.get_by_label(translated("Reason")).fill("OSS registration checked.")
     shot("approve")
-    page.get_by_role("button", name="Approve").click()
+    page.get_by_role("button", name=translated("Approve")).click()
     expect(page.locator(".messagelist")).to_contain_text("approved")
     expect(page.locator(".field-profile_history")).to_contain_text("OSS")
     shot("approved")

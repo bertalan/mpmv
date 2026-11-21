@@ -36,6 +36,7 @@ from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_cms_home_blocks import _axe_helper_style
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -83,7 +84,7 @@ def test_an_editor_adds_a_term_landing_page_and_the_term_page_shows_it(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
     page.goto(f"{live_server.url}/admin/pages/add/cms/termlandingpage/{home.pk}/")
     page.locator("#id_title").fill("Wedding gift guide")
@@ -92,9 +93,9 @@ def test_an_editor_adds_a_term_landing_page_and_the_term_page_shows_it(
     modal.get_by_role("link", name="occasion: Weddings").click()
     expect(modal).to_be_hidden()
     shot("admin-term-landing")
-    page.get_by_role("button", name="More actions").click()
-    page.get_by_role("button", name="Publish").click()
-    expect(page.locator(".messages")).to_contain_text("published")
+    page.get_by_role("button", name=translated("More actions")).click()
+    page.get_by_role("button", name=translated("Publish")).click()
+    expect(page.locator(".messages")).to_contain_text(translated("published"))
     others = [v for v in csp_violations(page) if not _axe_helper_style(v)]
     assert others == [], "\n".join(others)
 

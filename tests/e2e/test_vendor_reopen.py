@@ -15,6 +15,7 @@ from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import ContractAcceptanceFactory, VendorContractFactory
 from tests.e2e.login import admin_login, verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -39,7 +40,9 @@ def test_staff_reopen_a_closed_vendor_with_a_reason(
     expect(page.locator(".errorlist")).to_be_visible()
     shot("reason-required")
 
-    page.get_by_label("Reason").fill("The owner asked to sell again after the winter break.")
+    page.get_by_label(translated("Reason")).fill(
+        "The owner asked to sell again after the winter break."
+    )
     page.get_by_role("button", name="Reopen").click()
     expect(page.locator(".messagelist")).to_contain_text("accept the contract in force again")
     checklist = page.locator(".field-onboarding")

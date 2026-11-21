@@ -12,6 +12,7 @@ from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.login import admin_login, verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -28,7 +29,7 @@ def test_staff_see_a_vendor_change_with_before_and_after(
 
     page.goto(f"{live_server.url}/django-admin/vendors/vendor/{vendor.pk}/change/")
     page.locator("#id_vat_number").fill("IT00000020032")
-    page.get_by_role("button", name="Save and continue editing").click()
+    page.get_by_role("button", name=translated("Save and continue editing")).click()
     expect(page.locator(".messagelist")).to_contain_text("was changed successfully")
 
     page.get_by_role("link", name="Changes to this vendor").click()
@@ -37,7 +38,7 @@ def test_staff_see_a_vendor_change_with_before_and_after(
     shot("vendor-trail")
 
     page.locator("#result_list tbody tr").first.locator("a").first.click()
-    changes = page.locator("fieldset", has_text="Changes").first
+    changes = page.locator("fieldset", has_text=translated("Changes")).first
     expect(changes).to_contain_text("vat_number")
     expect(changes).to_contain_text("IT00000010025")
     expect(changes).to_contain_text("IT00000020032")

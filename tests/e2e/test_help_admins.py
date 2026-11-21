@@ -27,6 +27,7 @@ from apps.cms.services import seed_site
 from apps.cms.tests.factories import HelpEntryFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.test_admin_csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -46,7 +47,7 @@ def check_modal(page: Page, shot: Callable[[str], Path], name: str) -> None:
     dialog = page.locator(DIALOG)
     expect(dialog).to_be_visible()
     expect(dialog.locator(".help-entry")).to_be_visible()
-    expect(dialog).to_have_accessible_name("Help for this page")
+    expect(dialog).to_have_accessible_name(translated("Help for this page"))
     shot(f"{name}-open")
     violations = run_axe(page)
     assert violations == [], format_violations(violations)
@@ -74,7 +75,7 @@ def test_the_wagtail_help_item_opens_the_page_help(
     sign_in(page, live_server)
     page.goto(f"{live_server.url}/admin/pages/{about.pk}/edit/")
     page.get_by_role("button", name=re.compile(r"^Help\d*")).click()  # a badge counts news
-    item = page.get_by_role("button", name="Help for this page")
+    item = page.get_by_role("button", name=translated("Help for this page"))
     expect(item).to_be_visible()
     shot("wagtail-menu")
     item.click()
@@ -91,7 +92,7 @@ def test_the_wagtail_help_item_answers_space_and_a_stale_answer_is_dropped(
     sign_in(page, live_server)
     page.goto(f"{live_server.url}/admin/")
     page.get_by_role("button", name=re.compile(r"^Help\d*")).click()
-    page.get_by_role("button", name="Help for this page").focus()
+    page.get_by_role("button", name=translated("Help for this page")).focus()
     page.keyboard.press("Space")
     expect(page.locator(DIALOG)).to_be_visible()
     page.keyboard.press("Escape")
@@ -144,7 +145,7 @@ def test_the_staff_admin_button_opens_the_screen_help(
     page.set_viewport_size({"width": 1280, "height": 800})
     sign_in(page, live_server)
     page.goto(f"{live_server.url}/django-admin/")
-    button = page.get_by_role("button", name="Help for this page")
+    button = page.get_by_role("button", name=translated("Help for this page"))
     expect(button).to_be_visible()
     box = button.bounding_box()
     tools = page.locator("#user-tools").bounding_box()
@@ -167,7 +168,7 @@ def test_the_staff_admin_change_form_lists_its_fields(
 ) -> None:
     sign_in(page, live_server)
     page.goto(f"{live_server.url}/django-admin/accounts/user/add/")
-    page.get_by_role("button", name="Help for this page").click()
+    page.get_by_role("button", name=translated("Help for this page")).click()
     fields = page.locator(f"{DIALOG} .help-fields")
     expect(fields).to_be_visible()
     expect(page.locator(f"{DIALOG} .help-fields__name").first).to_be_visible()

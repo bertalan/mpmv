@@ -21,6 +21,7 @@ from apps.cms.models import HomePage, LegalPage
 from apps.cms.tests.factories import LegalPageFactory, VendorRecruitmentPageFactory
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -85,12 +86,14 @@ def test_visitor_sees_the_plans_and_how_to_apply(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/sell-with-us/")
-    expect(page.get_by_role("heading", level=1)).to_have_text("Sell with us")
-    plans = page.get_by_role("region", name="Plans")
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Sell with us"))
+    plans = page.get_by_role("region", name=translated("Plans"))
     expect(plans.get_by_role("heading", name="Starter")).to_be_visible()
     expect(plans.get_by_role("heading", name="Workshop")).to_be_visible()
     expect(page.get_by_text("Who can sell?")).to_be_visible()
-    expect(page.get_by_role("link", name="Apply now")).to_have_attribute("href", "/vendor/apply/")
+    expect(page.get_by_role("link", name=translated("Apply now"))).to_have_attribute(
+        "href", "/vendor/apply/"
+    )
     shot("sell-with-us")
 
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
@@ -106,7 +109,7 @@ def test_editor_adds_a_legal_page_in_the_admin(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
 
     home = HomePage.objects.get(locale__language_code="en")
@@ -115,8 +118,8 @@ def test_editor_adds_a_legal_page_in_the_admin(
     page.locator("#id_kind").select_option("privacy")
     page.locator("#id_effective_date").fill("2026-01-01")
     shot("admin-add-legal-page")
-    page.get_by_role("button", name="More actions").click()
-    page.get_by_role("button", name="Publish").click()
+    page.get_by_role("button", name=translated("More actions")).click()
+    page.get_by_role("button", name=translated("Publish")).click()
     expect(page.get_by_text("Page 'Privacy policy' created and published.")).to_be_visible()
 
     legal = LegalPage.objects.get(title="Privacy policy")

@@ -16,6 +16,7 @@ from pytest_django.live_server_helper import LiveServer
 from apps.seo.models import ConsentLog
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.consent_banner]
 
@@ -60,9 +61,11 @@ def test_the_banner_shows_to_a_new_visitor_with_equal_choices(
     page.goto(f"{live_server.url}/")
     banner = page.locator("#consent-banner")
     expect(banner).to_be_visible()
-    expect(banner.get_by_role("heading", name="Cookies and your privacy")).to_be_visible()
-    reject = banner.get_by_role("button", name="Reject all")
-    accept = banner.get_by_role("button", name="Accept all")
+    expect(
+        banner.get_by_role("heading", name=translated("Cookies and your privacy"))
+    ).to_be_visible()
+    reject = banner.get_by_role("button", name=translated("Reject all"))
+    accept = banner.get_by_role("button", name=translated("Accept all"))
     expect(reject).to_be_visible()
     expect(accept).to_be_visible()
     reject_box, accept_box = reject.bounding_box(), accept.bounding_box()
@@ -73,9 +76,9 @@ def test_the_banner_shows_to_a_new_visitor_with_equal_choices(
         "e => getComputedStyle(e).backgroundColor"
     )
     shot("banner")
-    banner.get_by_text("Choose categories").click()
-    expect(banner.get_by_label("Statistics")).to_be_visible()
-    expect(banner.get_by_label("Necessary")).to_be_disabled()
+    banner.get_by_text(translated("Choose categories")).click()
+    expect(banner.get_by_label(translated("Statistics"))).to_be_visible()
+    expect(banner.get_by_label(translated("Necessary"))).to_be_disabled()
     shot("banner-categories")
     violations = run_axe(page, include="#consent-banner")
     assert not violations, format_violations(violations)
@@ -134,7 +137,7 @@ def test_accepting_stores_logs_and_starts_the_held_back_tag(
 
     consent_script_ready(page)
     with page.expect_response(lambda r: "/consent/" in r.url and r.request.method == "POST"):
-        page.get_by_role("button", name="Accept all").click()
+        page.get_by_role("button", name=translated("Accept all")).click()
     expect(page.locator("#consent-banner")).to_be_hidden()
     for _ in range(50):  # wait_for_function evaluates a string, which the CSP forbids
         if page.evaluate("window.__gatedRan === true"):
@@ -143,7 +146,7 @@ def test_accepting_stores_logs_and_starts_the_held_back_tag(
     assert len(requests) == 1
     assert page.evaluate("window.mpmvConsent.allows('statistics')") is True
     assert page.evaluate("window.mpmvConsent.signals().analytics_storage") == "granted"
-    expect(page.locator("#live-region")).to_have_text("Your cookie choice was saved.")
+    expect(page.locator("#live-region")).to_have_text(translated("Your cookie choice was saved."))
     expect(page.locator("#main")).to_be_focused()
     assert ConsentLog.objects.get().action == "accept_all"
     assert re.search(r"mpmv_consent=v1\.", page.evaluate("document.cookie"))
@@ -162,21 +165,21 @@ def test_rejecting_keeps_the_tag_away_and_the_choice_can_change_later(
     page.evaluate(INJECT_GATED)
     consent_script_ready(page)
     with page.expect_response(lambda r: "/consent/" in r.url and r.request.method == "POST"):
-        page.get_by_role("button", name="Reject all").click()
+        page.get_by_role("button", name=translated("Reject all")).click()
     expect(page.locator("#consent-banner")).to_be_hidden()
     page.wait_for_timeout(300)
     assert requests == []
     assert ConsentLog.objects.get().granted == []
 
-    page.get_by_role("link", name="Cookie settings").click()
-    expect(page.get_by_role("heading", name="Cookie settings")).to_be_visible()
+    page.get_by_role("link", name=translated("Cookie settings")).click()
+    expect(page.get_by_role("heading", name=translated("Cookie settings"))).to_be_visible()
     expect(page.locator("#consent-banner")).to_be_hidden()
     expect(page.locator("#prefs-statistics")).not_to_be_checked()
     page.locator("#prefs-statistics").check()
     consent_script_ready(page)
     with page.expect_response(lambda r: "/consent/" in r.url and r.request.method == "POST"):
-        page.get_by_role("button", name="Save my choices").click()
-    expect(page.locator("#live-region")).to_have_text("Your cookie choice was saved.")
+        page.get_by_role("button", name=translated("Save my choices")).click()
+    expect(page.locator("#live-region")).to_have_text(translated("Your cookie choice was saved."))
     shot("settings-saved")
     assert ConsentLog.objects.count() == 2
     page.reload()
@@ -217,7 +220,7 @@ def test_the_settings_page_confirms_accept_all_and_reject_all_visibly(
     save_on_settings(page, "Accept all")
     expect(notice).to_be_visible()
     expect(notice).to_have_attribute("role", "status")
-    expect(notice).to_contain_text("Your cookie choice was saved.")
+    expect(notice).to_contain_text(translated("Your cookie choice was saved."))
     expect(notice).to_contain_text("Optional cookies on: Preferences, Statistics, Marketing.")
     for code in ("preferences", "statistics", "marketing"):
         expect(page.locator(f"#prefs-{code}")).to_be_checked()
@@ -228,8 +231,8 @@ def test_the_settings_page_confirms_accept_all_and_reject_all_visibly(
 
     save_on_settings(page, "Reject all")  # a started script cannot be taken back: the page reloads
     expect(notice).to_be_visible()
-    expect(notice).to_contain_text("Your cookie choice was saved.")
-    expect(notice).to_contain_text("Only necessary cookies are on.")
+    expect(notice).to_contain_text(translated("Your cookie choice was saved."))
+    expect(notice).to_contain_text(translated("Only necessary cookies are on."))
     for code in ("preferences", "statistics", "marketing"):
         expect(page.locator(f"#prefs-{code}")).not_to_be_checked()
     assert consent_cookie_categories(page) == set()
@@ -284,8 +287,8 @@ def test_without_javascript_the_settings_page_still_saves_a_choice(
     try:
         page = context.new_page()
         page.goto(f"{live_server.url}/cookie-settings/")
-        page.get_by_role("button", name="Accept all").click()
-        expect(page.get_by_role("heading", name="Cookie settings")).to_be_visible()
+        page.get_by_role("button", name=translated("Accept all")).click()
+        expect(page.get_by_role("heading", name=translated("Cookie settings"))).to_be_visible()
         assert ConsentLog.objects.get().action == "accept_all"
         expect(page.locator("#prefs-marketing")).to_be_checked()
     finally:

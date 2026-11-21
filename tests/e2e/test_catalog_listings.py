@@ -29,6 +29,7 @@ from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -135,8 +136,8 @@ def test_the_filter_form_works_without_javascript(
     page = no_js_page
     page.goto(f"{live_server.url}/compatibility/maker/")
     page.get_by_label("Red").check()
-    page.get_by_label("Minimum price").fill("15")
-    page.get_by_role("button", name="Apply filters").click()
+    page.get_by_label(translated("Minimum price")).fill("15")
+    page.get_by_role("button", name=translated("Apply filters")).click()
     expect(page).to_have_url(f"{live_server.url}/compatibility/maker/?colour=red&price_min=15")
     expect(page.locator("article.product-card h3")).to_have_text(["Bag 3"])
 

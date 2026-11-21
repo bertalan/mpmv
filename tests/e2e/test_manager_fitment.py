@@ -26,6 +26,7 @@ from apps.manager.role_groups import sync_role_groups
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -52,9 +53,9 @@ def test_the_fitment_pages_open_and_are_accessible(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/account/login/")
-    page.get_by_label("Email").fill("staff@example.com")
-    page.get_by_label("Password").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_label(translated("Email")).fill("staff@example.com")
+    page.get_by_label(translated("Password")).fill(password)
+    page.get_by_role("button", name=translated("Sign in")).click()
     expect(page).to_have_url(re.compile(r"/account/mfa/verify/"))
     verify_with_totp(page, totp_token(device), window=True)
 
@@ -85,11 +86,13 @@ def test_the_fitment_pages_open_and_are_accessible(
     # A change shows its dry-run preview first (the passkey window is open for the staff user).
     page.goto(f"{live_server.url}/manager/platform/fitment/scheme/")
     form = page.locator("form:has(input[name=action][value=add_level])")
-    form.get_by_label("Code").fill("year")
+    form.get_by_label(translated("Code")).fill("year")
     form.get_by_label(re.compile(r"^Label \(English\)")).fill("Year")
     form.get_by_label(re.compile(r"^Plural label \(English\)")).fill("Years")
-    form.get_by_role("button", name="Preview the level").click()
-    expect(page.get_by_role("heading", name="Preview of the change", level=1)).to_be_visible()
+    form.get_by_role("button", name=translated("Preview the level")).click()
+    expect(
+        page.get_by_role("heading", name=translated("Preview of the change"), level=1)
+    ).to_be_visible()
     violations = run_axe(page)
     assert not violations, format_violations(violations)
     assert csp_violations(page) == []

@@ -19,6 +19,7 @@ from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.test_add_to_cart import product  # noqa: F401 (fixture)
 from tests.e2e.test_catalog_listings import term_page  # noqa: F401 (fixture)
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -133,7 +134,7 @@ def test_the_mini_cart_opens_traps_focus_and_returns_it_on_escape(
     trigger.focus()
     page.keyboard.press("Enter")
     expect(panel).to_be_visible()
-    expect(panel).to_contain_text("Your cart is empty")
+    expect(panel).to_contain_text(translated("Your cart is empty"))
     clean(page)
     trapped(page, "#mini-cart-offcanvas")
     page.keyboard.press("Escape")
@@ -153,8 +154,8 @@ def test_adding_a_product_updates_the_count_and_the_mini_cart_without_a_reload(
     expect(count).to_have_attribute("aria-live", "polite")
     expect(page.locator("#cart-badge")).to_be_hidden()
     page.locator("#product-quantity").fill("2")
-    page.get_by_role("button", name="Add to cart").click()
-    expect(page.locator("#add-to-cart-result")).to_contain_text("Added to your cart.")
+    page.get_by_role("button", name=translated("Add to cart")).click()
+    expect(page.locator("#add-to-cart-result")).to_contain_text(translated("Added to your cart."))
     expect(count).to_have_text("2 items")
     expect(page.locator("#cart-badge")).to_have_text("2")
     assert page.evaluate("() => window.__same_page === true")  # no reload
@@ -162,7 +163,7 @@ def test_adding_a_product_updates_the_count_and_the_mini_cart_without_a_reload(
     page.keyboard.press("Enter")
     panel = page.locator("#mini-cart-offcanvas")
     expect(panel).to_contain_text("Blue vase")
-    expect(panel.get_by_role("link", name="View cart")).to_have_attribute(
+    expect(panel.get_by_role("link", name=translated("View cart"))).to_have_attribute(
         "href", re.compile(r"/cart/$")
     )
     clean(page)
@@ -180,7 +181,7 @@ def test_the_count_survives_a_new_page(
     settings: Any,
 ) -> None:
     open_page(page, live_server, "/product/blue-vase/", 1280)
-    page.get_by_role("button", name="Add to cart").click()
+    page.get_by_role("button", name=translated("Add to cart")).click()
     expect(page.locator("#cart-badge")).to_have_text("1")
     page.goto(f"{live_server.url}/")
     expect(page.locator("#cart-badge")).to_have_text("1")

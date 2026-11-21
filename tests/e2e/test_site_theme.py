@@ -18,6 +18,7 @@ from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.themes.tests.builders import shipped_templates, write_theme
 from tests.e2e.login import admin_login, verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -41,7 +42,7 @@ def test_staff_switch_the_site_theme_and_visitors_see_it(
 ) -> None:
     page.goto(f"{live_server.url}/")
     expect(page.locator("html")).to_have_attribute("data-theme", "base")
-    expect(page.get_by_role("heading", level=1)).to_have_text("Home")
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Home"))
     shot("before")
 
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
@@ -51,10 +52,10 @@ def test_staff_switch_the_site_theme_and_visitors_see_it(
     verify_with_totp(page, totp_token(device), window=True)
 
     page.goto(f"{live_server.url}/django-admin/themes/themesettings/add/")
-    page.get_by_label("Site").select_option(index=1)
+    page.get_by_label(translated("Site")).select_option(index=1)
     page.get_by_label("Theme").select_option("alt")
     shot("admin-form")
-    page.get_by_role("button", name="Save", exact=True).click()
+    page.get_by_role("button", name=translated("Save"), exact=True).click()
     expect(page.locator(".messagelist")).to_contain_text("was added successfully")
 
     page.goto(f"{live_server.url}/")
@@ -62,7 +63,9 @@ def test_staff_switch_the_site_theme_and_visitors_see_it(
     expect(page.get_by_role("heading", level=1)).to_have_text("Alt theme: Home")
     shot("alt-home")
 
-    page.get_by_role("navigation", name="Main").get_by_role("link", name="About us").click()
+    page.get_by_role("navigation", name=translated("Main")).get_by_role(
+        "link", name="About us"
+    ).click()
     expect(page).to_have_url(re.compile(r"/about/$"))
     expect(page.get_by_role("heading", level=1)).to_have_text("About us")
     expect(page.locator("html")).to_have_attribute("data-theme", "alt")

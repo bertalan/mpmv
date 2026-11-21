@@ -21,6 +21,7 @@ from apps.vendors.tests.factories import (
 )
 from apps.vendors.tests.fakes import seed_legal_requirements
 from tests.e2e.login import fresh_passkey, open_passkey_window, verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -30,9 +31,9 @@ def staff_login(page: Page, live_server: LiveServer) -> None:
     user = UserFactory.create(email="staff@example.com", password=password, superuser=True)
     device = TOTPDeviceFactory.create(user=user)  # staff must verify a second factor (CORE.4)
     page.goto(f"{live_server.url}/django-admin/login/")
-    page.get_by_label("Email").fill("staff@example.com")
-    page.get_by_label("Password").fill(password)
-    page.get_by_role("button", name="Log in").click()
+    page.get_by_label(translated("Email")).fill("staff@example.com")
+    page.get_by_label(translated("Password")).fill(password)
+    page.get_by_role("button", name=translated("Log in")).click()
     verify_with_totp(page, totp_token(device))
 
 
@@ -49,7 +50,7 @@ def test_staff_create_vendor_and_start_onboarding(
     page.locator("#id_translations-0-language").select_option("en")
     page.locator("#id_translations-0-tagline").fill("Outdoor gear")
     shot("filled")
-    page.get_by_role("button", name="Save", exact=True).click()
+    page.get_by_role("button", name=translated("Save"), exact=True).click()
     expect(page.locator(".messagelist")).to_contain_text("was added successfully")
 
     vendor = Vendor.objects.get()
@@ -82,7 +83,7 @@ def test_staff_complete_an_incomplete_legal_profile(
 
     # Saving a partial profile is allowed: only the fiscal regime is added here.
     page.locator("#id_fiscal_regime").select_option("RF01")
-    page.get_by_role("button", name="Save and continue editing").click()
+    page.get_by_role("button", name=translated("Save and continue editing")).click()
     expect(page.locator(".messagelist")).to_contain_text("was changed successfully")
     expect(readiness).to_contain_text("Missing: PEC address, IBAN.")
 
@@ -90,7 +91,7 @@ def test_staff_complete_an_incomplete_legal_profile(
     fresh_passkey(page)  # an open passkey window plus a fresh passkey
     page.locator("#id_pec").fill("vendor-a@pec.example.com")
     page.locator("#id_iban").fill("IT60 X054 2811 1010 0000 0123 456")
-    page.get_by_role("button", name="Save and continue editing").click()
+    page.get_by_role("button", name=translated("Save and continue editing")).click()
     expect(readiness).to_contain_text("the legal profile is complete for payouts")
     shot("complete")
 
