@@ -164,8 +164,8 @@ def test_listing_cards_are_wide_with_the_placeholder_in_the_image_box(
         cards = page.evaluate(CARD_BOXES, ".product-card")
         assert cards, path
         for card in cards:
-            # At least about 220 px on a wide screen; on a phone full width or two in a row.
-            floor = 220 if width == 1280 else (width - 2 * 16 - 24) / 2
+            # At least 15rem (240 px) on a wide screen; on a phone full width or two in a row.
+            floor = 240 if width == 1280 else (width - 2 * 16 - 24) / 2
             assert card["width"] >= floor, (path, card)
             assert card["image"] >= card["width"] - 4, (path, card)  # the image fills the card
         if width == 375:
@@ -191,3 +191,23 @@ def test_a_product_without_images_shows_the_gallery_placeholder(
     assert box is not None
     assert box["width"] >= 300
     assert abs(box["width"] - box["height"]) < 2  # the same square box as a real image
+
+
+def _cards_in_first_row(page: Page, selector: str) -> int:
+    cards = page.evaluate(CARD_BOXES, selector)
+    assert cards, selector
+    return sum(1 for card in cards if abs(card["top"] - cards[0]["top"]) < 1)
+
+
+def test_cards_per_row_at_1280(
+    page: Page, live_server: LiveServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """THM.19: 3 listing cards per row at 1280 px, 4 in the related strip, each at least 240 px."""
+    monkeypatch.setattr(services, "LISTING_PER_PAGE", 6)
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto(f"{live_server.url}/compatibility/maker/")
+    assert _cards_in_first_row(page, ".product-card") == 3
+    page.goto(f"{live_server.url}/product/bag-0/")
+    assert _cards_in_first_row(page, ".product-related .product-card") == 4
+    for card in page.evaluate(CARD_BOXES, ".product-related .product-card"):
+        assert card["width"] >= 240, card
