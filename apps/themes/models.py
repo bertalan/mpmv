@@ -1,5 +1,7 @@
 """The theme of each Wagtail Site (spec 14 §14.3, Selection)."""
 
+from typing import Any
+
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
@@ -96,6 +98,11 @@ class BrandPalette(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """A palette that fails validation is never stored, whatever the caller."""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def roles(self) -> dict[str, str]:
         return {role: getattr(self, role) for role in ROLES}
