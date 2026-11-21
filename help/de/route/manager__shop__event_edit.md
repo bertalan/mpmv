@@ -1,10 +1,11 @@
 # Veranstaltung bearbeiten
-last-checked: 2026-11-18
+last-checked: 2026-11-21
 
 Auf dieser Seite ändern Sie eine Veranstaltung Ihres Shops und bereiten sie für die Prüfung vor.
 
 ## Was Sie tun können
 - Ändern Sie die Felder und klicken Sie auf **Entwurf speichern**. Jedes Speichern ist ein Entwurf.
+- Legen Sie unter **Tickets und Änderungen** den **Ticket-Link**, den **Ticketpreis (EUR)** oder **Freier Eintritt** fest und haken Sie **Verschoben** an, wenn die Veranstaltung verlegt wird (das Feld **Früherer Beginn** wird von Hand eingetragen).
 - Öffnen Sie **Vorschau des gespeicherten Entwurfs**, um zu sehen, wie die Seite aussehen wird.
 - Fügen Sie unter **Inhalt** die Blöcke der Veranstaltungsseite hinzu, bearbeiten, verschieben oder entfernen Sie sie. Jede Änderung wird als Entwurf gespeichert.
 - Klicken Sie unter **Absenden** auf **Zur Prüfung einreichen**, um den gespeicherten Entwurf an die Moderatoren der Plattform zu senden.
