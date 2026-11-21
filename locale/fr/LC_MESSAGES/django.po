@@ -6995,6 +6995,15 @@ msgstr ""
 "Indiquez à quoi ce produit convient avant de le publier : choisissez les articles compatibles dans"
 " l'onglet Compatibilité ou déclarez qu'il convient à tout."
 
+#: apps/vendors/services.py
+msgid ""
+"Please give us a phone number for your shop before you publish products: sellers who sell to "
+"consumers must show one in the withdrawal information. Send it to the platform staff."
+msgstr ""
+"Veuillez nous communiquer un numéro de téléphone pour votre boutique avant de publier des produits"
+" : les vendeurs qui vendent à des consommateurs doivent l’indiquer dans les informations sur la "
+"rétractation. Envoyez-le à l’équipe de la plateforme."
+
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
 msgstr "Libellé au pluriel"
@@ -15260,6 +15269,28 @@ msgstr "Tes sessions"
 msgid "Your shop cancelled order %(order_number)s and the customer was refunded in full."
 msgstr ""
 "Votre boutique a annulé la commande %(order_number)s et le client a été remboursé intégralement."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to %(support_email)s; until then"
+" you cannot publish products."
+msgstr ""
+"Votre boutique n’a pas de numéro de téléphone. Les vendeurs qui vendent à des consommateurs "
+"doivent en indiquer un : les acheteurs le voient dans les informations sur la rétractation et dans"
+" la confirmation de commande. Veuillez l’envoyer à %(support_email)s ; d’ici là, vous ne pouvez "
+"pas publier de produits."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to the platform staff; until "
+"then you cannot publish products."
+msgstr ""
+"Votre boutique n’a pas de numéro de téléphone. Les vendeurs qui vendent à des consommateurs "
+"doivent en indiquer un : les acheteurs le voient dans les informations sur la rétractation et dans"
+" la confirmation de commande. Veuillez l’envoyer à l’équipe de la plateforme ; d’ici là, vous ne "
+"pouvez pas publier de produits."
 
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."

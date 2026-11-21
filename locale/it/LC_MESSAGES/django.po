@@ -6932,6 +6932,14 @@ msgstr ""
 "Indichi a cosa è adatto questo prodotto prima di pubblicarlo: scelga gli articoli compatibili "
 "nella scheda Compatibilità, oppure dichiari che è adatto a tutto."
 
+#: apps/vendors/services.py
+msgid ""
+"Please give us a phone number for your shop before you publish products: sellers who sell to "
+"consumers must show one in the withdrawal information. Send it to the platform staff."
+msgstr ""
+"Ci comunichi un numero di telefono del Suo negozio prima di pubblicare prodotti: chi vende a "
+"consumatori deve indicarlo nelle informazioni sul recesso. Lo invii allo staff della piattaforma."
+
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
 msgstr "Etichetta al plurale"
@@ -15109,6 +15117,26 @@ msgstr "Le tue sessioni"
 msgid "Your shop cancelled order %(order_number)s and the customer was refunded in full."
 msgstr ""
 "Il tuo negozio ha annullato l’ordine %(order_number)s e il cliente è stato rimborsato per intero."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to %(support_email)s; until then"
+" you cannot publish products."
+msgstr ""
+"Il Suo negozio non ha un numero di telefono. Chi vende a consumatori deve indicarlo: gli "
+"acquirenti lo vedono nelle informazioni sul recesso e nella conferma d’ordine. Lo invii a "
+"%(support_email)s; fino ad allora non può pubblicare prodotti."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to the platform staff; until "
+"then you cannot publish products."
+msgstr ""
+"Il Suo negozio non ha un numero di telefono. Chi vende a consumatori deve indicarlo: gli "
+"acquirenti lo vedono nelle informazioni sul recesso e nella conferma d’ordine. Lo invii allo staff"
+" della piattaforma; fino ad allora non può pubblicare prodotti."
 
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."
