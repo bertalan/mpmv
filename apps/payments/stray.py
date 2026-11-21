@@ -15,6 +15,7 @@ a day. The alert's state is its audit trail: flagged, reminded, closed (the log 
 import datetime as dt
 import hashlib
 import logging
+from dataclasses import dataclass
 from decimal import Decimal
 
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -130,6 +131,52 @@ def open_stray_captures() -> list[Payment]:
     )
     by_ref = {p.provider_ref: p for p in Payment.objects.filter(provider_ref__in=list(refs))}
     return [by_ref[ref] for ref in refs if ref in by_ref]
+
+
+@dataclass(frozen=True)
+class OpenAlert:
+    """One open stray-payment alert as the Manager lists it: references and amounts only."""
+
+    payment_ref: str
+    order_ref: str
+    reason: str
+    amount: Decimal
+    currency: str
+    age_days: int
+    refund_confirmed: bool | None  # None: the provider could not tell
+
+
+def open_alerts(*, now: dt.datetime | None = None) -> list[OpenAlert]:
+    """The open alerts, oldest first, for the Manager page. Two queries whatever the rows; the
+    refund state is read from the provider, one call per alert (support refunds there)."""
+    moment = now or timezone.now()
+    closed = AuditLog.objects.filter(action=PAYMENT_STRAY_CLOSED).values("target_key")
+    flags = list(
+        AuditLog.objects.filter(action=PAYMENT_STRAY_FLAGGED)
+        .exclude(target_key__in=closed)
+        .order_by("created_at", "id")
+        .only("target_key", "after", "created_at")
+    )
+    refs = [flag.target_key for flag in flags]
+    by_ref = {p.provider_ref: p for p in Payment.objects.filter(provider_ref__in=refs)}
+    rows = []
+    for flag in flags:
+        payment = by_ref.get(flag.target_key)
+        if payment is None:
+            continue
+        refunded = _refunded(payment)
+        rows.append(
+            OpenAlert(
+                payment_ref=payment.provider_ref,
+                order_ref=payment.order_ref,
+                reason=str((flag.after or {}).get("reason", "mismatch")),
+                amount=payment.amount,
+                currency=payment.currency,
+                age_days=(moment - flag.created_at).days,
+                refund_confirmed=None if refunded is None else refunded >= payment.amount,
+            )
+        )
+    return rows
 
 
 def _close(
