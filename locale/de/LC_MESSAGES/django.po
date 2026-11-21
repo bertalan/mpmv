@@ -3192,7 +3192,7 @@ msgid ""
 "Due to a technical issue on our platform, your order %(order_number)s with seller %(vendor_name)s "
 "cannot be processed. The order has been cancelled at no cost to you, and we have immediately "
 "issued a full refund of EUR %(refund)s to your original payment method (credited within 5–10 "
-"business days, and in any event within the statutory 14-day limit). We apologize for the "
+"business days, and in any event within the statutory 14-day limit). We apologise for the "
 "inconvenience."
 msgstr ""
 "Leider konnte deine Bestellung %(order_number)s beim Verkäufer %(vendor_name)s aufgrund eines "
@@ -4083,7 +4083,7 @@ msgstr ""
 
 #: apps/catalog/models.py
 msgid ""
-"How buyers get this product. Buy: they order and pay on the site, so it needs a price. Catalog "
+"How buyers get this product. Buy: they order and pay on the site, so it needs a price. Catalogue "
 "only: it is shown but cannot be bought. On request: buyers ask you about it."
 msgstr ""
 "Wie Käufer dieses Produkt erhalten. Kauf: Sie bestellen und bezahlen auf der Website, daher ist "
@@ -13739,7 +13739,7 @@ msgstr ""
 #: apps/orders/templates/email/orders/package_cancelled/body.html
 #: apps/orders/templates/email/orders/package_cancelled/body.txt
 msgctxt "(L)"
-msgid "We apologize for the inconvenience."
+msgid "We apologise for the inconvenience."
 msgstr "Wir bitten die Unannehmlichkeiten zu entschuldigen."
 
 #: apps/orders/messages.py

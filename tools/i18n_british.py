@@ -20,7 +20,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # Apps swept so far (I18N.23). Paths are matched on the first two parts of the source reference.
-ALLOWED_APPS = ("apps/core/", "apps/accounts/", "apps/manager/", "apps/api/", "apps/mcp/")
+ALLOWED_APPS = (
+    "apps/core/",
+    "apps/accounts/",
+    "apps/manager/",
+    "apps/api/",
+    "apps/mcp/",
+    "apps/catalog/",
+    "apps/cart/",
+    "apps/orders/",
+    "apps/payments/",
+    "apps/shipping/",
+    "apps/tax/",
+    "apps/ledger/",
+    "apps/vendors/",
+    "apps/compliance/",
+)
 
 # American word (regex, whole word, case-insensitive) -> British spelling to use instead.
 US_TO_UK: dict[str, str] = {
