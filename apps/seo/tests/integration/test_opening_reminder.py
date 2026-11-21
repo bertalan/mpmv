@@ -11,10 +11,11 @@ from apps.cms import services as cms_services
 from apps.core.models import AuditLog
 from apps.seo import services
 from apps.seo.models import SeoSettings
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
-HEADING = "Before opening the platform"
+HEADING = translated("Before opening the platform")
 STEP = "Publish the terms of sale in every language."
 
 

@@ -16,6 +16,7 @@ from apps.catalog.models import Product
 from apps.catalog.services import delete_product, save_product
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
 from apps.core.audit import AuditContext
+from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog, TranslationStatus
 from apps.core.sitemap_version import sitemap_version
 from apps.vendors import engine
@@ -109,8 +110,12 @@ def test_a_dry_run_does_not_bump_the_version() -> None:
 def test_a_language_change_bumps_the_version() -> None:
     from apps.core.language_services import change_languages
 
+    current = configured_languages()
     before = sitemap_version()
-    target = [PRIMARY, "de" if PRIMARY != "de" else "fr"]
+    added = next(
+        code for code in ("de", "fr", "es", "nl") if code != PRIMARY and code not in current
+    )
+    target = [*current, added]
     change_languages(target, ctx=CTX, dry_run=False)
     assert sitemap_version() > before
 
