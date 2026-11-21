@@ -23,6 +23,7 @@ from . import (
     session_views,
     staff_draft_views,
     statement_views,
+    stray_views,
     termination_views,
     trust_edit_views,
     trust_views,
@@ -263,6 +264,8 @@ platform = (
             amendment_views.PlatformCancelView.as_view(),
             name="order_cancel",
         ),
+        # PAY.4: the open stray-payment alerts and their manual close (POST, a reason).
+        path("stray-payments/", stray_views.StrayPaymentsView.as_view(), name="stray_payments"),
         # ORD.32: a cart prepared from a past order, with its one-time link (Support, owner).
         path("order-drafts/", staff_draft_views.DraftListView.as_view(), name="order_drafts"),
         path(

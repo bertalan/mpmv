@@ -329,6 +329,12 @@ IDOR_REVIEWED: dict[str, str] = {
         "and opening a draft of another account is refused "
         "(`test_an_account_draft_opens_for_that_account_only`)."
     ),
+    "manager:platform:stray_payments": (
+        "No identifier in the URL; the close and Check now POSTs name a payment reference in "
+        "their body. Platform "
+        "space only (CORE.18 row platform.stray_payments), and the service refuses anyone but "
+        "Support or the platform owner; stray payments span shops by design (PAY.4)."
+    ),
     "manager:platform:order_draft": (
         "Platform space, Support and the platform owner only (CORE.18 row platform.order_drafts); "
         "a prepared cart spans shops by design and shows no contact data of the customer."
