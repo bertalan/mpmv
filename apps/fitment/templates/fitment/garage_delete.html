@@ -1,0 +1,15 @@
+{% extends "layouts/account.html" %}
+{% load i18n %}
+{% block title %}{% translate "Delete this vehicle?" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block account_content %}
+  <h1>{% translate "Delete this vehicle?" %}</h1>
+  <p data-garage-delete-profile><strong>{{ profile.name }}</strong>: {{ path }}</p>
+  <p>{% translate "The profile is deleted for good. This cannot be undone." %}</p>
+  <form method="post" action="{% url 'garage_profile_delete' profile.public_id %}">
+    {% csrf_token %}
+    <input type="hidden" name="confirm" value="yes">
+    {% include "components/button.html" with label=_("Yes, delete it") type="submit" variant="danger" only %}
+    {% include "components/button.html" with label=_("No, keep it") url=back_url variant="secondary" only %}
+  </form>
+{% endblock %}

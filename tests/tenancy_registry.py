@@ -1051,6 +1051,43 @@ ENDPOINTS: dict[str, Access] = {
     "privacy_erase_done": NoVendorData(
         "Static confirmation page after an erasure request (CMP.4): no data."
     ),
+    "garage_account": NoVendorData(
+        "The signed-in customer's own garage profiles (FIT.5): the list starts from the caller's "
+        "profiles (`test_the_page_lists_the_profiles_and_marks_the_active_one`); no vendor data."
+    ),
+    "garage_reset": NoVendorData(
+        "The signed-in customer switches their own active profile off (FIT.5): POST only, always "
+        "the caller's profiles (`test_reset_leaves_another_customers_garage_alone`)."
+    ),
+    "garage_profile_activate": NoVendorData(
+        "The signed-in customer makes one of their own profiles active (FIT.5): the profile is "
+        "looked up among the caller's own, "
+        "anything else is a 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`).",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "garage_profile_rename": NoVendorData(
+        "The signed-in customer renames one of their own profiles (FIT.5): the profile is "
+        "looked up among the caller's own, "
+        "anything else is a 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`).",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "garage_profile_duplicate": NoVendorData(
+        "The signed-in customer duplicates one of their own profiles (FIT.5): the profile is "
+        "looked up among the caller's own, "
+        "anything else is a 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`).",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "garage_profile_delete": NoVendorData(
+        "The signed-in customer deletes one of their own profiles after a "
+        "confirmation step (FIT.5): the profile is "
+        "looked up among the caller's own, "
+        "anything else is a 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`).",
+        kwargs={"public_id": NIL_UUID},
+    ),
     "customer_orders": NoVendorData(
         "The signed-in customer's own orders (ORD.7): the queryset starts from the caller's "
         "orders (`test_the_list_shows_only_the_callers_orders`); a vendor part shows the vendor's "
