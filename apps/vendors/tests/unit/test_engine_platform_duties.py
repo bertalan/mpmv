@@ -124,3 +124,43 @@ def test_the_hash_covers_the_language_code(monkeypatch: pytest.MonkeyPatch) -> N
     same = {"en": "Same text.", "it": "Same text."}
     monkeypatch.setattr(engine, "SELF_CERTIFICATION_TEXTS", same)
     assert engine.self_certification_hash("en") != engine.self_certification_hash("it")
+
+
+# The first 12 hex digits of `self_certification_hash` per language, for every version ever
+# released. Acceptances store the version and the full hash, so a version's row is frozen once
+# an acceptance of that language may exist (LIVE, STAGE or any other installation).
+SELF_CERTIFICATION_DIGESTS = {
+    1: {
+        "en": "09f0267f24b6",
+        "it": "db15f588e748",
+        "de": "bb6c7fe50d8c",
+        "fr": "5719ddb7afa2",
+        "es": "5b0a9df03a6e",
+    },
+}
+
+
+def test_a_changed_self_certification_text_needs_a_version_bump() -> None:
+    version = engine.SELF_CERTIFICATION_VERSION
+    assert version == max(SELF_CERTIFICATION_DIGESTS), (
+        "SELF_CERTIFICATION_VERSION changed: add a row for it to SELF_CERTIFICATION_DIGESTS "
+        "and keep the rows of the earlier versions as they are."
+    )
+    current = {
+        code: engine.self_certification_hash(code)[:12] for code in engine.SELF_CERTIFICATION_TEXTS
+    }
+    assert current == SELF_CERTIFICATION_DIGESTS[version], (
+        "A self-certification text changed (or a language was added) without a bump of "
+        "SELF_CERTIFICATION_VERSION. Bump the version and add a row. Edit the current row in "
+        "place only for a language in which no acceptance can exist yet."
+    )
+
+
+def test_unreviewed_languages_are_those_with_a_text_and_no_review_mark(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(engine, "SELF_CERTIFICATION_TEXTS", {"en": "A.", "it": "B.", "de": "C."})
+    monkeypatch.setattr(engine, "SELF_CERTIFICATION_REVIEWED_LANGUAGES", frozenset({"en", "it"}))
+    # "xx" has no text: `self_certification_languages_missing` reports it, not this function.
+    assert engine.self_certification_languages_unreviewed(("en", "it", "de", "xx")) == ("de",)
+    assert engine.self_certification_languages_missing(("en", "it", "de", "xx")) == ("xx",)
