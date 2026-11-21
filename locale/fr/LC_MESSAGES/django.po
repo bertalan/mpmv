@@ -11529,6 +11529,14 @@ msgstr "la boutique ne peut pas le livrer dans le pays de la commande"
 
 #: apps/vendors/models.py
 msgid ""
+"The shop name when this version was published, so an old version keeps the name it was published "
+"under. Empty on versions published before it was recorded."
+msgstr ""
+"Le nom de la boutique au moment de la publication de cette version, pour qu'une ancienne version garde le nom sous lequel "
+"elle a été publiée. Vide pour les versions publiées avant l'enregistrement du nom."
+
+#: apps/vendors/models.py
+msgid ""
 "The shop name your buyers see, for example 'Rossi Ceramics'. Required: the shop cannot be shown "
 "without a name."
 msgstr ""
