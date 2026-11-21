@@ -101,3 +101,7 @@ def test_english_and_italian_need_no_mark_and_the_default_stays_clean(tmp_path: 
     _write(tmp_path, "it", SENSITIVE)
 
     assert _messages(tmp_path, ["en", "it"], live=True) == []
+
+
+def test_the_review_header_is_the_same_in_the_tool_and_the_check() -> None:
+    assert catalog.REVIEW_HEADER == REVIEW_HEADER
