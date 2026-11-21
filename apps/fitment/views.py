@@ -57,6 +57,16 @@ def _back(request: HttpRequest) -> HttpResponseRedirect:
     return HttpResponseRedirect(target)
 
 
+def _back_to_referer(request: HttpRequest) -> HttpResponseRedirect:
+    """Back to the page the visitor came from: the Referer, only when it is a local address."""
+    target = request.headers.get("Referer", "")
+    if not url_has_allowed_host_and_scheme(
+        target, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        target = "/"
+    return HttpResponseRedirect(target)
+
+
 def _write(response: HttpResponse, value: garage.Garage) -> HttpResponse:
     if not value.vehicles or not services.anon_storage_enabled():  # off never writes the cookie
         response.delete_cookie(garage.COOKIE_NAME, samesite="Lax")
@@ -203,13 +213,15 @@ def merge_garage(request: HttpRequest) -> HttpResponse:
     """The sign-in notice's two buttons (spec 17 §17.4.3): `action=add` copies the staged vehicles
     into the account and clears the cookie; `action=dismiss` (*Not now*) only drops the notice.
     Both are explicit posts; nothing is ever merged without *Add*."""
-    response = _back(request)
+    response = _back_to_referer(request)
     user = request.user
     action = request.POST.get("action", "")
     if action not in {"add", "dismiss"}:
         return HttpResponse(status=400)
     if action == "dismiss":
         garage_merge.dismiss_pending(request)
+        return response
+    if not garage_merge.pending_count(request):  # nothing staged: a replayed or stale Add
         return response
     result = garage_merge.merge_pending(request, user, ctx=audit_context(request))  # type: ignore[arg-type]
     garage_merge.clear_cookie(response)

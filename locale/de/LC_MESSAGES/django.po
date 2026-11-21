@@ -3828,10 +3828,6 @@ msgstr "Vor- und Nachname"
 msgid "Gallery"
 msgstr "Galerie"
 
-#: themes/base/templates/components/garage_merge_notice.html
-msgid "Garage"
-msgstr "Garage"
-
 #: apps/manager/fitment_forms.py
 msgid "Garage noun"
 msgstr "Bezeichnung für die Garage"

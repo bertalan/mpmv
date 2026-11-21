@@ -50,7 +50,7 @@ def _save(client: Client, model: str) -> Any:
 
 
 def _menu(html: str) -> str:
-    match = re.search(r"<details class=\"user-menu garage-menu\".*?</details>", html, re.S)
+    match = re.search(r"<details class=\"garage-menu\".*?</details>", html, re.S)
     assert match, "the header carries no garage menu"
     return match.group(0)
 

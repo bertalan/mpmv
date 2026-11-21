@@ -1,5 +1,7 @@
 """FIT.7 (2/n): the sign-in merge notice and its two posts (spec 17 §17.4.3, FIT.6 case 8)."""
 
+import secrets
+
 import pytest
 from django.db import connection
 from django.template import Context
@@ -70,12 +72,15 @@ def test_the_notice_shows_after_sign_in_and_not_for_a_visitor(client: Client) ->
     assert reverse(MERGE) in html
     assert 'value="add"' in html
     assert 'value="dismiss"' in html
+    assert 'role="status"' in html
+    assert "<h2" not in html[html.index("data-garage-merge-notice") :].split("</section>")[0]
+    assert 'name="next"' not in html.split("data-garage-merge-notice")[1].split("</section>")[0]
 
 
 def test_not_now_merges_nothing_and_keeps_the_cookie(client: Client) -> None:
     user = UserFactory.create()
     _sign_in(client, user, "Roadster")
-    response = client.post(reverse(MERGE), {"action": "dismiss", "next": "/shop/"})
+    response = client.post(reverse(MERGE), {"action": "dismiss"}, headers={"Referer": "/shop/"})
     assert response.status_code == 302
     assert response["Location"] == "/shop/"
     assert not GarageProfile.objects.filter(user=user).exists()
@@ -86,7 +91,7 @@ def test_not_now_merges_nothing_and_keeps_the_cookie(client: Client) -> None:
 def test_add_merges_and_clears_the_cookie(client: Client) -> None:
     user = UserFactory.create()
     _sign_in(client, user, "Roadster", "Tourer")
-    response = client.post(reverse(MERGE), {"action": "add", "next": "/shop/"})
+    response = client.post(reverse(MERGE), {"action": "add"}, headers={"Referer": "/shop/"})
     assert response["Location"] == "/shop/"
     assert GarageProfile.objects.filter(user=user).count() == 2
     assert response.cookies[garage.COOKIE_NAME].value == ""  # cleared
@@ -109,8 +114,10 @@ def test_the_posts_are_explicit_and_safe(client: Client) -> None:
     _sign_in(client, user, "Roadster")
     assert client.get(reverse(MERGE)).status_code == 405
     assert client.post(reverse(MERGE), {"action": "nope"}).status_code == 400
-    response = client.post(reverse(MERGE), {"action": "dismiss", "next": "https://evil.example/"})
-    assert response["Location"] == "/"  # a foreign `next` is dropped
+    response = client.post(
+        reverse(MERGE), {"action": "dismiss"}, headers={"Referer": "https://evil.example/"}
+    )
+    assert response["Location"] == "/"  # a foreign Referer is dropped
     strict = Client(enforce_csrf_checks=True)
     strict.force_login(user)
     assert strict.post(reverse(MERGE), {"action": "add"}).status_code == 403
@@ -132,3 +139,49 @@ def test_the_notice_costs_no_query_for_a_visitor_and_one_session_read_signed_in(
         garage_merge_notice(Context({"request": request}))
         garage_merge_notice(Context({"request": request}))
     assert len(queries) <= 1
+
+
+def test_a_double_add_adds_once(client: Client) -> None:
+    user = UserFactory.create()
+    _sign_in(client, user, "Roadster", "Tourer")
+    client.post(reverse(MERGE), {"action": "add"})
+    client.cookies[garage.COOKIE_NAME] = _cookie("Roadster", "Tourer")  # a replay with the cookie
+    client.post(reverse(MERGE), {"action": "add"})
+    assert GarageProfile.objects.filter(user=user).count() == 2
+
+
+def test_add_after_not_now_merges_nothing(client: Client) -> None:
+    user = UserFactory.create()
+    _sign_in(client, user, "Roadster")
+    client.post(reverse(MERGE), {"action": "dismiss"})
+    client.post(reverse(MERGE), {"action": "add"})
+    assert not GarageProfile.objects.filter(user=user).exists()
+
+
+def test_the_notice_never_writes_the_page_url_and_skips_error_pages(client: Client) -> None:
+    user = UserFactory.create()
+    _sign_in(client, user, "Roadster")
+    secret = "tok-" + secrets.token_urlsafe(12)
+    html = client.get(f"/missing/{secret}/").content.decode()  # an error page
+    assert "data-garage-merge-notice" not in html
+    assert client.get("/", {"t": secret}).content.decode().count(secret) == 0
+    from apps.fitment.templatetags.garage_tags import garage_merge_notice
+
+    request = client.get("/").wsgi_request
+    assert garage_merge_notice(Context({"request": request, "exception": Exception()})) == {}
+
+
+def test_the_base_theme_renders_the_notice(client: Client) -> None:
+    from django.template.loader import render_to_string
+    from django.test import RequestFactory
+
+    from apps.themes.services import use_theme
+
+    request = RequestFactory().get("/shop/")
+    request.user = UserFactory.create()
+    request.session = {garage_merge.SESSION_KEY: {"vehicles": [{}], "active": None}}  # type: ignore[assignment]
+    with use_theme("base"):
+        html = render_to_string("components/garage_merge_notice.html", {}, request=request)
+    assert _sentence(1) in html
+    assert 'role="status"' in html
+    assert "/shop/" not in html
