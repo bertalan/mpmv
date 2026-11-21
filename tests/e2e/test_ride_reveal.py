@@ -107,14 +107,20 @@ def test_the_video_is_a_link_with_no_third_party_request_before_consent(
     open_ride(page, live_server, settings)
     opener = page.locator(f"{VIDEO} [data-bs-toggle=modal]")
     opener.focus()
+    page.evaluate(
+        """() => { window.__shown = new Promise((r) => document.querySelector(
+            "#sg-video-tour-modal").addEventListener("shown.bs.modal", r, {once: true})); }"""
+    )
     page.keyboard.press("Enter")
     modal = page.locator("#sg-video-tour-modal")
     expect(modal).to_be_visible()
+    page.evaluate("() => window.__shown")  # Bootstrap ignores a hide during the show transition
     expect(modal.locator("[data-video-gate]")).to_be_visible()
     expect(modal.locator("a[href*='cookie-settings']")).to_be_visible()
     assert modal.locator("iframe").count() == 0
     page.keyboard.press("Escape")
     expect(modal).to_be_hidden()
+    expect(modal).not_to_have_class(re.compile(r"\bshow\b"))
     expect(opener).to_be_focused()
     assert [url for url in foreign if "video.example" in url] == []
     violations = run_axe(page)
