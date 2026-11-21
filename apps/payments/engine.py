@@ -265,3 +265,29 @@ def validate_payment_request(request: PaymentRequest) -> list[str]:
     if not request.idempotency_key:
         problems.append("an idempotency key is required")
     return problems
+
+
+# PAY.4 (owner decision 2026-11-21): the nightly step for an open stray-capture alert.
+STRAY_AUTO_CLOSE_DAYS = 14
+STRAY_WAIT = "wait"
+STRAY_REMIND = "remind"
+STRAY_CLOSE = "close"
+
+
+def stray_alert_step(
+    *,
+    flagged_at: datetime,
+    now: datetime,
+    amount: Decimal,
+    refunded: Decimal | None,
+    reminded_today: bool,
+) -> str:
+    """What the nightly job does with an open stray-capture alert. Before 14 days: nothing. From
+    then on: close it when the provider confirms a refund of the whole payment amount (`refunded`
+    is None when the provider could not be read, which confirms nothing), else remind support,
+    at most once a day."""
+    if (now - flagged_at).days < STRAY_AUTO_CLOSE_DAYS:
+        return STRAY_WAIT
+    if refunded is not None and amount > 0 and refunded >= amount:
+        return STRAY_CLOSE
+    return STRAY_WAIT if reminded_today else STRAY_REMIND
