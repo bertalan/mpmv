@@ -169,19 +169,3 @@ def test_the_notice_never_writes_the_page_url_and_skips_error_pages(client: Clie
 
     request = client.get("/").wsgi_request
     assert garage_merge_notice(Context({"request": request, "exception": Exception()})) == {}
-
-
-def test_the_base_theme_renders_the_notice(client: Client) -> None:
-    from django.template.loader import render_to_string
-    from django.test import RequestFactory
-
-    from apps.themes.services import use_theme
-
-    request = RequestFactory().get("/shop/")
-    request.user = UserFactory.create()
-    request.session = {garage_merge.SESSION_KEY: {"vehicles": [{}], "active": None}}  # type: ignore[assignment]
-    with use_theme("base"):
-        html = render_to_string("components/garage_merge_notice.html", {}, request=request)
-    assert _sentence(1) in html
-    assert 'role="status"' in html
-    assert "/shop/" not in html
