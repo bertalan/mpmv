@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from apps.themes.models import BrandPalette
 from apps.themes.palettes import PRESETS, ROLES
 from apps.themes.services import registered_surfaces
+from apps.themes.tests.factories import BrandPaletteFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -57,3 +58,9 @@ def test_save_refuses_a_failing_palette_so_it_cannot_be_stored() -> None:
         row.save()
     assert BrandPalette.objects.count() == before
     assert not BrandPalette.objects.filter(slug="pale").exists()
+
+
+def test_the_factory_makes_valid_palettes_with_unique_slugs() -> None:
+    first, second = BrandPaletteFactory.create(), BrandPaletteFactory.create()
+    assert first.slug != second.slug
+    assert first.violations() == []
