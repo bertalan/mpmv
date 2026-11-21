@@ -10,9 +10,9 @@ from typing import Any
 from apps.core import tasks
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
-from apps.orders.services import flag_duplicate_payment, mark_order_paid
+from apps.orders.services import flag_duplicate_payment, mark_order_paid, stray_capture_reason
 
-from . import duplicates
+from . import duplicates, stray
 from .models import Payment
 from .signals import on_order_paid
 from .tasks import refund_duplicate_payment
@@ -40,3 +40,14 @@ def order_paid_on_payment(sender: type[Payment], payment: Payment, **kwargs: Any
     ):
         duplicates.flag_duplicate(payment, ctx=ctx)
         tasks.enqueue(refund_duplicate_payment, payment_id=payment.pk)
+        return
+    # PAY.4 (owner decision 2026-11-21): a capture on a cancelled order, or of another amount or
+    # currency, is not refunded automatically: staff are alerted and support refunds it by hand.
+    reason = stray_capture_reason(
+        payment.order_ref,
+        amount=payment.amount,
+        currency=payment.currency,
+        provider_ref=payment.provider_ref,
+    )
+    if reason:
+        stray.flag_stray_capture(payment, reason=reason, ctx=ctx)
