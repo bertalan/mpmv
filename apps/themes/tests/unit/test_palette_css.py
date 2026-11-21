@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from apps.themes.build import read_tokens
-from apps.themes.engine import resolve_tokens
+from apps.themes.engine import CSS_LAYERS, resolve_tokens
 from apps.themes.palettes import PRESETS, ROLES, css_digest, render_palette_css
 
 THEMES = Path(__file__).resolve().parents[4] / "themes"
@@ -24,8 +24,9 @@ def test_the_ride_default_is_red_so_the_red_palette_changes_nothing() -> None:
 
 def test_blue_overrides_the_palette_tokens_and_the_tokens_derived_from_them() -> None:
     css = render_palette_css(CHAIN, TOKENS, roles("blue"))
-    assert css.startswith(":root{")
-    assert "@layer" not in css  # unlayered: it beats the theme
+    assert css.startswith("@layer overrides{:root{")
+    assert css.rstrip().endswith("}}")
+    assert CSS_LAYERS.index("overrides") > CSS_LAYERS.index("tokens")  # so it wins the cascade
     assert "--color-accent:#046BD2" in css
     assert "--color-link:#046BD2" in css
     assert "--button-bg:#046BD2" in css  # `button.bg = "{color.accent}"` follows the palette

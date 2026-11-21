@@ -16,10 +16,10 @@ from typing import Any
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import (
-    Http404,
     HttpRequest,
     HttpResponse,
     HttpResponseBadRequest,
+    HttpResponseNotFound,
     HttpResponseServerError,
 )
 from django.shortcuts import render
@@ -27,6 +27,7 @@ from django.template import loader
 from django.views.decorators.cache import never_cache
 
 from .models import BrandPalette
+from .palettes import ROLES
 from .services import get_registry, palette_stylesheet, resolved_theme, use_theme
 from .styleguide import (
     sample_breadcrumbs,
@@ -106,15 +107,20 @@ def styleguide(request: HttpRequest) -> HttpResponse:
 def palette_css(request: HttpRequest, theme: str, palette: str, digest: str) -> HttpResponse:
     """The stylesheet of a palette on a theme. The URL holds the content digest, so a matching
     one is cached for a year; a stale digest (the palette changed since the page was built)
-    still gets the current CSS, but is not cached."""
-    row = BrandPalette.objects.filter(slug=palette).first()
-    if theme not in get_registry() or row is None or row.violations():
-        raise Http404("No such palette")
+    still gets the current CSS, with a short max-age so digest cycling cannot hammer the origin.
+
+    The theme is checked against the registry before any query, and a miss is a bare 404 (no
+    error page, so no site or menu queries for a probe)."""
+    if theme not in get_registry():
+        return HttpResponseNotFound()
+    row = BrandPalette.objects.filter(slug=palette).only("slug", *ROLES).first()
+    if row is None or row.violations():
+        return HttpResponseNotFound()
     css, current = palette_stylesheet(theme, row)
     if not css:
-        raise Http404("No such palette")
+        return HttpResponseNotFound()
     response = HttpResponse(css, content_type="text/css; charset=utf-8")
     response["Cache-Control"] = (
-        "public, max-age=31536000, immutable" if digest == current else "no-cache"
+        "public, max-age=31536000, immutable" if digest == current else "public, max-age=60"
     )
     return response

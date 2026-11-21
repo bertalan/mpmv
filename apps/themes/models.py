@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.contrib.settings.models import BaseSiteSetting
 from wagtail.models import Site
 
-from .palettes import ROLES, check_brand_palette
+from .palettes import ROLES
 
 
 class ThemeSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untyped
@@ -44,7 +44,7 @@ class ThemeSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untype
         "BrandPalette",
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         related_name="+",
         help_text=_(
             "The colour palette of the whole site. Leave it empty for the theme's own colours"
@@ -109,9 +109,9 @@ class BrandPalette(models.Model):
 
     def violations(self) -> list[str]:
         """Failing pairs against the surface of every registered theme (empty when valid)."""
-        from .services import registered_surfaces  # models are imported before the registry
+        from .services import palette_violations  # models are imported before the registry
 
-        return [str(v) for v in check_brand_palette(self.roles(), registered_surfaces())]
+        return list(palette_violations(tuple(sorted(self.roles().items()))))
 
     def clean(self) -> None:
         problems = self.violations()

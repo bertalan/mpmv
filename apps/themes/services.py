@@ -35,7 +35,7 @@ from .engine import (
     resolve_tokens,
 )
 from .models import BrandPalette, ThemeSettings
-from .palettes import css_digest, render_palette_css
+from .palettes import check_brand_palette, css_digest, render_palette_css
 
 THEME_SETTINGS_MODEL = "themes.themesettings"
 THEME_CONFIGURED = "themes.theme_settings.configured"
@@ -71,6 +71,7 @@ def theme_tokens(root: Path) -> dict[str, dict[str, str]]:
     return {slug: read_tokens(root / slug) for slug in load_registry(root).manifests}
 
 
+@functools.lru_cache(maxsize=1)
 def registered_surfaces() -> tuple[str, ...]:
     """The resolved `color.surface` of every registered theme, which a palette must also pass."""
     registry = get_registry()
@@ -82,11 +83,20 @@ def registered_surfaces() -> tuple[str, ...]:
     return tuple(sorted(s for s in surfaces if s))
 
 
+@functools.lru_cache(maxsize=64)
+def palette_violations(roles: tuple[tuple[str, str], ...]) -> tuple[str, ...]:
+    """Failing pairs of a palette against the registered themes (pure on its inputs, so cached
+    per palette until `clear_caches`; a page render does not recompute it)."""
+    return tuple(str(v) for v in check_brand_palette(dict(roles), registered_surfaces()))
+
+
 def clear_caches() -> None:
     """Forget the manifests read from disk (tests, settings changes)."""
     load_registry.cache_clear()
     theme_tokens.cache_clear()
     palette_asset.cache_clear()
+    registered_surfaces.cache_clear()
+    palette_violations.cache_clear()
 
 
 def default_theme() -> str:

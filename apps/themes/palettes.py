@@ -194,9 +194,10 @@ def render_palette_css(
 
     The palette is resolved as one more theme on top of the chain, so a token derived from a
     palette token (`button.bg = "{color.accent}"`) follows it. Only the custom properties that
-    change are written, in one unlayered `:root` rule that beats the theme's `@layer` rules; with
-    `bootstrap` the `--bs-*` variables of the Bootstrap map change too. Empty when the palette
-    changes nothing (a theme already in that palette).
+    change are written, in one `@layer overrides{:root{...}}` rule (the last layer, so it beats
+    the theme's tokens); with `bootstrap` the
+    `--bs-*` variables of the Bootstrap map change too. Empty when the palette changes
+    nothing (a theme already in that palette).
     """
     layered = {**tokens_by_theme, PALETTE_LAYER: palette_tokens(palette)}
     before = resolve_tokens(chain, tokens_by_theme)
@@ -211,7 +212,7 @@ def render_palette_css(
     if not changed:
         return ""
     body = ";".join(f"{name}:{changed[name]}" for name in sorted(changed))
-    return minify_css(f":root{{{body}}}") + "\n"
+    return minify_css(f"@layer overrides{{:root{{{body}}}}}") + "\n"
 
 
 def css_digest(css: str) -> str:
