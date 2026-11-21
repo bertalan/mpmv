@@ -10,6 +10,7 @@ from apps.accounts.models import User
 from apps.catalog.models import Attribute, AttributeValue
 from apps.catalog.tests.factories import clothing_attributes
 from apps.core.i18n import primary_language
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -55,18 +56,19 @@ def test_staff_add_an_attribute_with_names_and_values(staff_client: Client) -> N
 
 
 def test_staff_translate_a_value(staff_client: Client) -> None:
-    red = clothing_attributes()["color"].values.get(value="red")
+    # A size has a label in the primary language only: the second language is the new row.
+    small = clothing_attributes()["size"].values.get(value="s")
     data = {
-        "attribute": str(red.attribute_id),
-        "value": "red",
+        "attribute": str(small.attribute_id),
+        "value": "s",
         "position": "0",
     }
-    # Keep the existing EN and IT rows: post them as initial forms.
-    existing = list(red.translations.order_by("language"))
+    # Keep the existing rows: post them as initial forms.
+    existing = list(small.translations.order_by("language"))
     rows = [
         {
             "id": str(row.pk),
-            "value": str(red.pk),
+            "value": str(small.pk),
             "language": row.language,
             "label": row.label,
             "status": row.status,
@@ -74,13 +76,18 @@ def test_staff_translate_a_value(staff_client: Client) -> None:
         for row in existing
     ]
     data.update(
-        _formset("translations", [*rows, {"language": "de", "label": "Rot", "status": "published"}])
+        _formset(
+            "translations",
+            [*rows, {"language": other_language(), "label": "Klein", "status": "published"}],
+        )
     )
     data["translations-INITIAL_FORMS"] = str(len(existing))
-    url = reverse("admin:catalog_attributevalue_change", args=[red.pk])
+    url = reverse("admin:catalog_attributevalue_change", args=[small.pk])
     response = staff_client.post(url, data)
     assert response.status_code == 302, response.content.decode()[:2000]
-    assert AttributeValue.objects.get(pk=red.pk).translation("de").translation.label == "Rot"  # type: ignore[union-attr]
+    row = AttributeValue.objects.get(pk=small.pk).translation(other_language()).translation
+    assert row is not None
+    assert row.label == "Klein"
 
 
 def test_the_attribute_admin_pages_load(staff_client: Client) -> None:
