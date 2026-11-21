@@ -1741,6 +1741,15 @@ class SalesTermsVersion(BaseModel):
         editable=False,
         help_text=_("A fingerprint (SHA-256) of this version, to prove later it was not changed."),
     )
+    vendor_name = models.CharField(
+        max_length=150,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "The shop name when this version was published, so an old version keeps the name it "
+            "was published under. Empty on versions published before it was recorded."
+        ),
+    )
 
     class Meta:
         ordering = ["vendor_id", "-number"]
@@ -1776,7 +1785,13 @@ class SalesTermsVersion(BaseModel):
             "delivery_days": self.delivery_days,
             "return_cost_bearer": self.return_cost_bearer,
             "content_hash": self.content_hash,
+            "vendor_name": self.vendor_name,
         }
+
+    @property
+    def public_name(self) -> str:
+        """The shop name this version was published under (the current one for older rows)."""
+        return self.vendor_name or self.vendor.display_name
 
 
 class SalesTermsInForce(BaseModel):
