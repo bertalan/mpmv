@@ -160,3 +160,24 @@ def test_a_counter_already_on_screen_shows_its_final_value_at_once(
     assert text.text_content() == "1,250"
     page.wait_for_timeout(300)
     assert text.text_content() == "1,250"
+
+
+def test_the_animated_counter_ends_on_the_server_rendered_text(
+    page: Page, live_server: LiveServer, settings: SettingsWrapper
+) -> None:
+    """THM.9: the final value keeps the server's localised format (any MPMV_LANGUAGES)."""
+    settings.MPMV_THEME_DEFAULT = "ride"
+    page.emulate_media(reduced_motion="no-preference")
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    page.route("**/reveal.js*", lambda route: route.abort())
+    page.reload()
+    server_text = page.locator(COUNTER).first.locator("[data-counter-text]").text_content()
+    assert server_text
+    page.unroute("**/reveal.js*")
+    page.reload()
+    counter = page.locator(COUNTER).first
+    counter.scroll_into_view_if_needed()
+    expect(counter.locator("[data-counter-text]")).to_have_text(server_text, timeout=4000)
+    page.wait_for_timeout(1500)
+    assert counter.locator("[data-counter-text]").text_content() == server_text

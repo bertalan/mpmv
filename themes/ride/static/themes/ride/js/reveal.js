@@ -10,11 +10,14 @@ function countUp(box) {
   const text = box.querySelector("[data-counter-text]");
   const end = Number.parseInt(box.dataset.counter, 10);
   if (still || !text || !Number.isFinite(end)) return;
+  // The server renders the localised final value; the animation only counts toward it and
+  // ends on that exact text, so the format never changes when the animation stops.
+  const final = text.textContent;
   const format = new Intl.NumberFormat(language);
   const start = performance.now();
   const step = (now) => {
     const t = Math.min((now - start) / 1200, 1);
-    text.textContent = format.format(Math.round(end * (1 - (1 - t) ** 3)));
+    text.textContent = t < 1 ? format.format(Math.round(end * (1 - (1 - t) ** 3))) : final;
     if (t < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
