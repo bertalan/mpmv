@@ -20,6 +20,8 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
+from apps.cms.seed import PageText, seed_text
+from apps.core.i18n import primary_language
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import admin_login
 
@@ -107,10 +109,11 @@ def assert_target_size(stops: list[dict[str, Any]]) -> None:
             assert stop["height"] >= 24, size
 
 
-@pytest.mark.parametrize("path", ["/", "/about/"])
+@pytest.mark.parametrize("about", [False, True], ids=["home", "about"])
 def test_keyboard_reaches_every_control_with_a_visible_focus(
-    page: Page, live_server: LiveServer, shot: Callable[[str], Path], path: str
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path], about: bool
 ) -> None:
+    path = f"/{_about().slug}/" if about else "/"
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     page.goto(f"{live_server.url}{path}")
     expect(page.locator("html")).to_have_attribute("data-theme", "base")
@@ -150,6 +153,11 @@ def test_keyboard_reaches_every_control_on_the_sign_in_page(
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
 
 
+def _about() -> PageText:
+    """The seeded About page of the primary language (title and slug)."""
+    return seed_text(primary_language()).about
+
+
 def test_the_narrow_menu_is_a_keyboard_disclosure(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
@@ -157,7 +165,7 @@ def test_the_narrow_menu_is_a_keyboard_disclosure(
     page.set_viewport_size({"width": 375, "height": 800})
     page.goto(f"{live_server.url}/")
     menu = page.locator("button[aria-controls='site-nav']")
-    about = page.locator("#site-nav").get_by_role("link", name="About us")
+    about = page.locator("#site-nav").get_by_role("link", name=_about().title)
     expect(menu).to_be_visible()
     expect(menu).to_have_attribute("aria-expanded", "false")
     expect(about).to_be_hidden()
@@ -189,7 +197,7 @@ def test_without_javascript_the_navigation_links_are_shown(
     page = context.new_page()
     page.goto(f"{live_server.url}/")
     expect(page.locator("button[aria-controls='site-nav']")).to_be_hidden()
-    expect(page.locator("#site-nav").get_by_role("link", name="About us")).to_be_visible()
+    expect(page.locator("#site-nav").get_by_role("link", name=_about().title)).to_be_visible()
     context.close()
 
 
