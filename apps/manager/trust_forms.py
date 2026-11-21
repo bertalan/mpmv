@@ -8,6 +8,7 @@ from typing import Any
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
+from apps.core.nfc_forms import NFCForm
 from apps.trust.engine import TrustRulesData
 
 from .trust_views import GROUPS
@@ -33,7 +34,7 @@ class TiersField(forms.CharField):
             ) from None
 
 
-class TrustRulesForm(forms.Form):
+class TrustRulesForm(NFCForm):
     valid_from = forms.DateTimeField(
         label=_("Valid from"),
         widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),

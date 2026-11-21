@@ -88,6 +88,10 @@ class NFCFormMixin:
                 cleaned[name] = nfc_stream_value(value)  # StreamField text blocks, one hook
 
 
+class NFCForm(NFCFormMixin, forms.Form):
+    """A plain form (for example a Manager staff form) that stores its text in NFC."""
+
+
 class NFCAdminForm[M: Model](NFCFormMixin, forms.ModelForm[M]):
     """The Django admin model form (a `ModelAdmin.form`) that stores its text in NFC."""
 
