@@ -151,7 +151,12 @@ def test_the_gallery_has_thumbnail_buttons_and_keeps_the_zoom_dialog() -> None:
 
 def test_a_gallery_without_images_keeps_the_placeholder() -> None:
     html = render("gallery", id="g", label="Images", images=None)
-    assert 'class="gallery__placeholder"' in html
+    # THM.19: the decorative product placeholder in the same square box as a real image.
+    img = re.search(r"<img[^>]*ride-gallery__placeholder[^>]*>", html)
+    assert img, html
+    assert 'alt=""' in img.group(0)
+    assert "ride-gallery__image" in img.group(0)
+    assert "themes/ride/images/product-placeholder.svg" in img.group(0)
     assert "carousel-item" not in html
 
 
