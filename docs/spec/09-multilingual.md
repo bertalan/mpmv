@@ -49,9 +49,12 @@ Rules:
 - **Explicit fallback**: except for events (below), if the published translation is missing, the primary language (the first of `MPMV_LANGUAGES`, EN by default; I18N.15) is shown with a notice (the default and LIVE primary language is English), and the
   page is not included in that language's sitemap (never empty or duplicate content indexed).
   A fallback copy declares the EN page as its canonical URL (no `noindex`, so the two signals never
-  conflict), and `hreflang` lists only the languages that have a published translation. At go-live
-  this applies to all visitor content in DE, FR and ES, and to new visitor content in IT: a
+  conflict), and `hreflang` lists only the languages that have a published translation.
+  At go-live this applies to all visitor content in DE, FR and ES, and to new visitor content in IT: a
   migrated page with its IT translation lists EN and IT in `hreflang`, a new page lists EN only.
+  **Language switch (owner decision 2026-11-21, THM.35):** switching language on an object with
+  no translation keeps the visitor on the same page under the new prefix, showing this fallback
+  with a one-line notice; it no longer leads to that language's home as I18N.11 first specified.
 - Images (D-18): an image is language neutral by default. An image can optionally be dedicated to
   one language (for example packaging printed in German). Replacement rule: when a product, or a CMS
   gallery, has at least one image dedicated to the requested language, that language shows only its
