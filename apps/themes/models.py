@@ -1,5 +1,7 @@
 """The theme of each Wagtail Site (spec 14 §14.3, Selection)."""
 
+from typing import Any
+
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
@@ -7,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.contrib.settings.models import BaseSiteSetting
 from wagtail.models import Site
 
-from .palettes import ROLES, check_brand_palette
+from .palettes import ROLES
 
 
 class ThemeSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untyped
@@ -42,7 +44,7 @@ class ThemeSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untype
         "BrandPalette",
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         related_name="+",
         help_text=_(
             "The colour palette of the whole site. Leave it empty for the theme's own colours"
@@ -97,14 +99,19 @@ class BrandPalette(models.Model):
     def __str__(self) -> str:
         return self.name
 
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """A palette that fails validation is never stored, whatever the caller."""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def roles(self) -> dict[str, str]:
         return {role: getattr(self, role) for role in ROLES}
 
     def violations(self) -> list[str]:
         """Failing pairs against the surface of every registered theme (empty when valid)."""
-        from .services import registered_surfaces  # models are imported before the registry
+        from .services import palette_violations  # models are imported before the registry
 
-        return [str(v) for v in check_brand_palette(self.roles(), registered_surfaces())]
+        return list(palette_violations(tuple(sorted(self.roles().items()))))
 
     def clean(self) -> None:
         problems = self.violations()

@@ -5,7 +5,11 @@ registered theme (spec 14 §14.12)."""
 from pathlib import Path
 
 import pytest
+from django.db import connection
+from django.db.models import ProtectedError
 from django.test import Client, RequestFactory
+from django.test.utils import CaptureQueriesContext
+from django.urls import Resolver404, resolve
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.core.audit import AuditContext
@@ -16,6 +20,7 @@ from apps.themes.services import (
     active_palette,
     clear_caches,
     palette_href,
+    palette_violations,
     set_site_theme,
 )
 from apps.themes.tests.builders import write_theme
@@ -85,7 +90,7 @@ def test_a_stale_digest_gets_the_current_css_without_a_long_cache(
     set_site_theme(site, "ride", palette=BrandPalette.objects.get(slug="blue"), ctx=CTX)
     response = client.get("/palette/ride/blue.000000000000.css", HTTP_HOST=site.hostname)
     assert response.status_code == 200
-    assert response["Cache-Control"] == "no-cache"
+    assert response["Cache-Control"] == "public, max-age=60"
     for path in ("ride/nope", "ghost/blue"):
         missing = client.get(f"/palette/{path}.000000000000.css", HTTP_HOST=site.hostname)
         assert missing.status_code == 404
@@ -136,3 +141,66 @@ def test_a_stored_palette_that_fails_a_newly_registered_theme_is_not_applied(
     assert [w.id for w in warnings] == ["themes.W006"]
     assert "'red'" in warnings[0].msg
     assert site.hostname in warnings[0].msg
+
+
+def test_the_palette_css_is_layered_and_the_page_gains_no_inline_style(
+    client: Client, ride: None
+) -> None:
+    site = SiteFactory.create()
+    set_site_theme(site, "ride", palette=BrandPalette.objects.get(slug="blue"), ctx=CTX)
+    html = page(client, site.hostname)
+    href = "/palette/" + html.split(LINK)[1].split('"')[0]
+    css = client.get(href, HTTP_HOST=site.hostname).content.decode()
+    assert css.startswith("@layer overrides{:root{")
+    assert "<style" not in html
+    assert " style=" not in html
+
+
+def test_an_unknown_theme_is_a_404_before_any_palette_query(client: Client, ride: None) -> None:
+    site = SiteFactory.create()
+    with CaptureQueriesContext(connection) as captured:
+        response = client.get("/palette/ghost/blue.000000000000.css", HTTP_HOST=site.hostname)
+    assert response.status_code == 404
+    assert not [q for q in captured if "themes_brandpalette" in q["sql"]]
+
+
+def test_an_unknown_palette_is_a_404(client: Client, ride: None) -> None:
+    site = SiteFactory.create()
+    response = client.get("/palette/ride/nope.000000000000.css", HTTP_HOST=site.hostname)
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize("digest", ["short", "ZZZZZZZZZZZZ", "0000000000000", "00000000000g"])
+def test_a_malformed_digest_does_not_reach_the_view(
+    client: Client, ride: None, digest: str
+) -> None:
+    site = SiteFactory.create()
+    response = client.get(f"/palette/ride/blue.{digest}.css", HTTP_HOST=site.hostname)
+    assert response.status_code == 404
+    assert resolve_url_matches(f"/palette/ride/blue.{digest}.css") is False
+
+
+def resolve_url_matches(path: str) -> bool:
+    try:
+        resolve(path)
+    except Resolver404:
+        return False
+    return True
+
+
+def test_a_palette_in_use_cannot_be_deleted(ride: None) -> None:
+    site = SiteFactory.create()
+    blue = BrandPalette.objects.get(slug="blue")
+    set_site_theme(site, "ride", palette=blue, ctx=CTX)
+    with pytest.raises(ProtectedError):
+        blue.delete()
+    assert BrandPalette.objects.filter(slug="blue").exists()
+
+
+def test_the_violations_are_computed_once_per_palette(ride: None) -> None:
+    blue = BrandPalette.objects.get(slug="blue")
+    palette_violations.cache_clear()
+    assert blue.violations() == []
+    assert blue.violations() == []
+    info = palette_violations.cache_info()
+    assert (info.hits, info.misses) == (1, 1)

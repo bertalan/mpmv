@@ -7,6 +7,7 @@ spec 14 §14.4 through `ROLE_TOKENS`. The primary is also the link colour.
 """
 
 import hashlib
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
@@ -131,6 +132,10 @@ def _pairs(
     return pairs
 
 
+# Exactly #RRGGBB, either case: no shorthand, no trailing newline, nothing else.
+_ROLE_HEX_RE = re.compile(r"#[0-9a-fA-F]{6}")
+
+
 def check_brand_palette(
     palette: Mapping[str, str], surfaces: Iterable[str] = ()
 ) -> list[PaletteViolation]:
@@ -143,6 +148,11 @@ def check_brand_palette(
     for role in ROLES:
         if role not in palette:
             violations.append(PaletteViolation("missing", role, "required role"))
+            continue
+        if not isinstance(palette[role], str) or not _ROLE_HEX_RE.fullmatch(palette[role]):
+            violations.append(
+                PaletteViolation("invalid", role, f"{palette[role]!r} is not a #RRGGBB colour")
+            )
             continue
         try:
             contrast_ratio(palette[role], LIGHT_SURFACE)
@@ -199,9 +209,10 @@ def render_palette_css(
 
     The palette is resolved as one more theme on top of the chain, so a token derived from a
     palette token (`button.bg = "{color.accent}"`) follows it. Only the custom properties that
-    change are written, in one unlayered `:root` rule that beats the theme's `@layer` rules; with
-    `bootstrap` the `--bs-*` variables of the Bootstrap map change too. Empty when the palette
-    changes nothing (a theme already in that palette).
+    change are written, in one `@layer overrides{:root{...}}` rule (the last layer, so it beats
+    the theme's tokens); with `bootstrap` the
+    `--bs-*` variables of the Bootstrap map change too. Empty when the palette changes
+    nothing (a theme already in that palette).
     """
     before = resolve_tokens(chain, tokens_by_theme)
     after = resolve_with_palette(chain, tokens_by_theme, palette)
@@ -215,7 +226,7 @@ def render_palette_css(
     if not changed:
         return ""
     body = ";".join(f"{name}:{changed[name]}" for name in sorted(changed))
-    return minify_css(f":root{{{body}}}") + "\n"
+    return minify_css(f"@layer overrides{{:root{{{body}}}}}") + "\n"
 
 
 def css_digest(css: str) -> str:
