@@ -45,3 +45,15 @@ def test_a_colour_that_is_not_hex_is_refused() -> None:
     with pytest.raises(ValidationError) as caught:
         row.full_clean()
     assert "primary" in caught.value.message_dict
+
+
+def test_save_refuses_a_failing_palette_so_it_cannot_be_stored() -> None:
+    before = BrandPalette.objects.count()
+    row = BrandPalette.objects.get(slug="red")
+    row.pk = None
+    row.slug = "pale"
+    row.primary = "#FF6B6B"
+    with pytest.raises(ValidationError):
+        row.save()
+    assert BrandPalette.objects.count() == before
+    assert not BrandPalette.objects.filter(slug="pale").exists()

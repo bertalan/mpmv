@@ -6,6 +6,7 @@ A palette is a mapping of role name to `#rrggbb`. Roles map to the token contrac
 spec 14 §14.4 through `ROLE_TOKENS`. The primary is also the link colour.
 """
 
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
@@ -128,6 +129,10 @@ def _pairs(
     return pairs
 
 
+# Exactly #RRGGBB, either case: no shorthand, no trailing newline, nothing else.
+_ROLE_HEX_RE = re.compile(r"#[0-9a-fA-F]{6}")
+
+
 def check_brand_palette(
     palette: Mapping[str, str], surfaces: Iterable[str] = ()
 ) -> list[PaletteViolation]:
@@ -140,6 +145,11 @@ def check_brand_palette(
     for role in ROLES:
         if role not in palette:
             violations.append(PaletteViolation("missing", role, "required role"))
+            continue
+        if not isinstance(palette[role], str) or not _ROLE_HEX_RE.fullmatch(palette[role]):
+            violations.append(
+                PaletteViolation("invalid", role, f"{palette[role]!r} is not a #RRGGBB colour")
+            )
             continue
         try:
             contrast_ratio(palette[role], LIGHT_SURFACE)

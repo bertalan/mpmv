@@ -89,3 +89,16 @@ def test_palette_tokens_cover_every_role_and_set_the_link() -> None:
     tokens = palette_tokens(roles("blue"))
     assert set(ROLE_TOKENS.values()) <= set(tokens)
     assert tokens["color.link"] == tokens["color.accent"] == "#046BD2"
+
+
+@pytest.mark.parametrize(
+    "bad", ["#abc", "#C40417\n", "\n#C40417", "#C40417 ", "C40417", "#C4041", "#C404177"]
+)
+def test_a_role_must_be_exactly_six_hex_digits(bad: str) -> None:
+    problems = check_brand_palette(roles("red") | {"primary": bad})
+    assert [(v.kind, v.pair) for v in problems] == [("invalid", "primary")]
+
+
+def test_hex_case_is_free_for_a_role() -> None:
+    lower = {role: value.lower() for role, value in roles("red").items()}
+    assert check_brand_palette(lower) == []
