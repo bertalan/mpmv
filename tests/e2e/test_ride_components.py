@@ -15,6 +15,7 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.models import HomePage
+from apps.core.i18n import primary_language
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.test_consent_banner import consent_script_ready
@@ -31,7 +32,7 @@ STRIP = "#strip-1"
 
 @pytest.fixture
 def _components_home(live_server: LiveServer, _cms_site: None) -> None:
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     home.body = [
         (
             "strip",

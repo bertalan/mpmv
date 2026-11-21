@@ -10,21 +10,45 @@ import re
 from typing import Any
 
 import pytest
+from django.conf import settings as django_settings
+from django.utils import translation
 from playwright.sync_api import Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
+from apps.catalog import slugs
 from apps.catalog.models import Product
+from apps.catalog.taxonomy import TaxonomyTranslation, TermTranslation
+from apps.core.i18n import primary_language
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.test_add_to_cart import product  # noqa: F401 (fixture)
 from tests.e2e.test_catalog_listings import term_page  # noqa: F401 (fixture)
-from tests.i18n import translated
+from tests.i18n import localized, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
 SEARCH = "a[data-bs-target='#search-modal']"
 CART = "a[data-bs-target='#mini-cart-offcanvas']"
+PRODUCT = "/product/blue-vase/"
+
+
+def ride_paths() -> dict[str, str]:
+    """The home, the `term_page` listing and the `product` page, in the primary language."""
+    language = primary_language()
+    taxonomy = TaxonomyTranslation.objects.get(taxonomy__code="compat", language=language)
+    term = TermTranslation.objects.get(term__taxonomy__code="compat", language=language)
+    listing = slugs.term_path(
+        language, taxonomy.slug, [term.slug], default_language=django_settings.LANGUAGE_CODE
+    )
+    return {"home": "/", "listing": listing, "product": localized(PRODUCT)}
+
+
+def items(count: int) -> str:
+    """The cart count in words ("2 items"), in the primary language."""
+    with translation.override(primary_language()):
+        label = translation.ngettext("%(counter)s item", "%(counter)s items", count)
+    return label % {"counter": count}
 
 
 @pytest.fixture(autouse=True)
@@ -72,7 +96,7 @@ def test_the_gates_pass_on_ride_pages_at_every_width(
     term_page: None,  # noqa: F811
     product: Product,  # noqa: F811
 ) -> None:
-    path = {"home": "/", "listing": "/compatibility/maker/", "product": "/product/blue-vase/"}
+    path = ride_paths()
     open_page(page, live_server, path[where], width)
     expect(page.locator("html")).to_have_attribute("data-theme", "ride")
     expect(page.locator(SEARCH)).to_be_visible()
@@ -127,7 +151,7 @@ def test_the_mini_cart_opens_traps_focus_and_returns_it_on_escape(
     live_server: LiveServer,
     product: Product,  # noqa: F811
 ) -> None:
-    open_page(page, live_server, "/product/blue-vase/", 1280)
+    open_page(page, live_server, localized(PRODUCT), 1280)
     trigger = page.locator(CART)
     panel = page.locator("#mini-cart-offcanvas")
     expect(panel).to_be_hidden()
@@ -148,7 +172,7 @@ def test_adding_a_product_updates_the_count_and_the_mini_cart_without_a_reload(
     live_server: LiveServer,
     product: Product,  # noqa: F811
 ) -> None:
-    open_page(page, live_server, "/product/blue-vase/", 1280)
+    open_page(page, live_server, localized(PRODUCT), 1280)
     page.evaluate("() => { window.__same_page = true; }")
     count = page.locator("#cart-count")
     expect(count).to_have_attribute("aria-live", "polite")
@@ -156,7 +180,7 @@ def test_adding_a_product_updates_the_count_and_the_mini_cart_without_a_reload(
     page.locator("#product-quantity").fill("2")
     page.get_by_role("button", name=translated("Add to cart")).click()
     expect(page.locator("#add-to-cart-result")).to_contain_text(translated("Added to your cart."))
-    expect(count).to_have_text("2 items")
+    expect(count).to_have_text(items(2))
     expect(page.locator("#cart-badge")).to_have_text("2")
     assert page.evaluate("() => window.__same_page === true")  # no reload
     page.locator(CART).focus()
@@ -180,9 +204,9 @@ def test_the_count_survives_a_new_page(
     product: Product,  # noqa: F811
     settings: Any,
 ) -> None:
-    open_page(page, live_server, "/product/blue-vase/", 1280)
+    open_page(page, live_server, localized(PRODUCT), 1280)
     page.get_by_role("button", name=translated("Add to cart")).click()
     expect(page.locator("#cart-badge")).to_have_text("1")
     page.goto(f"{live_server.url}/")
     expect(page.locator("#cart-badge")).to_have_text("1")
-    expect(page.locator("#cart-count")).to_have_text("1 item")
+    expect(page.locator("#cart-count")).to_have_text(items(1))

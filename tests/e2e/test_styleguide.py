@@ -58,8 +58,10 @@ def test_staff_see_every_component_without_a_csp_violation(
     open_styleguide(page, live_server)
     expect(page.locator("html")).to_have_attribute("data-theme", "base")
     for section in SECTIONS:
-        expect(page.get_by_role("heading", name=section, exact=True)).to_be_visible()
-    expect(page.get_by_role("button", name=translated("Close"), exact=True)).to_be_visible()
+        expect(page.get_by_role("heading", name=translated(section), exact=True)).to_be_visible()
+    # The icon button of the Buttons section: other languages may call "Dismiss" "Close" too.
+    buttons = page.get_by_role("region", name=translated("Buttons"), exact=True)
+    expect(buttons.get_by_role("button", name=translated("Close"), exact=True)).to_be_visible()
     expect(page.locator(".error-summary a").first).to_be_visible()
     shot("desktop")
 
@@ -117,7 +119,7 @@ def test_cards_tiles_badges_and_alerts_render_without_a_csp_violation(
     page.evaluate("() => [...document.images].forEach((img) => { img.loading = 'eager'; })")
     page.wait_for_function(IMAGES_LOADED, timeout=5000)
     for kind in ("Sale", "New", "Out of stock", "On request"):
-        expect(page.locator(".badge", has_text=kind).first).to_be_visible()
+        expect(page.locator(".badge", has_text=translated(kind)).first).to_be_visible()
     expect(page.get_by_role("status").first).to_be_attached()
     page.locator("#sg-tiles").scroll_into_view_if_needed()
     shot("components-desktop")
@@ -221,7 +223,7 @@ def test_a_busy_button_neither_clicks_nor_submits(page: Page, live_server: LiveS
     page.wait_for_timeout(300)
     assert page.url == url
     assert "submitted" not in page.url
-    icon = form.get_by_role("button", name="Refresh, Refreshing")
+    icon = form.get_by_role("button", name=f"{translated('Refresh')}, {translated('Refreshing')}")
     expect(icon).to_be_visible()
     icon.click(force=True)
     page.wait_for_timeout(300)
@@ -237,7 +239,7 @@ def test_navigation_components_render_without_a_csp_violation(
     page.set_viewport_size({"width": 1280, "height": 900})
     open_styleguide(page, live_server)
     for section in ("Page frame", "Breadcrumbs", "Pagination", "Tabs", "In-page navigation"):
-        expect(page.get_by_role("heading", name=section, exact=True)).to_be_visible()
+        expect(page.get_by_role("heading", name=translated(section), exact=True)).to_be_visible()
     breadcrumb = page.get_by_role("navigation", name=translated("Breadcrumb")).first
     expect(breadcrumb.locator('[aria-current="page"]')).to_be_visible()
     # Alpine turned the tabs on: the list shows and the no-script headings are gone.
@@ -362,11 +364,11 @@ def test_the_whole_library_renders_without_a_csp_violation(
     page.set_viewport_size({"width": 1280, "height": 900})
     open_styleguide(page, live_server)
     for section in LIBRARY_SECTIONS:
-        heading = page.get_by_role("heading", name=section, exact=True)
+        heading = page.get_by_role("heading", name=translated(section), exact=True)
         heading.scroll_into_view_if_needed()
         expect(heading).to_be_visible()
     # base.js revealed the script-only controls.
-    expect(page.get_by_role("button", name="Open the size guide")).to_be_visible()
+    expect(page.get_by_role("button", name=translated("Open the size guide"))).to_be_visible()
     expect(page.get_by_role("button", name=translated("Next items"))).to_be_visible()
     expect(page.get_by_role("button", name=translated("Increase quantity")).first).to_be_visible()
     page.evaluate("() => [...document.images].forEach((img) => { img.loading = 'eager'; })")
@@ -386,9 +388,9 @@ def test_a_dialog_traps_the_focus_closes_on_escape_and_returns_it(
 ) -> None:
     page.set_viewport_size({"width": 1280, "height": 900})
     open_styleguide(page, live_server)
-    opener = page.get_by_role("button", name="Open the size guide")
+    opener = page.get_by_role("button", name=translated("Open the size guide"))
     opener.click()
-    dialog = page.get_by_role("dialog", name="Size guide")
+    dialog = page.get_by_role("dialog", name=translated("Size guide"))
     expect(dialog).to_be_visible()
     expect(dialog.get_by_role("button", name=translated("Close"))).to_be_focused()
     page.keyboard.press("Escape")

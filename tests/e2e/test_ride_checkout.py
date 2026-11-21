@@ -56,6 +56,17 @@ window.Stripe = function (key) {
 """
 
 WIDTHS = (360, 768, 1280)
+# The checkout's texts in the primary language; the pay button ends with the amount.
+TERMS = translated(
+    "I have read and accept the marketplace terms and the sales terms of each seller named above."
+)
+PAY = re.compile(
+    re.escape(translated("Confirm order and pay now – EUR %(total)s").split("%(total)s")[0])  # noqa: RUF001
+)
+CONFIRMING = translated(
+    "Payment received, confirming. This page updates when the payment is confirmed; do not "
+    "pay again."
+)
 
 
 def check_page(page: Page) -> None:
@@ -130,11 +141,11 @@ def test_a_keyboard_only_checkout_completes_with_ride(
     expect(page.get_by_role("heading", level=1)).to_have_text(translated("Review and pay"))
     check_page(page)
     shot("3-review")
-    terms = page.get_by_label(re.compile("I have read and accept"))
+    terms = page.get_by_label(TERMS)
     tab_to(page, terms)
     page.keyboard.press("Space")
     expect(terms).to_be_checked()
-    pay = page.get_by_role("button", name=re.compile("Confirm order and pay now"))
+    pay = page.get_by_role("button", name=PAY)
     tab_to(page, pay)
     page.keyboard.press("Enter")
 
@@ -151,7 +162,7 @@ def test_a_keyboard_only_checkout_completes_with_ride(
     tab_to(page, button)
     page.keyboard.press("Enter")
 
-    expect(page.get_by_text("Payment received, confirming")).to_be_visible()
+    expect(page.get_by_text(CONFIRMING)).to_be_visible()
     check_page(page)
     shot("5-confirming")
 
@@ -204,12 +215,12 @@ def test_review_payment_and_confirming_pass_the_gates_at_every_width(
 
     expect(page.get_by_role("heading", level=1)).to_have_text(translated("Review and pay"))
     _gates(page, width)
-    page.get_by_label(re.compile("I have read and accept")).check()
-    page.get_by_role("button", name=re.compile("Confirm order and pay now")).click()
+    page.get_by_label(TERMS).check()
+    page.get_by_role("button", name=PAY).click()
 
     expect(page.get_by_role("heading", level=1)).to_have_text(translated("Order received"))
     expect(page.locator("#fake-card")).to_be_visible()
     _gates(page, width)
     page.get_by_role("button", name=translated("Pay now")).click()
-    expect(page.get_by_text("Payment received, confirming")).to_be_visible()
+    expect(page.get_by_text(CONFIRMING)).to_be_visible()
     _gates(page, width)

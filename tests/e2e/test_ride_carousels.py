@@ -24,6 +24,11 @@ AUTO = "#sg-strip-auto"
 GALLERY = "#sg-gallery-carousel"
 
 
+def slide(count: int, total: int = 3) -> str:
+    """A slide's accessible name ("2 of 3") in the primary language."""
+    return translated("%(count)s of %(total)s") % {"count": count, "total": total}
+
+
 def active_label(page: Page, root: str) -> str:
     label: str = page.evaluate(
         "(root) => document.querySelector(`${root} .carousel-item.active`)"
@@ -50,19 +55,19 @@ def test_the_strip_works_with_the_keyboard_alone(
 ) -> None:
     open_ride(page, live_server, settings)
     page.locator(f"{STRIP} [data-bs-slide=next]").focus()
-    assert active_label(page, STRIP) == "1 of 3"
+    assert active_label(page, STRIP) == slide(1)
     page.keyboard.press("Enter")
-    expect(page.locator(f"{STRIP} .carousel-item.active")).to_have_attribute("aria-label", "2 of 3")
+    expect(page.locator(f"{STRIP} .carousel-item.active")).to_have_attribute("aria-label", slide(2))
     page.keyboard.press("Space")
-    expect(page.locator(f"{STRIP} .carousel-item.active")).to_have_attribute("aria-label", "3 of 3")
+    expect(page.locator(f"{STRIP} .carousel-item.active")).to_have_attribute("aria-label", slide(3))
     page.keyboard.press("ArrowLeft")
-    expect(page.locator(f"{STRIP} .carousel-item.active")).to_have_attribute("aria-label", "2 of 3")
+    expect(page.locator(f"{STRIP} .carousel-item.active")).to_have_attribute("aria-label", slide(2))
     page.keyboard.press("ArrowRight")
-    expect(page.locator(f"{STRIP} .carousel-item.active")).to_have_attribute("aria-label", "3 of 3")
+    expect(page.locator(f"{STRIP} .carousel-item.active")).to_have_attribute("aria-label", slide(3))
     indicator = page.locator(f"{STRIP} [data-bs-slide-to='0']")
     indicator.focus()
     page.keyboard.press("Enter")
-    expect(page.locator(f"{STRIP} .carousel-item.active")).to_have_attribute("aria-label", "1 of 3")
+    expect(page.locator(f"{STRIP} .carousel-item.active")).to_have_attribute("aria-label", slide(1))
     expect(indicator).to_have_attribute("aria-current", "true")
     assert csp_violations(page) == []
 
@@ -73,12 +78,12 @@ def test_the_hero_slider_and_the_gallery_thumbnails_use_buttons(
     open_ride(page, live_server, settings)
     page.locator(f"{HERO} [data-bs-slide=next]").focus()
     page.keyboard.press("Enter")
-    expect(page.locator(f"{HERO} .carousel-item.active")).to_have_attribute("aria-label", "2 of 3")
+    expect(page.locator(f"{HERO} .carousel-item.active")).to_have_attribute("aria-label", slide(2))
     thumb = page.locator(f"{GALLERY} [data-bs-slide-to='2']")
     thumb.focus()
     page.keyboard.press("Space")
     expect(page.locator(f"{GALLERY} .carousel-item.active")).to_have_attribute(
-        "aria-label", "3 of 3"
+        "aria-label", slide(3)
     )
     expect(thumb).to_have_attribute("aria-current", "true")
 
@@ -91,7 +96,7 @@ def test_no_autoplay_unless_enabled_and_the_toggle_starts_and_stops_it(
     page.set_viewport_size({"width": 1280, "height": 900})
     open_styleguide(page, live_server)
     page.wait_for_timeout(1800)  # the styleguide strip rotates every 1 s when enabled
-    assert active_label(page, STRIP) == "1 of 3"
+    assert active_label(page, STRIP) == slide(1)
     auto = page.locator(AUTO)
     toggle = auto.locator("[data-ride-toggle]")
     expect(toggle).to_have_text(translated("Pause"))
