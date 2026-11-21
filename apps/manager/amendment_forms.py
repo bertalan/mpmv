@@ -15,6 +15,7 @@ from typing import Any
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
+from apps.core.nfc_forms import NFCForm
 from apps.orders import amendment_engine as am
 
 ADDRESS_FIELDS = ("line1", "line2", "city", "postcode", "state", "country")
@@ -50,9 +51,11 @@ def lines_of(snapshot: Mapping[str, Any]) -> list[LineChoice]:
     ]
 
 
-class AmendmentForm(forms.Form):
+class AmendmentForm(NFCForm):
     """One draft: line changes (shop only), a carrier, a customer-requested address correction,
     the reason and, for platform staff, the mandatory note."""
+
+    nfc_exact_fields = ("carrier", "address_country")  # matched byte for byte (I18N.10)
 
     carrier = forms.ChoiceField(
         label=_("Shipping method"),
@@ -282,7 +285,7 @@ def initial_from(
     return initial
 
 
-class CancelPackageForm(forms.Form):
+class CancelPackageForm(NFCForm):
     """Cancel the whole package with a full refund (platform staff: the cause and the note are
     required; the cause decides who pays the refund fee, owner decision 2026-11-16)."""
 
@@ -319,7 +322,7 @@ class CancelPackageForm(forms.Form):
     )
 
 
-class ShopCancelForm(forms.Form):
+class ShopCancelForm(NFCForm):
     """The shop cancels the whole package with a full refund: for its own fault (the refund fee is
     the shop's), or because the customer asked, recorded with how, when and in which words (no
     refund fee)."""

@@ -3,8 +3,12 @@ format"). Pure parsing and writing of JSON and CSV; the values themselves are va
 models when the file is checked or imported (integration tests)."""
 
 import copy
+import csv as csv_module
+import io
 import json
 from typing import Any
+
+import pytest
 
 from apps.shipping import config_format as fmt
 
@@ -270,3 +274,43 @@ def test_names_are_nfc_and_codes_and_patterns_stay_exact() -> None:
     assert values["name"] == "Café"
     assert values["code"] == decomposed
     assert values["postcode_patterns"] == [decomposed]
+
+
+def _csv_with_flag(column: str, cell: str) -> str:
+    lines = fmt.dump_csv(sample_document()).splitlines()
+    header = lines[0].split(",")
+    row = next(
+        i for i, line in enumerate(lines) if ",standard," in line and line.startswith("method")
+    )
+    cells = next(csv_module.reader([lines[row]]))
+    cells[header.index(column)] = cell
+    out = io.StringIO()
+    csv_module.writer(out, lineterminator="\n").writerow(cells)
+    lines[row] = out.getvalue().rstrip("\n")
+    return "\n".join(lines)
+
+
+@pytest.mark.parametrize("column", ["is_default", "not_returnable_by_post"])
+@pytest.mark.parametrize("cell", ["0", "1", "t", "yes", "True", "TRUE"])
+def test_a_csv_boolean_other_than_true_or_false_is_a_row_error(column: str, cell: str) -> None:
+    parsed = fmt.parse_csv(_csv_with_flag(column, cell))
+    assert any(name == column for _ref, name in messages(parsed))
+
+
+@pytest.mark.parametrize("column", ["is_default", "not_returnable_by_post"])
+def test_a_csv_boolean_accepts_true_false_and_empty(column: str) -> None:
+    for cell in ("true", "false", ""):
+        assert not messages(fmt.parse_csv(_csv_with_flag(column, cell)))
+
+
+def test_not_returnable_by_post_needs_version_three() -> None:
+    for version in (1, 2):
+        document = sample_document()
+        document["version"] = version
+        if version == 1:
+            document["special_areas"] = []
+        document["methods"][0]["not_returnable_by_post"] = True
+        assert ("methods[0]", "not_returnable_by_post") in messages(fmt.parse_json(document))
+    document = sample_document()
+    document["methods"][0]["not_returnable_by_post"] = True
+    assert not messages(fmt.parse_json(document))
