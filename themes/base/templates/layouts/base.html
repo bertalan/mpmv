@@ -43,6 +43,7 @@ state; fixed to the bottom of the viewport, last in reading order like in the ta
     {% navigation_links "header" as header_links %}{% language_links as languages %}
     {% include "components/header.html" with site_name=site_name links=header_links languages=languages %}
   {% endblock %}
+  {% include "components/garage_merge_notice.html" %}
   {% block messages %}{% if messages %}<div class="site-messages">{% for message in messages %}{% include "components/alert.html" with level=message.level_tag message=message live="polite" only %}{% endfor %}</div>{% endif %}{% endblock %}
   <main id="main" class="site-main" tabindex="-1">
     {% block content %}{% endblock %}
