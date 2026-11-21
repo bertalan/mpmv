@@ -7,6 +7,9 @@ another role or a vendor member gets 404. The service checks the permission agai
 reason's hash only. Closing moves no money, so there is no passkey step-up.
 """
 
+import datetime as dt
+import logging
+import math
 from typing import Any, Final
 
 from django import forms
@@ -19,12 +22,19 @@ from django.utils.translation import gettext_lazy
 
 from apps.accounts.models import User
 from apps.core.audit import audit_context
+from apps.core.services import consume_rate_limit
 from apps.payments import stray
 
 from .fitment_views import WriteGate, writer
 from .views import ManagerView
 
+logger = logging.getLogger(__name__)
+
 SECTION: Final = "platform.stray_payments"  # a row of roles.MATRIX
+# "Check now" makes one provider call: a few per user and 10 minutes cover a support session
+# that works through the list, and keep a stuck key or a script off the provider's API.
+CHECK_LIMIT: Final = 10
+CHECK_WINDOW: Final = dt.timedelta(minutes=10)
 
 REASON_LABELS: Final = {
     "late": gettext_lazy("Order no longer awaiting payment"),
@@ -94,6 +104,18 @@ class StrayPaymentsView(WriteGate, ManagerView):
         form = CheckRefundForm(request.POST)
         if not form.is_valid():
             return self.render_to_response(self.get_context_data(form_errors=form), status=400)
+        wait = consume_rate_limit(
+            f"stray_check:user:{actor.pk}", limit=CHECK_LIMIT, window=CHECK_WINDOW
+        )
+        if wait:
+            # The check itself is audited (`stray_checked`); a refused one changes nothing.
+            logger.warning("stray-payment check throttled for user %s", actor.pk)
+            retry = str(max(1, math.ceil(wait.total_seconds())))
+            return HttpResponse(
+                _("Too many attempts. Please try again later."),
+                status=429,
+                headers={"Retry-After": retry},
+            )
         changes = stray.check_refund_now(  # PermissionDenied answers 403
             form.cleaned_data["payment"], actor=actor, ctx=audit_context(request)
         )

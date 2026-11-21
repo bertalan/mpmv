@@ -9,6 +9,7 @@ more. Payments and access-control code: needs human review.
 import datetime as dt
 import secrets
 from decimal import Decimal
+from html.parser import HTMLParser
 from typing import Any
 
 import pytest
@@ -250,3 +251,126 @@ def test_the_list_query_count_does_not_grow_with_rows() -> None:
     with CaptureQueriesContext(connection) as many:
         client.get(PAGE)
     assert len(many) == len(few)
+
+
+def test_check_now_is_rate_limited_per_user(provider: dict[str, Any]) -> None:
+    from apps.manager.stray_views import CHECK_LIMIT
+
+    payment = flag()
+    client, _support = staff("support")
+    check = {"action": "check", "payment": payment.provider_ref}
+    for _ in range(CHECK_LIMIT):
+        assert client.post(PAGE, check).status_code == 302
+    refused = client.post(PAGE, check)
+    assert refused.status_code == 429
+    assert int(refused["Retry-After"]) >= 1
+    assert provider["calls"] == CHECK_LIMIT  # the refused check never reaches the provider
+    assert AuditLog.objects.filter(action=PAYMENT_STRAY_CHECKED).count() == CHECK_LIMIT
+    other, _owner = staff("owner")  # the limit is per user
+    assert other.post(PAGE, check).status_code == 302
+    assert provider["calls"] == CHECK_LIMIT + 1
+
+
+class _CheckButtons(HTMLParser):
+    """The text (accessible name) of each submit button in a `action=check` form."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.names: list[str] = []
+        self._in_check_form = False
+        self._button: list[str] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        found = dict(attrs)
+        if tag == "form":
+            self._in_check_form = False
+        elif tag == "input" and found.get("name") == "action" and found.get("value") == "check":
+            self._in_check_form = True
+        elif tag == "button" and self._in_check_form:
+            self._button = []
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "form":
+            self._in_check_form = False
+        elif tag == "button" and self._button is not None:
+            self.names.append(" ".join("".join(self._button).split()))
+            self._button = None
+
+    def handle_data(self, data: str) -> None:
+        if self._button is not None:
+            self._button.append(data)
+
+
+def test_each_check_now_button_has_a_unique_accessible_name() -> None:
+    payments = [flag() for _ in range(3)]
+    client, _support = staff("support")
+    page = client.get(PAGE)
+    parser = _CheckButtons()
+    parser.feed(page.content.decode())
+    assert len(parser.names) == len(payments)
+    assert len(set(parser.names)) == len(payments)
+    with override(settings.LANGUAGE_CODE):
+        visible = gettext("Check now")
+    for payment in payments:
+        (name,) = [n for n in parser.names if payment.provider_ref in n]
+        assert name.startswith(visible)
+
+
+# --- a "Check now" racing a close: both lock the payment row ------------------------------------
+
+
+def _locks_on_payment(queries: CaptureQueriesContext) -> list[str]:
+    return [
+        q["sql"]
+        for q in queries.captured_queries
+        if "FOR UPDATE" in q["sql"] and 'FROM "payments_payment"' in q["sql"]
+    ]
+
+
+def test_a_check_after_a_close_is_a_no_op_with_a_message(provider: dict[str, Any]) -> None:
+    payment = flag()
+    client, _support = staff("support")
+    closed = client.post(PAGE, {"payment": payment.provider_ref, "reason": REASON})
+    assert closed.status_code == 302
+    check = client.post(PAGE, {"action": "check", "payment": payment.provider_ref}, follow=True)
+    assert check.status_code == 200
+    assert shown("This alert was already closed.", check.content.decode())
+    assert provider["calls"] == 0
+    assert not AuditLog.objects.filter(action=PAYMENT_STRAY_CHECKED).exists()
+
+
+def test_a_close_during_the_provider_call_leaves_the_check_unrecorded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payment = flag()
+    support = UserFactory.create(platform_role="support")
+
+    def reader(**_kw: Any) -> Decimal:  # support closes the alert while the provider answers
+        stray.close_stray_capture(payment.provider_ref, actor=support, reason=REASON, ctx=CTX)
+        return Decimal("12.50")
+
+    monkeypatch.setattr(registry.get_provider("fake"), "refunded_amount", reader)
+    changes = stray.check_refund_now(payment.provider_ref, actor=support, ctx=CTX)
+    assert changes.is_empty  # re-read under the lock: the alert is closed, nothing written
+    assert not AuditLog.objects.filter(action=PAYMENT_STRAY_CHECKED).exists()
+    assert AuditLog.objects.filter(action=PAYMENT_STRAY_CLOSED).count() == 1
+
+
+def test_check_now_and_the_close_lock_the_payment_row(provider: dict[str, Any]) -> None:
+    payment = flag()
+    support = UserFactory.create(platform_role="support")
+    with CaptureQueriesContext(connection) as queries:
+        stray.check_refund_now(payment.provider_ref, actor=support, ctx=CTX)
+    assert _locks_on_payment(queries)
+    with CaptureQueriesContext(connection) as queries:
+        stray.close_stray_capture(payment.provider_ref, actor=support, reason=REASON, ctx=CTX)
+    assert _locks_on_payment(queries)
+
+
+def test_the_nightly_auto_close_locks_the_payment_row(provider: dict[str, Any]) -> None:
+    payment = flag(amount="10.00")
+    provider["refunded"][payment.provider_ref] = "10.00"
+    with CaptureQueriesContext(connection) as queries:
+        stray.sweep_stray_captures(now=timezone.now() + dt.timedelta(days=20))
+    assert _locks_on_payment(queries)
+    assert AuditLog.objects.filter(action=PAYMENT_STRAY_CLOSED).count() == 1

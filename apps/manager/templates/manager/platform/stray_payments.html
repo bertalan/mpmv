@@ -37,7 +37,8 @@ one recorded (the nightly job from day 14, or "Check now"): the page never calls
                 {% csrf_token %}
                 <input type="hidden" name="action" value="check">
                 <input type="hidden" name="payment" value="{{ row.alert.payment_ref }}">
-                {% include "components/button.html" with label=_("Check now") type="submit" variant="secondary" only %}
+                {% comment %}Inline, not components/button.html: the hidden payment reference gives each row's button its own accessible name (WCAG 2.4.6).{% endcomment %}
+                <button type="submit" class="button button--secondary">{% translate "Check now" %}<span class="visually-hidden">, {{ row.alert.payment_ref }}</span></button>
               </form>{% endif %}
             </td>
             {% if can_close %}<td>

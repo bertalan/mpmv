@@ -222,16 +222,33 @@ def check_refund_now(
     """Support asks the provider once for the refund state of one open alert and records it
     (`stray_checked`). An alert closed, or never raised, gives an empty ChangeSet and no call."""
     by = _staff_role(actor, gettext("Only Support or the platform owner may check this refund."))
-    payment = Payment.objects.filter(provider_ref=provider_ref).first()
-    if payment is None or not _is_open(provider_ref):
+    with transaction.atomic():
+        payment = _lock_open(provider_ref)
+    if payment is None:
         return ChangeSet()
+    # The provider call runs outside the lock (no network wait while the row is held); the state
+    # is read again under the lock before the check is recorded, so a close in between wins.
     refunded = _refunded(payment)
     changes = ChangeSet()
-    detail = {"by": by, **_check_detail(refunded, timezone.now())}
-    changes.create(PAYMENT_MODEL, provider_ref, detail)
-    if not dry_run:
-        audit_changes(changes, ctx=ctx, action=PAYMENT_STRAY_CHECKED)
+    with transaction.atomic():
+        if _lock_open(provider_ref) is None:
+            return changes
+        detail = {"by": by, **_check_detail(refunded, timezone.now())}
+        changes.create(PAYMENT_MODEL, provider_ref, detail)
+        if not dry_run:
+            audit_changes(changes, ctx=ctx, action=PAYMENT_STRAY_CHECKED)
     return changes
+
+
+def _lock_open(provider_ref: str) -> Payment | None:
+    """Lock the payment row (inside a transaction) and return it while its alert is open.
+
+    The payment row is the alert's lock: the manual close, "Check now" and the nightly auto-close
+    all take it, then read the alert state again, so two of them never both act on one alert."""
+    payment = Payment.objects.select_for_update().filter(provider_ref=provider_ref).first()
+    if payment is None or not _is_open(provider_ref):
+        return None
+    return payment
 
 
 def _check_detail(refunded: Decimal | None, at: dt.datetime) -> dict[str, object]:
@@ -272,9 +289,9 @@ def close_stray_capture(
         "reason_sha256": hashlib.sha256(text.encode()).hexdigest(),
     }
     with transaction.atomic():
-        # The payment row is the lock: two closes at once write one entry, the second sees it.
-        payment = Payment.objects.select_for_update().filter(provider_ref=provider_ref).first()
-        if payment is None or not _is_open(provider_ref):
+        # Two closes at once write one entry: the second sees the first under the lock.
+        payment = _lock_open(provider_ref)
+        if payment is None:
             return ChangeSet()
         return _close(payment, detail, ctx, dry_run)
 
@@ -323,14 +340,19 @@ def sweep_stray_captures(*, now: dt.datetime | None = None, dry_run: bool = Fals
             refunded=refunded,
             reminded_today=reminded,
         )
-        if step == engine.STRAY_CLOSE:
-            detail = {"by": "auto", **_check_detail(refunded, moment)}
-            done = _close(payment, detail, SYSTEM_CTX, dry_run)
-            changes.changes.extend(done.changes)
-        elif step == engine.STRAY_REMIND:
-            changes.create(PAYMENT_MODEL, payment.provider_ref, {"date": today})
-            if not dry_run:
-                _remind(payment, today, _check_detail(refunded, moment))
+        if step == engine.STRAY_WAIT:
+            continue
+        with transaction.atomic():  # a manual close since the list was read wins
+            if _lock_open(payment.provider_ref) is None:
+                continue
+            if step == engine.STRAY_CLOSE:
+                detail = {"by": "auto", **_check_detail(refunded, moment)}
+                done = _close(payment, detail, SYSTEM_CTX, dry_run)
+                changes.changes.extend(done.changes)
+            elif step == engine.STRAY_REMIND:
+                changes.create(PAYMENT_MODEL, payment.provider_ref, {"date": today})
+                if not dry_run:
+                    _remind(payment, today, _check_detail(refunded, moment))
     return changes
 
 
