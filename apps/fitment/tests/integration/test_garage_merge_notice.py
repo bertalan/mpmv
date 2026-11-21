@@ -164,7 +164,12 @@ def test_the_notice_never_writes_the_page_url_and_skips_error_pages(client: Clie
     secret = "tok-" + secrets.token_urlsafe(12)
     html = client.get(f"/missing/{secret}/").content.decode()  # an error page
     assert "data-garage-merge-notice" not in html
-    assert client.get("/", {"t": secret}).content.decode().count(secret) == 0
+    from django.template.loader import render_to_string
+
+    request = client.get("/", {"t": secret}).wsgi_request  # a page URL holding a secret
+    notice = render_to_string("components/garage_merge_notice.html", {}, request=request)
+    assert "data-garage-merge-notice" in notice
+    assert secret not in notice
     from apps.fitment.templatetags.garage_tags import garage_merge_notice
 
     request = client.get("/").wsgi_request
