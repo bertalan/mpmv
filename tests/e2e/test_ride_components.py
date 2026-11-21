@@ -15,9 +15,11 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.models import HomePage
+from apps.core.i18n import primary_language
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.test_consent_banner import consent_script_ready
+from tests.i18n import translated
 
 pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.consent_banner]
 
@@ -30,7 +32,7 @@ STRIP = "#strip-1"
 
 @pytest.fixture
 def _components_home(live_server: LiveServer, _cms_site: None) -> None:
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     home.body = [
         (
             "strip",
@@ -91,13 +93,13 @@ def test_the_carousel_rotates_pauses_and_follows_the_keyboard(
 ) -> None:
     open_home(page, live_server, settings, 1280, "no-preference")
     toggle = page.locator(f"{STRIP} [data-ride-toggle]")
-    expect(toggle).to_have_text("Pause")
+    expect(toggle).to_have_text(translated("Pause"))
     expect(page.locator(f"{STRIP} .carousel-item.active")).not_to_have_attribute(
         "aria-label", "1 of 2", timeout=9000
     )
     toggle.focus()  # focus inside holds the rotation
     page.keyboard.press("Enter")
-    expect(toggle).to_have_text("Play")
+    expect(toggle).to_have_text(translated("Play"))
     page.locator("#consent-banner button").first.focus()
     page.mouse.move(0, 0)
     page.wait_for_timeout(1000)  # a slide already moving finishes first
@@ -175,7 +177,7 @@ def test_the_video_modal_injects_no_iframe_before_consent_and_does_after(
     expect(page.locator("[data-video] iframe")).to_have_count(0)
     page.keyboard.press("Escape")
     expect(page.locator("#consent-banner")).to_be_visible()  # never covered by the closed modal
-    page.get_by_role("button", name="Accept all").click()
+    page.get_by_role("button", name=translated("Accept all")).click()
     expect(page.locator("#consent-banner")).to_be_hidden()
     page.locator(".ride-video__open").click()
     expect(page.locator("[data-video] iframe")).to_have_attribute(
