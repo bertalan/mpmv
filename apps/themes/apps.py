@@ -20,7 +20,10 @@ class ThemesConfig(AppConfig):
 
     # Audit policy (SEC.4, docs/dev/audit-trail.md).
     audited_models = ("themesettings",)
-    unaudited_models: dict[str, str] = {}
+    unaudited_models = {
+        "brandpalette": "Seeded by a data migration; staff edits go through the audited"
+        " service of THM.31 part 2, which moves it to audited_models",
+    }
 
     def ready(self) -> None:
         from .checks import check_site_themes, check_themes

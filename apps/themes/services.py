@@ -24,13 +24,14 @@ from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.services import save_audited
 
-from .build import read_manifest_sources
+from .build import read_manifest_sources, read_tokens
 from .engine import (
     ThemeError,
     ThemeManifest,
     ThemeRegistry,
     build_registry,
     pick_theme,
+    resolve_tokens,
 )
 from .models import ThemeSettings
 
@@ -59,6 +60,18 @@ def load_registry(root: Path) -> ThemeRegistry:
 
 def get_registry() -> ThemeRegistry:
     return load_registry(themes_dir())
+
+
+def registered_surfaces() -> tuple[str, ...]:
+    """The resolved `color.surface` of every registered theme, which a palette must also pass."""
+    registry = get_registry()
+    root = themes_dir()
+    tokens_by_theme = {slug: read_tokens(root / slug) for slug in registry.manifests}
+    surfaces = {
+        resolve_tokens(registry.chain(slug), tokens_by_theme).get("color.surface", "")
+        for slug in registry.manifests
+    }
+    return tuple(sorted(s for s in surfaces if s))
 
 
 def clear_caches() -> None:
