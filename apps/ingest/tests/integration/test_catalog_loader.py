@@ -26,6 +26,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, TranslationStatus
 from apps.ingest import services
 from apps.vendors.models import Vendor, VendorTranslation
+from apps.vendors.services import consumer_phone_publish_messages
 from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
@@ -602,3 +603,19 @@ def test_cat22_values_are_written_by_nothing_on_a_dry_run() -> None:
     assert not report.changes.is_empty
     assert not Product.objects.exists()
     assert not ProductTranslation.objects.exists()
+
+
+def test_a_malformed_legacy_phone_is_left_empty_and_the_products_are_held_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # CMP.41 follow-up: the vendor still loads; the phone publish gate holds its products back.
+    check = {"vendor_phone": lambda product: consumer_phone_publish_messages(product.vendor)}
+    monkeypatch.setattr(publishing, "_CHECKS", check)
+    data = bundle()
+    data["vendors"][0]["phone"] = "not a number"
+    data["posts"] = [post(10, primary_language(), 1, "P-1")]
+    report = load(data)
+    assert Vendor.objects.get(legacy_wp_user_id=7).phone == ""
+    assert "vendor 7: malformed phone left empty" in report.problems
+    assert Product.objects.get(sku="P-1").status == ProductStatus.DRAFT
+    assert report.held_back == ["product 'P-1': vendor_phone"]

@@ -1,10 +1,12 @@
-"""The shipping configuration file format, version 2 (SHP.13, SHP.14, spec 06 "Configuration
+"""The shipping configuration file format, version 3 (SHP.13, SHP.14, VEN.36, spec 06 "Configuration
 file format"). Exports, imports, the standard template and the SHP.5 legacy import all use it.
 Pure functions, no ORM.
 
 Version 2 (SHP.14) fills the `special_areas` section that version 1 reserved and lets a method
-list the treatment it gives each special area (`area_treatments`). Version 1 files are still
-read (they hold neither); files are always written in the current version.
+list the treatment it gives each special area (`area_treatments`). Version 3 (VEN.36) adds the
+method field `not_returnable_by_post`. Version 1 and 2 files are still read (a method without
+the field keeps the stored value, or the model default `false` on create); files are always
+written in the current version.
 
 This module checks the shape of a file only: its format and version, the sections and the
 fields each row may have, that list fields hold text, that every row is named once and that a
@@ -14,12 +16,13 @@ choices) are validated by the models when a file is checked or imported
 
 A JSON document:
 
-    {"format": "mpmv.shipping-config", "version": 2,
+    {"format": "mpmv.shipping-config", "version": 3,
      "country_groups": [{"code", "countries"}],
      "zones": [{"code", "name", "priority", "countries", "country_groups", "postcode_patterns",
                 "states"}],
      "methods": [{"zone_scope", "zone", "key", "carrier", "service_level", "min_delivery_days",
-                  "max_delivery_days", "is_default", "free_shipping_threshold", "tax_treatment",
+                  "max_delivery_days", "not_returnable_by_post", "is_default",
+                  "free_shipping_threshold", "tax_treatment",
                   "over_max_weight", "bands": [{"from_kg", "to_kg", "cost_net", "surcharge_net"}],
                   "area_treatments": [{"area", "mode", "surcharge_type", "surcharge",
                                        "extra_days"}]}],
@@ -56,9 +59,9 @@ from apps.core.text import nfc
 from . import engine
 
 FORMAT: Final = "mpmv.shipping-config"
-VERSION: Final = 2
+VERSION: Final = 3
 # Versions this platform reads; version 1 files hold no special areas.
-SUPPORTED_VERSIONS: Final = (1, 2)
+SUPPORTED_VERSIONS: Final = (1, 2, 3)
 SPECIAL_AREAS_SINCE: Final = 2
 
 # Which zone a method ships to: one of the owner's zones (in the file or already stored), or a
@@ -100,6 +103,7 @@ FIELDS: Final[Mapping[str, tuple[str, ...]]] = {
         "free_shipping_threshold",
         "tax_treatment",
         "over_max_weight",
+        "not_returnable_by_post",
     ),
     BAND: ("from_kg", "to_kg", "cost_net", "surcharge_net"),
     PICKUP_OPTION: ("key", "cost_net", "address"),
@@ -142,7 +146,7 @@ PART_KEYS: Final[Mapping[str, str]] = {BAND: BANDS, AREA_TREATMENT: TREATMENTS}
 # Free text a person writes (I18N.10): the only values normalised to NFC on import.
 TEXT_FIELDS: Final = ("name", "address")
 LIST_FIELDS: Final = frozenset({"countries", "country_groups", "postcode_patterns", "states"})
-BOOLEAN_FIELDS: Final = frozenset({"is_default"})
+BOOLEAN_FIELDS: Final = frozenset({"is_default", "not_returnable_by_post"})
 NUMBER_FIELDS: Final = frozenset(
     {
         "priority",
@@ -196,6 +200,8 @@ CSV_COLUMNS: Final = (
     "surcharge_type",
     "surcharge",
     "extra_days",
+    # version 3 (VEN.36)
+    "not_returnable_by_post",
 )
 FILE: Final = "file"  # the ref of issues that concern the whole file
 
