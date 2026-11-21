@@ -403,8 +403,32 @@ def test_the_pdf_is_rendered_once_per_version_and_revalidated_by_etag(
     second = client.get(url)
     assert first.content == second.content == b"%PDF-fake"
     assert len(calls) == 1
-    assert first["Cache-Control"] == "public, no-cache"
-    revalidated = client.get(url, headers={"If-None-Match": first["ETag"]})
-    assert revalidated.status_code == 304
+    assert first["Cache-Control"] == "private, no-cache"
+    etag = first["ETag"]
+    for header in (etag, f"W/{etag}", f'"other", {etag}', "*"):
+        assert client.get(url, headers={"If-None-Match": header}).status_code == 304
+    assert client.get(url, headers={"If-None-Match": '"other"'}).status_code == 200
     assert len(calls) == 1
-    assert AuditLog.objects.filter(action=ts.READ).count() == 3
+    assert AuditLog.objects.filter(action=ts.READ).count() == 7
+
+
+def test_a_rename_changes_the_pdf_etag_of_a_version_without_a_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from apps.vendors import terms_views
+
+    seen: list[str] = []
+
+    def fake(html: str) -> bytes:
+        seen.append(html)
+        return b"%PDF-fake"
+
+    monkeypatch.setattr(terms_views, "render_html", fake)
+    version = SalesTermsVersionFactory.create(vendor_name="")
+    vendor = version.vendor
+    url = ts.accepted_terms_pdf_url(version)
+    first = Client().get(url)
+    Vendor.objects.filter(pk=vendor.pk).update(display_name="Renamed Shop")
+    second = Client().get(url)
+    assert first["ETag"] != second["ETag"]
+    assert "Renamed Shop" in seen[-1]

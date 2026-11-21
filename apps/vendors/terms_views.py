@@ -4,13 +4,14 @@ Readable by anyone through a signed, expiring, multi-use link; every read is log
 or tampered link is a plain 404. The same link downloads the version as a PDF (VEN.36).
 """
 
+import hashlib
 from typing import Any
 
 from django.core.cache import cache
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.template.loader import render_to_string
-from django.utils import translation
+from django.utils.http import parse_etags
 from django.views.decorators.http import require_GET
 
 from apps.core.http import client_ip
@@ -22,7 +23,7 @@ from . import terms_services as services
 from .models import SalesTermsVersion
 
 PDF_CACHE_SECONDS = 24 * 60 * 60
-PDF_CACHE_CONTROL = "public, no-cache"
+PDF_CACHE_CONTROL = "private, no-cache"
 
 
 def _context(version: SalesTermsVersion, token: str) -> dict[str, Any]:
@@ -55,21 +56,24 @@ def download(request: HttpRequest, token: str) -> HttpResponse:
     )
     if version is None:
         raise Http404("These terms are not available.")
-    # A version is immutable, so its PDF is rendered once per language and kept. The URL carries
-    # a signed, expiring token, so the browser cache revalidates by ETag rather than keeping it.
-    language = translation.get_language() or "en"
-    etag = f'"{version.content_hash[:32]}-{language}"'
-    if request.headers.get("If-None-Match") == etag:
+    # The text of a version never changes, but the page also shows the shop name (live for rows
+    # without a snapshot) and the operator's data. Key the cache and the ETag on the rendered
+    # HTML, so a rename never serves a stale PDF. The ETag is revalidated, never kept for long:
+    # the URL carries a signed, expiring token.
+    html = render_to_string(
+        "documents/vendors/sales_terms.html", _context(version, token), request=request
+    )
+    digest = hashlib.sha256(html.encode()).hexdigest()[:32]
+    etag = f'"{version.pk}-{digest}"'
+    sent = {tag.removeprefix("W/") for tag in parse_etags(request.headers.get("If-None-Match", ""))}
+    if "*" in sent or etag in sent:
         response = HttpResponse(status=304)
         response["ETag"] = etag
         response["Cache-Control"] = PDF_CACHE_CONTROL
         return response
-    key = f"vendors:terms-pdf:{version.pk}:{version.content_hash[:16]}:{language}"
+    key = f"vendors:terms-pdf:{version.pk}:{digest}"
     pdf = cache.get(key)
     if pdf is None:
-        html = render_to_string(
-            "documents/vendors/sales_terms.html", _context(version, token), request=request
-        )
         try:
             pdf = render_html(html)
         except AttachmentUnavailable:
