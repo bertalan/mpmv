@@ -2127,6 +2127,7 @@ msgid "Cause: the shop cannot fulfil the order."
 msgstr "Ursache: Der Shop kann die Bestellung nicht ausführen."
 
 #: apps/manager/templates/manager/platform/fitment_node.html
+#: themes/base/templates/components/garage_banner.html
 msgid "Change"
 msgstr "Ändern"
 
@@ -8522,6 +8523,7 @@ msgstr[0] "%(count)s weiteren anzeigen"
 msgstr[1] "%(count)s weitere anzeigen"
 
 #: apps/manager/templates/manager/platform/profile_changes.html
+#: themes/base/templates/components/garage_banner.html
 msgid "Show all"
 msgstr "Alle anzeigen"
 
@@ -8572,6 +8574,10 @@ msgstr "Die neuesten Produkte dieses Shops anzeigen."
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Showing %(vendor)s only."
 msgstr "Es wird nur %(vendor)s angezeigt."
+
+#: themes/base/templates/components/garage_banner.html
+msgid "Showing items for: %(label)s"
+msgstr "Artikel für: %(label)s"
 
 #: apps/cms/forms_pages.py
 msgid ""

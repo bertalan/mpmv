@@ -2103,6 +2103,7 @@ msgid "Cause: the shop cannot fulfil the order."
 msgstr "Causa: il negozio non può evadere l’ordine."
 
 #: apps/manager/templates/manager/platform/fitment_node.html
+#: themes/base/templates/components/garage_banner.html
 msgid "Change"
 msgstr "Modifica"
 
@@ -8443,6 +8444,7 @@ msgstr[0] "Mostra altri %(count)s"
 msgstr[1] "Mostra altri %(count)s"
 
 #: apps/manager/templates/manager/platform/profile_changes.html
+#: themes/base/templates/components/garage_banner.html
 msgid "Show all"
 msgstr "Mostra tutto"
 
@@ -8493,6 +8495,10 @@ msgstr "Mostra i prodotti più recenti di questo negozio."
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Showing %(vendor)s only."
 msgstr "Solo %(vendor)s."
+
+#: themes/base/templates/components/garage_banner.html
+msgid "Showing items for: %(label)s"
+msgstr "Articoli per: %(label)s"
 
 #: apps/cms/forms_pages.py
 msgid ""
