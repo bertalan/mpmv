@@ -23,13 +23,17 @@ from apps.accounts.services import (
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
 from apps.core.models import AuditLog, Throttle
+from tests.i18n import translated
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("admin_open")]  # OPS.5
 
 LOGIN_URL = "/django-admin/login/"
 IP = "203.0.113.7"
 OTHER_IP = "198.51.100.20"
-GENERIC_ERROR = "Please enter the correct email and password for a staff account."
+GENERIC_ERROR = (
+    "Please enter the correct %(username)s and password for a staff account. "
+    "Note that both fields may be case-sensitive."
+)
 CAPTCHA_ON = {
     "CAPTCHA_ENABLED": True,
     "CAPTCHA_VERIFIER": "apps.accounts.tests.fakes.FakeCaptchaVerifier",
@@ -169,7 +173,7 @@ def test_locked_wrong_and_unknown_accounts_get_the_same_generic_error(
     _fail(client, staff.email, ACCOUNT_LOCKOUT.free_attempts)
     locked = _error_page(client, staff.email, password)
     for page in (wrong, unknown, locked):
-        assert GENERIC_ERROR in page
+        assert translated(GENERIC_ERROR) % {"username": "email"} in page
 
 
 def test_unknown_emails_are_locked_exactly_like_real_ones(client: Client) -> None:

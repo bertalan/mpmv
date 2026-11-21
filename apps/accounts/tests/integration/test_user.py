@@ -10,6 +10,7 @@ from django.db import IntegrityError, transaction
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
+from apps.core.i18n import configured_languages, primary_language
 
 pytestmark = pytest.mark.django_db
 
@@ -27,7 +28,7 @@ def test_create_user_normalizes_email_and_hashes_password() -> None:
     assert user.email == "mario.rossi@example.com"
     assert user.password != PASSWORD
     assert user.check_password(PASSWORD)
-    assert user.preferred_language == "en"
+    assert user.preferred_language == primary_language()
     assert not user.is_staff
     assert user.public_id is not None
 
@@ -60,7 +61,7 @@ def test_login_with_email_and_password() -> None:
     assert authenticate(username="luca@example.com", password=PASSWORD + "-wrong") is None
 
 
-@pytest.mark.parametrize("language", ["en", "it", "de", "fr", "es"])
+@pytest.mark.parametrize("language", configured_languages())
 def test_preferred_language_accepts_configured_languages(language: str) -> None:
     UserFactory.build(preferred_language=language).full_clean()
 

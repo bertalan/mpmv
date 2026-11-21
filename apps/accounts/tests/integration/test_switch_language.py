@@ -7,6 +7,8 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.accounts.services import set_preferred_language
 from apps.accounts.tests.factories import UserFactory
+from apps.core.i18n import configured_languages, primary_language
+from tests.i18n import language_prefix, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -26,20 +28,24 @@ def _switch(client: Client, language: str, next_url: str) -> str:
     return str(response["Location"])
 
 
-@pytest.mark.parametrize(
-    ("next_url", "language", "expected"),
-    [
-        ("/", "it", "/it/"),
-        ("/", "de", "/de/"),
-        ("/it/", "de", "/de/"),
-        ("/it/", "en", "/"),
-        ("/de/", "it", "/it/"),
-        ("/", "fr", "/fr/"),
-        ("/fr/", "es", "/es/"),
-        ("/es/?page=2", "en", "/?page=2"),
-        ("/de/?page=2", "en", "/?page=2"),
-    ],
-)
+def _switch_cases() -> list[tuple[str, str, str]]:
+    """Every configured language to every other one, from a page and from a page with a query."""
+    cases = []
+    for source in configured_languages():
+        for target in configured_languages():
+            if target != source:
+                for tail in ("/", "/?page=2"):
+                    cases.append(
+                        (
+                            f"{language_prefix(source)}{tail}",
+                            target,
+                            f"{language_prefix(target)}{tail}",
+                        )
+                    )
+    return cases
+
+
+@pytest.mark.parametrize(("next_url", "language", "expected"), _switch_cases())
 def test_switcher_keeps_the_current_page(
     client: Client, next_url: str, language: str, expected: str
 ) -> None:
@@ -47,15 +53,19 @@ def test_switcher_keeps_the_current_page(
 
 
 def test_switcher_follows_to_a_page_in_the_new_language(client: Client) -> None:
+    other = other_language()
     response = client.post(
-        reverse("switch_language"), {"language": "de", "next": "/it/"}, follow=True
+        reverse("switch_language"),
+        {"language": other, "next": f"{language_prefix(primary_language())}/"},
+        follow=True,
     )
     assert response.status_code == 200
-    assert response["Content-Language"] == "de"
+    assert response["Content-Language"] == other
 
 
 def test_switcher_never_redirects_off_site(client: Client) -> None:
-    assert _switch(client, "it", "https://attacker.example/") == "/it/"
+    other = other_language()
+    assert _switch(client, other, "https://attacker.example/") == f"{language_prefix(other)}/"
 
 
 def test_switcher_ignores_unconfigured_languages(client: Client) -> None:
@@ -74,9 +84,12 @@ def test_switcher_only_accepts_post(client: Client) -> None:
 def test_switcher_remembers_the_choice_of_a_signed_in_user(client: Client) -> None:
     user = UserFactory.create()
     client.force_login(user)
-    assert _switch(client, "de", "/it/") == "/de/"
+    other = other_language()
+    assert _switch(client, other, f"{language_prefix(primary_language())}/") == (
+        f"{language_prefix(other)}/"
+    )
     user.refresh_from_db()
-    assert user.preferred_language == "de"
+    assert user.preferred_language == other
 
 
 def test_switcher_works_for_anonymous_visitors_without_storing_anything(client: Client) -> None:
@@ -85,20 +98,21 @@ def test_switcher_works_for_anonymous_visitors_without_storing_anything(client: 
 
 
 def test_an_explicit_prefix_wins_over_the_preferred_language(client: Client) -> None:
-    user = UserFactory.create(preferred_language="de")
+    user = UserFactory.create(preferred_language=other_language())
     client.force_login(user)
-    response = client.get("/it/")
+    response = client.get(f"{language_prefix(primary_language())}/")
     assert response.status_code == 200
-    assert response["Content-Language"] == "it"
+    assert response["Content-Language"] == primary_language()
 
 
 def test_set_preferred_language_dry_run_returns_the_change_without_saving() -> None:
     user = UserFactory.create()
-    changeset = set_preferred_language(user, "it", dry_run=True)
+    before, other = user.preferred_language, other_language()
+    changeset = set_preferred_language(user, other, dry_run=True)
     assert changeset.summary() == {"create": 0, "update": 1, "delete": 0}
-    assert changeset.changes[0].fields == {"preferred_language": ("en", "it")}
+    assert changeset.changes[0].fields == {"preferred_language": (before, other)}
     user.refresh_from_db()
-    assert user.preferred_language == "en"
+    assert user.preferred_language == before
 
 
 def test_set_preferred_language_saves_and_is_a_no_op_when_unchanged() -> None:
