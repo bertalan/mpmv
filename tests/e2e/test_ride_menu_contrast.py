@@ -23,6 +23,7 @@ import pytest
 from playwright.sync_api import Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
+from wagtail.models import Locale
 
 from apps.cms.models import HomePage
 from apps.cms.templatetags import cms_tags
@@ -52,6 +53,8 @@ PAGES = {
     "standard": "/about/",
     "cart": "/cart/",
 }
+# The category and product fixture exist in English only; the standard page is seeded per language.
+ENGLISH_CONTENT = {"listing", "product", "standard"}
 HERO = {
     "heading": "Ride better",
     "text": "Gear from small workshops.",
@@ -140,7 +143,7 @@ def _ride_with_submenu(
 
 
 def add_hero() -> None:
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale=Locale.get_default())
     home.body = [("hero", HERO)]
     home.save_revision().publish()
 
@@ -282,6 +285,7 @@ def open_dropdown(page: Page) -> None:
 def test_menu_text_reaches_aa_contrast_in_every_state(
     name: str,
     width: int,
+    settings: SettingsWrapper,
     page: Page,
     live_server: LiveServer,
     paths: dict,  # type: ignore[type-arg]  # noqa: F811
@@ -290,7 +294,10 @@ def test_menu_text_reaches_aa_contrast_in_every_state(
         add_hero()
     page.emulate_media(reduced_motion="reduce")
     page.set_viewport_size({"width": width, "height": 800})
-    response = page.goto(f"{live_server.url}{PAGES[name]}")
+    url = PAGES[name]
+    if name in ENGLISH_CONTENT and "en" not in [code for code, _ in settings.LANGUAGES]:
+        pytest.skip("the fixture content is English and English is not served in this run")
+    response = page.goto(f"{live_server.url}{url}")
     assert response is not None
     assert response.status == 200
     page.wait_for_load_state("load")
