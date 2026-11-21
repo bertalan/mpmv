@@ -330,7 +330,8 @@ IDOR_REVIEWED: dict[str, str] = {
         "(`test_an_account_draft_opens_for_that_account_only`)."
     ),
     "manager:platform:stray_payments": (
-        "No identifier in the URL; the close POST names a payment reference in its body. Platform "
+        "No identifier in the URL; the close and Check now POSTs name a payment reference in "
+        "their body. Platform "
         "space only (CORE.18 row platform.stray_payments), and the service refuses anyone but "
         "Support or the platform owner; stray payments span shops by design (PAY.4)."
     ),

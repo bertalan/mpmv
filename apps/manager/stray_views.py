@@ -42,8 +42,13 @@ class CloseAlertForm(forms.Form):
     )
 
 
+class CheckRefundForm(forms.Form):
+    payment = forms.CharField(max_length=255, widget=forms.HiddenInput)
+
+
 class StrayPaymentsView(WriteGate, ManagerView):
-    """The open alerts (GET) and the manual close of one (POST, CSRF, a reason)."""
+    """The open alerts (GET, no provider call), the manual close of one (POST, CSRF, a reason)
+    and "Check now" (POST `action=check`: one provider call for that alert, recorded)."""
 
     section = SECTION
     write_section = SECTION
@@ -64,6 +69,8 @@ class StrayPaymentsView(WriteGate, ManagerView):
         actor = self.manager.user
         if not isinstance(actor, User):
             raise Http404("No Manager page here.")
+        if request.POST.get("action") == "check":
+            return self._check(request, actor)
         form = CloseAlertForm(request.POST)
         if not form.is_valid():
             return self.render_to_response(self.get_context_data(form_errors=form), status=400)
@@ -81,4 +88,24 @@ class StrayPaymentsView(WriteGate, ManagerView):
             messages.info(request, _("This alert was already closed."))
         else:
             messages.success(request, _("The alert is closed. Support gets no more reminders."))
+        return HttpResponseRedirect(reverse("manager:platform:stray_payments"))
+
+    def _check(self, request: HttpRequest, actor: User) -> HttpResponse:
+        form = CheckRefundForm(request.POST)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form_errors=form), status=400)
+        changes = stray.check_refund_now(  # PermissionDenied answers 403
+            form.cleaned_data["payment"], actor=actor, ctx=audit_context(request)
+        )
+        if changes.is_empty:
+            messages.info(request, _("This alert was already closed."))
+        else:
+            after = changes.changes[0].after or {}
+            refunded = after.get("refunded")
+            if refunded is None:
+                messages.warning(
+                    request, _("The payment provider could not be reached. Please try again later.")
+                )
+            else:
+                messages.info(request, _("The refund state is checked and recorded."))
         return HttpResponseRedirect(reverse("manager:platform:stray_payments"))

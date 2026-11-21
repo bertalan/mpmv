@@ -3,7 +3,8 @@
 {% comment %}
 Stray payments (PAY.4, Support and the platform owner; Finance reads): the open alerts of payments
 that succeeded on no awaiting order, oldest first. References and amounts only, no customer data.
-Closing asks for a reason; the audit log keeps its fingerprint only.
+Closing asks for a reason; the audit log keeps its fingerprint only. The refund state is the last
+one recorded (the nightly job from day 14, or "Check now"): the page never calls the provider.
 {% endcomment %}
 {% block manager_content %}
   <h1>{% translate "Stray payments" %}</h1>
@@ -20,6 +21,7 @@ Closing asks for a reason; the audit log keeps its fingerprint only.
           <th scope="col">{% translate "Amount" %}</th>
           <th scope="col">{% translate "Age in days" %}</th>
           <th scope="col">{% translate "Refund confirmed" %}</th>
+          <th scope="col">{% translate "Checked" %}</th>
           {% if can_close %}<th scope="col">{% translate "Close the alert" %}</th>{% endif %}
         </tr></thead>
         <tbody>
@@ -29,7 +31,15 @@ Closing asks for a reason; the audit log keeps its fingerprint only.
             <td>{{ row.reason }}</td>
             <td>{{ row.alert.amount }} {{ row.alert.currency }}</td>
             <td>{{ row.alert.age_days }}</td>
-            <td>{% if row.alert.refund_confirmed is None %}{% translate "Unknown" %}{% elif row.alert.refund_confirmed %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td>
+            <td>{% if not row.alert.checked_at %}{% translate "Not checked yet" %}{% elif row.alert.refund_confirmed is None %}{% translate "Unknown" %}{% elif row.alert.refund_confirmed %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td>
+            <td>{% if row.alert.checked_at %}{{ row.alert.checked_at|date:"SHORT_DATETIME_FORMAT" }}{% else %}-{% endif %}
+              {% if can_close %}<form method="post" action="{% url 'manager:platform:stray_payments' %}" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="action" value="check">
+                <input type="hidden" name="payment" value="{{ row.alert.payment_ref }}">
+                {% include "components/button.html" with label=_("Check now") type="submit" variant="secondary" only %}
+              </form>{% endif %}
+            </td>
             {% if can_close %}<td>
               <form method="post" action="{% url 'manager:platform:stray_payments' %}" class="manager-form" novalidate>
                 {% csrf_token %}

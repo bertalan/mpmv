@@ -27,7 +27,11 @@ from apps.accounts.tests.mfa import verified_login
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.payments import registry, stray
-from apps.payments.changeset_keys import PAYMENT_STRAY_CLOSED, PAYMENT_STRAY_REMINDED
+from apps.payments.changeset_keys import (
+    PAYMENT_STRAY_CHECKED,
+    PAYMENT_STRAY_CLOSED,
+    PAYMENT_STRAY_REMINDED,
+)
 from apps.payments.models import Payment
 from apps.vendors.tests.factories import VendorMemberFactory
 
@@ -156,18 +160,83 @@ def test_a_close_needs_the_csrf_token() -> None:
     assert not AuditLog.objects.filter(action=PAYMENT_STRAY_CLOSED).exists()
 
 
-def test_the_refund_state_comes_from_the_provider(monkeypatch: pytest.MonkeyPatch) -> None:
-    full, part = flag(amount="10.00"), flag(amount="10.00")
-    refunded = {full.provider_ref: Decimal("10.00"), part.provider_ref: Decimal("1.00")}
+@pytest.fixture
+def provider(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """The fake provider's refund reader, counting its calls: `refunded[ref]` is its answer."""
+    state: dict[str, Any] = {"calls": 0, "refunded": {}}
 
     def reader(*, provider_ref: str, **_kw: Any) -> Decimal:
-        return refunded[provider_ref]
+        state["calls"] += 1
+        return Decimal(state["refunded"].get(provider_ref, "0"))
 
     monkeypatch.setattr(registry.get_provider("fake"), "refunded_amount", reader)
+    return state
+
+
+def test_the_list_makes_no_provider_call(provider: dict[str, Any]) -> None:
+    for _ in range(3):
+        flag()
+    client, _support = staff("support")
+    page = client.get(PAGE)
+    assert page.status_code == 200
+    assert provider["calls"] == 0
+    assert shown("Not checked yet", page.content.decode())
+    assert all(row.checked_at is None for row in stray.open_alerts())
+
+
+def test_check_now_calls_the_provider_once_and_records_it(provider: dict[str, Any]) -> None:
+    full, other = flag(amount="10.00"), flag(amount="10.00")
+    provider["refunded"][full.provider_ref] = "10.00"
+    client, support = staff("support")
+    response = client.post(PAGE, {"action": "check", "payment": full.provider_ref})
+    assert response.status_code == 302
+    assert provider["calls"] == 1
+    entry = AuditLog.objects.get(action=PAYMENT_STRAY_CHECKED, target_key=full.provider_ref)
+    assert entry.actor_id == support.pk
+    assert (entry.after or {})["refunded"] == "10.00"
     rows = {row.payment_ref: row for row in stray.open_alerts()}
     assert rows[full.provider_ref].refund_confirmed is True
-    assert rows[part.provider_ref].refund_confirmed is False
-    assert rows[full.provider_ref].age_days == 0
+    assert rows[full.provider_ref].checked_at is not None
+    assert rows[other.provider_ref].checked_at is None
+    client.get(PAGE)
+    assert provider["calls"] == 1  # the list reads the recorded check, not the provider
+
+
+def test_check_now_by_finance_answers_403_and_needs_csrf(provider: dict[str, Any]) -> None:
+    payment = flag()
+    client, _finance = staff("finance")
+    assert client.post(PAGE, {"action": "check", "payment": payment.provider_ref}).status_code == (
+        403
+    )
+    support = UserFactory.create(platform_role="support")
+    strict = Client(enforce_csrf_checks=True)
+    verified_login(strict, support)
+    assert strict.post(PAGE, {"action": "check", "payment": payment.provider_ref}).status_code == (
+        403
+    )
+    assert provider["calls"] == 0
+    assert not AuditLog.objects.filter(action=PAYMENT_STRAY_CHECKED).exists()
+
+
+def test_the_nightly_reminder_records_the_refund_check(provider: dict[str, Any]) -> None:
+    payment = flag(amount="10.00")
+    provider["refunded"][payment.provider_ref] = "1.00"
+    night = timezone.now() + dt.timedelta(days=20)
+    stray.sweep_stray_captures(now=night)
+    assert provider["calls"] == 1
+    (row,) = stray.open_alerts(now=night)
+    assert row.refund_confirmed is False
+    assert row.checked_at == night
+    assert row.age_days == 20
+    assert provider["calls"] == 1
+
+
+def test_a_close_makes_no_provider_call(provider: dict[str, Any]) -> None:
+    payment = flag()
+    client, _support = staff("support")
+    client.post(PAGE, {"payment": payment.provider_ref, "reason": REASON})
+    assert AuditLog.objects.filter(action=PAYMENT_STRAY_CLOSED).count() == 1
+    assert provider["calls"] == 0
 
 
 def test_the_list_query_count_does_not_grow_with_rows() -> None:

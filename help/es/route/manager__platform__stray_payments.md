@@ -6,6 +6,9 @@ Esta página le muestra los pagos que se completaron pero no se usaron para un p
 ## La lista
 Cada fila muestra la referencia del pago, la referencia del pedido, por qué el pago es huérfano (el pedido ya no espera el pago, el importe o la moneda no coinciden, la referencia del pago es errónea o ningún pedido coincide), el importe, la antigüedad en días y si el proveedor de pagos confirma un reembolso completo.
 
+## El estado del reembolso
+La página no consulta al proveedor de pagos. Muestra la última comprobación: el trabajo nocturno comprueba cada alerta desde el día 14, y Aún no comprobado significa que no hay ninguna comprobación registrada. Para comprobar una alerta ahora, elija Comprobar ahora en su fila: se consulta al proveedor una vez y el resultado se registra con su hora.
+
 ## Cerrar una alerta
 1. Reembolse el pago a mano en el proveedor de pagos.
 2. En su fila, escriba el motivo del cierre (por ejemplo, cómo se reembolsó) y elija Cerrar la alerta.

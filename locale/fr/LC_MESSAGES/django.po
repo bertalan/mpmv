@@ -2180,6 +2180,10 @@ msgstr "Chat ou message"
 msgid "check"
 msgstr "à vérifier"
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Check now"
+msgstr "Vérifier maintenant"
+
 #: apps/orders/customer_views.py
 msgid ""
 "Check the cart, then go to checkout: nothing is ordered or paid until you place the order and pay."
@@ -2198,6 +2202,10 @@ msgstr "Vérifie l'orthographe, essaie avec moins de mots ou avec une partie du 
 #: apps/vendors/templates/vendors/apply/sent.html
 msgid "Check your email"
 msgstr "Consultez votre messagerie"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Checked"
+msgstr "Vérifié"
 
 #: apps/orders/templates/orders/checkout.html themes/ride/templates/orders/checkout.html
 msgid "Checkout"
@@ -5615,6 +5623,10 @@ msgstr "Non ajouté : %(item)s, %(reason)s."
 msgid "Not available in your language: shown in %(name)s."
 msgstr "Non disponible dans ta langue : affiché en %(name)s."
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Not checked yet"
+msgstr "Pas encore vérifié"
+
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Not connected"
 msgstr "Non connecté"
@@ -6153,6 +6165,10 @@ msgid ""
 msgstr ""
 "Uniquement à la demande du client, dans le même pays et le même territoire fiscal. Enregistrez "
 "comment et quand le client l’a demandé, ainsi que ses propres mots."
+
+#: apps/payments/stray.py
+msgid "Only Support or the platform owner may check this refund."
+msgstr "Seuls le Support ou le propriétaire de la plateforme peuvent vérifier ce remboursement."
 
 #: apps/payments/stray.py
 msgid "Only Support or the platform owner may close this alert."
@@ -11004,6 +11020,10 @@ msgid "The payment form could not be loaded. Please reload this page in a moment
 msgstr ""
 "Le formulaire de paiement n'a pas pu être chargé. Veuillez recharger cette page dans un instant."
 
+#: apps/manager/stray_views.py
+msgid "The payment provider could not be reached. Please try again later."
+msgstr "Le prestataire de paiement est injoignable. Veuillez réessayer plus tard."
+
 #: apps/vendors/admin.py
 msgid ""
 "The payment provider's fixed fee per payment, in euro, for example 2.00. Enter 0 if there is none."
@@ -11376,6 +11396,10 @@ msgstr ""
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
 msgid "The refund fee is charged to your shop."
 msgstr "Les frais de remboursement sont facturés à votre boutique."
+
+#: apps/manager/stray_views.py
+msgid "The refund state is checked and recorded."
+msgstr "L'état du remboursement est vérifié et enregistré."
 
 #: apps/events/models.py
 msgid "The region or province of the place, for example 'Lombardia'. Optional."

@@ -6,6 +6,9 @@ Questa pagina mostra i pagamenti andati a buon fine ma non usati per un ordine, 
 ## L'elenco
 Ogni riga mostra il riferimento del pagamento, il riferimento dell'ordine, perché il pagamento è anomalo (l'ordine non attende più il pagamento, l'importo o la valuta non corrispondono, il riferimento del pagamento è errato, oppure nessun ordine corrisponde), l'importo, l'età in giorni e se il fornitore di pagamento conferma un rimborso completo.
 
+## Lo stato del rimborso
+La pagina non interroga il fornitore di pagamento. Mostra l'ultima verifica: il job notturno verifica ogni avviso dal 14° giorno, e Non ancora verificato indica che nessuna verifica è registrata. Per verificare subito un avviso, scelga Verifica ora nella sua riga: il fornitore viene interrogato una volta e il risultato viene registrato con l'ora.
+
 ## Chiudere un avviso
 1. Rimborsi il pagamento a mano presso il fornitore di pagamento.
 2. Nella sua riga, scriva il motivo della chiusura (per esempio come è stato rimborsato) e scelga Chiudi l'avviso.
