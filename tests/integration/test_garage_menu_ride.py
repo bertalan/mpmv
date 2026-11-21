@@ -27,7 +27,8 @@ def test_the_ride_header_carries_the_garage_menu_and_the_chooser_renders() -> No
             request=request,
         )
     assert "data-garage-menu" in header
-    assert "Add your garage" in header
+    with translation.override(primary_language()):
+        assert translation.gettext("Add your garage") in header
     assert reverse("garage_choose") in header
     assert "data-garage-empty" in chooser
 
