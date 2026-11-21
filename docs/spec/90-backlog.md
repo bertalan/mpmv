@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **463** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3592 h** (P1 2625 h · P2 867 h · P3 100 h)
+- Micro-tasks: **465** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3596 h** (P1 2625 h · P2 871 h · P3 100 h)
 - P1 critical path (schedule lower bound with full parallelism): **197 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → PAY.7 → ORD.20 → ORD.21 → ORD.22 → ORD.23
 
 ## By macro area
@@ -17,7 +17,7 @@
 | ARC | Architecture and foundations | 36 | 232 | 52 | 4 | 288 |
 | CORE | Identity, permissions, API, backoffice | 32 | 224 | 4 | 6 | 234 |
 | CAT | Product catalog | 30 | 162 | 86 | 3 | 251 |
-| VEN | Vendors, commissions, ledger | 40 | 298 | 35 | 0 | 333 |
+| VEN | Vendors, commissions, ledger | 42 | 298 | 39 | 0 | 337 |
 | TAX | Tax engine | 22 | 98 | 37 | 0 | 135 |
 | SHP | Shipping and quotes | 15 | 96 | 30 | 0 | 126 |
 | ORD | Cart, orders, returns | 39 | 254 | 82 | 5 | 341 |
@@ -36,7 +36,7 @@
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 16 | 25 | 48 | 8 | 81 |
 | MIG | Migration and cutover | 22 | 141 | 29 | 0 | 170 |
-| **Total** | | **463** | **2625** | **867** | **100** | **3592** |
+| **Total** | | **465** | **2625** | **871** | **100** | **3596** |
 
 ## By phase
 
@@ -380,7 +380,7 @@
 | MIG.20 | Refunds migration (owner decision 2026-11-11, relayed by lane-a, #86): refund child orders and marketplace refund requests are stored inside the historical order (refunded amount, date, reason); there is no separate refund model for legacy data; no new ledger entry and no tax recalculation | P1 | 4 | MIG.4 | A migrated order shows its refunded amount, date and reason; the MIG.5 parity report reconciles order total minus refunds against the legacy figures; a refund amount that does not parse as `Decimal` is rejected with a report; the migration writes no ledger entry for a refund (MIG.8 covers balances); no refund model or table exists for legacy data |
 | MIG.22 | Domains, mail and TLS at cutover (owner decision 2026-11-16, §13.4): DNS inventory exported from the registrar into private storage, a dedicated mail host record and the MX moved to it before the switch when mail is self-managed on the legacy server (a dedicated mail service is a recommended follow-up, and a precondition for shutting the legacy server down), SPF, DKIM and DMARC for the transactional provider (ARC.16), TTL 300 s from T−7, production certificates issued before the switch (ACME DNS-01), legacy site on an internal hostname behind basic auth and `noindex`, Stripe webhook URLs and domain verification updated, staged HSTS | P1 | 6 | MIG.9 | Runbook checklist: the inventory file is in private storage; a mail test send and receive passes after the MX change, before the switch; the TTL check shows 300 s on the switched records; certificates are valid before the switch; the legacy host answers 401 over valid HTTPS without credentials (HSTS `includeSubDomains` applies to it) and carries `noindex`; rollback by DNS was rehearsed in a dress rehearsal |
 
-### F6 — After go-live (P2) (140 tasks, 981 h)
+### F6 — After go-live (P2) (142 tasks, 985 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -408,6 +408,8 @@
 | VEN.28 | Read-only document access for closed vendors (proposed, lane-a decision on #170, not built): the CORE.17 shop space refuses members of a closed vendor with a 403 page; for the legal retention period they may still need to download their own past payout statements, invoices and DAC7 data. A dedicated read-only area for the closed vendor's former members, downloads only through signed URLs, no other shop page, every download in the AuditLog, access ending with the retention period | P2 | 4 | CORE.17, VEN.9, VEN.15, VEN.23 | A member of a closed vendor downloads that vendor's past payout statements, invoices and DAC7 data and opens no other shop page; another vendor's documents answer 404; after the retention period the area answers 403 with the closed-vendor page; each download writes an AuditLog entry |
 | VEN.30 | Vendor terms and checklist for promotions: contract clause on funding, commission on the list price, platform promotions and campaign selection, price-honesty duty (no raising a price to fund a discount), 30 days' notice for changes (P2B), CMP.10 checklist row | P2 | 4 | VEN.14, CMP.24 | New contract version carries the clause as a specific-approval item; checklist row visible; wording approved |
 | VEN.37 | Editable vendor slug with redirects (owner decision Q-23, 2026-11-13): staff (and the vendor owner, with a fresh passkey window, CORE.25) may change a vendor's slug; every old slug is kept in a slug history and answers a permanent 301 redirect to the current one, for the shop page and its sub-pages; history rows are never deleted and an old slug stays reserved, even after the vendor is deleted; the change is audited and the sitemap and canonical URLs follow | P2 | 5 | VEN.10, CAT.6 | After a change, the old shop URL and a product listing under it answer 301 to the new ones; another vendor cannot take the old slug; the audit log holds the change; the canonical URL of the shop and of its listings uses the new slug; deleting the vendor keeps its slug history |
+| VEN.41 | Business-only seller flag (follow-up of the CMP.41 review, 2026-11-21): a flag on `Vendor` (default off) that marks a seller who sells to businesses only, so the B2C phone rule from CMP.41 (a phone is required to onboard a seller that sells to consumers) can exempt it; the flag is set by staff, audited, and is read by the activation gate and the CMP.41 helper; a seller with the flag never sells to a consumer, and a consumer order against it is refused | P2 | 3 | VEN.1, CMP.41 | A flagged seller activates without a phone and an unflagged one needs it; a flagged seller refuses a consumer order; a change of the flag writes an AuditLog entry |
+| VEN.42 | Vendor phone help text (follow-up of the CMP.41 review, 2026-11-21): the `Vendor.phone` field help text still says "Optional" although a phone is required for a seller that sells to consumers; change it to state the rule (required for sellers that sell to consumers), with a migration for the changed help text and a changed msgid with its translations (I18N) | P2 | 1 | CMP.41, VEN.41 | The model help text no longer says "Optional"; `makemigrations --check` is clean; the catalogues carry the new msgid in every language and the old one is gone |
 | TAX.6 | Rate import from official source + staff review + validity periods; a new rate takes effect at midnight in the time zone of the rate's country, not the operator's (owner decision Q-51, 2026-11-13): staff enter only the date, and the engine converts it with the country's zone (for example Portugal one hour after Italy) | P2 | 8 | TAX.1 | Simulated update without touching past orders; a rate starting on 1 January in a country one hour behind Italy is not applied to an order placed at 00:30 Italian time |
 | TAX.8 | `distance_sales_eu` + `suggest_regime` from the ledger | P2 | 6 | VEN.4 | T16 green |
 | TAX.9 | Cart tax simulator in admin and API (`/tax/simulate`) | P2 | 6 | TAX.4, SHP.4 | Staff simulate a mixed cart |
