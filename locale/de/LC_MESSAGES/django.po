@@ -6492,7 +6492,7 @@ msgstr ""
 "Weitere Produkte, die Sie zusammen mit diesem vorschlagen möchten, zum Beispiel ein besseres "
 "Modell. Optional: Lassen Sie das Feld leer, um nichts vorzuschlagen."
 
-#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: apps/catalog/templates/catalog/includes/other_sellers.html apps/seo/page_builders.py
 #: themes/ride/templates/catalog/includes/other_sellers.html
 msgid "Other sellers of this product"
 msgstr "Weitere Anbieter dieses Produkts"
@@ -14943,7 +14943,8 @@ msgid ""
 msgstr ""
 "Sie haben das Recht, binnen %(days)s Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen."
 
-#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
+#: apps/catalog/templates/catalog/product.html apps/seo/page_builders.py
+#: themes/ride/templates/catalog/product.html
 msgid "You may also like"
 msgstr "Das könnte dir auch gefallen"
 

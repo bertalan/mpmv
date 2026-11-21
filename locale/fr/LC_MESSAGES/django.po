@@ -6486,7 +6486,7 @@ msgstr ""
 "Autres produits que vous souhaitez suggérer avec celui-ci, par exemple un meilleur modèle. "
 "Facultatif : laissez vide pour ne rien suggérer."
 
-#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: apps/catalog/templates/catalog/includes/other_sellers.html apps/seo/page_builders.py
 #: themes/ride/templates/catalog/includes/other_sellers.html
 msgid "Other sellers of this product"
 msgstr "Autres vendeurs de ce produit"
@@ -14900,7 +14900,8 @@ msgstr ""
 "Vous avez le droit de vous rétracter du présent contrat sans donner de motif dans un délai de "
 "%(days)s jours."
 
-#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
+#: apps/catalog/templates/catalog/product.html apps/seo/page_builders.py
+#: themes/ride/templates/catalog/product.html
 msgid "You may also like"
 msgstr "Tu aimeras aussi"
 
