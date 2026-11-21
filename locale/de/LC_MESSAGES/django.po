@@ -2873,6 +2873,10 @@ msgstr ""
 "Tage einer wiederkehrenden ganztägigen Veranstaltung, die übersprungen werden, zum Beispiel ein "
 "Feiertag. Wenn Sie das Feld leer lassen, wird kein Tag übersprungen."
 
+#: apps/manager/fitment_forms.py
+msgid "Days of notice before deletion"
+msgstr "Tage Vorankündigung vor der Löschung"
+
 #: apps/manager/templates/manager/shop/money_statement.html
 msgid "Debits"
 msgstr "Belastungen"
@@ -5227,6 +5231,10 @@ msgstr "Monat"
 #: apps/events/templates/events/_links.html
 msgid "Month calendar"
 msgstr "Monatskalender"
+
+#: apps/manager/fitment_forms.py
+msgid "Months without use before deletion"
+msgstr "Monate ohne Nutzung vor der Löschung"
 
 #: themes/base/templates/components/help_entry.html
 msgid "More help"
@@ -8069,6 +8077,11 @@ msgstr ""
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
 msgstr "Speichern Sie zuerst Ihre Änderungen: Es wird der zuletzt gespeicherte Entwurf eingereicht."
+
+#: apps/manager/fitment_forms.py
+msgid "Saved items unused for this long are deleted from customer accounts."
+msgstr ""
+"Gespeicherte Einträge, die so lange nicht genutzt wurden, werden aus den Kundenkonten gelöscht."
 
 #: apps/manager/fitment_views.py apps/manager/views.py
 msgid "Saved."
@@ -11510,6 +11523,10 @@ msgstr ""
 #: apps/vendors/models.py
 msgid "The seller."
 msgstr "Der Verkäufer."
+
+#: apps/manager/fitment_forms.py
+msgid "The service email goes out this many days before. Shorter than the months."
+msgstr "Die Service-E-Mail geht so viele Tage vorher raus. Kürzer als die Monate."
 
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt

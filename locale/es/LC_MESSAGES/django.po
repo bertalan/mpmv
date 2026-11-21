@@ -2839,6 +2839,10 @@ msgstr ""
 "Días de un evento recurrente de todo el día que se omiten, por ejemplo un día festivo. Si lo deja "
 "vacío, no se omite ningún día."
 
+#: apps/manager/fitment_forms.py
+msgid "Days of notice before deletion"
+msgstr "Días de aviso antes de la eliminación"
+
 #: apps/manager/templates/manager/shop/money_statement.html
 msgid "Debits"
 msgstr "Cargos"
@@ -5177,6 +5181,10 @@ msgstr "Mes"
 #: apps/events/templates/events/_links.html
 msgid "Month calendar"
 msgstr "Calendario del mes"
+
+#: apps/manager/fitment_forms.py
+msgid "Months without use before deletion"
+msgstr "Meses sin uso antes de la eliminación"
 
 #: themes/base/templates/components/help_entry.html
 msgid "More help"
@@ -8001,6 +8009,11 @@ msgstr ""
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
 msgstr "Guarde primero los cambios: se envía el último borrador guardado."
+
+#: apps/manager/fitment_forms.py
+msgid "Saved items unused for this long are deleted from customer accounts."
+msgstr ""
+"Los elementos guardados sin uso durante este tiempo se eliminan de las cuentas de los clientes."
 
 #: apps/manager/fitment_views.py apps/manager/views.py
 msgid "Saved."
@@ -11386,6 +11399,10 @@ msgstr ""
 #: apps/vendors/models.py
 msgid "The seller."
 msgstr "El vendedor."
+
+#: apps/manager/fitment_forms.py
+msgid "The service email goes out this many days before. Shorter than the months."
+msgstr "El correo de servicio sale tantos días antes. Más corto que los meses."
 
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
