@@ -877,6 +877,7 @@ ROUTE_GUIDE: dict[str, str] = {
     "customer_orders": "customer:account",
     "withdrawal": "customer:withdrawal",
     "withdrawal_confirm": "customer:withdrawal",
+    "garage_account": "customer:account",
     "privacy_account": "customer:account",
     "privacy_requests": "customer:account",
     "vendors:apply": "vendor:getting-started",
