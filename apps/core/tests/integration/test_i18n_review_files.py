@@ -8,7 +8,7 @@ import pytest
 from openpyxl import Workbook, load_workbook
 
 from apps.core.audit import AuditContext
-from apps.core.i18n import primary_language
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.i18n_review import engine
 from apps.core.i18n_review.engine import Rule
 from apps.core.i18n_review.services import ImportReport, export_catalog, import_file
@@ -112,7 +112,7 @@ def test_read_me_lists_every_rule_in_german_for_german(locale: Path, tmp_path: P
         assert engine.rule_text(rule, "de") in text
 
 
-@pytest.mark.parametrize("lang", [primary_language(), other_language(), "de", "fr", "es"])
+@pytest.mark.parametrize("lang", configured_languages())
 def test_each_language_gets_its_own_read_me_and_banner(tmp_path: Path, lang: str) -> None:
     loc = tmp_path / "loc"
     _po(loc, lang, ROWS)
@@ -163,7 +163,9 @@ def test_po_format_for_poedit(locale: Path, tmp_path: Path) -> None:
 def test_a_language_without_a_catalog_exports_every_text_as_missing(tmp_path: Path) -> None:
     loc = tmp_path / "loc"
     _po(loc, other_language(), ROWS)
-    path = export_catalog(lang="fr", scope="all", fmt="xlsx", out_dir=tmp_path, locale_dir=loc)
+    path = export_catalog(
+        lang=primary_language(), scope="all", fmt="xlsx", out_dir=tmp_path, locale_dir=loc
+    )
     ws = load_workbook(path).worksheets[1]
     assert {r[7].value for r in ws.iter_rows(min_row=3)} == {"missing"}
 
@@ -534,11 +536,12 @@ def test_existing_file_modes_are_kept_and_new_files_are_0644(locale: Path, tmp_p
     assert (folder / "django.po").stat().st_mode & 0o777 == 0o640
     assert (folder / "django.mo").stat().st_mode & 0o777 == 0o664
 
-    fr = export_catalog(lang="fr", scope="all", fmt="xlsx", out_dir=tmp_path, locale_dir=locale)
+    fresh = next(code for code in (other_language(), primary_language()) if code != "de")
+    fr = export_catalog(lang=fresh, scope="all", fmt="xlsx", out_dir=tmp_path, locale_dir=locale)
     wb = load_workbook(fr)
     wb.worksheets[1].cell(row=3, column=6).value = "Bonjour %(name)s"
     wb.save(fr)
     import_file(fr, locale_dir=locale, ctx=CTX)
-    created = locale / "fr" / "LC_MESSAGES"
+    created = locale / fresh / "LC_MESSAGES"
     assert (created / "django.po").stat().st_mode & 0o777 == 0o644
     assert (created / "django.mo").stat().st_mode & 0o777 == 0o644

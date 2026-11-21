@@ -16,15 +16,17 @@ import pytest
 from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.test import Client
-from django.utils import timezone
+from django.utils import timezone, translation
 from wagtail.models import Locale, Site
 
 from apps.accounts.models import User
 from apps.cms.services import seed_site
+from apps.core.i18n import configured_languages, primary_language
 from apps.events import services
 from apps.events.models import EventIndexPage, EventPage, PolicyMode, VendorEventPolicy
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from tests.i18n import language_prefix, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
@@ -39,6 +41,16 @@ def _site() -> None:
 
 def _locale(code: str) -> Locale:
     return Locale.objects.get(language_code=code)
+
+
+def _list(code: str, tail: str = "") -> str:
+    """The event list of a language, whatever the primary language is."""
+    return f"{language_prefix(code)}/events/{tail}"
+
+
+def _name(code: str) -> str:
+    """The language's name in that language ("Deutsch"), as the fallback label shows it."""
+    return str(translation.get_language_info(code)["name_local"])
 
 
 def _fresh(page: EventPage) -> EventPage:
@@ -230,25 +242,26 @@ def _article(html: str, title: str) -> str:
 def test_the_italian_list_shows_the_german_event_with_lang_hreflang_and_the_language_name(
     client: Client,
 ) -> None:
-    page = Fixture().create("de", title="Herbstmesse")
-    html = _get(client, "/it/events/")
+    original = other_language()
+    page = Fixture().create(original, title="Herbstmesse")
+    html = _get(client, _list(primary_language()))
     article = _article(html, "Herbstmesse")
-    assert re.search(r"<article[^>]*\blang=\"de\"", article)
+    assert re.search(rf"<article[^>]*\blang=\"{original}\"", article)
     link = re.search(r"<a [^>]*>", article)
     assert link
-    assert 'hreflang="de"' in link.group(0)
-    assert f'href="/de/events/{page.slug}/"' in link.group(0)
-    assert "Deutsch" in article
-    assert "1 event" in html
+    assert f'hreflang="{original}"' in link.group(0)
+    assert f'href="{page.url}"' in link.group(0)
+    assert _name(original) in article
+    assert html.count("event-summary") == 1  # the one event of the count line
 
 
 def test_after_an_italian_translation_the_list_shows_it_without_a_lang_override(
     client: Client,
 ) -> None:
     fixture = Fixture()
-    page = fixture.create("de", title="Herbstmesse")
-    italian = fixture.translate(page, "it", title="Fiera d'autunno")
-    html = _get(client, "/it/events/")
+    page = fixture.create(other_language(), title="Herbstmesse")
+    italian = fixture.translate(page, primary_language(), title="Fiera d'autunno")
+    html = _get(client, _list(primary_language()))
     article = _article(html, "Fiera d&#x27;autunno")
     assert not re.search(r"<article[^>]*\blang=", article)
     assert f'href="{italian.url}"' in article
@@ -269,41 +282,44 @@ def test_the_english_list_falls_back_to_the_original_not_to_another_translation(
     client: Client,
 ) -> None:
     fixture = Fixture()
-    page = fixture.create("de", title="Herbstmesse")
-    fixture.translate(page, "it", title="Fiera d'autunno")
-    html = _get(client, "/events/")
+    original = other_language()
+    page = fixture.create(original, title="Herbstmesse")
+    fixture.translate(page, third_language(), title="Fiera d'autunno")
+    html = _get(client, _list(primary_language()))
     article = _article(html, "Herbstmesse")
-    assert re.search(r"<article[^>]*\blang=\"de\"", article)
+    assert re.search(rf"<article[^>]*\blang=\"{original}\"", article)
     assert "Fiera" not in html
 
 
 def test_the_fallback_marks_stay_on_the_month_view(client: Client) -> None:
-    Fixture().create("de", title="Herbstmesse")
+    original = other_language()
+    Fixture().create(original, title="Herbstmesse")
     start = timezone.now() + dt.timedelta(days=10)
-    html = _get(client, f"/it/events/calendar/{start:%Y-%m}/")
-    assert 'lang="de"' in _article(html, "Herbstmesse")
-    assert "Deutsch" in _article(html, "Herbstmesse")
+    html = _get(client, _list(primary_language(), f"calendar/{start:%Y-%m}/"))
+    assert f'lang="{original}"' in _article(html, "Herbstmesse")
+    assert _name(original) in _article(html, "Herbstmesse")
 
 
 def test_only_events_in_filter_limits_the_list_to_real_translations(client: Client) -> None:
     fixture = Fixture()
-    german = fixture.create("de", title="Herbstmesse")
-    both = fixture.create("de", title="Frühlingsmesse")
-    fixture.translate(both, "it", title="Fiera di primavera")
-    html = _get(client, "/it/events/?translated=1")
+    url = _list(primary_language())
+    german = fixture.create(other_language(), title="Herbstmesse")
+    both = fixture.create(other_language(), title="Frühlingsmesse")
+    fixture.translate(both, primary_language(), title="Fiera di primavera")
+    html = _get(client, f"{url}?translated=1")
     assert "Fiera di primavera" in html
     assert "Herbstmesse" not in html
-    assert "1 event" in html
-    assert 'name="translated"' in _get(client, "/it/events/")
+    assert html.count("event-summary") == 1  # the one event of the count line
+    assert 'name="translated"' in _get(client, url)
     assert german.slug  # the fallback event stays in the unfiltered list
-    assert "Herbstmesse" in _get(client, "/it/events/")
+    assert "Herbstmesse" in _get(client, url)
 
 
 def test_the_only_events_filter_is_noindex_and_keeps_the_choice_in_the_form(
     client: Client,
 ) -> None:
-    Fixture().create("de")
-    html = _get(client, "/it/events/?translated=1")
+    Fixture().create(other_language())
+    html = _get(client, f"{_list(primary_language())}?translated=1")
     assert re.search(r'<meta name="robots" content="noindex', html)
     assert re.search(r'<input[^>]*name="translated"[^>]*checked', html)
 
@@ -312,13 +328,14 @@ def test_the_fallback_follows_the_original_even_when_the_translation_is_a_draft(
     client: Client,
 ) -> None:
     fixture = Fixture()
-    page = fixture.create("de", title="Herbstmesse")
+    original = other_language()
+    page = fixture.create(original, title="Herbstmesse")
     services.add_event_translation(
-        fixture.user, page, _locale("it"), {"title": "Bozza", "summary": "x"}
+        fixture.user, page, _locale(primary_language()), {"title": "Bozza", "summary": "x"}
     )
-    html = _get(client, "/it/events/")
+    html = _get(client, _list(primary_language()))
     assert "Bozza" not in html
-    assert 'lang="de"' in _article(html, "Herbstmesse")
+    assert f'lang="{original}"' in _article(html, "Herbstmesse")
 
 
 def test_events_for_locale_returns_each_event_once_in_the_best_language() -> None:
@@ -340,29 +357,44 @@ def test_a_hidden_event_leaves_every_language_list(client: Client) -> None:
     from apps.accounts.tests.factories import UserFactory
 
     fixture = Fixture()
-    page = fixture.create("de", title="Herbstmesse")
+    page = fixture.create(other_language(), title="Herbstmesse")
     services.hide_event(UserFactory.create(is_staff=True, is_superuser=True), page, "spam")
-    assert "Herbstmesse" not in _get(client, "/it/events/")
+    assert "Herbstmesse" not in _get(client, _list(primary_language()))
 
 
 # --- hreflang with translations
 
 
-def test_hreflang_lists_existing_translations_with_x_default_on_the_english_one(
+def test_hreflang_lists_existing_translations_with_x_default_on_the_original(
     client: Client,
 ) -> None:
+    # Two configured languages other than English: x-default falls on the original.
+    codes = [code for code in configured_languages() if code != "en"]
+    if len(codes) < 2:
+        pytest.skip("needs two configured languages other than English")
+    translated, original = codes[0], codes[1]
     fixture = Fixture()
-    page = fixture.create("de")
-    fixture.translate(page, "it")
+    page = fixture.create(original)
+    fixture.translate(page, translated)
     html = _get(client, page.url)
     alternates = re.findall(r'<link rel="alternate" hreflang="([^"]+)" href="([^"]+)"', html)
-    assert [code for code, _url in alternates] == ["it", "de", "x-default"]
-    default = dict(alternates)["x-default"]
-    assert default.endswith(f"/de/events/{page.slug}/")
+    assert [code for code, _url in alternates] == [translated, original, "x-default"]
+    assert dict(alternates)["x-default"].endswith(page.url)
+
+
+def test_hreflang_x_default_follows_the_english_translation(client: Client) -> None:
+    if "en" not in configured_languages():
+        pytest.skip("English is not configured: x-default stays on the original")
+    others = [code for code in configured_languages() if code != "en"]
+    if len(others) < 2:
+        pytest.skip("needs two configured languages other than English")
+    fixture = Fixture()
+    page = fixture.create(others[1])
+    fixture.translate(page, others[0])
     fixture.translate(page, "en", title="Autumn fair")
     html = _get(client, page.url)
     by_code = dict(re.findall(r'<link rel="alternate" hreflang="([^"]+)" href="([^"]+)"', html))
-    assert set(by_code) == {"de", "it", "en", "x-default"}
+    assert set(by_code) == {others[1], others[0], "en", "x-default"}
     assert by_code["x-default"] == by_code["en"]
 
 
@@ -370,15 +402,17 @@ def test_a_draft_translation_is_not_in_hreflang_and_has_no_url_to_visitors(
     client: Client,
 ) -> None:
     fixture = Fixture()
-    page = fixture.create("de")
+    page = fixture.create(other_language())
+    code = primary_language()
     draft = services.add_event_translation(
-        fixture.user, page, _locale("fr"), {"title": "Salon", "summary": "x"}
+        fixture.user, page, _locale(code), {"title": "Salon", "summary": "x"}
     ).page
     assert draft is not None
     html = _get(client, page.url)
-    assert 'hreflang="fr"' not in html
-    _get(client, f"/fr/events/{draft.slug}/", 404)
-    assert f"/fr/events/{draft.slug}/" not in client.get("/sitemap-fr-events.xml").content.decode()
+    assert f'hreflang="{code}"' not in html
+    draft_url = f"{language_prefix(code)}/events/{draft.slug}/"
+    _get(client, draft_url, 404)
+    assert draft_url not in client.get(f"/sitemap-{code}-events.xml").content.decode()
 
 
 def test_no_fallback_copy_of_an_event_page_exists_in_a_language_without_a_translation(
@@ -395,14 +429,15 @@ def test_no_fallback_copy_of_an_event_page_exists_in_a_language_without_a_transl
 
 def test_the_sitemap_of_a_language_lists_its_translation_only(client: Client) -> None:
     fixture = Fixture()
-    page = fixture.create("de")
-    italian = fixture.translate(page, "it")
-    it_map = client.get("/sitemap-it-events.xml").content.decode()
-    de_map = client.get("/sitemap-de-events.xml").content.decode()
-    assert f"/it/events/{italian.slug}/" in it_map
-    assert f"/de/events/{page.slug}/" not in it_map
-    assert f"/de/events/{page.slug}/" in de_map
-    assert f"/it/events/{italian.slug}/" not in de_map
+    original, translated = other_language(), primary_language()
+    page = fixture.create(original)
+    italian = fixture.translate(page, translated)
+    t_map = client.get(f"/sitemap-{translated}-events.xml").content.decode()
+    o_map = client.get(f"/sitemap-{original}-events.xml").content.decode()
+    assert italian.url in t_map
+    assert page.url not in t_map
+    assert page.url in o_map
+    assert italian.url not in o_map
 
 
 # --- Case 11: synchronised structured fields and moderation
@@ -410,9 +445,11 @@ def test_the_sitemap_of_a_language_lists_its_translation_only(client: Client) ->
 
 def test_changing_the_dates_on_the_original_changes_every_translation() -> None:
     fixture = Fixture()
-    page = fixture.create("de")
-    italian = fixture.translate(page, "it")
-    french = fixture.translate(page, "fr")
+    page = fixture.create(other_language())
+    italian = fixture.translate(page, primary_language())
+    french = (
+        fixture.translate(page, third_language()) if len(configured_languages()) > 2 else italian
+    )
     assert page.starts_at is not None
     new_start = page.starts_at + dt.timedelta(days=3)
     services.save_event_draft(
@@ -421,8 +458,8 @@ def test_changing_the_dates_on_the_original_changes_every_translation() -> None:
         page,
     )
     services.submit_event(fixture.user, page)
-    for translation in (italian, french):
-        fresh = _fresh(translation)
+    for translated in (italian, french):
+        fresh = _fresh(translated)
         assert fresh.starts_at == new_start
         assert fresh.ends_at == new_start + dt.timedelta(hours=2)
         assert fresh.city == "Merano"
