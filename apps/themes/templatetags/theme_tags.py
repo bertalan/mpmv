@@ -17,7 +17,7 @@ from django.utils.safestring import SafeString
 
 from .. import engine
 from ..appearance import active_payment_appearance
-from ..services import palette_href
+from ..services import active_palette, palette_href
 
 register = template.Library()
 
@@ -44,10 +44,17 @@ def heading_level(value: object, default: int = 3) -> int:
     return engine.heading_level(value, default)
 
 
-@register.simple_tag
-def payment_appearance_json() -> str:
-    """The Stripe Payment Element appearance of the active theme as JSON, for a data attribute."""
-    return json.dumps(active_payment_appearance(), sort_keys=True)
+@register.simple_tag(takes_context=True)
+def payment_appearance_json(context: template.Context) -> str:
+    """The Stripe Payment Element appearance of the active theme as JSON, for a data attribute.
+
+    In the site palette when one is set and passes the contrast check (THM.31), the same rule
+    as the palette stylesheet; without a request, the theme's own colours.
+    """
+    request = context.get("request")
+    palette = active_palette(request) if request is not None else None
+    roles = palette.roles() if palette is not None else None
+    return json.dumps(active_payment_appearance(roles), sort_keys=True)
 
 
 _CHOICE_GROUPS = (forms.RadioSelect, forms.CheckboxSelectMultiple)

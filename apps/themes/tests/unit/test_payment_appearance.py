@@ -6,6 +6,8 @@ from the resolved tokens of the active theme: colours, font family and radius.
 
 import json
 
+import pytest
+
 from apps.themes.appearance import active_payment_appearance, payment_appearance
 from apps.themes.build import read_manifest_sources, read_tokens
 from apps.themes.engine import build_registry, resolve_tokens
@@ -56,3 +58,53 @@ def test_every_text_pair_of_the_appearance_meets_aa() -> None:
 def test_the_active_theme_chooses_the_appearance() -> None:
     with use_theme("ride"):
         assert active_payment_appearance()["variables"]["colorPrimary"] == "#C40417"
+
+
+# --- THM.31: the site palette reaches the payment iframe (spec 14 §14.12)
+
+
+def palette_roles(slug: str) -> dict[str, str]:
+    from apps.themes.palettes import PRESETS, ROLES
+
+    return {role: PRESETS[slug][role] for role in ROLES}
+
+
+@pytest.mark.parametrize("slug", ["red", "blue", "petrol"])
+def test_the_appearance_follows_the_palette_primary_text_and_surface(slug: str) -> None:
+    from apps.themes.palettes import PALETTE_LAYER, palette_tokens
+
+    roles = palette_roles(slug)
+    with use_theme("ride"):
+        value = active_payment_appearance(roles)
+    chain = ("ride", "base")
+    expected = resolve_tokens(
+        [PALETTE_LAYER, *chain],
+        {
+            **{s: read_tokens(SHIPPED_THEMES / s) for s in chain},
+            PALETTE_LAYER: palette_tokens(roles),
+        },
+    )
+    variables = value["variables"]
+    assert variables["colorPrimary"] == roles["primary"] == expected["color.accent"]
+    assert variables["colorText"] == expected["color.text"]
+    assert variables["colorBackground"] == expected["color.surface"]
+    assert value["rules"][".Input"]["border"] == f"1px solid {roles['control_border']}"
+    assert value["rules"][".Input:focus"]["outline"] == f"2px solid {roles['focus']}"
+
+
+def test_blue_and_petrol_leave_the_red_primary_behind() -> None:
+    with use_theme("ride"):
+        primaries = {
+            slug: active_payment_appearance(palette_roles(slug))["variables"]["colorPrimary"]
+            for slug in ("blue", "petrol")
+        }
+    assert "#C40417" not in primaries.values()
+
+
+def test_no_palette_means_the_theme_defaults() -> None:
+    with use_theme("ride"):
+        assert active_payment_appearance(None) == active_payment_appearance()
+        assert (
+            active_payment_appearance()["variables"]
+            == payment_appearance(tokens_of("ride"))["variables"]
+        )

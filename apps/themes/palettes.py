@@ -173,6 +173,21 @@ def palette_tokens(palette: Mapping[str, str]) -> dict[str, str]:
     return tokens
 
 
+def resolve_with_palette(
+    chain: Sequence[str],
+    tokens_by_theme: Mapping[str, Mapping[str, str]],
+    palette: Mapping[str, str],
+) -> dict[str, str]:
+    """The resolved tokens of a theme (its `chain`, child first) with `palette` on top.
+
+    The palette is one more theme above the chain, so a token derived from a palette token
+    (`button.bg = "{color.accent}"`) follows it. Shared by the palette stylesheet and the Stripe
+    appearance, so the payment iframe and the page always agree.
+    """
+    layered = {**tokens_by_theme, PALETTE_LAYER: palette_tokens(palette)}
+    return resolve_tokens([PALETTE_LAYER, *chain], layered)
+
+
 def render_palette_css(
     chain: Sequence[str],
     tokens_by_theme: Mapping[str, Mapping[str, str]],
@@ -188,9 +203,8 @@ def render_palette_css(
     `bootstrap` the `--bs-*` variables of the Bootstrap map change too. Empty when the palette
     changes nothing (a theme already in that palette).
     """
-    layered = {**tokens_by_theme, PALETTE_LAYER: palette_tokens(palette)}
     before = resolve_tokens(chain, tokens_by_theme)
-    after = resolve_tokens([PALETTE_LAYER, *chain], layered)
+    after = resolve_with_palette(chain, tokens_by_theme, palette)
     changed = {css_name(k): v for k, v in after.items() if before.get(k) != v}
     if bootstrap:
         try:
