@@ -39,3 +39,10 @@ def test_exception_keeps_the_role_notice() -> None:
 
 def test_swept_apps_are_clean_now() -> None:
     assert british.check() == 0
+
+
+def test_the_scope_matches_whole_app_directories_only() -> None:
+    """`apps/core_x` or `apps/api_v2` is not swept by accident (review of #960)."""
+    assert british.in_scope(["apps/core/templates/x.html:3"])
+    assert not british.in_scope(["apps/core_x/templates/x.html:3"])
+    assert not british.in_scope(["apps/api_v2/views.py:9"])

@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # Apps swept so far (I18N.23). Paths are matched on the first two parts of the source reference.
-ALLOWED_APPS = ("apps/core", "apps/accounts", "apps/manager", "apps/api", "apps/mcp")
+ALLOWED_APPS = ("apps/core/", "apps/accounts/", "apps/manager/", "apps/api/", "apps/mcp/")
 
 # American word (regex, whole word, case-insensitive) -> British spelling to use instead.
 US_TO_UK: dict[str, str] = {
@@ -59,7 +59,7 @@ US_TO_UK: dict[str, str] = {
     r"judgment": "judgement",
 }
 
-# msgid prefixes that keep a listed word, with the reason.
+# Exact msgids that keep a listed word, with the reason.
 EXCEPTIONS: dict[str, str] = {
     # "Catalog and moderation" is the name of a role group stored in the database (migration
     # 0003); renaming it needs a data migration of its own, so the notice keeps naming it.
