@@ -2863,6 +2863,10 @@ msgstr ""
 "Giorni di un evento ripetuto che dura tutto il giorno e che vengono saltati, per esempio un giorno"
 " festivo. Se lo lasci vuoto, non si salta nessun giorno."
 
+#: apps/manager/fitment_forms.py
+msgid "Days of notice before deletion"
+msgstr "Giorni di preavviso prima della cancellazione"
+
 #: apps/manager/templates/manager/shop/money_statement.html
 msgid "Debits"
 msgstr "Addebiti"
@@ -5210,6 +5214,10 @@ msgstr "Mese"
 msgid "Month calendar"
 msgstr "Calendario del mese"
 
+#: apps/manager/fitment_forms.py
+msgid "Months without use before deletion"
+msgstr "Mesi senza uso prima della cancellazione"
+
 #: themes/base/templates/components/help_entry.html
 msgid "More help"
 msgstr "Altro aiuto"
@@ -6104,6 +6112,10 @@ msgstr ""
 "Solo su richiesta del cliente, nello stesso paese e nello stesso territorio fiscale. Registra come"
 " e quando lo ha chiesto il cliente e le sue parole."
 
+#: apps/payments/stray.py
+msgid "Only Support or the platform owner may close this alert."
+msgstr "Solo l'assistenza o il titolare della piattaforma possono chiudere questo avviso."
+
 #: apps/orders/staff_drafts.py
 msgid "Only Support or the platform owner may prepare a cart."
 msgstr "Solo l'assistenza o il titolare della piattaforma possono preparare un carrello."
@@ -6464,7 +6476,7 @@ msgstr ""
 "Altri prodotti che vuoi suggerire insieme a questo, per esempio un modello migliore. Facoltativo: "
 "lascialo vuoto per non suggerire nulla."
 
-#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: apps/catalog/templates/catalog/includes/other_sellers.html apps/seo/page_builders.py
 #: themes/ride/templates/catalog/includes/other_sellers.html
 msgid "Other sellers of this product"
 msgstr "Altri venditori di questo prodotto"
@@ -6968,6 +6980,18 @@ msgid ""
 msgstr ""
 "Indichi a cosa è adatto questo prodotto prima di pubblicarlo: scelga gli articoli compatibili "
 "nella scheda Compatibilità, oppure dichiari che è adatto a tutto."
+
+#: apps/payments/stray.py
+msgid "Please give the reason for closing this alert."
+msgstr "Indichi il motivo per cui chiude questo avviso."
+
+#: apps/vendors/services.py
+msgid ""
+"Please give us a phone number for your shop before you publish products: sellers who sell to "
+"consumers must show one in the withdrawal information. Send it to the platform staff."
+msgstr ""
+"Ci comunichi un numero di telefono del Suo negozio prima di pubblicare prodotti: chi vende a "
+"consumatori deve indicarlo nelle informazioni sul recesso. Lo invii allo staff della piattaforma."
 
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
@@ -8022,6 +8046,11 @@ msgstr ""
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
 msgstr "Salvi prima le modifiche: viene inviata l'ultima bozza salvata."
+
+#: apps/manager/fitment_forms.py
+msgid "Saved items unused for this long are deleted from customer accounts."
+msgstr ""
+"Gli elementi salvati non usati per questo periodo vengono cancellati dagli account dei clienti."
 
 #: apps/manager/fitment_views.py apps/manager/views.py
 msgid "Saved."
@@ -11419,6 +11448,10 @@ msgstr ""
 msgid "The seller."
 msgstr "Il venditore."
 
+#: apps/manager/fitment_forms.py
+msgid "The service email goes out this many days before. Shorter than the months."
+msgstr "L'e-mail di servizio parte tanti giorni prima. Più breve dei mesi."
+
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
 #: apps/manager/templates/manager/platform/termination_detail.html
@@ -14791,7 +14824,8 @@ msgstr ""
 "Lei ha il diritto di recedere dal presente contratto entro %(days)s giorni senza indicarne le "
 "ragioni."
 
-#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
+#: apps/catalog/templates/catalog/product.html apps/seo/page_builders.py
+#: themes/ride/templates/catalog/product.html
 msgid "You may also like"
 msgstr "Potrebbe piacerti anche"
 
@@ -15146,6 +15180,26 @@ msgstr "Le tue sessioni"
 msgid "Your shop cancelled order %(order_number)s and the customer was refunded in full."
 msgstr ""
 "Il tuo negozio ha annullato l’ordine %(order_number)s e il cliente è stato rimborsato per intero."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to %(support_email)s; until then"
+" you cannot publish products."
+msgstr ""
+"Il Suo negozio non ha un numero di telefono. Chi vende a consumatori deve indicarlo: gli "
+"acquirenti lo vedono nelle informazioni sul recesso e nella conferma d’ordine. Lo invii a "
+"%(support_email)s; fino ad allora non può pubblicare prodotti."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to the platform staff; until "
+"then you cannot publish products."
+msgstr ""
+"Il Suo negozio non ha un numero di telefono. Chi vende a consumatori deve indicarlo: gli "
+"acquirenti lo vedono nelle informazioni sul recesso e nella conferma d’ordine. Lo invii allo staff"
+" della piattaforma; fino ad allora non può pubblicare prodotti."
 
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."

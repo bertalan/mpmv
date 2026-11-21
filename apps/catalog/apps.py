@@ -53,4 +53,13 @@ class CatalogConfig(AppConfig):
     }
 
     def ready(self) -> None:
+        from apps.vendors.services import consumer_phone_publish_messages
+
         from . import signals  # noqa: F401  (connects the CAT.14 upsell guard)
+        from .publishing import register_publication_check
+
+        # CMP.41 follow-up (owner decision 2026-11-19): a seller to consumers needs a phone
+        # before its products go live. The rule is the vendors app's; the catalog registers it.
+        register_publication_check(
+            "vendor_phone", lambda product: consumer_phone_publish_messages(product.vendor)
+        )

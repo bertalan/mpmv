@@ -58,6 +58,7 @@ SCOPES = (
     "apps/manager",
     "apps/fitment/templates/email",  # the garage inactivity notice (FIT.5 3/3)
     "apps/fitment/services.py",  # the publish gate message (FIT.18), shown to vendors and staff
+    "apps/payments/stray.py",  # closing a stray-payment alert (PAY.4), staff, formal
     "apps/accounts",
     "apps/orders/templates",
     "apps/seo",
@@ -475,6 +476,38 @@ def is_reviewed(entry: polib.POEntry) -> bool:
     return any(line.strip() == REVIEWED_MARK for line in entry.tcomment.splitlines())
 
 
+REVIEW_HEADER = "# review: sensitive entries reviewed (I18N.19)"
+
+
+def _mark_entry_block(block: str) -> str:
+    """`block` with a `# reviewed` translator comment, unless a sensitive entry has it already."""
+    # A dummy header first: polib reads leading comments of a bare block as the file header.
+    entry = polib.pofile('msgid ""\nmsgstr ""\n\n' + block + "\n")[0:1]
+    if not entry or sensitive_group(entry[0]) is None or is_reviewed(entry[0]):
+        return block
+    lines = block.split("\n")
+    at = next(i for i, line in enumerate(lines) if not line.startswith("# "))
+    return "\n".join([*lines[:at], "# " + REVIEWED_MARK, *lines[at:]])
+
+
+def mark_reviewed(lang: str) -> int:
+    """Mark every sensitive entry of `lang` `# reviewed` and add the header line.
+
+    A text edit: nothing is re-wrapped or re-ordered (the translator's act, after the review of
+    `review-export`; never run it on an unreviewed catalog). Returns the entries newly marked.
+    """
+    path = _po_path(lang)
+    head, _, rest = path.read_text(encoding="utf-8").partition("\n\n")
+    blocks = [head, *rest.split("\n\n")]
+    changed = [_mark_entry_block(b) for b in blocks[1:]]
+    count = sum(1 for old, new in zip(blocks[1:], changed, strict=True) if old != new)
+    if REVIEW_HEADER not in head:
+        top, _, tail = head.partition("\nmsgid")
+        head = f"{top}\n{REVIEW_HEADER}\nmsgid{tail}"
+    path.write_text("\n\n".join([head, *changed]), encoding="utf-8")
+    return count
+
+
 def review_rows(lang: str, *, everything: bool = False, pending: bool = False) -> list[list[str]]:
     rows = []
     for e in polib.pofile(str(_po_path(lang))):
@@ -570,6 +603,11 @@ if __name__ == "__main__":
         ns = ap.parse_args(sys.argv[2:])
         n = review_export(ns.lang, ns.out, everything=ns.everything, pending=ns.pending)
         print(f"{n} entries", file=sys.stderr)
+        raise SystemExit(0)
+    if command == "mark-reviewed":
+        ap = argparse.ArgumentParser(prog="i18n_catalog.py mark-reviewed")
+        ap.add_argument("lang", choices=LANGUAGES)
+        print(f"{mark_reviewed(ap.parse_args(sys.argv[2:]).lang)} entries marked", file=sys.stderr)
         raise SystemExit(0)
     if command == "extract":
         extract()

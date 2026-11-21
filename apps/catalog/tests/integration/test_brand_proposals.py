@@ -309,7 +309,7 @@ def test_merging_redirects_every_language_and_keeps_earlier_redirects_one_hop() 
     paths = dict(Redirect.objects.values_list("source_path", "target_path"))
     assert paths[localized("/brand/old/")] == localized("/brand/new/")
     assert paths[localized("/brand/vecchio/", other_language())] == localized(
-        localized("/brand/nuovo/"), other_language()
+        "/brand/nuovo/", other_language()
     )
     earlier.refresh_from_db()
     assert earlier.target_path == localized("/brand/new/")

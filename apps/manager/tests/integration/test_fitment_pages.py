@@ -152,6 +152,8 @@ def test_the_scheme_settings_are_saved_through_the_service(client: Client) -> No
         "year_min": "1950",
         "year_max_offset": "2",
         "max_profiles": "5",
+        "garage_inactivity_months": "18",
+        "garage_notice_days": "20",
         "confirm": "1",
     }
     assert client.post(SCHEME, data).status_code == 302

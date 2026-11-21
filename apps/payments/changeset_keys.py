@@ -11,3 +11,11 @@ CONNECTED_ACCOUNT_UPDATED = "payments.connected_account.updated"
 PAYMENT_DUPLICATE_FLAGGED = "payments.payment.duplicate_flagged"
 PAYMENT_DUPLICATE_REFUNDED = "payments.payment.duplicate_refunded"
 PAYMENT_DUPLICATE_REFUND_FAILED = "payments.payment.duplicate_refund_failed"
+
+# PAY.4 (owner decision 2026-11-21): a capture on a cancelled order, or of another amount or
+# currency, is not refunded automatically; staff are alerted and support refunds it by hand.
+PAYMENT_STRAY_FLAGGED = "payments.payment.stray_flagged"
+# A stray-payment alert closed by Support (by hand, with a reason) or by the nightly job (after
+# 14 days, only with a full refund confirmed); a daily reminder while it stays open.
+PAYMENT_STRAY_CLOSED = "payments.payment.stray_closed"
+PAYMENT_STRAY_REMINDED = "payments.payment.stray_reminded"

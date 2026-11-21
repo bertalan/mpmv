@@ -1303,6 +1303,51 @@ def _audit_payment_problem(
     audit_changes(changeset, ctx=ctx, action=action)
 
 
+def _capture_problem(
+    order: Order, *, amount: Decimal, currency: str, provider_ref: str | None
+) -> tuple[str, dict[str, Any]] | None:
+    """Why a payment cannot pay `order` (not yet paid): the audit action and its detail."""
+    if order.state != "awaiting_payment":
+        return "orders.payment_late", {"state": order.state, "amount": amount}
+    if provider_ref is not None and provider_ref != order.payment_intent_ref:
+        return "orders.payment_ref_mismatch", {
+            "paid_with": provider_ref,
+            "expected": order.payment_intent_ref,
+        }
+    if currency.upper() != CURRENCY or amount != order.grand_total:
+        return "orders.payment_mismatch", {
+            "paid": amount,
+            "currency": currency,
+            "expected": order.grand_total,
+        }
+    return None
+
+
+# PAY.4 (owner decision 2026-11-21): the problems that make a payment a stray capture.
+STRAY_CAPTURE_REASONS = {
+    "orders.payment_late": "late",
+    "orders.payment_mismatch": "mismatch",
+    "orders.payment_ref_mismatch": "wrong_reference",
+}
+
+
+def stray_capture_reason(
+    order_ref: str, *, amount: Decimal, currency: str, provider_ref: str | None = None
+) -> str:
+    """Why a confirmed payment that `mark_order_paid` refused is stray money (PAY.4): "late" when
+    the order is no longer awaiting payment (cancelled), "mismatch" when the amount or currency is
+    not the order's gross total, "wrong_reference" when the payment is not the one started for
+    the order, "unmatched" when no order has that number, "" when the order is paid (the duplicate
+    path). Reads only; the caller alerts staff and refunds nothing (support refunds by hand)."""
+    order = Order.objects.filter(number=order_ref).first() if order_ref else None
+    if order is None:
+        return "unmatched"
+    if order.state in PAID_OR_LATER:
+        return ""
+    found = _capture_problem(order, amount=amount, currency=currency, provider_ref=provider_ref)
+    return STRAY_CAPTURE_REASONS.get(found[0], "") if found else ""
+
+
 def mark_order_paid(
     order_ref: str,
     *,
@@ -1335,24 +1380,9 @@ def mark_order_paid(
             return False
         if order.state in PAID_OR_LATER:
             return False
-        if order.state != "awaiting_payment":
-            problem(order_ref, "orders.payment_late", {"state": order.state, "amount": amount}, ctx)
-            return False
-        if provider_ref is not None and provider_ref != order.payment_intent_ref:
-            problem(
-                order_ref,
-                "orders.payment_ref_mismatch",
-                {"paid_with": provider_ref, "expected": order.payment_intent_ref},
-                ctx,
-            )
-            return False
-        if currency.upper() != CURRENCY or amount != order.grand_total:
-            problem(
-                order_ref,
-                "orders.payment_mismatch",
-                {"paid": amount, "currency": currency, "expected": order.grand_total},
-                ctx,
-            )
+        found = _capture_problem(order, amount=amount, currency=currency, provider_ref=provider_ref)
+        if found is not None:
+            problem(order_ref, *found, ctx)
             return False
         if dry_run:
             return True
