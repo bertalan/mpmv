@@ -189,16 +189,37 @@ CLOSE_JS = """
   };
   const fg = icon ? rgb(getComputedStyle(icon).color).slice(0, 3) : bg;
   const [l1, l2] = [lum(fg), lum(bg)].sort((a, b) => b - a);
+  const ratio = (a, b) => {
+    const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+    return Math.round(((x + 0.05) / (y + 0.05)) * 100) / 100;
+  };
+  // The panel behind the button (its parents), the button's own fill, the icon, the outline.
+  let panel = [255, 255, 255];
+  for (let n = button.parentElement; n && n.nodeType === 1; n = n.parentElement) {
+    const c = rgb(getComputedStyle(n).backgroundColor);
+    if (c[3] >= 1) { panel = c.slice(0, 3); break; }
+  }
+  const own = rgb(getComputedStyle(button).backgroundColor);
+  const fill = own[3] >= 1 ? own.slice(0, 3) : panel;
+  const outline = getComputedStyle(button);
   return {
+    iconOnFill: ratio(fg, fill),
+    fillOnPanel: ratio(fill, panel),
+    outlineOnPanel: ratio(rgb(outline.outlineColor).slice(0, 3), panel),
+    outlineWidth: parseFloat(outline.outlineWidth),
+    outlineStyle: outline.outlineStyle,
     label: button.getAttribute('aria-label'),
     href: use ? use.getAttribute('href') : '',
-    bgImage: getComputedStyle(button).backgroundImage,
-    filter: getComputedStyle(button).filter,
+    bgImage: outline.backgroundImage,
+    filter: outline.filter,
     iconWidth: icon ? icon.getBoundingClientRect().width : 0,
     ratio: Math.round(((l1 + 0.05) / (l2 + 0.05)) * 100) / 100,
   };
 }
 """
+
+
+MEASURED: list[str] = []  # printed with -s: the ratios behind the PR comment
 
 
 def close_failures(page: Page, selector: str) -> list[str]:
@@ -213,6 +234,39 @@ def close_failures(page: Page, selector: str) -> list[str]:
         bad.append(f"{selector} close button: Bootstrap's data: URI or filter applies ({state})")
     if state["ratio"] < 3:
         bad.append(f"{selector} close button: X at {state['ratio']}:1")
+    bad += close_state_failures(page, selector, button)
+    return bad
+
+
+def close_state_failures(page: Page, selector: str, button: Any) -> list[str]:
+    """Hover and keyboard focus: the icon stays at AA on the button's fill, the hover fill is a
+    visible change (3:1 against the panel), the focus outline is drawn at 3:1 against the panel."""
+    bad = []
+    button.hover()
+    page.wait_for_timeout(300)
+    hover = button.evaluate(CLOSE_JS)
+    MEASURED.append(
+        f"{selector} hover: icon {hover['iconOnFill']}:1, fill {hover['fillOnPanel']}:1"
+    )
+    if hover["iconOnFill"] < AA_TEXT:
+        bad.append(f"{selector} close hover: X at {hover['iconOnFill']}:1 on its fill")
+    if hover["fillOnPanel"] < 3:
+        bad.append(f"{selector} close hover: fill at {hover['fillOnPanel']}:1 on the panel")
+    page.mouse.move(0, 0)
+    button.focus()
+    page.keyboard.press("Shift+Tab")
+    page.keyboard.press("Tab")  # focus-visible needs a keyboard-driven focus
+    page.wait_for_timeout(300)
+    focus = button.evaluate(CLOSE_JS)
+    MEASURED.append(
+        f"{selector} focus: icon {focus['iconOnFill']}:1, outline {focus['outlineOnPanel']}:1"
+    )
+    if focus["outlineStyle"] == "none" or focus["outlineWidth"] < 2:
+        bad.append(f"{selector} close focus-visible: no outline ({focus})")
+    if focus["outlineOnPanel"] < 3:
+        bad.append(f"{selector} close focus: outline at {focus['outlineOnPanel']}:1 on the panel")
+    if focus["iconOnFill"] < 3:
+        bad.append(f"{selector} close focus: X at {focus['iconOnFill']}:1")
     return bad
 
 
@@ -279,4 +333,5 @@ def test_menu_text_reaches_aa_contrast_in_every_state(
     bad += failures(page, ".site-header")
     snap(page, f"{tag}-scrolled")
 
+    print("\n".join(sorted(set(MEASURED))))
     assert bad == [], "\n".join(bad)

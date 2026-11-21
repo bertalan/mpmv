@@ -292,9 +292,12 @@
     filter: none;
   }
 
+  /* Hover: a light disc with the dark X. The panels are dark (`--color-surface-inverse`), and the
+     heading colour is nearly the same shade, so it showed no hover. The light surface is over 3:1
+     against the panel (WCAG 1.4.11) and the heading-coloured X on it is over 4.5:1. */
   .btn-close--sprite:hover {
-    background: var(--color-heading);
-    color: var(--color-text-inverse);
+    background: var(--color-surface-sunken);
+    color: var(--color-heading);
   }
 
   #search-modal .modal-title,
