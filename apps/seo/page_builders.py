@@ -319,6 +319,7 @@ def _product(ctx: PageContext) -> list[Node]:
     )
     url = f"{ctx.site}{page.canonical_path}"
     [entity] = [n for n in nodes if n["@type"] in {"Product", "ProductGroup"}]
+    widgets = _product_widget_lists(ctx, url)
     web = ge.webpage_node(
         kind="ItemPage",
         url=url,
@@ -328,8 +329,31 @@ def _product(ctx: PageContext) -> list[Node]:
         description=str(page.short_description or ""),
         breadcrumb_id=f"{url}#breadcrumb",
         main_entity_id=str(entity["@id"]),
+        has_part_ids=[str(node["@id"]) for node in widgets],
     )
-    return [web, *nodes]
+    return [web, *nodes, *widgets]
+
+
+def _product_widget_lists(ctx: PageContext, url: str) -> list[Node]:
+    """The product page's widgets as named `ItemList`s of product ids (spec 10, "Widgets feed
+    the graph"): the related products and the other sellers of the same article. A list item
+    references its product page and repeats no offer; an empty widget adds nothing. The graph is
+    printed on noindex pages too (machine readers), as on the search results page."""
+    with translation.override(ctx.language):
+        widgets = (
+            ("related", str(translation.gettext("You may also like"))),
+            ("other_sellers", str(translation.gettext("Other sellers of this product"))),
+        )
+    nodes = [
+        ge.item_list_node(
+            list_id=f"{url}#{key.replace('_', '-')}",
+            name=name,
+            language=ctx.language,
+            entries=product_entries(ctx, ctx.context.get(key) or ()),
+        )
+        for key, name in widgets
+    ]
+    return [node for node in nodes if node]
 
 
 def _listing(ctx: PageContext) -> list[Node]:
