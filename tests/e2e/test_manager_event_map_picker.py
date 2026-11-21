@@ -93,7 +93,9 @@ def _open(page: Page, live_server: LiveServer, event: EventPage) -> Locator:
 
 def _save(page: Page) -> None:
     page.get_by_role("button", name=translated("Save draft")).click()
-    expect(page.locator("main")).to_contain_text("saved as a draft")
+    expect(page.locator("main")).to_contain_text(
+        translated("The event is saved as a draft. Submit it when it is ready.")
+    )
     expect(page).to_have_url(re.compile(r"/manager/shop/events/[0-9a-f-]+/$"))
 
 

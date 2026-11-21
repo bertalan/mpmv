@@ -31,6 +31,7 @@ from apps.vendors import services as vendor_services
 from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.e2e.test_login_lockout import generic_error
 from tests.e2e.test_vendor_claim import code_from_secret, emailed_link_path
 from tests.i18n import translated
 
@@ -129,7 +130,7 @@ def test_a_failed_login_explains_itself_accessibly(
     expect(secret_field).to_have_attribute("aria-invalid", "true")
     error_id = secret_field.get_attribute("aria-describedby")
     assert error_id
-    expect(page.locator(f"#{error_id}")).to_contain_text("correct email and password")
+    expect(page.locator(f"#{error_id}")).to_contain_text(generic_error())
     _no_axe_violations(page)
     shot("login-error")
     assert csp_violations(page) == []
@@ -211,10 +212,11 @@ def test_a_vendor_claimant_pastes_new_passwords_and_a_code(
     )
     page.goto(f"{live_server.url}{emailed_link_path()}")
     page.get_by_role("button", name=translated("Continue")).click()
+    # The claim pages themselves are not translated yet: their text is English in every language.
     page.get_by_label("VAT number or TIN").fill(vendor.vat_number)
-    page.get_by_role("button", name=translated("Confirm")).click()
+    page.get_by_role("button", name="Confirm").click()
 
-    first = page.get_by_label(translated("Password"), exact=True)
+    first = page.get_by_label("Password", exact=True)
     again = page.get_by_label("Password again")
     expect(first).to_have_attribute("autocomplete", "new-password")
     expect(again).to_have_attribute("autocomplete", "new-password")
@@ -223,7 +225,7 @@ def test_a_vendor_claimant_pastes_new_passwords_and_a_code(
     password = secrets.token_urlsafe(16)
     _paste(page, first, password)
     _paste(page, again, password)
-    toggles = page.get_by_role("button", name=translated("Show password"))
+    toggles = page.get_by_role("button", name="Show password")
     expect(toggles).to_have_count(2)
     toggles.first.click()
     expect(first).to_have_attribute("type", "text")
@@ -231,8 +233,8 @@ def test_a_vendor_claimant_pastes_new_passwords_and_a_code(
     toggles.first.click()
 
     secret = page.get_by_test_id("totp-secret").inner_text()
-    page.get_by_label(translated("Full name")).fill("Claimant Example")
-    _paste(page, page.get_by_label(translated("Authentication code")), code_from_secret(secret))
+    page.get_by_label("Full name").fill("Claimant Example")
+    _paste(page, page.get_by_label("Authentication code"), code_from_secret(secret))
     shot("claim-account-pasted")
     page.get_by_role("button", name="Submit the claim").click()
     expect(page.get_by_text("waiting for approval")).to_be_visible()

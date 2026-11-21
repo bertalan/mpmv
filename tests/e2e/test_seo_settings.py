@@ -46,7 +46,14 @@ def test_on_stage_the_indexing_switch_is_read_only_and_says_why(
     _sign_in(page, live_server)
     page.goto(f"{live_server.url}/admin/seo/settings/")
     expect(page.get_by_role("heading", name=translated("SEO settings"))).to_be_visible()
-    expect(page.get_by_text("Indexing is forced off by the server")).to_be_visible()
+    expect(
+        page.get_by_text(
+            translated(
+                "Indexing is forced off by the server (MPMV_FORCE_NOINDEX or demo mode). Every "
+                "page is noindex and this switch cannot be turned on here."
+            )
+        )
+    ).to_be_visible()
     expect(
         page.get_by_label(translated("Allow search engines to index this site"))
     ).to_be_disabled()

@@ -64,7 +64,7 @@ def test_link_get_then_continue_post_then_step_up_then_approve(
     expect(page.get_by_role("heading", name="Approve document doc-1")).to_be_visible()
     shot("action-page")
 
-    page.get_by_role("button", name=translated("Approve")).click()
+    page.get_by_role("button", name="Approve").click()
     expect(page.get_by_text("approved doc-1")).to_be_visible()
     shot("approved")
     assert [("doc-1", user.pk)] == APPROVED

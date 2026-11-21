@@ -29,8 +29,11 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 
 def _press(page: Page, name: str) -> None:
-    """Reach a button with the keyboard focus and press Enter, as a keyboard user does."""
-    page.get_by_role("button", name=name).first.focus()
+    """Reach a button with the keyboard focus and press Enter, as a keyboard user does.
+
+    `name` is the button's English msgid: the page shows it in the primary language.
+    """
+    page.get_by_role("button", name=translated(name)).first.focus()
     page.keyboard.press("Enter")
 
 
@@ -72,7 +75,9 @@ def test_the_vendor_creates_an_event_and_submits_it(
     _press(page, "Save draft")
 
     expect(page.get_by_role("heading", name=translated("Edit the event"))).to_be_visible()
-    expect(page.locator("main")).to_contain_text("saved as a draft")
+    expect(page.locator("main")).to_contain_text(
+        translated("The event is saved as a draft. Submit it when it is ready.")
+    )
     expect(page).to_have_url(re.compile(r"/manager/shop/events/[0-9a-f-]+/$"))
     saved = EventPage.objects.get(title="Autumn fair")
     assert saved.rrule == "FREQ=WEEKLY;BYDAY=SA"
@@ -82,6 +87,6 @@ def test_the_vendor_creates_an_event_and_submits_it(
     _press(page, "Submit for review")
     expect(page).to_have_url(re.compile(r"/manager/shop/events/$"))
     expect(page.locator("main")).to_contain_text("Autumn fair")
-    expect(page.locator("main")).to_contain_text("Awaiting review")
+    expect(page.locator("main")).to_contain_text(translated("Awaiting review"))
     _accessible(page)
     shot("events-submitted")

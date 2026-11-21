@@ -12,6 +12,7 @@ from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import (
@@ -21,6 +22,7 @@ from apps.vendors.tests.factories import (
 )
 from apps.vendors.tests.fakes import seed_legal_requirements
 from tests.e2e.login import fresh_passkey, open_passkey_window, verify_with_totp
+from tests.e2e.test_audit_log import CHANGED_EDIT_AGAIN, translated_pattern
 from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -47,15 +49,17 @@ def test_staff_create_vendor_and_start_onboarding(
     page.get_by_label("Display name").fill("Vendor A")
     page.locator("#id_country").fill("IT")  # other "country" labels exist
     page.get_by_label("Contact email").fill("vendor-a@example.com")
-    page.locator("#id_translations-0-language").select_option("en")
+    page.locator("#id_translations-0-language").select_option(primary_language())
     page.locator("#id_translations-0-tagline").fill("Outdoor gear")
     shot("filled")
     page.get_by_role("button", name=translated("Save"), exact=True).click()
-    expect(page.locator(".messagelist")).to_contain_text("was added successfully")
+    expect(page.locator(".messagelist")).to_contain_text(
+        translated_pattern("The {name} “{obj}” was added successfully.")
+    )
 
     vendor = Vendor.objects.get()
     assert vendor.slug == "vendor-a"
-    assert vendor.translations.get(language="en").tagline == "Outdoor gear"
+    assert vendor.translations.get(language=primary_language()).tagline == "Outdoor gear"
 
     page.goto(f"{live_server.url}/django-admin/vendors/vendor/")
     page.locator("input[name='_selected_action']").first.check()
@@ -84,7 +88,7 @@ def test_staff_complete_an_incomplete_legal_profile(
     # Saving a partial profile is allowed: only the fiscal regime is added here.
     page.locator("#id_fiscal_regime").select_option("RF01")
     page.get_by_role("button", name=translated("Save and continue editing")).click()
-    expect(page.locator(".messagelist")).to_contain_text("was changed successfully")
+    expect(page.locator(".messagelist")).to_contain_text(translated_pattern(CHANGED_EDIT_AGAIN))
     expect(readiness).to_contain_text("Missing: PEC address, IBAN.")
 
     open_passkey_window(page)  # the IBAN is bank data: D-32 group 3 `payout_details`:

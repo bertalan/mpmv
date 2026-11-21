@@ -27,6 +27,7 @@ from apps.orders.models import AmendmentState, OrderAmendment
 from apps.payments.tests.fake_stripe import FakeStripeClient
 from apps.vendors.tests.factories import VendorMemberFactory
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS
+from tests.e2e.test_audit_log import translated_pattern
 from tests.e2e.test_manager_shell import _accessible, _login
 from tests.i18n import translated
 
@@ -84,7 +85,9 @@ def test_a_vendor_removes_an_unavailable_line_and_the_customer_sees_v2(
     page.goto(f"{live_server.url}/manager/shop/orders/{sub.public_id}/")
     page.get_by_role("link", name=translated("Change this order")).focus()
     page.keyboard.press("Enter")
-    expect(page.get_by_role("heading", name=re.compile("Change order"))).to_be_visible()
+    expect(
+        page.get_by_role("heading", name=translated_pattern("Change order %(number)s"))
+    ).to_be_visible()
     _accessible(page)
     shot("amend-form")
 
@@ -98,9 +101,11 @@ def test_a_vendor_removes_an_unavailable_line_and_the_customer_sees_v2(
 
     preview = page.locator("[data-amendment-preview]")
     expect(preview.locator("[data-amendment-money]")).to_have_text(
-        "36.60 EUR refunded to the customer"
+        translated("%(amount)s refunded to the customer") % {"amount": "36.60 EUR"}
     )
-    expect(preview.locator("[data-amendment-kind]")).to_contain_text("Minor change")
+    expect(preview.locator("[data-amendment-kind]")).to_contain_text(
+        translated("Minor change: it applies at once")
+    )
     _accessible(page)
     shot("amend-preview")
 
@@ -115,7 +120,12 @@ def test_a_vendor_removes_an_unavailable_line_and_the_customer_sees_v2(
     page.get_by_role("button", name=translated("Confirm with my passkey")).focus()
     page.keyboard.press("Enter")
 
-    expect(page.get_by_text(re.compile("36.60 EUR is refunded to the customer"))).to_be_visible()
+    applied = translated(
+        "The change is applied. %(amount)s is refunded to the customer, credited within "
+        "5 to 10 business days depending on the card issuer, and in any case within 14 "
+        "days."
+    ) % {"amount": "36.60 EUR"}
+    expect(page.get_by_text(applied)).to_be_visible()
     expect(page.locator("[data-version]").first).to_have_text("2")
     _accessible(page)
     shot("amend-applied")
@@ -134,8 +144,11 @@ def test_a_vendor_removes_an_unavailable_line_and_the_customer_sees_v2(
     )
     page.goto(f"{live_server.url}/account/orders/{sub.order.public_id}/")
     versions = page.locator("[data-versions]")
-    expect(versions.locator('[data-version="2"]')).to_contain_text("B removed as unavailable")
-    expect(versions.locator('[data-version="2"]')).to_contain_text("36.60 EUR refunded")
+    version_2 = versions.locator('[data-version="2"]')
+    expect(version_2).to_contain_text(
+        translated("%(title)s removed as unavailable") % {"title": "B"}
+    )
+    expect(version_2).to_contain_text(translated("%(amount)s refunded.") % {"amount": "36.60 EUR"})
     expect(page.locator("[data-cancel-rest-offer]")).to_be_visible()
     _accessible(page)
     shot("customer-v2")

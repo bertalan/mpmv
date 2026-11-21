@@ -1,5 +1,6 @@
 """E2E: staff change a vendor's VAT number and read the change in the audit view (SEC.4)."""
 
+import re
 import secrets
 from collections.abc import Callable
 from pathlib import Path
@@ -16,6 +17,14 @@ from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
+CHANGED_EDIT_AGAIN = "The {name} “{obj}” was changed successfully. You may edit it again below."
+
+
+def translated_pattern(msgid: str) -> re.Pattern[str]:
+    """`msgid` in the primary language as a pattern, its placeholders (`{name}`, `%(x)s`) open."""
+    parts = re.split(r"\{\w+\}|%\(\w+\)s", translated(msgid))
+    return re.compile(".+".join(re.escape(part) for part in parts))
+
 
 def test_staff_see_a_vendor_change_with_before_and_after(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
@@ -30,7 +39,7 @@ def test_staff_see_a_vendor_change_with_before_and_after(
     page.goto(f"{live_server.url}/django-admin/vendors/vendor/{vendor.pk}/change/")
     page.locator("#id_vat_number").fill("IT00000020032")
     page.get_by_role("button", name=translated("Save and continue editing")).click()
-    expect(page.locator(".messagelist")).to_contain_text("was changed successfully")
+    expect(page.locator(".messagelist")).to_contain_text(translated_pattern(CHANGED_EDIT_AGAIN))
 
     page.get_by_role("link", name="Changes to this vendor").click()
     # The VAT number is DAC7 data: a staff change is a DAC7 correction (VEN.23).
@@ -38,7 +47,7 @@ def test_staff_see_a_vendor_change_with_before_and_after(
     shot("vendor-trail")
 
     page.locator("#result_list tbody tr").first.locator("a").first.click()
-    changes = page.locator("fieldset", has_text=translated("Changes")).first
+    changes = page.locator("fieldset", has_text="Changes").first
     expect(changes).to_contain_text("vat_number")
     expect(changes).to_contain_text("IT00000010025")
     expect(changes).to_contain_text("IT00000020032")

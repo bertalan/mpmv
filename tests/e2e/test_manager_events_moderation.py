@@ -38,7 +38,9 @@ COMMENT = "Please add the end date of the offer."
 def _add_paragraph(page: Page, text: str) -> None:
     page.get_by_label(translated("Add a block")).select_option("paragraph")
     _press(page, "Add")
-    expect(page.get_by_role("heading", name=re.compile("block", re.I))).to_be_visible()
+    expect(
+        page.get_by_role("heading", name=re.compile(re.escape(translated("Add a block"))))
+    ).to_be_visible()
     page.get_by_label(translated("Text")).fill(text)
     _press(page, "Save")
     expect(page.locator("main")).to_contain_text(text)
@@ -86,7 +88,7 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     draft = EventPage.objects.get(pk=event.pk).get_latest_revision_as_object()
     assert [b.block_type for b in draft.body] == ["paragraph", "paragraph"]
     _press(page, "Submit for review")
-    expect(page.locator("main")).to_contain_text("Awaiting review")
+    expect(page.locator("main")).to_contain_text(translated("Awaiting review"))
 
     # A moderator asks for changes in the Wagtail admin.
     page.context.clear_cookies()
@@ -116,7 +118,7 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     # The vendor resubmits and the moderator approves in the Wagtail admin.
     page.goto(f"{live_server.url}/manager/shop/events/{event.public_id}/")
     _press(page, "Submit for review")
-    expect(page.locator("main")).to_contain_text("Awaiting review")
+    expect(page.locator("main")).to_contain_text(translated("Awaiting review"))
     page.context.clear_cookies()
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("moderator@example.com")
@@ -125,7 +127,8 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     verify_with_totp(page, totp_token(staff_device, offset_steps=1))
     page.goto(f"{live_server.url}/admin/events/review/")
     page.get_by_role("link", name="Saldi d'autunno").click()
-    approve = page.get_by_role("button", name="Approve and Publish", exact=True)
+    approve_and_publish = translated("%(label)s and Publish") % {"label": translated("Approve")}
+    approve = page.get_by_role("button", name=approve_and_publish, exact=True)
     if not approve.is_visible():
         page.get_by_role("button", name=translated("More actions")).click()
     approve.click()

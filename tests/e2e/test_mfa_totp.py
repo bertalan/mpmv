@@ -88,7 +88,7 @@ def test_a_wrong_code_keeps_the_admin_closed(
 
     admin_login(page, live_server.url, "staff@example.com", password)
     verify_with_totp(page, totp_token(device, offset_steps=10))
-    expect(page.get_by_text("Invalid code")).to_be_visible()
+    expect(page.get_by_text(translated("Invalid code. Try again."))).to_be_visible()
     shot("invalid-code")
 
     page.goto(f"{live_server.url}/django-admin/")

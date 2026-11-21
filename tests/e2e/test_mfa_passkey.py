@@ -111,7 +111,12 @@ def test_the_banner_opens_the_passkey_window(
 
     page.goto(f"{live_server.url}/manager/platform/")
     banner = page.locator(".session-level--closed")
-    expect(banner).to_contain_text("open a passkey window to cover several in a row")
+    expect(banner).to_contain_text(
+        translated(
+            "Sensitive actions ask for your passkey once, or open a passkey window to cover "
+            "several in a row."
+        )
+    )
     expect(banner.locator("form[data-passkey-ready]")).to_have_count(1)
     shot("banner-passkey-window-closed")
     banner.get_by_role("button", name=translated("Open passkey window")).click()
@@ -133,7 +138,11 @@ def test_the_security_page_shows_the_passkey(
     _sign_in_with_a_new_passkey(page, live_server.url, "staff2@example.com", password)
 
     page.goto(f"{live_server.url}/account/mfa/setup/?from=security")
-    expect(page.get_by_text("Your account is protected with a passkey")).to_be_visible()
-    expect(page.get_by_text("Your role requires a second factor")).to_have_count(0)
+    expect(
+        page.get_by_text(translated("Your account is protected with a passkey."))
+    ).to_be_visible()
+    expect(
+        page.get_by_text(translated("Your role requires a second factor before you can continue."))
+    ).to_have_count(0)
     expect(page.get_by_role("button", name=translated("Add another passkey"))).to_be_visible()
     shot("security-page-with-passkey")

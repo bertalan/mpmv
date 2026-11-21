@@ -53,23 +53,24 @@ def test_claim_an_imported_vendor(
     assert not ActionLinkUse.objects.exists()  # the GET spent nothing
 
     page.get_by_role("button", name=translated("Continue")).click()
+    # The claim pages themselves are not translated yet: their text is English in every language.
     expect(page.get_by_role("heading", name=re.compile("Claim"))).to_be_visible()
     page.get_by_label("VAT number or TIN").fill("IT00000000000")
-    page.get_by_role("button", name=translated("Confirm")).click()
+    page.get_by_role("button", name="Confirm").click()
     expect(page.get_by_text("does not match")).to_be_visible()
     shot("claim-wrong-vat")
 
     page.get_by_label("VAT number or TIN").fill(vendor.vat_number)
-    page.get_by_role("button", name=translated("Confirm")).click()
-    expect(page.get_by_label(translated("Password"), exact=True)).to_be_visible()
+    page.get_by_role("button", name="Confirm").click()
+    expect(page.get_by_label("Password", exact=True)).to_be_visible()
     shot("claim-account")
 
     password = secrets.token_urlsafe(16)
     secret = page.get_by_test_id("totp-secret").inner_text()
-    page.get_by_label(translated("Full name")).fill("Claimant Example")
-    page.get_by_label(translated("Password"), exact=True).fill(password)
+    page.get_by_label("Full name").fill("Claimant Example")
+    page.get_by_label("Password", exact=True).fill(password)
     page.get_by_label("Password again").fill(password)
-    page.get_by_label(translated("Authentication code")).fill(code_from_secret(secret))
+    page.get_by_label("Authentication code").fill(code_from_secret(secret))
     page.get_by_role("button", name="Submit the claim").click()
     expect(page.get_by_text("waiting for approval")).to_be_visible()
     shot("claim-submitted")

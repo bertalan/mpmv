@@ -19,12 +19,13 @@ from wagtail.models import Collection
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.catalog.tests.factories import ProductFactory
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import ImageLicenceFactory
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
-from tests.i18n import translated
+from tests.i18n import other_language, translated
 from tests.upload_corpus import png
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -236,24 +237,25 @@ def test_the_manager_language_switcher_changes_the_language(
     VendorMemberFactory.create(vendor=VendorFactory.create(display_name="Shop One"), user=user)
     _login(page, live_server.url, "switcher@example.com", password)
     verify_with_totp(page, totp_token(device))
+    primary, other = primary_language(), other_language()
     expect(page).to_have_url(re.compile(r"/manager/shop/"))
-    expect(page.locator("html")).to_have_attribute("lang", "en")
-    shot("manager-en")
+    expect(page.locator("html")).to_have_attribute("lang", primary)
+    shot("manager-primary")
 
-    page.locator('button[value="it"]').click()
+    page.locator(f'button[value="{other}"]').click()
     expect(page).to_have_url(re.compile(r"/manager/shop/"))
-    expect(page.locator("html")).to_have_attribute("lang", "it")
-    expect(page.locator('button[value="it"]')).to_have_attribute("aria-current", "true")
-    shot("manager-it")
+    expect(page.locator("html")).to_have_attribute("lang", other)
+    expect(page.locator(f'button[value="{other}"]')).to_have_attribute("aria-current", "true")
+    shot("manager-other")
 
-    page.locator('button[value="en"]').click()
-    expect(page.locator("html")).to_have_attribute("lang", "en")
+    page.locator(f'button[value="{primary}"]').click()
+    expect(page.locator("html")).to_have_attribute("lang", primary)
 
 
-def test_the_storefront_profile_shows_italian_help_text(
+def test_the_storefront_profile_shows_its_help_text_in_a_second_language(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
-    """ARC.31: a Manager form shows its help text, in the Italian interface."""
+    """ARC.31: a Manager form shows its help text, in the interface of a second language."""
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
     owner = UserFactory.create(email="owner-it@example.com", password=password)
     device = TOTPDeviceFactory.create(user=owner)
@@ -264,12 +266,14 @@ def test_the_storefront_profile_shows_italian_help_text(
     _login(page, live_server.url, "owner-it@example.com", password)
     verify_with_totp(page, totp_token(device))
     expect(page).to_have_url(re.compile(r"/manager/shop/"))
-    page.locator('button[value="it"]').click()
-    expect(page.locator("html")).to_have_attribute("lang", "it")
+    other = other_language()
+    page.locator(f'button[value="{other}"]').click()
+    expect(page.locator("html")).to_have_attribute("lang", other)
 
     page.goto(f"{live_server.url}/manager/shop/profile/")
-    expect(page.locator("html")).to_have_attribute("lang", "it")
-    help_text = page.get_by_text("Una riga sotto il nome del negozio. Testo semplice.")
-    expect(help_text).to_be_visible()
-    expect(page.get_by_text("One line under the shop name")).to_have_count(0)
-    shot("profile-form-help-it")
+    expect(page.locator("html")).to_have_attribute("lang", other)
+    msgid = "One line under the shop name. Plain text."
+    assert translated(msgid, other) != msgid  # the catalog has it in that language
+    expect(page.get_by_text(translated(msgid, other))).to_be_visible()
+    expect(page.get_by_text(msgid)).to_have_count(0)
+    shot("profile-form-help-other")

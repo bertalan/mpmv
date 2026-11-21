@@ -64,6 +64,7 @@ def test_admin_works_under_strict_csp(
     shot("changelist")
 
     page.get_by_role("link", name="staff@example.com").click()
-    expect(page.get_by_label(translated("Full name"))).to_be_visible()
+    # The model field has no translated verbose name: its label is English in every language.
+    expect(page.get_by_label("Full name")).to_be_visible()
     assert csp_violations(page) == []
     shot("change-form")
