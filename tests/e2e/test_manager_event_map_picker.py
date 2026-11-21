@@ -29,6 +29,7 @@ from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_manager_shell import _accessible, _login
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -91,8 +92,10 @@ def _open(page: Page, live_server: LiveServer, event: EventPage) -> Locator:
 
 
 def _save(page: Page) -> None:
-    page.get_by_role("button", name="Save draft").click()
-    expect(page.locator("main")).to_contain_text("saved as a draft")
+    page.get_by_role("button", name=translated("Save draft")).click()
+    expect(page.locator("main")).to_contain_text(
+        translated("The event is saved as a draft. Submit it when it is ready.")
+    )
     expect(page).to_have_url(re.compile(r"/manager/shop/events/[0-9a-f-]+/$"))
 
 
