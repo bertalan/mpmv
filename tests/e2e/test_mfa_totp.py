@@ -16,6 +16,7 @@ from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.core.models import AuditLog
 from tests.e2e.login import admin_login, verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -36,24 +37,28 @@ def test_first_login_forces_totp_enrolment_then_a_recovery_code_signs_in(
 
     admin_login(page, live_server.url, "staff@example.com", password)
     expect(page).to_have_url(re.compile(r"/account/mfa/setup/"))
-    expect(page.get_by_role("heading", name="Set up two-factor authentication")).to_be_visible()
+    expect(
+        page.get_by_role("heading", name=translated("Set up two-factor authentication"))
+    ).to_be_visible()
     shot("forced-setup")
 
-    page.get_by_role("link", name="Use an authenticator app").click()
+    page.get_by_role("link", name=translated("Use an authenticator app")).click()
     expect(page.locator("svg").first).to_be_visible()  # the QR code
     secret = page.locator("#totp-secret").inner_text().replace(" ", "")
     shot("totp-qr")
 
     token = str(totp(b32decode(secret))).zfill(6)
-    page.get_by_label("Authentication code").fill(token)
-    page.get_by_role("button", name="Confirm").click()
+    page.get_by_label(translated("Authentication code")).fill(token)
+    page.get_by_role("button", name=translated("Confirm")).click()
     codes = page.locator("ol.recovery-codes li").all_inner_texts()
     assert len(codes) == 10
     shot("recovery-codes")
 
-    page.get_by_role("link", name="Continue").click()
+    page.get_by_role("link", name=translated("Continue")).click()
     expect(
-        page.get_by_role("link", name="Log out").or_(page.get_by_role("button", name="Log out"))
+        page.get_by_role("link", name=translated("Log out")).or_(
+            page.get_by_role("button", name=translated("Log out"))
+        )
     ).to_be_visible()
     shot("admin")
     assert page.evaluate("window.__cspViolations") == []
@@ -63,10 +68,12 @@ def test_first_login_forces_totp_enrolment_then_a_recovery_code_signs_in(
     admin_login(page, live_server.url, "staff@example.com", password)
     expect(page).to_have_url(re.compile(r"/account/mfa/verify/"))
     shot("verify")
-    page.get_by_label("Recovery code").fill(codes[0])
-    page.get_by_role("button", name="Use recovery code").click()
+    page.get_by_label(translated("Recovery code")).fill(codes[0])
+    page.get_by_role("button", name=translated("Use recovery code")).click()
     expect(
-        page.get_by_role("link", name="Log out").or_(page.get_by_role("button", name="Log out"))
+        page.get_by_role("link", name=translated("Log out")).or_(
+            page.get_by_role("button", name=translated("Log out"))
+        )
     ).to_be_visible()
     shot("signed-in-with-recovery-code")
     assert AuditLog.objects.filter(action="accounts.mfa.recovery_code_used").count() == 1
@@ -81,7 +88,7 @@ def test_a_wrong_code_keeps_the_admin_closed(
 
     admin_login(page, live_server.url, "staff@example.com", password)
     verify_with_totp(page, totp_token(device, offset_steps=10))
-    expect(page.get_by_text("Invalid code")).to_be_visible()
+    expect(page.get_by_text(translated("Invalid code. Try again."))).to_be_visible()
     shot("invalid-code")
 
     page.goto(f"{live_server.url}/django-admin/")
