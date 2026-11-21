@@ -7,12 +7,17 @@ import re
 from typing import Any
 
 import pytest
+from django.apps import apps
+from django.db import connection
 from django.test import Client, RequestFactory
+from django.test.utils import CaptureQueriesContext
+from wagtail.models import Site
 
+from apps.catalog.models import Product
 from apps.cms.blocks import page_graph_nodes
 from apps.cms.models import HomePage
 from apps.cms.services import SeedReport
-from apps.cms.tests.integration.test_product_grid import _about, _home
+from apps.cms.tests.integration.test_product_grid import _about, _home, listed
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -84,3 +89,46 @@ def test_the_rendered_page_links_each_list_once_with_a_distinct_id(seeded: SeedR
     assert len({n["@id"] for n in lists}) == 2
     [page] = [n for n in graph if n["@type"] == "WebPage"]
     assert all({"@id": n["@id"]} in page["hasPart"] for n in lists)
+
+
+def test_a_retired_product_card_leaves_the_list(seeded: SeedReport) -> None:
+    product = listed("Strip jug")
+    home = _publish(_home(), [_strip(("product", product))])
+    [node] = _nodes(home)
+    assert node["numberOfItems"] == 1
+    Product.objects.filter(pk=product.pk).update(status=Product.Status.RETIRED)
+    assert _nodes(home) == []
+
+
+def test_the_card_lookups_run_once_per_request_and_do_not_grow_with_the_cards(
+    seeded: SeedReport,
+) -> None:
+    home = _publish(_home(), [_featured(("page", _about()))])
+    request = RequestFactory().get(home.url)
+    context = {"request": request, "page": home}
+    page_graph_nodes(home.body, context)
+    with CaptureQueriesContext(connection) as again:
+        page_graph_nodes(home.body, context)
+    assert len(again) == 0
+
+    def count(cards: int) -> int:
+        vendors = [VendorFactory.create(status=Vendor.Status.ACTIVE) for _ in range(cards)]
+        page = _publish(_home(), [_featured(*(("vendor", v) for v in vendors))])
+        fresh = {"request": RequestFactory().get(page.url), "page": page}
+        with CaptureQueriesContext(connection) as captured:
+            page_graph_nodes(page.body, fresh)
+        return len(captured)
+
+    assert count(2) == count(6)
+
+
+def test_a_noindex_page_keeps_its_graph(seeded: SeedReport) -> None:
+    home = _publish(_home(), [_featured(("page", _about()))])
+    apps.get_model("seo", "SeoSettings").objects.update_or_create(
+        site=Site.objects.get(is_default_site=True), defaults={"allow_indexing": False}
+    )
+    html = Client().get(home.url).content.decode()
+    blocks = SCRIPT.findall(html)
+    assert len(blocks) == 1
+    graph = json.loads(blocks[0])["@graph"]
+    assert [n for n in graph if n["@type"] == "ItemList"]

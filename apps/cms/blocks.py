@@ -778,20 +778,30 @@ def _card_targets(
     values: Iterable[_CardValue], language: str, request: Any
 ) -> dict[tuple[str, int], _Target]:
     """The public targets of `values`, keyed by (kind, id); a target that is not public is
-    missing."""
+    missing. The result is kept on the request: the page graph and the block's own render ask
+    for the same cards, and the lookups run once."""
     chosen: dict[str, list[Any]] = defaultdict(list)
     for value in values:
         if value.target() is not None:
             chosen[value.target_kind].append(value.target())
+    key = (language, tuple((kind, tuple(t.pk for t in found)) for kind, found in chosen.items()))
+    kept: dict[Any, dict[tuple[str, int], _Target]] | None = None
+    if request is not None:
+        kept = request.__dict__.setdefault("_cms_card_targets", {})
+        if key in kept:
+            return kept[key]
     resolved = {
         "page": _page_targets(chosen["page"], language, request) if chosen["page"] else {},
         "term": _term_targets(chosen["term"], language) if chosen["term"] else {},
         "vendor": _vendor_targets(chosen["vendor"], language) if chosen["vendor"] else {},
         "product": _product_targets(chosen["product"], language) if chosen["product"] else {},
     }
-    return {
+    found_targets = {
         (kind, pk): target for kind, targets in resolved.items() for pk, target in targets.items()
     }
+    if kept is not None:
+        kept[key] = found_targets
+    return found_targets
 
 
 def public_cards(values: Iterable[_CardValue], language: str, request: Any) -> list[Card]:
