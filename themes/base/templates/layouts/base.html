@@ -1,4 +1,4 @@
-{% load i18n static wagtailcore_tags cms_tags image_credits seo_jsonld %}{% get_current_language as LANGUAGE_CODE %}{% wagtail_site as current_site %}{% firstof current_site.site_name site_name "MPMV" as site_name %}<!doctype html>
+{% load i18n static wagtailcore_tags cms_tags image_credits seo_jsonld theme_tags %}{% get_current_language as LANGUAGE_CODE %}{% wagtail_site as current_site %}{% firstof current_site.site_name site_name "MPMV" as site_name %}<!doctype html>
 {% comment %}
 Public page layout of the base theme (THM.3, spec 14 §14.3, §14.6). Pages extend it and fill
 `content`; `title` and `description` default to the CMS page's SEO fields. The header holds the
@@ -25,6 +25,7 @@ state; fixed to the bottom of the viewport, last in reading order like in the ta
   {% block description %}{% page_description_meta %}{% endblock %}
   <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true}'>
   {% with "themes/"|add:theme.slug|add:"/theme.css" as theme_css %}<link rel="stylesheet" href="{% static theme_css %}">{% endwith %}
+  {% palette_css_href as palette_href %}{% if palette_href %}<link rel="stylesheet" href="{{ palette_href }}">{% endif %}
   {% block foundation_scripts %}{% endblock %}
   <script type="module" src="{% static 'themes/base/js/base.js' %}"></script>
   <script type="module" src="{% static 'themes/base/js/countdown.js' %}"></script>

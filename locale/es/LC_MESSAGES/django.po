@@ -9375,6 +9375,12 @@ msgstr ""
 "profesionales (art. 1341, segundo párrafo, del Código Civil italiano), una por línea con el "
 "formato: número de artículo | título. Por ejemplo: 7 | Limitación de responsabilidad. Obligatorio."
 
+#: apps/themes/models.py
+msgid ""
+"The colour palette of the whole site. Leave it empty for the theme's own colours (Red for ride)."
+msgstr ""
+"La paleta de colores de todo el sitio. Déjala vacía para usar los colores del tema (Rojo para ride)."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "The company that makes the brand's products, when it is not the brand itself. It is shown on the "

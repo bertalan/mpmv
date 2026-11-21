@@ -9466,6 +9466,12 @@ msgstr ""
 "(Art. 1341 Abs. 2 des italienischen Zivilgesetzbuchs), eine pro Zeile in der Form: Artikelnummer |"
 " Titel. Zum Beispiel: 7 | Haftungsbeschränkung. Pflichtfeld."
 
+#: apps/themes/models.py
+msgid ""
+"The colour palette of the whole site. Leave it empty for the theme's own colours (Red for ride)."
+msgstr ""
+"Die Farbpalette der gesamten Website. Leer lassen, um die Farben des Themes zu verwenden (Rot für ride)."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "The company that makes the brand's products, when it is not the brand itself. It is shown on the "

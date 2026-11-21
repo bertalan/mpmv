@@ -17,6 +17,7 @@ from django.utils.safestring import SafeString
 
 from .. import engine
 from ..appearance import active_payment_appearance
+from ..services import palette_href
 
 register = template.Library()
 
@@ -121,3 +122,15 @@ def in_groups(value: object, size: object) -> list[list[object]]:
         step = 1
     step = step if step > 0 else 1
     return [items[start : start + step] for start in range(0, len(items), step)]
+
+
+@register.simple_tag(takes_context=True)
+def palette_css_href(context: template.Context) -> str:
+    """The URL of the site palette stylesheet to link after `theme.css`, or "" (spec 14 §14.12).
+
+    Error pages (`minimal_chrome`) never touch the database, so they keep the theme's colours.
+    """
+    request = context.get("request")
+    if request is None or context.get("minimal_chrome"):
+        return ""
+    return palette_href(request)

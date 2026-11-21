@@ -38,6 +38,18 @@ class ThemeSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untype
         ),
     )
 
+    palette = models.ForeignKey(
+        "BrandPalette",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text=_(
+            "The colour palette of the whole site. Leave it empty for the theme's own colours"
+            " (Red for ride)."
+        ),
+    )
+
     class Meta:
         verbose_name = "site theme"
         verbose_name_plural = "site themes"

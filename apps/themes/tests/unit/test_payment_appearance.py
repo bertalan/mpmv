@@ -23,7 +23,7 @@ def test_the_appearance_uses_the_ride_colours_fonts_and_radius() -> None:
     tokens = tokens_of("ride")
     appearance = payment_appearance(tokens)
     variables = appearance["variables"]
-    assert variables["colorPrimary"] == tokens["color.accent"] == "#046BD2"
+    assert variables["colorPrimary"] == tokens["color.accent"] == "#C40417"
     assert variables["colorText"] == tokens["color.text"]
     assert variables["colorBackground"] == tokens["color.surface"]
     assert variables["colorDanger"] == tokens["color.danger"]
@@ -55,4 +55,4 @@ def test_every_text_pair_of_the_appearance_meets_aa() -> None:
 
 def test_the_active_theme_chooses_the_appearance() -> None:
     with use_theme("ride"):
-        assert active_payment_appearance()["variables"]["colorPrimary"] == "#046BD2"
+        assert active_payment_appearance()["variables"]["colorPrimary"] == "#C40417"

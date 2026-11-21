@@ -6,10 +6,12 @@ A palette is a mapping of role name to `#rrggbb`. Roles map to the token contrac
 spec 14 §14.4 through `ROLE_TOKENS`. The primary is also the link colour.
 """
 
-from collections.abc import Iterable, Mapping
+import hashlib
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
-from .engine import ThemeError, contrast_ratio
+from .bootstrap_map import bootstrap_variables
+from .engine import ThemeError, contrast_ratio, css_name, minify_css, resolve_tokens
 
 TEXT = 4.5  # WCAG 2.2 SC 1.4.3
 UI = 3.0  # WCAG 2.2 SC 1.4.11
@@ -35,6 +37,7 @@ ROLE_TOKENS: dict[str, str] = {
 ROLES = tuple(ROLE_TOKENS)
 
 DEFAULT_PALETTE = "red"
+PALETTE_LAYER = "palette"  # name of the pseudo theme that carries the palette tokens
 
 PRESETS: dict[str, dict[str, str]] = {
     "red": {
@@ -168,3 +171,39 @@ def palette_tokens(palette: Mapping[str, str]) -> dict[str, str]:
     tokens = {ROLE_TOKENS[role]: palette[role] for role in ROLES}
     tokens["color.link"] = palette["primary"]
     return tokens
+
+
+def render_palette_css(
+    chain: Sequence[str],
+    tokens_by_theme: Mapping[str, Mapping[str, str]],
+    palette: Mapping[str, str],
+    *,
+    bootstrap: bool = False,
+) -> str:
+    """The stylesheet that turns a theme (its `chain`, child first) into `palette`.
+
+    The palette is resolved as one more theme on top of the chain, so a token derived from a
+    palette token (`button.bg = "{color.accent}"`) follows it. Only the custom properties that
+    change are written, in one unlayered `:root` rule that beats the theme's `@layer` rules; with
+    `bootstrap` the `--bs-*` variables of the Bootstrap map change too. Empty when the palette
+    changes nothing (a theme already in that palette).
+    """
+    layered = {**tokens_by_theme, PALETTE_LAYER: palette_tokens(palette)}
+    before = resolve_tokens(chain, tokens_by_theme)
+    after = resolve_tokens([PALETTE_LAYER, *chain], layered)
+    changed = {css_name(k): v for k, v in after.items() if before.get(k) != v}
+    if bootstrap:
+        try:
+            old, new = bootstrap_variables(before), bootstrap_variables(after)
+        except KeyError:
+            old = new = {}
+        changed.update({k: v for k, v in new.items() if old.get(k) != v})
+    if not changed:
+        return ""
+    body = ";".join(f"{name}:{changed[name]}" for name in sorted(changed))
+    return minify_css(f":root{{{body}}}") + "\n"
+
+
+def css_digest(css: str) -> str:
+    """The 12 hex digits that name a palette stylesheet (its URL changes with its content)."""
+    return hashlib.sha256(css.encode()).hexdigest()[:12]
