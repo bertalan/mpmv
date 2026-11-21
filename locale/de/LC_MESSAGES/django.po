@@ -11586,8 +11586,9 @@ msgid ""
 "The shop name when this version was published, so an old version keeps the name it was published "
 "under. Empty on versions published before it was recorded."
 msgstr ""
-"Der Shopname zum Zeitpunkt der Veröffentlichung dieser Version, damit eine alte Version den Namen behält, unter dem sie "
-"veröffentlicht wurde. Leer bei Versionen, die vor der Erfassung des Namens veröffentlicht wurden."
+"Der Shopname zum Zeitpunkt der Veröffentlichung dieser Version, damit eine alte Version den Namen "
+"behält, unter dem sie veröffentlicht wurde. Leer bei Versionen, die vor der Erfassung des Namens "
+"veröffentlicht wurden."
 
 #: apps/vendors/models.py
 msgid ""
