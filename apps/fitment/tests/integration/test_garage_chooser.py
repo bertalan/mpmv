@@ -190,3 +190,27 @@ def test_the_chooser_lists_options_and_marks_the_active_one(client: Client, vehi
     assert "Acme, Tourer" in html
     assert 'name="next" value="/shop/"' in html
     assert 'href="/shop/"' in html  # Cancel returns without a change
+
+
+def test_a_404_page_renders_no_garage_menu_and_runs_no_garage_query(
+    client: Client, vehicles: None
+) -> None:
+    """Error pages stay cheap and identical for every path (SEC.5, OPS.5): the `exception` guard
+    in the `garage_menu` tag keeps the menu, and its scheme query, off them."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    _save(client, "Roadster")  # a garage that a normal page would show
+    with CaptureQueriesContext(connection) as queries:
+        response = client.get("/no-such-page-here/")
+    assert response.status_code == 404
+    assert "data-garage-menu" not in response.content.decode()
+    assert not [q for q in queries.captured_queries if "fitment_" in q["sql"]]
+
+
+def test_the_menu_link_carries_no_next(client: Client, vehicles: None) -> None:
+    """The current URL can hold a secret (an action link's token): the menu never echoes it."""
+    menu = _menu(client.get("/?secret=x").content.decode())
+    assert "next=" not in menu
+    assert "secret" not in menu
+    assert f'href="{reverse(CHOOSE)}"' in menu
