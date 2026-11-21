@@ -2,6 +2,7 @@
 fitment never imports the themes app)."""
 
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from django.template.loader import render_to_string
 from django.test import RequestFactory
 from django.urls import reverse
@@ -81,3 +82,35 @@ def test_no_template_script_or_e2e_targets_the_old_user_menu_classes_for_the_gar
         and "user-menu" in text
     ]
     assert suspects == []
+
+
+def test_the_ride_listing_and_base_blog_carry_the_garage_banner_without_the_page_url() -> None:
+    from django.http import HttpResponse
+
+    from apps.fitment import garage
+    from apps.fitment.tests.factories import FitmentNodeFactory
+    from apps.fitment.views import _write
+
+    make = FitmentNodeFactory.create(name="Acme")
+    FitmentNodeFactory.create(name="Roadster", parent=make)
+    request = RequestFactory().get("/shop/?token=top-secret-marker")
+    request.user = AnonymousUser()
+    cookie = (
+        _write(HttpResponse(), garage.Garage((garage.Vehicle("Acme", "Roadster"),), 0))
+        .cookies[garage.COOKIE_NAME]
+        .value
+    )
+    request.COOKIES[garage.COOKIE_NAME] = cookie
+    for theme in ("ride", "base"):
+        with use_theme(theme):
+            html = render_to_string("components/garage_banner.html", {}, request=request)
+        assert "data-garage-banner" in html
+        assert 'role="status"' in html
+        assert reverse("garage_choose") in html
+        assert "top-secret-marker" not in html
+        assert "/shop/" not in html
+        with translation.override(primary_language()):
+            assert (
+                translation.gettext("Showing items for: %(label)s") % {"label": "Acme, Roadster"}
+                in html
+            )

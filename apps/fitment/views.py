@@ -149,7 +149,8 @@ def apply_garage(request: HttpRequest) -> HttpResponse:
     if not garage_state.garage_state(request):
         raise Http404("the garage is off")
     choice = request.POST.get("choice", "")
-    response = _back(request)
+    # The banner's *Show all* posts no `next` (the page URL can hold a secret): the Referer then.
+    response = _back(request) if request.POST.get("next") else _back_to_referer(request)
     signed_in = garage_state.account_garage_on(request)
     kind, _, ref = choice.partition(":")
     if choice == "generic":

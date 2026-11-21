@@ -1,0 +1,16 @@
+{% load i18n garage_tags %}{% comment %}
+The garage banner of a list (FIT.7 3/n, spec 17 §17.4.4): a labelled region above the results that
+names the vehicle the list is for, with *Change* (the chooser) and *Show all* (the chooser's apply
+post with `generic`). Shown only with an active vehicle, never on an error page. Neither control
+carries the page's URL, as it can hold a secret token: *Show all* returns by the Referer, checked on
+the server. The "N of M items" count waits for the filter (FIT.8).
+{% endcomment %}{% garage_banner as banner %}{% if banner %}<section class="garage-banner site-messages" role="status" aria-label="{{ banner.noun }}" data-garage-banner>
+  <p>{% blocktranslate with label=banner.label %}Showing items for: {{ label }}{% endblocktranslate %}</p>
+  {% translate "Change" as change_label %}{% translate "Show all" as all_label %}{% url 'garage_choose' as choose_url %}
+  {% include "components/button.html" with label=change_label url=choose_url variant="ghost" only %}
+  <form method="post" action="{% url 'garage_apply' %}">
+    {% csrf_token %}
+    <input type="hidden" name="choice" value="generic">
+    {% include "components/button.html" with label=all_label type="submit" variant="ghost" only %}
+  </form>
+</section>{% endif %}

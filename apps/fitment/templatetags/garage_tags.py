@@ -1,4 +1,4 @@
-"""The header garage menu's state (FIT.7 1/n)."""
+"""The garage menu, banner and merge notice states (FIT.7)."""
 
 from typing import Any
 
@@ -35,3 +35,18 @@ def garage_merge_notice(context: template.Context) -> dict[str, Any]:
         return {}
     count = pending_count(request)
     return {"count": count} if count else {}
+
+
+@register.simple_tag(takes_context=True)
+def garage_banner(context: template.Context) -> dict[str, Any]:
+    """The state for `components/garage_banner.html` (spec 17 §17.4.4): `noun` and `label` of the
+    active vehicle. Empty without an active vehicle (generic shows no banner: the header menu
+    already says "generic"), without a request and on error pages. It reads the request's cached
+    garage state, so a listing pays no query beyond the header menu's."""
+    request = context.get("request")
+    if request is None or "exception" in context:
+        return {}
+    state = garage_state(request)
+    if not state or not state["active_label"]:
+        return {}
+    return {"noun": state["noun"], "label": state["active_label"]}
