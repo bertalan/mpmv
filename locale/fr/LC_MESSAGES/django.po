@@ -2865,6 +2865,10 @@ msgstr ""
 "Jours d'un événement récurrent d'une journée entière qui sont ignorés, par exemple un jour férié. "
 "Si vous le laissez vide, aucun jour n'est ignoré."
 
+#: apps/manager/fitment_forms.py
+msgid "Days of notice before deletion"
+msgstr "Jours de préavis avant la suppression"
+
 #: apps/manager/templates/manager/shop/money_statement.html
 msgid "Debits"
 msgstr "Débits"
@@ -5225,6 +5229,10 @@ msgstr "Mois"
 msgid "Month calendar"
 msgstr "Calendrier du mois"
 
+#: apps/manager/fitment_forms.py
+msgid "Months without use before deletion"
+msgstr "Mois sans utilisation avant la suppression"
+
 #: themes/base/templates/components/help_entry.html
 msgid "More help"
 msgstr "Plus d'aide"
@@ -6995,6 +7003,15 @@ msgstr ""
 "Indiquez à quoi ce produit convient avant de le publier : choisissez les articles compatibles dans"
 " l'onglet Compatibilité ou déclarez qu'il convient à tout."
 
+#: apps/vendors/services.py
+msgid ""
+"Please give us a phone number for your shop before you publish products: sellers who sell to "
+"consumers must show one in the withdrawal information. Send it to the platform staff."
+msgstr ""
+"Veuillez nous communiquer un numéro de téléphone pour votre boutique avant de publier des produits"
+" : les vendeurs qui vendent à des consommateurs doivent l’indiquer dans les informations sur la "
+"rétractation. Envoyez-le à l’équipe de la plateforme."
+
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
 msgstr "Libellé au pluriel"
@@ -8056,6 +8073,10 @@ msgstr ""
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
 msgstr ""
 "Enregistrez d'abord vos modifications : c'est le dernier brouillon enregistré qui est envoyé."
+
+#: apps/manager/fitment_forms.py
+msgid "Saved items unused for this long are deleted from customer accounts."
+msgstr "Les éléments enregistrés inutilisés pendant cette durée sont supprimés des comptes clients."
 
 #: apps/manager/fitment_views.py apps/manager/views.py
 msgid "Saved."
@@ -11481,6 +11502,10 @@ msgstr ""
 #: apps/vendors/models.py
 msgid "The seller."
 msgstr "Le vendeur."
+
+#: apps/manager/fitment_forms.py
+msgid "The service email goes out this many days before. Shorter than the months."
+msgstr "L'e-mail de service part autant de jours avant. Plus court que les mois."
 
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
@@ -15260,6 +15285,28 @@ msgstr "Tes sessions"
 msgid "Your shop cancelled order %(order_number)s and the customer was refunded in full."
 msgstr ""
 "Votre boutique a annulé la commande %(order_number)s et le client a été remboursé intégralement."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to %(support_email)s; until then"
+" you cannot publish products."
+msgstr ""
+"Votre boutique n’a pas de numéro de téléphone. Les vendeurs qui vendent à des consommateurs "
+"doivent en indiquer un : les acheteurs le voient dans les informations sur la rétractation et dans"
+" la confirmation de commande. Veuillez l’envoyer à %(support_email)s ; d’ici là, vous ne pouvez "
+"pas publier de produits."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to the platform staff; until "
+"then you cannot publish products."
+msgstr ""
+"Votre boutique n’a pas de numéro de téléphone. Les vendeurs qui vendent à des consommateurs "
+"doivent en indiquer un : les acheteurs le voient dans les informations sur la rétractation et dans"
+" la confirmation de commande. Veuillez l’envoyer à l’équipe de la plateforme ; d’ici là, vous ne "
+"pouvez pas publier de produits."
 
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."

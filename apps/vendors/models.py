@@ -694,6 +694,7 @@ class Vendor(BaseModel):
         for name in (
             *engine.COMPACT_FIELDS,
             "pec",
+            "phone",
             "registered_province",
             "establishment_province",
         ):

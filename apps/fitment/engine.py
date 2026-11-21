@@ -364,6 +364,7 @@ def profile_node_retired(status: str) -> bool:
 
 # --- 24-month inactivity cleanup (FIT.5 3/3, spec 17 §17.4.5) ----------------------------------
 
+# Defaults of the scheme settings `garage_inactivity_months` and `garage_notice_days`.
 INACTIVITY_MONTHS = 24
 NOTICE_DAYS = 30
 KEEP = "keep"

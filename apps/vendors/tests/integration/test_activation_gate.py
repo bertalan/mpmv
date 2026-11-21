@@ -235,9 +235,12 @@ def test_a_language_without_a_text_is_refused_by_the_service() -> None:
 
 
 def test_a_non_eu_vendor_is_not_asked_for_trader_fields_but_still_for_the_certification() -> None:
-    vendor = onboarding(non_eu_company=True, phone="")
+    # The address rows are EU-only; the phone of a seller to consumers is asked of every vendor
+    # (CMP.41 follow-up, owner decision 2026-11-19).
+    vendor = onboarding(non_eu_company=True, phone="", registered_city="")
     assert onboarding_checklist(vendor).blocking_missing == (engine.PLATFORM_DUTIES,)
-    assert platform_duties_missing(vendor) == (engine.SELF_CERTIFICATION,)
+    assert platform_duties_missing(vendor) == ("phone", engine.SELF_CERTIFICATION)
+    Vendor.objects.filter(pk=vendor.pk).update(phone="+44 20 7946 0123")
     certify(vendor)
     assert platform_duties_missing(vendor) == ()
 

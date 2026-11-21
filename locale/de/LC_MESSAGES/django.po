@@ -2873,6 +2873,10 @@ msgstr ""
 "Tage einer wiederkehrenden ganztägigen Veranstaltung, die übersprungen werden, zum Beispiel ein "
 "Feiertag. Wenn Sie das Feld leer lassen, wird kein Tag übersprungen."
 
+#: apps/manager/fitment_forms.py
+msgid "Days of notice before deletion"
+msgstr "Tage Vorankündigung vor der Löschung"
+
 #: apps/manager/templates/manager/shop/money_statement.html
 msgid "Debits"
 msgstr "Belastungen"
@@ -5228,6 +5232,10 @@ msgstr "Monat"
 msgid "Month calendar"
 msgstr "Monatskalender"
 
+#: apps/manager/fitment_forms.py
+msgid "Months without use before deletion"
+msgstr "Monate ohne Nutzung vor der Löschung"
+
 #: themes/base/templates/components/help_entry.html
 msgid "More help"
 msgstr "Weitere Hilfe"
@@ -7002,6 +7010,15 @@ msgstr ""
 "Geben Sie vor der Veröffentlichung an, wofür dieses Produkt passt: Wählen Sie im Tab Passform die "
 "passenden Artikel aus oder erklären Sie, dass es für alles passt."
 
+#: apps/vendors/services.py
+msgid ""
+"Please give us a phone number for your shop before you publish products: sellers who sell to "
+"consumers must show one in the withdrawal information. Send it to the platform staff."
+msgstr ""
+"Bitte teilen Sie uns eine Telefonnummer für Ihren Shop mit, bevor Sie Produkte veröffentlichen: "
+"Wer an Verbraucher verkauft, muss sie in der Widerrufsbelehrung angeben. Senden Sie sie an das "
+"Team der Plattform."
+
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
 msgstr "Pluralbezeichnung"
@@ -8060,6 +8077,11 @@ msgstr ""
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
 msgstr "Speichern Sie zuerst Ihre Änderungen: Es wird der zuletzt gespeicherte Entwurf eingereicht."
+
+#: apps/manager/fitment_forms.py
+msgid "Saved items unused for this long are deleted from customer accounts."
+msgstr ""
+"Gespeicherte Einträge, die so lange nicht genutzt wurden, werden aus den Kundenkonten gelöscht."
 
 #: apps/manager/fitment_views.py apps/manager/views.py
 msgid "Saved."
@@ -11501,6 +11523,10 @@ msgstr ""
 #: apps/vendors/models.py
 msgid "The seller."
 msgstr "Der Verkäufer."
+
+#: apps/manager/fitment_forms.py
+msgid "The service email goes out this many days before. Shorter than the months."
+msgstr "Die Service-E-Mail geht so viele Tage vorher raus. Kürzer als die Monate."
 
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
@@ -15307,6 +15333,26 @@ msgid "Your shop cancelled order %(order_number)s and the customer was refunded 
 msgstr ""
 "Ihr Shop hat die Bestellung %(order_number)s storniert, und dem Kunden wurde der volle Betrag "
 "erstattet."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to %(support_email)s; until then"
+" you cannot publish products."
+msgstr ""
+"Ihr Shop hat keine Telefonnummer. Wer an Verbraucher verkauft, muss eine angeben: Käufer sehen sie"
+" in der Widerrufsbelehrung und in der Bestellbestätigung. Bitte senden Sie sie an "
+"%(support_email)s; bis dahin können Sie keine Produkte veröffentlichen."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to the platform staff; until "
+"then you cannot publish products."
+msgstr ""
+"Ihr Shop hat keine Telefonnummer. Wer an Verbraucher verkauft, muss eine angeben: Käufer sehen sie"
+" in der Widerrufsbelehrung und in der Bestellbestätigung. Bitte senden Sie sie an das Team der "
+"Plattform; bis dahin können Sie keine Produkte veröffentlichen."
 
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."
