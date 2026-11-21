@@ -63,6 +63,7 @@ SPACE_PREFIXES = ("manager:", "mfa:", "orders:")
 SPACE_NAMES = (
     "customer_orders",
     "customer_order",
+    "garage_account",
     "privacy_account",
     "privacy_requests",
     "withdrawal",

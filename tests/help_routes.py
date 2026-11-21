@@ -67,4 +67,10 @@ ALLOWED: dict[str, str] = {
     "mfa:remove_device": "POST only, redirects to the factors page",
     "orders:cart_add": "POST only, redirects to the cart",
     "orders:cart_mini": "a fragment of the header, not a screen",
+    # FIT.5 2/3: the actions of "My garage" (garage_account has its own help file).
+    "garage_reset": "POST only, redirects to My garage",
+    "garage_profile_activate": "POST only, redirects to My garage",
+    "garage_profile_rename": "POST only, redirects to My garage",
+    "garage_profile_duplicate": "POST only, redirects to My garage",
+    "garage_profile_delete": "the confirmation step of a delete; POST redirects to My garage",
 }
