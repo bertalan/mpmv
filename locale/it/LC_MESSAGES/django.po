@@ -6944,6 +6944,10 @@ msgstr ""
 "Indichi a cosa è adatto questo prodotto prima di pubblicarlo: scelga gli articoli compatibili "
 "nella scheda Compatibilità, oppure dichiari che è adatto a tutto."
 
+#: apps/payments/stray.py
+msgid "Please give the reason for closing this alert."
+msgstr "Indichi il motivo per cui chiude questo avviso."
+
 #: apps/vendors/services.py
 msgid ""
 "Please give us a phone number for your shop before you publish products: sellers who sell to "
@@ -6951,9 +6955,6 @@ msgid ""
 msgstr ""
 "Ci comunichi un numero di telefono del Suo negozio prima di pubblicare prodotti: chi vende a "
 "consumatori deve indicarlo nelle informazioni sul recesso. Lo invii allo staff della piattaforma."
-#: apps/payments/stray.py
-msgid "Please give the reason for closing this alert."
-msgstr "Indichi il motivo per cui chiude questo avviso."
 
 #: apps/manager/fitment_forms.py
 msgid "Plural label"

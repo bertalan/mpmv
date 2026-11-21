@@ -7007,6 +7007,10 @@ msgstr ""
 "Indiquez à quoi ce produit convient avant de le publier : choisissez les articles compatibles dans"
 " l'onglet Compatibilité ou déclarez qu'il convient à tout."
 
+#: apps/payments/stray.py
+msgid "Please give the reason for closing this alert."
+msgstr "Veuillez indiquer le motif de la clôture de cette alerte."
+
 #: apps/vendors/services.py
 msgid ""
 "Please give us a phone number for your shop before you publish products: sellers who sell to "
@@ -7015,9 +7019,6 @@ msgstr ""
 "Veuillez nous communiquer un numéro de téléphone pour votre boutique avant de publier des produits"
 " : les vendeurs qui vendent à des consommateurs doivent l’indiquer dans les informations sur la "
 "rétractation. Envoyez-le à l’équipe de la plateforme."
-#: apps/payments/stray.py
-msgid "Please give the reason for closing this alert."
-msgstr "Veuillez indiquer le motif de la clôture de cette alerte."
 
 #: apps/manager/fitment_forms.py
 msgid "Plural label"

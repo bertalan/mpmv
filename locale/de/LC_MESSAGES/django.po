@@ -7014,6 +7014,10 @@ msgstr ""
 "Geben Sie vor der Veröffentlichung an, wofür dieses Produkt passt: Wählen Sie im Tab Passform die "
 "passenden Artikel aus oder erklären Sie, dass es für alles passt."
 
+#: apps/payments/stray.py
+msgid "Please give the reason for closing this alert."
+msgstr "Bitte geben Sie den Grund an, aus dem Sie diese Warnung schließen."
+
 #: apps/vendors/services.py
 msgid ""
 "Please give us a phone number for your shop before you publish products: sellers who sell to "
@@ -7022,9 +7026,6 @@ msgstr ""
 "Bitte teilen Sie uns eine Telefonnummer für Ihren Shop mit, bevor Sie Produkte veröffentlichen: "
 "Wer an Verbraucher verkauft, muss sie in der Widerrufsbelehrung angeben. Senden Sie sie an das "
 "Team der Plattform."
-#: apps/payments/stray.py
-msgid "Please give the reason for closing this alert."
-msgstr "Bitte geben Sie den Grund an, aus dem Sie diese Warnung schließen."
 
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
