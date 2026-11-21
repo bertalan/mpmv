@@ -264,10 +264,20 @@ month plus 5%).
 ### Plan entitlements and plan fees (VEN.19, P2)
 
 Plans are data (VEN.2), and their `features` keys are the **entitlements**: what a plan allows
-beyond commission and product limits (for example `vendor_branding`, spec 14 §14.12, `accounting_connector`, the paid accounting module of D-48 (a), spec 11, and `orders_api`, the paid orders API of MQ-56, spec 07). Code never
+beyond commission and product limits (for example `vendor_branding` and `storefront_palette`, spec 14 §14.12, `accounting_connector`, the paid accounting module of D-48 (a), spec 11, and `orders_api`, the paid orders API of MQ-56, spec 07). Code never
 tests a plan code; it asks `plan_allows(vendor, feature) -> bool` in `apps/vendors/services.py`,
 backed by a pure `engine.plan_allows(plan_features, feature)`. A plan change has an effective date
 and is audited; losing an entitlement hides the feature and keeps its data.
+
+| Feature key | What it unlocks | Intended plans | Spec |
+|---|---|---|---|
+| `vendor_branding` | Logo and banner image on the storefront (Q-64) | Paid plans | 14 §14.12, THM.11 |
+| `storefront_palette` | A palette of its own (predefined or built with the palette builder) on the vendor's storefront pages; without it the storefront uses the site palette (owner decision 2026-11-21) | Top plan only | 14 §14.12, THM.32 |
+| `accounting_connector` | The paid accounting module (D-48 (a)) | Set by the operator | 11, CMP.36 to CMP.38 |
+| `orders_api` | The orders API scopes (MQ-56) | Higher plans | 07, ORD.33 to ORD.39 |
+
+The "intended plans" column is the owner's intent; the plan matrix itself is data the operator
+edits, and code only calls `plan_allows`.
 
 Plan fees (D-04: not at launch). From P2, a plan with a `monthly_fee` is charged once per month
 and vendor by a scheduled job (ARC.9) as a `plan_fee` ledger debit, so it is settled against the
