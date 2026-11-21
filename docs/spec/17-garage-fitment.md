@@ -96,7 +96,7 @@ class FitmentScheme(Model):  # singleton per installation
     year_max_offset = SmallIntegerField()  # e.g. 1900 and +2 years
     contains_special_category = BooleanField(default=False)  # §17.4.5: forces session-only storage
     max_profiles = PositiveSmallIntegerField(default=10)
-    garage_inactivity_months = PositiveSmallIntegerField(default=24)  # 1..120, spec 17.4.5
+    garage_inactivity_months = PositiveSmallIntegerField(default=24)  # 1..36, owner cap
     garage_notice_days = PositiveSmallIntegerField(default=30)  # 0 .. months*30-1
 
 

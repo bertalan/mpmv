@@ -170,8 +170,8 @@ def _check_types(values: Mapping[str, Any]) -> None:
 def _validate_scheme(scheme: FitmentScheme) -> None:
     if not 1 <= scheme.max_profiles <= 50:
         raise FitmentError("Profiles per customer must be between 1 and 50.")
-    if not 1 <= scheme.garage_inactivity_months <= 120:
-        raise FitmentError("Months without use must be between 1 and 120.")
+    if not 1 <= scheme.garage_inactivity_months <= 36:
+        raise FitmentError("Months without use must be between 1 and 36.")
     if not 0 <= scheme.garage_notice_days < scheme.garage_inactivity_months * 30:
         raise FitmentError("The notice days must be at least 0 and shorter than the retention.")
     if not 1000 <= scheme.year_min <= 2100:

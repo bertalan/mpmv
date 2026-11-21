@@ -8011,9 +8011,10 @@ msgid "Save your changes first: the latest saved draft is the one that is submit
 msgstr "Guarde primero los cambios: se envía el último borrador guardado."
 
 #: apps/manager/fitment_forms.py
-msgid "Saved items unused for this long are deleted from customer accounts."
+msgid "Saved items unused for this long are deleted from customer accounts. At most 36."
 msgstr ""
-"Los elementos guardados sin uso durante este tiempo se eliminan de las cuentas de los clientes."
+"Los elementos guardados sin uso durante este tiempo se eliminan de las cuentas de los clientes. "
+"Como máximo 36."
 
 #: apps/manager/fitment_views.py apps/manager/views.py
 msgid "Saved."

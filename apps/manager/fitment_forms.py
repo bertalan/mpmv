@@ -45,8 +45,10 @@ class SchemeForm(forms.Form):
     garage_inactivity_months = forms.IntegerField(
         label=_("Months without use before deletion"),
         min_value=1,
-        max_value=120,
-        help_text=_("Saved items unused for this long are deleted from customer accounts."),
+        max_value=36,
+        help_text=_(
+            "Saved items unused for this long are deleted from customer accounts. At most 36."
+        ),
     )
     garage_notice_days = forms.IntegerField(
         label=_("Days of notice before deletion"),
