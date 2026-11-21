@@ -18,6 +18,7 @@ import logging
 from decimal import Decimal
 
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext
 
@@ -70,7 +71,7 @@ def flag_stray_capture(
     dry run returns the change and writes nothing."""
     changes = ChangeSet()
     if AuditLog.objects.filter(
-        action=PAYMENT_STRAY_FLAGGED, target_key=payment.provider_ref
+        target_model=PAYMENT_MODEL, action=PAYMENT_STRAY_FLAGGED, target_key=payment.provider_ref
     ).exists():
         return changes
     changes.create(
@@ -114,16 +115,22 @@ def _closer(actor: User) -> str:
 
 
 def _is_open(provider_ref: str) -> bool:
-    flagged = AuditLog.objects.filter(action=PAYMENT_STRAY_FLAGGED, target_key=provider_ref)
-    closed = AuditLog.objects.filter(action=PAYMENT_STRAY_CLOSED, target_key=provider_ref)
+    flagged = AuditLog.objects.filter(
+        target_model=PAYMENT_MODEL, action=PAYMENT_STRAY_FLAGGED, target_key=provider_ref
+    )
+    closed = AuditLog.objects.filter(
+        target_model=PAYMENT_MODEL, action=PAYMENT_STRAY_CLOSED, target_key=provider_ref
+    )
     return flagged.exists() and not closed.exists()
 
 
 def open_stray_captures() -> list[Payment]:
     """The payments whose stray-capture alert is open, oldest flag first."""
-    closed = AuditLog.objects.filter(action=PAYMENT_STRAY_CLOSED).values("target_key")
+    closed = AuditLog.objects.filter(
+        target_model=PAYMENT_MODEL, action=PAYMENT_STRAY_CLOSED
+    ).values("target_key")
     refs = (
-        AuditLog.objects.filter(action=PAYMENT_STRAY_FLAGGED)
+        AuditLog.objects.filter(target_model=PAYMENT_MODEL, action=PAYMENT_STRAY_FLAGGED)
         .exclude(target_key__in=closed)
         .order_by("created_at", "id")
         .values_list("target_key", flat=True)
@@ -159,15 +166,17 @@ def close_stray_capture(
     text = " ".join(str(reason or "").split())
     if not text:
         raise ValidationError(gettext("Please give the reason for closing this alert."))
-    payment = Payment.objects.filter(provider_ref=provider_ref).first()
-    if payment is None or not _is_open(provider_ref):
-        return ChangeSet()
     detail: dict[str, object] = {
         "by": by,
         "reason_length": len(text),
         "reason_sha256": hashlib.sha256(text.encode()).hexdigest(),
     }
-    return _close(payment, detail, ctx, dry_run)
+    with transaction.atomic():
+        # The payment row is the lock: two closes at once write one entry, the second sees it.
+        payment = Payment.objects.select_for_update().filter(provider_ref=provider_ref).first()
+        if payment is None or not _is_open(provider_ref):
+            return ChangeSet()
+        return _close(payment, detail, ctx, dry_run)
 
 
 def _refunded(payment: Payment) -> Decimal | None:
@@ -189,27 +198,33 @@ def _refunded(payment: Payment) -> Decimal | None:
 
 def sweep_stray_captures(*, now: dt.datetime | None = None, dry_run: bool = False) -> ChangeSet:
     """The nightly job: close each open alert 14 days old whose full refund the provider confirms;
-    remind support about the others of that age, once per alert and business day."""
+    remind support about the others of that age, once per alert and day."""
     moment = now or timezone.now()
     today = timezone.localtime(moment, business_tz()).date().isoformat()
     changes = ChangeSet()
     for payment in open_stray_captures():
         entry = AuditLog.objects.filter(
-            action=PAYMENT_STRAY_FLAGGED, target_key=payment.provider_ref
+            target_model=PAYMENT_MODEL,
+            action=PAYMENT_STRAY_FLAGGED,
+            target_key=payment.provider_ref,
         ).earliest("created_at")
         reminded = AuditLog.objects.filter(
-            action=PAYMENT_STRAY_REMINDED, target_key=payment.provider_ref, after__date=today
+            target_model=PAYMENT_MODEL,
+            action=PAYMENT_STRAY_REMINDED,
+            target_key=payment.provider_ref,
+            after__date=today,
         ).exists()
         age_ok = (moment - entry.created_at).days >= engine.STRAY_AUTO_CLOSE_DAYS
+        refunded = _refunded(payment) if age_ok else None
         step = engine.stray_alert_step(
             flagged_at=entry.created_at,
             now=moment,
             amount=payment.amount,
-            refunded=_refunded(payment) if age_ok else None,
+            refunded=refunded,
             reminded_today=reminded,
         )
         if step == engine.STRAY_CLOSE:
-            done = _close(payment, {"by": "auto", "refunded": payment.amount}, SYSTEM_CTX, dry_run)
+            done = _close(payment, {"by": "auto", "refunded": refunded}, SYSTEM_CTX, dry_run)
             changes.changes.extend(done.changes)
         elif step == engine.STRAY_REMIND:
             changes.create(PAYMENT_MODEL, payment.provider_ref, {"date": today})
