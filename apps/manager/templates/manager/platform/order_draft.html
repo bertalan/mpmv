@@ -15,7 +15,7 @@ Every change and send is a POST with CSRF and a note. No contact data of the cus
     <dt>{% translate "Link" %}</dt><dd>{% if link_active %}{% blocktranslate with date=link_expires_at|date:"SHORT_DATETIME_FORMAT" %}Sent, usable once until {{ date }}{% endblocktranslate %}{% else %}{% translate "Not sent, or no longer usable" %}{% endif %}</dd>
     <dt>{% translate "Sends left today" %}</dt><dd>{{ sends_left }} / {{ max_sends }}</dd>
   </dl>
-  <p>{% translate "This is not an order. The customer opens the link, checks the cart and pays at checkout; the prices are the catalog prices of that moment. You never place or pay the order for the customer." %}</p>
+  <p>{% translate "This is not an order. The customer opens the link, checks the cart and pays at checkout; the prices are the catalogue prices of that moment. You never place or pay the order for the customer." %}</p>
 
   {% if skipped %}
     <h2>{% translate "Left out of the cart" %}</h2>

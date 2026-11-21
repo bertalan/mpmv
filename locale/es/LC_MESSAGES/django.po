@@ -12365,7 +12365,7 @@ msgstr "Esta es una versión archivada."
 #: apps/manager/templates/manager/platform/order_draft.html
 msgid ""
 "This is not an order. The customer opens the link, checks the cart and pays at checkout; the "
-"prices are the catalog prices of that moment. You never place or pay the order for the customer."
+"prices are the catalogue prices of that moment. You never place or pay the order for the customer."
 msgstr ""
 "Esto no es un pedido. El cliente abre el enlace, revisa el carrito y paga en la caja; los precios "
 "son los del catálogo en ese momento. Usted nunca hace ni paga el pedido por el cliente."
@@ -13229,8 +13229,8 @@ msgstr ""
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid ""
-"Until your payout account is active, your products are shown in the catalog and sold on request: "
-"customers cannot add them to the cart."
+"Until your payout account is active, your products are shown in the catalogue and sold on request:"
+" customers cannot add them to the cart."
 msgstr ""
 "Hasta que su cuenta de cobros esté activa, sus productos aparecen en el catálogo y se venden bajo "
 "petición: los clientes no pueden añadirlos al carrito."
@@ -14629,7 +14629,7 @@ msgstr ""
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid ""
-"You are authenticated as %(username)s, but are not authorized to access this page. Would you like "
+"You are authenticated as %(username)s, but are not authorised to access this page. Would you like "
 "to login to a different account?"
 msgstr ""
 "Has iniciado sesión como %(username)s, pero no tienes autorización para acceder a esta página. "
