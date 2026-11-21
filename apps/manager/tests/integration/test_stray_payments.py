@@ -12,10 +12,14 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+from django.conf import settings
 from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
+from django.utils.formats import localize
+from django.utils.html import escape
+from django.utils.translation import gettext, override
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
@@ -48,6 +52,13 @@ def flag(reason: str = "late", amount: str = "12.50") -> Payment:
     return payment
 
 
+def shown(text: str, page: str) -> bool:
+    """`text`, in the primary language, is on `page` (raw or HTML-escaped)."""
+    with override(settings.LANGUAGE_CODE):
+        local = gettext(text)
+    return local in page or escape(local) in page
+
+
 def staff(role: str | None) -> tuple[Client, User]:
     user = UserFactory.create(platform_role=role) if role else UserFactory.create()
     client = Client()
@@ -63,9 +74,10 @@ def test_the_roles_with_the_row_see_the_open_alerts(role: str) -> None:
     assert page.status_code == 200
     text = page.content.decode()
     assert payment.provider_ref in text
-    assert "12.50 EUR" in text
-    assert "No matching order" in text
-    assert ("Close the alert" in text) is (role != "finance")
+    with override(settings.LANGUAGE_CODE):
+        assert f"{localize(payment.amount)} EUR" in text
+    assert shown("No matching order", text)
+    assert shown("Close the alert", text) is (role != "finance")
 
 
 @pytest.mark.parametrize("role", ["catalog", "config"])
@@ -110,7 +122,7 @@ def test_support_closes_an_alert_it_is_audited_and_leaves_the_list() -> None:
     assert REASON not in str(entry.after)
     page = client.get(response["Location"])
     assert payment.provider_ref not in page.content.decode()
-    assert "No stray-payment alert is open." in page.content.decode()
+    assert shown("No stray-payment alert is open.", page.content.decode())
     # The nightly job, 20 days on, reminds no more about it.
     stray.sweep_stray_captures(now=timezone.now() + dt.timedelta(days=20))
     assert not AuditLog.objects.filter(action=PAYMENT_STRAY_REMINDED).exists()
@@ -122,7 +134,7 @@ def test_a_second_close_is_a_no_op_with_a_message() -> None:
     client.post(PAGE, {"payment": payment.provider_ref, "reason": REASON})
     again = client.post(PAGE, {"payment": payment.provider_ref, "reason": REASON}, follow=True)
     assert again.status_code == 200
-    assert "This alert was already closed." in again.content.decode()
+    assert shown("This alert was already closed.", again.content.decode())
     assert AuditLog.objects.filter(action=PAYMENT_STRAY_CLOSED).count() == 1
 
 
