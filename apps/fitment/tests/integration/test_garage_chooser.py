@@ -10,9 +10,11 @@ from typing import Any
 import pytest
 from django.test import Client
 from django.urls import reverse
+from django.utils import translation
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.accounts.tests.factories import UserFactory
+from apps.core.i18n import primary_language
 from apps.fitment import garage
 from apps.fitment.models import GarageProfile
 from apps.fitment.tests.factories import (
@@ -22,6 +24,13 @@ from apps.fitment.tests.factories import (
 )
 
 pytestmark = pytest.mark.django_db
+
+
+def _t(msgid: str) -> str:
+    """`msgid` as a page in the primary language shows it (CI also runs with `it,de`)."""
+    with translation.override(primary_language()):
+        return translation.gettext(msgid)
+
 
 CHOOSE = "garage_choose"
 APPLY = "garage_apply"
@@ -48,7 +57,7 @@ def _menu(html: str) -> str:
 
 def test_the_menu_invites_a_visitor_without_a_garage(client: Client, vehicles: None) -> None:
     html = _menu(client.get("/").content.decode())
-    assert "Add your garage" in html
+    assert _t("Add your garage") in html
     assert reverse(CHOOSE) in html
     assert "My garage" not in html  # nothing to manage for a visitor
 
@@ -78,7 +87,8 @@ def test_the_chooser_applies_a_cookie_vehicle_with_a_post_and_a_redirect(
     assert garage.parse(response.cookies[garage.COOKIE_NAME].value).active == 0
     assert "?" not in response["Location"]  # no garage state in the URL
     follow = client.get("/")
-    assert "is now your active vehicle" in follow.content.decode()  # the polite announcement
+    announced = _t("%(name)s is now your active vehicle.").split("%(name)s")[-1].strip()
+    assert announced in follow.content.decode()  # the polite announcement
 
 
 def test_generic_keeps_the_vehicles_but_applies_none(client: Client, vehicles: None) -> None:
