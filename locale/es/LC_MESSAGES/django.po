@@ -6081,6 +6081,10 @@ msgstr ""
 "Solo a petición del cliente, dentro del mismo país y territorio fiscal. Registre cómo y cuándo lo "
 "pidió el cliente, y sus palabras."
 
+#: apps/payments/stray.py
+msgid "Only Support or the platform owner may close this alert."
+msgstr "Solo soporte o el titular de la plataforma pueden cerrar esta alerta."
+
 #: apps/orders/staff_drafts.py
 msgid "Only Support or the platform owner may prepare a cart."
 msgstr "Solo soporte o el titular de la plataforma pueden preparar un carrito."
@@ -6946,6 +6950,10 @@ msgid ""
 msgstr ""
 "Indique a qué se adapta este producto antes de publicarlo: elija los artículos compatibles en la "
 "pestaña Compatibilidad o declare que se adapta a todo."
+
+#: apps/payments/stray.py
+msgid "Please give the reason for closing this alert."
+msgstr "Indique el motivo por el que cierra esta alerta."
 
 #: apps/vendors/services.py
 msgid ""

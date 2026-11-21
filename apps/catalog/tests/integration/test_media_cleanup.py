@@ -36,6 +36,7 @@ from apps.core.tests.factories import (
     PlatformOperatorFactory,
 )
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
@@ -338,4 +339,8 @@ def test_the_list_warns_that_old_page_versions_may_hold_a_listed_image(client: C
     page = client.get(reverse(URL_NAME)).content.decode()
 
     assert "data-orphan-old-versions" in page
-    assert "old version of a page" in page
+    warning = translated(
+        "An image that is only in an old version of a page may be listed here. If you delete it, "
+        "going back to that version would show a missing image."
+    )
+    assert warning in page

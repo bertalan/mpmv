@@ -47,6 +47,12 @@ def switch_targets(html: str) -> dict[str, tuple[str, bool]]:
     return {m["code"]: (m["next"], m["notice"] == "1") for m in FORM.finditer(html)}
 
 
+def untranslated_languages() -> list[str]:
+    """The configured languages that the test objects have no translation in (not the first two)."""
+    taken = {primary_language(), other_language()}
+    return [code for code in configured_languages() if code not in taken]
+
+
 def hreflang(html: str) -> dict[str, str]:
     return dict(re.findall(r'<link rel="alternate" hreflang="([^"]+)" href="([^"]+)"', html))
 
@@ -71,8 +77,8 @@ def test_a_term_page_switches_to_its_translation(client: Client, compat: dict[st
         False,
     )
     assert targets[primary_language()][0] == "/compatibility/maker/"
-    for code in ("de", "fr", "es"):
-        assert targets[code] == (f"/{code}/", True)
+    for code in untranslated_languages():
+        assert targets[code] == (f"{language_prefix(code)}/", True)
     same_as_hreflang(html)
 
 
@@ -89,7 +95,8 @@ def test_a_brand_page_switches_to_its_translation(client: Client) -> None:
         localized("/brand/acme-it/", other_language()),
         False,
     )
-    assert targets["de"] == (f"{language_prefix(third_language())}/", True)
+    for code in untranslated_languages():
+        assert targets[code] == (f"{language_prefix(code)}/", True)
     same_as_hreflang(html)
 
 
@@ -103,7 +110,8 @@ def test_a_vendor_storefront_switches_to_its_translation(client: Client) -> None
     assert targets[other_language()][0].startswith(f"{language_prefix(other_language())}/")
     assert vendor.slug in targets[other_language()][0]
     assert targets[other_language()][1] is False
-    assert targets["fr"] == ("/fr/", True)
+    for code in untranslated_languages():
+        assert targets[code] == (f"{language_prefix(code)}/", True)
     same_as_hreflang(html)
 
 
@@ -115,7 +123,8 @@ def test_a_vendor_storefront_in_the_fallback_language_offers_the_other_languages
     targets = switch_targets(
         client.get(localized(f"/shop/{vendor.slug}/", other_language())).content.decode()
     )
-    assert targets["de"] == (f"{language_prefix(third_language())}/", True)
+    for code in untranslated_languages():
+        assert targets[code] == (f"{language_prefix(code)}/", True)
 
 
 def test_switching_to_a_translation_goes_there_without_a_notice(
@@ -173,7 +182,8 @@ def test_a_listing_never_carries_its_query_to_a_home_page(
     compat: dict[str, Any],  # noqa: F811
 ) -> None:
     targets = switch_targets(client.get("/compatibility/maker/?utm_source=x").content.decode())
-    assert targets["de"] == (f"{language_prefix(third_language())}/", True)
+    for code in untranslated_languages():
+        assert targets[code] == (f"{language_prefix(code)}/", True)
 
 
 @pytest.fixture(autouse=True)

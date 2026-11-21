@@ -199,6 +199,9 @@ def _deploy_check(module: str, **extra: str) -> subprocess.CompletedProcess[str]
         # provider adapter comes with ARC.19, so the check sees only its dotted path here.
         "MPMV_EMAIL_SENDER": "apps.example.ProviderEmailSender",
         "MPMV_EMAIL_FROM": "no-reply@shop.example.com",
+        # The value of deploy/server/mpmv.env.example. The test env lists de, fr and es, which
+        # core.W915 (I18N.19) flags until their catalogs carry the review mark.
+        "MPMV_LANGUAGES": "en,it",
         **extra,
     }
     return subprocess.run(
