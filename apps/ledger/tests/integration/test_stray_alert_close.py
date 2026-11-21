@@ -11,12 +11,14 @@ import dataclasses
 import datetime as dt
 import json
 import logging
+import threading
 import time
 from decimal import Decimal
 from typing import Any
 
 import pytest
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import connection
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
@@ -157,6 +159,34 @@ def test_a_manual_close_is_audited_without_the_reason_and_happens_once(
     assert AuditLog.objects.filter(action=PAYMENT_STRAY_CLOSED).count() == 1
 
 
+@pytest.mark.django_db(transaction=True)
+def test_two_concurrent_closes_write_one_entry() -> None:
+    payment = flagged(place(sellable()))
+    # A flush by an earlier transactional test drops the role groups (a data migration), so the
+    # closer here is the superuser; the permission check has its own tests above and below.
+    support = UserFactory.create(superuser=True)
+    barrier = threading.Barrier(2)
+    results: list[bool] = []
+
+    def close_once() -> None:
+        try:
+            barrier.wait(timeout=10)
+            changes = stray.close_stray_capture(
+                payment.provider_ref, actor=support, reason=REASON, ctx=staff_ctx(support)
+            )
+            results.append(changes.is_empty)
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=close_once) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    assert sorted(results) == [False, True]
+    assert AuditLog.objects.filter(action=PAYMENT_STRAY_CLOSED).count() == 1
+
+
 @pytest.mark.parametrize("role", ["finance", "catalog", None])
 def test_only_support_or_the_platform_owner_may_close(
     stripe: FakeStripeClient, role: str | None
@@ -201,6 +231,7 @@ def test_the_nightly_job_closes_a_14_day_old_alert_with_a_full_refund(
     stray.sweep_stray_captures(now=night)
     entry = AuditLog.objects.get(action=PAYMENT_STRAY_CLOSED)
     assert (entry.after or {})["by"] == "auto"
+    assert Decimal(str((entry.after or {})["refunded"])) == payment.amount  # the provider's figure
     assert stray.open_stray_captures() == []
     assert stray.sweep_stray_captures(now=night).is_empty
 

@@ -285,7 +285,7 @@ def stray_alert_step(
     """What the nightly job does with an open stray-capture alert. Before 14 days: nothing. From
     then on: close it when the provider confirms a refund of the whole payment amount (`refunded`
     is None when the provider could not be read, which confirms nothing), else remind support,
-    at most once a business day."""
+    at most once a day."""
     if (now - flagged_at).days < STRAY_AUTO_CLOSE_DAYS:
         return STRAY_WAIT
     if refunded is not None and amount > 0 and refunded >= amount:
