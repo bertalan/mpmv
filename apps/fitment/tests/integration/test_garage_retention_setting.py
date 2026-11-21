@@ -63,7 +63,7 @@ def test_the_change_is_audited() -> None:
     "bad",
     [
         {"garage_inactivity_months": 0},
-        {"garage_inactivity_months": 121},
+        {"garage_inactivity_months": 37},
         {"garage_notice_days": -1},
         {"garage_inactivity_months": 1, "garage_notice_days": 30},  # notice not under the period
         {"garage_inactivity_months": "24"},
@@ -75,3 +75,8 @@ def test_invalid_retention_values_are_refused(bad: dict[str, object]) -> None:
         services.save_scheme(bad, ctx=CTX)
     scheme = services.current_scheme()
     assert (scheme.garage_inactivity_months, scheme.garage_notice_days) == (24, 30)
+
+
+def test_36_months_is_the_largest_retention_accepted() -> None:
+    services.save_scheme({"garage_inactivity_months": 36}, ctx=CTX)
+    assert services.current_scheme().garage_inactivity_months == 36
