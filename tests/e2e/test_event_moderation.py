@@ -17,7 +17,7 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.core.models import AuditLog
-from apps.events.models import EVENT_MODERATORS, EventPage
+from apps.events.models import EVENT_MODERATORS, EVENT_REVIEW, EventPage
 from apps.events.services import (
     EventRefused,
     ensure_event_review_workflow,
@@ -29,6 +29,7 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -78,18 +79,19 @@ def test_a_moderator_approves_staff_hide_and_the_vendor_cannot_resubmit(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("moderator@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
 
     # The moderator opens the review list and approves the submitted event.
     page.goto(f"{live_server.url}/admin/events/review/")
-    expect(page.get_by_role("heading", name="Events awaiting review")).to_be_visible()
+    expect(page.get_by_role("heading", name=translated("Events awaiting review"))).to_be_visible()
     shot("review-list")
     assert _admin_violations(page) == [], "\n".join(_admin_violations(page))
     page.get_by_role("link", name="Spring trade fair").click()
-    approve = page.get_by_role("button", name="Approve and Publish", exact=True)
+    approve_label = translated("%(label)s and Publish") % {"label": translated("Approve")}
+    approve = page.get_by_role("button", name=approve_label, exact=True)
     if not approve.is_visible():
-        page.get_by_role("button", name="More actions").click()
+        page.get_by_role("button", name=translated("More actions")).click()
     approve.click()
     expect(page.locator(".messages")).to_contain_text("Spring trade fair")
     event.refresh_from_db()
@@ -98,15 +100,18 @@ def test_a_moderator_approves_staff_hide_and_the_vendor_cannot_resubmit(
 
     # Staff hide it from the page editor, with a reason (an empty one is refused).
     page.goto(f"{live_server.url}/admin/pages/{event.pk}/edit/")
-    page.get_by_role("button", name="More actions").click()
-    page.get_by_role("link", name="Hide event").click()
-    page.get_by_role("button", name="Hide event").click()  # the browser asks for the reason
-    expect(page.get_by_label("Reason")).to_be_focused()
-    page.get_by_label("Reason").fill("The offer in the description is misleading.")
+    page.get_by_role("button", name=translated("More actions")).click()
+    page.get_by_role("link", name=translated("Hide event")).click()
+    page.get_by_role(
+        "button", name=translated("Hide event")
+    ).click()  # the browser asks for the reason
+    expect(page.get_by_label(translated("Reason"))).to_be_focused()
+    page.get_by_label(translated("Reason")).fill("The offer in the description is misleading.")
     shot("hide-form")
     assert _admin_violations(page) == [], "\n".join(_admin_violations(page))
-    page.get_by_role("button", name="Hide event").click()
-    expect(page.locator(".messages")).to_contain_text("hidden")
+    page.get_by_role("button", name=translated("Hide event")).click()
+    hidden = translated("Event '%(title)s' hidden.") % {"title": "Spring trade fair"}
+    expect(page.locator(".messages")).to_contain_text(hidden)
     shot("hidden")
     event.refresh_from_db()
     assert event.hidden_at is not None
@@ -123,11 +128,16 @@ def test_a_moderator_approves_staff_hide_and_the_vendor_cannot_resubmit(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill(owner.email)
     page.locator("input[name=password]").fill(vendor_password)
-    page.get_by_role("button", name="Sign in").click()
-    if page.get_by_label("Authentication code").count():
+    page.get_by_role("button", name=translated("Sign in")).click()
+    if page.get_by_label(translated("Authentication code")).count():
         verify_with_totp(page, totp_token(vendor_device))
     page.goto(f"{live_server.url}/admin/pages/{event.pk}/edit/")
-    expect(page.get_by_role("button", name="Submit to Event review")).to_have_count(0)
+    expect(
+        page.get_by_role(
+            "button",
+            name=translated("Submit to %(workflow_name)s") % {"workflow_name": EVENT_REVIEW},
+        )
+    ).to_have_count(0)
     expect(page.locator("#id_title")).to_have_count(0)
     shot("vendor-refused")
     with pytest.raises(EventRefused):
