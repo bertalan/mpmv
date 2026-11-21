@@ -42,6 +42,18 @@ class SchemeForm(forms.Form):
         ),
     )
     max_profiles = forms.IntegerField(label=_("Profiles per customer"), min_value=1, max_value=50)
+    garage_inactivity_months = forms.IntegerField(
+        label=_("Months without use before deletion"),
+        min_value=1,
+        max_value=120,
+        help_text=_("Saved items unused for this long are deleted from customer accounts."),
+    )
+    garage_notice_days = forms.IntegerField(
+        label=_("Days of notice before deletion"),
+        min_value=0,
+        max_value=3600,
+        help_text=_("The service email goes out this many days before. Shorter than the months."),
+    )
 
 
 def _language_names() -> list[tuple[str, str]]:
