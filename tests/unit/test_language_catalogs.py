@@ -476,7 +476,7 @@ def test_the_part_2_labels_differ_from_the_english_source(lang: str) -> None:
 # I18N.20 part 3: the template scope guard. Every template that carries translation tags is in the
 # catalog scope (`tools/i18n_catalog.py` SCOPES) or in EXCLUDED below, with a reason. A new template
 # with `{% translate %}` therefore fails here until somebody decides where it belongs.
-# The entries below are the storefront and staff templates still English-only; each one is
+# The entries below are the editor, admin and developer templates still English-only; each one is
 # tracked by the named follow-up slice and leaves this set when it joins SCOPES.
 EXCLUDED = {
     # Editor, admin and Wagtail screens: formal register, own slice.
@@ -491,7 +491,6 @@ EXCLUDED = {
     "themes/ride/templates/layouts/": "layout override, I18N.20 part 3b",
     "themes/base/templates/styleguide.html": "developer style guide, not shown to customers",
     "themes/ride/templates/styleguide": "developer style guide, not shown to customers",
-    # Email templates: their own scope (one language per recipient), I18N.20 part 3c.
 }
 _TRANSLATION_TAG = re.compile(r"\{%-?\s*(?:translate|trans|blocktranslate|blocktrans)\b")
 
