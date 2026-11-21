@@ -61,7 +61,8 @@ def _chain_appearance(
 def active_payment_appearance(palette: Mapping[str, str] | None = None) -> dict[str, Any]:
     """The appearance of the theme the page is rendered with, in `palette` (roles) if given.
 
-    The caller passes only a palette that passed the contrast check (`services.active_palette`);
+    Callers must pass a palette already checked by `services.active_palette`: this function does
+    not run the contrast check itself, so an unchecked palette would reach the payment page as is.
     None keeps the theme's own colours.
     """
     roles = tuple(sorted(palette.items())) if palette else ()

@@ -97,6 +97,9 @@ def clear_caches() -> None:
     palette_asset.cache_clear()
     registered_surfaces.cache_clear()
     palette_violations.cache_clear()
+    from .appearance import clear_cache  # lazy: appearance imports this module
+
+    clear_cache()
 
 
 def default_theme() -> str:

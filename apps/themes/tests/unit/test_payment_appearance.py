@@ -108,3 +108,14 @@ def test_no_palette_means_the_theme_defaults() -> None:
             active_payment_appearance()["variables"]
             == payment_appearance(tokens_of("ride"))["variables"]
         )
+
+
+def test_clear_caches_forgets_the_cached_appearance() -> None:
+    from apps.themes.appearance import _chain_appearance
+    from apps.themes.services import clear_caches
+
+    with use_theme("ride"):
+        active_payment_appearance()
+    assert _chain_appearance.cache_info().currsize
+    clear_caches()
+    assert not _chain_appearance.cache_info().currsize

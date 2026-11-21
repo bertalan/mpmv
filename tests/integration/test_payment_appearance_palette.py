@@ -21,12 +21,12 @@ RIDE_RED = "#C40417"
 
 def choose_palette(slug: str, **overrides: str) -> BrandPalette:
     palette = BrandPalette.objects.get(slug=slug)
-    if overrides:  # a stored row that no longer passes (written directly, bypassing `clean`)
+    if overrides:  # a stored row that no longer passes (written past `save`, which validates)
         palette.pk = None
         palette.slug = slug + "-stale"
-        for role, value in overrides.items():
-            setattr(palette, role, value)
         palette.save()
+        BrandPalette.objects.filter(pk=palette.pk).update(**overrides)
+        palette.refresh_from_db()
     site = Site.objects.get(is_default_site=True)
     ThemeSettingsFactory.create(site=site, theme="ride", palette=palette)
     clear_caches()
