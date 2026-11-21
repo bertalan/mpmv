@@ -19,6 +19,7 @@ from wagtail.admin.rich_text import DraftailRichTextArea
 
 from apps.core.nfc_forms import NFCForm
 from apps.manager import event_block_forms as blocks
+from apps.manager import session_views
 from apps.manager.amendment_forms import (
     AmendmentForm,
     CancelPackageForm,
@@ -139,13 +140,13 @@ FORMS: dict[str, tuple[Callable[[dict[str, str]], NFCForm], tuple[str, ...], tup
     "trust_rules": (lambda d: TrustRulesForm(d, current=in_force_data()[0]), ("note",), ()),
     "storefront": (lambda d: StorefrontProfileForm(d), ("tagline", "description"), ()),
     "logo": (lambda d: VendorLogoForm(d), ("logo_alt",), ()),
-    "shipment": (lambda d: ShipmentForm(d), (), ("tracking_number",)),
+    "shipment": (lambda d: ShipmentForm(d), ("carrier",), ("tracking_number",)),
     "staff_role": (lambda d: StaffRoleForm(d), ("reason",), ("email",)),
     "sales_terms": (lambda d: SalesTermsForm(d), ("body", "governing_law"), ()),
     "return_policy": (lambda d: ReturnPolicyForm(d), (), ("returns_page_url", "return_country")),
     "user_lookup": (lambda d: UserLookupForm(d), (), ("email",)),
     "end_sessions": (lambda d: EndUserSessionsForm(d), ("reason",), ()),
-    "end_every_session": (lambda d: EndEverySessionForm(d), (), ("confirm",)),
+    "end_every_session": (lambda d: EndEverySessionForm(d), ("confirm",), ()),
     "image_upload": (lambda d: ImageUploadForm(d), ("title",), ()),
     "document_upload": (lambda d: DocumentUploadForm(d), ("title",), ()),
     "external_link": (lambda d: ExternalLinkForm(d), ("link_text",), ("url",)),
@@ -187,7 +188,6 @@ def test_the_exact_fields_are_kept_as_typed(name: str) -> None:
         (lambda d: EventImageForm(d), "permission_ref"),
         (lambda d: ExternalLinkForm(d), "url"),
         (lambda d: SchemeForm(d), "garage_noun_key"),
-        (lambda d: EndEverySessionForm(d), "confirm"),
     ],
 )
 def test_an_exact_field_keeps_its_decomposed_text(
@@ -232,3 +232,14 @@ def test_an_amendment_changes_only_its_text_never_its_amounts() -> None:
     assert form.cleaned_data["reason"] == unicodedata.normalize("NFC", text["reason"])
     request = form.customer_request() or {}
     assert request["text"] == unicodedata.normalize("NFC", text["request_text"])
+
+
+def test_the_panic_word_matches_a_decomposed_accented_word(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A translated panic word with an accent matches whether it is typed composed or not."""
+    word = f"FIN{secrets.token_hex(2).upper()}\u00c9"  # ends with a composed "E" acute
+    monkeypatch.setattr(session_views, "_", lambda _text: word)
+    form = EndEverySessionForm({"confirm": f" {unicodedata.normalize('NFD', word)} "})
+    assert form.is_valid(), form.errors
+    assert session_views.panic_word_matches(form.cleaned_data["confirm"])
+    assert session_views.panic_word_matches(unicodedata.normalize("NFD", word))
+    assert not session_views.panic_word_matches(word[:-1])

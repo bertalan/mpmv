@@ -9,6 +9,7 @@ from wagtail.admin.rich_text import DraftailRichTextArea
 from wagtail.rich_text import features as feature_registry
 
 from apps.core.nfc_forms import NFCForm
+from apps.core.text import nfc
 from apps.orders import engine as orders_engine
 from apps.vendors import return_engine
 from apps.vendors.engine import LOGO_ALT_MAX_LENGTH, PROFILE_MAX_LENGTH
@@ -182,7 +183,7 @@ class ShipmentForm(NFCForm):
 
     def clean_carrier(self) -> str:
         try:
-            return orders_engine.normalise_carrier(self.cleaned_data["carrier"])
+            return orders_engine.normalise_carrier(nfc(self.cleaned_data["carrier"]) or "")
         except orders_engine.InvalidTracking:
             raise forms.ValidationError(_("Enter a valid carrier name."), code="invalid") from None
 
@@ -368,8 +369,6 @@ class EndUserSessionsForm(NFCForm):
 
 class EndEverySessionForm(NFCForm):
     """The platform owner's panic button (CORE.24): the fixed word confirms it."""
-
-    nfc_exact_fields = ("confirm",)  # matched byte for byte (I18N.10)
 
     confirm = forms.CharField(
         label=_("Confirmation"),
