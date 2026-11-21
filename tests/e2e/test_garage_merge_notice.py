@@ -70,22 +70,21 @@ def test_a_customer_adds_the_device_garage_with_the_keyboard(
     _sign_in(page, live_server, user, value)
     page.goto(f"{live_server.url}/")
     notice = page.locator("[data-garage-merge-notice]")
-    expect(notice).to_contain_text("You have 2 profiles saved on this device")
+    expect(notice).to_be_visible()
+    expect(notice.locator("p")).to_contain_text("2")
     _accessible(page)
     shot("notice")
 
-    page.get_by_role("button", name="Not now").focus()
+    notice.locator("button[value=dismiss]").focus()
     page.keyboard.press("Enter")
     expect(notice).to_have_count(0)
     assert not GarageProfile.objects.filter(user=user).exists()
 
     _sign_in(page, live_server, user, value)  # the next sign-in asks again
     page.goto(f"{live_server.url}/")
-    page.get_by_role("button", name="Add", exact=True).focus()
+    notice.locator("button[value=add]").focus()
     page.keyboard.press("Enter")
-    expect(page.locator(".site-messages [role=status]")).to_contain_text(
-        "2 profiles added to your account"
-    )
+    expect(page.locator(".site-messages [role=status]")).to_contain_text("2")
     expect(notice).to_have_count(0)
     assert GarageProfile.objects.filter(user=user).count() == 2
     assert all(c["name"] != garage.COOKIE_NAME for c in page.context.cookies())

@@ -104,10 +104,10 @@ def test_a_shared_computer_never_merges_without_add(client: Client) -> None:
 
 
 def test_the_posts_are_explicit_and_safe(client: Client) -> None:
-    assert client.get(reverse(MERGE)).status_code == 405
-    assert client.post(reverse(MERGE), {"action": "add"}).status_code == 400  # signed out
+    assert client.post(reverse(MERGE), {"action": "add"}).status_code == 302  # to sign in
     user = UserFactory.create()
     _sign_in(client, user, "Roadster")
+    assert client.get(reverse(MERGE)).status_code == 405
     assert client.post(reverse(MERGE), {"action": "nope"}).status_code == 400
     response = client.post(reverse(MERGE), {"action": "dismiss", "next": "https://evil.example/"})
     assert response["Location"] == "/"  # a foreign `next` is dropped

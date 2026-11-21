@@ -6,6 +6,7 @@ import uuid
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.utils.cache import add_never_cache_headers
@@ -14,7 +15,7 @@ from django.utils.translation import gettext, ngettext
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.audit import audit_context
-from apps.core.public_forms import Protection, public_form
+from apps.core.public_forms import Protection, not_anonymous, public_form
 
 from . import garage, garage_merge, garage_profiles, garage_state, services
 from .models import GarageProfile
@@ -191,6 +192,12 @@ apply_garage = _declared_fit7(
 )
 
 
+@not_anonymous(
+    reason="login_required: a signed-out request is redirected to sign in",
+    purpose="Garage merge notice: add the staged anonymous vehicles, or dismiss the notice",
+    task="FIT.7",
+)
+@login_required
 @require_POST
 def merge_garage(request: HttpRequest) -> HttpResponse:
     """The sign-in notice's two buttons (spec 17 §17.4.3): `action=add` copies the staged vehicles
@@ -199,12 +206,12 @@ def merge_garage(request: HttpRequest) -> HttpResponse:
     response = _back(request)
     user = request.user
     action = request.POST.get("action", "")
-    if not user.is_authenticated or action not in {"add", "dismiss"}:
+    if action not in {"add", "dismiss"}:
         return HttpResponse(status=400)
     if action == "dismiss":
         garage_merge.dismiss_pending(request)
         return response
-    result = garage_merge.merge_pending(request, user, ctx=audit_context(request))
+    result = garage_merge.merge_pending(request, user, ctx=audit_context(request))  # type: ignore[arg-type]
     garage_merge.clear_cookie(response)
     messages.success(
         request,
@@ -216,14 +223,3 @@ def merge_garage(request: HttpRequest) -> HttpResponse:
         % {"count": result.added},
     )
     return response
-
-
-merge_garage = _declared_fit7(
-    merge_garage,
-    purpose="Garage merge notice: add the staged anonymous vehicles, or dismiss the notice",
-    reason=(
-        "a signed-in customer's explicit Add copies vehicles staged from their own browser cookie "
-        "into their own profiles (audited, within the profile limit); Not now writes nothing"
-    ),
-    no_rate_limit="no external call: a bounded number of indexed lookups and at most the limit",
-)
