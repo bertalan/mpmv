@@ -28,6 +28,15 @@ class FitmentConfig(AppConfig):
 
         register_publication_check("fitment", publish_gate_messages)
 
+        # FIT.6: at sign-in the anonymous garage is staged for the merge notice (never merged).
+        from django.contrib.auth.signals import user_logged_in, user_logged_out
+
+        from .garage_merge import flag_sign_out, stage_on_login
+
+        user_logged_in.connect(stage_on_login, dispatch_uid="fitment.stage_garage_merge")
+        # FIT.6: at sign-out the cookie made from the account's active profile is cleared.
+        user_logged_out.connect(flag_sign_out, dispatch_uid="fitment.garage_sign_out")
+
     audited_models = (
         "fitmentscheme",
         "fitmentlevel",

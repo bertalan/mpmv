@@ -166,6 +166,14 @@ msgid_plural "%(n)s products selected."
 msgstr[0] "%(n)s producto seleccionado."
 msgstr[1] "%(n)s productos seleccionados."
 
+#: apps/fitment/garage_views.py
+msgid "%(name)s is deleted."
+msgstr "%(name)s se ha eliminado."
+
+#: apps/fitment/garage_views.py
+msgid "%(name)s is now your active vehicle."
+msgstr "%(name)s es ahora tu vehículo activo."
+
 #: apps/accounts/mfa_views.py
 msgid "%(name)s removed."
 msgstr "%(name)s eliminado."
@@ -604,6 +612,14 @@ msgstr ""
 "Un recordatorio privado de por qué existe la regla, de hasta 200 caracteres. Los visitantes nunca "
 "lo ven."
 
+#: apps/fitment/garage_views.py
+msgid "A profile name has at most %(max)d characters."
+msgstr "El nombre de un perfil tiene como máximo %(max)d caracteres."
+
+#: apps/fitment/garage_views.py
+msgid "A profile needs a name."
+msgstr "Un perfil necesita un nombre."
+
 #: apps/manager/event_forms.py
 msgid "A promotion (an offer, with no place), a trade fair or meeting, or something else. Required."
 msgstr "Una promoción (una oferta, sin lugar), una feria o reunión, u otra cosa. Obligatorio."
@@ -1018,7 +1034,8 @@ msgstr "Medida adoptada"
 msgid "Actions"
 msgstr "Acciones"
 
-#: apps/manager/fitment_forms.py
+#: apps/fitment/templates/fitment/garage_account.html apps/manager/fitment_forms.py
+#: themes/ride/templates/fitment/garage_account.html
 msgid "Active"
 msgstr "Activo"
 
@@ -2227,6 +2244,13 @@ msgstr ""
 msgid "Choose a time zone such as Europe/Rome."
 msgstr "Elija una zona horaria, por ejemplo Europe/Rome."
 
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid "Choose a vehicle while you browse the shop and save it: the shop then shows what fits it."
+msgstr ""
+"Elige un vehículo mientras navegas por la tienda y guárdalo: la tienda te mostrará entonces lo que"
+" le encaja."
+
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid "Choose a vendor"
@@ -2853,6 +2877,11 @@ msgstr "imagen para compartir por defecto"
 msgid "Defaults to 'Apply now'."
 msgstr "Por defecto es «Solicitar ahora»."
 
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid "Delete"
+msgstr "Eliminar"
+
 #: apps/manager/templates/manager/platform/fitment_node.html
 msgid "Delete (only when nothing uses it and it has no children)"
 msgstr "Eliminar (solo cuando nada lo usa y no tiene hijos)"
@@ -2860,6 +2889,10 @@ msgstr "Eliminar (solo cuando nada lo usa y no tiene hijos)"
 #: apps/accounts/admin.py
 msgid "Delete selected %(verbose_name_plural)s"
 msgstr "Eliminar %(verbose_name_plural)s seleccionados"
+
+#: apps/fitment/templates/fitment/garage_delete.html
+msgid "Delete this vehicle?"
+msgstr "¿Eliminar este vehículo?"
 
 #: apps/orders/customer_views.py
 msgid "Delivered"
@@ -3128,6 +3161,11 @@ msgstr ""
 "alguno para ti y hemos ordenado de inmediato el reembolso íntegro de EUR %(refund)s en el mismo "
 "medio de pago utilizado (abono en 5 a 10 días laborables y, en todo caso, en un máximo de 14 "
 "días). Te pedimos disculpas por las molestias."
+
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid "Duplicate"
+msgstr "Duplicar"
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 #: themes/ride/templates/accounts/mfa/_recovery_codes_list.html
@@ -4985,6 +5023,11 @@ msgstr "Fabricado por %(name)s"
 msgid "Main"
 msgstr "Principal"
 
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid "Make active"
+msgstr "Activar"
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 #: themes/ride/templates/accounts/mfa/overview.html
 msgid "Manage recovery codes"
@@ -5160,6 +5203,11 @@ msgstr "Mover hacia arriba"
 msgid "MPN"
 msgstr "MPN"
 
+#: apps/fitment/templates/fitment/garage_account.html apps/manager/site_map.py
+#: themes/ride/templates/fitment/garage_account.html
+msgid "My garage"
+msgstr "Mi garaje"
+
 #: apps/manager/site_map.py apps/orders/templates/orders/customer_orders.html
 #: themes/ride/templates/orders/customer_orders.html
 msgid "My orders"
@@ -5239,6 +5287,11 @@ msgstr "Nuevo nodo de compatibilidad"
 #: apps/catalog/taxonomy_admin.py
 msgid "New logo file"
 msgstr "Nuevo archivo del logotipo"
+
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid "New name"
+msgstr "Nuevo nombre"
 
 #: apps/manager/fitment_views.py
 msgid "New node"
@@ -5454,11 +5507,20 @@ msgstr "Todavía no hay cambios en la tienda."
 msgid "No threshold differs from the version in force."
 msgstr "Ningún umbral difiere de la versión en vigor."
 
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid "No vehicle is active: the shop shows everything."
+msgstr "Ningún vehículo está activo: la tienda lo muestra todo."
+
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "No version is published yet. Until you publish one, your products are sold on request only."
 msgstr ""
 "Todavía no hay ninguna versión publicada. Hasta que publique una, sus productos se venden solo "
 "bajo petición."
+
+#: apps/fitment/templates/fitment/garage_delete.html
+msgid "No, keep it"
+msgstr "No, conservarlo"
 
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
@@ -6373,7 +6435,7 @@ msgstr ""
 "Otros productos que desea sugerir junto con este, por ejemplo un modelo mejor. Opcional: déjelo "
 "vacío para no sugerir nada."
 
-#: apps/catalog/templates/catalog/includes/other_sellers.html
+#: apps/catalog/templates/catalog/includes/other_sellers.html apps/seo/page_builders.py
 #: themes/ride/templates/catalog/includes/other_sellers.html
 msgid "Other sellers of this product"
 msgstr "Otros vendedores de este producto"
@@ -7155,6 +7217,14 @@ msgstr "Productos aún sin declarar"
 msgid "professional seller"
 msgstr "vendedor profesional"
 
+#: apps/fitment/garage_views.py
+msgid "Profile duplicated."
+msgstr "Perfil duplicado."
+
+#: apps/fitment/garage_views.py
+msgid "Profile renamed."
+msgstr "Perfil renombrado."
+
 #: apps/manager/fitment_forms.py
 msgid "Profiles per customer"
 msgstr "Perfiles por cliente"
@@ -7557,6 +7627,11 @@ msgstr "Quitar el vehículo"
 msgid "removed"
 msgstr "eliminado"
 
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid "Rename"
+msgstr "Cambiar nombre"
+
 #: apps/manager/templates/manager/platform/fitment_node.html
 msgid "Rename (the old name becomes an alias)"
 msgstr "Renombrar (el nombre anterior pasa a ser un alias)"
@@ -7649,6 +7724,16 @@ msgstr "Obligatoria. Por qué lo hace, por ejemplo quién lo pidió y cómo. El 
 #: apps/manager/forms.py
 msgid "Reseller: we buy the products to resell"
 msgstr "Revendedor: compramos los productos para revenderlos"
+
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid "Reset only switches the active vehicle off. Your profiles are kept."
+msgstr "Restablecer solo desactiva el vehículo activo. Tus perfiles se conservan."
+
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid "Reset: show everything"
+msgstr "Restablecer: mostrar todo"
 
 #: apps/compliance/templates/compliance/includes/product_safety.html
 msgid "Responsible person in the EU"
@@ -11035,6 +11120,14 @@ msgstr ""
 msgid "The products you bring or put on offer. Only your own products. Optional."
 msgstr "Los productos que lleva u ofrece. Solo sus propios productos. Opcional."
 
+#: apps/fitment/garage_views.py
+msgid "The profile could not be duplicated."
+msgstr "No se pudo duplicar el perfil."
+
+#: apps/fitment/templates/fitment/garage_delete.html
+msgid "The profile is deleted for good. This cannot be undone."
+msgstr "El perfil se elimina para siempre. No se puede deshacer."
+
 #: apps/orders/ui/forms.py
 msgid "The province or state, where your country uses one. Optional."
 msgstr "La provincia o el estado, si tu país utiliza uno. Opcional."
@@ -12290,6 +12383,14 @@ msgstr "Este artículo no se puede comprar en este momento."
 #: apps/orders/ui/present.py
 msgid "This item has no price yet."
 msgstr "Este artículo todavía no tiene precio."
+
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid ""
+"This item is no longer in the catalogue. Delete this profile and save a new vehicle in its place."
+msgstr ""
+"Este elemento ya no está en el catálogo. Elimina este perfil y guarda un vehículo nuevo en su "
+"lugar."
 
 #: apps/orders/ui/present.py
 msgid "This item is out of stock, or fewer are available than the quantity in your cart."
@@ -14501,6 +14602,10 @@ msgstr "Escrito en la administración"
 msgid "Yes"
 msgstr "Sí"
 
+#: apps/fitment/templates/fitment/garage_delete.html
+msgid "Yes, delete it"
+msgstr "Sí, eliminarlo"
+
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid ""
 "You are a member of several vendors. Choose the one to work on; you can switch from the header "
@@ -14596,6 +14701,13 @@ msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Tiene %(counter)s código de recuperación sin usar."
 msgstr[1] "Tiene %(counter)s códigos de recuperación sin usar."
 
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid "You have %(total)s saved vehicle, of at most %(maximum)s."
+msgid_plural "You have %(total)s saved vehicles, of at most %(maximum)s."
+msgstr[0] "Tienes %(total)s vehículo guardado, de un máximo de %(maximum)s."
+msgstr[1] "Tienes %(total)s vehículos guardados, de un máximo de %(maximum)s."
+
 #: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid ""
 "You have 14 days from delivery to withdraw, also through the online withdrawal button. The seller "
@@ -14633,6 +14745,11 @@ msgstr "Todavía no tiene imágenes."
 msgid "You have no orders yet"
 msgstr "Todavía no tienes pedidos"
 
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid "You have no saved vehicles yet"
+msgstr "Aún no tienes vehículos guardados"
+
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "You have not set a policy yet. The standard one applies: the shop pays the return shipping."
 msgstr ""
@@ -14655,7 +14772,8 @@ msgstr ""
 "Usted tiene derecho a desistir del presente contrato en un plazo de %(days)s días naturales sin "
 "necesidad de justificación."
 
-#: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
+#: apps/catalog/templates/catalog/product.html apps/seo/page_builders.py
+#: themes/ride/templates/catalog/product.html
 msgid "You may also like"
 msgstr "También te puede gustar"
 
@@ -14837,6 +14955,20 @@ msgstr ""
 #: apps/vendors/forms.py
 msgid "Your full name"
 msgstr "Su nombre completo"
+
+#: apps/fitment/garage_views.py
+msgid "Your garage holds at most %(max)d profiles: delete one first."
+msgstr "Tu garaje admite como máximo %(max)d perfiles: elimina antes uno."
+
+#: apps/fitment/templates/fitment/garage_account.html
+#: themes/ride/templates/fitment/garage_account.html
+msgid "Your garage is full: it holds at most %(maximum)s profiles. Delete one to make room."
+msgstr ""
+"Tu garaje está lleno: admite como máximo %(maximum)s perfiles. Elimina uno para hacer sitio."
+
+#: apps/fitment/garage_views.py
+msgid "Your garage is reset. Your profiles are kept."
+msgstr "Tu garaje se ha restablecido. Tus perfiles se conservan."
 
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "your image library"

@@ -131,6 +131,7 @@ MIDDLEWARE = [
     # EVT.14: no cookie and no `Vary: Accept-Language` on tiles; outside Session and Locale.
     "apps.core.middleware.TileResponseNeutralMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "apps.fitment.middleware.GarageSignOutMiddleware",  # FIT.6: the garage cookie at sign-out
     "django.middleware.locale.LocaleMiddleware",
     "apps.core.middleware.LanguageRedirectMiddleware",  # retired language prefixes (I18N.15)
     # OPS.5: the Django admin answers the normal 404 outside the networks; before CommonMiddleware
