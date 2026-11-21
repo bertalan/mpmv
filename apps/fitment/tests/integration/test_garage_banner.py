@@ -225,3 +225,22 @@ def test_the_banner_shows_on_a_category_listing_too(client: Client) -> None:
 
     html = client.get(category_url(primary_language(), "bags")).content.decode()
     assert _t("Showing items for: %(label)s") % {"label": "Acme, Tourer"} in _banner(html)
+
+
+def test_an_action_link_referer_is_never_remembered_nor_a_return_target(client: Client) -> None:
+    """The URL of an action link holds a token (`language_switch_home` views): not stored in the
+    session, and *Apply* lands on `/` instead of back on a single-use link."""
+    secret = reverse("staff_draft_link", kwargs={"token": "top-secret-marker"})
+    _save(client, "Roadster")
+    client.get(reverse("garage_choose"), headers={"Referer": secret})
+    assert "top-secret-marker" not in str(dict(client.session))
+    from_chooser = client.post(
+        reverse("garage_apply"),
+        {"choice": "vehicle:0"},
+        headers={"Referer": reverse("garage_choose")},
+    )
+    assert from_chooser["Location"] == "/"
+    banner = client.post(
+        reverse("garage_apply"), {"choice": "generic"}, headers={"Referer": secret}
+    )
+    assert banner["Location"] == "/"

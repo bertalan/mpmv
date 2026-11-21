@@ -17,6 +17,7 @@ from django.utils.translation import gettext, ngettext
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.audit import audit_context
+from apps.core.i18n import path_carries_secret
 from apps.core.public_forms import Protection, not_anonymous, public_form
 
 from . import garage, garage_merge, garage_profiles, garage_state, services
@@ -142,8 +143,8 @@ def _remember_return(request: HttpRequest) -> None:
     ):
         return
     parts = urlsplit(referer)
-    if parts.path == request.path:
-        return
+    if parts.path == request.path or path_carries_secret(parts.path):
+        return  # not the chooser itself, and never an action link or key URL (a token)
     session[_RETURN_KEY] = parts.path + (f"?{parts.query}" if parts.query else "")
 
 
@@ -163,6 +164,8 @@ def _return_target(request: HttpRequest) -> HttpResponseRedirect:
         return HttpResponseRedirect(kept)
     if urlsplit(referer).path == reverse("garage_choose"):
         return HttpResponseRedirect("/")  # nothing remembered: not back onto the chooser
+    if path_carries_secret(urlsplit(referer).path):
+        return HttpResponseRedirect("/")  # a single-use link is never a return target
     return _back_to_referer(request)
 
 

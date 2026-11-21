@@ -114,3 +114,15 @@ def language_switch_home[V: Callable[..., Any]](view: V) -> V:
 
 def switch_goes_home(request: HttpRequest | None) -> bool:
     return bool(getattr(request, "language_switch_home", False))
+
+
+def path_carries_secret(path: str) -> bool:
+    """Whether `path` resolves to a view marked `language_switch_home`: its URL holds a secret, so
+    it must not be copied anywhere (session, page, redirect target)."""
+    from django.urls import Resolver404, resolve
+
+    try:
+        match = resolve(path)
+    except Resolver404:
+        return False
+    return bool(getattr(match.func, "language_switch_home", False))
