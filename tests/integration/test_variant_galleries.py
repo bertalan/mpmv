@@ -37,7 +37,8 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests.i18n import other_language, product_url
 
-pytestmark = pytest.mark.django_db
+# The variant choices are in the buy form, shown with a consumer price (TAX.12, #757).
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
 CTX = AuditContext(actor_label="system:test", source="system")
 MUG = slugs.product_path(primary_language(), "mug", default_language=settings.LANGUAGE_CODE)

@@ -29,6 +29,7 @@
       </div>
     </form>
     {% if count_text %}<p class="listing-count text-body-secondary" role="status">{{ count_text }}</p>{% endif %}
+    {% include "components/garage_banner.html" %}
 
     {% if searched and not only %}
       <div class="row g-4">

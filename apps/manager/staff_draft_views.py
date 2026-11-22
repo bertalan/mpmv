@@ -30,6 +30,7 @@ from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
 from apps.cart import engine as cart_engine
 from apps.core.audit import audit_context
+from apps.core.nfc_forms import NFCForm
 from apps.orders import engine as orders_engine
 from apps.orders import staff_drafts
 from apps.orders.models import Order, StaffDraft, StaffDraftLine, StaffDraftState
@@ -44,6 +45,7 @@ SKIPPED_LABELS = {
     orders_engine.REORDER_NOT_DELIVERABLE: gettext_lazy(
         "the shop cannot deliver it to the order's country"
     ),
+    orders_engine.REORDER_NO_PRICE: gettext_lazy("has no price yet"),
 }
 
 STATE_LABELS: dict[StaffDraftState, Any] = {
@@ -52,7 +54,7 @@ STATE_LABELS: dict[StaffDraftState, Any] = {
 }
 
 
-class DraftNoteForm(forms.Form):
+class DraftNoteForm(NFCForm):
     note = forms.CharField(
         label=gettext_lazy("Note"),
         max_length=staff_drafts.NOTE_MAX,

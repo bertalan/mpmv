@@ -7,6 +7,7 @@ Blog index (CMS.3): the live articles of this language, newest first, twelve per
 {% block page_content %}
   <h1>{{ page.title }}</h1>
   {% if page.intro %}{{ page.intro|richtext }}{% endif %}
+  {% include "components/garage_banner.html" %}
   {% translate "No articles have been published yet." as empty %}
   {% include "cms/includes/post_list.html" with empty=empty %}
 {% endblock %}

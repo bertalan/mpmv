@@ -13,9 +13,11 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 from django.utils import translation
+from django.utils.translation import gettext
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.fitment import garage_profiles
 from apps.fitment.models import FitmentScheme, GarageProfile
@@ -159,7 +161,11 @@ def test_the_limit_refuses_a_duplicate_with_a_message(client: Client, user: User
     post(client, "garage_profile_duplicate", profile.public_id)
     assert GarageProfile.objects.filter(user=user).count() == 1
     body = client.get(reverse(PAGE)).content.decode()
-    assert "at most 1 profile" in body  # the flash message
+    with translation.override(primary_language()):
+        flash = gettext("Your garage holds at most %(max)d profiles: delete one first.") % {
+            "max": 1
+        }
+    assert flash in body  # the flash message
     assert "data-garage-full" in body  # the standing note on the page
 
 
@@ -184,7 +190,7 @@ def test_a_retired_node_is_marked_with_its_action(client: Client, user: User) ->
     node.save()
     body = client.get(reverse(PAGE)).content.decode()
     assert "data-garage-retired" in body
-    assert "no longer in the catalogue" in body
+    assert "data-garage-retired-note" in body
 
 
 @pytest.mark.parametrize("name", PROFILE_ACTIONS)

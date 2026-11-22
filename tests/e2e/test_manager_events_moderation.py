@@ -1,9 +1,10 @@
 """E2E (EVT.4 part 3): the whole vendor-to-moderator loop for a promotion.
 
-A vendor in IT creates a promotion with two body blocks and submits it, with the keyboard (the
-datetime-local fields use fill(), as in part 1). A moderator asks for changes in the Wagtail admin;
-the comment shows in the vendor's list; the vendor resubmits and the moderator approves. The
-map picker (click, drag, typing) is covered by `test_manager_event_map_picker.py`.
+A vendor creates a promotion in a second language, with two body blocks, and submits it, with
+the keyboard (the datetime-local fields use fill(), as in part 1). A moderator asks for changes
+in the Wagtail admin; the comment shows in the vendor's list; the vendor resubmits and the
+moderator approves. The map picker (click, drag, typing) is covered by
+`test_manager_event_map_picker.py`.
 """
 
 import re
@@ -28,7 +29,7 @@ from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_manager_events import _press
 from tests.e2e.test_manager_shell import _accessible, _login
-from tests.i18n import translated
+from tests.i18n import other_language, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -65,7 +66,7 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     staff_device = TOTPDeviceFactory.create(user=staff)
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
-    # The vendor creates a promotion in IT with two body blocks and submits it.
+    # The vendor creates a promotion in a second language with two body blocks and submits it.
     _login(page, live_server.url, "seller@example.com", vendor_password)
     verify_with_totp(page, totp_token(seller_device), window=True)
     page.goto(f"{live_server.url}/manager/shop/events/new/")
@@ -74,12 +75,13 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     page.get_by_label(translated("Type")).select_option("promotion")
     page.get_by_label(translated("Starts at")).fill("2027-10-02T09:00")
     page.get_by_label(translated("Ends at")).fill("2027-10-09T18:00")
-    page.locator("#id_language").select_option("it")  # chosen explicitly (EVT.8)
+    language = other_language()  # not the primary one: chosen explicitly (EVT.8)
+    page.locator("#id_language").select_option(language)
     _press(page, "Save draft")
     expect(page).to_have_url(re.compile(r"/manager/shop/events/[0-9a-f-]+/$"))
     expect(page.get_by_role("heading", name=translated("Edit the event"))).to_be_visible()
     event = EventPage.objects.get(title="Saldi d'autunno")
-    assert event.locale.language_code == "it"
+    assert event.locale.language_code == language
     _add_paragraph(page, "Primo paragrafo dell'offerta.")
     _add_paragraph(page, "Secondo paragrafo dell'offerta.")
     page.goto(f"{live_server.url}/manager/shop/events/{event.public_id}/")

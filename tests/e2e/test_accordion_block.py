@@ -8,6 +8,7 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.models import HomePage
+from apps.core.i18n import primary_language
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 
@@ -21,7 +22,7 @@ SECTIONS = [
 
 @pytest.fixture
 def _accordion_home(live_server: LiveServer, _cms_site: None) -> None:
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     home.body = [("accordion", {"sections": SECTIONS, "open_first": False})]
     home.save_revision().publish()
 

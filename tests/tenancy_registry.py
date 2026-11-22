@@ -550,6 +550,10 @@ ENDPOINTS: dict[str, Access] = {
         "Public image files (THM.12): published images and their renditions, no vendor data.",
         kwargs={"path": "images/missing.webp"},
     ),
+    "palette:css": NoVendorData(
+        "Public site palette stylesheet (THM.31): colors only, the same for every visitor.",
+        path="/palette/default/missing.000000000000.css",
+    ),
     "wagtaildocs_serve": NoVendorData(
         "Wagtail document serve view (CMS.15): library documents are not vendor data; a private "
         "collection or restricted page refuses anonymous visitors.",
@@ -923,6 +927,18 @@ ENDPOINTS: dict[str, Access] = {
     "garage_forget": NoVendorData(
         "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
         "and the vehicle scheme; no vendor data."
+    ),
+    "garage_choose": NoVendorData(
+        "The garage chooser (FIT.7): lists the visitor's own cookie vehicles or own profiles; "
+        "no vendor data."
+    ),
+    "garage_apply": NoVendorData(
+        "The garage chooser's Apply (FIT.7): writes the visitor's own cookie or activates their "
+        "own profile (another account's is a 404); no vendor data."
+    ),
+    "garage_merge": NoVendorData(
+        "The sign-in notice's Add and Not now (FIT.7): a signed-in customer copies the vehicles of "
+        "their own browser cookie into their own profiles; no vendor data."
     ),
     "manager:platform:orders": StaffOnly(
         "Order changes (ORD.20 part 3): Support and the platform owner find an order by number; "

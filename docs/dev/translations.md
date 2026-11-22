@@ -148,3 +148,18 @@ counsel sign-off mark are not built yet (I18N.19).
 empty, a placeholder or not https, or when the default Wagtail `Site` differs from it (the seed
 syncs the `Site`). `site_root_url()` raises `ImproperlyConfigured` in production settings and never
 returns an empty string, so a canonical, hreflang or sitemap URL is never relative.
+
+## Vendor self-certification texts (CMP.25)
+
+The DSA article 30(1)(e) statement a vendor owner accepts is a Python literal per language in
+`SELF_CERTIFICATION_TEXTS` (`apps/vendors/engine.py`), not a gettext entry: the acceptance stores
+the version and the hash of the exact text. `review-export` does not export it, so hand it to the
+translator separately. The review gate covers it with its own mark:
+
+- `vendors.E001` (`vendors.W001` outside LIVE): a configured language has no text.
+- `vendors.E002` (`vendors.W002` outside LIVE): a configured language has a text but is not in
+  `SELF_CERTIFICATION_REVIEWED_LANGUAGES`. Add the language there in the commit that carries the
+  text the translator approved. `en` and `it` are served without the gate.
+
+Changing a text after an acceptance of it may exist needs a bump of `SELF_CERTIFICATION_VERSION`;
+a unit test pins the digests of each version and fails otherwise.

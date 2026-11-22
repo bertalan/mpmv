@@ -19,6 +19,7 @@ from apps.catalog.models import Category, Product
 from apps.core.geocoding import AddressQuery, GeocodeResult
 from apps.core.geocoding import engine as geo_engine
 from apps.core.i18n import configured_languages
+from apps.core.nfc_forms import NFCForm
 from apps.events import engine, services
 from apps.events.models import EventPage, default_timezone
 from apps.vendors.models import Vendor
@@ -70,7 +71,10 @@ def language_choices(exclude: Iterable[str] = ()) -> list[tuple[str, str]]:
     ]
 
 
-class EventForm(forms.Form):
+class EventForm(NFCForm):
+    # Matched byte for byte (I18N.10): the time zone id, the country code, the map picker values.
+    nfc_exact_fields = ("timezone", "country", "geo_source", "picked_latitude", "picked_longitude")
+
     language = forms.ChoiceField(
         label=_("Language"),
         required=False,
@@ -590,7 +594,7 @@ def initial_from_page(page: EventPage) -> dict[str, Any]:
     return initial
 
 
-class EventTranslationForm(forms.Form):
+class EventTranslationForm(NFCForm):
     """The text of a translation (EVT.8): title, summary and venue name. Everything else is the
     original's and is copied on publish. With `languages`, the form also asks which language to
     add (the "Add translation" page)."""

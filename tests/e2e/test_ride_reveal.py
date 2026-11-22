@@ -9,16 +9,26 @@ makes no third-party request before; axe `wcag22aa` and zero CSP violations at 3
 import re
 
 import pytest
+from django.template.defaultfilters import floatformat
+from django.utils import translation
 from playwright.sync_api import Browser, Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
+from apps.core.i18n import primary_language
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import csp_violations
 from tests.e2e.test_ride_bootstrap_components import open_ride
 from tests.e2e.test_styleguide import open_styleguide
 
 pytestmark = pytest.mark.django_db(transaction=True)
+
+
+def grouped(number: int) -> str:
+    """`number` with the primary language's thousands separator, as the counter shows it."""
+    with translation.override(primary_language()):
+        return str(floatformat(number, "0g"))
+
 
 REVEAL = "#sg-reveal [data-reveal]"
 COUNTER = "#sg-counters [data-counter]"
@@ -53,7 +63,7 @@ def test_reduced_motion_shows_every_revealed_element_and_animates_nothing(
         assert state[2] == "none"
     counter = page.locator(COUNTER).first
     page.wait_for_timeout(600)
-    expect(counter.locator("[data-counter-text]")).to_have_text("1,250")
+    expect(counter.locator("[data-counter-text]")).to_have_text(grouped(1250))
 
 
 def test_with_motion_an_element_is_revealed_once_it_scrolls_into_view_and_counts_up(
@@ -70,7 +80,10 @@ def test_with_motion_an_element_is_revealed_once_it_scrolls_into_view_and_counts
     expect(last).to_have_css("opacity", "1")
     counter = page.locator(COUNTER).first
     counter.scroll_into_view_if_needed()
-    expect(counter.locator("[data-counter-text]")).to_have_text("1,250", timeout=4000)
+    # The count-up writes the number with the browser's format for the page language, which
+    # may group differently from the server's (Italian: "1250", not "1.250").
+    final = page.evaluate("() => new Intl.NumberFormat(document.documentElement.lang).format(1250)")
+    expect(counter.locator("[data-counter-text]")).to_have_text(final, timeout=4000)
     assert csp_violations(page) == []
 
 
@@ -89,7 +102,7 @@ def test_without_javascript_every_revealed_element_and_counter_is_readable(
     for index in range(items.count()):
         expect(items.nth(index)).to_have_css("opacity", "1")
         expect(items.nth(index)).to_be_visible()
-    expect(bare.locator(COUNTER).first).to_contain_text("1,250")
+    expect(bare.locator(COUNTER).first).to_contain_text(grouped(1250))
     expect(bare.locator("#sg-progress progress").first).to_be_visible()
     expect(bare.locator(f"{VIDEO} a[href]").first).to_be_visible()
     expect(bare.locator("[data-countdown-upcoming]").first).to_be_visible()
@@ -107,14 +120,23 @@ def test_the_video_is_a_link_with_no_third_party_request_before_consent(
     open_ride(page, live_server, settings)
     opener = page.locator(f"{VIDEO} [data-bs-toggle=modal]")
     opener.focus()
+    page.evaluate(
+        """() => { window.__shown = false;
+            document.querySelector("#sg-video-tour-modal").addEventListener(
+                "shown.bs.modal", () => { window.__shown = true; }, {once: true}); }"""
+    )
     page.keyboard.press("Enter")
     modal = page.locator("#sg-video-tour-modal")
     expect(modal).to_be_visible()
+    page.wait_for_function(
+        "() => window.__shown === true"
+    )  # Bootstrap ignores a hide during the show transition
     expect(modal.locator("[data-video-gate]")).to_be_visible()
     expect(modal.locator("a[href*='cookie-settings']")).to_be_visible()
     assert modal.locator("iframe").count() == 0
     page.keyboard.press("Escape")
     expect(modal).to_be_hidden()
+    expect(modal).not_to_have_class(re.compile(r"\bshow\b"))
     expect(opener).to_be_focused()
     assert [url for url in foreign if "video.example" in url] == []
     violations = run_axe(page)
@@ -157,6 +179,6 @@ def test_a_counter_already_on_screen_shows_its_final_value_at_once(
     page.set_viewport_size({"width": 1280, "height": 5000})
     open_styleguide(page, live_server)
     text = page.locator(COUNTER).first.locator("[data-counter-text]")
-    assert text.text_content() == "1,250"
+    assert text.text_content() == grouped(1250)
     page.wait_for_timeout(300)
-    assert text.text_content() == "1,250"
+    assert text.text_content() == grouped(1250)

@@ -13,9 +13,11 @@ from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
+from apps.core.i18n import primary_language
 from apps.events.models import EventIndexPage, EventPage
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -53,10 +55,10 @@ def test_staff_publishes_an_event_and_visitors_see_it(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
 
-    index = EventIndexPage.objects.get(locale__language_code="en")
+    index = EventIndexPage.objects.get(locale__language_code=primary_language())
     page.goto(f"{live_server.url}/admin/pages/add/events/eventpage/{index.pk}/")
     page.locator("#id_title").fill("Spring trade fair")
     page.locator("#id_summary").fill("Meet the makers at the spring trade fair.")
@@ -72,15 +74,16 @@ def test_staff_publishes_an_event_and_visitors_see_it(
     page.locator("#id_country").fill("IT")
     expect(page.locator(".xdsoft_datetimepicker:visible")).to_have_count(0)
     shot("admin-add-event")
-    more_actions = page.get_by_role("button", name="More actions")
+    more_actions = page.get_by_role("button", name=translated("More actions"))
     more_actions.scroll_into_view_if_needed()
     expect(more_actions).to_be_enabled()
     more_actions.click()
-    publish = page.get_by_role("button", name="Publish")
+    publish = page.get_by_role("button", name=translated("Publish"))
     expect(publish).to_be_visible()
     expect(publish).to_be_enabled()
     publish.click()
-    expect(page.get_by_text("Page 'Spring trade fair' created and published.")).to_be_visible()
+    created = translated("Page '%(page_title)s' created and published.")
+    expect(page.get_by_text(created % {"page_title": "Spring trade fair"})).to_be_visible()
     admin_violations = [v for v in csp_violations(page) if not _axe_helper_style(v)]
     assert admin_violations == [], "\n".join(admin_violations)
 
