@@ -25,6 +25,7 @@ from django.http import (
 from django.shortcuts import render
 from django.template import loader
 from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET
 
 from .models import BrandPalette
 from .palettes import ROLES
@@ -104,6 +105,7 @@ def styleguide(request: HttpRequest) -> HttpResponse:
     return response
 
 
+@require_GET
 def palette_css(request: HttpRequest, theme: str, palette: str, digest: str) -> HttpResponse:
     """The stylesheet of a palette on a theme. The URL holds the content digest, so a matching
     one is cached for a year; a stale digest (the palette changed since the page was built)
