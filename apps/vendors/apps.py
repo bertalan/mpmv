@@ -33,7 +33,12 @@ class VendorsConfig(AppConfig):
     }
 
     def ready(self) -> None:
+        from django.core import checks
+
         from . import services
+        from .checks import check_self_certification_texts
+
+        checks.register(check_self_certification_texts)  # CMP.25 texts, I18N.19 review gate
 
         services.register_claim_purpose()  # VEN.24: the email-bound claim link (CORE.15)
         services.register_application_purpose()  # VEN.22: the application email link
