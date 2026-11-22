@@ -20,7 +20,7 @@ go-live.
 |---|---|---|
 | Accounts | `test_accounts_attacks.py`, `test_passkey_window_attacks.py`, `test_session_lifetime_attacks.py` | present |
 | Request tampering | `test_request_tampering.py` | present |
-| Business logic | `test_business_logic_attacks.py` | present (cart, catalogue API, shipping import; coupons, refunds, payouts: 3a-2) |
+| Business logic | `test_business_logic_attacks.py`, `test_payment_attacks.py` | present (cart, catalogue API, shipping import; payments and refunds: 3a-2; coupons and payouts to do) |
 | Integrations | `test_integration_attacks.py` | present (webhook replay, outbound SSRF and redirects, XML and archive guards, CSV formulas) |
 | Resource abuse | `test_resource_abuse.py` | present (2a: bodies, JSON depth, uploads, pagination; ReDoS is slice 2b) |
 | Information leaks | `test_information_leaks.py` | to do |

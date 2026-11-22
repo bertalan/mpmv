@@ -30,10 +30,11 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 
 def _login(page: Page, base_url: str, email: str, password: str) -> None:
+    """Sign in on the Manager login. By field id, not by label: the labels follow the language."""
     page.goto(f"{base_url}/account/login/")
-    page.get_by_label("Email").fill(email)
-    page.get_by_label("Password").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.locator("#id_username").fill(email)
+    page.locator("#id_password").fill(password)
+    page.locator("form:has(#id_password) [type=submit]").click()
 
 
 # Wagtail's editor bundle (Draftail, D-34) injects `<style>` elements, which the strict CSP blocks

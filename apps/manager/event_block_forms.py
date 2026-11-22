@@ -17,6 +17,7 @@ from django.utils.translation import gettext_lazy as _
 from apps.catalog.models import Product
 from apps.cms.engine import NEUTRAL, PRODUCT_GRID_DEFAULT, PRODUCT_GRID_MAX
 from apps.core.models import MediaImage
+from apps.core.nfc_forms import NFCForm
 from apps.events import engine, services
 from apps.events.models import EventPage
 from apps.vendors.models import Vendor
@@ -40,7 +41,7 @@ def _unwrap(item: Any) -> Any:
     return item
 
 
-class BlockForm(forms.Form):
+class BlockForm(NFCForm):
     """Base of the block forms: `vendor` scopes every chooser."""
 
     kind: ClassVar[str]

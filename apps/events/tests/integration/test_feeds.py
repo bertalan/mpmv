@@ -22,13 +22,13 @@ from apps.accounts.tests.factories import UserFactory
 from apps.cms.services import seed_site
 from apps.core.i18n import primary_language
 from apps.core.models import Throttle
-from apps.events.models import EventPage
+from apps.events.models import EventIndexPage, EventPage
 from apps.events.services import hide_event
 from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.events.tests.integration.test_multilingual_events import Fixture
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import language_prefix, other_language, translated
+from tests.i18n import other_language, translated
 
 pytestmark = pytest.mark.django_db
 
@@ -47,6 +47,11 @@ def _site() -> None:
 
 def _index_path() -> str:
     return str(primary_index().url)
+
+
+def _index_in(language: str) -> str:
+    """The path of the events index in `language` (no prefix for the primary one)."""
+    return str(EventIndexPage.objects.get(locale__language_code=language).url)
 
 
 def _event(days: int = 10, **fields: Any) -> EventPage:
@@ -112,9 +117,7 @@ def test_the_platform_rss_lists_each_event_once_with_a_stable_guid() -> None:
     assert _titles(channel) == ["Spring fair"]
     assert item.findtext("guid") == f"urn:uuid:{page.translation_key}"
     assert item.findtext("link", "").endswith(str(page.url))
-    assert item.findtext("category") == translated(
-        "Trade fair or meeting", page.locale.language_code
-    )
+    assert item.findtext("category") == translated("Trade fair or meeting")
     assert channel.findtext("language") == page.locale.language_code
     assert channel.find(f"{ATOM}link").get("rel") == "self"
     assert item.findtext(f"{DC}language") is None  # no fallback: no language override
@@ -337,34 +340,32 @@ def test_geo_and_georss_point_only_when_the_event_has_coordinates() -> None:
 # --- Case 10 (feed part): the original-language fallback
 
 
-def test_the_italian_feeds_carry_the_german_event_with_its_language() -> None:
-    # The primary-language feeds carry an event written in another configured language.
+def test_the_feeds_of_one_language_carry_an_event_written_in_another_with_its_language() -> None:
     client = Client()
     fixture = Fixture()
-    listed, original = primary_language(), other_language()
-    base = f"{language_prefix(listed)}/events/"
+    original, view = other_language(), primary_language()
     page = fixture.create(original, title="Herbstmesse")
-    channel = _rss(client, f"{base}feed.rss")
+    feed, calendar = _index_in(view) + "feed.rss", _index_in(view) + "calendar.ics"
+    channel = _rss(client, feed)
     item = channel.find("item")
-    assert channel.findtext("language") == listed
+    assert channel.findtext("language") == view
     assert item.findtext(f"{DC}language") == original
     assert item.findtext("link", "").endswith(str(page.url))
-    response = client.get(f"{base}calendar.ics")
+    response = client.get(calendar)
     event = Calendar.from_ical(response.content).walk("VEVENT")[0]
     assert event["SUMMARY"].params["LANGUAGE"] == original
     assert str(event["URL"]).endswith(str(page.url))
     uid = str(event["UID"])
-    italian = fixture.translate(page, listed, title="Fiera d'autunno")
-    item = _rss(client, f"{base}feed.rss").find("item")
+    translation = fixture.translate(page, view, title="Fiera d'autunno")
+    item = _rss(client, feed).find("item")
     assert item.findtext("title") == "Fiera d'autunno"
     assert item.findtext(f"{DC}language") is None
-    event = Calendar.from_ical(client.get(f"{base}calendar.ics").content).walk("VEVENT")[0]
+    event = Calendar.from_ical(client.get(calendar).content).walk("VEVENT")[0]
     assert "LANGUAGE" not in event["SUMMARY"].params
     assert str(event["UID"]) == uid  # one UID in every language
-    assert str(event["URL"]).endswith(str(italian.url))
-    own = f"{language_prefix(original)}/events/calendar.ics"
-    german = Calendar.from_ical(client.get(own).content).walk("VEVENT")[0]
-    assert str(german["UID"]) == uid
+    assert str(event["URL"]).endswith(str(translation.url))
+    in_original = client.get(_index_in(original) + "calendar.ics").content
+    assert str(Calendar.from_ical(in_original).walk("VEVENT")[0]["UID"]) == uid
 
 
 # --- Rate limit

@@ -3756,7 +3756,7 @@ msgstr "Formularfelder"
 msgid "form page"
 msgstr "Formularseite"
 
-#: apps/manager/event_forms.py
+#: apps/events/templates/events/event_page.html apps/manager/event_forms.py
 msgid "Free entry"
 msgstr "Freier Eintritt"
 
@@ -3820,6 +3820,10 @@ msgstr "Wenn Sie neue Codes generieren, funktionieren alle bisherigen Codes nich
 #: themes/ride/templates/compliance/privacy_account.html
 msgid "Get a copy of the data we hold about you as a JSON file."
 msgstr "Erhalte eine Kopie der Daten, die wir über dich gespeichert haben, als JSON-Datei."
+
+#: apps/events/templates/events/event_page.html
+msgid "Get tickets"
+msgstr "Tickets holen"
 
 #: apps/manager/event_fields.py
 msgid "Give a number from -%(limit)d to %(limit)d, for example 45.464200."
@@ -3954,6 +3958,10 @@ msgstr "GTIN"
 #: apps/manager/staff_draft_views.py
 msgid "Guest"
 msgstr "Gast"
+
+#: apps/manager/staff_draft_views.py apps/orders/customer_views.py
+msgid "has no price yet"
+msgstr "hat noch keinen Preis"
 
 #: apps/manager/event_block_forms.py
 msgid "Heading"
@@ -6137,6 +6145,10 @@ msgstr ""
 "Nur auf Wunsch des Kunden, innerhalb desselben Landes und Steuergebiets. Erfassen Sie, wie und "
 "wann der Kunde angefragt hat, und seine Worte."
 
+#: apps/payments/stray.py
+msgid "Only Support or the platform owner may close this alert."
+msgstr "Nur der Support oder der Plattformbetreiber darf diese Warnung schließen."
+
 #: apps/orders/staff_drafts.py
 msgid "Only Support or the platform owner may prepare a cart."
 msgstr "Nur der Support oder der Plattformbetreiber darf einen Warenkorb vorbereiten."
@@ -7010,6 +7022,10 @@ msgstr ""
 "Geben Sie vor der Veröffentlichung an, wofür dieses Produkt passt: Wählen Sie im Tab Passform die "
 "passenden Artikel aus oder erklären Sie, dass es für alles passt."
 
+#: apps/payments/stray.py
+msgid "Please give the reason for closing this alert."
+msgstr "Bitte geben Sie den Grund an, aus dem Sie diese Warnung schließen."
+
 #: apps/vendors/services.py
 msgid ""
 "Please give us a phone number for your shop before you publish products: sellers who sell to "
@@ -7060,6 +7076,7 @@ msgstr "Position"
 msgid "Postcode"
 msgstr "Postleitzahl"
 
+#: apps/events/templates/events/_summary.html apps/events/templates/events/event_page.html
 #: apps/manager/event_forms.py
 msgid "Postponed"
 msgstr "Verschoben"
@@ -7174,6 +7191,10 @@ msgstr "Früherer Beginn"
 #: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "Previous versions"
 msgstr "Frühere Versionen"
+
+#: apps/events/templates/events/event_page.html
+msgid "Previously"
+msgstr "Vorher"
 
 #: apps/catalog/templates/catalog/includes/listing_filters.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
@@ -11575,6 +11596,15 @@ msgstr "der Shop kann nicht in das Land der Bestellung liefern"
 
 #: apps/vendors/models.py
 msgid ""
+"The shop name when this version was published, so an old version keeps the name it was published "
+"under. Empty on versions published before it was recorded."
+msgstr ""
+"Der Shopname zum Zeitpunkt der Veröffentlichung dieser Version, damit eine alte Version den Namen "
+"behält, unter dem sie veröffentlicht wurde. Leer bei Versionen, die vor der Erfassung des Namens "
+"veröffentlicht wurden."
+
+#: apps/vendors/models.py
+msgid ""
 "The shop name your buyers see, for example 'Rossi Ceramics'. Required: the shop cannot be shown "
 "without a name."
 msgstr ""
@@ -12533,6 +12563,10 @@ msgstr ""
 msgid "This item cannot be bought right now."
 msgstr "Dieser Artikel kann derzeit nicht gekauft werden."
 
+#: apps/catalog/templates/catalog/product.html apps/orders/ui/present.py
+msgid "This item has no price yet, so you can't buy it online."
+msgstr "Dieser Artikel hat noch keinen Preis, daher kannst du ihn nicht online kaufen."
+
 #: apps/orders/ui/present.py
 msgid "This item has no price yet."
 msgstr "Dieser Artikel hat noch keinen Preis."
@@ -13006,6 +13040,10 @@ msgstr "Ticket-Link"
 #: apps/manager/event_forms.py
 msgid "Ticket price (EUR)"
 msgstr "Ticketpreis (EUR)"
+
+#: apps/events/templates/events/event_page.html
+msgid "Tickets"
+msgstr "Tickets"
 
 #: apps/manager/event_forms.py
 msgid "Tickets and changes"

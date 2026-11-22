@@ -10,6 +10,9 @@
   catalog. German, French and Spanish are still waiting for their catalogs (I18N.7): for them the
   same finding is only informational, so the shipped default configuration stays free of
   warnings until I18N.7 delivers; remove `CATALOG_PENDING` then.
+- core.E915 (core.W915 outside LIVE): a configured language other than English and Italian whose
+  catalog lacks the review mark (I18N.19): the header line written by
+  `tools/i18n_catalog.py mark-reviewed <lang>`.
 """
 
 from collections.abc import Iterable
@@ -27,6 +30,24 @@ from mpmv.settings.languages import KNOWN_LANGUAGES
 CATALOG_PENDING = frozenset({"de", "fr", "es"})
 # The language the msgids are written in: it needs no catalog.
 SOURCE_LANGUAGE = "en"
+# Customer languages served without the review gate (the default MPMV_LANGUAGES).
+UNGATED_LANGUAGES = frozenset({"en", "it"})
+# Header line of a catalog whose sensitive entries a translator reviewed (the i18n tool).
+REVIEW_HEADER = "# review: sensitive entries reviewed (I18N.19)"
+
+
+def _is_reviewed(code: str) -> bool:
+    for root in settings.LOCALE_PATHS:
+        path = Path(root) / code.replace("-", "_") / "LC_MESSAGES" / "django.po"
+        if path.is_file():
+            with path.open(encoding="utf-8") as handle:
+                for line in handle:
+                    if line.startswith("msgid"):
+                        return False
+                    if line.rstrip("\n") == REVIEW_HEADER:
+                        return True
+            return False
+    return False
 
 
 def _catalog_gap(code: str) -> tuple[int, int] | None:
@@ -86,6 +107,29 @@ def check_language_settings(
                     id="core.W911",
                 )
             )
+    return messages
+
+
+def check_language_review(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """core.E915 / core.W915: a listed language whose catalog lacks the review mark (I18N.19)."""
+    messages: list[checks.CheckMessage] = []
+    for code in dict.fromkeys(str(code) for code, _name in settings.LANGUAGES):
+        if code in UNGATED_LANGUAGES or code not in KNOWN_LANGUAGES or _is_reviewed(code):
+            continue
+        text = (
+            f"Language {code!r} is listed but its sensitive strings are not marked as reviewed "
+            "(I18N.19): it is still gated."
+        )
+        hint = (
+            f"Have a translator review `tools/i18n_catalog.py review-export {code}`, then run "
+            f"`tools/i18n_catalog.py mark-reviewed {code}`; or remove it from MPMV_LANGUAGES."
+        )
+        if settings.LIVE_DATA:
+            messages.append(checks.Error(text, hint=hint, id="core.E915"))
+        else:
+            messages.append(checks.Warning(text, hint=hint, id="core.W915"))
     return messages
 
 

@@ -163,7 +163,10 @@ def test_a_replayed_webhook_inside_the_window_has_no_second_effect(
 # --- SSRF in every outbound URL ---------------------------------------------------------------
 
 # Every place that opens an outbound connection, and why its host cannot be chosen by a user.
+# Callers of the apps.core.outbound helpers count as call sites too: the helper refuses
+# redirects but does not choose the host, so each caller still needs its own reason.
 OUTBOUND_CALL_SITES = {
+    "apps/core/outbound.py": "the no-redirect opener; the host is always the caller's",
     "apps/core/geocoding/adapters.py": "fixed provider URLs; the address only in the query",
     "apps/accounts/captcha.py": "the fixed Turnstile siteverify URL",
     "apps/tax/vies.py": "settings.VIES_API_URL; the VAT number only in the JSON body",
@@ -174,6 +177,7 @@ OUTBOUND_CALL_SITES = {
 _OUTBOUND = re.compile(
     r"\burlopen\(|\bbuild_opener\(|\bimport (?:requests|httpx|urllib3|aiohttp)\b"
     r"|\bfrom (?:requests|httpx|urllib3|aiohttp)\b|\bHTTPS?Connection\(|\bcreate_connection\("
+    r"|\bopen_url\(|\bno_redirect_opener\("
 )
 
 
@@ -228,11 +232,12 @@ def test_a_hostile_address_cannot_steer_the_geocoder(
         def read(self) -> bytes:
             return b"[]"
 
-    def fake_urlopen(request: urllib.request.Request, timeout: float) -> Answer:
+    def fake_open_url(request: urllib.request.Request, *, timeout: float) -> Answer:
         sent.append(request)
         return Answer()
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    # The transport opens through the no-redirect helper, bound by name in the adapters module.
+    monkeypatch.setattr(geo, "open_url", fake_open_url)
     kwargs: dict[str, Any] = {"transport": geo.http_get_json}
     if adapter in (geo.LocationIQGeocoder, geo.OpenCageGeocoder):
         kwargs["key"] = secrets.token_urlsafe(16)
@@ -315,10 +320,6 @@ TRANSPORTS: dict[str, Callable[[str], object]] = {
 }
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Finding: the outbound transports follow redirects to any host (urllib default)",
-)
 @pytest.mark.parametrize("name", sorted(TRANSPORTS))
 def test_an_outbound_transport_does_not_follow_a_redirect_to_another_host(name: str) -> None:
     """A provider answer (or a man in the middle on a misconfigured URL) redirecting to an

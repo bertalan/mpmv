@@ -166,7 +166,7 @@ def test_the_page_has_one_graph_with_the_brand_node(client: Client) -> None:
     graph = _graph(_page(client, localized("/brand/acme/")))
     node = _node(graph, "Brand")
     assert node["name"] == "Acme"
-    assert node["@id"] == "http://localhost/brand/acme/#brand"
+    assert node["@id"] == f"http://localhost{localized('/brand/acme/')}#brand"
     assert node["url"] == "https://acme.example/"
     assert node["description"] == "Anvils since 1949."
     assert node["sameAs"] == [

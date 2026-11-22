@@ -1324,7 +1324,11 @@ def _capture_problem(
 
 
 # PAY.4 (owner decision 2026-11-21): the problems that make a payment a stray capture.
-STRAY_CAPTURE_REASONS = {"orders.payment_late": "late", "orders.payment_mismatch": "mismatch"}
+STRAY_CAPTURE_REASONS = {
+    "orders.payment_late": "late",
+    "orders.payment_mismatch": "mismatch",
+    "orders.payment_ref_mismatch": "wrong_reference",
+}
 
 
 def stray_capture_reason(
@@ -1332,10 +1336,13 @@ def stray_capture_reason(
 ) -> str:
     """Why a confirmed payment that `mark_order_paid` refused is stray money (PAY.4): "late" when
     the order is no longer awaiting payment (cancelled), "mismatch" when the amount or currency is
-    not the order's gross total, "" otherwise (unknown order, order paid, payment not the one
-    started). Reads only; the caller alerts staff and refunds nothing (support refunds by hand)."""
-    order = Order.objects.filter(number=order_ref).first()
-    if order is None or order.state in PAID_OR_LATER:
+    not the order's gross total, "wrong_reference" when the payment is not the one started for
+    the order, "unmatched" when no order has that number, "" when the order is paid (the duplicate
+    path). Reads only; the caller alerts staff and refunds nothing (support refunds by hand)."""
+    order = Order.objects.filter(number=order_ref).first() if order_ref else None
+    if order is None:
+        return "unmatched"
+    if order.state in PAID_OR_LATER:
         return ""
     found = _capture_problem(order, amount=amount, currency=currency, provider_ref=provider_ref)
     return STRAY_CAPTURE_REASONS.get(found[0], "") if found else ""

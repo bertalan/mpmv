@@ -131,6 +131,7 @@ def test_a_version_1_file_is_still_imported() -> None:
     document["special_areas"] = []
     for method in document["methods"]:
         del method["area_treatments"]
+        del method["not_returnable_by_post"]
     other = VendorFactory.create()
 
     result = import_config(fmt.parse_json(document), vendor=other, ctx=CTX)
