@@ -28,10 +28,11 @@ class ThemeSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untype
     site = models.OneToOneField(
         Site,
         on_delete=models.CASCADE,
-        verbose_name="site",
+        verbose_name=_("Site"),
         help_text=_("The site this theme is for. Each site has one theme."),
     )
     theme = models.CharField(
+        _("Theme"),
         max_length=32,
         blank=True,
         help_text=_(

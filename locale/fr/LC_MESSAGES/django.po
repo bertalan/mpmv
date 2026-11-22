@@ -390,6 +390,14 @@ msgstr "une modification de l’adresse de livraison"
 msgid "A change to the storefront profile of %(vendor_name)s was reverted"
 msgstr "Une modification du profil de vitrine de %(vendor_name)s a été annulée"
 
+#: apps/vendors/templates/vendors/claim/signed_in.html
+msgid ""
+"A claim creates a new account for the vendor's legal email address. You are signed in with another"
+" account: sign out, then open the link from the email again."
+msgstr ""
+"Une demande crée un nouveau compte pour l'adresse e-mail légale du vendeur. Vous êtes connecté "
+"avec un autre compte : déconnectez-vous, puis ouvrez de nouveau le lien reçu par e-mail."
+
 #: apps/cms/blocks.py apps/cms/models.py
 msgid "A clear, short answer. It opens when the visitor clicks the question. Required."
 msgstr ""
@@ -1013,6 +1021,10 @@ msgstr "Tout accepter"
 msgid "Accept the order"
 msgstr "Accepter la commande"
 
+#: apps/orders/models.py
+msgid "Accepted"
+msgstr "Accepté"
+
 #: apps/orders/customer_views.py
 msgid "Accepted by the seller"
 msgstr "Accepté par le vendeur"
@@ -1528,7 +1540,7 @@ msgstr "Candidature annulée"
 msgid "Applications open soon."
 msgstr "Les candidatures ouvriront bientôt."
 
-#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/platform/termination_detail.html apps/orders/models.py
 msgid "Applied"
 msgstr "Appliquée"
 
@@ -1642,7 +1654,9 @@ msgid "Attendance"
 msgstr "Participation"
 
 #: apps/accounts/templates/accounts/mfa/totp.html apps/accounts/templates/accounts/mfa/verify.html
-#: themes/ride/templates/accounts/mfa/totp.html themes/ride/templates/accounts/mfa/verify.html
+#: apps/vendors/templates/vendors/claim/account.html
+#: apps/vendors/templates/vendors/claim/sign_in.html themes/ride/templates/accounts/mfa/totp.html
+#: themes/ride/templates/accounts/mfa/verify.html
 msgid "Authentication code"
 msgstr "Code d'authentification"
 
@@ -1652,11 +1666,12 @@ msgid "authenticator app"
 msgstr "application d'authentification"
 
 #: apps/accounts/templates/accounts/mfa/setup.html apps/accounts/templates/accounts/mfa/totp.html
-#: themes/ride/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/totp.html
+#: apps/vendors/templates/vendors/claim/account.html themes/ride/templates/accounts/mfa/setup.html
+#: themes/ride/templates/accounts/mfa/totp.html
 msgid "Authenticator app"
 msgstr "Application d'authentification"
 
-#: apps/manager/event_image_form.py
+#: apps/core/models.py apps/manager/event_image_form.py
 msgid "Author"
 msgstr "Auteur"
 
@@ -1834,7 +1849,7 @@ msgstr "Avant et après"
 msgid "Before opening the platform"
 msgstr "Avant l'ouverture de la plateforme"
 
-#: apps/orders/customer_views.py
+#: apps/orders/customer_views.py apps/orders/models.py
 msgid "Being prepared"
 msgstr "En préparation"
 
@@ -2006,7 +2021,7 @@ msgid "Cancellation policy"
 msgstr "Conditions d'annulation"
 
 #: apps/events/templates/events/_summary.html apps/events/templates/events/event_calendar.html
-#: apps/events/templates/events/event_page.html apps/orders/customer_views.py
+#: apps/events/templates/events/event_page.html apps/orders/customer_views.py apps/orders/models.py
 msgid "Cancelled"
 msgstr "Annulé"
 
@@ -2037,7 +2052,8 @@ msgstr "ne peut pas être livré à ton adresse"
 msgid "Cannot change once the level has nodes."
 msgstr "Ne peut plus être modifié une fois que le niveau contient des nœuds."
 
-#: apps/accounts/templates/accounts/mfa/totp.html themes/ride/templates/accounts/mfa/totp.html
+#: apps/accounts/templates/accounts/mfa/totp.html apps/vendors/templates/vendors/claim/account.html
+#: themes/ride/templates/accounts/mfa/totp.html
 msgid "Cannot scan? Enter this key:"
 msgstr "Impossible de scanner ? Saisissez cette clé :"
 
@@ -2237,7 +2253,8 @@ msgstr "Consultez votre messagerie"
 msgid "Checked"
 msgstr "Vérifié"
 
-#: apps/orders/templates/orders/checkout.html themes/ride/templates/orders/checkout.html
+#: apps/orders/models.py apps/orders/templates/orders/checkout.html
+#: themes/ride/templates/orders/checkout.html
 msgid "Checkout"
 msgstr "Paiement"
 
@@ -2478,13 +2495,29 @@ msgstr "Choisi : {name}"
 msgid "City"
 msgstr "Ville"
 
+#: apps/vendors/templates/vendors/claim/account.html
+#: apps/vendors/templates/vendors/claim/identity.html
+#: apps/vendors/templates/vendors/claim/sign_in.html
+msgid "Claim %(name)s"
+msgstr "Revendiquer %(name)s"
+
 #: apps/vendors/templates/email/vendors/claim_link/subject.txt
 msgid "Claim %(vendor_name)s on the platform"
 msgstr "Revendiquez %(vendor_name)s sur la plateforme"
 
+#: apps/vendors/templates/vendors/claim/submitted.html
+msgid "Claim submitted"
+msgstr "Demande envoyée"
+
 #: apps/vendors/templates/email/vendors/claim_link/body.html
 msgid "Claim the vendor"
 msgstr "Revendiquer le vendeur"
+
+#: apps/vendors/templates/vendors/claim/account.html
+#: apps/vendors/templates/vendors/claim/identity.html
+#: apps/vendors/templates/vendors/claim/sign_in.html
+msgid "Claim your vendor"
+msgstr "Revendiquez votre vendeur"
 
 #: apps/vendors/templates/documents/vendors/sales_terms.html
 #: apps/vendors/templates/vendors/terms/read.html
@@ -2603,6 +2636,7 @@ msgid "Complete"
 msgstr "Complet"
 
 #: apps/compliance/templates/compliance/privacy_requests.html apps/orders/customer_views.py
+#: apps/orders/models.py
 msgid "Completed"
 msgstr "Terminé"
 
@@ -2621,7 +2655,7 @@ msgstr "Calculer la modification"
 #: apps/manager/templates/manager/platform/trust_rule_preview.html
 #: apps/manager/templates/manager/shop/fitment_bulk.html
 #: apps/manager/templates/manager/shop/fitment_product.html
-#: themes/ride/templates/accounts/mfa/totp.html
+#: apps/vendors/templates/vendors/claim/identity.html themes/ride/templates/accounts/mfa/totp.html
 msgid "Confirm"
 msgstr "Confirmer"
 
@@ -2950,6 +2984,10 @@ msgstr "Déclaration"
 msgid "Declaration required to publish"
 msgstr "Déclaration requise pour publier"
 
+#: apps/orders/models.py
+msgid "Declined"
+msgstr "Refusé"
+
 #: themes/base/templates/components/quantity_stepper.html
 #: themes/ride/templates/components/quantity_stepper.html
 msgid "Decrease quantity"
@@ -2984,7 +3022,7 @@ msgstr "Supprimer les %(verbose_name_plural)s sélectionnés"
 msgid "Delete this vehicle?"
 msgstr "Supprimer ce véhicule ?"
 
-#: apps/orders/customer_views.py
+#: apps/orders/customer_views.py apps/orders/models.py
 msgid "Delivered"
 msgstr "Livré"
 
@@ -3136,6 +3174,10 @@ msgstr "Itinéraire sur OpenStreetMap"
 msgid "Discard the draft"
 msgstr "Abandonner le brouillon"
 
+#: apps/orders/models.py
+msgid "Discarded"
+msgstr "Écarté"
+
 #: themes/base/templates/components/launch_countdown.html
 #: themes/ride/templates/components/launch_countdown.html
 msgid "Discover it"
@@ -3216,6 +3258,10 @@ msgstr ""
 #: apps/manager/product_views.py
 msgid "draft"
 msgstr "brouillon"
+
+#: apps/orders/models.py
+msgid "Draft"
+msgstr "Brouillon"
 
 #: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "Draft: this text has not been checked by legal counsel yet and is not final."
@@ -3452,6 +3498,10 @@ msgstr "Saisissez le numéro de suivi : uniquement des lettres, des chiffres, de
 msgid "Enter this when you buy for a business, or untick the box."
 msgstr "Renseigne ce champ si tu achètes pour une entreprise, ou décoche la case."
 
+#: apps/vendors/views.py
+msgid "Enter your full name."
+msgstr "Saisissez votre nom et prénom."
+
 #: apps/compliance/templates/compliance/privacy_account.html
 #: themes/ride/templates/compliance/privacy_account.html
 msgid "Erase my account"
@@ -3597,6 +3647,10 @@ msgstr "Attendu"
 #: apps/manager/fitment_views.py
 msgid "Expected to declare fitment"
 msgstr "Doit déclarer la compatibilité"
+
+#: apps/orders/models.py
+msgid "Expired"
+msgstr "Expiré"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Explanation"
@@ -3845,7 +3899,7 @@ msgstr "De l'année"
 msgid "Frozen orders and payouts"
 msgstr "Commandes et versements gelés"
 
-#: apps/orders/ui/forms.py
+#: apps/accounts/models.py apps/orders/ui/forms.py apps/vendors/templates/vendors/claim/account.html
 msgid "Full name"
 msgstr "Nom et prénom"
 
@@ -4670,7 +4724,7 @@ msgstr ""
 msgid "introduction"
 msgstr "introduction"
 
-#: apps/accounts/mfa_views.py
+#: apps/accounts/mfa_views.py apps/vendors/views.py
 msgid "Invalid code. Check the time on your device and try again."
 msgstr "Code invalide. Vérifiez l'heure de votre appareil et réessayez."
 
@@ -5006,7 +5060,7 @@ msgstr "Niveaux"
 msgid "Levels of the scheme"
 msgstr "Niveaux du schéma"
 
-#: apps/manager/event_image_form.py
+#: apps/core/models.py apps/manager/event_image_form.py
 msgid "Licence"
 msgstr "Licence"
 
@@ -5030,6 +5084,7 @@ msgid "Link after the launch"
 msgstr "Lien après le lancement"
 
 #: apps/vendors/templates/vendors/apply/invalid.html
+#: apps/vendors/templates/vendors/claim/invalid.html
 msgid "Link not valid"
 msgstr "Lien non valide"
 
@@ -6336,6 +6391,10 @@ msgstr "Ouvrir la page publique"
 msgid "Open the review list"
 msgstr "Ouvrir la liste de relecture"
 
+#: apps/orders/models.py
+msgid "Open: staff may change it and send the link"
+msgstr "Ouvert : l'équipe peut la modifier et envoyer le lien"
+
 #: apps/manager/staff_draft_views.py
 msgid "Open: you may change it and send the link"
 msgstr "Ouvert : vous pouvez le modifier et envoyer le lien"
@@ -6343,6 +6402,10 @@ msgstr "Ouvert : vous pouvez le modifier et envoyer le lien"
 #: apps/manager/staff_draft_views.py
 msgid "Opened by the customer: the items are in their cart"
 msgstr "Ouvert par le client : les articles sont dans son panier"
+
+#: apps/orders/models.py
+msgid "Opened: the customer put it in their cart"
+msgstr "Ouvert par le client : le client l'a mise dans son panier"
 
 #: apps/manager/templates/manager/shop/money_statement.html
 msgid "Opening balance"
@@ -6681,6 +6744,10 @@ msgstr "Obsolète"
 msgid "Overdue GPSR safety case: %(kind)s %(reference)s"
 msgstr "Dossier de sécurité GPSR en retard : %(kind)s %(reference)s"
 
+#: apps/core/models.py
+msgid "Own work"
+msgstr "Œuvre personnelle"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Owner"
 msgstr "Titulaire"
@@ -6735,7 +6802,7 @@ msgstr "Type de page"
 msgid "Pagination"
 msgstr "Pagination"
 
-#: apps/orders/customer_views.py
+#: apps/orders/customer_views.py apps/orders/models.py
 msgid "Paid"
 msgstr "Payé"
 
@@ -6747,7 +6814,7 @@ msgstr ""
 "Colis payés et pas encore expédiés, du plus ancien au plus récent. Les colis expédiés ou clos se "
 "retrouvent avec le numéro de commande ci-dessus."
 
-#: apps/orders/customer_views.py
+#: apps/orders/customer_views.py apps/orders/models.py
 msgid "Partly refunded"
 msgstr "Partiellement remboursé"
 
@@ -6795,9 +6862,15 @@ msgid "Passkeys need JavaScript."
 msgstr "Les clés d'accès nécessitent JavaScript."
 
 #: apps/compliance/templates/compliance/privacy_account.html
-#: apps/manager/templates/manager/login.html themes/ride/templates/compliance/privacy_account.html
+#: apps/manager/templates/manager/login.html apps/vendors/templates/vendors/claim/account.html
+#: apps/vendors/templates/vendors/claim/sign_in.html
+#: themes/ride/templates/compliance/privacy_account.html
 msgid "Password"
 msgstr "Mot de passe"
+
+#: apps/vendors/templates/vendors/claim/account.html
+msgid "Password again"
+msgstr "Mot de passe, de nouveau"
 
 #: apps/events/templates/events/_links.html apps/events/templates/events/event_past.html
 msgid "Past events"
@@ -6883,7 +6956,7 @@ msgstr "Versements"
 msgid "PDF or image, 5 MB at most."
 msgstr "PDF ou image, 5 Mo au maximum."
 
-#: apps/compliance/templates/compliance/privacy_requests.html
+#: apps/compliance/templates/compliance/privacy_requests.html apps/orders/models.py
 msgid "Pending"
 msgstr "En attente"
 
@@ -7454,7 +7527,7 @@ msgstr "Proposer une modification"
 msgid "Propose a missing item"
 msgstr "Proposer un élément manquant"
 
-#: apps/manager/fitment_forms.py
+#: apps/manager/fitment_forms.py apps/orders/models.py
 msgid "Proposed"
 msgstr "Proposé"
 
@@ -7550,6 +7623,10 @@ msgstr "Question %(number)d"
 #: apps/manager/event_block_forms.py
 msgid "Questions and answers"
 msgstr "Questions et réponses"
+
+#: apps/orders/models.py
+msgid "Quote in progress"
+msgstr "Devis en cours"
 
 #: apps/orders/customer_views.py
 msgid "Quote requested"
@@ -7742,7 +7819,7 @@ msgstr "Remboursement confirmé"
 msgid "Refund fee"
 msgstr "Frais de remboursement"
 
-#: apps/orders/customer_views.py
+#: apps/orders/customer_views.py apps/orders/models.py
 msgid "Refunded"
 msgstr "Remboursé"
 
@@ -8239,7 +8316,8 @@ msgstr "Enregistré."
 msgid "Say whether the content is illegal or only against the platform terms."
 msgstr "Indiquez si le contenu est illicite ou seulement contraire aux conditions de la plateforme."
 
-#: apps/accounts/templates/accounts/mfa/totp.html themes/ride/templates/accounts/mfa/totp.html
+#: apps/accounts/templates/accounts/mfa/totp.html apps/vendors/templates/vendors/claim/account.html
+#: themes/ride/templates/accounts/mfa/totp.html
 msgid "Scan this QR code with your authenticator app, then enter the 6-digit code it shows."
 msgstr ""
 "Scannez ce code QR avec votre application d'authentification, puis saisissez le code à 6 chiffres "
@@ -8479,7 +8557,7 @@ msgstr "Expédiez à cette adresse :"
 msgid "Ship to:"
 msgstr "Expédier à :"
 
-#: apps/orders/customer_views.py
+#: apps/orders/customer_views.py apps/orders/models.py
 msgid "Shipped"
 msgstr "Expédié"
 
@@ -8635,6 +8713,8 @@ msgid "Show only the products of one vendor."
 msgstr "Afficher uniquement les produits d'un vendeur."
 
 #: apps/accounts/forms.py apps/manager/templates/manager/login.html apps/vendors/forms.py
+#: apps/vendors/templates/vendors/claim/account.html
+#: apps/vendors/templates/vendors/claim/sign_in.html
 msgid "Show password"
 msgstr "Afficher le mot de passe"
 
@@ -8722,6 +8802,14 @@ msgstr "Se déconnecter"
 msgid "Sign out of this session"
 msgstr "Se déconnecter de cette session"
 
+#: apps/vendors/templates/vendors/claim/signed_in.html
+msgid "Sign out to claim"
+msgstr "Se déconnecter pour revendiquer"
+
+#: apps/vendors/templates/vendors/claim/signed_in.html
+msgid "Sign out to claim this vendor"
+msgstr "Déconnectez-vous pour revendiquer ce vendeur"
+
 #: apps/compliance/templates/compliance/includes/model_withdrawal_form.html
 msgid "Signature of consumer(s) (only if this form is notified on paper)"
 msgstr ""
@@ -8754,7 +8842,7 @@ msgstr ""
 "placent côte à côte sur les grands écrans. Diaporama : la bannière ci-dessus est la première "
 "diapositive et les diapositives ci-dessous suivent."
 
-#: apps/seo/admin_views.py
+#: apps/seo/admin_views.py apps/themes/models.py
 msgid "Site"
 msgstr "Site"
 
@@ -9091,6 +9179,11 @@ msgstr "Envoyer"
 msgid "Submit for review"
 msgstr "Soumettre pour vérification"
 
+#: apps/vendors/templates/vendors/claim/account.html
+#: apps/vendors/templates/vendors/claim/sign_in.html
+msgid "Submit the claim"
+msgstr "Envoyer la demande"
+
 #: apps/events/templates/events/_subscribe.html
 msgid "Subscribe"
 msgstr "S'abonner"
@@ -9114,6 +9207,10 @@ msgstr "Résumé"
 #: apps/manager/event_forms.py
 msgid "Sunday"
 msgstr "Dimanche"
+
+#: apps/orders/models.py
+msgid "Superseded"
+msgstr "Remplacé"
 
 #: apps/orders/customer_views.py
 msgid "Support changed this cart after sending the link. Use the newest link we emailed you."
@@ -9209,6 +9306,23 @@ msgstr "Texte"
 #: apps/cms/blocks.py
 msgid "Text after the launch"
 msgstr "Texte après le lancement"
+
+#: apps/vendors/templates/vendors/claim/sign_in.html
+msgid ""
+"Thank you, the business is confirmed. An account already uses <strong>%(email)s</strong>: sign in "
+"with it to submit the claim. Enter its password and a code from its authenticator app."
+msgstr ""
+"Merci, l'entreprise est confirmée. Un compte utilise déjà <strong>%(email)s</strong> : connectez-"
+"vous avec ce compte pour envoyer la demande. Saisissez son mot de passe et un code de son "
+"application d'authentification."
+
+#: apps/vendors/templates/vendors/claim/account.html
+msgid ""
+"Thank you, the business is confirmed. Now create your account: it signs in with "
+"<strong>%(email)s</strong>, a password and an authenticator app."
+msgstr ""
+"Merci, l'entreprise est confirmée. Créez maintenant votre compte : il se connecte avec "
+"<strong>%(email)s</strong>, un mot de passe et une application d'authentification."
 
 #: apps/orders/customer_views.py
 msgid "Thank you. The seller can now ship the rest."
@@ -10533,6 +10647,16 @@ msgstr ""
 "Le lien a expiré, a déjà été utilisé ou n'appartient à aucune candidature en attente. Ouvrez le "
 "lien du dernier e-mail reçu, ou postulez de nouveau."
 
+#: apps/vendors/templates/vendors/claim/invalid.html
+msgid ""
+"The link has expired, was replaced by a newer one, was already used, or the claim is locked after "
+"too many attempts. Open the link from the most recent email, or ask the platform staff to send you"
+" a new one."
+msgstr ""
+"Le lien a expiré, a été remplacé par un plus récent, a déjà été utilisé, ou la demande est bloquée"
+" après trop de tentatives. Ouvrez le lien du dernier e-mail ou demandez à l'équipe de la "
+"plateforme de vous en envoyer un nouveau."
+
 #: apps/manager/staff_draft_views.py
 msgid "The link is sent to the customer. It works once, until %(date)s."
 msgstr "Le lien est envoyé au client. Il fonctionne une seule fois, jusqu’au %(date)s."
@@ -11121,6 +11245,10 @@ msgstr "La clé d'accès n'a pas fonctionné."
 msgid "the passkey was not accepted"
 msgstr "la clé d'accès n'a pas été acceptée"
 
+#: apps/vendors/views.py
+msgid "The password or the authentication code is not correct."
+msgstr "Le mot de passe ou le code d'authentification n'est pas correct."
+
 #: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid "The payment form could not be loaded. Please reload this page in a moment."
 msgstr ""
@@ -11247,6 +11375,18 @@ msgstr "le propriétaire de la plateforme"
 #: apps/manager/forms.py
 msgid "The platform role to give to that account or to take away from it."
 msgstr "Le rôle de plateforme à attribuer à ce compte ou à lui retirer."
+
+#: apps/vendors/templates/vendors/claim/account.html
+msgid "The platform staff review your claim before you can manage the vendor."
+msgstr "L'équipe de la plateforme examine votre demande avant que vous puissiez gérer le vendeur."
+
+#: apps/vendors/templates/vendors/claim/sign_in.html
+msgid ""
+"The platform staff review your claim before you can manage the vendor. If you cannot sign in with "
+"this account, contact the platform staff."
+msgstr ""
+"L'équipe de la plateforme examine votre demande avant que vous puissiez gérer le vendeur. Si vous "
+"ne parvenez pas à vous connecter avec ce compte, contactez l'équipe de la plateforme."
 
 #: apps/manager/templates/manager/shop/termination.html
 msgid ""
@@ -12132,6 +12272,10 @@ msgstr "La traduction"
 msgid "The translation is saved as a draft. Submit it when it is ready."
 msgstr "La traduction est enregistrée comme brouillon. Soumettez-la quand elle est prête."
 
+#: apps/vendors/views.py
+msgid "The two passwords do not match."
+msgstr "Les deux mots de passe ne correspondent pas."
+
 #: apps/catalog/attributes.py
 msgid ""
 "The unit of a number attribute, for example cm, kg or ml. Leave it empty for choice and text "
@@ -12448,6 +12592,10 @@ msgstr ""
 "La zone vers laquelle cette méthode expédie. Un vendeur peut proposer plusieurs méthodes pour la "
 "même zone."
 
+#: apps/themes/models.py
+msgid "Theme"
+msgstr "Thème"
+
 #: themes/base/templates/components/error_summary.html
 #: themes/ride/templates/components/error_summary.html
 msgid "There is a problem"
@@ -12605,6 +12753,10 @@ msgstr ""
 " passkey pour cette modification (une fenêtre passkey ouverte ne la couvre pas ; une confirmation "
 "donnée avant la modification du brouillon ne compte plus)."
 
+#: apps/vendors/templates/vendors/claim/invalid.html
+msgid "This claim link is not valid"
+msgstr "Ce lien de revendication n'est pas valide"
+
 #: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.html
 #: apps/compliance/templates/email/compliance/withdrawal_acknowledgement/body.txt
 msgid ""
@@ -12622,6 +12774,12 @@ msgstr "Ce contenu n’est pas disponible dans cette langue."
 #: apps/orders/ui/forms.py
 msgid "This does not look like an EU VAT number. Check the prefix and the digits."
 msgstr "Cela ne ressemble pas à un numéro de TVA de l'UE. Vérifiez le préfixe et les chiffres."
+
+#: apps/vendors/views.py
+msgid "This does not match the VAT number or TIN we hold for this vendor."
+msgstr ""
+"Cela ne correspond pas au numéro de TVA ou d'identification fiscale que nous avons pour ce "
+"vendeur."
 
 #: apps/orders/amendments.py
 msgid "This draft was started by platform staff: only that side may change or apply it."
@@ -12919,6 +13077,14 @@ msgid ""
 msgstr ""
 "Ce vendeur est suspendu ou fermé, le profil de vitrine ne peut donc pas être modifié. Contactez "
 "l'assistance pour le faire rouvrir."
+
+#: apps/vendors/templates/vendors/claim/identity.html
+msgid ""
+"This vendor was set up for you on the platform. To claim it, first confirm the VAT number or the "
+"tax identification number (TIN) of the business."
+msgstr ""
+"Ce vendeur a été créé pour vous sur la plateforme. Pour le revendiquer, confirmez d'abord le "
+"numéro de TVA ou le numéro d'identification fiscale (TIN) de l'entreprise."
 
 #: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "This version comes into effect on %(date)s."
@@ -13311,7 +13477,7 @@ msgstr ""
 "courrier électronique) et dans le récapitulatif de la commande avant de la passer)"
 
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/manager/stray_views.py
-#: apps/orders/customer_views.py
+#: apps/orders/customer_views.py apps/vendors/views.py
 msgid "Too many attempts. Please try again later."
 msgstr "Trop de tentatives. Veuillez réessayer plus tard."
 
@@ -13714,6 +13880,10 @@ msgstr "TVA incluse dans le total"
 msgid "VAT number"
 msgstr "Numéro de TVA"
 
+#: apps/vendors/templates/vendors/claim/identity.html
+msgid "VAT number or TIN"
+msgstr "Numéro de TVA ou d'identification fiscale (TIN)"
+
 #: apps/catalog/templates/catalog/includes/listing_filters.html
 #: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
 #: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
@@ -13839,7 +14009,11 @@ msgid_plural "View your cart: %(counter)s items"
 msgstr[0] "Voir ton panier : %(counter)s article"
 msgstr[1] "Voir ton panier : %(counter)s articles"
 
-#: apps/orders/customer_views.py
+#: apps/orders/models.py
+msgid "Waiting for a quote"
+msgstr "En attente d'un devis"
+
+#: apps/orders/customer_views.py apps/orders/models.py
 msgid "Waiting for payment"
 msgstr "En attente de paiement"
 
@@ -14920,7 +15094,7 @@ msgstr "Rétractation enregistrée"
 msgid "Withdrawal window"
 msgstr "Délai de rétractation"
 
-#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/platform/termination_detail.html apps/orders/models.py
 msgid "Withdrawn"
 msgstr "Retiré"
 
@@ -15225,6 +15399,15 @@ msgstr "Votre compte est protégé par une clé d'accès."
 #: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Your account is protected with an authenticator app."
 msgstr "Votre compte est protégé par une application d'authentification."
+
+#: apps/vendors/templates/vendors/claim/submitted.html
+msgid ""
+"Your account is ready and your claim of %(name)s is waiting for approval by the platform staff. "
+"You will be able to manage the vendor, its tax data and its payouts once they approve it."
+msgstr ""
+"Votre compte est prêt et votre demande pour %(name)s attend l'approbation de l'équipe de la "
+"plateforme. Vous pourrez gérer le vendeur, ses données fiscales et ses versements une fois la "
+"demande approuvée."
 
 #: apps/vendors/templates/vendors/apply/confirmed.html
 msgid ""
