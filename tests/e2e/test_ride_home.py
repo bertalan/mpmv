@@ -14,9 +14,11 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.models import HomePage
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import MediaImageFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -27,7 +29,7 @@ NO_SIDEWAYS_SCROLL = "() => document.documentElement.scrollWidth <= window.inner
 def _ride_home(settings: SettingsWrapper, live_server: LiveServer, _cms_site: None) -> None:
     settings.MPMV_THEME_DEFAULT = "ride"
     settings.MPMV_HELP_URL = "/about/#help"
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     banner = MediaImageFactory.create(title="Banner", file__filename="banner.png")
     home.body = [
         (
@@ -92,7 +94,7 @@ def test_the_home_page_renders_with_ride_at_every_width(
     assert page.evaluate(NO_SIDEWAYS_SCROLL)
     toggle = page.locator(".nav-toggle")
     if width >= 1024:  # 64rem
-        expect(page.get_by_role("navigation", name="Main")).to_be_visible()
+        expect(page.get_by_role("navigation", name=translated("Main"))).to_be_visible()
         expect(toggle).to_be_hidden()
     else:
         expect(toggle).to_be_visible()
@@ -109,7 +111,7 @@ def test_the_burger_menu_opens_and_closes_below_64rem(
     width = 360
     open_home(page, live_server, width, 800)
     toggle = page.locator(".nav-toggle")
-    first_link = page.get_by_role("navigation", name="Main").get_by_role("link").first
+    first_link = page.get_by_role("navigation", name=translated("Main")).get_by_role("link").first
     # THM.15 1/3: the toggler opens a Bootstrap offcanvas (a modal dialog), which has no
     # aria-expanded contract; the focus trap and the return of focus are in test_ride_navbar.py.
     expect(toggle).to_have_attribute("aria-controls", "site-offcanvas")

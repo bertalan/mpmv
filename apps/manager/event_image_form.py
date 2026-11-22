@@ -4,11 +4,14 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 
 from apps.core.models import ImageLicence
+from apps.core.nfc_forms import NFCForm
 
 
-class EventImageForm(forms.Form):
+class EventImageForm(NFCForm):
     """The upload form of the shop's image library: the file and its licence data (CMS.8).
     Never a collection: the image goes into the shop's own."""
+
+    nfc_exact_fields = ("permission_ref",)  # matched byte for byte (I18N.10)
 
     file = forms.FileField(
         label=_("File"),

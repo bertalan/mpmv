@@ -12,9 +12,12 @@ from pytest_django.live_server_helper import LiveServer
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.catalog.models import Product
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.login import admin_login, verify_with_totp
+from tests.e2e.test_audit_log import translated_pattern
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -34,19 +37,23 @@ def test_staff_create_a_product_and_change_its_price(
     page.locator("#id_sku").fill("bag-01")
     page.locator("#id_price_net").fill("25.00")
     page.locator("#id_weight_kg").fill("0.750")
-    page.locator("#id_translations-0-language").select_option("en")
+    page.locator("#id_translations-0-language").select_option(primary_language())
     page.locator("#id_translations-0-title").fill("Leather bag")
     shot("filled")
-    page.get_by_role("button", name="Save and continue editing").click()
-    expect(page.locator(".messagelist")).to_contain_text("was added successfully")
+    page.get_by_role("button", name=translated("Save and continue editing")).click()
+    expect(page.locator(".messagelist")).to_contain_text(
+        translated_pattern("The {name} “{obj}” was added successfully.")
+    )
 
     product = Product.objects.get()
     assert (product.sku, product.sku_key) == ("bag-01", "bag-01")  # kept as typed (CAT.13)
-    assert product.translations.get(language="en").title == "Leather bag"
+    assert product.translations.get(language=primary_language()).title == "Leather bag"
 
     page.locator("#id_price_net").fill("29.00")
-    page.get_by_role("button", name="Save", exact=True).click()
-    expect(page.locator(".messagelist")).to_contain_text("was changed successfully")
+    page.get_by_role("button", name=translated("Save"), exact=True).click()
+    expect(page.locator(".messagelist")).to_contain_text(
+        translated_pattern("The {name} “{obj}” was changed successfully.")
+    )
     shot("price-changed")
 
     product.refresh_from_db()
