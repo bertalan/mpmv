@@ -12,10 +12,14 @@ from django.urls import reverse
 
 from apps.core.i18n import primary_language
 from apps.themes.services import use_theme
-from tests.i18n import other_language
+from tests.i18n import other_language, translated
 
 pytestmark = pytest.mark.django_db
 
+ADD_PASSKEY = (
+    "Your account has no passkey yet. "
+    '<a href="%(overview_url)s">Add a passkey</a> to be able to confirm this.'
+)
 TEMPLATE = "accounts/levels/prompt.html"
 
 
@@ -48,7 +52,10 @@ def test_the_ride_prompt_renders_with_the_current_url_names() -> None:
 
 
 def test_the_ride_prompt_shows_the_shop_window_note_only_for_a_shop_window() -> None:
-    note = "It never covers another shop."
+    note = translated(
+        "This window covers only the sensitive actions of this shop that its owner confirms. "
+        "It never covers another shop."
+    )
     assert note in _render(shop_window=True)
     assert note not in _render(shop_window=False)
 
@@ -56,16 +63,27 @@ def test_the_ride_prompt_shows_the_shop_window_note_only_for_a_shop_window() -> 
 @pytest.mark.parametrize(
     ("context", "expected"),
     [
-        ({"group": 3}, "asks for a passkey of its own each time"),
+        (
+            {"group": 3},
+            "It is critical: it asks for a passkey of its own each time, "
+            "even with a passkey window open.",
+        ),
         ({"can_do_once": False}, "Open passkey window"),
-        ({"can_elevate": False, "has_passkey": False}, "Add a passkey"),
-        ({"can_elevate": False, "has_passkey": True}, "Ask a platform owner"),
+        ({"can_elevate": False, "has_passkey": False}, ADD_PASSKEY),
+        (
+            {"can_elevate": False, "has_passkey": True},
+            "Your role may not open a passkey window or do this once. Ask a platform owner.",
+        ),
     ],
 )
 def test_the_ride_prompt_keeps_every_variant_of_the_base_page(
     context: dict[str, Any], expected: str
 ) -> None:
-    assert expected in _render(**context)
+    if expected is ADD_PASSKEY:
+        wanted = translated(ADD_PASSKEY) % {"overview_url": reverse("mfa:overview")}
+    else:
+        wanted = translated(expected)
+    assert wanted in _render(**context)
 
 
 def test_the_ride_prompt_is_translated() -> None:
@@ -75,5 +93,5 @@ def test_the_ride_prompt_is_translated() -> None:
         italian = _render()
     with translation.override(primary_language()):
         english = _render()
-    assert "This needs your passkey" in english
+    assert translated("This needs your passkey", primary_language()) in english
     assert italian != english  # the Italian catalogue covers the refusal page (6fca0f69)
