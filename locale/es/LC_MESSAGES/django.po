@@ -1147,6 +1147,7 @@ msgstr "Añadir al carrito"
 msgid "Add translation"
 msgstr "Añadir traducción"
 
+#: themes/base/templates/components/garage_banner.html
 #: themes/base/templates/components/garage_menu.html
 msgid "Add your garage"
 msgstr "Añadir tu garaje"
@@ -3113,8 +3114,8 @@ msgstr "Descartar el borrador"
 msgid "Discover it"
 msgstr "Descúbrelo"
 
-#: themes/base/templates/components/alert.html themes/base/templates/components/toast.html
-#: themes/ride/templates/components/alert.html
+#: themes/base/templates/components/alert.html themes/base/templates/components/garage_banner.html
+#: themes/base/templates/components/toast.html themes/ride/templates/components/alert.html
 msgid "Dismiss"
 msgstr "Cerrar"
 

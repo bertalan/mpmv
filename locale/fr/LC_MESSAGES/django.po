@@ -1156,6 +1156,7 @@ msgstr "Ajouter au panier"
 msgid "Add translation"
 msgstr "Ajouter une traduction"
 
+#: themes/base/templates/components/garage_banner.html
 #: themes/base/templates/components/garage_menu.html
 msgid "Add your garage"
 msgstr "Ajouter ton garage"
@@ -3140,8 +3141,8 @@ msgstr "Abandonner le brouillon"
 msgid "Discover it"
 msgstr "Découvre-le"
 
-#: themes/base/templates/components/alert.html themes/base/templates/components/toast.html
-#: themes/ride/templates/components/alert.html
+#: themes/base/templates/components/alert.html themes/base/templates/components/garage_banner.html
+#: themes/base/templates/components/toast.html themes/ride/templates/components/alert.html
 msgid "Dismiss"
 msgstr "Fermer"
 
