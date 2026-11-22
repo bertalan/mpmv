@@ -15045,7 +15045,7 @@ msgid "You can read the scheme but not change it."
 msgstr "Vous pouvez lire le schéma mais pas le modifier."
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/product.html
-msgid "You can view this section; changes need the Catalog role."
+msgid "You can view this section; changes need the Catalogue role."
 msgstr "Vous pouvez consulter cette section ; les modifications nécessitent le rôle Catalogue."
 
 #: apps/compliance/templates/compliance/withdrawal_choose.html

@@ -23,7 +23,7 @@ REVERT_PROFILE_PERMISSION: Final = "vendors.revert_storefront_profile"  # CORE.9
 EDITORS_ADMIN_PERMISSION: Final = "wagtailadmin.access_admin"
 # Opens a passkey window (CORE.25). Owner decision 2026-11-12 (D-32): owner, support and finance.
 ELEVATE_PERMISSION: Final = "core.elevate"
-REVIEW_NOTICES_PERMISSION: Final = "compliance.review_notices"  # CMP.5, Catalog and moderation
+REVIEW_NOTICES_PERMISSION: Final = "compliance.review_notices"  # CMP.5, Catalogue and moderation
 
 
 class Access(StrEnum):
@@ -68,8 +68,8 @@ ROLES: Final[tuple[Role, ...]] = (
     ),
     Role(
         CATALOG,
-        "Platform: catalog and moderation",
-        "Catalog and moderation",
+        "Platform: catalogue and moderation",
+        "Catalogue and moderation",
         (
             "manager.platform_catalog",
             VIEW_ALL_VENDORS_PERMISSION,
@@ -124,10 +124,10 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.catalog": {CATALOG: E, SUPPORT: R, OWNER: R},
     "platform.moderation": {CATALOG: E, OWNER: R},
     # CAT.11: the product list, bulk publish and the audited fields. CAT.30 (MQ-52): Support
-    # reads the section; every write stays with Catalog and moderation (the services refuse too).
+    # reads the section; every write stays with Catalogue and moderation (the services refuse too).
     "platform.products": {CATALOG: E, SUPPORT: R, OWNER: R},
     # FIT.1 part 2: the fitment scheme and the categories expected to declare fitment (operator
-    # settings, Configuration and tax), and the nodes of the scheme (Catalog and moderation).
+    # settings, Configuration and tax), and the nodes of the scheme (Catalogue and moderation).
     "platform.fitment_scheme": {CONFIG: E, OWNER: R},
     "platform.fitment_categories": {CONFIG: E, CATALOG: R, OWNER: R},
     "platform.fitment_nodes": {CATALOG: E, SUPPORT: R, OWNER: R},

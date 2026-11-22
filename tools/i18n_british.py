@@ -64,9 +64,6 @@ EXCEPTIONS: dict[str, str] = {
     # `catalog:brand` is a URL name, an identifier the editor types; it is never renamed.
     "The name of the screen (for example catalog:brand) or of the page type (for example "
     "cms.StandardPage). Leave it empty for the general text.": "URL name",
-    # "Catalog and moderation" is the name of a role group stored in the database (migration
-    # 0003); renaming it needs a data migration of its own, so the notice keeps naming it.
-    "You can view this section; changes need the Catalog role.": "role group name",
 }
 
 _WORDS = re.compile(r"\b(?:" + "|".join(US_TO_UK) + r")\b", re.IGNORECASE)
@@ -87,6 +84,35 @@ def _catalog():  # type: ignore[no-untyped-def]
 def american_words(text: str) -> list[str]:
     """The American words of one string, in order."""
     return [m.group(0) for m in _WORDS.finditer(text)]
+
+
+# Help pages (I18N.25 follow-up): prose of help/en/**/*.md is British English too.
+HELP_DIR = ROOT / "help" / "en"
+
+_FENCE = re.compile(r"^(```|~~~).*?^\1[^\n]*$", re.MULTILINE | re.DOTALL)
+_INLINE_CODE = re.compile(r"`[^`\n]*`")
+_URL = re.compile(r"https?://\S+|\]\([^)\s]*\)")
+_IDENTIFIER = re.compile(r"\b[a-z_]+:[a-z_.]+\b")  # URL names such as catalog:brand
+
+
+def markdown_prose(text: str) -> str:
+    """The prose of a markdown page: no fenced or inline code, URLs or identifiers."""
+    for pattern in (_FENCE, _INLINE_CODE, _URL, _IDENTIFIER):
+        text = pattern.sub(" ", text)
+    return text
+
+
+def help_violations(root: Path | None = None) -> list[str]:
+    """One line per American word in the prose of a help/en page."""
+    base = root if root is not None else HELP_DIR
+    bad = []
+    for path in sorted(base.rglob("*.md")):
+        prose = markdown_prose(path.read_text(encoding="utf-8"))
+        for n, line in enumerate(prose.splitlines(), 1):
+            words = american_words(line)
+            if words:
+                bad.append(f"{path.relative_to(base)}:{n}: {sorted(set(words))}")
+    return bad
 
 
 def in_scope(places: list[str]) -> bool:
@@ -111,7 +137,10 @@ def check() -> int:
     bad = violations(_catalog().collect())
     for line in bad:
         print(f"American spelling in an English msgid (I18N.23): {line}", file=sys.stderr)
-    return 1 if bad else 0
+    help_bad = help_violations()
+    for line in help_bad:
+        print(f"American spelling in help/en prose (I18N.25): {line}", file=sys.stderr)
+    return 1 if bad or help_bad else 0
 
 
 if __name__ == "__main__":
