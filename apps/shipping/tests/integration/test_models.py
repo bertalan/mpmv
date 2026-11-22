@@ -88,13 +88,14 @@ def test_carrier_defaults_and_translated_label() -> None:
     CarrierTranslationFactory.create(
         carrier=carrier, language=primary_language(), label="Main courier", status=PUBLISHED
     )
+    # No row in the other language yet: it falls back to the primary one.
+    fallback = carrier.translation(other_language())
+    assert fallback.is_fallback
+    assert label_of(fallback) == "Main courier"
     CarrierTranslationFactory.create(
         carrier=carrier, language=other_language(), label="Corriere", status=PUBLISHED
     )
-    assert label_of(carrier.translation("it")) == "Corriere"
-    fallback = carrier.translation("de")
-    assert fallback.is_fallback  # explicit EN fallback
-    assert label_of(fallback) == "Main courier"
+    assert label_of(carrier.translation(other_language())) == "Corriere"
     assert str(carrier) == "main"
 
 
@@ -284,12 +285,10 @@ def test_a_country_group_in_use_keeps_its_code() -> None:
 
 def test_the_eu_group_is_seeded_with_the_member_states(seeded_groups: None) -> None:
     assert members("eu") == set(EU_MEMBER_STATES)
-    assert label_of(CountryGroup.objects.get(code="eu").translation("en"), "name") == (
-        "European Union"
-    )
-    assert label_of(CountryGroup.objects.get(code="eu").translation("it"), "name") == (
-        "Unione europea"
-    )
+    # The seed writes the English name in the primary language and the Italian one in "it"
+    # (Italian wins when it is the primary language).
+    names = dict(CountryGroup.objects.get(code="eu").translations.values_list("language", "name"))
+    assert names == {primary_language(): "European Union", "it": "Unione europea"}
 
 
 def test_the_seeded_continents_cover_every_country(seeded_groups: None) -> None:

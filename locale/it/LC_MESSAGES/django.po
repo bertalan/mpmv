@@ -3188,7 +3188,7 @@ msgid ""
 "Due to a technical issue on our platform, your order %(order_number)s with seller %(vendor_name)s "
 "cannot be processed. The order has been cancelled at no cost to you, and we have immediately "
 "issued a full refund of EUR %(refund)s to your original payment method (credited within 5–10 "
-"business days, and in any event within the statutory 14-day limit). We apologize for the "
+"business days, and in any event within the statutory 14-day limit). We apologise for the "
 "inconvenience."
 msgstr ""
 "Ti informiamo che a causa di un’anomalia tecnica della piattaforma non è possibile dare seguito al"
@@ -4088,7 +4088,7 @@ msgstr ""
 
 #: apps/catalog/models.py
 msgid ""
-"How buyers get this product. Buy: they order and pay on the site, so it needs a price. Catalog "
+"How buyers get this product. Buy: they order and pay on the site, so it needs a price. Catalogue "
 "only: it is shown but cannot be bought. On request: buyers ask you about it."
 msgstr ""
 "Come chi compra ottiene questo prodotto. Acquisto: ordina e paga sul sito, quindi serve un prezzo."
@@ -12455,7 +12455,7 @@ msgstr "Questa è una versione archiviata."
 #: apps/manager/templates/manager/platform/order_draft.html
 msgid ""
 "This is not an order. The customer opens the link, checks the cart and pays at checkout; the "
-"prices are the catalog prices of that moment. You never place or pay the order for the customer."
+"prices are the catalogue prices of that moment. You never place or pay the order for the customer."
 msgstr ""
 "Questo non è un ordine. Il cliente apre il link, controlla il carrello e paga alla cassa; i prezzi"
 " sono quelli del catalogo in quel momento. Lei non effettua né paga mai l'ordine al posto del "
@@ -13322,8 +13322,8 @@ msgstr ""
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid ""
-"Until your payout account is active, your products are shown in the catalog and sold on request: "
-"customers cannot add them to the cart."
+"Until your payout account is active, your products are shown in the catalogue and sold on request:"
+" customers cannot add them to the cart."
 msgstr ""
 "Finché il Suo account per i pagamenti non è attivo, i Suoi prodotti compaiono nel catalogo e si "
 "vendono su richiesta: i clienti non possono aggiungerli al carrello."
@@ -13656,7 +13656,7 @@ msgstr ""
 #: apps/orders/templates/email/orders/package_cancelled/body.html
 #: apps/orders/templates/email/orders/package_cancelled/body.txt
 msgctxt "(L)"
-msgid "We apologize for the inconvenience."
+msgid "We apologise for the inconvenience."
 msgstr "Ci scusiamo per l’inconveniente."
 
 #: apps/orders/messages.py
@@ -14721,7 +14721,7 @@ msgstr ""
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid ""
-"You are authenticated as %(username)s, but are not authorized to access this page. Would you like "
+"You are authenticated as %(username)s, but are not authorised to access this page. Would you like "
 "to login to a different account?"
 msgstr ""
 "Hai effettuato l’accesso come %(username)s, ma non sei autorizzato ad accedere a questa pagina. "
