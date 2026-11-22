@@ -16,11 +16,16 @@ from playwright.sync_api import Locator, Page, ViewportSize, expect
 from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.tests.factories import UserFactory
+from apps.cms.seed import seed_text
 from apps.cms.tests.factories import HelpEntryFactory
+from apps.core.i18n import primary_language
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
+
+ABOUT = f"/{seed_text(primary_language()).about.slug}/"  # the seeded About page
 
 DESKTOP = ViewportSize(width=1280, height=800)
 MOBILE = ViewportSize(width=375, height=740)
@@ -53,8 +58,8 @@ def test_the_button_opens_the_page_help_and_the_dialog_behaves(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     page.set_viewport_size(DESKTOP)
     sign_in(page, live_server)
-    page.goto(f"{live_server.url}/about/")
-    button = page.get_by_role("button", name="Help for this page")
+    page.goto(f"{live_server.url}{ABOUT}")
+    button = page.get_by_role("button", name=translated("Help for this page"))
     expect(button).to_be_visible()
     box = button.bounding_box()
     assert box is not None
@@ -73,7 +78,7 @@ def test_the_button_opens_the_page_help_and_the_dialog_behaves(
     expect(dialog).to_be_visible()
     expect(dialog).to_contain_text("About pages")
     expect(dialog).to_contain_text("Read me.")
-    expect(dialog).to_have_accessible_name("Help for this page")
+    expect(dialog).to_have_accessible_name(translated("Help for this page"))
     shot("desktop-open")
 
     violations = run_axe(page)
@@ -104,7 +109,7 @@ def test_the_user_menu_item_opens_the_same_modal(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     page.set_viewport_size(DESKTOP)
     sign_in(page, live_server)
-    page.goto(f"{live_server.url}/about/")
+    page.goto(f"{live_server.url}{ABOUT}")
     page.locator("header .user-menu summary").click()
     shot("menu-open")
     page.locator("header .user-menu [data-help-open]").click()
@@ -121,7 +126,7 @@ def test_a_narrow_screen_keeps_the_button_in_the_header(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     page.set_viewport_size(MOBILE)
     sign_in(page, live_server)
-    page.goto(f"{live_server.url}/about/")
+    page.goto(f"{live_server.url}{ABOUT}")
     button = help_button(page)
     expect(button).to_be_visible()
     header_box = page.locator("header.site-header").bounding_box()
@@ -164,7 +169,7 @@ def test_a_page_with_a_form_lists_its_fields_with_their_help_texts(
     fields = page.locator("dialog#help-dialog .help-fields")
     expect(fields).to_be_visible()
     expect(page.locator("dialog#help-dialog .help-fields__title")).to_have_text(
-        "Fields on this page"
+        translated("Fields on this page")
     )
     listed = page.locator("dialog#help-dialog .help-fields__name").all_inner_texts()
     assert [name.split(" (required)")[0].strip() for name in listed] == labels
@@ -177,12 +182,12 @@ def test_a_page_with_a_form_lists_its_fields_with_their_help_texts(
 
 def test_a_page_without_a_form_lists_no_fields(page: Page, live_server: LiveServer) -> None:
     sign_in(page, live_server)
-    page.goto(f"{live_server.url}/about/")
+    page.goto(f"{live_server.url}{ABOUT}")
     open_modal(page)
     expect(page.locator("dialog#help-dialog .help-fields")).to_have_count(0)
 
 
 def test_an_anonymous_visitor_sees_no_help_button(page: Page, live_server: LiveServer) -> None:
-    page.goto(f"{live_server.url}/about/")
+    page.goto(f"{live_server.url}{ABOUT}")
     expect(page.locator("button.help-button")).to_have_count(0)
     expect(page.locator("dialog#help-dialog")).to_have_count(0)
