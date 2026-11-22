@@ -128,6 +128,14 @@ PUBLIC: dict[str, str] = {
         "Anonymous garage cookie control (FIT.6, Q-G1): a POST that only writes or clears the "
         "visitor's own technical cookie, CSRF-checked, nothing stored or logged on the server."
     ),
+    "garage_choose": (
+        "The garage chooser (FIT.7): a GET that reads the visitor's own cookie or, signed in, "
+        "their own profiles, and changes nothing."
+    ),
+    "garage_apply": (
+        "Anonymous garage cookie control (FIT.7): a POST that only writes the visitor's own "
+        "technical cookie or, signed in, activates one of their own profiles; CSRF-checked."
+    ),
     "dsa_notice": (
         "Public report form for illegal content (DSA art. 16, CMP.5): the page is public by "
         "design; the POST is CSRF-checked, behind Turnstile and rate limited per address, and "

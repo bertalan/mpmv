@@ -171,13 +171,21 @@ msgstr[1] "%(n)s Produkte ausgewählt."
 msgid "%(name)s is deleted."
 msgstr "%(name)s wurde gelöscht."
 
-#: apps/fitment/garage_views.py
+#: apps/fitment/garage_views.py apps/fitment/views.py
 msgid "%(name)s is now your active vehicle."
 msgstr "%(name)s ist jetzt dein aktives Fahrzeug."
 
 #: apps/accounts/mfa_views.py
 msgid "%(name)s removed."
 msgstr "%(name)s entfernt."
+
+#: themes/base/templates/components/garage_menu.html
+msgid "%(noun)s: %(name)s"
+msgstr "%(noun)s: %(name)s"
+
+#: themes/base/templates/components/garage_menu.html
+msgid "%(noun)s: generic"
+msgstr "%(noun)s: allgemein"
 
 #: apps/manager/amendment_views.py
 msgid "%(qty)s x %(unit)s"
@@ -1148,6 +1156,10 @@ msgstr "In den Warenkorb"
 msgid "Add translation"
 msgstr "Übersetzung hinzufügen"
 
+#: themes/base/templates/components/garage_menu.html
+msgid "Add your garage"
+msgstr "Garage hinzufügen"
+
 #: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "added %(created)s"
 msgstr "hinzugefügt am %(created)s"
@@ -1515,6 +1527,10 @@ msgstr "Angewendete Filter"
 #: apps/cms/models.py
 msgid "applies to"
 msgstr "gilt für"
+
+#: apps/fitment/templates/fitment/garage_choose.html
+msgid "Apply"
+msgstr "Anwenden"
 
 #: apps/catalog/templates/catalog/includes/listing_filters.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
@@ -1900,6 +1916,7 @@ msgstr "Kalenderadresse zum Kopieren"
 msgid "Call to action"
 msgstr "Handlungsaufforderung"
 
+#: apps/fitment/templates/fitment/garage_choose.html
 #: apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
 #: apps/manager/templates/manager/platform/product.html
@@ -2139,6 +2156,10 @@ msgstr ""
 msgid "Change this order"
 msgstr "Diese Bestellung ändern"
 
+#: themes/base/templates/components/garage_menu.html
+msgid "Change vehicle"
+msgstr "Fahrzeug wechseln"
+
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/platform/orders.html
 msgid "Changes are disabled."
 msgstr "Änderungen sind deaktiviert."
@@ -2271,7 +2292,13 @@ msgstr ""
 msgid "Choose a time zone such as Europe/Rome."
 msgstr "Wählen Sie eine Zeitzone, zum Beispiel Europe/Rome."
 
+#: apps/fitment/templates/fitment/garage_choose.html
+#: themes/base/templates/components/garage_menu.html
+msgid "Choose a vehicle"
+msgstr "Fahrzeug wählen"
+
 #: apps/fitment/templates/fitment/garage_account.html
+#: apps/fitment/templates/fitment/garage_choose.html
 #: themes/ride/templates/fitment/garage_account.html
 msgid "Choose a vehicle while you browse the shop and save it: the shop then shows what fits it."
 msgstr ""
@@ -3802,6 +3829,10 @@ msgstr "Galerie"
 msgid "Garage noun"
 msgstr "Bezeichnung für die Garage"
 
+#: apps/fitment/views.py
+msgid "Garage reset: showing all items."
+msgstr "Garage zurückgesetzt: Es werden alle Artikel angezeigt."
+
 #: apps/cms/models.py
 msgid "General (every other screen)"
 msgstr "Allgemein (alle anderen Bildschirme)"
@@ -3815,6 +3846,10 @@ msgstr "Neue Codes generieren"
 #: themes/ride/templates/accounts/mfa/recovery_codes.html
 msgid "Generating new codes makes every previous code stop working."
 msgstr "Wenn Sie neue Codes generieren, funktionieren alle bisherigen Codes nicht mehr."
+
+#: apps/fitment/templates/fitment/garage_choose.html
+msgid "Generic (show all)"
+msgstr "Allgemein (alles anzeigen)"
 
 #: apps/compliance/templates/compliance/privacy_account.html
 #: themes/ride/templates/compliance/privacy_account.html
@@ -5265,7 +5300,9 @@ msgstr "Nach oben verschieben"
 msgid "MPN"
 msgstr "MPN"
 
-#: apps/fitment/templates/fitment/garage_account.html apps/manager/site_map.py
+#: apps/fitment/templates/fitment/garage_account.html
+#: apps/fitment/templates/fitment/garage_choose.html apps/manager/site_map.py
+#: themes/base/templates/components/garage_menu.html
 #: themes/ride/templates/fitment/garage_account.html
 msgid "My garage"
 msgstr "Meine Garage"
@@ -14982,6 +15019,7 @@ msgid "You have no orders yet"
 msgstr "Du hast noch keine Bestellungen"
 
 #: apps/fitment/templates/fitment/garage_account.html
+#: apps/fitment/templates/fitment/garage_choose.html
 #: themes/ride/templates/fitment/garage_account.html
 msgid "You have no saved vehicles yet"
 msgstr "Du hast noch keine Fahrzeuge gespeichert"
