@@ -74,6 +74,7 @@ url, never rendered as a dead link), and the context of the help link.
       {% endwith %}
       {% include "components/help_link.html" %}
       {% if languages %}{% include "components/language_switcher.html" %}{% endif %}
+      {% include "components/garage_menu.html" %}
       {% help_context as help %}{% include "components/user_tools.html" %}
     </div>
   </div>
