@@ -73,6 +73,12 @@
     min-inline-size: 0;
   }
 
+  .site-footer .site-footer__social {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-l);
+  }
+
   .site-footer__social .icon {
     flex: none;
     inline-size: 1.25rem;
