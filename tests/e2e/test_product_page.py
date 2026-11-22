@@ -40,7 +40,8 @@ PUBLISHED = TranslationStatus.PUBLISHED
 
 
 @pytest.fixture
-def product_page() -> None:
+def product_page(consumer_prices: None) -> None:
+    """The variant choices are in the buy form, shown only with a consumer price (ORD.19)."""
     vendor = VendorFactory.create(
         status=Vendor.Status.ACTIVE, sells_online=True, display_name="Rossi Ceramics"
     )

@@ -25,6 +25,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.countries import InvalidCountry
 from apps.shipping import engine as shipping_engine
 from apps.shipping.services import quote_shipping
+from apps.tax import prices as tax_prices
 
 from . import engine, services
 from .models import OrderLine
@@ -173,12 +174,26 @@ def item_limits(items: list[_Item]) -> dict[ItemKey, int | None]:
 
 
 def plan_items(
-    items: list[_Item], *, in_cart: dict[ItemKey, int], country: str, language: str
+    items: list[_Item],
+    *,
+    in_cart: dict[ItemKey, int],
+    country: str,
+    language: str,
+    prices: tax_prices.PriceCheck | None = None,
 ) -> list[engine.ReorderOutcome]:
-    """What of `items` can go into a cart today, with today's stock and shipping to `country`,
-    added to what the cart holds (`in_cart`); one outcome per item, in order."""
+    """What of `items` can go into a cart today, with today's stock, consumer price (#757) and
+    shipping to `country`, added to what the cart holds (`in_cart`); one outcome per item, in
+    order. `prices` defaults to `cart.services.price_check(country=country)`."""
     limits = item_limits(items)
     known = {key: limit for key, limit in limits.items() if limit is not None}
+    prices = prices or cart_services.price_check(country=country or None)
+    unpriced = {
+        item.key
+        for item in items
+        if item.product is not None
+        and item.key in known
+        and not cart_services.has_price(item.product, item.variant, prices)
+    }
     blocked = _undeliverable(items, known, country, language)
     return engine.plan_reorder(
         [
@@ -187,6 +202,7 @@ def plan_items(
                 quantity=item.quantity,
                 in_cart=in_cart.get(item.key, 0),
                 limit=limits[item.key],
+                unpriced=item.key in unpriced,
                 undeliverable=item.key in blocked,
             )
             for item in items
@@ -203,7 +219,10 @@ def fill_cart(
     in_cart = (
         {(ln.product_id, ln.variant_id): ln.quantity for ln in cart.lines.all()} if cart.pk else {}
     )
-    outcomes = plan_items(items, in_cart=in_cart, country=country, language=cart.language)
+    prices = cart_services.price_check(country=country or None)  # the tax tables, read once
+    outcomes = plan_items(
+        items, in_cart=in_cart, country=country, language=cart.language, prices=prices
+    )
     result = ReorderResult()
     to_add: list[tuple[Product, Variant | None, int]] = []
     for item, outcome in zip(items, outcomes, strict=True):
@@ -224,7 +243,9 @@ def fill_cart(
         )
     if to_add:  # one lock and a constant number of queries, whatever the number of lines
         result.changeset.changes.extend(
-            cart_services.add_many_to_cart(cart, to_add, ctx=ctx, dry_run=dry_run).changes
+            cart_services.add_many_to_cart(
+                cart, to_add, ctx=ctx, prices=prices, dry_run=dry_run
+            ).changes
         )
     return result
 

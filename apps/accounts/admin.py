@@ -24,6 +24,7 @@ from django.contrib.auth.forms import (
     AdminPasswordChangeForm,
     AdminUserCreationForm,
     SetUnusablePasswordMixin,
+    UserChangeForm,
 )
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied
@@ -34,6 +35,7 @@ from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from apps.core.audit import audit_context
 from apps.core.models import PLATFORM_OWNER_CODENAME
+from apps.core.nfc_forms import NFCAdminForm, NFCFormMixin
 
 from . import services
 from .decorators import level_gated_action, requires_level, step_up_required
@@ -69,6 +71,16 @@ class StaffCreationForm(AdminUserCreationForm):  # type: ignore[type-arg]
             "password and cannot sign in with a password until one is set."
         )
     )
+
+
+class NFCUserChangeForm(NFCFormMixin, UserChangeForm):  # type: ignore[type-arg]
+    """The user change form: the name in NFC (I18N.10); the email and password hash stay exact."""
+
+    nfc_exact_fields = ("email", "password")
+
+
+class GroupForm(NFCAdminForm[Group]):
+    """The group form: the name in NFC (I18N.10), so its uniqueness check compares NFC."""
 
 
 # Fields that grant access: only a superuser may change them.
@@ -115,6 +127,7 @@ admin.site.login_form = StaffLoginForm
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin[User]):
     add_form = StaffCreationForm
+    form = NFCUserChangeForm
     ordering = ("email",)
     list_display = ("email", "full_name", "is_staff", "is_active", "preferred_language", "mfa")
     search_fields = ("email", "full_name")
@@ -345,6 +358,8 @@ class GroupAdmin(DjangoGroupAdmin):
     the group and for permissions that change later; superuser-only is the smaller and safer
     rule until CORE.8.
     """
+
+    form = GroupForm
 
     def has_module_permission(self, request: HttpRequest) -> bool:
         return _is_superuser(request)

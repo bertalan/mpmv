@@ -36,7 +36,7 @@ from apps.cart.session import GUEST_CART_SESSION_KEY
 from apps.catalog.models import Product
 from apps.core import services as core_services
 from apps.core.audit import AuditContext
-from apps.core.models import AuditLog, OutboxEmail
+from apps.core.models import AuditLog, OutboxEmail, PlatformOperator
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.orders import engine, staff_drafts
 from apps.orders.models import Order, StaffDraft, StaffDraftLine, StaffDraftState, StockReservation
@@ -45,7 +45,8 @@ from apps.orders.tests.integration.test_order_again import product as make_produ
 from apps.orders.tests.integration.test_order_again import vendor as make_vendor
 from mpmv.log_redaction import REDACTED, redact_secret_paths
 
-pytestmark = pytest.mark.django_db
+# Items in a cart need a consumer price (TAX.12, #757): an operator, rates, tax profiles.
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
 CTX = AuditContext(actor_label="staff:test", source=AuditLog.Source.ADMIN)
 NOTE = "The customer asked by phone to order the same again."
@@ -282,8 +283,9 @@ def test_the_link_expires_after_the_operator_setting_default_seven_days() -> Non
     draft.refresh_from_db()
     assert draft.link_expires_at is not None
     assert dt.timedelta(days=7) <= draft.link_expires_at - before < dt.timedelta(days=7, minutes=1)
+    PlatformOperator.objects.update(valid_to=utc(2026, 1, 1))  # the consumer_prices operator
     PlatformOperatorFactory.create(
-        open_ended=True, valid_from=utc(2026, 1, 1), staff_draft_link_days=2
+        open_ended=True, valid_from=utc(2026, 1, 1), staff_draft_link_days=2, country="IT"
     )
     sent_token(draft)
     draft.refresh_from_db()

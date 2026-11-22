@@ -85,6 +85,7 @@ from apps.cms.models import CountdownCacheMixin
 from apps.core.fields import CountryField, MoneyField
 from apps.core.geocoding import GeocodeResult
 from apps.core.models import BaseModel
+from apps.core.money import CURRENCY
 from apps.core.nfc_forms import NFCPageForm
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
@@ -420,6 +421,10 @@ def _constraints() -> list[models.BaseConstraint]:
                 & Q(online_url__startswith="https://")
             ),
             name="events_eventpage_online_url_https",
+        ),
+        models.CheckConstraint(
+            condition=Q(ticket_url="") | Q(ticket_url__startswith="https://"),
+            name="events_eventpage_ticket_url_https",
         ),
         models.CheckConstraint(
             condition=Q(geo_confidence__gte=0, geo_confidence__lte=1),
@@ -1055,6 +1060,7 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
 
         context: dict[str, Any] = super().get_context(request, *args, **kwargs)
         context.update(listing.event_context(self, request))
+        context["currency"] = CURRENCY
         return context
 
     def serve(self, request: HttpRequest, *args: Any, **kwargs: Any) -> Any:

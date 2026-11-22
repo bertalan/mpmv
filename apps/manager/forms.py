@@ -8,6 +8,8 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.admin.rich_text import DraftailRichTextArea
 from wagtail.rich_text import features as feature_registry
 
+from apps.core.nfc_forms import NFCForm
+from apps.core.text import nfc
 from apps.orders import engine as orders_engine
 from apps.vendors import return_engine
 from apps.vendors.engine import LOGO_ALT_MAX_LENGTH, PROFILE_MAX_LENGTH
@@ -50,7 +52,7 @@ def _editor() -> DraftailRichTextArea:
     return widget
 
 
-class StorefrontProfileForm(forms.Form):
+class StorefrontProfileForm(NFCForm):
     """The texts and policies of one language (the owner only, `shop.profile`).
 
     The tagline is plain text. The description and the policies are rich text (D-34): Wagtail's
@@ -125,7 +127,7 @@ class ProductRoleForm(forms.Form):
     )
 
 
-class VendorLogoForm(forms.Form):
+class VendorLogoForm(NFCForm):
     """The logo: a new image (checked by content in the service), its description, or removal."""
 
     logo = forms.FileField(
@@ -150,8 +152,10 @@ class VendorLogoForm(forms.Form):
     )
 
 
-class ShipmentForm(forms.Form):
+class ShipmentForm(NFCForm):
     """The tracking number (and carrier) to ship with (ORD.6); the service checks them again."""
+
+    nfc_exact_fields = ("tracking_number",)  # matched byte for byte (I18N.10)
 
     tracking_number = forms.CharField(
         label=_("Tracking number"),
@@ -179,13 +183,15 @@ class ShipmentForm(forms.Form):
 
     def clean_carrier(self) -> str:
         try:
-            return orders_engine.normalise_carrier(self.cleaned_data["carrier"])
+            return orders_engine.normalise_carrier(nfc(self.cleaned_data["carrier"]) or "")
         except orders_engine.InvalidTracking:
             raise forms.ValidationError(_("Enter a valid carrier name."), code="invalid") from None
 
 
-class StaffRoleForm(forms.Form):
+class StaffRoleForm(NFCForm):
     """Grant or revoke a platform role (CORE.18); the service owns the rules."""
+
+    nfc_exact_fields = ("email",)  # matched byte for byte (I18N.10)
 
     ACTIONS = (("grant", "grant"), ("revoke", "revoke"))
 
@@ -212,7 +218,7 @@ class StaffRoleForm(forms.Form):
         self.fields["role"].choices = [(r.key, r.label) for r in roles.ROLES]  # type: ignore[attr-defined]
 
 
-class SalesTermsForm(forms.Form):
+class SalesTermsForm(NFCForm):
     """A new version of the seller's sales terms (VEN.35). The service owns the rules."""
 
     body = forms.CharField(
@@ -280,8 +286,10 @@ class SalesTermsForm(forms.Form):
     )
 
 
-class ReturnPolicyForm(forms.Form):
+class ReturnPolicyForm(NFCForm):
     """A proposal of the seller's return policy (VEN.40). The service owns the rules."""
+
+    nfc_exact_fields = ("returns_page_url", "return_country")  # matched byte for byte (I18N.10)
 
     return_window_days = forms.IntegerField(
         label=_("Return window in days"),
@@ -334,8 +342,10 @@ class ReturnPolicyForm(forms.Form):
         return str(self.cleaned_data["return_country"]).strip().upper()
 
 
-class UserLookupForm(forms.Form):
+class UserLookupForm(NFCForm):
     """Find the account whose sessions Support looks at (CORE.24)."""
+
+    nfc_exact_fields = ("email",)  # matched byte for byte (I18N.10)
 
     email = forms.EmailField(
         label=_("Email of the account"),
@@ -343,7 +353,7 @@ class UserLookupForm(forms.Form):
     )
 
 
-class EndUserSessionsForm(forms.Form):
+class EndUserSessionsForm(NFCForm):
     """Support ends every session of one account (CORE.24); the service owns the rules."""
 
     user = forms.UUIDField(widget=forms.HiddenInput)
@@ -357,7 +367,7 @@ class EndUserSessionsForm(forms.Form):
     )
 
 
-class EndEverySessionForm(forms.Form):
+class EndEverySessionForm(NFCForm):
     """The platform owner's panic button (CORE.24): the fixed word confirms it."""
 
     confirm = forms.CharField(

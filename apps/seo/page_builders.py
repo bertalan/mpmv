@@ -230,6 +230,13 @@ def _event_node(ctx: PageContext, url: str) -> Node:
             language=page.locale.language_code,
             attendance=str(page.attendance),
             cancelled=page.cancelled_at is not None,
+            postponed=page.postponed,
+            previous_start=(
+                page.previous_start.astimezone(page.zone()) if page.previous_start else None
+            ),
+            ticket_url=str(page.ticket_url),
+            price=page.price,
+            is_free=page.is_free,
             venue_name=str(page.venue_name),
             street=str(page.street),
             postcode=str(page.postcode),

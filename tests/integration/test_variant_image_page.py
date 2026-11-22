@@ -32,7 +32,8 @@ from apps.themes.services import use_theme
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
-pytestmark = pytest.mark.django_db
+# The variant choices are in the buy form, shown with a consumer price (TAX.12, #757).
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
 GOOD = "4006381333931"
 PRODUCT_GTIN = "96385074"

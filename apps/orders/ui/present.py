@@ -53,6 +53,8 @@ BLOCK_MESSAGES = {
     ),
     engine.NO_PRICE: gettext_lazy("This item has no price yet."),
 }
+# Why the add-to-cart form refuses an item without a price the buyer can see (#757).
+NO_PRICE_TO_BUY = gettext_lazy("This item has no price yet, so you can't buy it online.")
 NBSP = "\N{NO-BREAK SPACE}"
 QUOTE_CODES = frozenset({engine.ON_REQUEST, engine.NEEDS_QUOTE})
 
