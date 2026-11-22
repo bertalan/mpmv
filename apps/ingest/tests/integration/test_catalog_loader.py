@@ -261,7 +261,9 @@ def test_products_are_keyed_by_vendor_sku_and_group_never_by_sku_alone() -> None
     assert Product.objects.filter(sku_key="same").count() == 2
     assert {p.vendor.legacy_wp_user_id for p in Product.objects.all()} == {7, 8}
     first = Product.objects.get(vendor__legacy_wp_user_id=7)
-    assert (first.legacy_wp_id_en, first.legacy_wp_id_it) == (10, 11)
+    # Legacy ids stay en/it: with it as primary, the primary post is the it one.
+    assert first.legacy_wp_id_en == 10
+    assert first.legacy_wp_id_it == (10 if primary_language() == "it" else 11)
     assert any("also used by translation group" in problem for problem in report.problems)
 
 
@@ -289,8 +291,8 @@ def test_a_product_with_no_it_twin_is_en_only_with_fallback_and_a_queue_entry() 
     ).is_fallback  # the IT page shows the fallback notice
     english = product.translation(primary_language()).translation
     assert english is not None
-    assert english.title == "Bag A-2 en"
-    assert "product 'A-2' [it]" in report.translation_queue
+    assert english.title == f"Bag A-2 {primary_language()}"
+    assert f"product 'A-2' [{other_language()}]" in report.translation_queue
 
 
 def test_variations_load_with_options_and_an_untranslated_one_goes_to_the_queue() -> None:
@@ -334,7 +336,7 @@ def test_variations_load_with_options_and_an_untranslated_one_goes_to_the_queue(
     assert ProductAttribute.objects.get(product=product, attribute__code="color").is_variant_axis
     queued = Variant.objects.get(sku="V-1-B").translations.get(language=other_language())
     assert queued.status == TranslationStatus.MACHINE
-    assert "variant 'V-1-B' [it]" in report.translation_queue
+    assert f"variant 'V-1-B' [{other_language()}]" in report.translation_queue
     assert (
         Variant.objects.get(sku="V-1-R").translations.get(language=other_language()).status
         == "published"
