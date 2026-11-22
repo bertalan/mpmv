@@ -29,6 +29,7 @@ from apps.catalog.tests.factories import (
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
@@ -75,7 +76,7 @@ def test_the_banner_holds_the_only_h1_and_the_breadcrumb(client: Client, term_pa
     assert banner.h1 is not None
     nav = banner.select_one("nav.breadcrumb")
     assert nav is not None
-    assert nav["aria-label"] == "Breadcrumb"
+    assert nav["aria-label"] == translated("Breadcrumb")
     assert nav.select_one("[aria-current=page]").get_text(strip=True) == "Maker"
     assert nav.find("a")["href"]  # Home
 
@@ -122,7 +123,7 @@ def test_the_pagination_is_a_bootstrap_pagination_with_numbers(
     client: Client, term_page: str
 ) -> None:
     soup = page(client, term_page + "?page=2")
-    nav = soup.select_one("nav[aria-label=Pagination]")
+    nav = soup.select_one(f'nav[aria-label="{translated("Pagination")}"]')
     assert nav is not None
     assert nav.select_one("ul.pagination")
     items = nav.select("li.page-item > a.page-link")
@@ -160,7 +161,7 @@ def listing_data(
         "chips": [(a["href"], a.get_text(" ", strip=True)) for a in soup.select(".filter-chips a")],
         "pagination": [
             (a["href"], a.get("rel", [None])[0], a.has_attr("aria-current"))
-            for a in soup.select("nav[aria-label=Pagination] a")
+            for a in soup.select(f'nav[aria-label="{translated("Pagination")}"] a')
         ],
         "prices": [p.get_text(" ", strip=True) for p in soup.select(".product-card-price")],
         "titles": [a.get_text(strip=True) for a in soup.select(".product-card h3 a")],
@@ -189,8 +190,10 @@ def test_a_filtered_listing_carries_chips_and_filters_across_pages(
 ) -> None:
     for theme in ("base", "ride"):
         data = listing_data(client, term_page + "?price_min=5&page=2", theme, settings)
-        assert data["chips"][0][1].startswith("From")
-        assert data["chips"][-1][1] == "Clear all filters"
+        assert data["chips"][0][1].startswith(
+            translated("From %(currency)s %(amount)s").split("%")[0]
+        )
+        assert data["chips"][-1][1] == translated("Clear all filters")
         assert data["pagination"]
         assert all("price_min=5" in href for href, _, _ in data["pagination"])
         assert ("price_min", "number", "5", False) in data["controls"]
