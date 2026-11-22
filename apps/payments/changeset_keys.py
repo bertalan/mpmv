@@ -19,3 +19,5 @@ PAYMENT_STRAY_FLAGGED = "payments.payment.stray_flagged"
 # 14 days, only with a full refund confirmed); a daily reminder while it stays open.
 PAYMENT_STRAY_CLOSED = "payments.payment.stray_closed"
 PAYMENT_STRAY_REMINDED = "payments.payment.stray_reminded"
+# A refund check run by hand from the Manager page: the provider's refunded amount and when.
+PAYMENT_STRAY_CHECKED = "payments.payment.stray_checked"
