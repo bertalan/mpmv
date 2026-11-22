@@ -8,18 +8,18 @@ flow carries a vehicle name or a garage parameter.
 import re
 
 import pytest
-from django.http import HttpResponse
 from playwright.sync_api import Locator, Page, expect
 from pytest_django.live_server_helper import LiveServer
 
 from apps.fitment import garage
 from apps.fitment.tests.factories import FitmentNodeFactory, FitmentSchemeFactory
-from apps.fitment.views import _write
 from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
-_FORBIDDEN_IN_URL = re.compile(r"acme|roadster|tourer|vehicle|garage_|active", re.IGNORECASE)
+_FORBIDDEN_IN_URL = re.compile(
+    r"acme|roadster|tourer|vehicle|garage_|active|garage=|make=|model=", re.IGNORECASE
+)
 
 
 def _menu(page: Page) -> Locator:
@@ -34,7 +34,7 @@ def test_the_garage_survives_reload_language_switch_and_back(
     FitmentNodeFactory.create(name="Roadster", parent=make)
     FitmentNodeFactory.create(name="Tourer", parent=make)
     value = garage.Garage((garage.Vehicle("Acme", "Roadster"), garage.Vehicle("Acme", "Tourer")), 0)
-    cookie = _write(HttpResponse(), value).cookies[garage.COOKIE_NAME].value
+    cookie = garage.dumps(value)
     page.context.add_cookies(
         [{"name": garage.COOKIE_NAME, "value": cookie, "url": live_server.url}]
     )
@@ -61,15 +61,15 @@ def test_the_garage_survives_reload_language_switch_and_back(
     expect(page.locator("html")).to_have_attribute("lang", re.compile(f"^{second}"))
     expect(_menu(page)).to_contain_text("Acme, Tourer")
 
-    # Back and forward keep it too.
-    page.go_back()
+    # Walk the history back to the first page, loaded while Roadster was active on the server:
+    # it must show the vehicle chosen since (Tourer), not the one it was rendered with.
+    for _ in range(8):
+        if "s=zzz" in page.url:
+            break
+        page.go_back()
+    assert "s=zzz" in page.url
     expect(_menu(page)).to_contain_text("Acme, Tourer")
     page.go_forward()
-    expect(_menu(page)).to_contain_text("Acme, Tourer")
-
-    # Back to the chooser page through history, then home: the state is still the same.
-    page.goto(f"{live_server.url}/")
-    page.go_back()
     expect(_menu(page)).to_contain_text("Acme, Tourer")
 
     assert len(visited) >= 5
