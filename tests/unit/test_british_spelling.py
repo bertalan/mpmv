@@ -69,3 +69,20 @@ def test_i18n_24_apps_are_in_scope() -> None:
         "compliance",
     ):
         assert british.in_scope([f"apps/{app}/models.py:3"]), app
+
+
+def test_help_markdown_scan_finds_prose_and_ignores_code(tmp_path: Path) -> None:
+    """I18N.25 follow-up: a US word in help prose is found; in code, URLs, identifiers not."""
+    (tmp_path / "a.md").write_text("The catalog price.\n", encoding="utf-8")
+    assert british.help_violations(tmp_path) == ["a.md:1: ['catalog']"]
+    (tmp_path / "a.md").write_text(
+        "Use `catalog` here, see https://x.test/catalog/ and [l](/catalog/), "
+        "the catalog:brand page, role Catalog and moderation.\n\n"
+        "```\ncatalog color\n```\n",
+        encoding="utf-8",
+    )
+    assert british.help_violations(tmp_path) == []
+
+
+def test_help_en_prose_is_british() -> None:
+    assert british.help_violations() == []

@@ -4,9 +4,9 @@ last-checked: 2026-11-18
 Use this page to check a cart prepared from a past order, change its quantities and send the customer the one-time link.
 
 ## Check the items
-The table shows each item at today's catalog price, the units available and the quantity. Items that cannot be bought or delivered today are listed under Left out of the cart, with the reason.
+The table shows each item at today's catalogue price, the units available and the quantity. Items that cannot be bought or delivered today are listed under Left out of the cart, with the reason.
 
-You cannot change a price: the customer pays the catalog price of the moment they check out.
+You cannot change a price: the customer pays the catalogue price of the moment they check out.
 
 ## Change the quantities
 1. Change a quantity, up to the units available. Set it to 0 to remove the item.
