@@ -21,6 +21,7 @@
       {% include "components/search_form.html" with id="search-page-input" action=location query=query name="s" label=_("Search the shop") only %}
       {% if searched and window and not only %}<p class="listing-count" role="status">{% blocktranslate count counter=window.total %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktranslate %}</p>{% endif %}
     </header>
+    {% include "components/garage_banner.html" %}
 
     {% if searched and not only %}
       {% include "catalog/includes/listing_filters.html" %}

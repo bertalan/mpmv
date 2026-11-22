@@ -9,17 +9,22 @@ import re
 import secrets
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
+from django.utils import translation
+from django.utils.translation.trans_real import DjangoTranslation
 from playwright.sync_api import Locator, Page, expect
 from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.cms.models import HomePage
+from apps.core.i18n import primary_language
 from apps.core.tests.factories import MediaImageFactory
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -29,18 +34,42 @@ def _axe_helper_style(violation: str) -> bool:
     return "style-src-elem blocked inline" in violation and "wagtailadmin/js/vendor.js" in violation
 
 
-def _label(text: str) -> re.Pattern[str]:
-    """A field's accessible name: Wagtail appends "*" to the label of a required field."""
-    return re.compile(rf"^{text}\*?$")
+def translated_js(msgid: str) -> str:
+    """`msgid` from the JavaScript catalogs (Wagtail's editor), in the primary language."""
+    return DjangoTranslation(primary_language(), domain="djangojs").gettext(msgid)
+
+
+def insert_a_block() -> str:
+    """The name of the StreamField's "Insert a block" button, in the primary language."""
+    return translated_js("Insert a block")
+
+
+def see_all_products(name: str) -> str:
+    """The accessible name of a "See all" link of a product listing, in the primary language."""
+    msgid = 'See all<span class="visually-hidden"> products: %(name)s</span>'
+    return re.sub("<[^>]+>", "", translated(msgid) % {"name": name})
+
+
+def _label(path: str) -> re.Pattern[str]:
+    """The accessible name Wagtail gives a home-page block field (`"cta.link.url"`): the block's
+    label in the primary language (a label derived from the field name is not translated); "*"
+    marks a required field."""
+    block: Any = HomePage._meta.get_field("body").stream_block
+    for name in path.split("."):
+        block = getattr(block, "child_block", block).child_blocks[name]
+    with translation.override(primary_language()):
+        label = str(block.label)
+    return re.compile(rf"^{re.escape(label)}\*?$")
 
 
 def _add_block(page: Page, label: str) -> Locator:
     """Append a block of type `label` to the body and return its form."""
-    body = page.locator("#panel-child-content-body-section")
+    # The panel id carries the tab's translated name ("content", "contenuto"...), so match its ends.
+    body = page.locator('[id^="panel-child-"][id$="-body-section"]')
     count = page.locator("input[name=body-count]")
     index = int(count.input_value())  # the new block is the last top-level one
-    body.get_by_role("button", name="Insert a block").last.click()
-    page.get_by_role("option", name=label, exact=True).click()
+    body.get_by_role("button", name=insert_a_block()).last.click()
+    page.get_by_role("option", name=translated(label), exact=True).click()
     expect(count).to_have_value(str(index + 1))
     # Its fields are named `body-<index>-value-…`; nested list items are inside it.
     fields = page.locator(f'[name^="body-{index}-value-"]')
@@ -55,33 +84,33 @@ def test_an_editor_builds_the_home_page_with_hero_cta_and_faq(
     editor = UserFactory.create(email="editor@example.com", password=password, superuser=True)
     device = TOTPDeviceFactory.create(user=editor)
     MediaImageFactory.create(title="Workshop banner", file__filename="banner.png")
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
     page.goto(f"{live_server.url}/admin/pages/{home.pk}/edit/")
 
     hero = _add_block(page, "Hero")
-    hero.get_by_role("textbox", name=_label("Heading")).fill("Handmade goods")
-    hero.get_by_role("textbox", name=_label("Text")).fill("From small workshops.")
-    hero.get_by_role("button", name="Choose an image").click()
+    hero.get_by_role("textbox", name=_label("hero.heading")).fill("Handmade goods")
+    hero.get_by_role("textbox", name=_label("hero.text")).fill("From small workshops.")
+    hero.get_by_role("button", name=translated("Choose an image")).click()
     modal = page.locator(".modal")
     modal.get_by_text("Workshop banner").click()
     expect(modal).to_be_hidden()
-    hero.get_by_role("textbox", name=_label("Alt text")).fill("A potter at the wheel")
+    hero.get_by_role("textbox", name=_label("hero.alt_text")).fill("A potter at the wheel")
 
     cta = _add_block(page, "Call to action")
-    cta.get_by_role("textbox", name=_label("Heading")).fill("Sell with us")
-    cta.get_by_role("textbox", name=_label("URL")).fill("https://example.com/apply/")
-    cta.get_by_role("textbox", name=_label("Label")).fill("Apply")
+    cta.get_by_role("textbox", name=_label("cta.heading")).fill("Sell with us")
+    cta.get_by_role("textbox", name=_label("cta.link.url")).fill("https://example.com/apply/")
+    cta.get_by_role("textbox", name=_label("cta.link.label")).fill("Apply")
 
     faq = _add_block(page, "FAQ")
-    faq.get_by_role("textbox", name=_label("Heading")).fill("Questions")
-    faq.get_by_role("textbox", name=_label("Question")).fill("Do you ship abroad?")
+    faq.get_by_role("textbox", name=_label("faq.heading")).fill("Questions")
+    faq.get_by_role("textbox", name=_label("faq.items.question")).fill("Do you ship abroad?")
     answer_editor = faq.locator(".public-DraftEditor-content").first  # Draftail rich text
     answer_editor.click()
     answer_editor.press_sequentially("Yes, to most countries.")
@@ -89,9 +118,9 @@ def test_an_editor_builds_the_home_page_with_hero_cta_and_faq(
     expect(faq.locator('input[name$="-value-answer"]')).to_have_value(re.compile("most countries"))
     shot("admin-blocks")
 
-    page.get_by_role("button", name="More actions").click()
-    page.get_by_role("button", name="Publish").click()
-    expect(page.locator(".messages")).to_contain_text("published")
+    page.get_by_role("button", name=translated("More actions")).click()
+    page.get_by_role("button", name=translated("Publish")).click()
+    expect(page.locator(".messages")).to_contain_text(translated("published"))
 
     page.goto(f"{live_server.url}/")
     expect(page.get_by_role("heading", name="Handmade goods")).to_be_visible()

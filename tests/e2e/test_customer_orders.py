@@ -22,6 +22,7 @@ from apps.orders.tests.integration.test_retention import place
 from apps.shipping.tests.factories import CarrierFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -57,7 +58,7 @@ def test_a_customer_reads_the_list_and_a_shipped_order(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/account/orders/")
-    expect(page.get_by_role("heading", level=1, name="My orders")).to_be_visible()
+    expect(page.get_by_role("heading", level=1, name=translated("My orders"))).to_be_visible()
     expect(page.get_by_role("link", name=shipped.number)).to_be_visible()
     expect(page.get_by_role("link", name=waiting.number)).to_be_visible()
     _accessible(page)
@@ -65,8 +66,8 @@ def test_a_customer_reads_the_list_and_a_shipped_order(
 
     page.get_by_role("link", name=shipped.number).click()
     expect(page.get_by_role("heading", level=1)).to_contain_text(shipped.number)
-    expect(page.locator("li.timeline__step--current")).to_contain_text("Shipped")
-    link = page.get_by_role("link", name="Track the parcel")
+    expect(page.locator("li.timeline__step--current")).to_contain_text(translated("Shipped"))
+    link = page.get_by_role("link", name=translated("Track the parcel"))
     expect(link).to_have_attribute("href", "https://tracking.example.com/AB123")
     _accessible(page)
     shot("detail")

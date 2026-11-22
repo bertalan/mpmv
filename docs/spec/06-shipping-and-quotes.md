@@ -228,7 +228,7 @@ the SHP.6 editor.
 **JSON**: an object with `format` = `"mpmv.shipping-config"`, `version` = `3` and these sections
 (lists of objects; a missing optional field takes the model default on create and keeps the stored
 value on update). Version 2 (SHP.14) adds the special areas and the method treatments; version 1
-files are still read (they hold neither). Version 3 (VEN.36) adds the method flag `not_returnable_by_post` (bulky goods that cannot be returned by post; a boolean, `false` when absent on create and the stored value kept on update, so version 1 and 2 files still import unchanged). Files are always written in version 3:
+files are still read (they hold neither). Version 3 (VEN.36) adds the method flag `not_returnable_by_post` (bulky goods that cannot be returned by post; a boolean, `false` when absent on create and the stored value kept on update, so version 1 and 2 files still import unchanged; a version 1 or 2 file that carries the field gets a per-row error). Files are always written in version 3:
 
 | Section | Fields | Named by |
 |---|---|---|
@@ -253,7 +253,7 @@ territory_code, area, mode, surcharge_type, surcharge, extra_days, not_returnabl
 seven before the last since version 2, the last since version 3). `record` is `format` (first line, with `code` and `version`), `country_group`, `zone`,
 `method`, `band`, `area_treatment`, `pickup_option` or `special_area`; a band or an area treatment
 names its method with `zone_scope`, `zone` and `key`, and its method must be in the same file. Lists are separated by `|`; an empty number cell is `null`; booleans are
-`true` / `false`; a cell that does not apply to its record must be empty.
+`true` / `false` only (lowercase; `0`, `1`, `t` are errors); a cell that does not apply to its record must be empty.
 
 **Validation and import.** The parser checks only the shape (format, version, known fields, lists
 of text, every row named once). The values are validated by the models themselves (field

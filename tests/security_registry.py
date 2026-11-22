@@ -50,6 +50,11 @@ TILE = (
     "tile is a 404 before any database or upstream call (`apps/core/tests/integration/"
     "test_map_tiles.py`)."
 )
+PALETTE_CSS = (
+    "Public site palette stylesheet (THM.31): GET only (a POST is a 405), the same CSS for every "
+    "visitor, named by theme, palette slug and content digest; it holds colors, no vendor data, "
+    "and an unknown theme or palette is a 404 (`test_the_palette_stylesheet_answers_only_get`)."
+)
 SIGN_IN = "Sign-in page: must answer before the visitor is signed in."
 PASSWORD_RESET = "Password reset flow of the editors' admin: answers before sign-in."
 
@@ -66,6 +71,7 @@ PUBLIC: dict[str, str] = {
     "home": "Public home page.",
     "media": MEDIA,
     "map_tile": TILE,
+    "palette:css": PALETTE_CSS,
     "catalog:category": PUBLIC_CATALOG,
     "catalog:product": PUBLIC_CATALOG,
     "catalog:brand": PUBLIC_CATALOG,
@@ -127,6 +133,14 @@ PUBLIC: dict[str, str] = {
     "garage_forget": (
         "Anonymous garage cookie control (FIT.6, Q-G1): a POST that only writes or clears the "
         "visitor's own technical cookie, CSRF-checked, nothing stored or logged on the server."
+    ),
+    "garage_choose": (
+        "The garage chooser (FIT.7): a GET that reads the visitor's own cookie or, signed in, "
+        "their own profiles, and changes nothing."
+    ),
+    "garage_apply": (
+        "Anonymous garage cookie control (FIT.7): a POST that only writes the visitor's own "
+        "technical cookie or, signed in, activates one of their own profiles; CSRF-checked."
     ),
     "dsa_notice": (
         "Public report form for illegal content (DSA art. 16, CMP.5): the page is public by "
@@ -271,6 +285,7 @@ IDOR_REVIEWED: dict[str, str] = {
     "media": MEDIA,
     "wagtaildocs_serve": DOCUMENT,
     "map_tile": TILE,
+    "palette:css": PALETTE_CSS,
     "sitemap_section": SITEMAP,
     "llms_language": SITEMAP,
     "sitemap_part": SITEMAP,
@@ -417,6 +432,7 @@ PLACEHOLDER_404: dict[str, str] = {
     "media": MEDIA,
     "wagtaildocs_serve": DOCUMENT,
     "map_tile": TILE,
+    "palette:css": PALETTE_CSS,
     "wagtailadmin_password_reset_confirm": (
         "Password reset confirmation of the editors' admin, public by design (PUBLIC): the uid "
         "and token in the URL are the credential, not a reference to an object a caller could "

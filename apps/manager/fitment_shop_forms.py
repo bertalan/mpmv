@@ -10,6 +10,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product
 from apps.core import translations
+from apps.core.nfc_forms import NFCForm
 from apps.fitment.engine import STEP_LENGTH
 from apps.fitment.models import DeclarationMode, FitmentNode, FitmentNote, NodeStatus
 from apps.fitment.services import RowInput
@@ -101,7 +102,8 @@ class CopyForm(forms.Form):
         _choose(self.fields["source"], sources)
 
 
-class ProposalForm(forms.Form):
+class ProposalForm(NFCForm):
+    nfc_exact_fields = ("parent",)  # matched byte for byte (I18N.10)
     name = forms.CharField(label=_("Name of the missing item"), max_length=120)
     parent = forms.ChoiceField(
         label=_("Belongs under"),

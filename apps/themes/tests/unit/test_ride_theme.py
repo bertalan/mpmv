@@ -80,15 +80,15 @@ def test_the_compressed_css_is_within_the_budget(theme_css: str) -> None:
 
 def test_the_palette_is_the_operator_palette_of_the_spec(tokens: dict[str, str]) -> None:
     """Spec 14 §14.4 and §14.12; the dark surface, neutrals and scrim come from the brief."""
-    assert tokens["color.accent"].upper() == "#046BD2"
+    assert tokens["color.accent"].upper() == "#C40417"
     assert tokens["color.on-accent"].upper() == "#FFFFFF"
-    assert tokens["color.accent-hover"].upper() == "#035AB1"
-    assert tokens["color.accent-tint"].upper() == "#EEF6FF"
-    assert tokens["color.secondary"].upper() == "#FBA926"
-    assert tokens["color.on-secondary"].upper() == "#1A1A1A"
-    assert tokens["color.secondary-hover"].upper() == "#E89A1E"
-    assert tokens["color.secondary-text"].upper() == "#BE5900"
-    assert tokens["color.link"].upper() == "#046BD2"
+    assert tokens["color.accent-hover"].upper() == "#9E0312"
+    assert tokens["color.accent-tint"].upper() == "#FDECEE"
+    assert tokens["color.secondary"].upper() == "#2B3138"
+    assert tokens["color.on-secondary"].upper() == "#FFFFFF"
+    assert tokens["color.secondary-hover"].upper() == "#1B2026"
+    assert tokens["color.secondary-text"].upper() == "#2B3138"
+    assert tokens["color.link"].upper() == "#C40417"
     assert tokens["color.surface-inverse"].upper() == "#30373F"
     assert tokens["color.heading"].upper() == "#242424"
     assert tokens["color.text"].upper() == "#343434"
@@ -99,10 +99,7 @@ def test_the_palette_is_the_operator_palette_of_the_spec(tokens: dict[str, str])
     assert tokens["color.overlay"].upper() == "#051026"
 
 
-def test_no_red_is_left(tokens: dict[str, str], sources: str) -> None:
-    for name, value in tokens.items():
-        if name.startswith("color.") and name != "color.danger" and "red" not in name:
-            assert value.upper() not in {"#E3051A", "#C40417", "#FFE8E8"}, name
+def test_no_leftover_accent_fill(sources: str) -> None:
     assert "accent-fill" not in sources
 
 
@@ -155,18 +152,17 @@ def test_the_measured_pairs_of_the_spec(tokens: dict[str, str]) -> None:
     def ratio(fg: str, bg: str) -> float:
         return round(contrast_ratio(tokens[fg], tokens[bg]), 2)
 
-    assert ratio("color.on-accent", "color.accent") == 5.20
-    assert ratio("color.on-accent", "color.accent-hover") == 6.77
-    assert ratio("color.on-secondary", "color.secondary") == 8.95
-    assert ratio("color.on-secondary", "color.secondary-hover") == 7.52
-    assert ratio("color.secondary-text", "color.surface") == 4.55
-    assert ratio("color.accent", "color.accent-tint") == 4.77
+    assert ratio("color.on-accent", "color.accent") == 6.22
+    assert ratio("color.on-accent", "color.accent-hover") == 8.48
+    assert ratio("color.on-secondary", "color.secondary") == 13.13
+    assert ratio("color.on-secondary", "color.secondary-hover") == 16.39
+    assert ratio("color.secondary-text", "color.surface") == 13.13
+    assert ratio("color.accent", "color.accent-tint") == 5.45
 
 
 def test_the_primary_is_never_text_on_the_dark_surface(tokens: dict[str, str]) -> None:
     """The link colour fails on the dark surface, so the CSS must use white there."""
     assert contrast_ratio(tokens["color.link"], tokens["color.surface-inverse"]) < AA
-    assert contrast_ratio(tokens["color.on-secondary"], tokens["color.surface-inverse"]) < AA
     header = "\n".join(read_css_sources(RIDE, "ride"))
     assert "color-link" not in re.search(r"\.site-header a[^}]*\}", header).group(0)  # type: ignore[union-attr]
 
@@ -424,6 +420,6 @@ def test_the_lucide_notice_ships_with_the_sprite() -> None:
 
 
 def test_the_dark_mode_primary_is_defined_and_measured(tokens: dict[str, str]) -> None:
-    """Spec 14 §14.12: `#0580FA` on `#121417` is 4.81:1. Dark mode itself is not wired yet."""
-    assert tokens["color.accent-dark"].upper() == "#0580FA"
-    assert round(contrast_ratio(tokens["color.accent-dark"], "#121417"), 2) == 4.81
+    """Spec 14 §14.12: `#FF6B6B` on `#121417` is 6.65:1. Dark mode itself is not wired yet."""
+    assert tokens["color.accent-dark"].upper() == "#FF6B6B"
+    assert round(contrast_ratio(tokens["color.accent-dark"], "#121417"), 2) == 6.65

@@ -9,6 +9,7 @@ from pytest_django.live_server_helper import LiveServer
 from apps.cms import help_sync
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import language_prefix, other_language
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -21,7 +22,7 @@ def _synced(live_server: LiveServer, _cms_site: None) -> None:
 @pytest.mark.parametrize("theme", ["base", "ride"])
 @pytest.mark.parametrize("width", [360, 768, 1280])
 @pytest.mark.parametrize(
-    "path", ["/help-centre/", "/help-centre/withdrawal/", "/it/help-centre/shipping/"]
+    "path", ["/help-centre/", "/help-centre/withdrawal/", "{other}/help-centre/shipping/"]
 )
 def test_the_help_pages_pass_the_gates(
     theme: str,
@@ -31,6 +32,8 @@ def test_the_help_pages_pass_the_gates(
     live_server: LiveServer,
     settings: SettingsWrapper,
 ) -> None:
+    if "{other}" in path:  # a second language's prefix, resolved once settings are known
+        path = path.format(other=language_prefix(other_language()))
     settings.MPMV_THEME_DEFAULT = theme
     settings.MPMV_HELP_URL = ""
     page.emulate_media(reduced_motion="reduce")

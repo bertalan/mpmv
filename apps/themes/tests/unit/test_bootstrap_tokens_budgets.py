@@ -125,7 +125,7 @@ def test_the_main_variables_come_from_the_tokens() -> None:
     tokens = ride_tokens()
     mapped = bootstrap_variables(tokens)
     assert mapped["--bs-primary"].lower() == tokens["color.accent"].lower()
-    assert mapped["--bs-primary-rgb"] == "4,107,210"
+    assert mapped["--bs-primary-rgb"] == "196,4,23"
     assert mapped["--bs-secondary"].lower() == tokens["color.secondary"].lower()
     assert mapped["--bs-body-color"].lower() == tokens["color.text"].lower()
     assert mapped["--bs-link-color"].lower() == tokens["color.link"].lower()

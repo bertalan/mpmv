@@ -32,7 +32,8 @@ from apps.orders.services import LineInput, VendorOrderInput
 from apps.orders.tests.integration.test_retention import COMMISSION, place
 from apps.vendors.tests.factories import VendorFactory
 
-pytestmark = pytest.mark.django_db
+# Items in a cart need a consumer price (TAX.12, #757): an operator, rates, tax profiles.
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
 CTX = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
 

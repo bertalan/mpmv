@@ -17,7 +17,7 @@ from apps.catalog.models import Product
 from tests.e2e.csp import csp_violations
 from tests.e2e.test_add_to_cart import product  # noqa: F401 (fixture)
 from tests.e2e.test_catalog_listings import term_page  # noqa: F401 (fixture)
-from tests.e2e.test_ride_overlays import _ride, clean, open_page  # noqa: F401 (fixtures)
+from tests.e2e.test_ride_overlays import _ride, clean, open_page, ride_paths  # noqa: F401 (fixtures)
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -105,7 +105,7 @@ def test_the_gates_pass_with_the_footer_chrome_at_every_width(
     term_page: None,  # noqa: F811
     product: Product,  # noqa: F811
 ) -> None:
-    path = {"home": "/", "listing": "/compatibility/maker/", "product": "/product/blue-vase/"}
+    path = ride_paths()
     open_page(page, live_server, path[where], width)
     expect(page.locator(BACK_TO_TOP)).to_be_attached()
     expect(

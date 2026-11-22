@@ -37,6 +37,12 @@ msgstr "%(amount)s rimborsati."
 msgid "%(browser)s on %(system)s"
 msgstr "%(browser)s su %(system)s"
 
+#: apps/fitment/views.py
+msgid "%(count)d profile added to your account."
+msgid_plural "%(count)d profiles added to your account."
+msgstr[0] "%(count)d profilo aggiunto al tuo account."
+msgstr[1] "%(count)d profili aggiunti al tuo account."
+
 #: themes/ride/templates/components/gallery.html themes/ride/templates/components/hero_slider.html
 #: themes/ride/templates/components/strip.html
 msgid "%(count)s of %(total)s"
@@ -169,13 +175,21 @@ msgstr[1] "%(n)s prodotti selezionati."
 msgid "%(name)s is deleted."
 msgstr "%(name)s è stato eliminato."
 
-#: apps/fitment/garage_views.py
+#: apps/fitment/garage_views.py apps/fitment/views.py
 msgid "%(name)s is now your active vehicle."
 msgstr "%(name)s è ora il tuo veicolo attivo."
 
 #: apps/accounts/mfa_views.py
 msgid "%(name)s removed."
 msgstr "%(name)s rimosso."
+
+#: themes/base/templates/components/garage_menu.html
+msgid "%(noun)s: %(name)s"
+msgstr "%(noun)s: %(name)s"
+
+#: themes/base/templates/components/garage_menu.html
+msgid "%(noun)s: generic"
+msgstr "%(noun)s: generico"
 
 #: apps/manager/amendment_views.py
 msgid "%(qty)s x %(unit)s"
@@ -1041,6 +1055,7 @@ msgid "Active"
 msgstr "Attivo"
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
+#: themes/base/templates/components/garage_merge_notice.html
 msgid "Add"
 msgstr "Aggiungi"
 
@@ -1133,6 +1148,10 @@ msgstr "Aggiungi al carrello"
 #: apps/manager/templates/manager/shop/events.html
 msgid "Add translation"
 msgstr "Aggiungi traduzione"
+
+#: themes/base/templates/components/garage_menu.html
+msgid "Add your garage"
+msgstr "Aggiungi il tuo garage"
 
 #: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "added %(created)s"
@@ -1493,6 +1512,10 @@ msgstr "Filtri applicati"
 #: apps/cms/models.py
 msgid "applies to"
 msgstr "si applica a"
+
+#: apps/fitment/templates/fitment/garage_choose.html
+msgid "Apply"
+msgstr "Applica"
 
 #: apps/catalog/templates/catalog/includes/listing_filters.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
@@ -1879,6 +1902,7 @@ msgstr "Indirizzo del calendario da copiare"
 msgid "Call to action"
 msgstr "Invito all'azione"
 
+#: apps/fitment/templates/fitment/garage_choose.html
 #: apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
 #: apps/manager/templates/manager/platform/product.html
@@ -2079,6 +2103,7 @@ msgid "Cause: the shop cannot fulfil the order."
 msgstr "Causa: il negozio non può evadere l’ordine."
 
 #: apps/manager/templates/manager/platform/fitment_node.html
+#: themes/base/templates/components/garage_banner.html
 msgid "Change"
 msgstr "Modifica"
 
@@ -2114,6 +2139,10 @@ msgstr ""
 #: apps/manager/templates/manager/shop/order.html
 msgid "Change this order"
 msgstr "Modifica questo ordine"
+
+#: themes/base/templates/components/garage_menu.html
+msgid "Change vehicle"
+msgstr "Cambia veicolo"
 
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/platform/orders.html
 msgid "Changes are disabled."
@@ -2245,7 +2274,13 @@ msgstr ""
 msgid "Choose a time zone such as Europe/Rome."
 msgstr "Scegli un fuso orario, per esempio Europe/Rome."
 
+#: apps/fitment/templates/fitment/garage_choose.html
+#: themes/base/templates/components/garage_menu.html
+msgid "Choose a vehicle"
+msgstr "Scegli un veicolo"
+
 #: apps/fitment/templates/fitment/garage_account.html
+#: apps/fitment/templates/fitment/garage_choose.html
 #: themes/ride/templates/fitment/garage_account.html
 msgid "Choose a vehicle while you browse the shop and save it: the shop then shows what fits it."
 msgstr ""
@@ -3711,7 +3746,7 @@ msgstr "Campi del modulo"
 msgid "form page"
 msgstr "pagina con modulo"
 
-#: apps/manager/event_forms.py
+#: apps/events/templates/events/event_page.html apps/manager/event_forms.py
 msgid "Free entry"
 msgstr "Ingresso gratuito"
 
@@ -3757,6 +3792,10 @@ msgstr "Galleria"
 msgid "Garage noun"
 msgstr "Nome del garage"
 
+#: apps/fitment/views.py
+msgid "Garage reset: showing all items."
+msgstr "Garage azzerato: vengono mostrati tutti gli articoli."
+
 #: apps/cms/models.py
 msgid "General (every other screen)"
 msgstr "Generale (ogni altra schermata)"
@@ -3771,10 +3810,18 @@ msgstr "Genera nuovi codici"
 msgid "Generating new codes makes every previous code stop working."
 msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
 
+#: apps/fitment/templates/fitment/garage_choose.html
+msgid "Generic (show all)"
+msgstr "Generico (mostra tutto)"
+
 #: apps/compliance/templates/compliance/privacy_account.html
 #: themes/ride/templates/compliance/privacy_account.html
 msgid "Get a copy of the data we hold about you as a JSON file."
 msgstr "Ottieni una copia dei dati che conserviamo su di te come file JSON."
+
+#: apps/events/templates/events/event_page.html
+msgid "Get tickets"
+msgstr "Acquista i biglietti"
 
 #: apps/manager/event_fields.py
 msgid "Give a number from -%(limit)d to %(limit)d, for example 45.464200."
@@ -3908,6 +3955,10 @@ msgstr "GTIN"
 #: apps/manager/staff_draft_views.py
 msgid "Guest"
 msgstr "Ospite"
+
+#: apps/manager/staff_draft_views.py apps/orders/customer_views.py
+msgid "has no price yet"
+msgstr "non ha ancora un prezzo"
 
 #: apps/manager/event_block_forms.py
 msgid "Heading"
@@ -5204,7 +5255,9 @@ msgstr "Sposta su"
 msgid "MPN"
 msgstr "MPN"
 
-#: apps/fitment/templates/fitment/garage_account.html apps/manager/site_map.py
+#: apps/fitment/templates/fitment/garage_account.html
+#: apps/fitment/templates/fitment/garage_choose.html apps/manager/site_map.py
+#: themes/base/templates/components/garage_menu.html
 #: themes/ride/templates/fitment/garage_account.html
 msgid "My garage"
 msgstr "Il mio garage"
@@ -5576,6 +5629,10 @@ msgstr "Non in vigore"
 #: apps/manager/amendment_views.py
 msgid "not in the order"
 msgstr "non nell'ordine"
+
+#: themes/base/templates/components/garage_merge_notice.html
+msgid "Not now"
+msgstr "Non ora"
 
 #: apps/manager/staff_draft_views.py apps/manager/templates/manager/platform/order_draft.html
 msgid "Not sent, or no longer usable"
@@ -6997,6 +7054,7 @@ msgstr "Posizione"
 msgid "Postcode"
 msgstr "CAP"
 
+#: apps/events/templates/events/_summary.html apps/events/templates/events/event_page.html
 #: apps/manager/event_forms.py
 msgid "Postponed"
 msgstr "Rinviato"
@@ -7111,6 +7169,10 @@ msgstr "Inizio precedente"
 #: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "Previous versions"
 msgstr "Versioni precedenti"
+
+#: apps/events/templates/events/event_page.html
+msgid "Previously"
+msgstr "Prima"
 
 #: apps/catalog/templates/catalog/includes/listing_filters.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
@@ -8395,6 +8457,7 @@ msgstr[0] "Mostra altri %(count)s"
 msgstr[1] "Mostra altri %(count)s"
 
 #: apps/manager/templates/manager/platform/profile_changes.html
+#: themes/base/templates/components/garage_banner.html
 msgid "Show all"
 msgstr "Mostra tutto"
 
@@ -8445,6 +8508,10 @@ msgstr "Mostra i prodotti più recenti di questo negozio."
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Showing %(vendor)s only."
 msgstr "Solo %(vendor)s."
+
+#: themes/base/templates/components/garage_banner.html
+msgid "Showing items for: %(label)s"
+msgstr "Articoli per: %(label)s"
 
 #: apps/cms/forms_pages.py
 msgid ""
@@ -9372,6 +9439,13 @@ msgstr ""
 "delle tue condizioni che richiedono l'approvazione specifica degli acquirenti professionali (art. "
 "1341, secondo comma, del Codice civile), una per riga nella forma: numero dell'articolo | titolo. "
 "Per esempio: 7 | Limitazione di responsabilità. Obbligatorio."
+
+#: apps/themes/models.py
+msgid ""
+"The colour palette of the whole site. Leave it empty for the theme's own colours (Red for ride)."
+msgstr ""
+"La palette di colori dell'intero sito. Lasciala vuota per usare i colori del tema (Rosso per "
+"ride)."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -11462,6 +11536,15 @@ msgstr "il negozio non può consegnarlo nel paese dell'ordine"
 
 #: apps/vendors/models.py
 msgid ""
+"The shop name when this version was published, so an old version keeps the name it was published "
+"under. Empty on versions published before it was recorded."
+msgstr ""
+"Il nome del negozio quando questa versione è stata pubblicata, così una versione vecchia conserva "
+"il nome con cui è stata pubblicata. Vuoto per le versioni pubblicate prima che il nome venisse "
+"registrato."
+
+#: apps/vendors/models.py
+msgid ""
 "The shop name your buyers see, for example 'Rossi Ceramics'. Required: the shop cannot be shown "
 "without a name."
 msgstr ""
@@ -12406,6 +12489,10 @@ msgstr ""
 msgid "This item cannot be bought right now."
 msgstr "Questo articolo non si può acquistare in questo momento."
 
+#: apps/catalog/templates/catalog/product.html apps/orders/ui/present.py
+msgid "This item has no price yet, so you can't buy it online."
+msgstr "Questo articolo non ha ancora un prezzo, quindi non puoi acquistarlo online."
+
 #: apps/orders/ui/present.py
 msgid "This item has no price yet."
 msgstr "Questo articolo non ha ancora un prezzo."
@@ -12853,6 +12940,10 @@ msgstr "Link ai biglietti"
 #: apps/manager/event_forms.py
 msgid "Ticket price (EUR)"
 msgstr "Prezzo del biglietto (EUR)"
+
+#: apps/events/templates/events/event_page.html
+msgid "Tickets"
+msgstr "Biglietti"
 
 #: apps/manager/event_forms.py
 msgid "Tickets and changes"
@@ -14708,6 +14799,12 @@ msgstr "Non puoi modificare questo evento."
 msgid "You do not have permission to open this page."
 msgstr "Non hai il permesso di aprire questa pagina."
 
+#: themes/base/templates/components/garage_merge_notice.html
+msgid "You have %(counter)s profile saved on this device. Add it to your account?"
+msgid_plural "You have %(counter)s profiles saved on this device. Add them to your account?"
+msgstr[0] "Hai %(counter)s profilo salvato su questo dispositivo. Vuoi aggiungerlo al tuo account?"
+msgstr[1] "Hai %(counter)s profili salvati su questo dispositivo. Vuoi aggiungerli al tuo account?"
+
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 #: themes/ride/templates/accounts/mfa/recovery_codes.html
 msgid "You have %(counter)s unused recovery code."
@@ -14760,6 +14857,7 @@ msgid "You have no orders yet"
 msgstr "Non hai ancora ordini"
 
 #: apps/fitment/templates/fitment/garage_account.html
+#: apps/fitment/templates/fitment/garage_choose.html
 #: themes/ride/templates/fitment/garage_account.html
 msgid "You have no saved vehicles yet"
 msgstr "Non hai ancora veicoli salvati"

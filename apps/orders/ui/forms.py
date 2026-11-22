@@ -11,6 +11,7 @@ from typing import Any
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
+from apps.core.nfc_forms import NFCFormMixin
 from apps.tax import engine as tax_engine
 from apps.vendors.forms import COUNTRY_NAMES
 
@@ -21,7 +22,10 @@ def _autocomplete(token: str) -> dict[str, str]:
     return {"autocomplete": token}
 
 
-class CheckoutDetailsForm(forms.Form):
+class CheckoutDetailsForm(NFCFormMixin, forms.Form):
+    # Names and the address are stored in NFC (I18N.10); the email and VAT id stay as typed.
+    nfc_exact_fields = ("email", "vat_id")
+
     email = forms.EmailField(
         label=_("Email address"),
         help_text=_(

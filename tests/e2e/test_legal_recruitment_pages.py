@@ -19,8 +19,10 @@ from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.cms.models import HomePage, LegalPage
 from apps.cms.tests.factories import LegalPageFactory, VendorRecruitmentPageFactory
+from apps.core.i18n import primary_language
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import language_prefix, other_language, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -31,7 +33,8 @@ def _publish(page: LegalPage) -> LegalPage:
     return page
 
 
-def _terms_in_english_and_italian() -> None:
+def _terms_in_two_languages() -> str:
+    """Terms in the primary language (two versions) and in a second one; returns the second."""
     english = LegalPageFactory.create(
         title="Terms of sale", effective_date=dt.date(2026, 1, 1), live=False
     )
@@ -41,19 +44,20 @@ def _terms_in_english_and_italian() -> None:
     english = _publish(english)
 
     italian: LegalPage = english.copy_for_translation(
-        Locale.objects.get(language_code="it")
+        Locale.objects.get(language_code=other_language())
     ).specific
     italian.title = "Condizioni di vendita"
     italian.slug = "condizioni-di-vendita"
     italian.effective_date = dt.date(2026, 3, 1)
     italian.body = [("paragraph", "<p>Condizioni di vendita in italiano.</p>")]
     _publish(italian)
+    return str(italian.locale.language_code)
 
 
-def test_visitor_reads_the_terms_their_archive_and_the_italian_version(
+def test_visitor_reads_the_terms_their_archive_and_the_translated_version(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
-    _terms_in_english_and_italian()
+    other = _terms_in_two_languages()
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/terms-of-sale/")
@@ -62,18 +66,20 @@ def test_visitor_reads_the_terms_their_archive_and_the_italian_version(
     expect(page.locator('time[datetime="2026-06-01"]').first).to_be_visible()
     shot("en-terms")
 
-    page.get_by_role("link", name=re.compile("Version 1")).click()
+    page.get_by_role(
+        "link", name=re.compile(translated("Version %(number)s") % {"number": 1})
+    ).click()
     expect(page).to_have_url(re.compile(r"/terms-of-sale/versions/1/$"))
     expect(page.get_by_text("Sample terms.")).to_be_visible()
     expect(page.locator('time[datetime="2026-01-01"]').first).to_be_visible()
     shot("en-terms-version-1")
 
     page.goto(f"{live_server.url}/terms-of-sale/")
-    page.locator('button[value="it"]').click()
-    expect(page).to_have_url(re.compile(r"/it/condizioni-di-vendita/$"))
+    page.locator(f'button[value="{other}"]').click()
+    expect(page).to_have_url(re.compile(rf"{language_prefix(other)}/condizioni-di-vendita/$"))
     expect(page.get_by_role("heading", level=1)).to_have_text("Condizioni di vendita")
     expect(page.locator('time[datetime="2026-03-01"]').first).to_be_visible()
-    shot("it-terms")
+    shot("translated-terms")
 
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
 
@@ -86,7 +92,7 @@ def test_visitor_sees_the_plans_and_how_to_apply(
 
     page.goto(f"{live_server.url}/sell-with-us/")
     expect(page.get_by_role("heading", level=1)).to_have_text("Sell with us")
-    plans = page.get_by_role("region", name="Plans")
+    plans = page.get_by_role("region", name=translated("Plans"))
     expect(plans.get_by_role("heading", name="Starter")).to_be_visible()
     expect(plans.get_by_role("heading", name="Workshop")).to_be_visible()
     expect(page.get_by_text("Who can sell?")).to_be_visible()
@@ -106,18 +112,19 @@ def test_editor_adds_a_legal_page_in_the_admin(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
 
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     page.goto(f"{live_server.url}/admin/pages/add/cms/legalpage/{home.pk}/")
     page.locator("#id_title").fill("Privacy policy")
     page.locator("#id_kind").select_option("privacy")
     page.locator("#id_effective_date").fill("2026-01-01")
     shot("admin-add-legal-page")
-    page.get_by_role("button", name="More actions").click()
-    page.get_by_role("button", name="Publish").click()
-    expect(page.get_by_text("Page 'Privacy policy' created and published.")).to_be_visible()
+    page.get_by_role("button", name=translated("More actions")).click()
+    page.get_by_role("button", name=translated("Publish")).click()
+    created = translated("Page '%(page_title)s' created and published.")
+    expect(page.get_by_text(created % {"page_title": "Privacy policy"})).to_be_visible()
 
     legal = LegalPage.objects.get(title="Privacy policy")
     assert [(v.number, v.effective_date) for v in legal.versions.all()] == [
