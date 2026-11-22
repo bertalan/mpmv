@@ -13315,7 +13315,8 @@ msgstr ""
 "Angaben des Verkäufers in Ihrer Bestellbestätigung (Seite und E-Mail) und in der Bestellübersicht "
 "beim Bezahlvorgang)"
 
-#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/orders/customer_views.py
+#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/manager/stray_views.py
+#: apps/orders/customer_views.py
 msgid "Too many attempts. Please try again later."
 msgstr "Zu viele Versuche. Bitte versuche es später erneut."
 

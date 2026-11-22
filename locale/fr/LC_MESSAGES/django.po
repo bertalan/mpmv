@@ -13275,7 +13275,8 @@ msgstr ""
 "électronique : voir les coordonnées du vendeur dans votre confirmation de commande (page et "
 "courrier électronique) et dans le récapitulatif de la commande avant de la passer)"
 
-#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/orders/customer_views.py
+#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/manager/stray_views.py
+#: apps/orders/customer_views.py
 msgid "Too many attempts. Please try again later."
 msgstr "Trop de tentatives. Veuillez réessayer plus tard."
 
