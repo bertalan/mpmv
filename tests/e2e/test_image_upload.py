@@ -69,8 +69,8 @@ def test_an_upload_without_licence_or_author_is_refused_then_accepted_with_them(
     shot("upload-refused")
 
     page.locator("input[type=file][name=file]").set_input_files(upload)
-    page.get_by_label("Licence").select_option(label="CC BY 4.0")
-    page.get_by_label("Author").fill("Ada Lovelace")
+    page.get_by_label(translated("Licence")).select_option(label="CC BY 4.0")
+    page.get_by_label(translated("Author")).fill("Ada Lovelace")
     page.get_by_label("Source URL").fill("https://example.com/lake")
     page.locator("form [type=submit]").last.click()
 

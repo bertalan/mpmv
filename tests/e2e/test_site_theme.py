@@ -55,9 +55,8 @@ def test_staff_switch_the_site_theme_and_visitors_see_it(
     verify_with_totp(page, totp_token(device), window=True)
 
     page.goto(f"{live_server.url}/django-admin/themes/themesettings/add/")
-    # The model's site field has no translated verbose name yet: its label is English.
-    page.get_by_label("Site").select_option(index=1)
-    page.get_by_label("Theme").select_option("alt")
+    page.get_by_label(translated("Site")).select_option(index=1)
+    page.get_by_label(translated("Theme")).select_option("alt")
     shot("admin-form")
     page.get_by_role("button", name=translated("Save"), exact=True).click()
     expect(page.locator(".messagelist")).to_contain_text(

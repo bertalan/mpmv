@@ -48,11 +48,11 @@ def test_the_vendor_fulfils_an_order_end_to_end(
 
     page.get_by_role("link", name=sub.order.number).click()
     # The order states have no translated labels yet: they read in English in every language.
-    expect(page.locator("[data-order-state]")).to_have_text("Pending")
+    expect(page.locator("[data-order-state]")).to_have_text(translated("Pending"))
     _accessible(page)
     shot("order-pending")
     page.get_by_role("button", name=translated("Accept the order")).click()
-    expect(page.locator("[data-order-state]")).to_have_text("Accepted")
+    expect(page.locator("[data-order-state]")).to_have_text(translated("Accepted"))
 
     page.get_by_role("button", name=translated("Mark as shipped")).click()  # no tracking number yet
     expect(page.get_by_role("region", name=translated("There is a problem"))).to_be_visible()

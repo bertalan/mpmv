@@ -213,11 +213,11 @@ def test_a_vendor_claimant_pastes_new_passwords_and_a_code(
     page.goto(f"{live_server.url}{emailed_link_path()}")
     page.get_by_role("button", name=translated("Continue")).click()
     # The claim pages themselves are not translated yet: their text is English in every language.
-    page.get_by_label("VAT number or TIN").fill(vendor.vat_number)
-    page.get_by_role("button", name="Confirm").click()
+    page.get_by_label(translated("VAT number or TIN")).fill(vendor.vat_number)
+    page.get_by_role("button", name=translated("Confirm")).click()
 
-    first = page.get_by_label("Password", exact=True)
-    again = page.get_by_label("Password again")
+    first = page.get_by_label(translated("Password"), exact=True)
+    again = page.get_by_label(translated("Password again"))
     expect(first).to_have_attribute("autocomplete", "new-password")
     expect(again).to_have_attribute("autocomplete", "new-password")
     _no_axe_violations(page)
@@ -233,9 +233,9 @@ def test_a_vendor_claimant_pastes_new_passwords_and_a_code(
     toggles.first.click()
 
     secret = page.get_by_test_id("totp-secret").inner_text()
-    page.get_by_label("Full name").fill("Claimant Example")
-    _paste(page, page.get_by_label("Authentication code"), code_from_secret(secret))
+    page.get_by_label(translated("Full name")).fill("Claimant Example")
+    _paste(page, page.get_by_label(translated("Authentication code")), code_from_secret(secret))
     shot("claim-account-pasted")
-    page.get_by_role("button", name="Submit the claim").click()
-    expect(page.get_by_text("waiting for approval")).to_be_visible()
+    page.get_by_role("button", name=translated("Submit the claim")).click()
+    expect(page.get_by_role("heading", name=translated("Claim submitted"))).to_be_visible()
     assert csp_violations(page) == []
