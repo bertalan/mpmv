@@ -9537,7 +9537,8 @@ msgstr ""
 msgid ""
 "The colour palette of the whole site. Leave it empty for the theme's own colours (Red for ride)."
 msgstr ""
-"Die Farbpalette der gesamten Website. Leer lassen, um die Farben des Themes zu verwenden (Rot für ride)."
+"Die Farbpalette der gesamten Website. Leer lassen, um die Farben des Themes zu verwenden (Rot für "
+"ride)."
 
 #: apps/catalog/taxonomy.py
 msgid ""
