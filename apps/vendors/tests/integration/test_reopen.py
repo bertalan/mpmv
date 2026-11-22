@@ -287,9 +287,9 @@ def test_saving_a_stale_profile_does_not_undo_a_reopen() -> None:
     stale = Vendor.objects.get(pk=member.vendor.pk)  # e.g. an admin form opened before
     reopen_vendor(member.vendor, actor=staff_user(), reason=REASON, ctx=STAFF_CTX)
 
-    stale.phone = "+39 06 000000"
+    stale.phone = "+44 20 7946 0125"
     save_vendor(stale, ctx=STAFF_CTX)
 
     stored = Vendor.objects.get(pk=member.vendor.pk)
-    assert stored.phone == "+39 06 000000"
+    assert stored.phone == "+44 20 7946 0125"
     assert (stored.status, stored.onboarding_round) == (Vendor.Status.ONBOARDING, 2)

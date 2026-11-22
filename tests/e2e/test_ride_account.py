@@ -21,6 +21,7 @@ from apps.accounts.tests.mfa import password_login, totp_token, verified_login
 from apps.orders.tests.integration.test_retention import place
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -65,7 +66,7 @@ def test_the_customer_area_renders_with_ride(
     _signed_in_page(page, live_server)
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(f"{live_server.url}/account/orders/")
-    expect(page.get_by_role("heading", level=1, name="My orders")).to_be_visible()
+    expect(page.get_by_role("heading", level=1, name=translated("My orders"))).to_be_visible()
     _check(page, width)
     shot(f"{width}-orders")
     page.locator("tbody a").first.click()
@@ -73,7 +74,7 @@ def test_the_customer_area_renders_with_ride(
     _check(page, width)
     shot(f"{width}-order")
     page.goto(f"{live_server.url}/account/sessions/")
-    expect(page.get_by_role("heading", level=1, name="Your sessions")).to_be_visible()
+    expect(page.get_by_role("heading", level=1, name=translated("Your sessions"))).to_be_visible()
     _check(page, width)
     shot(f"{width}-sessions")
     page.goto(f"{live_server.url}/account/privacy/")
@@ -96,27 +97,29 @@ def test_a_customer_signs_in_with_the_keyboard_only(
     _check(page, width)
     shot(f"{width}-login")
 
-    expect(page.get_by_label("Email")).to_be_focused()  # autofocus: first stop for typing
+    expect(
+        page.get_by_label(translated("Email"))
+    ).to_be_focused()  # autofocus: first stop for typing
     page.keyboard.type("rider@example.com")
     page.keyboard.press("Tab")
-    expect(page.get_by_label("Password")).to_be_focused()
+    expect(page.get_by_label(translated("Password"))).to_be_focused()
     page.keyboard.type(password)
     page.keyboard.press("Enter")
 
     expect(page).to_have_url(re.compile(r"/account/mfa/verify/"))
     _check(page, width)
     shot(f"{width}-verify")
-    page.get_by_label("Authentication code").focus()
+    page.get_by_label(translated("Authentication code")).focus()
     page.keyboard.type(totp_token(device))
     page.keyboard.press("Enter")
     page.wait_for_url(lambda url: "/account/mfa/verify" not in url)
 
     page.goto(f"{live_server.url}/account/orders/")
-    expect(page.get_by_role("heading", level=1, name="My orders")).to_be_visible()
+    expect(page.get_by_role("heading", level=1, name=translated("My orders"))).to_be_visible()
     _check(page, width)
     page.goto(f"{live_server.url}/account/sessions/")
-    expect(page.get_by_role("heading", level=1, name="Your sessions")).to_be_visible()
-    expect(page.get_by_role("button", name="Sign out of this session")).to_be_visible()
+    expect(page.get_by_role("heading", level=1, name=translated("Your sessions"))).to_be_visible()
+    expect(page.get_by_role("button", name=translated("Sign out of this session"))).to_be_visible()
     _check(page, width)
     page.keyboard.press("Tab")
     focus = page.evaluate(

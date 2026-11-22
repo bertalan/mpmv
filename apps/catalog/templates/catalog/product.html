@@ -49,6 +49,10 @@
           <p class="product-price">{% if page_data.price is not None %}{% consumer_price page_data.price page_data.product.fiscal_category page_data.vendor as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p>
           <p class="product-stock">{% include "catalog/includes/stock_status.html" with status=page_data.stock_status %}</p>
         {% endif %}
+        {% consumer_price page_data.price page_data.product.fiscal_category page_data.vendor as buyable %}
+        {% if not buyable %}
+        <p class="product-unpriced" role="note">{% translate "This item has no price yet, so you can't buy it online." %}</p>
+        {% else %}
         <form class="product-form" method="post" action="{% url 'orders:cart_add' %}" hx-post="{% url 'orders:cart_add' %}" hx-target="#add-to-cart-result" hx-swap="innerHTML">
           {% csrf_token %}
           <input type="hidden" name="product" value="{{ page_data.product.public_id }}">
@@ -70,6 +74,7 @@
           <button type="submit" class="button">{% translate "Add to cart" %}</button>
           <div id="add-to-cart-result"></div>
         </form>
+        {% endif %}
       {% endif %}
       {% seller_name page_data.vendor as seller %}{% if seller %}<p class="product-vendor">{% translate "Sold by" %} <a href="{{ vendor_url }}">{{ seller }}</a></p>{% endif %}
     </section>

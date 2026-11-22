@@ -1,10 +1,9 @@
 """EVT.12: provider adapters behind the `Geocoder` protocol. No test reaches the network: the
-adapters get a recording transport, and the HTTP transport is tested with `urlopen` mocked."""
+adapters get a recording transport, and the HTTP transport is tested with its `open_url` mocked."""
 
 import io
 import secrets
 import urllib.error
-import urllib.request
 from collections.abc import Mapping
 from typing import Any
 
@@ -162,7 +161,7 @@ def test_the_fake_returns_its_results_and_records_its_calls() -> None:
         failing.geocode(QUERY, language="en", limit=5, timeout=3.0)
 
 
-# --- HTTP transport (urlopen mocked: never a real request)
+# --- HTTP transport (open_url mocked: never a real request)
 
 
 class FakeResponse(io.BytesIO):
@@ -184,7 +183,7 @@ def test_the_http_transport_sends_params_headers_and_timeout(
         seen["timeout"] = timeout
         return FakeResponse(b'[{"lat": "1"}]')
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(adapters, "open_url", fake_urlopen)
     answer = adapters.http_get_json(
         "https://geo.example.com/search", {"q": "a b"}, {"User-Agent": "MPMV/test"}, 3.0
     )
@@ -211,7 +210,7 @@ def test_the_http_transport_maps_network_errors(
     def fake_urlopen(request: Any, timeout: float) -> FakeResponse:
         raise error
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(adapters, "open_url", fake_urlopen)
     with pytest.raises(expected):
         adapters.http_get_json("https://geo.example.com/search", {}, {}, 3.0)
 
@@ -229,7 +228,7 @@ def test_http_errors_never_carry_the_url_and_its_key(
     def fake_urlopen(request: Any, timeout: float) -> FakeResponse:
         raise urllib.error.HTTPError(url, status, "error", {}, io.BytesIO(b""))  # type: ignore[arg-type]
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(adapters, "open_url", fake_urlopen)
     with pytest.raises(expected) as caught:
         adapters.http_get_json("https://geo.example.com/search", {"key": key}, {}, 3.0)
     assert key not in str(caught.value)
@@ -238,7 +237,7 @@ def test_http_errors_never_carry_the_url_and_its_key(
 
 
 def test_invalid_json_is_an_unavailable_provider(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(urllib.request, "urlopen", lambda request, timeout: FakeResponse(b"<html>"))
+    monkeypatch.setattr(adapters, "open_url", lambda request, timeout: FakeResponse(b"<html>"))
     with pytest.raises(GeocoderUnavailable):
         adapters.http_get_json("https://geo.example.com/search", {}, {}, 3.0)
 

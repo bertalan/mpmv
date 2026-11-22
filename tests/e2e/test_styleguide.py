@@ -22,6 +22,7 @@ from apps.accounts.tests.mfa import totp_token
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import admin_login, verify_with_totp
 from tests.e2e.test_base_theme_keyboard import FOCUSED, assert_visible_focus
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -57,8 +58,10 @@ def test_staff_see_every_component_without_a_csp_violation(
     open_styleguide(page, live_server)
     expect(page.locator("html")).to_have_attribute("data-theme", "base")
     for section in SECTIONS:
-        expect(page.get_by_role("heading", name=section, exact=True)).to_be_visible()
-    expect(page.get_by_role("button", name="Close", exact=True)).to_be_visible()
+        expect(page.get_by_role("heading", name=translated(section), exact=True)).to_be_visible()
+    # The icon button of the Buttons section: other languages may call "Dismiss" "Close" too.
+    buttons = page.get_by_role("region", name=translated("Buttons"), exact=True)
+    expect(buttons.get_by_role("button", name=translated("Close"), exact=True)).to_be_visible()
     expect(page.locator(".error-summary a").first).to_be_visible()
     shot("desktop")
 
@@ -116,7 +119,7 @@ def test_cards_tiles_badges_and_alerts_render_without_a_csp_violation(
     page.evaluate("() => [...document.images].forEach((img) => { img.loading = 'eager'; })")
     page.wait_for_function(IMAGES_LOADED, timeout=5000)
     for kind in ("Sale", "New", "Out of stock", "On request"):
-        expect(page.locator(".badge", has_text=kind).first).to_be_visible()
+        expect(page.locator(".badge", has_text=translated(kind)).first).to_be_visible()
     expect(page.get_by_role("status").first).to_be_attached()
     page.locator("#sg-tiles").scroll_into_view_if_needed()
     shot("components-desktop")
@@ -150,7 +153,7 @@ def test_a_dismissible_alert_closes_and_the_focus_moves_on(
     page.set_viewport_size({"width": 1280, "height": 900})
     open_styleguide(page, live_server)
     alert = page.locator("#sg-alert-dismissible")
-    button = alert.get_by_role("button", name="Dismiss")
+    button = alert.get_by_role("button", name=translated("Dismiss"))
     expect(button).to_be_visible()
     button.focus()
     page.keyboard.press("Enter")
@@ -183,7 +186,7 @@ def test_an_out_of_band_alert_from_htmx_can_be_dismissed(
     )
     swapped = page.locator("#sg-alert-feed #sg-alert-oob")
     expect(swapped).to_have_count(1)
-    button = swapped.get_by_role("button", name="Dismiss")
+    button = swapped.get_by_role("button", name=translated("Dismiss"))
     expect(button).to_be_visible()
     button.click()
     expect(page.locator("#sg-alert-oob")).to_have_count(0)
@@ -220,7 +223,7 @@ def test_a_busy_button_neither_clicks_nor_submits(page: Page, live_server: LiveS
     page.wait_for_timeout(300)
     assert page.url == url
     assert "submitted" not in page.url
-    icon = form.get_by_role("button", name="Refresh, Refreshing")
+    icon = form.get_by_role("button", name=f"{translated('Refresh')}, {translated('Refreshing')}")
     expect(icon).to_be_visible()
     icon.click(force=True)
     page.wait_for_timeout(300)
@@ -236,8 +239,8 @@ def test_navigation_components_render_without_a_csp_violation(
     page.set_viewport_size({"width": 1280, "height": 900})
     open_styleguide(page, live_server)
     for section in ("Page frame", "Breadcrumbs", "Pagination", "Tabs", "In-page navigation"):
-        expect(page.get_by_role("heading", name=section, exact=True)).to_be_visible()
-    breadcrumb = page.get_by_role("navigation", name="Breadcrumb").first
+        expect(page.get_by_role("heading", name=translated(section), exact=True)).to_be_visible()
+    breadcrumb = page.get_by_role("navigation", name=translated("Breadcrumb")).first
     expect(breadcrumb.locator('[aria-current="page"]')).to_be_visible()
     # Alpine turned the tabs on: the list shows and the no-script headings are gone.
     expect(page.get_by_role("tablist").first).to_be_visible()
@@ -247,7 +250,7 @@ def test_navigation_components_render_without_a_csp_violation(
     page.set_viewport_size({"width": 375, "height": 800})
     page.wait_for_timeout(100)  # the layout settles after the resize
     # The THM.3 header is the mobile menu pattern: a disclosure button on narrow screens.
-    expect(page.get_by_role("button", name="Menu", exact=True)).to_be_visible()
+    expect(page.get_by_role("button", name=translated("Menu"), exact=True)).to_be_visible()
     shot("navigation-phone")
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
 
@@ -320,7 +323,11 @@ def test_pagination_and_breadcrumb_links_show_a_visible_focus(
     link.focus()
     expect(link).to_be_focused()
     assert_visible_focus([page.evaluate(FOCUSED)])
-    crumb = page.get_by_role("navigation", name="Breadcrumb").first.get_by_role("link").first
+    crumb = (
+        page.get_by_role("navigation", name=translated("Breadcrumb"))
+        .first.get_by_role("link")
+        .first
+    )
     crumb.focus()
     assert_visible_focus([page.evaluate(FOCUSED)])
 
@@ -357,13 +364,13 @@ def test_the_whole_library_renders_without_a_csp_violation(
     page.set_viewport_size({"width": 1280, "height": 900})
     open_styleguide(page, live_server)
     for section in LIBRARY_SECTIONS:
-        heading = page.get_by_role("heading", name=section, exact=True)
+        heading = page.get_by_role("heading", name=translated(section), exact=True)
         heading.scroll_into_view_if_needed()
         expect(heading).to_be_visible()
     # base.js revealed the script-only controls.
-    expect(page.get_by_role("button", name="Open the size guide")).to_be_visible()
-    expect(page.get_by_role("button", name="Next items")).to_be_visible()
-    expect(page.get_by_role("button", name="Increase quantity").first).to_be_visible()
+    expect(page.get_by_role("button", name=translated("Open the size guide"))).to_be_visible()
+    expect(page.get_by_role("button", name=translated("Next items"))).to_be_visible()
+    expect(page.get_by_role("button", name=translated("Increase quantity")).first).to_be_visible()
     page.evaluate("() => [...document.images].forEach((img) => { img.loading = 'eager'; })")
     page.wait_for_function(IMAGES_LOADED, timeout=5000)
     page.locator("#sg-search").scroll_into_view_if_needed()
@@ -381,17 +388,17 @@ def test_a_dialog_traps_the_focus_closes_on_escape_and_returns_it(
 ) -> None:
     page.set_viewport_size({"width": 1280, "height": 900})
     open_styleguide(page, live_server)
-    opener = page.get_by_role("button", name="Open the size guide")
+    opener = page.get_by_role("button", name=translated("Open the size guide"))
     opener.click()
-    dialog = page.get_by_role("dialog", name="Size guide")
+    dialog = page.get_by_role("dialog", name=translated("Size guide"))
     expect(dialog).to_be_visible()
-    expect(dialog.get_by_role("button", name="Close")).to_be_focused()
+    expect(dialog.get_by_role("button", name=translated("Close"))).to_be_focused()
     page.keyboard.press("Escape")
     expect(dialog).to_be_hidden()
     expect(opener).to_be_focused()
     # The close button closes it too, without script.
     opener.click()
-    dialog.get_by_role("button", name="Close").click()
+    dialog.get_by_role("button", name=translated("Close")).click()
     expect(dialog).to_be_hidden()
     assert csp_violations(page) == []
 
@@ -411,8 +418,8 @@ def test_the_quantity_stepper_steps_within_its_limits(page: Page, live_server: L
     open_styleguide(page, live_server)
     stepper = page.locator(".quantity", has=page.locator("#sg-qty-default"))
     field = page.locator("#sg-qty-default")
-    plus = stepper.get_by_role("button", name="Increase quantity")
-    minus = stepper.get_by_role("button", name="Decrease quantity")
+    plus = stepper.get_by_role("button", name=translated("Increase quantity"))
+    minus = stepper.get_by_role("button", name=translated("Decrease quantity"))
     expect(field).to_have_value("2")
     for _ in range(3):
         plus.click()
@@ -422,7 +429,7 @@ def test_the_quantity_stepper_steps_within_its_limits(page: Page, live_server: L
     expect(field).to_have_value("4")
     expect(plus).to_be_enabled()
     at_min = page.locator(".quantity", has=page.locator("#sg-qty-min"))
-    expect(at_min.get_by_role("button", name="Decrease quantity")).to_be_disabled()
+    expect(at_min.get_by_role("button", name=translated("Decrease quantity"))).to_be_disabled()
     expect(page.locator("#sg-qty-disabled")).to_be_disabled()
 
 
@@ -433,8 +440,8 @@ def test_the_quantity_stepper_keeps_the_keyboard_focus_at_its_limits(
     open_styleguide(page, live_server)
     stepper = page.locator(".quantity", has=page.locator("#sg-qty-default"))
     field = page.locator("#sg-qty-default")
-    plus = stepper.get_by_role("button", name="Increase quantity")
-    minus = stepper.get_by_role("button", name="Decrease quantity")
+    plus = stepper.get_by_role("button", name=translated("Increase quantity"))
+    minus = stepper.get_by_role("button", name=translated("Decrease quantity"))
     plus.focus()
     for _ in range(4):  # 2 to the maximum of 5, then once more at the limit
         page.keyboard.press("Enter")
@@ -457,8 +464,8 @@ def test_the_carousel_buttons_scroll_the_track(page: Page, live_server: LiveServ
     track = page.locator("#sg-carousel-featured-track")
     track.scroll_into_view_if_needed()
     assert track.evaluate("(el) => el.scrollLeft") == 0
-    previous = page.get_by_role("button", name="Previous items")
-    following = page.get_by_role("button", name="Next items")
+    previous = page.get_by_role("button", name=translated("Previous items"))
+    following = page.get_by_role("button", name=translated("Next items"))
     expect(previous).to_have_attribute("aria-disabled", "true")
     expect(following).not_to_have_attribute("aria-disabled", "true")
     following.click()
@@ -482,16 +489,18 @@ def test_a_toast_is_added_to_the_live_region_and_dismissed(
     page.get_by_role("button", name="Show a toast").click()
     expect(region.locator(".toast")).to_have_count(2)
     expect(region.locator(".toast").last).to_contain_text("Added to the cart.")
-    region.locator(".toast").last.get_by_role("button", name="Dismiss").click()
+    region.locator(".toast").last.get_by_role("button", name=translated("Dismiss")).click()
     expect(region.locator(".toast")).to_have_count(1)
     # The focus moves to the remaining toast's Dismiss button, not to the top of the content.
-    expect(region.locator(".toast").first.get_by_role("button", name="Dismiss")).to_be_focused()
-    region.locator(".toast").first.get_by_role("button", name="Dismiss").click()
+    expect(
+        region.locator(".toast").first.get_by_role("button", name=translated("Dismiss"))
+    ).to_be_focused()
+    region.locator(".toast").first.get_by_role("button", name=translated("Dismiss")).click()
     expect(region.locator(".toast")).to_have_count(0)
     # The last toast was raised on load, not by a control: the focus falls back to the content.
     expect(page.locator("#main")).to_be_focused()
     trigger = page.get_by_role("button", name="Show a toast")
     trigger.click()
-    region.locator(".toast").first.get_by_role("button", name="Dismiss").click()
+    region.locator(".toast").first.get_by_role("button", name=translated("Dismiss")).click()
     expect(trigger).to_be_focused()
     assert csp_violations(page) == []
