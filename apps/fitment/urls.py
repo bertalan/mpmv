@@ -7,6 +7,7 @@ from . import views
 urlpatterns = [
     path("garage/", views.choose_garage, name="garage_choose"),
     path("garage/apply/", views.apply_garage, name="garage_apply"),
+    path("garage/merge/", views.merge_garage, name="garage_merge"),
     path("garage/save/", views.save_vehicle, name="garage_save"),
     path("garage/remove/", views.remove_vehicle, name="garage_remove"),
     path("garage/forget/", views.forget_garage, name="garage_forget"),

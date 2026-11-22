@@ -12,7 +12,7 @@ no garage state is ever put in a URL (`next` is only the page to return to).
   {% if options %}
     <form method="post" action="{% url 'garage_apply' %}" data-garage-chooser>
       {% csrf_token %}
-      <input type="hidden" name="next" value="{{ next }}">
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
       <fieldset>
         <legend>{% translate "Choose a vehicle" %}</legend>
         <p><label><input type="radio" name="choice" value="generic"{% if not active_label %} checked{% endif %}> {% translate "Generic (show all)" %}</label></p>
@@ -21,7 +21,7 @@ no garage state is ever put in a URL (`next` is only the page to return to).
         {% endfor %}
       </fieldset>
       {% include "components/button.html" with label=_("Apply") type="submit" only %}
-      {% include "components/button.html" with label=_("Cancel") url=next variant="ghost" only %}
+      {% include "components/button.html" with label=_("Cancel") url=next|default:"/" variant="ghost" only %}
     </form>
     {% if signed_in %}<p><a href="{% url 'garage_account' %}">{% translate "My garage" %}</a></p>{% endif %}
   {% else %}

@@ -10,6 +10,7 @@ Bootstrap cards with Bootstrap pagination (cms/includes/post_list.html).
   {% include "components/page_banner.html" with title=page.title items=trail only %}
   <div class="page-content">
     {% if page.intro %}{{ page.intro|richtext }}{% endif %}
+    {% include "components/garage_banner.html" %}
     {% translate "No articles have been published yet." as empty %}
     {% include "cms/includes/post_list.html" with empty=empty %}
   </div>

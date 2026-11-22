@@ -932,6 +932,10 @@ ENDPOINTS: dict[str, Access] = {
         "The garage chooser's Apply (FIT.7): writes the visitor's own cookie or activates their "
         "own profile (another account's is a 404); no vendor data."
     ),
+    "garage_merge": NoVendorData(
+        "The sign-in notice's Add and Not now (FIT.7): a signed-in customer copies the vehicles of "
+        "their own browser cookie into their own profiles; no vendor data."
+    ),
     "manager:platform:orders": StaffOnly(
         "Order changes (ORD.20 part 3): Support and the platform owner find an order by number; "
         "a vendor member gets the platform gate's refusal (test_amendment_views)."

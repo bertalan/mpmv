@@ -3,20 +3,24 @@
 cookie: no server record, no log of its value."""
 
 import uuid
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.utils.cache import add_never_cache_headers
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.utils.translation import gettext
+from django.utils.translation import gettext, ngettext
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.audit import audit_context
-from apps.core.public_forms import Protection, public_form
+from apps.core.i18n import path_carries_secret
+from apps.core.public_forms import Protection, not_anonymous, public_form
 
-from . import garage, garage_profiles, garage_state, services
+from . import garage, garage_merge, garage_profiles, garage_state, services
 from .models import GarageProfile
 
 _PURPOSE = "Anonymous garage cookie (technical, written on Save only)"
@@ -49,6 +53,16 @@ def _declared_fit7[T](view: T, *, purpose: str, reason: str, no_rate_limit: str)
 
 def _back(request: HttpRequest) -> HttpResponseRedirect:
     target = request.POST.get("next", "")
+    if not url_has_allowed_host_and_scheme(
+        target, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        target = "/"
+    return HttpResponseRedirect(target)
+
+
+def _back_to_referer(request: HttpRequest) -> HttpResponseRedirect:
+    """Back to the page the visitor came from: the Referer, only when it is a local address."""
+    target = request.headers.get("Referer", "")
     if not url_has_allowed_host_and_scheme(
         target, allowed_hosts={request.get_host()}, require_https=request.is_secure()
     ):
@@ -115,6 +129,46 @@ def _safe_next(request: HttpRequest, value: str) -> str:
     return value if allowed else "/"
 
 
+_RETURN_KEY = "fitment_garage_return"
+
+
+def _remember_return(request: HttpRequest) -> None:
+    """Keep the page the visitor came from, server-side, for the chooser's *Apply*: only the path
+    and query of a same-host Referer, in the session. It is never written into the page (the
+    Referer can be a secret-token URL). The chooser's own address is not kept."""
+    referer = request.headers.get("Referer", "")
+    session = getattr(request, "session", None)
+    if session is None or not url_has_allowed_host_and_scheme(
+        referer, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return
+    parts = urlsplit(referer)
+    if parts.path == request.path or path_carries_secret(parts.path):
+        return  # not the chooser itself, and never an action link or key URL (a token)
+    session[_RETURN_KEY] = parts.path + (f"?{parts.query}" if parts.query else "")
+
+
+def _return_target(request: HttpRequest) -> HttpResponseRedirect:
+    """Where *Apply* goes when no `next` is posted: the remembered page when the post comes from
+    the chooser, else the Referer (the banner's *Show all*); `/` as a last resort."""
+    session = getattr(request, "session", None)
+    kept = session.pop(_RETURN_KEY, "") if session is not None else ""
+    referer = request.headers.get("Referer", "")
+    if (
+        kept
+        and urlsplit(referer).path == reverse("garage_choose")
+        and url_has_allowed_host_and_scheme(
+            kept, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+        )
+    ):
+        return HttpResponseRedirect(kept)
+    if urlsplit(referer).path == reverse("garage_choose"):
+        return HttpResponseRedirect("/")  # nothing remembered: not back onto the chooser
+    if path_carries_secret(urlsplit(referer).path):
+        return HttpResponseRedirect("/")  # a single-use link is never a return target
+    return _back_to_referer(request)
+
+
 @require_http_methods(["GET", "HEAD"])
 def choose_garage(request: HttpRequest) -> HttpResponse:
     """The chooser (FIT.7): the profiles or cookie vehicles to pick from, with an explicit *Apply*.
@@ -122,10 +176,12 @@ def choose_garage(request: HttpRequest) -> HttpResponse:
     state = garage_state.garage_state(request)
     if not state:
         raise Http404("the garage is off")
+    given = request.GET.get("next", "")
+    _remember_return(request)
     response = render(
         request,
         "fitment/garage_choose.html",
-        {**state, "next": _safe_next(request, request.GET.get("next", ""))},
+        {**state, "next": _safe_next(request, given) if given else ""},
     )
     add_never_cache_headers(response)
     return response
@@ -138,7 +194,8 @@ def apply_garage(request: HttpRequest) -> HttpResponse:
     if not garage_state.garage_state(request):
         raise Http404("the garage is off")
     choice = request.POST.get("choice", "")
-    response = _back(request)
+    # The banner's *Show all* posts no `next` (the page URL can hold a secret): the Referer then.
+    response = _back(request) if request.POST.get("next") else _return_target(request)
     signed_in = garage_state.account_garage_on(request)
     kind, _, ref = choice.partition(":")
     if choice == "generic":
@@ -189,3 +246,38 @@ apply_garage = _declared_fit7(
     ),
     no_rate_limit="no server-side work beyond a cookie write or one audited profile update",
 )
+
+
+@not_anonymous(
+    reason="login_required: a signed-out request is redirected to sign in",
+    purpose="Garage merge notice: add the staged anonymous vehicles, or dismiss the notice",
+    task="FIT.7",
+)
+@login_required
+@require_POST
+def merge_garage(request: HttpRequest) -> HttpResponse:
+    """The sign-in notice's two buttons (spec 17 §17.4.3): `action=add` copies the staged vehicles
+    into the account and clears the cookie; `action=dismiss` (*Not now*) only drops the notice.
+    Both are explicit posts; nothing is ever merged without *Add*."""
+    response = _back_to_referer(request)
+    user = request.user
+    action = request.POST.get("action", "")
+    if action not in {"add", "dismiss"}:
+        return HttpResponse(status=400)
+    if action == "dismiss":
+        garage_merge.dismiss_pending(request)
+        return response
+    if not garage_merge.pending_count(request):  # nothing staged: a replayed or stale Add
+        return response
+    result = garage_merge.merge_pending(request, user, ctx=audit_context(request))  # type: ignore[arg-type]
+    garage_merge.clear_cookie(response)
+    messages.success(
+        request,
+        ngettext(
+            "%(count)d profile added to your account.",
+            "%(count)d profiles added to your account.",
+            result.added,
+        )
+        % {"count": result.added},
+    )
+    return response

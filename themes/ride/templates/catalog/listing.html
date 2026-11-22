@@ -22,6 +22,7 @@
     {% include "components/page_banner.html" with title=name items=trail text=count_text only %}
     {% if scope.vendor.logo %}<img class="listing-logo mb-3" src="{{ scope.vendor.logo.file.url }}" alt="{{ scope.vendor.logo_alt }}" width="{{ scope.vendor.logo.width }}" height="{{ scope.vendor.logo.height }}">{% endif %}
     {% if is_fallback %}<p class="listing-notice alert alert-info" role="note">{% translate "This page is not available in your language yet." %}</p>{% endif %}
+    {% include "components/garage_banner.html" %}
     {% if vendor_profile %}{% include "catalog/includes/vendor_profile.html" %}{% endif %}
     {% if brand_profile and not brand_profile.is_empty %}{% include "catalog/includes/brand_profile.html" %}{% endif %}
     {% if editorial.before %}{{ editorial.before }}{% endif %}
