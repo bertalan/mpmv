@@ -111,7 +111,10 @@ def test_regenerating_requires_a_recent_verification(client: Client) -> None:
     assert not RecoveryCode.objects.exists()
 
 
+@override_settings(MFA_RECOVERY_THROTTLE_FACTOR=60)
 def test_failed_attempts_are_throttled(client: Client) -> None:
+    # A 60 s back-off, not the default 1 s: a slow CI runner once took over a second between the
+    # two posts, so the right code was accepted (train #1006, 22 Nov).
     user = UserFactory.create(staff=True)
     TOTPDeviceFactory.create(user=user)
     code = engine.generate_recovery_codes(1)[0]
