@@ -38,9 +38,11 @@ def test_every_app_and_theme_is_checked() -> None:
         assert british.in_scope([f"apps/{app}/models.py:3"]), app
 
 
-def test_exception_keeps_the_role_notice() -> None:
-    msgid = "You can view this section; changes need the Catalog role."
+def test_the_role_notice_needs_no_exception() -> None:
+    msgid = "You can view this section; changes need the Catalogue role."
+    assert msgid not in british.EXCEPTIONS
     assert british.violations({(msgid, None): (None, ["apps/manager/list.html"])}) == []
+    assert len(british.EXCEPTIONS) == 1  # only the URL name is left
 
 
 def test_swept_apps_are_clean_now() -> None:

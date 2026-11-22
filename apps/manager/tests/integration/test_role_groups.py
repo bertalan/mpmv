@@ -1,5 +1,7 @@
 """CORE.18 (part 1) done-when: seeded groups, idempotence, drift check, role membership."""
 
+from typing import Any
+
 import pytest
 from django.apps import apps
 from django.contrib.auth.models import Group, Permission
@@ -217,3 +219,54 @@ def test_upgrading_from_the_previous_release_does_not_block_migrate() -> None:
     assert check_role_drift() == []
     for key in ("catalog", "owner"):
         assert "wagtailadmin.access_admin" in _perms(Group.objects.get(name=roles.role(key).group))
+
+
+def _rename_migration() -> Any:
+    import importlib
+
+    return importlib.import_module("apps.manager.migrations.0007_rename_catalogue_group")
+
+
+def test_the_group_is_named_catalogue_and_moderation() -> None:
+    assert roles.role("catalog").group == "Catalogue and moderation"
+    assert Group.objects.filter(name="Catalogue and moderation").exists()
+    assert not Group.objects.filter(name="Catalog and moderation").exists()
+
+
+def test_the_rename_migration_renames_and_reverses_keeping_members_and_permissions() -> None:
+    migration = _rename_migration()
+    user = UserFactory.create(platform_role="catalog")
+    group = Group.objects.get(name="Catalogue and moderation")
+    perms, pk = _perms(group), group.pk
+    migration.backwards(apps, None)
+    old = Group.objects.get(name="Catalog and moderation")
+    assert old.pk == pk
+    assert _perms(old) == perms
+    assert user.groups.filter(pk=pk).exists()
+    assert not Group.objects.filter(name="Catalogue and moderation").exists()
+    migration.forwards(apps, None)
+    new = Group.objects.get(name="Catalogue and moderation")
+    assert new.pk == pk
+    assert _perms(new) == perms
+    assert user.groups.filter(pk=pk).exists()
+
+
+def test_the_rename_migration_is_idempotent_and_tolerates_a_missing_group() -> None:
+    migration = _rename_migration()
+    migration.forwards(apps, None)  # already renamed
+    Group.objects.filter(name="Catalogue and moderation").delete()
+    migration.forwards(apps, None)  # missing
+    migration.backwards(apps, None)
+    assert not Group.objects.filter(name__startswith="Catalog").exists()
+
+
+def test_the_rename_merges_into_an_empty_group_already_holding_the_new_name() -> None:
+    migration = _rename_migration()
+    user = UserFactory.create(platform_role="catalog")
+    migration.backwards(apps, None)
+    perms = _perms(Group.objects.get(name="Catalog and moderation"))
+    new = Group.objects.create(name="Catalogue and moderation")
+    migration.forwards(apps, None)
+    assert not Group.objects.filter(name="Catalog and moderation").exists()
+    assert _perms(new) == perms
+    assert user.groups.filter(pk=new.pk).exists()

@@ -64,9 +64,6 @@ EXCEPTIONS: dict[str, str] = {
     # `catalog:brand` is a URL name, an identifier the editor types; it is never renamed.
     "The name of the screen (for example catalog:brand) or of the page type (for example "
     "cms.StandardPage). Leave it empty for the general text.": "URL name",
-    # "Catalog and moderation" is the name of a role group stored in the database (migration
-    # 0003); renaming it needs a data migration of its own, so the notice keeps naming it.
-    "You can view this section; changes need the Catalog role.": "role group name",
 }
 
 _WORDS = re.compile(r"\b(?:" + "|".join(US_TO_UK) + r")\b", re.IGNORECASE)

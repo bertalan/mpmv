@@ -111,7 +111,7 @@ catalogue, customers, orders) from another platform is the job of a **source con
 import format that the migration loaders read ([13](13-migration-cutover.md), "Source
 connectors"). The setup wizard offers both as initial data sources (ARC.26,
 [01](01-stack-and-architecture.md)), and the Manager platform space hosts the import pages
-for the Catalog and moderation role ([02](02-core-identity-permissions.md)).
+for the Catalogue and moderation role ([02](02-core-identity-permissions.md)).
 
 ### Recurring jobs
 

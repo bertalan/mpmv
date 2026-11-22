@@ -189,7 +189,7 @@ class FitmentNodeQuerySet(MP_NodeQuerySet):  # type: ignore[misc]  # treebeard i
         return self.filter(status=NodeStatus.ACTIVE)  # type: ignore[no-any-return]
 
     def proposals(self) -> Self:
-        """The review queue of the Catalog and moderation role."""
+        """The review queue of the Catalogue and moderation role."""
         return self.filter(status=NodeStatus.PROPOSED)  # type: ignore[no-any-return]
 
 

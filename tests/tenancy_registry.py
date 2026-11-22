@@ -1031,15 +1031,15 @@ ENDPOINTS: dict[str, Access] = {
         "Configuration and tax writes, Catalog and the owner read, a vendor member gets 404."
     ),
     "manager:platform:fitment_nodes": StaffOnly(
-        "Fitment nodes (FIT.1): the shared vocabulary, not vendor-owned; Catalog and moderation "
+        "Fitment nodes (FIT.1): the shared vocabulary, not vendor-owned; Catalogue and moderation "
         "writes, Support and the owner read, a vendor member gets 404."
     ),
     "manager:platform:fitment_proposals": StaffOnly(
-        "Proposed fitment nodes (FIT.1): the review queue of the Catalog and moderation role; a "
+        "Proposed fitment nodes (FIT.1): the review queue of the Catalogue and moderation role; a "
         "vendor member gets 404."
     ),
     "manager:platform:fitment_node_new": StaffOnly(
-        "Add a fitment node (FIT.1): Catalog and moderation only; a vendor member gets 404."
+        "Add a fitment node (FIT.1): Catalogue and moderation only; a vendor member gets 404."
     ),
     "manager:platform:fitment_node": StaffOnly(
         "One fitment node (FIT.1): the shared vocabulary, not vendor-owned; Catalog and "
@@ -1047,12 +1047,12 @@ ENDPOINTS: dict[str, Access] = {
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "manager:platform:fitment_node_merge": StaffOnly(
-        "Merge of one fitment node (FIT.1): Catalog and moderation only, shown as a dry run "
+        "Merge of one fitment node (FIT.1): Catalogue and moderation only, shown as a dry run "
         "first; a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "manager:platform:catalog_products": StaffOnly(
-        "Product list of the platform (CAT.11): Catalog and moderation writes, the owner reads, "
+        "Product list of the platform (CAT.11): Catalogue and moderation writes, the owner reads, "
         "Finance, Support and a vendor member get 404; rows come from for_actor."
     ),
     "manager:platform:catalog_product": StaffOnly(

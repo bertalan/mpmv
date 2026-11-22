@@ -272,7 +272,7 @@ def test_staff_set_the_product_role_override_with_an_audit_entry(client: Client)
     assert client.post(detail(product), data).status_code == 200  # refused by the form
 
 
-NOTICE = "You can view this section; changes need the Catalog role."
+NOTICE = "You can view this section; changes need the Catalogue role."
 WRITE_CONTROLS = (
     'name="selected"',
     'name="action"',

@@ -7,7 +7,7 @@ keeps the filters. A bulk action POSTs the selection and first shows its dry-run
 {% endcomment %}
 {% block manager_content %}
   <h1>{{ title }}</h1>
-  {% if read_only %}{% include "components/alert.html" with level="info" message=_("You can view this section; changes need the Catalog role.") only %}{% endif %}
+  {% if read_only %}{% include "components/alert.html" with level="info" message=_("You can view this section; changes need the Catalogue role.") only %}{% endif %}
   {% if filters %}
     <form method="get" class="manager-filters" role="search" aria-label="{% translate 'Filters' %}">
       {% for filter in filters %}

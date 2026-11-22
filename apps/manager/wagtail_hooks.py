@@ -2,7 +2,7 @@
 
 The `HelpEntry` snippet (apps.cms) is platform content, so its permissions are not Django model
 permissions a group could be handed: they come from the role-permission matrix. The row is
-"Platform: moderation (vendor events, storefront changes, content)": the Catalog and moderation
+"Platform: moderation (vendor events, storefront changes, content)": the Catalogue and moderation
 role edits, the platform owner reads, no other role has access, and the technical superuser
 holds none without a role (break-glass). The check is role membership from `roles.py`, never
 `has_perm`. Reaching the editors' admin at all still needs its own access permission.

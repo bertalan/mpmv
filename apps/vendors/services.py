@@ -2139,7 +2139,7 @@ def _require_approval_permission(ctx: AuditContext) -> None:
 
 APPROVAL_DENIED = (
     "Granting the owner role needs the vendor approval permission "
-    "(Catalog and moderation, or the platform owner)."
+    "(Catalogue and moderation, or the platform owner)."
 )
 
 
