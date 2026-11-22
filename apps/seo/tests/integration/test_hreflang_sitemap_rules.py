@@ -23,7 +23,7 @@ from wagtail.models import Locale, Site
 from apps.catalog import slugs
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
-from apps.cms.services import translate_page
+from apps.cms.services import seed_site, translate_page
 from apps.cms.tests.factories import StandardPageFactory
 from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
@@ -252,3 +252,42 @@ def test_a_sample_of_sitemap_urls_agrees_with_their_own_hreflang(client: Client)
             assert {c: p for c, p in back.items() if c != "x-default"} == {
                 c: p for c, p in links.items() if c != "x-default"
             }, (path, other_path)  # reciprocity
+
+
+# --- Fallback copies of CMS pages (CMS.19)
+
+
+def test_an_untranslated_alias_shows_the_source_and_is_in_no_alternate_set(
+    client: Client,
+) -> None:
+    """A page in another language that is an alias of its source (wagtail-localize's mirror of
+    an untranslated page) shows the source's text, is canonical to it, names no `hreflang` of
+    its own language and is in no sitemap of that language."""
+    other = other_language()
+    seed_site()  # a home in every language, to hold the alias
+    found = translated_page("Untranslated", [])
+    source = (
+        Site.objects.get(is_default_site=True)
+        .root_page.get_children()
+        .get(url_path__endswith="/untranslated/")
+    )
+    locale = Locale.objects.get(language_code=other)
+    copy = source.create_alias(
+        parent=source.get_parent().get_translation(locale),
+        update_locale=locale,
+        reset_translation_key=False,
+    )
+    copy_path = path_of(copy.url)
+    expected = {
+        primary_language(): found[primary_language()],
+        "x-default": found[primary_language()],
+    }
+
+    html = client.get(copy_path).content.decode()
+    assert "Untranslated" in html
+    assert alternates(html) == expected
+    canonical = re.search(r'<link rel="canonical" href="([^"]+)"', html)
+    assert canonical is not None
+    assert path_of(canonical.group(1)) == found[primary_language()]
+    assert alternates(client.get(found[primary_language()]).content.decode()) == expected
+    assert copy_path not in sitemap_urls(client, other)

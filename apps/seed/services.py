@@ -30,6 +30,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.files.images import ImageFile
 from django.db import transaction
 from django.db.models import Q
+from django.urls import reverse
 from django.utils import timezone
 from wagtail.models import Locale
 
@@ -70,6 +71,7 @@ from apps.core.services import (
     save_image,
 )
 from apps.core.site_root import sync_default_site
+from apps.core.site_url import absolute_url
 from apps.core.text import slugify
 from apps.events.models import EventIndexPage, EventPage
 from apps.events.services import ensure_event_indexes
@@ -1058,9 +1060,10 @@ def _set_body(page: Any, body: list[Any]) -> bool:
     return bool(_stripped(page.body.get_prep_value()) != before)
 
 
-def _home_body(
+def _shop_body(
     language: str, images: dict[str, MediaImage], how: Any, vendors: list[Vendor], terms: list[Term]
 ) -> list[Any]:
+    """The demo shop page: the product content the home showed before CMS.19."""
     heading, text, label = data.HOME_HERO.get(language) or data.HOME_HERO[SOURCE_LANGUAGE]
     return [
         (
@@ -1093,14 +1096,63 @@ def _home_body(
     ]
 
 
-def _is_seed_home(page: HomePage, language: str) -> bool:
-    """Whether the home still has the CMS.1 sample text or the seed's own body."""
+def _landing_body(images: dict[str, MediaImage], shop: StandardPage) -> list[Any]:
+    """The vendor-recruitment home (CMS.19): English example copy, existing blocks only."""
+    apply_url = absolute_url(None, reverse("vendors:apply"))  # a full URL, as the link block asks
+
+    def cta(heading: str, text: str, link: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+        return ("cta", {"heading": heading, "text": text, "link": link})
+
+    apply = {"page": None, "url": apply_url, "label": data.APPLY_LABEL}
+    to_shop = {"page": shop, "url": "", "label": data.SHOP_LABEL}
+    heading, text = data.LANDING_HERO
+    return [
+        (
+            "hero",
+            {
+                "heading": heading,
+                "text": text,
+                "image": images["home-hero"],
+                "alt_text": data.HOME_HERO_ALT[SOURCE_LANGUAGE],
+                "links": [apply, to_shop],
+            },
+        ),
+        ("paragraph", data.DEMO_NOTICE[SOURCE_LANGUAGE]),
+        ("paragraph", data.LANDING_BENEFITS),
+        ("paragraph", data.LANDING_STEPS),
+        ("paragraph", data.LANDING_FEES),
+        (
+            "strip",
+            {
+                "heading": data.LANDING_QUOTES_HEADING,
+                "cards": [
+                    ("testimonial", {"quote": quote, "author": author, "role": role})
+                    for quote, author, role in data.LANDING_QUOTES
+                ],
+                "per_view": "2",
+            },
+        ),
+        (
+            "faq",
+            {
+                "heading": data.LANDING_FAQ_HEADING,
+                "items": [{"question": q, "answer": a} for q, a in data.LANDING_FAQ],
+            },
+        ),
+        cta(*data.LANDING_CTA, apply),
+        cta(*data.LANDING_SHOP_CTA, to_shop),
+    ]
+
+
+def _is_seed_home(page: HomePage, images: dict[str, MediaImage]) -> bool:
+    """Whether the home still has the CMS.1 sample text or a body the seed wrote (a hero with the
+    seed's picture: the shop content before CMS.19, the landing after it)."""
     raw = _stripped(page.body.get_prep_value())
-    sample = seed_text(language).home.body
+    sample = seed_text(page.locale.language_code).home.body
     if raw == [{"type": "paragraph", "value": sample}] or raw == []:
         return True
-    heading = (data.HOME_HERO.get(language) or data.HOME_HERO[SOURCE_LANGUAGE])[0]
-    return bool(raw) and raw[0].get("type") == "hero" and raw[0]["value"].get("heading") == heading
+    first = raw[0] if raw else {}
+    return first.get("type") == "hero" and first["value"].get("image") == images["home-hero"].pk
 
 
 def _translation(source: Any, locale: Locale) -> Any:
@@ -1144,14 +1196,34 @@ def _cms(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> Non
         )
         for node in data.TERMS
     ]
-    for page in HomePage.objects.filter(depth=2).select_related("locale"):
-        language = page.locale.language_code
-        if not _is_seed_home(page, language):
+
+    def shop_body(language: str) -> list[Any]:
+        local_how = how.get_translation_or_none(locales[language]) or how
+        return _shop_body(language, images, local_how, vendors, terms)
+
+    shop = _standard_page(run, home, locales, images["home-hero"], data.SHOP, shop_body)
+    _recruitment_home(run, home, images, shop)
+
+
+def _recruitment_home(
+    run: _Run, home: HomePage, images: dict[str, MediaImage], shop: StandardPage
+) -> None:
+    """The source home gets the landing (CMS.19); every other seed home becomes its alias, an
+    untranslated copy that shows the English text and is in no `hreflang` (spec 09 fallback)."""
+    changed = _is_seed_home(home, images) and _set_body(home, _landing_body(images, shop))
+    if changed:
+        _publish(home)  # Wagtail updates the aliases with it
+        run.changes.update("cms.homepage", home.locale.language_code, {}, {"body": "landing"})
+    aliased = False
+    for page in HomePage.objects.filter(depth=2).exclude(pk=home.pk).select_related("locale"):
+        if page.alias_of_id == home.pk or not _is_seed_home(page, images):
             continue
-        local_how = how.get_translation_or_none(page.locale) or how
-        if _set_body(page, _home_body(language, images, local_how, vendors, terms)):
-            _publish(page)
-            run.changes.update("cms.homepage", language, {}, {"body": "demo"})
+        page.alias_of = home
+        page.save(update_fields=["alias_of"])
+        aliased = True
+        run.changes.update("cms.homepage", page.locale.language_code, {}, {"alias_of": "source"})
+    if aliased:
+        home.update_aliases()  # Wagtail's own sync, as when an editor publishes the source
 
 
 def _standard_page(
@@ -1350,7 +1422,9 @@ def _seed_pages(model: Any, slugs: Iterable[str]) -> list[Any]:
 
 
 def _reset_cms(run: _Run) -> None:
-    for page in _seed_pages(StandardPage, [data.HOW_IT_WORKS.slug["en"], data.SHOWCASE.slug["en"]]):
+    for page in _seed_pages(
+        StandardPage, [s.slug["en"] for s in (data.HOW_IT_WORKS, data.SHOWCASE, data.SHOP)]
+    ):
         run.changes.delete("cms.standardpage", page.url_path, {})
         page.delete()
     for page in _seed_pages(LegalPage, [spec.slug["en"] for spec in data.LEGAL_PAGES.values()]):
@@ -1358,11 +1432,17 @@ def _reset_cms(run: _Run) -> None:
         if page.live:
             page.unpublish()
             run.changes.update("cms.legalpage", page.url_path, {"live": True}, {"live": False})
+    hero_title = data.IMAGES["home-hero"][0]
+    heroes = set(MediaImage.objects.filter(title=hero_title).values_list("pk", flat=True))
     for page in HomePage.objects.filter(depth=2).select_related("locale"):
         language = page.locale.language_code
         raw = _stripped(page.body.get_prep_value())
-        heading = (data.HOME_HERO.get(language) or data.HOME_HERO[SOURCE_LANGUAGE])[0]
-        if raw and raw[0].get("type") == "hero" and raw[0]["value"].get("heading") == heading:
+        seeded = (
+            bool(raw) and raw[0].get("type") == "hero" and raw[0]["value"].get("image") in heroes
+        )
+        if page.alias_of_id is not None or seeded:  # back to the CMS.1 sample text
+            page.alias_of = None
+            page.title = page.draft_title = seed_text(language).home.title
             page.body = [("paragraph", seed_text(language).home.body)]
             _publish(page)
             run.changes.update("cms.homepage", language, {"body": "demo"}, {"body": "sample"})

@@ -53,6 +53,7 @@ def page_is_noindex(page: Page) -> bool:
 def _cms_entries(language: str, request: HttpRequest, *, events: bool) -> Iterator[Entry]:
     site = Site.find_for_request(request)
     pages = Page.objects.live().public().filter(locale__language_code=language, depth__gte=2)
+    pages = pages.filter(alias_of__isnull=True)  # an alias is a fallback copy of its source
     if site is not None:  # this site's tree only: another site's pages are not ours to list
         # The root page and its translations: each language has its own tree.
         trees = Q()
