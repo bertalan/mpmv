@@ -48,3 +48,14 @@
   border-inline-start: 0.25rem solid currentcolor;
   padding-inline-start: 0.75rem;
 }
+
+/* CAT.23: the variant's own picture in the variant list; CAT.26: its gallery replaces the product's */
+.variant-thumb {
+  max-width: 4rem;
+  height: auto;
+  vertical-align: middle;
+}
+
+.gallery[hidden] {
+  display: none;
+}

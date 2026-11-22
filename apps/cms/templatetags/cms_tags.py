@@ -7,11 +7,12 @@ from typing import Any
 
 from django import template
 from django.conf import settings
+from django.core.cache import cache
 from django.http import HttpRequest
 from django.urls import NoReverseMatch, reverse
 from django.utils import translation
 from django.utils.translation import gettext
-from wagtail.models import Locale, Page
+from wagtail.models import Locale, Page, Site
 
 from apps.core.i18n import (
     LanguageLink,
@@ -23,7 +24,8 @@ from apps.core.i18n import (
 from apps.core.image_licences import Credit
 
 from .. import engine, services
-from ..models import NavigationMenu
+from ..footer_cache import FOOTER_CACHE_SECONDS, footer_cache_key
+from ..models import FooterSettings, NavigationMenu
 
 register = template.Library()
 
@@ -67,10 +69,12 @@ def _site_links_item() -> list[MenuLink]:
 
 
 def _menu_links(request: HttpRequest | None, menu: NavigationMenu | None) -> list[MenuLink]:
+    return _stream_links(request, menu.links) if menu is not None else []
+
+
+def _stream_links(request: HttpRequest | None, stream: Any) -> list[MenuLink]:
     links: list[MenuLink] = []
-    if menu is None:
-        return links
-    for block in menu.links:
+    for block in stream:
         value = block.value
         if block.block_type == "external":
             links.append(MenuLink(label=value["label"], url=value["url"]))
@@ -82,6 +86,47 @@ def _menu_links(request: HttpRequest | None, menu: NavigationMenu | None) -> lis
         if page.live:
             links.append(MenuLink(label=value["label"] or page.title, url=page.get_url(request)))
     return links
+
+
+@dataclass(frozen=True)
+class FooterColumnView:
+    title: str
+    links: list[MenuLink]
+
+
+@register.simple_tag(takes_context=True)
+def footer_chrome(context: dict[str, Any]) -> dict[str, Any]:
+    """The footer's CMS content for the visitor's language (CMS.17), the same for every theme:
+    `widgets` (up to four columns with `title`, `links`) and `social_links` (`label`,
+    `url`). Empty lists when the site has no footer setting; a column with no title and no
+    links is left out, so nothing renders empty."""
+    request: HttpRequest | None = context.get("request")
+    site = Site.find_for_request(request) if request is not None else None
+    if site is None:
+        return {"widgets": [], "social_links": []}
+    language = translation.get_language() or settings.LANGUAGE_CODE
+    key = footer_cache_key(site.pk, language)
+    cached: dict[str, Any] | None = cache.get(key)
+    if cached is None:
+        cached = _footer_content(request, site, language)
+        cache.set(key, cached, FOOTER_CACHE_SECONDS)
+    return cached
+
+
+def _footer_content(request: HttpRequest | None, site: Site, language: str) -> dict[str, Any]:
+    footer = FooterSettings.objects.filter(site=site).first()
+    if footer is None:
+        return {"widgets": [], "social_links": []}
+    widgets = []
+    for column in engine.footer_columns(((c.language, c) for c in footer.columns.all()), language):
+        view = FooterColumnView(title=column.title, links=_stream_links(request, column.links))
+        if view.title or view.links:
+            widgets.append(view)
+    profiles = engine.footer_profiles(((p.language, p) for p in footer.profiles.all()), language)
+    return {
+        "widgets": widgets,
+        "social_links": [MenuLink(label=p.label, url=p.url) for p in profiles],
+    }
 
 
 def _home(code: str, suffix: str = "") -> str:
@@ -139,6 +184,32 @@ def switch_next_url(context: dict[str, Any]) -> str:
 def page_image_credits(page: Page) -> list[Credit]:
     """The credits for the page's "Image credits" disclosure (CMS.8)."""
     return services.page_image_credits(page)
+
+
+@register.simple_tag(takes_context=True)
+def page_trail(
+    context: dict[str, Any], page: Page | None = None, current: str = ""
+) -> list[dict[str, str]]:
+    """The breadcrumb of a content page (THM.9): Home, the page's live public ancestors below
+    its language's home, then the page itself, last, as the current page.
+
+    `current` names a deeper current page that is not in the tree (an author, an archived
+    version, a system page): the page then becomes a link before it. Without `page` the trail is
+    Home and `current`. The labels match the `BreadcrumbList` of the page graph (`seo`).
+    """
+    request: HttpRequest | None = context.get("request")
+    try:
+        home = reverse("home")
+    except NoReverseMatch:  # a URLconf without the public routes
+        home = "/"
+    trail = [{"label": str(gettext("Home")), "url": home}]
+    if page is not None:
+        for ancestor in page.get_ancestors().filter(depth__gte=3).live().public():
+            trail.append({"label": str(ancestor.title), "url": ancestor.get_url(request) or ""})
+        trail.append({"label": str(page.title), "url": page.get_url(request) or ""})
+    if current:
+        trail.append({"label": current, "url": ""})
+    return trail
 
 
 # --- Contextual help (ARC.32)

@@ -52,11 +52,9 @@ BLOCK_MESSAGES = {
         "We cannot calculate the VAT for this vendor's items to your address. Contact the vendor."
     ),
     engine.NO_PRICE: gettext_lazy("This item has no price yet."),
-    engine.SHIPPING_VAT_SPLIT: gettext_lazy(
-        "Shipping on a package with different VAT rates cannot be ordered yet. "
-        "Order these items in separate orders."
-    ),
 }
+# Why the add-to-cart form refuses an item without a price the buyer can see (#757).
+NO_PRICE_TO_BUY = gettext_lazy("This item has no price yet, so you can't buy it online.")
 NBSP = "\N{NO-BREAK SPACE}"
 QUOTE_CODES = frozenset({engine.ON_REQUEST, engine.NEEDS_QUOTE})
 

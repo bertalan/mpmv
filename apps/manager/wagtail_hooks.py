@@ -2,7 +2,7 @@
 
 The `HelpEntry` snippet (apps.cms) is platform content, so its permissions are not Django model
 permissions a group could be handed: they come from the role-permission matrix. The row is
-"Platform: moderation (vendor events, storefront changes, content)": the Catalog and moderation
+"Platform: moderation (vendor events, storefront changes, content)": the Catalogue and moderation
 role edits, the platform owner reads, no other role has access, and the technical superuser
 holds none without a role (break-glass). The check is role membership from `roles.py`, never
 `has_perm`. Reaching the editors' admin at all still needs its own access permission.
@@ -16,14 +16,20 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.permission_policies.base import BasePermissionPolicy
 from wagtail.permissions import register_permission_policy
 from wagtail.snippets.models import register_snippet
-from wagtail.snippets.views.snippets import CopyView, DeleteView, EditView, SnippetViewSet
+from wagtail.snippets.views.snippets import (
+    CopyView,
+    CreateView,
+    DeleteView,
+    EditView,
+    SnippetViewSet,
+)
 
 from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
 from apps.cms.models import HelpEntry
 
 from . import roles
-from .role_groups import user_roles
+from .role_groups import effective_roles
 
 HELP_SECTION = "platform.moderation"
 READ_ACTIONS = frozenset({"view"})
@@ -34,7 +40,7 @@ class HelpEntryPermissionPolicy(BasePermissionPolicy):  # type: ignore[misc]  # 
     """Permissions on help entries from the matrix row of `HELP_SECTION`."""
 
     def user_has_permission(self, user: Any, action: str) -> bool:
-        return roles.allows(HELP_SECTION, user_roles(user), write=action not in READ_ACTIONS)
+        return roles.allows(HELP_SECTION, effective_roles(user), write=action not in READ_ACTIONS)
 
     def user_has_permission_for_instance(self, user: Any, action: str, instance: Any) -> bool:
         """A row that comes from a repository file (ARC.36) is read-only for everyone, the
@@ -70,6 +76,16 @@ class _FileRowGuard:
         return obj
 
 
+class HelpEntryCreateView(CreateView):  # type: ignore[misc]
+    @requires_level_method(GATE_ACTION)
+    def post(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().post(request, *args, **kwargs)
+
+    @requires_level_method(GATE_ACTION)
+    def put(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+        return super().put(request, *args, **kwargs)
+
+
 class HelpEntryEditView(_FileRowGuard, EditView):  # type: ignore[misc]  # Wagtail is untyped
     @requires_level_method(GATE_ACTION)
     def post(self, request: Any, *args: Any, **kwargs: Any) -> Any:
@@ -102,6 +118,7 @@ class HelpEntryCopyView(_FileRowGuard, CopyView):  # type: ignore[misc]
 
 class HelpEntryViewSet(SnippetViewSet):  # type: ignore[misc]  # Wagtail is untyped
     model = HelpEntry
+    add_view_class = HelpEntryCreateView
     edit_view_class = HelpEntryEditView
     delete_view_class = HelpEntryDeleteView
     copy_view_class = HelpEntryCopyView

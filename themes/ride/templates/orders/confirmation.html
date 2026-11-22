@@ -33,5 +33,10 @@ Stripe Appearance still comes from the theme tokens.{% endcomment %}
     {% include "components/alert.html" with level="info" message=_("Online payment is not available yet. The items stay held for you for a short time.") only %}
     <p><button type="button" class="btn btn-primary btn-lg" disabled>{% translate "Pay now" %}</button></p>
   {% endif %}
+  {% if sellers %}<section class="order-sellers" aria-labelledby="order-sellers-title">
+    <h2 id="order-sellers-title" class="h5 mt-4">{% translate "Seller details" %}</h2>
+    <p>{% translate "You have a separate contract with each seller. These are the details to contact each seller, also to withdraw." %}</p>
+    {% for contact in sellers %}{% include "components/seller_details.html" with contact=contact only %}{% endfor %}
+  </section>{% endif %}
 </article>
 {% endblock %}

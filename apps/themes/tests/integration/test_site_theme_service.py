@@ -53,7 +53,7 @@ def test_a_dry_run_reports_the_change_and_writes_nothing() -> None:
     assert [(c.op, c.model, c.key) for c in changes.changes] == [
         ("create", THEME_SETTINGS_MODEL, str(site.pk))
     ]
-    assert changes.changes[0].after == {"site": site.hostname, "theme": "ride"}
+    assert changes.changes[0].after == {"site": site.hostname, "theme": "ride", "palette": ""}
     assert not ThemeSettings.objects.exists()
     assert not AuditLog.objects.exists()
 
@@ -70,8 +70,8 @@ def test_choosing_a_theme_saves_it_and_audits_before_and_after() -> None:
         (THEME_SETTINGS_MODEL, str(site.pk)),
     ]
     assert entries[0].before is None
-    assert entries[1].before == {"site": site.hostname, "theme": "ride"}
-    assert entries[1].after == {"site": site.hostname, "theme": "calm"}
+    assert entries[1].before == {"site": site.hostname, "theme": "ride", "palette": ""}
+    assert entries[1].after == {"site": site.hostname, "theme": "calm", "palette": ""}
     assert entries[1].actor_label == CTX.actor_label
 
 

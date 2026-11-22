@@ -16,6 +16,18 @@ def _sync_editor_roles(using: str = DEFAULT_DB_ALIAS, **kwargs: Any) -> None:
     editor_roles.sync_editor_roles(using=using)
 
 
+def _ensure_snippet_workflow(using: str = DEFAULT_DB_ALIAS, **kwargs: Any) -> None:
+    """`post_migrate`: the "Content snippet review" workflow exists (CMS.14)."""
+    from wagtail.models import Workflow
+
+    if using != DEFAULT_DB_ALIAS:
+        return
+    if Workflow._meta.db_table in connections[using].introspection.table_names():
+        from .models import content_snippet_workflow
+
+        content_snippet_workflow(create=True)
+
+
 def _grant_new_page(
     sender: Any, instance: Any, created: bool, raw: bool = False, **kw: Any
 ) -> None:
@@ -47,13 +59,19 @@ class CmsConfig(AppConfig):
         "legalpage": "Wagtail page: each published text is an audited LegalPageVersion",
         "vendorrecruitmentpage": "Wagtail page: editor content with revisions and action log",
         "standardpage": "Wagtail page: editor content with revisions and Wagtail's action log",
+        "formpage": "Wagtail page: editor content with revisions and Wagtail's action log",
+        "formfield": "a field of a form page, saved and logged with its page",
         "blogindexpage": "Wagtail page: editor content with revisions and Wagtail's action log",
         "blogpostpage": "Wagtail page: editor content with revisions and Wagtail's action log",
         "blogauthor": "Wagtail snippet: a byline name, logged in Wagtail's action log",
         "termlandingpage": "Wagtail page: editor content with revisions and action log",
         "vendorlandingpage": "Wagtail page: editor content with revisions and action log",
         "editorroleseed": "marker row that a role was seeded once; no security data of its own",
+        "contentsnippet": "Wagtail snippet: reusable text (CMS.14), revisions and action log",
         "navigationmenu": "Wagtail snippet: menu content, logged in Wagtail's action log",
+        "footersettings": "Wagtail setting: footer content (CMS.17), public text and links",
+        "footercolumn": "a column of the footer setting, saved with it",
+        "socialprofile": "a public profile link of the footer setting, saved with it",
         "helpentry": "Wagtail snippet: help text (ARC.32), logged in Wagtail's action log",
         # Installed only for wagtail-localize's editor (I18N.3); its menu is hidden.
         "wagtaildocs.document": "Wagtail document: editor upload, logged in Wagtail's action log",
@@ -65,12 +83,24 @@ class CmsConfig(AppConfig):
     def ready(self) -> None:
         from wagtail.signals import page_published
 
-        from .checks import check_base_url, check_vendor_guide_url
+        from .checks import (
+            check_base_url,
+            check_reserved_root_slugs,
+            check_snippet_workflow,
+            check_vendor_guide_url,
+            check_video_embed_origins,
+        )
         from .models import LegalPage
         from .signals import record_published_legal_page, sanitise_before_save
 
         checks.register(check_base_url, deploy=True)
         checks.register(check_vendor_guide_url)
+        checks.register(check_video_embed_origins)
+        checks.register(check_reserved_root_slugs, checks.Tags.database)
+        checks.register(check_snippet_workflow, checks.Tags.database)
+        from . import slugs
+
+        slugs.install()  # no root-level page called like a route (ARC.37)
         _declare_page_restriction_forms()
         # After every migrate (and every test database flush): one Locale per configured
         # language, so adding a language to settings.LANGUAGES needs no migration (spec 09).
@@ -82,6 +112,9 @@ class CmsConfig(AppConfig):
         # Editor roles (CORE.8, Q-58): groups and page grants after every migrate, and a grant
         # for every page created later in a part of the tree a role is bound to.
         post_migrate.connect(_sync_editor_roles, sender=self, dispatch_uid="cms.editor_roles")
+        post_migrate.connect(
+            _ensure_snippet_workflow, sender=self, dispatch_uid="cms.snippet_workflow"
+        )
         from . import workflow
 
         workflow.install()  # nobody approves their own submission
@@ -102,6 +135,52 @@ class CmsConfig(AppConfig):
         )
         post_delete.connect(
             help_lookup.drop_cache, sender=HelpEntry, dispatch_uid="cms.help_cache_delete"
+        )
+        # The cached footer (CMS.17) is dropped when its content or a linked page changes.
+        from wagtail.signals import page_unpublished
+
+        from . import footer_cache
+        from .models import FooterColumn, FooterSettings, SocialProfile
+
+        for model in (FooterSettings, FooterColumn, SocialProfile):
+            label = model.__name__.lower()
+            post_save.connect(
+                footer_cache.drop_footer_cache,
+                sender=model,
+                dispatch_uid=f"cms.footer_cache_save.{label}",
+            )
+            post_delete.connect(
+                footer_cache.drop_footer_cache,
+                sender=model,
+                dispatch_uid=f"cms.footer_cache_delete.{label}",
+            )
+        page_published.connect(
+            footer_cache.drop_footer_cache, dispatch_uid="cms.footer_cache_published"
+        )
+        page_unpublished.connect(
+            footer_cache.drop_footer_cache, dispatch_uid="cms.footer_cache_unpublished"
+        )
+        # Pages and fragments that show a reusable snippet (CMS.14) are dropped when its live
+        # text changes: a publish, an unpublish or a delete, never a draft.
+        from wagtail.signals import published, unpublished
+
+        from . import snippet_cache
+        from .models import ContentSnippet
+
+        published.connect(
+            snippet_cache.drop_snippet_cache,
+            sender=ContentSnippet,
+            dispatch_uid="cms.snippet_cache_published",
+        )
+        unpublished.connect(
+            snippet_cache.drop_snippet_cache,
+            sender=ContentSnippet,
+            dispatch_uid="cms.snippet_cache_unpublished",
+        )
+        post_delete.connect(
+            snippet_cache.drop_snippet_cache,
+            sender=ContentSnippet,
+            dispatch_uid="cms.snippet_cache_delete",
         )
         _guard_editor()
 

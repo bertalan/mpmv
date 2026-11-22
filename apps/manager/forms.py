@@ -8,7 +8,10 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.admin.rich_text import DraftailRichTextArea
 from wagtail.rich_text import features as feature_registry
 
+from apps.core.nfc_forms import NFCForm
+from apps.core.text import nfc
 from apps.orders import engine as orders_engine
+from apps.vendors import return_engine
 from apps.vendors.engine import LOGO_ALT_MAX_LENGTH, PROFILE_MAX_LENGTH
 
 # Wagtail's default editor features (D-34), minus the ones whose chooser the Manager does not
@@ -49,7 +52,7 @@ def _editor() -> DraftailRichTextArea:
     return widget
 
 
-class StorefrontProfileForm(forms.Form):
+class StorefrontProfileForm(NFCForm):
     """The texts and policies of one language (the owner only, `shop.profile`).
 
     The tagline is plain text. The description and the policies are rich text (D-34): Wagtail's
@@ -106,7 +109,25 @@ class StorefrontProfileForm(forms.Form):
     )
 
 
-class VendorLogoForm(forms.Form):
+class ProductRoleForm(forms.Form):
+    """Whether the shop makes or resells its products (SEO.10; the owner only)."""
+
+    default_product_role = forms.ChoiceField(
+        label=_("What the shop is to its products"),
+        required=False,
+        choices=[
+            ("", _("Not sure")),
+            ("producer", _("Producer: we make the products")),
+            ("reseller", _("Reseller: we buy the products to resell")),
+        ],
+        help_text=_(
+            "Shown to search engines and AI assistants in the product data. If you are not "
+            "sure, we never say that you make the product. A single product can differ."
+        ),
+    )
+
+
+class VendorLogoForm(NFCForm):
     """The logo: a new image (checked by content in the service), its description, or removal."""
 
     logo = forms.FileField(
@@ -131,8 +152,10 @@ class VendorLogoForm(forms.Form):
     )
 
 
-class ShipmentForm(forms.Form):
+class ShipmentForm(NFCForm):
     """The tracking number (and carrier) to ship with (ORD.6); the service checks them again."""
+
+    nfc_exact_fields = ("tracking_number",)  # matched byte for byte (I18N.10)
 
     tracking_number = forms.CharField(
         label=_("Tracking number"),
@@ -160,13 +183,15 @@ class ShipmentForm(forms.Form):
 
     def clean_carrier(self) -> str:
         try:
-            return orders_engine.normalise_carrier(self.cleaned_data["carrier"])
+            return orders_engine.normalise_carrier(nfc(self.cleaned_data["carrier"]) or "")
         except orders_engine.InvalidTracking:
             raise forms.ValidationError(_("Enter a valid carrier name."), code="invalid") from None
 
 
-class StaffRoleForm(forms.Form):
+class StaffRoleForm(NFCForm):
     """Grant or revoke a platform role (CORE.18); the service owns the rules."""
+
+    nfc_exact_fields = ("email",)  # matched byte for byte (I18N.10)
 
     ACTIONS = (("grant", "grant"), ("revoke", "revoke"))
 
@@ -193,7 +218,7 @@ class StaffRoleForm(forms.Form):
         self.fields["role"].choices = [(r.key, r.label) for r in roles.ROLES]  # type: ignore[attr-defined]
 
 
-class SalesTermsForm(forms.Form):
+class SalesTermsForm(NFCForm):
     """A new version of the seller's sales terms (VEN.35). The service owns the rules."""
 
     body = forms.CharField(
@@ -261,8 +286,66 @@ class SalesTermsForm(forms.Form):
     )
 
 
-class UserLookupForm(forms.Form):
+class ReturnPolicyForm(NFCForm):
+    """A proposal of the seller's return policy (VEN.40). The service owns the rules."""
+
+    nfc_exact_fields = ("returns_page_url", "return_country")  # matched byte for byte (I18N.10)
+
+    return_window_days = forms.IntegerField(
+        label=_("Return window in days"),
+        help_text=_(
+            "How many days a consumer has to send goods back after receiving them. The law sets "
+            "a minimum of 14 days for sales to consumers, so a lower number is refused. Required."
+        ),
+        min_value=return_engine.MIN_WINDOW_DAYS,
+        max_value=return_engine.MAX_WINDOW_DAYS,
+    )
+    return_shipping_paid_by = forms.ChoiceField(
+        label=_("Who pays the return shipping"),
+        help_text=_(
+            "Choose the seller if returns are free for the buyer. Choose the customer if the "
+            "buyer pays the cost of sending goods back. It must match your sales terms. Required."
+        ),
+        choices=[("customer", _("The customer")), ("vendor", _("The seller"))],
+    )
+    return_methods = forms.MultipleChoiceField(
+        label=_("Accepted return methods"),
+        help_text=_("Tick every way a buyer can send goods back. Choose at least one. Required."),
+        choices=[
+            (return_engine.POST, _("By post")),
+            (return_engine.DROP_OFF, _("At a drop-off point")),
+            (return_engine.IN_STORE, _("In the store")),
+        ],
+        widget=forms.CheckboxSelectMultiple,
+    )
+    returns_page_url = forms.CharField(
+        label=_("Public returns page"),
+        help_text=_(
+            "The address of a public page on your own site that explains how returns work. It "
+            "must start with https://. Optional: leave it empty if you have no such page."
+        ),
+        max_length=return_engine.URL_MAX,
+        required=False,
+        widget=forms.URLInput(attrs={"autocomplete": "off"}),
+    )
+    return_country = forms.CharField(
+        label=_("Country returns are sent to"),
+        help_text=_(
+            "The country where you receive returned goods, as a two-letter code, for example "
+            "IT. Required."
+        ),
+        min_length=2,
+        max_length=2,
+    )
+
+    def clean_return_country(self) -> str:
+        return str(self.cleaned_data["return_country"]).strip().upper()
+
+
+class UserLookupForm(NFCForm):
     """Find the account whose sessions Support looks at (CORE.24)."""
+
+    nfc_exact_fields = ("email",)  # matched byte for byte (I18N.10)
 
     email = forms.EmailField(
         label=_("Email of the account"),
@@ -270,7 +353,7 @@ class UserLookupForm(forms.Form):
     )
 
 
-class EndUserSessionsForm(forms.Form):
+class EndUserSessionsForm(NFCForm):
     """Support ends every session of one account (CORE.24); the service owns the rules."""
 
     user = forms.UUIDField(widget=forms.HiddenInput)
@@ -284,7 +367,7 @@ class EndUserSessionsForm(forms.Form):
     )
 
 
-class EndEverySessionForm(forms.Form):
+class EndEverySessionForm(NFCForm):
     """The platform owner's panic button (CORE.24): the fixed word confirms it."""
 
     confirm = forms.CharField(

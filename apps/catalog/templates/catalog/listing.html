@@ -20,10 +20,11 @@
   <div class="listing">
     <header class="listing-header">
       {% if scope.vendor.logo %}<img class="listing-logo" src="{{ scope.vendor.logo.file.url }}" alt="{{ scope.vendor.logo_alt }}" width="{{ scope.vendor.logo.width }}" height="{{ scope.vendor.logo.height }}">{% endif %}
-      <h1>{{ name }}</h1>
+      {% if name %}<h1>{{ name }}</h1>{% endif %}
       {% if is_fallback %}<p class="listing-notice">{% translate "This page is not available in your language yet." %}</p>{% endif %}
       <p class="listing-count">{% blocktranslate count counter=window.total %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktranslate %}</p>
     </header>
+    {% include "components/garage_banner.html" %}
     {% if vendor_profile %}{% include "catalog/includes/vendor_profile.html" %}{% endif %}
     {% if brand_profile and not brand_profile.is_empty %}{% include "catalog/includes/brand_profile.html" %}{% endif %}
     {% if editorial.before %}{{ editorial.before }}{% endif %}

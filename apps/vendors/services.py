@@ -70,6 +70,7 @@ from apps.core.services import (
     save_audited,
 )
 from apps.core.sitemap_version import bump_sitemap_version
+from apps.core.text import nfc_deep, nfc_text_fields
 from apps.core.throttling import ip_bucket
 from apps.core.uploads import UploadRefused, check_document
 from apps.core.validity import next_start_error
@@ -118,6 +119,7 @@ VENDOR_FIELDS = (
     "mail_language",
     "sales_mode_default",
     "enquiries_enabled",
+    "default_product_role",
     "legacy_wp_user_id",
 )
 
@@ -228,6 +230,49 @@ MASKED_FIELDS: dict[str, Callable[[Any], str]] = {
 }
 
 
+def trader_contact(vendor: Vendor) -> engine.TraderContact:
+    """The seller's contact for the withdrawal information and the order confirmation (CMP.41):
+    the registered office as the geographic address, the phone and the contact email. Read
+    live, so a buyer who withdraws later writes to where the seller is now."""
+    return engine.trader_contact(
+        shop_name=vendor.display_name,
+        legal_name=vendor.legal_name,
+        street=vendor.registered_street,
+        street_number=vendor.registered_street_number,
+        postal_code=vendor.registered_postal_code,
+        city=vendor.registered_city,
+        country=str(vendor.registered_country or vendor.country or ""),
+        phone=vendor.phone,
+        email=vendor.contact_email,
+    )
+
+
+def sells_to_consumers(vendor: Vendor) -> bool:
+    """Whether `vendor` sells to consumers (B2C). True for every vendor: no business-only seller
+    flag exists yet, and the checkout sells to consumers by default. Such a flag, when one is
+    added, is read here and nowhere else."""
+    return True
+
+
+def consumer_phone_missing(vendor: Vendor) -> bool:
+    """A seller to consumers without a phone (CMP.41 follow-up, owner decision 2026-11-19): it
+    cannot be activated nor publish products, and its shop area says so."""
+    return engine.consumer_phone_missing(
+        vendor.phone, sells_to_consumers=sells_to_consumers(vendor)
+    )
+
+
+CONSUMER_PHONE_MESSAGE = gettext_lazy(
+    "Please give us a phone number for your shop before you publish products: sellers who sell "
+    "to consumers must show one in the withdrawal information. Send it to the platform staff."
+)
+
+
+def consumer_phone_publish_messages(vendor: Vendor) -> list[str]:
+    """The publish-gate messages of `vendor`'s products, registered by the catalog."""
+    return [str(CONSUMER_PHONE_MESSAGE)] if consumer_phone_missing(vendor) else []
+
+
 def vendor_snapshot(vendor: Vendor) -> dict[str, Any]:
     """The audited fields of `vendor`, with the encrypted ones masked (SEC.3)."""
     snapshot = {name: getattr(vendor, name) for name in VENDOR_FIELDS}
@@ -253,6 +298,7 @@ def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> 
 def _save_vendor(
     vendor: Vendor, *, ctx: AuditContext, dry_run: bool, action: str | None = None
 ) -> ChangeSet:
+    nfc_text_fields(vendor)  # I18N.10
     vendor.normalize()
     vendor.fill_tin_from_vat()
     vendor.full_clean()
@@ -1358,7 +1404,8 @@ def is_self_certified(vendor: Vendor) -> bool:
 
 def platform_duties_missing(vendor: Vendor) -> tuple[str, ...]:
     """What the stored vendor still lacks for activation under CMP.25: the `activation`
-    requirement fields, then the self-certification (`engine.platform_duties_missing`).
+    requirement fields, the phone of a seller to consumers (CMP.41 follow-up), then the
+    self-certification (`engine.platform_duties_missing`).
 
     The self-certification is asked of every vendor while the field rules are EU-only; that is
     harmless while D-21 admits only EU vendors (follow-up: scope it to the EU if that changes)."""
@@ -1367,6 +1414,7 @@ def platform_duties_missing(vendor: Vendor) -> tuple[str, ...]:
         stored.legal_identity().values(),
         requirement_rules(engine.ACTIVATION),
         certified=is_self_certified(stored),
+        phone_required=sells_to_consumers(stored),
     )
 
 
@@ -2055,6 +2103,46 @@ def submit_claim_as_account(link: ActionLinkCheck, user: User, *, ctx: AuditCont
     return claim
 
 
+VENDOR_APPROVAL_SECTION = "platform.vendor_approval"
+
+
+def may_approve_claims(user: AbstractBaseUser | AnonymousUser) -> bool:
+    """Whether `user` holds the matrix cell "approve or suspend a vendor" (CORE.18).
+
+    The check lives in the Manager app, above this one in the dependency graph, so it is reached
+    through `settings.PLATFORM_SECTION_CHECK`."""
+    check = import_string(settings.PLATFORM_SECTION_CHECK)
+    return bool(check(user, VENDOR_APPROVAL_SECTION, write=True))
+
+
+RETURN_POLICY_SECTION = "platform.return_policy"
+
+
+def can_approve_return_policy(actor: AbstractBaseUser | AnonymousUser) -> bool:
+    """Whether `actor` holds the matrix cell "approve a vendor's return policy" (CORE.18, VEN.40).
+
+    Role membership, not `can_reopen` (the profile reopen right) and never `has_perm`. Reached
+    through `settings.PLATFORM_SECTION_CHECK`, the Manager app being above this one."""
+    check = import_string(settings.PLATFORM_SECTION_CHECK)
+    return bool(check(actor, RETURN_POLICY_SECTION, write=True))
+
+
+def _require_approval_permission(ctx: AuditContext) -> None:
+    """A context that names a user (an adapter acting for staff) needs the approval section.
+    Contexts without a user (system, management commands) are internal and not checked here."""
+    if ctx.actor_id is None:
+        return
+    actor = User.objects.filter(pk=ctx.actor_id).first()
+    if actor is None or not may_approve_claims(actor):
+        raise PermissionDenied(APPROVAL_DENIED)
+
+
+APPROVAL_DENIED = (
+    "Granting the owner role needs the vendor approval permission "
+    "(Catalogue and moderation, or the platform owner)."
+)
+
+
 def _decide(
     claim: VendorClaim,
     status: str,
@@ -2067,6 +2155,8 @@ def _decide(
 ) -> ChangeSet:
     version = claim.version if reviewed_version is None else reviewed_version
     claimant_id = claim.claimant_id if reviewed_claimant_id is None else reviewed_claimant_id
+    if status == VendorClaim.Status.APPROVED:
+        _require_approval_permission(ctx)
     with transaction.atomic():
         locked = (
             VendorClaim.objects.select_for_update(of=("self",))
@@ -2130,6 +2220,9 @@ def approve_claim(
     may change its legal identity, tax profile and payout data. Raises `engine.ClaimError`
     when no claim waits for approval, the vendor meanwhile got an account holder, or the
     claimant's email is no longer the legal email of record (or the account is inactive).
+
+    Raises `PermissionDenied` when `ctx` names a user without the vendor approval section
+    (CORE.18); nothing is granted or audited.
 
     The decision is bound to the claim staff reviewed: `reviewed_version` and
     `reviewed_claimant_id` (by default those of `claim` as loaded) must still match under the
@@ -2227,6 +2320,40 @@ def _lock_profile_vendor(vendor: Vendor, actor: User) -> Vendor:
     return locked
 
 
+def set_default_product_role(
+    vendor: Vendor,
+    role: str,
+    *,
+    actor: User,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """The vendor owner says whether the shop makes or resells its products (SEO.10).
+
+    `role` is `producer`, `reseller` or empty (unknown). Owner only (`profile`), and not for a
+    suspended or closed vendor (`PermissionDenied`). One `vendor.updated` audit entry holds the
+    value before and after; an unchanged value writes nothing.
+    """
+    if role not in Vendor.ProductRole.values and role != "":
+        raise ValidationError({"default_product_role": "Choose producer, reseller or unknown."})
+    with transaction.atomic():
+        locked = _lock_profile_vendor(vendor, actor)
+        changes = ChangeSet()
+        changes.update(
+            MODEL_LABEL,
+            str(vendor.public_id),
+            {"default_product_role": locked.default_product_role},
+            {"default_product_role": role},
+        )
+        if dry_run or changes.is_empty:
+            return changes
+        Vendor.objects.filter(pk=vendor.pk).update(
+            default_product_role=role, updated_at=timezone.now()
+        )
+        audit_changes(changes, ctx=ctx, action=UPDATED)
+    return changes
+
+
 def save_storefront_profile(
     vendor: Vendor,
     language: str,
@@ -2260,6 +2387,7 @@ def save_storefront_profile(
     unknown = sorted(set(values) - set(PROFILE_FIELDS))
     if unknown:
         raise ValidationError(f"Not storefront profile fields: {', '.join(unknown)}.")
+    values = nfc_deep(values)  # I18N.10: texts and policies are stored in NFC
     # A bogus image format would make the page fail: refused on the raw text, before the cleaning
     # (which would drop such an embed without a word).
     formats = import_string("apps.cms.engine.image_format_names")()

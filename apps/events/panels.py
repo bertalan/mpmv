@@ -128,6 +128,17 @@ def event_content_panels() -> list[Any]:
         ),
         MultiFieldPanel(
             [
+                FieldPanel("ticket_url"),
+                FieldRowPanel([FieldPanel("price"), FieldPanel("is_free")]),
+            ],
+            heading=_("Tickets"),
+        ),
+        MultiFieldPanel(
+            [FieldPanel("postponed"), FieldPanel("previous_start")],
+            heading=_("Postponed"),
+        ),
+        MultiFieldPanel(
+            [
                 FieldPanel("venue_name"),
                 FieldPanel("street"),
                 FieldRowPanel([FieldPanel("postcode"), FieldPanel("city")]),

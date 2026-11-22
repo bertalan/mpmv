@@ -12,12 +12,17 @@ that mints the single-use grant bound to the amendment's digest, then replays th
 mutation is a POST with a CSRF token; another shop's package is a 404 (CORE.3 scoping).
 """
 
+import datetime as dt
+import uuid
 from dataclasses import replace
 from decimal import Decimal
 from typing import Any, ClassVar, Final
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
+from django.db.models import Prefetch
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -33,7 +38,13 @@ from apps.core.models import AuditLog
 from apps.core.session_policy import GROUP_CRITICAL
 from apps.orders import amendment_engine as am
 from apps.orders import amendments, versions
-from apps.orders.models import AmendmentState, OrderAmendment, VendorOrder
+from apps.orders.models import (
+    OPEN_AMENDMENT_STATES,
+    AmendmentState,
+    OrderAmendment,
+    VendorOrder,
+    VendorOrderState,
+)
 from apps.orders.services import PAID_OR_LATER, OrdersFrozen
 
 from .amendment_forms import (
@@ -44,6 +55,7 @@ from .amendment_forms import (
     lines_of,
 )
 from .spaces import Space
+from .staff_draft_views import order_page_context
 from .views import ManagerView, address_lines
 
 PLATFORM_SECTION: Final = "platform.support_actions"  # a row of roles.MATRIX: Support, owner
@@ -205,13 +217,21 @@ class AmendmentPage(ManagerView):
         order = sub.order
         version = versions.current_version(sub) if sub.current_version_id else None
         draft = amendments.open_amendment(sub)
-        # The same rule as the service (`_lock_amendable`): a paid order, a package pending or
-        # accepted.
-        amendable = (
-            version is not None
-            and sub.state in am.AMENDABLE_VENDOR_ORDER_STATES
-            and order.state in PAID_OR_LATER
-        )
+        # The same rule as the service (`_lock_amendable`): `amendments.staff_actionable`. A
+        # frozen shop or a registered withdrawal leaves the forms on the page, disabled, with the
+        # reason (ORD.30); the other refusals (not paid, shipped) hide them.
+        verdict = amendments.staff_actionable(sub) if self.staff else None
+        if verdict is not None:
+            amendable = version is not None and (
+                verdict.actionable or verdict.block_reason is not None
+            )
+        else:
+            amendable = (
+                version is not None
+                and sub.state in am.AMENDABLE_VENDOR_ORDER_STATES
+                and order.state in PAID_OR_LATER
+            )
+        blocked = verdict.block_reason if verdict is not None else None
         mine = draft is not None and self.draft_side(draft)
         context.update(
             title=_("Change the order"),
@@ -229,6 +249,7 @@ class AmendmentPage(ManagerView):
             show_address=amendable and order.privacy_status == "active",
             address=address_lines(versions.delivery_address(sub, version)) if version else [],
             amendable=amendable,
+            blocked=BLOCK_LABELS.get(blocked, "") if blocked else "",
             hold_until=sub.ship_hold_until,
             draft=draft,
             draft_mine=mine,
@@ -252,6 +273,8 @@ class AmendmentPage(ManagerView):
         if amendable and "cancel_form" not in context:
             context["cancel_form"] = self.cancel_form()
         context["cancel_url"] = self.url("order_cancel", sub)
+        if self.staff:  # ORD.32: prepare a cart for the customer from this order
+            context.update(order_page_context(order), order_page_url=self.page_url(sub))
         return context
 
     def refused(self, message: str, status: int = 409, **extra: Any) -> HttpResponse:
@@ -431,35 +454,121 @@ class ShopAmendmentDiscardView(AmendmentDiscardView):
 # --- the platform space ------------------------------------------------------------------------
 
 
+BLOCK_LABELS = {
+    amendments.BLOCK_VENDOR_FROZEN: gettext_lazy("Shop frozen"),
+    amendments.BLOCK_WITHDRAWAL: gettext_lazy("Withdrawal registered"),
+}
+
+
 class PlatformOrdersView(ManagerView):
-    """Support and the platform owner find a paid order by its number."""
+    """Support and the platform owner find a paid order by its number (any package, shipped or
+    closed included) and see, oldest first, the packages on which an ORD.22 action is still
+    possible (ORD.30: `amendments.staff_actionable`, the rule the actions use). The list shows no
+    buyer contact data: number, shop, state, date, total and the open amendment."""
 
     section = PLATFORM_SECTION
     template_name = "manager/platform/orders.html"
+    paginate_by: ClassVar[int] = 25
+
+    def _number_rows(self, number: str) -> list[dict[str, str]]:
+        found = (
+            self.scoped(VendorOrder)
+            .select_related("order", "vendor")
+            .filter(order__number=number)
+            .order_by("id")
+        )
+        return [
+            {
+                "vendor": sub.vendor.display_name,
+                "state": sub.get_state_display(),
+                "url": reverse("manager:platform:order", args=[sub.public_id]),
+            }
+            for sub in found
+        ]
+
+    def _filters(self, rows: Any) -> tuple[Any, dict[str, str]]:
+        """Narrow `rows` by `?shop=`, `?state=`, `?placed_from=` and `?placed_to=`; a value that
+        is not valid narrows nothing. Returns the rows and the accepted values."""
+        get = self.request.GET
+        used: dict[str, str] = {}
+        shop = get.get("shop", "")
+        try:
+            shop_id = uuid.UUID(shop)
+        except ValueError:
+            shop_id = None
+        if shop_id:
+            rows = rows.filter(vendor__public_id=shop_id)
+            used["shop"] = shop
+        state = get.get("state", "")
+        if state in am.AMENDABLE_VENDOR_ORDER_STATES:
+            rows = rows.filter(state=state)
+            used["state"] = state
+        for name, lookup in (
+            ("placed_from", "order__created_at__date__gte"),
+            ("placed_to", "order__created_at__date__lte"),
+        ):
+            try:
+                day = dt.date.fromisoformat(get.get(name, ""))
+            except ValueError:
+                continue
+            rows = rows.filter(**{lookup: day})
+            used[name] = day.isoformat()
+        return rows, used
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         number = self.request.GET.get("number", "").strip()[:40]
-        rows = []
-        if number:
-            found = (
-                self.scoped(VendorOrder)
-                .select_related("order", "vendor")
-                .filter(order__number=number)
-                .order_by("id")
+        rows = self._number_rows(number) if number else []
+        open_amendments = OrderAmendment.objects.filter(state__in=OPEN_AMENDMENT_STATES).only(
+            "vendor_order_id", "state"
+        )
+        base_rows = amendments.staff_actionable_packages(self.scoped(VendorOrder))
+        actionable, used = self._filters(
+            base_rows.select_related("order", "vendor").prefetch_related(
+                Prefetch("amendments", queryset=open_amendments, to_attr="open")
             )
-            rows = [
-                {
-                    "vendor": sub.vendor.display_name,
-                    "state": sub.get_state_display(),
-                    "url": reverse("manager:platform:order", args=[sub.public_id]),
-                }
-                for sub in found
-            ]
+        )
+        page = Paginator(actionable.order_by("order__created_at", "id"), self.paginate_by).get_page(
+            self.request.GET.get("page")
+        )
+        # A blocked package (frozen shop, registered withdrawal) stays listed with its reason.
+        verdicts = amendments.staff_actionability(list(page.object_list))
+        base = urlencode(used)
+        lead = f"?{base}&" if base else "?"
         context.update(
             number=number,
             rows=rows,
             searched=bool(number),
+            packages=[
+                {
+                    "number": sub.order.number,
+                    "vendor": sub.vendor.display_name,
+                    "state": sub.get_state_display(),
+                    "placed": sub.order.created_at,
+                    "total": _money(sub.gross_total),
+                    "amendment": sub.open[0].get_state_display() if sub.open else "",
+                    "blocked": BLOCK_LABELS.get(verdicts[sub.pk].block_reason or "", ""),
+                    "url": reverse("manager:platform:order", args=[sub.public_id]),
+                }
+                for sub in page.object_list
+            ],
+            page_obj=page,
+            previous_url=f"{lead}page={page.previous_page_number()}" if page.has_previous() else "",
+            next_url=f"{lead}page={page.next_page_number()}" if page.has_next() else "",
+            shop_choices=[
+                (str(public_id), name)
+                for public_id, name in base_rows.order_by("vendor__display_name")
+                .values_list("vendor__public_id", "vendor__display_name")
+                .distinct()
+            ],
+            state_choices=[
+                (key, label)
+                for key, label in VendorOrderState.choices
+                if key in am.AMENDABLE_VENDOR_ORDER_STATES
+            ],
+            filter_values={
+                name: used.get(name, "") for name in ("shop", "state", "placed_from", "placed_to")
+            },
             # ORD.22: package cancellations per shop and cause; a shop's own "the customer asked"
             # drops the refund fee on its word alone, so those come first and are marked.
             cancellation_days=amendments.CANCELLATION_COUNT_DAYS,

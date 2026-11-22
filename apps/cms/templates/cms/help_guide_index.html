@@ -1,0 +1,14 @@
+{% extends "layouts/content.html" %}
+{% load i18n %}
+{% block title %}{% translate "Help" %} · {{ site_name }}{% endblock %}
+{% block page_content %}
+  <article class="help-guide">
+    <h1>{% translate "Help" %}</h1>
+    {% if audience != "vendor" %}<p>{% translate "Short answers to the questions customers ask most. Pick a topic." %}</p>{% endif %}
+    <nav aria-label="{% translate 'Help topics' %}">
+      <ul class="help-guide__topics">
+        {% for entry in sections %}<li><a href="{{ entry.url }}">{{ entry.title }}</a></li>{% endfor %}
+      </ul>
+    </nav>
+  </article>
+{% endblock %}

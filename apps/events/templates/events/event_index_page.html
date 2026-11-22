@@ -5,16 +5,20 @@ Events list (EVT.6, spec 15 "Public pages"): the upcoming and ongoing events of 
 grouped by month, with a plain GET filter form (vendor, type, month), a results count and
 pagination. It works without JavaScript. Filtered and later pages are `noindex`. EVT.8: events
 without a translation in this language show in their original language, marked; "Only events in
-<language>" keeps real translations. EVT.15 adds the map.
+<language>" keeps real translations. EVT.15: a map of the listed events that have
+coordinates, above the list, as an enhancement.
 {% endcomment %}
 {% block head %}{% if robots %}{% robots_meta robots %}{% endif %}
-  {% event_feed_alternates vendor=filters.vendor kind=filters.type %}{% endblock %}
+  {% event_feed_alternates vendor=filters.vendor kind=filters.type %}
+  {% if map %}{% include "events/_map_assets.html" %}{% endif %}{% endblock %}
 {% block page_content %}
   <h1>{{ page.title }}</h1>
   {% if page.intro and not filters.active %}{{ page.intro|richtext }}{% endif %}
   {% include "events/_links.html" with current="list" %}
   {% event_subscribe vendor=filters.vendor kind=filters.type %}
+  {% include "components/garage_banner.html" %}
   {% include "events/_filters.html" with form_action=list_url %}
   {% translate "No events are planned at the moment." as empty_text %}
-  {% include "events/_results.html" %}
+  {% if map %}{% include "events/_index_map.html" %}{% endif %}
+  {% include "events/_results.html" with plot=True %}
 {% endblock %}

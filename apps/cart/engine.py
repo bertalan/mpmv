@@ -58,10 +58,26 @@ def line_limit(available: int | None) -> int:
     return max(0, min(available, MAX_LINE_QUANTITY))
 
 
+def is_whole_quantity(quantity: object) -> bool:
+    """A count of units: an int, not a bool, a float or a Decimal (the database would truncate
+    1.5 to 1 without a word)."""
+    return isinstance(quantity, int) and not isinstance(quantity, bool)
+
+
+def count_error(quantity: object) -> str | None:
+    """Why `quantity` is not a number of units to add, or None."""
+    if not is_whole_quantity(quantity):
+        return "The quantity must be a whole number."
+    if quantity < 1:  # type: ignore[operator]
+        return "The quantity must be at least 1."
+    return None
+
+
 def quantity_error(quantity: int, *, limit: int) -> str | None:
     """Why a line cannot hold `quantity` units, or None."""
-    if quantity < 1:
-        return "The quantity must be at least 1."
+    error = count_error(quantity)
+    if error is not None:
+        return error
     if limit <= 0:
         return "This item is out of stock."
     if quantity > limit:
@@ -113,6 +129,10 @@ def display_unit_price(
     if sales_mode != BUY:
         return None
     return override if override is not None else price_net
+
+
+# Why an item without a price the buyer can see cannot go in a cart (#757, TAX.12).
+NO_PRICE_ERROR = "This item has no price yet, so you can't buy it online."
 
 
 # --- Merge on sign-in

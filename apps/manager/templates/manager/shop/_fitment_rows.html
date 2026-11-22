@@ -1,0 +1,28 @@
+{% load i18n static %}
+{% comment %}The rows of a fitment table (FIT.3): native selects, so it works without a script.{% endcomment %}
+{{ formset.management_form }}
+<div class="table-scroll" data-fitment-picker-url="{% url 'manager:shop:fitment_nodes' %}" data-fitment-picker-more="{% translate 'More items exist than are shown.' %}" data-fitment-picker-count="{% translate '{n} choices' %}" data-fitment-picker-search="{% translate 'Search by name' %}" data-fitment-picker-none="{% translate 'No item found.' %}" data-fitment-picker-found="{% translate '{n} items found' %}" data-fitment-picker-chosen="{% translate 'Chosen: {name}' %}" data-fitment-picker-first="{% translate 'Choose: {label}' %}" role="region" aria-labelledby="fitment-rows-caption" tabindex="0">
+  <table class="table">
+    <caption id="fitment-rows-caption">{% translate "What it fits" %}</caption>
+    <thead><tr>
+      <th scope="col">{% translate "Item" %}</th>
+      <th scope="col">{% translate "From year" %}</th>
+      <th scope="col">{% translate "To year" %}</th>
+      <th scope="col">{% translate "Excludes" %}</th>
+      <th scope="col">{% translate "Note" %}</th>
+      {% if formset.can_delete %}<th scope="col">{% translate "Remove" %}</th>{% endif %}
+    </tr></thead>
+    <tbody>
+      {% for form in formset %}<tr>
+        <td>{{ form.node }}{% for error in form.node.errors %}<p class="field__error">{{ error }}</p>{% endfor %}{% for error in form.year_from.errors %}<p class="field__error">{{ error }}</p>{% endfor %}{% for error in form.year_to.errors %}<p class="field__error">{{ error }}</p>{% endfor %}</td>
+        <td>{{ form.year_from }}</td>
+        <td>{{ form.year_to }}</td>
+        <td>{{ form.is_exclusion }}</td>
+        <td>{{ form.note }}</td>
+        {% if formset.can_delete %}<td><label class="visually-hidden" for="{{ form.DELETE.id_for_label }}">{% translate "Remove" %}</label>{{ form.DELETE }}</td>{% endif %}
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+<p id="fitment-picker-status" class="visually-hidden" role="status" aria-live="polite"></p>
+<script src="{% static 'manager/fitment-picker.js' %}" defer></script>

@@ -413,6 +413,9 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
     handled = {
         "cart.cart": "exported, deleted",
         "orders.order": "exported, restricted or anonymised through ORD.2",
+        "orders.staffdraft": "customer link and staff author (SET_NULL): the draft copies no "
+        "personal data (product, variant, quantity only); the user row stays as the tombstone "
+        "(ORD.32)",
         "orders.orderamendment": "actor: a vendor member or staff (refused like vendor users); the "
         "customer's new address and words are anonymised with the order (ORD.20, D-29)",
         "accounts.passkeydevice": "exported by name, deleted",
@@ -434,12 +437,17 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
         "accounts.user_user_permissions": "stripped on erasure",
         "tax.taxregimechangerequest": "vendor side, CMP.4 2/2",
         "core.mediaimage": "staff upload reference (Wagtail owner field)",
+        "fitment.garageprofile": "the account garage (FIT.5 3/3): exported (name, vehicle path, "
+        "year, flag, last use) and deleted on erasure; the 24-month cleanup deletes it too",
+        "vendors.returnpolicyversion": "staff reviewer reference (SET_NULL on erasure), not the "
+        "customer's data; the record stays (VEN.40)",
     }
     handled |= {
         f"cms.{name}": "staff page owner (Wagtail), not the customer's data"
         for name in [
             "blogindexpage",
             "blogpostpage",
+            "formpage",
             "homepage",
             "legalpage",
             "standardpage",
@@ -449,6 +457,8 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
         ]
     }
     handled |= {
+        "cms.contentsnippet": "staff editor reference (lock owner), not the customer's data; "
+        "the lock is released on erasure (SET_NULL), the text stays (CMS.14)",
         "events.eventindexpage": "staff page owner (Wagtail), not the customer's data",
         "ingest.reviewitem": "staff or vendor reviewer (resolved_by), not the customer's data",
     }
@@ -492,3 +502,19 @@ def test_a_pending_request_row_completes_on_the_next_run() -> None:
     request.refresh_from_db()
     assert request.completed_at is not None
     assert gdpr.is_anonymised(request.user)
+
+
+def test_erasure_also_empties_the_stored_message_of_every_row() -> None:
+    """ORD.26: the rendered subject and bodies go with the context."""
+    mail = OutboxEmail.objects.create(
+        recipient="gone@example.com",
+        template_key="tests.reminder",
+        language="en",
+        context="{}",
+        subject="Hello Gone",
+        text_body="Hello Gone\n",
+        html_body="<p>Hello Gone</p>",
+    )
+    gdpr._erase_outbox("gone@example.com", "erased@anonymised.invalid")
+    mail.refresh_from_db()
+    assert (mail.subject, mail.text_body, mail.html_body, mail.context) == ("", "", "", "")

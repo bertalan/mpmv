@@ -25,7 +25,9 @@ has no header and no hook for its account menu); the static script and style com
 from collections.abc import Callable
 from typing import Any
 
+from django.contrib import messages
 from django.http import HttpRequest
+from django.shortcuts import redirect
 from django.templatetags.static import static
 from django.urls import URLPattern, path, reverse
 from django.utils.html import format_html
@@ -33,6 +35,7 @@ from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail.admin.menu import MenuItem
 from wagtail.admin.ui.sidebar import LinkMenuItem as LinkMenuItemComponent
+from wagtail.contrib.settings.registry import register_setting
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 from wagtail.users import wagtail_hooks as wagtail_users_hooks
@@ -51,8 +54,9 @@ from .choosers import (
     term_chooser,
     vendor_chooser,
 )
-from .models import BlogAuthor, NavigationMenu
+from .models import BlogAuthor, ContentSnippet, FooterSettings, NavigationMenu
 from .services import listing_editorial, search_articles
+from .snippet_workflow import REFUSED_MESSAGE, snippet_can_publish
 
 
 class NavigationMenuViewSet(SnippetViewSet):  # type: ignore[misc]  # Wagtail is untyped
@@ -79,6 +83,33 @@ class BlogAuthorViewSet(SnippetViewSet):  # type: ignore[misc]
 
 
 register_snippet(BlogAuthorViewSet)
+
+
+class ContentSnippetViewSet(SnippetViewSet):  # type: ignore[misc]
+    """The reusable texts (CMS.14): drafts, moderation, translations and a usage screen."""
+
+    model = ContentSnippet
+    icon = "snippet"
+    menu_label = _("Reusable snippets")
+    menu_name = "content-snippets"
+    add_to_admin_menu = True
+    list_display = ("title", "locale", "live")
+    list_filter = ("locale",)
+    search_fields = ("title",)
+    delete_template_name = "cms/admin/content_snippet_confirm_delete.html"
+
+
+register_snippet(ContentSnippetViewSet)
+
+
+@hooks.register("before_publish")  # type: ignore[untyped-decorator]
+def refuse_unreviewed_snippet_publish(request: Any, obj: Any) -> Any:
+    """Fail closed (CMS.14): a snippet is published only through its active review workflow.
+    If the workflow is missing or switched off, the edit stays a draft."""
+    if not isinstance(obj, ContentSnippet) or snippet_can_publish(obj):
+        return None
+    messages.error(request, REFUSED_MESSAGE)
+    return redirect("wagtailsnippets_cms_contentsnippet:edit", obj.pk)
 
 
 def _withdraw(hook_name: str, registered_by: Callable[[Any], bool]) -> None:
@@ -210,3 +241,7 @@ def search_articles_group(
 ) -> SearchGroup | None:
     """The articles below the products of the search results page (CAT.27)."""
     return search_articles(request, query, language, limit)
+
+
+# Footer columns and social profiles (CMS.17): a Wagtail setting, one per site.
+register_setting(FooterSettings, icon="list-ul")

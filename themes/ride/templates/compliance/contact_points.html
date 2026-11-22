@@ -1,0 +1,43 @@
+{% extends "layouts/base.html" %}
+{% load i18n cms_tags %}
+{% comment %}
+The DSA points of contact on `ride` (THM.9 part 1; CMP.5): the app template's content (the
+operator, the contacts for authorities and for users, their languages) under the page banner
+(the only h1, the breadcrumb), as two Bootstrap cards. The contact form is a link; there is no
+map.
+{% endcomment %}
+{% block content %}
+  <article class="legal-page contact-points">
+    {% translate "Points of contact" as heading %}
+    {% page_trail current=heading as trail %}
+    {% blocktranslate trimmed asvar operated with name=points.legal_name %}Operated by {{ name }}.{% endblocktranslate %}
+    {% include "components/page_banner.html" with title=heading items=trail text=operated only %}
+    <div class="row row-cols-1 row-cols-md-2 g-4 mt-0">
+      <section class="col" aria-labelledby="contact-authorities">
+        <div class="card h-100"><div class="card-body">
+          <h2 id="contact-authorities" class="card-title h4">{% translate "For authorities" %}</h2>
+          {% if points.authority_email %}
+            <p><a href="mailto:{{ points.authority_email }}">{{ points.authority_email }}</a></p>
+          {% endif %}
+          {% if authority_languages %}
+            <p class="mb-0">{% translate "Languages:" %} {{ authority_languages|join:", " }}</p>
+          {% endif %}
+        </div></div>
+      </section>
+      <section class="col" aria-labelledby="contact-users">
+        <div class="card h-100"><div class="card-body">
+          <h2 id="contact-users" class="card-title h4">{% translate "For users of the service" %}</h2>
+          {% if points.user_email %}
+            <p><a href="mailto:{{ points.user_email }}">{{ points.user_email }}</a></p>
+          {% endif %}
+          {% if points.user_url %}
+            <p><a class="contact-form btn btn-outline-secondary" href="{{ points.user_url }}" rel="noopener noreferrer">{% translate "Contact form" %}</a></p>
+          {% endif %}
+          {% if user_languages %}
+            <p class="mb-0">{% translate "Languages:" %} {{ user_languages|join:", " }}</p>
+          {% endif %}
+        </div></div>
+      </section>
+    </div>
+  </article>
+{% endblock %}

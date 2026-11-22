@@ -1,8 +1,8 @@
 """`{% responsive_image image "<preset>" alt=… %}` (THM.12, spec 14 §14.7).
 
 Renders a Wagtail image as a `<picture>` with AVIF and WebP sources and a JPEG fallback at the
-preset's widths (`apps.core.images.PRESETS`: hero, content, gallery, card, logo), with `sizes`,
-width and height. Nothing is rendered when `image` is empty.
+preset's widths (`apps.core.images.PRESETS`: hero, content, article, avatar, gallery, card,
+logo), with `sizes`, width and height. Nothing is rendered when `image` is empty.
 
 `priority=True` asks for the LCP treatment (`fetchpriority="high"`, not lazy). Only the first
 such image of a response gets it: a page's lead image and every hero block ask for it, and

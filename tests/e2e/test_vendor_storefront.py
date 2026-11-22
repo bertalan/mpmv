@@ -19,11 +19,13 @@ from apps.catalog.tests.factories import (
     ProductFactory,
     ProductTranslationFactory,
 )
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import other_language, translated, vendor_url
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -34,7 +36,7 @@ def _product(title: str, vendor: Vendor, category: object) -> None:
     product = ProductFactory.create(
         vendor=vendor, status=Product.Status.PUBLISHED, category=category
     )
-    for language in ("en", "it"):
+    for language in (primary_language(), other_language()):
         ProductTranslationFactory.create(
             product=product,
             language=language,
@@ -44,15 +46,15 @@ def _product(title: str, vendor: Vendor, category: object) -> None:
         )
 
 
-def test_the_italian_storefront_shows_bio_policies_and_categories(
+def test_a_second_language_storefront_shows_bio_policies_and_categories(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     vendor = VendorFactory.create(
         status=Vendor.Status.ACTIVE, sells_online=True, slug="acme", display_name="Acme"
     )
     for language, tagline, bio, policy in (
-        ("en", "Copper since 1950", "Our English story.", "Ships in two days."),
-        ("it", "Rame dal 1950", "La nostra storia.", "Spedizione in due giorni."),
+        (primary_language(), "Copper since 1950", "Our English story.", "Ships in two days."),
+        (other_language(), "Rame dal 1950", "La nostra storia.", "Spedizione in due giorni."),
     ):
         VendorTranslationFactory.create(
             vendor=vendor,
@@ -65,7 +67,7 @@ def test_the_italian_storefront_shows_bio_policies_and_categories(
     kettles = CategoryFactory.create()
     pans = CategoryFactory.create()
     for category, en, it in ((kettles, "Kettles", "Bollitori"), (pans, "Pans", "Padelle")):
-        for language, name in (("en", en), ("it", it)):
+        for language, name in ((primary_language(), en), (other_language(), it)):
             CategoryTranslationFactory.create(
                 category=category, language=language, name=name, slug=name.lower(), status=PUBLISHED
             )
@@ -73,17 +75,19 @@ def test_the_italian_storefront_shows_bio_policies_and_categories(
     _product("Padella rame", vendor, pans)
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
-    page.goto(f"{live_server.url}/it/shop/acme/")
+    second = other_language()  # the storefront in a second language
+    storefront = f"{live_server.url}{vendor_url(second, 'acme')}"
+    page.goto(storefront)
     expect(page.get_by_text("Rame dal 1950")).to_be_visible()
     expect(page.get_by_text("La nostra storia.")).to_be_visible()
     page.locator("summary").first.click()
     expect(page.get_by_text("Spedizione in due giorni.")).to_be_visible()
-    nav = page.get_by_role("navigation", name="Store categories")
+    nav = page.get_by_role("navigation", name=translated("Store categories", second))
     expect(nav.get_by_role("link", name="Bollitori")).to_be_visible()
     expect(nav.get_by_role("link", name="Padelle")).to_be_visible()
-    shot("public-vendor-storefront-it")
+    shot("public-vendor-storefront-second")
     nav.get_by_role("link", name="Bollitori").click()
-    expect(page).to_have_url(f"{live_server.url}/it/shop/acme/?category=bollitori")
+    expect(page).to_have_url(f"{storefront}?category=bollitori")
     expect(page.locator(".product-grid li")).to_have_count(1)
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
     violations = run_axe(page)

@@ -1,7 +1,24 @@
-/* Ride: catalog listings (THM.7 part 1): filter column, product cards, numbered pagination.
+/* Ride: catalog listings (THM.7 part 1): filter column, product cards, numbered pagination;
+   the search results page (THM.17): form, list groups.
    Bootstrap classes do the layout; this file maps them on the ride tokens. Colours only through
    tokens. Transitions only when the visitor has no reduced-motion preference. */
 @layer overrides {
+  /* `base` and the home blocks lay `.product-grid` out as a CSS grid, and their layers sit above
+     `bootstrap`. When a ride template builds the grid on Bootstrap's row (`row row-cols-*`), the
+     row must win, or each column takes its share of a grid cell and the cards shrink. */
+  .product-grid.row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    grid-template-columns: none;
+    margin-block: calc(-1 * var(--bs-gutter-y)) 0;
+    margin-inline: calc(-0.5 * var(--bs-gutter-x));
+  }
+
+  .product-grid.row > li {
+    display: block;
+  }
+
   .listing-filters fieldset {
     border: 0;
     padding: 0;
@@ -53,9 +70,39 @@
     min-block-size: 2.75rem;
   }
 
+
+  /* THM.17: the search results page. A list-group row is one stretched link of at least 44 px. */
+  .search-group .list-group-item a:not(.btn),
+  .search-suggestions .list-group-item a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2.75rem;
+    font-family: var(--font-display);
+  }
+
+  .search-group .list-group-item:has(a:focus-visible),
+  .search-suggestions .list-group-item:has(a:focus-visible) {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: calc(var(--focus-offset) * -1);
+  }
+
+  .search-group .btn,
+  .search-page .input-group .btn {
+    min-block-size: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .search-page .input-group .form-control {
+    min-block-size: 2.75rem;
+  }
+
+
   @media (prefers-reduced-motion: reduce) {
     .product-card,
     .page-link,
+    .form-control,
+    .list-group-item,
     .btn {
       transition: none;
     }

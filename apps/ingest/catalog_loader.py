@@ -64,6 +64,7 @@ from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.models import TranslationStatus
 from apps.core.services import audit_changes
+from apps.vendors import engine as vendors_engine
 from apps.vendors import services as vendor_services
 from apps.vendors.models import Vendor, VendorTranslation
 
@@ -131,7 +132,7 @@ class CatalogLoader:
         include_unpublished: bool,
         attribute_aliases: Mapping[str, str],
     ) -> None:
-        self.bundle = bundle
+        self.bundle = rules.nfc_bundle(bundle)  # free text in NFC (I18N.10)
         self.ctx = ctx
         self.include_unpublished = include_unpublished
         self.aliases = {
@@ -271,7 +272,7 @@ class CatalogLoader:
             slug=_text(row, "slug"),
             country=_text(row, "country"),
             contact_email=_text(row, "email"),
-            phone=_text(row, "phone"),
+            phone=self._phone(row),
             legacy_wp_user_id=int(row["user_id"]),
         )
         self._merge("vendors.vendor", vendor_services.save_vendor(vendor, ctx=self.ctx))
@@ -292,6 +293,15 @@ class CatalogLoader:
                 },
             )
         return vendor
+
+    def _phone(self, row: Row) -> str:
+        """The legacy phone; a malformed one is left empty and reported, so the vendor still
+        loads and the publish gate holds its products back (CMP.41 follow-up)."""
+        phone = _text(row, "phone").strip()
+        if vendors_engine.is_valid_phone(phone):
+            return phone
+        self.report.problems.append(f"vendor {row['user_id']}: malformed phone left empty")
+        return ""
 
     def _defer_vendor_data(self, row: Row, vendor: Vendor) -> None:
         """Hook: the vendor-level commission (a CommissionRule, VEN.2, loaded by MIG.4) and the
@@ -683,6 +693,10 @@ class CatalogLoader:
             weight_kg=rules.parse_decimal(english.get("weight_kg"), field="weight"),
             gtin=self._gtin(english, key[1]),
             mpn=_text(english, "mpn")[:70],
+            length_mm=self._millimetres(english, "length_mm", key[1]),
+            width_mm=self._millimetres(english, "width_mm", key[1]),
+            height_mm=self._millimetres(english, "height_mm", key[1]),
+            country_of_origin=self._origin(english, key[1]),
             legacy_wp_id_en=self._legacy_id(english),
             legacy_wp_id_it=self._legacy_id(langs.get("it")),
             status=ProductStatus.DRAFT,
@@ -731,6 +745,34 @@ class CatalogLoader:
             return ""
         return gtin
 
+    def _millimetres(self, post: Row, name: str, sku: str) -> int | None:
+        """A CAT.22 dimension; an invalid value is dropped and reported, never silent."""
+        try:
+            return rules.parse_mm(post.get(name), field=name)
+        except rules.BadValue as error:
+            self.report.problems.append(f"product {sku!r}: {error}, dropped")
+            return None
+
+    def _origin(self, post: Row, sku: str) -> str:
+        """The CAT.22 country of origin as an upper-case ISO 3166-1 alpha-2 code."""
+        code = _text(post, "country_of_origin").strip().upper()
+        if catalog_engine.country_error(code) is not None:
+            self.report.problems.append(
+                f"product {sku!r}: country of origin {code!r} dropped (not an ISO 3166-1 code)"
+            )
+            return ""
+        return code
+
+    def _label(self, row: Row, name: str, limit: int, sku: str) -> str:
+        """A CAT.22 material or colour text; one longer than the column is dropped, reported."""
+        value = _text(row, name).strip()
+        if len(value) > limit:
+            self.report.problems.append(
+                f"product {sku!r}: {name} dropped (longer than {limit} characters)"
+            )
+            return ""
+        return value
+
     @staticmethod
     def _when(raw: object) -> dt.datetime | None:
         if _empty(raw):
@@ -755,6 +797,8 @@ class CatalogLoader:
                 description=_text(row, "description"),
                 seo_title=_text(row, "seo_title"),
                 seo_description=_text(row, "seo_description"),
+                material=self._label(row, "material", 120, sku),
+                colour=self._label(row, "colour", 80, sku),
             )
             catalog_services.sync_product_slug(text, ctx=self.ctx)
         english = langs[self.source]
@@ -766,6 +810,8 @@ class CatalogLoader:
                 title=_text(english, "title"),
                 short_description=_text(english, "short_description"),
                 description=_text(english, "description"),
+                material=self._label(english, "material", 120, sku),
+                colour=self._label(english, "colour", 80, sku),
             )
             catalog_services.sync_product_slug(text, ctx=self.ctx)
             self.report.translation_queue.append(f"product {sku!r} [{language}]")

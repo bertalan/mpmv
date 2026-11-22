@@ -34,7 +34,7 @@ from apps.core.money import CURRENCY
 from apps.core.site_url import absolute_url
 from apps.vendors import services as vendors_services
 
-from . import listings, product_pages, services, slugs
+from . import engine, listings, product_pages, services, slugs
 
 TEMPLATE = "catalog/listing.html"
 PRODUCT_TEMPLATE = "catalog/product.html"
@@ -129,7 +129,7 @@ def _trail(name: str, location: str) -> list[dict[str, str]]:
     return [
         {"label": str(_("Home")), "url": reverse("home")},
         {"label": name, "url": location},
-    ]
+    ][: 2 if name else 1]
 
 
 def _listing(
@@ -276,9 +276,15 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
     if request.path_info != location:
         query = request.META.get("QUERY_STRING", "")
         return HttpResponsePermanentRedirect(listings.join_query(location, query))
-    alternates = hreflang_alternates(
-        {lang: absolute_url(request, path) for lang, path in page.paths.items()}
+    alternates = (
+        hreflang_alternates(
+            {lang: absolute_url(request, path) for lang, path in page.paths.items()}
+        )
+        if engine.prints_hreflang(page.product.status)
+        else []
     )
+    specifications = product_pages.specifications(page.product, language)
+    fitment = product_pages.fitment(page.product, language)
     context: dict[str, Any] = {
         "page_data": page,
         "currency": CURRENCY,
@@ -288,7 +294,24 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
         "robots": listings.ROBOTS_INDEX,
         "vendor_url": slugs.vendor_path(language, page.vendor.slug, default_language=default),
         "gallery_items": product_pages.gallery_items(page),
+        "variant_gallery_items": product_pages.variant_gallery_items(page),
         "related": product_pages.related(page, language),
+        "other_sellers": product_pages.other_sellers(page.product, language, request=request),
+        "specifications": specifications,
+        "fitment": fitment,
+        "return_terms": (
+            product_pages.return_terms(page.vendor) if page.price is not None else None
+        ),
+        # The product page's tabs (ride): the first one with content is the open one.
+        "first_tab": (
+            "description"
+            if page.description
+            else "specs"
+            if specifications
+            else "fitment"
+            if fitment
+            else "details"
+        ),
         "trail": _trail(page.title, location),
     }
     response: HttpResponse = render(request, PRODUCT_TEMPLATE, context)

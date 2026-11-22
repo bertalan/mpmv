@@ -10,8 +10,10 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.models import HomePage
+from apps.core.i18n import primary_language
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.e2e.test_ride_carousels import slide
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -28,7 +30,7 @@ def _showcase_home(live_server: LiveServer, _cms_site: None) -> None:
     images = [
         MediaImageFactory.create(title=f"G{n}", file__filename=f"g{n}.png") for n in (1, 2, 3)
     ]
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     home.body = [
         ("section_title", {"eyebrow": "Our range", "title": "Gear for every ride", "lead": "Hi"}),
         (
@@ -88,12 +90,12 @@ def test_the_gallery_and_the_strip_work_with_the_keyboard(
     settings.MPMV_THEME_DEFAULT = "ride"
     open_home(page, live_server, 1280)
     gallery = page.locator("#gallery-1")
-    expect(gallery.locator(".carousel-item.active")).to_have_attribute("aria-label", "1 of 3")
+    expect(gallery.locator(".carousel-item.active")).to_have_attribute("aria-label", slide(1))
     gallery.locator("[data-bs-slide=next]").focus()
     page.keyboard.press("Enter")
-    expect(gallery.locator(".carousel-item.active")).to_have_attribute("aria-label", "2 of 3")
+    expect(gallery.locator(".carousel-item.active")).to_have_attribute("aria-label", slide(2))
     page.wait_for_timeout(1200)
-    expect(gallery.locator(".carousel-item.active")).to_have_attribute("aria-label", "2 of 3")
+    expect(gallery.locator(".carousel-item.active")).to_have_attribute("aria-label", slide(2))
     strip = page.locator("#strip-1")
     strip.locator("[data-bs-slide=next]").focus()
     page.keyboard.press("Enter")

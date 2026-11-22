@@ -1,0 +1,14 @@
+# Compatibilità di un prodotto
+last-checked: 2026-11-19
+
+Qui indica a che cosa si adatta questo prodotto: elementi specifici, tutto, oppure nulla ancora dichiarato.
+
+## Che cosa può fare
+- Scelga **Dichiarazione**, poi compili le righe: **Articolo**, **Dall'anno**, **All'anno**, **Esclude** e **Nota**. Spunti **Rimuovi** per togliere una riga.
+- Per scegliere un **Articolo**, selezioni la marca, poi il modello, poi la variante negli elenchi che compaiono uno dopo l'altro. Oppure digiti almeno due lettere in **Cerca per nome** e scelga un risultato con il mouse, oppure con le frecce e Invio. Esc chiude i risultati. Senza script, un unico elenco mostra tutti gli elementi approvati.
+- Selezioni **Anteprima** per vedere le modifiche. Non viene scritto nulla finché non preme **Conferma**.
+- Sotto **Copia da un altro prodotto** scelga uno dei suoi prodotti e selezioni **Anteprima della copia**.
+- Se un elemento manca, usi **Proponi un elemento mancante**.
+
+## Da sapere
+Si possono scegliere solo elementi approvati. Un elemento proposto resta nascosto finché la piattaforma non lo verifica. Un negozio può avere al massimo 20 proposte in attesa.

@@ -178,6 +178,7 @@ def test_every_signed_token_declaration_is_tested() -> None:
         "vendors:apply_cancel",
         "vendor_claim:claim",
         "withdrawal_confirm",
+        "staff_draft_link_continue",  # ORD.32, tested in apps/orders/.../test_staff_drafts.py
     }
 
 

@@ -12,8 +12,9 @@ from pathlib import Path
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import translation
 from PIL import Image
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Browser, Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 from wagtail.models import Collection
@@ -21,6 +22,9 @@ from wagtail.models import Collection
 from apps.catalog import media
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import (
+    AttributeFactory,
+    AttributeTranslationFactory,
+    ProductAttributeFactory,
     ProductFactory,
     ProductTranslationFactory,
     TaxonomyFactory,
@@ -29,19 +33,33 @@ from apps.catalog.tests.factories import (
     VariantTranslationFactory,
 )
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import ImageLicenceFactory
+from apps.fitment.tests.factories import (
+    FitmentNodeFactory,
+    ProductFitmentFactory,
+    ProductFitmentStateFactory,
+)
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import localized, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
 PUBLISHED = TranslationStatus.PUBLISHED
 NO_SIDEWAYS_SCROLL = "() => document.documentElement.scrollWidth <= window.innerWidth"
-PRODUCT = "/product/hand-made-mug/"
-STOREFRONT = "/shop/acme/"
+PRODUCT = localized("/product/hand-made-mug/")
+STOREFRONT = localized("/shop/acme/")
+
+
+def more(count: int) -> str:
+    """The fitment list's "Show 3 more" summary, in the primary language."""
+    with translation.override(primary_language()):
+        label = translation.ngettext("Show %(count)s more", "Show %(count)s more", count)
+    return label % {"count": count}
 
 
 @pytest.fixture(autouse=True)
@@ -52,7 +70,7 @@ def _ride(settings: SettingsWrapper, live_server: LiveServer, site_allows_indexi
     )
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="en",
+        language=primary_language(),
         status=PUBLISHED,
         tagline="Ceramics since 1950",
         description="Our story.",
@@ -79,7 +97,7 @@ def _ride(settings: SettingsWrapper, live_server: LiveServer, site_allows_indexi
     for sku, label, default in (("MUG-S", "Small", False), ("MUG-L", "Large", True)):
         variant = VariantFactory.create(product=product, sku=sku, is_default=default)
         VariantTranslationFactory.create(
-            variant=variant, language="en", label=label, status=PUBLISHED
+            variant=variant, language=primary_language(), label=label, status=PUBLISHED
         )
     for index in range(3):
         other = ProductFactory.create(
@@ -89,6 +107,7 @@ def _ride(settings: SettingsWrapper, live_server: LiveServer, site_allows_indexi
             product=other, title=f"Cup {index}", slug=f"cup-{index}", status=PUBLISHED
         )
         other.terms.add(term)
+    _specifications_and_fitment(product)
     if Collection.get_first_root_node() is None:  # a transactional test starts without one
         Collection.add_root(name="Root")
     licence = ImageLicenceFactory.create(code="own-work", name="Own work", source_required=False)
@@ -104,6 +123,22 @@ def _ride(settings: SettingsWrapper, live_server: LiveServer, site_allows_indexi
             alt_text=f"A {color} mug",
             ctx=AuditContext(actor_label="system:test", source="system"),
         )
+
+
+def _specifications_and_fitment(product: Product) -> None:
+    """A finish and a width for the Specifications tab; 15 models for the Fits tab (the list is
+    cut after 12 and the rest sits behind a native <details>)."""
+    finish = AttributeFactory.create(code="finish", kind="text")
+    AttributeTranslationFactory.create(attribute=finish, language=primary_language(), name="Finish")
+    ProductAttributeFactory.create(product=product, attribute=finish, text_value="Glazed")
+    width = AttributeFactory.create(code="width", kind="number", unit="cm")
+    AttributeTranslationFactory.create(attribute=width, language=primary_language(), name="Width")
+    ProductAttributeFactory.create(product=product, attribute=width, numeric_value=Decimal("8.5"))
+    ProductFitmentStateFactory.create(product=product)
+    make = FitmentNodeFactory.create(name="Acme Motors")
+    for number in range(15):
+        node = FitmentNodeFactory.create(parent=make, name=f"Model {number:02d}")
+        ProductFitmentFactory.create(product=product, node=node)
 
 
 @pytest.mark.parametrize("width", [360, 768, 1280])
@@ -161,18 +196,77 @@ def test_the_gallery_carousel_works_with_the_keyboard_only(
 
 def test_the_tabs_work_with_the_keyboard_only(page: Page, live_server: LiveServer) -> None:
     page.goto(f"{live_server.url}{PRODUCT}")
-    description = page.get_by_role("tab", name="Description")
-    details = page.get_by_role("tab", name="Details")
+    description = page.get_by_role("tab", name=translated("Description"))
+    details = page.get_by_role("tab", name=translated("Details"))
     expect(description).to_have_attribute("aria-selected", "true")
     description.focus()
-    page.keyboard.press("ArrowRight")
+    for _step in range(3):  # Description, Specifications, Fits, Details
+        page.keyboard.press("ArrowRight")
     expect(details).to_be_focused()
     expect(details).to_have_attribute("aria-selected", "true")
     expect(page.locator("#product-panel-details")).to_be_visible()
     expect(page.locator("#product-panel-description")).to_be_hidden()
-    page.keyboard.press("ArrowLeft")
+    for _step in range(3):
+        page.keyboard.press("ArrowLeft")
     expect(description).to_have_attribute("aria-selected", "true")
     expect(page.locator("#product-panel-description")).to_be_visible()
+
+
+def test_the_specifications_and_fitment_tabs_work_with_the_keyboard_only(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.goto(f"{live_server.url}{PRODUCT}")
+    specs = page.get_by_role("tab", name=translated("Specifications"))
+    fits = page.get_by_role("tab", name=translated("Fits"))
+    page.get_by_role("tab", name=translated("Description")).focus()
+    page.keyboard.press("ArrowRight")
+    expect(specs).to_be_focused()
+    expect(specs).to_have_attribute("aria-selected", "true")
+    expect(page.locator("#product-panel-specs .product-specs")).to_contain_text("Glazed")
+    expect(page.locator("#product-panel-specs .product-specs")).to_contain_text("8.5 cm")
+    page.keyboard.press("ArrowRight")
+    expect(fits).to_be_focused()
+    expect(page.locator("#product-panel-fitment")).to_be_visible()
+    expect(page.locator("#product-panel-fitment .fitment-group").first).to_contain_text(
+        "Acme Motors"
+    )
+    assert (
+        page.locator("#product-panel-fitment > .product-fitment > .fitment-group li").count() == 12
+    )
+
+
+def test_the_fitment_disclosure_opens_with_the_keyboard(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    page.goto(f"{live_server.url}{PRODUCT}")
+    page.get_by_role("tab", name=translated("Fits")).click()
+    summary = page.locator(".product-fitment-more > summary")
+    expect(summary).to_have_text(more(3))
+    box = summary.bounding_box()
+    assert box is not None
+    assert box["height"] >= 44
+    expect(page.get_by_text("Model 14")).to_be_hidden()
+    summary.focus()
+    page.keyboard.press("Enter")
+    expect(page.get_by_text("Model 14")).to_be_visible()
+    violations = run_axe(page)
+    assert violations == [], format_violations(violations)
+    shot("fitment-open")
+
+
+def test_without_javascript_every_panel_is_in_turn(
+    browser: Browser, live_server: LiveServer
+) -> None:
+    context = browser.new_context(java_script_enabled=False)
+    try:
+        page = context.new_page()
+        page.goto(f"{live_server.url}{PRODUCT}")
+        expect(page.locator(".product-info .nav-tabs")).to_be_hidden()
+        for panel in ("description", "specs", "fitment", "details"):
+            expect(page.locator(f"#product-panel-{panel}")).to_be_visible()
+        expect(page.locator("#product-panel-specs h2")).to_be_visible()
+    finally:
+        context.close()
 
 
 def test_the_accordion_works_with_the_keyboard_only(page: Page, live_server: LiveServer) -> None:

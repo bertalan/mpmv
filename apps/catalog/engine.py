@@ -15,6 +15,7 @@ from typing import Any, Protocol, cast
 from urllib.parse import unquote_to_bytes, urlsplit
 from zoneinfo import ZoneInfo
 
+from apps.core.countries import ISO_3166_ALPHA2
 from apps.core.money import CENT, to_decimal
 
 SKU_MAX_LENGTH = 64
@@ -22,6 +23,34 @@ SKU_MAX_LENGTH = 64
 # Characters that commonly break exports, URLs, spreadsheets or matching (spec 03 §3.2).
 _SKU_SLASHES = frozenset("/\\")
 _SKU_QUOTES = frozenset("'\"`\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u00b4")
+
+
+class _HasRole(Protocol):
+    vendor_role: str
+
+    @property
+    def vendor(self) -> Any: ...
+
+
+def effective_vendor_role(product: _HasRole) -> str:
+    """What the vendor is to this product (SEO.10): `"producer"`, `"reseller"` or `""` (unknown).
+
+    The product's own role wins; a blank one falls back to the vendor's default, and an unknown
+    value is never promoted to a role (the structured data stays conservative).
+    """
+    for role in (product.vendor_role, product.vendor.default_product_role):
+        if role in ("producer", "reseller"):
+            return str(role)
+    return ""
+
+
+RETIRED_STATUS = "retired"  # `Product.Status.RETIRED`: the page stays live, not purchasable
+
+
+def prints_hreflang(status: str) -> bool:
+    """Whether a product page prints `hreflang` alternates (and `x-default`): a retired product's
+    page stays online but advertises no language set (owner decision 2026-11-20, I18N.17)."""
+    return status != RETIRED_STATUS
 
 
 def sku_match_key(raw: str) -> str:
@@ -322,6 +351,46 @@ def weight_error(value: object) -> str | None:
     return None if error is None else f"{error}."
 
 
+GTIN_LENGTHS = (8, 12, 13, 14)
+MPN_MAX_LENGTH = 70
+
+
+def normalise_identifier(value: object) -> str:
+    """A GTIN or MPN as stored (CAT.23): surrounding whitespace removed, None is empty."""
+    return value.strip() if isinstance(value, str) else ""
+
+
+def gtin_check_digit_ok(digits: str) -> bool:
+    """The GS1 check digit: the digits right to left, from the one before the check digit,
+    weighted 3, 1, 3, 1..., add up to a number whose ten's complement is the last digit."""
+    body = digits[:-1]
+    total = sum(int(d) * (3 if i % 2 == 0 else 1) for i, d in enumerate(reversed(body)))
+    return (10 - total % 10) % 10 == int(digits[-1])
+
+
+def gtin_error(value: object) -> str | None:
+    """Why `value` is not a GTIN (8, 12, 13 or 14 digits, GS1 check digit; "" means none), or
+    None; ends with a period."""
+    if value == "":
+        return None
+    if not isinstance(value, str) or not value.isascii() or not value.isdigit():
+        return "needs digits only."
+    if len(value) not in GTIN_LENGTHS:
+        return "needs 8, 12, 13 or 14 digits."
+    if not gtin_check_digit_ok(value):
+        return "has a wrong check digit: check the last digit."
+    return None
+
+
+def mpn_error(value: object) -> str | None:
+    """Why `value` is not a usable MPN (at most 70 characters), or None; ends with a period."""
+    if not isinstance(value, str):
+        return "needs text."
+    if len(value) > MPN_MAX_LENGTH:
+        return f"is too long: at most {MPN_MAX_LENGTH} characters."
+    return None
+
+
 @dataclass(frozen=True)
 class AttributeSpec:
     """What the platform knows of an attribute: its kind and, for a choice, its value codes."""
@@ -351,6 +420,8 @@ class VariantIn:
     weight_kg_override: Decimal | None = None
     stock_qty: int = 0
     is_default: bool = False
+    gtin: str = ""
+    mpn: str = ""
 
 
 @dataclass(frozen=True)
@@ -359,6 +430,33 @@ class TranslationIn:
     title: str
     short_description: str = ""
     description: str = ""
+    material: str = ""
+    colour: str = ""
+
+
+MAX_DIMENSION_MM = 2_147_483_647  # the largest value the integer column stores
+
+
+def dimension_error(value: object) -> str | None:
+    """Why `value` is not a valid size in mm (None: no size), or None; ends with a period."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        return "needs a whole number of millimetres."
+    if value <= 0:
+        return "must be above 0; leave it empty instead."
+    if value > MAX_DIMENSION_MM:
+        return "is too large."
+    return None
+
+
+def country_error(value: object) -> str | None:
+    """Why `value` is not an upper-case ISO 3166-1 alpha-2 code ("" means none), or None."""
+    if value == "":
+        return None
+    if not isinstance(value, str) or value not in ISO_3166_ALPHA2:
+        return "needs an upper-case ISO 3166-1 alpha-2 country code, for example IT."
+    return None
 
 
 @dataclass(frozen=True)
@@ -371,6 +469,10 @@ class ProductIn:
     sales_mode: str = "buy"
     fiscal_category: str = "standard"
     weight_kg: Decimal | None = None
+    length_mm: int | None = None
+    width_mm: int | None = None
+    height_mm: int | None = None
+    country_of_origin: str = ""
     translations: tuple[TranslationIn, ...] = ()
     attributes: tuple[AttributeIn, ...] = ()
     variants: tuple[VariantIn, ...] = field(default=())
@@ -1201,3 +1303,169 @@ def gallery_selection[R: GalleryRow](rows: Iterable[R], language: str) -> list[R
     if cover is None:
         return ordered
     return [cover, *(row for row in ordered if row is not cover)]
+
+
+def variant_gallery[R: GalleryRow](
+    own: Iterable[R], shared: Iterable[R], cover: R | None, language: str
+) -> list[R]:
+    """The gallery shown when a variant is selected (CAT.26): the variant's own images first
+    (the D-18 rule applied to them), its cover leading them, then the product's gallery in the
+    same language rule. Empty when the variant has nothing of its own in `language`: the page
+    then keeps the product gallery. An image dedicated to another language never shows, cover
+    included."""
+    shown = gallery_selection(own, language)
+    usable_cover = cover if cover is not None and cover.language in (None, language) else None
+    if usable_cover is not None:
+        shown = [usable_cover, *(row for row in shown if row != usable_cover)]
+    if not shown:
+        return []
+    return [*shown, *(row for row in gallery_selection(shared, language) if row not in shown)]
+
+
+# --- Translation state of a product (CAT.11)
+
+STALE = "stale"
+MISSING = "missing"
+
+
+def translation_states(
+    rows: Iterable[tuple[str, str, str]], languages: Sequence[str], source: str
+) -> dict[str, str]:
+    """The state of a product's texts in each language: `missing`, `stale` (made from another
+    source text than the current one) or the row's workflow status (`machine`, `reviewed`,
+    `published`). `rows` are (language, status, source_hash); `source` is the source language."""
+    by_language = {language: (status, digest) for language, status, digest in rows}
+    source_digest = by_language.get(source, ("", ""))[1]
+    states: dict[str, str] = {}
+    for language in languages:
+        if language not in by_language:
+            states[language] = MISSING
+            continue
+        status, digest = by_language[language]
+        stale = language != source and source in by_language and digest != source_digest
+        states[language] = STALE if stale else status
+    return states
+
+
+def translations_complete(states: Mapping[str, str]) -> bool:
+    """True when every language is published and none is stale or missing."""
+    return all(state == "published" for state in states.values())
+
+
+# --- Upsert and publishing rules (CAT.10): pure planning, no ORM.
+
+UPSERT_PRODUCT_FIELDS = (
+    "sales_mode",
+    "fiscal_category",
+    "weight_kg",
+    "length_mm",
+    "width_mm",
+    "height_mm",
+    "country_of_origin",
+)
+UPSERT_TEXT_FIELDS = ("title", "short_description", "description", "material", "colour")
+UPSERT_VARIANT_FIELDS = (
+    "price_net_override",
+    "weight_kg_override",
+    "stock_qty",
+    "is_default",
+    "gtin",
+    "mpn",
+)
+
+
+def product_field_changes(stored: Mapping[str, Any], data: ProductIn) -> dict[str, Any]:
+    """The product fields `data` sets to another value than `stored` holds (price excluded)."""
+    return {
+        name: getattr(data, name)
+        for name in UPSERT_PRODUCT_FIELDS
+        if stored[name] != getattr(data, name)
+    }
+
+
+def translation_plan(
+    stored: Mapping[str, Mapping[str, str]], given: Sequence[TranslationIn]
+) -> tuple[list[TranslationIn], dict[str, dict[str, str]]]:
+    """Split `given` texts into new languages and, per existing language, the changed fields.
+    Languages the payload does not mention are left alone."""
+    new: list[TranslationIn] = []
+    changed: dict[str, dict[str, str]] = {}
+    for text in given:
+        current = stored.get(text.language)
+        if current is None:
+            new.append(text)
+            continue
+        fields = {
+            name: getattr(text, name)
+            for name in UPSERT_TEXT_FIELDS
+            if current[name] != getattr(text, name)
+        }
+        if fields:
+            changed[text.language] = fields
+    return new, changed
+
+
+def variant_plan(
+    stored: Mapping[str, Mapping[str, Any]], given: Sequence[VariantIn]
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Per stored variant (by SKU match key) the fields `given` changes, and the SKUs of the
+    variants that do not exist yet. Prices are compared as given."""
+    changes: dict[str, dict[str, Any]] = {}
+    unknown: list[str] = []
+    for variant in given:
+        key = sku_match_key(variant.sku)
+        current = stored.get(key)
+        if current is None:
+            unknown.append(variant.sku)
+            continue
+        fields: dict[str, Any] = {}
+        for name in UPSERT_VARIANT_FIELDS:
+            wanted = getattr(variant, name)
+            if name in ("gtin", "mpn"):
+                wanted = normalise_identifier(wanted)
+            if current[name] != wanted:
+                fields[name] = wanted
+        if fields:
+            changes[key] = fields
+    return changes, unknown
+
+
+def structure_mismatch(
+    stored_attributes: Mapping[str, tuple[tuple[str, ...], Decimal | None, str, bool]],
+    stored_options: Mapping[str, Mapping[str, str]],
+    data: ProductIn,
+) -> list[str]:
+    """Why `data` would change the attributes, axes or variant options of an existing product;
+    the upsert does not do that (it refuses the row). `stored_attributes` maps a code to
+    (sorted value codes, number, text, axis); `stored_options` a variant match key to its
+    options."""
+    given = {a.code: (tuple(sorted(a.values)), a.number, a.text, a.axis) for a in data.attributes}
+    errors: list[str] = []
+    if given != dict(stored_attributes):
+        errors.append("The attributes of an existing product cannot be changed by an upsert.")
+    for variant in data.variants:
+        current = stored_options.get(sku_match_key(variant.sku))
+        if current is not None and dict(variant.options) != dict(current):
+            errors.append(f"Variant {variant.sku}: its options cannot be changed by an upsert.")
+    return errors
+
+
+def publication_errors(
+    sales_mode: str,
+    price_net: Decimal | None,
+    weight_kg: Decimal | None,
+    languages: Iterable[str],
+    primary: str,
+) -> list[str]:
+    """Why a product cannot go live (spec 03 §3.2 Rules), apart from the checks other apps
+    register: a `buy` product needs a weight above 0 and a price above 0; every product needs
+    the primary-language text."""
+    errors: list[str] = []
+    if sales_mode == "buy":
+        if weight_kg is None or weight_kg <= 0:
+            errors.append("A product for sale needs a weight above 0.")
+        if price_net is None or price_net <= 0:
+            errors.append("A product for sale needs a price above 0.")
+    if primary not in set(languages):
+        errors.append(f"The {primary.upper()} translation is missing.")
+    return errors

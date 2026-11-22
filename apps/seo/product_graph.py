@@ -27,9 +27,15 @@ _AVAILABILITY: Final = {
 }
 _GTIN_KEYS: Final = {8: "gtin8", 12: "gtin12", 13: "gtin13", 14: "gtin14"}
 FINITE_WINDOW: Final = f"{SCHEMA}/MerchantReturnFiniteReturnWindow"
-# The customer pays the return shipping (a withdrawal); a lack of conformity is free by law.
+# A lack of conformity is free by law; who pays a withdrawal return is stated only when the
+# vendor's approved policy says so (SEO.11).
 CUSTOMER_PAYS_RETURN: Final = f"{SCHEMA}/ReturnShippingFees"
 FREE_RETURN: Final = f"{SCHEMA}/FreeReturn"
+_RETURN_METHODS: Final = {
+    "post": "ReturnByMail",
+    "drop_off": "ReturnAtKiosk",
+    "in_store": "ReturnInStore",
+}
 
 
 @dataclass(frozen=True)
@@ -85,6 +91,12 @@ class ProductData:
     manufacturer_id: str = ""
     images: tuple[ImageData, ...] = ()
     weight_kg: Decimal | None = None
+    width_mm: int | None = None
+    height_mm: int | None = None
+    depth_mm: int | None = None
+    material: str = ""
+    color: str = ""
+    country_of_origin: str = ""  # ISO 3166-1 alpha-2
     offer: OfferData | None = None
     variants: tuple[VariantData, ...] = ()
     varies_by: tuple[
@@ -169,6 +181,14 @@ def _variant_node(variant: VariantData, *, product_url: str) -> dict[str, Any]:
     )
 
 
+def _millimetres(value: int | None) -> dict[str, Any] | str:
+    """A dimension as a `QuantitativeValue` in millimetres (UN/CEFACT `MMT`); nothing when
+    unknown or not positive."""
+    if not value or value <= 0:
+        return ""
+    return {"@type": "QuantitativeValue", "value": value, "unitCode": "MMT"}
+
+
 def product_node(data: ProductData) -> dict[str, Any]:
     """The `Product`, or the `ProductGroup` of a product with variants (each variant a
     `Product` with its own offer, Google's variant markup)."""
@@ -188,6 +208,14 @@ def product_node(data: ProductData) -> dict[str, Any]:
             {"@type": "QuantitativeValue", "value": float(data.weight_kg), "unitCode": "KGM"}
             if data.weight_kg is not None
             else ""
+        ),
+        "width": _millimetres(data.width_mm),
+        "height": _millimetres(data.height_mm),
+        "depth": _millimetres(data.depth_mm),
+        "material": data.material,
+        "color": data.color,
+        "countryOfOrigin": (
+            {"@type": "Country", "name": data.country_of_origin} if data.country_of_origin else ""
         ),
     }
     node.update(_identifiers(data.gtin, data.mpn))
@@ -217,11 +245,20 @@ def organization_node(*, node_id: str, name: str, url: str) -> dict[str, Any]:
 
 
 def return_policy_node(
-    *, node_id: str, countries: Sequence[str], return_country: str, days: int, link: str = ""
+    *,
+    node_id: str,
+    countries: Sequence[str],
+    return_country: str,
+    days: int,
+    link: str = "",
+    paid_by: str = "",
+    methods: Sequence[str] = (),
 ) -> dict[str, Any]:
-    """A consumer return policy: `days` is the 14-day withdrawal floor, the customer pays the
-    return shipping, and a lack of conformity (`itemDefectReturnFees`) is free. Nothing is
-    promised to business buyers beyond the terms."""
+    """A consumer return policy: `days` is the vendor's approved window or the 14-day floor,
+    and a lack of conformity (`itemDefectReturnFees`) is free. `paid_by` ("vendor" or
+    "customer") sets `returnFees` only when the vendor's approved policy says it; empty states
+    nothing. Nothing is promised to business buyers beyond the terms."""
+    fees = {"vendor": FREE_RETURN, "customer": CUSTOMER_PAYS_RETURN}.get(paid_by, "")
     return _clean(
         {
             "@type": "MerchantReturnPolicy",
@@ -230,9 +267,12 @@ def return_policy_node(
             "returnPolicyCountry": return_country,
             "returnPolicyCategory": FINITE_WINDOW,
             "merchantReturnDays": days,
-            "returnFees": CUSTOMER_PAYS_RETURN,
+            "returnFees": fees,
             "itemDefectReturnFees": FREE_RETURN,
             "merchantReturnLink": link,
+            "returnMethod": [
+                f"{SCHEMA}/{_RETURN_METHODS[m]}" for m in methods if m in _RETURN_METHODS
+            ],
         }
     )
 
@@ -245,9 +285,36 @@ def shipping_node(
     currency: str,
     min_days: int | None = None,
     max_days: int | None = None,
+    name: str = "",
+    weight_from_kg: Decimal | None = None,
+    weight_to_kg: Decimal | None = None,
 ) -> dict[str, Any]:
     """One `OfferShippingDetails` per zone and rate: the countries in one `DefinedRegion`
-    (none for a world zone), not one node per country."""
+    (none for a world zone), not one node per country. `name` is the shipping service's name
+    (SEO.12). `weight_from_kg` set marks a node for another weight band than the product's own
+    (SEO.12): the band goes in a `ShippingService` with its `ShippingConditions.weight`, the
+    upper bound only when the band has one."""
+    band = (
+        _clean(
+            {
+                "@type": "ShippingService",
+                "name": name,
+                "shippingConditions": {
+                    "@type": "ShippingConditions",
+                    "weight": _clean(
+                        {
+                            "@type": "QuantitativeValue",
+                            "minValue": f"{weight_from_kg:f}",
+                            "maxValue": "" if weight_to_kg is None else f"{weight_to_kg:f}",
+                            "unitCode": "KGM",
+                        }
+                    ),
+                },
+            }
+        )
+        if weight_from_kg is not None
+        else ""
+    )
     transit = _clean(
         {
             "@type": "QuantitativeValue",
@@ -261,6 +328,8 @@ def shipping_node(
         {
             "@type": "OfferShippingDetails",
             "@id": node_id,
+            "name": name,
+            "hasShippingService": band,
             "shippingRate": {
                 "@type": "MonetaryAmount",
                 "value": f"{rate:.2f}",
@@ -274,6 +343,16 @@ def shipping_node(
             ),
         }
     )
+
+
+def vendor_role_refs(role: str, *, brand_id: str, maker_id: str, vendor_id: str) -> tuple[str, str]:
+    """`(brand_id, manufacturer_id)` for the product node (SEO.10). The CAT.20 Brand and
+    Manufacturer come first in every role. Only a producer vendor fills a gap: it is the brand
+    when CAT.20 has none (one GTIN, one brand `@id`) and the manufacturer when CAT.20 names
+    none. A reseller or an unknown role never names the vendor as either (never invented)."""
+    if role == "producer" and vendor_id:
+        return brand_id or vendor_id, maker_id or vendor_id
+    return brand_id, maker_id
 
 
 def product_graph(

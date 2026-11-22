@@ -33,14 +33,27 @@ from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Protocol, TypedDict
+from typing import Any, Protocol, TypedDict, cast
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser, Group
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import F, Q, QuerySet
+from django.db.models import (
+    Case,
+    DateTimeField,
+    F,
+    Func,
+    IntegerField,
+    Q,
+    QuerySet,
+    TextField,
+    Value,
+    When,
+    Window,
+)
+from django.db.models.functions import Coalesce, Concat, RowNumber
 from django.http import Http404
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -71,6 +84,7 @@ from apps.core.geocoding import services as geocoding
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog, ImageLicence, MediaImage
 from apps.core.services import consume_rate_limit, save_audited
+from apps.core.text import nfc_deep
 from apps.vendors.engine import VendorAction
 from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.scoping import is_platform_staff
@@ -335,6 +349,11 @@ EDITABLE_FIELDS = (
     "exdate_days",
     "attendance",
     "online_url",
+    "ticket_url",
+    "price",
+    "is_free",
+    "postponed",
+    "previous_start",
     "venue_name",
     "street",
     "postcode",
@@ -387,6 +406,11 @@ class EventInput(TypedDict, total=False):
     exdate_days: list[dt.date]
     attendance: str
     online_url: str
+    ticket_url: str
+    price: Decimal | None
+    is_free: bool
+    postponed: bool
+    previous_start: dt.datetime | None
     venue_name: str
     street: str
     postcode: str
@@ -625,6 +649,26 @@ def _set_links(page: EventPage, data: Mapping[str, Any]) -> None:
         page.categories = categories
 
 
+MAX_BODY_DEPTH = 20  # StreamField block values nest a few levels at most (SEC.5 item 10)
+
+
+def _too_deep(value: Any, limit: int) -> bool:
+    """Whether lists and mappings in `value` nest deeper than `limit` (iterative: no recursion)."""
+    stack = [(value, 0)]
+    while stack:
+        node, depth = stack.pop()
+        if isinstance(node, Mapping):
+            children = list(node.values())
+        elif isinstance(node, list | tuple):
+            children = list(node)
+        else:
+            continue
+        if depth >= limit:
+            return True
+        stack.extend((child, depth + 1) for child in children)
+    return False
+
+
 def _apply(page: EventPage, data: Mapping[str, Any], *, staff: bool) -> None:
     unknown = sorted(set(data) - INPUT_FIELDS)
     if unknown:
@@ -637,6 +681,9 @@ def _apply(page: EventPage, data: Mapping[str, Any], *, staff: bool) -> None:
             raise ValidationError(
                 {name: _("At most %(max)d exclusions.") % {"max": engine.MAX_EXDATES}}
             )
+    if _too_deep(data.get("body"), MAX_BODY_DEPTH):
+        raise ValidationError({"body": _("The body is nested too deeply.")})
+    data = nfc_deep(data)  # I18N.10: texts and the body's rich text are stored in NFC
     for name in EDITABLE_FIELDS:
         if name in data:
             setattr(page, name, data[name])
@@ -1570,25 +1617,76 @@ def search_events(
     locale = Locale.objects.filter(language_code=language).first()
     if locale is None:
         return None
-    needle = query.casefold()
-    # TODO(CAT.28): this loads every public event per search; filter in the database instead.
-    found = [
-        item
-        for item in events_for_locale(locale)
-        if needle
-        in " ".join(
-            (item.page.title, item.page.summary, item.page.venue_name, item.page.city)
-        ).casefold()
-    ]
-    found.sort(key=lambda item: item.page.sort_key())
+    pages = (
+        EventPage.objects.live()
+        .public()
+        .filter(hidden_at__isnull=True)
+        .filter(Q(vendor__isnull=True) | Q(vendor__status=Vendor.Status.ACTIVE))
+    )
+    # EVT.8 in SQL: rank each event's public versions (wanted language, original, then the
+    # configured order) and keep the first, so the text match below reads the shown version.
+    order = configured_languages()
+    rank = Case(
+        When(locale__language_code=language, then=Value(0)),
+        When(locale__language_code=F("original_locale__language_code"), then=Value(1)),
+        *(
+            When(locale__language_code=code, then=Value(2 + index))
+            for index, code in enumerate(order)
+        ),
+        default=None,
+        output_field=IntegerField(),
+    )
+    shown = (
+        pages.annotate(
+            language_rank=rank,
+            position=Window(
+                RowNumber(),
+                partition_by=F("translation_key"),
+                order_by=(F("language_rank").asc(nulls_last=True), F("pk").asc()),
+            ),
+        )
+        .filter(language_rank__isnull=False, position=1)
+        .values("pk")
+    )
+    start = Case(
+        When(starts_at__isnull=False, then=F("starts_at")),
+        default=Func(
+            F("start_date"),
+            F("timezone"),
+            template="(%(expressions)s)",
+            arg_joiner="::timestamp AT TIME ZONE ",
+            output_field=DateTimeField(),
+        ),
+        output_field=DateTimeField(),
+    )
+    matched = (
+        EventPage.objects.filter(pk__in=shown)
+        .annotate(
+            haystack=Concat(
+                Coalesce("title", Value("")),
+                Value(" "),
+                Coalesce("summary", Value("")),
+                Value(" "),
+                Coalesce("venue_name", Value("")),
+                Value(" "),
+                Coalesce("city", Value("")),
+                output_field=TextField(),
+            )
+        )
+        .filter(haystack__icontains=query)
+        .select_related("locale")
+        .annotate(starts_sort=start)
+        .order_by("starts_sort", "path")
+    )
+    found = cast(list[EventPage], list(matched[: limit + 1]))
     items = [
         search_page.SearchItem(
-            title=item.page.title,
-            url=item.page.get_url(request) or "",
-            summary=item.page.summary,
-            language=item.language if item.fallback else "",
+            title=page.title,
+            url=page.get_url(request) or "",
+            summary=page.summary,
+            language="" if page.locale_id == locale.pk else page.locale.language_code,
         )
-        for item in found[:limit]
+        for page in found[:limit]
     ]
     return search_page.SearchGroup(
         "events", str(_("Events")), items, order=10, more=len(found) > limit

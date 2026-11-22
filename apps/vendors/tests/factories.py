@@ -29,6 +29,7 @@ from apps.vendors.models import (
     CrossVendorConsent,
     LegalFieldRequirement,
     NoTinCountry,
+    ReturnPolicyVersion,
     SalesTermsInForce,
     SalesTermsVersion,
     SelfCertification,
@@ -207,6 +208,8 @@ class VendorFactory(DjangoModelFactory[Vendor]):
     country = "IT"
     vat_number = factory.Sequence(lambda n: f"IT{italian_vat(n)}")
     contact_email = factory.LazyAttribute(lambda o: f"{slugify(o.display_name)}@example.com")
+    # CMP.41 follow-up: a seller to consumers needs one to publish. Fictional: UK drama range.
+    phone = "+44 20 7946 0000"
     status = Vendor.Status.APPLICANT
 
     @factory.post_generation
@@ -521,3 +524,25 @@ class SalesTermsInForceFactory(DjangoModelFactory[SalesTermsInForce]):
 
     version = factory.SubFactory(SalesTermsVersionFactory, in_force=False)
     vendor = factory.SelfAttribute("version.vendor")
+
+
+class ReturnPolicyVersionFactory(DjangoModelFactory[ReturnPolicyVersion]):
+    """A proposed (pending) version of a vendor's return policy (VEN.40)."""
+
+    class Meta:
+        model = ReturnPolicyVersion
+
+    vendor = factory.SubFactory(VendorFactory)
+    number = factory.LazyAttribute(
+        lambda o: (
+            1
+            if o.vendor.pk is None
+            else ReturnPolicyVersion.objects.filter(vendor=o.vendor).count() + 1
+        )
+    )
+    return_window_days = 30
+    return_shipping_paid_by = "customer"
+    return_methods = factory.LazyFunction(lambda: ["post"])
+    returns_page_url = "https://shop.example/returns"
+    return_country = "IT"
+    status = "pending"

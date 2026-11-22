@@ -37,18 +37,22 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, ClassVar
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.utils import timezone
+from django.utils import timezone, translation
+from django.utils.formats import number_format
 from django.utils.translation import get_language
 from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
 from wagtail.blocks import StructBlockValidationError
+from wagtail.documents.blocks import DocumentChooserBlock
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Page
+from wagtail.snippets.blocks import SnippetChooserBlock
 
 from apps.catalog.models import (
     Category,
@@ -71,6 +75,7 @@ from apps.core import translations
 from apps.core.images import rendition_or_original
 from apps.core.money import CURRENCY
 from apps.vendors.models import Vendor, VendorTranslation
+from apps.vendors.seller_name import public_name
 from apps.vendors.services import has_public_storefront
 
 from .choosers import (
@@ -85,6 +90,8 @@ from .engine import (
     PRODUCT_GRID_DEFAULT,
     PRODUCT_GRID_MAX,
     countdown_state,
+    file_size_parts,
+    file_type_label,
     gallery_for_language,
     grid_limit,
     link_language,
@@ -574,6 +581,44 @@ class FaqBlock(blocks.StructBlock):  # type: ignore[misc]
         template = "cms/blocks/faq.html"
 
 
+class AccordionSectionBlock(blocks.StructBlock):  # type: ignore[misc]
+    title = blocks.CharBlock(
+        max_length=250,
+        help_text=_("The title of the section, always visible. Required."),
+    )
+    body = blocks.RichTextBlock(
+        features=RICH_TEXT_FEATURES,
+        help_text=_("The text that shows when the visitor opens the section. Required."),
+    )
+
+    class Meta:
+        icon = "list-ul"
+        label = _("Section")
+
+
+class AccordionBlock(blocks.StructBlock):  # type: ignore[misc]
+    """Titled sections that open and close, built on native `<details>` and `<summary>` (D-36,
+    CMS.16): no script, keyboard accessible, closed by default. It is not a FAQ: the page emits
+    no FAQPage data for it (only the `faq` block does)."""
+
+    sections = blocks.ListBlock(
+        AccordionSectionBlock(),
+        min_num=1,
+        label=_("Sections"),
+        help_text=_("Add at least one section. Each has a title and a text that opens on click."),
+    )
+    open_first = blocks.BooleanBlock(
+        required=False,
+        label=_("Open the first section"),
+        help_text=_("Tick this to show the first section already open. Otherwise all are closed."),
+    )
+
+    class Meta:
+        icon = "list-ul"
+        label = _("Accordion")
+        template = "cms/blocks/accordion.html"
+
+
 # --- Cards (part 2/2)
 #
 # The targets of all the cards of a block are resolved in bulk (`_card_targets`): a constant
@@ -712,9 +757,10 @@ def _vendor_targets(vendors: list[Vendor], language: str) -> dict[int, _Target]:
     for vendor in public:
         shown = translations.resolve(texts.get(vendor.pk, {}).values(), language).translation
         href = storefront_path(vendor.slug, language, primary)
-        targets[vendor.pk] = _Target(
-            vendor.display_name, href, shown.tagline if shown is not None else ""
-        )
+        name = public_name(vendor)
+        if name is None:  # a person's legal name is never a card title (SEO.15)
+            continue
+        targets[vendor.pk] = _Target(name, href, shown.tagline if shown is not None else "")
     return targets
 
 
@@ -732,20 +778,30 @@ def _card_targets(
     values: Iterable[_CardValue], language: str, request: Any
 ) -> dict[tuple[str, int], _Target]:
     """The public targets of `values`, keyed by (kind, id); a target that is not public is
-    missing."""
+    missing. The result is kept on the request: the page graph and the block's own render ask
+    for the same cards, and the lookups run once."""
     chosen: dict[str, list[Any]] = defaultdict(list)
     for value in values:
         if value.target() is not None:
             chosen[value.target_kind].append(value.target())
+    key = (language, tuple((kind, tuple(t.pk for t in found)) for kind, found in chosen.items()))
+    kept: dict[Any, dict[tuple[str, int], _Target]] | None = None
+    if request is not None:
+        kept = request.__dict__.setdefault("_cms_card_targets", {})
+        if key in kept:
+            return kept[key]
     resolved = {
         "page": _page_targets(chosen["page"], language, request) if chosen["page"] else {},
         "term": _term_targets(chosen["term"], language) if chosen["term"] else {},
         "vendor": _vendor_targets(chosen["vendor"], language) if chosen["vendor"] else {},
         "product": _product_targets(chosen["product"], language) if chosen["product"] else {},
     }
-    return {
+    found_targets = {
         (kind, pk): target for kind, targets in resolved.items() for pk, target in targets.items()
     }
+    if kept is not None:
+        kept[key] = found_targets
+    return found_targets
 
 
 def public_cards(values: Iterable[_CardValue], language: str, request: Any) -> list[Card]:
@@ -866,6 +922,44 @@ class ProductCardBlock(blocks.StructBlock):  # type: ignore[misc]
         value_class = ProductCardValue
 
 
+def _href_in_language(href: str, language: str) -> bool:
+    """Whether a site path is one of `language`'s URLs: a card that falls back to another
+    language's page (a term without a text in the page language) stays out of the graph."""
+    default = settings.LANGUAGE_CODE
+    if not href.startswith("/"):
+        return True
+    others = [f"/{code}/" for code, _name in settings.LANGUAGES if code != default]
+    if language == default:
+        return not any(href.startswith(prefix) for prefix in others)
+    return href.startswith(f"/{language}/")
+
+
+def _cards_item_list(
+    name: str, cards: Iterable[Card], context: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    """One schema.org `ItemList` of the public cards of a featured links block or a strip
+    (SEO.7): each item is the card's target page (`@id` and `url`) with its label, in the page
+    language only. No card, no list."""
+    request = context.get("request")
+    language = _page_language(dict(context))
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for card in cards:
+        if not card.href or not _href_in_language(card.href, language):
+            continue
+        url = request.build_absolute_uri(card.href) if request is not None else card.href
+        if url in seen:
+            continue
+        seen.add(url)
+        item = {"@id": url, "name": card.label, "url": url}
+        items.append({"@type": "ListItem", "position": len(items) + 1, "item": item})
+    if not items:
+        return []
+    return [
+        {"@type": "ItemList", "name": name, "numberOfItems": len(items), "itemListElement": items}
+    ]
+
+
 class FeaturedLinksBlock(blocks.StructBlock):  # type: ignore[misc]
     """A heading and cards to pages, terms and vendors; left out when no card is public."""
 
@@ -896,6 +990,13 @@ class FeaturedLinksBlock(blocks.StructBlock):  # type: ignore[misc]
         cards = (card_value.card(targets) for card_value in values)
         context["cards"] = [card for card in cards if card is not None]
         return context
+
+    def graph_nodes(self, value: Any, context: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """The block's named `ItemList` (SEO.7): its heading, else a generic name."""
+        values = [child.value for child in value["cards"]]
+        targets = _card_targets(values, _page_language(dict(context)), context.get("request"))
+        cards = [card for card in (v.card(targets) for v in values) if card is not None]
+        return _cards_item_list(value.get("heading") or str(_("Featured links")), cards, context)
 
 
 class ArticleLinksBlock(FeaturedLinksBlock):
@@ -1040,6 +1141,13 @@ class StripBlock(blocks.StructBlock):  # type: ignore[misc]
         context["carousel_id"] = _unique_id(parent_context, "strip", value)
         return context
 
+    def graph_nodes(self, value: Any, context: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """The strip's named `ItemList` (SEO.7): its cards that lead to a page, not the quotes."""
+        values = [c.value for c in value["cards"] if c.block_type != "testimonial"]
+        targets = _card_targets(values, _page_language(dict(context)), context.get("request"))
+        cards = [card for card in (v.card(targets) for v in values) if card is not None]
+        return _cards_item_list(value.get("heading") or str(_("Featured")), cards, context)
+
 
 class SectionTitleBlock(blocks.StructBlock):  # type: ignore[misc]
     """A heading with a small line above it and an optional lead (THM.14): the `ride` theme styles
@@ -1145,8 +1253,12 @@ class ProgressBlock(blocks.StructBlock):  # type: ignore[misc]
 
 
 def validate_video_url(url: str) -> None:
-    """Only YouTube and Vimeo addresses (https), so the embed is a known no-tracking origin."""
-    if parse_video_url(url) is None:
+    """Only YouTube and Vimeo addresses (https) whose no-tracking embed origin is in
+    `settings.MPMV_VIDEO_EMBED_ORIGINS`, the same list the CSP `frame-src` is built from."""
+    links = parse_video_url(url)
+    allowed = {o.rstrip("/") for o in settings.MPMV_VIDEO_EMBED_ORIGINS}
+    embed = urlsplit(links.embed_url) if links else None
+    if links is None or f"{embed.scheme}://{embed.netloc}" not in allowed:  # type: ignore[union-attr]
         raise ValidationError(
             _(
                 "Use the address of a YouTube or Vimeo video, starting with https://. "
@@ -1213,6 +1325,110 @@ class VideoModalBlock(blocks.StructBlock):  # type: ignore[misc]
             request.mpmv_video_embed = True  # the CSP middleware adds the frame origins
         context["video"] = links
         context["video_id"] = _unique_id(parent_context, "video", value)
+        return context
+
+
+# --- Download (CMS.15)
+
+
+@dataclass(frozen=True)
+class Download:
+    """What the download template shows: the link and the words that go with it."""
+
+    url: str
+    title: str
+    type_label: str
+    size_label: str
+
+    @property
+    def details(self) -> str:
+        """ "PDF, 1.2 MB": the type and size, in text, before the click."""
+        return ", ".join(part for part in (self.type_label, self.size_label) if part)
+
+
+def download_for(document: Any, title: str, language: str) -> Download | None:
+    """The download of `document` with its size in `language`'s number format, or None when the
+    document or its file is missing (the block is then hidden, never a broken link)."""
+    if document is None:
+        return None
+    try:
+        size = int(document.file.size)
+        url = str(document.url)
+    except (OSError, ValueError):  # the file is gone from the storage
+        return None
+    value, unit = file_size_parts(size)
+    with translation.override(language):
+        number = number_format(value, decimal_pos=0 if unit == "B" else 1, use_l10n=True)
+    return Download(
+        url=url,
+        title=(title or "").strip() or str(document.title),
+        type_label=file_type_label(str(document.filename)),
+        size_label=f"{number} {unit}",
+    )
+
+
+class DownloadBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A link to a file of the media library that shows its type and size before the click
+    (D-36, CMS.15). Type and size are read from the file, so an editor cannot get them wrong; if
+    the document is deleted or its file is gone, nothing is shown."""
+
+    document = DocumentChooserBlock(
+        label=_("File"),
+        help_text=_(
+            "Choose a file from the media library, or upload a new one. Its type and size are "
+            "shown next to the link by themselves."
+        ),
+    )
+    title = blocks.CharBlock(
+        required=False,
+        max_length=120,
+        help_text=_(
+            "The words of the link, for example 'Terms of sale'. Up to 120 characters. "
+            "If you leave it empty, the title of the file is used."
+        ),
+    )
+
+    class Meta:
+        icon = "doc-full-inverse"
+        label = _("Download")
+        template = "cms/blocks/download.html"
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        context["download"] = download_for(
+            value.get("document"), value.get("title", ""), _page_language(parent_context)
+        )
+        return context
+
+
+class ContentSnippetBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A reusable content snippet placed in a page body (D-36, CMS.14). The text is shown in the
+    page's language: the snippet's own live translation, else the primary language's live copy
+    (spec 09's explicit fallback), never a third language; an unpublished snippet renders
+    nothing. The snippet is rich text only, so it can never contain this block."""
+
+    snippet = SnippetChooserBlock(
+        "cms.ContentSnippet",
+        label=_("Snippet"),
+        help_text=_(
+            "Choose a reusable text. When it is changed and approved, every page that uses it "
+            "shows the new text. Nothing is shown while the snippet is not published."
+        ),
+    )
+
+    class Meta:
+        icon = "snippet"
+        label = _("Reusable snippet")
+        template = "cms/blocks/content_snippet.html"
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        from . import services
+
+        context = super().get_context(value, parent_context=parent_context)
+        page = (parent_context or {}).get("page")
+        context["content_snippet"] = services.live_snippet_copy(
+            value.get("snippet"), _page_language(parent_context), memo=page
+        )
         return context
 
 

@@ -15,6 +15,8 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.cms.services import seed_site
+from apps.core.i18n import configured_languages
+from apps.core.models import AuditLog
 from apps.events import services
 from apps.events.models import EventPage, PolicyMode, VendorEventPolicy
 from apps.vendors.models import Vendor
@@ -244,3 +246,20 @@ def test_the_translate_pages_render_under_the_ride_theme(
     response = signed_in.get(_translate_url(page))
     assert response.status_code == 200
     assert 'data-theme="ride"' in response.text
+
+
+def test_a_suspended_vendor_cannot_add_a_translation(
+    signed_in: Client, owner: User, vendor: Vendor
+) -> None:
+    """D-44 / Q-53: the vendor is suspended after the event exists; no row is written."""
+    page = _german_event(owner, vendor)
+    target = next(code for code in configured_languages() if code != "de")
+    Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.SUSPENDED)
+    response = signed_in.post(
+        _translate_url(page), {"language": target, "title": "T", "summary": "S"}
+    )
+    # The form is shown again with a refusal; it is not a redirect to the saved draft.
+    assert response.status_code == 200
+    assert response.context["form"].non_field_errors()
+    assert not EventPage.objects.filter(locale__language_code=target).exists()
+    assert not AuditLog.objects.filter(action="events.event_translation_added").exists()

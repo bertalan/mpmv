@@ -8,7 +8,9 @@ from typing import Any
 import pytest
 from django.apps import apps
 from django.conf import settings
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 from wagtail.models import Site
 
 from apps.catalog.models import Product
@@ -239,10 +241,115 @@ def test_a_product_without_weight_still_has_the_return_policy(client: Client, th
     _html, document = graph_of(client)
     policy = node(document, "MerchantReturnPolicy")
     assert policy["applicableCountry"] == ["IT"]
-    assert policy["returnFees"] == "https://schema.org/ReturnShippingFees"
+    assert policy["returnFees"] == "https://schema.org/FreeReturn"  # Q-105 default
+    assert "merchantReturnLink" not in policy  # the default has no returns page
     assert policy["merchantReturnDays"] == 14
     assert not [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"]
     assert schema_check.dangling_references(document) == []
+
+
+def _sold_product(country: str = "DE") -> Product:
+    from apps.shipping.tests.factories import ShippingMethodFactory, ShippingZoneFactory
+
+    product = live(
+        price_net=Decimal("12.50"),
+        weight_kg=None,
+        vendor=VendorFactory.create(
+            status=Vendor.Status.ACTIVE, sells_online=True, country=country
+        ),
+    )
+    ShippingMethodFactory.create(
+        vendor=product.vendor, zone=ShippingZoneFactory.create(countries=["IT"])
+    )
+    return product
+
+
+def _policy(document: dict[str, Any]) -> dict[str, Any]:
+    assert schema_check.dangling_references(document) == []
+    assert schema_check.rich_result_errors(document) == []
+    return node(document, "MerchantReturnPolicy")
+
+
+def test_an_approved_policy_states_its_window_link_country_methods_and_payer(
+    client: Client, theme: str
+) -> None:
+    from apps.vendors.tests.factories import ReturnPolicyVersionFactory
+
+    product = _sold_product()
+    ReturnPolicyVersionFactory.create(
+        vendor=product.vendor,
+        status="approved",
+        return_window_days=30,
+        return_shipping_paid_by="vendor",
+        return_methods=["post", "in_store"],
+        returns_page_url="https://shop.example/returns",
+        return_country="FR",
+    )
+    _html, document = graph_of(client)
+    policy = _policy(document)
+    assert policy["merchantReturnDays"] == 30
+    assert policy["merchantReturnLink"] == "https://shop.example/returns"
+    assert policy["returnPolicyCountry"] == "FR"
+    assert policy["returnFees"] == "https://schema.org/FreeReturn"
+    assert policy["returnMethod"] == [
+        "https://schema.org/ReturnByMail",
+        "https://schema.org/ReturnInStore",
+    ]
+
+
+def test_a_customer_paid_approved_policy_says_so(client: Client, theme: str) -> None:
+    from apps.vendors.tests.factories import ReturnPolicyVersionFactory
+
+    product = _sold_product()
+    ReturnPolicyVersionFactory.create(
+        vendor=product.vendor, status="approved", return_shipping_paid_by="customer"
+    )
+    _html, document = graph_of(client)
+    assert _policy(document)["returnFees"] == "https://schema.org/ReturnShippingFees"
+
+
+def test_a_pending_policy_is_not_stated(client: Client, theme: str) -> None:
+    from apps.vendors.tests.factories import ReturnPolicyVersionFactory
+
+    product = _sold_product()
+    ReturnPolicyVersionFactory.create(
+        vendor=product.vendor, status="pending", return_window_days=60
+    )
+    _html, document = graph_of(client)
+    policy = _policy(document)
+    assert policy["merchantReturnDays"] == 14
+    assert policy["returnPolicyCountry"] == "DE"
+    assert policy["returnFees"] == "https://schema.org/FreeReturn"  # the default, not the pending
+    for absent in ("merchantReturnLink", "returnMethod"):
+        assert absent not in policy
+
+
+def test_a_vendor_without_a_country_falls_back_to_the_operator_country(
+    client: Client, theme: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from apps.seo import product_jsonld
+
+    # TAX.12 cannot price a vendor without a country; the policy fallback is what is under test.
+    monkeypatch.setattr(product_jsonld, "_offer_price", lambda page, net, request: net)
+    _sold_product(country="")
+    _html, document = graph_of(client)
+    assert _policy(document)["returnPolicyCountry"] == "IT"  # the consumer_prices operator
+
+
+def test_the_policy_read_is_one_query_per_page(client: Client, theme: str) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from apps.vendors.tests.factories import ReturnPolicyVersionFactory
+
+    product = _sold_product()
+    for approved in (False, True):
+        if approved:
+            ReturnPolicyVersionFactory.create(vendor=product.vendor, status="approved")
+        with CaptureQueriesContext(connection) as queries:
+            client.get(MUG)
+        reads = [q for q in queries if "vendors_returnpolicyversion" in q["sql"]]
+        assert len(reads) == 1
 
 
 def test_an_image_carries_the_licence_fields_of_the_real_model() -> None:
@@ -322,3 +429,383 @@ def test_a_shipping_zone_the_visitor_is_not_in_has_no_shipping_node(
     assert "6.90" not in json.dumps(document)
     assert schema_check.dangling_references(document) == []
     assert schema_check.rich_result_errors(document) == []
+
+
+# SEO.10 2/2: the vendor role in the brand and manufacturer references.
+
+
+def _approved_brand(name: str = "Acme", *, with_maker: bool = False) -> Any:
+    from apps.catalog.tests.factories import (
+        BrandFactory,
+        BrandTranslationFactory,
+        ManufacturerFactory,
+    )
+
+    brand = BrandFactory.create(
+        name=name, manufacturer=ManufacturerFactory.create() if with_maker else None
+    )
+    for language in configured_languages():
+        BrandTranslationFactory.create(
+            brand=brand,
+            language=language,
+            slug=f"{name.lower()}-{language}",
+            status=TranslationStatus.PUBLISHED,
+        )
+    return brand
+
+
+def _role_item(client: Client, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    Product.objects.all().delete()
+    vendor = VendorFactory.create(
+        status=Vendor.Status.ACTIVE,
+        sells_online=True,
+        legal_form=Vendor.LegalForm.SRL,
+        default_product_role=kwargs.pop("default_role", ""),
+    )
+    live(price_net=Decimal("10.00"), gtin="4006381333931", vendor=vendor, **kwargs)
+    _html, document = graph_of(client)
+    return document, node(document, "Product")
+
+
+def _org(document: dict[str, Any]) -> dict[str, Any]:
+    org: dict[str, Any]
+    [org] = [
+        n
+        for n in document["@graph"]
+        if n["@type"] == "Organization" and n["@id"].startswith("http://localhost/shop/")
+    ]
+    return org
+
+
+def test_a_producer_without_a_brand_is_the_brand_and_the_manufacturer(client: Client) -> None:
+    document, item = _role_item(client, vendor_role="producer")
+    org = _org(document)
+    assert item["brand"] == {"@id": org["@id"]}
+    assert item["manufacturer"] == {"@id": org["@id"]}
+    assert item["offers"]["seller"] == {"@id": org["@id"]}
+    assert schema_check.dangling_references(document) == []
+    assert schema_check.rich_result_errors(document) == []
+
+
+def test_a_producer_with_a_brand_keeps_the_brand_and_is_the_manufacturer(client: Client) -> None:
+    brand = _approved_brand()
+    document, item = _role_item(client, vendor_role="producer", brand=brand)
+    assert item["brand"] == {"@id": node(document, "Brand")["@id"]}
+    assert item["manufacturer"] == {"@id": _org(document)["@id"]}
+    assert item["offers"]["seller"] == {"@id": _org(document)["@id"]}
+    assert schema_check.dangling_references(document) == []
+
+
+def test_a_cat20_manufacturer_wins_over_a_producer_vendor(client: Client) -> None:
+    brand = _approved_brand(with_maker=True)
+    document, item = _role_item(client, vendor_role="producer", brand=brand)
+    [maker] = [n for n in document["@graph"] if "#manufacturer-" in n["@id"]]
+    assert item["manufacturer"] == {"@id": maker["@id"]}
+    assert schema_check.dangling_references(document) == []
+
+
+def test_a_reseller_names_only_the_cat20_brand(client: Client) -> None:
+    brand = _approved_brand()
+    document, item = _role_item(client, vendor_role="reseller", brand=brand)
+    assert item["brand"] == {"@id": node(document, "Brand")["@id"]}
+    assert "manufacturer" not in item
+    assert item["offers"]["seller"] == {"@id": _org(document)["@id"]}
+
+
+def test_a_reseller_without_a_brand_makes_no_brand_claim(client: Client) -> None:
+    document, item = _role_item(client, vendor_role="reseller")
+    assert "brand" not in item
+    assert "manufacturer" not in item
+    assert item["offers"]["seller"] == {"@id": _org(document)["@id"]}
+
+
+def test_a_reseller_with_a_cat20_manufacturer_names_it(client: Client) -> None:
+    brand = _approved_brand(with_maker=True)
+    document, item = _role_item(client, vendor_role="reseller", brand=brand)
+    [maker] = [n for n in document["@graph"] if "#manufacturer-" in n["@id"]]
+    assert item["manufacturer"] == {"@id": maker["@id"]}
+
+
+def test_an_unknown_role_never_names_the_vendor_as_brand_or_manufacturer(client: Client) -> None:
+    document, item = _role_item(client)
+    assert "brand" not in item
+    assert "manufacturer" not in item
+    brand = _approved_brand()
+    document, item = _role_item(client, brand=brand)
+    assert item["brand"] == {"@id": node(document, "Brand")["@id"]}
+    assert "manufacturer" not in item
+
+
+def test_the_vendor_default_applies_and_the_product_override_wins(client: Client) -> None:
+    _document, item = _role_item(client, default_role="producer")
+    assert "manufacturer" in item
+    _document, item = _role_item(client, default_role="producer", vendor_role="reseller")
+    assert "manufacturer" not in item
+
+
+def test_a_producer_and_a_reseller_of_one_gtin_share_the_brand_id(client: Client) -> None:
+    brand = _approved_brand()
+    _document, producer = _role_item(client, vendor_role="producer", brand=brand)
+    _document, reseller = _role_item(client, vendor_role="reseller", brand=brand)
+    assert producer["brand"] == reseller["brand"]
+
+
+def test_a_person_seller_is_never_the_brand_or_manufacturer(client: Client) -> None:
+    vendor = VendorFactory.create(
+        status=Vendor.Status.ACTIVE,
+        sells_online=True,
+        italian_sole_proprietor=True,
+        first_name="Mario",
+        last_name="Rossi",
+        legal_name="Mario Rossi",
+        display_name="Mario Rossi",
+        default_product_role="producer",
+    )
+    live(price_net=Decimal("10.00"), vendor=vendor)
+    _html, document = graph_of(client)
+    item = node(document, "Product")
+    assert "brand" not in item
+    assert "manufacturer" not in item
+    assert not [n for n in document["@graph"] if n["@type"] == "Person"]
+
+
+def test_an_on_request_producer_page_keeps_the_vendor_node_it_refers_to(client: Client) -> None:
+    document, item = _role_item(
+        client, vendor_role="producer", sales_mode=Product.SalesMode.ON_REQUEST
+    )
+    assert "offers" not in item
+    assert item["brand"] == {"@id": _org(document)["@id"]}
+    assert schema_check.dangling_references(document) == []
+
+
+def test_the_vendor_role_adds_no_queries(client: Client) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    brand = _approved_brand(with_maker=True)
+    product = live(price_net=Decimal("10.00"), brand=brand)
+    with CaptureQueriesContext(connection) as unknown:
+        client.get(MUG)
+    Product.objects.filter(pk=product.pk).update(vendor_role="producer")
+    with CaptureQueriesContext(connection) as producer:
+        client.get(MUG)
+    assert len(producer) <= len(unknown)
+
+
+def test_the_product_states_its_dimensions_material_colour_and_origin(client: Client) -> None:
+    from apps.catalog.models import ProductTranslation
+
+    product = live(
+        price_net=Decimal("10.00"),
+        length_mm=300,
+        width_mm=200,
+        height_mm=100,
+        country_of_origin="IT",
+    )
+    ProductTranslation.objects.filter(product=product).update(
+        material="Glazed ceramic", colour="Matt black"
+    )
+    _html, document = graph_of(client)
+    item = node(document, "Product")
+    assert item["width"] == {"@type": "QuantitativeValue", "value": 200, "unitCode": "MMT"}
+    assert item["height"]["value"] == 100
+    assert item["depth"] == {"@type": "QuantitativeValue", "value": 300, "unitCode": "MMT"}
+    assert item["material"] == "Glazed ceramic"
+    assert item["color"] == "Matt black"
+    assert item["countryOfOrigin"] == {"@type": "Country", "name": "IT"}
+    assert schema_check.dangling_references(document) == []
+
+
+def test_a_product_without_those_fields_has_none_of_them(client: Client) -> None:
+    live(price_net=Decimal("10.00"))
+    _html, document = graph_of(client)
+    item = node(document, "Product")
+    for key in ("width", "height", "depth", "material", "color", "countryOfOrigin"):
+        assert key not in item
+
+
+def test_the_attributes_add_no_queries(client: Client) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from apps.catalog.models import ProductTranslation
+
+    product = live(price_net=Decimal("10.00"))
+    with CaptureQueriesContext(connection) as bare:
+        client.get(MUG)
+    Product.objects.filter(pk=product.pk).update(
+        length_mm=300, width_mm=200, height_mm=100, country_of_origin="IT"
+    )
+    ProductTranslation.objects.filter(product=product).update(material="Steel", colour="Red")
+    with CaptureQueriesContext(connection) as full:
+        client.get(MUG)
+    assert len(full) <= len(bare)
+
+
+def test_each_variant_carries_its_own_identifiers_and_image(client: Client) -> None:
+    from apps.catalog.tests.factories import ProductImageFactory
+
+    product = live(
+        kind=Product.Kind.VARIABLE, price_net=Decimal("10.00"), gtin="4006381333931", mpn="MUG-77"
+    )
+    own = VariantFactory.create(
+        product=product,
+        gtin="96385074",
+        mpn="MUG-77-B",
+        cover_image=ProductImageFactory.create(product=product),
+    )
+    bare = VariantFactory.create(product=product, gtin="", mpn="")
+    for variant in (own, bare):
+        for language in configured_languages():
+            VariantTranslationFactory.create(variant=variant, language=language, label="V")
+    _html, document = graph_of(client)
+    assert schema_check.dangling_references(document) == []
+    group = node(document, "ProductGroup")
+    by_sku = {v["sku"]: v for v in group["hasVariant"]}
+    assert by_sku[str(own.sku)]["gtin8"] == "96385074"
+    assert by_sku[str(own.sku)]["mpn"] == "MUG-77-B"
+    assert by_sku[str(own.sku)]["image"][0]["contentUrl"].startswith("http")
+    # never the product's identifiers, and nothing blank
+    for key in ("gtin8", "gtin13", "mpn", "image"):
+        assert key not in by_sku[str(bare.sku)]
+
+
+def _banded_method(product: Product, *, name: str = "Courier") -> Any:
+    from apps.shipping.tests.factories import (
+        ShippingMethodFactory,
+        ShippingMethodTranslationFactory,
+        ShippingZoneFactory,
+        WeightBandFactory,
+    )
+
+    method = ShippingMethodFactory.create(
+        vendor=product.vendor, zone=ShippingZoneFactory.create(countries=["IT", "DE"])
+    )
+    for language in configured_languages():
+        ShippingMethodTranslationFactory.create(
+            method=method, language=language, name=name, status=TranslationStatus.PUBLISHED
+        )
+    for low, high, cost in (("0", "1", "6.90"), ("1", "5", "9.90"), ("5", "20", "14.90")):
+        WeightBandFactory.create(
+            method=method, from_kg=Decimal(low), to_kg=high and Decimal(high), cost_net=cost
+        )
+    return method
+
+
+def test_each_shipping_node_names_its_service_and_other_weight_bands_follow(
+    client: Client, theme: str
+) -> None:
+    product = live(price_net=Decimal("12.50"), weight_kg=Decimal("0.500"))
+    _banded_method(product)
+    _html, document = graph_of(client)
+    nodes = [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"]
+    assert len(nodes) == 3
+    assert {n["name"] for n in nodes} == {"Courier"}
+    own = [n for n in nodes if "hasShippingService" not in n]
+    assert [n["shippingRate"]["value"] for n in own] == ["8.42"]
+    banded = {
+        n["hasShippingService"]["shippingConditions"]["weight"]["minValue"]: n
+        for n in nodes
+        if n not in own
+    }
+    assert banded["1.000"]["shippingRate"]["value"] == "12.08"  # 9.90 net + 22 % VAT
+    assert (
+        banded["5.000"]["hasShippingService"]["shippingConditions"]["weight"]["maxValue"]
+        == "20.000"
+    )
+    offer = node(document, "Product")["offers"]
+    assert len(offer["shippingDetails"]) == 3
+    assert schema_check.dangling_references(document) == []
+    assert schema_check.rich_result_errors(document) == []
+
+
+def test_the_banded_shipping_nodes_cost_no_query_per_band(client: Client, theme: str) -> None:
+    product = live(price_net=Decimal("12.50"), weight_kg=Decimal("0.500"))
+    _banded_method(product)
+    client.get(MUG)  # warm caches
+    with CaptureQueriesContext(connection) as one:
+        client.get(MUG)
+    from apps.shipping.tests.factories import WeightBandFactory
+
+    method = product.vendor.shipping_methods.first()
+    WeightBandFactory.create(method=method, from_kg=Decimal("20"), to_kg=None, cost_net="30")
+    with CaptureQueriesContext(connection) as more:
+        client.get(MUG)
+    assert len(more) <= len(one)
+
+
+def test_more_than_four_extra_bands_emit_exactly_four_ordered_by_weight(
+    client: Client, theme: str
+) -> None:
+    from apps.shipping.tests.factories import WeightBandFactory
+
+    product = live(price_net=Decimal("12.50"), weight_kg=Decimal("0.500"))
+    method = _banded_method(product)
+    method.bands.filter(from_kg__gte=Decimal("5")).delete()
+    for low in range(5, 11):  # six more bands above the 1-5 kg one: seven extra in all
+        WeightBandFactory.create(
+            method=method, from_kg=Decimal(low), to_kg=Decimal(low + 1), cost_net="9.90"
+        )
+    _html, document = graph_of(client)
+    nodes = [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"]
+    extra = [n for n in nodes if "hasShippingService" in n]
+    assert len(extra) == 4
+    lows = [n["hasShippingService"]["shippingConditions"]["weight"]["minValue"] for n in extra]
+    assert lows == ["1.000", "5.000", "6.000", "7.000"]
+    assert schema_check.dangling_references(document) == []
+
+
+def test_a_product_without_weight_gets_no_banded_nodes(client: Client, theme: str) -> None:
+    product = live(price_net=Decimal("12.50"), weight_kg=None)
+    _banded_method(product)
+    _html, document = graph_of(client)
+    assert [n for n in document["@graph"] if n["@type"] == "OfferShippingDetails"] == []
+
+
+def _add_variants(product: Product, count: int, start: int = 0) -> None:
+    from apps.catalog.tests.factories import ProductImageFactory
+
+    for number in range(start, start + count):
+        variant = VariantFactory.create(
+            product=product,
+            gtin="96385074",
+            mpn=f"MUG-{number}",
+            cover_image=ProductImageFactory.create(product=product),
+        )
+        for language in configured_languages():
+            VariantTranslationFactory.create(variant=variant, language=language, label=f"V{number}")
+
+
+def _variable_with(count: int) -> Product:
+    product = live(kind=Product.Kind.VARIABLE, price_net=Decimal("10.00"))
+    _add_variants(product, count)
+    return product
+
+
+@pytest.mark.parametrize("count", [2, 6])
+def test_a_product_with_variants_has_no_dangling_references(client: Client, count: int) -> None:
+    _variable_with(count)
+    _html, document = graph_of(client)
+    assert len(node(document, "ProductGroup")["hasVariant"]) == count
+    assert schema_check.dangling_references(document) == []
+
+
+def test_the_query_count_does_not_grow_with_the_variants(client: Client) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    product = _variable_with(3)
+    client.get(MUG)  # warm the caches
+    client.get(MUG)
+    with CaptureQueriesContext(connection) as two:
+        client.get(MUG)
+    _add_variants(product, 3, start=3)
+    client.get(MUG)
+    client.get(MUG)
+    with CaptureQueriesContext(connection) as six:
+        client.get(MUG)
+
+    def about_variants(queries: Any) -> list[str]:
+        return [q["sql"] for q in queries if "variant" in q["sql"] or "image" in q["sql"]]
+
+    assert len(about_variants(six)) == len(about_variants(two))

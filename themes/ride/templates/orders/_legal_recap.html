@@ -15,6 +15,7 @@ order are the app template's. Nothing here is a box.
       <dt class="col-sm-4">{% translate "Seller" %}</dt><dd class="col-sm-8">{{ seller.legal_name }} ({% translate "professional seller" %})</dd>
       {% if seller.address %}<dt class="col-sm-4">{% translate "Address" %}</dt><dd class="col-sm-8">{{ seller.address }}</dd>{% endif %}
       {% if seller.vat_number %}<dt class="col-sm-4">{% translate "VAT number" %}</dt><dd class="col-sm-8">{{ seller.vat_number }}</dd>{% endif %}
+      {% if seller.phone %}<dt class="col-sm-4">{% translate "Phone" %}</dt><dd class="col-sm-8">{{ seller.phone }}</dd>{% endif %}
       {% if seller.contact_email %}<dt class="col-sm-4">{% translate "Contact" %}</dt><dd class="col-sm-8">{{ seller.contact_email }}</dd>{% endif %}
       {% if seller.has_terms %}
       <dt class="col-sm-4">{% translate "Delivery time" %}</dt><dd class="col-sm-8">{% blocktranslate with days=seller.delivery_days %}{{ days }} working days{% endblocktranslate %}</dd>

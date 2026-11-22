@@ -29,6 +29,8 @@ NOT_PAGES = (
     "manager:platform:profile_revert",  # POST only, redirects to the changes page
     "manager:platform:profile_confirm",  # POST only, redirects to the changes page
     "manager:shop:termination_data",  # a JSON file download, not a page
+    "manager:shop:fitment_nodes",  # FIT.3 picker: a JSON list of child nodes, not a page
+    "manager:shop:money_export",  # VEN.9: POST only, a CSV file download
     "manager:platform:user_sessions_find",  # POST only, redirects to the sessions page
     # ORD.20 part 3: POST only, they redirect to the amendment page (or show the passkey prompt).
     "manager:shop:amendment_apply",
@@ -39,6 +41,10 @@ NOT_PAGES = (
     "manager:platform:order_cancel",
     # ORD.20 part 3b-1: POST only, records invoice_issued_at and redirects to the order page.
     "manager:shop:order_invoice_issued",
+    # ORD.32: POST only, they redirect to the prepared cart's page (or show it with the refusal).
+    "manager:platform:order_draft_new",
+    "manager:platform:order_draft_lines",
+    "manager:platform:order_draft_send",
     *MODAL_FRAGMENTS,
 )
 
@@ -61,4 +67,10 @@ ALLOWED: dict[str, str] = {
     "mfa:remove_device": "POST only, redirects to the factors page",
     "orders:cart_add": "POST only, redirects to the cart",
     "orders:cart_mini": "a fragment of the header, not a screen",
+    # FIT.5 2/3: the actions of "My garage" (garage_account has its own help file).
+    "garage_reset": "POST only, redirects to My garage",
+    "garage_profile_activate": "POST only, redirects to My garage",
+    "garage_profile_rename": "POST only, redirects to My garage",
+    "garage_profile_duplicate": "POST only, redirects to My garage",
+    "garage_profile_delete": "the confirmation step of a delete; POST redirects to My garage",
 }

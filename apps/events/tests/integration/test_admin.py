@@ -25,6 +25,7 @@ from apps.cms import roles
 from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.vendors.tests.factories import VendorMemberFactory
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
@@ -77,7 +78,7 @@ def test_staff_edit_view_groups_the_fields_per_spec(client: Client) -> None:
     assert response.status_code == 200
     html = response.content.decode()
     for heading in ("When", "Where", "Attendance", "Links", "Moderation"):
-        assert heading in html, heading
+        assert translated(heading) in html, heading
     for name in ("summary", "event_type", "starts_at", "ends_at", "timezone", "rrule"):
         assert f'name="{name}"' in html, name
     for name in ("attendance", "venue_name", "city", "country", "latitude", "longitude"):

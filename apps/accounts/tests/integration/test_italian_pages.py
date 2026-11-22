@@ -21,7 +21,7 @@ def italian() -> User:
 def test_the_mfa_overview_is_in_italian(client: Client, italian: User) -> None:
     verified_login(client, italian)
     html = client.get(reverse("mfa:overview"), headers=EN).text
-    for text in ("Verifica in due passaggi", "I tuoi fattori", "Aggiungi un fattore"):
+    for text in ("Verifica in due passaggi", "I Suoi fattori", "Aggiungi un fattore"):
         assert text in html
     assert "Add a factor" not in html
     assert "non usat" in html  # the unused-codes count, in plural form
@@ -36,7 +36,7 @@ def test_the_mfa_setup_and_totp_pages_are_in_italian(client: Client, italian: Us
     assert 'data-text-unsupported="Questo browser non supporta le passkey."' in setup
     verified_login(client, italian)
     totp = client.get(reverse("mfa:totp"), headers=EN).text
-    assert "Configura un\u2019app di autenticazione" in totp
+    assert "Configura un'app di autenticazione" in totp
     assert "Codice di autenticazione" in totp
 
 

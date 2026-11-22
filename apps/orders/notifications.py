@@ -23,6 +23,7 @@ from typing import Any
 from django.conf import settings
 
 from apps.core.services import enqueue_email as _enqueue_email
+from apps.vendors import services as vendor_services
 
 from . import engine, legal
 from .models import Order, OrderLine, PrivacyStatus, VendorOrder
@@ -110,6 +111,7 @@ def notify_order_placed(order: Order) -> None:
         template_key=ORDER_RECEIVED,
         language=order.language,
         idempotency_key=f"order:{order.public_id}:received",
+        order_ref=order.public_id,
         context={
             "order_number": order.number,
             "customer_name": order.customer_name,
@@ -133,6 +135,7 @@ def notify_order_paid(order: Order) -> None:
         template_key=PAYMENT_CONFIRMED,
         language=language,
         idempotency_key=f"order:{order.public_id}:paid",
+        order_ref=order.public_id,
         context={**base, "total": _money(order.grand_total)},
     )
     for sub in order.vendor_orders.select_related("vendor").order_by("id"):
@@ -141,6 +144,7 @@ def notify_order_paid(order: Order) -> None:
             template_key=ORDER_CONFIRMATION,
             language=language,
             idempotency_key=f"vendor-order:{sub.public_id}:confirmation",
+            order_ref=order.public_id,
             context={
                 **base,
                 "vendor_order_ref": str(sub.public_id),
@@ -149,6 +153,9 @@ def notify_order_paid(order: Order) -> None:
                 "lines": _lines(sub),
                 "shipping": _money(sub.shipping_net + sub.shipping_tax_amount),
                 "total": _money(sub.gross_total),
+                # CMP.41: the seller's name, address, phone and email; the withdrawal
+                # information points to this confirmation for them.
+                "seller": vendor_services.trader_contact(sub.vendor).as_dict(),
                 # The non-fiscal PDF is built when the email is sent (documents.py), not stored.
                 "attachment": {"kind": CONFIRMATION_PDF_KIND, "ref": str(sub.public_id)},
             },
@@ -159,6 +166,7 @@ def notify_order_paid(order: Order) -> None:
                 template_key=VENDOR_NEW_ORDER,
                 language=_vendor_language(sub),
                 idempotency_key=f"vendor-order:{sub.public_id}:new",
+                order_ref=order.public_id,
                 context={
                     "order_number": order.number,
                     "vendor_name": _vendor_name(sub),
@@ -180,6 +188,7 @@ def _vendor_event(sub: VendorOrder, kind: str, event: str) -> None:
         template_key=kind,
         language=order.language,
         idempotency_key=f"vendor-order:{sub.public_id}:{event}",
+        order_ref=order.public_id,
         context={
             "order_number": order.number,
             "customer_name": order.customer_name,
@@ -202,6 +211,7 @@ def notify_order_cancelled(order: Order) -> None:
         template_key=ORDER_CANCELLED,
         language=order.language,
         idempotency_key=f"order:{order.public_id}:cancelled",
+        order_ref=order.public_id,
         context={"order_number": order.number, "customer_name": order.customer_name},
     )
 
@@ -217,6 +227,7 @@ def notify_vendor_order_cancelled(sub: VendorOrder) -> None:
             template_key=VENDOR_ORDER_CANCELLED_NOTICE,
             language=_vendor_language(sub),
             idempotency_key=f"vendor-order:{sub.public_id}:cancelled-notice",
+            order_ref=order.public_id,
             context={
                 "order_number": order.number,
                 "vendor_name": _vendor_name(sub),
@@ -238,6 +249,7 @@ def notify_vendor_order_shipped(sub: VendorOrder) -> None:
         template_key=VENDOR_ORDER_SHIPPED,
         language=order.language,
         idempotency_key=f"vendor-order:{sub.public_id}:shipped",
+        order_ref=order.public_id,
         context={
             "order_number": order.number,
             "customer_name": order.customer_name,

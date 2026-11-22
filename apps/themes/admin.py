@@ -34,7 +34,15 @@ class ThemeSettingsForm(forms.ModelForm[ThemeSettings]):
 
     class Meta:
         model = ThemeSettings
-        fields = ("site", "theme")
+        fields = ("site", "theme", "palette")
+
+    def clean_palette(self) -> Any:
+        palette = self.cleaned_data.get("palette")
+        if palette is not None and (problems := palette.violations()):
+            raise forms.ValidationError(
+                "This palette fails the contrast check: " + "; ".join(problems)
+            )
+        return palette
 
 
 @admin.register(ThemeSettings)
@@ -57,7 +65,7 @@ class ThemeSettingsAdmin(admin.ModelAdmin[ThemeSettings]):
         return False
 
     def save_model(self, request: HttpRequest, obj: ThemeSettings, form: Any, change: bool) -> None:
-        set_site_theme(obj.site, obj.theme, ctx=audit_context(request))
+        set_site_theme(obj.site, obj.theme, palette=obj.palette, ctx=audit_context(request))
         # The service saved its own instance: point the admin's at the stored row.
         obj.pk = ThemeSettings.objects.values_list("pk", flat=True).get(site=obj.site)
         obj._state.adding = False

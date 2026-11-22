@@ -48,14 +48,15 @@ from wagtail_localize.operations import TranslationCreator
 from apps.catalog import listings, search_page, slugs
 from apps.catalog import services as catalog
 from apps.catalog.models import Category, Term
-from apps.core.audit import AuditContext
+from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
-from apps.core.i18n import configured_languages, hreflang_alternates
+from apps.core.i18n import configured_languages, hreflang_alternates, primary_language
 from apps.core.image_licences import Credit
 from apps.core.money import CURRENCY
 from apps.core.services import run_mutation
 from apps.core.site_url import absolute_url
 from apps.vendors.models import Vendor
+from apps.vendors.seller_name import public_name
 
 from . import engine
 from .blocks import public_cards
@@ -1060,7 +1061,10 @@ def _vendor_story(
     url = page.get_url(request) if page is not None else None
     if not url:
         return None
-    context = {"url": url, "vendor_name": vendor.display_name}
+    name = public_name(vendor)
+    if name is None:  # no public name to put in "Read the story of ..." (SEO.15)
+        return None
+    context = {"url": url, "vendor_name": name}
     return listings.ListingEditorial(
         before=render_to_string("cms/includes/vendor_story_link.html", context, request)
     )
@@ -1233,3 +1237,76 @@ def search_articles(
     return search_page.SearchGroup(
         "articles", str(_("Articles")), items, order=20, more=len(pages) > limit
     )
+
+
+# --- Form pages (CMS.13): retention of the stored submissions
+
+FORM_SUBMISSIONS_PURGED = "cms.form_submissions_purged"
+
+
+def purge_expired_form_submissions(
+    *, ctx: AuditContext, now: dt.datetime | None = None, dry_run: bool = False
+) -> ChangeSet:
+    """Delete the submissions of every form page that are older than the page's own
+    `retention_days` (default 90, at most 365). Idempotent: a second run finds nothing. One
+    `cms.form_submissions_purged` audit entry per page that lost rows, with counts only (never
+    the answers, which are personal data); `dry_run` changes nothing and writes nothing."""
+    from wagtail.contrib.forms.models import FormSubmission
+
+    from .models import FormPage
+
+    now = now or timezone.now()
+    changes = ChangeSet()
+    for page_id, days in FormPage.objects.order_by("pk").values_list("pk", "retention_days"):
+        cutoff = now - dt.timedelta(days=days)
+        expired = FormSubmission.objects.filter(page_id=page_id, submit_time__lt=cutoff)
+        with transaction.atomic():
+            deleted = expired.count() if dry_run else expired.delete()[0]
+            if not deleted:
+                continue
+            snapshot = {"deleted": deleted, "retention_days": days}
+            changes.delete("wagtailforms.formsubmission", f"page:{page_id}", snapshot)
+            if not dry_run:
+                record(ctx, FORM_SUBMISSIONS_PURGED, "cms.formpage", str(page_id), None, snapshot)
+    return changes
+
+
+def footer_profile_urls(site: Any) -> list[str]:
+    """The social profile URLs of `site`'s footer setting, in every language, for the
+    Organization `sameAs` (SEO.7); none when the site has no footer setting."""
+    from .models import SocialProfile
+
+    return list(
+        SocialProfile.objects.filter(settings__site=site)
+        .order_by("sort_order", "pk")
+        .values_list("url", flat=True)
+    )
+
+
+def live_snippet_copy(snippet: Any, language: str, *, memo: Any = None) -> Any:
+    """The live copy of the chosen snippet to show on a page of `language` (CMS.14): the copy
+    in that language, else the primary language's, else None (nothing is rendered). One query
+    per distinct snippet; `memo` (the page being rendered) keeps the answer for its other
+    placements."""
+    from .models import ContentSnippet
+
+    if snippet is None:
+        return None
+    cache_key = (snippet.translation_key, language)
+    store: dict[Any, Any] | None = None
+    if memo is not None:
+        store = memo.__dict__.setdefault("_content_snippet_memo", {})
+        if cache_key in store:
+            return store[cache_key]
+    copies = {
+        copy.locale.language_code: copy
+        for copy in ContentSnippet.objects.filter(
+            translation_key=snippet.translation_key,
+            live=True,
+            locale__language_code__in={language, primary_language()},
+        ).select_related("locale")
+    }
+    found = copies.get(language) or copies.get(primary_language())
+    if store is not None:
+        store[cache_key] = found
+    return found

@@ -12,4 +12,4 @@ This page lists the statements of reasons the platform has sent to your shop. A 
 
 The statement does not name who sent the report.
 
-If the page is empty, the platform has sent no statement for your shop. Questions about a statement: write to {{ operator.support_email }}.
+If the page is empty, the platform has sent no statement for your shop. Questions about a statement: write to {{ operator.compliance_email }}.

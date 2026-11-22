@@ -34,7 +34,7 @@ from apps.vendors.scoping import get_for_actor_or_404
 
 from .mutations import ChangeSetOut, DryRun, audit_context, changeset_out
 from .security import ApiKey
-from .text import PlainText
+from .text import NFCText, PlainText
 
 router = Router(tags=["events"])
 
@@ -53,9 +53,9 @@ class EventIn(Schema):
 
     model_config = ConfigDict(extra="forbid")
 
-    title: PlainText = Field("", max_length=255)
+    title: NFCText = Field("", max_length=255)
     slug: PlainText = ""
-    summary: PlainText = Field("", max_length=300)
+    summary: NFCText = Field("", max_length=300)
     event_type: PlainText = Field("", description="promotion, fair or other.")
     all_day: bool = False
     starts_at: dt.datetime | None = None
@@ -68,13 +68,13 @@ class EventIn(Schema):
     exdate_days: list[dt.date] = Field(default_factory=list)
     attendance: PlainText = Field("", description="in_person, online or mixed.")
     online_url: PlainText = ""
-    venue_name: PlainText = ""
-    street: PlainText = ""
+    venue_name: NFCText = ""
+    street: NFCText = ""
     postcode: PlainText = ""
-    city: PlainText = ""
-    region: PlainText = ""
+    city: NFCText = ""
+    region: NFCText = ""
     country: PlainText = ""
-    booth: PlainText = ""
+    booth: NFCText = ""
     latitude: Decimal | None = Field(None, max_digits=9, decimal_places=6)
     longitude: Decimal | None = Field(None, max_digits=9, decimal_places=6)
     body: list[dict[str, Any]] = Field(
@@ -102,10 +102,10 @@ class TranslationIn(Schema):
     language: PlainText = Field(
         "", description="The language to add: en, it, de, fr or es (required)."
     )
-    title: PlainText = Field("", max_length=255)
+    title: NFCText = Field("", max_length=255)
     slug: PlainText = ""
-    summary: PlainText = Field("", max_length=300)
-    venue_name: PlainText = ""
+    summary: NFCText = Field("", max_length=300)
+    venue_name: NFCText = ""
     body: list[dict[str, Any]] = Field(
         default_factory=list,
         description="StreamField blocks: [{type, value}] with vendor-safe types only.",

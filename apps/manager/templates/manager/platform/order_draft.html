@@ -1,0 +1,67 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+One prepared cart (ORD.32): its lines at today's prices with the stock, the items left out and
+why, the quantities (never a price) and the one-time link to the order's account or guest email.
+Every change and send is a POST with CSRF and a note. No contact data of the customer is shown.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% blocktranslate %}Prepared cart from order {{ number }}{% endblocktranslate %}</h1>
+  <p><a href="{% url 'manager:platform:order_drafts' %}">{% translate "Back to the prepared carts" %}</a></p>
+  {% if action_error %}{% include "components/alert.html" with level="danger" message=action_error live="assertive" only %}{% endif %}
+  <dl class="manager-facts">
+    <dt>{% translate "Status" %}</dt><dd data-draft-state>{{ state_label }}</dd>
+    <dt>{% translate "The link goes to" %}</dt><dd>{{ customer_kind }}</dd>
+    <dt>{% translate "Link" %}</dt><dd>{% if link_active %}{% blocktranslate with date=link_expires_at|date:"SHORT_DATETIME_FORMAT" %}Sent, usable once until {{ date }}{% endblocktranslate %}{% else %}{% translate "Not sent, or no longer usable" %}{% endif %}</dd>
+    <dt>{% translate "Sends left today" %}</dt><dd>{{ sends_left }} / {{ max_sends }}</dd>
+  </dl>
+  <p>{% translate "This is not an order. The customer opens the link, checks the cart and pays at checkout; the prices are the catalogue prices of that moment. You never place or pay the order for the customer." %}</p>
+
+  {% if skipped %}
+    <h2>{% translate "Left out of the cart" %}</h2>
+    <ul>{% for item in skipped %}<li>{{ item.title }}{% if item.variant %} ({{ item.variant }}){% endif %}: {{ item.reason }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  <h2>{% translate "Items" %}</h2>
+  {% if rows %}
+    <form method="post" action="{{ lines_url }}" class="manager-form" novalidate>
+      {% csrf_token %}
+      <fieldset class="manager-fieldset" {% if not is_open %}disabled{% endif %}>
+        <div class="table-scroll" role="region" aria-labelledby="lines-caption" tabindex="0">
+          <table class="table">
+            <caption id="lines-caption">{% translate "Items at today's prices (net)" %}</caption>
+            <thead><tr><th scope="col">{% translate "Item" %}</th><th scope="col">{% translate "Unit price today" %}</th><th scope="col">{% translate "Available" %}</th><th scope="col">{% translate "Quantity" %}</th><th scope="col">{% translate "Total" %}</th></tr></thead>
+            <tbody>
+              {% for row in rows %}<tr>
+                <th scope="row">{{ row.title }}{% if row.variant %} ({{ row.variant }}){% endif %}</th>
+                <td>{{ row.unit }}</td>
+                <td>{% if row.limit is None %}{% translate "not for sale" %}{% else %}{{ row.limit }}{% endif %}</td>
+                <td><label class="visually-hidden" for="qty-{{ row.key }}">{% blocktranslate with item=row.title %}Quantity of {{ item }}{% endblocktranslate %}</label><input type="number" id="qty-{{ row.key }}" name="qty-{{ row.key }}" value="{{ row.quantity }}" min="0"{% if row.limit is not None %} max="{{ row.limit }}"{% endif %} inputmode="numeric"></td>
+                <td>{{ row.total }}</td>
+              </tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p>{% translate "Set a quantity to 0 to remove the item. A change makes a link already sent stop working." %}</p>
+        {% for field in note_form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+        {% include "components/button.html" with label=_("Save the quantities") type="submit" variant="secondary" only %}
+      </fieldset>
+    </form>
+  {% else %}
+    <p>{% translate "The cart is empty: there is nothing to send." %}</p>
+  {% endif %}
+
+  {% if is_open and rows %}
+    <section aria-labelledby="send-heading">
+      <h2 id="send-heading">{% translate "Send the link to the customer" %}</h2>
+      <p>{% blocktranslate %}The link goes only to the email of the order's account, or to the guest's email for a guest order. It works once, and at most {{ max_sends }} links can be sent per day. A new link replaces the one sent before.{% endblocktranslate %}</p>
+      <form method="post" action="{{ send_url }}" class="manager-form" novalidate>
+        {% csrf_token %}
+        <fieldset class="manager-fieldset" {% if not sends_left %}disabled{% endif %}>
+        {% for field in send_form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+        {% include "components/button.html" with label=_("Send the link") type="submit" only %}
+        </fieldset>
+      </form>
+    </section>
+  {% endif %}
+{% endblock %}

@@ -15,6 +15,14 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+# SEO.15: the seller-name rule lives in `apps.vendors.seller_name` (a layer every public surface
+# may import); the structured data keeps using it through this module.
+from apps.vendors.seller_name import VendorNameFacts as VendorNameFacts
+from apps.vendors.seller_name import natural_person_names as natural_person_names
+from apps.vendors.seller_name import normalize_name as normalize_name
+from apps.vendors.seller_name import public_seller_name as public_seller_name
+from apps.vendors.seller_name import reveals_person as reveals_person
+
 NECESSARY = "necessary"
 PREFERENCES = "preferences"
 STATISTICS = "statistics"

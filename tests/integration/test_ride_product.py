@@ -57,6 +57,7 @@ def mug(ride: None) -> str:
         status=Product.Status.PUBLISHED,
         kind=Product.Kind.VARIABLE,
         price_net=Decimal("18.00"),
+        weight_kg=None,  # a weight would add the Specifications tab: this file tests two tabs
     )
     ProductTranslationFactory.create(
         product=product,

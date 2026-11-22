@@ -1,0 +1,16 @@
+{% load i18n %}{# The official model withdrawal form (art. 246a par. 1 sec. 2 EGBGB, Annex 2) for goods, formal register (I18N.20). #}
+<div class="model-withdrawal-form">
+  <h3>{% translate "Model withdrawal form" %}</h3>
+  <p>{% translate "(Complete and return this form only if you wish to withdraw from the contract.)" %}</p>
+  <ul>
+    <li>{% translate "To: the seller of the order (name, postal address, telephone number and email address: see the seller details in your order confirmation (page and email) and in the order summary at checkout)" %}</li>
+    <li>{% translate "I/We (*) hereby give notice that I/We (*) withdraw from my/our (*) contract of sale of the following goods (*)" %}</li>
+    <li>{% translate "Ordered on (*) / received on (*)" %}</li>
+    <li>{% translate "Name of consumer(s)" %}</li>
+    <li>{% translate "Address of consumer(s)" %}</li>
+    <li>{% translate "Signature of consumer(s) (only if this form is notified on paper)" %}</li>
+    <li>{% translate "Date" %}</li>
+  </ul>
+  <p>{% translate "(*) Delete as appropriate." %}</p>
+  {% if not pdf_view %}<p><a href="{% url 'withdrawal_form_pdf' %}">{% translate "Download the form as PDF" %}</a></p>{% endif %}
+</div>

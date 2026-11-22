@@ -93,3 +93,31 @@ def test_only_the_owner_manages_staff_roles() -> None:
 def test_the_generated_doc_is_current() -> None:
     doc = Path(__file__).parents[4] / "docs" / "dev" / "platform-roles.md"
     assert doc.read_text() == roles.render_matrix_doc()
+
+
+def test_support_reads_but_never_writes_the_products_section_cat30() -> None:
+    assert roles.allows("platform.products", [roles.SUPPORT])
+    assert not roles.allows("platform.products", [roles.SUPPORT], write=True)
+    assert not roles.allows("platform.products", [roles.FINANCE])
+
+
+def test_return_policy_approval_is_its_own_cell_ven40() -> None:
+    """Catalogue and moderation and the owner approve; no other role, and the superuser none."""
+    for key in roles.ROLE_KEYS:
+        expected = key in (roles.CATALOG, roles.OWNER)
+        assert roles.allows("platform.return_policy", [key], write=True) is expected
+    assert not roles.allows("platform.return_policy", [roles.SUPERUSER])
+    # Independent of the profile reopen right (a Django permission no role holds).
+    assert all("change_vendor" not in p for r in roles.ROLES for p in r.permissions)
+
+
+def test_the_catalog_services_know_every_platform_role_permission() -> None:
+    """CAT.30: the catalog services list the permission of every platform role."""
+    from apps.catalog import services
+
+    own = {perm for role in roles.ROLES for perm in role.permissions if perm.startswith("manager.")}
+    assert own <= set(services.PLATFORM_ROLE_PERMISSIONS)
+    assert set(services.CATALOG_EDITOR_PERMISSIONS) == {
+        "manager.platform_catalog",
+        roles.PLATFORM_OWNER_PERMISSION,
+    }

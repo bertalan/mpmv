@@ -21,6 +21,9 @@ The Django admin is classified as a whole: staff only, with the object pages of 
 models tested on Vendor B's objects.
 """
 
+import secrets
+from decimal import Decimal
+
 from django.contrib import admin
 from django.db import models
 from django.test import Client
@@ -86,24 +89,39 @@ from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
-from apps.fitment.models import ProductFitment, ProductFitmentState
-from apps.fitment.tests.factories import ProductFitmentFactory, ProductFitmentStateFactory
+from apps.fitment.models import FitmentNodeProposal, ProductFitment, ProductFitmentState
+from apps.fitment.tests.factories import (
+    FitmentCategoryFactory,
+    FitmentNodeProposalFactory,
+    ProductFitmentFactory,
+    ProductFitmentStateFactory,
+)
 from apps.ingest.models import (
     ImportRun,
+    ItemChange,
     MappingTable,
     ProductDraft,
     ReviewItem,
     SourceItem,
+    SourceMissing,
     SourceObservation,
+    SourceState,
+    SourceStateVersion,
+    SourceVariation,
     SupplierSource,
 )
 from apps.ingest.tests.factories import (
     ImportRunFactory,
+    ItemChangeFactory,
     MappingTableFactory,
     ProductDraftFactory,
     ReviewItemFactory,
     SourceItemFactory,
+    SourceMissingFactory,
     SourceObservationFactory,
+    SourceStateFactory,
+    SourceStateVersionFactory,
+    SourceVariationFactory,
     SupplierSourceFactory,
 )
 from apps.ledger.models import LedgerEntry, Refund
@@ -151,9 +169,12 @@ from apps.tax.tests.factories import (
     VendorTaxProfileFactory,
     VendorTaxProfileTranslationFactory,
 )
+from apps.trust.models import VendorTrustSnapshot
+from apps.trust.tests.factories import VendorTrustSnapshotFactory
 from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
+    ReturnPolicyVersion,
     SalesTermsInForce,
     SalesTermsVersion,
     SelfCertification,
@@ -166,6 +187,7 @@ from apps.vendors.models import (
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
     CrossVendorConsentFactory,
+    ReturnPolicyVersionFactory,
     SalesTermsInForceFactory,
     SalesTermsVersionFactory,
     SelfCertificationFactory,
@@ -211,7 +233,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         vendor=vendor, certified=False
     ),
     SelfCertification: lambda vendor: SelfCertificationFactory.create(vendor=vendor),
+    # TRU.1: a vendor's computed trust result; the Manager shows a vendor its own (TRU.2).
+    VendorTrustSnapshot: lambda vendor: VendorTrustSnapshotFactory.create(vendor=vendor),
     # VEN.35: a published version of the seller's sales terms and the pointer to the one in force.
+    ReturnPolicyVersion: lambda vendor: ReturnPolicyVersionFactory.create(vendor=vendor),
     SalesTermsVersion: lambda vendor: SalesTermsVersionFactory.create(vendor=vendor),
     SalesTermsInForce: lambda vendor: SalesTermsInForceFactory.create(version__vendor=vendor),
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
@@ -221,6 +246,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
+    FitmentNodeProposal: lambda vendor: FitmentNodeProposalFactory.create(vendor=vendor),
     ProductFitmentState: lambda vendor: ProductFitmentStateFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
@@ -263,6 +289,13 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     SourceItem: lambda vendor: SourceItemFactory.create(source__vendor=vendor),
     SourceObservation: lambda vendor: SourceObservationFactory.create(item__source__vendor=vendor),
     ProductDraft: lambda vendor: ProductDraftFactory.create(item__source__vendor=vendor),
+    SourceState: lambda vendor: SourceStateFactory.create(item__source__vendor=vendor),
+    SourceStateVersion: lambda vendor: SourceStateVersionFactory.create(
+        item__source__vendor=vendor
+    ),
+    SourceVariation: lambda vendor: SourceVariationFactory.create(item__source__vendor=vendor),
+    SourceMissing: lambda vendor: SourceMissingFactory.create(item__source__vendor=vendor),
+    ItemChange: lambda vendor: ItemChangeFactory.create(item__source__vendor=vendor),
     ImportRun: lambda vendor: ImportRunFactory.create(source__vendor=vendor),
     ReviewItem: lambda vendor: ReviewItemFactory.create(run__source__vendor=vendor),
     MappingTable: lambda vendor: MappingTableFactory.create(vendor=vendor),
@@ -340,6 +373,11 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
 # Models with a ForeignKey chain to Vendor that are deliberately not vendor-scoped, by label,
 # with the reason.
 NOT_VENDOR_OWNED: dict[str, str] = {
+    "orders.StaffDraftLine": (
+        "An item of a cart that platform staff prepared from a past order (ORD.32): the product is "
+        "what the customer may buy again, not an owner; only Support and the platform owner see "
+        "drafts, and no vendor endpoint lists them."
+    ),
     "vendors.CommissionRule": (
         "Platform pricing configuration managed by staff only (VEN.2): the optional vendor is "
         "the rule's target, not an owner; no vendor endpoint lists or edits commission rules."
@@ -384,6 +422,24 @@ def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[s
 def manager_vendor(vendor: Vendor) -> Vendor:
     """The Manager's shop pages show the selected vendor itself (CORE.17)."""
     return vendor
+
+
+def ledger_entry_with_ref(vendor: Vendor) -> LedgerEntry:
+    """A sale with a unique provider reference, the field the VEN.9 pages show (CORE.3)."""
+    return LedgerEntryFactory.create(vendor=vendor, external_ref=f"tr_{secrets.token_hex(8)}")
+
+
+def payout_entry_with_ref(vendor: Vendor) -> LedgerEntry:
+    return LedgerEntryFactory.create(
+        vendor=vendor,
+        kind="payout",
+        amount=Decimal("-1.00"),
+        external_ref=f"po_{secrets.token_hex(8)}",
+    )
+
+
+def external_ref_of(obj: models.Model) -> str:
+    return str(obj.external_ref)  # type: ignore[attr-defined]
 
 
 def vendor_with_pending_termination(vendor: Vendor) -> Vendor:
@@ -494,6 +550,15 @@ ENDPOINTS: dict[str, Access] = {
         "Public image files (THM.12): published images and their renditions, no vendor data.",
         kwargs={"path": "images/missing.webp"},
     ),
+    "palette:css": NoVendorData(
+        "Public site palette stylesheet (THM.31): colors only, the same for every visitor.",
+        path="/palette/default/missing.000000000000.css",
+    ),
+    "wagtaildocs_serve": NoVendorData(
+        "Wagtail document serve view (CMS.15): library documents are not vendor data; a private "
+        "collection or restricted page refuses anonymous visitors.",
+        path="/documents/0/missing.pdf",
+    ),
     "home": NoVendorData("Public home page."),
     "catalog:category": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "product-category"}),
     "catalog:product": NoVendorData(
@@ -555,10 +620,25 @@ ENDPOINTS: dict[str, Access] = {
         "Secure action link Continue POST (CORE.15): a token of another user or object is "
         "refused before anything is shown."
     ),
+    "staff_draft_link": NoVendorData(
+        "Link of a cart prepared by support (ORD.32): a Continue page for a one-time token; "
+        "shows no object.",
+        kwargs={"token": "not-a-token"},
+    ),
+    "staff_draft_link_continue": NoVendorData(
+        "Continue POST of a prepared cart's link (ORD.32): an unknown token or another "
+        "customer's draft is refused before anything is shown."
+    ),
     "vendor_terms:read": NoVendorData(
         "Sales terms in force of any seller (VEN.35, VEN.32 exception): public by design, behind "
         "a signed, expiring link; a superseded version and a tampered link are a 404, every read "
         "is logged.",
+        kwargs={"token": "not-a-token"},
+    ),
+    "vendor_terms:pdf": NoVendorData(
+        "PDF of the sales terms in force of any seller (VEN.36): public by design behind the same "
+        "signed, expiring link; a superseded version and a tampered link are a 404 (an accepted-"
+        "terms link opens its own version), every read is logged.",
         kwargs={"token": "not-a-token"},
     ),
     "vendor_claim:claim": NoVendorData(
@@ -584,6 +664,10 @@ ENDPOINTS: dict[str, Access] = {
     "help_entry": NoVendorData(
         "Contextual help (ARC.32): the platform's help text for a screen, the same for every "
         "signed-in caller; reads no vendor data."
+    ),
+    "map_tile": NoVendorData(
+        "Map tile proxy (EVT.14): a tile image, the same for everyone, no vendor data.",
+        kwargs={"z": "99", "x": "0", "y": "0"},
     ),
     "geocoding_find": NoVendorData(
         "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
@@ -634,10 +718,28 @@ ENDPOINTS: dict[str, Access] = {
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # CMP.5 part 4: the notice of termination and the data download show the selected vendor only.
     "manager:shop:sales_terms": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:return_policy": VendorScopedList(
+        make=manager_vendor, identify=vendor_display_name
+    ),
     "manager:shop:termination": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # The statements of reasons of the selected shop (DSA art. 17); another shop's are never listed.
     "manager:shop:statements": VendorScopedList(
         make=lambda vendor: StatementOfReasonsFactory.create(vendor=vendor)
+    ),
+    # VEN.9: the vendor's own ledger; another vendor's entries never show or export (the provider
+    # reference is the visible mark; the statement names the selected shop).
+    "manager:shop:money": VendorScopedList(make=ledger_entry_with_ref, identify=external_ref_of),
+    "manager:shop:money_transactions": VendorScopedList(
+        make=ledger_entry_with_ref, identify=external_ref_of
+    ),
+    "manager:shop:money_payouts": VendorScopedList(
+        make=payout_entry_with_ref, identify=external_ref_of
+    ),
+    "manager:shop:money_statement": VendorScopedList(
+        make=manager_vendor, identify=vendor_display_name
+    ),
+    "manager:shop:money_export": VendorScopedList(
+        make=ledger_entry_with_ref, identify=external_ref_of, methods=("POST",)
     ),
     # The download exists only while a notice is pending: the vendor made here has one.
     "manager:shop:termination_data": VendorScopedList(
@@ -708,6 +810,31 @@ ENDPOINTS: dict[str, Access] = {
     "manager:shop:event_translate": VendorScoped(
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
         sample={"public_id": NIL_UUID},
+    ),
+    # FIT.3: the Fits pages of the shop; every product is found through `scoped()`.
+    "manager:shop:fitment": VendorScopedList(
+        make=lambda vendor: ProductFactory.create(vendor=vendor),
+        identify=lambda product: str(product.sku),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:fitment_nodes": NoVendorData(
+        "Picker JSON (FIT.3): the approved fitment nodes, the platform's shared vocabulary with no "
+        "vendor data; members of a shop only, bounded, read-only "
+        "(apps/manager/tests/integration/test_fitment_picker.py)."
+    ),
+    "manager:shop:fitment_product": VendorScoped(
+        make=lambda vendor: ProductFactory.create(vendor=vendor),
+        methods=("GET", "POST"),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:fitment_proposals": VendorScopedList(
+        make=lambda vendor: FitmentNodeProposalFactory.create(vendor=vendor),
+        identify=lambda proposal: str(proposal.node.name),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:fitment_report": VendorScopedList(
+        make=lambda vendor: ProductFactory.create(
+            vendor=vendor, category=FitmentCategoryFactory.create().category
+        ),
+        identify=lambda product: str(product.sku),  # type: ignore[attr-defined]
     ),
     # EVT.4 part 2: the block editor, the preview and the image library.
     "manager:shop:event_block_add": VendorScoped(
@@ -801,6 +928,22 @@ ENDPOINTS: dict[str, Access] = {
         "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
         "and the vehicle scheme; no vendor data."
     ),
+    "garage_choose": NoVendorData(
+        "The garage chooser (FIT.7): lists the visitor's own cookie vehicles or own profiles; "
+        "no vendor data."
+    ),
+    "garage_apply": NoVendorData(
+        "The garage chooser's Apply (FIT.7): writes the visitor's own cookie or activates their "
+        "own profile (another account's is a 404); no vendor data."
+    ),
+    "garage_line_dismiss": NoVendorData(
+        "The Add your garage line's Dismiss (FIT.7): sets one flag in the visitor's own session; "
+        "no vendor data."
+    ),
+    "garage_merge": NoVendorData(
+        "The sign-in notice's Add and Not now (FIT.7): a signed-in customer copies the vehicles of "
+        "their own browser cookie into their own profiles; no vendor data."
+    ),
     "manager:platform:orders": StaffOnly(
         "Order changes (ORD.20 part 3): Support and the platform owner find an order by number; "
         "a vendor member gets the platform gate's refusal (test_amendment_views)."
@@ -823,9 +966,51 @@ ENDPOINTS: dict[str, Access] = {
         "only, POST only, with a note and a fresh passkey.",
         kwargs={"public_id": NIL_UUID},
     ),
+    "manager:platform:stray_payments": StaffOnly(
+        "Stray payments (PAY.4): Support and the platform owner close, Finance reads; a close by "
+        "Finance answers 403, other roles and a vendor member 404 (test_stray_payments). The "
+        "alerts span shops by design and show references and amounts only."
+    ),
+    "manager:platform:order_drafts": StaffOnly(
+        "Prepared carts (ORD.32): Support and the platform owner only; a vendor member gets the "
+        "platform gate's refusal and other roles 404 (test_staff_drafts)."
+    ),
+    "manager:platform:order_draft_new": StaffOnly(
+        "Prepare a cart from an order (ORD.32): Support and the platform owner only, POST only, "
+        "with a note.",
+        kwargs={"order": NIL_UUID},
+    ),
+    "manager:platform:order_draft": StaffOnly(
+        "One prepared cart (ORD.32): Support and the platform owner only.",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "manager:platform:order_draft_lines": StaffOnly(
+        "Change a prepared cart's quantities (ORD.32): Support and the platform owner only, POST "
+        "only, with a note; never a price.",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "manager:platform:order_draft_send": StaffOnly(
+        "Send a prepared cart's one-time link (ORD.32): Support and the platform owner only, POST "
+        "only, to the order's own account or guest email.",
+        kwargs={"public_id": NIL_UUID},
+    ),
     "manager:platform:amendment_settings": StaffOnly(
         "The amendment settings in force (ORD.20 part 3): platform configuration, no vendor "
         "data; the configuration role and the platform owner only."
+    ),
+    "manager:platform:trust_rules": StaffOnly(
+        "The trust rules versions (TRU.1 part 2): platform configuration, no vendor data; the "
+        "configuration role and the platform owner only."
+    ),
+    "manager:platform:trust_rule": StaffOnly(
+        "One trust rules version (TRU.1 part 2): platform configuration, no vendor data; the "
+        "configuration role and the platform owner only.",
+        kwargs={"version": "1"},
+    ),
+    "manager:platform:trust_rule_new": StaffOnly(
+        "A new trust rules version with a dry-run preview (TRU.1 part 2): platform configuration, "
+        "no vendor data; the configuration role and the platform owner only; the POST needs the "
+        "operator_config session level."
     ),
     "manager:platform:terminations": StaffOnly(
         "Notices of termination (CMP.5 part 4): platform data; needs the "
@@ -846,15 +1031,15 @@ ENDPOINTS: dict[str, Access] = {
         "Configuration and tax writes, Catalog and the owner read, a vendor member gets 404."
     ),
     "manager:platform:fitment_nodes": StaffOnly(
-        "Fitment nodes (FIT.1): the shared vocabulary, not vendor-owned; Catalog and moderation "
+        "Fitment nodes (FIT.1): the shared vocabulary, not vendor-owned; Catalogue and moderation "
         "writes, Support and the owner read, a vendor member gets 404."
     ),
     "manager:platform:fitment_proposals": StaffOnly(
-        "Proposed fitment nodes (FIT.1): the review queue of the Catalog and moderation role; a "
+        "Proposed fitment nodes (FIT.1): the review queue of the Catalogue and moderation role; a "
         "vendor member gets 404."
     ),
     "manager:platform:fitment_node_new": StaffOnly(
-        "Add a fitment node (FIT.1): Catalog and moderation only; a vendor member gets 404."
+        "Add a fitment node (FIT.1): Catalogue and moderation only; a vendor member gets 404."
     ),
     "manager:platform:fitment_node": StaffOnly(
         "One fitment node (FIT.1): the shared vocabulary, not vendor-owned; Catalog and "
@@ -862,8 +1047,16 @@ ENDPOINTS: dict[str, Access] = {
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "manager:platform:fitment_node_merge": StaffOnly(
-        "Merge of one fitment node (FIT.1): Catalog and moderation only, shown as a dry run "
+        "Merge of one fitment node (FIT.1): Catalogue and moderation only, shown as a dry run "
         "first; a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "manager:platform:catalog_products": StaffOnly(
+        "Product list of the platform (CAT.11): Catalogue and moderation writes, the owner reads, "
+        "Finance, Support and a vendor member get 404; rows come from for_actor."
+    ),
+    "manager:platform:catalog_product": StaffOnly(
+        "One product, preview and audited fields (CAT.11): same roles as the list.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "subprocessors": NoVendorData(
@@ -882,6 +1075,43 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "privacy_erase_done": NoVendorData(
         "Static confirmation page after an erasure request (CMP.4): no data."
+    ),
+    "garage_account": NoVendorData(
+        "The signed-in customer's own garage profiles (FIT.5): the list starts from the caller's "
+        "profiles (`test_the_page_lists_the_profiles_and_marks_the_active_one`); no vendor data."
+    ),
+    "garage_reset": NoVendorData(
+        "The signed-in customer switches their own active profile off (FIT.5): POST only, always "
+        "the caller's profiles (`test_reset_leaves_another_customers_garage_alone`)."
+    ),
+    "garage_profile_activate": NoVendorData(
+        "The signed-in customer makes one of their own profiles active (FIT.5): the profile is "
+        "looked up among the caller's own, "
+        "anything else is a 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`).",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "garage_profile_rename": NoVendorData(
+        "The signed-in customer renames one of their own profiles (FIT.5): the profile is "
+        "looked up among the caller's own, "
+        "anything else is a 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`).",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "garage_profile_duplicate": NoVendorData(
+        "The signed-in customer duplicates one of their own profiles (FIT.5): the profile is "
+        "looked up among the caller's own, "
+        "anything else is a 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`).",
+        kwargs={"public_id": NIL_UUID},
+    ),
+    "garage_profile_delete": NoVendorData(
+        "The signed-in customer deletes one of their own profiles after a "
+        "confirmation step (FIT.5): the profile is "
+        "looked up among the caller's own, "
+        "anything else is a 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`).",
+        kwargs={"public_id": NIL_UUID},
     ),
     "customer_orders": NoVendorData(
         "The signed-in customer's own orders (ORD.7): the queryset starts from the caller's "
@@ -904,6 +1134,12 @@ ENDPOINTS: dict[str, Access] = {
         "The signed-in customer keeps the rest of one of their own packages (ORD.20): looked up "
         "like the cancel; anything else is a 404 (`test_a_stranger_cannot_cancel_the_rest`).",
         kwargs={"public_id": NIL_UUID, "package": NIL_UUID},
+    ),
+    "customer_order_again": NoVendorData(
+        "The signed-in customer puts one of their own past orders back in their cart (ORD.31): "
+        "the order is looked up among the caller's own; anything else is a 404 "
+        "(`test_another_customers_order_is_a_404_also_by_guessing`).",
+        kwargs={"public_id": NIL_UUID},
     ),
     "privacy_requests": StaffOnly(
         "Erasure requests (CMP.4): platform data listed by public id; needs "
@@ -958,6 +1194,19 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "consumer_information": NoVendorData(
         "Pre-contractual information (CMP.6): platform-wide legal text, no vendor data."
+    ),
+    "withdrawal_form_pdf": NoVendorData(
+        "Blank model withdrawal form PDF (I18N.20): platform-wide legal text, no vendor data."
+    ),
+    "customer_help": NoVendorData("Customer help index (ARC.37): repository text, no vendor data."),
+    "customer_help_section": NoVendorData(
+        "Customer help section (ARC.37): repository text, no vendor data.",
+        kwargs={"section": "ordering"},
+    ),
+    "vendor_help": NoVendorData("Seller guide index (ARC.37): repository text, no vendor data."),
+    "vendor_help_section": NoVendorData(
+        "Seller guide section (ARC.37): repository text, no vendor data.",
+        kwargs={"section": "getting-started"},
     ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
@@ -1056,6 +1305,10 @@ API_OPERATIONS: dict[str, Access] = {
         "404. Shows only the ChangeSet of what it creates."
     ),
     "GET /api/v1/catalog/products/{public_id}": VendorScoped(
+        make=lambda vendor: ProductFactory.create(vendor=vendor)
+    ),
+    # CAT.15
+    "GET /api/v1/catalog/products/{public_id}/other-sellers": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor)
     ),
     # EVT.5

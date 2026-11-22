@@ -37,6 +37,7 @@ and lives on that URL; a vendor landing page tells an active vendor's story with
 """
 
 import datetime as dt
+import logging
 import uuid
 from typing import Any, ClassVar
 from urllib.parse import urljoin
@@ -53,25 +54,44 @@ from django.utils import timezone
 from django.utils.cache import get_max_age, patch_cache_control
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
 from wagtail import blocks
 from wagtail.admin.panels import FieldPanel
 from wagtail.contrib.routable_page.models import RoutablePageMixin, path
+from wagtail.contrib.settings.models import BaseSiteSetting
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images import get_image_model_string
-from wagtail.models import Page, PageManager, PageQuerySet, TranslatableMixin
+from wagtail.models import (
+    DraftStateMixin,
+    LockableMixin,
+    Orderable,
+    Page,
+    PageManager,
+    PageQuerySet,
+    RevisionMixin,
+    TranslatableMixin,
+    Workflow,
+    WorkflowMixin,
+)
 from wagtail_localize.fields import BaseTranslatableField, SynchronizedField, TranslatableField
 from wagtail_localize.models import Translation
 
+from apps.core.fields import LanguageField
 from apps.core.images import rendition_or_original
+from apps.core.nfc_forms import NFCInlinePanel, NFCModelForm, NFCPageForm
 from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
 from apps.vendors.services import has_public_storefront
 
 from . import engine
 from .blocks import (
     RICH_TEXT_FEATURES,
+    AccordionBlock,
     ArticleLinksBlock,
     CallToActionBlock,
+    ContentSnippetBlock,
     CounterBlock,
+    DownloadBlock,
     FaqBlock,
     FeaturedLinksBlock,
     FigureBlock,
@@ -90,6 +110,26 @@ from .blocks import (
     paragraph_block,
 )
 from .choosers import term_chooser, vendor_chooser
+from .footer_forms import FooterSettingsForm
+from .forms_pages import FormField as FormField  # re-exported: models live in their own module
+from .forms_pages import FormPage as FormPage
+
+
+def seo_image_field() -> "models.ForeignKey[Any, Any]":
+    """The picture search and social previews show for a page (SEO.8 2/2, D-36), optional: the
+    page's main image, the site default and the platform logo follow in that order."""
+    return models.ForeignKey(
+        get_image_model_string(),
+        verbose_name=_("sharing image"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text=_(
+            "The picture shown when this page is shared on social networks. If you leave it "
+            "empty, the main image of the page, the site default or the logo is used."
+        ),
+    )
 
 
 def body_field(
@@ -124,6 +164,9 @@ def body_field(
             ("counter", CounterBlock()),
             ("progress", ProgressBlock()),
             ("video_modal", VideoModalBlock()),
+            ("download", DownloadBlock()),
+            ("accordion", AccordionBlock()),
+            ("content_snippet", ContentSnippetBlock()),
             *grid,
             *extra,
             *sections,
@@ -185,9 +228,16 @@ class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is u
     on every save (the page table holds the locale, so no database constraint can).
     """
 
+    base_form_class = NFCPageForm
+
     body = body_field(countdown=True, products=True)
+    seo_image = seo_image_field()
 
     content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("body")]
+    promote_panels: ClassVar[list[Any]] = [*Page.promote_panels, FieldPanel("seo_image")]
+    override_translatable_fields: ClassVar[list[Any]] = [
+        SynchronizedField("seo_image", overridable=True)
+    ]
     parent_page_types: ClassVar[list[str]] = ["wagtailcore.Page"]
     subpage_types: ClassVar[list[str]] = [
         "cms.StandardPage",
@@ -222,6 +272,8 @@ class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is u
 
 class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
     """A static page: about us, contact, FAQ (spec 10 §10.2), with an optional main image."""
+
+    base_form_class = NFCPageForm
 
     image = models.ForeignKey(
         get_image_model_string(),
@@ -262,6 +314,7 @@ class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
         ),
     )
     body = body_field(countdown=True, products=True)
+    seo_image = seo_image_field()
 
     content_panels: ClassVar[list[Any]] = [
         *Page.content_panels,
@@ -270,10 +323,15 @@ class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
         FieldPanel("image_caption"),
         FieldPanel("body"),
     ]
-    promote_panels: ClassVar[list[Any]] = [*Page.promote_panels, FieldPanel("noindex")]
+    promote_panels: ClassVar[list[Any]] = [
+        *Page.promote_panels,
+        FieldPanel("seo_image"),
+        FieldPanel("noindex"),
+    ]
     # Spec 10 "Images per locale": the source image until a translator replaces it.
     override_translatable_fields: ClassVar[list[Any]] = [
-        SynchronizedField("image", overridable=True)
+        SynchronizedField("image", overridable=True),
+        SynchronizedField("seo_image", overridable=True),
     ]
     parent_page_types: ClassVar[list[str]] = ["cms.HomePage", "cms.StandardPage"]
     subpage_types: ClassVar[list[str]] = [
@@ -344,6 +402,8 @@ class EditorRoleSeed(models.Model):
 class NavigationMenu(TranslatableMixin, models.Model):  # type: ignore[misc]
     """The header or footer links of one language (a snippet editors manage per locale)."""
 
+    base_form_class = NFCModelForm
+
     class Location(models.TextChoices):
         HEADER = "header", _("Header")
         FOOTER = "footer", _("Footer")
@@ -379,6 +439,123 @@ class NavigationMenu(TranslatableMixin, models.Model):  # type: ignore[misc]
 
     def __str__(self) -> str:
         return f"{self.get_location_display()} ({self.locale})"
+
+
+# --- Footer columns and social profiles (CMS.17)
+
+
+class FooterSettings(ClusterableModel, BaseSiteSetting):  # type: ignore[misc]  # untyped
+    """The footer content of one Wagtail Site: up to four widget columns per language and the
+    social profile links. One row per site; each column and profile says which language it is
+    for (a profile with no language shows in every language). With no column and no profile
+    the footer shows nothing extra."""
+
+    base_form_class = FooterSettingsForm
+    panels: ClassVar[list[Any]] = [
+        NFCInlinePanel("columns", label=_("Widget column"), heading=_("Widget columns")),
+        NFCInlinePanel("profiles", label=_("Social profile"), heading=_("Social profiles")),
+    ]
+
+    class Meta:
+        verbose_name = _("footer")
+        verbose_name_plural = _("footer")
+
+    def __str__(self) -> str:
+        return f"Footer of {self.site}"
+
+    def clean(self) -> None:
+        """At most four widget columns per language (the columns as held on this object, saved
+        or not, so scripts and the API are held to the same limit as the edit form)."""
+        super().clean()
+        for code in engine.too_many_columns(c.language for c in self.columns.all()):
+            raise ValidationError(
+                _("The footer shows at most four widget columns for each language (%(code)s).")
+                % {"code": code}
+            )
+
+
+class FooterColumn(Orderable):  # type: ignore[misc]
+    """A footer widget column of one language: a title and a list of page or external links."""
+
+    settings = ParentalKey(FooterSettings, on_delete=models.CASCADE, related_name="columns")
+    language = LanguageField(
+        _("language"),
+        help_text=_("The language of the visitors who see this column. Up to four per language."),
+    )
+    title = models.CharField(
+        _("title"),
+        max_length=100,
+        blank=True,
+        help_text=_("The heading of the column, for example 'Company'."),
+    )
+    links = StreamField(
+        [("page", PageLinkBlock()), ("external", ExternalLinkBlock())],
+        blank=True,
+        verbose_name=_("links"),
+        help_text=_(
+            "The links of the column, in the order shown: a page of this site or another website."
+        ),
+    )
+
+    panels: ClassVar[list[Any]] = [
+        FieldPanel("language"),
+        FieldPanel("title"),
+        FieldPanel("links"),
+    ]
+
+    class Meta(Orderable.Meta):  # type: ignore[misc]
+        verbose_name = _("footer column")
+
+    def __str__(self) -> str:
+        return f"{self.language}: {self.title}"
+
+
+class SocialProfile(Orderable):  # type: ignore[misc]
+    """A social profile link of the footer. The visible label is the network's name."""
+
+    settings = ParentalKey(FooterSettings, on_delete=models.CASCADE, related_name="profiles")
+    network = models.CharField(
+        _("network"),
+        max_length=16,
+        choices=[(code, name) for code, name in engine.SOCIAL_NETWORKS.items()],
+    )
+    url = models.URLField(
+        _("address"),
+        max_length=300,
+        help_text=_("The full address of the profile. It must start with https://."),
+    )
+    language = LanguageField(
+        _("language"),
+        blank=True,
+        help_text=_("Leave empty to show the profile in every language."),
+    )
+
+    panels: ClassVar[list[Any]] = [
+        FieldPanel("network"),
+        FieldPanel("url"),
+        FieldPanel("language"),
+    ]
+
+    class Meta(Orderable.Meta):  # type: ignore[misc]
+        verbose_name = _("social profile")
+
+    def __str__(self) -> str:
+        return f"{self.network}: {self.url}"
+
+    @property
+    def label(self) -> str:
+        return engine.SOCIAL_NETWORKS.get(self.network, self.network)
+
+    def clean(self) -> None:
+        super().clean()
+        if engine.social_url_error(self.url):
+            raise ValidationError(
+                {
+                    "url": _(
+                        "Enter an absolute address that starts with https:// and has no user name."
+                    )
+                }
+            )
 
 
 # --- Contextual help (ARC.32)
@@ -530,6 +707,8 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
     No EN fallback (Q-42): a language without its own published page has no such page, so the
     URL is not found; nothing serves the EN text in its place (`language_fallback`).
     """
+
+    base_form_class = NFCPageForm
 
     class Kind(models.TextChoices):
         TERMS = "terms", _("Terms of sale")
@@ -858,6 +1037,8 @@ class FAQItemBlock(blocks.StructBlock):  # type: ignore[misc]
 class VendorRecruitmentPage(Page):  # type: ignore[misc]
     """ "Sell with us": the plans, a FAQ and the call to apply (VEN.22's public form)."""
 
+    base_form_class = NFCPageForm
+
     intro = body_field(
         _("introduction"),
         help_text=_(
@@ -909,6 +1090,119 @@ class VendorRecruitmentPage(Page):  # type: ignore[misc]
         return context
 
 
+# --- Reusable content snippet (CMS.14)
+
+_logger = logging.getLogger(__name__)
+
+CONTENT_SNIPPET_REVIEW = "Content snippet review"
+
+
+class ContentSnippet(
+    WorkflowMixin,  # type: ignore[misc]  # Wagtail is untyped
+    DraftStateMixin,  # type: ignore[misc]
+    LockableMixin,  # type: ignore[misc]
+    RevisionMixin,  # type: ignore[misc]
+    TranslatableMixin,  # type: ignore[misc]
+    models.Model,
+):
+    """A text written once and placed in any page body by the `content_snippet` block (D-36).
+
+    Translatable per language (wagtail-localize), with drafts and revisions, and a moderation
+    workflow: an edit reaches the pages that use it only when it is approved and published.
+    Rich text only: a snippet cannot hold a snippet block, so there is no recursion."""
+
+    base_form_class = NFCModelForm
+
+    title = models.CharField(
+        _("title"),
+        max_length=120,
+        help_text=_(
+            "A name for the editors, for example 'Shipping terms'. Never shown to visitors. "
+            "Up to 120 characters. Required."
+        ),
+    )
+    body = RichTextField(
+        _("text"),
+        features=RICH_TEXT_FEATURES,
+        help_text=_(
+            "The text shown wherever the snippet is placed. If you leave it empty, "
+            "nothing is shown."
+        ),
+    )
+
+    panels: ClassVar[list[Any]] = [FieldPanel("title"), FieldPanel("body")]
+    translatable_fields: ClassVar[list[Any]] = [
+        SynchronizedField("title"),
+        TranslatableField("body"),
+    ]
+
+    class Meta(TranslatableMixin.Meta):  # type: ignore[misc]
+        verbose_name = _("reusable snippet")
+        verbose_name_plural = _("reusable snippets")
+        ordering: ClassVar[list[str]] = ["title"]
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(
+                fields=["locale", "title"], name="cms_content_snippet_title_per_locale"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.title)
+
+    def get_workflow(self) -> Workflow | None:
+        """Every snippet goes through "Content snippet review" (one approval task)."""
+        workflow = content_snippet_workflow()
+        return workflow if workflow is not None and workflow.active else None
+
+    @property
+    def has_workflow(self) -> bool:
+        return self.get_workflow() is not None
+
+    def publish(self, revision: Any, *args: Any, **kwargs: Any) -> Any:
+        """Fail closed on every path (admin, API, shell, scheduled job): no active review
+        workflow, no publish. A scheduled go-live is skipped with a warning and stays scheduled,
+        so one refused snippet does not stop `publish_scheduled` for the other objects."""
+        from .snippet_workflow import REFUSED_MESSAGE, SnippetPublishRefused, snippet_can_publish
+
+        if snippet_can_publish(self):
+            return super().publish(revision, *args, **kwargs)
+        if kwargs.get("log_action") == "wagtail.publish.scheduled":
+            _logger.warning(
+                "Scheduled publish of snippet %s (revision %s) skipped: review workflow "
+                "missing or switched off. It stays scheduled.",
+                self.pk,
+                getattr(revision, "pk", None),
+            )
+            return None
+        raise SnippetPublishRefused(str(REFUSED_MESSAGE))
+
+
+def content_snippet_workflow(*, create: bool = False) -> Workflow | None:
+    """The "Content snippet review" workflow: one `GroupApprovalTask` for "Snippet publishers".
+
+    Created after every `migrate` (`create=True`), never on a request, so a page view or an
+    editor screen does not write. Never changed once it exists, so staff may edit its task and
+    groups in the admin."""
+    from django.contrib.auth.models import Group
+    from django.db import transaction
+    from wagtail.models import GroupApprovalTask, WorkflowTask
+
+    from . import roles
+
+    workflow: Workflow | None = (
+        Workflow.objects.filter(name=CONTENT_SNIPPET_REVIEW).order_by("pk").first()
+    )
+    if workflow is not None or not create:
+        return workflow
+    with transaction.atomic():
+        group, _created = Group.objects.get_or_create(name=roles.SNIPPET_PUBLISHERS)
+        task = GroupApprovalTask.objects.create(name=CONTENT_SNIPPET_REVIEW)
+        task.groups.add(group)
+        workflow = Workflow.objects.create(name=CONTENT_SNIPPET_REVIEW)
+        WorkflowTask.objects.create(workflow=workflow, task=task, sort_order=0)
+    return workflow
+
+
 # --- Blog (CMS.3)
 
 
@@ -922,6 +1216,8 @@ class BlogAuthor(TranslatableMixin, models.Model):  # type: ignore[misc]  # Wagt
     """The byline of articles: a name, not a user account (legacy authors have none), with a
     bio, a photo and an author page. A translatable snippet: each language has its own copy, the
     bio and the photo's alt text are translated, the name, slug and photo are the source's."""
+
+    base_form_class = NFCModelForm
 
     name = models.CharField(
         _("name"),
@@ -1064,6 +1360,8 @@ class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
     articles here, paginated the same way. An author without articles gets an empty list.
     """
 
+    base_form_class = NFCPageForm
+
     PER_PAGE = 12
 
     intro = RichTextField(
@@ -1162,6 +1460,8 @@ class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
 class BlogPostPage(Page):  # type: ignore[misc]
     """An article: date, author, summary, main image and body (spec 10 §10.2)."""
 
+    base_form_class = NFCPageForm
+
     date = models.DateField(
         _("publication date"),
         default=timezone.localdate,
@@ -1219,6 +1519,7 @@ class BlogPostPage(Page):  # type: ignore[misc]
             "If you leave it empty, no caption is shown."
         ),
     )
+    seo_image = seo_image_field()
     body = StreamField(
         [
             ("paragraph", paragraph_block()),
@@ -1232,6 +1533,9 @@ class BlogPostPage(Page):  # type: ignore[misc]
             ("counter", CounterBlock()),
             ("progress", ProgressBlock()),
             ("video_modal", VideoModalBlock()),
+            ("download", DownloadBlock()),
+            ("accordion", AccordionBlock()),
+            ("content_snippet", ContentSnippetBlock()),
             ("product_grid", ProductGridBlock()),
             ("product_cards", ProductCardsBlock()),
         ],
@@ -1253,8 +1557,10 @@ class BlogPostPage(Page):  # type: ignore[misc]
         FieldPanel("image_caption"),
         FieldPanel("body"),
     ]
+    promote_panels: ClassVar[list[Any]] = [*Page.promote_panels, FieldPanel("seo_image")]
     override_translatable_fields: ClassVar[list[Any]] = [
-        SynchronizedField("image", overridable=True)
+        SynchronizedField("image", overridable=True),
+        SynchronizedField("seo_image", overridable=True),
     ]
     parent_page_types: ClassVar[list[str]] = ["cms.BlogIndexPage"]
     subpage_types: ClassVar[list[str]] = []
@@ -1318,6 +1624,8 @@ class TermLandingPage(Page):  # type: ignore[misc]
     current URL (MIG.11); its place in the page tree answers one 301 there. The editor's preview
     renders the editorial part with the term's newest products.
     """
+
+    base_form_class = NFCPageForm
 
     term = models.ForeignKey(
         "catalog.Term",
@@ -1431,6 +1739,8 @@ class VendorLandingPage(Page):  # type: ignore[misc]
     products (spec 10 §10.2), linked from the storefront. Shown only while the vendor is
     active: otherwise it has no URL and answers 404. Vendor-owned data (CORE.3 scoping).
     """
+
+    base_form_class = NFCPageForm
 
     vendor_scope: ClassVar[str] = "vendor"
     objects = VendorLandingPageManager()

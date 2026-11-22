@@ -32,11 +32,28 @@ from tests.tenancy import CrossTenant
 
 PUBLIC_CATALOG = "Public catalog listing (CAT.8): published products of active vendors only."
 PUBLIC_CMS = "Public CMS page (CMS.1)."
+DOCUMENT = (
+    "Wagtail document serve view (CMS.15, `test_the_serve_view_sends_an_attachment_with_nosniff`): "
+    "a library document as an attachment with nosniff; one in a private collection is refused "
+    "(`test_a_document_in_a_private_collection_is_refused_to_anonymous_visitors`); an unknown id "
+    "is a 404."
+)
 MEDIA = (
     "Public image files (THM.12, apps.core.media): published images and renditions, served to "
     "anyone as on STAGE/LIVE through Caddy. The path names a file in the image folders only, not "
     "an object a caller could swap for another tenant's; anything outside them is a 404 "
     "(tests/integration/test_modern_image_formats.py)."
+)
+TILE = (
+    "Map tile proxy (EVT.14, apps.core.maps): the path is three validated integers, never an "
+    "object; a tile is the same for everyone and carries no user or tenant data. An invalid "
+    "tile is a 404 before any database or upstream call (`apps/core/tests/integration/"
+    "test_map_tiles.py`)."
+)
+PALETTE_CSS = (
+    "Public site palette stylesheet (THM.31): GET only (a POST is a 405), the same CSS for every "
+    "visitor, named by theme, palette slug and content digest; it holds colors, no vendor data, "
+    "and an unknown theme or palette is a 404 (`test_the_palette_stylesheet_answers_only_get`)."
 )
 SIGN_IN = "Sign-in page: must answer before the visitor is signed in."
 PASSWORD_RESET = "Password reset flow of the editors' admin: answers before sign-in."
@@ -53,6 +70,8 @@ PUBLIC: dict[str, str] = {
     ),
     "home": "Public home page.",
     "media": MEDIA,
+    "map_tile": TILE,
+    "palette:css": PALETTE_CSS,
     "catalog:category": PUBLIC_CATALOG,
     "catalog:product": PUBLIC_CATALOG,
     "catalog:brand": PUBLIC_CATALOG,
@@ -95,6 +114,14 @@ PUBLIC: dict[str, str] = {
     ),
     "action_link:open": "Secure action link (CORE.15): the signed token is the credential.",
     "action_link:continue": "Secure action link (CORE.15): the signed token is the credential.",
+    "staff_draft_link": (
+        "Link of a cart prepared by support (ORD.32): the one-time random token is the "
+        "credential; a GET shows a Continue page and changes nothing."
+    ),
+    "staff_draft_link_continue": (
+        "Link of a cart prepared by support (ORD.32): the token in the POST body is the "
+        "credential, rate limited per IP; an account's cart needs that account signed in."
+    ),
     "garage_save": (
         "Anonymous garage cookie control (FIT.6, Q-G1): a POST that only writes or clears the "
         "visitor's own technical cookie, CSRF-checked, nothing stored or logged on the server."
@@ -106,6 +133,18 @@ PUBLIC: dict[str, str] = {
     "garage_forget": (
         "Anonymous garage cookie control (FIT.6, Q-G1): a POST that only writes or clears the "
         "visitor's own technical cookie, CSRF-checked, nothing stored or logged on the server."
+    ),
+    "garage_choose": (
+        "The garage chooser (FIT.7): a GET that reads the visitor's own cookie or, signed in, "
+        "their own profiles, and changes nothing."
+    ),
+    "garage_apply": (
+        "Anonymous garage cookie control (FIT.7): a POST that only writes the visitor's own "
+        "technical cookie or, signed in, activates one of their own profiles; CSRF-checked."
+    ),
+    "garage_line_dismiss": (
+        "The Add your garage line's Dismiss (FIT.7): a POST that sets one boolean in the "
+        "visitor's own session and redirects by a checked same-host Referer; CSRF-checked."
     ),
     "dsa_notice": (
         "Public report form for illegal content (DSA art. 16, CMP.5): the page is public by "
@@ -132,6 +171,26 @@ PUBLIC: dict[str, str] = {
     "consumer_information": (
         "Pre-contractual information (CMP.6, directive 2011/83/EU art. 49): the same legal text "
         "for every visitor, public by law."
+    ),
+    "withdrawal_form_pdf": (
+        "Blank model withdrawal form as a PDF (I18N.20): the same legal text for every visitor, "
+        "no order or personal data, public by law."
+    ),
+    "customer_help": (
+        "Customer help index (ARC.37): the same repository-file text for every visitor, "
+        "read-only, public by design."
+    ),
+    "customer_help_section": (
+        "Customer help section (ARC.37): the same repository-file text for every visitor, "
+        "read-only, public by design."
+    ),
+    "vendor_help": (
+        "Seller guide index (ARC.37): the same repository-file text for every visitor, "
+        "read-only, public by design."
+    ),
+    "vendor_help_section": (
+        "Seller guide section (ARC.37): the same repository-file text for every visitor, "
+        "read-only, public by design."
     ),
     "subprocessors": (
         "Sub-processor register (CMP.4): static reviewed data, read-only, public by design "
@@ -165,6 +224,7 @@ PUBLIC: dict[str, str] = {
     "events_resource": "Public event ICS download and RSS/ICS feeds (EVT.6, EVT.9): a published "
     "event's calendar file; rate limited per IP and path (30 a minute, then 429).",
     "wagtail_serve": PUBLIC_CMS,
+    "wagtaildocs_serve": DOCUMENT,
     "wagtailcore_login": "Sign-in for password-protected CMS pages.",
     "wagtailcore_authenticate_with_password": "Password form of a private CMS page.",
     "wagtailadmin_login": SIGN_IN,
@@ -212,12 +272,24 @@ SITEMAP = (
 )
 
 IDOR_REVIEWED: dict[str, str] = {
+    "customer_help_section": (
+        "Public by design (ARC.37): the slug names a fixed section of the repository help text, "
+        "the same for every visitor; an unknown slug is a 404 "
+        "(`test_an_unknown_section_is_a_404`)."
+    ),
+    "vendor_help_section": (
+        "Public by design (ARC.37): the slug names a fixed section of the repository seller "
+        "guide, the same for every visitor; an unknown slug is a 404."
+    ),
     "events_resource": (
         "Public by design (EVT.6, EVT.9): the path names a published event's calendar file or a "
         "feed, the same for every visitor; a hidden event and an unknown path are a 404 "
         "(`test_pending_draft_and_hidden_events_are_404_to_visitors`)."
     ),
     "media": MEDIA,
+    "wagtaildocs_serve": DOCUMENT,
+    "map_tile": TILE,
+    "palette:css": PALETTE_CSS,
     "sitemap_section": SITEMAP,
     "llms_language": SITEMAP,
     "sitemap_part": SITEMAP,
@@ -234,6 +306,31 @@ IDOR_REVIEWED: dict[str, str] = {
         "Looked up like the cancel of the rest (ORD.20): a stranger's order or package answers "
         "404 (`test_a_stranger_cannot_cancel_the_rest`)."
     ),
+    "garage_profile_activate": (
+        "The profile is looked up among the signed-in customer's own (FIT.5); a stranger's "
+        "profile or a guessed id answers 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`)."
+    ),
+    "garage_profile_rename": (
+        "The profile is looked up among the signed-in customer's own (FIT.5); a stranger's "
+        "profile or a guessed id answers 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`)."
+    ),
+    "garage_profile_duplicate": (
+        "The profile is looked up among the signed-in customer's own (FIT.5); a stranger's "
+        "profile or a guessed id answers 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`)."
+    ),
+    "garage_profile_delete": (
+        "The profile is looked up among the signed-in customer's own (FIT.5); a stranger's "
+        "profile or a guessed id answers 404 "
+        "(`test_another_customers_profile_is_a_404_like_an_unknown_one`)."
+    ),
+    "customer_order_again": (
+        "The order is looked up among the signed-in customer's own (ORD.31); a stranger's order "
+        "or a guessed id answers 404 "
+        "(`test_another_customers_order_is_a_404_also_by_guessing`)."
+    ),
     "mfa:remove_device": (
         "The factor is looked up among the signed-in user's own (CORE.4); another user's factor "
         "answers 404 (`test_a_user_cannot_remove_another_users_second_factor`)."
@@ -246,6 +343,21 @@ IDOR_REVIEWED: dict[str, str] = {
         "The signed token is bound to one user and one object (CORE.15); a token of another "
         "user or object is refused (apps/accounts/tests/integration/test_action_links.py)."
     ),
+    "staff_draft_link": (
+        "The random token names one draft by its digest (ORD.32); a guessed token is refused, "
+        "and opening a draft of another account is refused "
+        "(`test_an_account_draft_opens_for_that_account_only`)."
+    ),
+    "manager:platform:stray_payments": (
+        "No identifier in the URL; the close and Check now POSTs name a payment reference in "
+        "their body. Platform "
+        "space only (CORE.18 row platform.stray_payments), and the service refuses anyone but "
+        "Support or the platform owner; stray payments span shops by design (PAY.4)."
+    ),
+    "manager:platform:order_draft": (
+        "Platform space, Support and the platform owner only (CORE.18 row platform.order_drafts); "
+        "a prepared cart spans shops by design and shows no contact data of the customer."
+    ),
     "manager:platform:profile_confirm": (
         "Platform space, for staff holding the revert permission only (a vendor member gets 403 "
         "from the gate); the entry is an audit entry of any vendor, which staff may review by "
@@ -255,6 +367,11 @@ IDOR_REVIEWED: dict[str, str] = {
         "Platform space, for staff holding the revert permission only (a vendor member gets 403 "
         "from the gate, `test_a_vendor_member_cannot_reach_the_page_or_the_revert`); the entry is "
         "an audit entry of any vendor, which staff may review by design."
+    ),
+    "vendor_terms:pdf": (
+        "Public by design (VEN.36): the same signed link as the page, for the PDF of the version; "
+        "a superseded or tampered link is a 404 and every read is logged "
+        "(`test_a_tampered_or_superseded_link_gives_no_pdf`)."
     ),
     "vendor_terms:read": (
         "Public by design (VEN.35, VEN.32 exception): the signed link names the version in "
@@ -314,11 +431,18 @@ PLACEHOLDER_404: dict[str, str] = {
     "sitemap_section": SITEMAP,
     "llms_language": SITEMAP,
     "sitemap_part": SITEMAP,
+    "vendor_terms:pdf": (
+        "Public by design (VEN.36): the signed token is the credential; a tampered, expired or "
+        "superseded token is a 404 for everyone, and the route shows only the terms in force."
+    ),
     "vendor_terms:read": (
         "Public by design (VEN.35): the signed token is the credential; a tampered, expired or "
         "superseded token is a 404 for everyone, and the route shows only the terms in force."
     ),
     "media": MEDIA,
+    "wagtaildocs_serve": DOCUMENT,
+    "map_tile": TILE,
+    "palette:css": PALETTE_CSS,
     "wagtailadmin_password_reset_confirm": (
         "Password reset confirmation of the editors' admin, public by design (PUBLIC): the uid "
         "and token in the URL are the credential, not a reference to an object a caller could "
@@ -328,6 +452,12 @@ PLACEHOLDER_404: dict[str, str] = {
 
 # Tables a GET of one endpoint may also write, with the reason.
 GET_WRITES_BY_ENDPOINT: dict[str, dict[str, str]] = {
+    "vendor_terms:pdf": {
+        "core_auditlog": (
+            "Every download of the sales terms PDF, and every denied attempt, is logged (VEN.36): "
+            "the entry holds the result, the format and the version, never the reader."
+        ),
+    },
     "vendor_terms:read": {
         "core_auditlog": (
             "Every read of the sales terms in force, and every denied attempt, is logged (VEN.35, "

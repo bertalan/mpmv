@@ -6,6 +6,7 @@ names and value labels in the requested language; `GET /api/v1/catalog/attribute
 platform's attributes so a client knows the codes to send.
 """
 
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -13,11 +14,12 @@ from django.test import Client
 
 from apps.api.tests.factories import ApiClientFactory
 from apps.catalog.models import Attribute, Product, Variant
-from apps.catalog.tests.factories import ProductFactory, clothing_attributes
+from apps.catalog.tests.factories import ProductFactory, attribute_with_values
 from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -27,7 +29,33 @@ SCOPES = ["catalog:read", "catalog:write"]
 
 @pytest.fixture
 def attributes() -> dict[str, Attribute]:
-    return clothing_attributes()
+    """The clothing attributes with texts in the primary language and one other one (I18N.15).
+
+    Names and labels fall back to the primary language, so sizes and the width have a primary
+    text only (a page in the other language falls back to them); colors have both.
+    """
+    first, second = primary_language(), other_language()
+    return {
+        "size": attribute_with_values(
+            "size",
+            {first: "Size", second: "Taglia"},
+            {"s": {first: "S"}, "m": {first: "M"}, "l": {first: "L"}},
+        ),
+        "color": attribute_with_values(
+            "color",
+            {first: "Color", second: "Colore"},
+            {"red": {first: "Red", second: "Rosso"}, "blue": {first: "Blue", second: "Blu"}},
+        ),
+        "material": attribute_with_values(
+            "material",
+            {first: "Material"},
+            {"cotton": {first: "Cotton", second: "Cotone"}, "linen": {first: "Linen"}},
+        ),
+        "bag_width": attribute_with_values(
+            "bag_width", {first: "Width"}, {}, kind=Attribute.Kind.NUMBER, unit="cm"
+        ),
+        "author": attribute_with_values("author", {first: "Author"}, {}, kind=Attribute.Kind.TEXT),
+    }
 
 
 @pytest.fixture
@@ -84,7 +112,9 @@ def test_a_vendor_key_creates_a_size_by_color_product(
     assert product.variants.count() == 4
     assert AuditLog.objects.filter(action="catalog.product.created").exists()
 
-    detail = client.get(f"{PRODUCTS}/{product.public_id}?language=it", headers=headers)
+    detail = client.get(
+        f"{PRODUCTS}/{product.public_id}?language={other_language()}", headers=headers
+    )
     assert detail.status_code == 200, detail.content
     data = detail.json()
     assert data["sku"] == "TEE-1"
@@ -237,7 +267,9 @@ def test_an_unknown_language_is_refused(client: Client, vendor: Vendor) -> None:
 def test_the_attribute_catalogue_lists_codes_kinds_and_labels(
     client: Client, attributes: dict[str, Attribute], vendor: Vendor
 ) -> None:
-    response = client.get("/api/v1/catalog/attributes?language=it", headers=_headers(vendor))
+    response = client.get(
+        f"/api/v1/catalog/attributes?language={other_language()}", headers=_headers(vendor)
+    )
     assert response.status_code == 200, response.content
     by_code = {a["code"]: a for a in response.json()}
     assert by_code["size"]["kind"] == "choice"
@@ -251,3 +283,102 @@ def test_the_attribute_catalogue_lists_codes_kinds_and_labels(
         "name": "Width",
         "values": [],
     }
+
+
+def test_without_a_language_the_catalogue_uses_the_primary_language(
+    client: Client, attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    """The default is the operator's primary language, never a literal `en` (I18N.15)."""
+    url = "/api/v1/catalog/attributes"
+    absent = client.get(url, headers=_headers(vendor))
+    primary = client.get(f"{url}?language={primary_language()}", headers=_headers(vendor))
+    other = client.get(f"{url}?language={other_language()}", headers=_headers(vendor))
+    assert absent.status_code == 200, absent.content
+    assert absent.json() == primary.json()
+    names = {a["code"]: a["name"] for a in absent.json()}
+    assert names["size"] == "Size"
+    assert {a["code"]: a["name"] for a in other.json()}["size"] == "Taglia"
+
+
+def test_an_explicit_language_wins_over_the_primary_one(
+    client: Client, attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    response = client.get(
+        f"/api/v1/catalog/attributes?language={other_language()}", headers=_headers(vendor)
+    )
+    assert {a["code"]: a["name"] for a in response.json()}["color"] == "Colore"
+
+
+def test_the_language_default_is_not_baked_into_the_schema(client: Client) -> None:
+    from apps.api.v1.catalog import LanguageQuery
+
+    assert LanguageQuery().language == primary_language()
+    schema = LanguageQuery.model_json_schema()["properties"]["language"]
+    assert "default" not in schema
+
+
+# --- CAT.15: other sellers of a product
+
+
+def _published(vendor: Vendor, title: str, **fields: Any) -> Product:
+    from apps.catalog.tests.factories import ProductTranslationFactory
+    from apps.core.models import TranslationStatus
+
+    product = ProductFactory.create(vendor=vendor, status=Product.Status.PUBLISHED, **fields)
+    ProductTranslationFactory.create(
+        product=product,
+        language=primary_language(),
+        title=title,
+        slug=title.lower().replace(" ", "-"),
+        status=TranslationStatus.PUBLISHED,
+    )
+    return product
+
+
+@pytest.mark.usefixtures("consumer_prices")
+def test_other_sellers_lists_the_same_gtin_of_other_vendors(client: Client) -> None:
+    mine = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    other = VendorFactory.create(
+        status=Vendor.Status.ACTIVE,
+        sells_online=True,
+        display_name="Shop Beta",
+        legal_form=Vendor.LegalForm.SRL,
+    )
+    gtin = "4006381333931"
+    product = _published(mine, "Mug A", gtin=gtin)
+    listed = _published(other, "Mug B", gtin=gtin, price_net=Decimal("10.00"))
+    _published(other, "Mug C", gtin="4006381333948")  # another article
+    _published(mine, "Mug D", gtin=gtin)  # the caller's own vendor
+    response = client.get(
+        f"{PRODUCTS}/{product.public_id}/other-sellers?language={primary_language()}",
+        headers=_headers(mine),
+    )
+    assert response.status_code == 200
+    [row] = response.json()
+    assert row["public_id"] == str(listed.public_id)
+    assert row["title"] == "Mug B"
+    assert row["seller"] == "Shop Beta"
+    assert row["price"] == "12.20"  # the consumer price with VAT (TAX.12), never the net one
+    assert row["url"].endswith("/mug-b/")
+
+
+def test_other_sellers_of_another_vendors_product_is_a_404(client: Client) -> None:
+    mine = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    stranger = _published(VendorFactory.create(status=Vendor.Status.ACTIVE), "Mug A")
+    response = client.get(f"{PRODUCTS}/{stranger.public_id}/other-sellers", headers=_headers(mine))
+    assert response.status_code == 404
+
+
+def test_other_sellers_is_bounded_and_needs_the_read_scope(client: Client) -> None:
+    mine = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    product = _published(mine, "Mug A", gtin="4006381333931")
+    for index in range(3):
+        _published(
+            VendorFactory.create(status=Vendor.Status.ACTIVE),
+            f"Mug N{index}",
+            gtin="4006381333931",
+        )
+    url = f"{PRODUCTS}/{product.public_id}/other-sellers"
+    assert len(client.get(f"{url}?limit=2", headers=_headers(mine)).json()) == 2
+    assert client.get(f"{url}?limit=0", headers=_headers(mine)).status_code == 422
+    assert client.get(url, headers=_headers(mine, ["events:read"])).status_code == 403

@@ -16,6 +16,7 @@ from .env import (
     env_secret_list,
     env_str,
     map_tile_origin,
+    map_tile_upstream_url,
 )
 from .languages import language_settings
 
@@ -40,6 +41,7 @@ LOCAL_APPS = [
     "apps.orders",
     "apps.payments",
     "apps.ledger",
+    "apps.trust",  # vendor trust badges (TRU.1, spec 16): reads vendors; read by seo and manager
     "apps.ingest",
     "apps.fitment",  # scheme and nodes of the garage (FIT.1, spec 17): above catalog, below cms
     "apps.cms",
@@ -99,6 +101,7 @@ INSTALLED_APPS = [
     "wagtail.admin",
     "wagtail.contrib.settings",  # BaseSiteSetting for the per-site theme (THM.1)
     "wagtail.contrib.routable_page",  # `routablepageurl` for the blog's author pages (CMS.3)
+    "wagtail.contrib.forms",  # editor-built form pages and their stored submissions (CMS.13)
     "wagtail",
     "modelcluster",
     "taggit",
@@ -125,7 +128,10 @@ MIDDLEWARE = [
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
+    # EVT.14: no cookie and no `Vary: Accept-Language` on tiles; outside Session and Locale.
+    "apps.core.middleware.TileResponseNeutralMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "apps.fitment.middleware.GarageSignOutMiddleware",  # FIT.6: the garage cookie at sign-out
     "django.middleware.locale.LocaleMiddleware",
     "apps.core.middleware.LanguageRedirectMiddleware",  # retired language prefixes (I18N.15)
     # OPS.5: the Django admin answers the normal 404 outside the networks; before CommonMiddleware
@@ -217,6 +223,10 @@ VENDOR_APPLICATION_RATE_LIMIT = 20
 # Public search page (CAT.27): searches allowed per client IP per minute (the query is not
 # counted when empty); a client over it gets a 429.
 SEARCH_RATE_LIMIT = 30
+# Editor-built form pages (CMS.13): submissions allowed per client IP every 15 minutes (over it
+# a 429), and the largest POST body accepted (over it a 400); neither stores anything.
+FORM_PAGE_RATE_LIMIT = 10
+FORM_PAGE_MAX_SUBMISSION_BYTES = 32 * 1024
 # Unconfirmed applications (owner decision D-24, VEN.22): the account and its applicant vendor
 # are deleted this many days after the request, and one reminder goes out after this many hours.
 VENDOR_APPLICATION_RETENTION_DAYS = 3
@@ -249,6 +259,11 @@ ORDER_FREEZE_HOOKS: list[str] = ["apps.compliance.services.orders_frozen"]
 # ORD.20: a consumer withdrawal registered on a vendor order (CMP.6) blocks new amendments; each
 # hook takes the vendor order and returns True when one is registered.
 ORDER_WITHDRAWAL_HOOKS: list[str] = ["apps.compliance.withdrawal.has_withdrawal"]
+# ORD.30: the same two rules for a page of packages at once (constant queries): the freeze hook
+# takes the vendors and returns the ids of the frozen ones, the withdrawal hook takes vendor order
+# ids and returns those with a registered withdrawal.
+ORDER_FREEZE_BATCH_HOOKS: list[str] = ["apps.compliance.services.frozen_vendor_ids"]
+ORDER_WITHDRAWAL_BATCH_HOOKS: list[str] = ["apps.compliance.withdrawal.withdrawn_vendor_order_ids"]
 # ORD.20: the ledger carries out the PAY.4 refund of an amendment's decrease and of a cancel of
 # the rest, in the transaction of the change (orders cannot import the ledger).
 ORDER_AMENDMENT_REFUND_HOOK = "apps.ledger.refunds.refund_amendment"
@@ -294,6 +309,7 @@ TEMPLATES = [
             "builtins": [
                 "apps.seo.templatetags.seo_robots",
                 "apps.seo.templatetags.seo_links",
+                "apps.seo.templatetags.seo_meta",
                 "apps.seo.templatetags.consent",
             ],
             "loaders": [
@@ -330,6 +346,13 @@ MPMV_HELP_URL = env_str("MPMV_HELP_URL", "")
 MPMV_VERSION = os.environ.get("MPMV_VERSION", "") or "dev"
 # The vendor guide the help dialog links on vendor-facing screens (ARC.32); empty = no link.
 MPMV_VENDOR_GUIDE_URL = env_str("MPMV_VENDOR_GUIDE_URL", "")
+
+# Origins a video block may embed (THM.14): added to the CSP `frame-src` of a page that renders a
+# video, and the block refuses an address whose embed is elsewhere. Comma separated plain https
+# origins (cms.E003 refuses anything else); an empty value disables video embeds.
+MPMV_VIDEO_EMBED_ORIGINS = env_list(
+    "MPMV_VIDEO_EMBED_ORIGINS", "https://www.youtube-nocookie.com,https://player.vimeo.com"
+)
 
 # Consent provider (SEO.9, D-10): the name of the consent tool in use. `self-hosted` is our own
 # minimal banner; an operator adds another by naming its class in MPMV_CONSENT_PROVIDERS
@@ -437,10 +460,13 @@ WAGTAILIMAGES_IMAGE_FORM_BASE = "apps.core.forms.MediaImageForm"
 WAGTAILDOCS_EXTENSIONS = ["pdf"]
 WAGTAILDOCS_MAX_UPLOAD_SIZE = 10 * 1024 * 1024
 WAGTAILDOCS_DOCUMENT_FORM_BASE = "apps.core.document_forms.DocumentForm"
-# No document serve view is mounted: a document's URL is its media path, which Caddy answers
-# with 404 (deploy/caddy/Caddyfile). Without this, the admin's document pages fail on the
-# missing `wagtaildocs_serve` route.
-WAGTAILDOCS_SERVE_METHOD = "direct"
+# Documents are served by Wagtail's view (/documents/<id>/<name>), which checks collection
+# privacy and page restrictions and sends Content-Disposition attachment and nosniff. Caddy keeps
+# answering 404 for /media/documents/ (deploy/caddy/Caddyfile). ARC.15 will switch this to
+# "redirect" with short-lived signed URLs.
+WAGTAILDOCS_SERVE_METHOD = "serve_view"
+# Wagtail shows PDFs inline by default; an empty list makes every document an attachment.
+WAGTAILDOCS_INLINE_CONTENT_TYPES: list[str] = []
 # Renditions without an explicit format-* go to WebP. GIF is left out: Wagtail turns a still GIF
 # into PNG and keeps an animated one as GIF, which WebP conversion would flatten to one frame.
 # Templates ask for AVIF, WebP and JPEG explicitly ({% responsive_image %}, apps.core.images).
@@ -604,15 +630,33 @@ GEOCODING_ACCESS_POLICIES: list[str] = ["apps.vendors.services.is_vendor_member"
 
 # Maps (EVT.13, spec 15 "Maps"): the Leaflet tile URL template, its attribution and the view of
 # a map without a point (latitude, longitude, zoom). The tiles come from the EVT.14 proxy on the
-# site itself (`/maps/tiles/{z}/{x}/{y}.png`) once it exists; until then empty means no tile
-# layer (the picker still works: click, drag and the inputs). An absolute https URL is allowed in
+# site itself (`/maps/tiles/{z}/{x}/{y}.png`, the default). An absolute https URL is allowed in
 # the CSP for that one origin only, and never in tests (no third-party network).
-MAP_TILE_URL = env_str("MPMV_MAP_TILE_URL", "")
+MAP_TILE_URL = env_str("MPMV_MAP_TILE_URL", "") or "/maps/tiles/{z}/{x}/{y}.png"
 MAP_TILE_ATTRIBUTION = env_str("MPMV_MAP_TILE_ATTRIBUTION", "") or "© OpenStreetMap contributors"
 MAP_TILE_ATTRIBUTION_URL = (
     env_str("MPMV_MAP_TILE_ATTRIBUTION_URL", "") or "https://www.openstreetmap.org/copyright"
 )
 MAP_DEFAULT_VIEW = (48.0, 10.0, 4)
+# Tile proxy (EVT.14, apps.core.maps): the upstream URL template (OpenStreetMap's public tile
+# server at launch; a paid EU provider later, by changing this value only), the identifying
+# User-Agent (empty: the product, the site URL and the operator contact), the zoom range, the
+# per-IP limit, the daily cap of upstream requests (OSM tile usage policy: light use only) and
+# the storage alias of the cache. Tiles are cached at least 7 days, longer when the upstream says.
+MAP_TILE_UPSTREAM_URL = map_tile_upstream_url(
+    env_str("MPMV_MAP_TILE_UPSTREAM_URL", "") or "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+)
+MAP_TILE_UPSTREAM = "apps.core.maps.adapters.HttpTileUpstream"
+MAP_TILE_USER_AGENT = env_str("MPMV_MAP_TILE_USER_AGENT", "")
+MAP_TILE_MIN_ZOOM = 2  # spec 15: tiles from zoom 2 to 18
+MAP_TILE_MAX_ZOOM = 18
+MAP_TILE_UPSTREAM_TIMEOUT = 5.0  # seconds
+MAP_TILE_SINGLE_FLIGHT_WAIT = 8.0  # seconds a request waits for a concurrent fetch of its tile
+MAP_TILE_UPSTREAM_DAILY_LIMIT = env_int("MPMV_MAP_TILE_UPSTREAM_DAILY_LIMIT", 100_000)
+MAP_TILE_IP_LIMIT = 600  # tiles per IP and window (one map view loads about 20)
+MAP_TILE_IP_WINDOW = 60  # seconds
+MAP_TILE_BROWSER_MAX_AGE = 7 * 24 * 3600  # Cache-Control max-age for browsers and the CDN
+MAP_TILE_CACHE_STORAGE = "default"
 _MAP_TILE_ORIGIN = map_tile_origin(MAP_TILE_URL)
 if _MAP_TILE_ORIGIN:
     SECURE_CSP = {

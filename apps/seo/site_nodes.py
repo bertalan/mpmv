@@ -1,5 +1,6 @@
 """The shared nodes of every page's graph, from the operator row (SEO.7)."""
 
+from collections.abc import Sequence
 from typing import Any
 from urllib.parse import urljoin
 
@@ -19,7 +20,10 @@ def _logo_url(operator: Any, site: str) -> str:
         return ""
 
 
-def operator_graph_node(operator: Any, site: str) -> dict[str, Any]:
+def operator_graph_node(
+    operator: Any, site: str, extra_profiles: Sequence[str] = ()
+) -> dict[str, Any]:
+    """`extra_profiles`: the footer's social profile URLs (CMS.17), after the operator's own."""
     from apps.cms.engine import profile_links
 
     return ge.operator_node(
@@ -28,15 +32,24 @@ def operator_graph_node(operator: Any, site: str) -> dict[str, Any]:
         logo_url=_logo_url(operator, site),
         email=str(operator.support_email),
         vat_id=str(operator.vat_number),
-        profiles=profile_links(operator.official_profiles),
+        profiles=profile_links([*operator.official_profiles, *extra_profiles]),
     )
 
 
 def website_graph_node(
     request: HttpRequest, site: str, language: str, *, publisher: bool, operator_name: str = ""
 ) -> dict[str, Any]:
+    from django.conf import settings
+
+    from apps.catalog.services import SEARCH_PARAMETER
+
+    home = "/" if language == settings.LANGUAGE_CODE else f"/{language}/"
     row = Site.find_for_request(request)
     name = row.site_name if row is not None and row.site_name else operator_name
     return ge.website_node(
-        site=site, name=name, language=language, search_template="", publisher=publisher
+        site=site,
+        name=name,
+        language=language,
+        search_template=ge.search_template(site, home, SEARCH_PARAMETER),
+        publisher=publisher,
     )

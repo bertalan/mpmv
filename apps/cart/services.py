@@ -7,7 +7,7 @@ the order placed from it is audited and snapshotted (ORD.2, ORD.4). Request hand
 belongs to this visitor) is in `session.py`.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Literal, overload
@@ -15,11 +15,14 @@ from typing import Any, Literal, overload
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
+from django.http import HttpRequest
 from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.catalog.models import Product, Variant
+from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
+from apps.tax import prices as tax_prices
 from apps.vendors import services as vendors
 
 from . import engine
@@ -27,6 +30,7 @@ from .models import Cart, CartLine
 
 CART_MODEL = "cart.cart"
 LINE_MODEL = "cart.cartline"
+BULK_ADD_ACTION = "cart.lines_added_in_bulk"
 
 
 def _cart_snapshot(cart: Cart) -> dict[str, Any]:
@@ -152,6 +156,13 @@ def _purchase_limit(product: Product, variant: Variant | None) -> int:
     return engine.line_limit(available)
 
 
+def item_limit(product: Product, variant: Variant | None) -> int:
+    """The most units of the item a cart line may hold today; ValidationError when it cannot be
+    bought (not for sale, vendor paused, on request). 0 means out of stock (ORD.31). The caller
+    loads the product with `select_related("vendor__connected_account")`."""
+    return _purchase_limit(product, variant)
+
+
 def _unit_price(product: Product, variant: Variant | None) -> Decimal | None:
     override = variant.price_net_override if variant is not None else None
     return engine.display_unit_price(
@@ -162,6 +173,34 @@ def _unit_price(product: Product, variant: Variant | None) -> Decimal | None:
 def line_unit_price(line: CartLine) -> Decimal | None:
     """The unit net price shown for a cart line now (None when the product has no online price)."""
     return _unit_price(line.product, line.variant)
+
+
+# The ValidationError code of an item without a price the buyer can see (#757).
+NO_PRICE = "no_price"
+
+
+def price_check(
+    request: HttpRequest | None = None, *, country: str | None = None
+) -> tax_prices.PriceCheck:
+    """The consumer-price test for one destination: `country`, else the one the shop's prices
+    use for `request` (the remembered delivery country, the language, the operator). Build it
+    once and pass it to `has_price` for every item: the tax tables are read once."""
+    return tax_prices.PriceCheck(request, country=country)
+
+
+def has_price(product: Product, variant: Variant | None, prices: tax_prices.PriceCheck) -> bool:
+    """True when the buyer can see a price for the item (TAX.12): a net price, and the VAT the
+    checkout will charge for this vendor and destination can be decided.
+
+    Without one (the vendor has no valid tax profile, no rate for the category) the item shows
+    no amount, so it cannot go in a cart and its line blocks the checkout (#757). The caller
+    loads the product with its vendor."""
+    return prices.priced(_unit_price(product, variant), product.fiscal_category, product.vendor)
+
+
+def _check_price(product: Product, variant: Variant | None, prices: tax_prices.PriceCheck) -> None:
+    if not has_price(product, variant, prices):
+        raise ValidationError(engine.NO_PRICE_ERROR, code=NO_PRICE)
 
 
 def _check_quantity(quantity: int, limit: int) -> None:
@@ -176,21 +215,25 @@ def add_to_cart(
     *,
     variant: Variant | None = None,
     quantity: int = 1,
+    prices: tax_prices.PriceCheck | None = None,
     dry_run: bool = False,
 ) -> ChangeSet:
     """Add `quantity` units of the product (or of its variant) to the cart.
 
     Adding an item already in the cart adds up the quantities on its line. Refused with a
-    ValidationError when the item cannot be bought or the total exceeds the available stock.
+    ValidationError when the item cannot be bought, has no consumer price for the destination of
+    `prices` (default: `price_check()`; code NO_PRICE) or the total exceeds the available stock.
     The line remembers the current display price (`added_price_net`).
     """
-    if quantity < 1:
-        raise ValidationError({"quantity": "The quantity must be at least 1."})
+    error = engine.count_error(quantity)
+    if error is not None:
+        raise ValidationError({"quantity": error})
     with transaction.atomic():
         Cart.objects.select_for_update().get(pk=cart.pk)  # one change at a time per cart
         product = Product.objects.select_related(_VENDOR_ACCOUNT).get(pk=product.pk)
         variant = None if variant is None else Variant.objects.get(pk=variant.pk)
         limit = _purchase_limit(product, variant)
+        _check_price(product, variant, prices or price_check())
         price = _unit_price(product, variant)
         line = CartLine.objects.filter(cart=cart, product=product, variant=variant).first()
         changeset = ChangeSet()
@@ -216,8 +259,99 @@ def add_to_cart(
     return changeset
 
 
+def add_many_to_cart(
+    cart: Cart,
+    items: Sequence[tuple[Product, Variant | None, int]],
+    *,
+    ctx: AuditContext,
+    prices: tax_prices.PriceCheck | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Add several items at once: `(product, variant, quantity)` each, one cart lock.
+
+    The same rules and result as `add_to_cart` per item (quantities of an item listed twice are
+    added up), but the products, variants and existing lines are read in one query each and the
+    lines are written in bulk, so the query count does not grow with the number of items (ORD.31).
+    All or nothing: one refused item raises ValidationError and nothing is written. A real call
+    writes one AuditLog entry (`BULK_ADD_ACTION`) with the product and variant public ids and the
+    quantities added, no personal data; a dry run writes none."""
+    if any(quantity < 1 for _, _, quantity in items):
+        raise ValidationError({"quantity": "The quantity must be at least 1."})
+    wanted: dict[tuple[int, int | None], int] = {}
+    for product, variant, quantity in items:
+        key = (product.pk, None if variant is None else variant.pk)
+        wanted[key] = wanted.get(key, 0) + quantity
+    changeset = ChangeSet()
+    if not wanted:
+        return changeset
+    with transaction.atomic():
+        Cart.objects.select_for_update().get(pk=cart.pk)  # one change at a time per cart
+        products = Product.objects.select_related(_VENDOR_ACCOUNT).in_bulk(
+            {product_id for product_id, _ in wanted}
+        )
+        variants = Variant.objects.in_bulk({vid for _, vid in wanted if vid is not None})
+        existing = {
+            (line.product_id, line.variant_id): line for line in CartLine.objects.filter(cart=cart)
+        }
+        for old in existing.values():
+            old.cart = cart  # the snapshot reads it: no query per line
+        created: list[CartLine] = []
+        updated: list[CartLine] = []
+        prices = prices or price_check()
+        for (product_id, variant_id), quantity in wanted.items():
+            product = products[product_id]
+            variant = None if variant_id is None else variants[variant_id]
+            limit = _purchase_limit(product, variant)
+            _check_price(product, variant, prices)
+            price = _unit_price(product, variant)
+            line = existing.get((product_id, variant_id))
+            if line is None:
+                line = CartLine(
+                    cart=cart,
+                    product=product,
+                    variant=variant,
+                    quantity=quantity,
+                    added_price_net=price,
+                )
+                _check_quantity(line.quantity, limit)
+                changeset.create(LINE_MODEL, str(line.public_id), _line_snapshot(line))
+                created.append(line)
+            else:
+                before = _line_snapshot(line)
+                line.quantity += quantity
+                line.added_price_net = price
+                line.updated_at = timezone.now()
+                _check_quantity(line.quantity, limit)
+                changeset.update(LINE_MODEL, str(line.public_id), before, _line_snapshot(line))
+                updated.append(line)
+        if not dry_run:
+            CartLine.objects.bulk_create(created)
+            CartLine.objects.bulk_update(updated, ["quantity", "added_price_net", "updated_at"])
+            _touch(cart.pk)
+            record(
+                ctx,
+                BULK_ADD_ACTION,
+                CART_MODEL,
+                str(cart.public_id),
+                None,
+                {
+                    "lines": [
+                        {
+                            "product": str(products[product_id].public_id),
+                            "variant": None if vid is None else str(variants[vid].public_id),
+                            "quantity": quantity,
+                        }
+                        for (product_id, vid), quantity in wanted.items()
+                    ]
+                },
+            )
+    return changeset
+
+
 def set_line_quantity(line: CartLine, quantity: int, *, dry_run: bool = False) -> ChangeSet:
     """Set the line's quantity; 0 removes the line. Refused above the available stock."""
+    if not engine.is_whole_quantity(quantity):
+        raise ValidationError({"quantity": "The quantity must be a whole number."})
     if quantity <= 0:
         return remove_line(line, dry_run=dry_run)
     with transaction.atomic():

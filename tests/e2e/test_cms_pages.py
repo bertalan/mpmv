@@ -1,4 +1,4 @@
-"""E2E (CMS.1): EN/IT home and static pages, per-language navigation, Wagtail admin under CSP.
+"""E2E (CMS.1): home and static pages, per-language navigation, Wagtail admin under CSP.
 
 Done when: "EN/IT home and static pages". The seed content (`manage.py seed_cms`) is loaded
 for every e2e test by the suite's conftest.
@@ -16,7 +16,10 @@ from pytest_django.live_server_helper import LiveServer
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.cms.models import NavigationMenu, StandardPage
+from apps.cms.seed import seed_text
+from apps.core.i18n import primary_language
 from tests.e2e.login import verify_with_totp
+from tests.i18n import language_prefix, other_language, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -36,31 +39,36 @@ def csp_violations(page: Page) -> list[str]:
     return violations
 
 
-def test_visitor_reads_home_and_static_pages_in_english_and_italian(
+def test_visitor_reads_home_and_static_pages_in_two_languages(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
+    primary, other = primary_language(), other_language()
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/")
-    expect(page.locator("html")).to_have_attribute("lang", "en")
-    expect(page.get_by_role("heading", level=1)).to_have_text("Home")
-    shot("en-home")
+    expect(page.locator("html")).to_have_attribute("lang", primary)
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Home"))
+    shot(f"{primary}-home")
 
-    page.get_by_role("navigation", name="Main").get_by_role("link", name="About us").click()
-    expect(page).to_have_url(re.compile(r"/about/$"))
-    expect(page.get_by_role("heading", level=1)).to_have_text("About us")
-    shot("en-about")
+    about = seed_text(primary).about
+    page.get_by_role("navigation", name=translated("Main")).get_by_role(
+        "link", name=about.title
+    ).click()
+    expect(page).to_have_url(re.compile(rf"/{about.slug}/$"))
+    expect(page.get_by_role("heading", level=1)).to_have_text(about.title)
+    shot(f"{primary}-about")
 
-    page.locator('button[value="it"]').click()
-    expect(page).to_have_url(re.compile(r"/it/chi-siamo/$"))
-    expect(page.locator("html")).to_have_attribute("lang", "it")
-    expect(page.get_by_role("heading", level=1)).to_have_text("Chi siamo")
-    shot("it-about")
+    texts = seed_text(other)
+    page.locator(f'button[value="{other}"]').click()
+    expect(page).to_have_url(re.compile(rf"{language_prefix(other)}/{texts.about.slug}/$"))
+    expect(page.locator("html")).to_have_attribute("lang", other)
+    expect(page.get_by_role("heading", level=1)).to_have_text(texts.about.title)
+    shot(f"{other}-about")
 
-    page.get_by_role("contentinfo").get_by_role("link", name="Home").click()
-    expect(page).to_have_url(re.compile(r"/it/$"))
-    expect(page.get_by_text("Prodotti di artigiani indipendenti")).to_be_visible()
-    shot("it-home")
+    page.get_by_role("contentinfo").get_by_role("link", name=translated("Home", other)).click()
+    expect(page).to_have_url(re.compile(rf"{language_prefix(other)}/$"))
+    expect(page.get_by_text(re.sub("<[^>]+>", "", texts.home.body))).to_be_visible()
+    shot(f"{other}-home")
 
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
 
@@ -78,25 +86,27 @@ def test_editor_opens_the_wagtail_admin_under_strict_csp(
     assert "'unsafe-inline'" not in response.headers["content-security-policy"]
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
     page.goto(f"{live_server.url}/admin/pages/")
-    expect(page.get_by_role("link", name="Home").first).to_be_visible()
+    expect(page.get_by_role("link", name=translated("Home")).first).to_be_visible()
     shot("admin-pages")
 
-    # The Italian header menu: a StreamField of links, edited without inline scripts.
-    menu = NavigationMenu.objects.get(locale__language_code="it", location="header")
+    # A second language's header menu: a StreamField of links, edited without inline scripts.
+    other = other_language()
+    title = seed_text(other).about.title
+    menu = NavigationMenu.objects.get(locale__language_code=other, location="header")
     page.goto(f"{live_server.url}/admin/snippets/cms/navigationmenu/edit/{menu.pk}/")
-    expect(page.get_by_text("Chi siamo").first).to_be_visible()
-    shot("admin-it-menu")
+    expect(page.get_by_text(title).first).to_be_visible()
+    shot("admin-other-menu")
 
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
 
-    about = StandardPage.objects.get(locale__language_code="it")
+    about = StandardPage.objects.get(locale__language_code=other)
     page.goto(f"{live_server.url}/admin/pages/{about.pk}/edit/")
-    expect(page.locator("#id_title")).to_have_value("Chi siamo")
-    expect(page.get_by_role("button", name="Save draft")).to_be_visible()
-    shot("admin-it-page")
+    expect(page.locator("#id_title")).to_have_value(title)
+    expect(page.get_by_role("button", name=translated("Save draft"))).to_be_visible()
+    shot("admin-other-page")
     # Known: the editor's built-in accessibility checker (axe-core, in Wagtail's vendor.js)
     # adds a helper <style> element, which the CSP blocks; editing is not affected.
     others = [v for v in csp_violations(page) if not _axe_helper_style(v)]

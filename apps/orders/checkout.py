@@ -29,6 +29,7 @@ from apps.core.services import flag_enabled
 from apps.shipping import engine as shipping_engine
 from apps.shipping.services import quote_shipping
 from apps.tax import engine as tax_engine
+from apps.tax import prices as tax_prices
 from apps.tax import services as tax_services
 from apps.tax.models import VatValidation
 from apps.vendors import services as vendors_services
@@ -136,9 +137,8 @@ def _choose(
     return next((r for r in rates if r.key == key), None)
 
 
-def _shipping_choice(
-    rate: shipping_engine.ShippingRate, portions: Sequence[tax_engine.TaxPortion]
-) -> dict[str, Any]:
+def _shipping_choice(rate: shipping_engine.ShippingRate) -> dict[str, Any]:
+    """The chosen rate; `place_order` adds the VAT portions (`tax_portions`) to it."""
     return {
         "key": rate.key,
         "kind": rate.kind,
@@ -150,10 +150,6 @@ def _shipping_choice(
         "min_days": rate.min_days,
         "max_days": rate.max_days,
         "free_shipping": rate.free_shipping,
-        "tax_portions": [
-            {"net": str(p.net), "tax": str(p.tax), "rate": str(p.rate), "reason": str(p.reason)}
-            for p in portions
-        ],
     }
 
 
@@ -176,6 +172,7 @@ def build_checkout(
     shipping_choices: Mapping[int, str] | None = None,
     commission_snapshots: Mapping[int, dict[str, Any]] | None = None,
     quotes_enabled: bool = True,
+    prices: tax_prices.PriceCheck | None = None,
     now: dt.datetime | None = None,
 ) -> CheckoutPreview:
     """Preview the checkout of `cart` for the delivery address (`line1`, `city`, `postcode`,
@@ -188,7 +185,9 @@ def build_checkout(
     valid, fresh one makes a reverse-charge business. Blocking messages are in `preview.blocks`
     and on each package; `preview.placeable` is true when nothing blocks. A package whose
     shipping needs a quote (over the last weight band, special area, no weight, SHP.3) is
-    `quote`, not priced, with a `needs_quote` message. Reads only."""
+    `quote`, not priced, with a `needs_quote` message. Before the address, a line without a
+    consumer price for the destination of `prices` (the view passes the visitor's, as the product
+    page uses; default `price_check()`) is a `no_price` block (#757). Reads only."""
     now = now or timezone.now()
     billing = dict(billing_address) if billing_address else dict(shipping_address)
     delivery = dict(shipping_address)
@@ -219,6 +218,16 @@ def build_checkout(
             )
         )
 
+    unpriced: set[int] = set()  # cart line ids without a consumer price, before the address
+    if destination is None and cart_packages:
+        prices = prices or cart_services.price_check()  # the tax tables, read once per cart
+        unpriced = {
+            line.item.pk
+            for package in cart_packages
+            for line in package.lines
+            if not cart_services.has_price(line.item.product, line.item.variant, prices)
+        }
+
     summaries: list[engine.PackageSummary] = []
     ready: list[PlaceVendor] = []
     customer_ctx: tax_engine.TaxContext | None = None
@@ -235,6 +244,7 @@ def build_checkout(
             commission=(commission_snapshots or {}).get(vendor.pk, {}),
             quotes_enabled=quotes_enabled,
             language=language,
+            unpriced=unpriced,
             now=now,
         )
         if not flag_enabled(flags.CHECKOUT, vendor=vendor):
@@ -311,6 +321,7 @@ def _package(
     commission: dict[str, Any],
     quotes_enabled: bool,
     language: str,
+    unpriced: set[int],
     now: dt.datetime,
 ) -> tuple[engine.PackageSummary, PlaceVendor | None, tax_engine.TaxContext | None]:
     """Check, tax, quote and price one vendor package: (summary, placeable vendor or None, the
@@ -340,7 +351,14 @@ def _package(
     if found:
         return stop(engine.BLOCKED, *found)
     if destination is None:
-        return stop(engine.BLOCKED)  # the cart-level address message says why
+        # Before the address the buyer sees estimated consumer prices (TAX.12): a line without
+        # one says so and blocks (#757). With the address, the tax engine decides below.
+        no_price = [
+            _block(engine.NO_PRICE, "This item has no price yet.", vid, product_id=line.product_id)
+            for line in cart_lines
+            if line.pk in unpriced
+        ]
+        return stop(engine.BLOCKED, *no_price)  # the cart-level address message says why
 
     # Goods VAT per line (tax engine). A blocking tax error stops this package only.
     try:
@@ -414,22 +432,12 @@ def _package(
             shipping_options=_options(outcome.rates, ctx, goods),
         )
 
+    # A package with goods at several VAT rates splits its shipping across them (TAX.17); the
+    # order keeps the portions (ORD.29).
     amounts = engine.price_package(ctx, inputs, rate.net)
-    extra: list[engine.Block] = []
-    if len(amounts.shipping_portions) > 1:
-        # The order stores one shipping VAT rate per vendor order (database check), so a package
-        # with two VAT rates is priced and shown here but cannot be placed until the order keeps
-        # the portions (follow-up of ORD.3).
-        extra.append(
-            _block(
-                engine.SHIPPING_VAT_SPLIT,
-                "Shipping on a package with different VAT rates cannot be placed yet.",
-                vid,
-            )
-        )
     summary = engine.PackageSummary(
         vendor_id=vid,
-        state=engine.BLOCKED if extra else engine.READY,
+        state=engine.READY,
         lines=tuple(
             engine.SummaryLine(
                 product_id=b.product_id,
@@ -443,14 +451,12 @@ def _package(
             )
             for b, p in zip(bare, amounts.lines, strict=True)
         ),
-        blocks=tuple(extra),
+        blocks=(),
         shipping_options=_options(outcome.rates, ctx, goods),
         selected_shipping=rate.key,
         shipping_portions=amounts.shipping_portions,
         totals=amounts.totals,
     )
-    if extra:
-        return summary, None, ctx
     first = amounts.shipping_portions[0] if amounts.shipping_portions else None
     place = PlaceVendor(
         vendor=vendor,
@@ -471,7 +477,8 @@ def _package(
         ],
         shipping_net=rate.net,
         shipping_tax=first,
-        shipping_choice=_shipping_choice(rate, amounts.shipping_portions),
+        shipping_portions=amounts.shipping_portions,
+        shipping_choice=_shipping_choice(rate),
         commission_snapshot=commission,
         tax_profile_snapshot=_profile_snapshot(vendor, now),
     )

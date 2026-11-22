@@ -12,15 +12,18 @@ position. Create and move nodes through `apps.fitment.services`, never by writin
 
 from typing import Any, ClassVar, Self
 
+from django.conf import settings
 from django.contrib.postgres.fields import IntegerRangeField
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
 
 from apps.catalog.models import Category, Product
 from apps.core.fields import LanguageField
 from apps.core.models import BaseModel, TranslationModel
+from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
@@ -74,6 +77,20 @@ class FitmentScheme(BaseModel):
         default=10,
         validators=[MinValueValidator(1), MaxValueValidator(50)],
         help_text=_("How many saved items one customer account can keep."),
+    )
+    garage_inactivity_months = models.PositiveSmallIntegerField(
+        _("months without use before a saved item is deleted"),
+        default=24,
+        validators=[MinValueValidator(1), MaxValueValidator(36)],
+        help_text=_(
+            "A saved item unused for this long is deleted from the account. At most 36 months."
+        ),
+    )
+    garage_notice_days = models.PositiveSmallIntegerField(
+        _("days of notice before deletion"),
+        default=30,
+        validators=[MaxValueValidator(3600)],
+        help_text=_("The service email goes out this many days before. It must be shorter."),
     )
 
     class Meta:
@@ -172,7 +189,7 @@ class FitmentNodeQuerySet(MP_NodeQuerySet):  # type: ignore[misc]  # treebeard i
         return self.filter(status=NodeStatus.ACTIVE)  # type: ignore[no-any-return]
 
     def proposals(self) -> Self:
-        """The review queue of the Catalog and moderation role."""
+        """The review queue of the Catalogue and moderation role."""
         return self.filter(status=NodeStatus.PROPOSED)  # type: ignore[no-any-return]
 
 
@@ -361,6 +378,14 @@ class FitmentCategory(BaseModel):
         related_name="fitment_setting",
         help_text=_("Items in this category must say which items they fit."),
     )
+    require_declaration = models.BooleanField(
+        _("require a declaration to publish"),
+        default=False,
+        help_text=_(
+            "A product for sale in this category cannot be published until it says which "
+            "items it fits, or that it fits everything (FIT.18)."
+        ),
+    )
 
     class Meta:
         verbose_name_plural = "fitment categories"
@@ -484,3 +509,65 @@ class ProductFitment(BaseModel):
     def year_to(self) -> int | None:
         # PostgreSQL stores integer ranges as [lower, upper): the last year is upper - 1.
         return None if self.years is None or self.years.upper is None else self.years.upper - 1
+
+
+class FitmentNodeProposal(BaseModel):
+    """Which shop proposed a node (FIT.3, spec 17 §17.3.2): the anti-flooding limit counts the
+    proposals of a shop that still wait for review. Written only by
+    `services.propose_node_for_vendor`; the node itself stays platform data."""
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="fitment_proposals")
+    node = models.OneToOneField(FitmentNode, on_delete=models.PROTECT, related_name="proposal")
+
+    def __str__(self) -> str:
+        return f"{self.vendor_id}: {self.node_id}"
+
+
+class GarageProfile(BaseModel):
+    """A saved item of a customer's account garage (FIT.5, spec 17 §17.4.1).
+
+    Personal data once linked to an account: exported and erased with it (CMP.4). The node is
+    at any depth; a merge moves the profile to the survivor (`references`), a retired node keeps
+    it, marked by `node_retired`. At most one profile per user is active; none active is the
+    generic state. Create and change through `apps.fitment.garage_profiles`.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="garage_profiles"
+    )
+    name = models.CharField(_("name"), max_length=engine.MAX_PROFILE_NAME)
+    node = models.ForeignKey(
+        FitmentNode,
+        on_delete=models.PROTECT,
+        related_name="garage_profiles",
+        help_text=_("Any depth: a make only, or down to a variant."),
+    )
+    year = models.SmallIntegerField(_("year"), null=True, blank=True)
+    is_active = models.BooleanField(_("active"), default=False)
+    last_used_at = models.DateTimeField(default=timezone.now)
+    inactivity_notice_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When the service email about the 24-month cleanup was queued."),
+    )
+
+    class Meta:
+        ordering = ["-last_used_at", "id"]
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(is_active=True),
+                name="fitment_one_active_garage_profile",
+            )
+        ]
+        indexes: ClassVar[list[models.Index]] = [models.Index(fields=["last_used_at"])]
+
+    def __str__(self) -> str:
+        return self.name
+
+    @property
+    def node_retired(self) -> bool:
+        return engine.profile_node_retired(self.node.status)

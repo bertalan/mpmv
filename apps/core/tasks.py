@@ -19,8 +19,9 @@ import asyncio
 import contextlib
 import datetime as dt
 import functools
+import json
 import logging
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, ParamSpec, TypeVar
 from zoneinfo import ZoneInfo
@@ -72,6 +73,11 @@ class Retry:
         return int(min(self.base_delay * 2**attempts, self.max_delay))
 
 
+class PermanentJobError(Exception):
+    """Raised by a job whose failure retrying cannot fix (a corrupt file): the queue marks the job
+    failed at once, without the retries, so it shows up in the failed jobs."""
+
+
 DEFAULT_RETRY = Retry()
 NO_RETRY = Retry(max_attempts=0)
 
@@ -86,6 +92,8 @@ class _BackoffStrategy(BaseRetryStrategy):
     def get_retry_decision(
         self, *, exception: BaseException, job: _QueueRow
     ) -> RetryDecision | None:
+        if isinstance(exception, PermanentJobError):
+            return None
         delay = self.policy.delay_after(job.attempts)
         if delay is None:
             return None
@@ -231,10 +239,25 @@ def _worker_connection(app: App) -> Iterator[App]:
 
 
 def task(
-    name: str, *, queue: str = "default", retry: Retry = DEFAULT_RETRY
+    name: str, *, queue: str = "default", retry: Retry = DEFAULT_RETRY, pass_context: bool = False
 ) -> Callable[[Callable[P, R]], Task[P, R, P]]:
-    """Declare a job under a stable `name` such as `ingest.stock` (stored in queued rows)."""
-    return _proxy_app.task(name=name, queue=queue, retry=_BackoffStrategy(retry))
+    """Declare a job under a stable `name` such as `ingest.stock` (stored in queued rows).
+
+    With `pass_context` the worker calls the job with a `JobContext` as first argument, so it can
+    read `context.job.attempts`; a direct call may leave it out."""
+    declare: Any = _proxy_app.task
+    declared: Callable[[Callable[P, R]], Task[P, R, P]] = declare(
+        name=name, queue=queue, retry=_BackoffStrategy(retry), pass_context=pass_context
+    )
+    return declared
+
+
+def retry_policy(job: Job) -> Retry:
+    """The retry policy a job was declared with."""
+    strategy = job.retry_strategy
+    if not isinstance(strategy, _BackoffStrategy):
+        raise TypeError(f"{job.name} has no retry policy of ours")
+    return strategy.policy
 
 
 def locked(key: str | None = None) -> Callable[[Task[P, R, A]], Task[P, R, A]]:
@@ -325,6 +348,14 @@ class JobInfo:
     attempts: int
     scheduled_at: dt.datetime | None
     lock: str | None  # set by `@locked`: no two jobs with this key run at once
+    task_kwargs: dict[str, Any]
+
+
+def _kwargs(raw: Any) -> dict[str, Any]:
+    """The job's arguments; the driver may hand them over as JSON text."""
+    if isinstance(raw, str | bytes):
+        raw = json.loads(raw)
+    return dict(raw) if raw else {}
 
 
 def _job_info(row: _QueueRow) -> JobInfo:
@@ -338,12 +369,50 @@ def _job_info(row: _QueueRow) -> JobInfo:
         attempts=row.attempts,
         scheduled_at=row.scheduled_at,
         lock=row.lock,
+        task_kwargs=_kwargs(row.task_kwargs),
     )
 
 
 def list_jobs(task_name: str | None = None, *, status: str | None = None) -> list[JobInfo]:
     rows = _ready_app().job_manager.list_jobs(task=task_name, status=status)
     return sorted((_job_info(row) for row in rows), key=lambda info: info.id)
+
+
+def latest_jobs(
+    task_name: str, *, statuses: Sequence[str], group_by: Sequence[str], limit: int
+) -> list[JobInfo]:
+    """The newest `limit` jobs of `task_name` in one of `statuses`, newest first, keeping only the
+    newest job for each distinct value of the argument names in `group_by`. Ordering and limit are
+    done by the database, so the cost does not grow with the number of old jobs."""
+    from django.db import connection
+
+    if not group_by:
+        raise ValueError("group_by needs at least one argument name")
+    distinct = ", ".join(["args ->> %s"] * len(group_by))
+    sql = (
+        "SELECT id, task_name, queue_name, status, attempts, scheduled_at, lock, args FROM ("  # noqa: S608 - only "%s" placeholders
+        f"SELECT DISTINCT ON ({distinct}) id, task_name, queue_name, status, attempts, "
+        "scheduled_at, lock, args FROM procrastinate_jobs "
+        "WHERE task_name = %s AND status = ANY(%s) "
+        f"ORDER BY {distinct}, id DESC) latest ORDER BY id DESC LIMIT %s"
+    )
+    params: list[Any] = [*group_by, task_name, list(statuses), *group_by, limit]
+    with connection.cursor() as cursor:
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+    return [
+        JobInfo(
+            id=row[0],
+            task_name=row[1],
+            queue=row[2],
+            status=row[3],
+            attempts=row[4],
+            scheduled_at=row[5],
+            lock=row[6],
+            task_kwargs=_kwargs(row[7]),
+        )
+        for row in rows
+    ]
 
 
 def get_job(job_id: int) -> JobInfo:
@@ -399,33 +468,51 @@ def run_worker(
 # --- Jobs of the core app -------------------------------------------------------------------
 
 
-@task("core.render_image")
-def render_image(image_id: int) -> None:
-    """Make the renditions of every preset of one `MediaImage` (CAT.4 review).
+@task("core.render_image", pass_context=True)
+def render_image(context: Any = None, *, image_id: int, group: str | None = None) -> None:
+    """Make the renditions of one preset group of one `MediaImage` (CAT.4 review).
 
-    Queued by the `post_save` receiver of `apps.core.signals` when the file is new or replaced
-    (one waiting job per image). Safe to run twice: a rendition that exists is reused; a deleted
-    image is skipped. A file that cannot be decoded (corrupt, a decompression bomb, missing) is
-    logged and dropped: retrying cannot fix it.
+    Queued by the `post_save` receiver of `apps.core.signals` when the file is new or replaced:
+    one job per group of `images.RENDER_GROUPS`, hero first, so a 40 MP original is not
+    decoded and encoded about 46 times in one job (one waiting job per image and group). Without
+    `group` (jobs queued before the split) it renders every group. Safe to run twice: a
+    rendition that exists is reused; a deleted image is skipped.
+
+    Monitoring (CAT.24): a failure that retrying cannot fix (a file that cannot be decoded:
+    corrupt, a decompression bomb, missing) is logged, recorded and alerted once, and fails the
+    job at once (`PermanentJobError`); any other failure is retried, and the attempt after the
+    last retry records the error and alerts once. The staff list shows both.
     """
     from PIL import UnidentifiedImageError
     from PIL.Image import DecompressionBombError
 
-    from . import images
+    from . import images, rendition_monitor
     from .models import MediaImage
 
     image = MediaImage.objects.filter(pk=image_id).first()
     if image is None:
         return
     try:
-        images.render_all(image)
+        if group is None:
+            images.render_all(image)
+        else:
+            images.render_group(image, group)
     except (DecompressionBombError, UnidentifiedImageError, OSError) as error:
         logger.warning(
-            "core.render_image image %s skipped, its file cannot be rendered: %s: %s",
+            "core.render_image image %s group %s skipped, its file cannot be rendered: %s: %s",
             image_id,
+            group or "all",
             type(error).__name__,
             error,
         )
+        rendition_monitor.report_failure(image_id, group, error, retryable=False)
+        raise PermanentJobError(f"{type(error).__name__}: {error}") from error
+    except Exception as error:
+        attempts = int(context.job.attempts) if context is not None else 0
+        policy = retry_policy(render_image)
+        if policy.delay_after(attempts) is None:  # no retry left
+            rendition_monitor.report_failure(image_id, group, error, retryable=True)
+        raise
 
 
 @periodic("*/5 * * * *")

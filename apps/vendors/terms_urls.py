@@ -7,5 +7,6 @@ from . import terms_views
 app_name = "vendor_terms"
 
 urlpatterns = [
+    path("<str:token>/pdf/", terms_views.download, name="pdf"),
     path("<str:token>/", terms_views.read, name="read"),
 ]

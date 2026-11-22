@@ -1,12 +1,15 @@
 """VEN.24: staff send, resend / regenerate, approve and reject vendor claims from the admin."""
 
+import importlib
 from collections.abc import Callable
 from typing import Any, cast
 from urllib.parse import urlsplit
 
 import pytest
 from django.contrib import admin
+from django.contrib.auth.models import Group
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.test import Client, RequestFactory
 from django.urls import reverse
@@ -34,9 +37,20 @@ STAFF_B = AuditContext(actor_label="staff:b", source=AuditLog.Source.ADMIN)
 CHANGELIST = "admin:vendors_vendor_changelist"
 
 
+def grant_platform_role(user: User, key: str) -> None:
+    """Put `user` in a CORE.18 role group (the groups come from the data migration)."""
+    # Dynamic: the layer contract forbids a vendors -> manager import, tests included.
+    roles = importlib.import_module("apps.manager.roles")
+
+    user.groups.add(Group.objects.get(name=roles.role(key).group))
+
+
 @pytest.fixture
 def staff_client(client: Client, superuser: User) -> Client:
-    # Approving a claim grants the owner role: D-32 critical, so the session has a fresh passkey.
+    # Approving a claim grants the owner role: D-32 critical, so the session has a fresh passkey,
+    # and the matrix section "approve or suspend a vendor" (CORE.18), so the staff member holds
+    # the platform owner role.
+    grant_platform_role(superuser, "owner")
     verified_login(client, superuser, passkey=True)
     return client
 
@@ -113,6 +127,51 @@ def test_staff_approve_a_submitted_claim(staff_client: Client) -> None:
     claim.refresh_from_db()
     assert claim.status == VendorClaim.Status.APPROVED
     assert VendorMember.objects.get(vendor=vendor).role == engine.OWNER
+
+
+@pytest.mark.parametrize("role", [None, "support", "finance", "config"])
+def test_granting_the_owner_role_needs_the_vendor_approval_permission(
+    client: Client, superuser: User, role: str | None
+) -> None:
+    """CORE.18: `platform.vendor_approval` is edited by Catalog and the platform owner only; a
+    staff member with `change_vendor` (a superuser has it) but another role, or none, cannot
+    approve a claim, on the review page or on the decision."""
+    if role is not None:
+        grant_platform_role(superuser, role)
+    verified_login(client, superuser, passkey=True)
+    vendor = VendorFactory.create(italian_company=True)
+    claim = submitted_claim(vendor)
+    selected = {"action": "approve_claim", "_selected_action": [vendor.pk]}
+    for data in (selected, {**selected, "post": "yes", **reviewed(claim)}):
+        response = client.post(reverse(CHANGELIST), data, follow=True)
+        assert response.status_code == 200
+        assert any("approval permission" in text for text in messages_of(response))
+    claim.refresh_from_db()
+    assert claim.status == VendorClaim.Status.SUBMITTED
+    assert not VendorMember.objects.filter(vendor=vendor).exists()
+    assert not AuditLog.objects.filter(action=services.CLAIM_APPROVED).exists()
+
+
+def test_the_catalog_role_may_grant_the_owner_role_and_it_is_audited(
+    client: Client, superuser: User
+) -> None:
+    grant_platform_role(superuser, "catalog")
+    verified_login(client, superuser, passkey=True)
+    vendor = VendorFactory.create(italian_company=True)
+    submitted_claim(vendor)
+    decide(client, "approve_claim", vendor)
+    assert VendorMember.objects.get(vendor=vendor).role == engine.OWNER
+    entry = AuditLog.objects.get(action=services.CLAIM_APPROVED)
+    assert entry.source == AuditLog.Source.ADMIN
+
+
+def test_the_rejection_needs_no_vendor_approval_permission(client: Client, superuser: User) -> None:
+    verified_login(client, superuser, passkey=True)  # no role at all
+    vendor = VendorFactory.create(italian_company=True)
+    claim = submitted_claim(vendor)
+    decide(client, "reject_claim", vendor)
+    claim.refresh_from_db()
+    assert claim.status == VendorClaim.Status.REJECTED
 
 
 def test_staff_reject_a_submitted_claim(staff_client: Client) -> None:
@@ -420,3 +479,31 @@ def test_a_dialog_error_is_shown_not_raised(staff_client: Client) -> None:
     assert response.status_code == 200
     assert "account holder" in response.content.decode()
     assert not OutboxEmail.objects.exists()
+
+
+@pytest.mark.parametrize("role", [None, "support", "finance", "config"])
+def test_the_service_refuses_an_approval_by_staff_without_the_section(
+    superuser: User, role: str | None
+) -> None:
+    """CORE.18 in the service, so every adapter is covered: nothing granted, nothing audited."""
+    if role is not None:
+        grant_platform_role(superuser, role)
+    vendor = VendorFactory.create(italian_company=True)
+    claim = submitted_claim(vendor)
+    ctx = AuditContext(actor_label="staff:x", source=AuditLog.Source.ADMIN, actor_id=superuser.pk)
+    for dry_run in (True, False):
+        with pytest.raises(PermissionDenied):
+            services.approve_claim(claim, ctx=ctx, dry_run=dry_run)
+    claim.refresh_from_db()
+    assert claim.status == VendorClaim.Status.SUBMITTED
+    assert not VendorMember.objects.filter(vendor=vendor).exists()
+    assert not AuditLog.objects.filter(action=services.CLAIM_APPROVED).exists()
+
+
+def test_the_service_lets_a_staff_member_with_the_section_approve(superuser: User) -> None:
+    grant_platform_role(superuser, "catalog")
+    vendor = VendorFactory.create(italian_company=True)
+    claim = submitted_claim(vendor)
+    ctx = AuditContext(actor_label="staff:x", source=AuditLog.Source.ADMIN, actor_id=superuser.pk)
+    services.approve_claim(claim, ctx=ctx)
+    assert VendorMember.objects.get(vendor=vendor).role == engine.OWNER

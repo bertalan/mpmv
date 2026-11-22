@@ -16,6 +16,7 @@ from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
@@ -107,7 +108,7 @@ def test_filters_by_type_vendor_and_month(client: Client) -> None:
     assert "Mine fair" in in_month
     far = _get(client, f"{base}?month=2099-01")
     assert "Mine fair" not in far
-    assert "No events are planned" in far
+    assert translated("No events are planned at the moment.") in far
     # An unknown value is ignored, not an error.
     assert "Mine fair" in _get(client, f"{base}?type=bogus&month=nonsense")
 
@@ -129,7 +130,7 @@ def test_pagination_pages_and_a_missing_page_is_404(client: Client) -> None:
     assert "Event number 00" in first
     assert "Event number 12" not in first
     assert 'rel="next"' in first
-    assert "Page 1 of 2" in first
+    assert translated("Page %(page)s of %(count)s") % {"page": 1, "count": 2} in first
     second = _get(client, f"{base}?page=2")
     assert "Event number 12" in second
     assert 'rel="prev"' in second

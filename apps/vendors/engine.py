@@ -7,7 +7,7 @@ import datetime as dt
 import hashlib
 import hmac
 import re
-from collections.abc import Collection, Container, Iterable, Mapping, Sequence
+from collections.abc import Collection, Container, Iterable, Iterator, Mapping, Sequence
 from decimal import Decimal
 from enum import StrEnum
 from html import unescape
@@ -793,7 +793,33 @@ def normalized(identity: LegalIdentity) -> LegalIdentity:
     changes["pec"] = identity.pec.strip()
     changes["place_of_birth"] = identity.place_of_birth.strip()
     changes["business_registration_number"] = identity.business_registration_number.strip()
+    changes["phone"] = identity.phone.strip()  # stored as typed: the pages show it so
     return dataclasses.replace(identity, **changes)
+
+
+# --- Seller phone (CMP.41 follow-up, owner decision 2026-11-19): DSA article 30 and the German
+# withdrawal information give it to consumers, so a seller to consumers must have one.
+
+_PHONE_SEPARATORS = re.compile(r"[\s().\-/]")
+# Digits only, with an optional leading +: at most 15 digits (ITU-T E.164), at least 6.
+_PHONE = re.compile(r"\+?[0-9]{6,15}")
+
+
+def normalized_phone(value: str) -> str:
+    """The compact form the format is checked on (the stored value stays as typed): no spaces,
+    dots, dashes, slashes or brackets; a leading 00 is +."""
+    phone = _PHONE_SEPARATORS.sub("", value)
+    return f"+{phone[2:]}" if phone.startswith("00") else phone
+
+
+def is_valid_phone(value: str) -> bool:
+    """Empty, or 6 to 15 digits with an optional leading + once compacted."""
+    return not value.strip() or bool(_PHONE.fullmatch(normalized_phone(value)))
+
+
+def consumer_phone_missing(phone: str, *, sells_to_consumers: bool) -> bool:
+    """A seller to consumers without a phone cannot be activated nor publish products."""
+    return sells_to_consumers and not phone.strip()
 
 
 def _address_errors(identity: LegalIdentity, prefix: str) -> dict[str, list[str]]:
@@ -873,6 +899,11 @@ def identity_errors(identity: LegalIdentity) -> dict[str, list[str]]:
     )
     check("iban", is_valid_iban(ident.iban), "Not a valid IBAN (check digits or length).")
     check("bic", is_valid_bic(ident.bic), "A BIC has 8 or 11 characters, e.g. ABCDITMMXXX.")
+    check(
+        "phone",
+        is_valid_phone(ident.phone),
+        "A phone number has 6 to 15 digits, with the country prefix, e.g. +39 06 1234 5678.",
+    )
     if ident.share_capital is not None and ident.share_capital < 0:
         errors["share_capital"] = ["The share capital cannot be negative."]
     errors.update(_address_errors(ident, "registered"))
@@ -1580,9 +1611,19 @@ def onboarding_checklist(
 # with Union law. Unlike a self-attestation (CMP.10) it blocks activation. DAC7 data does not.
 
 SELF_CERTIFICATION: Final = "self_certification"
-# Bump when a text changes: acceptances keep the version and hash they were given.
+# Bump when any text changes once an acceptance of it may exist, in any language and on any
+# installation (STAGE included): acceptances keep the version and the hash they were given, and
+# the hash of a version must keep naming one text. A bump asks every vendor still in onboarding
+# to certify again. `test_engine_platform_duties` pins the digests of each version and fails on
+# a text edited without a bump.
 # The wording is a placeholder until the one-off legal review (CMP.24).
 SELF_CERTIFICATION_VERSION: Final = 1
+# The I18N.19 review gate for these texts. They are Python literals, so the per-language review
+# mark of the gettext catalogs (`tools/i18n_catalog.py mark-reviewed`) does not see them. English
+# is the source and Italian the owner's language: both are served without the gate, as in
+# I18N.19. Add a translated language here only in the commit that carries the text the owner's
+# professional translator approved; until then `vendors.E002` refuses it on LIVE.
+SELF_CERTIFICATION_REVIEWED_LANGUAGES: Final[frozenset[str]] = frozenset({"en", "it"})
 SELF_CERTIFICATION_TEXTS: Final[Mapping[str, str]] = {
     "en": (
         "I certify, on behalf of the vendor, that it will offer on this marketplace only "
@@ -1592,6 +1633,22 @@ SELF_CERTIFICATION_TEXTS: Final[Mapping[str, str]] = {
         "Certifico, a nome del venditore, che offrirà su questo marketplace solo prodotti e "
         "servizi conformi alle norme applicabili del diritto dell'Unione."
     ),
+    # I18N.20: de, fr and es follow the wording of DSA article 30(1)(e) in each language. They
+    # wait for the professional translator (I18N.19) like every sensitive text: see
+    # SELF_CERTIFICATION_REVIEWED_LANGUAGES.
+    "de": (
+        "Ich versichere im Namen des Verkäufers, dass dieser auf diesem Marktplatz nur Produkte "
+        "und Dienstleistungen anbieten wird, die den geltenden Vorschriften des Unionsrechts "
+        "entsprechen."
+    ),
+    "fr": (
+        "Je certifie, au nom du vendeur, qu'il ne proposera sur cette place de marché que des "
+        "produits et services conformes aux règles applicables du droit de l'Union."
+    ),
+    "es": (
+        "Certifico, en nombre del vendedor, que este ofrecerá en este marketplace únicamente "
+        "productos y servicios que cumplan las normas aplicables del Derecho de la Unión."
+    ),
 }
 
 
@@ -1600,12 +1657,26 @@ class SelfCertificationError(ValueError):
 
 
 def self_certification_text(language: str) -> str:
-    try:
-        return SELF_CERTIFICATION_TEXTS[language]
-    except KeyError:
-        raise SelfCertificationError(
-            f"there is no self-certification text in {language!r}"
-        ) from None
+    text = SELF_CERTIFICATION_TEXTS.get(language, "")
+    if not text.strip():  # an empty text is no statement to accept
+        raise SelfCertificationError(f"there is no self-certification text in {language!r}")
+    return text
+
+
+def self_certification_languages_missing(languages: Iterable[str]) -> tuple[str, ...]:
+    """The languages of `languages` with no self-certification text (or an empty one). Pure."""
+    return tuple(code for code in languages if not SELF_CERTIFICATION_TEXTS.get(code, "").strip())
+
+
+def self_certification_languages_unreviewed(languages: Iterable[str]) -> tuple[str, ...]:
+    """The languages of `languages` that have a text no translator has approved yet (I18N.19).
+    A language with no text is reported by `self_certification_languages_missing` only. Pure."""
+    missing = set(self_certification_languages_missing(languages))
+    return tuple(
+        code
+        for code in languages
+        if code not in missing and code not in SELF_CERTIFICATION_REVIEWED_LANGUAGES
+    )
 
 
 def self_certification_hash(language: str) -> str:
@@ -1623,11 +1694,21 @@ def check_can_certify(status: str, role: str | None) -> None:
 
 
 def platform_duties_missing(
-    values: Mapping[str, Any], rules: Iterable[Requirement], *, certified: bool
+    values: Mapping[str, Any],
+    rules: Iterable[Requirement],
+    *,
+    certified: bool,
+    phone_required: bool = False,
 ) -> tuple[str, ...]:
     """What activation still needs: the `activation` fields the rules require and the vendor has
-    not filled in (in field order), then `SELF_CERTIFICATION` unless `certified`. Pure."""
+    not filled in (in field order), the phone of a seller to consumers (`phone_required`, CMP.41
+    follow-up) whatever the rules say, then `SELF_CERTIFICATION` unless `certified`. Pure."""
     missing = missing_required_fields(values, rules, purpose=ACTIVATION)
+    if (
+        consumer_phone_missing(str(values.get("phone") or ""), sells_to_consumers=phone_required)
+        and "phone" not in missing
+    ):
+        missing.append("phone")
     return (*missing, *(() if certified else (SELF_CERTIFICATION,)))
 
 
@@ -1950,7 +2031,45 @@ def _escape(text: str) -> str:
 
 
 _TAG: Final = re.compile(r"<(embed|a)\b([^>]*)>", re.IGNORECASE)
-_ATTR: Final = re.compile(r"""([a-zA-Z_:][-\w:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>/]+))""")
+_NAME_RUN: Final = re.compile(r"[-\w:.]+")
+_NAME_START: Final = re.compile(r"[a-zA-Z_:]")
+_ATTR_VALUE: Final = re.compile(r"""\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>/]+))""")
+
+
+def _tags(html: str) -> Iterator[tuple[str, str]]:
+    """Every `<embed ..>` and `<a ..>` tag of `html` as (name, raw attributes), left to right.
+
+    A `<` with no `>` after it starts no tag, and neither does any later one, so the scan stops
+    at the last `>` instead of every `<` reading to the end of the text."""
+    last = html.rfind(">")
+    position = html.find("<")
+    while 0 <= position < last:
+        match = _TAG.match(html, position)
+        if match:
+            yield match.group(1), match.group(2)
+            position = html.find("<", match.end())
+        else:
+            position = html.find("<", position + 1)
+
+
+def _attributes(raw: str) -> dict[str, str]:
+    """The `name=value` attributes of a tag body (names lower-cased, the last one wins; a value
+    quoted with `"` or `'`, or bare). Every name is read once: a name that is not followed by `=`
+    starts nothing at its later characters either."""
+    attrs: dict[str, str] = {}
+    position = 0
+    while run := _NAME_RUN.search(raw, position):
+        position = run.end()
+        start = _NAME_START.search(raw, run.start(), run.end())
+        if start is None:
+            continue
+        value = _ATTR_VALUE.match(raw, run.end())
+        if value:
+            attrs[raw[start.start() : run.end()].lower()] = (
+                value.group(1) or value.group(2) or value.group(3) or ""
+            )
+            position = value.end()
+    return attrs
 
 
 def media_references(html: str) -> tuple[list[str], list[str]]:
@@ -1959,8 +2078,8 @@ def media_references(html: str) -> tuple[list[str], list[str]]:
     that is not a number is returned as is and refused by the caller)."""
     images: list[str] = []
     documents: list[str] = []
-    for tag, raw in _TAG.findall(html):
-        attrs = {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}
+    for tag, raw in _tags(html):
+        attrs = _attributes(raw)
         if tag.lower() == "embed" and attrs.get("embedtype", "").lower() == "image":
             images.append(attrs.get("id", ""))
         elif tag.lower() == "a" and attrs.get("linktype", "").lower() == "document":
@@ -1972,12 +2091,8 @@ def has_page_link(html: str) -> bool:
     """Whether a stored rich text links a Wagtail page (`<a linktype="page" id=..>`): such a link
     resolves any page id, a draft or another vendor's page included, so vendors may not use it."""
     return any(
-        tag.lower() == "a"
-        and {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}.get(
-            "linktype", ""
-        ).lower()
-        == "page"
-        for tag, raw in _TAG.findall(html)
+        tag.lower() == "a" and _attributes(raw).get("linktype", "").lower() == "page"
+        for tag, raw in _tags(html)
     )
 
 
@@ -2008,10 +2123,10 @@ def has_unsafe_link(html: str) -> bool:
     links (`linktype="document"`, no href) are refused by `media_problem` until ARC.15. The
     sanitiser lets `http:`, `mailto:`, relative and scheme-relative addresses through, but a
     vendor text may only link out over https (VEN.31), whatever the form posted."""
-    for tag, raw in _TAG.findall(html):
+    for tag, raw in _tags(html):
         if tag.lower() != "a":
             continue
-        attrs = {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}
+        attrs = _attributes(raw)
         if "href" in attrs and not is_https_address(unescape(attrs["href"])):
             return True
     return False
@@ -2020,13 +2135,9 @@ def has_unsafe_link(html: str) -> bool:
 def image_embed_formats(html: str) -> list[str]:
     """The `format` of every image embed of a stored rich text, as written ("" when missing)."""
     return [
-        {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}.get("format", "")
-        for tag, raw in _TAG.findall(html)
-        if tag.lower() == "embed"
-        and {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}.get(
-            "embedtype", ""
-        ).lower()
-        == "image"
+        _attributes(raw).get("format", "")
+        for tag, raw in _tags(html)
+        if tag.lower() == "embed" and _attributes(raw).get("embedtype", "").lower() == "image"
     ]
 
 
@@ -2100,3 +2211,52 @@ def effective_sales_mode(
     if product_mode != BUY:
         return product_mode
     return vendor_sales_mode(vendor_mode, payout_ready=payout_ready, terms_ok=terms_ok)
+
+
+# --- Trader contact (CMP.41)
+
+
+@dataclasses.dataclass(frozen=True)
+class TraderContact:
+    """Who the consumer contracts with and how to reach them: the name, the geographic address,
+    the telephone and the email the withdrawal information must give per seller (Art. 246a
+    EGBGB Anlage 1, Gestaltungshinweis 2; the model form, Anlage 2). An empty phone means the
+    seller gave none: templates leave the line out and never show a made-up number."""
+
+    shop_name: str
+    legal_name: str
+    address: str
+    phone: str
+    email: str
+
+    def as_dict(self) -> dict[str, str]:
+        """Plain values for an email context (stored as JSON in the outbox)."""
+        return dataclasses.asdict(self)
+
+
+def postal_address(street: str, number: str, postal_code: str, city: str, country: str) -> str:
+    """One line: "street number, postal code city, country", empty parts left out."""
+    first = " ".join(p for p in (street.strip(), number.strip()) if p)
+    town = " ".join(p for p in (postal_code.strip(), city.strip()) if p)
+    return ", ".join(p for p in (first, town, country.strip()) if p)
+
+
+def trader_contact(
+    *,
+    shop_name: str,
+    legal_name: str,
+    street: str,
+    street_number: str,
+    postal_code: str,
+    city: str,
+    country: str,
+    phone: str,
+    email: str,
+) -> TraderContact:
+    return TraderContact(
+        shop_name=shop_name,
+        legal_name=legal_name.strip() or shop_name,
+        address=postal_address(street, street_number, postal_code, city, country),
+        phone=phone.strip(),
+        email=email.strip(),
+    )

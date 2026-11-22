@@ -30,6 +30,7 @@ DEFAULT_CODES: Final[Mapping[int, str]] = {
     404: "not_found",
     405: "method_not_allowed",
     409: "conflict",
+    413: "payload_too_large",
     422: "validation_error",
     429: "rate_limited",
     500: "internal_error",

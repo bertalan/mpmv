@@ -9,6 +9,7 @@ button names the obligation to pay; the confirmation email carries the terms as 
 """
 
 import datetime as dt
+import html as html_lib
 import re
 from typing import Any
 
@@ -69,8 +70,11 @@ def publish_terms(
     return page
 
 
-def seller(name: str, *, country: str = "IT", law: str = "IT", **terms: Any) -> Vendor:
-    found = vendor(name)
+def seller(
+    name: str, *, country: str = "IT", law: str = "IT", identity: bool = False, **terms: Any
+) -> Vendor:
+    """`identity` gives a full legal identity: registered address and phone (CMP.41)."""
+    found = vendor(name, italian_company=True) if identity else vendor(name)
     if country != "IT":
         Vendor.objects.filter(pk=found.pk).update(country=country, registered_country=country)
         found.refresh_from_db()
@@ -126,6 +130,67 @@ def test_each_seller_has_a_recap_block_with_a_link_to_the_terms_version_in_force
     assert "professional seller" in html
     assert "Delivery time" in html
     assert "Legal guarantee" in html
+
+
+def _seller_block(html: str, shop: Vendor, css: str) -> str:
+    """The block of `shop` among the `css` blocks of the page."""
+    blocks = html.split(f'class="{css}')[1:]
+    found = [b for b in blocks if shop.display_name in b]
+    assert found, shop.display_name
+    return html_lib.unescape(found[0])
+
+
+def test_the_recap_gives_each_seller_address_phone_and_email(
+    client: Client,
+    commission: None,  # noqa: F811
+) -> None:
+    """CMP.41: the trader's geographic address, telephone and email in each seller block."""
+    publish_terms()
+    cart = with_cart(client)
+    alpha = seller("Alpha Shop", identity=True)
+    assert alpha.phone
+    assert alpha.registered_city
+    beta = seller("Beta Shop", identity=True)
+    Vendor.objects.filter(pk=beta.pk).update(phone="")  # the phone is optional
+    add(cart, alpha, "30.00", "Blue vase")
+    add(cart, beta, "20.00", "Red cup")
+    html = review(client)
+    with_phone = _seller_block(html, alpha, "legal-recap__seller")
+    assert f"{alpha.registered_postal_code} {alpha.registered_city}" in with_phone
+    assert "Phone" in with_phone
+    assert alpha.phone in with_phone
+    assert alpha.contact_email in with_phone
+    without = _seller_block(html, beta, "legal-recap__seller")
+    assert "Phone" not in without  # no phone given: the line is left out, never invented
+    assert beta.contact_email in without
+
+
+def test_the_confirmation_page_gives_the_seller_details_per_seller(
+    client: Client,
+    commission: None,  # noqa: F811
+) -> None:
+    """CMP.41: the withdrawal text points to the order confirmation for the seller's details."""
+    publish_terms()
+    cart = with_cart(client)
+    alpha = seller("Alpha Shop", identity=True)
+    assert alpha.phone
+    assert alpha.registered_city
+    beta = seller("Beta Shop", identity=True)
+    Vendor.objects.filter(pk=beta.pk).update(phone="")  # the phone is optional
+    add(cart, alpha, "30.00", "Blue vase")
+    add(cart, beta, "20.00", "Red cup")
+    review(client)
+    place(client, BOX1)
+    page = client.get(reverse("orders:confirmation")).content.decode()
+    assert page.count('class="seller-details') == 2
+    first = _seller_block(page, alpha, "seller-details")
+    assert alpha.legal_name in first
+    assert f"{alpha.registered_street} {alpha.registered_street_number}" in first
+    assert alpha.phone in first
+    assert alpha.contact_email in first
+    second = _seller_block(page, beta, "seller-details")
+    assert "Phone" not in second
+    assert beta.contact_email in second
 
 
 def test_the_order_cannot_be_placed_without_box_1_and_nothing_is_saved(

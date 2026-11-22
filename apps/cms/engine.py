@@ -41,6 +41,7 @@ import math
 import re
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 from functools import lru_cache
 from html import escape, unescape
 from html.parser import HTMLParser
@@ -605,6 +606,27 @@ def sanitise_rich_text(html: str, features: Sequence[str] | None) -> str:
 HELP_ROUTE = "route"
 HELP_PAGE_TYPE = "page_type"
 HELP_GENERAL = "general"
+HELP_GUIDE = "guide"
+# The guide pages generated from the help files (ARC.37): audience -> sections, in page order.
+# A guide entry's key is `<audience>:<section>`; its file is `guide/<audience>__<section>.md`.
+GUIDE_SECTIONS: dict[str, tuple[str, ...]] = {
+    "customer": ("ordering", "payment", "shipping", "changes", "withdrawal", "account"),
+    # The seller's guide: only what the shop space, the application and the account screens do.
+    "vendor": (
+        "getting-started",
+        "orders",
+        "changes",
+        "catalogue",
+        "shipping",
+        "payments",
+        "api",
+        "returns",
+        "events",
+        "security",
+    ),
+}
+# The guide audiences, in the order the help index shows them.
+GUIDE_AUDIENCES: tuple[str, ...] = ("customer", "vendor")
 _HELP_KEY_RE = re.compile(r"[A-Za-z0-9_.:-]{1,120}")
 # The CMS catch-all names no screen: such a request is told apart by its page type instead.
 _HELP_ANONYMOUS_ROUTES = ("wagtail_serve",)
@@ -704,9 +726,36 @@ _YOUTUBE_HOSTS = frozenset(
 _VIMEO_HOSTS = frozenset({"vimeo.com", "www.vimeo.com", "player.vimeo.com"})
 
 
-# The only origins a video block ever frames (never a wildcard); the CSP `frame-src` gets them on
-# the responses that render such a block (apps.cms.middleware.VideoEmbedCspMiddleware).
+# The default of the `MPMV_VIDEO_EMBED_ORIGINS` setting: the only origins a video block frames
+# (never a wildcard). The CSP `frame-src` gets the configured origins on the responses that render
+# such a block (apps.cms.middleware.VideoEmbedCspMiddleware), and the block refuses an address
+# whose embed is on any other origin (apps.cms.blocks.validate_video_url).
 VIDEO_EMBED_ORIGINS = ("https://www.youtube-nocookie.com", "https://player.vimeo.com")
+
+
+def video_origin_problem(origin: str) -> str | None:
+    """Why `origin` cannot go in a CSP frame-src list as a video origin, or None when it is a
+    plain `https://host` origin (no wildcard, path, query, fragment, credentials or port)."""
+    if not isinstance(origin, str) or origin != origin.strip() or not origin:
+        return "it is empty or has surrounding spaces"
+    if "*" in origin:
+        return "it has a wildcard"
+    parts = urlsplit(origin)
+    if parts.scheme != "https":
+        return "it is not an https origin"
+    try:
+        port = parts.port
+    except ValueError:
+        return "its port is not valid"
+    if parts.username is not None or parts.password is not None or "@" in parts.netloc:
+        return "it has credentials"
+    if port is not None:
+        return "it has a port"
+    if not parts.hostname or origin != f"https://{parts.hostname}":
+        return "it is not just a scheme and a host (no path, query or fragment)"
+    return None
+
+
 _VIMEO_HASH = re.compile(r"^[0-9a-f]{6,20}$")
 
 
@@ -769,3 +818,133 @@ def parse_video_url(url: str) -> VideoLinks | None:
             embed += f"h={unlisted_hash}&dnt=1" if unlisted_hash else "dnt=1"
             return VideoLinks(watch, embed)
     return None
+
+
+# --- Footer columns and social profiles (CMS.17, spec 10 §10.2)
+
+MAX_FOOTER_COLUMNS = 4
+
+# The closed list of networks: the value stored, the visible text label (a proper name, the same
+# in every language; the label is always shown, never an icon alone).
+SOCIAL_NETWORKS: dict[str, str] = {
+    "bluesky": "Bluesky",
+    "facebook": "Facebook",
+    "github": "GitHub",
+    "instagram": "Instagram",
+    "linkedin": "LinkedIn",
+    "mastodon": "Mastodon",
+    "pinterest": "Pinterest",
+    "telegram": "Telegram",
+    "threads": "Threads",
+    "tiktok": "TikTok",
+    "wikidata": "Wikidata",
+    "x": "X",
+    "youtube": "YouTube",
+}
+
+
+def social_url_error(url: str) -> str:
+    """Why `url` cannot be a social profile link, or "" when it can: an absolute `https://` URL
+    with a host and no user name or password (so never `javascript:`, `http:` or a path)."""
+    if profile_key(url) is None:
+        return "Enter an absolute address that starts with https:// and has no user name."
+    return ""
+
+
+def footer_columns[T](rows: Iterable[tuple[str, T]], language: str) -> list[T]:
+    """The columns of `language`, in order, at most four (`rows` are (language, column))."""
+    return [column for code, column in rows if code == language][:MAX_FOOTER_COLUMNS]
+
+
+def footer_profiles[T](rows: Iterable[tuple[str, T]], language: str) -> list[T]:
+    """The profiles shown in `language`: those for all languages (blank) and its own."""
+    return [profile for code, profile in rows if code in ("", language)]
+
+
+def too_many_columns(languages: Iterable[str]) -> list[str]:
+    """The languages with more than four columns (`languages` has one entry per column)."""
+    counts: dict[str, int] = {}
+    for code in languages:
+        counts[code] = counts.get(code, 0) + 1
+    return [code for code, total in counts.items() if total > MAX_FOOTER_COLUMNS]
+
+
+# The guide page a screen's help dialog links as "More help" (route name -> guide key).
+ROUTE_GUIDE: dict[str, str] = {
+    "orders:cart": "customer:ordering",
+    "orders:checkout": "customer:ordering",
+    "orders:review": "customer:ordering",
+    "orders:confirmation": "customer:payment",
+    "orders:shipping": "customer:shipping",
+    "customer_order": "customer:changes",
+    "customer_orders": "customer:account",
+    "withdrawal": "customer:withdrawal",
+    "withdrawal_confirm": "customer:withdrawal",
+    "garage_account": "customer:account",
+    "privacy_account": "customer:account",
+    "privacy_requests": "customer:account",
+    "vendors:apply": "vendor:getting-started",
+    "manager:shop:orders": "vendor:orders",
+    "manager:shop:order": "vendor:orders",
+    "manager:shop:order_amend": "vendor:changes",
+    "manager:shop:payments": "vendor:payments",
+    "manager:shop:sales_terms": "vendor:returns",
+    "manager:shop:events": "vendor:events",
+    "manager:shop:event_new": "vendor:events",
+    "manager:shop:event_edit": "vendor:events",
+    "manager:shop:event_translate": "vendor:events",
+    "manager:shop:event_cancel": "vendor:events",
+    "manager:shop:dashboard": "vendor:getting-started",
+    "manager:shop:profile": "vendor:getting-started",
+    "manager:shop:statements": "vendor:security",
+    "manager:shop:termination": "vendor:security",
+}
+
+
+def guide_key(audience: str, section: str) -> str:
+    return f"{audience}:{section}"
+
+
+def guide_key_valid(key: object) -> bool:
+    """Whether `key` is `<audience>:<section>` of a registered guide section."""
+    if not isinstance(key, str) or ":" not in key:
+        return False
+    audience, _sep, section = key.partition(":")
+    return section in GUIDE_SECTIONS.get(audience, ())
+
+
+# Slugs a CMS page directly under a language home cannot use: the route of an app is matched
+# before the Wagtail catch-all, so such a page would never be reached (ARC.37 `help-centre`).
+RESERVED_ROOT_SLUGS: frozenset[str] = frozenset({"help-centre"})
+
+
+def is_reserved_root_slug(slug: object, parent_depth: int | None) -> bool:
+    """True when a page with `slug` under a parent at `parent_depth` would be shadowed by a
+    route. Language homes sit at depth 2 of the tree, so their children are the root level."""
+    return parent_depth == 2 and isinstance(slug, str) and slug in RESERVED_ROOT_SLUGS
+
+
+# --- Download block (CMS.15)
+
+FILE_SIZE_UNITS = ("B", "KB", "MB", "GB")
+
+
+def file_size_parts(size: int) -> tuple[Decimal, str]:
+    """A file size as a number and a unit, in decimal units (1 KB = 1000 B) like the operating
+    systems' file managers: whole bytes below a kilobyte, one decimal from there. A value that
+    rounds up to 1000 moves to the next unit, so 999 950 bytes read "1.0 MB", not "1000.0 KB"."""
+    if size < 1000:
+        return Decimal(max(size, 0)), FILE_SIZE_UNITS[0]
+    value = Decimal(size)
+    for unit in FILE_SIZE_UNITS[1:]:
+        value /= 1000
+        rounded = value.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+        if rounded < 1000 or unit == FILE_SIZE_UNITS[-1]:
+            return rounded, unit
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
+def file_type_label(name: str) -> str:
+    """The file type shown to visitors: the upper-case extension ("PDF"), "" when there is none."""
+    stem, dot, extension = name.rpartition(".")
+    return extension.upper() if dot and stem else ""

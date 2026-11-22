@@ -27,7 +27,7 @@ from apps.events.models import EventIndexPage, EventPage
 from apps.events.tests.factories import EventPageFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import other_language
+from tests.i18n import other_language, translated
 
 pytestmark = pytest.mark.django_db
 
@@ -143,7 +143,7 @@ def test_hiding_cancelling_and_publishing_show_on_the_next_response(client: Clie
     assert "Newly published" in _storefront(client, vendor)
     services.cancel_event(staff, keep)
     cancelled = _section(_storefront(client, vendor))
-    assert "Cancelled" in cancelled  # a cancelled event stays, marked (spec 15)
+    assert translated("Cancelled") in cancelled  # a cancelled event stays, marked (spec 15)
 
 
 def test_the_query_count_does_not_grow_with_the_number_of_events(client: Client) -> None:
@@ -153,6 +153,7 @@ def test_the_query_count_does_not_grow_with_the_number_of_events(client: Client)
     _storefront(client, vendor)  # warm caches that are not per-event
 
     def count() -> int:
+        _storefront(client, vendor)  # publishing a page drops the cached footer (CMS.17): warm it
         with CaptureQueriesContext(connection) as queries:
             _storefront(client, vendor)
         return len(queries)

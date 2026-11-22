@@ -8,7 +8,7 @@ style: the CSP has no 'unsafe-inline'.
 """
 
 import re
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 import pytest
@@ -35,7 +35,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import language_prefix, other_language, product_url
+from tests.i18n import language_prefix, other_language, product_url, translated
 
 pytestmark = pytest.mark.django_db
 
@@ -196,13 +196,23 @@ def test_applied_filter_chips_link_to_the_canonical_url_without_them(
     client: Client, shop: dict[str, Any]
 ) -> None:
     page = soup(client, "/compatibility/maker/?colour=red&vendor=acme")
-    chips = page.find(attrs={"aria-label": "Applied filters"})
+    chips = page.find(attrs={"aria-label": translated("Applied filters")})
     links = {a.get_text(" ", strip=True): a["href"] for a in chips.find_all("a")}
+    remove = translated("remove filter")
     assert links == {
-        "Red (remove filter)": "/compatibility/maker/?vendor=acme",
-        "Acme (remove filter)": "/compatibility/maker/?colour=red",
-        "Clear all filters": "/compatibility/maker/",
+        f"Red ({remove})": "/compatibility/maker/?vendor=acme",
+        f"Acme ({remove})": "/compatibility/maker/?colour=red",
+        translated("Clear all filters"): "/compatibility/maker/",
     }
+
+
+def gross_price(language: str) -> str:
+    """12.50 net with the VAT of the visitor's estimated country (TAX.12): a page in a language
+    that names a country (it, de, fr in the `consumer_prices` rates) gets that country's rate;
+    any other language gets the operator's country, IT."""
+    rate = {"de": Decimal("19"), "fr": Decimal("20")}.get(language, Decimal("22"))
+    gross = Decimal("12.50") * (100 + rate) / 100
+    return str(gross.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
 @pytest.mark.usefixtures("consumer_prices")
@@ -214,16 +224,16 @@ def test_product_cards_show_title_link_and_public_price(
     by_title = {card.find("h3").get_text(strip=True): card for card in cards}
     assert set(by_title) == {"Steel bag", "Custom bag"}
     priced = by_title["Steel bag"]
-    assert priced.find("a")["href"] == "/product/steel-bag-en/"
+    assert priced.find("a")["href"] == product_url(primary_language(), "steel-bag-en")
     it_page = soup(client, f"{language_prefix(other_language())}/compatibilita/marca/")
     assert it_page.find("a", string=re.compile("Steel bag IT"))["href"] == (
         product_url(other_language(), "steel-bag-it")
     )
-    # The consumer price with Italian VAT (TAX.12): 12.50 + 22 % = 15.25. The machine-readable
-    # price is never localised (the IT page shows "15,25").
-    assert it_page.find("data")["value"] == "15.25"
-    assert "15.25" in priced.get_text()
-    assert "Price on request" in by_title["Custom bag"].get_text()
+    # The consumer price with the VAT of the page language's country (TAX.12). The
+    # machine-readable price is never localised (an Italian page shows "15,25").
+    assert it_page.find("data")["value"] == gross_price(other_language())
+    assert priced.find("data")["value"] == gross_price(primary_language())
+    assert translated("Price on request") in by_title["Custom bag"].get_text()
 
 
 @pytest.mark.usefixtures("consumer_prices")
@@ -238,8 +248,9 @@ def test_a_consumer_card_shows_a_vat_inclusive_price(client: Client, shop: dict[
     text = card.get_text(" ", strip=True)
     assert "excl. VAT" not in text
     assert "12.50" not in text
-    assert "15.25" in text
-    assert "Indicative price. Final amount at checkout." in text
+    assert "12,50" not in text
+    assert card.find("data")["value"] == gross_price(primary_language())
+    assert translated("Indicative price. Final amount at checkout.") in text
 
 
 def test_the_pagination_nav(
@@ -247,7 +258,7 @@ def test_the_pagination_nav(
 ) -> None:
     monkeypatch.setattr(services, "LISTING_PER_PAGE", 1)
     page = soup(client, "/compatibility/maker/?page=2")
-    nav = page.find("nav", attrs={"aria-label": "Pagination"})
+    nav = page.find("nav", attrs={"aria-label": translated("Pagination")})
     current = nav.find(attrs={"aria-current": "page"})
     assert current.get_text(strip=True) == "2"
     assert nav.find("a", rel="prev")["href"] == "/compatibility/maker/"
@@ -256,16 +267,19 @@ def test_the_pagination_nav(
         "/compatibility/maker/"
     ]
     first = soup(client, "/compatibility/maker/?colour=blue,red")
-    next_link = first.find("nav", attrs={"aria-label": "Pagination"}).find("a", rel="next")
+    next_link = first.find("nav", attrs={"aria-label": translated("Pagination")}).find(
+        "a", rel="next"
+    )
     assert next_link["href"] == "/compatibility/maker/?colour=blue,red&page=2"
 
 
 def test_the_empty_state(client: Client, shop: dict[str, Any]) -> None:
     page = soup(client, "/compatibility/maker/?price_min=1000")
     assert page.find("article", class_="product-card") is None
-    assert "No products match" in page.get_text()
-    assert page.find("nav", attrs={"aria-label": "Pagination"}) is None
-    assert page.find("a", string=re.compile("Clear all filters"))["href"] == "/compatibility/maker/"
+    assert translated("No products match these filters.") in page.get_text()
+    assert page.find("nav", attrs={"aria-label": translated("Pagination")}) is None
+    clear = re.compile(re.escape(translated("Clear all filters")))
+    assert page.find("a", string=clear)["href"] == "/compatibility/maker/"
 
 
 def form_query(form: Any, **extra: str) -> list[tuple[str, str]]:
@@ -319,7 +333,9 @@ def test_a_card_on_a_fallback_language_page_links_to_the_source_language_url(
     )
     product.terms.add(shop["maker"])
     page = soup(client, f"{language_prefix(other_language())}/compatibilita/marca/")
-    assert page.find("a", string=re.compile("Plain bag"))["href"] == "/product/plain-bag-en/"
+    assert page.find("a", string=re.compile("Plain bag"))["href"] == (
+        product_url(primary_language(), "plain-bag-en")
+    )
 
 
 def test_the_cards_load_their_texts_in_a_fixed_number_of_queries(

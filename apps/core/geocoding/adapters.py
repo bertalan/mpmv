@@ -17,6 +17,8 @@ from typing import Any
 from django.conf import settings
 from django.utils.module_loading import import_string
 
+from apps.core.outbound import open_url
+
 from . import (
     AddressQuery,
     GeocodeResult,
@@ -55,7 +57,7 @@ def http_get_json(
     full_url = f"{url}?{urllib.parse.urlencode(params)}" if params else url
     request = urllib.request.Request(full_url, headers=dict(headers), method="GET")  # noqa: S310 (adapter's fixed https base URL)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 (adapter's fixed https base URL)
+        with open_url(request, timeout=timeout) as response:  # never follows a redirect
             body = response.read()
     except urllib.error.HTTPError as exc:
         if exc.code in _RATE_LIMIT_STATUSES:

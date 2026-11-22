@@ -51,15 +51,24 @@ ACCOUNT_PAGES: Final[Pages] = (
     (gettext_noop("Sign in"), "login"),
     (gettext_noop("Two-factor authentication"), "mfa:overview"),
     (gettext_noop("My orders"), "customer_orders"),
+    (gettext_noop("My garage"), "garage_account"),
     (gettext_noop("Privacy and your data"), "privacy_account"),
 )
 SHOP_PAGES: Final[Pages] = (
     (gettext_noop("Dashboard"), "manager:shop:dashboard"),
     (gettext_noop("Storefront profile"), "manager:shop:profile"),
     (gettext_noop("Payments"), "manager:shop:payments"),
+    (gettext_noop("Money"), "manager:shop:money"),
+    (gettext_noop("Transactions"), "manager:shop:money_transactions"),
+    (gettext_noop("Payouts"), "manager:shop:money_payouts"),
+    (gettext_noop("Statement"), "manager:shop:money_statement"),
     (gettext_noop("Sales terms"), "manager:shop:sales_terms"),
+    (gettext_noop("Return policy"), "manager:shop:return_policy"),
     (gettext_noop("Orders"), "manager:shop:orders"),
     (gettext_noop("Events"), "manager:shop:events"),
+    (gettext_noop("Fitment"), "manager:shop:fitment"),
+    (gettext_noop("Fitment report"), "manager:shop:fitment_report"),
+    (gettext_noop("Propose a missing item"), "manager:shop:fitment_proposals"),
     (gettext_noop("Choose a vendor"), "manager:shop:vendor"),
     (gettext_noop("Termination notice"), "manager:shop:termination"),
     (gettext_noop("Statements of reasons"), "manager:shop:statements"),
@@ -77,8 +86,12 @@ PLATFORM_PAGES: Final[Pages] = (
     (gettext_noop("Fitment categories"), "manager:platform:fitment_categories"),
     (gettext_noop("Fitment nodes"), "manager:platform:fitment_nodes"),
     (gettext_noop("Proposed nodes"), "manager:platform:fitment_proposals"),
+    (gettext_noop("Products"), "manager:platform:catalog_products"),
     (gettext_noop("Order changes"), "manager:platform:orders"),
+    (gettext_noop("Order drafts"), "manager:platform:order_drafts"),
+    (gettext_noop("Stray payments"), "manager:platform:stray_payments"),
     (gettext_noop("Order change settings"), "manager:platform:amendment_settings"),
+    (gettext_noop("Trust rules"), "manager:platform:trust_rules"),
 )
 ADMIN_PAGES: Final[Pages] = ((gettext_noop("Editors' admin"), "wagtailadmin_home"),)
 # Listed only once the setup wizard exists and has not been completed (ARC.25).
@@ -93,8 +106,13 @@ NOT_LISTED: Final = frozenset(
         "manager:shop:amendment_apply",
         "manager:shop:amendment_discard",
         "manager:shop:order_cancel",
+        "manager:shop:fitment_product",
         "manager:shop:order_invoice_issued",
         "manager:platform:order",
+        "manager:platform:order_draft",  # ORD.32: needs a draft record
+        "manager:platform:order_draft_new",  # ORD.32: POST only, makes a draft
+        "manager:platform:order_draft_lines",  # ORD.32: POST only, changes the lines
+        "manager:platform:order_draft_send",  # ORD.32: POST only, emails the link
         "manager:platform:amendment_apply",
         "manager:platform:amendment_discard",
         "manager:platform:order_cancel",
@@ -110,6 +128,8 @@ NOT_LISTED: Final = frozenset(
         "manager:shop:event_block_remove",
         "manager:shop:event_preview",
         "manager:shop:termination_data",
+        "manager:shop:fitment_nodes",
+        "manager:shop:money_export",  # VEN.9: POST only, a CSV download
         "manager:shop:image_choose",
         "manager:shop:image_results",
         "manager:shop:image_create",
@@ -124,7 +144,10 @@ NOT_LISTED: Final = frozenset(
         "manager:platform:profile_confirm",
         "manager:platform:notice",
         "manager:platform:termination",
+        "manager:platform:trust_rule",
+        "manager:platform:trust_rule_new",
         "manager:platform:user_sessions_find",
+        "manager:platform:catalog_product",
         "manager:platform:fitment_node_new",
         "manager:platform:fitment_node",
         "manager:platform:fitment_node_merge",

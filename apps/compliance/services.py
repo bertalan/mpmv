@@ -664,7 +664,7 @@ def flag_overdue_safety_cases(
     transactional outbox), `overdue_alerted_at` set and an audit entry. A case already flagged
     is left alone. With no compliance or support address configured the case is still flagged
     (the log error is the alert): setting an address later does not resend it. The in-app
-    notice for the Catalog and moderation role is a follow-up (it needs the Manager notices)."""
+    notice for the Catalogue and moderation role is a follow-up (it needs the Manager notices)."""
     moment = now or timezone.now()
     changes = ChangeSet()
     recipient = "" if dry_run else staff_alert_address(moment)
@@ -2017,6 +2017,18 @@ def orders_frozen(vendor: Vendor) -> bool:
     staff have not reviewed the freeze yet (`settings.ORDER_FREEZE_HOOKS`). A voluntary closure
     is not frozen."""
     return payouts_frozen(vendor)
+
+
+def frozen_vendor_ids(vendors: Iterable[Vendor]) -> set[int]:
+    """The ids of the given vendors for which `orders_frozen` holds, in one query (ORD.30)."""
+    return set(
+        TerminationNotice.objects.filter(
+            vendor__in=list(vendors),
+            status=TerminationNotice.Status.APPLIED,
+            frozen_at__isnull=False,
+            freeze_reviewed_at__isnull=True,
+        ).values_list("vendor_id", flat=True)
+    )
 
 
 def review_termination_freeze(

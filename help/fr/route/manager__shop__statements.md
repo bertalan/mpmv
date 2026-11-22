@@ -12,4 +12,4 @@ Cette page liste les exposés des motifs que la plateforme a envoyés à votre b
 
 L'exposé n'indique pas qui a envoyé le signalement.
 
-Si la page est vide, la plateforme n'a envoyé aucun exposé pour votre boutique. Pour toute question sur un exposé, écrivez à {{ operator.support_email }}.
+Si la page est vide, la plateforme n'a envoyé aucun exposé pour votre boutique. Pour toute question sur un exposé, écrivez à {{ operator.compliance_email }}.

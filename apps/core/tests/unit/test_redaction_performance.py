@@ -140,3 +140,33 @@ def test_the_cheap_minors_are_redacted(text: str) -> None:
     out = redact_text(text)
     for leaked in (_PW, _T8, "123456", "SflKxw", "0542811101", "4111"):
         assert leaked not in out
+
+
+@pytest.mark.parametrize("word", ["passw", "auth", "session"])
+def test_the_secret_word_check_only_sees_the_text_just_before_a_uuid(word: str) -> None:
+    """The secret-word pattern backtracks quadratically on a long run, so it must never get one:
+    the caller cuts the text before a UUID to a few dozen characters (SEC.5)."""
+    uuid = "123e4567-e89b-12d3-a456-426614174000"
+    text = (word * (60_000 // len(word))) + " " + uuid
+    started = time.perf_counter()
+    redact_text(text)
+    assert time.perf_counter() - started < 2
+
+
+@pytest.mark.parametrize(
+    ("before", "found"),
+    [
+        ("password=", True),
+        ("my_passwords: ", True),
+        ('"authorization" : "', True),
+        ("session_id='", True),
+        ("Bearer ", True),
+        ("apikey=", True),
+        ("hello ", False),
+        ("passw0rd and more", False),
+    ],
+)
+def test_the_secret_word_check_keeps_its_matches(before: str, found: bool) -> None:
+    from apps.core.observability import _SECRET_WORD_BEFORE
+
+    assert bool(_SECRET_WORD_BEFORE.search(before)) is found

@@ -9,7 +9,7 @@ Every change to the permissions of a role needs a new `manager` data migration t
 | Role | Group | Permissions |
 |---|---|---|
 | Configuration and tax | Platform: configuration and tax | `manager.platform_config` |
-| Catalog and moderation | Platform: catalog and moderation | `manager.platform_catalog`, `vendors.view_all_vendors`, `compliance.review_notices`, `vendors.revert_storefront_profile`, `wagtailadmin.access_admin` |
+| Catalogue and moderation | Platform: catalogue and moderation | `manager.platform_catalog`, `vendors.view_all_vendors`, `compliance.review_notices`, `vendors.revert_storefront_profile`, `wagtailadmin.access_admin` |
 | Finance and payments | Platform: finance and payments | `manager.platform_finance`, `vendors.view_all_vendors`, `core.elevate` |
 | Support | Platform: support | `manager.platform_support`, `vendors.view_all_vendors`, `core.elevate` |
 | Platform owner | Platform: owner | `core.platform_owner`, `vendors.view_all_vendors`, `compliance.review_notices`, `vendors.revert_storefront_profile`, `wagtailadmin.access_admin`, `core.elevate` |
@@ -20,14 +20,16 @@ Incompatible pairs (refused unless the one-person-team setting is on): Configura
 
 E edit, R read only, A audited support action, I impersonation within the policy, empty means no access (404).
 
-| Section | Configuration and tax | Catalog and moderation | Finance and payments | Support | Platform owner | Tech. superuser |
+| Section | Configuration and tax | Catalogue and moderation | Finance and payments | Support | Platform owner | Tech. superuser |
 |---|---|---|---|---|---|---|
 | Platform: dashboard | R | R | R | R | R |  |
 | Platform: map of the site (CORE.30) | R | R | R | R | R |  |
 | Platform: configuration and tax (ARC.24) | E |  |  |  | R |  |
 | Platform: owner-only settings (CMP.13, CMP.11 approvals) | R |  |  |  | E |  |
+| Platform: trust rules, the versions of the badge thresholds (TRU.1) | E |  |  |  | E |  |
 | Platform: catalog, categories, attributes, taxonomies, imports |  | E |  | R | R |  |
 | Platform: moderation (vendor events, storefront changes, content) |  | E |  |  | R |  |
+| Platform: products, bulk publish, preview, translation status (CAT.11) |  | E |  | R | R |  |
 | Platform: fitment scheme, the levels of the garage (FIT.1) | E |  |  |  | R |  |
 | Platform: categories expected to declare fitment (FIT.1) | E | R |  |  | R |  |
 | Platform: fitment nodes, proposals, merge and retire (FIT.1) |  | E |  | R | R |  |
@@ -37,8 +39,11 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Platform: vendors (applications, plans) | R | R | R | R | E |  |
 | Platform: approve or suspend a vendor (step-up, reason) |  | E |  |  | E |  |
 | Platform: close a vendor definitively |  |  |  |  | E |  |
+| Platform: approve or reject a vendor's return policy (VEN.40) |  | E |  |  | E |  |
 | Platform: orders and customers |  |  | R | R+A | R |  |
 | Platform: support actions (unlock, resend link) |  |  |  | A | A |  |
+| Platform: carts prepared from a past order, one-time link (ORD.32) |  |  |  | A | A |  |
+| Platform: stray-payment alerts, close one by hand (PAY.4) |  |  | R | A | A |  |
 | Platform: a user's sessions, end them (CORE.24) |  |  |  | A | A |  |
 | Platform: end every session, the panic button (CORE.24) |  |  |  |  | E |  |
 | Platform: account activation and service messages (CORE.19) |  |  |  | A | E |  |

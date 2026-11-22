@@ -20,11 +20,11 @@ go-live.
 |---|---|---|
 | Accounts | `test_accounts_attacks.py`, `test_passkey_window_attacks.py`, `test_session_lifetime_attacks.py` | present |
 | Request tampering | `test_request_tampering.py` | present |
-| Business logic | `test_business_logic.py` | to do |
-| Integrations | `test_integrations.py` | to do |
-| Resource abuse | `test_resource_abuse.py` | to do |
+| Business logic | `test_business_logic_attacks.py`, `test_payment_attacks.py` | present (cart, catalogue API, shipping import; payments and refunds: 3a-2; coupons and payouts to do) |
+| Integrations | `test_integration_attacks.py` | present (webhook replay, outbound SSRF and redirects, XML and archive guards, CSV formulas) |
+| Resource abuse | `test_resource_abuse.py` | present (2a: bodies, JSON depth, uploads, pagination; ReDoS is slice 2b) |
 | Information leaks | `test_information_leaks.py` | to do |
-| AI and agents (SEC.9) | `test_ai_agents.py` | to do |
+| AI and agents (SEC.9) | `test_ai_agent_injection.py` | present (2d: llms.txt, JSON-LD, ICS, RSS; MCP and enricher wait for AI.1 and ING.5) |
 
 ## Cases covered elsewhere
 
@@ -58,6 +58,33 @@ go-live.
 | Wagtail password reset page closed to a signed-in superuser | `apps/cms/tests/integration/test_cms_admin.py::test_passwords_are_not_changed_from_the_wagtail_admin` |
 | `frame-ancestors 'none'` and `X-Frame-Options: DENY` with the LIVE settings | `tests/integration/test_security_headers.py::test_live_security_headers_are_present`, `test_live_csp_is_strict` |
 
+### Resource abuse
+
+| Case | Covering test |
+|---|---|
+| A page past the last answers 404 | `apps/catalog/tests/integration/test_listing_views.py` (deep and malformed page numbers: `tests/security/test_resource_abuse.py`) |
+| Malformed JSON is a 400 problem | `apps/api/tests/integration/test_v1_errors.py` |
+| Per-key API rate limit | `tests/integration/test_rate_limits.py` |
+
+Scenarios in `test_resource_abuse.py`: body, field-count and file-count limits are set; image byte
+and pixel caps; oversized and over-wide form posts are 400; deeply nested JSON on the catalog and
+events APIs is a 4xx problem, never a 500; deep pagination does no OFFSET scan. Search-query and
+export caps are skipped until CAT.9 and the CMP exports exist.
+
+Findings kept as `xfail(strict=True)`: an oversized API body is a logged 500 instead of a 413
+problem; API request arrays have no `maxItems`; the event `body` schema is free-form JSON.
+
+## Natural-language injection is data
+
+Text that is visible and reads like an instruction ("ignore previous instructions ...") passes
+through `llms.txt`, the feeds and the JSON-LD graph by design. It is data, not instructions: the
+agent-facing surfaces keep it inside its own field (one link text, one RSS element, one JSON-LD
+string) and label it as content, and nothing in them can turn it into structure, a link, markup
+or a hidden character (`test_ai_agent_injection.py`). Telling an agent not to obey it is the
+agent's job; the platform's job is that it can never look like anything but content. `llms.txt`
+also caps titles at 200 and the summary at 500 characters. API v1 serves text as JSON data
+(`apps/api/tests/integration/test_v1_hostile_text.py`).
+
 ## Not testable yet
 
 - Enumeration through registration, password reset and vendor claim: no such page exists yet
@@ -66,3 +93,15 @@ go-live.
   the gap visible.
 - Mass assignment of `price` or `status` in customer forms: no customer form (cart, checkout,
   account) exists yet; the API and admin sweeps run today.
+
+## ReDoS sweep (`test_redos.py`, helpers in `redos.py`)
+
+Every regular expression our code can run on user input must stay linear on adversarial input.
+`redos.collect_patterns()` finds them under `apps/`: literal `re.*` calls, `RegexValidator`
+and `re_path` (AST), compiled module and class attributes (runtime), validators on model fields
+and every routed URL pattern. Each is run on pumped, never-matching inputs in a worker process
+with a hard kill. A new regex is swept with no change to the test. A call site whose pattern is
+built at runtime must be listed in `DYNAMIC` with its reason and an expansion; a pattern whose
+input is bounded before it arrives goes in `INPUT_LIMITS` with the bound. Third-party code is not
+scanned (only its URL routes). The 1,000-character sweep runs on every PR; the 100 KB sweep is
+`security_slow` (nightly, `make test-security-nightly`).

@@ -31,7 +31,7 @@ from tests.i18n import other_language
 pytestmark = pytest.mark.django_db
 
 # The CORE.18 catalog role group (apps/manager/roles.py); not imported: compliance sits below.
-CATALOG_GROUP = "Platform: catalog and moderation"
+CATALOG_GROUP = "Platform: catalogue and moderation"
 
 CTX = AuditContext(actor_id=1, actor_label="staff:ops", source="admin", ip="127.0.0.1")
 NOW = dt.datetime(2026, 3, 1, 10, 0, tzinfo=dt.UTC)

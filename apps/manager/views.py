@@ -40,7 +40,12 @@ from apps.catalog.services import product_kpis
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
 from apps.core.public_forms import Protection, pre_mfa_step, public_form
-from apps.core.services import flag_enabled
+from apps.core.services import (
+    NoPlatformOperator,
+    OverlappingPlatformOperators,
+    current_operator,
+    flag_enabled,
+)
 from apps.orders import amendments as orders_amendments
 from apps.orders import engine as orders_engine
 from apps.orders import versions as orders_versions
@@ -70,13 +75,20 @@ from apps.vendors.services import (
     revert_profile_change,
     reverted_entry_ids,
     save_storefront_profile,
+    set_default_product_role,
     set_vendor_logo,
 )
 
 from . import roles as roles_module
 from . import site_map, staff_roles
 from .access import ManagerContext, home_url
-from .forms import ShipmentForm, StaffRoleForm, StorefrontProfileForm, VendorLogoForm
+from .forms import (
+    ProductRoleForm,
+    ShipmentForm,
+    StaffRoleForm,
+    StorefrontProfileForm,
+    VendorLogoForm,
+)
 from .middleware import manager_context
 from .navigation import Section, registry
 from .spaces import Space
@@ -134,6 +146,14 @@ def shell_context(ctx: ManagerContext, current: Section) -> dict[str, Any]:
 # --- Built-in sections (registered in sections.py)
 
 
+def support_email() -> str:
+    """The support address of the operator in force; empty when none is configured."""
+    try:
+        return str(current_operator().support_email or "").strip()
+    except (NoPlatformOperator, OverlappingPlatformOperators):
+        return ""
+
+
 class ShopDashboardView(ManagerView):
     section = "shop.dashboard"
     template_name = "manager/shop/dashboard.html"
@@ -141,6 +161,11 @@ class ShopDashboardView(ManagerView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context["products"] = product_kpis(self.scoped(Product))
+        # CMP.41 follow-up: a seller to consumers without a phone is told what to do.
+        vendor = self.manager.vendor
+        missing = vendor is not None and vendors_services.consumer_phone_missing(vendor)
+        context["phone_missing"] = missing
+        context["support_email"] = support_email() if missing else ""
         return context
 
 
@@ -192,6 +217,12 @@ class StorefrontProfileView(ManagerView):
             VendorLogoForm(initial={"logo_alt": vendor.logo_alt if vendor else ""}),
         )
         context["logo"] = current
+        context.setdefault(
+            "role_form",
+            ProductRoleForm(
+                initial={"default_product_role": vendor.default_product_role if vendor else ""}
+            ),
+        )
         context["machine_draft"] = (
             row is not None and row.status == VendorTranslation.Status.MACHINE
         )
@@ -223,6 +254,26 @@ class StorefrontProfileView(ManagerView):
                 return HttpResponseRedirect(reverse("manager:shop:profile"))
         return self.render_to_response(self.get_context_data(logo_form=form))
 
+    def post_role(self, request: HttpRequest, vendor: Vendor, actor: User) -> HttpResponse:
+        """The product role form (SEO.10): producer, reseller or not sure."""
+        form = ProductRoleForm(request.POST)
+        if form.is_valid():
+            ctx = replace(audit_context(request), source=AuditLog.Source.VENDOR)
+            try:
+                changes = set_default_product_role(
+                    vendor, form.cleaned_data["default_product_role"], actor=actor, ctx=ctx
+                )
+            except ValidationError as error:
+                form.add_error(None, error)
+            except PermissionDenied:  # suspended between the page and the save
+                return self.render_to_response(self.get_context_data(), status=403)
+            else:
+                messages.success(
+                    request, _("Saved.") if not changes.is_empty else _("Nothing changed.")
+                )
+                return HttpResponseRedirect(reverse("manager:shop:profile"))
+        return self.render_to_response(self.get_context_data(role_form=form))
+
     @requires_level_method("content_edit")  # group 1: any session, CORE.26 can tighten it
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         vendor, actor = self.manager.vendor, self.manager.user
@@ -232,6 +283,8 @@ class StorefrontProfileView(ManagerView):
             return self.render_to_response(self.get_context_data(), status=403)
         if request.POST.get("action") == "logo":
             return self.post_logo(request, vendor, actor)
+        if request.POST.get("action") == "role":
+            return self.post_role(request, vendor, actor)
         language = self.language()
         form = StorefrontProfileForm(request.POST, initial=self.stored_values(language))
         if form.is_valid():

@@ -1,10 +1,12 @@
 {% load i18n theme_tags %}{% comment %}
 Site footer (THM.3, spec 14 §14.6): the help link first, in the same place on every page
 (WCAG 3.2.6), the footer menu (CMS.1), the legal links and the copyright line. Each list is a
-labelled `<nav>`, left out when empty.
+labelled `<nav>`, left out when empty. CMS.17: up to four widget columns and the social profile
+links, each left out when empty.
 
 Context: `site_name`, `links` (the footer menu: `label` and `url`), `legal_links` (same shape;
-a slot for the legal pages of CMS.5, empty until then), and the context of the help link.
+a slot for the legal pages of CMS.5, empty until then), and the context of the help link; optional `widgets` (`title`, `links`: `label` and `url`) and
+`social_links` (`label` and `url`: the visible label is the link's text).
 {% endcomment %}<footer class="site-footer">
   <div class="site-footer__inner">
     {% include "components/help_link.html" %}
@@ -22,6 +24,13 @@ a slot for the legal pages of CMS.5, empty until then), and the context of the h
         </ul>
       </nav>
     {% endif %}
+    {% for widget in widgets|slice:":4" %}
+      <section class="site-footer__widget">
+        {% if widget.title %}<h2 class="site-footer__heading">{{ widget.title }}</h2>{% endif %}
+        {% if widget.links %}<ul>{% for link in widget.links %}<li>{% with href=link.url|safe_href %}{% if href %}<a href="{{ href }}">{{ link.label }}</a>{% else %}{{ link.label }}{% endif %}{% endwith %}</li>{% endfor %}</ul>{% endif %}
+      </section>
+    {% endfor %}
+    {% if social_links %}<nav aria-label="{% translate 'Social' %}"><ul class="site-footer__social">{% for link in social_links %}{% with href=link.url|safe_href %}{% if href %}<li><a href="{{ href }}" rel="me noopener">{{ link.label }}</a></li>{% endif %}{% endwith %}{% endfor %}</ul></nav>{% endif %}
     <p>&copy; {% now "Y" %} {{ site_name }}</p>
     {% consent_settings_link as consent_link %}{% if consent_link %}<p>{{ consent_link }}</p>{% endif %}
   </div>

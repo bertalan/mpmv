@@ -12,9 +12,10 @@ page lookup.
 from django.conf.urls.i18n import i18n_patterns
 from django.contrib import admin
 from django.http import HttpRequest, JsonResponse
-from django.urls import include, path
+from django.urls import include, path, re_path
 from django.views.decorators.http import require_safe
 from wagtail.admin import urls as wagtailadmin_urls
+from wagtail.documents.views.serve import serve as serve_document
 
 from apps.accounts.views import switch_language
 from apps.core.media import serve_media
@@ -53,6 +54,10 @@ urlpatterns = [
     path("admin/", include("apps.cms.admin_urls")),  # replaces Wagtail's account page (CMS.1)
     path("admin/", include("apps.core.admin_urls")),  # collection moves keep SVG (THM.12)
     path("admin/", include(wagtailadmin_urls)),  # editors' admin (Wagtail, CMS.1)
+    # Wagtail's document serve view (CMS.15): collection and page restrictions apply. Its password
+    # form is not mounted (a password restriction needs captcha and a rate limit first), so only
+    # login and group restrictions are supported.
+    re_path(r"^documents/(\d+)/(.*)$", serve_document, name="wagtaildocs_serve"),
     path("i18n/switch/", switch_language, name="switch_language"),
     path("", include("apps.seo.save_urls")),  # cookie consent choice (SEO.5)
     path("", include("apps.seo.sitemap_urls")),  # sitemap index and per-language sitemaps (I18N.6)
@@ -63,14 +68,18 @@ urlpatterns = [
     path("account/link/", include("apps.accounts.action_link_urls")),  # CORE.15
     path("account/privacy/", include("apps.compliance.account_urls")),  # CMP.4 self-service
     path("account/orders/", include("apps.orders.account_urls")),  # My orders (ORD.7)
+    path("account/garage/", include("apps.fitment.garage_account_urls")),  # My garage (FIT.5)
+    path("account/cart-draft/", include("apps.orders.draft_link_urls")),  # ORD.32
     path("account/", include("apps.manager.account_urls")),  # Manager sign-in (CORE.17)
     path("manager/", include("apps.manager.urls")),  # the Manager's two spaces (CORE.17)
     path("vendor/claim/", include("apps.vendors.urls")),  # claim an imported vendor (VEN.24)
     path("vendor/terms/", include("apps.vendors.terms_urls")),  # sales terms in force (VEN.35)
     path("_help/", include("apps.cms.help_urls")),  # contextual help dialog (ARC.32)
     path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
+    path("maps/", include("apps.core.maps.urls")),  # same-origin map tile proxy (EVT.14)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
     path("_styleguide/", include("apps.themes.urls")),
+    path("palette/", include("apps.themes.palette_urls")),  # site palette CSS (THM.31)
     # Temporary staff "Site links" page for STAGE testing (OPS.12); remove before LIVE.
     path("_links/", include("apps.seo.urls")),
     *i18n_patterns(
@@ -81,6 +90,7 @@ urlpatterns = [
         path("", include("apps.seo.consent_urls")),  # cookie settings page (SEO.5)
         path("", include("apps.fitment.urls")),  # anonymous garage cookie (FIT.6)
         path("", include("apps.events.urls")),  # `calendar.ics` of an event (EVT.6)
+        path("", include("apps.cms.guide_urls")),  # customer help pages (ARC.37)
         path("", include("apps.cms.urls")),
         prefix_default_language=False,
     ),

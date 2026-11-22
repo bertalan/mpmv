@@ -65,8 +65,12 @@ class ListFilter:
 
     name: str
     label: StrOrPromise
-    choices: Sequence[tuple[str, str]]
+    choices: Sequence[tuple[str, StrOrPromise]]
     lookup: str
+    text: bool = False  # a free-text box (`?q=...`) instead of a choice: `apply` decides
+
+    def accepts(self, value: str) -> bool:
+        return bool(value.strip()) if self.text else value in {key for key, _l in self.choices}
 
     def apply[M: Model](self, rows: QuerySet[M], value: str) -> QuerySet[M]:
         if value in {key for key, _label in self.choices}:
@@ -102,9 +106,13 @@ class ManagerListView(ManagerView):
 
     # --- Listing
 
+    def get_filters(self) -> Sequence[ListFilter]:
+        """The filters of this request; a list whose choices depend on data overrides this."""
+        return self.filters
+
     def filtered(self) -> QuerySet[Any]:
         rows = self.rows()
-        for list_filter in self.filters:
+        for list_filter in self.get_filters():
             rows = list_filter.apply(rows, self.request.GET.get(list_filter.name, ""))
         return rows
 
@@ -112,8 +120,8 @@ class ManagerListView(ManagerView):
         """The filter part of the query string, kept by pagination and after a bulk action."""
         pairs = [
             (f.name, self.request.GET[f.name])
-            for f in self.filters
-            if self.request.GET.get(f.name, "") in {key for key, _label in f.choices}
+            for f in self.get_filters()
+            if f.accepts(self.request.GET.get(f.name, ""))
         ]
         return urlencode(pairs)
 
@@ -143,9 +151,10 @@ class ManagerListView(ManagerView):
                     "name": f.name,
                     "label": f.label,
                     "choices": f.choices,
+                    "text": f.text,
                     "value": self.request.GET.get(f.name, ""),
                 }
-                for f in self.filters
+                for f in self.get_filters()
             ],
             bulk_actions=self.available_actions(),
         )

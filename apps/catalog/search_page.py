@@ -35,6 +35,7 @@ from apps.core.money import CURRENCY
 from apps.core.services import consume_rate_limit
 from apps.core.throttling import ip_bucket
 from apps.vendors import services as vendors_services
+from apps.vendors.seller_name import public_name
 
 from . import listings, services, slugs
 from .models import CategoryTranslation, Product
@@ -60,6 +61,7 @@ class SearchItem:
     url: str
     summary: str = ""
     language: str = ""  # set when the item is shown in a language other than the page's
+    ref: int | None = None  # the primary key of the row behind the item, where a reader needs it
 
 
 @dataclass(frozen=True)
@@ -75,6 +77,13 @@ class SearchGroup:
 
     def with_see_all(self, url: str) -> "SearchGroup":
         return SearchGroup(self.key, self.title, self.items, self.order, self.more, url)
+
+
+@dataclass(frozen=True)
+class SearchGraphPage:
+    """The subject of the results page's schema.org graph (SEO.7): the query it answers."""
+
+    query: str
 
 
 @dataclass(frozen=True)
@@ -155,19 +164,40 @@ def category_suggestions(language: str) -> list[SearchItem]:
 # --- Vendors
 
 
-def vendors_group(request: HttpRequest, query: str, language: str, limit: int) -> SearchGroup:
-    rows = list(
+def _public_vendor_matches(query: str, limit: int) -> list[tuple[Any, str]]:
+    """Up to `limit` active vendors whose public name contains `query`, with that name.
+
+    A natural person's legal name is neither shown nor matched (SEO.15). The database does the
+    filtering, the ordering and the cut: `icontains` narrows to the candidates, which are streamed
+    in the final order, and the rule of `seller_name.public_name` (a Unicode normalisation that
+    SQL cannot express exactly) is applied to each one until `limit` are found. No row is read
+    past the last match, and the work does not grow with the number of vendors."""
+    needle = query.casefold()
+    candidates = (
         vendors_services.storefront_vendors()
         .filter(display_name__icontains=query)
-        .order_by("display_name", "pk")[: limit + 1]
+        .order_by("display_name", "pk")
     )
+    rows: list[tuple[Any, str]] = []
+    for vendor in candidates.iterator(chunk_size=limit):
+        shown = public_name(vendor)
+        if shown and needle in shown.casefold():
+            rows.append((vendor, shown))
+            if len(rows) == limit:
+                break
+    return rows
+
+
+def vendors_group(request: HttpRequest, query: str, language: str, limit: int) -> SearchGroup:
+    rows = _public_vendor_matches(query, limit + 1)
     default = settings.LANGUAGE_CODE
     items = [
         SearchItem(
-            title=str(vendor.display_name),
+            title=shown,
             url=slugs.vendor_path(language, vendor.slug, default_language=default),
+            ref=vendor.pk,
         )
-        for vendor in rows[:limit]
+        for vendor, shown in rows[:limit]
     ]
     return SearchGroup("vendors", str(_("Vendors")), items, order=30, more=len(rows) > limit)
 
@@ -235,6 +265,7 @@ def search_view(request: HttpRequest) -> HttpResponseBase:
     filter_groups = services.listing_filter_groups(services.NO_SCOPE, params, language)
     context: dict[str, Any] = {
         "query": query,
+        "graph_object": SearchGraphPage(query),
         "location": path,
         "only": only,
         "cards": services.product_cards(results.products, language) if results else [],

@@ -21,13 +21,16 @@ from apps.fitment.models import (
     FitmentNode,
     FitmentNodeAlias,
     FitmentNodeMerge,
+    FitmentNodeProposal,
     FitmentNodeTranslation,
     FitmentNote,
     FitmentNoteTranslation,
     FitmentScheme,
+    GarageProfile,
     ProductFitment,
     ProductFitmentState,
 )
+from apps.vendors.tests.factories import VendorFactory
 
 
 class FitmentSchemeFactory(DjangoModelFactory[FitmentScheme]):
@@ -159,3 +162,23 @@ class ProductFitmentFactory(DjangoModelFactory[ProductFitment]):
     node = factory.SubFactory(FitmentNodeFactory)
     node_path = factory.LazyAttribute(lambda o: o.node.path)
     source = ProductFitment.Source.MANUAL
+
+
+class FitmentNodeProposalFactory(DjangoModelFactory[FitmentNodeProposal]):
+    class Meta:
+        model = FitmentNodeProposal
+
+    vendor = factory.SubFactory(VendorFactory)
+    node = factory.SubFactory(FitmentNodeFactory, status=FitmentNode.Status.PROPOSED)
+
+
+class GarageProfileFactory(DjangoModelFactory[GarageProfile]):
+    """An account garage profile (FIT.5); the node is a root node unless given."""
+
+    class Meta:
+        model = GarageProfile
+
+    user = factory.SubFactory("apps.accounts.tests.factories.UserFactory")
+    node = factory.SubFactory(FitmentNodeFactory)
+    name = factory.Sequence(lambda n: f"Profile {n}")
+    is_active = False

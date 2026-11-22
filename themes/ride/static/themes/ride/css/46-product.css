@@ -64,6 +64,13 @@
     flex: none;
   }
 
+  /* CAT.23: the variant's own picture in the list (CAT.26: its gallery replaces the product's) */
+  .variant-thumb {
+    max-inline-size: 4rem;
+    block-size: auto;
+    vertical-align: middle;
+  }
+
   .store-categories .nav-link {
     min-block-size: var(--target-primary);
     display: flex;
@@ -78,6 +85,70 @@
     border-color: var(--color-accent);
   }
 
+  /* Specifications and fitment (THM.7 part 3): a two-column list that stacks on a narrow screen,
+     and a native <details> that holds the long end of the fitment list. */
+  .product-specs {
+    display: grid;
+    grid-template-columns: minmax(8rem, max-content) 1fr;
+    gap: var(--space-xs) var(--space-m);
+    margin: 0;
+  }
+
+  .product-specs dt {
+    font-weight: 700;
+    color: var(--color-heading);
+  }
+
+  .product-specs dd {
+    margin: 0;
+  }
+
+  @media (max-width: 40rem) {
+    .product-specs {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+
+    .product-specs dd {
+      margin-block-end: var(--space-xs);
+    }
+  }
+
+  .product-fitment .fitment-make {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    margin-block: var(--space-s) var(--space-xs);
+  }
+
+  .product-fitment .fitment-entries {
+    margin: 0;
+    padding-inline-start: 1.25rem;
+  }
+
+  .product-fitment .fitment-years,
+  .product-fitment .fitment-note {
+    color: var(--color-text-muted);
+  }
+
+  .product-fitment .is-excluded {
+    font-style: italic;
+  }
+
+  .product-fitment-more > summary {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--target-primary);
+    margin-block-start: var(--space-s);
+    font-weight: 700;
+    color: var(--color-accent-hover);
+    cursor: pointer;
+  }
+
+  .product-fitment-more > summary:focus-visible {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-offset);
+  }
+
   /* Without JavaScript: panels in turn, accordion items open, no tab strip (it has no effect). */
   .no-js .product-info .nav-tabs {
     display: none;
@@ -86,6 +157,17 @@
   .no-js .product-info .tab-pane {
     display: block;
     opacity: 1;
+  }
+
+  .no-js .product-info .tab-pane > .visually-hidden {
+    position: static !important;
+    inline-size: auto !important;
+    block-size: auto !important;
+    margin: 0 0 var(--space-s) !important;
+    overflow: visible !important;
+    clip: auto !important;
+    clip-path: none !important;
+    white-space: normal !important;
   }
 
   .no-js .accordion-collapse {

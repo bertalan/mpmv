@@ -1,0 +1,48 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load i18n wagtailimages_tags %}
+{% block main_content %}
+  <p>{% blocktranslate count counter=total %}{{ counter }} image is not used by any product, brand, vendor, page, event or draft, and is more than a day old.{% plural %}{{ counter }} images are not used by any product, brand, vendor, page, event or draft, and are more than a day old.{% endblocktranslate %}</p>
+  {% include "catalog/admin/orphan_images_old_versions.html" %}
+  {% if preview %}
+    <div class="help-block help-info" role="status">
+      <p>{% blocktranslate count counter=preview.deleted|length %}Preview: {{ counter }} image would be deleted. Nothing has been deleted yet.{% plural %}Preview: {{ counter }} images would be deleted. Nothing has been deleted yet.{% endblocktranslate %}</p>
+      {% if preview.refused %}
+        <p>{% blocktranslate count counter=preview.refused|length %}{{ counter }} image would be kept because it is in use, too new or not yours to delete.{% plural %}{{ counter }} images would be kept because they are in use, too new or not yours to delete.{% endblocktranslate %}</p>
+      {% endif %}
+    </div>
+  {% endif %}
+  {% if images %}
+    <form method="post" action="{% url 'catalog_orphan_images' %}?p={{ page_obj.number }}">
+      {% csrf_token %}
+      <table class="listing">
+        <thead>
+          <tr>
+            <th><span class="w-sr-only">{% translate "Select" %}</span></th>
+            <th>{% translate "Image" %}</th>
+            <th>{% translate "Title" %}</th>
+            <th>{% translate "Collection" %}</th>
+            <th>{% translate "Uploaded" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for image in images %}
+            <tr>
+              <td><input type="checkbox" name="image" value="{{ image.pk }}" id="orphan-{{ image.pk }}" aria-label="{{ image.title }}"></td>
+              <td>{% image image max-80x80 %}</td>
+              <td><a href="{% url 'wagtailimages:edit' image.pk %}">{{ image.title }}</a></td>
+              <td>{{ image.collection.name }}</td>
+              <td>{{ image.created_at|date:"SHORT_DATE_FORMAT" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p>
+        <button type="submit" name="mode" value="preview" class="button button-secondary">{% translate "Preview delete" %}</button>
+        <button type="submit" name="mode" value="delete" class="button no">{% translate "Delete selected images" %}</button>
+      </p>
+    </form>
+    {% if page_obj.paginator.num_pages > 1 %}
+      {% include "wagtailadmin/shared/pagination_nav.html" with items=page_obj linkurl="catalog_orphan_images" %}
+    {% endif %}
+  {% endif %}
+{% endblock %}

@@ -20,14 +20,17 @@ from pydantic import Field, field_validator
 
 from apps.api.auth import api_client_of
 from apps.api.v1.errors import ApiProblem
-from apps.catalog import engine, services
+from apps.catalog import engine, product_pages, services
 from apps.catalog.models import Product, ProductAttribute, Variant
+from apps.core.i18n import primary_language
+from apps.seo import seller
+from apps.tax.prices import PriceUnavailable, consumer_price
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import get_for_actor_or_404
 
 from .mutations import ChangeSetOut, DryRun, audit_context, changeset_out
 from .security import ApiKey
-from .text import PlainText
+from .text import NFCText, PlainText
 
 router = Router(tags=["catalog"])
 
@@ -42,8 +45,13 @@ def _language(value: str) -> str:
 
 
 class LanguageQuery(Schema):
+    # default_factory: resolved per request, as the primary language follows MPMV_LANGUAGES.
     language: str = Field(
-        "en", description="Language of names and labels; EN is the fallback (spec 09)."
+        default_factory=primary_language,
+        description=(
+            "Language of names and labels; the operator's primary language when absent, and "
+            "the primary language is the fallback (spec 09)."
+        ),
     )
 
     @field_validator("language")
@@ -97,9 +105,11 @@ def list_attributes(
 
 class TranslationIn(Schema):
     language: PlainText
-    title: PlainText = Field(min_length=1, max_length=255)
-    short_description: PlainText = ""
-    description: PlainText = ""
+    title: NFCText = Field(min_length=1, max_length=255)
+    short_description: NFCText = ""
+    description: NFCText = ""
+    material: NFCText = Field("", max_length=120)
+    colour: NFCText = Field("", max_length=80)
 
 
 class ProductAttributeIn(Schema):
@@ -108,7 +118,7 @@ class ProductAttributeIn(Schema):
         default_factory=list, description="Value codes (choice attributes)."
     )
     number: Decimal | None = Field(None, description="Number attributes, in the attribute's unit.")
-    text: PlainText = Field("", max_length=255, description="Text attributes (language-neutral).")
+    text: NFCText = Field("", max_length=255, description="Text attributes (language-neutral).")
     variant_axis: bool = Field(
         False, description="The variants vary on it; axes are ordered as listed."
     )
@@ -123,6 +133,10 @@ class VariantIn(Schema):
     weight_kg_override: Decimal | None = Field(None, ge=0, max_digits=8, decimal_places=3)
     stock_qty: int = Field(0, ge=0)
     is_default: bool = False
+    gtin: PlainText = Field(
+        "", max_length=32, description="8, 12, 13 or 14 digits with the GS1 check digit."
+    )
+    mpn: PlainText = Field("", max_length=engine.MPN_MAX_LENGTH)
 
 
 class ProductIn(Schema):
@@ -135,6 +149,10 @@ class ProductIn(Schema):
     fiscal_category: Literal["standard", "reduced", "book_art74"] = "standard"
     price_net: Decimal = Field(description="EUR, VAT excluded.")
     weight_kg: Decimal | None = Field(None, ge=0, max_digits=8, decimal_places=3)
+    length_mm: int | None = None
+    width_mm: int | None = None
+    height_mm: int | None = None
+    country_of_origin: str = Field("", max_length=2)
     translations: list[TranslationIn] = Field(default_factory=list)
     attributes: list[ProductAttributeIn] = Field(default_factory=list)
     variants: list[VariantIn] = Field(
@@ -149,8 +167,14 @@ class ProductIn(Schema):
             fiscal_category=self.fiscal_category,
             price_net=self.price_net,
             weight_kg=self.weight_kg,
+            length_mm=self.length_mm,
+            width_mm=self.width_mm,
+            height_mm=self.height_mm,
+            country_of_origin=self.country_of_origin,
             translations=tuple(
-                engine.TranslationIn(t.language, t.title, t.short_description, t.description)
+                engine.TranslationIn(
+                    t.language, t.title, t.short_description, t.description, t.material, t.colour
+                )
                 for t in self.translations
             ),
             attributes=tuple(
@@ -165,6 +189,8 @@ class ProductIn(Schema):
                     weight_kg_override=v.weight_kg_override,
                     stock_qty=v.stock_qty,
                     is_default=v.is_default,
+                    gtin=v.gtin,
+                    mpn=v.mpn,
                 )
                 for v in self.variants
             ),
@@ -273,6 +299,8 @@ def _variant_out(variant: Variant, language: str) -> dict[str, Any]:
         "options": {o.attribute.code: o.value.value for o in options},
         "price_net_override": variant.price_net_override,
         "stock_qty": variant.stock_qty,
+        "gtin": variant.gtin,
+        "mpn": variant.mpn,
     }
 
 
@@ -300,3 +328,70 @@ def get_product(
             _variant_out(variant, language) for variant in product.variants.order_by("position")
         ],
     }
+
+
+# --- Other sellers of a product (CAT.15)
+
+OTHER_SELLERS_MAX = 24
+
+
+class OtherSellersQuery(LanguageQuery):
+    limit: int = Field(
+        product_pages.OTHER_SELLERS_LIMIT,
+        ge=1,
+        le=OTHER_SELLERS_MAX,
+        description="At most this many offers (cheapest first by consumer price, then by title).",
+    )
+
+
+class OtherSellerOut(Schema):
+    public_id: uuid.UUID
+    title: str
+    url: str = Field(description="Path of the offer's product page, in `language`.")
+    seller: str | None = Field(
+        description="The vendor's public seller name; null when it has none that may be shown."
+    )
+    price: Decimal | None = Field(
+        description="The consumer price as the shop shows it (VAT included at the destination "
+        "rate, TAX.12); null for a product on request or when no price can be shown."
+    )
+    price_note: str = ""
+
+
+@router.get(
+    "/products/{public_id}/other-sellers",
+    response=list[OtherSellerOut],
+    auth=ApiKey(READ),
+    summary="Other sellers of a product",
+)
+def other_sellers(
+    request: HttpRequest, public_id: uuid.UUID, query: Annotated[OtherSellersQuery, Query()]
+) -> list[dict[str, Any]]:
+    """Other vendors' published products with the same GTIN, or the same brand and MPN (owner
+    decision Q-33): never the caller's own vendor, an unpublished product, an inactive vendor or
+    a product without a published text in `language`. The caller reaches only a product it may
+    read; the offers listed are public data."""
+    product = get_for_actor_or_404(
+        Product.objects.select_related("vendor"), api_client_of(request), public_id=public_id
+    )
+    out: list[dict[str, Any]] = []
+    for card in product_pages.other_sellers(product, query.language, query.limit, request):
+        price = None
+        if card.price is not None and card.vendor is not None:
+            try:
+                price = consumer_price(
+                    card.price, card.fiscal_category, vendor=card.vendor, request=request
+                )
+            except PriceUnavailable:
+                price = None
+        out.append(
+            {
+                "public_id": card.public_id,
+                "title": card.title,
+                "url": card.url,
+                "seller": seller.public_name(card.vendor) if card.vendor is not None else None,
+                "price": None if price is None else price.amount,
+                "price_note": "" if price is None else price.note,
+            }
+        )
+    return out

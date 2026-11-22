@@ -5,6 +5,7 @@ Amounts are `Decimal`, rounded half up per line before they are added up (spec 0
 
 import calendar
 import datetime as dt
+import hashlib
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -111,6 +112,54 @@ def shipping_tax(shipping_net: Decimal, rate: Decimal) -> Decimal:
     return round_line(shipping_net * rate / HUNDRED)
 
 
+def stored_shipping_portions(
+    shipping_choice: Mapping[str, Any] | None,
+) -> list[tuple[Decimal, Decimal, Decimal]]:
+    """`(net, rate, tax)` of each shipping VAT portion kept with the shipping choice."""
+    stored = (shipping_choice or {}).get("tax_portions") or []
+    return [
+        (Decimal(str(p["net"])), Decimal(str(p["rate"])), Decimal(str(p["tax"]))) for p in stored
+    ]
+
+
+class ShippingPortionsMismatch(ValueError):
+    """The shipping VAT portions of a vendor order do not add up (ORD.29)."""
+
+
+def check_shipping_portions(
+    shipping_net: Decimal,
+    portions: Sequence[tuple[Decimal, Decimal, Decimal]],
+    *,
+    shipping_tax: Decimal | None = None,
+) -> Decimal:
+    """The shipping VAT of a vendor order split across rates: the sum of its portions.
+
+    `portions` are `(net, rate, tax)`. The invariant of a vendor order without a single shipping
+    rate (ORD.29): at least one portion, each portion's VAT is its net at its rate rounded half up
+    (TAX.17 rounds per portion), the nets add up to `shipping_net` and, when given, the stored
+    `shipping_tax` is the sum of the portions' VAT. Raises `ShippingPortionsMismatch` otherwise.
+    """
+    if not portions:
+        raise ShippingPortionsMismatch("shipping split across rates needs its VAT portions")
+    for net, rate, tax in portions:
+        expected = round_line(net * rate / HUNDRED)
+        if net < 0 or tax != expected:
+            raise ShippingPortionsMismatch(
+                f"shipping portion {net} at {rate}% must carry {expected} VAT, not {tax}"
+            )
+    nets = sum((net for net, _, _ in portions), start=Decimal("0.00"))
+    if nets != shipping_net:
+        raise ShippingPortionsMismatch(
+            f"shipping portions add up to {nets}, not to the shipping net {shipping_net}"
+        )
+    total = sum((tax for _, _, tax in portions), start=Decimal("0.00"))
+    if shipping_tax is not None and total != shipping_tax:
+        raise ShippingPortionsMismatch(
+            f"shipping VAT {shipping_tax} is not the sum of its portions ({total})"
+        )
+    return total
+
+
 # --- checkout preview (ORD.3, SHP.4) ---------------------------------------------------------
 
 # Blocking messages of the checkout. `needs_quote` is not a failure: the package goes the quote
@@ -126,7 +175,6 @@ SHIPPING_BLOCKED = "shipping_blocked"
 SHIPPING_CHOICE_INVALID = "shipping_choice_invalid"
 TAX_BLOCKED = "tax_blocked"
 NO_PRICE = "no_price"
-SHIPPING_VAT_SPLIT = "shipping_vat_split"
 
 READY = "ready"
 QUOTE = "quote"
@@ -579,3 +627,120 @@ def vehicle_line(snapshot: Mapping[str, str], language: str) -> str:
     if not label:
         return ""
     return _VEHICLE_LINE.get(language, _VEHICLE_LINE["en"]).format(vehicle=label)
+
+
+# --- order again (ORD.31) --------------------------------------------------------------------
+
+# Why a line of a past order was not put back in the cart (the view maps each code to a sentence).
+REORDER_RETIRED = "retired"
+REORDER_OUT_OF_STOCK = "out_of_stock"
+REORDER_NOT_DELIVERABLE = "not_deliverable"
+REORDER_NO_PRICE = "no_price"  # no consumer price can be decided today (#757)
+
+
+@dataclass(frozen=True)
+class ReorderWish:
+    """One item of a past order: the units wanted again and what the cart holds now.
+
+    `limit` is the most units one line may hold today (`cart.engine.line_limit`), or None when
+    the item cannot be bought any more. `undeliverable` is true when shipping to the customer's
+    current address is blocked for the item's vendor."""
+
+    key: object
+    quantity: int
+    in_cart: int
+    limit: int | None
+    undeliverable: bool = False
+    unpriced: bool = False
+
+
+@dataclass(frozen=True)
+class ReorderOutcome:
+    """What happens to one item: `skipped` (a reason code), or `quantity` units in the cart in
+    all, `added` of them new; `capped` when the stock allows fewer than were asked for."""
+
+    key: object
+    skipped: str = ""
+    quantity: int = 0
+    added: int = 0
+    requested: int = 0
+
+    @property
+    def capped(self) -> bool:
+        return not self.skipped and self.quantity < self.requested
+
+
+def plan_reorder(wishes: Sequence[ReorderWish]) -> list[ReorderOutcome]:
+    """Decide, per item of a past order, what goes into the cart (ORD.31). Today's data only.
+
+    An item that cannot be bought any more is skipped as retired, one without a consumer price
+    as no price, one with no stock as out of
+    stock, one the vendor cannot ship to the current address as not deliverable. Otherwise the
+    units are added to the ones already in the cart, capped at the limit. A line already above
+    the limit is never reduced here (the checkout re-checks it)."""
+    outcomes = []
+    for wish in wishes:
+        requested = wish.in_cart + wish.quantity
+        if wish.limit is None:
+            outcomes.append(ReorderOutcome(wish.key, skipped=REORDER_RETIRED))
+        elif wish.unpriced:
+            outcomes.append(ReorderOutcome(wish.key, skipped=REORDER_NO_PRICE))
+        elif wish.limit <= 0:
+            outcomes.append(ReorderOutcome(wish.key, skipped=REORDER_OUT_OF_STOCK))
+        elif wish.undeliverable:
+            outcomes.append(ReorderOutcome(wish.key, skipped=REORDER_NOT_DELIVERABLE))
+        else:
+            total = max(wish.in_cart, min(requested, wish.limit))
+            outcomes.append(
+                ReorderOutcome(
+                    wish.key, quantity=total, added=total - wish.in_cart, requested=requested
+                )
+            )
+    return outcomes
+
+
+# --- staff draft from a past order (ORD.32) --------------------------------------------------
+
+DRAFT_MAX_SENDS_PER_DAY = 3
+# Why a draft's link does not open (the view maps each code to a sentence).
+DRAFT_LINK_UNKNOWN = "unknown"
+DRAFT_LINK_USED = "used"
+DRAFT_LINK_EXPIRED = "expired"
+DRAFT_LINK_CHANGED = "changed"
+
+
+def draft_token_digest(token: str) -> str:
+    """What is stored of a link token: its SHA-256, so a database read never yields a link."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def draft_link_refusal(
+    *,
+    is_open: bool,
+    issued_version: int | None,
+    version: int,
+    expires_at: dt.datetime | None,
+    now: dt.datetime,
+) -> str | None:
+    """Why the link of a draft found by its digest cannot be used now, or None: the draft was
+    already opened (single use), the link expired, or the draft changed after it was sent."""
+    if not is_open:
+        return DRAFT_LINK_USED
+    if expires_at is None or now >= expires_at:
+        return DRAFT_LINK_EXPIRED
+    if issued_version != version:
+        return DRAFT_LINK_CHANGED
+    return None
+
+
+def draft_sends_today(send_times: Iterable[str], *, now: dt.datetime, tz: dt.tzinfo) -> int:
+    """How many of the ISO `send_times` fall on today's business day (in `tz`)."""
+    today = now.astimezone(tz).date()
+    return sum(
+        1 for value in send_times if dt.datetime.fromisoformat(value).astimezone(tz).date() == today
+    )
+
+
+def draft_sends_left(send_times: Iterable[str], *, now: dt.datetime, tz: dt.tzinfo) -> int:
+    """The sends still allowed today: at most `DRAFT_MAX_SENDS_PER_DAY` per draft and day."""
+    return max(0, DRAFT_MAX_SENDS_PER_DAY - draft_sends_today(send_times, now=now, tz=tz))

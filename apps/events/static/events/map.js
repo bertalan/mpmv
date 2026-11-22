@@ -57,8 +57,37 @@ function attributionLink(text, url) {
   return `<a href="${escape(url)}">${escape(text)}</a>`;
 }
 
+// Leaflet cancels a tile it no longer needs by pointing the image at a `data:` GIF, which the
+// page's CSP (`img-src 'self'`) blocks and reports. These two methods do the same cleanup
+// without a `data:` URL: the tile image is detached, so the browser drops its request. Nothing
+// else of Leaflet changes and the vendored file stays byte-identical.
+function tileLayer(url, options) {
+  const L = window.L;
+  const Layer = L.TileLayer.extend({
+    _removeTile(key) {
+      return L.GridLayer.prototype._removeTile.call(this, key);
+    },
+    _abortLoading() {
+      for (const key of Object.keys(this._tiles)) {
+        const { el, coords } = this._tiles[key];
+        if (coords.z !== this._tileZoom && !el.complete) {
+          el.onload = L.Util.falseFn;
+          el.onerror = L.Util.falseFn;
+          L.DomUtil.remove(el);
+          delete this._tiles[key];
+          this.fire("tileabort", { tile: el, coords });
+        }
+      }
+    },
+  });
+  return new Layer(url, options);
+}
+
 // A Leaflet map in `element`, centred on [lat, lng] at `zoom`, with the configured tiles.
-export function createMap(element, { lat, lng, zoom, tileUrl, attribution, attributionUrl }) {
+export function createMap(
+  element,
+  { lat, lng, zoom, tileUrl, attribution, attributionUrl, wheelZoom = true },
+) {
   const L = window.L;
   const still = reducedMotion();
   const map = L.map(element, {
@@ -66,12 +95,14 @@ export function createMap(element, { lat, lng, zoom, tileUrl, attribution, attri
     zoom,
     minZoom: 2,
     maxZoom: 18,
+    scrollWheelZoom: wheelZoom,
     zoomAnimation: !still,
     fadeAnimation: !still,
     markerZoomAnimation: !still,
+    inertia: !still,
   });
   if (tileUrl) {
-    L.tileLayer(tileUrl, {
+    tileLayer(tileUrl, {
       minZoom: 2,
       maxZoom: 18,
       attribution: attributionLink(attribution, attributionUrl),
@@ -298,9 +329,146 @@ export function initPicker(root) {
   return map;
 }
 
+// Scroll-wheel zoom is off until the map has focus (WCAG 2.1.1 and 2.4.3 in practice: a page
+// scroll must not be captured by a map the visitor only passes over). `data-wheel-zoom` shows
+// the state to tests and styles.
+function wheelZoomOnFocus(map, element) {
+  const set = (on) => {
+    if (on) {
+      map.scrollWheelZoom.enable();
+    } else {
+      map.scrollWheelZoom.disable();
+    }
+    element.dataset.wheelZoom = on ? "on" : "off";
+  };
+  set(false);
+  element.addEventListener("focusin", () => set(true));
+  element.addEventListener("focusout", (event) => {
+    if (!event.relatedTarget || !element.contains(event.relatedTarget)) {
+      set(false);
+    }
+  });
+}
+
+// A popup built from text nodes only: event data is never inserted as markup.
+function popupContent(lines, link) {
+  const box = document.createElement("div");
+  lines.forEach((text, index) => {
+    if (!text) {
+      return;
+    }
+    const line = document.createElement(index === 0 && !link ? "strong" : "span");
+    if (index === 0 && link) {
+      const anchor = document.createElement("a");
+      anchor.href = link;
+      anchor.textContent = text;
+      line.append(anchor);
+      line.className = "event-map__popup-title";
+    } else {
+      line.textContent = text;
+    }
+    if (box.childNodes.length > 0) {
+      box.append(document.createElement("br"));
+    }
+    box.append(line);
+  });
+  return box;
+}
+
+function mapMarker(point, title, content) {
+  const marker = window.L.marker(point, { keyboard: true, title, alt: title });
+  marker.bindPopup(content, { autoPan: true });
+  return marker;
+}
+
+function mapOptions(data) {
+  return {
+    tileUrl: data.tileUrl,
+    attribution: data.attribution,
+    attributionUrl: data.attributionUrl,
+    wheelZoom: false,
+  };
+}
+
+// The map of an event page (EVT.15): one marker with a popup. The server-rendered fallback
+// (the address and the attribution) is replaced by the map, whose attribution control carries
+// the same text. The container is the labelled region; the marker is keyboard focusable with
+// the venue name as its title.
+export function initEventMap(root) {
+  if (!window.L || root.dataset.mapReady === "true") {
+    return null;
+  }
+  const data = root.dataset;
+  const point = validPoint(number(data.lat), number(data.lng));
+  if (!point) {
+    return null;
+  }
+  data.mapReady = "true";
+  root.replaceChildren();
+  const map = createMap(root, {
+    lat: point[0],
+    lng: point[1],
+    zoom: number(data.zoom) ?? POINT_ZOOM,
+    ...mapOptions(data),
+  });
+  const label = data.label || "";
+  mapMarker(point, label, popupContent([label, data.address], "")).addTo(map);
+  wheelZoomOnFocus(map, root);
+  return map;
+}
+
+// The map of the events list (EVT.15): a marker for every listed item that has `data-lat` and
+// `data-lng`, with a popup holding its title (a link to the event) and its date line. Items
+// without coordinates are listed but not plotted. The container stays hidden when nothing is
+// plotted.
+export function initIndexMap(root) {
+  if (!window.L || root.dataset.mapReady === "true") {
+    return null;
+  }
+  const canvas = root.querySelector("[data-map-canvas]");
+  const items = [...document.querySelectorAll("article[data-lat][data-lng]")];
+  const plotted = items
+    .map((item) => ({
+      item,
+      point: validPoint(number(item.dataset.lat), number(item.dataset.lng)),
+    }))
+    .filter((entry) => entry.point);
+  if (!canvas || plotted.length === 0) {
+    return null;
+  }
+  const data = root.dataset;
+  data.mapReady = "true";
+  root.hidden = false;
+  const map = createMap(canvas, {
+    lat: number(data.defaultLat) ?? 0,
+    lng: number(data.defaultLng) ?? 0,
+    zoom: number(data.defaultZoom) ?? 4,
+    ...mapOptions(data),
+  });
+  const bounds = window.L.latLngBounds([]);
+  for (const { item, point } of plotted) {
+    const anchor = item.querySelector("a[href]");
+    const title = anchor ? anchor.textContent.trim() : "";
+    const meta = item.querySelector(".event-meta");
+    const when = meta ? meta.textContent.replace(/\s+/g, " ").trim() : "";
+    const href = anchor ? anchor.getAttribute("href") : "";
+    mapMarker(point, title, popupContent([title, when], href)).addTo(map);
+    bounds.extend(point);
+  }
+  map.fitBounds(bounds, { maxZoom: 14, padding: [24, 24], animate: false });
+  wheelZoomOnFocus(map, canvas);
+  return map;
+}
+
 function initAll() {
   for (const root of document.querySelectorAll("[data-map-picker]")) {
     initPicker(root);
+  }
+  for (const root of document.querySelectorAll("[data-event-map]")) {
+    initEventMap(root);
+  }
+  for (const root of document.querySelectorAll("[data-events-map]")) {
+    initIndexMap(root);
   }
 }
 

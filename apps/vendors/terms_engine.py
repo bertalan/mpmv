@@ -62,7 +62,7 @@ def competent_court(b2b_court: str, registered_city: str, *, buyer_is_business: 
     return b2b_court.strip() or registered_city.strip() or None
 
 
-_CLAUSE_LINE = re.compile(r"^\s*(?P<article>[^|:\-]+?)\s*[|:\-]\s*(?P<title>.+?)\s*$")
+_CLAUSE_SEPARATOR = re.compile(r"[|:\-]")
 
 
 def parse_clauses(text: str) -> list[dict[str, str]]:
@@ -71,11 +71,14 @@ def parse_clauses(text: str) -> list[dict[str, str]]:
     for line in text.splitlines():
         if not line.strip():
             continue
-        match = _CLAUSE_LINE.match(line)
-        if match is None:
-            clauses.append({"article": line.strip(), "title": ""})
+        # Linear time: a lazy-quantifier regex here backtracks quadratically on a long line (SEC.5).
+        separator = _CLAUSE_SEPARATOR.search(line)
+        article = line[: separator.start()].strip() if separator else ""
+        title = line[separator.end() :].strip() if separator else ""
+        if article and title:
+            clauses.append({"article": article, "title": title})
         else:
-            clauses.append({"article": match["article"], "title": match["title"]})
+            clauses.append({"article": line.strip(), "title": ""})
     return clauses
 
 

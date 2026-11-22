@@ -20,25 +20,31 @@ from django.db.models import Model
 from django.utils import timezone
 from django.utils.text import slugify
 from factory.django import DjangoModelFactory
-from wagtail.models import Locale, Page
+from wagtail.models import Locale, Page, Site
 
 from apps.cms.models import (
     BlogAuthor,
     BlogIndexPage,
     BlogPostPage,
+    ContentSnippet,
     EditorRoleSeed,
+    FooterColumn,
+    FooterSettings,
+    FormField,
+    FormPage,
     HelpEntry,
     HomePage,
     LegalPage,
     LegalPageReview,
     LegalPageVersion,
     NavigationMenu,
+    SocialProfile,
     StandardPage,
     TermLandingPage,
     VendorLandingPage,
     VendorRecruitmentPage,
 )
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, primary_language
 from apps.vendors.models import Vendor
 
 
@@ -343,6 +349,23 @@ class BlogAuthorFactory(DjangoModelFactory[BlogAuthor]):
         return super()._create(model_class, *args, **kwargs)  # type: ignore[no-untyped-call]
 
 
+class ContentSnippetFactory(DjangoModelFactory[ContentSnippet]):
+    """A live snippet (CMS.14) of the default language unless `locale` is given."""
+
+    class Meta:
+        model = ContentSnippet
+        django_get_or_create = ("title", "locale")
+
+    title = factory.Sequence(lambda n: f"Snippet {n}")
+    body = "<p>Reusable text.</p>"
+    live = True
+
+    @classmethod
+    def _create(cls, model_class: type[ContentSnippet], *args: Any, **kwargs: Any) -> Any:
+        kwargs.setdefault("locale", Locale.get_default())
+        return super()._create(model_class, *args, **kwargs)  # type: ignore[no-untyped-call]
+
+
 class BlogIndexPageFactory(_InTree, DjangoModelFactory[BlogIndexPage]):
     """A language's blog (CMS.3), `/blog/` under its home: the primary language's first, then
     the first language whose home has no blog yet (one blog per home)."""
@@ -401,3 +424,71 @@ def editor_user(*roles: str) -> Any:
     user = UserFactory.create(password=secrets.token_urlsafe(16))
     user.groups.add(*Group.objects.filter(name__in=roles))
     return user
+
+
+class FormPageFactory(_InTree, DjangoModelFactory[FormPage]):
+    """A form page (CMS.13) under the primary language's home; add its fields with
+    `FormFieldFactory`."""
+
+    class Meta:
+        model = FormPage
+
+    title = factory.Sequence(lambda n: f"Form {n}")
+    slug = factory.LazyAttribute(lambda page: slugify(page.title))
+    parent = None
+    intro = ""
+    thank_you_text = ""
+    submit_label = ""
+    retention_days = 90
+
+    @classmethod
+    def _default_parent(cls) -> Page:
+        return _primary_home()
+
+
+class FormFieldFactory(DjangoModelFactory[FormField]):
+    class Meta:
+        model = FormField
+
+    page = factory.SubFactory(FormPageFactory)
+    label = factory.Sequence(lambda n: f"Field {n}")
+    field_type = "singleline"
+    required = False
+
+
+class FooterSettingsFactory(DjangoModelFactory[FooterSettings]):
+    """The footer setting of the default site (CMS.17), one per site."""
+
+    class Meta:
+        model = FooterSettings
+
+    site = None
+
+    @classmethod
+    def _create(cls, model_class: type[FooterSettings], *args: Any, **kwargs: Any) -> Any:
+        if kwargs.get("site") is None:
+            kwargs["site"] = Site.objects.get(is_default_site=True)
+        row, _ = model_class._default_manager.get_or_create(site=kwargs.pop("site"), **kwargs)
+        return row
+
+
+class FooterColumnFactory(DjangoModelFactory[FooterColumn]):
+    class Meta:
+        model = FooterColumn
+
+    settings = factory.SubFactory(FooterSettingsFactory)
+    language = factory.LazyFunction(primary_language)
+    title = factory.Sequence(lambda n: f"Column {n}")
+    links = factory.LazyFunction(
+        lambda: [("external", {"url": "https://example.com/help/", "label": "Help"})]
+    )
+
+
+class SocialProfileFactory(DjangoModelFactory[SocialProfile]):
+    class Meta:
+        model = SocialProfile
+
+    settings = factory.SubFactory(FooterSettingsFactory)
+    network = "mastodon"
+    url = factory.Sequence(lambda n: f"https://social.example/@shop{n}")
+    language = ""

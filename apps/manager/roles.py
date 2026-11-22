@@ -23,7 +23,7 @@ REVERT_PROFILE_PERMISSION: Final = "vendors.revert_storefront_profile"  # CORE.9
 EDITORS_ADMIN_PERMISSION: Final = "wagtailadmin.access_admin"
 # Opens a passkey window (CORE.25). Owner decision 2026-11-12 (D-32): owner, support and finance.
 ELEVATE_PERMISSION: Final = "core.elevate"
-REVIEW_NOTICES_PERMISSION: Final = "compliance.review_notices"  # CMP.5, Catalog and moderation
+REVIEW_NOTICES_PERMISSION: Final = "compliance.review_notices"  # CMP.5, Catalogue and moderation
 
 
 class Access(StrEnum):
@@ -68,8 +68,8 @@ ROLES: Final[tuple[Role, ...]] = (
     ),
     Role(
         CATALOG,
-        "Platform: catalog and moderation",
-        "Catalog and moderation",
+        "Platform: catalogue and moderation",
+        "Catalogue and moderation",
         (
             "manager.platform_catalog",
             VIEW_ALL_VENDORS_PERMISSION,
@@ -120,10 +120,14 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.map": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: R, OWNER: R},  # CORE.30
     "platform.config": {CONFIG: E, OWNER: R},
     "platform.owner_settings": {CONFIG: R, OWNER: E},
+    "platform.trust_rules": {CONFIG: E, OWNER: E},  # TRU.1 part 2: the versions of the trust rules
     "platform.catalog": {CATALOG: E, SUPPORT: R, OWNER: R},
     "platform.moderation": {CATALOG: E, OWNER: R},
+    # CAT.11: the product list, bulk publish and the audited fields. CAT.30 (MQ-52): Support
+    # reads the section; every write stays with Catalogue and moderation (the services refuse too).
+    "platform.products": {CATALOG: E, SUPPORT: R, OWNER: R},
     # FIT.1 part 2: the fitment scheme and the categories expected to declare fitment (operator
-    # settings, Configuration and tax), and the nodes of the scheme (Catalog and moderation).
+    # settings, Configuration and tax), and the nodes of the scheme (Catalogue and moderation).
     "platform.fitment_scheme": {CONFIG: E, OWNER: R},
     "platform.fitment_categories": {CONFIG: E, CATALOG: R, OWNER: R},
     "platform.fitment_nodes": {CATALOG: E, SUPPORT: R, OWNER: R},
@@ -134,8 +138,16 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.vendors": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: R, OWNER: E},
     "platform.vendor_approval": {CATALOG: E, OWNER: E},
     "platform.vendor_closure": {OWNER: E},
+    # VEN.40: approve or reject a vendor's return policy. Not the profile reopen right
+    # (`vendors.change_vendor`): a moderation decision, like the vendor approval.
+    "platform.return_policy": {CATALOG: E, OWNER: E},
     "platform.orders_customers": {FINANCE: R, SUPPORT: RA, OWNER: R},
     "platform.support_actions": {SUPPORT: A, OWNER: A},
+    # ORD.32: a cart prepared from a past order and its one-time link (no Catalog, Finance or
+    # Configuration: 404, the Manager convention).
+    "platform.order_drafts": {SUPPORT: A, OWNER: A},
+    # PAY.4: the open stray-payment alerts; Support or the owner closes one, Finance reads.
+    "platform.stray_payments": {FINANCE: R, SUPPORT: A, OWNER: A},
     "platform.user_sessions": {SUPPORT: A, OWNER: A},  # CORE.24: end one user's sessions
     "platform.sessions_panic": {OWNER: E},  # CORE.24: the "End every session" panic button
     "platform.activation": {SUPPORT: A, OWNER: E},
@@ -152,7 +164,9 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.map": "Platform: map of the site (CORE.30)",
     "platform.config": "Platform: configuration and tax (ARC.24)",
     "platform.owner_settings": "Platform: owner-only settings (CMP.13, CMP.11 approvals)",
+    "platform.trust_rules": "Platform: trust rules, the versions of the badge thresholds (TRU.1)",
     "platform.catalog": "Platform: catalog, categories, attributes, taxonomies, imports",
+    "platform.products": "Platform: products, bulk publish, preview, translation status (CAT.11)",
     "platform.moderation": "Platform: moderation (vendor events, storefront changes, content)",
     "platform.fitment_scheme": "Platform: fitment scheme, the levels of the garage (FIT.1)",
     "platform.fitment_categories": "Platform: categories expected to declare fitment (FIT.1)",
@@ -163,8 +177,11 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.vendors": "Platform: vendors (applications, plans)",
     "platform.vendor_approval": "Platform: approve or suspend a vendor (step-up, reason)",
     "platform.vendor_closure": "Platform: close a vendor definitively",
+    "platform.return_policy": "Platform: approve or reject a vendor's return policy (VEN.40)",
     "platform.orders_customers": "Platform: orders and customers",
     "platform.support_actions": "Platform: support actions (unlock, resend link)",
+    "platform.order_drafts": "Platform: carts prepared from a past order, one-time link (ORD.32)",
+    "platform.stray_payments": "Platform: stray-payment alerts, close one by hand (PAY.4)",
     "platform.user_sessions": "Platform: a user's sessions, end them (CORE.24)",
     "platform.sessions_panic": "Platform: end every session, the panic button (CORE.24)",
     "platform.activation": "Platform: account activation and service messages (CORE.19)",

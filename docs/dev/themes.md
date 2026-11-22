@@ -273,7 +273,31 @@ To add or update baselines after a reviewed, intentional change:
    command on the CI runner and uploads every baseline as the `visual-baselines` artifact.
 2. Commit them under `tests/e2e/baselines/<theme>/` and review them in the pull request like code.
 
-The first baselines for `base` and `ride` are committed by THM.10.
+THM.10 committed the baselines for `base` and `ride`: the styleguide
+(`test_theme_quality_gates.py`) and the key pages (`tests/e2e/test_visual_baselines.py`: home,
+listing, product, search results, event, blog post, legal, cart and 404) at 360, 768 and 1280 px.
+Each image is the top 1800 CSS px of the page, so the set stays small in a public repository.
+The browser asks for reduced motion (no reveal effects, no carousel autoplay: carousels sit on the
+first slide), screenshots disable animations, the data is fixed (factory titles, dates, prices)
+and the launch countdown is masked.
+
+THM.31 added `ride-blue/` and `ride-petrol/`: the home page and the product page of `ride` with
+the Blue and Petrol palettes chosen (`test_palette_page_matches_its_visual_baseline` in
+`tests/e2e/test_visual_baselines.py`), at 375 and 1280 px. They are generated like the others,
+with `MPMV_VISUAL=update` on the CI runner; the test first checks that the computed `--color-accent`
+is the palette's primary, so a silent fallback to Red fails before any image is compared.
+
+An intentional visual change needs a reviewed baseline update: the pull request that changes the
+look also changes the PNGs, and the reviewer looks at the images in the diff. To update:
+
+```sh
+MPMV_VISUAL=update uv run pytest -m e2e -k visual_baseline   # or: make e2e-baselines
+```
+
+Run it on the CI platform (the **Visual baselines** workflow) and commit only the PNGs that
+changed on purpose; a locally rendered PNG can differ in font anti-aliasing from the CI runner.
+`MPMV_VISUAL=compare` runs the comparison locally, which is how to check that the suite is
+stable and that a CSS change fails it.
 
 ## Bootstrap foundation (THM.13)
 
@@ -294,17 +318,18 @@ The first baselines for `base` and `ride` are committed by THM.10.
 `themes/ride/` is the first vertical theme (`parent = "base"`). It was written clean-room from the
 public spec and a brief: no file derives from a reference template (spec 14 §14.8).
 
-- **Tokens** (`tokens.toml`): the colours are the operator palette of spec 14 §14.4 and §14.12
-  (primary `#046BD2` with white, hover `#035AB1`, tint `#EEF6FF`, secondary `#FBA926` with
-  `#1A1A1A` text, secondary text `#BE5900`); the neutrals, the dark surface `#30373F` of header
+- **Tokens** (`tokens.toml`): the colour defaults are the **Red** palette of spec 14 §14.12
+  (owner decision 2026-11-21, THM.31): primary `#C40417` with white, hover `#9E0312`, tint
+  `#FDECEE`, secondary `#2B3138` with white text; the former operator palette is now the Blue
+  palette (§14.12), a choice of the site. The neutrals, the dark surface `#30373F` of header
   and footer and the navy `#051026` scrim come from the brief. The primary is never text on the
   dark surface (white there). Extra tokens: `color.heading`, `color.border-strong`,
   `color.overlay`, `scrim.opacity`, `step.display`, `space.section`, `radius.pill`,
-  `radius.round`, `shadow.button-hover`. Buttons: filled primary (default), amber
+  `radius.round`, `shadow.button-hover`. Buttons: filled primary (default), secondary
   `.button--secondary`, filled dark `.button--dark`, outline dark `.button--ghost`, outline
   primary `.button--outline-accent`. Every text pair is tested in
-  `apps/themes/tests/unit/test_ride_theme.py`. CSS uses `var(--…)` only, so a vendor or operator
-  palette overrides the defaults with custom properties.
+  `apps/themes/tests/unit/test_ride_theme.py`. CSS uses `var(--…)` only, so a palette overrides
+  the defaults with custom properties (next section).
 - **Fonts**: Barlow 400 and 700, Barlow Condensed 600 and 700, woff2 subset to Latin and Latin
   Extended-A (the gate allows 4 files), `font-display: swap`, one preload in `layouts/base.html`.
   Upstream commit and licence are in `LICENSES.toml`; the OFL text with the copyright notice is
@@ -333,9 +358,45 @@ public spec and a brief: no file derives from a reference template (spec 14 §14
   scrim) is built but no page includes it until THM.7 and THM.9 adopt it. The footer takes optional
   `widgets` (up to four columns) and `social_links`, and ends with a back-to-top link: a plain
   `#top` link, always visible without JavaScript, shown after 400 px of scroll with `ride.js`
-  (`html.is-scrolled`). No CMS setting feeds the widgets or social links yet (CMS.17).
+  (`html.is-scrolled`). CMS.17: the `footer_chrome` tag (`apps/cms/templatetags/cms_tags.py`) reads the
+  site's footer setting (Wagtail Settings > Footer) and gives both themes the same `widgets` and
+  `social_links`; with nothing set nothing is rendered.
 - **Not yet**: catalog, cart, checkout, account and content pages are THM.7 to THM.9. Pages that
   override the `head` block without `{{ block.super }}` lose the font preload only.
+
+### Surfaces and nesting (THM.20)
+
+The four surface classes (`surface-light`, `surface-muted`, `surface-band`, `surface-primary`)
+each set every `--s-*` variable (background, text, heading, link, focus, button), and headings,
+links, buttons and focus rings below read them. A surface nested in another therefore resets all
+of them. A white card inside a band must carry `.surface-light`, otherwise it inherits the band's
+white headings and links and shows white on white. The band focus ring is the lighter
+`color.focus-on-dark` token (4.5:1 or more on the band, checked under each palette in
+`apps/themes/tests/unit/test_ride_surfaces.py`). The heading rule covers h1 to h6.
+
+## Site palettes (THM.31)
+
+- A palette is a `BrandPalette` row (13 colour roles, `apps/themes/palettes.py`); Red, Blue and
+  Petrol are seeded by a data migration. `check_brand_palette(roles, surfaces)` checks every pair
+  of spec 14 §14.12 against `#FFFFFF` and the resolved `color.surface` of every registered theme;
+  `BrandPalette.clean()`, the admin form and `set_site_theme` refuse a failing palette and name
+  the pair and its ratio.
+- Staff pick the palette next to the theme in Themes > Site themes. The choice is written by
+  `set_site_theme(site, theme, palette=..., ctx=..., dry_run=...)` and audited (`AuditLog` with the
+  old and new values, `palette` holds the slug). Leaving the palette empty keeps the theme's own
+  colours (Red for `ride`).
+- Rendering: `render_palette_css` resolves the palette as one more theme on top of the chain and
+  writes only the custom properties that change, so a derived token such as `--button-bg` and
+  the `--bs-*` variables follow. The result is an unlayered `:root` rule (it beats the theme's
+  `@layer` rules), served by the view `palette_css` at
+  `/palette/<theme>/<palette>.<digest>.css`: same origin, named by its content digest, cached for
+  a year when the digest matches. `layouts/base.html` links it after `theme.css`; error pages do
+  not (no database). A palette that changes nothing (Red on `ride`) links nothing.
+- A stored palette that fails against the surface of a theme registered later is not applied
+  (the site falls back to the theme's tokens) and `themes.W006` names it.
+- Not yet: the Stripe appearance (`appearance.py`) still reads the theme's tokens, so a site on
+  Blue or Petrol keeps the theme's primary there; the palette builder and the vendor storefront
+  palette are THM.33, THM.34 and THM.32.
 
 ## System checks
 
@@ -345,6 +406,7 @@ public spec and a brief: no file derives from a reference template (spec 14 §14
 | `themes.E002` | `MPMV_THEME_DEFAULT` names no registered theme |
 | `themes.E003` | A stored site setting names a theme that is not registered (database check: run by `migrate` and `manage.py check --database default`) |
 | `themes.E004` | The `base` theme is missing or invalid |
+| `themes.W006` | A site's stored palette fails the contrast check against the registered themes, so it is not applied (database check) |
 
 ## Imports
 
@@ -397,6 +459,16 @@ setting clears the registry cache. `SiteFactory` and `ThemeSettingsFactory` are 
 - `video_modal.html` is a plain link to the video first. With JavaScript it opens a Bootstrap
   modal; `js/video.js` creates the `<iframe>` only when `window.mpmvConsent.allows("marketing")`,
   else the modal shows a placeholder with a link to the cookie settings. No request goes to the
-  video site before consent. The provider's origin must be added to the CSP `frame-src` by a
-  reviewed setting (none is added here); until then the browser blocks the frame.
+  video site before consent. The allowed origins are the setting
+  `MPMV_VIDEO_EMBED_ORIGINS` (comma separated plain https origins; default the YouTube no-cookie
+  and Vimeo player origins; `cms.E003` refuses `http://`, wildcards, paths and ports). The CSP
+  middleware adds them to `frame-src` only on a page that renders a video, and the block refuses
+  an address whose embed is on another origin: one list for both.
+- THM.9 part 2: `ride` overrides `seo/consent/banner.html` and `_actions.html` (the consent banner
+  as a Bootstrap alert, `css/52-consent.css`). Same ids, `data-*` hooks, form, texts and button
+  values as `base`; Reject and Accept share the same `btn btn-outline-dark` classes. The banner
+  stays flush with the bottom edge so `--consent-offset` (set by consent.js) is exact: body padding
+  and scroll padding keep every focused element out from under it. The testimonial and blog
+  carousels are the strip block (`components/strip.html`); `tests/e2e/test_ride_components.py`
+  proves the whole set on a CMS page.
 - Not wired to the CMS yet (no block fields); the cta block carries `data-reveal` as the first use.

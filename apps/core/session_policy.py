@@ -75,6 +75,8 @@ DEFAULT_SENSITIVE_ACTIONS: Final = frozenset(
         "profile_revert",  # CORE.9 3/3: revert an owner's storefront text or logo change
         "notice_decision",  # CMP.5: review, decide, restrict, tell the authorities
         "sales_terms_publish",  # VEN.35: a seller publishes a new version of its sales terms
+        "order_draft_send",  # ORD.32: staff email a draft's payment link (owner 2026-11-19)
+        "return_policy_review",  # VEN.40 3/3: staff approve or reject a vendor's return policy
     }
 )
 DEFAULT_CRITICAL_ACTIONS: Final = frozenset(

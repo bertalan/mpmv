@@ -1,0 +1,7 @@
+{% load i18n %}{% comment %}
+The buttons of a consent form in the `ride` theme (THM.9 part 2): reject and accept carry the same
+Bootstrap classes, so neither is pushed (SEO.5). Same names and values as `base`.
+{% endcomment %}<div class="consent-actions">
+  <button type="submit" class="btn btn-outline-dark" name="action" value="reject_all">{% translate "Reject all" %}</button>
+  <button type="submit" class="btn btn-outline-dark" name="action" value="accept_all">{% translate "Accept all" %}</button>
+</div>

@@ -9,3 +9,10 @@
 {% endif %}{% for line in lines %}- {{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}: {{ line.total }} EUR
 {% endfor %}{% blocktranslate %}Shipping: {{ shipping }} EUR{% endblocktranslate %}
 {% blocktranslate %}Total: {{ total }} EUR{% endblocktranslate %}
+{% if seller %}
+{% translate "Seller details" %}
+{{ seller.legal_name }}
+{% if seller.address %}{{ seller.address }}
+{% endif %}{% if seller.phone %}{% translate "Phone" %}: {{ seller.phone }}
+{% endif %}{% if seller.email %}{% translate "Email" %}: {{ seller.email }}
+{% endif %}{% endif %}

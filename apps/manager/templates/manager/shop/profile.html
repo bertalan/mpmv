@@ -47,5 +47,15 @@ the top with links to the fields and set `aria-invalid` on them. The language li
         {% include "components/button.html" with label=_("Save logo") type="submit" only %}
       </form>
     </section>
+    <section class="manager-role-section" aria-labelledby="role-heading">
+      <h2 id="role-heading">{% translate "Producer or reseller" %}</h2>
+      {% include "components/error_summary.html" with form=role_form summary_id="role-error-summary" autofocus=True only %}
+      <form method="post" action="{% url 'manager:shop:profile' %}" class="manager-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="role">
+        {% for field in role_form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+        {% include "components/button.html" with label=_("Save the product role") type="submit" only %}
+      </form>
+    </section>
   {% endif %}
 {% endblock %}

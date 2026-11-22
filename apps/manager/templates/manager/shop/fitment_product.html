@@ -1,0 +1,38 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}The Fits tab of one product (FIT.3): mode, rows and copy, with a dry-run preview.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p><a href="{{ list_url }}">{% translate "Back to the products" %}</a> · <a href="{{ propose_url }}">{% translate "Propose a missing item" %}</a></p>
+  <p class="manager-lead">{% blocktranslate with state=state_label sku=product.sku %}{{ sku }}: {{ state }}.{% endblocktranslate %}</p>
+  {% if error %}{% include "components/alert.html" with level="danger" message=error live="assertive" only %}{% endif %}
+  {% if changes or changes is not None and echo %}
+    <p class="manager-lead">{% translate "Nothing has changed yet. Check the changes below, then confirm." %}</p>
+    {% for warning in warnings %}{% include "components/alert.html" with level="warning" message=warning only %}{% endfor %}
+    <ul class="manager-changes">
+      {% for change in changes %}<li><strong>{{ change.op }}</strong> {{ change.model }} <code>{{ change.key }}</code></li>
+      {% empty %}<li>{% translate "This action changes nothing." %}</li>{% endfor %}
+    </ul>
+    <form method="post" class="manager-confirm">
+      {% csrf_token %}
+      {% for key, value in echo %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+      {% include "components/button.html" with label=_("Confirm") type="submit" name="confirm" value="1" only %}
+      {% include "components/button.html" with label=_("Cancel") url=request.path variant="ghost" only %}
+    </form>
+  {% else %}
+    <form method="post" class="manager-form" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save">
+      {% include "components/field.html" with field=mode_form.mode only %}
+      {% include "manager/shop/_fitment_rows.html" %}
+      {% include "components/button.html" with label=_("Preview") type="submit" only %}
+    </form>
+    <h2>{% translate "Copy from another product" %}</h2>
+    <form method="post" class="manager-form" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="copy">
+      {% include "components/field.html" with field=copy_form.source only %}
+      {% include "components/button.html" with label=_("Preview the copy") type="submit" variant="secondary" only %}
+    </form>
+  {% endif %}
+{% endblock %}

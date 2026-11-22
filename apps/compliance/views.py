@@ -5,7 +5,8 @@ import math
 
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
-from django.utils.translation import get_language
+from django.utils.cache import patch_cache_control
+from django.utils.translation import get_language, pgettext
 from django.utils.translation import gettext as _
 from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_GET, require_POST
@@ -13,12 +14,15 @@ from django.views.decorators.http import require_GET, require_POST
 from apps.accounts.captcha import captcha_passes
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
+from apps.core.i18n import primary_language
 from apps.core.public_forms import Protection, public_form
-from apps.core.services import NoPlatformOperator
+from apps.core.services import AttachmentUnavailable, NoPlatformOperator
 from apps.orders.models import Order
+from apps.vendors import services as vendor_services
 
 from . import engine, services, withdrawal
 from . import subprocessors as subprocessors_register
+from .documents import render_model_withdrawal_form_pdf
 from .forms import URL_MAX, NoticeForm, WithdrawalLookupForm
 from .models import Notice, WithdrawalStatement
 
@@ -99,7 +103,11 @@ def notice_form(request: HttpRequest) -> HttpResponse:
             if wait:
                 return _too_many(wait)
             form.add_error(
-                None, _("The verification failed. Please reload the page and try again.")
+                None,
+                # The notice page is formal (I18N.20); the withdrawal page keeps the informal text.
+                pgettext(
+                    "formal", "The verification failed. Please reload the page and try again."
+                ),
             )
             return _render_form(request, form)
         wait = services.notice_retry_after(ip)  # counted once the captcha passed
@@ -283,10 +291,9 @@ def withdrawal_done(request: HttpRequest) -> HttpResponse:
                 "statements": statements,
                 "submitted_at": withdrawal.display_time(statements[0].submitted_at),
                 "emailed": all(s.acknowledged_at for s in statements),
+                # CMP.41: name, geographic address, phone and email per seller (Anlage 1).
                 "vendor_contacts": [
-                    (s.vendor_order.vendor.display_name, s.vendor_order.vendor.contact_email)
-                    for s in statements
-                    if s.vendor_order.vendor.contact_email
+                    vendor_services.trader_contact(s.vendor_order.vendor) for s in statements
                 ],
                 **_labels_context(),
             },
@@ -301,3 +308,25 @@ def consumer_information(request: HttpRequest) -> HttpResponse:
     49(1)(h)), and the legal guarantee. Public and cached: the same for every visitor."""
     info = withdrawal.precontractual(get_language() or "en")
     return render(request, "compliance/consumer_information.html", {"info": info})
+
+
+@require_GET
+def withdrawal_form_pdf(request: HttpRequest) -> HttpResponse:
+    """The blank model withdrawal form as a PDF in the active language (I18N.20). Public, cached,
+    the same for every visitor: it carries no order or personal data."""
+    language = get_language() or primary_language()
+    try:
+        pdf = render_model_withdrawal_form_pdf(language)
+    except AttachmentUnavailable:
+        unavailable = HttpResponse(
+            _("The PDF is not available right now. Please try again later."),
+            status=503,
+            content_type="text/plain; charset=utf-8",
+        )
+        # Only the PDF is cached for a day: a shared cache must never keep the failure.
+        unavailable["Cache-Control"] = "no-store"
+        return unavailable
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="withdrawal-form-{language}.pdf"'
+    patch_cache_control(response, public=True, max_age=86400)
+    return response

@@ -282,7 +282,7 @@ _TOKEN_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$")
 # A token value is pasted into a CSS declaration: nothing that could end it, open a block,
 # escape a character, start a comment or close the stylesheet.
 _FORBIDDEN_VALUE_RE = re.compile(r"[;{}<>\\\x00-\x1f\x7f]|/\*|\*/")
-_HEX_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+_HEX_RE = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})")
 
 
 def _quotes_balanced(value: str) -> bool:
@@ -380,7 +380,7 @@ def resolve_tokens(chain: Sequence[str], tokens_by_theme: Mapping[str, Tokens]) 
 
 
 def _channels(colour: str) -> tuple[int, int, int]:
-    if not isinstance(colour, str) or not _HEX_RE.match(colour):
+    if not isinstance(colour, str) or not _HEX_RE.fullmatch(colour):
         raise ThemeError(f"{colour!r} is not a #rgb or #rrggbb colour")
     digits = colour[1:]
     if len(digits) == 3:
@@ -504,7 +504,7 @@ _STRING_OR_COMMENT_RE = re.compile(
     re.DOTALL,
 )
 _SPACE_RE = re.compile(r"\s+")
-_AROUND_RE = re.compile(r"\s*([{};,>])\s*")
+_AROUND_RE = re.compile(r"(?:(?<!\s)\s*)?([{};,>])\s*")  # starts at a run of spaces once
 _AFTER_COLON_RE = re.compile(r":\s+")
 
 

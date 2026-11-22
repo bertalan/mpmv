@@ -16,12 +16,42 @@ How a commit becomes a release and reaches STAGE and LIVE. The mechanics are in
 Owner rule: every STAGE release is preceded by a coherence check on the exact commit being
 released.
 
-1. lane-a announces "release candidate" on the Lane board issue (#86). lane-b runs the
+1. lane-a announces "release candidate" on the Lane board issue (#726). lane-b runs the
    coherence check on current `main` and opens one PR (docs and tests only).
 2. lane-a merges that PR with no other merge in between, then cuts the pre-release from that
    merge commit, named by its full SHA, after green CI.
 3. A major finding that the PR does not fix blocks the tag until lane-a decides. If anything
    else merges after the check, the next tag needs a new check.
+
+Before every coherence check, the lane running it first compiles the **backlog of pending work**
+(owner rule 2026-11-18). Lane-b compiles the pass; each item goes to the lane that owns it, so
+lane-a acts on the merge train, the owner-question register and the Lane board asks
+([parallel-lanes.md](parallel-lanes.md)):
+
+- open PRs with red CI, a conflict with `main` or a review waiting;
+- ready-to-merge PRs the train keeps skipping;
+- follow-ups on the tracker issue (#757) with no owner;
+- unanswered asks on the Lane board;
+- owner questions not yet asked (lane-a asks them; see the night rule below).
+
+Each one is fixed, assigned, asked about or parked before the check starts.
+
+**Night rule.** At night, and whenever the owner is away, nobody asks the owner anything. Lane-a
+records the question in the owner-question register, the slice that needs the answer is parked,
+and the work moves on to the next item, so a morning answer never stalls the night. By day lane-a
+asks. Lane-b never asks the owner directly: it writes the question in its PR under "Owner
+questions" (label `owner-question`) and lane-a relays it.
+
+Every coherence check also includes a **stale-items sweep** (owner rule 2026-11-18). The check PR
+stays docs and tests only (step 1): it lists each item with a follow-up task, and code removals go
+to that follow-up PR.
+
+- unfinished work: backlog rows marked done whose Done-when is not fully met, `TODO` and `FIXME`
+  without a task ID, open follow-up items on the tracker issue (#757) older than a week;
+- old files: unused templates, static files, fixtures, scripts and settings, dead code no test
+  reaches, docs that describe removed behaviour;
+- leftovers from the lanes: branches already merged or abandoned, and old worktrees. These are
+  **listed only, in the coherence PR description**. Deleting a branch is the owner's decision.
 
 ## What the release workflow does
 
@@ -274,8 +304,8 @@ How failures are reported: when a scheduled or manual run on `main` fails, the `
 (`tools/security_report.py`, the only job with `issues: write`) opens one issue labelled
 `security` per workflow, titled `[security-nightly] ...` or `[security-stage] ...`, with the job
 results, finding counts and failing test names (no URL, host or address), and posts one line on the
-lane board, issue #86: `to lane-a: security-nightly failed: <run link>`. While that issue stays
-open, later failures update its text and add a comment instead of a new line on #86. The next green
+lane board, issue #726: `to lane-a: security-nightly failed: <run link>`. While that issue stays
+open, later failures update its text and add a comment instead of a new line on #726. The next green
 run comments and closes it. A skipped run (no target secret, or a run off `main`) never closes
 it: if `STAGE_URL` is removed while a `[security-stage]` issue is open, the issue stays open until
 a scan runs again or someone closes it by hand.

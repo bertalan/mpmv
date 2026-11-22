@@ -6,6 +6,7 @@ fragment, so one entity is one node site-wide. An empty value is left out, never
 """
 
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any, Final
 
 SCHEMA: Final = "https://schema.org"
@@ -126,6 +127,56 @@ def webpage_node(
             "dateModified": date_modified,
         }
     )
+
+
+@dataclass(frozen=True)
+class ListEntry:
+    """One item of an `ItemList`: the canonical URL is the `@id` (a list never repeats the
+    item's own node, offers included); `kind` is the schema.org type of the page, if known."""
+
+    url: str
+    name: str
+    kind: str = ""
+    image: str = ""
+
+
+def search_template(site: str, home_path: str, parameter: str = "s") -> str:
+    """The `SearchAction` target: the language home with `?s=` and the placeholder (kept
+    unescaped, it is not a value)."""
+    return f"{site}{home_path}?{parameter}={{search_term_string}}"
+
+
+def item_list_node(
+    *, list_id: str, name: str, language: str, entries: Iterable[ListEntry]
+) -> dict[str, Any]:
+    """An `ItemList` of pages in order (`position`, and the item's `@id`, `url`, `name`);
+    empty for no entries. A page listed twice stays once."""
+    seen: set[str] = set()
+    elements: list[dict[str, Any]] = []
+    for entry in entries:
+        if not entry.url or entry.url in seen:
+            continue
+        seen.add(entry.url)
+        item = _clean(
+            {
+                "@id": entry.url,
+                "@type": entry.kind,
+                "name": entry.name,
+                "url": entry.url,
+                "image": entry.image,
+            }
+        )
+        elements.append({"@type": "ListItem", "position": len(elements) + 1, "item": item})
+    if not elements:
+        return {}
+    return {
+        "@type": "ItemList",
+        "@id": list_id,
+        "name": name,
+        "inLanguage": language,
+        "numberOfItems": len(elements),
+        "itemListElement": elements,
+    }
 
 
 def faq_node(*, url: str, language: str, questions: Iterable[tuple[str, str]]) -> dict[str, Any]:

@@ -7,6 +7,7 @@ recurrence presets of `apps.events.engine` write the RRULE, and a promotion has 
 import datetime as dt
 import zoneinfo
 from collections.abc import Iterable
+from decimal import Decimal
 from typing import Any
 
 from django import forms
@@ -18,6 +19,7 @@ from apps.catalog.models import Category, Product
 from apps.core.geocoding import AddressQuery, GeocodeResult
 from apps.core.geocoding import engine as geo_engine
 from apps.core.i18n import configured_languages
+from apps.core.nfc_forms import NFCForm
 from apps.events import engine, services
 from apps.events.models import EventPage, default_timezone
 from apps.vendors.models import Vendor
@@ -54,6 +56,7 @@ PLACE_FIELDS = (
     "country",
     "booth",
 )
+OFFER_FIELDS = ("ticket_url", "price", "is_free", "postponed", "previous_start")
 ADDRESS_QUERY_FIELDS = ("country", "postcode", "city", "street")
 _DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 
@@ -68,7 +71,10 @@ def language_choices(exclude: Iterable[str] = ()) -> list[tuple[str, str]]:
     ]
 
 
-class EventForm(forms.Form):
+class EventForm(NFCForm):
+    # Matched byte for byte (I18N.10): the time zone id, the country code, the map picker values.
+    nfc_exact_fields = ("timezone", "country", "geo_source", "picked_latitude", "picked_longitude")
+
     language = forms.ChoiceField(
         label=_("Language"),
         required=False,
@@ -241,6 +247,36 @@ class EventForm(forms.Form):
         help_text=_("Where to find you at a fair, for example Hall 3, stand B12. Optional."),
     )
 
+    ticket_url = forms.URLField(
+        label=_("Ticket link"),
+        required=False,
+        max_length=500,
+        help_text=_("Where people get tickets or register, starting with https://. Optional."),
+    )
+    price = forms.DecimalField(
+        label=_("Ticket price (EUR)"),
+        required=False,
+        min_value=Decimal(0),
+        max_digits=12,
+        decimal_places=2,
+        help_text=_("Leave it empty if you do not want to show a price."),
+    )
+    is_free = forms.BooleanField(
+        label=_("Free entry"),
+        required=False,
+        help_text=_("Tick it when entry costs nothing. Leave the price empty."),
+    )
+    postponed = forms.BooleanField(
+        label=_("Postponed"),
+        required=False,
+        help_text=_("Tick it when the event is moved: change the date above to the new one."),
+    )
+    previous_start = WallClockField(
+        label=_("Previous start"),
+        required=False,
+        help_text=_("When the event was first planned, in the event's time zone. Optional."),
+    )
+
     latitude = CoordinateField(
         limit=90,
         label=_("Latitude"),
@@ -299,6 +335,7 @@ class EventForm(forms.Form):
             ),
         ),
         (_("Where"), PLACE_FIELDS),
+        (_("Tickets and changes"), OFFER_FIELDS),
         (_("Products and categories"), ("products", "categories")),
     )
     POINT_FIELDS = ("latitude", "longitude")
@@ -367,6 +404,12 @@ class EventForm(forms.Form):
             for name in ("starts_at", "ends_at"):
                 if data.get(name) is not None:
                     data[name] = data[name].replace(tzinfo=zone)
+        if zone is not None and data.get("previous_start") is not None:
+            data["previous_start"] = data["previous_start"].replace(tzinfo=zone)
+        if data.get("is_free") and data.get("price") is not None:
+            self.add_error("price", _("A free event has no price: leave it empty."))
+        if data.get("previous_start") is not None and not data.get("postponed"):
+            self.add_error("previous_start", _("Only a postponed event has a previous start."))
         data["rrule"] = self._rrule(data, all_day, zone)
         self._clean_point(data)
         return data
@@ -461,6 +504,8 @@ class EventForm(forms.Form):
         promotion = data["event_type"] == EventPage.EventType.PROMOTION
         for name in PLACE_FIELDS:
             event[name] = "" if promotion else data[name]
+        for name in OFFER_FIELDS:
+            event[name] = data[name]
         event.update(self._point_data())
         event["products"] = [product.pk for product in data["products"]]
         event["categories"] = [category.pk for category in data["categories"]]
@@ -523,6 +568,9 @@ def initial_from_page(page: EventPage) -> dict[str, Any]:
         )
     }
     initial["country"] = str(page.country) if page.country else ""
+    for name in OFFER_FIELDS:
+        initial[name] = getattr(page, name)
+    initial["previous_start"] = wall(page.previous_start)
     initial["latitude"] = page.latitude
     initial["longitude"] = page.longitude
     initial["geo_source"] = page.geo_source
@@ -546,7 +594,7 @@ def initial_from_page(page: EventPage) -> dict[str, Any]:
     return initial
 
 
-class EventTranslationForm(forms.Form):
+class EventTranslationForm(NFCForm):
     """The text of a translation (EVT.8): title, summary and venue name. Everything else is the
     original's and is copied on publish. With `languages`, the form also asks which language to
     add (the "Add translation" page)."""

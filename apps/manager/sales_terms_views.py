@@ -18,6 +18,7 @@ from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
+from apps.shipping import services as shipping_services
 from apps.vendors import terms_engine
 from apps.vendors import terms_services as services
 from apps.vendors.models import SalesTermsVersion
@@ -50,7 +51,11 @@ class SalesTermsView(ManagerView):
             }
         context.setdefault("form", SalesTermsForm(initial=initial))
         context["current"] = current
-        context["versions"] = self.scoped(SalesTermsVersion).order_by("-number")
+        versions = list(self.scoped(SalesTermsVersion).order_by("-number"))
+        context["versions"] = [(v, services.accepted_terms_pdf_url(v)) for v in versions]
+        context["bulky_without_estimate"] = shipping_services.methods_missing_return_estimate(
+            vendor, estimate=current.return_cost_info if current is not None else ""
+        )
         context["link"] = services.terms_url(current) if current is not None else ""
         context["template_clause"] = _(
             "These terms are governed by the law of [country]. Disputes with business buyers "

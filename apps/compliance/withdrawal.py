@@ -27,7 +27,7 @@ Settings: `WITHDRAWAL_PERIOD_DAYS` (default 14, never below 14) and
 import datetime as dt
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -260,6 +260,15 @@ def has_withdrawal(vendor_order: VendorOrder) -> bool:
     return WithdrawalStatement.objects.filter(vendor_order_id=vendor_order.pk).exists()
 
 
+def withdrawn_vendor_order_ids(ids: Iterable[int]) -> set[int]:
+    """Of the given vendor order ids, those with a withdrawal statement, in one query (ORD.30)."""
+    return set(
+        WithdrawalStatement.objects.filter(vendor_order_id__in=list(ids)).values_list(
+            "vendor_order_id", flat=True
+        )
+    )
+
+
 def submit_withdrawal(
     order: Order,
     vendor_order_ids: Sequence[uuid.UUID | str],
@@ -339,6 +348,7 @@ def submit_withdrawal(
             template_key=ACK_TEMPLATE,
             language=order.language,
             idempotency_key=f"withdrawal:{created[0].public_id}:ack",
+            order_ref=order.public_id,
             context={
                 "order_number": order.number,
                 "customer_name": order.customer_name,
@@ -365,6 +375,7 @@ def submit_withdrawal(
                     template_key=VENDOR_TEMPLATE,
                     language=settings.LANGUAGE_CODE,  # vendors have no language of their own yet
                     idempotency_key=f"withdrawal:{statement.public_id}:vendor",
+                    order_ref=order.public_id,
                     context={
                         "order_number": order.number,
                         "reference": str(statement.public_id),

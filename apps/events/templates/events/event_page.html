@@ -1,19 +1,21 @@
 {% extends "layouts/content.html" %}
-{% load i18n tz wagtailcore_tags cms_tags event_feeds %}
+{% load i18n l10n tz wagtailcore_tags cms_tags event_feeds seo_seller %}
 {% comment %}
 Event page (EVT.1 part 2/2, spec 15 "Public pages"): a minimal page on the base theme layout.
 Dates are in the page's language and the event's own time zone, with machine-readable
 `<time datetime>` values; the type is text. No inline script or style (CSP, spec 14 §14.5).
 EVT.6 adds the ICS and report links and the robots rule (cancelled or long-past events are
-noindex); the linked products come with EVT.8/EVT.15, the map with EVT.15.
+noindex). EVT.15 adds the map with its directions links, or an "Open in maps" search link
+when the event has an address and no coordinates.
 {% endcomment %}
 {% block head %}{% if robots %}{% robots_meta robots %}{% endif %}
-  {% event_feed_alternates vendor=page.vendor.slug %}{% endblock %}
+  {% event_feed_alternates vendor=page.vendor.slug %}
+  {% if map.point %}{% include "events/_map_assets.html" %}{% endif %}{% endblock %}
 {% block page_content %}
   <article class="event">
     <header>
       <h1>{{ page.title }}</h1>
-      {% if page.cancelled_at %}<p role="status" class="event-status">{% translate "Cancelled" %}</p>{% endif %}
+      {% if page.cancelled_at %}<p role="status" class="event-status">{% translate "Cancelled" %}</p>{% elif page.postponed %}<p role="status" class="event-status">{% translate "Postponed" %}</p>{% endif %}
       <p>{{ page.summary }}</p>
     </header>
     <dl class="event-facts">
@@ -30,11 +32,15 @@ noindex); the linked products come with EVT.8/EVT.15, the map with EVT.15.
           {% endwith %}{% endtimezone %}
         {% endif %}
       </dd>
+      {% if page.postponed and not page.cancelled_at and page.previous_start %}
+        <dt>{% translate "Previously" %}</dt>
+        <dd>{% timezone page.timezone %}<time datetime="{{ page.previous_start|date:'c' }}">{{ page.previous_start|date:"DATETIME_FORMAT" }}</time>{% endtimezone %}</dd>
+      {% endif %}
       <dt>{% translate "Type" %}</dt>
       <dd>{{ page.get_event_type_display }}</dd>
-      {% if page.vendor %}
+      {% seller_name page.vendor as seller %}{% if seller %}
         <dt>{% translate "Vendor" %}</dt>
-        <dd>{% if vendor_href %}<a href="{{ vendor_href }}">{{ page.vendor.display_name }}</a>{% else %}{{ page.vendor.display_name }}{% endif %}</dd>
+        <dd>{% if vendor_href %}<a href="{{ vendor_href }}">{{ seller }}</a>{% else %}{{ seller }}{% endif %}</dd>
       {% endif %}
       {% if page.attendance %}
         <dt>{% translate "Attendance" %}</dt>
@@ -49,7 +55,15 @@ noindex); the linked products come with EVT.8/EVT.15, the map with EVT.15.
             {% if page.postcode or page.city %}{{ page.postcode }} {{ page.city }}{% if page.region %} ({{ page.region }}){% endif %}<br>{% endif %}
             {% if page.country %}{{ page.country }}{% endif %}
           </address>
+          {% if map.search_url %}<p><a data-map-search href="{{ map.search_url }}" rel="noopener">{% translate "Open in maps" %}</a></p>{% endif %}
           {% if page.booth %}<p>{% blocktranslate with booth=page.booth %}Booth {{ booth }}{% endblocktranslate %}</p>{% endif %}
+        </dd>
+      {% endif %}
+      {% if page.ticket_url or page.price is not None or page.is_free %}
+        <dt>{% translate "Tickets" %}</dt>
+        <dd>
+          {% if page.is_free %}{% translate "Free entry" %}{% elif page.price is not None %}<data value="{{ page.price|unlocalize }}">{{ currency }} {{ page.price|floatformat:2 }}</data>{% endif %}
+          {% if page.ticket_url %}<a href="{{ page.ticket_url }}" rel="noopener noreferrer">{% translate "Get tickets" %}</a>{% endif %}
         </dd>
       {% endif %}
       {% if page.online_url %}
@@ -57,6 +71,7 @@ noindex); the linked products come with EVT.8/EVT.15, the map with EVT.15.
         <dd><a href="{{ page.online_url }}" rel="noopener">{% translate "Join online" %}</a></dd>
       {% endif %}
     </dl>
+    {% if map.point %}{% include "events/_event_map.html" %}{% endif %}
     {% for block in page.body %}{% include_block block %}{% endfor %}
     <p class="event-actions">
       <a href="{{ ics_url }}" type="text/calendar" download>{% translate "Add to calendar" %}</a>

@@ -5,8 +5,9 @@ A publish never edits a stored version: it adds the next one and moves the point
 signed, expiring, multi-use link, and every read is logged; a superseded version is not public
 (it stays readable through an order snapshot once ORD.17 stores one).
 
-Deferred to the rows that own them: the VEN.32 private document store (PDF of a version), the
-ORD.17 checkout snapshot, the VEN.35 settings per shipping class (SHP.4).
+Deferred to the row that owns it: the ORD.17 checkout snapshot. The PDF of a version is VEN.36
+(`terms_views.download`, the same signed links); the per shipping class flag lives in
+`apps.shipping.services.methods_missing_return_estimate`.
 """
 
 from collections.abc import Mapping
@@ -134,6 +135,7 @@ def publish_sales_terms(
             delivery_days=int(values["delivery_days"]),
             return_cost_bearer=str(values.get("return_cost_bearer") or ""),
             return_cost_info=str(values.get("return_cost_info") or "").strip(),
+            vendor_name=vendor.display_name,
         )
         version.content_hash = engine.content_hash(version.hash_fields())
         changes.create(
@@ -163,6 +165,12 @@ def accepted_terms_url(version: SalesTermsVersion) -> str:
     return reverse("vendor_terms:read", args=[token])
 
 
+def accepted_terms_pdf_url(version: SalesTermsVersion) -> str:
+    """The PDF of the exact version a buyer accepted, also once it is superseded (VEN.36)."""
+    token = signing.dumps(str(version.public_id), salt=ARCHIVE_SALT)
+    return reverse("vendor_terms:pdf", args=[token])
+
+
 def _candidate(token: str) -> tuple[SalesTermsVersion | None, bool]:
     """The version a token names and whether it is an accepted-terms link (any version)."""
     for salt, max_age in ((LINK_SALT, LINK_MAX_AGE), (ARCHIVE_SALT, ARCHIVE_MAX_AGE)):
@@ -179,7 +187,7 @@ def _candidate(token: str) -> tuple[SalesTermsVersion | None, bool]:
     return None, False
 
 
-def read_terms(token: str, *, ctx: AuditContext) -> SalesTermsVersion | None:
+def read_terms(token: str, *, ctx: AuditContext, fmt: str = "html") -> SalesTermsVersion | None:
     """The version a link names, if it is valid and, for a 24-hour link, still in force (an
     accepted-terms link opens its version also when superseded); every attempt is logged.
 
@@ -205,6 +213,7 @@ def read_terms(token: str, *, ctx: AuditContext) -> SalesTermsVersion | None:
                 "result": "ok",
                 "vendor": str(version.vendor.public_id),
                 "content_hash": version.content_hash,
+                **({"format": fmt} if fmt != "html" else {}),
             },
         )
     return version

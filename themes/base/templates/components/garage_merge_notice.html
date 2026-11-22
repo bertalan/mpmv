@@ -1,0 +1,15 @@
+{% load i18n garage_tags %}{% comment %}
+The sign-in merge notice (FIT.7 2/n, spec 17 §17.4.3): one non-modal region on the page after
+sign-in, offered while vehicles from this browser's cookie are staged. *Add* and *Not now* are
+two explicit posts (with CSRF) that return to the page the visitor came from (the Referer, checked
+on the server); the page's own URL is never written into the markup, as it can hold a secret
+token. Nothing merges unasked.
+{% endcomment %}{% garage_merge_notice as notice %}{% if notice %}<section class="site-messages garage-merge-notice" role="status" data-garage-merge-notice>
+  <p>{% blocktranslate count counter=notice.count %}You have {{ counter }} profile saved on this device. Add it to your account?{% plural %}You have {{ counter }} profiles saved on this device. Add them to your account?{% endblocktranslate %}</p>
+  <form method="post" action="{% url 'garage_merge' %}">
+    {% csrf_token %}
+    {% translate "Add" as add_label %}{% translate "Not now" as later_label %}
+    {% include "components/button.html" with label=add_label type="submit" name="action" value="add" only %}
+    {% include "components/button.html" with label=later_label type="submit" name="action" value="dismiss" variant="ghost" only %}
+  </form>
+</section>{% endif %}

@@ -1,0 +1,47 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+One product for staff (CAT.11): the facts, the state of each language and, for the Catalog and
+moderation role, the audited fields with a dry-run preview before they are written.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  {% if read_only %}{% include "components/alert.html" with level="info" message=_("You can view this section; changes need the Catalogue role.") only %}{% endif %}
+  <p><a href="{{ list_url }}">{% translate "Back to the products" %}</a></p>
+  <dl class="manager-facts">
+    <dt>{% translate "SKU" %}</dt><dd>{{ product.sku }}</dd>
+    <dt>{% translate "Shop" %}</dt><dd>{{ product.vendor.display_name }}</dd>
+    <dt>{% translate "Status" %}</dt><dd>{{ product.get_status_display }}</dd>
+    <dt>{% translate "Category" %}</dt><dd>{{ product.category|default:"—" }}</dd>
+    <dt>{% translate "Sales mode" %}</dt><dd>{{ product.get_sales_mode_display }}</dd>
+    <dt>{% translate "Fiscal category" %}</dt><dd>{{ product.get_fiscal_category_display }}</dd>
+  </dl>
+  <h2>{% translate "Translations" %}</h2>
+  <table class="table">
+    <caption class="visually-hidden">{% translate "Translations" %}</caption>
+    <thead><tr><th scope="col">{% translate "Language" %}</th><th scope="col">{% translate "State" %}</th><th scope="col">{% translate "Title" %}</th></tr></thead>
+    <tbody>{% for language in languages %}<tr><th scope="row">{{ language.code }}</th><td>{{ language.state }}</td><td>{{ language.title|default:"—" }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% if can_write %}
+    <h2>{% translate "Fields staff may change" %}</h2>
+    {% if changes %}
+      <p class="manager-lead">{% translate "Nothing has changed yet. Check the changes below, then confirm." %}</p>
+      <ul class="manager-changes">
+        {% for change in changes %}<li><strong>{{ change.op }}</strong>
+          {% if change.fields %}<ul>{% for name, values in change.fields.items %}<li>{{ name }}: {{ values.0|default_if_none:"—" }} → {{ values.1|default_if_none:"—" }}</li>{% endfor %}</ul>{% endif %}
+        </li>{% endfor %}
+      </ul>
+    {% endif %}
+    <form method="post">
+      {% csrf_token %}
+      {% if changes %}
+        {% for key, value in echo %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+        {% include "components/button.html" with label=_("Confirm") type="submit" name="confirm" value="1" only %}
+        {% include "components/button.html" with label=_("Cancel") url=request.path variant="ghost" only %}
+      {% else %}
+        {{ form.as_div }}
+        {% include "components/button.html" with label=_("Preview") type="submit" only %}
+      {% endif %}
+    </form>
+  {% endif %}
+{% endblock %}

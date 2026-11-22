@@ -41,6 +41,8 @@ EVENT_FILES = (
         f"apps/events/templates/events/{name}.html"
         for name in (
             "event_calendar",
+            "_event_map",
+            "_index_map",
             "event_index_page",
             "event_page",
             "event_past",
@@ -54,18 +56,28 @@ EVENT_FILES = (
 )
 SCOPES = (
     "apps/manager",
+    "apps/fitment/templates/email",  # the garage inactivity notice (FIT.5 3/3)
+    "apps/fitment/services.py",  # the publish gate message (FIT.18), shown to vendors and staff
+    "apps/payments/stray.py",  # closing a stray-payment alert (PAY.4), staff, formal
     "apps/accounts",
     "apps/orders/templates",
     "apps/seo",
     "apps/orders/ui",
-    "apps/vendors/templates/email/vendors/profile_reverted",
+    "apps/vendors/templates/email",  # the vendor emails (I18N.20 3c)
     "apps/events/templates/email",  # the event moderation emails (EVT.11)
+    "apps/catalog/templates/email",  # brand rejected notice to the vendor (I18N.20 3c)
+    "apps/core/templates/email",  # the operations alert to staff (I18N.20 3c)
     "apps/orders/customer_views.py",  # the customer area labels (ORD.7)
     "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
+    "apps/compliance/views.py",  # withdrawal and notice errors, the form PDF 503 (I18N.20)
+    "apps/compliance/templates/email",  # the compliance emails (I18N.20 3c)
     "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)
     "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
     "apps/vendors/models.py",
     "apps/vendors/templates/vendors/terms",  # the public sales terms page (VEN.35)
+    "apps/vendors/templates/documents/vendors",  # the sales terms PDF (VEN.36), same strings as the page
+    "apps/vendors/templates/vendors/apply",  # the vendor application pages (VEN.22), formal
+    "apps/vendors/forms.py",  # the application and confirm forms (VEN.22)
     "themes/base/templates/layouts",
     "themes/ride/templates/components/header.html",  # the Bootstrap navbar and offcanvas (THM.15)
     "themes/ride/templates/components/footer.html",  # social nav label, back to top (THM.15)
@@ -76,17 +88,86 @@ SCOPES = (
     "apps/catalog/templates/catalog/product.html",
     "apps/catalog/templates/catalog/includes/stock_status.html",
     "apps/catalog/templates/catalog/includes/product_card.html",
+    # The storefront catalog (I18N.20 part 1): listing, search, the product page includes, the
+    # spec table labels (CAT.22), the fitment summary (FIT.9) and the ride catalog overrides.
+    "apps/catalog/templates/catalog/listing.html",
+    "apps/catalog/templates/catalog/search.html",
+    "apps/catalog/templates/catalog/includes",
+    "apps/catalog/product_pages.py",
+    "apps/fitment/product_summary.py",
+    "themes/ride/templates/catalog",
+    "themes/base/templates/components/gallery.html",  # the product gallery (variant images)
+    "themes/ride/templates/components/gallery.html",
     # The note under every consumer price (TAX.12, owner wording 2026-11-16), in all languages.
     "apps/tax/prices.py",
     # Temporary staff "Site links" page (OPS.12); remove before LIVE.
     "apps/seo/site_links.py",
     "apps/seo/templates/seo/site_links.html",
+    # The customer privacy page (I18N.13 follow-up): informal register, "Your data" has its own context.
+    "apps/compliance/templates/compliance/privacy_account.html",
+    "themes/ride/templates/compliance/privacy_account.html",
+    # The staff note of the unused-images list (CAT.25): the rest of that page is English admin.
+    "apps/catalog/templates/catalog/admin/orphan_images_old_versions.html",
+    # The customer help pages (ARC.37): informal register.
+    "apps/cms/templates/cms/help_guide_index.html",
+    "apps/cms/templates/cms/help_guide_section.html",
     *EVENT_FILES,  # the public event pages (EVT.6)
+    # The rest of the public event surface (I18N.20 part 2): the vendor storefront list and the
+    # feed labels (RSS and calendar titles, the text of each calendar entry).
+    "apps/events/templates/events/_storefront.html",
+    "apps/events/feeds.py",
+    # The blog, the CMS blocks, the footer and the form page, in `base` and in `ride`
+    # (I18N.20 part 2); the editor-facing strings of these files join with part 3.
+    "apps/cms/templates/cms/blog_author_page.html",
+    "apps/cms/templates/cms/blog_index_page.html",
+    "apps/cms/templates/cms/blog_post_page.html",
+    "apps/cms/templates/cms/form_page.html",
+    "apps/cms/templates/cms/form_page_landing.html",
+    "apps/cms/templates/cms/blocks",
+    "apps/cms/templates/cms/includes",
+    "apps/cms/forms_pages.py",  # the refusals of the public form page (CMS.13)
+    "apps/cms/blocks.py",  # only the launch countdown: its "Available now" (see ONLY_CLASSES)
+    "themes/ride/templates/cms",
+    "themes/base/templates/components",
+    "themes/ride/templates/components",
+    # The consumer-law storefront pages (I18N.20 part 3b, slice 1): consumer information,
+    # withdrawal, privacy requests, notices, product safety, the legal pages and the ride
+    # legal recap of the checkout. Informal customer register, legal terms of art per country.
+    "apps/compliance/templates/compliance",
+    "themes/ride/templates/compliance",
+    "apps/cms/templates/cms/legal_page.html",
+    "apps/cms/templates/cms/legal_page_version.html",
+    "themes/ride/templates/orders/_legal_recap.html",
+    "themes/ride/templates/orders/_legal_boxes.html",
+    # Customer template overrides (I18N.20 part 3b, slice 2): the ride account and order
+    # overrides, the consent banner, the garage saver and the image credits.
+    "themes/ride/templates/accounts",
+    "themes/ride/templates/orders",
+    "themes/ride/templates/seo",
+    "apps/fitment/templates/fitment/_garage_saver.html",
+    # The "My garage" page of the customer area (FIT.5 2/3).
+    "apps/fitment/templates/fitment/garage_account.html",
+    "apps/fitment/templates/fitment/garage_delete.html",
+    "apps/fitment/garage_views.py",
+    # The header garage menu and the chooser (FIT.7 1/n).
+    "apps/fitment/templates/fitment/garage_choose.html",
+    "apps/fitment/views.py",
+    "apps/fitment/garage_state.py",
+    "themes/ride/templates/fitment",
+    "apps/core/templates/core/components/image_credit.html",
+    "apps/core/templates/core/components/image_credits_disclosure.html",
+    # The remaining CMS page templates (I18N.20 part 3b, slice 3): landing and recruitment pages.
+    "apps/cms/templates/cms/home_page.html",
+    "apps/cms/templates/cms/standard_page.html",
+    "apps/cms/templates/cms/term_landing_page.html",
+    "apps/cms/templates/cms/vendor_landing_page.html",
+    "apps/cms/templates/cms/vendor_recruitment_page.html",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (
     "apps/vendors/services.py",
     "apps/cms/templatetags/cms_tags.py",  # the header's "Site links" item (OPS.12)
+    "apps/cms/slugs.py",  # the reserved-slug error of the page form (ARC.37)
 )
 # Single Python modules scanned in full: customer-facing messages of apps that are not in SCOPES.
 FILES = (
@@ -94,6 +175,7 @@ FILES = (
     "apps/orders/amendments.py",
     "apps/orders/amendment_engine.py",  # the classification reasons and refusals (ORD.20)
     "apps/orders/amendment_notices.py",
+    "apps/orders/staff_drafts.py",  # the refusals staff read on a prepared cart (ORD.32)
 )
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
@@ -148,6 +230,8 @@ ONLY_CLASSES = {
     "apps/compliance/forms.py": ("WithdrawalLookupForm",),
     "apps/cms/models.py": ("HelpEntry",),
     "apps/events/models.py": ("EventType", "Attendance"),  # the labels the pages show
+    "apps/cms/forms_pages.py": ("FormPage",),
+    "apps/cms/blocks.py": ("LaunchCountdownBlock",),
 }
 SKIP_PARTS = {"tests", "migrations", "static", "node_modules"}
 
@@ -344,11 +428,24 @@ SENSITIVE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     ("compliance forms", ("apps/compliance/",)),
     (
+        "DSA statements of reasons (EVT.11)",
+        (
+            "apps/manager/templates/manager/shop/statements.html",
+            "apps/manager/statement_views.py",
+        ),
+    ),
+    (
+        "event moderation emails (EVT.11)",
+        ("apps/events/templates/email/events/", "apps/events/notifications.py"),
+    ),
+    (
         "sales terms",
         (
             "apps/vendors/templates/vendors/terms/",
             "apps/manager/templates/manager/shop/sales_terms.html",
             "apps/manager/sales_terms_views.py",
+            "apps/manager/templates/manager/shop/return_policy.html",
+            "apps/manager/return_policy_views.py",
         ),
     ),
     ("price notes and tax", ("apps/tax/",)),
@@ -377,6 +474,38 @@ def sensitive_group(entry: polib.POEntry) -> str | None:
 
 def is_reviewed(entry: polib.POEntry) -> bool:
     return any(line.strip() == REVIEWED_MARK for line in entry.tcomment.splitlines())
+
+
+REVIEW_HEADER = "# review: sensitive entries reviewed (I18N.19)"
+
+
+def _mark_entry_block(block: str) -> str:
+    """`block` with a `# reviewed` translator comment, unless a sensitive entry has it already."""
+    # A dummy header first: polib reads leading comments of a bare block as the file header.
+    entry = polib.pofile('msgid ""\nmsgstr ""\n\n' + block + "\n")[0:1]
+    if not entry or sensitive_group(entry[0]) is None or is_reviewed(entry[0]):
+        return block
+    lines = block.split("\n")
+    at = next(i for i, line in enumerate(lines) if not line.startswith("# "))
+    return "\n".join([*lines[:at], "# " + REVIEWED_MARK, *lines[at:]])
+
+
+def mark_reviewed(lang: str) -> int:
+    """Mark every sensitive entry of `lang` `# reviewed` and add the header line.
+
+    A text edit: nothing is re-wrapped or re-ordered (the translator's act, after the review of
+    `review-export`; never run it on an unreviewed catalog). Returns the entries newly marked.
+    """
+    path = _po_path(lang)
+    head, _, rest = path.read_text(encoding="utf-8").partition("\n\n")
+    blocks = [head, *rest.split("\n\n")]
+    changed = [_mark_entry_block(b) for b in blocks[1:]]
+    count = sum(1 for old, new in zip(blocks[1:], changed, strict=True) if old != new)
+    if REVIEW_HEADER not in head:
+        top, _, tail = head.partition("\nmsgid")
+        head = f"{top}\n{REVIEW_HEADER}\nmsgid{tail}"
+    path.write_text("\n\n".join([head, *changed]), encoding="utf-8")
+    return count
 
 
 def review_rows(lang: str, *, everything: bool = False, pending: bool = False) -> list[list[str]]:
@@ -474,6 +603,11 @@ if __name__ == "__main__":
         ns = ap.parse_args(sys.argv[2:])
         n = review_export(ns.lang, ns.out, everything=ns.everything, pending=ns.pending)
         print(f"{n} entries", file=sys.stderr)
+        raise SystemExit(0)
+    if command == "mark-reviewed":
+        ap = argparse.ArgumentParser(prog="i18n_catalog.py mark-reviewed")
+        ap.add_argument("lang", choices=LANGUAGES)
+        print(f"{mark_reviewed(ap.parse_args(sys.argv[2:]).lang)} entries marked", file=sys.stderr)
         raise SystemExit(0)
     if command == "extract":
         extract()

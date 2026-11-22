@@ -26,7 +26,7 @@ from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 pytestmark = pytest.mark.django_db
 
 # The CORE.18 catalog role group (apps/manager/roles.py); not imported: compliance sits below.
-CATALOG_GROUP = "Platform: catalog and moderation"
+CATALOG_GROUP = "Platform: catalogue and moderation"
 
 PLATFORM = "/manager/platform/terminations/"
 SHOP = "/manager/shop/termination/"

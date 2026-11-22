@@ -1,7 +1,7 @@
 """FIT.1 part 2: the Manager pages of the fitment scheme, its nodes and its categories.
 
 The scheme is Configuration and tax (step-up, dry-run preview first), the nodes and the
-categories are Catalog and moderation. The rules live in `apps.fitment.services`; these tests
+categories are Catalogue and moderation. The rules live in `apps.fitment.services`; these tests
 prove the pages are thin adapters over them.
 """
 
@@ -14,6 +14,7 @@ from apps.accounts import levels
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.catalog.tests.factories import CategoryFactory
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.fitment import services
 from apps.fitment.models import (
@@ -24,6 +25,7 @@ from apps.fitment.models import (
     FitmentNodeMerge,
 )
 from apps.fitment.tests.factories import FitmentLevelFactory, FitmentNodeFactory
+from apps.manager.fitment_forms import SchemeForm
 from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
@@ -41,12 +43,13 @@ def sign_in(client: Client, role: str, **kwargs: Any) -> None:
 
 
 def add_level(client: Client, code: str, label: str, *, confirm: bool = True, **extra: str) -> Any:
+    lang = primary_language()
     data = {
         "action": "add_level",
         "code": code,
-        "label_en": label,
-        "plural_en": f"{label}s",
-        "placeholder_en": "",
+        f"label_{lang}": label,
+        f"plural_{lang}": f"{label}s",
+        f"placeholder_{lang}": "",
         **extra,
     }
     if confirm:
@@ -152,6 +155,8 @@ def test_the_scheme_settings_are_saved_through_the_service(client: Client) -> No
         "year_min": "1950",
         "year_max_offset": "2",
         "max_profiles": "5",
+        "garage_inactivity_months": "18",
+        "garage_notice_days": "20",
         "confirm": "1",
     }
     assert client.post(SCHEME, data).status_code == 302
@@ -209,11 +214,11 @@ def test_a_level_is_renamed_in_a_language(client: Client) -> None:
         {
             "action": "rename_level",
             "level": "make",
-            "label_en": "Make",
-            "plural_en": "Makes",
-            "label_it": "Marca",
-            "plural_it": "Marche",
-            "placeholder_it": "Scegli la marca",
+            f"label_{primary_language()}": "Make",
+            f"plural_{primary_language()}": "Makes",
+            f"label_{other_language()}": "Marca",
+            f"plural_{other_language()}": "Marche",
+            f"placeholder_{other_language()}": "Scegli la marca",
             "confirm": "1",
         },
     )
@@ -442,3 +447,44 @@ def test_an_unknown_node_is_a_404(client: Client) -> None:
     nil = "00000000-0000-0000-0000-000000000000"
     assert client.get(f"{NODES}{nil}/").status_code == 404
     assert client.get(f"{NODES}{nil}/merge/").status_code == 404
+
+
+def test_the_publish_gate_is_set_in_bulk_with_a_preview_and_an_audit_entry(
+    client: Client,
+) -> None:
+    category = CategoryFactory.create()
+    sign_in(client, "config")
+    data = {"action": "require_declaration", "selected": [str(category.public_id)]}
+    assert client.post(CATEGORIES, data).status_code == 200
+    assert not FitmentCategory.objects.exists()
+    assert client.post(CATEGORIES, {**data, "confirm": "1"}).status_code == 302
+    assert FitmentCategory.objects.get(category=category).require_declaration is True
+    assert AuditLog.objects.filter(action=services.CATEGORY_PUBLISH_GATE_CHANGED).count() == 1
+    client.post(
+        CATEGORIES,
+        {"action": "no_declaration", "selected": [str(category.public_id)], "confirm": "1"},
+    )
+    assert FitmentCategory.objects.get(category=category).require_declaration is False
+
+
+def test_the_catalog_role_cannot_set_the_publish_gate(client: Client) -> None:
+    category = CategoryFactory.create()
+    sign_in(client, "catalog")
+    response = client.post(
+        CATEGORIES,
+        {"action": "require_declaration", "selected": [str(category.public_id)], "confirm": "1"},
+    )
+    assert response.status_code == 404
+    assert not FitmentCategory.objects.exists()
+
+
+def test_the_scheme_form_refuses_37_months_and_accepts_36() -> None:
+    base = {
+        "garage_noun_key": "Garage",
+        "year_min": 1950,
+        "year_max_offset": 2,
+        "max_profiles": 10,
+        "garage_notice_days": 30,
+    }
+    assert "garage_inactivity_months" in SchemeForm({**base, "garage_inactivity_months": 37}).errors
+    assert SchemeForm({**base, "garage_inactivity_months": 36}).is_valid()

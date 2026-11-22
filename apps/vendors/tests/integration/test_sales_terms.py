@@ -4,10 +4,11 @@ import secrets
 from typing import Any
 
 import pytest
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import DatabaseError, connection, transaction
 from django.test import Client
-from django.urls import reverse
+from django.urls import resolve, reverse
 
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
@@ -308,3 +309,126 @@ def test_an_accepted_terms_link_opens_a_superseded_version_and_never_a_forged_on
     assert client.get(ts.terms_url(old)).status_code == 404  # the 24-hour link stays in-force only
     token = link.rstrip("/").rsplit("/", 1)[1]
     assert client.get(reverse("vendor_terms:read", args=[token + "x"])).status_code == 404
+
+
+def _published(body: str = "Download text") -> tuple[Vendor, SalesTermsVersion, str]:
+    vendor = VendorFactory.create()
+    ts.publish_sales_terms(vendor, values(body=body), actor=owner_of(vendor), ctx=CTX)
+    version = current(vendor)
+    return vendor, version, ts.terms_url(version).rstrip("/").rsplit("/", 1)[1]
+
+
+def test_the_terms_page_links_the_pdf_of_the_same_signed_link() -> None:
+    _, _, token = _published()
+    response = Client().get(reverse("vendor_terms:read", args=[token]))
+    assert response.status_code == 200
+    assert reverse("vendor_terms:pdf", args=[token]) in response.content.decode()
+
+
+def test_the_pdf_of_the_version_in_force_downloads_as_an_attachment() -> None:
+    vendor, version, token = _published()
+    response = Client().get(reverse("vendor_terms:pdf", args=[token]))
+    assert response.status_code == 200
+    assert response["Content-Type"] == "application/pdf"
+    assert response.content.startswith(b"%PDF")
+    assert response["Content-Disposition"] == (
+        f'attachment; filename="sales-terms-{vendor.slug}-v{version.number}.pdf"'
+    )
+    assert response["X-Robots-Tag"] == "noindex, nofollow"
+    entry = AuditLog.objects.filter(action=ts.READ).latest("pk")
+    assert (entry.after or {})["format"] == "pdf"
+
+
+def test_a_tampered_or_superseded_link_gives_no_pdf() -> None:
+    vendor, _, token = _published("Old text")
+    client = Client()
+    assert client.get(reverse("vendor_terms:pdf", args=[token + "x"])).status_code == 404
+    ts.publish_sales_terms(vendor, values(body="New text"), actor=owner_of(vendor), ctx=CTX)
+    assert client.get(reverse("vendor_terms:pdf", args=[token])).status_code == 404
+
+
+def test_the_pdf_of_an_old_version_still_downloads_through_the_accepted_terms_link() -> None:
+    vendor, old, _ = _published("Old text")
+    old_link = ts.accepted_terms_url(old)
+    ts.publish_sales_terms(vendor, values(body="New text"), actor=owner_of(vendor), ctx=CTX)
+    assert current(vendor).pk != old.pk
+    response = Client().get(ts.accepted_terms_pdf_url(old))
+    assert response.status_code == 200
+    assert response.content.startswith(b"%PDF")
+    assert f"-v{old.number}.pdf" in response["Content-Disposition"]
+    pdf_match = resolve(ts.accepted_terms_pdf_url(old))
+    read_match = resolve(old_link)
+    assert pdf_match.url_name == "pdf"
+    assert signing.loads(pdf_match.kwargs["token"], salt=ts.ARCHIVE_SALT) == signing.loads(
+        read_match.kwargs["token"], salt=ts.ARCHIVE_SALT
+    )
+
+
+def test_a_version_keeps_the_shop_name_it_was_published_under() -> None:
+    vendor, version, token = _published()
+    assert version.vendor_name == vendor.display_name
+    old_name = vendor.display_name
+    Vendor.objects.filter(pk=vendor.pk).update(display_name="Renamed Shop")
+    version = SalesTermsVersion.objects.get(pk=version.pk)
+    assert version.public_name == old_name
+    page = Client().get(reverse("vendor_terms:read", args=[token])).content.decode()
+    assert old_name in page
+    assert "Renamed Shop" not in page
+
+
+def test_an_older_version_without_a_snapshot_shows_the_current_name() -> None:
+    version = SalesTermsVersionFactory.create(vendor_name="")
+    assert version.public_name == version.vendor.display_name
+
+
+def test_the_pdf_is_rendered_once_per_version_and_revalidated_by_etag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from django.core.cache import cache
+
+    from apps.vendors import terms_views
+
+    cache.clear()
+    calls: list[str] = []
+
+    def fake(html: str) -> bytes:
+        calls.append(html)
+        return b"%PDF-fake"
+
+    monkeypatch.setattr(terms_views, "render_html", fake)
+    _, _, token = _published()
+    client = Client()
+    url = reverse("vendor_terms:pdf", args=[token])
+    first = client.get(url)
+    second = client.get(url)
+    assert first.content == second.content == b"%PDF-fake"
+    assert len(calls) == 1
+    assert first["Cache-Control"] == "private, no-cache"
+    etag = first["ETag"]
+    for header in (etag, f"W/{etag}", f'"other", {etag}', "*"):
+        assert client.get(url, headers={"If-None-Match": header}).status_code == 304
+    assert client.get(url, headers={"If-None-Match": '"other"'}).status_code == 200
+    assert len(calls) == 1
+    assert AuditLog.objects.filter(action=ts.READ).count() == 7
+
+
+def test_a_rename_changes_the_pdf_etag_of_a_version_without_a_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from apps.vendors import terms_views
+
+    seen: list[str] = []
+
+    def fake(html: str) -> bytes:
+        seen.append(html)
+        return b"%PDF-fake"
+
+    monkeypatch.setattr(terms_views, "render_html", fake)
+    version = SalesTermsVersionFactory.create(vendor_name="")
+    vendor = version.vendor
+    url = ts.accepted_terms_pdf_url(version)
+    first = Client().get(url)
+    Vendor.objects.filter(pk=vendor.pk).update(display_name="Renamed Shop")
+    second = Client().get(url)
+    assert first["ETag"] != second["ETag"]
+    assert "Renamed Shop" in seen[-1]

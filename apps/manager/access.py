@@ -24,7 +24,7 @@ from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.services import is_vendor_member
 
 from . import roles
-from .role_groups import in_role_group, user_roles
+from .role_groups import effective_roles, in_role_group, user_roles
 from .spaces import Space
 
 type AnyUser = AbstractBaseUser | AnonymousUser
@@ -41,11 +41,13 @@ def is_platform_staff(user: AnyUser) -> bool:
 
 def may_access_section(user: AnyUser, section: str, *, write: bool = False) -> bool:
     """Whether the roles `user` holds give access to a matrix section (CORE.18): role membership,
-    never `has_perm`, and none for a technical superuser without a role. Django admin pages of
-    lower apps reach it through `settings.PLATFORM_SECTION_CHECK`."""
+    never `has_perm`, and none for a technical superuser without a role. A platform owner granted
+    the permission directly (CORE.23, `bootstrap_platform_owner`) holds the owner role
+    (`effective_roles`). Django admin pages of lower apps reach it through
+    `settings.PLATFORM_SECTION_CHECK`."""
     if getattr(user, "holds_all_platform_roles", False):  # the audit check's imaginary user
         return roles.allows(section, roles.ROLE_KEYS, write=write)
-    return roles.allows(section, user_roles(user), write=write)
+    return roles.allows(section, effective_roles(user), write=write)
 
 
 def _has_admin_access(user: AnyUser) -> bool:

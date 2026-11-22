@@ -10,6 +10,8 @@ from typing import Annotated
 
 from pydantic import AfterValidator
 
+from apps.core.text import nfc
+
 
 def storable_text(value: str) -> str:
     if "\x00" in value:
@@ -20,3 +22,12 @@ def storable_text(value: str) -> str:
 
 
 PlainText = Annotated[str, AfterValidator(storable_text)]
+
+
+def storable_nfc_text(value: str) -> str:
+    return str(nfc(storable_text(value)))
+
+
+# Free text a client writes (a title, a description): storable and Unicode NFC (I18N.10). Not for
+# codes and SKUs, which stay as sent.
+NFCText = Annotated[str, AfterValidator(storable_nfc_text)]
