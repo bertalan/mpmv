@@ -89,12 +89,6 @@ def american_words(text: str) -> list[str]:
 # Help pages (I18N.25 follow-up): prose of help/en/**/*.md is British English too.
 HELP_DIR = ROOT / "help" / "en"
 
-# Phrases of help prose that keep a listed word, with the reason.
-HELP_EXCEPTIONS: dict[str, str] = {
-    "Catalog and moderation": "role group name stored in the database (migration 0003)",
-    "Catalog role": "role group name stored in the database (migration 0003)",
-}
-
 _FENCE = re.compile(r"^(```|~~~).*?^\1[^\n]*$", re.MULTILINE | re.DOTALL)
 _INLINE_CODE = re.compile(r"`[^`\n]*`")
 _URL = re.compile(r"https?://\S+|\]\([^)\s]*\)")
@@ -105,8 +99,6 @@ def markdown_prose(text: str) -> str:
     """The prose of a markdown page: no fenced or inline code, URLs or identifiers."""
     for pattern in (_FENCE, _INLINE_CODE, _URL, _IDENTIFIER):
         text = pattern.sub(" ", text)
-    for phrase in HELP_EXCEPTIONS:
-        text = text.replace(phrase, " ")
     return text
 
 

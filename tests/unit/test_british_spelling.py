@@ -77,11 +77,15 @@ def test_help_markdown_scan_finds_prose_and_ignores_code(tmp_path: Path) -> None
     assert british.help_violations(tmp_path) == ["a.md:1: ['catalog']"]
     (tmp_path / "a.md").write_text(
         "Use `catalog` here, see https://x.test/catalog/ and [l](/catalog/), "
-        "the catalog:brand page, role Catalog and moderation.\n\n"
+        "the catalog:brand page, role Catalogue and moderation.\n\n"
         "```\ncatalog color\n```\n",
         encoding="utf-8",
     )
     assert british.help_violations(tmp_path) == []
+
+
+def test_help_has_no_exceptions_left() -> None:
+    assert not hasattr(british, "HELP_EXCEPTIONS")
 
 
 def test_help_en_prose_is_british() -> None:
