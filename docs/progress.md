@@ -2974,7 +2974,7 @@ Findings:
 
 1. Minor (queue), lane-b: #919 (conflicting) and #945 (all shards red) block FIT.6 regression case 8. Merge main into #919, fix the shards of #945 (stacked on it), then ask for re-approval. Also #958 conflicts with main: merge main.
 2. Minor, lane-b: #875 shard 1/4 red. Re-run once and read the failing test; if it is a language-dependent test, fix it in the PR.
-3. Minor, lane-a: #954 conflicts; #943 shard 4/4 is red; #912 and #950 wait on their authors. #915, #936, #937 and #948 are labelled and not in a train: the next train can take them.
+3. Minor, lane-a: #954 conflicts; #943 shard 4/4 is red; #912 and #950 wait on their authors. (#915, #936, #937 and #948 merged after the draft.)
 4. Minor, lane-a (SEC.5): part 3a-2 lacks the payout-after-IBAN-change scenario and coupon stacking (waits for PRM). The row now says `partial`.
 5. Minor, lane-b (I18N.19): staff preview on STAGE and counsel sign-off remain; until then de, fr and es cannot be on LIVE (`core.E915`). No action beyond the row.
 6. Note, lane-a (owner questions, from the PR bodies): `sells_to_consumers` is true for every seller (#922), so a business-only seller must also give a phone number; the 14-day auto-close of a stray capture only on a confirmed full refund and no step-up for the manual close (#938); the 36-month cap (#958).
