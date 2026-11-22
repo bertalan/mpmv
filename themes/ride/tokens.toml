@@ -41,6 +41,7 @@
 
 [color.blue]
 500 = "#2F80ED"  # focus: at least 3:1 on white and on the dark surface
+300 = "#7DB3FA"  # focus on the dark band: at least 4.5:1 on the dark surface
 
 # --- Semantic tier
 
@@ -64,6 +65,7 @@ secondary-hover = "{color.charcoal.500}"
 secondary-text = "{color.charcoal.400}"
 link = "{color.brand.500}"
 focus = "{color.blue.500}"
+focus-on-dark = "{color.blue.300}"
 info = "{color.slate.700}"
 overlay = "{color.navy.950}"
 
@@ -95,8 +97,54 @@ round = "50%"
 [shadow]
 button-hover = "0 6px 16px color-mix(in srgb, var(--color-accent) 28%, transparent)"
 
+# Image overlay scrim (THM.20): `opacity` is the strong end (hero, tiles), `soft` the light one.
 [scrim]
 opacity = "0.82"
+soft = "0.45"
+
+# Section surfaces (THM.20): each variant names its background and the colours of its heading,
+# text, link, focus ring and button, all derived from the palette tokens, so a palette change
+# carries every pair along. apps/themes/tests/unit/test_ride_surfaces.py checks the pairs under
+# each predefined palette. On the dark and primary bands the link and the button are inverted.
+[surface.light]
+bg = "{color.surface}"
+text = "{color.text}"
+heading = "{color.heading}"
+link = "{color.link}"
+focus = "{color.focus}"
+button-bg = "{color.accent}"
+button-fg = "{color.on-accent}"
+button-hover = "{color.accent-hover}"
+
+[surface.muted]
+bg = "{color.surface-sunken}"
+text = "{color.text}"
+heading = "{color.heading}"
+link = "{color.link}"
+focus = "{color.focus}"
+button-bg = "{color.accent}"
+button-fg = "{color.on-accent}"
+button-hover = "{color.accent-hover}"
+
+[surface.band]
+bg = "{color.surface-inverse}"
+text = "{color.text-inverse}"
+heading = "{color.text-inverse}"
+link = "{color.text-inverse}"
+focus = "{color.focus-on-dark}"
+button-bg = "{color.text-inverse}"
+button-fg = "{color.surface-inverse}"
+button-hover = "{color.accent-tint}"
+
+[surface.primary]
+bg = "{color.accent}"
+text = "{color.on-accent}"
+heading = "{color.on-accent}"
+link = "{color.on-accent}"
+focus = "{color.on-accent}"
+button-bg = "{color.on-accent}"
+button-fg = "{color.accent}"
+button-hover = "{color.accent-tint}"
 
 [header]
 height = "4.5rem"
