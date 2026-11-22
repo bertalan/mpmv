@@ -6,7 +6,7 @@ The English msgids are the English interface, and it is written in British Engli
 scans the msgids the gettext catalog collects (`tools/i18n_catalog.py collect`) whose source file
 is in an allow-listed app and fails on a word from the fixed list below. It never looks at code
 identifiers, URL names or model and field names: only at msgids. The list grows slice by slice
-(I18N.24 and I18N.25 add the other apps); a word that must stay American goes to EXCEPTIONS with
+(I18N.25 made it every app and theme); a word that must stay American goes to EXCEPTIONS with
 the reason.
 """
 
@@ -19,23 +19,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Apps swept so far (I18N.23). Paths are matched on the first two parts of the source reference.
-ALLOWED_APPS = (
-    "apps/core/",
-    "apps/accounts/",
-    "apps/manager/",
-    "apps/api/",
-    "apps/mcp/",
-    "apps/catalog/",
-    "apps/cart/",
-    "apps/orders/",
-    "apps/payments/",
-    "apps/shipping/",
-    "apps/tax/",
-    "apps/ledger/",
-    "apps/vendors/",
-    "apps/compliance/",
-)
+# Every app is swept (I18N.25): paths are matched on the source reference of the msgid.
+ALLOWED_APPS = ("apps/", "themes/")
 
 # American word (regex, whole word, case-insensitive) -> British spelling to use instead.
 US_TO_UK: dict[str, str] = {
@@ -76,6 +61,9 @@ US_TO_UK: dict[str, str] = {
 
 # Exact msgids that keep a listed word, with the reason.
 EXCEPTIONS: dict[str, str] = {
+    # `catalog:brand` is a URL name, an identifier the editor types; it is never renamed.
+    "The name of the screen (for example catalog:brand) or of the page type (for example "
+    "cms.StandardPage). Leave it empty for the general text.": "URL name",
     # "Catalog and moderation" is the name of a role group stored in the database (migration
     # 0003); renaming it needs a data migration of its own, so the notice keeps naming it.
     "You can view this section; changes need the Catalog role.": "role group name",

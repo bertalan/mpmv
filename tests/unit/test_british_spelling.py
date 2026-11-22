@@ -24,12 +24,18 @@ def test_us_words_are_found_and_british_ones_pass() -> None:
     ]
 
 
-def test_only_allow_listed_apps_are_checked() -> None:
+def test_every_app_and_theme_is_checked() -> None:
+    """I18N.25: the allow-list is every app and the theme templates."""
     found = {
         ("Your catalog", None): (None, ["apps/manager/x.html"]),
         ("Your color", None): (None, ["apps/fitment/x.html"]),
+        ("Your favorite", None): (None, ["themes/ride/templates/x.html"]),
+        ("Your colour", None): (None, ["apps/seo/x.html"]),
+        ("Your colors", None): (None, ["tools/x.py"]),
     }
-    assert len(british.violations(found)) == 1
+    assert len(british.violations(found)) == 3
+    for app in ("cms", "seo", "events", "fitment", "trust", "ingest", "themes", "seed"):
+        assert british.in_scope([f"apps/{app}/models.py:3"]), app
 
 
 def test_exception_keeps_the_role_notice() -> None:
@@ -41,11 +47,11 @@ def test_swept_apps_are_clean_now() -> None:
     assert british.check() == 0
 
 
-def test_the_scope_matches_whole_app_directories_only() -> None:
-    """`apps/core_x` or `apps/api_v2` is not swept by accident (review of #960)."""
+def test_the_scope_is_apps_and_themes_only() -> None:
     assert british.in_scope(["apps/core/templates/x.html:3"])
-    assert not british.in_scope(["apps/core_x/templates/x.html:3"])
-    assert not british.in_scope(["apps/api_v2/views.py:9"])
+    assert british.in_scope(["themes/base/templates/x.html:3"])
+    assert not british.in_scope(["tools/x.py:9"])
+    assert not british.in_scope(["docs/x.md:9"])
 
 
 def test_i18n_24_apps_are_in_scope() -> None:
