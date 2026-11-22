@@ -14,6 +14,14 @@
     color: var(--color-text-inverse);
   }
 
+  /* Rule: a panel that paints its own (light) background sets its own text and link colour, so
+     the header's light link colour above never reaches it (white on white, 22 Nov). Every light
+     panel opened from the dark bar is listed here; tests/e2e/test_ride_header_panels.py checks it. */
+  .site-header :is(.user-menu__list, .garage-menu__list),
+  .site-header :is(.user-menu__list, .garage-menu__list) :is(a, button) {
+    color: var(--color-text);
+  }
+
   /* The navbar keeps the theme's own spacing, not Bootstrap's. */
   .site-header__inner {
     --bs-navbar-padding-x: 0;
