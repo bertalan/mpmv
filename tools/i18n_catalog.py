@@ -149,6 +149,10 @@ SCOPES = (
     "apps/fitment/templates/fitment/garage_account.html",
     "apps/fitment/templates/fitment/garage_delete.html",
     "apps/fitment/garage_views.py",
+    # The header garage menu and the chooser (FIT.7 1/n).
+    "apps/fitment/templates/fitment/garage_choose.html",
+    "apps/fitment/views.py",
+    "apps/fitment/garage_state.py",
     "themes/ride/templates/fitment",
     "apps/core/templates/core/components/image_credit.html",
     "apps/core/templates/core/components/image_credits_disclosure.html",

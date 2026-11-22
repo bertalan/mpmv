@@ -924,6 +924,14 @@ ENDPOINTS: dict[str, Access] = {
         "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
         "and the vehicle scheme; no vendor data."
     ),
+    "garage_choose": NoVendorData(
+        "The garage chooser (FIT.7): lists the visitor's own cookie vehicles or own profiles; "
+        "no vendor data."
+    ),
+    "garage_apply": NoVendorData(
+        "The garage chooser's Apply (FIT.7): writes the visitor's own cookie or activates their "
+        "own profile (another account's is a 404); no vendor data."
+    ),
     "manager:platform:orders": StaffOnly(
         "Order changes (ORD.20 part 3): Support and the platform owner find an order by number; "
         "a vendor member gets the platform gate's refusal (test_amendment_views)."
