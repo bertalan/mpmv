@@ -96,7 +96,7 @@ class FitmentScheme(Model):  # singleton per installation
     year_max_offset = SmallIntegerField()  # e.g. 1900 and +2 years
     contains_special_category = BooleanField(default=False)  # §17.4.5: forces session-only storage
     max_profiles = PositiveSmallIntegerField(default=10)
-    garage_inactivity_months = PositiveSmallIntegerField(default=24)  # 1..120, spec 17.4.5
+    garage_inactivity_months = PositiveSmallIntegerField(default=24)  # 1..36, owner cap
     garage_notice_days = PositiveSmallIntegerField(default=30)  # 0 .. months*30-1
 
 
@@ -399,6 +399,8 @@ grids, blog index, event list) a region labelled "Garage" shows above the result
   an account profile: until the user deletes it, or the account is erased (CMP.4), or **24 months
   without use** (a setting), after a service email 30 days before. The anonymous cookie: 180 days
   from the last change, and removable at any time.
+  The three periods together: the anonymous cookie is capped at 12 months (Q-G1), an account profile
+  defaults to 24 months without use (Q-G7), and the owner caps that setting at 36 months.
 - **The staged cookie at sign-in (FIT.6).** To offer the merge notice (§17.4.3) the server keeps one
   entry, `fitment_garage_pending`, in the visitor's server-side session: the make, model and year
   of the cookie's vehicles (at most three), no identifier. It lives as long as the session and is

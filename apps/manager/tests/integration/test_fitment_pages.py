@@ -14,6 +14,7 @@ from apps.accounts import levels
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.catalog.tests.factories import CategoryFactory
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.fitment import services
 from apps.fitment.models import (
@@ -24,6 +25,7 @@ from apps.fitment.models import (
     FitmentNodeMerge,
 )
 from apps.fitment.tests.factories import FitmentLevelFactory, FitmentNodeFactory
+from apps.manager.fitment_forms import SchemeForm
 from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
@@ -41,12 +43,13 @@ def sign_in(client: Client, role: str, **kwargs: Any) -> None:
 
 
 def add_level(client: Client, code: str, label: str, *, confirm: bool = True, **extra: str) -> Any:
+    lang = primary_language()
     data = {
         "action": "add_level",
         "code": code,
-        "label_en": label,
-        "plural_en": f"{label}s",
-        "placeholder_en": "",
+        f"label_{lang}": label,
+        f"plural_{lang}": f"{label}s",
+        f"placeholder_{lang}": "",
         **extra,
     }
     if confirm:
@@ -211,11 +214,11 @@ def test_a_level_is_renamed_in_a_language(client: Client) -> None:
         {
             "action": "rename_level",
             "level": "make",
-            "label_en": "Make",
-            "plural_en": "Makes",
-            "label_it": "Marca",
-            "plural_it": "Marche",
-            "placeholder_it": "Scegli la marca",
+            f"label_{primary_language()}": "Make",
+            f"plural_{primary_language()}": "Makes",
+            f"label_{other_language()}": "Marca",
+            f"plural_{other_language()}": "Marche",
+            f"placeholder_{other_language()}": "Scegli la marca",
             "confirm": "1",
         },
     )
@@ -473,3 +476,15 @@ def test_the_catalog_role_cannot_set_the_publish_gate(client: Client) -> None:
     )
     assert response.status_code == 404
     assert not FitmentCategory.objects.exists()
+
+
+def test_the_scheme_form_refuses_37_months_and_accepts_36() -> None:
+    base = {
+        "garage_noun_key": "Garage",
+        "year_min": 1950,
+        "year_max_offset": 2,
+        "max_profiles": 10,
+        "garage_notice_days": 30,
+    }
+    assert "garage_inactivity_months" in SchemeForm({**base, "garage_inactivity_months": 37}).errors
+    assert SchemeForm({**base, "garage_inactivity_months": 36}).is_valid()
