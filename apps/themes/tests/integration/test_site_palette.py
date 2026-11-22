@@ -204,3 +204,11 @@ def test_the_violations_are_computed_once_per_palette(ride: None) -> None:
     assert blue.violations() == []
     info = palette_violations.cache_info()
     assert (info.hits, info.misses) == (1, 1)
+
+
+def test_the_palette_stylesheet_answers_only_get(client: Client) -> None:
+    url = "/palette/ride/blue.000000000000.css"
+    for method in (client.post, client.put, client.delete):
+        response = method(url)
+        assert response.status_code == 405
+        assert response["Allow"] == "GET"

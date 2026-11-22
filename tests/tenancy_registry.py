@@ -550,6 +550,10 @@ ENDPOINTS: dict[str, Access] = {
         "Public image files (THM.12): published images and their renditions, no vendor data.",
         kwargs={"path": "images/missing.webp"},
     ),
+    "palette:css": NoVendorData(
+        "Public site palette stylesheet (THM.31): colors only, the same for every visitor.",
+        path="/palette/default/missing.000000000000.css",
+    ),
     "wagtaildocs_serve": NoVendorData(
         "Wagtail document serve view (CMS.15): library documents are not vendor data; a private "
         "collection or restricted page refuses anonymous visitors.",
