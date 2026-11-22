@@ -35,6 +35,7 @@ from apps.tax import engine as tax
 from apps.tax.tests.factories import TaxRateFactory
 from apps.vendors.tests.factories import CommissionRuleFactory
 from tests.e2e.visual import WIDTHS, assert_matches_baseline, require_visual_mode
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -119,8 +120,10 @@ def test_key_page_matches_its_visual_baseline(
     page.set_viewport_size({"width": 1280, "height": 900})
     if name == "cart":
         page.goto(f"{live_server.url}/product/blue-vase/")
-        page.get_by_role("button", name="Add to cart").click()
-        expect(page.locator("#add-to-cart-result")).to_contain_text("Added to your cart.")
+        page.get_by_role("button", name=translated("Add to cart")).click()
+        expect(page.locator("#add-to-cart-result")).to_contain_text(
+            translated("Added to your cart.")
+        )
     response = page.goto(f"{live_server.url}{PAGES[name].format(**paths)}")
     assert response is not None
     assert response.status == (404 if name == "not-found" else 200)

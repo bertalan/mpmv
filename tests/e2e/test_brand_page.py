@@ -18,8 +18,10 @@ from apps.catalog.tests.factories import (
     ManufacturerFactory,
     brand_logo_image,
 )
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import brand_url, other_language
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -37,8 +39,8 @@ def brand_page() -> None:
         manufacturer=ManufacturerFactory.create(legal_name="Acme Holdings Ltd", country="GB"),
     )
     for language, slug, text in (
-        ("en", "acme", "Anvils since 1949."),
-        ("it", "acme-it", "Incudini dal 1949."),
+        (primary_language(), "acme", "Anvils since 1949."),
+        (other_language(), "acme-it", "Incudini dal 1949."),
     ):
         BrandTranslationFactory.create(
             brand=brand,
@@ -51,20 +53,19 @@ def brand_page() -> None:
 
 @pytest.mark.usefixtures("brand_page")
 @pytest.mark.parametrize(
-    ("path", "language", "text"),
-    [
-        ("/brand/acme/", "en", "Anvils since 1949."),
-        ("/it/marchio/acme-it/", "it", "Incudini dal 1949."),
-    ],
+    ("second", "slug", "text"),
+    [(False, "acme", "Anvils since 1949."), (True, "acme-it", "Incudini dal 1949.")],
 )
 def test_a_brand_page_shows_its_content_and_structured_data(
     page: Page,
     live_server: LiveServer,
     shot: Callable[[str], Path],
-    path: str,
-    language: str,
+    second: bool,
+    slug: str,
     text: str,
 ) -> None:
+    language = other_language() if second else primary_language()
+    path = brand_url(language, slug)
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     response = page.goto(f"{live_server.url}{path}")
     assert response is not None
@@ -78,5 +79,5 @@ def test_a_brand_page_shows_its_content_and_structured_data(
     shot(language)
     graph = json.loads(page.locator('script[type="application/ld+json"]').inner_text())["@graph"]
     brand = next(node for node in graph if node["@type"] == "Brand")
-    assert brand["@id"] == f"{live_server.url}/brand/acme/#brand"
+    assert brand["@id"] == f"{live_server.url}{brand_url(primary_language(), 'acme')}#brand"
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
