@@ -626,11 +626,13 @@ class SalesTermsSeed:
     return_cost_info: str = ""
 
     def values(self, language: str = "en") -> dict[str, Any]:
+        """The terms form values; clause titles in `language`, else English."""
         body = "\n\n".join(self.body[code] for code in ("it", "en"))
         return {
             "body": body,
             "clauses": [
-                {"article": article, "title": titles[language]} for article, titles in self.clauses
+                {"article": article, "title": titles.get(language) or titles["en"]}
+                for article, titles in self.clauses
             ],
             "governing_law": self.governing_law,
             "b2b_court": self.b2b_court,
