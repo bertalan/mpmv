@@ -96,6 +96,63 @@ def test_the_textures_load_from_the_same_origin(
     assert csp_violations(page) == []
 
 
+def computed(page: Page, selector: str) -> dict[str, str]:
+    values: dict[str, str] = page.evaluate(
+        """(sel) => { const s = getComputedStyle(document.querySelector(sel));
+          return {color: s.outlineColor, width: s.outlineWidth, style: s.outlineStyle,
+                  bg: s.backgroundColor, text: s.color}; }""",
+        selector,
+    )
+    return values
+
+
+def test_the_band_focus_ring_is_the_on_dark_token_and_visible(
+    page: Page, live_server: LiveServer, settings: SettingsWrapper
+) -> None:
+    styleguide_with("ride", page, live_server, settings)
+    band = f"{SECTION} .surface-band:not(.texture-topo):not(.edge-torn)"
+    token = page.evaluate(
+        """() => { const p = document.createElement('i'); document.body.append(p);
+          p.style.color = getComputedStyle(document.documentElement)
+            .getPropertyValue('--surface-band-focus'); const c = getComputedStyle(p).color;
+          p.remove(); return c; }"""
+    )
+    page.locator(band).scroll_into_view_if_needed()
+    page.locator(f"{SECTION} .surface-muted .button").first.focus()
+    for target in ("p a", ".button"):
+        for _ in range(8):
+            page.keyboard.press("Tab")
+            if page.evaluate(
+                "([b, t]) => document.activeElement === document.querySelector(b + ' ' + t)",
+                [band, target],
+            ):
+                break
+        else:
+            raise AssertionError(f"Tab never reached {target} on the band")
+        ring = computed(page, f"{band} {target}:focus-visible")
+        assert ring["color"] == token, (target, ring, token)
+        assert ring["style"] != "none"
+        assert float(ring["width"].removesuffix("px")) > 0
+        bg = hexed(computed(page, band)["bg"])
+        assert contrast_ratio(hexed(ring["color"]), bg) >= 4.5
+
+
+def test_a_light_card_nested_in_the_band_is_readable(
+    page: Page, live_server: LiveServer, settings: SettingsWrapper
+) -> None:
+    styleguide_with("ride", page, live_server, settings)
+    nested = f"{SECTION} .surface-band .surface-light"
+    read = page.evaluate(
+        """(sel) => { const box = document.querySelector(sel);
+          const c = (q) => getComputedStyle(box.querySelector(q)).color;
+          return {bg: getComputedStyle(box).backgroundColor, heading: c('h4'),
+                  text: c('p'), link: c('p a')}; }""",
+        nested,
+    )
+    for part in ("heading", "text", "link"):
+        assert contrast_ratio(hexed(read[part]), hexed(read["bg"])) >= 4.5, part
+
+
 @pytest.mark.parametrize("width", WIDTHS)
 def test_the_surfaces_section_matches_its_visual_baseline(
     width: int, page: Page, live_server: LiveServer, settings: SettingsWrapper

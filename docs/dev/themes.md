@@ -364,6 +364,16 @@ public spec and a brief: no file derives from a reference template (spec 14 §14
 - **Not yet**: catalog, cart, checkout, account and content pages are THM.7 to THM.9. Pages that
   override the `head` block without `{{ block.super }}` lose the font preload only.
 
+### Surfaces and nesting (THM.20)
+
+The four surface classes (`surface-light`, `surface-muted`, `surface-band`, `surface-primary`)
+each set every `--s-*` variable (background, text, heading, link, focus, button), and headings,
+links, buttons and focus rings below read them. A surface nested in another therefore resets all
+of them. A white card inside a band must carry `.surface-light`, otherwise it inherits the band's
+white headings and links and shows white on white. The band focus ring is the lighter
+`color.focus-on-dark` token (4.5:1 or more on the band, checked under each palette in
+`apps/themes/tests/unit/test_ride_surfaces.py`). The heading rule covers h1 to h6.
+
 ## Site palettes (THM.31)
 
 - A palette is a `BrandPalette` row (13 colour roles, `apps/themes/palettes.py`); Red, Blue and

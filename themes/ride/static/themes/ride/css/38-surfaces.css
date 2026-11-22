@@ -3,6 +3,9 @@
    in tokens.toml). Colours only through tokens. A surface sets background-color only, so a
    texture class can add a background-image on the same element. */
 @layer utilities {
+  /* Nesting: every surface class sets ALL the --s-* variables, so a surface nested in another
+     one resets them. A white card inside a band needs .surface-light, or it inherits the band's
+     white headings and links (white on white). */
   .surface-light,
   .surface-muted,
   .surface-band,

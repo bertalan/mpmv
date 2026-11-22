@@ -24,6 +24,9 @@ TOKENS = {slug: read_tokens(THEMES / slug) for slug in CHAIN}
 SURFACES = ("light", "muted", "band", "primary")
 TEXTURES = ("edge-torn.svg", "texture-topo.svg")
 TEXT, UI = 4.5, 3.0
+VARS = ("bg", "text", "heading", "link", "focus", "button-bg", "button-fg", "button-hover")
+DARK = ("band", "primary")
+FOCUS_ON_DARK = 4.5  # margin over the 3:1 floor on the dark and primary bands
 
 
 def resolved(palette: str) -> dict[str, str]:
@@ -40,7 +43,7 @@ def pairs(surface: str) -> list[tuple[str, str, str, float]]:
         ("button label", f"{p}.button-fg", f"{p}.button-bg", TEXT),
         ("button label on hover", f"{p}.button-fg", f"{p}.button-hover", TEXT),
         ("button edge", f"{p}.button-bg", f"{p}.bg", UI),
-        ("focus ring", f"{p}.focus", f"{p}.bg", UI),
+        ("focus ring", f"{p}.focus", f"{p}.bg", FOCUS_ON_DARK if surface in DARK else UI),
     ]
 
 
@@ -109,3 +112,45 @@ def test_the_styleguide_section_shows_every_surface_with_its_parts() -> None:
         assert block, surface
         assert all(part in block.group(1) for part in ('class="eyebrow"', "<h3>", "<p>", "<a "))
         assert 'class="button"' in block.group(1)
+
+
+def test_the_band_focus_ring_uses_the_lighter_on_dark_token() -> None:
+    tokens = resolved("red")
+    assert tokens["surface.band.focus"] == tokens["color.focus-on-dark"]
+    assert tokens["color.focus-on-dark"] != tokens["color.focus"]
+
+
+def test_the_heading_rule_covers_h1_to_h6() -> None:
+    source = (RIDE / "static/themes/ride/css/10-type-shapes.css").read_text()
+    rule = source[: source.index("--s-heading")]
+    selectors = rule[rule.rindex("{", 0, rule.rindex("{")) :]
+    for level in range(1, 7):
+        assert re.search(rf"\bh{level}\b", selectors), f"h{level}"
+
+
+@pytest.mark.parametrize("palette", sorted(PRESETS))
+def test_a_light_surface_nested_in_a_band_has_its_own_readable_pairs(palette: str) -> None:
+    """Nesting `.surface-light` resets every --s-* variable, so its pairs are the light ones."""
+    tokens = resolved(palette)
+    for part in ("text", "heading", "link"):
+        assert contrast_ratio(tokens[f"surface.light.{part}"], tokens["surface.light.bg"]) >= TEXT
+    assert tokens["surface.light.bg"] != tokens["surface.band.bg"]
+
+
+def test_the_surfaces_stylesheet_documents_nesting_and_sets_every_variable_per_surface() -> None:
+    source = css()
+    assert "surface nested in another" in " ".join(source.split())
+    for surface in SURFACES:
+        block = re.search(rf"^  \.surface-{surface} \{{\n    --s-bg:(.*?)\}}", source, re.S | re.M)
+        assert block
+        for var in VARS:
+            assert f"--s-{var}:" in "--s-bg:" + block.group(1), f"{surface} {var}"
+
+
+@pytest.mark.usefixtures("english_interface")
+def test_the_styleguide_nests_a_light_card_in_the_band() -> None:
+    with use_theme("ride"):
+        html = render_to_string("styleguide_surfaces.html", {})
+    band = re.search(r'<div class="surface-band [^"]*">(.*?)<h3>', html, re.S)
+    assert band
+    assert re.search(r'<div class="surface-band [^"]*">.*?<div class="surface-light ', html, re.S)
