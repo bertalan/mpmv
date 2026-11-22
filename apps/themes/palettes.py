@@ -12,12 +12,21 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from .bootstrap_map import bootstrap_variables
-from .engine import ThemeError, contrast_ratio, css_name, minify_css, resolve_tokens
-
-TEXT = 4.5  # WCAG 2.2 SC 1.4.3
-UI = 3.0  # WCAG 2.2 SC 1.4.11
-LIGHT_SURFACE = "#FFFFFF"
-DARK_SURFACE = "#121417"  # the dark token set of spec 14 §14.4
+from .engine import (
+    DARK_SURFACE,
+    LIGHT_SURFACE,
+    ThemeError,
+    contrast_ratio,
+    css_name,
+    minify_css,
+    resolve_tokens,
+)
+from .engine import (
+    TEXT_CONTRAST as TEXT,
+)
+from .engine import (
+    UI_CONTRAST as UI,
+)
 
 # Role -> token. `primary` also sets `color.link`.
 ROLE_TOKENS: dict[str, str] = {
@@ -100,9 +109,19 @@ class PaletteViolation:
     kind: str
     pair: str
     message: str
+    ratio: float | None = None  # the measured ratio of a contrast failure, floored to 2 places
+    minimum: float | None = None
 
     def __str__(self) -> str:
         return f"{self.pair}: {self.message}"
+
+
+class PaletteRejected(ThemeError):
+    """A palette the server refuses to store: `violations` name every failing pair."""
+
+    def __init__(self, violations: Sequence[PaletteViolation]) -> None:
+        self.violations = list(violations)
+        super().__init__("palette refused: " + "; ".join(str(v) for v in self.violations))
 
 
 def _pairs(
@@ -171,6 +190,8 @@ def check_brand_palette(
                     name,
                     f"{foreground} on {background} is {shown:.2f}:1, "
                     f"below the {minimum:g}:1 minimum",
+                    ratio=shown,
+                    minimum=minimum,
                 )
             )
     return violations

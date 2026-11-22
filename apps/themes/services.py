@@ -11,12 +11,13 @@
 
 import contextlib
 import functools
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.http import HttpRequest
 from django.urls import reverse
 from wagtail.models import Site
@@ -35,10 +36,19 @@ from .engine import (
     resolve_tokens,
 )
 from .models import BrandPalette, ThemeSettings
-from .palettes import check_brand_palette, css_digest, render_palette_css
+from .palettes import (
+    PRESETS,
+    ROLES,
+    PaletteRejected,
+    PaletteViolation,
+    check_brand_palette,
+    css_digest,
+    render_palette_css,
+)
 
 THEME_SETTINGS_MODEL = "themes.themesettings"
 THEME_CONFIGURED = "themes.theme_settings.configured"
+PALETTE_CONFIGURED = "themes.brand_palette.configured"
 
 _REQUEST_ATTR = "_mpmv_theme"
 _PALETTE_ATTR = "_mpmv_palette"
@@ -270,3 +280,50 @@ def palette_href(request: HttpRequest) -> str:
     if not css:
         return ""
     return reverse("palette:css", args=[theme, palette.slug, digest])
+
+
+# --- Palette builder save (THM.33, spec 14 §14.12)
+
+
+def palette_snapshot(palette: BrandPalette) -> dict[str, Any]:
+    return {"slug": palette.slug, "name": palette.name, **palette.roles()}
+
+
+def save_palette(
+    slug: str,
+    name: str,
+    roles: Mapping[str, str],
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Create or update a built palette, audited with the old and new values.
+
+    The server runs `check_brand_palette` against the surface of every registered theme again,
+    whatever the client computed: a failing palette raises `PaletteRejected` (the pair and its
+    ratio in `violations`) before anything is written, also on a dry run. The predefined
+    palettes cannot be overwritten; the builder starts from them and saves under its own slug.
+    """
+    if slug in PRESETS:
+        raise PaletteRejected(
+            [PaletteViolation("reserved", slug, "a predefined palette cannot be overwritten")]
+        )
+    if violations := check_brand_palette(roles, registered_surfaces()):
+        raise PaletteRejected(violations)
+    palette = BrandPalette.objects.filter(slug=slug).first() or BrandPalette(slug=slug)
+    palette.name = name
+    for role in ROLES:
+        setattr(palette, role, roles[role])
+    try:
+        palette.full_clean()
+    except ValidationError as exc:
+        raise ThemeError("; ".join(exc.messages)) from exc
+    return save_audited(
+        palette,
+        palette_snapshot,
+        key=slug,
+        ctx=ctx,
+        created=PALETTE_CONFIGURED,
+        updated=PALETTE_CONFIGURED,
+        dry_run=dry_run,
+    )

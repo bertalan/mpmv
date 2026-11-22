@@ -71,11 +71,14 @@ def test_a_save_stores_the_palette_and_audits_old_and_new_values() -> None:
     stored = BrandPalette.objects.get(slug="mine")
     assert stored.roles() == roles
     created = AuditLog.objects.get(action=PALETTE_CONFIGURED)
+    assert created.after is not None
     assert created.after["primary"] == BASE["primary"]
 
     changed = derive_palette({**BASE, "primary": "#5B1580"})
     save_palette("mine", "Mine", changed, ctx=CTX)
     update = AuditLog.objects.filter(action=PALETTE_CONFIGURED).latest("pk")
+    assert update.before is not None
+    assert update.after is not None
     assert update.before["primary"] == BASE["primary"]
     assert update.after["primary"] == "#5B1580"
 

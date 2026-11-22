@@ -3,13 +3,14 @@
 import pytest
 
 from apps.themes.engine import (
+    DARK_SURFACE,
     ThemeError,
     contrast_ratio,
     derive_palette,
     nearest_compliant,
     suggest_foreground,
 )
-from apps.themes.palettes import DARK_SURFACE, PRESETS, ROLES, check_brand_palette
+from apps.themes.palettes import PRESETS, ROLES, check_brand_palette
 
 
 def channels(colour: str) -> tuple[int, int, int]:
@@ -63,7 +64,8 @@ def test_derive_palette_on_each_predefined_palettes_base_colours_passes(slug: st
     palette = derive_palette(base)
     assert tuple(palette) == ROLES
     assert check_brand_palette(palette) == []
-    assert check_brand_palette(palette, ["#F8F9FA", "#FFFFFF"]) == []
+    surfaces = ["#F8F9FA", "#FFFFFF"]
+    assert check_brand_palette(derive_palette(base, surfaces=surfaces), surfaces) == []
     assert {key: palette[key] for key in base} == base
 
 
