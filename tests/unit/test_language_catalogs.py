@@ -476,19 +476,13 @@ def test_the_part_2_labels_differ_from_the_english_source(lang: str) -> None:
 # I18N.20 part 3: the template scope guard. Every template that carries translation tags is in the
 # catalog scope (`tools/i18n_catalog.py` SCOPES) or in EXCLUDED below, with a reason. A new template
 # with `{% translate %}` therefore fails here until somebody decides where it belongs.
-# The entries below are the editor, admin and developer templates still English-only; each one is
-# tracked by the named follow-up slice and leaves this set when it joins SCOPES.
 EXCLUDED = {
-    # Editor, admin and Wagtail screens: formal register, own slice.
-    "apps/catalog/templates/admin/": "admin-only, I18N.20 part 3b",
-    "apps/catalog/templates/catalog/admin/": "admin-only, I18N.20 part 3b",
-    "apps/cms/templates/cms/admin/": "editor-only, I18N.20 part 3b",
-    "apps/cms/templates/wagtail_localize/": "editor-only, I18N.20 part 3b",
-    "apps/core/templates/admin/": "admin-only, I18N.20 part 3b",
-    "apps/events/templates/events/admin/": "admin-only, I18N.20 part 3b",
-    "apps/vendors/templates/admin/": "admin-only, I18N.20 part 3b",
-    "themes/ride/templates/manager/": "Manager override, I18N.20 part 3b",
-    "themes/ride/templates/layouts/": "layout override, I18N.20 part 3b",
+    # Stock Wagtail or Django admin msgids that these overrides copy: Wagtail and Django ship
+    # the translations themselves, so a second copy here would drift from them.
+    "apps/cms/templates/cms/admin/login.html": "Wagtail login copy, Wagtail translates it",
+    "apps/cms/templates/wagtail_localize/": "wagtail-localize overrides, its own catalog",
+    "apps/core/templates/admin/": "Django admin filter widget, Django translates it",
+    "apps/vendors/templates/admin/": "Django delete confirmation copy, Django translates it",
     "themes/base/templates/styleguide.html": "developer style guide, not shown to customers",
     "themes/ride/templates/styleguide": "developer style guide, not shown to customers",
 }
