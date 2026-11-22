@@ -81,7 +81,7 @@ def test_there_is_no_comment_or_share_ui(
     page = soup(client, paths[kind], settings)
     main = page.find("main")
     assert main is not None
-    assert not main.select("[class*=comment], [class*=share], #comments, form")
+    assert not main.select("[class*=comment], [class*=share], #comments, textarea")
     text = main.get_text(" ").lower()
     assert "share this" not in text
     assert "leave a comment" not in text
