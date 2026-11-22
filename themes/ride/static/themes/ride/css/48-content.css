@@ -26,6 +26,16 @@
     overflow: hidden;
   }
 
+  /* The card names its own link and focus colours (also set by the generic surface rules,
+     38-surfaces.css: `a:not(.button)` and `:focus-visible`), so it stays right if those change. */
+  .post-summary a:not(.button) {
+    color: var(--s-link);
+  }
+
+  .post-summary :focus-visible {
+    outline-color: var(--s-focus);
+  }
+
   .post-summary .card-title a {
     color: var(--s-link);
     text-decoration: none;

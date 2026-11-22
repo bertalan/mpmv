@@ -8,9 +8,13 @@ from typing import Any
 
 import pytest
 from bs4 import BeautifulSoup
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 from pytest_django.fixtures import Settings as SettingsWrapper
 
+from apps.cms.models import BlogPostPage
+from apps.core.tests.factories import MediaImageFactory
 from tests.ride_content_site import build_content_site
 
 pytestmark = pytest.mark.django_db
@@ -82,9 +86,9 @@ def test_there_is_no_comment_or_share_ui(
     main = page.find("main")
     assert main is not None
     assert not main.select("[class*=comment], [class*=share], #comments, textarea")
-    text = main.get_text(" ").lower()
-    assert "share this" not in text
-    assert "leave a comment" not in text
+    assert not main.select(
+        "form[action*=comment], form[action*=share], a[href*=share], a[href*=comment]"
+    )
 
 
 def test_the_author_page_uses_the_same_card(
@@ -94,3 +98,37 @@ def test_the_author_page_uses_the_same_card(
     author = soup(client, paths["author"], settings).select("article.post-summary")
     assert len(author) == len(blog) == 3
     assert [c["class"] for c in author] == [c["class"] for c in blog]
+
+
+def test_the_featured_card_shows_the_newest_post_image_on_the_band(
+    client: Client, paths: dict[str, str], settings: SettingsWrapper
+) -> None:
+    featured = soup(client, paths["blog"], settings).select_one("article.post-summary--featured")
+    assert featured is not None
+    assert "surface-band" in featured["class"]
+    img = featured.select_one(".post-summary__media picture img")
+    assert img is not None
+    assert img["alt"] == "Bench 2"
+
+
+def test_the_index_page_does_not_query_per_post_image(
+    client: Client, settings: SettingsWrapper
+) -> None:
+    settings.MPMV_THEME_DEFAULT = "ride"
+    few = build_content_site(posts=3, images=True)
+    client.get(few["blog"])  # warm caches (site, settings, translations)
+
+    def queries(path: str) -> int:
+        with CaptureQueriesContext(connection) as captured:
+            assert client.get(path).status_code == 200
+        return len(captured)
+
+    base = queries(few["blog"])
+    # Every post of a page has an image: the count must not grow with the posts.
+    for post in BlogPostPage.objects.all():
+        if post.image_id is None:
+            post.image = MediaImageFactory.create(file__width=1600, file__height=900)
+            post.image_alt_text = "A bench"
+            post.save()
+    with_images = queries(few["blog"])
+    assert with_images <= base + 1
