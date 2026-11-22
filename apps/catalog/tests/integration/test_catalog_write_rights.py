@@ -1,7 +1,7 @@
 """CAT.30 (MQ-52): Support reads the platform catalog; every write service refuses it.
 
 Per role and per write service: Support, Finance and Configuration are refused with
-PermissionDenied before anything is written or audited; Catalog and moderation and the platform
+PermissionDenied before anything is written or audited; Catalogue and moderation and the platform
 owner role pass the service check (the Manager still lets the owner only read), and so does a
 pipeline without a user.
 """
@@ -18,6 +18,7 @@ from apps.catalog import media, publishing, services
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductImageFactory, RedirectFactory, VariantFactory
 from apps.core.audit import AuditContext, user_context
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 
 pytestmark = pytest.mark.django_db
@@ -140,7 +141,7 @@ def _guarded(w: World) -> dict[str, Callable[[AuditContext], Any]]:
         "set_language": lambda c: media.set_language(w.image, None, ctx=c),
         "reorder": lambda c: media.reorder(w.product, [w.image], ctx=c),
         "delete_image": lambda c: media.delete_image(w.image, ctx=c),
-        "set_text": lambda c: media.set_text(w.image, "en", alt_text="x", ctx=c),
+        "set_text": lambda c: media.set_text(w.image, primary_language(), alt_text="x", ctx=c),
         "upload_image": lambda c: media.upload_image(
             w.product, file=None, title="t", licence=None, author="a", ctx=c
         ),

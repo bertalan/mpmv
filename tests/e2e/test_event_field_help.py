@@ -16,10 +16,15 @@ from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.events.tests.factories import EventPageFactory
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
-SUMMARY_HELP = "One or two sentences that tell what the event is, up to 300 characters."
+SUMMARY_HELP = (  # the field's help text (its catalog msgid), shown in the primary language
+    "One or two sentences that tell what the event is, up to 300 characters. "
+    "They are shown in the events list, in calendar feeds and in search results. "
+    "Required: the event cannot be saved without it."
+)
 
 
 def test_the_event_editor_shows_the_help_text_next_to_a_field(
@@ -32,13 +37,13 @@ def test_the_event_editor_shows_the_help_text_next_to_a_field(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
 
     page.goto(f"{live_server.url}/admin/pages/{event.pk}/edit/")
     field = page.locator("[data-field]").filter(has=page.locator("#id_summary"))
     expect(field).to_be_visible()
-    help_text = field.get_by_text(SUMMARY_HELP, exact=False)
+    help_text = field.get_by_text(translated(SUMMARY_HELP), exact=False)
     expect(help_text).to_be_visible()
     help_text.scroll_into_view_if_needed()
     shot("event-field-help")

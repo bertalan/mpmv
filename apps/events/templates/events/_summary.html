@@ -15,7 +15,7 @@ name; `plot` (the list only) adds `data-lat` and `data-lng` for the map of EVT.1
     {% endif %}
     · {{ event.get_event_type_display }}{% seller_name event.vendor as seller %}{% if seller %} · {{ seller }}{% endif %}
     {% if item.language %} · <span class="event-language" lang="{{ item.language }}">{{ item.language_name }}</span>{% endif %}
-    {% if event.cancelled_at %} · <span class="event-status">{% translate "Cancelled" %}</span>{% endif %}
+    {% if event.cancelled_at %} · <span class="event-status">{% translate "Cancelled" %}</span>{% elif event.postponed %} · <span class="event-status">{% translate "Postponed" %}</span>{% endif %}
   </p>
   {% if event.summary %}<p>{{ event.summary }}</p>{% endif %}
 </article>

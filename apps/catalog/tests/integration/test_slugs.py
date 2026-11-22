@@ -276,13 +276,11 @@ def test_the_italian_old_slug_redirects_under_the_italian_prefix(client: Client)
     )
     rebuild_product_slugs(ctx=CTX)
     response = client.get(
-        localized(
-            localized("/product/borsa-in-pelle-it-sku-00001/?utm_source=feed"), other_language()
-        )
+        localized("/product/borsa-in-pelle-it-sku-00001/?utm_source=feed", other_language())
     )
     assert response.status_code == 301
     assert response["Location"] == localized(
-        localized("/product/borsa-in-pelle/?utm_source=feed"), other_language()
+        "/product/borsa-in-pelle/?utm_source=feed", other_language()
     )
 
 
@@ -372,9 +370,7 @@ def test_a_first_generation_title_lang_slug_becomes_history_and_redirects_once(
     rebuild_product_slugs(ctx=CTX)
     response = client.get(localized("/product/borsa-in-pelle-it/", other_language()))
     assert response.status_code == 301
-    assert response["Location"] == localized(
-        localized("/product/borsa-in-pelle/"), other_language()
-    )
+    assert response["Location"] == localized("/product/borsa-in-pelle/", other_language())
 
 
 def test_title_lang_and_legacy_sku_slugs_all_land_on_the_same_new_slug_in_one_hop(

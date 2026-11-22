@@ -20,7 +20,8 @@ from django.db import connection
 from django.test import Client, RequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone, translation
+from django.utils.html import escape
 
 from apps.accounts import levels, lifetimes
 from apps.accounts.models import User, UserSession
@@ -29,6 +30,7 @@ from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fake_authenticator import FakeAuthenticator
 from apps.accounts.tests.mfa import password_login, verified_login
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.core.services import configure_platform_operator
 from apps.core.tests.factories import PlatformOperatorFactory
@@ -178,7 +180,9 @@ def test_the_login_page_says_why_the_session_ended() -> None:
     _, client = staff_client()
     age(client, 31 * 60)
     response = client.get(LIST, follow=True)
-    assert str(lifetimes.IDLE_MESSAGE) in response.content.decode()
+    with translation.override(primary_language()):
+        message = str(lifetimes.IDLE_MESSAGE)
+    assert escape(message) in response.content.decode()
 
 
 def test_a_json_client_gets_401_when_its_session_ends() -> None:

@@ -1,7 +1,7 @@
 """CORE.18 security review: role groups never widen existing powers; roles never mix (spec 02).
 
 Unlocking an account is a Support action (and the owner's); duplicating a product to another
-vendor is a Catalog and moderation action (and the owner's). A vendor member or a customer in a
+vendor is a Catalogue and moderation action (and the owner's). A vendor member or a customer in a
 role group gets no role powers anywhere.
 """
 

@@ -68,6 +68,7 @@ urlpatterns = [
     path("account/link/", include("apps.accounts.action_link_urls")),  # CORE.15
     path("account/privacy/", include("apps.compliance.account_urls")),  # CMP.4 self-service
     path("account/orders/", include("apps.orders.account_urls")),  # My orders (ORD.7)
+    path("account/garage/", include("apps.fitment.garage_account_urls")),  # My garage (FIT.5)
     path("account/cart-draft/", include("apps.orders.draft_link_urls")),  # ORD.32
     path("account/", include("apps.manager.account_urls")),  # Manager sign-in (CORE.17)
     path("manager/", include("apps.manager.urls")),  # the Manager's two spaces (CORE.17)
@@ -78,6 +79,7 @@ urlpatterns = [
     path("maps/", include("apps.core.maps.urls")),  # same-origin map tile proxy (EVT.14)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
     path("_styleguide/", include("apps.themes.urls")),
+    path("palette/", include("apps.themes.palette_urls")),  # site palette CSS (THM.31)
     # Temporary staff "Site links" page for STAGE testing (OPS.12); remove before LIVE.
     path("_links/", include("apps.seo.urls")),
     *i18n_patterns(

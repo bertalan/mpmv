@@ -24,6 +24,7 @@ from apps.accounts.tests.factories import (
 from apps.accounts.tests.fake_authenticator import FakeAuthenticator
 from apps.accounts.tests.mfa import password_login, verified_login
 from apps.core.models import AuditLog
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
@@ -219,7 +220,7 @@ def test_passkey_forms_never_post_natively(
 
 # --- The account security page (CORE.25 / CORE.4)
 
-REQUIRES = "Your role requires a second factor before you can continue"
+REQUIRES = "Your role requires a second factor before you can continue."
 
 
 def test_the_security_page_shows_the_passkey_state_and_no_requires_text(client: Client) -> None:
@@ -227,24 +228,24 @@ def test_the_security_page_shows_the_passkey_state_and_no_requires_text(client: 
     PasskeyDeviceFactory.create(user=user, name="Work laptop")
     verified_login(client, user)
     content = client.get(reverse("mfa:setup") + "?from=security").content.decode()
-    assert "Your account is protected with a passkey" in content
+    assert translated("Your account is protected with a passkey.") in content
     assert "Work laptop" in content
-    assert "never used" in content
-    assert "Add another passkey" in content
-    assert "Use an authenticator app" in content
-    assert REQUIRES not in content
+    assert translated("never used") in content
+    assert translated("Add another passkey") in content
+    assert translated("Use an authenticator app") in content
+    assert translated(REQUIRES) not in content
 
 
 def test_the_security_page_says_a_role_needs_a_factor_when_there_is_none(client: Client) -> None:
     user = UserFactory.create(staff=True)
     password_login(client, user)
     content = client.get(reverse("mfa:setup")).content.decode()
-    assert REQUIRES in content
-    assert "Your account is protected with a passkey" not in content
+    assert translated(REQUIRES) in content
+    assert translated("Your account is protected with a passkey.") not in content
 
 
 def test_the_security_page_keeps_the_requires_text_for_the_mfa_gate(client: Client) -> None:
     user = UserFactory.create(staff=True)
     password_login(client, user)
     content = client.get(reverse("mfa:setup") + "?next=/manager/platform/").content.decode()
-    assert REQUIRES in content
+    assert translated(REQUIRES) in content

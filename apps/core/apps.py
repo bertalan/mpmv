@@ -60,7 +60,11 @@ class CoreConfig(AppConfig):
             check_trusted_proxy_for_deploy,
             translation_models,
         )
-        from .language_checks import check_language_settings, check_language_state
+        from .language_checks import (
+            check_language_review,
+            check_language_settings,
+            check_language_state,
+        )
 
         checks.register(translation_models)
         checks.register(check_audit_policy, checks.Tags.security)
@@ -76,6 +80,7 @@ class CoreConfig(AppConfig):
 
         checks.register(check_site_hostname, checks.Tags.database)
         checks.register(check_language_settings)
+        checks.register(check_language_review)
         checks.register(check_language_state, checks.Tags.database)
         post_migrate.connect(_sync_language_state, sender=self, dispatch_uid="core.language_state")
         checks.register(check_email_settings)

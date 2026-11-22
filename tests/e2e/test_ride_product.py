@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import translation
 from PIL import Image
 from playwright.sync_api import Browser, Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
@@ -32,6 +33,7 @@ from apps.catalog.tests.factories import (
     VariantTranslationFactory,
 )
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import ImageLicenceFactory
 from apps.fitment.tests.factories import (
@@ -43,13 +45,21 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import localized, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
 PUBLISHED = TranslationStatus.PUBLISHED
 NO_SIDEWAYS_SCROLL = "() => document.documentElement.scrollWidth <= window.innerWidth"
-PRODUCT = "/product/hand-made-mug/"
-STOREFRONT = "/shop/acme/"
+PRODUCT = localized("/product/hand-made-mug/")
+STOREFRONT = localized("/shop/acme/")
+
+
+def more(count: int) -> str:
+    """The fitment list's "Show 3 more" summary, in the primary language."""
+    with translation.override(primary_language()):
+        label = translation.ngettext("Show %(count)s more", "Show %(count)s more", count)
+    return label % {"count": count}
 
 
 @pytest.fixture(autouse=True)
@@ -60,7 +70,7 @@ def _ride(settings: SettingsWrapper, live_server: LiveServer, site_allows_indexi
     )
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="en",
+        language=primary_language(),
         status=PUBLISHED,
         tagline="Ceramics since 1950",
         description="Our story.",
@@ -87,7 +97,7 @@ def _ride(settings: SettingsWrapper, live_server: LiveServer, site_allows_indexi
     for sku, label, default in (("MUG-S", "Small", False), ("MUG-L", "Large", True)):
         variant = VariantFactory.create(product=product, sku=sku, is_default=default)
         VariantTranslationFactory.create(
-            variant=variant, language="en", label=label, status=PUBLISHED
+            variant=variant, language=primary_language(), label=label, status=PUBLISHED
         )
     for index in range(3):
         other = ProductFactory.create(
@@ -119,10 +129,10 @@ def _specifications_and_fitment(product: Product) -> None:
     """A finish and a width for the Specifications tab; 15 models for the Fits tab (the list is
     cut after 12 and the rest sits behind a native <details>)."""
     finish = AttributeFactory.create(code="finish", kind="text")
-    AttributeTranslationFactory.create(attribute=finish, language="en", name="Finish")
+    AttributeTranslationFactory.create(attribute=finish, language=primary_language(), name="Finish")
     ProductAttributeFactory.create(product=product, attribute=finish, text_value="Glazed")
     width = AttributeFactory.create(code="width", kind="number", unit="cm")
-    AttributeTranslationFactory.create(attribute=width, language="en", name="Width")
+    AttributeTranslationFactory.create(attribute=width, language=primary_language(), name="Width")
     ProductAttributeFactory.create(product=product, attribute=width, numeric_value=Decimal("8.5"))
     ProductFitmentStateFactory.create(product=product)
     make = FitmentNodeFactory.create(name="Acme Motors")
@@ -186,8 +196,8 @@ def test_the_gallery_carousel_works_with_the_keyboard_only(
 
 def test_the_tabs_work_with_the_keyboard_only(page: Page, live_server: LiveServer) -> None:
     page.goto(f"{live_server.url}{PRODUCT}")
-    description = page.get_by_role("tab", name="Description")
-    details = page.get_by_role("tab", name="Details")
+    description = page.get_by_role("tab", name=translated("Description"))
+    details = page.get_by_role("tab", name=translated("Details"))
     expect(description).to_have_attribute("aria-selected", "true")
     description.focus()
     for _step in range(3):  # Description, Specifications, Fits, Details
@@ -206,9 +216,9 @@ def test_the_specifications_and_fitment_tabs_work_with_the_keyboard_only(
     page: Page, live_server: LiveServer
 ) -> None:
     page.goto(f"{live_server.url}{PRODUCT}")
-    specs = page.get_by_role("tab", name="Specifications")
-    fits = page.get_by_role("tab", name="Fits")
-    page.get_by_role("tab", name="Description").focus()
+    specs = page.get_by_role("tab", name=translated("Specifications"))
+    fits = page.get_by_role("tab", name=translated("Fits"))
+    page.get_by_role("tab", name=translated("Description")).focus()
     page.keyboard.press("ArrowRight")
     expect(specs).to_be_focused()
     expect(specs).to_have_attribute("aria-selected", "true")
@@ -229,9 +239,9 @@ def test_the_fitment_disclosure_opens_with_the_keyboard(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     page.goto(f"{live_server.url}{PRODUCT}")
-    page.get_by_role("tab", name="Fits").click()
+    page.get_by_role("tab", name=translated("Fits")).click()
     summary = page.locator(".product-fitment-more > summary")
-    expect(summary).to_have_text("Show 3 more")
+    expect(summary).to_have_text(more(3))
     box = summary.bounding_box()
     assert box is not None
     assert box["height"] >= 44

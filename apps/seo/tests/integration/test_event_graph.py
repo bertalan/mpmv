@@ -10,6 +10,7 @@ cross-language fallback; a fixed number of queries.
 import datetime as dt
 import json
 import re
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -25,6 +26,7 @@ from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.seo import schema_check, seller
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import language_prefix, other_language
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
@@ -244,7 +246,7 @@ def test_the_event_page_takes_a_bounded_number_of_queries() -> None:
 
 
 def test_the_node_is_in_the_page_language_only() -> None:
-    """No cross-language fallback: a German event's node says `de`, and its Italian URL is 404."""
+    """No cross-language fallback: the node says the event's language, its primary URL is 404."""
     from wagtail.models import Locale
 
     from apps.accounts.models import User
@@ -272,16 +274,20 @@ def test_the_node_is_in_the_page_language_only() -> None:
         "country": "IT",
     }
     page = services.save_event_draft(
-        user, data, vendor=vendor, locale=Locale.objects.get(language_code="de")
+        user, data, vendor=vendor, locale=Locale.objects.get(language_code=other_language())
     ).page
     assert page is not None
     services.submit_event(user, page)
     page.refresh_from_db()
     node = event_of(page)
-    assert node["inLanguage"] == "de"
-    assert node["url"] == f"http://localhost/de/events/{page.slug}/"
+    assert node["inLanguage"] == other_language()
+    prefix = language_prefix(other_language())
+    assert node["url"] == f"http://localhost{prefix}/events/{page.slug}/"
     assert node["description"] == "Treffen Sie die Hersteller."
-    assert Client().get(f"/it/events/{page.slug}/").status_code == 404
+    assert (
+        Client().get(f"{language_prefix(primary_language())}/events/{page.slug}/").status_code
+        == 404
+    )
 
 
 def test_hostile_text_cannot_break_out_of_the_json_ld_script() -> None:
@@ -296,3 +302,44 @@ def test_hostile_text_cannot_break_out_of_the_json_ld_script() -> None:
     assert node["name"] == payload
     assert node["description"] == payload
     assert node["location"]["name"] == payload
+
+
+def test_a_postponed_event_has_status_and_previous_start_in_rome_time() -> None:
+    previous = dt.datetime(2027, 2, 10, 8, 0, tzinfo=dt.UTC)
+    node = event_of(create(located=True, postponed=True, previous_start=previous))
+    assert node["eventStatus"] == "https://schema.org/EventPostponed"
+    assert node["previousStartDate"] == "2027-02-10T09:00:00+01:00"
+
+
+def test_a_postponed_event_without_previous_start() -> None:
+    node = event_of(create(located=True, postponed=True))
+    assert node["eventStatus"] == "https://schema.org/EventPostponed"
+    assert "previousStartDate" not in node
+
+
+def test_cancelled_wins_over_postponed_in_the_page_graph() -> None:
+    page = create(located=True, postponed=True)
+    EventPage.objects.filter(pk=page.pk).update(
+        status=EventPage.Status.CANCELLED, cancelled_at=dt.datetime(2027, 1, 1, tzinfo=dt.UTC)
+    )
+    assert event_of(page)["eventStatus"] == "https://schema.org/EventCancelled"
+
+
+def test_offers_from_price_link_and_free() -> None:
+    priced = event_of(
+        create(located=True, price=Decimal("9"), ticket_url="https://tickets.example/a")
+    )
+    assert priced["offers"] == {
+        "@type": "Offer",
+        "url": "https://tickets.example/a",
+        "price": "9.00",
+        "priceCurrency": "EUR",
+    }
+    free = event_of(create(located=True, is_free=True))
+    assert free["offers"] == {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}
+    link = event_of(create(located=True, ticket_url="https://tickets.example/b"))
+    assert link["offers"] == {"@type": "Offer", "url": "https://tickets.example/b"}
+
+
+def test_no_offers_key_without_data() -> None:
+    assert "offers" not in event_of(create(located=True))

@@ -15,6 +15,7 @@ from pytest_django.live_server_helper import LiveServer
 from apps.events.tests.factories import EventPageFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -83,8 +84,8 @@ def test_the_list_filters_with_a_plain_form_submission(page: Page, live_server: 
         ends_at=start + dt.timedelta(days=1, hours=8),
     )
     page.goto(f"{live_server.url}/events/")
-    page.get_by_label("Type").select_option("promotion")
-    page.get_by_role("button", name="Show events").click()
+    page.get_by_label(translated("Type")).select_option("promotion")
+    page.get_by_role("button", name=translated("Show events")).click()
     expect(page).to_have_url(re.compile(r"/events/\?.*type=promotion"))
     expect(page.get_by_role("link", name="Autumn sale")).to_be_visible()
     expect(page.get_by_role("link", name="Spring fair")).to_have_count(0)

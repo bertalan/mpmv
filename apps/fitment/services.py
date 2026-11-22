@@ -5,7 +5,7 @@ these functions. Every mutation takes the actor's `AuditContext`, accepts `dry_r
 `ChangeSet` is returned and nothing is written) and writes one `AuditLog` entry per change.
 Refusals raise `FitmentError`, whose message is safe to show to staff.
 
-Who may call them (Configuration and tax with step-up for the scheme, Catalog and moderation for
+Who may call them (Configuration and tax with step-up for the scheme, Catalogue and moderation for
 the nodes) is the adapter's job (CORE.18), never decided here.
 
 Other parts of the garage add what points at a node (product rows, customer profiles) through
@@ -78,6 +78,8 @@ SCHEME_FIELDS = (
     "year_max_offset",
     "contains_special_category",
     "max_profiles",
+    "garage_inactivity_months",
+    "garage_notice_days",
 )
 MAX_NAME_LENGTH = 120
 
@@ -152,6 +154,8 @@ _SCHEME_TYPES: dict[str, type] = {
     "year_max_offset": int,
     "contains_special_category": bool,
     "max_profiles": int,
+    "garage_inactivity_months": int,
+    "garage_notice_days": int,
 }
 
 
@@ -166,6 +170,10 @@ def _check_types(values: Mapping[str, Any]) -> None:
 def _validate_scheme(scheme: FitmentScheme) -> None:
     if not 1 <= scheme.max_profiles <= 50:
         raise FitmentError("Profiles per customer must be between 1 and 50.")
+    if not 1 <= scheme.garage_inactivity_months <= 36:
+        raise FitmentError("Months without use must be between 1 and 36.")
+    if not 0 <= scheme.garage_notice_days < scheme.garage_inactivity_months * 30:
+        raise FitmentError("The notice days must be at least 0 and shorter than the retention.")
     if not 1000 <= scheme.year_min <= 2100:
         raise FitmentError("The earliest year must be between 1000 and 2100.")
     if not 0 <= scheme.year_max_offset <= 20:

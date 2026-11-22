@@ -1,7 +1,7 @@
 """ARC.32 / CORE.18: help entries are edited by platform staff, by the role-permission matrix.
 
 The `HelpEntry` snippet is content owned by the "Platform: moderation (... content)" row: the
-Catalog and moderation role edits, the platform owner reads, no other role has access and the
+Catalogue and moderation role edits, the platform owner reads, no other role has access and the
 technical superuser (break-glass) holds none without a role. The check asks `roles.py` through
 role membership, never `has_perm`.
 """

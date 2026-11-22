@@ -120,8 +120,9 @@ rule texts are shown in the Read me and quoted in row errors, so one entry serve
 
 The `de`, `fr` and `es` catalogs are AI drafts (#588). Until a professional translator has reviewed
 the sensitive strings and counsel has signed off the legal and tax wording, production serves only
-`en,it`: the default of `MPMV_LANGUAGES` leaves the three languages out (no system check yet
-refuses a LIVE deploy that lists them). Staff preview them on STAGE with
+`en,it`: the default of `MPMV_LANGUAGES` leaves the three languages out, and the system check
+`core.E915` refuses a LIVE deploy that lists a language other than `en` and `it` whose catalog has
+no review mark (`core.W915`, a warning, elsewhere). Staff preview them on STAGE with
 `MPMV_LANGUAGES=en,it,de,fr,es`.
 
 ```sh
@@ -130,8 +131,16 @@ python tools/i18n_catalog.py review-export <lang> [--all] [--pending] [--out FIL
 
 writes the entries in `SENSITIVE_GROUPS` (order emails and documents, compliance forms, DSA statements of reasons and event moderation emails (EVT.11), terms,
 price notes, cart and order components, order-change pages) as a CSV for the translator.
-A reviewed entry carries the translator comment `# reviewed` in the `.po`. The per-language gate
-checks, the staff preview switch and the counsel sign-off mark are not built yet (I18N.19).
+A reviewed entry carries the translator comment `# reviewed` in the `.po`.
+
+```sh
+python tools/i18n_catalog.py mark-reviewed <lang>
+```
+
+is the translator's act, after the review: it adds `# reviewed` to every sensitive entry and the
+header line `# review: sensitive entries reviewed (I18N.19)` that the check reads (a text edit,
+nothing is re-wrapped). Never run it on an unreviewed catalog. The staff preview switch and the
+counsel sign-off mark are not built yet (I18N.19).
 
 ## Absolute URLs (I18N.18)
 
@@ -139,3 +148,18 @@ checks, the staff preview switch and the counsel sign-off mark are not built yet
 empty, a placeholder or not https, or when the default Wagtail `Site` differs from it (the seed
 syncs the `Site`). `site_root_url()` raises `ImproperlyConfigured` in production settings and never
 returns an empty string, so a canonical, hreflang or sitemap URL is never relative.
+
+## Vendor self-certification texts (CMP.25)
+
+The DSA article 30(1)(e) statement a vendor owner accepts is a Python literal per language in
+`SELF_CERTIFICATION_TEXTS` (`apps/vendors/engine.py`), not a gettext entry: the acceptance stores
+the version and the hash of the exact text. `review-export` does not export it, so hand it to the
+translator separately. The review gate covers it with its own mark:
+
+- `vendors.E001` (`vendors.W001` outside LIVE): a configured language has no text.
+- `vendors.E002` (`vendors.W002` outside LIVE): a configured language has a text but is not in
+  `SELF_CERTIFICATION_REVIEWED_LANGUAGES`. Add the language there in the commit that carries the
+  text the translator approved. `en` and `it` are served without the gate.
+
+Changing a text after an acceptance of it may exist needs a bump of `SELF_CERTIFICATION_VERSION`;
+a unit test pins the digests of each version and fails otherwise.

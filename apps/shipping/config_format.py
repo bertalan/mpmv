@@ -1,10 +1,12 @@
-"""The shipping configuration file format, version 2 (SHP.13, SHP.14, spec 06 "Configuration
+"""The shipping configuration file format, version 3 (SHP.13, SHP.14, VEN.36, spec 06 "Configuration
 file format"). Exports, imports, the standard template and the SHP.5 legacy import all use it.
 Pure functions, no ORM.
 
 Version 2 (SHP.14) fills the `special_areas` section that version 1 reserved and lets a method
-list the treatment it gives each special area (`area_treatments`). Version 1 files are still
-read (they hold neither); files are always written in the current version.
+list the treatment it gives each special area (`area_treatments`). Version 3 (VEN.36) adds the
+method field `not_returnable_by_post`. Version 1 and 2 files are still read (a method without
+the field keeps the stored value, or the model default `false` on create); files are always
+written in the current version.
 
 This module checks the shape of a file only: its format and version, the sections and the
 fields each row may have, that list fields hold text, that every row is named once and that a
@@ -14,12 +16,13 @@ choices) are validated by the models when a file is checked or imported
 
 A JSON document:
 
-    {"format": "mpmv.shipping-config", "version": 2,
+    {"format": "mpmv.shipping-config", "version": 3,
      "country_groups": [{"code", "countries"}],
      "zones": [{"code", "name", "priority", "countries", "country_groups", "postcode_patterns",
                 "states"}],
      "methods": [{"zone_scope", "zone", "key", "carrier", "service_level", "min_delivery_days",
-                  "max_delivery_days", "is_default", "free_shipping_threshold", "tax_treatment",
+                  "max_delivery_days", "not_returnable_by_post", "is_default",
+                  "free_shipping_threshold", "tax_treatment",
                   "over_max_weight", "bands": [{"from_kg", "to_kg", "cost_net", "surcharge_net"}],
                   "area_treatments": [{"area", "mode", "surcharge_type", "surcharge",
                                        "extra_days"}]}],
@@ -56,10 +59,12 @@ from apps.core.text import nfc
 from . import engine
 
 FORMAT: Final = "mpmv.shipping-config"
-VERSION: Final = 2
+VERSION: Final = 3
 # Versions this platform reads; version 1 files hold no special areas.
-SUPPORTED_VERSIONS: Final = (1, 2)
+SUPPORTED_VERSIONS: Final = (1, 2, 3)
 SPECIAL_AREAS_SINCE: Final = 2
+NOT_RETURNABLE: Final = "not_returnable_by_post"
+NOT_RETURNABLE_SINCE: Final = 3
 
 # Which zone a method ships to: one of the owner's zones (in the file or already stored), or a
 # platform zone (vendor files only).
@@ -100,6 +105,7 @@ FIELDS: Final[Mapping[str, tuple[str, ...]]] = {
         "free_shipping_threshold",
         "tax_treatment",
         "over_max_weight",
+        "not_returnable_by_post",
     ),
     BAND: ("from_kg", "to_kg", "cost_net", "surcharge_net"),
     PICKUP_OPTION: ("key", "cost_net", "address"),
@@ -142,7 +148,7 @@ PART_KEYS: Final[Mapping[str, str]] = {BAND: BANDS, AREA_TREATMENT: TREATMENTS}
 # Free text a person writes (I18N.10): the only values normalised to NFC on import.
 TEXT_FIELDS: Final = ("name", "address")
 LIST_FIELDS: Final = frozenset({"countries", "country_groups", "postcode_patterns", "states"})
-BOOLEAN_FIELDS: Final = frozenset({"is_default"})
+BOOLEAN_FIELDS: Final = frozenset({"is_default", "not_returnable_by_post"})
 NUMBER_FIELDS: Final = frozenset(
     {
         "priority",
@@ -196,6 +202,8 @@ CSV_COLUMNS: Final = (
     "surcharge_type",
     "surcharge",
     "extra_days",
+    # version 3 (VEN.36)
+    "not_returnable_by_post",
 )
 FILE: Final = "file"  # the ref of issues that concern the whole file
 
@@ -432,6 +440,8 @@ def _add_csv_row(parsed: ParsedConfig, ref: str, cells: Mapping[str, str]) -> No
     for name in FIELDS[record]:
         if name in cells:
             _put_cell(values, name, cells[name])
+            if name in BOOLEAN_FIELDS and name in values and not isinstance(values[name], bool):
+                parsed.issue(ref, name, "Must be true or false (lowercase) or empty.")
     method = None
     if record in METHOD_PARTS:
         link: dict[str, Any] = {}
@@ -447,8 +457,7 @@ def _put_cell(values: dict[str, Any], name: str, cell: str) -> None:
         values[name] = [item.strip() for item in cell.split(LIST_SEPARATOR)] if cell.strip() else []
     elif name in BOOLEAN_FIELDS:
         if cell.strip():
-            flag = cell.strip().lower()
-            values[name] = {"true": True, "false": False}.get(flag, cell)
+            values[name] = {"true": True, "false": False}.get(cell.strip(), cell)
     elif name in NUMBER_FIELDS:
         values[name] = cell.strip() or None
     elif name == "zone_scope":
@@ -503,6 +512,13 @@ def _add_row(
             parsed.issue(ref, name, "Must be a single value, not a list or an object.")
         if any(_unstorable(item) for item in (value if isinstance(value, list) else [value])):
             parsed.issue(ref, name, "Contains a null or unpaired surrogate character.")
+    if record == METHOD and NOT_RETURNABLE in values and parsed.version < NOT_RETURNABLE_SINCE:
+        parsed.issue(
+            ref,
+            NOT_RETURNABLE,
+            f"Needs format version {NOT_RETURNABLE_SINCE}: this file declares version "
+            f"{parsed.version}.",
+        )
     scope = values.get("zone_scope")
     if record == METHOD and scope is not None and scope not in ZONE_SCOPES:
         parsed.issue(ref, "zone_scope", f"Must be one of {', '.join(ZONE_SCOPES)}.")

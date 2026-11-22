@@ -2,12 +2,12 @@
 <html lang="{{ email_language }}">
 <body>
 <p>{% translate "Hello," %}</p>
-<p>{% if cause == "vendor_fault" %}{% blocktranslate context "(L)" %}We are sorry to tell you that the seller {{ vendor_name }} cannot fulfil your order {{ order_number }}. Your order with {{ vendor_name }} has been cancelled and we have immediately refunded the full {{ refund }} EUR to the payment method you used for the purchase.{% endblocktranslate %} {% include "email/orders/_credit_time.txt" %}{% elif cause == "customer_request" %}{% blocktranslate %}As you asked, your order {{ order_number }} with {{ vendor_name }} has been cancelled, and we have refunded the full {{ refund }} EUR to the payment method you used for the purchase.{% endblocktranslate %} {% include "email/orders/_credit_time.txt" %}{% else %}{% blocktranslate context "(L)" %}Due to a technical issue on our platform, your order {{ order_number }} with seller {{ vendor_name }} cannot be processed. The order has been cancelled at no cost to you, and we have immediately issued a full refund of EUR {{ refund }} to your original payment method (credited within 5–10 business days, and in any event within the statutory 14-day limit). We apologize for the inconvenience.{% endblocktranslate %}{% endif %}</p>
+<p>{% if cause == "vendor_fault" %}{% blocktranslate context "(L)" %}We are sorry to tell you that the seller {{ vendor_name }} cannot fulfil your order {{ order_number }}. Your order with {{ vendor_name }} has been cancelled and we have immediately refunded the full {{ refund }} EUR to the payment method you used for the purchase.{% endblocktranslate %} {% include "email/orders/_credit_time.txt" %}{% elif cause == "customer_request" %}{% blocktranslate %}As you asked, your order {{ order_number }} with {{ vendor_name }} has been cancelled, and we have refunded the full {{ refund }} EUR to the payment method you used for the purchase.{% endblocktranslate %} {% include "email/orders/_credit_time.txt" %}{% else %}{% blocktranslate context "(L)" %}Due to a technical issue on our platform, your order {{ order_number }} with seller {{ vendor_name }} cannot be processed. The order has been cancelled at no cost to you, and we have immediately issued a full refund of EUR {{ refund }} to your original payment method (credited within 5–10 business days, and in any event within the statutory 14-day limit). We apologise for the inconvenience.{% endblocktranslate %}{% endif %}</p>
 <p>{% translate "Cancelled items:" %}</p>
 <ul>
 {% for line in lines %}<li>{{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}</li>
 {% endfor %}</ul>
 <p>{% blocktranslate %}Reason: “{{ reason }}”{% endblocktranslate %}</p>
-{% if cause == "vendor_fault" %}<p>{% translate "We apologize for the inconvenience." context "(L)" %}</p>
+{% if cause == "vendor_fault" %}<p>{% translate "We apologise for the inconvenience." context "(L)" %}</p>
 {% endif %}</body>
 </html>

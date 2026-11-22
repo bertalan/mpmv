@@ -47,6 +47,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import MediaImage, TranslationStatus
 from apps.core.tests.factories import MediaImageFactory, SvgCollectionFactory
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import other_language
 
 
 class ProductFactory(DjangoModelFactory[Product]):
@@ -366,28 +367,32 @@ def attribute_with_values(
 def clothing_attributes() -> dict[str, Attribute]:
     """Synthetic size, color, material, bag_width (cm) and author attributes.
 
-    Sizes have EN labels only (an IT page falls back to them); colors are also in IT.
+    Sizes have labels in the primary language only (a page in another language falls back to
+    them); colors are also in a second language.
     """
+    primary, other = primary_language(), other_language()
     return {
         "size": attribute_with_values(
             "size",
-            {"en": "Size", "it": "Taglia"},
-            {"s": {"en": "S"}, "m": {"en": "M"}, "l": {"en": "L"}},
+            {primary: "Size", other: "Taglia"},
+            {"s": {primary: "S"}, "m": {primary: "M"}, "l": {primary: "L"}},
         ),
         "color": attribute_with_values(
             "color",
-            {"en": "Color", "it": "Colore"},
-            {"red": {"en": "Red", "it": "Rosso"}, "blue": {"en": "Blue", "it": "Blu"}},
+            {primary: "Color", other: "Colore"},
+            {"red": {primary: "Red", other: "Rosso"}, "blue": {primary: "Blue", other: "Blu"}},
         ),
         "material": attribute_with_values(
             "material",
-            {"en": "Material"},
-            {"cotton": {"en": "Cotton", "it": "Cotone"}, "linen": {"en": "Linen"}},
+            {primary: "Material"},
+            {"cotton": {primary: "Cotton", other: "Cotone"}, "linen": {primary: "Linen"}},
         ),
         "bag_width": attribute_with_values(
-            "bag_width", {"en": "Width"}, {}, kind=Attribute.Kind.NUMBER, unit="cm"
+            "bag_width", {primary: "Width"}, {}, kind=Attribute.Kind.NUMBER, unit="cm"
         ),
-        "author": attribute_with_values("author", {"en": "Author"}, {}, kind=Attribute.Kind.TEXT),
+        "author": attribute_with_values(
+            "author", {primary: "Author"}, {}, kind=Attribute.Kind.TEXT
+        ),
     }
 
 
@@ -416,6 +421,6 @@ class ProductImageTranslationFactory(DjangoModelFactory[ProductImageTranslation]
         model = ProductImageTranslation
 
     product_image = factory.SubFactory(ProductImageFactory)
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     status = TranslationStatus.PUBLISHED
     alt_text = factory.Faker("sentence", nb_words=4)

@@ -51,6 +51,7 @@ ACCOUNT_PAGES: Final[Pages] = (
     (gettext_noop("Sign in"), "login"),
     (gettext_noop("Two-factor authentication"), "mfa:overview"),
     (gettext_noop("My orders"), "customer_orders"),
+    (gettext_noop("My garage"), "garage_account"),
     (gettext_noop("Privacy and your data"), "privacy_account"),
 )
 SHOP_PAGES: Final[Pages] = (
@@ -88,6 +89,7 @@ PLATFORM_PAGES: Final[Pages] = (
     (gettext_noop("Products"), "manager:platform:catalog_products"),
     (gettext_noop("Order changes"), "manager:platform:orders"),
     (gettext_noop("Order drafts"), "manager:platform:order_drafts"),
+    (gettext_noop("Stray payments"), "manager:platform:stray_payments"),
     (gettext_noop("Order change settings"), "manager:platform:amendment_settings"),
     (gettext_noop("Trust rules"), "manager:platform:trust_rules"),
 )

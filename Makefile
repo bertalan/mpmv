@@ -147,8 +147,9 @@ i18n: ## Re-extract and compile the interface-string catalogs (I18N.7; no GNU ge
 	uv run python tools/i18n_catalog.py extract
 	uv run python tools/i18n_catalog.py compile
 
-i18n-check: ## Catalogs are complete, translated and compiled (I18N.7)
+i18n-check: ## Catalogs are complete, translated and compiled (I18N.7); EN msgids in British spelling (I18N.23)
 	uv run python tools/i18n_catalog.py check
+	uv run python tools/i18n_british.py check
 
 typecheck: ## Static type check with mypy
 	uv run mypy .

@@ -54,26 +54,29 @@ def test_the_form_offers_the_registered_themes_and_the_default(staff_client: Cli
 
 def test_staff_choose_a_theme_and_the_change_is_audited(staff_client: Client) -> None:
     site = SiteFactory.create()
-    response = staff_client.post(reverse(ADD), {"site": site.pk, "theme": "ride"})
+    response = staff_client.post(reverse(ADD), {"site": site.pk, "theme": "ride", "palette": ""})
     assert response.status_code == 302, response.content
     setting = ThemeSettings.objects.get(site=site)
     assert setting.theme == "ride"
 
     change = reverse("admin:themes_themesettings_change", args=[setting.pk])
-    response = staff_client.post(change, {"site": site.pk, "theme": "base"})
+    response = staff_client.post(change, {"site": site.pk, "theme": "base", "palette": ""})
     assert response.status_code == 302, response.content
 
     entries = AuditLog.objects.filter(action=THEME_CONFIGURED).order_by("pk")
     assert [(e.before, e.after) for e in entries] == [
-        (None, {"site": site.hostname, "theme": "ride"}),
-        ({"site": site.hostname, "theme": "ride"}, {"site": site.hostname, "theme": "base"}),
+        (None, {"site": site.hostname, "theme": "ride", "palette": ""}),
+        (
+            {"site": site.hostname, "theme": "ride", "palette": ""},
+            {"site": site.hostname, "theme": "base", "palette": ""},
+        ),
     ]
     assert entries[0].actor_label.startswith("staff:")
 
 
 def test_an_unregistered_theme_is_refused_by_the_form(staff_client: Client) -> None:
     site = SiteFactory.create()
-    response = staff_client.post(reverse(ADD), {"site": site.pk, "theme": "nope"})
+    response = staff_client.post(reverse(ADD), {"site": site.pk, "theme": "nope", "palette": ""})
     assert response.status_code == 200
     assert response.context["adminform"].form.errors["theme"]
     assert not ThemeSettings.objects.exists()

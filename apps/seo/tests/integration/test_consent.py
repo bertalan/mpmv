@@ -16,7 +16,7 @@ from apps.seo.models import ConsentLog
 from apps.seo.providers import SelfHostedConsentProvider, get_provider
 from apps.seo.tests.factories import ConsentLogFactory
 from apps.seo.tests.fakes import FakeConsentProvider
-from tests.i18n import language_prefix, other_language
+from tests.i18n import language_prefix, other_language, translated
 
 pytestmark = pytest.mark.django_db
 
@@ -199,7 +199,7 @@ def test_the_settings_page_shows_the_current_choice_and_is_not_cached(client: Cl
 
 def test_the_settings_page_works_in_italian(client: Client) -> None:
     html = client.get(f"{language_prefix(other_language())}/cookie-settings/").content.decode()
-    assert "Impostazioni dei cookie" in html
+    assert translated("Cookie settings", other_language()) in html
 
 
 def checked_boxes(html: str) -> set[str]:
@@ -239,17 +239,16 @@ def test_the_settings_page_shows_a_visible_notice_after_a_save(client: Client) -
     ):
         client.post("/consent/", {"action": action, "next": "/cookie-settings/"}, headers=SAME_SITE)
         html = client.get("/cookie-settings/?saved=1").content.decode()
-        assert re.search(
-            r'role="status" data-consent-notice>\s*<p><strong>Your cookie choice was saved\.', html
-        )
+        saved = re.escape(translated("Your cookie choice was saved."))
+        assert re.search(rf'role="status" data-consent-notice>\s*<p><strong>{saved}', html)
         assert checked_boxes(html) == boxes
-    assert "Only necessary cookies are on." in html
+    assert translated("Only necessary cookies are on.") in html
 
 
 def test_the_notice_names_the_optional_categories_that_are_on(client: Client) -> None:
     client.post("/consent/", {"action": "custom", "categories": ["statistics"]}, headers=SAME_SITE)
     html = client.get("/cookie-settings/?saved=1").content.decode()
-    assert "Optional cookies on: Statistics." in html
+    assert f"{translated('Optional cookies on:')} {translated('Statistics')}." in html
     assert checked_boxes(html) == {"statistics"}
 
 
@@ -266,8 +265,8 @@ def test_the_settings_notice_is_translated(client: Client) -> None:
     html = client.get(
         f"{language_prefix(other_language())}/cookie-settings/?saved=1"
     ).content.decode()
-    assert "La tua scelta sui cookie è stata salvata." in html
-    assert "Solo i cookie necessari sono attivi." in html
+    assert translated("Your cookie choice was saved.", other_language()) in html
+    assert translated("Only necessary cookies are on.", other_language()) in html
 
 
 # --- The banner is the same for everyone (page cache safe)
@@ -349,9 +348,8 @@ def test_the_banner_offers_reject_and_accept_with_equal_weight(client: Client) -
 
 def test_the_footer_links_to_the_settings_page(client: Client) -> None:
     html = client.get("/").content.decode()
-    assert re.search(
-        r'<a class="consent-settings-link" href="/cookie-settings/">Cookie settings</a>', html
-    )
+    link = re.escape(translated("Cookie settings"))
+    assert re.search(rf'<a class="consent-settings-link" href="/cookie-settings/">{link}</a>', html)
 
 
 def test_the_banner_markup_has_no_inline_script_or_handler(client: Client) -> None:

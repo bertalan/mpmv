@@ -67,7 +67,7 @@ def stored_treatments(vendor: Vendor) -> list[tuple[str, str, str, Decimal, int]
 def test_a_vendor_export_lists_its_treatments_and_the_areas_they_name() -> None:
     document = export_config(vendor_with_treatments())
 
-    assert document["version"] == fmt.VERSION == 2
+    assert document["version"] == fmt.VERSION == 3
     standard = document["methods"][index(document["methods"], zone="home", key="standard")]
     assert standard["area_treatments"] == [
         {
@@ -131,6 +131,7 @@ def test_a_version_1_file_is_still_imported() -> None:
     document["special_areas"] = []
     for method in document["methods"]:
         del method["area_treatments"]
+        del method["not_returnable_by_post"]
     other = VendorFactory.create()
 
     result = import_config(fmt.parse_json(document), vendor=other, ctx=CTX)

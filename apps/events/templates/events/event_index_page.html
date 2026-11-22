@@ -16,6 +16,7 @@ coordinates, above the list, as an enhancement.
   {% if page.intro and not filters.active %}{{ page.intro|richtext }}{% endif %}
   {% include "events/_links.html" with current="list" %}
   {% event_subscribe vendor=filters.vendor kind=filters.type %}
+  {% include "components/garage_banner.html" %}
   {% include "events/_filters.html" with form_action=list_url %}
   {% translate "No events are planned at the moment." as empty_text %}
   {% if map %}{% include "events/_index_map.html" %}{% endif %}

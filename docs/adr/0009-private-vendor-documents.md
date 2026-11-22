@@ -64,7 +64,7 @@ Public media (product images, Wagtail images) stays on its own path and CDN and 
   version. A file that fails is never stored.
 - **Access rules** (one function, `can_read_document(user, version)`, default deny):
   - vendor owner and members of the owning vendor (`current_vendor`, CORE.3);
-  - platform staff only by CORE.18 section (Catalog and moderation, Finance and payments, Support,
+  - platform staff only by CORE.18 section (Catalogue and moderation, Finance and payments, Support,
     owner, technical superuser as the matrix says), never by `has_perm`;
   - a customer only when the version's hash equals a hash stored in the snapshot of one of
     their own orders (customer identity from the session or the order access token), and only

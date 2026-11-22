@@ -25,10 +25,12 @@ from apps.catalog.tests.factories import (
     TermFactory,
     TermTranslationFactory,
 )
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import language_prefix, other_language, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -37,27 +39,29 @@ PUBLISHED = TranslationStatus.PUBLISHED
 
 @pytest.fixture
 def term_page(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Term "maker" of the landing taxonomy "compatibility" (IT "compatibilita/marca"), and a
-    filterable "colour" taxonomy; three products on the maker, two of them red; one per page."""
+    """Term "maker" of the landing taxonomy "compatibility" (in the second language
+    "compatibilita/marca"), and a filterable "colour" taxonomy; three products on the maker, two
+    of them red; one per page."""
+    first, second = primary_language(), other_language()
     monkeypatch.setattr(services, "LISTING_PER_PAGE", 1)
     compat = TaxonomyFactory.create(code="compat", has_landing=True, filterable=False)
-    for language, name, slug in (("en", "Compatibility", "compatibility"),
-                                 ("it", "Compatibilità", "compatibilita")):  # fmt: skip
+    for language, name, slug in ((first, "Compatibility", "compatibility"),
+                                 (second, "Compatibilità", "compatibilita")):  # fmt: skip
         TaxonomyTranslationFactory.create(
             taxonomy=compat, language=language, name=name, slug=slug, status=PUBLISHED
         )
     maker = TermFactory.create(taxonomy=compat)
-    for language, name, slug in (("en", "Maker", "maker"), ("it", "Marca", "marca")):
+    for language, name, slug in ((first, "Maker", "maker"), (second, "Marca", "marca")):
         TermTranslationFactory.create(
             term=maker, language=language, name=name, slug=slug, status=PUBLISHED
         )
     colour = TaxonomyFactory.create(code="colour", hierarchical=False)
-    for language, name, slug in (("en", "Colour", "colour"), ("it", "Colore", "colore")):
+    for language, name, slug in ((first, "Colour", "colour"), (second, "Colore", "colore")):
         TaxonomyTranslationFactory.create(
             taxonomy=colour, language=language, name=name, slug=slug, status=PUBLISHED
         )
     red = TermFactory.create(taxonomy=colour)
-    for language, name, slug in (("en", "Red", "red"), ("it", "Rosso", "rosso")):
+    for language, name, slug in ((first, "Red", "red"), (second, "Rosso", "rosso")):
         TermTranslationFactory.create(
             term=red, language=language, name=name, slug=slug, status=PUBLISHED
         )
@@ -72,6 +76,11 @@ def term_page(monkeypatch: pytest.MonkeyPatch) -> None:
         product.terms.add(maker, *colours)
 
 
+def _second() -> str:
+    """The URL prefix of the second language, the one with the "compatibilita/marca" names."""
+    return language_prefix(other_language())
+
+
 @pytest.fixture
 def no_js_page(browser: Browser) -> Iterator[Page]:
     context = browser.new_context(java_script_enabled=False)
@@ -80,17 +89,19 @@ def no_js_page(browser: Browser) -> Iterator[Page]:
 
 
 @pytest.mark.usefixtures("term_page", "site_allows_indexing")
-@pytest.mark.parametrize(("path", "language", "heading"),
-                         [("/compatibility/maker/", "en", "Maker"),
-                          ("/it/compatibilita/marca/", "it", "Marca")])  # fmt: skip
+@pytest.mark.parametrize(("second", "path", "heading"),
+                         [(False, "/compatibility/maker/", "Maker"),
+                          (True, "/compatibilita/marca/", "Marca")])  # fmt: skip
 def test_a_term_page_answers_200_in_each_language(
     page: Page,
     live_server: LiveServer,
     shot: Callable[[str], Path],
+    second: bool,
     path: str,
-    language: str,
     heading: str,
 ) -> None:
+    language = other_language() if second else primary_language()
+    path = language_prefix(language) + path
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     response = page.goto(f"{live_server.url}{path}")
     assert response is not None
@@ -109,22 +120,24 @@ def test_filtering_and_paginating_stay_on_the_term_url(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     page.add_init_script(RECORD_CSP_VIOLATIONS)
-    page.goto(f"{live_server.url}/it/compatibilita/marca/")
+    page.goto(f"{live_server.url}{_second()}/compatibilita/marca/")
     # Interface strings may carry another app's Italian catalogue: locate by structure here.
     page.get_by_label("Rosso").check()
     page.locator('form[role="search"] button[type="submit"]').click()
-    expect(page).to_have_url(f"{live_server.url}/it/compatibilita/marca/?colore=rosso")
+    expect(page).to_have_url(f"{live_server.url}{_second()}/compatibilita/marca/?colore=rosso")
     expect(page.locator(".filter-chips")).to_contain_text("Rosso")
     shot("filtered")
 
     pagination = page.locator("nav.pagination")
     pagination.locator('a[rel="next"]').click()
-    expect(page).to_have_url(f"{live_server.url}/it/compatibilita/marca/?colore=rosso&page=2")
+    expect(page).to_have_url(
+        f"{live_server.url}{_second()}/compatibilita/marca/?colore=rosso&page=2"
+    )
     expect(pagination.locator('[aria-current="page"]')).to_have_text("2")
     shot("page-2")
 
     page.get_by_role("link", name=re.compile("Rosso")).click()
-    expect(page).to_have_url(f"{live_server.url}/it/compatibilita/marca/")
+    expect(page).to_have_url(f"{live_server.url}{_second()}/compatibilita/marca/")
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
 
 
@@ -135,8 +148,8 @@ def test_the_filter_form_works_without_javascript(
     page = no_js_page
     page.goto(f"{live_server.url}/compatibility/maker/")
     page.get_by_label("Red").check()
-    page.get_by_label("Minimum price").fill("15")
-    page.get_by_role("button", name="Apply filters").click()
+    page.get_by_label(translated("Minimum price")).fill("15")
+    page.get_by_role("button", name=translated("Apply filters")).click()
     expect(page).to_have_url(f"{live_server.url}/compatibility/maker/?colour=red&price_min=15")
     expect(page.locator("article.product-card h3")).to_have_text(["Bag 3"])
 

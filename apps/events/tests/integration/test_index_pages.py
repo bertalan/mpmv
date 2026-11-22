@@ -20,7 +20,7 @@ from apps.cms.services import seed_site
 from apps.cms.tests.factories import HomePageFactory
 from apps.core.i18n import primary_language
 from apps.events.models import EventIndexPage
-from apps.events.services import ensure_event_indexes
+from apps.events.services import INDEX_TITLES, ensure_event_indexes
 from apps.events.tests.factories import EventIndexPageFactory, EventPageFactory
 from tests.i18n import other_language
 
@@ -53,7 +53,7 @@ def test_every_enabled_locale_gets_one_index_after_the_seed() -> None:
     assert len({index.translation_key for index in indexes}) == 1
     assert all(index.live and index.slug == "events" for index in indexes)
     italian = indexes.get(locale__language_code=other_language())
-    assert italian.title == "Eventi"
+    assert italian.title == INDEX_TITLES[other_language()]
 
 
 def test_ensure_is_idempotent_and_reports_what_it_creates() -> None:

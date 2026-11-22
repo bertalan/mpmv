@@ -5,13 +5,18 @@ import re
 import pytest
 from django.test import Client
 from django.urls import reverse
+from django.utils import translation
+from django.utils.html import escape
+from django.utils.translation import ngettext
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from apps.accounts import engine
 from apps.accounts.models import RecoveryCode, User
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import password_login, totp_token, verified_login
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
@@ -64,11 +69,17 @@ def test_a_pending_secret_is_bound_to_the_session_that_started_the_enrolment(
     assert not TOTPDevice.objects.filter(pk=attacker_device.pk).exists()
 
     response = victim.post(reverse("mfa:totp"), {"token": totp_token(attacker_device)})
-    assert "Invalid code" in response.content.decode()
+    assert (
+        escape(translated("Invalid code. Check the time on your device and try again."))
+        in response.content.decode()
+    )
     assert not TOTPDevice.objects.filter(user=staff, confirmed=True).exists()
 
     stale = client.post(reverse("mfa:totp"), {"token": totp_token(attacker_device)})
-    assert "Invalid code" in stale.content.decode()
+    assert (
+        escape(translated("Invalid code. Check the time on your device and try again."))
+        in stale.content.decode()
+    )
     assert not TOTPDevice.objects.filter(user=staff, confirmed=True).exists()
 
 
@@ -86,7 +97,10 @@ def test_a_wrong_code_does_not_confirm_the_device(client: Client, staff: User) -
     wrong = totp_token(device, offset_steps=10)
     response = client.post(reverse("mfa:totp"), {"token": wrong})
     assert response.status_code == 200
-    assert "Invalid code" in response.content.decode()
+    assert (
+        escape(translated("Invalid code. Check the time on your device and try again."))
+        in response.content.decode()
+    )
     device.refresh_from_db()
     assert not device.confirmed
     assert client.get("/django-admin/").status_code == 302
@@ -117,7 +131,13 @@ def test_the_right_code_confirms_verifies_and_shows_recovery_codes_once(
 
     page = client.get(reverse("mfa:recovery_codes")).content.decode()
     assert not CODE_RE.findall(page)  # never shown again
-    assert "10 unused" in page
+    with translation.override(primary_language()):
+        unused = ngettext(
+            "You have %(counter)s unused recovery code.",
+            "You have %(counter)s unused recovery codes.",
+            10,
+        ) % {"counter": 10}
+    assert unused in page
 
     audit = AuditLog.objects.get(action="accounts.mfa.enrolled")
     assert audit.actor_id == staff.pk
@@ -160,7 +180,7 @@ def test_verification_with_a_wrong_code_keeps_the_admin_closed(client: Client) -
         reverse("mfa:verify"), {"method": "totp", "token": totp_token(device, offset_steps=10)}
     )
     assert response.status_code == 200
-    assert "Invalid code" in response.content.decode()
+    assert escape(translated("Invalid code. Try again.")) in response.content.decode()
     assert client.get("/django-admin/").status_code == 302
 
 

@@ -53,9 +53,9 @@ def document_v2() -> dict[str, Any]:
     return document
 
 
-def test_the_current_version_is_2() -> None:
-    assert fmt.VERSION == 2
-    assert fmt.empty_document()["version"] == 2
+def test_the_current_version_is_3() -> None:
+    assert fmt.VERSION == 3
+    assert fmt.empty_document()["version"] == 3
 
 
 def test_a_version_2_document_round_trips_through_its_rows() -> None:

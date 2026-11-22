@@ -27,11 +27,13 @@ from apps.catalog.tests.factories import (
 from apps.core import images as core_images
 from apps.core import tasks as core_tasks
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, ImageLicence, MediaImage, MediaImageRendition
 from apps.core.tests.factories import ImageLicenceFactory
 from apps.vendors.engine import vendor_collection_name
 from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from tests.i18n import other_language, product_url
 
 pytestmark = pytest.mark.django_db
 
@@ -120,11 +122,14 @@ def test_the_page_renders_before_the_renditions_exist(client: Any, licence: Imag
         status="published", vendor=VendorFactory.create(status=Vendor.Status.ACTIVE)
     )
     ProductTranslationFactory.create(
-        product=product, language="en", slug="mug-en", status="published"
+        product=product,
+        language=primary_language(),
+        slug=f"mug-{primary_language()}",
+        status="published",
     )
     upload(product, licence, alt_text="A mug")
     assert not MediaImageRendition.objects.exists()
-    response = client.get("/product/mug-en/")
+    response = client.get(product_url(primary_language(), f"mug-{primary_language()}"))
     assert response.status_code == 200
     assert 'alt="A mug"' in response.content.decode()
 
@@ -210,9 +215,9 @@ def test_only_a_cover_can_be_locked(licence: ImageLicence) -> None:
 
 def test_the_language_is_set_and_checked(licence: ImageLicence) -> None:
     row = upload(ProductFactory.create(), licence)
-    media.set_language(row, "de", ctx=CTX)
+    media.set_language(row, other_language(), ctx=CTX)
     row.refresh_from_db()
-    assert row.language == "de"
+    assert row.language == other_language()
     media.set_language(row, None, ctx=CTX)
     row.refresh_from_db()
     assert row.language is None
@@ -244,33 +249,38 @@ def test_a_de_dedicated_image_replaces_the_neutral_gallery_in_de_only(
     product = ProductFactory.create(
         status="published", vendor=VendorFactory.create(status=Vendor.Status.ACTIVE)
     )
-    ProductTranslationFactory.create(product=product, language="en", status="published")
+    ProductTranslationFactory.create(
+        product=product, language=primary_language(), status="published"
+    )
     neutral = [upload(product, licence, c) for c in ("red", "green")]
-    german = upload(product, licence, "blue", language="de")
-    in_de = [g.image.pk for g in product_pages.gallery(product, "de")]
-    in_en = [g.image.pk for g in product_pages.gallery(product, "en")]
-    in_it = [g.image.pk for g in product_pages.gallery(product, "it")]
+    german = upload(product, licence, "blue", language=other_language())
+    in_de = [g.image.pk for g in product_pages.gallery(product, other_language())]
+    in_en = [g.image.pk for g in product_pages.gallery(product, primary_language())]
     assert in_de == [german.image_id]
-    assert in_en == in_it == [r.image_id for r in neutral]
+    assert in_en == [r.image_id for r in neutral]
 
 
 def test_alt_text_falls_back_to_en_and_uses_a_published_translation(licence: ImageLicence) -> None:
     product = ProductFactory.create()
     row = upload(product, licence, alt_text="A red mug", caption="Front view")
-    assert [g.alt for g in product_pages.gallery(product, "de")] == ["A red mug"]
-    media.set_text(row, "de", alt_text="Eine rote Tasse", caption="Vorderansicht", ctx=CTX)
-    assert [g.alt for g in product_pages.gallery(product, "de")] == ["A red mug"]  # a machine draft
-    media.set_text(row, "de", alt_text="Eine rote Tasse", status="published", ctx=CTX)
-    page = product_pages.gallery(product, "de")[0]
+    assert [g.alt for g in product_pages.gallery(product, other_language())] == ["A red mug"]
+    media.set_text(
+        row, other_language(), alt_text="Eine rote Tasse", caption="Vorderansicht", ctx=CTX
+    )
+    assert [g.alt for g in product_pages.gallery(product, other_language())] == [
+        "A red mug"
+    ]  # a machine draft
+    media.set_text(row, other_language(), alt_text="Eine rote Tasse", status="published", ctx=CTX)
+    page = product_pages.gallery(product, other_language())[0]
     assert page.alt == "Eine rote Tasse"
-    assert [g.caption for g in product_pages.gallery(product, "en")] == ["Front view"]
+    assert [g.caption for g in product_pages.gallery(product, primary_language())] == ["Front view"]
 
 
 def test_the_cover_leads_the_gallery(licence: ImageLicence) -> None:
     product = ProductFactory.create()
     first, second = upload(product, licence, "red"), upload(product, licence, "blue")
     media.set_cover(second, ctx=CTX)
-    assert [g.image.pk for g in product_pages.gallery(product, "en")] == [
+    assert [g.image.pk for g in product_pages.gallery(product, primary_language())] == [
         second.image_id,
         first.image_id,
     ]
@@ -292,17 +302,19 @@ def test_the_product_page_renders_the_language_set_with_its_alt_text(
     product = ProductFactory.create(
         status="published", vendor=VendorFactory.create(status=Vendor.Status.ACTIVE)
     )
-    for language in ("en", "de"):
+    for language in (primary_language(), other_language()):
         ProductTranslationFactory.create(
             product=product, language=language, slug=f"mug-{language}", status="published"
         )
     for row in (
         upload(product, licence, "red", alt_text="Neutral mug"),
-        upload(product, licence, "blue", language="de", alt_text="Deutsche Tasse"),
+        upload(product, licence, "blue", language=other_language(), alt_text="Deutsche Tasse"),
     ):
         media.render_renditions(row.image_id)  # the job; a page never builds renditions
-    german = client.get("/de/product/mug-de/").content.decode()
-    english = client.get("/product/mug-en/").content.decode()
+    german = client.get(product_url(other_language(), f"mug-{other_language()}")).content.decode()
+    english = client.get(
+        product_url(primary_language(), f"mug-{primary_language()}")
+    ).content.decode()
     assert "Deutsche Tasse" in german
     assert "Neutral mug" not in german
     assert "Neutral mug" in english
@@ -313,7 +325,7 @@ def test_the_product_page_renders_the_language_set_with_its_alt_text(
 
 def test_a_translation_row_resolves_through_the_image() -> None:
     text = ProductImageTranslationFactory.create(alt_text="Blue mug")
-    assert text.product_image.translation("en").translation == text
+    assert text.product_image.translation(primary_language()).translation == text
 
 
 # --- Review fixes (second review of #592)
@@ -322,20 +334,22 @@ def test_a_translation_row_resolves_through_the_image() -> None:
 def test_an_image_without_alt_text_uses_the_product_title(licence: ImageLicence) -> None:
     product = ProductFactory.create()
     ProductTranslationFactory.create(
-        product=product, language="en", title="Red mug", status="published"
+        product=product, language=primary_language(), title="Red mug", status="published"
     )
     upload(product, licence)  # no alt text given
-    assert [g.alt for g in product_pages.gallery(product, "en")] == ["Red mug"]
-    assert [g.alt for g in product_pages.gallery(product, "it")] == ["Red mug"]  # EN fallback
+    assert [g.alt for g in product_pages.gallery(product, primary_language())] == ["Red mug"]
+    assert [g.alt for g in product_pages.gallery(product, other_language())] == [
+        "Red mug"
+    ]  # EN fallback
 
 
 def test_a_given_alt_text_wins_over_the_title(licence: ImageLicence) -> None:
     product = ProductFactory.create()
     ProductTranslationFactory.create(
-        product=product, language="en", title="Red mug", status="published"
+        product=product, language=primary_language(), title="Red mug", status="published"
     )
     upload(product, licence, alt_text="Front view")
-    assert [g.alt for g in product_pages.gallery(product, "en")] == ["Front view"]
+    assert [g.alt for g in product_pages.gallery(product, primary_language())] == ["Front view"]
 
 
 def test_the_same_file_with_another_author_keeps_its_own_licence_data(
@@ -424,7 +438,7 @@ def test_a_member_of_the_vendor_manages_its_images(licence: ImageLicence) -> Non
     media.upload_image(product, file=png(), title="t", licence=licence, author="a", ctx=ctx)
     row = ProductImage.objects.get(product=product)
     media.set_cover(row, ctx=ctx)
-    media.set_text(row, "en", alt_text="A mug", ctx=ctx)
+    media.set_text(row, primary_language(), alt_text="A mug", ctx=ctx)
     media.delete_image(row, ctx=ctx)
     assert not ProductImage.objects.exists()
 
@@ -450,9 +464,9 @@ def test_another_vendors_member_is_refused_on_every_service(licence: ImageLicenc
         ),
         lambda: media.set_cover(row, ctx=ctx),
         lambda: media.lock_cover(row, locked=False, ctx=ctx),
-        lambda: media.set_language(row, "de", ctx=ctx),
+        lambda: media.set_language(row, other_language(), ctx=ctx),
         lambda: media.reorder(product, [row], ctx=ctx),
-        lambda: media.set_text(row, "en", alt_text="x", ctx=ctx),
+        lambda: media.set_text(row, primary_language(), alt_text="x", ctx=ctx),
         lambda: media.delete_image(row, ctx=ctx),
         lambda: media.delete_image(row, ctx=ctx, dry_run=True),
     ]

@@ -20,7 +20,7 @@ from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import language_prefix, other_language, vendor_url
+from tests.i18n import language_prefix, other_language, translated, vendor_url
 
 pytestmark = pytest.mark.django_db
 
@@ -221,15 +221,17 @@ def test_the_vendor_feed_items_carry_the_shop_line_and_the_platform_feed_too(
     shop = slugs.vendor_path(primary_language(), vendor.slug, default_language=primary_language())
     expected = f"{_root()}{shop}"
     vendor_feed = _get(client, f"{index}vendor/{vendor.slug}/feed.rss")
-    assert f"Shop: {expected}" in vendor_feed
+    line = translated("Shop: %(url)s") % {"url": expected}
+    assert line in vendor_feed
     # The line is part of every item of a vendor event, platform feed included (as reviewed).
-    assert f"Shop: {expected}" in _get(client, f"{index}feed.rss")
+    assert line in _get(client, f"{index}feed.rss")
 
 
 def test_an_event_without_a_vendor_has_no_shop_line(client: Client) -> None:
     _event(vendor=None)
     index = str(primary_index().url)
-    assert "Shop:" not in _get(client, f"{index}feed.rss")
+    label = translated("Shop: %(url)s").split("%(url)s")[0]
+    assert label not in _get(client, f"{index}feed.rss")
 
 
 def test_the_ics_description_stays_escaped_with_hostile_content(client: Client) -> None:
