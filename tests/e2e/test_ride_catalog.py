@@ -139,3 +139,77 @@ def test_the_filter_form_submits_with_the_keyboard_only(
             break
     page.keyboard.press("Enter")
     expect(page).to_have_url(f"{live_server.url}/compatibility/maker/?price_min=5&price_max=50")
+
+
+# THM.19: the listing grid is Bootstrap's row, never the home tile grid, and a product without an
+# image shows the decorative placeholder in the card's (and the gallery's) image box.
+CARD_BOXES = """sel => [...document.querySelectorAll(sel)].map(card => {
+  const box = card.getBoundingClientRect();
+  const img = card.querySelector('img');
+  return {width: box.width, top: box.top, image: img ? img.getBoundingClientRect().width : 0};
+})"""
+
+
+def _listing_paths() -> list[str]:
+    """A term listing, the vendor storefront and a product page with its related products."""
+    vendor = Vendor.objects.get()
+    return ["/compatibility/maker/", f"/shop/{vendor.slug}/", "/product/bag-0/"]
+
+
+@pytest.mark.parametrize("width", [375, 1280])
+def test_listing_cards_are_wide_with_the_placeholder_in_the_image_box(
+    width: int, page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    page.set_viewport_size({"width": width, "height": 900})
+    for path in _listing_paths():
+        page.goto(f"{live_server.url}{path}")
+        cards = page.evaluate(CARD_BOXES, ".product-card")
+        assert cards, path
+        for card in cards:
+            # At least 15rem (240 px) on a wide screen; on a phone full width or two in a row.
+            floor = 240 if width == 1280 else (width - 2 * 16 - 24) / 2
+            assert card["width"] >= floor, (path, card)
+            assert card["image"] >= card["width"] - 4, (path, card)  # the image fills the card
+        if width == 375:
+            tops = [card["top"] for card in cards]
+            assert max(sum(1 for t in tops if abs(t - top) < 1) for top in tops) <= 2, path
+        placeholders = page.locator(".product-card img.product-card-placeholder")
+        assert placeholders.count() == len(cards), path
+        for alt in placeholders.evaluate_all("els => els.map(e => e.getAttribute('alt'))"):
+            assert alt == "", path
+    shot(f"{width}-listing-grid")
+
+
+def test_a_product_without_images_shows_the_gallery_placeholder(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto(f"{live_server.url}/product/bag-0/")
+    img = page.locator("img.ride-gallery__placeholder")
+    expect(img).to_have_count(1)
+    expect(img).to_be_visible()
+    expect(img).to_have_attribute("alt", "")
+    box = img.bounding_box()
+    assert box is not None
+    assert box["width"] >= 300
+    assert abs(box["width"] - box["height"]) < 2  # the same square box as a real image
+
+
+def _cards_in_first_row(page: Page, selector: str) -> int:
+    cards = page.evaluate(CARD_BOXES, selector)
+    assert cards, selector
+    return sum(1 for card in cards if abs(card["top"] - cards[0]["top"]) < 1)
+
+
+def test_cards_per_row_at_1280(
+    page: Page, live_server: LiveServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """THM.19: 3 listing cards per row at 1280 px, 4 in the related strip, each at least 240 px."""
+    monkeypatch.setattr(services, "LISTING_PER_PAGE", 6)
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto(f"{live_server.url}/compatibility/maker/")
+    assert _cards_in_first_row(page, ".product-card") == 3
+    page.goto(f"{live_server.url}/product/bag-0/")
+    assert _cards_in_first_row(page, ".product-related .product-card") == 4
+    for card in page.evaluate(CARD_BOXES, ".product-related .product-card"):
+        assert card["width"] >= 240, card
