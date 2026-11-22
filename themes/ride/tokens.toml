@@ -6,18 +6,19 @@
 
 # --- Primitive tier
 
+# The colour defaults are the Red palette of spec 14 §14.12 (owner decision 2026-11-21, THM.31).
+# A site may choose Blue, Petrol or another palette in its theme settings; the palette stylesheet
+# then overrides these custom properties, so they stay the build-time default.
+
 [color.brand]
-50 = "#EEF6FF"  # tint: primary text on it 4.77:1
-400 = "#0580FA"  # primary in dark mode (4.81:1 on #121417), not wired yet
-500 = "#046BD2"  # primary: text, link, UI colour and fill (white on it 5.20:1)
-700 = "#035AB1"  # primary hover (white on it 6.77:1)
+50 = "#FDECEE"  # tint: primary text on it 5.45:1
+400 = "#FF6B6B"  # primary in dark mode (6.65:1 on #121417), not wired yet
+500 = "#C40417"  # primary: text, link, UI colour and fill (white on it 6.22:1)
+700 = "#9E0312"  # primary hover (white on it 8.48:1)
 
-[color.amber]
-400 = "#FBA926"  # secondary: background only, always with dark text (8.95:1)
-500 = "#E89A1E"  # secondary hover (dark text on it 7.52:1)
-
-[color.orange]
-700 = "#BE5900"  # secondary as text (4.55:1 on white)
+[color.charcoal]
+400 = "#2B3138"  # secondary: background and text, white on it 13.13:1
+500 = "#1B2026"  # secondary hover
 
 [color.ink]
 950 = "#1A1A1A"
@@ -57,10 +58,10 @@ accent = "{color.brand.500}"
 accent-hover = "{color.brand.700}"
 accent-tint = "{color.brand.50}"
 accent-dark = "{color.brand.400}"
-secondary = "{color.amber.400}"
-on-secondary = "{color.ink.950}"
-secondary-hover = "{color.amber.500}"
-secondary-text = "{color.orange.700}"
+secondary = "{color.charcoal.400}"
+on-secondary = "#FFFFFF"
+secondary-hover = "{color.charcoal.500}"
+secondary-text = "{color.charcoal.400}"
 link = "{color.brand.500}"
 focus = "{color.blue.500}"
 info = "{color.slate.700}"
@@ -92,7 +93,7 @@ pill = "999px"
 round = "50%"
 
 [shadow]
-button-hover = "0 6px 16px rgb(4 107 210 / 0.28)"
+button-hover = "0 6px 16px color-mix(in srgb, var(--color-accent) 28%, transparent)"
 
 [scrim]
 opacity = "0.82"

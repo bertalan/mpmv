@@ -6,6 +6,8 @@
 - themes.E003 (database): a site's `ThemeSettings` names a theme that is not registered (for
   example one removed since it was chosen). Run by `migrate` and `check --database default`.
 - themes.E004: the `base` theme is missing or invalid.
+- themes.W006 (database): a site's stored palette fails the contrast check against the registered
+  themes (a theme was added since), so it is not applied.
 - themes.E005: a theme's `foundation` files are missing or differ from their `VENDORED.toml`.
 """
 
@@ -90,13 +92,21 @@ def check_site_themes(
             continue  # `migrate` checks first: the table may lack columns the migration adds
         try:
             with transaction.atomic(using=alias):
-                stored = list(
-                    ThemeSettings.objects.using(alias).exclude(theme="").select_related("site")
-                )
+                stored = list(ThemeSettings.objects.using(alias).select_related("site", "palette"))
         except DatabaseError:
             continue  # not migrated yet
         for setting in stored:
-            if setting.theme not in registry:
+            if setting.palette is not None and (problems := setting.palette.violations()):
+                messages.append(
+                    checks.Warning(
+                        f"Site {setting.site.hostname!r} has palette {setting.palette.slug!r}, "
+                        f"which fails the contrast check and is not applied: {problems[0]}",
+                        hint="Choose another palette, or fix this one (spec 14 §14.12). The "
+                        "site renders in its theme's own colours meanwhile.",
+                        id="themes.W006",
+                    )
+                )
+            if setting.theme and setting.theme not in registry:
                 messages.append(
                     checks.Error(
                         f"Site {setting.site.hostname!r} uses theme {setting.theme!r}, "

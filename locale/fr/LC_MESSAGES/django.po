@@ -9510,6 +9510,13 @@ msgstr ""
 " (art. 1341, deuxième alinéa, du Code civil), une par ligne sous la forme : numéro d'article | "
 "titre. Par exemple : 7 | Limitation de responsabilité. Obligatoire."
 
+#: apps/themes/models.py
+msgid ""
+"The colour palette of the whole site. Leave it empty for the theme's own colours (Red for ride)."
+msgstr ""
+"La palette de couleurs de l'ensemble du site. Laissez vide pour utiliser les couleurs du thème "
+"(Rouge pour ride)."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "The company that makes the brand's products, when it is not the brand itself. It is shown on the "
