@@ -7,7 +7,7 @@ import pytest
 from django.test import Client
 
 from apps.cms.models import HomePage
-from apps.cms.services import SeedReport
+from apps.cms.services import SeedReport, seed_site
 from apps.core.i18n import primary_language
 from apps.themes.services import use_theme
 
@@ -15,6 +15,11 @@ pytestmark = pytest.mark.django_db
 
 SCRIPT = "themes/base/js/countdown.js"
 TARGET = dt.datetime(2030, 12, 1, 9, 0, tzinfo=dt.UTC)
+
+
+@pytest.fixture
+def seeded() -> SeedReport:
+    return seed_site()
 
 
 def _countdown() -> tuple[str, dict[str, Any]]:

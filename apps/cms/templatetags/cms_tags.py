@@ -9,8 +9,11 @@ from django import template
 from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpRequest
+from django.templatetags.static import static
 from django.urls import NoReverseMatch, reverse
 from django.utils import translation
+from django.utils.html import format_html
+from django.utils.safestring import SafeString
 from django.utils.translation import gettext
 from wagtail.models import Locale, Page, Site
 
@@ -242,3 +245,20 @@ def help_context(context: dict[str, Any]) -> dict[str, str] | None:
         "page_type": engine.help_page_type(label),
         "language": translation.get_language() or settings.LANGUAGE_CODE,
     }
+
+
+@register.simple_tag(takes_context=True)
+def countdown_script(context: Any) -> SafeString:
+    """The theme's `countdown.js` module tag, once per request (THM.36).
+
+    The base layouts do not load the script; a page gets it only through a countdown block.
+    A browser runs a module once per URL anyway; the request flag only avoids repeat tags.
+    """
+    request = context.get("request")
+    if request is not None:
+        if getattr(request, "_countdown_script", False):
+            return SafeString("")
+        request._countdown_script = True
+    return format_html(
+        '<script type="module" src="{}"></script>', static("themes/base/js/countdown.js")
+    )
