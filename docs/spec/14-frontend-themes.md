@@ -332,6 +332,7 @@ the anonymous page cache on.
 |---|---|---|
 | CSS per theme (`theme.css`, compressed) | ≤ 45 KB (`base`); ≤ 48 KB for `ride` (`css_budget_kb` in its manifest; measured 40.5 KB at THM.13 part 3) | unit test on the build output (THM.5, THM.13) |
 | JavaScript total, including htmx and Alpine (compressed) | ≤ 40 KB (`base`); ≤ 70 KB for `ride` (`js_budget_kb`; measured 63.2 KB at THM.13) | unit test (THM.5, THM.13) |
+| Each lazy script under `js/lazy/` (compressed) | ≤ 8 KB (`lazy_js_budget_kb` overrides; shipped scripts measure about 2 KB) | gate in `apps/themes/gates.py` (THM.5) |
 | Web fonts | ≤ 2 families, ≤ 4 woff2 files, Latin + Latin Extended-A subsets, `font-display: swap`, one preload | `LICENSES.toml` and build check (THM.5) |
 | LCP (mobile, 4G profile) | < 2.5 s | SEO.6 on STAGE |
 | CLS | < 0.1 (images and embeds always have width and height or `aspect-ratio`) | SEO.6 |

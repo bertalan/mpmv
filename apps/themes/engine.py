@@ -60,6 +60,7 @@ _OPTIONAL = (
     "foundation",
     "css_budget_kb",
     "js_budget_kb",
+    "lazy_js_budget_kb",
 )
 FOUNDATIONS = ("bootstrap-5.3",)  # CSS frameworks a theme may declare (spec 14 §14.5)
 
@@ -81,6 +82,7 @@ class ThemeManifest:
     foundation: str | None = None  # a name of FOUNDATIONS: the vendored framework under it
     css_budget_kb: int | None = None  # compressed theme.css limit; None keeps the default (§14.7)
     js_budget_kb: int | None = None  # compressed JavaScript limit of a page; None keeps the default
+    lazy_js_budget_kb: int | None = None  # compressed limit of each js/lazy/ script; None: default
 
 
 def _text(data: Mapping[str, object], key: str) -> str:
@@ -127,7 +129,9 @@ def parse_manifest(data: Mapping[str, object], *, dirname: str) -> ThemeManifest
         foundation = data["foundation"]
         if foundation not in FOUNDATIONS:
             raise ThemeError(f"foundation {foundation!r} must be one of {', '.join(FOUNDATIONS)}")
-    budgets = {key: _budget(data, key) for key in ("css_budget_kb", "js_budget_kb")}
+    budgets = {
+        key: _budget(data, key) for key in ("css_budget_kb", "js_budget_kb", "lazy_js_budget_kb")
+    }
     return ThemeManifest(
         slug=slug,
         name=name,
@@ -138,6 +142,7 @@ def parse_manifest(data: Mapping[str, object], *, dirname: str) -> ThemeManifest
         foundation=str(foundation) if foundation is not None else None,
         css_budget_kb=budgets["css_budget_kb"],
         js_budget_kb=budgets["js_budget_kb"],
+        lazy_js_budget_kb=budgets["lazy_js_budget_kb"],
     )
 
 

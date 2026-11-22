@@ -1528,7 +1528,7 @@ msgstr "Le candidature apriranno presto."
 
 #: apps/manager/templates/manager/platform/termination_detail.html apps/orders/models.py
 msgid "Applied"
-msgstr "Applicata"
+msgstr "Applicato"
 
 #: apps/catalog/templates/catalog/listing.html themes/ride/templates/catalog/listing.html
 msgid "Applied filters"
@@ -9235,7 +9235,7 @@ msgid ""
 "with it to submit the claim. Enter its password and a code from its authenticator app."
 msgstr ""
 "Grazie, l'attività è confermata. Un account usa già <strong>%(email)s</strong>: acceda con quello "
-"per inviare la richiesta. Inserisca la sua password e un codice della sua app di autenticazione."
+"per inviare la richiesta. Inserisca la Sua password e un codice della Sua app di autenticazione."
 
 #: apps/vendors/templates/vendors/claim/account.html
 msgid ""
