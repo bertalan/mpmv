@@ -14,6 +14,7 @@ from playwright.sync_api import Page
 from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.models import NavigationMenu
+from apps.core.i18n import primary_language
 from tests.e2e.test_base_theme_focus import (
     ADD_SPACER,
     FOCUS_VISIBLE_AT_CENTRE,
@@ -33,7 +34,7 @@ SCROLL_PADDING = "() => parseFloat(getComputedStyle(document.documentElement).sc
 def long_header_menu(base_url: str) -> None:
     """Four links in the primary language's header menu: the seeded About page and three more."""
     menu = NavigationMenu.objects.get(
-        location=NavigationMenu.Location.HEADER, locale__language_code="en"
+        location=NavigationMenu.Location.HEADER, locale__language_code=primary_language()
     )
     links = [(block.block_type, block.value) for block in menu.links]
     links += [

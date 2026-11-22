@@ -29,10 +29,12 @@ from apps.cms.tests.factories import (
     LegalPageFactory,
     VendorRecruitmentPageFactory,
 )
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
 from tests.e2e.axe import format_violations, run_axe
+from tests.i18n import category_url, language_prefix, localized
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -40,18 +42,24 @@ REPORT_DIR = Path(__file__).resolve().parents[2] / "build" / "e2e" / "axe"
 # The key public pages: the seeded site (home, About, blog), the recruitment funnel, the legal
 # pages, the Manager sign-in, a vendor storefront and a public catalogue listing, in the primary
 # and a second language. Cart, checkout and the product page do not exist yet (see Follow-ups).
-KEY_PAGES = (
-    "/",
-    "/it/",
-    "/blog/",
-    "/vendor/apply/",
-    "/terms-of-sale/",
-    "/sell-with-us/",
-    "/account/login/",
-    "/shop/acme/",
-    "/it/shop/acme/",
-    "/product-category/vases/",
-    "/it/categoria-prodotto/vasi/",
+PRIMARY = primary_language()
+SECOND = next((code for code in configured_languages() if code != PRIMARY), PRIMARY)
+KEY_PAGES = tuple(
+    dict.fromkeys(
+        (
+            "/",
+            f"{language_prefix(SECOND)}/",
+            "/blog/",
+            "/vendor/apply/",
+            "/terms-of-sale/",
+            "/sell-with-us/",
+            "/account/login/",
+            localized("/shop/acme/"),
+            localized("/shop/acme/", SECOND),
+            category_url(PRIMARY, "vases"),
+            category_url(SECOND, "vasi"),
+        )
+    )
 )
 
 
@@ -66,12 +74,12 @@ def storefront() -> Vendor:
     vendor = VendorFactory.create(
         status=Vendor.Status.ACTIVE, sells_online=True, slug="acme", display_name="Acme"
     )
-    for language in ("en", "it"):
+    for language in dict.fromkeys((PRIMARY, SECOND)):
         VendorTranslationFactory.create(
             vendor=vendor, language=language, status=TranslationStatus.PUBLISHED
         )
     category = CategoryFactory.create()
-    for language, name, slug in (("en", "Vases", "vases"), ("it", "Vasi", "vasi")):
+    for language, name, slug in ((PRIMARY, "Vases", "vases"), (SECOND, "Vasi", "vasi")):
         CategoryTranslationFactory.create(
             category=category,
             language=language,
