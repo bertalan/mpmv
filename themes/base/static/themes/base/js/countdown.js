@@ -2,14 +2,11 @@
 //
 // The server renders the absolute date in the operator's time zone, the call to action, and the
 // expired text `hidden`. This module, for each [data-countdown] block:
-// - rewrites the <time> text in the visitor's time zone, in the page language (Intl);
-// - shows the remaining days, hours and minutes, updated once a minute (no seconds); minutes
-//   round up, as `apps.cms.engine.countdown_state` does, so the counter never reads 0 before
-//   the target;
-// - reveals the pause button: paused, the counter stops updating (WCAG 2.2.2);
-// - at the target, hides the countdown, reveals the expired text and link, and announces the
-//   expired text once through the page's polite live region (#live-region, WCAG 4.1.3). The
-//   counter itself is never a live region.
+// - rewrites the <time> text in the visitor's time zone and the page language (Intl);
+// - shows the days, hours and minutes left, once a minute (minutes round up, as
+//   `apps.cms.engine.countdown_state` does), and a pause button (WCAG 2.2.2);
+// - at the target, hides the countdown, reveals the expired text and link, and announces it once
+//   through the polite live region (#live-region, WCAG 4.1.3). The counter is never live.
 // No inline script or style attribute, so the strict CSP holds; no animation at all.
 
 const MINUTE = 60_000;
@@ -18,15 +15,20 @@ const MINUTE = 60_000;
 const MAX_DELAY = 2 ** 31 - 1;
 const language = document.documentElement.lang || undefined;
 
+// Intl may be missing or throw: each use is guarded, answers null, and the server text stays.
 function formatDate(date) {
-  return new Intl.DateTimeFormat(language, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  }).format(date);
+  try {
+    return new Intl.DateTimeFormat(language, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(date);
+  } catch {
+    return null;
+  }
 }
 
 function formatRemaining(left) {
@@ -39,10 +41,14 @@ function formatRemaining(left) {
   // Leading zero units are left out; the minutes always show.
   const first = parts.findIndex(([, value]) => value > 0);
   const shown = parts.slice(first < 0 ? 2 : Math.min(first, 2));
-  const words = shown.map(([unit, value]) =>
-    new Intl.NumberFormat(language, { style: "unit", unit, unitDisplay: "long" }).format(value),
-  );
-  return new Intl.ListFormat(language, { style: "long", type: "unit" }).format(words);
+  try {
+    const words = shown.map(([unit, value]) =>
+      new Intl.NumberFormat(language, { style: "unit", unit, unitDisplay: "long" }).format(value),
+    );
+    return new Intl.ListFormat(language, { style: "long", type: "unit" }).format(words);
+  } catch {
+    return null;
+  }
 }
 
 function announce(text) {
@@ -68,8 +74,14 @@ function startCountdown(block) {
   let paused = false;
   let done = false;
 
+  // No working Intl: no counter and no pause button.
+  const canCount = formatRemaining(MINUTE) !== null;
+
   if (time) {
-    time.textContent = formatDate(new Date(target));
+    const text = formatDate(new Date(target));
+    if (text !== null) {
+      time.textContent = text;
+    }
   }
 
   function expire() {
@@ -97,20 +109,19 @@ function startCountdown(block) {
       return;
     }
     if (paused) {
-      // Paused, the counter stands still; the launch itself still switches the block.
       timer = setTimeout(tick, Math.min(left, MAX_DELAY));
       return;
     }
-    if (remaining) {
+    if (canCount && remaining) {
       remaining.textContent = formatRemaining(left);
     }
-    timer = setTimeout(tick, left % MINUTE || MINUTE);
+    timer = setTimeout(tick, canCount ? left % MINUTE || MINUTE : Math.min(left, MAX_DELAY));
   }
 
-  if (counter) {
+  if (counter && canCount) {
     counter.hidden = false;
   }
-  if (pause) {
+  if (pause && canCount) {
     pause.hidden = false;
     pause.addEventListener("click", () => {
       paused = !paused;
