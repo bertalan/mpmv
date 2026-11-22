@@ -51,17 +51,18 @@ def navigation_links(context: dict[str, Any], location: str) -> list[MenuLink]:
     """The links of the header or footer menu; pages are shown in the active language.
 
     Links to deleted or unpublished pages are left out. The header menu ends with the
-    temporary "Site links" item (OPS.12; remove before LIVE).
+    temporary "Site links" item (OPS.12; remove before LIVE), for staff only (THM.21).
     """
     links = _menu_links(context.get("request"), _menu(location))
-    if location == NavigationMenu.Location.HEADER:
+    user = getattr(context.get("request"), "user", None)
+    if location == NavigationMenu.Location.HEADER and getattr(user, "is_staff", False):
         links.extend(_site_links_item())
     return links
 
 
 def _site_links_item() -> list[MenuLink]:
-    """The temporary staff "Site links" page (OPS.12), shown to everyone so the owner can test
-    its protection on STAGE; remove before LIVE."""
+    """The temporary staff "Site links" page (OPS.12); the caller adds it for staff only, so the
+    menu of a visitor or a customer never shows a link they cannot open; remove before LIVE."""
     try:
         return [MenuLink(label=gettext("Site links"), url=reverse("site_links"))]
     except NoReverseMatch:  # a test URLconf without the route

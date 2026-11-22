@@ -61,7 +61,32 @@
   }
 
   .site-header__tools {
+    display: flex;
+    align-items: center;
     gap: var(--space-xs) var(--space-s);
+  }
+
+  /* --- Overlay (THM.21): a bar over the home hero (the page's first block, not a slider) is
+     translucent, with a gradient of the hero's scrim colour (85% to 70%, never lighter) behind the links so
+     they stay readable even on a white image (tests/e2e/test_ride_menu_contrast.py measures the 70% end over white). It turns
+     solid once the page is scrolled (`is-away`, ride.js); without JavaScript it stays solid. The
+     bar keeps its place in the flow and its negative end margin pulls the hero under it. */
+  .site-header:has(~ .site-main > .block-hero:not(.block-hero--slider):first-child):not(:has(~ :is(.site-messages, .garage-merge-notice))) {
+    margin-block-end: calc(-1 * var(--header-offset, var(--header-height)));
+  }
+
+  html:not(.no-js):not(.is-away)
+    .site-header:has(~ .site-main > .block-hero:not(.block-hero--slider):first-child):not(:has(~ :is(.site-messages, .garage-merge-notice))) {
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-overlay) 85%, transparent),
+      color-mix(in srgb, var(--color-overlay) 70%, transparent)
+    );
+  }
+
+  .site-header:has(~ .site-main > .block-hero:not(.block-hero--slider):first-child):not(:has(~ :is(.site-messages, .garage-merge-notice)))
+    ~ .site-main > .block-hero .hero {
+    padding-block-start: calc(var(--space-section) + var(--header-offset, var(--header-height)));
   }
 
   /* --- Dropdown sub-menus (Bootstrap dropdown): a button next to the link. */
@@ -170,18 +195,55 @@
     }
 
     .site-header {
+      --header-height: 4rem;
+
       position: static;
     }
 
-    .site-nav {
-      order: 1;
-      flex: 0 0 auto;
-      margin-inline-start: auto;
+    /* One row of at most 64 px (THM.21): logo, search, cart, menu button. The secondary tools
+       are in the drawer. */
+    .site-header__inner {
+      flex-wrap: nowrap;
+      gap: var(--space-s);
+    }
+
+    .site-name {
+      flex: 1 1 auto;
+      min-inline-size: 0;
+      font-size: var(--step-1);
+      line-height: 1.1;
+    }
+
+    /* Not sticky here, but positioned, so it paints above the hero it overlays. */
+    .site-header:has(~ .site-main > .block-hero:not(.block-hero--slider):first-child):not(:has(~ :is(.site-messages, .garage-merge-notice))) {
+      position: relative;
     }
 
     .site-header__tools {
+      order: 1;
+      flex: 0 0 auto;
+      flex-wrap: nowrap;
+    }
+
+    .site-nav {
       order: 2;
-      flex-basis: 100%;
+      flex: 0 0 auto;
+    }
+
+    .site-header__more {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-s);
+      margin-block-start: var(--space-l);
+      padding-block-start: var(--space-m);
+      border-block-start: 1px solid currentcolor;
+    }
+
+    .site-header__more :is(.user-menu__list, .garage-menu__list) {
+      position: static;
+      margin-block-start: var(--space-xs);
+      box-shadow: none;
     }
 
     .site-nav ul {
@@ -235,8 +297,18 @@
     .site-header .offcanvas-body {
       display: flex;
       flex-grow: 0;
+      align-items: center;
       padding: 0;
       overflow: visible;
+    }
+
+    /* The secondary tools end the inline navigation (THM.21). */
+    .site-header__more {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-xs) var(--space-s);
+      margin-inline-start: auto;
     }
 
     .site-nav .navbar-nav {
