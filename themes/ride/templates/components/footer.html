@@ -13,7 +13,7 @@ context) shows a strip of vendor logos above the footer; with none nothing rende
 (site name, footer menu, social profiles), the columns, and a copyright row.
 CMS.17: the context comes from the `footer_chrome` tag (the footer setting); with no setting
 nothing is passed and the three columns above are all that shows.
-{% endcomment %}{% if vendor_logos %}<section class="site-footer-strip">
+{% endcomment %}<div class="site-footer-group">{% if vendor_logos %}<section class="site-footer-strip">
   <div class="site-footer-strip__inner">{% include "components/logo_strip.html" with label=_("Our vendors") logos=vendor_logos only %}</div>
 </section>{% endif %}<footer class="site-footer">
   <div class="site-footer__top">
@@ -54,4 +54,4 @@ nothing is passed and the three columns above are all that shows.
     {% consent_settings_link as consent_link %}{% if consent_link %}<p>{{ consent_link }}</p>{% endif %}
     <a class="back-to-top" href="#top">{% include "components/icon.html" with name="chevron-down" %}{% translate "Back to top" %}</a>
   </div>
-</footer>
+</footer></div>

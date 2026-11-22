@@ -10,14 +10,21 @@ import pytest
 from playwright.sync_api import Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
+from wagtail.models import Site
 
 from apps.catalog.models import Product
+from apps.catalog.tests.factories import brand_logo_image
+from apps.cms.models import FooterColumn, FooterSettings, SocialProfile
+from apps.core.i18n import primary_language
 from apps.themes.engine import contrast_ratio
+from apps.vendors.models import Vendor
+from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.test_add_to_cart import product  # noqa: F401 (fixture)
 from tests.e2e.test_catalog_listings import term_page  # noqa: F401 (fixture)
 from tests.e2e.test_ride_overlays import ride_paths
+from tests.e2e.visual import assert_matches_baseline, require_visual_mode
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -110,3 +117,32 @@ def test_the_consent_card_covers_at_most_30_percent_of_a_phone_viewport(
     violations = run_axe(page, include="#consent-banner")
     assert not violations, format_violations(violations)
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
+
+
+@pytest.mark.parametrize("width", [375, 1280])
+def test_the_footer_with_strip_columns_and_social_icons_matches_its_baseline(
+    width: int, page: Page, live_server: LiveServer
+) -> None:
+    require_visual_mode()
+    for name in ("Alpine Works", "Berg Cycles", "Cima Gear"):
+        vendor = VendorFactory.create(display_name=name, status=Vendor.Status.ACTIVE)
+        Vendor.objects.filter(pk=vendor.pk).update(logo=brand_logo_image())
+    footer = FooterSettings.objects.create(site=Site.objects.get(is_default_site=True))
+    for n in range(3):
+        FooterColumn.objects.create(
+            settings=footer,
+            language=primary_language(),
+            title=f"Column {n}",
+            links=[("external", {"url": f"https://example.com/{n}/", "label": f"Link {n}"})],
+        )
+    for network in ("mastodon", "instagram", "github"):
+        SocialProfile.objects.create(
+            settings=footer, network=network, url=f"https://social.example/{network}"
+        )
+    visit(page, live_server, "/", width)
+    expect(page.locator(".site-footer-strip .logo-strip li")).to_have_count(3)
+    expect(page.locator(".site-footer__social svg")).to_have_count(3)
+    page.evaluate("document.querySelector('#consent-banner')?.remove()")
+    assert_matches_baseline(
+        page, theme="ride", name="footer", width=width, selector=".site-footer-group"
+    )
