@@ -5,7 +5,6 @@ the visitor then goes through the cart and checkout to the payment page (the fak
 card data, no Stripe). Only the VIES client is replaced, as in the ORD.5 e2e.
 """
 
-import re
 from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
@@ -24,7 +23,8 @@ from apps.tax import engine as tax
 from apps.tax.tests.factories import TaxRateFactory
 from apps.vendors.tests.factories import CommissionRuleFactory
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS
-from tests.e2e.test_checkout import check_page, fill_delivery
+from tests.e2e.test_checkout import TERMS, cart_link_name, check_page, fill_delivery, pay_button
+from tests.i18n import localized, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -51,24 +51,25 @@ def test_a_visitor_goes_from_the_product_page_to_the_payment_page(
     page: Page, live_server: LiveServer, product: Product, shot: Callable[[str], Path]
 ) -> None:
     page.add_init_script(RECORD_CSP_VIOLATIONS)
-    page.goto(f"{live_server.url}/product/blue-vase/")
+    product_page = f"{live_server.url}{localized('/product/blue-vase/')}"
+    page.goto(product_page)
     page.locator("#product-quantity").fill("2")
     shot("1-product")
     check_page(page)
-    page.get_by_role("button", name="Add to cart").click()
-    expect(page.locator("#add-to-cart-result")).to_contain_text("Added to your cart.")
-    expect(page.get_by_role("link", name="View your cart: 2 items")).to_be_visible()
-    expect(page).to_have_url(f"{live_server.url}/product/blue-vase/")  # no reload, no redirect
+    page.get_by_role("button", name=translated("Add to cart")).click()
+    expect(page.locator("#add-to-cart-result")).to_contain_text(translated("Added to your cart."))
+    expect(page.get_by_role("link", name=cart_link_name(2))).to_be_visible()
+    expect(page).to_have_url(product_page)  # no reload, no redirect
     shot("2-added")
 
-    page.get_by_role("link", name="View your cart: 2 items").click()
-    expect(page.get_by_role("heading", level=1)).to_have_text("Your cart")
-    page.get_by_role("link", name="Continue to checkout").click()
+    page.get_by_role("link", name=cart_link_name(2)).click()
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Your cart"))
+    page.get_by_role("link", name=translated("Continue to checkout")).click()
     fill_delivery(page)
     page.locator("#id_city").press("Enter")
-    expect(page.get_by_role("heading", level=1)).to_have_text("Review and pay")
-    page.get_by_label(re.compile("I have read and accept")).check()  # ORD.17 box 1
-    page.get_by_role("button", name=re.compile("Confirm order and pay now")).click()
-    expect(page.get_by_role("heading", level=1)).to_have_text("Order received")
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Review and pay"))
+    page.get_by_label(translated(TERMS)).check()  # ORD.17 box 1
+    pay_button(page).click()
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Order received"))
     check_page(page)
     assert Order.objects.get().grand_total == Decimal("256.08")  # 2 x 100 + 9.90, VAT 22%
