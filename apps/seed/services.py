@@ -1256,7 +1256,7 @@ def _cms(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> Non
         )
 
     shop = _standard_page(run, home, locales, images["home-hero"], data.SHOP, shop_body)
-    demo_home.seed_navigation(run, locales, [("shop", shop), ("blog", blog), ("about", how)])
+    demo_home.seed_navigation(run, locales, [("shop", shop), ("blog", blog)])
     _recruitment_home(run, home, images, shop)
 
 

@@ -59,7 +59,7 @@ def test_the_header_menu_links_shop_blog_and_about(demo_seed: ChangeSet) -> None
     pages = [link.value["page"].specific for link in menu.links]
     assert [type(page) for page in pages][:3] == [StandardPage, BlogIndexPage, StandardPage]
     assert pages[0].slug == data.SHOP.slug["en"]
-    assert pages[2].slug == data.HOW_IT_WORKS.slug["en"]
+    assert pages[2].slug == "about"
 
 
 def test_the_footer_has_a_column_and_a_social_profile(demo_seed: ChangeSet) -> None:

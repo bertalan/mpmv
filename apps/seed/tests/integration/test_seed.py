@@ -228,7 +228,7 @@ STOREFRONT = (
     ("/", data.LANDING_HERO[0]),  # CMS.19: English example content in every language
     (f"{language_prefix(other_language())}/", data.LANDING_HERO[0]),
     (f"{language_prefix(third_language())}/", data.LANDING_HERO[0]),
-    ("/demo-shop/", "Made by independent makers"),
+    ("/demo-shop/", "Made by hand, sent from the workshop"),
     (f"{language_prefix(other_language())}/demo-negozio/", "Fatto da artigiani indipendenti"),
     (localized("/product-category/demo-home-kitchen/"), "Stoneware dinner plate"),
     (

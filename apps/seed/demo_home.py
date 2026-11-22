@@ -40,7 +40,7 @@ BLOG_INTRO: Final[Texts] = {
     "de": "<p>Neuigkeiten aus den Werkstätten, mit Hinweisen zu Materialien und Pflege.</p>",
 }
 AUTHOR: Final = ("Demo editor", "demo-editor")
-POSTS: Final = (
+POSTS: Final[tuple[dict[str, Any], ...]] = (
     {
         "slug": {"en": "choosing-timber", "it": "scegliere-il-legno", "de": "holz-auswaehlen"},
         "title": {
@@ -201,14 +201,14 @@ def seed_blog(
         post = BlogPostPage.objects.child_of(index).filter(slug=spec["slug"]["en"]).first()
         if post is None:
             post = BlogPostPage(
-                title=pick(spec["title"], source),  # type: ignore[arg-type]
-                slug=spec["slug"]["en"],  # type: ignore[index]
+                title=pick(spec["title"], source),
+                slug=spec["slug"]["en"],
                 date=spec["date"],
                 author=author,
-                summary=pick(spec["summary"], source),  # type: ignore[arg-type]
-                image=images[spec["image"]],  # type: ignore[index]
-                image_alt_text=pick(spec["title"], source),  # type: ignore[arg-type]
-                body=[("paragraph", pick(spec["text"], source))],  # type: ignore[arg-type]
+                summary=pick(spec["summary"], source),
+                image=images[spec["image"]],
+                image_alt_text=pick(spec["title"], source),
+                body=[("paragraph", pick(spec["text"], source))],
             )
             index.add_child(instance=post)
             post = _publish(post)
@@ -248,17 +248,17 @@ def seed_navigation(
 ) -> None:
     """The header menu of every language (`pages` is (label key, source page)) and the footer."""
     for language, locale in locales.items():
-        links = [
-            (
-                "page",
-                {"page": _local(page, locale), "label": pick(MENU_LABELS[key], language)},
-            )
-            for key, page in pages
-        ]
         menu = NavigationMenu.objects.filter(locale=locale, location="header").first()
-        if menu is None:
-            NavigationMenu.objects.create(locale=locale, location="header", links=links)
-            run.created("cms.navigationmenu", f"header {language}")
+        if menu is None or len(menu.links) != 1 or menu.links[0].value["label"]:
+            continue  # an editor's menu stays as it is
+        about = menu.links[0].value["page"]  # the CMS.1 About page
+        entries = [*pages, ("about", about)]
+        menu.links = [
+            ("page", {"page": _local(page, locale), "label": pick(MENU_LABELS[key], language)})
+            for key, page in entries
+        ]
+        menu.save()
+        run.created("cms.navigationmenu", f"header {language}")
     site = Site.objects.get(is_default_site=True)
     footer = FooterSettings.for_site(site)
     for language, locale in locales.items():
