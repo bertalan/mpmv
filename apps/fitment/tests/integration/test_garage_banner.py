@@ -244,3 +244,22 @@ def test_an_action_link_referer_is_never_remembered_nor_a_return_target(client: 
         reverse("garage_apply"), {"choice": "generic"}, headers={"Referer": secret}
     )
     assert banner["Location"] == "/"
+
+
+def test_a_secret_referer_under_another_language_prefix_is_not_remembered(client: Client) -> None:
+    """`i18n_patterns` match only the active language's prefix: the guard tries every language."""
+    from tests.i18n import language_prefix, other_language
+
+    other = other_language()
+    with translation.override(other):
+        secret = reverse("vendors:apply_confirm", kwargs={"user_key": "top-secret-marker"})
+    assert secret.startswith(language_prefix(other) + "/") or other == primary_language()
+    _save(client, "Roadster")
+    client.get(reverse("garage_choose"), headers={"Referer": secret})
+    assert "top-secret-marker" not in str(dict(client.session))
+    applied = client.post(
+        reverse("garage_apply"),
+        {"choice": "vehicle:0"},
+        headers={"Referer": reverse("garage_choose")},
+    )
+    assert applied["Location"] == "/"

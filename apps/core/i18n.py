@@ -118,11 +118,17 @@ def switch_goes_home(request: HttpRequest | None) -> bool:
 
 def path_carries_secret(path: str) -> bool:
     """Whether `path` resolves to a view marked `language_switch_home`: its URL holds a secret, so
-    it must not be copied anywhere (session, page, redirect target)."""
+    it must not be copied anywhere (session, page, redirect target). The path is tried under every
+    configured language, as `i18n_patterns` only match the active language's prefix: a German page
+    seen by a request in Italian must be recognised too."""
     from django.urls import Resolver404, resolve
 
-    try:
-        match = resolve(path)
-    except Resolver404:
-        return False
-    return bool(getattr(match.func, "language_switch_home", False))
+    for code in configured_languages():
+        with translation.override(code):
+            try:
+                match = resolve(path)
+            except Resolver404:
+                continue
+        if getattr(match.func, "language_switch_home", False):
+            return True
+    return False
