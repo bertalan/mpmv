@@ -10,17 +10,24 @@ from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.services import ACCOUNT_LOCKOUT
 from apps.accounts.tests.factories import UserFactory
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
-GENERIC_ERROR = "Please enter the correct email and password for a staff account."
+
+def generic_error() -> str:
+    """Django admin's failed-login message in the primary language (the username is the email)."""
+    return translated(
+        "Please enter the correct %(username)s and password for a staff account. Note that "
+        "both fields may be case-sensitive."
+    ) % {"username": "email"}
 
 
 def _submit(page: Page, url: str, email: str, password: str) -> None:
     page.goto(url)
-    page.get_by_label("Email").fill(email)
-    page.get_by_label("Password").fill(password)
-    page.get_by_role("button", name="Log in").click()
+    page.get_by_label(translated("Email")).fill(email)
+    page.get_by_label(translated("Password")).fill(password)
+    page.get_by_role("button", name=translated("Log in")).click()
 
 
 def test_staff_is_locked_out_after_repeated_failures(
@@ -32,10 +39,10 @@ def test_staff_is_locked_out_after_repeated_failures(
 
     for _ in range(ACCOUNT_LOCKOUT.free_attempts):
         _submit(page, url, "staff@example.com", secrets.token_urlsafe(16))
-        expect(page.get_by_text(GENERIC_ERROR)).to_be_visible()
+        expect(page.get_by_text(generic_error())).to_be_visible()
     shot("failed-attempts")
 
     _submit(page, url, "staff@example.com", password)
-    expect(page.get_by_text(GENERIC_ERROR)).to_be_visible()  # same message: nothing leaks
-    expect(page.get_by_role("button", name="Log in")).to_be_visible()
+    expect(page.get_by_text(generic_error())).to_be_visible()  # same message: nothing leaks
+    expect(page.get_by_role("button", name=translated("Log in"))).to_be_visible()
     shot("locked-out")

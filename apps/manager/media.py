@@ -42,6 +42,7 @@ from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
+from apps.core.nfc_forms import NFCForm
 from apps.vendors import engine
 from apps.vendors.models import Vendor
 from apps.vendors.services import (
@@ -69,7 +70,7 @@ PRESERVED = ["multiple", "select_format", "layout"]
 DOC_PREFIX = "document-chooser-upload"
 
 
-class ImageUploadForm(forms.Form):
+class ImageUploadForm(NFCForm):
     """What the vendor sends: the file and a title. Never a collection: that is the vendor's."""
 
     title = forms.CharField(label=_("Title"), max_length=255, required=False)
@@ -278,7 +279,7 @@ class ManagerImageUploadView(_OwnListing, _FormatStep, ImageChosenResponseMixin,
 # --- Documents (VEN.31 part 2): the same gate and scope, PDFs only ----------------------------
 
 
-class DocumentUploadForm(forms.Form):
+class DocumentUploadForm(NFCForm):
     """The file and a title. Never a collection: that is the vendor's."""
 
     title = forms.CharField(label=_("Title"), max_length=255, required=False)
@@ -407,7 +408,8 @@ def https_address(value: str) -> str:
     return value
 
 
-class ExternalLinkForm(forms.Form):
+class ExternalLinkForm(NFCForm):
+    nfc_exact_fields = ("url",)  # matched byte for byte (I18N.10)
     url = forms.CharField(
         label=_("Web address"),
         help_text=_(

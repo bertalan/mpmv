@@ -10,8 +10,10 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.models import HomePage
+from apps.core.i18n import primary_language
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.e2e.test_ride_carousels import slide
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -40,7 +42,7 @@ SLIDE_B: dict[str, object] = {
 def _slider_home(settings: SettingsWrapper, live_server: LiveServer, _cms_site: None) -> None:
     settings.MPMV_THEME_DEFAULT = "ride"
     settings.MPMV_HELP_URL = "/about/#help"
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     home.body = [
         (
             "hero",
@@ -99,12 +101,12 @@ def test_the_slider_works_with_the_keyboard_and_does_not_move_on_its_own(
     open_home(page, live_server, 1280)
     slider = page.locator("#hero-slider-1")
     active = slider.locator(".carousel-item.active")
-    expect(active).to_have_attribute("aria-label", "1 of 3")
+    expect(active).to_have_attribute("aria-label", slide(1))
     page.wait_for_timeout(1500)
-    expect(active).to_have_attribute("aria-label", "1 of 3")
+    expect(active).to_have_attribute("aria-label", slide(1))
     slider.locator("[data-bs-slide=next]").focus()
     page.keyboard.press("Enter")
-    expect(slider.locator(".carousel-item.active")).to_have_attribute("aria-label", "2 of 3")
+    expect(slider.locator(".carousel-item.active")).to_have_attribute("aria-label", slide(2))
 
 
 def test_a_phone_shows_one_strip_item_per_view(page: Page, live_server: LiveServer) -> None:

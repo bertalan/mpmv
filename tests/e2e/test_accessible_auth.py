@@ -31,7 +31,9 @@ from apps.vendors import services as vendor_services
 from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.e2e.test_login_lockout import generic_error
 from tests.e2e.test_vendor_claim import code_from_secret, emailed_link_path
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -51,7 +53,9 @@ def _no_axe_violations(page: Page) -> None:
 
 def _logged_in(page: Page) -> None:
     expect(
-        page.get_by_role("link", name="Log out").or_(page.get_by_role("button", name="Log out"))
+        page.get_by_role("link", name=translated("Log out")).or_(
+            page.get_by_role("button", name=translated("Log out"))
+        )
     ).to_be_visible()
 
 
@@ -63,7 +67,7 @@ def clipboard_page(page: Page, live_server: LiveServer) -> Page:
 
 
 def _check_toggle(page: Page, password_field: Locator) -> None:
-    toggle = page.get_by_role("button", name="Show password")
+    toggle = page.get_by_role("button", name=translated("Show password"))
     expect(toggle).to_have_attribute("aria-pressed", "false")
     toggle.click()
     expect(password_field).to_have_attribute("type", "text")
@@ -83,8 +87,8 @@ def test_staff_paste_a_password_and_a_totp_code(
     RecoveryCodeFactory.create(device=RecoveryCodeDeviceFactory.create(user=user))
 
     page.goto(f"{live_server.url}/django-admin/login/")
-    email = page.get_by_label("Email")
-    secret_field = page.get_by_label("Password")
+    email = page.get_by_label(translated("Email"))
+    secret_field = page.get_by_label(translated("Password"))
     expect(email).to_have_attribute("autocomplete", "username")
     expect(secret_field).to_have_attribute("autocomplete", "current-password")
     _no_axe_violations(page)
@@ -93,17 +97,19 @@ def test_staff_paste_a_password_and_a_totp_code(
     _paste(page, secret_field, password)
     _check_toggle(page, secret_field)
     shot("login-pasted")
-    page.get_by_role("button", name="Log in").click()
+    page.get_by_role("button", name=translated("Log in")).click()
 
     expect(page).to_have_url(re.compile(r"/account/mfa/verify/"))
-    code = page.get_by_label("Authentication code")
+    code = page.get_by_label(translated("Authentication code"))
     expect(code).to_have_attribute("autocomplete", "one-time-code")
     expect(code).to_have_attribute("inputmode", "numeric")
-    expect(page.get_by_label("Recovery code")).to_have_attribute("autocomplete", "one-time-code")
+    expect(page.get_by_label(translated("Recovery code"))).to_have_attribute(
+        "autocomplete", "one-time-code"
+    )
     _no_axe_violations(page)
     _paste(page, code, totp_token(device))
     shot("verify-pasted")
-    page.get_by_role("button", name="Verify", exact=True).click()
+    page.get_by_role("button", name=translated("Verify"), exact=True).click()
     _logged_in(page)
     assert csp_violations(page) == []
 
@@ -116,15 +122,15 @@ def test_a_failed_login_explains_itself_accessibly(
     UserFactory.create(email="staff@example.com", password=password, superuser=True)
 
     page.goto(f"{live_server.url}/django-admin/login/")
-    page.get_by_label("Email").fill("staff@example.com")
-    _paste(page, page.get_by_label("Password"), "x" + password)
-    page.get_by_role("button", name="Log in").click()
+    page.get_by_label(translated("Email")).fill("staff@example.com")
+    _paste(page, page.get_by_label(translated("Password")), "x" + password)
+    page.get_by_role("button", name=translated("Log in")).click()
 
-    secret_field = page.get_by_label("Password")
+    secret_field = page.get_by_label(translated("Password"))
     expect(secret_field).to_have_attribute("aria-invalid", "true")
     error_id = secret_field.get_attribute("aria-describedby")
     assert error_id
-    expect(page.locator(f"#{error_id}")).to_contain_text("correct email and password")
+    expect(page.locator(f"#{error_id}")).to_contain_text(generic_error())
     _no_axe_violations(page)
     shot("login-error")
     assert csp_violations(page) == []
@@ -150,11 +156,11 @@ def test_editors_paste_their_password_on_the_wagtail_login(
     _paste(page, secret_field, password)
     _check_toggle(page, secret_field)
     shot("wagtail-login-pasted")
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
 
     expect(page).to_have_url(re.compile(r"/account/mfa/verify/"))
-    _paste(page, page.get_by_label("Authentication code"), totp_token(device))
-    page.get_by_role("button", name="Verify", exact=True).click()
+    _paste(page, page.get_by_label(translated("Authentication code")), totp_token(device))
+    page.get_by_role("button", name=translated("Verify"), exact=True).click()
     expect(page).to_have_url(re.compile(r"/admin/$"))
     assert csp_violations(page) == []
 
@@ -167,27 +173,27 @@ def test_mfa_enrolment_pages_pass_axe_and_accept_a_pasted_code(
     UserFactory.create(email="staff@example.com", password=password, staff=True)
 
     page.goto(f"{live_server.url}/django-admin/login/")
-    page.get_by_label("Email").fill("staff@example.com")
-    _paste(page, page.get_by_label("Password"), password)
-    page.get_by_role("button", name="Log in").click()
+    page.get_by_label(translated("Email")).fill("staff@example.com")
+    _paste(page, page.get_by_label(translated("Password")), password)
+    page.get_by_role("button", name=translated("Log in")).click()
 
     expect(page).to_have_url(re.compile(r"/account/mfa/setup/"))
     _no_axe_violations(page)
-    page.get_by_role("link", name="Use an authenticator app").click()
+    page.get_by_role("link", name=translated("Use an authenticator app")).click()
     _no_axe_violations(page)
     secret = page.locator("#totp-secret").inner_text().replace(" ", "")
 
-    code = page.get_by_label("Authentication code")
+    code = page.get_by_label(translated("Authentication code"))
     expect(code).to_have_attribute("autocomplete", "one-time-code")
     _paste(page, code, "000000")
-    page.get_by_role("button", name="Confirm").click()
-    code = page.get_by_label("Authentication code")
+    page.get_by_role("button", name=translated("Confirm")).click()
+    code = page.get_by_label(translated("Authentication code"))
     expect(code).to_have_attribute("aria-invalid", "true")
     _no_axe_violations(page)
     shot("enrolment-error")
 
     _paste(page, code, str(totp(b32decode(secret))).zfill(6))
-    page.get_by_role("button", name="Confirm").click()
+    page.get_by_role("button", name=translated("Confirm")).click()
     expect(page.locator("ol.recovery-codes li")).to_have_count(10)
     _no_axe_violations(page)
     shot("recovery-codes")
@@ -205,7 +211,8 @@ def test_a_vendor_claimant_pastes_new_passwords_and_a_code(
         vendor, ctx=AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
     )
     page.goto(f"{live_server.url}{emailed_link_path()}")
-    page.get_by_role("button", name="Continue").click()
+    page.get_by_role("button", name=translated("Continue")).click()
+    # The claim pages themselves are not translated yet: their text is English in every language.
     page.get_by_label("VAT number or TIN").fill(vendor.vat_number)
     page.get_by_role("button", name="Confirm").click()
 

@@ -9,11 +9,13 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 from apps.core import translations
+from apps.core.nfc_forms import NFCForm
 from apps.fitment.models import FitmentNode, NodeStatus
 from apps.fitment.services import LevelLabels
 
 
-class SchemeForm(forms.Form):
+class SchemeForm(NFCForm):
+    nfc_exact_fields = ("garage_noun_key",)  # matched byte for byte (I18N.10)
     garage_noun_key = forms.CharField(
         label=_("Garage noun"),
         max_length=60,
@@ -62,7 +64,7 @@ def _language_names() -> list[tuple[str, str]]:
     return [(code, str(name)) for code, name in settings.LANGUAGES]
 
 
-class LevelLabelsForm(forms.Form):
+class LevelLabelsForm(NFCForm):
     """The label, plural label and picker hint of a level, one set per site language. The source
     language is required; another language is saved only when its label is filled."""
 
@@ -106,6 +108,7 @@ class LevelLabelsForm(forms.Form):
 
 
 class AddLevelForm(LevelLabelsForm):
+    nfc_exact_fields = ("code",)  # matched byte for byte (I18N.10)
     code = forms.SlugField(
         label=_("Code"),
         max_length=40,
@@ -120,7 +123,8 @@ class AddLevelForm(LevelLabelsForm):
     field_order = ["code", "translate_names"]
 
 
-class NodeForm(forms.Form):
+class NodeForm(NFCForm):
+    nfc_exact_fields = ("parent",)  # matched byte for byte (I18N.10)
     name = forms.CharField(label=_("Name"), max_length=120)
     status = forms.ChoiceField(
         label=_("Status"),
@@ -144,11 +148,11 @@ class NodeForm(forms.Form):
             raise forms.ValidationError(_("This parent does not exist.")) from None
 
 
-class NodeNameForm(forms.Form):
+class NodeNameForm(NFCForm):
     name = forms.CharField(label=_("Name"), max_length=120)
 
 
-class AliasForm(forms.Form):
+class AliasForm(NFCForm):
     alias = forms.CharField(label=_("Alias"), max_length=120)
     language = forms.ChoiceField(
         label=_("Language"),
@@ -157,12 +161,12 @@ class AliasForm(forms.Form):
     )
 
 
-class TranslatedNameForm(forms.Form):
+class TranslatedNameForm(NFCForm):
     language = forms.ChoiceField(label=_("Language"), choices=_language_names)
     name = forms.CharField(label=_("Name"), max_length=120)
 
 
-class ReasonForm(forms.Form):
+class ReasonForm(NFCForm):
     reason = forms.CharField(
         label=_("Reason"),
         widget=forms.Textarea(attrs={"rows": 3}),

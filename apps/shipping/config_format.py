@@ -63,6 +63,8 @@ VERSION: Final = 3
 # Versions this platform reads; version 1 files hold no special areas.
 SUPPORTED_VERSIONS: Final = (1, 2, 3)
 SPECIAL_AREAS_SINCE: Final = 2
+NOT_RETURNABLE: Final = "not_returnable_by_post"
+NOT_RETURNABLE_SINCE: Final = 3
 
 # Which zone a method ships to: one of the owner's zones (in the file or already stored), or a
 # platform zone (vendor files only).
@@ -438,6 +440,8 @@ def _add_csv_row(parsed: ParsedConfig, ref: str, cells: Mapping[str, str]) -> No
     for name in FIELDS[record]:
         if name in cells:
             _put_cell(values, name, cells[name])
+            if name in BOOLEAN_FIELDS and name in values and not isinstance(values[name], bool):
+                parsed.issue(ref, name, "Must be true or false (lowercase) or empty.")
     method = None
     if record in METHOD_PARTS:
         link: dict[str, Any] = {}
@@ -453,8 +457,7 @@ def _put_cell(values: dict[str, Any], name: str, cell: str) -> None:
         values[name] = [item.strip() for item in cell.split(LIST_SEPARATOR)] if cell.strip() else []
     elif name in BOOLEAN_FIELDS:
         if cell.strip():
-            flag = cell.strip().lower()
-            values[name] = {"true": True, "false": False}.get(flag, cell)
+            values[name] = {"true": True, "false": False}.get(cell.strip(), cell)
     elif name in NUMBER_FIELDS:
         values[name] = cell.strip() or None
     elif name == "zone_scope":
@@ -509,6 +512,13 @@ def _add_row(
             parsed.issue(ref, name, "Must be a single value, not a list or an object.")
         if any(_unstorable(item) for item in (value if isinstance(value, list) else [value])):
             parsed.issue(ref, name, "Contains a null or unpaired surrogate character.")
+    if record == METHOD and NOT_RETURNABLE in values and parsed.version < NOT_RETURNABLE_SINCE:
+        parsed.issue(
+            ref,
+            NOT_RETURNABLE,
+            f"Needs format version {NOT_RETURNABLE_SINCE}: this file declares version "
+            f"{parsed.version}.",
+        )
     scope = values.get("zone_scope")
     if record == METHOD and scope is not None and scope not in ZONE_SCOPES:
         parsed.issue(ref, "zone_scope", f"Must be one of {', '.join(ZONE_SCOPES)}.")

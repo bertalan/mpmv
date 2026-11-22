@@ -23,6 +23,7 @@ from apps.accounts import services as accounts_services
 from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
 from apps.core.audit import audit_context
+from apps.core.text import nfc
 
 from .forms import EndEverySessionForm, EndUserSessionsForm, UserLookupForm
 from .views import ManagerView
@@ -31,6 +32,12 @@ USER_SESSIONS_SECTION: Final = "platform.user_sessions"  # a row of roles.MATRIX
 PANIC_SECTION: Final = "platform.sessions_panic"  # a row of roles.MATRIX
 # The word the platform owner types, in the language of the page.
 PANIC_WORD: Final = gettext_noop("END EVERY SESSION")
+
+
+def panic_word_matches(typed: str) -> bool:
+    """`typed` is the panic word in the active language; both sides in NFC (I18N.10), so a
+    translation with accents matches however the keyboard composed them."""
+    return nfc(typed.strip()) == nfc(_(PANIC_WORD))
 
 
 def _actor(view: ManagerView) -> User:
@@ -135,7 +142,7 @@ class EndEverySessionView(ManagerView):
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         actor = _actor(self)
         form = EndEverySessionForm(request.POST)
-        if form.is_valid() and form.cleaned_data["confirm"].strip() != _(PANIC_WORD):
+        if form.is_valid() and not panic_word_matches(form.cleaned_data["confirm"]):
             form.add_error("confirm", _("Type the words exactly as shown."))
         if not form.is_valid():
             return self.render_to_response(self.get_context_data(form=form), status=400)

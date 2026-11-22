@@ -133,4 +133,5 @@ def test_the_help_chrome_follows_the_pages_language() -> None:
     assert tools["data-help-lang"] == other_language()
     button = tools.select_one("button.help-button")
     assert button is not None
-    assert button["aria-label"] == "Aiuto per questa pagina"
+    with translation.override(other_language()):
+        assert button["aria-label"] == gettext("Help for this page")
