@@ -90,3 +90,15 @@ def test_help_has_no_exceptions_left() -> None:
 
 def test_help_en_prose_is_british() -> None:
     assert british.help_violations() == []
+
+
+def test_the_role_matrix_labels_are_british_english() -> None:
+    """I18N.23 follow-up: SECTION_LABELS are plain strings, so the msgid sweep misses them."""
+    from apps.manager import roles
+
+    bad = {
+        key: british.american_words(label)
+        for key, label in roles.SECTION_LABELS.items()
+        if british.american_words(label)
+    }
+    assert bad == {}

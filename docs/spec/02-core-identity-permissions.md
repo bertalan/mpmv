@@ -593,7 +593,7 @@ in the audit log row means the `AuditLog` entries filtered to the sections the r
 | Shop: access by support log (own vendor) | R | — | — | — | — | — | — | — | — |
 | Platform: configuration and tax (ARC.24) | — | — | E | — | — | — | R | — | — |
 | Platform: owner-only settings (CMP.13, CMP.11 approvals) | — | — | R | — | — | — | E | — | — |
-| Platform: catalog, categories, attributes, taxonomies, imports | — | — | — | E | — | R | R | — | — |
+| Platform: catalogue, categories, attributes, taxonomies, imports | — | — | — | E | — | R | R | — | — |
 | Platform: moderation (vendor events, storefront changes, content) | — | — | — | E | — | — | R | — | — |
 | Platform: vendors (applications, plans) | — | — | R (name, plan) | R | R | R | E | — | — |
 | Platform: approve or suspend a vendor (step-up, reason) | — | — | — | E | — | — | E | — | — |
