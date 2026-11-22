@@ -13175,7 +13175,8 @@ msgstr ""
 "dati del venditore nella conferma d'ordine (pagina ed e-mail) e nel riepilogo dell'ordine al "
 "momento dell'acquisto)"
 
-#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/orders/customer_views.py
+#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/manager/stray_views.py
+#: apps/orders/customer_views.py
 msgid "Too many attempts. Please try again later."
 msgstr "Troppi tentativi. Riprova più tardi."
 

@@ -13181,7 +13181,8 @@ msgstr ""
 "electrónico: véanse los datos del vendedor en su confirmación del pedido (página y correo "
 "electrónico) y en el resumen del pedido al tramitarlo)"
 
-#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/orders/customer_views.py
+#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/manager/stray_views.py
+#: apps/orders/customer_views.py
 msgid "Too many attempts. Please try again later."
 msgstr "Demasiados intentos. Inténtelo de nuevo más tarde."
 
