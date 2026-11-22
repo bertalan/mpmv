@@ -302,3 +302,9 @@ def test_build_theme_css_declares_the_layers_first_and_concatenates_base_first()
         "overrides",
     )
     assert css.index("--a:1") < css.index("body{margin:0}") < css.index(".hero")
+
+
+@pytest.mark.parametrize("colour", ["#FFFFFF\n", "#FFF\n"])
+def test_contrast_ratio_rejects_a_trailing_newline(colour: str) -> None:
+    with pytest.raises(ThemeError):
+        contrast_ratio(colour, "#FFFFFF")

@@ -1,9 +1,15 @@
 """The theme of each Wagtail Site (spec 14 §14.3, Selection)."""
 
+from typing import Any
+
+from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from wagtail.contrib.settings.models import BaseSiteSetting
 from wagtail.models import Site
+
+from .palettes import ROLES, check_brand_palette
 
 
 class ThemeSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untyped
@@ -40,3 +46,62 @@ class ThemeSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untype
 
     def __str__(self) -> str:
         return f"{self.site.hostname}: {self.theme or 'environment default'}"
+
+
+HEX_COLOUR = RegexValidator(
+    r"^#[0-9A-Fa-f]{6}$", "Use a six digit hex colour such as #C40417.", code="hex_colour"
+)
+
+
+def _colour(help_text: str) -> "models.CharField[str, str]":
+    return models.CharField(max_length=7, validators=[HEX_COLOUR], help_text=help_text)
+
+
+class BrandPalette(models.Model):
+    """A site colour palette (spec 14 §14.12, THM.31): data, not code.
+
+    The Red, Blue and Petrol presets are seeded by a data migration. Every row passes
+    `check_brand_palette` (`clean`), whatever staff type. Roles map to tokens in
+    `palettes.ROLE_TOKENS`.
+    """
+
+    slug = models.SlugField(max_length=32, unique=True)
+    name = models.CharField(max_length=64)
+    primary = _colour("Buttons, badges, links and UI colour.")
+    primary_hover = _colour("Hover and pressed background of the primary.")
+    primary_tint = _colour("Tinted section background; the primary is text on it.")
+    on_primary = _colour("Text on the primary and its hover.")
+    primary_dark = _colour("The primary on the dark surface #121417.")
+    secondary = _colour("Accent background, always with text.")
+    secondary_hover = _colour("Hover background of the accent.")
+    secondary_text = _colour("The accent used as text or icon on the surface.")
+    on_secondary = _colour("Text on the accent and its hover.")
+    band = _colour("Header band, footer and dark sections.")
+    text_on_band = _colour("Text and links on the band.")
+    focus = _colour("Focus ring, 3:1 on the surface and the band.")
+    control_border = _colour("Borders of inputs and outlined buttons, 3:1 on the surface.")
+
+    class Meta:
+        ordering = ("name",)
+
+    def __str__(self) -> str:
+        return self.name
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """A palette that fails validation is never stored, whatever the caller."""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def roles(self) -> dict[str, str]:
+        return {role: getattr(self, role) for role in ROLES}
+
+    def violations(self) -> list[str]:
+        """Failing pairs against the surface of every registered theme (empty when valid)."""
+        from .services import registered_surfaces  # models are imported before the registry
+
+        return [str(v) for v in check_brand_palette(self.roles(), registered_surfaces())]
+
+    def clean(self) -> None:
+        problems = self.violations()
+        if problems:
+            raise ValidationError({"primary": problems})

@@ -11,7 +11,8 @@ import factory
 from factory.django import DjangoModelFactory
 from wagtail.models import Page, Site
 
-from apps.themes.models import ThemeSettings
+from apps.themes.models import BrandPalette, ThemeSettings
+from apps.themes.palettes import PRESETS
 
 
 def _default_root() -> Page:
@@ -48,3 +49,26 @@ class ThemeSettingsFactory(DjangoModelFactory[ThemeSettings]):
 
     site = factory.SubFactory(SiteFactory)
     theme = "base"
+
+
+class BrandPaletteFactory(DjangoModelFactory[BrandPalette]):
+    """A valid palette: the Red preset roles under a unique slug (`save` runs `full_clean`)."""
+
+    class Meta:
+        model = BrandPalette
+
+    slug = factory.Sequence(lambda n: f"palette-{n}")
+    name = factory.Sequence(lambda n: f"Palette {n}")
+    primary = PRESETS["red"]["primary"]
+    primary_hover = PRESETS["red"]["primary_hover"]
+    primary_tint = PRESETS["red"]["primary_tint"]
+    on_primary = PRESETS["red"]["on_primary"]
+    primary_dark = PRESETS["red"]["primary_dark"]
+    secondary = PRESETS["red"]["secondary"]
+    secondary_hover = PRESETS["red"]["secondary_hover"]
+    secondary_text = PRESETS["red"]["secondary_text"]
+    on_secondary = PRESETS["red"]["on_secondary"]
+    band = PRESETS["red"]["band"]
+    text_on_band = PRESETS["red"]["text_on_band"]
+    focus = PRESETS["red"]["focus"]
+    control_border = PRESETS["red"]["control_border"]
