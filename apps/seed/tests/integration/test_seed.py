@@ -225,9 +225,11 @@ def test_the_command_reports_the_changes_and_the_time() -> None:
 
 
 STOREFRONT = (
-    ("/", "Made by independent makers"),
-    (f"{language_prefix(other_language())}/", "Fatto da artigiani indipendenti"),
-    (f"{language_prefix(third_language())}/", "Von unabhängigen Herstellern"),
+    ("/", data.LANDING_HERO[0]),  # CMS.19: English example content in every language
+    (f"{language_prefix(other_language())}/", data.LANDING_HERO[0]),
+    (f"{language_prefix(third_language())}/", data.LANDING_HERO[0]),
+    ("/demo-shop/", "Made by independent makers"),
+    (f"{language_prefix(other_language())}/demo-negozio/", "Fatto da artigiani indipendenti"),
     (localized("/product-category/demo-home-kitchen/"), "Stoneware dinner plate"),
     (
         localized("/product-category/demo-casa-e-cucina/", other_language()),

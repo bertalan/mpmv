@@ -1083,12 +1083,16 @@ def listing_editorial(
 
 
 def page_language_urls(page: Page | None, request: HttpRequest | None) -> dict[str, str]:
-    """{language code: URL} of the live translations of `page` (itself included): the one
-    source of the page's `hreflang` links and of its language switcher (`apps.core.i18n`)."""
+    """{language code: URL} of the live translations of `page` (itself included, unless it is an
+    alias): the one source of the page's `hreflang` links and of its language switcher
+    (`apps.core.i18n`)."""
     if page is None:
         return {}
     urls: dict[str, str] = {}
-    for translated in page.get_translations(inclusive=True).live().select_related("locale"):
+    # An alias in another language is an untranslated copy of its source (wagtail-localize's
+    # mirror; the CMS.19 home): it shows the source's text, so it is no translation to list.
+    translations = page.get_translations(inclusive=True).live().filter(alias_of__isnull=True)
+    for translated in translations.select_related("locale"):
         # A page that is live but not shown to visitors (a hidden event) is not offered.
         if not getattr(translated.specific, "is_publicly_visible", lambda: True)():
             continue

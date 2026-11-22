@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **490** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3701 h** (P1 2706 h · P2 895 h · P3 100 h)
+- Micro-tasks: **491** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3705 h** (P1 2706 h · P2 899 h · P3 100 h)
 - P1 critical path (schedule lower bound with full parallelism): **197 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → PAY.7 → ORD.20 → ORD.21 → ORD.22 → ORD.23
 
 ## By macro area
@@ -25,7 +25,7 @@
 | PRM | Coupons and cart recovery | 16 | 0 | 143 | 10 | 153 |
 | ING | Supplier import and pipelines | 14 | 92 | 36 | 0 | 128 |
 | I18N | Multilingual | 25 | 115 | 17 | 0 | 132 |
-| CMS | Wagtail content | 17 | 67 | 25 | 0 | 92 |
+| CMS | Wagtail content | 18 | 67 | 29 | 0 | 96 |
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
 | TRU | Trust, reviews and community (D-37 proposal) | 11 | 0 | 70 | 16 | 86 |
 | FIT | Garage and fitment (D-38) | 18 | 174 | 0 | 14 | 188 |
@@ -36,7 +36,7 @@
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 16 | 25 | 48 | 8 | 81 |
 | MIG | Migration and cutover | 22 | 141 | 29 | 0 | 170 |
-| **Total** | | **490** | **2706** | **895** | **100** | **3701** |
+| **Total** | | **491** | **2706** | **899** | **100** | **3705** |
 
 ## By phase
 
@@ -399,7 +399,7 @@
 | MIG.20 | Refunds migration (owner decision 2026-11-11, relayed by lane-a, #86): refund child orders and marketplace refund requests are stored inside the historical order (refunded amount, date, reason); there is no separate refund model for legacy data; no new ledger entry and no tax recalculation | P1 | 4 | MIG.4 | A migrated order shows its refunded amount, date and reason; the MIG.5 parity report reconciles order total minus refunds against the legacy figures; a refund amount that does not parse as `Decimal` is rejected with a report; the migration writes no ledger entry for a refund (MIG.8 covers balances); no refund model or table exists for legacy data |
 | MIG.22 | Domains, mail and TLS at cutover (owner decision 2026-11-16, §13.4): DNS inventory exported from the registrar into private storage, a dedicated mail host record and the MX moved to it before the switch when mail is self-managed on the legacy server (a dedicated mail service is a recommended follow-up, and a precondition for shutting the legacy server down), SPF, DKIM and DMARC for the transactional provider (ARC.16), TTL 300 s from T−7, production certificates issued before the switch (ACME DNS-01), legacy site on an internal hostname behind basic auth and `noindex`, Stripe webhook URLs and domain verification updated, staged HSTS | P1 | 6 | MIG.9 | Runbook checklist: the inventory file is in private storage; a mail test send and receive passes after the MX change, before the switch; the TTL check shows 300 s on the switched records; certificates are valid before the switch; the legacy host answers 401 over valid HTTPS without credentials (HSTS `includeSubDomains` applies to it) and carries `noindex`; rollback by DNS was rehearsed in a dress rehearsal |
 
-### F6 — After go-live (P2) (148 tasks, 1009 h)
+### F6 — After go-live (P2) (149 tasks, 1013 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -483,6 +483,7 @@
 | CMS.15 | `download` block (owner decision D-36): a link to a file from the media library showing its file type and size in text before the click, with a human-readable title | P2 | 3 | CMS.2 | The block shows "PDF, 1.2 MB" computed from the file; a missing file hides the block; the link text names the file and its type for a screen reader |
 | CMS.16 | `accordion` block (owner decision D-36): titled sections built on native `<details>` and `<summary>`, closed by default, no script, rich text only through the CMS.12 sanitiser | P2 | 3 | CMS.2, CMS.12 | A page with an accordion works with scripts disabled, each section opens from the keyboard, and the axe audit is clean |
 | CMS.18 | Page revision retention (owner decision 2026-11-18): a nightly job keeps the revisions of the last 12 months plus the last 10 per page and deletes the rest; `dry_run=True` returns the `ChangeSet` without deleting; every run writes an `AuditLog` row; it never deletes the live revision or the latest 10, and never a revision referenced by scheduled publishing | P2 | 4 | CAT.25, CMS.1 | In a test with old revisions only those older than 12 months and beyond the latest 10 are deleted; dry run deletes nothing; the live and the scheduled revision survive; the run is audited |
+| CMS.19 | Home page as a vendor-recruitment landing (owner decision 2026-11-21): the demo seed builds the home from existing blocks as an invitation for shopkeepers to join as sellers, also at launch: a hero with an "Apply now" button to the VEN.22 application form, benefits, how it works in three steps, fees (only the operator's real fee terms, otherwise placeholders marked "Example fee, set by the operator"), testimonials from invented sellers, a short FAQ and a link to the shop; the product content of the former demo home moves to a separate demo shop page; the example copy is English only, and the home in every other active language is a Wagtail alias of the source home (an untranslated copy): it shows the English content, is canonical to the source, and no page lists it in `hreflang` or in its language sitemap until a translation replaces the alias | P2 | 4 | ARC.10, CMS.2, I18N.6 | The seed creates the home with those sections and a second run changes nothing; the home links to the shop and to Apply; with `MPMV_LANGUAGES=it,de` and with the default set, the other-language home renders the English content and no `hreflang` names that language |
 | EVT.16 | Event notifications in the customer's account preferences (owner decision Q-74): follow a vendor and turn its event notifications on or off in the ORD.11 section; channel and frequency as ORD.11 defines them, consent records per CMP.4 for any email; hours to be re-estimated once ORD.11 is scoped | P2 | 4 | ORD.11, EVT.11, CMP.4 | A customer who follows a vendor with notifications on is told about that vendor's new published events only; turning them off stops them at once; no email is sent without a recorded consent |
 | EVT.17 | Google option after go-live (owner decision: no Google at go-live): Google Geocoding adapter last in the chain and off without a key; vendored GoogleMutant on the official Maps JavaScript API (never direct tile URLs), per-site setting and key; consent purpose and click-to-load placeholder; Google CSP sources with nonce only on consented Google-map responses, security review of the exception; `geo_expires_at` (30 days), confirmation request and daily expiry job; Google-geocoded points never on a non-Google map and never in feeds, JSON-LD or the index map | P2 | 8 | EVT.12, EVT.15, SEO.5, ARC.9, ARC.16 | Regression cases 26–28 green; with consent, a Google-geocoded point renders on the Google layer and the CSP e2e check passes on that response; Google tile URLs never appear in any request |
 | TRU.1 | `trust` app and rules: `TrustRules` (versioned, staff-editable with audit, dry-run preview), `VendorTrustInputs`, pure `compute_vendor_trust` for badges 1 to 7 with tiers and hysteresis, append-only `VendorTrustSnapshot`; import contracts extended | P2 | 10 | ORD.2, VEN.5, ARC.18 | The §16.11 cases 4, 6 and 7 pass on the engine with no database; a new rules version changes a vendor's result and the old snapshot keeps its `rules_version` |

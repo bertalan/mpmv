@@ -174,7 +174,9 @@ def _order_context() -> dict[str, Any]:
 @pytest.mark.django_db
 def test_a_per_language_template_wins_and_missing_ones_fall_back_to_english() -> None:
     context = {"item": "the GPSR checklist", "due": "2026-12-01", "action_url": "https://x.test/c"}
-    italian = services.render_email(REMINDER, other_language(), context)
+    # The test templates ship an `it` folder and no `de` one: these are template-folder facts,
+    # independent of which languages are configured, so the codes are named on purpose.
+    italian = services.render_email(REMINDER, "it", context)
     german = services.render_email(REMINDER, "de", context)
     assert italian.subject == "Promemoria: the GPSR checklist"
     assert german.subject == "Reminder: the GPSR checklist"  # no German text: EN, as spec 09
@@ -204,7 +206,7 @@ def test_otp_reminder_and_order_emails_go_through_the_outbox(
     reminder = _enqueue(
         REMINDER,
         recipient="vendor@example.com",
-        language=other_language(),
+        language="it",  # the test templates ship an `it` folder, whatever the primary language is
         context={"item": "GPSR", "due": "2026-12-01", "action_url": "https://x.test/c"},
     )
     order = _enqueue(ORDER, recipient="customer@example.com", context=_order_context())
