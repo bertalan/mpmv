@@ -16,6 +16,7 @@ from apps.core.models import OutboxEmail
 from apps.vendors import engine
 from apps.vendors.models import Vendor
 from tests.e2e.axe import format_violations, run_axe
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -31,17 +32,17 @@ def test_a_visitor_applies_and_confirms_the_email(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     page.goto(f"{live_server.url}/vendor/apply/")
-    expect(page.get_by_role("heading", level=1)).to_have_text("Apply to sell with us")
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Apply to sell with us"))
     violations = run_axe(page)
     assert violations == [], format_violations(violations)
     shot("apply-form")
 
-    page.get_by_label("Your full name").fill("Ada Example")
-    page.get_by_label("Email address").fill("ada@example.com")
-    page.get_by_label("Name of your business or shop").fill("Ada Workshop")
-    page.get_by_label("Country where your business is established").select_option("IT")
-    page.get_by_role("button", name="Send my application").click()
-    expect(page.get_by_role("heading", name="Check your email")).to_be_visible()
+    page.get_by_label(translated("Your full name")).fill("Ada Example")
+    page.get_by_label(translated("Email address")).fill("ada@example.com")
+    page.get_by_label(translated("Name of your business or shop")).fill("Ada Workshop")
+    page.get_by_label(translated("Country where your business is established")).select_option("IT")
+    page.get_by_role("button", name=translated("Send my application")).click()
+    expect(page.get_by_role("heading", name=translated("Check your email"))).to_be_visible()
     shot("apply-sent")
 
     user = User.objects.get(email="ada@example.com")
@@ -49,15 +50,17 @@ def test_a_visitor_applies_and_confirms_the_email(
     assert Vendor.objects.get(contact_email="ada@example.com").status == engine.APPLICANT
 
     page.goto(f"{live_server.url}{emailed_link_path()}")
-    page.get_by_role("button", name="Continue").click()
-    expect(page.get_by_role("heading", name="Confirm your email address")).to_be_visible()
+    page.get_by_role("button", name=translated("Continue")).click()
+    expect(
+        page.get_by_role("heading", name=translated("Confirm your email address"))
+    ).to_be_visible()
     violations = run_axe(page)
     assert violations == [], format_violations(violations)
     shot("apply-confirm")
     assert User.objects.get(email="ada@example.com").has_usable_password() is False
-    page.get_by_label("Choose a password").fill(secrets.token_urlsafe(18))
-    page.get_by_role("button", name="Confirm my email").click()
-    expect(page.get_by_role("heading", name="Your email is confirmed")).to_be_visible()
+    page.get_by_label(translated("Choose a password")).fill(secrets.token_urlsafe(18))
+    page.get_by_role("button", name=translated("Confirm my email")).click()
+    expect(page.get_by_role("heading", name=translated("Your email is confirmed"))).to_be_visible()
     shot("apply-confirmed")
 
     user.refresh_from_db()
@@ -69,23 +72,23 @@ def test_the_address_owner_cancels_with_the_this_was_not_me_link(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     page.goto(f"{live_server.url}/vendor/apply/")
-    page.get_by_label("Your full name").fill("Ada Example")
-    page.get_by_label("Email address").fill("ada@example.com")
-    page.get_by_label("Name of your business or shop").fill("Ada Workshop")
-    page.get_by_label("Country where your business is established").select_option("IT")
-    page.get_by_role("button", name="Send my application").click()
-    expect(page.get_by_role("heading", name="Check your email")).to_be_visible()
+    page.get_by_label(translated("Your full name")).fill("Ada Example")
+    page.get_by_label(translated("Email address")).fill("ada@example.com")
+    page.get_by_label(translated("Name of your business or shop")).fill("Ada Workshop")
+    page.get_by_label(translated("Country where your business is established")).select_option("IT")
+    page.get_by_role("button", name=translated("Send my application")).click()
+    expect(page.get_by_role("heading", name=translated("Check your email"))).to_be_visible()
 
     email = OutboxEmail.objects.filter(template_key="vendors.application_confirm").first()
     assert email is not None
     cancel_url = str(json.loads(email.context)["cancel_url"])
     page.goto(f"{live_server.url}/{cancel_url.split('/', 3)[3]}")
-    page.get_by_role("button", name="Continue").click()
-    expect(page.get_by_role("heading", name="Cancel this application")).to_be_visible()
+    page.get_by_role("button", name=translated("Continue")).click()
+    expect(page.get_by_role("heading", name=translated("Cancel this application"))).to_be_visible()
     assert User.objects.filter(email="ada@example.com").exists()  # a GET deletes nothing
     shot("apply-cancel")
-    page.get_by_role("button", name="Cancel the application, this was not me").click()
-    expect(page.get_by_role("heading", name="Nothing is waiting")).to_be_visible()
+    page.get_by_role("button", name=translated("Cancel the application, this was not me")).click()
+    expect(page.get_by_role("heading", name=translated("Nothing is waiting"))).to_be_visible()
     shot("apply-cancelled")
     assert not User.objects.filter(email="ada@example.com").exists()
     assert not Vendor.objects.filter(contact_email="ada@example.com").exists()
@@ -95,9 +98,9 @@ def test_a_form_with_errors_lists_them_in_a_summary(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     page.goto(f"{live_server.url}/vendor/apply/")
-    page.get_by_label("Email address").fill("not-an-email")
-    page.get_by_role("button", name="Send my application").click()
-    expect(page.get_by_role("region", name="There is a problem")).to_be_visible()
+    page.get_by_label(translated("Email address")).fill("not-an-email")
+    page.get_by_role("button", name=translated("Send my application")).click()
+    expect(page.get_by_role("region", name=translated("There is a problem"))).to_be_visible()
     violations = run_axe(page)
     assert violations == [], format_violations(violations)
     shot("apply-errors")

@@ -18,6 +18,7 @@ from typing import Any, Protocol, Self, runtime_checkable
 from django.conf import settings
 from django.utils.module_loading import import_string
 
+from apps.core.outbound import open_url
 from apps.core.services import NoPlatformOperator, current_operator
 
 from . import engine
@@ -63,7 +64,7 @@ def post_json(url: str, data: Mapping[str, Any], timeout: float) -> Mapping[str,
         headers={"Content-Type": "application/json", "Accept": "application/json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 - same configured https URL
+        with open_url(request, timeout=timeout) as response:  # never follows a redirect
             return _json_object(response.read())
     except urllib.error.HTTPError as exc:
         with exc:

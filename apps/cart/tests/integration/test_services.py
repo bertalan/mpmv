@@ -21,7 +21,8 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests.i18n import other_language
 
-pytestmark = pytest.mark.django_db
+# Items in a cart need a consumer price (TAX.12, #757): an operator, rates, tax profiles.
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
 
 def active_vendor() -> Vendor:

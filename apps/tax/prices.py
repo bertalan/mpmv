@@ -181,12 +181,16 @@ def estimated_destination(
     request: HttpRequest | None = None, *, at: dt.datetime | None = None
 ) -> tuple[str, str, bool]:
     """(country, postcode, estimated): the destination a displayed price uses for this visitor."""
+    return _estimate(request, _tables(request, at).operator_country)
+
+
+def _estimate(request: HttpRequest | None, operator_country: str) -> tuple[str, str, bool]:
     session = _session(request)
     remembered = session.get(DELIVERY_COUNTRY_KEY, "") if session is not None else ""
     country, estimated = engine.estimate_price_country(
         delivery_country=remembered if isinstance(remembered, str) else "",
         language=get_language() or "",
-        operator_country=_tables(request, at).operator_country,
+        operator_country=operator_country,
     )
     postcode: object = ""
     if session is not None and not estimated:
@@ -228,22 +232,7 @@ def consumer_price(
         chosen, where, estimated = country, postcode or "", False
     else:
         chosen, where, estimated = estimated_destination(request, at=at)
-    profile = _vendor_profile(tables, vendor)
-    try:
-        ctx = engine.consumer_context(
-            vendor.country,
-            profile,
-            destination_country=chosen,
-            destination_postcode=where or None,
-            rates=tables.rates,
-            on=tables.at.date(),
-            platform_country=tables.operator_country,
-            territories=tables.territories,
-        )
-        decision = engine.resolve_goods_tax(ctx, fiscal_category)
-        destination = normalize_country(chosen)
-    except (engine.BlockingTaxError, InvalidCountry, ValueError) as exc:
-        raise PriceUnavailable(str(exc)) from exc
+    decision, destination = _decide(tables, fiscal_category, vendor, chosen, where)
     if engine.is_northern_ireland(destination, where):
         destination = engine.NORTHERN_IRELAND_CODE
     return ConsumerPrice(
@@ -254,3 +243,59 @@ def consumer_price(
         estimated=estimated,
         business_net_view=business_net_view(request),
     )
+
+
+def _decide(
+    tables: _Tables, fiscal_category: str, vendor: Vendor, country: str, postcode: str
+) -> tuple[engine.TaxDecision, str]:
+    """The tax engine's decision for a consumer of `vendor` in `country`, and that country
+    normalized; PriceUnavailable when none can be made."""
+    profile = _vendor_profile(tables, vendor)
+    try:
+        ctx = engine.consumer_context(
+            vendor.country,
+            profile,
+            destination_country=country,
+            destination_postcode=postcode or None,
+            rates=tables.rates,
+            on=tables.at.date(),
+            platform_country=tables.operator_country,
+            territories=tables.territories,
+        )
+        return engine.resolve_goods_tax(ctx, fiscal_category), normalize_country(country)
+    except (engine.BlockingTaxError, InvalidCountry, ValueError) as exc:
+        raise PriceUnavailable(str(exc)) from exc
+
+
+class PriceCheck:
+    """Whether a consumer price can be decided for items of any vendor at one destination
+    (#757: an item without one cannot go in a cart). The operator, rates, territories and vendor
+    profiles are read once for all the items. The destination is `country` (and `postcode`), else
+    the one a displayed price uses for `request` (`estimated_destination`)."""
+
+    def __init__(
+        self,
+        request: HttpRequest | None = None,
+        *,
+        country: str | None = None,
+        postcode: str | None = None,
+    ) -> None:
+        self._tables: _Tables | None = None
+        self._country, self._postcode = "", ""
+        try:
+            self._tables = _tables(request, None)
+        except PriceUnavailable:  # no platform operator: no price can be decided
+            return
+        if country:
+            self._country, self._postcode = country, postcode or ""
+        else:
+            self._country, self._postcode, _ = _estimate(request, self._tables.operator_country)
+
+    def priced(self, net: Decimal | None, fiscal_category: str, vendor: Vendor) -> bool:
+        if self._tables is None or net is None:
+            return False
+        try:
+            _decide(self._tables, fiscal_category, vendor, self._country, self._postcode)
+        except PriceUnavailable:
+            return False
+        return True

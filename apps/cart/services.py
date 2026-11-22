@@ -15,12 +15,14 @@ from typing import Any, Literal, overload
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
+from django.http import HttpRequest
 from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.catalog.models import Product, Variant
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
+from apps.tax import prices as tax_prices
 from apps.vendors import services as vendors
 
 from . import engine
@@ -173,6 +175,34 @@ def line_unit_price(line: CartLine) -> Decimal | None:
     return _unit_price(line.product, line.variant)
 
 
+# The ValidationError code of an item without a price the buyer can see (#757).
+NO_PRICE = "no_price"
+
+
+def price_check(
+    request: HttpRequest | None = None, *, country: str | None = None
+) -> tax_prices.PriceCheck:
+    """The consumer-price test for one destination: `country`, else the one the shop's prices
+    use for `request` (the remembered delivery country, the language, the operator). Build it
+    once and pass it to `has_price` for every item: the tax tables are read once."""
+    return tax_prices.PriceCheck(request, country=country)
+
+
+def has_price(product: Product, variant: Variant | None, prices: tax_prices.PriceCheck) -> bool:
+    """True when the buyer can see a price for the item (TAX.12): a net price, and the VAT the
+    checkout will charge for this vendor and destination can be decided.
+
+    Without one (the vendor has no valid tax profile, no rate for the category) the item shows
+    no amount, so it cannot go in a cart and its line blocks the checkout (#757). The caller
+    loads the product with its vendor."""
+    return prices.priced(_unit_price(product, variant), product.fiscal_category, product.vendor)
+
+
+def _check_price(product: Product, variant: Variant | None, prices: tax_prices.PriceCheck) -> None:
+    if not has_price(product, variant, prices):
+        raise ValidationError(engine.NO_PRICE_ERROR, code=NO_PRICE)
+
+
 def _check_quantity(quantity: int, limit: int) -> None:
     error = engine.quantity_error(quantity, limit=limit)
     if error is not None:
@@ -185,12 +215,14 @@ def add_to_cart(
     *,
     variant: Variant | None = None,
     quantity: int = 1,
+    prices: tax_prices.PriceCheck | None = None,
     dry_run: bool = False,
 ) -> ChangeSet:
     """Add `quantity` units of the product (or of its variant) to the cart.
 
     Adding an item already in the cart adds up the quantities on its line. Refused with a
-    ValidationError when the item cannot be bought or the total exceeds the available stock.
+    ValidationError when the item cannot be bought, has no consumer price for the destination of
+    `prices` (default: `price_check()`; code NO_PRICE) or the total exceeds the available stock.
     The line remembers the current display price (`added_price_net`).
     """
     error = engine.count_error(quantity)
@@ -201,6 +233,7 @@ def add_to_cart(
         product = Product.objects.select_related(_VENDOR_ACCOUNT).get(pk=product.pk)
         variant = None if variant is None else Variant.objects.get(pk=variant.pk)
         limit = _purchase_limit(product, variant)
+        _check_price(product, variant, prices or price_check())
         price = _unit_price(product, variant)
         line = CartLine.objects.filter(cart=cart, product=product, variant=variant).first()
         changeset = ChangeSet()
@@ -231,6 +264,7 @@ def add_many_to_cart(
     items: Sequence[tuple[Product, Variant | None, int]],
     *,
     ctx: AuditContext,
+    prices: tax_prices.PriceCheck | None = None,
     dry_run: bool = False,
 ) -> ChangeSet:
     """Add several items at once: `(product, variant, quantity)` each, one cart lock.
@@ -263,10 +297,12 @@ def add_many_to_cart(
             old.cart = cart  # the snapshot reads it: no query per line
         created: list[CartLine] = []
         updated: list[CartLine] = []
+        prices = prices or price_check()
         for (product_id, variant_id), quantity in wanted.items():
             product = products[product_id]
             variant = None if variant_id is None else variants[variant_id]
             limit = _purchase_limit(product, variant)
+            _check_price(product, variant, prices)
             price = _unit_price(product, variant)
             line = existing.get((product_id, variant_id))
             if line is None:
