@@ -102,6 +102,8 @@ def test_the_surfaces_section_matches_its_visual_baseline(
 ) -> None:
     require_visual_mode()
     styleguide_with("ride", page, live_server, settings)
+    # The sticky header would paint over the section in an element screenshot (CSSOM is allowed).
+    page.evaluate("() => { document.querySelector('header').style.position = 'static'; }")
     assert_matches_baseline(
         page, theme="ride", name="styleguide-surfaces", width=width, selector=SECTION
     )
