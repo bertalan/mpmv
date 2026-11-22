@@ -9787,6 +9787,14 @@ msgstr "Il cliente lo legge. Scrivilo in parole semplici."
 msgid "The customer was refunded %(refund)s EUR."
 msgstr "Al cliente sono stati rimborsati %(refund)s EUR."
 
+#: apps/orders/staff_drafts.py
+msgid ""
+"The customer's account is closed or its erasure is in progress: no cart may be prepared or sent "
+"for it."
+msgstr ""
+"L'account del cliente è chiuso o la sua cancellazione è in corso: non si può preparare né inviare "
+"alcun carrello per questo cliente."
+
 #: apps/manager/amendment_forms.py
 msgid "The customer's words"
 msgstr "Le parole del cliente"
