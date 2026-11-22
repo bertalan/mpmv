@@ -19,6 +19,7 @@ from django.http import HttpRequest
 from django.utils.module_loading import import_string
 
 from apps.core.http import client_ip
+from apps.core.outbound import open_url
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class CaptchaVerifier(Protocol):
 def _post_form(url: str, data: Mapping[str, str], timeout: float) -> Mapping[str, Any]:
     body = urllib.parse.urlencode(data).encode()
     request = urllib.request.Request(url, data=body, method="POST")  # noqa: S310 (fixed https URL)
-    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 (fixed https URL)
+    with open_url(request, timeout=timeout) as response:  # never follows a redirect
         answer = json.loads(response.read())
     if not isinstance(answer, dict):
         raise ValueError("siteverify did not answer with a JSON object")

@@ -110,3 +110,15 @@ def test_the_migration_applies_and_reverses() -> None:
     finally:
         MigrationExecutor(connection).migrate(leaf)
     assert set(NEW_FIELDS) <= columns()
+
+
+def test_the_database_rejects_a_ticket_link_that_is_not_https() -> None:
+    from django.db import IntegrityError, transaction
+
+    from apps.events.models import EventPage
+    from apps.events.tests.factories import EventPageFactory
+
+    page = EventPageFactory.create()
+    with pytest.raises(IntegrityError), transaction.atomic():
+        EventPage.objects.filter(pk=page.pk).update(ticket_url="http://tickets.example/x")
+    EventPage.objects.filter(pk=page.pk).update(ticket_url="https://tickets.example/x")
