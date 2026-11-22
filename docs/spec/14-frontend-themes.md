@@ -682,7 +682,7 @@ Unit tests (THM.31 and THM.33):
 - `themes`: `BrandPalette` (code, translated name, the role colours, `is_preset`) and a
   `palette` field on `ThemeSettings` (per Wagtail Site; empty means the theme's token default).
 - `vendors`: `VendorBranding` (vendor, starting palette code, the role colours as saved, logo,
-  banner, generated file name, updated by and at). `vendors` imports only the pure functions of
+  banner, palette digest, updated by and at). `vendors` imports only the pure functions of
   `apps/themes/engine.py`; `themes` never imports `vendors`.
 
 ### Delivery and CSP
@@ -694,7 +694,7 @@ Unit tests (THM.31 and THM.33):
 - The palette CSS is served by a view from the site's own origin at
   `/palette/<theme>/<palette>.<digest>.css`, so `style-src` stays `'self'`. The file name carries
   the content digest: a request whose digest matches the current palette gets
-  `Cache-Control: immutable`, a stale digest gets `max-age=60`, and only GET is allowed. The CSS
+  `Cache-Control: public, max-age=31536000, immutable`, a stale digest gets `public, max-age=60`, and only GET is allowed. The CSS
   is wrapped in `@layer overrides`. A view replaces a generated file because there is no build
   step and no file to store or clean up, the digest in the name keeps caches correct, and error
   pages never link the file. No inline `<style>` and no `style` attributes.
