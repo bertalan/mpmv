@@ -115,20 +115,29 @@ def test_the_index_page_does_not_query_per_post_image(
     client: Client, settings: SettingsWrapper
 ) -> None:
     settings.MPMV_THEME_DEFAULT = "ride"
-    few = build_content_site(posts=3, images=True)
-    client.get(few["blog"])  # warm caches (site, settings, translations)
+    path = build_content_site(posts=6, images=True)["blog"]
+    posts = list(BlogPostPage.objects.order_by("pk"))
 
-    def queries(path: str) -> int:
+    def set_images(count: int) -> None:
+        for number, post in enumerate(posts):
+            if number < count:
+                post.image = post.image or MediaImageFactory.create(
+                    file__width=1600, file__height=900
+                )
+                post.image_alt_text = "A bench"
+            else:
+                post.image = None
+                post.image_alt_text = ""
+            post.save()
+
+    def queries() -> int:
         with CaptureQueriesContext(connection) as captured:
             assert client.get(path).status_code == 200
         return len(captured)
 
-    base = queries(few["blog"])
-    # Every post of a page has an image: the count must not grow with the posts.
-    for post in BlogPostPage.objects.all():
-        if post.image_id is None:
-            post.image = MediaImageFactory.create(file__width=1600, file__height=900)
-            post.image_alt_text = "A bench"
-            post.save()
-    with_images = queries(few["blog"])
-    assert with_images <= base + 1
+    set_images(1)
+    client.get(path)  # warm caches (site, settings, translations)
+    one = queries()
+    set_images(6)
+    six = queries()
+    assert six <= one, (one, six)
