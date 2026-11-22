@@ -85,7 +85,9 @@ def _nothing_recorded() -> bool:
     return not EmailSuppression.objects.exists() and not AuditLog.objects.exists()
 
 
-@pytest.mark.parametrize("skew", [-301, 301, -86_400, 10**9], ids=["old", "future", "day", "far"])
+# A minute past the 300 s tolerance, not one second: a slow runner took over a second between
+# signing and checking, and the "future" case was accepted (main 29ce99c5, 22 Nov).
+@pytest.mark.parametrize("skew", [-360, 360, -86_400, 10**9], ids=["old", "future", "day", "far"])
 @pytest.mark.django_db
 def test_a_webhook_outside_the_timestamp_window_is_refused(
     client: Client, webhook_secret: str, skew: int
