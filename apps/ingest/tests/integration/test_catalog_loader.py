@@ -439,13 +439,14 @@ def test_a_malformed_price_rejects_only_that_product() -> None:
 
 def test_a_rejected_record_leaves_no_trace_in_the_report_or_the_audit_trail() -> None:
     data = bundle()
+    # The SKU must not be hex digits: a random UUID in the audit text could contain it.
     data["posts"] = [
         # The comma decimal fails after the product, its queue entry and a new value were written.
         post(
             10,
             primary_language(),
             1,
-            "BAD-1",
+            "REJECT-1",
             attributes={"pa_color": ["blue"], "pa_width": "12,5"},
         ),
         post(11, primary_language(), 2, "OK-1"),
@@ -453,16 +454,16 @@ def test_a_rejected_record_leaves_no_trace_in_the_report_or_the_audit_trail() ->
     report = load(data)
     assert set(Product.objects.values_list("sku", flat=True)) == {"OK-1"}
     assert not AttributeValue.objects.filter(value="blue").exists()
-    assert any("bad-1" in problem.lower() for problem in report.problems)
+    assert any("reject-1" in problem.lower() for problem in report.problems)
     assert report.created["catalog.product"] == 1
-    assert not [e for e in report.translation_queue if "bad-1" in e.lower()]
-    assert not [e for e in report.held_back if "bad-1" in e.lower()]
+    assert not [e for e in report.translation_queue if "reject-1" in e.lower()]
+    assert not [e for e in report.held_back if "reject-1" in e.lower()]
     changed = " ".join(str(c) for c in report.changes.changes).lower()
-    assert "bad-1" not in changed
+    assert "reject-1" not in changed
     assert "blue" not in changed
-    assert not [c for c in report.deferred.get("commission", []) if "bad-1" in c.lower()]
+    assert not [c for c in report.deferred.get("commission", []) if "reject-1" in c.lower()]
     logged = " ".join(f"{e.target_key} {e.after}".lower() for e in AuditLog.objects.all())
-    assert "bad-1" not in logged
+    assert "reject-1" not in logged
     assert "blue" not in logged
     assert Product.objects.get(sku="OK-1").translations.count() == 1  # the good record loads
 
