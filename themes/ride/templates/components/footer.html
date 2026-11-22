@@ -8,10 +8,15 @@ Context: `site_name`, `links`, `legal_links` (label and url each), and the conte
 help link. THM.15: optional `widgets` (up to four columns of the CMS: `title`, `links`),
 `social_links` (label and url: the label is the accessible name; an unsafe url is left out) and
 a back-to-top link at the end (a plain link to #top: no JavaScript, visible and focusable).
+THM.22: an optional `vendor_logos` list (`name`, `image_url`, optional `url`: the logo strip
+context) shows a strip of vendor logos above the footer; with none nothing renders. The footer is a top row
+(site name, footer menu, social profiles), the columns, and a copyright row.
 CMS.17: the context comes from the `footer_chrome` tag (the footer setting); with no setting
 nothing is passed and the three columns above are all that shows.
-{% endcomment %}<footer class="site-footer">
-  <div class="site-footer__inner">
+{% endcomment %}{% if vendor_logos %}<section class="site-footer-strip">
+  <div class="site-footer-strip__inner">{% include "components/logo_strip.html" with label=_("Our vendors") logos=vendor_logos only %}</div>
+</section>{% endif %}<footer class="site-footer">
+  <div class="site-footer__top">
     <div class="site-footer__col">
       <p class="site-footer__name">{{ site_name }}</p>
       {% include "components/help_link.html" %}
@@ -33,18 +38,20 @@ nothing is passed and the three columns above are all that shows.
           </ul>
         </nav>
       {% endif %}
-      <p>&copy; {% now "Y" %} {{ site_name }}</p>
-      {% consent_settings_link as consent_link %}{% if consent_link %}<p>{{ consent_link }}</p>{% endif %}
     </div>
+    {% if social_links %}<nav class="site-footer__socials" aria-label="{% translate 'Social' %}"><ul class="site-footer__social">{% for link in social_links %}{% with href=link.url|safe_href %}{% if href %}<li><a href="{{ href }}" rel="me noopener">{{ link.label }}</a></li>{% endif %}{% endwith %}{% endfor %}</ul></nav>{% endif %}
+  </div>
+  {% if widgets %}<div class="site-footer__inner">
     {% for widget in widgets|slice:":4" %}
       <div class="site-footer__col site-footer__widget">
         {% if widget.title %}<h2 class="site-footer__heading">{{ widget.title }}</h2>{% endif %}
         {% if widget.links %}<ul>{% for link in widget.links %}<li>{% with href=link.url|safe_href %}{% if href %}<a href="{{ href }}">{{ link.label }}</a>{% else %}{{ link.label }}{% endif %}{% endwith %}</li>{% endfor %}</ul>{% endif %}
       </div>
     {% endfor %}
-  </div>
-  <div class="site-footer__bar">
-    {% if social_links %}<nav aria-label="{% translate 'Social' %}"><ul class="site-footer__social">{% for link in social_links %}{% with href=link.url|safe_href %}{% if href %}<li><a href="{{ href }}" rel="me noopener">{{ link.label }}</a></li>{% endif %}{% endwith %}{% endfor %}</ul></nav>{% endif %}
+  </div>{% endif %}
+  <div class="site-footer__bar site-footer__copyright">
+    <p>&copy; {% now "Y" %} {{ site_name }}</p>
+    {% consent_settings_link as consent_link %}{% if consent_link %}<p>{{ consent_link }}</p>{% endif %}
     <a class="back-to-top" href="#top">{% include "components/icon.html" with name="chevron-down" %}{% translate "Back to top" %}</a>
   </div>
 </footer>

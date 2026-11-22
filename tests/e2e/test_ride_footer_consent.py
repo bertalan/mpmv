@@ -80,7 +80,7 @@ def test_the_footer_text_and_links_pass_on_their_own_surface(
     width: int, page: Page, live_server: LiveServer
 ) -> None:
     visit(page, live_server, "/", width)
-    read = page.evaluate(PAINT, ".site-footer__inner .site-footer__col")
+    read = page.evaluate(PAINT, ".site-footer__top .site-footer__col")
     bg = hexed(read["bg"])
     for part in ("text", "link"):
         assert contrast_ratio(hexed(read[part]), bg) >= 4.5, part
@@ -88,6 +88,7 @@ def test_the_footer_text_and_links_pass_on_their_own_surface(
     assert not violations, format_violations(violations)
 
 
+@pytest.mark.consent_banner
 def test_the_consent_card_covers_at_most_30_percent_of_a_phone_viewport(
     page: Page, live_server: LiveServer
 ) -> None:
