@@ -6,7 +6,6 @@ the same page in the other language even when its slug is translated.
 """
 
 import re
-from collections.abc import Callable
 
 import pytest
 from django.conf import settings
@@ -17,14 +16,18 @@ from wagtail.models import Site
 from apps.cms.seed import seed_text
 from apps.cms.services import SeedReport
 from apps.cms.tests.factories import StandardPageFactory
-from apps.core.i18n import configured_languages
-from tests.i18n import language_prefix, other_language, third_language
+from apps.core.i18n import configured_languages, primary_language
+from tests.i18n import language_prefix, other_language
 
 pytestmark = pytest.mark.django_db
 
 
 def _prefix(language: str) -> str:
     return "/" if language == settings.LANGUAGE_CODE else f"/{language}/"
+
+
+def _text_of(html: str) -> str:
+    return re.sub(r"<[^>]+>", "", html)
 
 
 def _about_path(language: str) -> str:
@@ -45,14 +48,9 @@ HOME_IN_EACH_LANGUAGE = {code: _prefix(code) for code in configured_languages()}
 
 
 def test_the_go_live_languages_are_all_requested() -> None:
-    assert (
-        f"{language_prefix(other_language())}/chi-siamo/",
-        other_language(),
-        "Chi siamo",
-    ) in PAGES
-    assert (f"{language_prefix(third_language())}/ueber-uns/", "de", "Über uns") in PAGES
-    assert ("/fr/qui-sommes-nous/", "fr", "Qui sommes-nous") in PAGES
-    assert ("/es/quienes-somos/", "es", "Quiénes somos") in PAGES
+    for code in configured_languages():
+        assert (_about_path(code), code, seed_text(code).about.title) in PAGES, code
+        assert (_prefix(code), code, seed_text(code).home.title) in PAGES, code
 
 
 @pytest.mark.parametrize(("path", "language", "title"), PAGES)
@@ -69,23 +67,23 @@ def test_each_language_serves_its_home_and_static_page(
 
 def test_the_italian_home_shows_italian_content(client: Client, seeded: SeedReport) -> None:
     html = client.get(f"{language_prefix(other_language())}/").content.decode()
-    assert "Prodotti di artigiani indipendenti" in html
-    assert "Products from independent makers" not in html
+    assert _text_of(seed_text(other_language()).home.body) in html
+    assert _text_of(seed_text(primary_language()).home.body) not in html
 
 
-@pytest.mark.parametrize(
-    "path_of",
-    [
-        lambda: f"{language_prefix(other_language())}/about/",
-        lambda: f"{language_prefix(third_language())}/chi-siamo/",
-        lambda: "/chi-siamo/",
-        lambda: "/missing/",
-    ],
-)
+# Every About slug asked in the tree of every other language, and a slug that exists nowhere.
+FOREIGN_PATHS = [
+    f"{_prefix(asked_in)}{seed_text(owner).about.slug}/"
+    for asked_in in configured_languages()
+    for owner in configured_languages()
+    if owner != asked_in
+] + ["/missing/"]
+
+
+@pytest.mark.parametrize("path", FOREIGN_PATHS)
 def test_a_page_is_found_only_in_its_own_language_tree(
-    client: Client, seeded: SeedReport, path_of: Callable[[], str]
+    client: Client, seeded: SeedReport, path: str
 ) -> None:
-    path = path_of()
     assert client.get(path).status_code == 404
 
 
@@ -142,11 +140,11 @@ def test_switching_language_on_a_static_page_follows_the_translated_slug(
 ) -> None:
     response = client.post(
         reverse("switch_language"),
-        {"language": other_language(), "next": f"{language_prefix(other_language())}/chi-siamo/"},
+        {"language": other_language(), "next": _about_path(other_language())},
         follow=True,
     )
-    assert response.redirect_chain[-1][0] == f"{language_prefix(other_language())}/chi-siamo/"
-    assert "<h1>Chi siamo</h1>" in response.content.decode()
+    assert response.redirect_chain[-1][0] == _about_path(other_language())
+    assert f"<h1>{seed_text(other_language()).about.title}</h1>" in response.content.decode()
 
 
 def test_a_page_without_translation_switches_to_the_other_languages_home(

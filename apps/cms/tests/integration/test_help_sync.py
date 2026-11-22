@@ -12,11 +12,11 @@ from wagtail.models import Locale
 from apps.cms import help as help_lookup
 from apps.cms import help_files, help_sync
 from apps.cms.models import HelpEntry
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.tests.factories import PlatformOperatorFactory
+from tests.i18n import other_language, third_language
 
 pytestmark = pytest.mark.django_db
-
-LANGS = ("en", "it", "de", "fr", "es")
 
 
 def write(root: Path, lang: str, kind: str, stem: str, title: str, body: str = "Body.") -> None:
@@ -25,21 +25,21 @@ def write(root: Path, lang: str, kind: str, stem: str, title: str, body: str = "
     path.write_text(f"# {title}\nlast-checked: 2026-11-17\n\n{body}\n", encoding="utf-8")
 
 
-def test_the_repository_files_create_the_general_entry_in_five_languages() -> None:
+def test_the_repository_files_create_the_general_entry_in_every_configured_language() -> None:
     changes = help_sync.sync_help()
     assert not changes.is_empty
     rows = HelpEntry.objects.filter(kind="general")
-    assert {r.locale.language_code for r in rows} == set(LANGS)
+    assert {r.locale.language_code for r in rows} == set(configured_languages())
     assert all(r.source == "file" for r in rows)
     assert len({r.translation_key for r in rows}) == 1
     assert help_sync.sync_help().is_empty  # a second run changes nothing
 
 
 def test_editing_a_file_updates_the_entry_and_files_win_over_staff(tmp_path: Path) -> None:
-    write(tmp_path, "en", "route", "manager__shop__orders", "Orders")
-    write(tmp_path, "it", "route", "manager__shop__orders", "Ordini")
+    write(tmp_path, primary_language(), "route", "manager__shop__orders", "Orders")
+    write(tmp_path, other_language(), "route", "manager__shop__orders", "Ordini")
     staff = HelpEntry.objects.create(
-        locale=Locale.objects.get(language_code="en"),
+        locale=Locale.objects.get(language_code=primary_language()),
         kind="route",
         key="manager:shop:orders",
         title="By hand",
@@ -47,9 +47,11 @@ def test_editing_a_file_updates_the_entry_and_files_win_over_staff(tmp_path: Pat
     help_sync.sync_help(root=tmp_path)
     staff.refresh_from_db()
     assert (staff.title, staff.source) == ("Orders", "file")
-    italian = HelpEntry.objects.get(key="manager:shop:orders", locale__language_code="it")
+    italian = HelpEntry.objects.get(
+        key="manager:shop:orders", locale__language_code=other_language()
+    )
     assert italian.title == "Ordini"
-    write(tmp_path, "en", "route", "manager__shop__orders", "Orders v2", "New body.")
+    write(tmp_path, primary_language(), "route", "manager__shop__orders", "Orders v2", "New body.")
     changes = help_sync.sync_help(root=tmp_path)
     assert changes.summary() == {"create": 0, "update": 1, "delete": 0}
     staff.refresh_from_db()
@@ -58,7 +60,7 @@ def test_editing_a_file_updates_the_entry_and_files_win_over_staff(tmp_path: Pat
 
 
 def test_a_dry_run_writes_nothing(tmp_path: Path) -> None:
-    write(tmp_path, "en", "route", "a__b", "A")
+    write(tmp_path, primary_language(), "route", "a__b", "A")
     changes = help_sync.sync_help(dry_run=True, root=tmp_path)
     assert changes.summary()["create"] == 1
     assert not HelpEntry.objects.filter(key="a:b").exists()
@@ -66,15 +68,18 @@ def test_a_dry_run_writes_nothing(tmp_path: Path) -> None:
 
 def test_a_staff_row_without_a_file_is_left_alone(tmp_path: Path) -> None:
     HelpEntry.objects.create(
-        locale=Locale.objects.get(language_code="en"), kind="route", key="x:y", title="Mine"
+        locale=Locale.objects.get(language_code=primary_language()),
+        kind="route",
+        key="x:y",
+        title="Mine",
     )
     help_sync.sync_help(root=tmp_path)
     assert HelpEntry.objects.get(key="x:y").source == "staff"
 
 
 def test_an_unknown_placeholder_fails_the_sync_and_writes_nothing(tmp_path: Path) -> None:
-    write(tmp_path, "en", "route", "good", "Good")
-    write(tmp_path, "it", "route", "bad", "Bad", "{{ operator.nope }}")
+    write(tmp_path, primary_language(), "route", "good", "Good")
+    write(tmp_path, other_language(), "route", "bad", "Bad", "{{ operator.nope }}")
     with pytest.raises(help_files.HelpFileError):
         help_sync.sync_help(root=tmp_path)
     assert not HelpEntry.objects.filter(key="good").exists()
@@ -97,7 +102,7 @@ def test_a_placeholder_renders_the_operators_current_value() -> None:
         valid_from=dt.datetime(2020, 1, 1, tzinfo=dt.UTC),
     )
     help_sync.sync_help()
-    content = help_lookup.help_for("no:such:route", "", "en")
+    content = help_lookup.help_for("no:such:route", "", primary_language())
     assert content is not None
     assert "help@operator.example" in content.html
     assert "{{" not in content.html
@@ -142,22 +147,36 @@ def test_the_modal_of_a_covered_route_shows_that_files_text_in_the_users_languag
     """The help lookup the modal uses: the route's own file wins over the general text, in the
     user's language, then the primary language, then the general entry."""
     cache.clear()
-    write(tmp_path, "en", "route", "manager__shop__orders", "Orders help", "English orders body.")
-    write(tmp_path, "it", "route", "manager__shop__orders", "Aiuto ordini", "Corpo ordini.")
-    write(tmp_path, "en", "general", "general", "General help", "General body.")
+    write(
+        tmp_path,
+        primary_language(),
+        "route",
+        "manager__shop__orders",
+        "Orders help",
+        "English orders body.",
+    )
+    write(
+        tmp_path,
+        other_language(),
+        "route",
+        "manager__shop__orders",
+        "Aiuto ordini",
+        "Corpo ordini.",
+    )
+    write(tmp_path, primary_language(), "general", "general", "General help", "General body.")
     help_sync.sync_help(root=tmp_path)
-    italian = help_lookup.help_for("manager:shop:orders", "", "it")
+    italian = help_lookup.help_for("manager:shop:orders", "", other_language())
     assert italian is not None
     assert (italian.title, italian.source) == ("Aiuto ordini", "route")
     assert "Corpo ordini." in italian.html
-    english = help_lookup.help_for("manager:shop:orders", "", "en")
+    english = help_lookup.help_for("manager:shop:orders", "", primary_language())
     assert english is not None
     assert english.title == "Orders help"
-    # No German file: the primary language answers, never another language.
-    fallback = help_lookup.help_for("manager:shop:orders", "", "de")
+    # No file in a third language: the primary language answers, never another language.
+    fallback = help_lookup.help_for("manager:shop:orders", "", third_language())
     assert fallback is not None
     assert fallback.title == "Orders help"
     # A route with no file of its own falls back to the general entry.
-    other = help_lookup.help_for("manager:shop:other", "", "it")
+    other = help_lookup.help_for("manager:shop:other", "", other_language())
     assert other is not None
     assert (other.title, other.source) == ("General help", "general")

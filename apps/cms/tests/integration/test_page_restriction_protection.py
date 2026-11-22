@@ -14,6 +14,7 @@ from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
 from apps.cms.tests.factories import StandardPageFactory
 from apps.core.public_forms import Protection, public_form_report
+from tests.i18n import language_prefix, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -238,10 +239,9 @@ def test_no_page_type_overrides_the_template_and_the_default_has_the_captcha_wid
     assert "captcha_widget" in get_template(name).template.source  # type: ignore[attr-defined]
 
 
-@pytest.mark.parametrize("prefix", ["/it"])
-def test_the_language_prefixed_route_is_limited_and_verified(client: Client, prefix: str) -> None:
+def test_the_language_prefixed_route_is_limited_and_verified(client: Client) -> None:
     restriction, password = _restricted()
-    url = prefix + _url(restriction)
+    url = language_prefix(other_language()) + _url(restriction)
     bad = client.post(url, {"password": password, "return_url": "/"}, REMOTE_ADDR="198.51.100.10")
     assert bad.status_code == 400
     for _ in range(settings.PAGE_RESTRICTION_IP_LIMIT - 1):
