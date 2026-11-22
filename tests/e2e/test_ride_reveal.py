@@ -9,13 +9,14 @@ makes no third-party request before; axe `wcag22aa` and zero CSP violations at 3
 import re
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.template.defaultfilters import floatformat
 from django.utils import translation
 from playwright.sync_api import Browser, Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
-from apps.core.i18n import primary_language
+from apps.core.i18n import configured_languages, primary_language
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import csp_violations
 from tests.e2e.test_ride_bootstrap_components import open_ride
@@ -80,10 +81,8 @@ def test_with_motion_an_element_is_revealed_once_it_scrolls_into_view_and_counts
     expect(last).to_have_css("opacity", "1")
     counter = page.locator(COUNTER).first
     counter.scroll_into_view_if_needed()
-    # The count-up writes the number with the browser's format for the page language, which
-    # may group differently from the server's (Italian: "1250", not "1.250").
-    final = page.evaluate("() => new Intl.NumberFormat(document.documentElement.lang).format(1250)")
-    expect(counter.locator("[data-counter-text]")).to_have_text(final, timeout=4000)
+    # The count-up ends on the server-rendered text, not on the browser's Intl format.
+    expect(counter.locator("[data-counter-text]")).to_have_text(grouped(1250), timeout=4000)
     assert csp_violations(page) == []
 
 
@@ -182,3 +181,66 @@ def test_a_counter_already_on_screen_shows_its_final_value_at_once(
     assert text.text_content() == grouped(1250)
     page.wait_for_timeout(300)
     assert text.text_content() == grouped(1250)
+
+
+def test_the_animated_counter_ends_on_the_server_rendered_text(
+    page: Page, live_server: LiveServer, settings: SettingsWrapper
+) -> None:
+    """THM.9: the final value keeps the server's localised format, not the browser's Intl one.
+
+    Runs in a configured language whose server grouping differs from the browser's Intl for the
+    same number, found at runtime (Italian and Spanish drop the 4-digit group in Intl, French uses
+    another space character), and set as the staff user's preferred language.
+    """
+    settings.MPMV_THEME_DEFAULT = "ride"
+    page.emulate_media(reduced_motion="no-preference")
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    language = None
+    for code in configured_languages():
+        with translation.override(code):
+            server = str(floatformat(1250, "0g"))
+        if server != page.evaluate("(lang) => new Intl.NumberFormat(lang).format(1250)", code):
+            language = code
+            break
+    if language is None:
+        pytest.skip("no configured language groups 1250 differently from the browser's Intl")
+    # The styleguide has no language prefix: the signed-in user's preference decides (I18N.12).
+    get_user_model().objects.filter(email="staff@example.com").update(preferred_language=language)
+    page.reload()
+    expect(page.locator("html")).to_have_attribute("lang", language)
+    page.route("**/reveal.js*", lambda route: route.abort())
+    page.reload()
+    server_text = page.locator(COUNTER).first.locator("[data-counter-text]").text_content()
+    with translation.override(language):
+        assert server_text == str(floatformat(1250, "0g"))
+    page.unroute("**/reveal.js*")
+    page.reload()
+    counter = page.locator(COUNTER).first
+    counter.scroll_into_view_if_needed()
+    expect(counter.locator("[data-counter-text]")).to_have_text(server_text, timeout=4000)
+    page.wait_for_timeout(1500)
+    assert counter.locator("[data-counter-text]").text_content() == server_text
+
+
+def test_a_browser_without_intl_keeps_the_server_text(
+    page: Page, live_server: LiveServer, settings: SettingsWrapper
+) -> None:
+    """THM.14: no `Intl` (or a rejected language tag) skips the count-up; the server text stays."""
+    settings.MPMV_THEME_DEFAULT = "ride"
+    page.emulate_media(reduced_motion="no-preference")
+    page.set_viewport_size({"width": 1280, "height": 900})
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(error.stack or ""))
+    page.add_init_script("delete window.Intl;")
+    open_styleguide(page, live_server)
+    counter = page.locator(COUNTER).first
+    counter.scroll_into_view_if_needed()
+    text = counter.locator("[data-counter-text]")
+    expected = text.text_content()
+    assert expected == grouped(1250)
+    page.wait_for_timeout(1500)
+    assert text.text_content() == expected
+    expect(counter).to_have_class(re.compile("is-visible"))
+    # The base countdown module has its own Intl use; only the reveal module is in scope here.
+    assert [e for e in errors if "reveal.js" in e] == []
