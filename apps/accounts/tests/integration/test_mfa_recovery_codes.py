@@ -5,6 +5,7 @@ import re
 import pytest
 from django.test import Client, override_settings
 from django.urls import reverse
+from django.utils.html import escape
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.accounts import engine
@@ -17,6 +18,7 @@ from apps.accounts.tests.factories import (
 )
 from apps.accounts.tests.mfa import password_login, verified_login
 from apps.core.models import AuditLog
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
@@ -61,7 +63,7 @@ def test_an_unknown_recovery_code_is_refused(client: Client) -> None:
         reverse("mfa:verify"),
         {"method": "recovery", "code": engine.generate_recovery_codes(1)[0]},
     )
-    assert "Invalid code" in response.content.decode()
+    assert escape(translated("Invalid code. Try again.")) in response.content.decode()
     assert client.get("/django-admin/").status_code == 302
 
 

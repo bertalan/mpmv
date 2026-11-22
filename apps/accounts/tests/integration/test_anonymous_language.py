@@ -9,6 +9,8 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
+from apps.core.i18n import primary_language
+from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -37,8 +39,8 @@ def test_an_unknown_language_is_ignored(client: Client) -> None:
 
 
 def test_the_choice_does_not_touch_the_prefixed_pages(client: Client) -> None:
-    _switch(client, "it")
-    assert _lang(client.get("/")) == "en"  # the prefix is the only source there
+    _switch(client, other_language())
+    assert _lang(client.get("/")) == primary_language()  # the prefix is the only source there
 
 
 def test_the_stored_preference_of_a_signed_in_user_wins_over_the_session(client: Client) -> None:
@@ -71,9 +73,9 @@ def test_a_login_keeps_a_preference_the_user_chose() -> None:
 def test_a_switch_by_a_signed_in_user_stores_the_preference_not_the_session(client: Client) -> None:
     user: User = UserFactory.create()
     client.force_login(user)
-    _switch(client, "es")
+    _switch(client, other_language())
     user.refresh_from_db()
-    assert user.preferred_language == "es"
+    assert user.preferred_language == other_language()
     assert KEY not in client.session
 
 

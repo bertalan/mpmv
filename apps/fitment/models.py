@@ -81,8 +81,10 @@ class FitmentScheme(BaseModel):
     garage_inactivity_months = models.PositiveSmallIntegerField(
         _("months without use before a saved item is deleted"),
         default=24,
-        validators=[MinValueValidator(1), MaxValueValidator(120)],
-        help_text=_("A saved item unused for this long is deleted from the account."),
+        validators=[MinValueValidator(1), MaxValueValidator(36)],
+        help_text=_(
+            "A saved item unused for this long is deleted from the account. At most 36 months."
+        ),
     )
     garage_notice_days = models.PositiveSmallIntegerField(
         _("days of notice before deletion"),

@@ -11,7 +11,7 @@ from collections.abc import Iterator
 import pytest
 from django.contrib.auth import authenticate
 from django.test import Client, override_settings
-from django.utils import timezone
+from django.utils import timezone, translation
 
 from apps.accounts.models import User
 from apps.accounts.services import (
@@ -22,14 +22,19 @@ from apps.accounts.services import (
 )
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
+from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, Throttle
+from tests.i18n import translated
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("admin_open")]  # OPS.5
 
 LOGIN_URL = "/django-admin/login/"
 IP = "203.0.113.7"
 OTHER_IP = "198.51.100.20"
-GENERIC_ERROR = "Please enter the correct email and password for a staff account."
+GENERIC_ERROR = (
+    "Please enter the correct %(username)s and password for a staff account. "
+    "Note that both fields may be case-sensitive."
+)
 CAPTCHA_ON = {
     "CAPTCHA_ENABLED": True,
     "CAPTCHA_VERIFIER": "apps.accounts.tests.fakes.FakeCaptchaVerifier",
@@ -161,6 +166,13 @@ def test_the_account_key_ignores_case_and_spaces(
 # --- No user enumeration
 
 
+def _username_label() -> str:
+    """The field name Django puts in the message: the username field's verbose name, in the
+    language of the page."""
+    with translation.override(primary_language()):
+        return str(User._meta.get_field(User.USERNAME_FIELD).verbose_name)  # type: ignore[union-attr]
+
+
 def test_locked_wrong_and_unknown_accounts_get_the_same_generic_error(
     client: Client, staff: User, password: str
 ) -> None:
@@ -169,7 +181,7 @@ def test_locked_wrong_and_unknown_accounts_get_the_same_generic_error(
     _fail(client, staff.email, ACCOUNT_LOCKOUT.free_attempts)
     locked = _error_page(client, staff.email, password)
     for page in (wrong, unknown, locked):
-        assert GENERIC_ERROR in page
+        assert translated(GENERIC_ERROR) % {"username": _username_label()} in page
 
 
 def test_unknown_emails_are_locked_exactly_like_real_ones(client: Client) -> None:
