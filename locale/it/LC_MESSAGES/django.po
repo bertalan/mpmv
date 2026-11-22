@@ -1149,6 +1149,7 @@ msgstr "Aggiungi al carrello"
 msgid "Add translation"
 msgstr "Aggiungi traduzione"
 
+#: themes/base/templates/components/garage_banner.html
 #: themes/base/templates/components/garage_menu.html
 msgid "Add your garage"
 msgstr "Aggiungi il tuo garage"
@@ -1221,6 +1222,10 @@ msgid ""
 msgstr ""
 "Dopo aver confermato l’email, accede e configura un’app di autenticazione: è obbligatoria per ogni"
 " venditore."
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Age in days"
+msgstr "Età in giorni"
 
 #: apps/core/templates/email/core/ops_alert/body.html
 #: apps/core/templates/email/core/ops_alert/body.txt
@@ -1310,9 +1315,17 @@ msgstr "Testo alternativo"
 msgid "Alt text %(number)d"
 msgstr "Testo alternativo %(number)d"
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Amount"
+msgstr "Importo"
+
 #: apps/manager/templates/manager/shop/_money_table.html
 msgid "Amount (EUR)"
 msgstr "Importo (EUR)"
+
+#: apps/manager/stray_views.py
+msgid "Amount or currency mismatch"
+msgstr "Importo o valuta non corrispondenti"
 
 #: apps/orders/amendment_engine.py
 msgid "an added line needs the customer's acceptance"
@@ -2178,6 +2191,10 @@ msgstr "Chat o messaggio"
 msgid "check"
 msgstr "da verificare"
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Check now"
+msgstr "Verifica ora"
+
 #: apps/orders/customer_views.py
 msgid ""
 "Check the cart, then go to checkout: nothing is ordered or paid until you place the order and pay."
@@ -2196,6 +2213,10 @@ msgstr "Controlla l'ortografia, prova con meno parole o con una parte del codice
 #: apps/vendors/templates/vendors/apply/sent.html
 msgid "Check your email"
 msgstr "Controlli la Sua email"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Checked"
+msgstr "Verificato"
 
 #: apps/orders/templates/orders/checkout.html themes/ride/templates/orders/checkout.html
 msgid "Checkout"
@@ -2466,6 +2487,10 @@ msgstr "Chiudi"
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "Close now"
 msgstr "Chiudi ora"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Close the alert"
+msgstr "Chiudi l'avviso"
 
 #: apps/manager/templates/manager/shop/money_statement.html
 msgid "Closing balance"
@@ -3085,8 +3110,8 @@ msgstr "Scarta la bozza"
 msgid "Discover it"
 msgstr "Scoprilo"
 
-#: themes/base/templates/components/alert.html themes/base/templates/components/toast.html
-#: themes/ride/templates/components/alert.html
+#: themes/base/templates/components/alert.html themes/base/templates/components/garage_banner.html
+#: themes/base/templates/components/toast.html themes/ride/templates/components/alert.html
 msgid "Dismiss"
 msgstr "Chiudi"
 
@@ -5416,6 +5441,7 @@ msgstr "Diapositiva successiva"
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
+#: apps/manager/templates/manager/platform/stray_payments.html
 msgid "No"
 msgstr "No"
 
@@ -5467,6 +5493,10 @@ msgstr "Nessun livello."
 #: apps/manager/templates/manager/shop/profile.html
 msgid "No logo yet."
 msgstr "Nessun logo per ora."
+
+#: apps/manager/stray_views.py
+msgid "No matching order"
+msgstr "Nessun ordine corrispondente"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "No money moves"
@@ -5557,6 +5587,10 @@ msgstr "Nessuna sessione registrata."
 msgid "No storefront changes yet."
 msgstr "Nessuna modifica al negozio per ora."
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "No stray-payment alert is open."
+msgstr "Nessun avviso di pagamento anomalo è aperto."
+
 #: apps/manager/templates/manager/platform/trust_rule_preview.html
 msgid "No threshold differs from the version in force."
 msgstr "Nessuna soglia differisce dalla versione in vigore."
@@ -5600,6 +5634,10 @@ msgstr "Non aggiunto: %(item)s, %(reason)s."
 #: apps/compliance/templates/compliance/includes/product_safety.html
 msgid "Not available in your language: shown in %(name)s."
 msgstr "Non disponibile nella tua lingua: mostrato in %(name)s."
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Not checked yet"
+msgstr "Non ancora verificato"
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Not connected"
@@ -6005,6 +6043,10 @@ msgstr "Si può scartare solo una bozza; questa è %(state)s."
 msgid "Only a draft can be edited; this one is %(state)s."
 msgstr "Si può modificare solo una bozza; questa è %(state)s."
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Only a fingerprint of the reason is kept in the audit log; do not write personal data in it."
+msgstr "Il registro di audit conserva solo un'impronta del motivo: non vi scriva dati personali."
+
 #: apps/manager/termination_views.py
 msgid "Only a pending notice can be withdrawn."
 msgstr "Si può ritirare solo un preavviso in corso."
@@ -6133,6 +6175,10 @@ msgstr ""
 " e quando lo ha chiesto il cliente e le sue parole."
 
 #: apps/payments/stray.py
+msgid "Only Support or the platform owner may check this refund."
+msgstr "Solo l'assistenza o il titolare della piattaforma possono verificare questo rimborso."
+
+#: apps/payments/stray.py
 msgid "Only Support or the platform owner may close this alert."
 msgstr "Solo l'assistenza o il titolare della piattaforma possono chiudere questo avviso."
 
@@ -6199,6 +6245,10 @@ msgstr "Apri la finestra passkey"
 #: apps/manager/templates/manager/platform/order_drafts.html
 msgid "Open prepared carts"
 msgstr "Carrelli preparati aperti"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Open stray-payment alerts"
+msgstr "Avvisi di pagamento anomalo aperti"
 
 #: apps/orders/templates/email/orders/staff_draft_link/body.html
 #: apps/orders/templates/orders/draft_link.html
@@ -6398,6 +6448,10 @@ msgstr ""
 msgid "Order drafts"
 msgstr "Bozze d'ordine"
 
+#: apps/manager/stray_views.py
+msgid "Order no longer awaiting payment"
+msgstr "Ordine non più in attesa di pagamento"
+
 #: apps/compliance/forms.py apps/manager/templates/manager/platform/order_drafts.html
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Order number"
@@ -6418,6 +6472,10 @@ msgstr "Ordine effettuato e pagato"
 #: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid "Order received"
 msgstr "Ordine ricevuto"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Order reference"
+msgstr "Riferimento dell'ordine"
 
 #: themes/base/templates/components/order_summary.html
 #: themes/ride/templates/components/order_summary.html
@@ -6728,10 +6786,24 @@ msgstr ""
 msgid "Payment received. Thank you."
 msgstr "Pagamento ricevuto. Grazie."
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Payment reference"
+msgstr "Riferimento del pagamento"
+
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Payments"
 msgstr "Pagamenti"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid ""
+"Payments that succeeded but were not used for an order. Refund each one by hand at the payment "
+"provider, then close its alert with a reason. An open alert 14 days old is reminded every day "
+"until it is closed."
+msgstr ""
+"Pagamenti andati a buon fine ma non usati per un ordine. Rimborsi ciascuno a mano presso il "
+"fornitore di pagamento, poi chiuda il suo avviso con un motivo. Un avviso aperto da 14 giorni "
+"viene ricordato ogni giorno finché non viene chiuso."
 
 #: apps/manager/money_views.py
 msgid "Payout"
@@ -7479,6 +7551,10 @@ msgstr "Motivazione"
 msgid "Reason (sent to the owners)"
 msgstr "Motivo (inviato ai titolari)"
 
+#: apps/manager/stray_views.py apps/manager/templates/manager/platform/stray_payments.html
+msgid "Reason for closing"
+msgstr "Motivo della chiusura"
+
 #: apps/manager/amendment_forms.py
 msgid "Reason for the cancellation"
 msgstr "Motivo dell'annullamento"
@@ -7590,6 +7666,10 @@ msgstr ""
 #: apps/manager/money_views.py
 msgid "Refund"
 msgstr "Rimborso"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Refund confirmed"
+msgstr "Rimborso confermato"
 
 #: apps/manager/money_views.py
 msgid "Refund fee"
@@ -8904,6 +8984,11 @@ msgstr "Profilo del negozio"
 msgid "Storefront profile saved."
 msgstr "Profilo del negozio salvato."
 
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Stray payments"
+msgstr "Pagamenti anomali"
+
 #: apps/manager/event_forms.py
 msgid "Street"
 msgstr "Via"
@@ -9153,6 +9238,10 @@ msgid ""
 msgstr ""
 "L’indirizzo che hai indicato quando hai ordinato. Dimostra che l’ordine è tuo e la conferma del "
 "tuo recesso viene inviata lì. Obbligatorio."
+
+#: apps/manager/stray_views.py
+msgid "The alert is closed. Support gets no more reminders."
+msgstr "L'avviso è chiuso. Il Supporto non riceverà altri promemoria."
 
 #: apps/ingest/models.py
 msgid "The answer, e.g. 404."
@@ -10937,6 +11026,10 @@ msgstr "la passkey non è stata accettata"
 msgid "The payment form could not be loaded. Please reload this page in a moment."
 msgstr "Impossibile caricare il modulo di pagamento. Ricarica la pagina tra un momento."
 
+#: apps/manager/stray_views.py
+msgid "The payment provider could not be reached. Please try again later."
+msgstr "Non è stato possibile contattare il fornitore di pagamento. Riprovi più tardi."
+
 #: apps/vendors/admin.py
 msgid ""
 "The payment provider's fixed fee per payment, in euro, for example 2.00. Enter 0 if there is none."
@@ -11304,6 +11397,10 @@ msgstr ""
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
 msgid "The refund fee is charged to your shop."
 msgstr "Il costo di rimborso è addebitato al tuo negozio."
+
+#: apps/manager/stray_views.py
+msgid "The refund state is checked and recorded."
+msgstr "Lo stato del rimborso è stato verificato e registrato."
 
 #: apps/events/models.py
 msgid "The region or province of the place, for example 'Lombardia'. Optional."
@@ -12345,6 +12442,10 @@ msgstr ""
 msgid "This action changes nothing."
 msgstr "Questa azione non modifica nulla."
 
+#: apps/manager/stray_views.py
+msgid "This alert was already closed."
+msgstr "Questo avviso era già chiuso."
+
 #: apps/orders/amendment_engine.py
 msgid ""
 "This amendment changes nothing: the lines, the shipping and the address would stay as they are."
@@ -13075,7 +13176,8 @@ msgstr ""
 "dati del venditore nella conferma d'ordine (pagina ed e-mail) e nel riepilogo dell'ordine al "
 "momento dell'acquisto)"
 
-#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/orders/customer_views.py
+#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/manager/stray_views.py
+#: apps/orders/customer_views.py
 msgid "Too many attempts. Please try again later."
 msgstr "Troppi tentativi. Riprova più tardi."
 
@@ -13280,6 +13382,10 @@ msgstr "Prezzo unitario oggi"
 #: apps/ingest/models.py
 msgid "Units the supplier states, empty if unknown."
 msgstr "Unità dichiarate dal fornitore, vuoto se sconosciute."
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Unknown"
+msgstr "Sconosciuto"
 
 #: apps/orders/amendment_engine.py
 msgid "unknown"
@@ -14535,6 +14641,10 @@ msgstr ""
 "Perché serve una persona: salto di prezzo, saldo, cambio di identità, articolo vecchio o SKU "
 "ambiguo."
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Why it is stray"
+msgstr "Perché è anomalo"
+
 #: apps/vendors/models.py
 msgid "Why it was switched, for example the incident or request reference. Up to 200 characters."
 msgstr ""
@@ -14702,9 +14812,14 @@ msgstr ""
 msgid "Written in the admin"
 msgstr "Scritto nell'area di amministrazione"
 
+#: apps/manager/stray_views.py
+msgid "Wrong payment reference"
+msgstr "Riferimento del pagamento errato"
+
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
+#: apps/manager/templates/manager/platform/stray_payments.html
 msgid "Yes"
 msgstr "Sì"
 

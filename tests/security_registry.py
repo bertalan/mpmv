@@ -142,6 +142,10 @@ PUBLIC: dict[str, str] = {
         "Anonymous garage cookie control (FIT.7): a POST that only writes the visitor's own "
         "technical cookie or, signed in, activates one of their own profiles; CSRF-checked."
     ),
+    "garage_line_dismiss": (
+        "The Add your garage line's Dismiss (FIT.7): a POST that sets one boolean in the "
+        "visitor's own session and redirects by a checked same-host Referer; CSRF-checked."
+    ),
     "dsa_notice": (
         "Public report form for illegal content (DSA art. 16, CMP.5): the page is public by "
         "design; the POST is CSRF-checked, behind Turnstile and rate limited per address, and "
@@ -343,6 +347,12 @@ IDOR_REVIEWED: dict[str, str] = {
         "The random token names one draft by its digest (ORD.32); a guessed token is refused, "
         "and opening a draft of another account is refused "
         "(`test_an_account_draft_opens_for_that_account_only`)."
+    ),
+    "manager:platform:stray_payments": (
+        "No identifier in the URL; the close and Check now POSTs name a payment reference in "
+        "their body. Platform "
+        "space only (CORE.18 row platform.stray_payments), and the service refuses anyone but "
+        "Support or the platform owner; stray payments span shops by design (PAY.4)."
     ),
     "manager:platform:order_draft": (
         "Platform space, Support and the platform owner only (CORE.18 row platform.order_drafts); "

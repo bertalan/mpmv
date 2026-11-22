@@ -13,6 +13,7 @@ from wagtail.test.utils.form_data import inline_formset, nested_form_data, strea
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.cms.models import FooterColumn, FooterSettings, SocialProfile
+from apps.core.i18n import primary_language
 from apps.core.nfc_forms import NFCFormMixin
 
 pytestmark = pytest.mark.django_db
@@ -45,7 +46,7 @@ def _post(admin: Client, title: str, label: str, url: str, *, saved: bool = Fals
     )
     link = {"page": "", "url": url, "label": label}
     column = {
-        "language": "en",
+        "language": primary_language(),
         "title": title,
         "links": streamfield([("external", link)]),
         **ids["column"],

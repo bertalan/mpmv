@@ -936,6 +936,10 @@ ENDPOINTS: dict[str, Access] = {
         "The garage chooser's Apply (FIT.7): writes the visitor's own cookie or activates their "
         "own profile (another account's is a 404); no vendor data."
     ),
+    "garage_line_dismiss": NoVendorData(
+        "The Add your garage line's Dismiss (FIT.7): sets one flag in the visitor's own session; "
+        "no vendor data."
+    ),
     "garage_merge": NoVendorData(
         "The sign-in notice's Add and Not now (FIT.7): a signed-in customer copies the vehicles of "
         "their own browser cookie into their own profiles; no vendor data."
@@ -961,6 +965,11 @@ ENDPOINTS: dict[str, Access] = {
         "Cancel a package with a full refund (ORD.20 part 3): Support and the platform owner "
         "only, POST only, with a note and a fresh passkey.",
         kwargs={"public_id": NIL_UUID},
+    ),
+    "manager:platform:stray_payments": StaffOnly(
+        "Stray payments (PAY.4): Support and the platform owner close, Finance reads; a close by "
+        "Finance answers 403, other roles and a vendor member 404 (test_stray_payments). The "
+        "alerts span shops by design and show references and amounts only."
     ),
     "manager:platform:order_drafts": StaffOnly(
         "Prepared carts (ORD.32): Support and the platform owner only; a vendor member gets the "

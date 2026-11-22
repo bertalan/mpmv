@@ -25,6 +25,17 @@ def account_garage_on(request: HttpRequest) -> bool:
 
 
 _CACHE = "_garage_state"
+LINE_DISMISSED_KEY = "fitment_garage_line_dismissed"
+
+
+def line_dismissed(request: HttpRequest) -> bool:
+    """Whether this session dismissed the *Add your garage* line (spec 17 §17.4.4: "for the
+    session"). A bare flag in the server-side session: no new cookie, no vehicle, no identifier.
+    A visitor who refuses cookies has no session and so sees the line each time."""
+    session = getattr(request, "session", None)
+    if session is None or not request.COOKIES.get(settings.SESSION_COOKIE_NAME):
+        return False  # no session cookie: nothing was kept, and reading it would create one
+    return bool(session.get(LINE_DISMISSED_KEY))
 
 
 def garage_state(request: HttpRequest) -> dict[str, Any]:
