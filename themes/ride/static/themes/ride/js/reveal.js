@@ -13,7 +13,12 @@ function countUp(box) {
   // The server renders the localised final value; the animation only counts toward it and
   // ends on that exact text, so the format never changes when the animation stops.
   const final = text.textContent;
-  const format = new Intl.NumberFormat(language);
+  let format;
+  try {
+    format = new Intl.NumberFormat(language);
+  } catch {
+    return; // no Intl, or a rejected language tag: the server text stays, nothing counts up
+  }
   const start = performance.now();
   const step = (now) => {
     const t = Math.min((now - start) / 1200, 1);
