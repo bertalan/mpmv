@@ -272,7 +272,7 @@ class ProductStatus(models.TextChoices):
 
 class SalesMode(models.TextChoices):
     BUY = "buy", "Buy"
-    CATALOG_ONLY = "catalog_only", "Catalog only"
+    CATALOG_ONLY = "catalog_only", "Catalogue only"
     ON_REQUEST = "on_request", "On request"
 
 
@@ -341,7 +341,7 @@ class Product(BaseModel):
         default=SalesMode.BUY,
         help_text=_(
             "How buyers get this product. Buy: they order and pay on the site, so it needs a "
-            "price. Catalog only: it is shown but cannot be bought. On request: buyers ask you "
+            "price. Catalogue only: it is shown but cannot be bought. On request: buyers ask you "
             "about it."
         ),
     )
