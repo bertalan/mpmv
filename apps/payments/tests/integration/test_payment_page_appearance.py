@@ -39,7 +39,7 @@ def test_the_ride_payment_page_carries_the_ride_appearance(
     stripe: FakeStripeClient,  # noqa: F811
 ) -> None:
     value = appearance(page(client, settings, "ride", stripe))
-    assert value["variables"]["colorPrimary"] == "#046BD2"
+    assert value["variables"]["colorPrimary"] == "#C40417"
     assert "Barlow" in value["variables"]["fontFamily"]
     assert value["variables"]["borderRadius"] == "4px"
 

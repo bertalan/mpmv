@@ -39,6 +39,12 @@ msgstr "%(amount)s remboursés."
 msgid "%(browser)s on %(system)s"
 msgstr "%(browser)s sur %(system)s"
 
+#: apps/fitment/views.py
+msgid "%(count)d profile added to your account."
+msgid_plural "%(count)d profiles added to your account."
+msgstr[0] "%(count)d profil ajouté à ton compte."
+msgstr[1] "%(count)d profils ajoutés à ton compte."
+
 #: themes/ride/templates/components/gallery.html themes/ride/templates/components/hero_slider.html
 #: themes/ride/templates/components/strip.html
 msgid "%(count)s of %(total)s"
@@ -1055,6 +1061,7 @@ msgid "Active"
 msgstr "Actif"
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
+#: themes/base/templates/components/garage_merge_notice.html
 msgid "Add"
 msgstr "Ajouter"
 
@@ -2114,6 +2121,7 @@ msgid "Cause: the shop cannot fulfil the order."
 msgstr "Cause : la boutique ne peut pas honorer la commande."
 
 #: apps/manager/templates/manager/platform/fitment_node.html
+#: themes/base/templates/components/garage_banner.html
 msgid "Change"
 msgstr "Modifier"
 
@@ -5672,6 +5680,10 @@ msgstr "Pas en vigueur"
 msgid "not in the order"
 msgstr "pas dans la commande"
 
+#: themes/base/templates/components/garage_merge_notice.html
+msgid "Not now"
+msgstr "Pas maintenant"
+
 #: apps/manager/staff_draft_views.py apps/manager/templates/manager/platform/order_draft.html
 msgid "Not sent, or no longer usable"
 msgstr "Non envoyé, ou plus utilisable"
@@ -8515,6 +8527,7 @@ msgstr[0] "Afficher %(count)s de plus"
 msgstr[1] "Afficher %(count)s de plus"
 
 #: apps/manager/templates/manager/platform/profile_changes.html
+#: themes/base/templates/components/garage_banner.html
 msgid "Show all"
 msgstr "Tout afficher"
 
@@ -8565,6 +8578,10 @@ msgstr "Afficher les produits les plus récents de cette boutique."
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Showing %(vendor)s only."
 msgstr "Affichage de %(vendor)s uniquement."
+
+#: themes/base/templates/components/garage_banner.html
+msgid "Showing items for: %(label)s"
+msgstr "Articles pour : %(label)s"
 
 #: apps/cms/forms_pages.py
 msgid ""
@@ -9492,6 +9509,13 @@ msgstr ""
 "Les clauses de vos conditions qui nécessitent l'approbation distincte des acheteurs professionnels"
 " (art. 1341, deuxième alinéa, du Code civil), une par ligne sous la forme : numéro d'article | "
 "titre. Par exemple : 7 | Limitation de responsabilité. Obligatoire."
+
+#: apps/themes/models.py
+msgid ""
+"The colour palette of the whole site. Leave it empty for the theme's own colours (Red for ride)."
+msgstr ""
+"La palette de couleurs de l'ensemble du site. Laissez vide pour utiliser les couleurs du thème "
+"(Rouge pour ride)."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -14921,6 +14945,12 @@ msgstr "Vous ne pouvez pas modifier cet événement."
 #: themes/base/templates/403.html
 msgid "You do not have permission to open this page."
 msgstr "Tu n'as pas l'autorisation d'ouvrir cette page."
+
+#: themes/base/templates/components/garage_merge_notice.html
+msgid "You have %(counter)s profile saved on this device. Add it to your account?"
+msgid_plural "You have %(counter)s profiles saved on this device. Add them to your account?"
+msgstr[0] "Tu as %(counter)s profil enregistré sur cet appareil. L'ajouter à ton compte ?"
+msgstr[1] "Tu as %(counter)s profils enregistrés sur cet appareil. Les ajouter à ton compte ?"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 #: themes/ride/templates/accounts/mfa/recovery_codes.html

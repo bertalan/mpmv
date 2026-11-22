@@ -79,6 +79,7 @@ urlpatterns = [
     path("maps/", include("apps.core.maps.urls")),  # same-origin map tile proxy (EVT.14)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
     path("_styleguide/", include("apps.themes.urls")),
+    path("palette/", include("apps.themes.palette_urls")),  # site palette CSS (THM.31)
     # Temporary staff "Site links" page for STAGE testing (OPS.12); remove before LIVE.
     path("_links/", include("apps.seo.urls")),
     *i18n_patterns(
