@@ -25,6 +25,7 @@ from apps.fitment.models import (
     FitmentNodeMerge,
 )
 from apps.fitment.tests.factories import FitmentLevelFactory, FitmentNodeFactory
+from apps.manager.fitment_forms import SchemeForm
 from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
@@ -475,3 +476,15 @@ def test_the_catalog_role_cannot_set_the_publish_gate(client: Client) -> None:
     )
     assert response.status_code == 404
     assert not FitmentCategory.objects.exists()
+
+
+def test_the_scheme_form_refuses_37_months_and_accepts_36() -> None:
+    base = {
+        "garage_noun_key": "Garage",
+        "year_min": 1950,
+        "year_max_offset": 2,
+        "max_profiles": 10,
+        "garage_notice_days": 30,
+    }
+    assert "garage_inactivity_months" in SchemeForm({**base, "garage_inactivity_months": 37}).errors
+    assert SchemeForm({**base, "garage_inactivity_months": 36}).is_valid()

@@ -3,10 +3,34 @@
 import django.core.validators
 from django.db import migrations, models
 
+CAP = 36
+
+
+def clamp_retention(apps, schema_editor):  # type: ignore[no-untyped-def]
+    """Owner cap (2026-11-21): a stored retention above 36 months is lowered to 36, which only
+    shortens how long personal data is kept. One `fitment.scheme.updated` entry per scheme row
+    changed shows the old and the new value."""
+    Scheme = apps.get_model("fitment", "FitmentScheme")
+    AuditLog = apps.get_model("core", "AuditLog")
+    for scheme in Scheme.objects.filter(garage_inactivity_months__gt=CAP):
+        old = scheme.garage_inactivity_months
+        scheme.garage_inactivity_months = CAP
+        scheme.save(update_fields=["garage_inactivity_months"])
+        AuditLog.objects.create(
+            actor_label="system:migration",
+            source="system",
+            action="fitment.scheme.updated",
+            target_model="fitment.fitmentscheme",
+            target_key=str(scheme.public_id),
+            before={"garage_inactivity_months": old},
+            after={"garage_inactivity_months": CAP},
+        )
+
 
 class Migration(migrations.Migration):
     dependencies = [
         ("fitment", "0007_garage_retention_settings"),
+        ("core", "0033_platformoperator_staff_draft_link_days"),
     ]
 
     operations = [
@@ -15,7 +39,10 @@ class Migration(migrations.Migration):
             name="garage_inactivity_months",
             field=models.PositiveSmallIntegerField(
                 default=24,
-                help_text="A saved item unused for this long is deleted from the account.",
+                help_text=(
+                    "A saved item unused for this long is deleted from the account. "
+                    "At most 36 months."
+                ),
                 validators=[
                     django.core.validators.MinValueValidator(1),
                     django.core.validators.MaxValueValidator(36),
@@ -23,4 +50,6 @@ class Migration(migrations.Migration):
                 verbose_name="months without use before a saved item is deleted",
             ),
         ),
+        # Reversible: the clamp cannot be undone (the old values are in the audit log).
+        migrations.RunPython(clamp_retention, migrations.RunPython.noop),
     ]

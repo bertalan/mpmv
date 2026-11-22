@@ -80,3 +80,18 @@ def test_invalid_retention_values_are_refused(bad: dict[str, object]) -> None:
 def test_36_months_is_the_largest_retention_accepted() -> None:
     services.save_scheme({"garage_inactivity_months": 36}, ctx=CTX)
     assert services.current_scheme().garage_inactivity_months == 36
+
+
+def test_one_month_is_accepted() -> None:
+    services.save_scheme({"garage_inactivity_months": 1, "garage_notice_days": 0}, ctx=CTX)
+    assert services.current_scheme().garage_inactivity_months == 1
+
+
+def test_the_model_refuses_37_months() -> None:
+    from django.core.exceptions import ValidationError
+
+    scheme = services.current_scheme()
+    scheme.garage_inactivity_months = 37
+    with pytest.raises(ValidationError) as caught:
+        scheme.full_clean(exclude=["garage_noun_key"])
+    assert "garage_inactivity_months" in caught.value.message_dict
