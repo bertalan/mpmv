@@ -23,7 +23,7 @@
 
     <div class="row g-4 my-0 py-4">
       <div class="col-lg-7">
-        {% if gallery_items %}
+        {% if gallery_items or not variant_gallery_items %}{# no image at all: the gallery placeholder (THM.19) #}
           {% include "components/gallery.html" with id="product-images" label=_("Product images") images=gallery_items only %}
         {% endif %}
         {% if variant_gallery_items %}
