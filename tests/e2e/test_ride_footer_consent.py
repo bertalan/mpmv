@@ -120,7 +120,7 @@ def test_the_consent_card_covers_at_most_30_percent_of_a_phone_viewport(
 
 
 @pytest.mark.parametrize("width", [375, 1280])
-def test_the_footer_with_strip_columns_and_social_icons_matches_its_baseline(
+def test_the_footer_with_strip_columns_and_social_icons_matches_its_visual_baseline(
     width: int, page: Page, live_server: LiveServer
 ) -> None:
     require_visual_mode()
