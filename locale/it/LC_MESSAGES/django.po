@@ -9440,6 +9440,12 @@ msgstr ""
 "1341, secondo comma, del Codice civile), una per riga nella forma: numero dell'articolo | titolo. "
 "Per esempio: 7 | Limitazione di responsabilità. Obbligatorio."
 
+#: apps/themes/models.py
+msgid ""
+"The colour palette of the whole site. Leave it empty for the theme's own colours (Red for ride)."
+msgstr ""
+"La palette di colori dell'intero sito. Lasciala vuota per usare i colori del tema (Rosso per ride)."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "The company that makes the brand's products, when it is not the brand itself. It is shown on the "

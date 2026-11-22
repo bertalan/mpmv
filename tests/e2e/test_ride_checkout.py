@@ -154,7 +154,7 @@ def test_a_keyboard_only_checkout_completes_with_ride(
     tab_to(page, card)
     page.keyboard.type("4242424242424242")
     appearance = page.evaluate("() => window.__appearance")
-    assert appearance["variables"]["colorPrimary"] == "#046BD2"
+    assert appearance["variables"]["colorPrimary"] == "#C40417"
     assert "Barlow" in appearance["variables"]["fontFamily"]
     check_page(page)
     shot("4-payment")

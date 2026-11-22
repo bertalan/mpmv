@@ -18,6 +18,7 @@ from typing import Any
 
 from django.conf import settings
 from django.http import HttpRequest
+from django.urls import reverse
 from wagtail.models import Site
 
 from apps.core.audit import AuditContext
@@ -33,12 +34,14 @@ from .engine import (
     pick_theme,
     resolve_tokens,
 )
-from .models import ThemeSettings
+from .models import BrandPalette, ThemeSettings
+from .palettes import check_brand_palette, css_digest, render_palette_css
 
 THEME_SETTINGS_MODEL = "themes.themesettings"
 THEME_CONFIGURED = "themes.theme_settings.configured"
 
 _REQUEST_ATTR = "_mpmv_theme"
+_PALETTE_ATTR = "_mpmv_palette"
 
 # What the template loader renders for: a request (theme resolved lazily, on the first themed
 # template), an explicit theme slug, or None (the environment default).
@@ -62,21 +65,41 @@ def get_registry() -> ThemeRegistry:
     return load_registry(themes_dir())
 
 
+@functools.cache
+def theme_tokens(root: Path) -> dict[str, dict[str, str]]:
+    """The raw `tokens.toml` of every registered theme under `root`, read once per process."""
+    return {slug: read_tokens(root / slug) for slug in load_registry(root).manifests}
+
+
+@functools.lru_cache(maxsize=1)
 def registered_surfaces() -> tuple[str, ...]:
     """The resolved `color.surface` of every registered theme, which a palette must also pass."""
     registry = get_registry()
-    root = themes_dir()
-    tokens_by_theme = {slug: read_tokens(root / slug) for slug in registry.manifests}
+    tokens = theme_tokens(themes_dir())
     surfaces = {
-        resolve_tokens(registry.chain(slug), tokens_by_theme).get("color.surface", "")
+        resolve_tokens(registry.chain(slug), tokens).get("color.surface", "")
         for slug in registry.manifests
     }
     return tuple(sorted(s for s in surfaces if s))
 
 
+@functools.lru_cache(maxsize=64)
+def palette_violations(roles: tuple[tuple[str, str], ...]) -> tuple[str, ...]:
+    """Failing pairs of a palette against the registered themes (pure on its inputs, so cached
+    per palette until `clear_caches`; a page render does not recompute it)."""
+    return tuple(str(v) for v in check_brand_palette(dict(roles), registered_surfaces()))
+
+
 def clear_caches() -> None:
     """Forget the manifests read from disk (tests, settings changes)."""
     load_registry.cache_clear()
+    theme_tokens.cache_clear()
+    palette_asset.cache_clear()
+    registered_surfaces.cache_clear()
+    palette_violations.cache_clear()
+    from .appearance import clear_cache  # lazy: appearance imports this module
+
+    clear_cache()
 
 
 def default_theme() -> str:
@@ -153,20 +176,39 @@ def current_chain() -> tuple[str, ...]:
 
 
 def theme_snapshot(setting: ThemeSettings) -> dict[str, Any]:
-    return {"site": setting.site.hostname, "theme": setting.theme}
+    palette = setting.palette.slug if setting.palette is not None else ""
+    return {"site": setting.site.hostname, "theme": setting.theme, "palette": palette}
+
+
+class Unchanged:
+    """Marks a setting `set_site_theme` leaves as it is."""
+
+
+UNCHANGED = Unchanged()
 
 
 def set_site_theme(
-    site: Site, theme: str, *, ctx: AuditContext, dry_run: bool = False
+    site: Site,
+    theme: str,
+    *,
+    ctx: AuditContext,
+    palette: BrandPalette | Unchanged | None = UNCHANGED,
+    dry_run: bool = False,
 ) -> ChangeSet:
-    """Choose the theme of a Wagtail Site ("" for the environment default), audited.
+    """Choose the theme and palette of a Wagtail Site, audited with the old and new values.
 
-    Raises ThemeError for a theme that is not registered.
+    `theme` "" is the environment default; `palette` None is the theme's own colours, and
+    leaving it out keeps the stored palette. Raises ThemeError for a theme that is not
+    registered or a palette that fails the contrast check against the registered themes.
     """
     if theme and theme not in get_registry():
         raise ThemeError(f"unknown theme {theme!r}")
+    if isinstance(palette, BrandPalette) and (problems := palette.violations()):
+        raise ThemeError(f"palette {palette.slug!r} fails: " + "; ".join(problems))
     setting = ThemeSettings.objects.filter(site=site).first() or ThemeSettings(site=site)
     setting.theme = theme
+    if not isinstance(palette, Unchanged):
+        setting.palette = palette
     return save_audited(
         setting,
         theme_snapshot,
@@ -176,3 +218,55 @@ def set_site_theme(
         updated=THEME_CONFIGURED,
         dry_run=dry_run,
     )
+
+
+# --- Site palette (THM.31, spec 14 §14.12)
+
+
+def active_palette(request: HttpRequest) -> BrandPalette | None:
+    """The palette stored for the request's site, or None: the theme's own colours.
+
+    A stored palette that fails the contrast check against the registered themes (a theme was
+    added since) is not applied; themes.W006 lists it. Resolved once per request.
+    """
+    if hasattr(request, _PALETTE_ATTR):
+        cached: BrandPalette | None = getattr(request, _PALETTE_ATTR)
+        return cached
+    site = Site.find_for_request(request)
+    palette = None
+    if site is not None:
+        stored = ThemeSettings.objects.filter(site=site).select_related("palette").first()
+        palette = stored.palette if stored is not None else None
+    if palette is not None and palette.violations():
+        palette = None
+    setattr(request, _PALETTE_ATTR, palette)
+    return palette
+
+
+@functools.lru_cache(maxsize=64)
+def palette_asset(root: Path, theme: str, roles: tuple[tuple[str, str], ...]) -> tuple[str, str]:
+    """(CSS, digest) of a palette on a theme; the CSS is empty when it changes nothing."""
+    registry = load_registry(root)
+    css = render_palette_css(
+        registry.chain(theme),
+        theme_tokens(root),
+        dict(roles),
+        bootstrap=registry.foundation(theme) is not None,
+    )
+    return css, css_digest(css)
+
+
+def palette_stylesheet(theme: str, palette: BrandPalette) -> tuple[str, str]:
+    return palette_asset(themes_dir(), theme, tuple(sorted(palette.roles().items())))
+
+
+def palette_href(request: HttpRequest) -> str:
+    """The same-origin URL of the active palette's stylesheet, or "" (nothing to link)."""
+    palette = active_palette(request)
+    if palette is None:
+        return ""
+    theme = active_theme(request).slug
+    css, digest = palette_stylesheet(theme, palette)
+    if not css:
+        return ""
+    return reverse("palette:css", args=[theme, palette.slug, digest])

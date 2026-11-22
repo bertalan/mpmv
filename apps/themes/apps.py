@@ -21,8 +21,8 @@ class ThemesConfig(AppConfig):
     # Audit policy (SEC.4, docs/dev/audit-trail.md).
     audited_models = ("themesettings",)
     unaudited_models = {
-        "brandpalette": "Seeded by a data migration; staff edits go through the audited"
-        " service of THM.31 part 2, which moves it to audited_models",
+        "brandpalette": "Seeded by a data migration and read-only here: a site's choice of "
+        "palette is audited on ThemeSettings; editing palettes arrives with the builder (THM.33)",
     }
 
     def ready(self) -> None:
