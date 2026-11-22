@@ -5,7 +5,7 @@ from typing import Any
 from django import template
 
 from apps.fitment.garage_merge import pending_count
-from apps.fitment.garage_state import garage_state
+from apps.fitment.garage_state import garage_state, line_dismissed
 
 register = template.Library()
 
@@ -50,3 +50,18 @@ def garage_banner(context: template.Context) -> dict[str, Any]:
     if not state or not state["active_label"]:
         return {}
     return {"noun": state["noun"], "label": state["active_label"]}
+
+
+@register.simple_tag(takes_context=True)
+def garage_line(context: template.Context) -> bool:
+    """Whether to show the discreet *Add your garage* line (spec 17 §17.4.4): the garage is on for
+    this visitor, holds no vehicle or profile, and the line was not dismissed in this session.
+    Never on an error page. The session is read last, so a visitor without a session cookie
+    costs no session query; the garage state is the header menu's cached read."""
+    request = context.get("request")
+    if request is None or "exception" in context:
+        return False
+    state = garage_state(request)
+    if not state or state["has_vehicles"]:
+        return False
+    return not line_dismissed(request)

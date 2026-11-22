@@ -165,6 +165,7 @@ def search_data(
         "controls": sorted(
             (c["name"], c.get("type", c.name), c.get("value", ""))
             for c in main.select("form input[name], form select[name]")
+            if c["name"] != "csrfmiddlewaretoken"  # random per render (the garage line's form)
         ),
         "labels": [label.get_text(strip=True) for label in main.select("form label")],
         "h2": [(h.get("id"), h.get_text(strip=True)) for h in main.select("h2")],
