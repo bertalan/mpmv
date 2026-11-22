@@ -44,7 +44,7 @@ INPUT_LIMITS: dict[str, tuple[int, str]] = {
         FAST_SIZE,
         "trusted input: lints the repository's own templates in CI (THM.3), never a request",
     ),
-    "apps/themes/engine.py:502": (
+    "apps/themes/engine.py:507": (
         FAST_SIZE,
         "trusted input: minifies the repository's theme CSS at build time (THM.2)",
     ),
@@ -82,7 +82,7 @@ DYNAMIC: dict[str, tuple[str, list[tuple[str, int, str]]]] = {
         "fixed template with a literal component name; trusted input (the repository's templates)",
         [(r"\sdata-bs-toggle\s*=\s*[\"']?\s*collapse\b", _IGNORECASE, "search")],
     ),
-    "apps/themes/engine.py:607": (
+    "apps/themes/engine.py:612": (
         "fixed template with an escaped literal layer name; trusted input (theme CSS)",
         [(r"@layer\s+base\s*\{", 0, "search")],
     ),
