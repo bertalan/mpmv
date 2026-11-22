@@ -161,9 +161,9 @@ def quote_shipping(
     Never a silent empty list."""
 ```
 
-`IndicativeRates` behaves like `NeedsQuote` at checkout (no payment, the order goes to
-`quote_requested`, covered vendors keep their rates), but the request starts from the estimate so the
-vendor quotes against it.
+`IndicativeRates` behaves like `NeedsQuote` at checkout, per vendor (SHP.16, §Quotes below): that
+vendor's lines are not paid and go to a `quote_requested` order, while covered vendors are paid now at
+their rates. The request starts from the estimate so the vendor quotes against it.
 
 Checkout rules:
 
