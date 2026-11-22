@@ -124,6 +124,81 @@
     font-size: 0.875rem;
   }
 
+  /* THM.29: split block, feature row, contact layout. */
+  .split {
+    display: grid;
+    gap: var(--space-m);
+  }
+
+  .split__media figure {
+    margin: 0;
+  }
+
+  .split__media img {
+    border-radius: var(--radius-card);
+  }
+
+  .feature-row__item {
+    padding-block-start: var(--space-s);
+    border-block-start: 2px solid var(--color-accent);
+  }
+
+  .feature-row__item .icon {
+    display: block;
+    margin-block-end: var(--space-xs);
+    color: var(--color-heading);
+  }
+
+  .contact-layout {
+    display: grid;
+    gap: var(--space-m);
+    align-items: start;
+  }
+
+  .contact-address address {
+    font-style: normal;
+  }
+
+  .contact-form-card {
+    --bs-card-border-color: var(--color-border);
+    box-shadow: none;
+  }
+
+  @media (min-width: 48rem) {
+    .split {
+      grid-template-columns: 5fr 7fr;
+      align-items: start;
+    }
+
+    .contact-layout {
+      grid-template-columns: 5fr 7fr;
+    }
+  }
+
+  /* THM.29: a legal page prints as plain text: no banner, header, footer or consent card; the
+     section anchors stay as ids and each section avoids a break after its heading. */
+  @media print {
+    .page-banner,
+    .site-header,
+    .site-footer,
+    .consent-banner,
+    .back-to-top {
+      display: none;
+    }
+
+    .legal-page .page-content {
+      padding: 0;
+    }
+
+    .legal-page .block-legal-section h2 {
+      break-after: avoid;
+    }
+
+    .legal-page a[href^="http"]::after {
+      content: " (" attr(href) ")";
+    }
+  }
+
   /* The plan is a Bootstrap card: its padding and border come from the card. */
   .plan.card {
     padding: 0;

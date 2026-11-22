@@ -199,3 +199,30 @@ def test_ride_blog_page_matches_its_visual_baseline(
     page.wait_for_function("() => [...document.images].every((img) => img.complete)", timeout=5000)
     for width in BLOG_WIDTHS:
         assert_matches_baseline(page, theme="ride", name=name, width=width)
+
+
+PAGE_KINDS = {"about": "standard", "legal": "legal", "contact": "contact"}
+
+
+@pytest.mark.parametrize("name", PAGE_KINDS)
+def test_ride_standard_page_matches_its_visual_baseline(
+    name: str,
+    page: Page,
+    live_server: LiveServer,
+    settings: SettingsWrapper,
+    site_allows_indexing: None,
+) -> None:
+    """THM.29: the `ride` About (split block), legal and Contact (address column, form card)."""
+    require_visual_mode()
+    settings.MPMV_THEME_DEFAULT = "ride"
+    site = build_content_site(images=True)
+    page.emulate_media(reduced_motion="reduce")
+    page.clock.set_fixed_time(utc(2026, 11, 18, 10))
+    page.set_viewport_size({"width": 1280, "height": 900})
+    response = page.goto(f"{live_server.url}{site[PAGE_KINDS[name]]}")
+    assert response is not None
+    assert response.status == 200
+    page.wait_for_load_state("load")
+    expect(page.locator("html")).to_have_attribute("data-theme", "ride")
+    for width in BLOG_WIDTHS:
+        assert_matches_baseline(page, theme="ride", name=f"page-{name}", width=width)

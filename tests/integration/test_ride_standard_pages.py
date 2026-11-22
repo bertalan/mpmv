@@ -67,11 +67,17 @@ def test_each_legal_section_keeps_an_anchor_and_its_data_hook(
 ) -> None:
     settings.MPMV_THEME_DEFAULT = "ride"
     build_content_site()
-    page = LegalPageFactory.create(title="Terms", legal_sections=True)
+    page = LegalPageFactory.create(
+        title="Terms",
+        body=[
+            ("legal_section", {"section": "restrictions", "heading": "Limits", "text": "<p>x</p>"}),
+            ("legal_section", {"section": "termination", "heading": "Ending", "text": "<p>y</p>"}),
+        ],
+    )
     page.save_revision().publish()
     doc = soup(client, page.url, settings)
     sections = doc.select("section.block-legal-section[data-section]")
-    assert sections
+    assert [s["id"] for s in sections] == ["section-restrictions", "section-termination"]
     for section in sections:
         assert section["id"] == f"section-{section['data-section']}"
         assert section.select_one("h2") is not None
