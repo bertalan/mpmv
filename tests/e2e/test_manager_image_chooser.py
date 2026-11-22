@@ -17,6 +17,7 @@ from apps.vendors import engine
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 from tests.upload_corpus import png
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -40,37 +41,37 @@ def test_the_owner_chooses_and_uploads_an_image_for_the_storefront_text(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/account/login/")
-    page.get_by_label("Email").fill("owner@example.com")
-    page.get_by_label("Password").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_label(translated("Email")).fill("owner@example.com")
+    page.get_by_label(translated("Password")).fill(password)
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
     page.goto(f"{live_server.url}/manager/shop/profile/")
 
     editor = page.locator(".Draftail-Editor").first
     editor.locator(".public-DraftEditor-content").click()
     page.get_by_role("button", name="Insert a block").first.click()
-    page.get_by_role("option", name="Image", exact=True).click()
+    page.get_by_role("option", name=translated("Image"), exact=True).click()
     dialog = page.locator(".modal-body")
     expect(dialog.get_by_text("Our anvil").first).to_be_visible()
     expect(dialog.get_by_text("Their secret plan")).to_have_count(0)
     shot("chooser-list")
 
-    dialog.get_by_role("tab", name="Upload").click()
+    dialog.get_by_role("tab", name=translated("Upload")).click()
     dialog.locator("input[type=file]").set_input_files(
         {"name": "lake.png", "mimeType": "image/png", "buffer": png((64, 48))}
     )
-    dialog.get_by_label("Title").fill("Lake view")
+    dialog.get_by_label(translated("Title")).fill("Lake view")
     shot("chooser-upload")
-    dialog.get_by_role("button", name="Upload").click()
-    expect(dialog.get_by_role("button", name="Insert image")).to_be_visible()
+    dialog.get_by_role("button", name=translated("Upload")).click()
+    expect(dialog.get_by_role("button", name=translated("Insert image"))).to_be_visible()
     shot("chooser-format")
-    dialog.get_by_label("Full width").check()
-    dialog.get_by_label("Alt text").fill("A lake at dawn")
-    dialog.get_by_role("button", name="Insert image").click()
+    dialog.get_by_label(translated("Full width")).check()
+    dialog.get_by_label(translated("Alt text")).fill("A lake at dawn")
+    dialog.get_by_role("button", name=translated("Insert image")).click()
     expect(editor.locator("img")).to_be_visible()
     shot("image-inserted")
-    page.get_by_role("button", name="Save", exact=True).click()
-    expect(page.get_by_text("Storefront profile saved.")).to_be_visible()
+    page.get_by_role("button", name=translated("Save"), exact=True).click()
+    expect(page.get_by_text(translated("Storefront profile saved."))).to_be_visible()
     # Draftail's own style elements are the known CSP noise (see test_manager_shell); the
     # chooser itself adds no violation.
     noise = "style-src-elem blocked inline"

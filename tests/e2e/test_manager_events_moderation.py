@@ -29,7 +29,7 @@ from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_manager_events import _press
 from tests.e2e.test_manager_shell import _accessible, _login
-from tests.i18n import other_language
+from tests.i18n import other_language, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -37,10 +37,12 @@ COMMENT = "Please add the end date of the offer."
 
 
 def _add_paragraph(page: Page, text: str) -> None:
-    page.get_by_label("Add a block").select_option("paragraph")
+    page.get_by_label(translated("Add a block")).select_option("paragraph")
     _press(page, "Add")
-    expect(page.get_by_role("heading", name=re.compile("block", re.I))).to_be_visible()
-    page.get_by_label("Text").fill(text)
+    expect(
+        page.get_by_role("heading", name=re.compile(re.escape(translated("Add a block"))))
+    ).to_be_visible()
+    page.get_by_label(translated("Text")).fill(text)
     _press(page, "Save")
     expect(page.locator("main")).to_contain_text(text)
 
@@ -68,16 +70,16 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     _login(page, live_server.url, "seller@example.com", vendor_password)
     verify_with_totp(page, totp_token(seller_device), window=True)
     page.goto(f"{live_server.url}/manager/shop/events/new/")
-    page.get_by_label("Title").fill("Saldi d'autunno")
-    page.get_by_label("Summary").fill("Sconti su tutto il negozio.")
-    page.get_by_label("Type").select_option("promotion")
-    page.get_by_label("Starts at").fill("2027-10-02T09:00")
-    page.get_by_label("Ends at").fill("2027-10-09T18:00")
+    page.get_by_label(translated("Title")).fill("Saldi d'autunno")
+    page.get_by_label(translated("Summary")).fill("Sconti su tutto il negozio.")
+    page.get_by_label(translated("Type")).select_option("promotion")
+    page.get_by_label(translated("Starts at")).fill("2027-10-02T09:00")
+    page.get_by_label(translated("Ends at")).fill("2027-10-09T18:00")
     language = other_language()  # not the primary one: chosen explicitly (EVT.8)
     page.locator("#id_language").select_option(language)
     _press(page, "Save draft")
     expect(page).to_have_url(re.compile(r"/manager/shop/events/[0-9a-f-]+/$"))
-    expect(page.get_by_role("heading", name="Edit the event")).to_be_visible()
+    expect(page.get_by_role("heading", name=translated("Edit the event"))).to_be_visible()
     event = EventPage.objects.get(title="Saldi d'autunno")
     assert event.locale.language_code == language
     _add_paragraph(page, "Primo paragrafo dell'offerta.")
@@ -88,22 +90,22 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     draft = EventPage.objects.get(pk=event.pk).get_latest_revision_as_object()
     assert [b.block_type for b in draft.body] == ["paragraph", "paragraph"]
     _press(page, "Submit for review")
-    expect(page.locator("main")).to_contain_text("Awaiting review")
+    expect(page.locator("main")).to_contain_text(translated("Awaiting review"))
 
     # A moderator asks for changes in the Wagtail admin.
     page.context.clear_cookies()
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("moderator@example.com")
     page.locator("input[name=password]").fill(staff_password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(staff_device))
     page.goto(f"{live_server.url}/admin/events/review/")
     page.get_by_role("link", name="Saldi d'autunno").click()
-    page.get_by_role("button", name="More actions").click()
-    page.get_by_role("button", name="Request changes").click()
+    page.get_by_role("button", name=translated("More actions")).click()
+    page.get_by_role("button", name=translated("Request changes")).click()
     page.locator("textarea[name=comment]:visible").fill(COMMENT)
     shot("request-changes")
-    page.get_by_role("button", name="Request changes").last.click()
+    page.get_by_role("button", name=translated("Request changes")).last.click()
     expect(page.locator(".messages")).to_be_visible()
 
     # The comment shows in the vendor area.
@@ -118,18 +120,19 @@ def test_a_vendor_promotion_is_moderated_and_the_comment_reaches_the_vendor(
     # The vendor resubmits and the moderator approves in the Wagtail admin.
     page.goto(f"{live_server.url}/manager/shop/events/{event.public_id}/")
     _press(page, "Submit for review")
-    expect(page.locator("main")).to_contain_text("Awaiting review")
+    expect(page.locator("main")).to_contain_text(translated("Awaiting review"))
     page.context.clear_cookies()
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("moderator@example.com")
     page.locator("input[name=password]").fill(staff_password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(staff_device, offset_steps=1))
     page.goto(f"{live_server.url}/admin/events/review/")
     page.get_by_role("link", name="Saldi d'autunno").click()
-    approve = page.get_by_role("button", name="Approve and Publish", exact=True)
+    approve_and_publish = translated("%(label)s and Publish") % {"label": translated("Approve")}
+    approve = page.get_by_role("button", name=approve_and_publish, exact=True)
     if not approve.is_visible():
-        page.get_by_role("button", name="More actions").click()
+        page.get_by_role("button", name=translated("More actions")).click()
     approve.click()
     expect(page.locator(".messages")).to_contain_text("Saldi d'autunno")
     published = EventPage.objects.get(pk=event.pk)

@@ -23,13 +23,17 @@ from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_manager_shell import _accessible, _login
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
 def _press(page: Page, name: str) -> None:
-    """Reach a button with the keyboard focus and press Enter, as a keyboard user does."""
-    page.get_by_role("button", name=name).first.focus()
+    """Reach a button with the keyboard focus and press Enter, as a keyboard user does.
+
+    `name` is the button's English msgid: the page shows it in the primary language.
+    """
+    page.get_by_role("button", name=translated(name)).first.focus()
     page.keyboard.press("Enter")
 
 
@@ -48,30 +52,32 @@ def test_the_vendor_creates_an_event_and_submits_it(
     _login(page, live_server.url, "seller@example.com", password)
     verify_with_totp(page, totp_token(device), window=True)
     page.goto(f"{live_server.url}/manager/shop/events/")
-    expect(page.get_by_role("heading", name="Events")).to_be_visible()
+    expect(page.get_by_role("heading", name=translated("Events"))).to_be_visible()
     expect(page.locator("main")).not_to_contain_text("Rival")
     _accessible(page)
     shot("events-empty")
 
-    page.get_by_role("link", name="New event").focus()
+    page.get_by_role("link", name=translated("New event")).focus()
     page.keyboard.press("Enter")
-    expect(page.get_by_role("heading", name="New event")).to_be_visible()
-    page.get_by_label("Title").fill("Autumn fair")
-    page.get_by_label("Summary").fill("Meet the makers at the autumn fair.")
-    page.get_by_label("Type").select_option("fair")
-    page.get_by_label("Starts at").fill("2027-10-02T09:00")
-    page.get_by_label("Ends at").fill("2027-10-02T18:00")
-    page.get_by_label("Repeats").select_option("weekly")
-    page.get_by_label("Saturday").check()
-    page.get_by_label("Attendance").select_option("in_person")
-    page.get_by_label("City").fill("Milano")
-    page.get_by_label("Country").fill("IT")
+    expect(page.get_by_role("heading", name=translated("New event"))).to_be_visible()
+    page.get_by_label(translated("Title")).fill("Autumn fair")
+    page.get_by_label(translated("Summary")).fill("Meet the makers at the autumn fair.")
+    page.get_by_label(translated("Type")).select_option("fair")
+    page.get_by_label(translated("Starts at")).fill("2027-10-02T09:00")
+    page.get_by_label(translated("Ends at")).fill("2027-10-02T18:00")
+    page.get_by_label(translated("Repeats")).select_option("weekly")
+    page.get_by_label(translated("Saturday")).check()
+    page.get_by_label(translated("Attendance")).select_option("in_person")
+    page.get_by_label(translated("City")).fill("Milano")
+    page.get_by_label(translated("Country")).fill("IT")
     _accessible(page)
     shot("event-form")
     _press(page, "Save draft")
 
-    expect(page.get_by_role("heading", name="Edit the event")).to_be_visible()
-    expect(page.locator("main")).to_contain_text("saved as a draft")
+    expect(page.get_by_role("heading", name=translated("Edit the event"))).to_be_visible()
+    expect(page.locator("main")).to_contain_text(
+        translated("The event is saved as a draft. Submit it when it is ready.")
+    )
     expect(page).to_have_url(re.compile(r"/manager/shop/events/[0-9a-f-]+/$"))
     saved = EventPage.objects.get(title="Autumn fair")
     assert saved.rrule == "FREQ=WEEKLY;BYDAY=SA"
@@ -81,6 +87,6 @@ def test_the_vendor_creates_an_event_and_submits_it(
     _press(page, "Submit for review")
     expect(page).to_have_url(re.compile(r"/manager/shop/events/$"))
     expect(page.locator("main")).to_contain_text("Autumn fair")
-    expect(page.locator("main")).to_contain_text("Awaiting review")
+    expect(page.locator("main")).to_contain_text(translated("Awaiting review"))
     _accessible(page)
     shot("events-submitted")

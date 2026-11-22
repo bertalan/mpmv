@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from django.apps import apps
+from django.conf import settings
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from playwright.sync_api import Page, expect
@@ -16,6 +17,7 @@ from pytest_django.live_server_helper import LiveServer
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.catalog.tests.factories import CategoryFactory
+from apps.core.i18n import primary_language
 from apps.fitment.tests.factories import (
     FitmentLevelFactory,
     FitmentNodeFactory,
@@ -26,6 +28,7 @@ from apps.manager.role_groups import sync_role_groups
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -52,9 +55,9 @@ def test_the_fitment_pages_open_and_are_accessible(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/account/login/")
-    page.get_by_label("Email").fill("staff@example.com")
-    page.get_by_label("Password").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_label(translated("Email")).fill("staff@example.com")
+    page.get_by_label(translated("Password")).fill(password)
+    page.get_by_role("button", name=translated("Sign in")).click()
     expect(page).to_have_url(re.compile(r"/account/mfa/verify/"))
     verify_with_totp(page, totp_token(device), window=True)
 
@@ -72,7 +75,7 @@ def test_the_fitment_pages_open_and_are_accessible(
         page.set_viewport_size({"width": width, "height": 900})
         for name, (path, heading) in pages.items():
             page.goto(f"{live_server.url}{path}")
-            expect(page.get_by_role("heading", name=heading, level=1)).to_be_visible()
+            expect(page.get_by_role("heading", name=translated(heading), level=1)).to_be_visible()
             violations = run_axe(page)
             assert not violations, format_violations(violations)
             assert csp_violations(page) == []
@@ -85,11 +88,16 @@ def test_the_fitment_pages_open_and_are_accessible(
     # A change shows its dry-run preview first (the passkey window is open for the staff user).
     page.goto(f"{live_server.url}/manager/platform/fitment/scheme/")
     form = page.locator("form:has(input[name=action][value=add_level])")
-    form.get_by_label("Code").fill("year")
-    form.get_by_label(re.compile(r"^Label \(English\)")).fill("Year")
-    form.get_by_label(re.compile(r"^Plural label \(English\)")).fill("Years")
-    form.get_by_role("button", name="Preview the level").click()
-    expect(page.get_by_role("heading", name="Preview of the change", level=1)).to_be_visible()
+    form.get_by_label(translated("Code")).fill("year")
+    # The source language's fields: the primary language, named by itself.
+    source = re.escape(str(dict(settings.LANGUAGES)[primary_language()]))
+    form.get_by_label(re.compile(rf"^{re.escape(translated('Label'))} \({source}\)")).fill("Year")
+    plural = re.compile(rf"^{re.escape(translated('Plural label'))} \({source}\)")
+    form.get_by_label(plural).fill("Years")
+    form.get_by_role("button", name=translated("Preview the level")).click()
+    expect(
+        page.get_by_role("heading", name=translated("Preview of the change"), level=1)
+    ).to_be_visible()
     violations = run_axe(page)
     assert not violations, format_violations(violations)
     assert csp_violations(page) == []
