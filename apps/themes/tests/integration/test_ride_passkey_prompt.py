@@ -79,7 +79,7 @@ def test_the_ride_prompt_shows_the_shop_window_note_only_for_a_shop_window() -> 
 def test_the_ride_prompt_keeps_every_variant_of_the_base_page(
     context: dict[str, Any], expected: str
 ) -> None:
-    if expected is ADD_PASSKEY:
+    if expected == ADD_PASSKEY:
         wanted = translated(ADD_PASSKEY) % {"overview_url": reverse("mfa:overview")}
     else:
         wanted = translated(expected)

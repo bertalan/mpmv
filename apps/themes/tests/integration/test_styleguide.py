@@ -231,7 +231,9 @@ def test_the_commerce_components_are_shown_in_every_state(staff_client: Client) 
     assert gettext("Lowest price in the last 30 days:").rstrip(":") in price
     assert gettext("Price on request") in price
     rating = section_html(html, "sg-rating")
-    assert 'class="rating__value"' in rating  # "Rated N out of 5", in the page language
+    before, after = gettext("Rated %(value)s out of 5").split("%(value)s")
+    sentence = re.escape(before) + r"\d+(?:[.,]\d+)?" + re.escape(after)
+    assert re.search(r'<span class="rating__value">\s*' + sentence + r"\s*</span>", rating)
     assert gettext("No reviews yet") in rating
     quantity = section_html(html, "sg-quantity")
     assert re.search(r'<input type="number"[^>]*\sdisabled', quantity)
