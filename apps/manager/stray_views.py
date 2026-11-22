@@ -4,7 +4,8 @@ The open stray-payment alerts, with the reason, the amount, the age and whether 
 confirms a full refund; support closes one by hand with a reason once it is settled, so the
 nightly job stops reminding. Finance reads the list; a close by Finance answers 403 (CAT.30),
 another role or a vendor member gets 404. The service checks the permission again and keeps the
-reason's hash only. Closing moves no money, so there is no passkey step-up.
+reason's hash only. Closing moves no money, so there is no passkey step-up; the POST still
+carries the everyday session gate (`orders_in_progress`) like every Manager mutation.
 """
 
 import datetime as dt
@@ -20,6 +21,7 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 
+from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
 from apps.core.audit import audit_context
 from apps.core.services import consume_rate_limit
@@ -75,6 +77,9 @@ class StrayPaymentsView(WriteGate, ManagerView):
         context.setdefault("form_errors", None)
         return context
 
+    # Group 1 (everyday support work, CORE.25): closing moves no money and "Check now" only reads
+    # the provider and records the answer, so any session level passes; CORE.26 can tighten it.
+    @requires_level_method("orders_in_progress")
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         actor = self.manager.user
         if not isinstance(actor, User):
