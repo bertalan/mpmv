@@ -10,7 +10,7 @@
   h2,
   h3,
   h4 {
-    color: var(--color-heading);
+    color: var(--s-heading, var(--color-heading)); /* a surface (THM.20) sets --s-heading */
     font-weight: 700;
     line-height: 1.1;
   }

@@ -1,0 +1,61 @@
+{% load i18n static %}{% comment %}
+Surfaces and decoration of `ride` (THM.20): the four section surfaces with an eyebrow, heading,
+text, link and button, the two own textures and the image scrim. Markup only: no inline style.
+{% endcomment %}
+  <section id="sg-surfaces" aria-labelledby="sg-surfaces-title">
+    <h2 id="sg-surfaces-title">{% translate "Surfaces and decoration" %}</h2>
+    <p>{% translate "Section surfaces are utility classes on the palette tokens, so each one follows the site palette." %}</p>
+
+    <div class="surface-light surface-pad">
+      <p class="eyebrow">{% translate "Light surface" %}</p>
+      <h3>{% translate "Ride further" %}</h3>
+      <p>{% translate "Body text on the light surface." %} <a href="#sg-surfaces">{% translate "A link" %}</a></p>
+      <a class="button" href="#sg-surfaces">{% translate "A button" %}</a>
+    </div>
+
+    <div class="surface-muted surface-pad">
+      <p class="eyebrow">{% translate "Muted surface" %}</p>
+      <h3>{% translate "Ride further" %}</h3>
+      <p>{% translate "Body text on the muted surface." %} <a href="#sg-surfaces">{% translate "A link" %}</a></p>
+      <a class="button" href="#sg-surfaces">{% translate "A button" %}</a>
+    </div>
+
+    <div class="surface-band surface-pad">
+      <p class="eyebrow">{% translate "Band surface" %}</p>
+      <h3>{% translate "Ride further" %}</h3>
+      <p>{% translate "Body text on the band surface." %} <a href="#sg-surfaces">{% translate "A link" %}</a></p>
+      <a class="button" href="#sg-surfaces">{% translate "A button" %}</a>
+    </div>
+
+    <div class="surface-primary surface-pad">
+      <p class="eyebrow">{% translate "Primary band surface" %}</p>
+      <h3>{% translate "Ride further" %}</h3>
+      <p>{% translate "Body text on the primary band surface." %} <a href="#sg-surfaces">{% translate "A link" %}</a></p>
+      <a class="button" href="#sg-surfaces">{% translate "A button" %}</a>
+    </div>
+
+    <h3>{% translate "Textures" %}</h3>
+    <div class="surface-muted surface-pad texture-topo">
+      <p class="eyebrow">{% translate "Topographic pattern" %}</p>
+      <p>{% translate "A light contour pattern behind a section, in our own SVG." %}</p>
+    </div>
+    <div class="surface-light surface-pad">
+      <p>{% translate "The torn edge below sits on top of the next section, in that section's colour." %}</p>
+    </div>
+    <div class="surface-band surface-pad edge-torn">
+      <p class="eyebrow">{% translate "Torn edge" %}</p>
+      <p>{% translate "This band starts with a torn edge." %}</p>
+    </div>
+
+    <h3>{% translate "Image scrim" %}</h3>
+    <div class="scrim-host">
+      <img src="{% static 'styleguide/sample-product.svg' %}" alt="" width="640" height="200" loading="lazy">
+      <div class="scrim" aria-hidden="true"></div>
+      <p class="scrim-caption">{% translate "Strong scrim: white text over any image." %}</p>
+    </div>
+    <div class="scrim-host">
+      <img src="{% static 'styleguide/sample-product.svg' %}" alt="" width="640" height="200" loading="lazy">
+      <div class="scrim scrim--soft" aria-hidden="true"></div>
+      <p class="scrim-caption">{% translate "Soft scrim." %}</p>
+    </div>
+  </section>

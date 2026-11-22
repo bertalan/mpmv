@@ -154,30 +154,39 @@ def check_screenshot(
     return Outcome("mismatch", result)
 
 
-def assert_matches_baseline(page: Page, *, theme: str, name: str, width: int) -> None:
+def assert_matches_baseline(
+    page: Page, *, theme: str, name: str, width: int, selector: str | None = None
+) -> None:
     """Screenshot the page at `width` (the top `MAX_HEIGHT` px at most) and compare it with its
-    baseline (see the module)."""
+    baseline (see the module). With `selector`, the screenshot is that element in full (a section
+    of the styleguide), whatever its position on the page."""
     mode = require_visual_mode()
     page.set_viewport_size({"width": width, "height": 900})
     page.wait_for_timeout(100)  # the layout settles after the resize
     page.evaluate("() => document.fonts.ready")
     actual = ACTUAL_DIR / theme / f"{name}-{width}.png"
     actual.parent.mkdir(parents=True, exist_ok=True)
-    page_height = page.evaluate("() => document.documentElement.scrollHeight")
-    page.screenshot(
-        path=str(actual),
-        full_page=True,
-        clip={"x": 0, "y": 0, "width": width, "height": min(page_height, MAX_HEIGHT)},
-        animations="disabled",
-        caret="hide",
-        # Dynamic regions: the launch countdown depends on the current time; a copy-to-clipboard
-        # field holds an absolute URL with the test server's random port; the footer year.
-        # The footer's copyright year (`{% now "Y" %}`, server side) changes on 1 January.
-        mask=[
-            page.locator("[data-countdown], #event-subscribe-url"),
-            page.locator("footer p", has_text="\u00a9"),
-        ],
-    )
+    # Dynamic regions: the launch countdown depends on the current time; a copy-to-clipboard
+    # field holds an absolute URL with the test server's random port; the footer year.
+    # The footer's copyright year (`{% now "Y" %}`, server side) changes on 1 January.
+    masks = [
+        page.locator("[data-countdown], #event-subscribe-url"),
+        page.locator("footer p", has_text="\u00a9"),
+    ]
+    if selector:
+        page.locator(selector).screenshot(
+            path=str(actual), animations="disabled", caret="hide", mask=masks
+        )
+    else:
+        page_height = page.evaluate("() => document.documentElement.scrollHeight")
+        page.screenshot(
+            path=str(actual),
+            full_page=True,
+            clip={"x": 0, "y": 0, "width": width, "height": min(page_height, MAX_HEIGHT)},
+            animations="disabled",
+            caret="hide",
+            mask=masks,
+        )
     baseline = baseline_path(theme, name, width)
     candidate = CANDIDATE_DIR / theme / baseline.name
     diff = DIFF_DIR / theme / baseline.name
