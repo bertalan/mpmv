@@ -36,6 +36,7 @@ SHOP_NOTE = (
     "This window covers only the sensitive actions of this shop that its owner confirms. "
     "It never covers another shop."
 )
+CANNOT_ELEVATE_NOTE = "Your role cannot open a passkey window."
 NO_ROLE_NOTE = "Your role may not open a passkey window or do this once. Ask a platform owner."
 
 pytestmark = [pytest.mark.django_db, pytest.mark.urls("apps.accounts.tests.integration.urls")]
@@ -322,7 +323,7 @@ def test_the_no_window_banner_offers_enrolment_to_who_holds_elevate_without_a_pa
     assert reverse("mfa:setup") in banner
     assert "next=" in banner
     assert 'data-passkey="elevate"' not in banner
-    assert _t("Your role cannot open a passkey window.") not in banner
+    assert _t(CANNOT_ELEVATE_NOTE) not in banner
 
 
 @pytest.mark.parametrize(
@@ -344,14 +345,14 @@ def test_a_non_superuser_platform_role_with_a_passkey_sees_the_passkey_window_bu
     banner = _no_window_banner(client)
     assert _t("Open passkey window") in banner
     assert 'data-passkey="elevate"' in banner
-    assert _t("Your role cannot open a passkey window.") not in banner
+    assert _t(CANNOT_ELEVATE_NOTE) not in banner
 
 
 def test_the_no_window_banner_says_plainly_when_the_role_cannot_elevate(client: Client) -> None:
     user, _ = _staff_with_passkey(elevate=False)
     _no_window_session(client, user)
     banner = _no_window_banner(client)
-    assert _t("Your role cannot open a passkey window.") in banner
+    assert _t(CANNOT_ELEVATE_NOTE) in banner
     assert 'data-passkey="elevate"' not in banner
     assert _t("Add a passkey") not in banner
 
@@ -1276,6 +1277,26 @@ def test_an_expired_unspent_grant_does_not_block_a_new_one() -> None:
 # --- D-32 amendment (owner 2026-11-14): shop owners confirm their own shop's owner actions
 
 
+def test_the_shop_note_text_is_the_one_the_prompt_template_shows() -> None:
+    """Positive control for the `not in` check below: the sentence is found when it is shown."""
+    from django.contrib.auth.models import AnonymousUser
+    from django.template.loader import render_to_string
+    from django.test import RequestFactory
+
+    request = RequestFactory().get("/")
+    request.user = AnonymousUser()
+    context = {
+        "can_elevate": True,
+        "can_do_once": False,
+        "shop_window": True,
+        "action": "export",
+        "group": 2,
+        "replay_url": "/",
+        "replay_method": "GET",
+    }
+    assert _t(SHOP_NOTE) in render_to_string("accounts/levels/prompt.html", context, request)
+
+
 def test_staff_with_elevate_keep_the_full_prompt_with_no_shop_note(client: Client) -> None:
     user, _ = _staff_with_passkey()
     _no_window_session(client, user)
@@ -1294,10 +1315,7 @@ def test_a_user_without_elevate_and_without_a_shop_is_never_offered_a_confirmati
     _no_window_session(client, user)
     refused = client.get(reverse("test-export"))
     assert not refused.context["can_do_once"]
-    assert (
-        _t("Your role may not open a passkey window or do this once. Ask a platform owner.")
-        in refused.content.decode()
-    )
+    assert _t(NO_ROLE_NOTE) in refused.content.decode()
     for action in sorted(levels.SHOP_OWNER_ACTIONS):
         assert not levels.may_confirm(user, action, None)
 
