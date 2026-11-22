@@ -822,6 +822,10 @@ class FeatureFlag(BaseModel):
         return flags.spec_of(self.name) if flags.is_registered(self.name) else None
 
 
+OWN_WORK_CODE = "own-work"  # seeded by migration 0013
+OWN_WORK_NAME = _("Own work")
+
+
 class ImageLicence(BaseModel):
     """An entry of the image licence allow list (CMS.8, spec 10 §10.2), edited by staff.
 
@@ -860,7 +864,8 @@ class ImageLicence(BaseModel):
         verbose_name = "image licence"
 
     def __str__(self) -> str:
-        return self.name
+        # The seeded "Own work" entry is shown translated; names staff typed stay as typed.
+        return str(OWN_WORK_NAME) if self.code == OWN_WORK_CODE else self.name
 
     def clean(self) -> None:
         error = restricted_licence_error(self.code, self.name, self.url)
@@ -1042,10 +1047,11 @@ class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
         null=True,
         blank=True,
         related_name="+",
+        verbose_name=_("Licence"),
         help_text="From the allow list: only licences that allow commercial use.",
     )
     author = models.CharField(
-        max_length=200, blank=True, help_text="The author or rights holder to credit."
+        _("Author"), max_length=200, blank=True, help_text="The author or rights holder to credit."
     )
     source_url = models.URLField(
         "source URL",

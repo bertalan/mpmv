@@ -56,8 +56,8 @@ def test_the_multiple_uploader_refuses_html_and_strips_a_photos_location(
     expect(refused.locator(".error-message")).not_to_be_empty()
     pending = uploads.filter(has_text="holiday.jpg")
     # The image model's licence and author fields have no translated verbose name yet.
-    pending.get_by_label("Licence").select_option(label="Own work")
-    pending.get_by_label("Author").fill("Ada Lovelace")
+    pending.get_by_label(translated("Licence")).select_option(label=translated("Own work"))
+    pending.get_by_label(translated("Author")).fill("Ada Lovelace")
     shot("pending-and-refused")
     with page.expect_response(lambda r: "create_from_uploaded_image" in r.url) as answer:
         pending.get_by_role("button", name=translated("Update")).click()

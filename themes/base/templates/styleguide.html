@@ -1,4 +1,4 @@
-{% extends "layouts/base.html" %}{% load i18n static %}
+{% extends "layouts/base.html" %}{% load i18n static theme_tags %}
 {% comment %}
 Styleguide (THM.4, spec 14 §14.9): every component of the active theme in every state, for
 staff and for the accessibility and visual tests. Never indexed nor cached (the view also sends
@@ -359,6 +359,7 @@ first error summary takes the focus on load.
     <p>{% translate "As the server renders it: the absolute date before the launch, the expired text after. The live counter and its pause button are CMS.9's module." %}</p>
     {% include "components/launch_countdown.html" with title=_("The new touring jacket") target=library.launch url="#sg-countdown" action=_("Get a reminder") heading_level=3 only %}
     {% include "components/launch_countdown.html" with title=_("The rain cover") target=library.launched expired=True expired_text=_("Now available.") expired_url="#sg-countdown" heading_level=3 only %}
+    {% countdown_script %}
   </section>
 
   <section aria-labelledby="sg-credits">

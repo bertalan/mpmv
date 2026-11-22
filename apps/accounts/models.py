@@ -61,7 +61,7 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
             "share it."
         ),
     )
-    full_name = models.CharField(max_length=150, blank=True)
+    full_name = models.CharField(_("Full name"), max_length=150, blank=True)
     preferred_language = LanguageField(default=primary_language)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False, help_text="Can log into the staff admin.")
