@@ -106,7 +106,7 @@ def test_the_featured_links_are_an_icon_feature_row() -> None:
     for item in items:
         assert item.select_one("svg.icon[aria-hidden='true']") is not None
         assert len(item.select("a")) == 1
-    assert doc.select_one("h2").get_text() == "Good to know"
+    assert [h.get_text() for h in doc.select("h2")] == ["Good to know"]
 
 
 def test_the_contact_points_are_an_address_column_and_a_form_card(
