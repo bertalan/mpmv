@@ -29,7 +29,8 @@ from apps.orders.tests.integration.test_staff_drafts import (
     staff,
 )
 
-pytestmark = pytest.mark.django_db
+# Items in a cart need a consumer price (TAX.12, ORD.19 on main): operator, rates, tax profiles.
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("consumer_prices")]
 
 
 def sent_draft(user: User | None) -> tuple[StaffDraft, str]:
