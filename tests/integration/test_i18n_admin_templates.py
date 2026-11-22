@@ -9,9 +9,12 @@ import html
 
 import pytest
 from django.test import Client
+from django.urls import reverse
 from django.utils import translation
 from django.utils.translation import gettext
 
+from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.mfa import verified_login
 from apps.cms.services import seed_site
 from apps.themes.services import use_theme
 from tests.i18n import other_language
@@ -39,3 +42,17 @@ def test_the_admin_template_labels_differ_from_the_english_source() -> None:
     lang = other_language()
     for text in ("Failed render jobs", "Events awaiting review", "Hide event", "Merge"):
         assert _say(lang, text) != text, text
+
+
+def test_the_events_review_page_renders_in_the_staff_language(client: Client) -> None:
+    from wagtail.users.models import UserProfile
+
+    lang = other_language()
+    user = UserFactory.create(superuser=True)
+    verified_login(client, user)
+    profile = UserProfile.get_for_user(user)
+    profile.preferred_language = lang
+    profile.save()
+    body = html.unescape(client.get(reverse("events_admin:review")).content.decode())
+    assert _say(lang, "No event is awaiting review.") in body
+    assert "No event is awaiting review." not in body
