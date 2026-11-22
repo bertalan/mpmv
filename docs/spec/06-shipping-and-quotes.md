@@ -290,8 +290,14 @@ customises without changing the template.
 
 ### Quotes (single order)
 
-If a package returns `NeedsQuote`, the whole checkout becomes a **quote request**:
-no payment is collected, and the order is created in the `quote_requested` state. Covered vendors keep their rate.
+If a package returns `NeedsQuote`, only the vendors whose packages need a quote go to a **quote request**
+(owner decision 2026-11-22, SHP.16; before it, the whole checkout became a quote request): the checkout
+produces a normal order, paid now, for the vendors with a rate, and a separate quote request with no
+payment, in the `quote_requested` state, for the others. The summary shows both parts ('Pay now' and
+'Quote request'). Cart-wide discounts (coupons, free-shipping thresholds) apply only to the part paid
+now, and the cart and the checkout summary tell the customer, before payment, that the products in the
+quote request do not benefit from them. The customer gets one confirmation for the order and one for the
+request. The same split serves the business-only vendors of VEN.41.
 
 ```mermaid
 stateDiagram-v2
@@ -417,3 +423,4 @@ and `apps.shipping` from importing `apps.events` (VEN.20, EVT.1).
 | SHP.13 | Standard shipping template proposed by the platform (zones, country groups, weight bands, VAT treatment, special areas) that a vendor copies and customises; export and re-import as JSON/CSV validated by the same validators used in tests, dry-run preview (ChangeSet), audited; SHP.5 legacy import reuses the format | P1 | 10 | SHP.12 | Round trip export -> import is lossless; an invalid file is rejected with a per-row report and changes nothing |
 | SHP.14 | Special areas: islands, remote and extra-VAT territories as postcode/province lists seeded in the standard template (IT islands and minor islands, Baleari, Corsica, Greek islands, Azores/Madeira, UK Highlands and Islands, Venice lagoon, carrier remote-area lists importable; extra-VAT: Livigno, Campione d Italia, Canarias, Ceuta/Melilla, French DOM, Aland, Mount Athos, Heligoland, Busingen linked to the TAX.1 Territory); per-method treatment: surcharge (fixed, percent, per kg), extra delivery days, unavailable, quote only, blocked; default: indicative cost subject to quote (the buyer sees an estimate and requests a quote for the exact price) | P1 | 12 | SHP.12, SHP.13, TAX.11 | A Sardinia address shows an indicative cost with a request-quote action; a vendor override to a fixed surcharge applies |
 | SHP.15 | Remaining special areas (owner decision Q-97): Greece Ionian islands (`49*`, `28*`, `29*`, `31*`), Sporades (`370*`, Skyros `34007`), Kythira and Antikythira (`801*`, with the Ionian islands), Saronic islands (exact codes `18010`, `18020`, `18040`, `18050`, and `189*`; Methana stays mainland) and Northern Ireland (`BT*`, remote, shipping only: the tax territory logic of TAX.7 is unchanged), seeded by an idempotent data migration | P2 | 2 | SHP.14 | One address per new area resolves to it; Patras, Athens, Piraeus, London and Glasgow codes stay mainland; the seed is idempotent and its reverse removes only its own areas |
+| SHP.16 | Per-vendor quote split (owner decision 2026-11-22): a checkout where some packages return `NeedsQuote` produces a paid order for the vendors with a rate and a separate SHP.9 quote request for the others, instead of turning the whole checkout into a quote; cart-wide coupons and free-shipping thresholds are recomputed on the paid part only, with a notice before payment that the products in the quote request do not benefit from them; two confirmations; the same mechanism serves VEN.41 business-only vendors; payments code, so flagged for human review | P1 | 6 | SHP.9, SHP.10, ORD.4 | Regression tests: a mixed checkout (one vendor with a rate, one `NeedsQuote`) creates one paid order and one quote request with the right lines and snapshots, and one PaymentIntent for the paid part only; a coupon and a free-shipping threshold are recomputed on the paid part, and the notice is shown in the cart and the summary before payment; a checkout where every package needs a quote still creates only a quote request; a checkout with no quote is unchanged; the two confirmation emails; ROUND_HALF_UP per line |
