@@ -2,6 +2,8 @@
 *Forget my garage*. Thin adapters over `garage` and `services`. They write only the visitor's own
 cookie: no server record, no log of its value."""
 
+import datetime as dt
+import math
 import uuid
 from urllib.parse import urlsplit
 
@@ -17,8 +19,10 @@ from django.utils.translation import gettext, ngettext
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.audit import audit_context
+from apps.core.http import client_ip
 from apps.core.i18n import path_carries_secret
 from apps.core.public_forms import Protection, not_anonymous, public_form
+from apps.core.services import consume_rate_limit
 
 from . import garage, garage_merge, garage_profiles, garage_state, services
 from .models import GarageProfile
@@ -51,13 +55,18 @@ def _declared_fit7[T](view: T, *, purpose: str, reason: str, no_rate_limit: str)
     )(view)
 
 
+_LINE_LIMIT = 30  # dismissals per address and window: far more than any person needs
+_LINE_WINDOW = dt.timedelta(hours=1)
+
+
 def _declared_fit7_line[T](view: T) -> T:
-    return _declared_fit7(
-        view,
+    return public_form(
+        protection=Protection.ALLOW,
         purpose="Dismiss the Add your garage line (a flag in the visitor's own session)",
+        task="FIT.7",
         reason="it stores one boolean in the visitor's session and redirects; nothing is logged",
-        no_rate_limit="no server-side work beyond one session write and a redirect",
-    )
+        rate_limit="per IP, 30 an hour, checked before the session is written",
+    )(view)
 
 
 def _back(request: HttpRequest) -> HttpResponseRedirect:
@@ -184,6 +193,12 @@ def dismiss_garage_line(request: HttpRequest) -> HttpResponse:
     """*Dismiss* on the *Add your garage* line: a flag in the session, then back to the page the
     visitor came from (the Referer, kept off secret-token URLs and the chooser). No `next` is
     read or written: the page URL can hold a secret."""
+    wait = consume_rate_limit(
+        f"garage-line:ip:{client_ip(request)}", limit=_LINE_LIMIT, window=_LINE_WINDOW
+    )
+    if wait:  # before any session write: a bot cannot mint session rows past the limit
+        retry = str(max(1, math.ceil(wait.total_seconds())))
+        return HttpResponse("Too many requests.", status=429, headers={"Retry-After": retry})
     request.session[garage_state.LINE_DISMISSED_KEY] = True
     return _return_target(request)
 

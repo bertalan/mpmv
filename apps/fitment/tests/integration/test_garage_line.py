@@ -172,3 +172,18 @@ def test_a_visitor_without_any_cookie_costs_no_session_query() -> None:
     with CaptureQueriesContext(connection) as queries:
         client.get(LISTING)
     assert not [q for q in queries.captured_queries if "django_session" in q["sql"]]
+
+
+def test_past_the_limit_the_dismissal_is_refused_and_mints_no_session() -> None:
+    from django.contrib.sessions.models import Session
+
+    from apps.fitment import views
+
+    for _ in range(views._LINE_LIMIT):
+        Client().post(reverse(DISMISS))
+    before = Session.objects.count()
+    response = Client().post(reverse(DISMISS))
+    assert response.status_code == 429
+    assert int(response["Retry-After"]) >= 1
+    assert "sessionid" not in response.cookies
+    assert Session.objects.count() == before
