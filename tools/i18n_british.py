@@ -89,6 +89,43 @@ def american_words(text: str) -> list[str]:
     return [m.group(0) for m in _WORDS.finditer(text)]
 
 
+# Help pages (I18N.25 follow-up): prose of help/en/**/*.md is British English too.
+HELP_DIR = ROOT / "help" / "en"
+
+# Phrases of help prose that keep a listed word, with the reason.
+HELP_EXCEPTIONS: dict[str, str] = {
+    "Catalog and moderation": "role group name stored in the database (migration 0003)",
+    "Catalog role": "role group name stored in the database (migration 0003)",
+}
+
+_FENCE = re.compile(r"^(```|~~~).*?^\1[^\n]*$", re.MULTILINE | re.DOTALL)
+_INLINE_CODE = re.compile(r"`[^`\n]*`")
+_URL = re.compile(r"https?://\S+|\]\([^)\s]*\)")
+_IDENTIFIER = re.compile(r"\b[a-z_]+:[a-z_.]+\b")  # URL names such as catalog:brand
+
+
+def markdown_prose(text: str) -> str:
+    """The prose of a markdown page: no fenced or inline code, URLs or identifiers."""
+    for pattern in (_FENCE, _INLINE_CODE, _URL, _IDENTIFIER):
+        text = pattern.sub(" ", text)
+    for phrase in HELP_EXCEPTIONS:
+        text = text.replace(phrase, " ")
+    return text
+
+
+def help_violations(root: Path | None = None) -> list[str]:
+    """One line per American word in the prose of a help/en page."""
+    base = root if root is not None else HELP_DIR
+    bad = []
+    for path in sorted(base.rglob("*.md")):
+        prose = markdown_prose(path.read_text(encoding="utf-8"))
+        for n, line in enumerate(prose.splitlines(), 1):
+            words = american_words(line)
+            if words:
+                bad.append(f"{path.relative_to(base)}:{n}: {sorted(set(words))}")
+    return bad
+
+
 def in_scope(places: list[str]) -> bool:
     return any(p.startswith(ALLOWED_APPS) for p in places)
 
@@ -111,7 +148,10 @@ def check() -> int:
     bad = violations(_catalog().collect())
     for line in bad:
         print(f"American spelling in an English msgid (I18N.23): {line}", file=sys.stderr)
-    return 1 if bad else 0
+    help_bad = help_violations()
+    for line in help_bad:
+        print(f"American spelling in help/en prose (I18N.25): {line}", file=sys.stderr)
+    return 1 if bad or help_bad else 0
 
 
 if __name__ == "__main__":
