@@ -5,6 +5,7 @@ import re
 import pytest
 from django.test import Client, override_settings
 from django.urls import reverse
+from django.utils.html import escape
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.accounts import engine
@@ -17,6 +18,7 @@ from apps.accounts.tests.factories import (
 )
 from apps.accounts.tests.mfa import password_login, verified_login
 from apps.core.models import AuditLog
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
@@ -61,7 +63,7 @@ def test_an_unknown_recovery_code_is_refused(client: Client) -> None:
         reverse("mfa:verify"),
         {"method": "recovery", "code": engine.generate_recovery_codes(1)[0]},
     )
-    assert "Invalid code" in response.content.decode()
+    assert escape(translated("Invalid code. Try again.")) in response.content.decode()
     assert client.get("/django-admin/").status_code == 302
 
 
@@ -109,7 +111,10 @@ def test_regenerating_requires_a_recent_verification(client: Client) -> None:
     assert not RecoveryCode.objects.exists()
 
 
+@override_settings(MFA_RECOVERY_THROTTLE_FACTOR=60)
 def test_failed_attempts_are_throttled(client: Client) -> None:
+    # A 60 s back-off, not the default 1 s: a slow CI runner once took over a second between the
+    # two posts, so the right code was accepted (train #1006, 22 Nov).
     user = UserFactory.create(staff=True)
     TOTPDeviceFactory.create(user=user)
     code = engine.generate_recovery_codes(1)[0]

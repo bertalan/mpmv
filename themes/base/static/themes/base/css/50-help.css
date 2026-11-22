@@ -11,8 +11,8 @@
   }
 
   .help-button,
-  .user-menu__summary,
-  .user-menu__item {
+  :is(.user-menu__summary, .garage-menu__summary),
+  :is(.user-menu__item, .garage-menu__item) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -33,7 +33,7 @@
   }
 
   .help-button[hidden],
-  .user-menu__item[hidden] {
+  :is(.user-menu__item, .garage-menu__item)[hidden] {
     display: none;
   }
 
@@ -43,25 +43,25 @@
   }
 
   .help-button:hover,
-  .user-menu__summary:hover {
+  :is(.user-menu__summary, .garage-menu__summary):hover {
     background: var(--color-accent-tint);
     color: var(--color-text);
   }
 
-  .user-menu {
+  :is(.user-menu, .garage-menu) {
     position: relative;
   }
 
-  .user-menu__summary {
+  :is(.user-menu__summary, .garage-menu__summary) {
     list-style: none;
   }
 
-  .user-menu__summary::-webkit-details-marker {
+  :is(.user-menu__summary, .garage-menu__summary)::-webkit-details-marker {
     display: none;
   }
 
   /* The open list sits under the summary, in the flow of the header's right edge. */
-  .user-menu__list {
+  :is(.user-menu__list, .garage-menu__list) {
     position: absolute;
     inset-block-start: calc(100% + var(--space-xs));
     inset-inline-end: 0;
@@ -77,14 +77,14 @@
     box-shadow: var(--shadow-raised);
   }
 
-  .user-menu__list .user-menu__item {
+  :is(.user-menu__list, .garage-menu__list) :is(.user-menu__item, .garage-menu__item) {
     inline-size: 100%;
     justify-content: flex-start;
     border-color: transparent;
     color: var(--color-text);
   }
 
-  .user-menu__list .user-menu__item:hover {
+  :is(.user-menu__list, .garage-menu__list) :is(.user-menu__item, .garage-menu__item):hover {
     background: var(--color-accent-tint);
   }
 

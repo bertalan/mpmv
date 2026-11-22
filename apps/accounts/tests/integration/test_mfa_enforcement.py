@@ -19,10 +19,16 @@ from apps.accounts.tests.factories import (
     UserFactory,
 )
 from apps.accounts.tests.mfa import password_login, verified_login
+from tests.i18n import language_prefix, other_language
 
 pytestmark = pytest.mark.django_db
 
-PROTECTED = ["/", "/it/", "/django-admin/", "/django-admin/accounts/user/"]
+PROTECTED = [
+    "/",
+    f"{language_prefix(other_language())}/",
+    "/django-admin/",
+    "/django-admin/accounts/user/",
+]
 
 
 def _redirect_target(response: object) -> tuple[str, str]:

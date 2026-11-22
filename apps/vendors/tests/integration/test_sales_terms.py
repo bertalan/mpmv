@@ -362,3 +362,73 @@ def test_the_pdf_of_an_old_version_still_downloads_through_the_accepted_terms_li
     assert signing.loads(pdf_match.kwargs["token"], salt=ts.ARCHIVE_SALT) == signing.loads(
         read_match.kwargs["token"], salt=ts.ARCHIVE_SALT
     )
+
+
+def test_a_version_keeps_the_shop_name_it_was_published_under() -> None:
+    vendor, version, token = _published()
+    assert version.vendor_name == vendor.display_name
+    old_name = vendor.display_name
+    Vendor.objects.filter(pk=vendor.pk).update(display_name="Renamed Shop")
+    version = SalesTermsVersion.objects.get(pk=version.pk)
+    assert version.public_name == old_name
+    page = Client().get(reverse("vendor_terms:read", args=[token])).content.decode()
+    assert old_name in page
+    assert "Renamed Shop" not in page
+
+
+def test_an_older_version_without_a_snapshot_shows_the_current_name() -> None:
+    version = SalesTermsVersionFactory.create(vendor_name="")
+    assert version.public_name == version.vendor.display_name
+
+
+def test_the_pdf_is_rendered_once_per_version_and_revalidated_by_etag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from django.core.cache import cache
+
+    from apps.vendors import terms_views
+
+    cache.clear()
+    calls: list[str] = []
+
+    def fake(html: str) -> bytes:
+        calls.append(html)
+        return b"%PDF-fake"
+
+    monkeypatch.setattr(terms_views, "render_html", fake)
+    _, _, token = _published()
+    client = Client()
+    url = reverse("vendor_terms:pdf", args=[token])
+    first = client.get(url)
+    second = client.get(url)
+    assert first.content == second.content == b"%PDF-fake"
+    assert len(calls) == 1
+    assert first["Cache-Control"] == "private, no-cache"
+    etag = first["ETag"]
+    for header in (etag, f"W/{etag}", f'"other", {etag}', "*"):
+        assert client.get(url, headers={"If-None-Match": header}).status_code == 304
+    assert client.get(url, headers={"If-None-Match": '"other"'}).status_code == 200
+    assert len(calls) == 1
+    assert AuditLog.objects.filter(action=ts.READ).count() == 7
+
+
+def test_a_rename_changes_the_pdf_etag_of_a_version_without_a_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from apps.vendors import terms_views
+
+    seen: list[str] = []
+
+    def fake(html: str) -> bytes:
+        seen.append(html)
+        return b"%PDF-fake"
+
+    monkeypatch.setattr(terms_views, "render_html", fake)
+    version = SalesTermsVersionFactory.create(vendor_name="")
+    vendor = version.vendor
+    url = ts.accepted_terms_pdf_url(version)
+    first = Client().get(url)
+    Vendor.objects.filter(pk=vendor.pk).update(display_name="Renamed Shop")
+    second = Client().get(url)
+    assert first["ETag"] != second["ETag"]
+    assert "Renamed Shop" in seen[-1]

@@ -29,11 +29,13 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
 PUBLISHED = TranslationStatus.PUBLISHED
 NO_SIDEWAYS_SCROLL = "() => document.documentElement.scrollWidth <= window.innerWidth"
+PAGINATION_NAV = f'nav[aria-label="{translated("Pagination")}"]'
 
 
 @pytest.fixture(autouse=True)
@@ -82,17 +84,17 @@ def test_the_listing_passes_the_gates(
 
 def test_the_pagination_works_with_the_keyboard_only(page: Page, live_server: LiveServer) -> None:
     page.goto(f"{live_server.url}/compatibility/maker/")
-    next_link = page.locator("nav[aria-label=Pagination] a[rel=next]")
+    next_link = page.locator(f"{PAGINATION_NAV} a[rel=next]")
     next_link.focus()
     page.keyboard.press("Enter")
     expect(page).to_have_url(f"{live_server.url}/compatibility/maker/?page=2")
-    expect(page.locator("nav[aria-label=Pagination] [aria-current=page]")).to_have_text("2")
+    expect(page.locator(f"{PAGINATION_NAV} [aria-current=page]")).to_have_text("2")
 
 
 def test_the_pagination_targets_are_at_least_24_px(page: Page, live_server: LiveServer) -> None:
     page.set_viewport_size({"width": 360, "height": 900})
     page.goto(f"{live_server.url}/compatibility/maker/")
-    for link in page.locator("nav[aria-label=Pagination] a").all():
+    for link in page.locator(f"{PAGINATION_NAV} a").all():
         box = link.bounding_box()
         assert box is not None
         assert min(box["width"], box["height"]) >= 24

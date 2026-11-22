@@ -96,6 +96,8 @@ class FitmentScheme(Model):  # singleton per installation
     year_max_offset = SmallIntegerField()  # e.g. 1900 and +2 years
     contains_special_category = BooleanField(default=False)  # §17.4.5: forces session-only storage
     max_profiles = PositiveSmallIntegerField(default=10)
+    garage_inactivity_months = PositiveSmallIntegerField(default=24)  # 1..36, owner cap
+    garage_notice_days = PositiveSmallIntegerField(default=30)  # 0 .. months*30-1
 
 
 class FitmentNode(MP_Node):  # treebeard tree: depth = level position
@@ -125,7 +127,7 @@ class FitmentNodeAlias(
 - Changing the scheme is rare and audited (Configuration and tax role, MFA step-up, dry run): adding
   a level at the end and renaming labels are allowed; reordering or removing a level with nodes
   under it is refused (the operator merges or retires nodes first).
-- Nodes are edited by the Catalog and moderation role in the Manager platform space: CRUD, merge
+- Nodes are edited by the Catalogue and moderation role in the Manager platform space: CRUD, merge
   (references moved in one transaction, the old node id answering as an alias for profiles), retire
   (kept in old profiles, hidden from pickers), and the review queue of proposals (§17.3.2).
 
@@ -215,7 +217,7 @@ Vendors only see and edit their own products (CORE.3 tenant isolation). The serv
 ### 17.3.2 A node the vendor cannot find
 
 Same pattern as brands (CAT.20): the vendor *proposes* a node (parent, name), it stays `proposed`
-and its rows inactive until Catalog and moderation approves, merges it into an existing node
+and its rows inactive until Catalogue and moderation approves, merges it into an existing node
 (duplicate detection on normalised name plus alias) or refuses with a reason. An anti-flooding limit
 on pending proposals per vendor (setting, default 20) applies; proposals arriving with an import run
 are grouped into one batch per run, reviewed together, outside that limit. Vendors are never free to
@@ -397,6 +399,8 @@ grids, blog index, event list) a region labelled "Garage" shows above the result
   an account profile: until the user deletes it, or the account is erased (CMP.4), or **24 months
   without use** (a setting), after a service email 30 days before. The anonymous cookie: 180 days
   from the last change, and removable at any time.
+  The three periods together: the anonymous cookie is capped at 12 months (Q-G1), an account profile
+  defaults to 24 months without use (Q-G7), and the owner caps that setting at 36 months.
 - **The staged cookie at sign-in (FIT.6).** To offer the merge notice (§17.4.3) the server keeps one
   entry, `fitment_garage_pending`, in the visitor's server-side session: the make, model and year
   of the cookie's vehicles (at most three), no identifier. It lives as long as the session and is
@@ -740,7 +744,7 @@ confirm, not a new dependency edge):
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
-| FIT.1 | Scheme and nodes (D-38, slice FIT-a): `FitmentScheme`, `FitmentLevel` (up to 4 node levels, translated labels), `FitmentNode` tree with status, aliases, optional translated names, `FitmentNote`; Manager platform pages for the scheme (Configuration and tax, step-up, dry run, no reorder or removal when nodes exist) and for nodes (Catalog and moderation: CRUD, merge with references moved, retire, proposals queue); the fitment-relevant categories as an operator setting seeded with none, bulk-settable, stored as `FitmentCategory` rows in the fitment app (a row means relevant) so the catalog never depends on fitment | P1 | 16 | CAT.2, CORE.17, CORE.18, I18N.2 | A two-level and a four-level scheme are created in two sectors' vocabularies; a scheme change that would orphan nodes is refused; a node merge moves the references; a proposed node is invisible to pickers until approved |
+| FIT.1 | Scheme and nodes (D-38, slice FIT-a): `FitmentScheme`, `FitmentLevel` (up to 4 node levels, translated labels), `FitmentNode` tree with status, aliases, optional translated names, `FitmentNote`; Manager platform pages for the scheme (Configuration and tax, step-up, dry run, no reorder or removal when nodes exist) and for nodes (Catalogue and moderation: CRUD, merge with references moved, retire, proposals queue); the fitment-relevant categories as an operator setting seeded with none, bulk-settable, stored as `FitmentCategory` rows in the fitment app (a row means relevant) so the catalog never depends on fitment | P1 | 16 | CAT.2, CORE.17, CORE.18, I18N.2 | A two-level and a four-level scheme are created in two sectors' vocabularies; a scheme change that would orphan nodes is refused; a node merge moves the references; a proposed node is invisible to pickers until approved |
 | FIT.2 | Product declaration (D-38, slice FIT-a): `ProductFitmentState`, `ProductFitment` with year range, exclusion, note, source, constraints, validation rules of §17.2.4, pure `fitment/engine.py` (`fits`, `check`, `no`, `unknown`), `set_product_fitment` with dry run, ChangeSet and AuditLog, `always_visible` and `rows_version` upkeep | P1 | 16 | FIT.1, CAT.14 | The regression cases 1 to 3 of §17.11 pass as unit tests with no database; an overlapping contradictory row is refused; a replace of several rows writes one AuditLog entry |
 | FIT.3 | Vendor Fits tab in the shop space (D-38, slice FIT-b): mode radio, cascading node picker with search and a no-script fallback, year fields, exclusion, notes, copy from another product, bulk action with ChangeSet preview, node proposals with an anti-flooding limit, per-vendor data-quality report | P1 | 14 | FIT.2, CAT.19, CORE.9 | A vendor sets fitment on a product and on 50 products in bulk; a proposal is pending and invisible until reviewed; the 21st pending proposal is refused; a cross-tenant negative test passes |
 | FIT.4 | CSV import and export of fitment and the ING link (D-38, slice FIT-b): headers from the level codes, `replace` and `add`, dry run report, set-based upsert through staging, review items for unmatched names, `MappingTable` kind `fitment`, `StagedFitment`, provenance rules, AI-parsed fitment never auto-published | P1 | 14 | FIT.2, ING.1, ING.5 | A 100 000-row file loads in a background task with a report; round trip export equals import; a feed refresh leaves `manual` rows alone; an AI-parsed row lands in review |

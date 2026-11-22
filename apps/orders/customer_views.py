@@ -88,6 +88,7 @@ REORDER_SKIPPED = {
     engine.REORDER_RETIRED: _("not sold any more"),
     engine.REORDER_OUT_OF_STOCK: _("out of stock"),
     engine.REORDER_NOT_DELIVERABLE: _("cannot be delivered to your address"),
+    engine.REORDER_NO_PRICE: _("has no price yet"),
 }
 STEP_STATE_LABEL = {
     "done": _("done"),

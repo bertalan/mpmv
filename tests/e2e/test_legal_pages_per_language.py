@@ -17,11 +17,13 @@ from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.engine import GO_LIVE_LEGAL_KINDS
 from apps.cms.models import LegalPage
+from apps.cms.seed import LEGAL_PLACEHOLDER_BODY, legal_placeholder
 from apps.cms.services import seed_site, set_legal_effective_date
 from apps.core.audit import AuditContext
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import AuditLog
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import language_prefix, other_language, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -33,13 +35,14 @@ def test_every_language_has_the_five_pages_each_with_its_own_date(
 ) -> None:
     seed_site(legal_placeholders=True)
     today = timezone.localdate()
+    primary, other = primary_language(), other_language()
     english_date = today + dt.timedelta(days=200)
     italian_date = today + dt.timedelta(days=45)
-    # A new English version, and the translator gives the Italian text its own date.
-    english = LegalPage.objects.live().get(kind="terms", locale__language_code="en")
+    # A new primary-language version, and the translator gives the other text its own date.
+    english = LegalPage.objects.live().get(kind="terms", locale__language_code=primary)
     english.effective_date = english_date
     english.save_revision().publish()
-    italian = LegalPage.objects.live().get(kind="terms", locale__language_code="it")
+    italian = LegalPage.objects.live().get(kind="terms", locale__language_code=other)
     set_legal_effective_date(italian, italian_date, ctx=CTX)
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
@@ -51,16 +54,20 @@ def test_every_language_has_the_five_pages_each_with_its_own_date(
             assert response.status == 200, (kind, code)
 
     page.goto(f"{live_server.url}{english.url}")
-    expect(page.get_by_role("heading", level=1)).to_have_text("Terms of sale")
-    expect(page.get_by_text(re.compile("not been checked by legal counsel"))).to_be_visible()
-    shot("en-terms-placeholder")
+    expect(page.get_by_role("heading", level=1)).to_have_text(
+        legal_placeholder(primary, "terms").title
+    )
+    draft = "Draft: this text has not been checked by legal counsel yet and is not final."
+    expect(page.get_by_text(translated(draft))).to_be_visible()
+    shot("primary-terms-placeholder")
 
-    page.locator('button[value="it"]').click()
-    expect(page).to_have_url(re.compile(r"/it/condizioni-di-vendita/$"))
-    expect(page.get_by_role("heading", level=1)).to_have_text("Condizioni di vendita")
+    terms = legal_placeholder(other, "terms")
+    page.locator(f'button[value="{other}"]').click()
+    expect(page).to_have_url(re.compile(rf"{language_prefix(other)}/{terms.slug}/$"))
+    expect(page.get_by_role("heading", level=1)).to_have_text(terms.title)
     expect(page.locator(f'time[datetime="{italian_date.isoformat()}"]').first).to_be_visible()
     expect(page.locator(f'time[datetime="{english_date.isoformat()}"]')).to_have_count(0)
-    shot("it-terms-own-date")
+    shot("other-terms-own-date")
 
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
 
@@ -69,10 +76,14 @@ def test_a_missing_language_is_not_found_rather_than_english(
     page: Page, live_server: LiveServer
 ) -> None:
     seed_site(legal_placeholders=True)
-    german = LegalPage.objects.live().get(kind="returns", locale__language_code="de")
+    other = other_language()
+    german = LegalPage.objects.live().get(kind="returns", locale__language_code=other)
     german_url = german.url
-    assert german_url.startswith("/de/")
-    english_text = "This page has no legal text yet"  # the EN placeholder's sentence
+    assert german_url.startswith(f"{language_prefix(other)}/")
+    # The primary language's placeholder sentence, without its markup.
+    english_text = (
+        re.sub("<[^>]+>", "", LEGAL_PLACEHOLDER_BODY[primary_language()]).split(".")[1].strip()
+    )
     german.unpublish()
 
     response = page.goto(f"{live_server.url}{german_url}")

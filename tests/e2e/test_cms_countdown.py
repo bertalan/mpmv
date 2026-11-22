@@ -9,6 +9,7 @@ names (no live counter, one polite announcement, a pause button).
 """
 
 import datetime as dt
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -19,8 +20,10 @@ from playwright.sync_api import Browser, Page, expect
 from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.models import HomePage
+from apps.core.i18n import primary_language
 from tests.e2e.conftest import SCREENSHOT_DIR
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -49,7 +52,7 @@ def _publish_countdown(target: dt.datetime, **fields: Any) -> None:
         "expired_link": "https://example.com/shop/jacket/",
     }
     value.update(fields)
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     home.body = [("countdown", value)]
     home.save_revision().publish()
 
@@ -69,6 +72,17 @@ COUNT_TIMERS = """(() => {
 })();"""
 
 
+def _minutes(page: Page, count: int) -> str:
+    """ "3 minutes" in the page language, as the browser's Intl spells it."""
+    spelled: str = page.evaluate(
+        """(count) => new Intl.NumberFormat(document.documentElement.lang, {
+          style: "unit", unit: "minute", unitDisplay: "long",
+        }).format(count)""",
+        count,
+    )
+    return spelled
+
+
 def _target() -> dt.datetime:
     return TARGET
 
@@ -86,26 +100,26 @@ def test_the_counter_updates_each_minute_pauses_and_announces_the_launch_once(
 
     block = page.locator(".launch-countdown")
     counter = block.locator("[data-countdown-remaining]")
-    pause = block.get_by_role("button", name="Pause countdown")
+    pause = block.get_by_role("button", name=translated("Pause countdown"))
     expect(counter).to_be_visible()
-    expect(counter).to_have_text("3 minutes")
+    expect(counter).to_have_text(_minutes(page, 3))
     expect(pause).to_be_visible()
     assert block.locator("[aria-live]").count() == 0
     assert page.locator("#live-region").get_attribute("role") == "status"
     shot("counting")
 
     page.clock.run_for(30_000)
-    expect(counter).to_have_text("2 minutes")
+    expect(counter).to_have_text(_minutes(page, 2))
 
     pause.click()
-    resume = block.get_by_role("button", name="Resume countdown")
+    resume = block.get_by_role("button", name=translated("Resume countdown"))
     expect(resume).to_be_visible()
     page.clock.run_for(60_000)
-    expect(counter).to_have_text("2 minutes")
+    expect(counter).to_have_text(_minutes(page, 2))
     shot("paused")
 
     resume.click()
-    expect(counter).to_have_text("1 minute")
+    expect(counter).to_have_text(_minutes(page, 1))
 
     page.clock.run_for(60_000)
     expired = block.locator("[data-countdown-expired]")
@@ -131,8 +145,15 @@ def test_the_date_is_shown_in_the_visitor_time_zone(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     page.goto(f"{live_server.url}/")
     when = page.locator(".launch-countdown time")
-    expect(when).to_contain_text("EST")
-    expect(when).to_contain_text("4:00")
+    # New York's short zone name in the page language ("EST" in English, "GMT-5" in others).
+    zone = page.evaluate(
+        """(at) => new Intl.DateTimeFormat(document.documentElement.lang, {
+          timeZone: "America/New_York", timeZoneName: "short",
+        }).formatToParts(new Date(at)).find((part) => part.type === "timeZoneName").value""",
+        TARGET.isoformat(),
+    )
+    expect(when).to_contain_text(zone)
+    expect(when).to_contain_text(re.compile(r"\b0?4[:.]00\b"))  # 9:00 UTC is 4:00 in New York
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
     context.close()
 
@@ -145,8 +166,8 @@ def test_a_paused_countdown_far_from_its_target_does_not_spin(
     page.add_init_script(COUNT_TIMERS)
     page.goto(f"{live_server.url}/")
     block = page.locator(".launch-countdown")
-    block.get_by_role("button", name="Pause countdown").click()
-    expect(block.get_by_role("button", name="Resume countdown")).to_be_visible()
+    block.get_by_role("button", name=translated("Pause countdown")).click()
+    expect(block.get_by_role("button", name=translated("Resume countdown"))).to_be_visible()
     before = page.evaluate("window.__timers")
     page.wait_for_timeout(500)
     assert page.evaluate("window.__timers") - before <= 1
@@ -185,3 +206,52 @@ def test_after_the_target_the_server_shows_the_expired_text_and_link(
     expect(block.locator("[data-countdown-pause]")).to_have_count(0)
     expect(page.locator("#live-region")).to_be_empty()
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
+
+
+DELETE_INTL = "delete window.Intl;"
+
+
+def test_without_intl_the_server_text_stays_and_the_module_throws_nothing(
+    page: Page, live_server: LiveServer
+) -> None:
+    _publish_countdown(TARGET)
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.add_init_script(DELETE_INTL)
+    page.goto(f"{live_server.url}/")
+    block = page.locator(".launch-countdown")
+    time = block.locator("time")
+    expect(time).to_be_visible()
+    assert page.evaluate("typeof window.Intl") == "undefined"
+    server_text = time.inner_text()
+    assert server_text.strip()
+    # The module is deferred: once the page has loaded and settled, it has run.
+    page.wait_for_load_state("networkidle")
+    assert time.inner_text() == server_text
+    expect(block.locator("[data-countdown-counter]")).to_be_hidden()
+    expect(block.locator("[data-countdown-pause]")).to_be_hidden()
+    assert errors == [], "\n".join(errors)
+
+
+def test_without_intl_the_expired_state_still_appears_at_the_target(
+    page: Page, live_server: LiveServer
+) -> None:
+    _publish_countdown(TARGET)
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.add_init_script(DELETE_INTL)
+    page.clock.install(time=TARGET - dt.timedelta(seconds=5))
+    page.goto(f"{live_server.url}/")
+    page.wait_for_load_state("networkidle")
+    assert page.evaluate("typeof window.Intl") == "undefined"
+    block = page.locator(".launch-countdown")
+    expect(block.locator("[data-countdown-expired]")).to_be_hidden()
+
+    page.clock.run_for(10_000)
+    expired = block.locator("[data-countdown-expired]")
+    expect(expired).to_be_visible()
+    expect(expired).to_contain_text("On sale now")
+    expect(block.get_by_role("link", name="Get a reminder")).to_be_hidden()
+    expect(block.locator("time")).to_be_hidden()
+    expect(page.locator("#live-region")).to_have_text("On sale now")
+    assert errors == [], "\n".join(errors)

@@ -2,7 +2,7 @@
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
 <meta charset="utf-8">
-<title>{% translate "Sales terms" %} - {{ vendor.display_name }}</title>
+<title>{% translate "Sales terms" %} - {{ version.public_name }}</title>
 <style>
 @page { size: A4; margin: 20mm 18mm 22mm 18mm; @bottom-center { content: counter(page) " / " counter(pages); font-size: 8pt; color: #444; } }
 body { font-family: "DejaVu Sans", sans-serif; font-size: 10pt; line-height: 1.4; color: #111; }
@@ -13,7 +13,7 @@ li { margin-bottom: 2mm; }
 </style>
 </head>
 <body>
-<h1>{% blocktranslate with name=vendor.display_name %}Sales terms of {{ name }}{% endblocktranslate %}</h1>
+<h1>{% blocktranslate with name=version.public_name %}Sales terms of {{ name }}{% endblocktranslate %}</h1>
 <p>{% blocktranslate with number=version.number date=version.effective_from|date:"Y-m-d" %}Version {{ number }}, in force from {{ date }}.{% endblocktranslate %} {% blocktranslate with hash=version.content_hash|slice:":12" %}Fingerprint {{ hash }}.{% endblocktranslate %}</p>
 <h2>{% translate "Delivery, returns and law" %}</h2>
 <ul>

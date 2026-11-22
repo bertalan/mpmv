@@ -17,6 +17,7 @@ from pytest_django.live_server_helper import LiveServer
 from apps.cms.templatetags import cms_tags
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -128,7 +129,7 @@ def test_there_is_one_switch_point_at_64rem(
     """Between 992 and 1023 px Bootstrap's own `lg` would expand; ride switches only at 1024."""
     open_home(page, live_server, width)
     toggle = page.locator(".nav-toggle")
-    inline_menu = page.get_by_role("navigation", name="Main").get_by_role("link").first
+    inline_menu = page.get_by_role("navigation", name=translated("Main")).get_by_role("link").first
     if burger:
         expect(toggle).to_be_visible()
         expect(inline_menu).to_be_hidden()
@@ -146,7 +147,7 @@ def test_without_javascript_the_main_nav_is_a_reachable_link_list(
     try:
         page = context.new_page()
         assert page.goto(f"{live_server.url}/") is not None
-        nav = page.get_by_role("navigation", name="Main")
+        nav = page.get_by_role("navigation", name=translated("Main"))
         expect(page.locator(".nav-toggle")).to_be_hidden()
         for link in nav.get_by_role("link").all():
             if link.get_attribute("class") != "dropdown-item":

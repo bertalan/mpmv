@@ -78,6 +78,20 @@ class FitmentScheme(BaseModel):
         validators=[MinValueValidator(1), MaxValueValidator(50)],
         help_text=_("How many saved items one customer account can keep."),
     )
+    garage_inactivity_months = models.PositiveSmallIntegerField(
+        _("months without use before a saved item is deleted"),
+        default=24,
+        validators=[MinValueValidator(1), MaxValueValidator(36)],
+        help_text=_(
+            "A saved item unused for this long is deleted from the account. At most 36 months."
+        ),
+    )
+    garage_notice_days = models.PositiveSmallIntegerField(
+        _("days of notice before deletion"),
+        default=30,
+        validators=[MaxValueValidator(3600)],
+        help_text=_("The service email goes out this many days before. It must be shorter."),
+    )
 
     class Meta:
         verbose_name = _("fitment scheme")
@@ -175,7 +189,7 @@ class FitmentNodeQuerySet(MP_NodeQuerySet):  # type: ignore[misc]  # treebeard i
         return self.filter(status=NodeStatus.ACTIVE)  # type: ignore[no-any-return]
 
     def proposals(self) -> Self:
-        """The review queue of the Catalog and moderation role."""
+        """The review queue of the Catalogue and moderation role."""
         return self.filter(status=NodeStatus.PROPOSED)  # type: ignore[no-any-return]
 
 

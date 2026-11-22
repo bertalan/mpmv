@@ -11,7 +11,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import OutboxEmail
 from apps.core.services import render_email
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
-from tests.i18n import other_language, third_language
+from tests.i18n import other_language, third_language, translated
 
 pytestmark = pytest.mark.django_db
 
@@ -90,12 +90,13 @@ def test_the_proposing_vendor_is_told_even_when_no_product_used_the_brand() -> N
     notice = by_recipient[proposer.contact_email]
     rendered = render_email(TEMPLATE, notice.language, notice.context_data)
     assert "Acmee" in rendered.text_body
-    assert "No products used it." in rendered.text_body
-    assert "No products used it." in rendered.html_body
+    unused = translated("No products used it.", notice.language)
+    assert unused in rendered.text_body
+    assert unused in rendered.html_body
     other = render_email(
         TEMPLATE, primary_language(), by_recipient[user.contact_email].context_data
     )
-    assert "No products used it." not in other.text_body
+    assert unused not in other.text_body
 
 
 def test_a_rejected_batch_tells_its_vendor_once_with_every_brand() -> None:
@@ -108,7 +109,7 @@ def test_a_rejected_batch_tells_its_vendor_once_with_every_brand() -> None:
     text = render_email(TEMPLATE, notice.language, notice.context_data).text_body
     assert "Alpha" in text
     assert "Beta" in text
-    assert text.count("No products used it.") == 1
+    assert text.count(translated("No products used it.", notice.language)) == 1
 
 
 def test_an_approval_sends_no_rejection_notice() -> None:

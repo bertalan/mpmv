@@ -18,6 +18,7 @@ from apps.core.models import AuditLog
 from apps.seo.models import SeoSettings
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import admin_login, verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -44,9 +45,18 @@ def test_on_stage_the_indexing_switch_is_read_only_and_says_why(
     settings.FORCE_NOINDEX = True
     _sign_in(page, live_server)
     page.goto(f"{live_server.url}/admin/seo/settings/")
-    expect(page.get_by_role("heading", name="SEO settings")).to_be_visible()
-    expect(page.get_by_text("Indexing is forced off by the server")).to_be_visible()
-    expect(page.get_by_label("Allow search engines to index this site")).to_be_disabled()
+    expect(page.get_by_role("heading", name=translated("SEO settings"))).to_be_visible()
+    expect(
+        page.get_by_text(
+            translated(
+                "Indexing is forced off by the server (MPMV_FORCE_NOINDEX or demo mode). Every "
+                "page is noindex and this switch cannot be turned on here."
+            )
+        )
+    ).to_be_visible()
+    expect(
+        page.get_by_label(translated("Allow search engines to index this site"))
+    ).to_be_disabled()
     shot("stage-forced")
     violations = [v for v in csp_violations(page) if not _axe_helper_style(v)]
     assert violations == [], "\n".join(violations)
@@ -64,9 +74,9 @@ def test_staff_allow_indexing_when_the_environment_does_not_force_noindex(
     _sign_in(page, live_server)
     page.goto(f"{live_server.url}/admin/seo/settings/")
     shot("before")
-    page.get_by_label("Allow search engines to index this site").check()
-    page.get_by_role("button", name="Save", exact=True).click()
-    expect(page.get_by_text("SEO settings saved.")).to_be_visible()
+    page.get_by_label(translated("Allow search engines to index this site")).check()
+    page.get_by_role("button", name=translated("Save"), exact=True).click()
+    expect(page.get_by_text(translated("SEO settings saved."))).to_be_visible()
     shot("saved")
     assert SeoSettings.objects.get().allow_indexing is True
     assert AuditLog.objects.filter(target_model="seo.seosettings").count() == 1

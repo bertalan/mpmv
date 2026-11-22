@@ -15,9 +15,11 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.models import HomePage
+from apps.core.i18n import primary_language
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.test_consent_banner import consent_script_ready
+from tests.i18n import translated
 
 pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.consent_banner]
 
@@ -30,7 +32,7 @@ STRIP = "#strip-1"
 
 @pytest.fixture
 def _components_home(live_server: LiveServer, _cms_site: None) -> None:
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     home.body = [
         (
             "strip",
@@ -91,13 +93,13 @@ def test_the_carousel_rotates_pauses_and_follows_the_keyboard(
 ) -> None:
     open_home(page, live_server, settings, 1280, "no-preference")
     toggle = page.locator(f"{STRIP} [data-ride-toggle]")
-    expect(toggle).to_have_text("Pause")
+    expect(toggle).to_have_text(translated("Pause"))
     expect(page.locator(f"{STRIP} .carousel-item.active")).not_to_have_attribute(
         "aria-label", "1 of 2", timeout=9000
     )
     toggle.focus()  # focus inside holds the rotation
     page.keyboard.press("Enter")
-    expect(toggle).to_have_text("Play")
+    expect(toggle).to_have_text(translated("Play"))
     page.locator("#consent-banner button").first.focus()
     page.mouse.move(0, 0)
     page.wait_for_timeout(1000)  # a slide already moving finishes first
@@ -163,36 +165,70 @@ def test_a_focused_element_is_never_behind_the_banner_or_the_sticky_header(
                 assert info["top"] >= info["header"] - 1, f"{name!r} sits under the header"
 
 
+def open_video_modal(page: Page) -> None:
+    """Click the play link and wait for Bootstrap's `shown` event.
+
+    Bootstrap ignores hide() (Escape, close button) while the show transition runs, so a close
+    sent earlier leaves the modal open.
+    """
+    page.evaluate(
+        """() => {
+            const modal = document.querySelector("[data-video] .modal");
+            window.__videoShown = false;
+            modal.addEventListener("shown.bs.modal", () => { window.__videoShown = true; },
+                {once: true});
+        }"""
+    )
+    page.locator(".ride-video__open").click()
+    page.wait_for_function("() => window.__videoShown === true")
+
+
+def close_video_modal(page: Page, *, escape: bool) -> None:
+    """Close the modal and wait for Bootstrap's `hidden` event."""
+    page.evaluate(
+        """() => {
+            const modal = document.querySelector("[data-video] .modal");
+            window.__videoHidden = false;
+            modal.addEventListener("hidden.bs.modal", () => { window.__videoHidden = true; },
+                {once: true});
+        }"""
+    )
+    if escape:
+        # A cross-origin frame can take focus and swallow a real key press, so send Escape
+        # straight to the modal, where Bootstrap listens for it.
+        page.locator("[data-video] .modal.show").dispatch_event(
+            "keydown", {"key": "Escape", "bubbles": True}
+        )
+    else:
+        page.locator("[data-video] .modal.show [data-bs-dismiss='modal']").first.click()
+    page.wait_for_function("() => window.__videoHidden === true")
+
+
 @pytest.mark.usefixtures("_components_home")
 def test_the_video_modal_injects_no_iframe_before_consent_and_does_after(
     page: Page, live_server: LiveServer, settings: SettingsWrapper
 ) -> None:
     open_home(page, live_server, settings, 1280, "reduce")
     consent_script_ready(page)
-    page.locator(".ride-video__open").click()
+    open_video_modal(page)
     expect(page.locator("[data-video-gate]")).to_be_visible()
     expect(page.locator("[data-video-gate] a[href*='youtube']")).to_be_visible()
     expect(page.locator("[data-video] iframe")).to_have_count(0)
-    page.keyboard.press("Escape")
+    close_video_modal(page, escape=True)
     expect(page.locator("#consent-banner")).to_be_visible()  # never covered by the closed modal
-    page.get_by_role("button", name="Accept all").click()
+    page.get_by_role("button", name=translated("Accept all")).click()
     expect(page.locator("#consent-banner")).to_be_hidden()
-    page.locator(".ride-video__open").click()
+    open_video_modal(page)
     expect(page.locator("[data-video] iframe")).to_have_attribute(
         "src", "https://www.youtube-nocookie.com/embed/abcdefghijk"
     )
     expect(page.locator("[data-video-gate]")).to_be_hidden()
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
-    # A cross-origin frame can take focus at any moment while it loads and swallow a real key
-    # press (the flake seen on main), so send Escape straight to the modal, where Bootstrap
-    # listens for it.
-    page.locator("[data-video] .modal.show").dispatch_event(
-        "keydown", {"key": "Escape", "bubbles": True}
-    )
+    close_video_modal(page, escape=True)
     expect(page.locator("[data-video] .modal")).to_be_hidden()
     expect(page.locator("[data-video] iframe")).to_have_count(0)
-    page.locator(".ride-video__open").click()
+    open_video_modal(page)
     expect(page.locator("[data-video] iframe")).to_have_count(1)
-    page.locator("[data-video] .modal.show [data-bs-dismiss='modal']").first.click()
+    close_video_modal(page, escape=False)
     expect(page.locator("[data-video] .modal")).to_be_hidden()
     expect(page.locator("[data-video] iframe")).to_have_count(0)

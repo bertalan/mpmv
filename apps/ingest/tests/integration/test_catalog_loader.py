@@ -26,6 +26,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import AuditLog, TranslationStatus
 from apps.ingest import services
 from apps.vendors.models import Vendor, VendorTranslation
+from apps.vendors.services import consumer_phone_publish_messages
 from tests.i18n import other_language
 
 pytestmark = pytest.mark.django_db
@@ -260,7 +261,9 @@ def test_products_are_keyed_by_vendor_sku_and_group_never_by_sku_alone() -> None
     assert Product.objects.filter(sku_key="same").count() == 2
     assert {p.vendor.legacy_wp_user_id for p in Product.objects.all()} == {7, 8}
     first = Product.objects.get(vendor__legacy_wp_user_id=7)
-    assert (first.legacy_wp_id_en, first.legacy_wp_id_it) == (10, 11)
+    # Legacy ids stay en/it: with it as primary, the primary post is the it one.
+    assert first.legacy_wp_id_en == 10
+    assert first.legacy_wp_id_it == (10 if primary_language() == "it" else 11)
     assert any("also used by translation group" in problem for problem in report.problems)
 
 
@@ -288,8 +291,8 @@ def test_a_product_with_no_it_twin_is_en_only_with_fallback_and_a_queue_entry() 
     ).is_fallback  # the IT page shows the fallback notice
     english = product.translation(primary_language()).translation
     assert english is not None
-    assert english.title == "Bag A-2 en"
-    assert "product 'A-2' [it]" in report.translation_queue
+    assert english.title == f"Bag A-2 {primary_language()}"
+    assert f"product 'A-2' [{other_language()}]" in report.translation_queue
 
 
 def test_variations_load_with_options_and_an_untranslated_one_goes_to_the_queue() -> None:
@@ -333,7 +336,7 @@ def test_variations_load_with_options_and_an_untranslated_one_goes_to_the_queue(
     assert ProductAttribute.objects.get(product=product, attribute__code="color").is_variant_axis
     queued = Variant.objects.get(sku="V-1-B").translations.get(language=other_language())
     assert queued.status == TranslationStatus.MACHINE
-    assert "variant 'V-1-B' [it]" in report.translation_queue
+    assert f"variant 'V-1-B' [{other_language()}]" in report.translation_queue
     assert (
         Variant.objects.get(sku="V-1-R").translations.get(language=other_language()).status
         == "published"
@@ -438,13 +441,14 @@ def test_a_malformed_price_rejects_only_that_product() -> None:
 
 def test_a_rejected_record_leaves_no_trace_in_the_report_or_the_audit_trail() -> None:
     data = bundle()
+    # The SKU must not be hex digits: a random UUID in the audit text could contain it.
     data["posts"] = [
         # The comma decimal fails after the product, its queue entry and a new value were written.
         post(
             10,
             primary_language(),
             1,
-            "BAD-1",
+            "REJECT-1",
             attributes={"pa_color": ["blue"], "pa_width": "12,5"},
         ),
         post(11, primary_language(), 2, "OK-1"),
@@ -452,16 +456,16 @@ def test_a_rejected_record_leaves_no_trace_in_the_report_or_the_audit_trail() ->
     report = load(data)
     assert set(Product.objects.values_list("sku", flat=True)) == {"OK-1"}
     assert not AttributeValue.objects.filter(value="blue").exists()
-    assert any("bad-1" in problem.lower() for problem in report.problems)
+    assert any("reject-1" in problem.lower() for problem in report.problems)
     assert report.created["catalog.product"] == 1
-    assert not [e for e in report.translation_queue if "bad-1" in e.lower()]
-    assert not [e for e in report.held_back if "bad-1" in e.lower()]
+    assert not [e for e in report.translation_queue if "reject-1" in e.lower()]
+    assert not [e for e in report.held_back if "reject-1" in e.lower()]
     changed = " ".join(str(c) for c in report.changes.changes).lower()
-    assert "bad-1" not in changed
+    assert "reject-1" not in changed
     assert "blue" not in changed
-    assert not [c for c in report.deferred.get("commission", []) if "bad-1" in c.lower()]
+    assert not [c for c in report.deferred.get("commission", []) if "reject-1" in c.lower()]
     logged = " ".join(f"{e.target_key} {e.after}".lower() for e in AuditLog.objects.all())
-    assert "bad-1" not in logged
+    assert "reject-1" not in logged
     assert "blue" not in logged
     assert Product.objects.get(sku="OK-1").translations.count() == 1  # the good record loads
 
@@ -602,3 +606,19 @@ def test_cat22_values_are_written_by_nothing_on_a_dry_run() -> None:
     assert not report.changes.is_empty
     assert not Product.objects.exists()
     assert not ProductTranslation.objects.exists()
+
+
+def test_a_malformed_legacy_phone_is_left_empty_and_the_products_are_held_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # CMP.41 follow-up: the vendor still loads; the phone publish gate holds its products back.
+    check = {"vendor_phone": lambda product: consumer_phone_publish_messages(product.vendor)}
+    monkeypatch.setattr(publishing, "_CHECKS", check)
+    data = bundle()
+    data["vendors"][0]["phone"] = "not a number"
+    data["posts"] = [post(10, primary_language(), 1, "P-1")]
+    report = load(data)
+    assert Vendor.objects.get(legacy_wp_user_id=7).phone == ""
+    assert "vendor 7: malformed phone left empty" in report.problems
+    assert Product.objects.get(sku="P-1").status == ProductStatus.DRAFT
+    assert report.held_back == ["product 'P-1': vendor_phone"]

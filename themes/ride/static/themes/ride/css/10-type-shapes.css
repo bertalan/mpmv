@@ -9,8 +9,10 @@
   h1,
   h2,
   h3,
-  h4 {
-    color: var(--color-heading);
+  h4,
+  h5,
+  h6 {
+    color: var(--s-heading, var(--color-heading)); /* a surface (THM.20) sets --s-heading */
     font-weight: 700;
     line-height: 1.1;
   }
@@ -46,7 +48,7 @@
     border-width: 2px;
   }
 
-  /* Secondary role of the operator palette: the amber fill with dark text. */
+  /* Secondary role of the operator palette: the fill (charcoal in Red, amber in Blue) with its own on-colour. */
   .button--secondary {
     --button-bg: var(--color-secondary);
     --button-fg: var(--color-on-secondary);

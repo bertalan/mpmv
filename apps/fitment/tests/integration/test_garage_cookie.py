@@ -9,8 +9,11 @@ from django.core.management.base import SystemCheckError
 from django.template.loader import render_to_string
 from django.test import Client, RequestFactory
 from django.urls import reverse
+from django.utils import translation
+from django.utils.translation import gettext
 from pytest_django.fixtures import Settings as SettingsWrapper
 
+from apps.core.i18n import primary_language
 from apps.fitment import garage, services
 from apps.fitment.models import FitmentNode, NodeStatus
 from apps.fitment.tests.factories import FitmentNodeFactory, FitmentSchemeFactory
@@ -217,25 +220,30 @@ def test_a_lifetime_above_12_months_fails_the_system_check(settings: SettingsWra
 
 
 def test_the_controls_show_the_spec_label_and_a_remove_button(make_model: None) -> None:
-    html = render_to_string(
-        "fitment/_garage_saver.html",
-        {
-            "garage_vehicles": [garage.Vehicle("Acme", "Roadster", "2019")],
-            "garage_candidate": {"make": "Acme", "model": "Tourer", "year": ""},
-            "next": "/",
-        },
-    )
-    assert garage.SAVE_LABEL in html
-    assert "Remove vehicle" in html
-    assert "Forget my garage" in html
+    with translation.override(primary_language()):
+        html = render_to_string(
+            "fitment/_garage_saver.html",
+            {
+                "garage_vehicles": [garage.Vehicle("Acme", "Roadster", "2019")],
+                "garage_candidate": {"make": "Acme", "model": "Tourer", "year": ""},
+                "next": "/",
+            },
+        )
+        label = gettext(garage.SAVE_LABEL)
+        remove, forget = gettext("Remove vehicle"), gettext("Forget my garage")
+    assert label in html
+    assert remove in html
+    assert forget in html
 
 
 def test_the_label_and_save_button_are_absent_when_storage_is_off() -> None:
-    html = render_to_string(
-        "fitment/_garage_saver.html",
-        {
-            "garage_candidate": {"make": "Acme", "model": "Tourer", "year": ""},
-            "garage_storage_off": True,
-        },
-    )
-    assert garage.SAVE_LABEL not in html
+    with translation.override(primary_language()):
+        html = render_to_string(
+            "fitment/_garage_saver.html",
+            {
+                "garage_candidate": {"make": "Acme", "model": "Tourer", "year": ""},
+                "garage_storage_off": True,
+            },
+        )
+        label = gettext(garage.SAVE_LABEL)
+    assert label not in html

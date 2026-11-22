@@ -108,7 +108,9 @@ def parse(raw: str | None) -> Garage:
     vehicles = vehicles[:MAX_VEHICLES]
     if not vehicles:
         return EMPTY
-    active = payload.get("active")
+    active = payload.get("active", 0)
+    if active is None:  # "generic": the vehicles are kept but none applies (FIT.7)
+        return Garage(tuple(vehicles), None)
     if not isinstance(active, int) or isinstance(active, bool) or not 0 <= active < len(vehicles):
         active = 0
     return Garage(tuple(vehicles), active)
@@ -141,7 +143,9 @@ def remove(value: Garage, index: int) -> Garage:
     vehicles = value.vehicles[:index] + value.vehicles[index + 1 :]
     if not vehicles:
         return EMPTY
-    active = value.active if value.active is not None else 0
+    if value.active is None:
+        return Garage(vehicles, None)
+    active = value.active
     if active > index:
         active -= 1
     elif active == index:

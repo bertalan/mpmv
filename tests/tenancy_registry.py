@@ -550,6 +550,10 @@ ENDPOINTS: dict[str, Access] = {
         "Public image files (THM.12): published images and their renditions, no vendor data.",
         kwargs={"path": "images/missing.webp"},
     ),
+    "palette:css": NoVendorData(
+        "Public site palette stylesheet (THM.31): colors only, the same for every visitor.",
+        path="/palette/default/missing.000000000000.css",
+    ),
     "wagtaildocs_serve": NoVendorData(
         "Wagtail document serve view (CMS.15): library documents are not vendor data; a private "
         "collection or restricted page refuses anonymous visitors.",
@@ -924,6 +928,22 @@ ENDPOINTS: dict[str, Access] = {
         "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
         "and the vehicle scheme; no vendor data."
     ),
+    "garage_choose": NoVendorData(
+        "The garage chooser (FIT.7): lists the visitor's own cookie vehicles or own profiles; "
+        "no vendor data."
+    ),
+    "garage_apply": NoVendorData(
+        "The garage chooser's Apply (FIT.7): writes the visitor's own cookie or activates their "
+        "own profile (another account's is a 404); no vendor data."
+    ),
+    "garage_line_dismiss": NoVendorData(
+        "The Add your garage line's Dismiss (FIT.7): sets one flag in the visitor's own session; "
+        "no vendor data."
+    ),
+    "garage_merge": NoVendorData(
+        "The sign-in notice's Add and Not now (FIT.7): a signed-in customer copies the vehicles of "
+        "their own browser cookie into their own profiles; no vendor data."
+    ),
     "manager:platform:orders": StaffOnly(
         "Order changes (ORD.20 part 3): Support and the platform owner find an order by number; "
         "a vendor member gets the platform gate's refusal (test_amendment_views)."
@@ -945,6 +965,11 @@ ENDPOINTS: dict[str, Access] = {
         "Cancel a package with a full refund (ORD.20 part 3): Support and the platform owner "
         "only, POST only, with a note and a fresh passkey.",
         kwargs={"public_id": NIL_UUID},
+    ),
+    "manager:platform:stray_payments": StaffOnly(
+        "Stray payments (PAY.4): Support and the platform owner close, Finance reads; a close by "
+        "Finance answers 403, other roles and a vendor member 404 (test_stray_payments). The "
+        "alerts span shops by design and show references and amounts only."
     ),
     "manager:platform:order_drafts": StaffOnly(
         "Prepared carts (ORD.32): Support and the platform owner only; a vendor member gets the "
@@ -1006,15 +1031,15 @@ ENDPOINTS: dict[str, Access] = {
         "Configuration and tax writes, Catalog and the owner read, a vendor member gets 404."
     ),
     "manager:platform:fitment_nodes": StaffOnly(
-        "Fitment nodes (FIT.1): the shared vocabulary, not vendor-owned; Catalog and moderation "
+        "Fitment nodes (FIT.1): the shared vocabulary, not vendor-owned; Catalogue and moderation "
         "writes, Support and the owner read, a vendor member gets 404."
     ),
     "manager:platform:fitment_proposals": StaffOnly(
-        "Proposed fitment nodes (FIT.1): the review queue of the Catalog and moderation role; a "
+        "Proposed fitment nodes (FIT.1): the review queue of the Catalogue and moderation role; a "
         "vendor member gets 404."
     ),
     "manager:platform:fitment_node_new": StaffOnly(
-        "Add a fitment node (FIT.1): Catalog and moderation only; a vendor member gets 404."
+        "Add a fitment node (FIT.1): Catalogue and moderation only; a vendor member gets 404."
     ),
     "manager:platform:fitment_node": StaffOnly(
         "One fitment node (FIT.1): the shared vocabulary, not vendor-owned; Catalog and "
@@ -1022,12 +1047,12 @@ ENDPOINTS: dict[str, Access] = {
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "manager:platform:fitment_node_merge": StaffOnly(
-        "Merge of one fitment node (FIT.1): Catalog and moderation only, shown as a dry run "
+        "Merge of one fitment node (FIT.1): Catalogue and moderation only, shown as a dry run "
         "first; a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "manager:platform:catalog_products": StaffOnly(
-        "Product list of the platform (CAT.11): Catalog and moderation writes, the owner reads, "
+        "Product list of the platform (CAT.11): Catalogue and moderation writes, the owner reads, "
         "Finance, Support and a vendor member get 404; rows come from for_actor."
     ),
     "manager:platform:catalog_product": StaffOnly(

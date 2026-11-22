@@ -1,8 +1,8 @@
 """E2E (I18N.11): the language switch stays on the same object.
 
-On a taxonomy term page the switch to Italian leads to the Italian term page (with the filter
-written in Italian), not to the Italian home; a language without a translation leads to its home
-with a notice. Works in a real browser, no CSP violation.
+On a taxonomy term page the switch to a second language leads to the term page in it (with the
+filter written in it), not to its home; a language without a translation leads to its home with a
+notice. Works in a real browser, no CSP violation.
 """
 
 from collections.abc import Callable
@@ -14,8 +14,10 @@ from django.utils.translation import gettext
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
+from apps.catalog.taxonomy import TaxonomyTranslation, TermTranslation
 from tests.e2e.test_catalog_listings import term_page  # noqa: F401
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import language_prefix, other_language
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -25,19 +27,34 @@ def test_the_switch_stays_on_the_same_term_page(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     page.add_init_script(RECORD_CSP_VIOLATIONS)
+    second = other_language()
     page.goto(f"{live_server.url}/compatibility/maker/?colour=red")
     switcher = page.locator("nav.language-switcher")
-    shot("switch-en")
-    switcher.locator('button[value="it"]').click()
-    expect(page).to_have_url(f"{live_server.url}/it/compatibilita/marca/?colore=rosso")
+    shot("switch-primary")
+    switcher.locator(f'button[value="{second}"]').click()
+    expect(page).to_have_url(
+        f"{live_server.url}{language_prefix(second)}/compatibilita/marca/?colore=rosso"
+    )
     expect(page.get_by_role("heading", level=1)).to_have_text("Marca")
     expect(page.locator(".site-messages")).to_have_count(0)
-    shot("switch-it")
+    shot("switch-second")
+    assert csp_violations(page) == [], "\n".join(csp_violations(page))
 
-    switcher.locator('button[value="de"]').click()
-    expect(page).to_have_url(f"{live_server.url}/de/")
-    expect(page.locator(".site-messages")).to_contain_text(switch_notice("de"))
-    shot("switch-de-notice")
+
+@pytest.mark.usefixtures("term_page")
+def test_a_language_without_the_term_leads_to_its_home_with_a_notice(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    page.add_init_script(RECORD_CSP_VIOLATIONS)
+    second = other_language()
+    # The term and its taxonomy lose their second-language translation.
+    TermTranslation.objects.filter(term__taxonomy__code="compat", language=second).delete()
+    TaxonomyTranslation.objects.filter(taxonomy__code="compat", language=second).delete()
+    page.goto(f"{live_server.url}/compatibility/maker/?colour=red")
+    page.locator("nav.language-switcher").locator(f'button[value="{second}"]').click()
+    expect(page).to_have_url(f"{live_server.url}{language_prefix(second)}/")
+    expect(page.locator(".site-messages")).to_contain_text(switch_notice(second))
+    shot("switch-second-notice")
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
 
 

@@ -27,6 +27,7 @@ from .session_views import PANIC_SECTION, USER_SESSIONS_SECTION
 from .spaces import Space
 from .staff_draft_views import SECTION as ORDER_DRAFTS_SECTION
 from .statement_views import SECTION as STATEMENTS_SECTION
+from .stray_views import SECTION as STRAY_SECTION
 from .termination_views import PLATFORM_SECTION as TERMINATIONS_SECTION
 from .termination_views import SHOP_SECTION as TERMINATION_SECTION
 from .termination_views import can_give_notice
@@ -191,7 +192,7 @@ BUILT_IN = (
         order=43,
         allowed=platform_role(NODES_SECTION),
     ),
-    # CAT.11: the products, for Catalog and moderation (the owner reads).
+    # CAT.11: the products, for Catalogue and moderation (the owner reads).
     Section(
         PRODUCTS_SECTION,
         Space.PLATFORM,
@@ -288,6 +289,15 @@ BUILT_IN = (
         "manager:platform:user_sessions",
         order=70,
         allowed=platform_role(USER_SESSIONS_SECTION),
+    ),
+    # PAY.4: the open stray-payment alerts (Support and the owner close; Finance reads).
+    Section(
+        STRAY_SECTION,
+        Space.PLATFORM,
+        _("Stray payments"),
+        "manager:platform:stray_payments",
+        order=52,
+        allowed=platform_role(STRAY_SECTION),
     ),
     # CORE.24: the platform owner's panic button, last in the menu.
     Section(

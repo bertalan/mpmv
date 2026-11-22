@@ -1,10 +1,11 @@
 # Modifier l'événement
-last-checked: 2026-11-18
+last-checked: 2026-11-21
 
 Utilisez cette page pour modifier un événement de votre boutique et le préparer à la vérification.
 
 ## Ce que vous pouvez faire
 - Modifiez les champs et appuyez sur **Enregistrer le brouillon**. Chaque enregistrement est un brouillon.
+- Sous **Billets et modifications**, réglez le **Lien de billetterie**, le **Prix du billet (EUR)** ou **Entrée libre**, et cochez **Reporté** si l'événement change de date (le **Début précédent** se saisit à la main).
 - Ouvrez **Aperçu du brouillon enregistré** pour voir l'aspect de la page.
 - Sous **Contenu**, ajoutez, modifiez, déplacez ou retirez les blocs de la page de l'événement. Chaque modification est enregistrée comme brouillon.
 - Sous **Envoyer**, appuyez sur **Soumettre pour vérification** pour envoyer le brouillon enregistré aux modérateurs de la plateforme.
