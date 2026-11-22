@@ -25,5 +25,5 @@ def test_the_ride_layout_leaves_countdown_js_to_the_countdown_block() -> None:
     with use_theme("ride"):
         html = template.render({"target": datetime(2031, 1, 1, 9, 0, tzinfo=UTC)}, request)
     assert "data-countdown" in html
-    assert "themes/base/js/countdown.js" not in html
+    assert "themes/base/js/lazy/countdown.js" not in html
     assert "ride-countdown" in html

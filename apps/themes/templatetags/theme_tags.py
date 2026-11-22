@@ -9,9 +9,11 @@
 """
 
 import json
+from typing import Any
 
 from django import forms, template
 from django.forms.boundfield import BoundField
+from django.templatetags.static import static
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import SafeString
 
@@ -141,3 +143,21 @@ def palette_css_href(context: template.Context) -> str:
     if request is None or context.get("minimal_chrome"):
         return ""
     return palette_href(request)
+
+
+@register.simple_tag(takes_context=True)
+def countdown_script(context: Any) -> SafeString:
+    """The theme's `countdown.js` module tag, once per request (THM.36).
+
+    The base layouts do not load the script (it sits under `js/lazy/`, outside the JS budget); a
+    page gets it through the CMS countdown block or the styleguide.
+    A browser runs a module once per URL anyway; the request flag only avoids repeat tags.
+    """
+    request = context.get("request")
+    if request is not None:
+        if getattr(request, "_countdown_script", False):
+            return SafeString("")
+        request._countdown_script = True
+    return format_html(
+        '<script type="module" src="{}"></script>', static("themes/base/js/lazy/countdown.js")
+    )

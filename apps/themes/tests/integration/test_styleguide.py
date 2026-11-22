@@ -274,3 +274,8 @@ def test_the_image_credit_is_shown_with_and_without_links(staff_client: Client) 
     assert 'rel="license"' in credits
     assert "CC0 1.0" in credits
     assert '<details class="image-credits">' in credits
+
+
+def test_the_styleguide_countdown_loads_the_on_demand_script_once(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    assert html.count("themes/base/js/lazy/countdown.js") == 1

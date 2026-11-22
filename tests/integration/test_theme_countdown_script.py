@@ -13,7 +13,7 @@ from apps.themes.services import use_theme
 
 pytestmark = pytest.mark.django_db
 
-SCRIPT = "themes/base/js/countdown.js"
+SCRIPT = "themes/base/js/lazy/countdown.js"
 TARGET = dt.datetime(2030, 12, 1, 9, 0, tzinfo=dt.UTC)
 
 
