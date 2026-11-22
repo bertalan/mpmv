@@ -15,6 +15,7 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.core.models import MediaImageRendition
 from apps.themes import views
+from tests.i18n import translated
 from tests.ride_content_site import build_content_site
 
 pytestmark = pytest.mark.django_db
@@ -93,7 +94,7 @@ def test_the_banner_holds_the_only_h1_and_the_breadcrumb(
     assert banner.h1 is not None
     nav = banner.select_one("nav.breadcrumb")
     assert nav is not None
-    assert nav["aria-label"] == "Breadcrumb"
+    assert nav["aria-label"] == translated("Breadcrumb")
     labels = [li.get_text(strip=True) for li in nav.select("li")]
     assert labels[0] == "Home"
     assert nav.select_one("[aria-current=page]").get_text(strip=True) == labels[-1]
@@ -136,7 +137,7 @@ def test_the_blog_uses_bootstrap_cards_and_pagination(
     paths = build_content_site(posts=13)
     page = soup(client, paths["blog"], "ride", settings)
     assert len(page.select("article.post-summary.card")) == 12
-    nav = page.select_one("nav[aria-label=Pagination] ul.pagination")
+    nav = page.select_one(f'nav[aria-label="{translated("Pagination")}"] ul.pagination')
     assert nav is not None
     assert nav.select_one("a.page-link[rel=next]")["href"] == "?page=2"
     second = soup(client, f"{paths['blog']}?page=2", "ride", settings)
@@ -180,11 +181,13 @@ def test_the_404_page_renders_in_ride_with_one_h1(
         response = client.get("/no-such-page-here/")
         assert response.status_code == 404
         page = BeautifulSoup(response.content, "html.parser")
-        assert [h.get_text(strip=True) for h in page.find_all("h1")] == ["Page not found"]
+        assert [h.get_text(strip=True) for h in page.find_all("h1")] == [
+            translated("Page not found")
+        ]
         robots = page.select_one("meta[name=robots]")
         assert robots is not None
         assert str(robots["content"]).startswith("noindex")
-        assert page.find("a", string="Go to the home page") is not None
+        assert page.find("a", string=translated("Go to the home page")) is not None
     assert page.select_one("main .page-banner h1") is not None
 
 
@@ -194,7 +197,9 @@ def test_the_500_page_renders_in_ride_without_the_database(settings: SettingsWra
     response = views.server_error(request)
     assert response.status_code == 500
     page = BeautifulSoup(response.content, "html.parser")
-    assert [h.get_text(strip=True) for h in page.find_all("h1")] == ["Something went wrong"]
+    assert [h.get_text(strip=True) for h in page.find_all("h1")] == [
+        translated("Something went wrong")
+    ]
     assert page.select_one("main .page-banner h1") is not None
-    assert page.find("a", string="Go to the home page") is not None
+    assert page.find("a", string=translated("Go to the home page")) is not None
     assert 'data-theme="ride"' in response.content.decode()
