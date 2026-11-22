@@ -25,6 +25,7 @@ from tests.e2e.test_add_to_cart import product  # noqa: F401 (fixture)
 from tests.e2e.test_catalog_listings import term_page  # noqa: F401 (fixture)
 from tests.e2e.test_ride_overlays import ride_paths
 from tests.e2e.visual import assert_matches_baseline, require_visual_mode
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -105,8 +106,8 @@ def test_the_consent_card_covers_at_most_30_percent_of_a_phone_viewport(
     box = card.bounding_box()
     assert box
     assert box["width"] * box["height"] <= 0.30 * 375 * 812, box
-    reject = card.get_by_role("button", name="Reject all")
-    accept = card.get_by_role("button", name="Accept all")
+    reject = card.get_by_role("button", name=translated("Reject all"))
+    accept = card.get_by_role("button", name=translated("Accept all"))
     assert reject.evaluate("e => getComputedStyle(e).backgroundColor") == accept.evaluate(
         "e => getComputedStyle(e).backgroundColor"
     )

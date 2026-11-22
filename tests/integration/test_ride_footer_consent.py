@@ -9,10 +9,12 @@ from typing import Any
 
 import pytest
 from django.template.loader import render_to_string
+from django.utils import translation
 
 from apps.themes.build import read_css_sources
 from apps.themes.services import use_theme
 from apps.themes.tests.builders import SHIPPED_THEMES
+from tests.i18n import translated
 
 pytestmark = pytest.mark.usefixtures("english_interface")
 
@@ -41,7 +43,8 @@ def test_the_vendor_strip_sits_above_the_footer_and_names_every_logo() -> None:
     assert 'class="logo-strip"' in strip
     assert 'alt="Vendor A"' in strip
     assert 'alt="Vendor B"' in strip
-    assert 'aria-label="Our vendors"' in strip
+    label = translated("Our vendors", translation.get_language())
+    assert f'aria-label="{label}"' in strip
     assert "logo-strip" not in footer
 
 
@@ -124,7 +127,7 @@ def test_the_sprite_has_a_glyph_for_every_social_network_of_cms_17() -> None:
 
 
 @pytest.mark.django_db
-def test_the_footer_vendor_logos_are_active_alphabetical_capped_and_one_query(
+def test_the_footer_vendor_logos_are_active_alphabetical_capped_and_two_queries(
     django_assert_num_queries: Any,
 ) -> None:
     from apps.catalog.tests.factories import brand_logo_image
@@ -145,7 +148,7 @@ def test_the_footer_vendor_logos_are_active_alphabetical_capped_and_one_query(
         make(f"Shop {index:02d}")
     make("Aaa Suspended", active=False)
     make("Aaa No logo", logo=False)
-    with django_assert_num_queries(1):
+    with django_assert_num_queries(2):
         logos = footer_vendor_logos()
     names = [logo["name"] for logo in logos]
     assert names == [f"Shop {i:02d}" for i in range(12)]
@@ -157,3 +160,21 @@ def test_no_vendor_logos_means_an_empty_list() -> None:
     from apps.cms.templatetags.cms_tags import footer_vendor_logos
 
     assert footer_vendor_logos() == []
+
+
+@pytest.mark.django_db
+def test_rendering_twelve_vendor_logos_does_not_query_per_logo(
+    django_assert_num_queries: Any,
+) -> None:
+    from apps.catalog.tests.factories import brand_logo_image
+    from apps.cms.templatetags.cms_tags import footer_vendor_logos
+    from apps.vendors.models import Vendor
+    from apps.vendors.tests.factories import VendorFactory
+
+    for index in range(12):
+        vendor = VendorFactory.create(display_name=f"Shop {index:02d}", status=Vendor.Status.ACTIVE)
+        Vendor.objects.filter(pk=vendor.pk).update(logo=brand_logo_image())
+    with django_assert_num_queries(2):  # pinned: the vendors with their logos, then the renditions
+        logos = footer_vendor_logos()
+        html = render("components/footer.html", site_name="Ride", vendor_logos=logos)
+    assert html.count('class="logo-strip__item"') == 12

@@ -120,7 +120,9 @@ FOOTER_VENDOR_LOGOS = 12
 @register.simple_tag
 def footer_vendor_logos() -> list[dict[str, Any]]:
     """The strip above the `ride` footer (THM.22): active vendors with a logo, by display name,
-    at most 12, one query. The alt text is the vendor's display name; the logo is not a link."""
+    at most 12, two queries (the vendors with their logos, then the renditions).
+    The alt text is the vendor's display name; the logo is not a link."""
+    from apps.core.images import prefetch_renditions
     from apps.vendors.services import storefront_vendors
 
     vendors = (
@@ -129,7 +131,9 @@ def footer_vendor_logos() -> list[dict[str, Any]]:
         .select_related("logo")
         .order_by("display_name", "id")[:FOOTER_VENDOR_LOGOS]
     )
-    return [{"name": vendor.display_name, "image": vendor.logo} for vendor in vendors]
+    found = list(vendors)
+    prefetch_renditions(vendor.logo for vendor in found)  # one query, not one per logo
+    return [{"name": vendor.display_name, "image": vendor.logo} for vendor in found]
 
 
 def _footer_content(request: HttpRequest | None, site: Site, language: str) -> dict[str, Any]:
