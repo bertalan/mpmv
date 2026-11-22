@@ -114,3 +114,25 @@ def test_the_ride_listing_and_base_blog_carry_the_garage_banner_without_the_page
                 translation.gettext("Showing items for: %(label)s") % {"label": "Acme, Roadster"}
                 in html
             )
+
+
+def test_the_ride_and_base_lists_carry_the_add_your_garage_line_without_the_page_url() -> None:
+    request = RequestFactory().get("/shop/?token=top-secret-marker")
+    request.user = AnonymousUser()
+    request.session = {}  # type: ignore[assignment]
+    for theme in ("ride", "base"):
+        with use_theme(theme):
+            html = render_to_string("components/garage_banner.html", {}, request=request)
+        assert "data-garage-line" in html
+        assert reverse("garage_choose") in html
+        assert reverse("garage_line_dismiss") in html
+        assert "top-secret-marker" not in html
+        assert "/shop/" not in html
+        assert "aria-live" not in html
+        with translation.override(primary_language()):
+            assert translation.gettext("Add your garage") in html
+    request.session = {"fitment_garage_line_dismissed": True}  # type: ignore[assignment]
+    with use_theme("ride"):
+        assert "data-garage-line" not in render_to_string(
+            "components/garage_banner.html", {}, request=request
+        )
